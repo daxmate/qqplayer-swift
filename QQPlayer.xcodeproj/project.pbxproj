@@ -301,7 +301,6 @@
 				Services/WhatsNew.swift,
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/PlayerGestureLogic.swift,
-				Views/Utility/FeatureGuideView.swift,
 				Views/Utility/HintCardView.swift,
 				Views/Utility/WhatsNewView.swift,
 			);
