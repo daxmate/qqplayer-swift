@@ -214,6 +214,20 @@
 "adjust_bands_after_creation" = "创建完成后，你可以随时调整所有的频段参数";
 "frequency_bands" = "频段";
 "edit_equalizer" = "编辑均衡器";
+"eq_add_band" = "添加频段";
+"eq_band_number" = "频段 %d";
+"eq_bands" = "频段";
+"eq_bands_count" = "%d / %d 段";
+"eq_create_manual" = "创建手动 EQ";
+"eq_create_manual_description" = "创建一个最多 16 段、完全可编辑的参数 EQ 预设。";
+"eq_edit_bands_hint" = "创建后可以编辑每个频段的频率、增益和 Q 值。";
+"eq_frequency" = "频率";
+"eq_gain" = "增益";
+"eq_manual_parametric" = "手动参数 EQ";
+"eq_parametric_editor" = "参数编辑器";
+"eq_q" = "Q";
+"eq_remove_band" = "移除频段";
+"eq_selected_band" = "选中的频段";
 "reset_to_flat" = "重置为平直 (Flat)";
 
 /* Imported GraphicEQ Presets */
@@ -222,6 +236,7 @@
 "import_graphiceq_description" = "导入第三方 GraphicEQ .txt 参数文件来快速调音";
 "imported_graphiceq" = "导入的 GraphicEQ";
 "import_graphiceq_file" = "导入 GraphicEQ 文件";
+"eq_imported_preset" = "导入的预设";
 
 /* General EQ Settings */
 "global_settings" = "全局设置";
@@ -238,6 +253,9 @@
 "save" = "保存";
 "create" = "创建";
 "preset_info" = "预设信息";
+"eq_copied" = "已复制";
+"eq_delete_confirm_message" = "确定要删除「%@」吗？此操作无法撤销。";
+"eq_delete_confirm_title" = "删除预设？";
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "导入 GraphicEQ";

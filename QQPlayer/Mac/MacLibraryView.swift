@@ -52,6 +52,7 @@ struct MacLibraryView: View {
     @State private var albumTracks: [Track] = []
     @State private var artistTracks: [Track] = []
     @State private var selectedTrackId: String?
+    @State private var showSettings = false
 
     // Search state (sidebar search field + grouped results)
     @State private var searchText = ""
@@ -96,8 +97,20 @@ struct MacLibraryView: View {
                 }
                 .help("force_dark_mode".localized)
             }
+
+            ToolbarItem {
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .help("settings".localized)
+            }
         }
         .preferredColorScheme(forceDark ? .dark : nil)
+        .sheet(isPresented: $showSettings) {
+            MacSettingsView()
+        }
         .task {
             reloadLibrary()
             if !indexer.isIndexing {
@@ -129,6 +142,10 @@ struct MacLibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏变化后刷新“我喜欢的音乐”列表（含正在展示时的实时移除）
             reloadLikedTracks()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+            // 设置页改了强制深色后同步工具栏月亮按钮状态（双向同步）
+            forceDark = DeleteSettings.load().forceDarkMode
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
             // 歌单管理（新建/重命名/删除/增删曲目）后刷新歌单列表与自动歌单计数

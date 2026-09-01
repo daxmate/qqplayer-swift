@@ -329,6 +329,32 @@ struct Localized {
         return "bands_limited_warning".localized(with: original, limited)
     }
 
+    // macOS EQ UI
+    static let eqCopied = "eq_copied".localized
+    static let eqDeleteConfirmTitle = "eq_delete_confirm_title".localized
+    static func eqDeleteConfirmMessage(_ name: String) -> String {
+        return "eq_delete_confirm_message".localized(with: name)
+    }
+    static let eqManualParametric = "eq_manual_parametric".localized
+    static let eqCreateManual = "eq_create_manual".localized
+    static let eqBands = "eq_bands".localized
+    static func eqBandsCount(_ used: Int, _ total: Int) -> String {
+        return "eq_bands_count".localized(with: used, total)
+    }
+    static let eqParametricEditor = "eq_parametric_editor".localized
+    static let eqAddBand = "eq_add_band".localized
+    static let eqRemoveBand = "eq_remove_band".localized
+    static let eqSelectedBand = "eq_selected_band".localized
+    static func eqBandNumber(_ index: Int) -> String {
+        return "eq_band_number".localized(with: index)
+    }
+    static let eqFrequency = "eq_frequency".localized
+    static let eqGain = "eq_gain".localized
+    static let eqQ = "eq_q".localized
+    static let eqCreateManualDescription = "eq_create_manual_description".localized
+    static let eqEditBandsHint = "eq_edit_bands_hint".localized
+    static let eqImportedPreset = "eq_imported_preset".localized
+
     // MARK: - Audio Settings
     static let audioSettings = "audio_settings".localized
     static let dsdPlaybackMode = "dsd_playback_mode".localized

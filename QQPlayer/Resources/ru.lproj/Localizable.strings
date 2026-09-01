@@ -208,6 +208,20 @@
 "adjust_bands_after_creation" = "После создания вы сможете настроить все частотные полосы";
 "frequency_bands" = "Частотные полосы";
 "edit_equalizer" = "Редактировать эквалайзер";
+"eq_add_band" = "Добавить полосу";
+"eq_band_number" = "Полоса %d";
+"eq_bands" = "Полосы";
+"eq_bands_count" = "%d / %d полос";
+"eq_create_manual" = "Создать ручной эквалайзер";
+"eq_create_manual_description" = "Создайте параметрический пресет эквалайзера с 16 полностью настраиваемыми полосами.";
+"eq_edit_bands_hint" = "После создания вы сможете редактировать частоту, усиление и Q каждой полосы.";
+"eq_frequency" = "Частота";
+"eq_gain" = "Усиление";
+"eq_manual_parametric" = "Ручной параметрический эквалайзер";
+"eq_parametric_editor" = "Параметрический редактор";
+"eq_q" = "Q";
+"eq_remove_band" = "Удалить полосу";
+"eq_selected_band" = "Выбранная полоса";
 "reset_to_flat" = "Сбросить";
 
 /* Imported GraphicEQ Presets */
@@ -216,6 +230,7 @@
 "import_graphiceq_description" = "Импортируйте файлы GraphicEQ .txt, чтобы начать";
 "imported_graphiceq" = "Импортированный GraphicEQ";
 "import_graphiceq_file" = "Импортировать файл GraphicEQ";
+"eq_imported_preset" = "Импортированный пресет";
 
 /* General EQ Settings */
 "global_settings" = "Глобальные настройки";
@@ -232,6 +247,9 @@
 "save" = "Сохранить";
 "create" = "Создать";
 "preset_info" = "Информация о пресете";
+"eq_copied" = "Скопировано";
+"eq_delete_confirm_message" = "Вы уверены, что хотите удалить «%@»? Это действие нельзя отменить.";
+"eq_delete_confirm_title" = "Удалить пресет?";
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "Импорт GraphicEQ";

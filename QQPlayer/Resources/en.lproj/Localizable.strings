@@ -220,6 +220,20 @@
 "adjust_bands_after_creation" = "You'll be able to adjust all frequency bands after creation";
 "frequency_bands" = "Frequency Bands";
 "edit_equalizer" = "Edit Equalizer";
+"eq_add_band" = "Add Band";
+"eq_band_number" = "Band %d";
+"eq_bands" = "Bands";
+"eq_bands_count" = "%d / %d bands";
+"eq_create_manual" = "Create Manual EQ";
+"eq_create_manual_description" = "Create a parametric EQ preset with up to 16 fully editable bands.";
+"eq_edit_bands_hint" = "You can edit frequency, gain, and Q for every band after creation.";
+"eq_frequency" = "Frequency";
+"eq_gain" = "Gain";
+"eq_manual_parametric" = "Manual Parametric EQ";
+"eq_parametric_editor" = "Parametric Editor";
+"eq_q" = "Q";
+"eq_remove_band" = "Remove Band";
+"eq_selected_band" = "Selected Band";
 "reset_to_flat" = "Reset to Flat";
 
 /* Imported GraphicEQ Presets */
@@ -228,6 +242,7 @@
 "import_graphiceq_description" = "Import GraphicEQ .txt files to get started";
 "imported_graphiceq" = "Imported GraphicEQ";
 "import_graphiceq_file" = "Import GraphicEQ File";
+"eq_imported_preset" = "Imported Preset";
 
 /* General EQ Settings */
 "global_settings" = "Global Settings";
@@ -244,6 +259,9 @@
 "save" = "Save";
 "create" = "Create";
 "preset_info" = "Preset Info";
+"eq_copied" = "Copied";
+"eq_delete_confirm_message" = "Are you sure you want to delete '%@'? This action cannot be undone.";
+"eq_delete_confirm_title" = "Delete Preset?";
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "Import GraphicEQ";

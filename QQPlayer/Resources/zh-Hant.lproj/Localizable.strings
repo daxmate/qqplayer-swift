@@ -359,6 +359,20 @@
 "frequency_bands" = "頻段";
 
 "edit_equalizer" = "編輯等化器";
+"eq_add_band" = "新增頻段";
+"eq_band_number" = "頻段 %d";
+"eq_bands" = "頻段";
+"eq_bands_count" = "%d / %d 段";
+"eq_create_manual" = "建立手動 EQ";
+"eq_create_manual_description" = "建立一個最多 16 段、完全可編輯的參數 EQ 預設。";
+"eq_edit_bands_hint" = "建立後可以編輯每個頻段的頻率、增益和 Q 值。";
+"eq_frequency" = "頻率";
+"eq_gain" = "增益";
+"eq_manual_parametric" = "手動參數 EQ";
+"eq_parametric_editor" = "參數編輯器";
+"eq_q" = "Q";
+"eq_remove_band" = "移除頻段";
+"eq_selected_band" = "選取的頻段";
 
 "reset_to_flat" = "重設為平直 (Flat)";
 
@@ -372,6 +386,7 @@
 "imported_graphiceq" = "匯入的 GraphicEQ";
 
 "import_graphiceq_file" = "匯入 GraphicEQ 檔案";
+"eq_imported_preset" = "匯入的預設";
 
 /* General EQ Settings */
 "global_settings" = "全局設定";
@@ -401,6 +416,9 @@
 "create" = "建立";
 
 "preset_info" = "預設資訊";
+"eq_copied" = "已複製";
+"eq_delete_confirm_message" = "確定要刪除「%@」嗎？此操作無法復原。";
+"eq_delete_confirm_title" = "刪除預設？";
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "匯入 GraphicEQ";

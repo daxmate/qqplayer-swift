@@ -33,6 +33,10 @@ struct MacPlayerView: View {
     @ObservedObject private var karaoke = KaraokeController.shared
     @ObservedObject private var player = PlayerEngine.shared
 
+    /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：歌词按钮显示、睡眠定时器隐藏）
+    @State private var showLyricsButton: Bool = DeleteSettings.load().showLyricsButton
+    @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
+
     var body: some View {
         VStack(spacing: 0) {
             // 跟唱大画面：隐藏播放区，把空间全部让给歌词区（决策上收 MacPlaybackGate，有测试）
@@ -70,6 +74,12 @@ struct MacPlayerView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
             favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+            // 设置页改了歌词/睡眠定时器开关后同步按钮可见性
+            let settings = DeleteSettings.load()
+            showLyricsButton = settings.showLyricsButton
+            showSleepTimerButton = settings.showSleepTimerButton
         }
         .task(id: track?.stableId) {
             guard let track else {
@@ -219,23 +229,26 @@ struct MacPlayerView: View {
                 .help(currentTrackIsFavorite ? "remove_from_liked_songs".localized : "add_to_liked_songs".localized)
 
                 // 睡眠定时器：15/30/45/60 分钟，激活后可取消（切歌不清除）
-                Menu {
-                    Button(Localized.sleepTimer15Minutes) { startSleepTimer(minutes: 15) }
-                    Button(Localized.sleepTimer30Minutes) { startSleepTimer(minutes: 30) }
-                    Button(Localized.sleepTimer45Minutes) { startSleepTimer(minutes: 45) }
-                    Button(Localized.sleepTimer60Minutes) { startSleepTimer(minutes: 60) }
+                // 默认隐藏（对齐 iOS showSleepTimerButton=false），设置页可开启
+                if showSleepTimerButton {
+                    Menu {
+                        Button(Localized.sleepTimer15Minutes) { startSleepTimer(minutes: 15) }
+                        Button(Localized.sleepTimer30Minutes) { startSleepTimer(minutes: 30) }
+                        Button(Localized.sleepTimer45Minutes) { startSleepTimer(minutes: 45) }
+                        Button(Localized.sleepTimer60Minutes) { startSleepTimer(minutes: 60) }
 
-                    if sleepTimerEndDate != nil {
-                        Divider()
-                        Button(Localized.cancelSleepTimer, role: .destructive) { cancelSleepTimer() }
+                        if sleepTimerEndDate != nil {
+                            Divider()
+                            Button(Localized.cancelSleepTimer, role: .destructive) { cancelSleepTimer() }
+                        }
+                    } label: {
+                        Image(systemName: sleepTimerEndDate == nil ? "timer" : "timer.circle.fill")
+                            .font(.system(size: 16))
                     }
-                } label: {
-                    Image(systemName: sleepTimerEndDate == nil ? "timer" : "timer.circle.fill")
-                        .font(.system(size: 16))
+                    .menuStyle(.borderlessButton)
+                    .foregroundColor(sleepTimerEndDate == nil ? .secondary : .accentColor)
+                    .help("sleep_timer".localized)
                 }
-                .menuStyle(.borderlessButton)
-                .foregroundColor(sleepTimerEndDate == nil ? .secondary : .accentColor)
-                .help("sleep_timer".localized)
 
                 Divider().frame(height: 24)
 
@@ -251,18 +264,20 @@ struct MacPlayerView: View {
                 .disabled(track == nil)
                 .help("karaoke_mode_help".localized)
 
-                // 歌词面板开关
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showLyrics.toggle()
+                // 歌词面板开关（默认显示，设置页可隐藏）
+                if showLyricsButton {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showLyrics.toggle()
+                        }
+                    } label: {
+                        Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble")
+                            .font(.system(size: 16))
                     }
-                } label: {
-                    Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble")
-                        .font(.system(size: 16))
+                    .buttonStyle(.plain)
+                    .foregroundColor(showLyrics ? .accentColor : .secondary)
+                    .help("toggle_lyrics_help".localized)
                 }
-                .buttonStyle(.plain)
-                .foregroundColor(showLyrics ? .accentColor : .secondary)
-                .help("toggle_lyrics_help".localized)
             }
 
             Spacer()

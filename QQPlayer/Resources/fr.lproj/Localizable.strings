@@ -208,6 +208,20 @@
 "adjust_bands_after_creation" = "Vous pourrez ajuster toutes les bandes de fréquence après la création";
 "frequency_bands" = "Bandes de Fréquence";
 "edit_equalizer" = "Modifier l'Égaliseur";
+"eq_add_band" = "Ajouter une bande";
+"eq_band_number" = "Bande %d";
+"eq_bands" = "Bandes";
+"eq_bands_count" = "%d / %d bandes";
+"eq_create_manual" = "Créer un EQ manuel";
+"eq_create_manual_description" = "Créez un préréglage EQ paramétrique avec jusqu'à 16 bandes entièrement modifiables.";
+"eq_edit_bands_hint" = "Vous pourrez modifier la fréquence, le gain et le Q de chaque bande après la création.";
+"eq_frequency" = "Fréquence";
+"eq_gain" = "Gain";
+"eq_manual_parametric" = "EQ paramétrique manuel";
+"eq_parametric_editor" = "Éditeur paramétrique";
+"eq_q" = "Q";
+"eq_remove_band" = "Supprimer la bande";
+"eq_selected_band" = "Bande sélectionnée";
 "reset_to_flat" = "Réinitialiser à Plat";
 
 /* Imported GraphicEQ Presets */
@@ -216,6 +230,7 @@
 "import_graphiceq_description" = "Importez des fichiers GraphicEQ .txt pour commencer";
 "imported_graphiceq" = "GraphicEQ Importé";
 "import_graphiceq_file" = "Importer un Fichier GraphicEQ";
+"eq_imported_preset" = "Préréglage importé";
 
 /* General EQ Settings */
 "global_settings" = "Réglages Globaux";
@@ -232,6 +247,9 @@
 "save" = "Enregistrer";
 "create" = "Créer";
 "preset_info" = "Infos du Préréglage";
+"eq_copied" = "Copié";
+"eq_delete_confirm_message" = "Voulez-vous vraiment supprimer « %@ » ? Cette action est irréversible.";
+"eq_delete_confirm_title" = "Supprimer le préréglage ?";
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "Importer GraphicEQ";
