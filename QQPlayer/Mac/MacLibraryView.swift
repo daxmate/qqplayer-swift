@@ -52,7 +52,6 @@ struct MacLibraryView: View {
     @State private var albumTracks: [Track] = []
     @State private var artistTracks: [Track] = []
     @State private var selectedTrackId: String?
-    @State private var showSettings = false
     /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
     @State private var showWhatsNew = false
 
@@ -99,20 +98,8 @@ struct MacLibraryView: View {
                 }
                 .help("force_dark_mode".localized)
             }
-
-            ToolbarItem {
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .help("settings".localized)
-            }
         }
         .preferredColorScheme(forceDark ? .dark : nil)
-        .sheet(isPresented: $showSettings) {
-            MacSettingsView()
-        }
         .sheet(isPresented: $showWhatsNew) {
             WhatsNewView(onClose: {
                 WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)

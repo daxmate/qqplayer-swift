@@ -11,39 +11,35 @@ import AppKit
 import SwiftUI
 
 struct MacSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var deleteSettings = DeleteSettings.load()
     @State private var showEQSettings = false
     @State private var showFeatureGuide = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Form {
-                // 功能与手势：帮助中心入口（置顶，对齐 iOS SettingsView）
-                Section {
-                    Button {
-                        showFeatureGuide = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "questionmark.circle.fill")
-                                .foregroundColor(.blue)
-                            Text(Localized.featureGuide)
-                                .foregroundColor(.primary)
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
+        Form {
+            // 功能与手势：帮助中心入口（置顶，对齐 iOS SettingsView）
+            Section {
+                Button {
+                    showFeatureGuide = true
+                } label: {
+                    HStack {
+                        Image(systemName: "questionmark.circle.fill")
+                            .foregroundColor(.blue)
+                        Text(Localized.featureGuide)
+                            .foregroundColor(.primary)
+                        Spacer()
                     }
-                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
-                appearanceSection
-                audioSection
-                playerControlsSection
-                informationSection
+                .buttonStyle(.plain)
             }
-            .formStyle(.grouped)
+            appearanceSection
+            audioSection
+            playerControlsSection
+            informationSection
         }
-        .frame(minWidth: 460, minHeight: 480)
+        .formStyle(.grouped)
+        .frame(minWidth: 460)
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
         }
@@ -57,20 +53,6 @@ struct MacSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text(Localized.settings)
-                .font(.title2)
-                .fontWeight(.bold)
-            Spacer()
-            Button(Localized.done) { dismiss() }
-                .keyboardShortcut(.cancelAction)
-        }
-        .padding()
     }
 
     // MARK: - Sections

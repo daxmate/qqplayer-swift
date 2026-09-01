@@ -18,5 +18,10 @@ struct QQPlayerMacApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
+        // 设置：系统 Settings scene → App 菜单自动出现「Settings…」(⌘,)，
+        // 打开独立设置窗口（macOS 惯例；主窗口 toolbar 不放设置按钮）
+        Settings {
+            MacSettingsView()
+        }
     }
 }
