@@ -358,6 +358,7 @@
 "hint_full_lyrics_line2" = "Balayez vers la droite pour revenir au lecteur";
 "hint_search_title" = "Recherche de paroles";
 "hint_search_line1" = "Balayez vers la gauche pour revenir au lecteur";
+"hint_search_mac_line1" = "Cliquez sur un résultat pour l'appliquer comme paroles";
 
 "cancel_sleep_timer" = "Annuler la minuterie";
 
@@ -515,3 +516,7 @@
 "playlist_manage_rename" = "Renommer";
 "playlist_manage_remove_from_playlist" = "Retirer de la playlist";
 "playlist_manage_empty" = "Cette playlist est vide";
+"play_order_sequential" = "Lecture séquentielle";
+"play_order_shuffle" = "Lecture aléatoire";
+"play_order_repeat_all" = "Répéter tout";
+"play_order_repeat_one" = "Répéter un morceau";

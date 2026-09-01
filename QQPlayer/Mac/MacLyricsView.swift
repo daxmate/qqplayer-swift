@@ -15,6 +15,8 @@ struct MacLyricsView: View {
     let currentTime: TimeInterval
     let isLoading: Bool
     let onClose: () -> Void
+    /// 歌词搜索入口（播放页 sheet 弹出 MacLyricsSearchView）
+    let onLyricsSearch: () -> Void
 
     @ObservedObject private var karaoke = KaraokeController.shared
 
@@ -61,6 +63,13 @@ struct MacLyricsView: View {
             Label("lyrics".localized, systemImage: "quote.bubble")
                 .font(.headline)
             Spacer()
+            Button(action: onLyricsSearch) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+            .help("lyrics_search_title".localized)
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)

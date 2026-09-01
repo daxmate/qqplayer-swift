@@ -68,6 +68,7 @@ struct WhatsNewView: View {
                 .padding(.horizontal, 30)
                 .padding(.vertical, 16)
             }
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -76,6 +77,7 @@ struct WhatsNewView: View {
                     }
                 }
             }
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
             settings = DeleteSettings.load()

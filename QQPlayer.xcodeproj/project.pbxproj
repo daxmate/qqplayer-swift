@@ -172,6 +172,7 @@
 				Mac/MacGraphicEQ10BandEditorView.swift,
 				Mac/MacHelpers.swift,
 				Mac/MacLibraryView.swift,
+				Mac/MacLyricsSearchView.swift,
 				Mac/MacLyricsView.swift,
 				Mac/MacManualEQEditorView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
@@ -225,6 +226,7 @@
 				Mac/MacGraphicEQ10BandEditorView.swift,
 				Mac/MacHelpers.swift,
 				Mac/MacLibraryView.swift,
+				Mac/MacLyricsSearchView.swift,
 				Mac/MacLyricsView.swift,
 				Mac/MacManualEQEditorView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
@@ -299,6 +301,9 @@
 				Services/WhatsNew.swift,
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/PlayerGestureLogic.swift,
+				Views/Utility/FeatureGuideView.swift,
+				Views/Utility/HintCardView.swift,
+				Views/Utility/WhatsNewView.swift,
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};

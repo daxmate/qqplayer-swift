@@ -358,6 +358,7 @@
 "hint_full_lyrics_line2" = "Смахните вправо, чтобы вернуться к плееру";
 "hint_search_title" = "Поиск текста";
 "hint_search_line1" = "Смахните влево, чтобы вернуться к плееру";
+"hint_search_mac_line1" = "Нажмите на результат, чтобы применить его как текст песни";
 
 "cancel_sleep_timer" = "Отменить таймер сна";
 
@@ -512,3 +513,7 @@
 "playlist_manage_rename" = "Переименовать";
 "playlist_manage_remove_from_playlist" = "Удалить из плейлиста";
 "playlist_manage_empty" = "В этом плейлисте пока нет песен";
+"play_order_sequential" = "Последовательное воспроизведение";
+"play_order_shuffle" = "Случайный порядок";
+"play_order_repeat_all" = "Повторять всё";
+"play_order_repeat_one" = "Повторять один";

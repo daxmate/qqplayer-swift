@@ -537,6 +537,7 @@
 "hint_search_title" = "歌詞搜尋頁";
 
 "hint_search_line1" = "向左滑：返回播放頁";
+"hint_search_mac_line1" = "點選結果即可套用為歌詞";
 
 
 "cancel_sleep_timer" = "取消睡眠定時";

@@ -36,6 +36,8 @@ struct MacPlayerView: View {
     /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：歌词按钮显示、睡眠定时器隐藏）
     @State private var showLyricsButton: Bool = DeleteSettings.load().showLyricsButton
     @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
+    /// 歌词搜索 sheet（手动指定歌词）
+    @State private var showLyricsSearch = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,6 +59,9 @@ struct MacPlayerView: View {
                         case .closePanel:
                             showLyrics = false
                         }
+                    },
+                    onLyricsSearch: {
+                        showLyricsSearch = true
                     }
                 )
                 .frame(maxHeight: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? .infinity : 330)
@@ -64,6 +69,19 @@ struct MacPlayerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $showLyricsSearch) {
+            if let track = player.currentTrack {
+                MacLyricsSearchView(
+                    track: track,
+                    onClose: { showLyricsSearch = false },
+                    onApply: { newLyrics in
+                        // 应用搜索结果：更新歌词显示 + 跟唱行注入（nil = 恢复自动）
+                        lyrics = newLyrics
+                        KaraokeController.shared.setLyrics(newLyrics?.syncedLyrics ?? [])
+                    }
+                )
+            }
+        }
         .animation(.easeInOut(duration: 0.25), value: karaoke.isKaraokeOn)
         .onChange(of: karaoke.isKaraokeOn) { isOn in
             // 进入跟唱：确保歌词面板可见（大画面依赖歌词区；决策上收 MacPlaybackGate）

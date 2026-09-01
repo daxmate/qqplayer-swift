@@ -14,11 +14,28 @@ struct MacSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var deleteSettings = DeleteSettings.load()
     @State private var showEQSettings = false
+    @State private var showFeatureGuide = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Form {
+                // 功能与手势：帮助中心入口（置顶，对齐 iOS SettingsView）
+                Section {
+                    Button {
+                        showFeatureGuide = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "questionmark.circle.fill")
+                                .foregroundColor(.blue)
+                            Text(Localized.featureGuide)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
                 appearanceSection
                 audioSection
                 playerControlsSection
@@ -29,6 +46,11 @@ struct MacSettingsView: View {
         .frame(minWidth: 460, minHeight: 480)
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
+        }
+        .sheet(isPresented: $showFeatureGuide) {
+            // 复用 iOS FeatureGuideView（无 UIKit 依赖，白名单直用）
+            FeatureGuideView()
+                .frame(minWidth: 520, minHeight: 480)
         }
         // 与 MacLibraryView 工具栏月亮按钮双向同步：任何一处写入
         // DeleteSettings 都会发 .qqplayerSettingsDidChange，这里重读。

@@ -53,6 +53,8 @@ struct MacLibraryView: View {
     @State private var artistTracks: [Track] = []
     @State private var selectedTrackId: String?
     @State private var showSettings = false
+    /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
+    @State private var showWhatsNew = false
 
     // Search state (sidebar search field + grouped results)
     @State private var searchText = ""
@@ -111,12 +113,22 @@ struct MacLibraryView: View {
         .sheet(isPresented: $showSettings) {
             MacSettingsView()
         }
+        .sheet(isPresented: $showWhatsNew) {
+            WhatsNewView(onClose: {
+                WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
+                showWhatsNew = false
+            })
+        }
         .task {
             reloadLibrary()
             if !indexer.isIndexing {
                 indexer.start()
             }
             player.ensureRemoteCommandsSetup()
+            // 新功能通告：当前版本未读过则弹（升级场景）；全新安装也会弹一次
+            if WhatsNewStore.shared.shouldShowCurrent() {
+                showWhatsNew = true
+            }
         }
         .onReceive(indexer.$isIndexing) { isIndexing in
             if !isIndexing {

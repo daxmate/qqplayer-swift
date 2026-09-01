@@ -160,10 +160,12 @@ struct FeatureGuideView: View {
             }
         }
         .navigationTitle(Localized.featureGuide)
-        .navigationBarTitleDisplayMode(.inline)
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
-            settings = DeleteSettings.load()
-        }
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+        #endif
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+                settings = DeleteSettings.load()
+            }
     }
 }
 

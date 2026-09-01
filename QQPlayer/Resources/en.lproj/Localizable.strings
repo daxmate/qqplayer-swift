@@ -370,6 +370,7 @@
 "hint_full_lyrics_line2" = "Swipe right to return to the player";
 "hint_search_title" = "Lyrics Search";
 "hint_search_line1" = "Swipe left to return to the player";
+"hint_search_mac_line1" = "Click a result to apply it as the lyrics";
 
 "cancel_sleep_timer" = "Cancel Sleep Timer";
 
