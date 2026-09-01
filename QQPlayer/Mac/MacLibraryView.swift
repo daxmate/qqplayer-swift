@@ -8,6 +8,7 @@
 //  membership exceptions.
 //
 
+import AppKit
 import Combine
 import SwiftUI
 
@@ -99,7 +100,6 @@ struct MacLibraryView: View {
                 .help("force_dark_mode".localized)
             }
         }
-        .preferredColorScheme(forceDark ? .dark : nil)
         .sheet(isPresented: $showWhatsNew) {
             WhatsNewView(onClose: {
                 WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
@@ -112,6 +112,8 @@ struct MacLibraryView: View {
                 indexer.start()
             }
             player.ensureRemoteCommandsSetup()
+            // 启动即应用全局外观（NSApp.appearance，设置窗口等所有窗口跟随）
+            applyMacAppearance()
             // 新功能通告：当前版本未读过则弹（升级场景）；全新安装也会弹一次
             if WhatsNewStore.shared.shouldShowCurrent() {
                 showWhatsNew = true
@@ -145,6 +147,7 @@ struct MacLibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             // 设置页改了强制深色后同步工具栏月亮按钮状态（双向同步）
             forceDark = DeleteSettings.load().forceDarkMode
+            applyMacAppearance()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
             // 歌单管理（新建/重命名/删除/增删曲目）后刷新歌单列表与自动歌单计数
@@ -272,6 +275,13 @@ struct MacLibraryView: View {
         } catch {
             print("❌ macOS reloadLikedTracks failed: \(error)")
         }
+    }
+
+    /// 全局外观：NSApp.appearance 控制所有窗口（主窗/设置窗/sheet）立即生效，
+    /// 还原时 nil = 跟随系统立即恢复。不用 .preferredColorScheme（只作用于
+    /// 挂载视图，且从 .dark 切回 nil 时系统不重新解析——2026-09-02 用户实测）。
+    private func applyMacAppearance() {
+        NSApp.appearance = forceDark ? NSAppearance(named: .darkAqua) : nil
     }
 
     private func resolveArtistName(for track: Track) -> String? {

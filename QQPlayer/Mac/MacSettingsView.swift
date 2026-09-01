@@ -63,9 +63,6 @@ struct MacSettingsView: View {
                 .onChange(of: deleteSettings.forceDarkMode) { _ in
                     deleteSettings.save()
                 }
-            Text(Localized.overrideSystemAppearance)
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
     }
 
@@ -94,17 +91,11 @@ struct MacSettingsView: View {
                 .onChange(of: deleteSettings.showLyricsButton) { _ in
                     deleteSettings.save()
                 }
-            Text(Localized.showLyricsButtonDescription)
-                .font(.caption)
-                .foregroundColor(.secondary)
 
             Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
                 .onChange(of: deleteSettings.showSleepTimerButton) { _ in
                     deleteSettings.save()
                 }
-            Text(Localized.showSleepTimerButtonDescription)
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
     }
 
