@@ -130,7 +130,7 @@ struct MacSmartPlaylistDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            if let selectedBucket {
+            if selectedBucket != nil {
                 Button {
                     self.selectedBucket = nil
                 } label: {

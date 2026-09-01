@@ -1097,9 +1097,15 @@
                         print("❌ macOS seek: engine start failed \(error)")
                         return
                     }
+                    // 等 isRunning（引擎启动通常 <100ms，1s 兜底）。async 上下文不能用
+                    // RunLoop.current.run（Swift 6 并发检查标记不可用），改用 Task.sleep
+                    // 轮询 + scheduleGeneration 防重入：await 期间新 seek 会递增 generation，
+                    // 检测到变化即退出（让新 seek 赢，避免旧值覆盖播放位置）。
+                    let seekGeneration = scheduleGeneration
                     let deadline = Date().addingTimeInterval(1.0)
                     while !audioEngine.isRunning && Date() < deadline {
-                        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+                        try? await Task.sleep(nanoseconds: 10_000_000)
+                        guard scheduleGeneration == seekGeneration else { return }
                     }
                 }
                 let startFrame = AVAudioFramePosition(clamped * audioFile.processingFormat.sampleRate)
