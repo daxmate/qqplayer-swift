@@ -88,7 +88,7 @@ struct MacLyricsSearchView: View {
                 showHint = HintCoordinator.showIfNeeded(.lyricsSearchPage)
             }
             Task {
-                manualActive = LyricsManager.shared.hasManualLyrics(for: track)
+                manualActive = await LyricsManager.shared.hasManualLyrics(for: track)
                 // 预填歌手名（原 init 内同步 DB 读挪到这里；先填再搜，首次自动搜索带歌手过滤）
                 let artistName: String = {
                     guard let artistId = track.artistId,
@@ -179,9 +179,11 @@ struct MacLyricsSearchView: View {
             Spacer()
 
             Button {
-                LyricsManager.shared.clearManualLyrics(for: track)
-                manualActive = false
-                onApply(nil) // 恢复自动：外层重新加载
+                Task {
+                    await LyricsManager.shared.clearManualLyrics(for: track)
+                    manualActive = false
+                    onApply(nil) // 恢复自动：外层重新加载
+                }
             } label: {
                 Text("lyrics_search_restore_auto".localized)
                     .font(.footnote.weight(.medium))
@@ -332,13 +334,15 @@ struct MacLyricsSearchView: View {
         applyingIndex = index
         searchError = ""
 
-        let lyrics = LyricsManager.shared.apply(candidate: candidate, for: track)
-        applyingIndex = nil
-        if let lyrics {
-            manualActive = true
-            onApply(lyrics)
-        } else {
-            searchError = "lyrics_search_apply_failed".localized
+        Task {
+            let lyrics = await LyricsManager.shared.apply(candidate: candidate, for: track)
+            applyingIndex = nil
+            if let lyrics {
+                manualActive = true
+                onApply(lyrics)
+            } else {
+                searchError = "lyrics_search_apply_failed".localized
+            }
         }
     }
 }
