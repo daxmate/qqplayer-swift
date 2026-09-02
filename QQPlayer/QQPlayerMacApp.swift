@@ -11,6 +11,12 @@ import SwiftUI
 struct QQPlayerMacApp: App {
     @State private var deleteSettings = DeleteSettings.load()
 
+    init() {
+        // 诊断基建：stderr（print + Swift fatal error）重定向落盘，
+        // 运行时报错可离线读取（~/Library/Logs/QQPlayerMac/stderr.log）
+        MacScanLogger.redirectStderr()
+    }
+
     var body: some Scene {
         WindowGroup {
             MacLibraryView()

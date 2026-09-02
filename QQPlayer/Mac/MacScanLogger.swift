@@ -38,4 +38,15 @@ enum MacScanLogger {
             print("⚠️ MacScanLogger failed: \(error)")
         }
     }
+
+    /// 诊断基建（2026-09-02）：启动时重定向 stderr 落盘。Xcode Run 的 app
+    /// 其 print/fatal error 只进 Xcode 控制台（外部不可见）；重定向后
+    /// ~/Library/Logs/QQPlayerMac/stderr.log 可随时读取定位运行时报错。
+    static func redirectStderr() {
+        let url = logURL.deletingLastPathComponent().appendingPathComponent("stderr.log")
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        } catch {}
+        freopen(url.path, "a+", stderr)
+    }
 }
