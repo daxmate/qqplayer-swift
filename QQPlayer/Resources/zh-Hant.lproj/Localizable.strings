@@ -171,6 +171,23 @@
 "delete_file_confirmation" = "你確定要刪除來源檔案 '%@' 嗎？此操作將從硬碟徹底刪除，無法撤銷。";
 
 /* Settings */
+
+/* Settings categories (web 版左导航分类对齐) */
+/* Appearance theme */
+"settings_category_playback" = "播放";
+"settings_category_appearance" = "介面";
+"settings_category_about" = "關於";
+"appearance_theme" = "主題";
+"theme_system" = "跟隨系統";
+"theme_dark" = "深色";
+"theme_light" = "淺色";
+"accent_color" = "強調色";
+"accent_orange" = "橙色";
+"accent_blue" = "藍色";
+"accent_green" = "綠色";
+"accent_purple" = "紫色";
+"accent_pink" = "粉色";
+"accent_teal" = "青色";
 "appearance" = "外觀";
 
 "information" = "關於";

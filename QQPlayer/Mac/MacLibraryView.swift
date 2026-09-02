@@ -43,7 +43,11 @@ struct MacLibraryView: View {
     @State private var section: MacLibrarySection = .tracks
     @State private var tracks: [Track] = []
     @State private var likedTracks: [Track] = []
-    @State private var forceDark: Bool = DeleteSettings.load().forceDarkMode
+    /// 外观三态（工具栏月亮按钮循环切换，初值含旧 forceDarkMode 迁移推导）
+    @State private var theme: AppearanceTheme = AppearanceTheme.resolved(
+        raw: DeleteSettings.load().appearanceTheme,
+        forceDarkMode: DeleteSettings.load().forceDarkMode
+    )
     @State private var albums: [Album] = []
     @State private var artists: [Artist] = []
     @State private var playlists: [Playlist] = []
@@ -90,14 +94,11 @@ struct MacLibraryView: View {
         .toolbar {
             ToolbarItem {
                 Button {
-                    forceDark.toggle()
-                    var settings = DeleteSettings.load()
-                    settings.forceDarkMode = forceDark
-                    settings.save()
+                    cycleTheme()
                 } label: {
-                    Image(systemName: forceDark ? "sun.max.fill" : "moon.fill")
+                    Image(systemName: themeIconName)
                 }
-                .help("force_dark_mode".localized)
+                .help(Localized.appearanceTheme)
             }
         }
         .sheet(isPresented: $showWhatsNew) {
@@ -145,8 +146,12 @@ struct MacLibraryView: View {
             reloadLikedTracks()
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
-            // 设置页改了强制深色后同步工具栏月亮按钮状态（双向同步）
-            forceDark = DeleteSettings.load().forceDarkMode
+            // 设置页改了主题/强调色后同步工具栏按钮状态（双向同步）
+            let settings = DeleteSettings.load()
+            theme = AppearanceTheme.resolved(
+                raw: settings.appearanceTheme,
+                forceDarkMode: settings.forceDarkMode
+            )
             applyMacAppearance()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
@@ -277,11 +282,34 @@ struct MacLibraryView: View {
         }
     }
 
+    /// 工具栏月亮按钮：三态循环 system → dark → light → system。
+    private func cycleTheme() {
+        let next: AppearanceTheme
+        switch theme {
+        case .system: next = .dark
+        case .dark: next = .light
+        case .light: next = .system
+        }
+        theme = next
+        var settings = DeleteSettings.load()
+        settings.appearanceTheme = next.rawValue
+        settings.forceDarkMode = next == .dark
+        settings.save()
+    }
+
+    private var themeIconName: String {
+        switch theme {
+        case .system: return "circle.lefthalf.filled"
+        case .dark: return "moon.fill"
+        case .light: return "sun.max.fill"
+        }
+    }
+
     /// 全局外观：NSApp.appearance 控制所有窗口（主窗/设置窗/sheet）立即生效，
-    /// 还原时 nil = 跟随系统立即恢复。不用 .preferredColorScheme（只作用于
+    /// system = nil 跟随系统立即恢复。不用 .preferredColorScheme（只作用于
     /// 挂载视图，且从 .dark 切回 nil 时系统不重新解析——2026-09-02 用户实测）。
     private func applyMacAppearance() {
-        NSApp.appearance = forceDark ? NSAppearance(named: .darkAqua) : nil
+        MacAppearance.apply(theme: theme)
     }
 
     private func resolveArtistName(for track: Track) -> String? {

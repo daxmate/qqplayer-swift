@@ -97,6 +97,23 @@
 "delete_file_confirmation" = "你确定要删除源文件 '%@' 吗？此操作将从硬盘彻底删除，无法撤销。";
 
 /* Settings */
+
+/* Settings categories (web 版左导航分类对齐) */
+/* Appearance theme */
+"settings_category_playback" = "播放";
+"settings_category_appearance" = "界面";
+"settings_category_about" = "关于";
+"appearance_theme" = "主题";
+"theme_system" = "跟随系统";
+"theme_dark" = "深色";
+"theme_light" = "浅色";
+"accent_color" = "强调色";
+"accent_orange" = "橙色";
+"accent_blue" = "蓝色";
+"accent_green" = "绿色";
+"accent_purple" = "紫色";
+"accent_pink" = "粉色";
+"accent_teal" = "青色";
 "appearance" = "外观";
 "information" = "关于";
 "minimalist_library_icons" = "极简媒体库图标";

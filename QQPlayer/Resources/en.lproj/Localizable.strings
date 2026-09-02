@@ -97,6 +97,23 @@
 "delete_file_confirmation" = "Are you sure you want to delete '%@'? This action cannot be undone.";
 
 /* Settings */
+
+/* Settings categories (web 版左导航分类对齐) */
+/* Appearance theme */
+"settings_category_playback" = "Playback";
+"settings_category_appearance" = "Appearance";
+"settings_category_about" = "About";
+"appearance_theme" = "Theme";
+"theme_system" = "Follow System";
+"theme_dark" = "Dark";
+"theme_light" = "Light";
+"accent_color" = "Accent Color";
+"accent_orange" = "Orange";
+"accent_blue" = "Blue";
+"accent_green" = "Green";
+"accent_purple" = "Purple";
+"accent_pink" = "Pink";
+"accent_teal" = "Teal";
 "appearance" = "Appearance";
 "information" = "Information";
 "minimalist_library_icons" = "Minimalist library icons";

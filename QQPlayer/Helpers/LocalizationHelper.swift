@@ -138,6 +138,23 @@ struct Localized {
     static let showSleepTimerButton = "show_sleep_timer_button".localized
     static let showSleepTimerButtonDescription = "show_sleep_timer_button_description".localized
 
+    // MARK: - Settings Categories（web 版左导航分类对齐）
+    static let settingsCategoryPlayback = "settings_category_playback".localized
+    static let settingsCategoryAppearance = "settings_category_appearance".localized
+    static let settingsCategoryAbout = "settings_category_about".localized
+
+    // MARK: - Appearance（主题三态 + 强调色）
+    static let appearanceTheme = "appearance_theme".localized
+    static let themeSystem = "theme_system".localized
+    static let themeDark = "theme_dark".localized
+    static let themeLight = "theme_light".localized
+    static let accentColor = "accent_color".localized
+
+    /// 强调色预设名（web 版 labelKey 语义：settings.accentColor.*）
+    static func accentName(_ key: String) -> String {
+        "accent_\(key)".localized
+    }
+
     // MARK: - Liked Songs Actions
     static let addToLikedSongs = "add_to_liked_songs".localized
     static let removeFromLikedSongs = "remove_from_liked_songs".localized

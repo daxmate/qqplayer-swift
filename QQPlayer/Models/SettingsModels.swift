@@ -142,6 +142,11 @@ struct DeleteSettings: Codable {
     var minimalistIcons: Bool = false
     var backgroundColorChoice: BackgroundColor = .violet
     var forceDarkMode: Bool = false
+    /// 外观三态主题（system/dark/light，对齐 web 版 theme 语义）。macOS 设置页写入；
+    /// 旧数据（无此 key）用 forceDarkMode 推导，见 init(from:) 与 AppearanceTheme.resolved。
+    var appearanceTheme: String = "system"
+    /// 强调色预设 key（orange/blue/green/purple/pink/teal，对齐 web 版 ACCENT_OPTIONS）
+    var accentColorName: String = "orange"
     var dsdPlaybackMode: DSDPlaybackMode = .pcm
     var deleteFromLibraryOnly: Bool = true
     var lastLibraryScanDate: Date?
@@ -159,6 +164,9 @@ struct DeleteSettings: Codable {
         minimalistIcons = try container.decodeIfPresent(Bool.self, forKey: .minimalistIcons) ?? false
         backgroundColorChoice = try container.decodeIfPresent(BackgroundColor.self, forKey: .backgroundColorChoice) ?? .violet
         forceDarkMode = try container.decodeIfPresent(Bool.self, forKey: .forceDarkMode) ?? false
+        appearanceTheme = try container.decodeIfPresent(String.self, forKey: .appearanceTheme)
+            ?? (forceDarkMode ? "dark" : "system")
+        accentColorName = try container.decodeIfPresent(String.self, forKey: .accentColorName) ?? "orange"
         dsdPlaybackMode = try container.decodeIfPresent(DSDPlaybackMode.self, forKey: .dsdPlaybackMode) ?? .pcm
         // Default to app-only deletion - deleting the user's actual files
         // should always be an explicit opt-in

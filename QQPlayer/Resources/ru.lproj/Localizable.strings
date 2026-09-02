@@ -85,6 +85,23 @@
 "delete_file_confirmation" = "Вы уверены, что хотите удалить «%@»? Это действие нельзя отменить.";
 
 /* Settings */
+
+/* Settings categories (web 版左导航分类对齐) */
+/* Appearance theme */
+"settings_category_playback" = "Воспроизведение";
+"settings_category_appearance" = "Оформление";
+"settings_category_about" = "О программе";
+"appearance_theme" = "Тема";
+"theme_system" = "Как в системе";
+"theme_dark" = "Тёмная";
+"theme_light" = "Светлая";
+"accent_color" = "Акцентный цвет";
+"accent_orange" = "Оранжевый";
+"accent_blue" = "Синий";
+"accent_green" = "Зелёный";
+"accent_purple" = "Фиолетовый";
+"accent_pink" = "Розовый";
+"accent_teal" = "Бирюзовый";
 "appearance" = "Внешний вид";
 "information" = "Информация";
 "minimalist_library_icons" = "Минималистичные иконки медиатеки";

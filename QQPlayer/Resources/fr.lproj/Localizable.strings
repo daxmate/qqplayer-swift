@@ -85,6 +85,23 @@
 "delete_file_confirmation" = "Êtes-vous sûr de vouloir supprimer '%@' ? Cette action ne peut pas être annulée.";
 
 /* Settings */
+
+/* Settings categories (web 版左导航分类对齐) */
+/* Appearance theme */
+"settings_category_playback" = "Lecture";
+"settings_category_appearance" = "Apparence";
+"settings_category_about" = "À propos";
+"appearance_theme" = "Thème";
+"theme_system" = "Suivre le système";
+"theme_dark" = "Sombre";
+"theme_light" = "Clair";
+"accent_color" = "Couleur d'accentuation";
+"accent_orange" = "Orange";
+"accent_blue" = "Bleu";
+"accent_green" = "Vert";
+"accent_purple" = "Violet";
+"accent_pink" = "Rose";
+"accent_teal" = "Sarcelle";
 "appearance" = "Apparence";
 "information" = "Informations";
 "minimalist_library_icons" = "Icônes minimalistes";
