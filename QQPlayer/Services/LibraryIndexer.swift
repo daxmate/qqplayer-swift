@@ -750,6 +750,20 @@ class LibraryIndexer: NSObject, ObservableObject {
             }
         }
 
+        /// 云端（dataless）文件下载完成后自动补扫入列：60s 后重扫一轮，最多 5 轮。
+        private var macRescanRounds = 0
+
+        private func autoscheduleRescan(skippedDataless: Int) {
+            guard skippedDataless > 0, macRescanRounds < 5 else { return }
+            macRescanRounds += 1
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 60_000_000_000) // 60s
+                guard !isIndexing else { return }
+                MacScanLogger.log("autoschedule rescan (round \(macRescanRounds))")
+                start()
+            }
+        }
+
         private func scanMusicFolder(generation: Int) async {
             // 决策上收：首行 guard 语义与 MacIndexingGate.canProceedScan 一致（有单测锁定）。
             guard MacIndexingGate.canProceedScan(
@@ -777,24 +791,25 @@ class LibraryIndexer: NSObject, ObservableObject {
                 print("📁 macOS found \(totalFiles) music files")
                 MacScanLogger.log("total files: \(totalFiles)")
 
-                // iCloud Drive dataless 文件预触发批量下载（系统队列并发），
-                // 避免 parse 到每个文件才逐个触发、全卡网络等待（2026-09-02 实测
-                // 161 文件 78 个 dataless，逐个触发是索引慢的根因）。
-                // Task.detached：73+ 次 iCloud API 调用若同步跑在主线程会卡 UI 几秒
-                let datalessCount = await Task.detached {
-                    await Self.prefetchDatalessDownloads(musicFiles)
+                // iCloud Drive dataless（云端未下载）本轮不 parse：无 iCloud
+                // entitlement 时 startDownloadingUbiquitousItem 无效（2026-09-02
+                // 实测），等待会让索引卡死。只索引已本地化文件；云端文件由用户
+                // 在 Finder 下载（或 entitlement 就绪）后自动补入（scan 尾部调度）。
+                let (localFiles, skippedDataless) = await Task.detached {
+                    await Self.partitionLocalFiles(musicFiles)
                 }.value
-                if datalessCount > 0 {
-                    MacScanLogger.log("prefetch dataless downloads: \(datalessCount) files")
+                musicFiles = localFiles
+                if skippedDataless > 0 {
+                    MacScanLogger.log("skipped dataless (cloud not downloaded): \(skippedDataless)")
+                    print("⏭️ Skipping \(skippedDataless) dataless iCloud files (not downloaded locally)")
                 }
 
-                guard totalFiles > 0 else {
-                    // 空目录也走 reconcile，清理已删除曲目（与 iOS 语义一致）。
+                guard !musicFiles.isEmpty else {
+                    // 全为云端未下载：不 reconcile（避免误删本地入列曲目）
                     guard generation == indexingGeneration else { return }
-                    await FileCleanupManager.shared.reconcileMissingFiles(in: folders)
-                    postPendingLibraryRefresh()
                     isIndexing = false
-                    print("❌ No music files found in \(folders.map(\.path))")
+                    print("❌ All \(skippedDataless) files are dataless; nothing to index this round")
+                    autoscheduleRescan(skippedDataless: skippedDataless)
                     return
                 }
 
@@ -846,7 +861,10 @@ class LibraryIndexer: NSObject, ObservableObject {
 
                 isIndexing = false
                 print("✅ macOS scan completed. Found \(tracksFound) tracks.")
-                MacScanLogger.log("scan completed, tracksFound: \(tracksFound)")
+                MacScanLogger.log("scan completed, tracksFound: \(tracksFound), skippedDataless: \(skippedDataless)")
+
+                // 云端文件下载完成后自动补扫入列（60s 后重扫，最多 5 轮）
+                autoscheduleRescan(skippedDataless: skippedDataless)
 
                 await processFolderPlaylists(allMusicFiles: musicFiles)
             } catch {
@@ -857,42 +875,27 @@ class LibraryIndexer: NSObject, ObservableObject {
         }
     #endif
 
-    /// macOS：预触发所有 dataless iCloud Drive 文件的按需下载（系统并发队列），
-    /// 返回触发数量。下载完成后系统落地文件内容，后续 parse 走本地读。
-    nonisolated private static func prefetchDatalessDownloads(_ files: [URL]) async -> Int {
-        var triggered = 0
+    /// macOS：分区本地已实体化文件与 iCloud dataless（云端未下载）文件。
+    /// 返回 (本地文件, dataless 数)。无 iCloud entitlement 时无法主动触发
+    /// 下载（2026-09-02 实测 startDownloadingUbiquitousItem 无效），dataless
+    /// 文件只跳过不等待，下载完成后由 autoscheduleRescan 补扫入列。
+    nonisolated private static func partitionLocalFiles(_ files: [URL]) async -> ([URL], Int) {
+        var local: [URL] = []
+        var dataless = 0
         for file in files {
             let values = try? file.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey])
-            guard values?.isUbiquitousItem == true else { continue }
-            if let status = values?.ubiquitousItemDownloadingStatus,
-               status == .downloaded || status == .current {
-                continue
-            }
-            try? FileManager.default.startDownloadingUbiquitousItem(at: file)
-            triggered += 1
-        }
-        return triggered
-    }
-
-    /// macOS：dataless 文件等待实体化（轮询下载状态，最多 60s）。
-    /// 非 iCloud 文件恒 true。
-    nonisolated private static func ensureFileMaterialized(_ url: URL) async -> Bool {
-        let values = try? url.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey])
-        guard values?.isUbiquitousItem == true else { return true }
-        if let status = values?.ubiquitousItemDownloadingStatus,
-           status == .downloaded || status == .current {
-            return true
-        }
-        // 预触发可能已发起；这里兜底再触发一次（幂等）
-        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
-        for _ in 0 ..< 60 {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            let current = (try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus
-            if current == .downloaded || current == .current {
-                return true
+            if values?.isUbiquitousItem == true {
+                if let status = values?.ubiquitousItemDownloadingStatus,
+                   status == .downloaded || status == .current {
+                    local.append(file)
+                } else {
+                    dataless += 1
+                }
+            } else {
+                local.append(file)
             }
         }
-        return false
+        return (local, dataless)
     }
 
     private func findMusicFiles(in directory: URL) async throws -> [URL] {
@@ -966,15 +969,9 @@ class LibraryIndexer: NSObject, ObservableObject {
             print("🎵 Starting to process file: \(fileURL.lastPathComponent)")
 
             #if os(macOS)
-                // macOS 本地文件：无 iCloud 容器下载步骤；但用户可能添加了
-                // iCloud Drive 文件夹——dataless 占位文件等待实体化（预触发
-                // 已批量发起下载），超时跳过不阻塞本轮
+                // macOS 本地文件：dataless 已在 scanMusicFolder 分区时过滤，
+                // 此处全是本地已实体化文件，无 iCloud 下载步骤
                 print("📱 Processing local file (macOS): \(fileURL.lastPathComponent)")
-                guard await Self.ensureFileMaterialized(fileURL) else {
-                    print("⏭️ Skipping dataless file not materialized: \(fileURL.lastPathComponent)")
-                    MacScanLogger.log("skip dataless timeout: \(fileURL.lastPathComponent)")
-                    return
-                }
             #else
                 let isLocalFile = !fileURL.path.contains("Mobile Documents")
 
