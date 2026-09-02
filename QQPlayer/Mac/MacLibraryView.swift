@@ -57,6 +57,10 @@ struct MacLibraryView: View {
     @State private var albumTracks: [Track] = []
     @State private var artistTracks: [Track] = []
     @State private var selectedTrackId: String?
+    /// 专辑/歌手详情 sheet 开关（上收自 MacAlbumGridView/MacArtistListView，
+    /// 支持歌曲右键「进专辑/进歌手」外部触发）
+    @State private var showAlbumSheet = false
+    @State private var showArtistSheet = false
     /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
     @State private var showWhatsNew = false
 
@@ -220,7 +224,10 @@ struct MacLibraryView: View {
                     artistNameResolver: resolveArtistName,
                     onPlay: playFromTrackList,
                     onSelect: { selectedTrackId = $0.stableId },
-                    playlistId: nil
+                    playlistId: nil,
+                    onPlayNext: { player.insertNext($0) },
+                    onShowArtist: showArtist(for:),
+                    onShowAlbum: showAlbum(for:)
                 )
             case .likedSongs:
                 MacTrackListView(
@@ -230,7 +237,10 @@ struct MacLibraryView: View {
                     artistNameResolver: resolveArtistName,
                     onPlay: playLikedTracks,
                     onSelect: { selectedTrackId = $0.stableId },
-                    playlistId: nil
+                    playlistId: nil,
+                    onPlayNext: { player.insertNext($0) },
+                    onShowArtist: showArtist(for:),
+                    onShowAlbum: showAlbum(for:)
                 )
             case .albums:
                 MacAlbumGridView(
@@ -238,7 +248,8 @@ struct MacLibraryView: View {
                     selectedAlbum: $selectedAlbum,
                     albumTracks: $albumTracks,
                     artistNameResolver: resolveArtistName,
-                    onPlayAlbum: playAlbum
+                    onPlayAlbum: playAlbum,
+                    showAlbumSheet: $showAlbumSheet
                 )
             case .artists:
                 MacArtistListView(
@@ -246,7 +257,8 @@ struct MacLibraryView: View {
                     selectedArtist: $selectedArtist,
                     artistTracks: $artistTracks,
                     artistNameResolver: resolveArtistName,
-                    onPlayArtist: playArtist
+                    onPlayArtist: playArtist,
+                    showArtistSheet: $showArtistSheet
                 )
             case .playlists:
                 MacPlaylistListView(
@@ -326,15 +338,15 @@ struct MacLibraryView: View {
 
     // MARK: - Playback actions
 
-    private func playFromTrackList(_ track: Track) {
+    private func playFromTrackList(_ track: Track, queue: [Track]) {
         Task {
-            await player.playTrack(track, queue: tracks)
+            await player.playTrack(track, queue: queue)
         }
     }
 
-    private func playLikedTracks(_ track: Track) {
+    private func playLikedTracks(_ track: Track, queue: [Track]) {
         Task {
-            await player.playTrack(track, queue: likedTracks)
+            await player.playTrack(track, queue: queue)
         }
     }
 
@@ -383,6 +395,34 @@ struct MacLibraryView: View {
                 self.searchResults = results
             }
         }
+    }
+
+    /// 歌曲右键「进歌手」：切到歌手分组并打开对应歌手详情
+    private func showArtist(for track: Track) {
+        guard let artistId = track.artistId else { return }
+        do {
+            artistTracks = try DatabaseManager.shared.getTracksByArtistId(artistId)
+        } catch {
+            print("❌ showArtist tracks failed: \(error)")
+        }
+        selectedArtist = artists.first { $0.id == artistId }
+        guard selectedArtist != nil else { return }
+        section = .artists
+        showArtistSheet = true
+    }
+
+    /// 歌曲右键「进专辑」：切到专辑分组并打开对应专辑详情
+    private func showAlbum(for track: Track) {
+        guard let albumId = track.albumId else { return }
+        do {
+            albumTracks = try DatabaseManager.shared.getTracksByAlbumId(albumId)
+        } catch {
+            print("❌ showAlbum tracks failed: \(error)")
+        }
+        selectedAlbum = albums.first { $0.id == albumId }
+        guard selectedAlbum != nil else { return }
+        section = .albums
+        showAlbumSheet = true
     }
 
     private func playAlbum(_ album: Album, tracks albumTracks: [Track]) {

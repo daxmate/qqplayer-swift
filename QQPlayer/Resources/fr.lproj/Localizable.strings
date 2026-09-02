@@ -86,6 +86,11 @@
 
 /* Settings */
 
+/* Track list context menu (A3) */
+"show_artist" = "Voir l'artiste";
+"show_album" = "Voir l'album";
+"locate_playing_track" = "Localiser le morceau en cours";
+
 /* Settings categories (web 版左导航分类对齐) */
 /* Appearance theme */
 "settings_category_playback" = "Lecture";

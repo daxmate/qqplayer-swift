@@ -104,9 +104,10 @@ struct MacPlaylistDetailSheet: View {
                 activeTrackId: player.currentTrack?.stableId,
                 isPlaying: player.isPlaying,
                 artistNameResolver: resolveArtistName,
-                onPlay: { track in play(track, queue: tracks) },
+                onPlay: { track, queue in play(track, queue: queue) },
                 onSelect: { _ in },
-                playlistId: playlist.id
+                playlistId: playlist.id,
+                onPlayNext: { player.insertNext($0) }
             )
         }
     }

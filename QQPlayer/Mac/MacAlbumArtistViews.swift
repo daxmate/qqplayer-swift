@@ -16,8 +16,8 @@ struct MacAlbumGridView: View {
     @Binding var albumTracks: [Track]
     let artistNameResolver: (Track) -> String?
     let onPlayAlbum: (Album, [Track]) -> Void
-
-    @State private var showAlbumSheet = false
+    /// 详情 sheet 开关（父视图持有，支持「右键 → 进专辑」外部触发）
+    @Binding var showAlbumSheet: Bool
 
     private let gridColumns = [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)]
 
@@ -143,8 +143,8 @@ struct MacArtistListView: View {
     @Binding var artistTracks: [Track]
     let artistNameResolver: (Track) -> String?
     let onPlayArtist: (Artist, [Track]) -> Void
-
-    @State private var showArtistSheet = false
+    /// 详情 sheet 开关（父视图持有，支持「右键 → 进歌手」外部触发）
+    @Binding var showArtistSheet: Bool
 
     var body: some View {
         List(artists, id: \.id) { artist in

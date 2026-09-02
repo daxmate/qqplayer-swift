@@ -98,6 +98,11 @@
 
 /* Settings */
 
+/* Track list context menu (A3) */
+"show_artist" = "进歌手";
+"show_album" = "进专辑";
+"locate_playing_track" = "定位当前播放";
+
 /* Settings categories (web 版左导航分类对齐) */
 /* Appearance theme */
 "settings_category_playback" = "播放";

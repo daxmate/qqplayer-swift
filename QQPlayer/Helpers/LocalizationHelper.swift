@@ -138,6 +138,11 @@ struct Localized {
     static let showSleepTimerButton = "show_sleep_timer_button".localized
     static let showSleepTimerButtonDescription = "show_sleep_timer_button_description".localized
 
+    // MARK: - Track List（列头排序/右键菜单/定位，web 版对齐）
+    static let showArtist = "show_artist".localized
+    static let showAlbum = "show_album".localized
+    static let locatePlayingTrack = "locate_playing_track".localized
+
     // MARK: - Settings Categories（web 版左导航分类对齐）
     static let settingsCategoryPlayback = "settings_category_playback".localized
     static let settingsCategoryAppearance = "settings_category_appearance".localized

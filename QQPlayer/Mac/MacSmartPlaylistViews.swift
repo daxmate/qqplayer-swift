@@ -210,8 +210,9 @@ struct MacSmartPlaylistDetailSheet: View {
             activeTrackId: player.currentTrack?.stableId,
             isPlaying: player.isPlaying,
             artistNameResolver: resolveArtistName,
-            onPlay: { track in play(track, queue: queue) },
-            onSelect: { _ in }
+            onPlay: { track, sortedQueue in play(track, queue: sortedQueue) },
+            onSelect: { _ in },
+            onPlayNext: { player.insertNext($0) }
         )
     }
 

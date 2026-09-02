@@ -86,6 +86,11 @@
 
 /* Settings */
 
+/* Track list context menu (A3) */
+"show_artist" = "К исполнителю";
+"show_album" = "К альбому";
+"locate_playing_track" = "Найти текущий трек";
+
 /* Settings categories (web 版左导航分类对齐) */
 /* Appearance theme */
 "settings_category_playback" = "Воспроизведение";
