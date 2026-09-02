@@ -63,6 +63,8 @@ struct MacLibraryView: View {
     @State private var showArtistSheet = false
     /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
     @State private var showWhatsNew = false
+    /// 曲库文件夹在扫描中变更 → 索引结束后自动补扫
+    @State private var rescanWhenIdle = false
 
     // Search state (sidebar search field + grouped results)
     @State private var searchText = ""
@@ -130,6 +132,11 @@ struct MacLibraryView: View {
                 if !debouncedSearchText.isEmpty {
                     performSearch(query: debouncedSearchText)
                 }
+                // 曲库文件夹在扫描中变更：索引结束后补一次重扫
+                if rescanWhenIdle {
+                    rescanWhenIdle = false
+                    indexer.start()
+                }
             }
         }
         .onChange(of: searchText) { newValue in
@@ -163,9 +170,14 @@ struct MacLibraryView: View {
             reloadLibrary()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFoldersChanged"))) { _ in
-            // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）
+            // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）。
+            // 若正在扫描，start() 会被 guard 吞掉 → 标记等索引结束自动补扫。
             reloadLibrary()
-            indexer.start()
+            if indexer.isIndexing {
+                rescanWhenIdle = true
+            } else {
+                indexer.start()
+            }
         }
     }
 

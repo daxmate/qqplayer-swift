@@ -516,15 +516,22 @@ class StateManager: @unchecked Sendable {
     }
 
     #if os(macOS)
-        /// macOS 曲库文件夹列表：设置页「音乐库」添加的外部文件夹；
-        /// 未配置（空数组）时回退默认 ~/Music/QQPlayer（对齐桌面端约定）。
+        /// macOS 曲库文件夹列表：默认 ~/Music/QQPlayer 始终在列，加上设置页
+        /// 「音乐库」添加的外部文件夹（多根共存，去重）。对齐用户期望：添加
+        /// 新路径不冲掉默认目录。
         func getMusicFolderURLs() -> [URL] {
             let defaultURL = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Music", isDirectory: true)
                 .appendingPathComponent("QQPlayer", isDirectory: true)
-            let configured = DeleteSettings.load().libraryFolders
-            guard !configured.isEmpty else { return [defaultURL] }
-            return configured.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+            var folders = [defaultURL]
+            let defaultPath = defaultURL.standardizedFileURL.path
+            for path in DeleteSettings.load().libraryFolders {
+                let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+                if url.standardizedFileURL.path != defaultPath {
+                    folders.append(url)
+                }
+            }
+            return folders
         }
     #endif
 
