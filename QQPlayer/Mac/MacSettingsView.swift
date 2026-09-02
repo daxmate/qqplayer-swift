@@ -12,27 +12,58 @@ import AppKit
 import SwiftUI
 
 struct MacSettingsView: View {
+    /// 设置分类（web 版左导航语义；后续加音乐库/歌词/快捷键等分类时在此扩展）
+    private enum SettingsCategory: String, CaseIterable, Hashable {
+        case playback
+        case appearance
+        case about
+
+        var title: String {
+            switch self {
+            case .playback: return Localized.settingsCategoryPlayback
+            case .appearance: return Localized.settingsCategoryAppearance
+            case .about: return Localized.settingsCategoryAbout
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .playback: return "play.circle"
+            case .appearance: return "paintbrush"
+            case .about: return "info.circle"
+            }
+        }
+    }
+
+    @State private var selectedCategory: SettingsCategory = .playback
     @State private var deleteSettings = DeleteSettings.load()
     @State private var showEQSettings = false
 
     var body: some View {
-        TabView {
-            MacPlaybackSettingsView(showEQSettings: $showEQSettings)
-                .tabItem {
-                    Label(Localized.settingsCategoryPlayback, systemImage: "play.circle")
-                }
+        // 左侧分类导航 + 右侧内容区（web 版布局；分类多了比顶部 tab 更合理）
+        HStack(spacing: 0) {
+            List(SettingsCategory.allCases, id: \.self, selection: $selectedCategory) { category in
+                Label(category.title, systemImage: category.icon)
+                    .tag(category)
+            }
+            .listStyle(.sidebar)
+            .frame(minWidth: 170)
 
-            MacAppearanceSettingsView()
-                .tabItem {
-                    Label(Localized.settingsCategoryAppearance, systemImage: "paintbrush")
-                }
+            Divider()
 
-            MacAboutSettingsView()
-                .tabItem {
-                    Label(Localized.settingsCategoryAbout, systemImage: "info.circle")
+            Group {
+                switch selectedCategory {
+                case .playback:
+                    MacPlaybackSettingsView(showEQSettings: $showEQSettings)
+                case .appearance:
+                    MacAppearanceSettingsView()
+                case .about:
+                    MacAboutSettingsView()
                 }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 540, minHeight: 400)
+        .frame(minWidth: 560, minHeight: 400)
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
         }
