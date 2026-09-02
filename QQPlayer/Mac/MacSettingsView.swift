@@ -47,7 +47,7 @@ struct MacSettingsView: View {
                     .tag(category)
             }
             .listStyle(.sidebar)
-            .frame(minWidth: 170)
+            .frame(width: 220)
 
             Divider()
 
@@ -63,7 +63,7 @@ struct MacSettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 560, minHeight: 400)
+        .frame(minWidth: 620, minHeight: 420)
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
         }
