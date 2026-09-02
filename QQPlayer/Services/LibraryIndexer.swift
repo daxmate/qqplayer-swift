@@ -889,51 +889,64 @@ class LibraryIndexer: NSObject, ObservableObject {
     /// The iCloud status is re-read per file rather than snapshotted so a
     /// mid-scan auth failure still halts further iCloud reads.
     nonisolated private func indexFile(_ fileURL: URL) async {
-        let isLocalFile = !fileURL.path.contains("Mobile Documents")
+        #if os(macOS)
+            // macOS：用户添加的文件夹（含 iCloud Drive 路径）一律按本地文件处理——
+            // Mobile Documents 判断是 iOS 容器语义；Mac 的 iCloud Drive 在本地
+            // 文件系统直接可读，无鉴权/下载门（2026-09-02 用户添加 iOS 版 iCloud
+            // 曲库全被跳过的根因）。
+            await processLocalFile(fileURL)
+        #else
+            let isLocalFile = !fileURL.path.contains("Mobile Documents")
 
-        if !isLocalFile {
-            let status = await AppCoordinator.shared.iCloudStatus
-            let isAvailable = await AppCoordinator.shared.isiCloudAvailable
-            if status == .authenticationRequired || !isAvailable {
-                print("🚫 Skipping iCloud file processing - iCloud authentication required: \(fileURL.lastPathComponent)")
-                return
+            if !isLocalFile {
+                let status = await AppCoordinator.shared.iCloudStatus
+                let isAvailable = await AppCoordinator.shared.isiCloudAvailable
+                if status == .authenticationRequired || !isAvailable {
+                    print("🚫 Skipping iCloud file processing - iCloud authentication required: \(fileURL.lastPathComponent)")
+                    return
+                }
             }
-        }
 
-        await processLocalFile(fileURL)
+            await processLocalFile(fileURL)
+        #endif
     }
 
     nonisolated private func processLocalFile(_ fileURL: URL) async {
         do {
             print("🎵 Starting to process file: \(fileURL.lastPathComponent)")
 
-            let isLocalFile = !fileURL.path.contains("Mobile Documents")
+            #if os(macOS)
+                // macOS 本地文件：无 iCloud 下载步骤
+                print("📱 Processing local file (macOS): \(fileURL.lastPathComponent)")
+            #else
+                let isLocalFile = !fileURL.path.contains("Mobile Documents")
 
-            // Only try to download from iCloud if it's actually an iCloud file
-            if !isLocalFile {
-                do {
-                    try await CloudDownloadManager.shared.ensureLocal(fileURL)
-                    print("✅ iCloud file ensured local: \(fileURL.lastPathComponent)")
-                } catch {
-                    print("⚠️ Failed to ensure iCloud file is local: \(fileURL.lastPathComponent) - \(error)")
+                // Only try to download from iCloud if it's actually an iCloud file
+                if !isLocalFile {
+                    do {
+                        try await CloudDownloadManager.shared.ensureLocal(fileURL)
+                        print("✅ iCloud file ensured local: \(fileURL.lastPathComponent)")
+                    } catch {
+                        print("⚠️ Failed to ensure iCloud file is local: \(fileURL.lastPathComponent) - \(error)")
 
-                    // Check for authentication errors
-                    if let cloudError = error as? CloudDownloadError {
-                        switch cloudError {
-                        case .authenticationRequired, .accessDenied:
-                            print("🔐 Authentication error in LibraryIndexer - switching to offline mode")
-                            await AppCoordinator.shared.handleiCloudAuthenticationError()
-                            return // Skip this file
-                        default:
-                            break
+                        // Check for authentication errors
+                        if let cloudError = error as? CloudDownloadError {
+                            switch cloudError {
+                            case .authenticationRequired, .accessDenied:
+                                print("🔐 Authentication error in LibraryIndexer - switching to offline mode")
+                                await AppCoordinator.shared.handleiCloudAuthenticationError()
+                                return // Skip this file
+                            default:
+                                break
+                            }
                         }
-                    }
 
-                    // Continue processing even if download fails (for other errors)
+                        // Continue processing even if download fails (for other errors)
+                    }
+                } else {
+                    print("📱 Processing local file (no iCloud download needed): \(fileURL.lastPathComponent)")
                 }
-            } else {
-                print("📱 Processing local file (no iCloud download needed): \(fileURL.lastPathComponent)")
-            }
+            #endif
 
             print("🆔 Generating stable ID for: \(fileURL.lastPathComponent)")
             let stableId = try generateStableId(for: fileURL)
