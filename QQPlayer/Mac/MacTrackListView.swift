@@ -132,46 +132,20 @@ struct MacTrackListView: View {
         }
     }
 
-    // MARK: - Toolbar（定位当前播放 / 多选批量条）
+    // MARK: - Toolbar（定位当前播放；2026-09-02 用户拍板：去掉顶部批量条，
+    // 多选操作全部走右键菜单——单击选中是 macOS 常态，选中 1 行弹批量条很突兀）
 
     private var toolbarRow: some View {
-        HStack(spacing: 10) {
-            if !selectedRows.isEmpty {
-                // 多选批量条（web 版 PlaylistBatchBar 对齐）：已选 n 首 + 移到废纸篓 + 清空选择
-                Label(Localized.selectedCount(selectedRows.count), systemImage: "checkmark.circle")
+        HStack {
+            Button {
+                locateActiveTrack()
+            } label: {
+                Label(Localized.locatePlayingTrack, systemImage: "location")
                     .font(.callout)
-                    .foregroundColor(.secondary)
-                Button {
-                    let tracks = displayedRows
-                        .filter { selectedRows.contains($0.id) }
-                        .map(\.track)
-                    requestTrash(tracks)
-                } label: {
-                    Label(Localized.moveToTrash, systemImage: "trash")
-                        .font(.callout)
-                }
-                .buttonStyle(.borderless)
-                .disabled(selectedRows.isEmpty)
-                Spacer()
-                Button {
-                    selectedRows.removeAll()
-                } label: {
-                    Image(systemName: "xmark.circle")
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("clear_selection_help".localized)
-            } else {
-                Button {
-                    locateActiveTrack()
-                } label: {
-                    Label(Localized.locatePlayingTrack, systemImage: "location")
-                        .font(.callout)
-                }
-                .buttonStyle(.borderless)
-                .disabled(activeTrackId == nil)
-                Spacer()
             }
+            .buttonStyle(.borderless)
+            .disabled(activeTrackId == nil)
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
@@ -384,23 +358,32 @@ struct MacTrackListView: View {
 
             for track in tracks {
                 let url = URL(fileURLWithPath: track.path)
+                MacTrashLogger.log("开始处理: \(track.title) | path=\(track.path)")
                 // web 语义：磁盘文件不存在（已丢）→ 照常清理引用计入 deleted；
                 // trash 失败且文件还在 → errors（保留曲目）；库内 → 移系统废纸篓
                 if fm.fileExists(atPath: url.path) {
                     do {
                         try fm.trashItem(at: url, resultingItemURL: nil)
+                        MacTrashLogger.log("trashItem 成功: \(track.title)")
                     } catch {
                         failedCount += 1
-                        print("🗑️ moveToTrash failed for \(track.title): \(error)")
+                        let msg = "🗑️ moveToTrash failed for \(track.title): \(error)"
+                        print(msg)
+                        MacTrashLogger.log(msg)
                         continue
                     }
+                } else {
+                    MacTrashLogger.log("文件不存在(磁盘已丢): \(track.path)")
                 }
                 do {
                     try DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
                     deletedAny = true
+                    MacTrashLogger.log("deleteTrack 成功: \(track.title)")
                 } catch {
                     failedCount += 1
-                    print("🗑️ deleteTrack failed for \(track.title): \(error)")
+                    let msg = "🗑️ deleteTrack failed for \(track.title): \(error)"
+                    print(msg)
+                    MacTrashLogger.log(msg)
                 }
             }
 

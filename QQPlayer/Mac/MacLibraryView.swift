@@ -223,7 +223,15 @@ struct MacLibraryView: View {
                         .foregroundColor(.secondary)
                 } else {
                     Button {
-                        indexer.start()
+                        // 2026-09-02 A4 修复：dataless 自动补扫在跑时 start() 会被
+                        // guard !isIndexing 静默吞掉 → 手动刷新"没反应"。改为排队：
+                        // 扫描结束后由 onReceive(isIndexing) 补一次重扫
+                        if indexer.isIndexing {
+                            MacScanLogger.log("手动刷新时正在扫描，标记排队（rescanWhenIdle）")
+                            rescanWhenIdle = true
+                        } else {
+                            indexer.start()
+                        }
                     } label: {
                         Label("refresh_library".localized, systemImage: "arrow.clockwise")
                     }

@@ -12,9 +12,10 @@ struct QQPlayerMacApp: App {
     @State private var deleteSettings = DeleteSettings.load()
 
     init() {
-        // 诊断基建：stderr（print + Swift fatal error）重定向落盘，
-        // 运行时报错可离线读取（~/Library/Logs/QQPlayerMac/stderr.log）
+        // 诊断基建：stderr + stdout 重定向落盘（print 走 stdout，Swift fatal 走 stderr），
+        // 运行时报错/业务日志可离线读取（~/Library/Logs/QQPlayerMac/{stdout,stderr}.log）
         MacScanLogger.redirectStderr()
+        MacScanLogger.redirectStdout()
     }
 
     var body: some Scene {
