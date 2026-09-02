@@ -183,6 +183,11 @@ struct MacLibraryView: View {
             // 歌单管理（新建/重命名/删除/增删曲目）后刷新歌单列表与自动歌单计数
             reloadLibrary()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            // iOS 同款标准通知：曲目删除/移动后整库重载（与 PlaylistsChanged 双通道，
+            // 2026-09-02 A4 用户反馈删除后曲库不刷新——deleteTrack 后必须重拉 tracks）
+            reloadLibrary()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFoldersChanged"))) { _ in
             // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）。
             // 若正在扫描，start() 会被 guard 吞掉 → 标记等索引结束自动补扫。

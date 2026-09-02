@@ -22,6 +22,8 @@ import SwiftUI
 private final class MacTrackTableRow: NSObject, Identifiable {
     let id: String
     let track: Track
+    /// 当前列表显示序号（随排序同步刷新；非 @objc——不参与排序比较）
+    var displayIndex: Int = 0
     /// 排序/显示字段：@objc 存储属性（title/artist/duration）
     @objc let title: String
     @objc let artistName: String
@@ -184,11 +186,12 @@ struct MacTrackListView: View {
                     Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
                         .foregroundColor(.accentColor)
                 } else {
-                    Text(row.track.trackNo.map(String.init) ?? "")
+                    // 显示列表序号（1 起，随排序同步），不显示专辑 trackNo
+                    Text("\(row.displayIndex)")
                         .foregroundColor(.secondary)
                 }
             }
-            .width(32)
+            .width(40)
 
             TableColumn("title".localized, value: \.title) { row in
                 Text(row.track.title)
@@ -214,19 +217,8 @@ struct MacTrackListView: View {
                     .monospacedDigit()
             }
             .width(56)
-
-            TableColumn("") { row in
-                let isFavorite = favoriteIds.contains(row.track.stableId)
-                Button {
-                    try? AppCoordinator.shared.toggleFavorite(trackStableId: row.track.stableId)
-                } label: {
-                    Image(systemName: isFavorite ? "heart.fill" : "heart")
-                        .foregroundColor(isFavorite ? .pink : .secondary)
-                }
-                .buttonStyle(.plain)
-                .help(isFavorite ? "remove_from_liked_songs".localized : "add_to_liked_songs".localized)
-            }
-            .width(32)
+            // 2026-09-02 用户拍板：不显示心形列——收藏入口收敛到右键菜单/播放页红心，
+            // 否则行内红心让右键「加入喜欢」失去意义
         }
         // macOS 惯例：单击选中、双击播放（Table primaryAction 原生实现，
         // AppKit NSTableView 底层；勿改手势模拟）
@@ -277,8 +269,13 @@ struct MacTrackListView: View {
     }
 
     /// 让显示行与排序状态同步（Table 内部按 sortOrder 重排，此处镜像供播放队列用）
+    /// 同时按显示顺序赋 displayIndex（# 列序号随排序刷新）
     private func syncDisplayedRows() {
-        displayedRows = rows.sorted(using: sortOrder)
+        let sorted = rows.sorted(using: sortOrder)
+        for (index, row) in sorted.enumerated() {
+            row.displayIndex = index + 1
+        }
+        displayedRows = sorted
     }
 
     // MARK: - Context menu（web 版 7 项对齐：播放/下一首播放/收藏/加歌单/进歌手/进专辑/歌单内移除）
@@ -407,21 +404,35 @@ struct MacTrackListView: View {
                 }
             }
 
-            // 播放队列联动（web removeSongsFromQueue 对齐）：从队列移除被删曲目；
-            // 正在播放的被删曲目 → 队列仍有歌则自动切下一首，否则停止
-            await handleDeletedTracksInPlayback(deletedStableIds)
-
+            // 通知先发（UI 立即刷新），播放队列联动后置（SFB 引擎切歌/加载可能耗时，
+            // 若 await 在通知前，加载慢会拖住曲库刷新——用户 2026-09-02 反馈删除不刷新）
             selectedRows.removeAll()
+
+            // 本地即时移除（不等父级通知链）：当前列表立即消失，序号重排
+            // （父级 reloadLibrary 随后全量重拉对齐歌单/专辑等其它视图）
+            if !deletedStableIds.isEmpty {
+                displayedRows.removeAll { deletedStableIds.contains($0.id) }
+                for (index, row) in displayedRows.enumerated() {
+                    row.displayIndex = index + 1
+                }
+            }
 
             if deletedAny {
                 // 先刷新全库（tracks/歌单），再刷新收藏列表——顺序相关：
                 // reloadLibrary 先重拉 tracks，reloadLikedTracks 才能用新数据过滤
+                NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
                 NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
                 NotificationCenter.default.post(name: NSNotification.Name("FavoritesChanged"), object: nil)
+            } else if failedCount > 0 {
+                // 全部失败（文件仍在）：也发一次 LibraryNeedsRefresh，让曲库列表与 DB 对齐
+                NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
             }
             if failedCount > 0 {
                 trashFailureAlert = Localized.moveToTrashFailed(count: failedCount)
             }
+
+            // 播放队列联动（不阻塞上面通知）
+            await handleDeletedTracksInPlayback(deletedStableIds)
         }
     }
 
