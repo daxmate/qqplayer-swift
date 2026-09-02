@@ -28,6 +28,7 @@
 		50455E615D9FAE84C741EB6E /* FormatInfoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071C4A9B25AFB9B772D8625E /* FormatInfoTests.swift */; };
 		5C3389AA47637899080AFA31 /* EQFrequencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D963241E1B89FFA0906475 /* EQFrequencyTests.swift */; };
 		5DD1433176A94929971A3F64 /* MacIndexingGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC7716081AB4D7298E62155 /* MacIndexingGateTests.swift */; };
+		A1E2F3A4B5C6D7E8F9A0B1C2 /* ArtworkExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */; };
 		664B6BEF05384F2098030629 /* SmartPlaylistDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51C1329002F4C3E963D14AC /* SmartPlaylistDataTests.swift */; };
 		667F37CD3A564FC66FC620E4 /* PlaybackOrderModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AE00850E1369590B0BB09C7 /* PlaybackOrderModeTests.swift */; };
 		6CC3183EEB974716AC10BD10 /* ModelsRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9706677182164C8987546D81 /* ModelsRoundTripTests.swift */; };
@@ -41,11 +42,11 @@
 		A7B1EF33208A478896011764 /* SpotifyAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4DA91270EB4FC2A4AF992C /* SpotifyAPITests.swift */; };
 		B1A000000000000000000002 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 2312D6192E6090E4007F756D /* GRDB */; };
 		B1A000000000000000000003 /* SFBAudioEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 230D66362E894889007C642A /* SFBAudioEngine */; };
-		B1A000000000000000000016 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000010 /* en */; };
-		B1A000000000000000000017 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000011 /* zh-Hans */; };
-		B1A000000000000000000018 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000012 /* zh-Hant */; };
-		B1A000000000000000000019 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000013 /* fr */; };
-		B1A00000000000000000001A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000014 /* ru */; };
+		B1A000000000000000000016 /* en in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000010 /* en */; };
+		B1A000000000000000000017 /* zh-Hans in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000011 /* zh-Hans */; };
+		B1A000000000000000000018 /* zh-Hant in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000012 /* zh-Hant */; };
+		B1A000000000000000000019 /* fr in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000013 /* fr */; };
+		B1A00000000000000000001A /* ru in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000014 /* ru */; };
 		B1C108FAF1AB4B1DBB94FE9B /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0399BDBD88CA4F6C9D2D731E /* WhatsNewTests.swift */; };
 		C21A43E3C4B1AEB96EDDE12E /* ModelCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6713EFB0F4A28ACE3266FB2 /* ModelCodableTests.swift */; };
 		CA3755439F62402997608072 /* LyricsSearchCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 478898B985884E89AA416C7F /* LyricsSearchCacheTests.swift */; };
@@ -131,6 +132,7 @@
 		23C312DA2E78015500342F7C /* SiriIntentsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SiriIntentsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		23C312DC2E78015500342F7C /* Intents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Intents.framework; path = System/Library/Frameworks/Intents.framework; sourceTree = SDKROOT; };
 		2DC7716081AB4D7298E62155 /* MacIndexingGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacIndexingGateTests.swift; sourceTree = "<group>"; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkExtractionTests.swift; sourceTree = "<group>"; };
 		478898B985884E89AA416C7F /* LyricsSearchCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsSearchCacheTests.swift; sourceTree = "<group>"; };
 		6793C3A51095FE68378E031D /* StableIdTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StableIdTests.swift; sourceTree = "<group>"; };
 		6C4DA91270EB4FC2A4AF992C /* SpotifyAPITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyAPITests.swift; sourceTree = "<group>"; };
@@ -146,8 +148,8 @@
 		ADB2386BA4DB497A8C3193F9 /* PlayHistoryCleanupTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayHistoryCleanupTests.swift; sourceTree = "<group>"; };
 		B1A000000000000000000001 /* QQPlayerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QQPlayerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1A000000000000000000010 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = QQPlayer/Resources/en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		B1A000000000000000000011 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = zh-Hans; path = QQPlayer/Resources/zh-Hans.lproj/Localizable.strings; sourceTree = "<group>"; };
-		B1A000000000000000000012 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = zh-Hant; path = QQPlayer/Resources/zh-Hant.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B1A000000000000000000011 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "QQPlayer/Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		B1A000000000000000000012 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "QQPlayer/Resources/zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		B1A000000000000000000013 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = QQPlayer/Resources/fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B1A000000000000000000014 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = QQPlayer/Resources/ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B2AE1DBB52BD462D8FAA704D /* SmartPlaylistUILogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartPlaylistUILogicTests.swift; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 			membershipExceptions = (
 				Info.plist,
 				Mac/MacAlbumArtistViews.swift,
+				Mac/MacArtworkThumbnail.swift,
 				Mac/MacEQImportView.swift,
 				Mac/MacEQSettingsView.swift,
 				Mac/MacGraphicEQ10BandEditorView.swift,
@@ -175,8 +178,8 @@
 				Mac/MacLyricsSearchView.swift,
 				Mac/MacLyricsView.swift,
 				Mac/MacManualEQEditorView.swift,
-				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacPlayerView.swift,
+				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
@@ -221,6 +224,7 @@
 				Helpers/LocalizationHelper.swift,
 				Helpers/ObjCExceptionCatcher.m,
 				Mac/MacAlbumArtistViews.swift,
+				Mac/MacArtworkThumbnail.swift,
 				Mac/MacEQImportView.swift,
 				Mac/MacEQSettingsView.swift,
 				Mac/MacGraphicEQ10BandEditorView.swift,
@@ -229,8 +233,8 @@
 				Mac/MacLyricsSearchView.swift,
 				Mac/MacLyricsView.swift,
 				Mac/MacManualEQEditorView.swift,
-				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacPlayerView.swift,
+				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
@@ -425,6 +429,7 @@
 				23C312DB2E78015500342F7C /* Frameworks */,
 				2312D60D2E6090E2007F756D /* Products */,
 				6340A698F069DD4C6EBF660D /* QQPlayerTests */,
+				5F4656413047950900D81EAE /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -451,6 +456,18 @@
 				6DD1F42DAA4891B4DF29507C /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		5F4656413047950900D81EAE /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				B1A000000000000000000010 /* en */,
+				B1A000000000000000000011 /* zh-Hans */,
+				B1A000000000000000000012 /* zh-Hant */,
+				B1A000000000000000000013 /* fr */,
+				B1A000000000000000000014 /* ru */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		6340A698F069DD4C6EBF660D /* QQPlayerTests */ = {
@@ -485,6 +502,7 @@
 				7D39DE9FAECA4B4799C0FA6D /* InterruptionResumePolicyTests.swift */,
 				F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */,
 				2DC7716081AB4D7298E62155 /* MacIndexingGateTests.swift */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */,
 				09BA4C067F2B43F4A9FBF149 /* DatabasePathResolverTests.swift */,
 			);
 			path = QQPlayerTests;
@@ -766,11 +784,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B1A000000000000000000016 /* Localizable.strings in Resources */,
-				B1A000000000000000000017 /* Localizable.strings in Resources */,
-				B1A000000000000000000018 /* Localizable.strings in Resources */,
-				B1A000000000000000000019 /* Localizable.strings in Resources */,
-				B1A00000000000000000001A /* Localizable.strings in Resources */,
+				B1A000000000000000000016 /* en in Resources */,
+				B1A000000000000000000017 /* zh-Hans in Resources */,
+				B1A000000000000000000018 /* zh-Hant in Resources */,
+				B1A000000000000000000019 /* fr in Resources */,
+				B1A00000000000000000001A /* ru in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -838,6 +856,7 @@
 				DD25E8BCF490415CAF2818C0 /* InterruptionResumePolicyTests.swift in Sources */,
 				908024B804AD4AB99325E36B /* MacPlaybackGateTests.swift in Sources */,
 				5DD1433176A94929971A3F64 /* MacIndexingGateTests.swift in Sources */,
+				A1E2F3A4B5C6D7E8F9A0B1C2 /* ArtworkExtractionTests.swift in Sources */,
 				4E4849B26C9142B8A27FCAE1 /* DatabasePathResolverTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

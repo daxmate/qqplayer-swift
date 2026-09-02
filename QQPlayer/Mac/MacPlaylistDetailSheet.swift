@@ -59,13 +59,21 @@ struct MacPlaylistDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(currentTitle)
-                .font(.title2)
-                .fontWeight(.bold)
-                .lineLimit(1)
-            Text(String(format: "track_count".localized, tracks.count))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            MacArtworkThumbnail(
+                track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
+                size: 56,
+                cornerRadius: 8,
+                placeholderIcon: "list.bullet.rectangle"
+            )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(currentTitle)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .lineLimit(1)
+                Text(String(format: "track_count".localized, tracks.count))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             Spacer()
             Button("playlist_manage_play_all".localized) { onPlayAll() }
                 .keyboardShortcut(.return)

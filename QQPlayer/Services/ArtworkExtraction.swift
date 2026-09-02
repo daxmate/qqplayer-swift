@@ -19,18 +19,40 @@ extension ArtworkManager {
     nonisolated func extractArtwork(from url: URL) async -> ArtworkImage? {
         let ext = url.pathExtension.lowercased()
 
+        let embedded: ArtworkImage?
         if ext == "flac" {
-            return await extractFlacArtwork(from: url)
+            embedded = await extractFlacArtwork(from: url)
         } else if ext == "mp3" {
-            return await extractMp3Artwork(from: url)
+            embedded = await extractMp3Artwork(from: url)
         } else if ext == "m4a" || ext == "mp4" || ext == "aac" {
-            return await extractM4AArtwork(from: url)
+            embedded = await extractM4AArtwork(from: url)
         } else if ext == "dsf" || ext == "dff" {
-            return await extractDSDArtwork(from: url)
+            embedded = await extractDSDArtwork(from: url)
         } else if ext == "opus" || ext == "ogg" {
-            return await extractGenericArtwork(from: url)
+            embedded = await extractGenericArtwork(from: url)
+        } else {
+            embedded = nil
         }
 
+        if let embedded {
+            return embedded
+        }
+        // 内嵌封面缺失时兜底：同目录 cover.jpg / cover.png / folder.jpg（对齐 web 版行为）
+        return Self.coverImage(inDirectoryOf: url)
+    }
+
+    /// 查找音频同目录的封面图（cover.jpg / cover.png / folder.jpg），无则 nil。
+    nonisolated static func coverImage(inDirectoryOf audioURL: URL) -> ArtworkImage? {
+        let directory = audioURL.deletingLastPathComponent()
+        let candidates = ["cover.jpg", "cover.png", "folder.jpg", "front.jpg"]
+        for name in candidates {
+            let candidate = directory.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: candidate.path),
+               let data = try? Data(contentsOf: candidate),
+               let image = ArtworkImage(data: data) {
+                return image
+            }
+        }
         return nil
     }
 

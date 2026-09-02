@@ -235,9 +235,12 @@ private struct MacSearchAlbumRow: View {
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 8) {
-                Image(systemName: "square.stack")
-                    .foregroundColor(.secondary)
-                    .frame(width: 16)
+                MacArtworkThumbnail(
+                    track: MacArtworkResolver.representativeTrack(forAlbum: album),
+                    size: 28,
+                    cornerRadius: 4,
+                    placeholderIcon: "square.stack"
+                )
 
                 Text(album.title)
                     .lineLimit(1)
@@ -293,9 +296,12 @@ private struct MacSearchPlaylistRow: View {
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 8) {
-                Image(systemName: "list.bullet.rectangle")
-                    .foregroundColor(.secondary)
-                    .frame(width: 16)
+                MacArtworkThumbnail(
+                    track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
+                    size: 28,
+                    cornerRadius: 4,
+                    placeholderIcon: "list.bullet.rectangle"
+                )
 
                 Text(playlist.title)
                     .lineLimit(1)

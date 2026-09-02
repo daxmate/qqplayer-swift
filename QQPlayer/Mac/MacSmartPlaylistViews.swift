@@ -9,7 +9,8 @@
 //
 //  Icon/subtitle decisions mirror the iOS SmartPlaylistUILogic so both
 //  platforms stay visually consistent; the iOS file is not compiled into the
-//  Mac target, hence the local copy.
+//  Mac target, hence the local copy. Card artwork uses MacArtworkCollage
+//  (2x2 cover collage, mirroring the iOS SmartPlaylistCardView).
 //
 
 import SwiftUI
@@ -46,11 +47,11 @@ enum MacSmartPlaylistUILogic {
 }
 
 /// Horizontal pinned-card strip (4 cards) at the top of the playlist page.
-/// Artwork collage is intentionally not rendered here — the macOS artwork
-/// pipeline is not wired up yet (album/artist pages use placeholder icons
-/// too); the card keeps the MacAlbumGridView placeholder style.
+/// Each card renders a 2x2 cover collage of its representative tracks
+/// (MacArtworkCollage) with the SF Symbol icon as placeholder fallback.
 struct MacSmartPlaylistCardStrip: View {
     let cards: [SmartPlaylistCardInfo]
+    let coverTracks: [SmartPlaylistKind: [Track]]
     let onSelect: (SmartPlaylistKind) -> Void
 
     private let cardWidth: CGFloat = 116
@@ -63,14 +64,12 @@ struct MacSmartPlaylistCardStrip: View {
                         onSelect(info.kind)
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.18))
-                                .frame(width: cardWidth, height: cardWidth)
-                                .overlay(
-                                    Image(systemName: MacSmartPlaylistUILogic.iconName(for: info.kind))
-                                        .font(.system(size: 30))
-                                        .foregroundColor(.secondary)
-                                )
+                            MacArtworkCollage(
+                                tracks: coverTracks[info.kind] ?? [],
+                                size: cardWidth,
+                                cornerRadius: 8,
+                                placeholderIcon: MacSmartPlaylistUILogic.iconName(for: info.kind)
+                            )
                             Text(Localized.smartPlaylistTitle(info.kind))
                                 .font(.callout)
                                 .fontWeight(.medium)

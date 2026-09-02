@@ -29,14 +29,11 @@ struct MacAlbumGridView: View {
                         openAlbum(album)
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.18))
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay(
-                                    Image(systemName: "square.stack")
-                                        .font(.system(size: 28))
-                                        .foregroundColor(.secondary)
-                                )
+                            MacArtworkThumbnailFill(
+                                track: MacArtworkResolver.representativeTrack(forAlbum: album),
+                                cornerRadius: 8,
+                                placeholderIcon: "square.stack"
+                            )
                             Text(album.title)
                                 .font(.callout)
                                 .fontWeight(.medium)
@@ -90,10 +87,22 @@ struct MacAlbumDetailSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(album.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+            HStack(spacing: 12) {
+                MacArtworkThumbnail(
+                    track: MacArtworkResolver.representativeTrack(forAlbum: album),
+                    size: 120,
+                    cornerRadius: 10,
+                    placeholderIcon: "square.stack"
+                )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(album.title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    if let albumArtist = album.albumArtist, !albumArtist.isEmpty {
+                        Text(ArtistNameNormalizer.displayName(albumArtist))
+                            .foregroundColor(.secondary)
+                    }
+                }
                 Spacer()
                 Button("play".localized) { onPlay() }
                     .keyboardShortcut(.return)
@@ -248,6 +257,7 @@ struct MacPlaylistListView: View {
     let onPlay: (Playlist) -> Void
 
     @State private var smartCards: [SmartPlaylistCardInfo] = []
+    @State private var smartCoverTracks: [SmartPlaylistKind: [Track]] = [:]
     @State private var showSmartSheet = false
     @State private var selectedSmartKind: SmartPlaylistKind?
     @State private var showPlaylistSheet = false
@@ -258,7 +268,7 @@ struct MacPlaylistListView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Pinned automatic playlists — always visible, never user-editable.
-            MacSmartPlaylistCardStrip(cards: smartCards) { kind in
+            MacSmartPlaylistCardStrip(cards: smartCards, coverTracks: smartCoverTracks) { kind in
                 selectedSmartKind = kind
                 showSmartSheet = true
             }
@@ -280,9 +290,13 @@ struct MacPlaylistListView: View {
                             selectedPlaylist = playlist
                             showPlaylistSheet = true
                         } label: {
-                            HStack {
-                                Image(systemName: "list.bullet.rectangle")
-                                    .foregroundColor(.secondary)
+                            HStack(spacing: 10) {
+                                MacArtworkThumbnail(
+                                    track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
+                                    size: 36,
+                                    cornerRadius: 6,
+                                    placeholderIcon: "list.bullet.rectangle"
+                                )
                                 Text(playlist.title)
                                     .lineLimit(1)
                                 Spacer()
@@ -334,11 +348,17 @@ struct MacPlaylistListView: View {
     private func reloadSmartCards() {
         do {
             smartCards = try SmartPlaylistStore.cardInfos()
+            var covers: [SmartPlaylistKind: [Track]] = [:]
+            for kind in SmartPlaylistKind.allCases {
+                covers[kind] = try SmartPlaylistStore.coverTracks(for: kind, limit: 4)
+            }
+            smartCoverTracks = covers
         } catch {
             // Keep the four cards visible with zero counts on failure.
             smartCards = SmartPlaylistKind.allCases.map {
                 SmartPlaylistCardInfo(kind: $0, title: $0.rawValue, count: 0)
             }
+            smartCoverTracks = [:]
             print("❌ MacPlaylistListView smart cardInfos failed: \(error)")
         }
     }
