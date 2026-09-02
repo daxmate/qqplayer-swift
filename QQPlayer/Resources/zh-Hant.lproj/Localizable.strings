@@ -207,9 +207,7 @@
 
 "player_controls" = "播放器控制";
 
-"show_lyrics_button" = "顯示歌詞按鈕";
 
-"show_lyrics_button_description" = "當睡眠定時按鈕關閉時，在播放器中顯示歌詞按鈕。";
 
 "show_sleep_timer_button" = "顯示睡眠定時按鈕";
 
@@ -880,9 +878,7 @@
 "load_library_failed" = "載入音樂庫失敗：%@";
 "not_playing" = "未在播放";
 "karaoke_mode_help" = "跟唱模式（倍速 / 單句循環 / AB 循環）";
-"toggle_lyrics_help" = "顯示 / 隱藏歌詞";
 "lyrics" = "歌詞";
-"close_lyrics_panel" = "關閉歌詞面板";
 "lyrics_loading" = "歌詞載入中…";
 "instrumental_no_lyrics" = "純音樂，無歌詞";
 "no_lyrics" = "暫無歌詞";

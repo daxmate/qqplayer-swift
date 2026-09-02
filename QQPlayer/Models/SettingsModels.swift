@@ -146,7 +146,6 @@ struct DeleteSettings: Codable {
     var deleteFromLibraryOnly: Bool = true
     var lastLibraryScanDate: Date?
     var autoCreateFolderPlaylists: Bool = true
-    var showLyricsButton: Bool = true
     var showSleepTimerButton: Bool = false
 
     // Home screen section visibility & order
@@ -166,7 +165,6 @@ struct DeleteSettings: Codable {
         deleteFromLibraryOnly = try container.decodeIfPresent(Bool.self, forKey: .deleteFromLibraryOnly) ?? true
         lastLibraryScanDate = try container.decodeIfPresent(Date.self, forKey: .lastLibraryScanDate)
         autoCreateFolderPlaylists = try container.decodeIfPresent(Bool.self, forKey: .autoCreateFolderPlaylists) ?? true
-        showLyricsButton = try container.decodeIfPresent(Bool.self, forKey: .showLyricsButton) ?? true
         showSleepTimerButton = try container.decodeIfPresent(Bool.self, forKey: .showSleepTimerButton) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections

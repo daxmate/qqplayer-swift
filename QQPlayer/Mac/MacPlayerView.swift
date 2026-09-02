@@ -26,15 +26,13 @@ struct MacPlayerView: View {
     @State private var isDragging = false
     @State private var lyrics: Lyrics?
     @State private var lyricsLoading = false
-    @State private var showLyrics = true
     @State private var favoriteIds: Set<String> = []
     @State private var sleepTimerEndDate: Date?
     @State private var sleepTimerTask: Task<Void, Never>?
     @ObservedObject private var karaoke = KaraokeController.shared
     @ObservedObject private var player = PlayerEngine.shared
 
-    /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：歌词按钮显示、睡眠定时器隐藏）
-    @State private var showLyricsButton: Bool = DeleteSettings.load().showLyricsButton
+    /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：睡眠定时器隐藏）
     @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
     /// 歌词搜索 sheet（手动指定歌词）
     @State private var showLyricsSearch = false
@@ -45,28 +43,18 @@ struct MacPlayerView: View {
             if !MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: karaoke.isKaraokeOn) {
                 playerSection
             }
-            if showLyrics || karaoke.isKaraokeOn {
-                Divider()
-                MacLyricsView(
-                    lyrics: lyrics,
-                    currentTime: playbackTime,
-                    isLoading: lyricsLoading,
-                    onClose: {
-                        // 决策上收 MacPlaybackGate.lyricsCloseAction（有测试）
-                        switch MacPlaybackGate.lyricsCloseAction(isKaraokeOn: karaoke.isKaraokeOn) {
-                        case .exitKaraokeKeepPanel:
-                            karaoke.toggleKaraokeMode()
-                        case .closePanel:
-                            showLyrics = false
-                        }
-                    },
-                    onLyricsSearch: {
-                        showLyricsSearch = true
-                    }
-                )
-                .frame(maxHeight: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? .infinity : 330)
-                .frame(height: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? nil : 330)
-            }
+            // 歌词常驻显示（2026-09-02 用户拍板：歌词是本 APP 第一重要功能，不提供隐藏入口）
+            Divider()
+            MacLyricsView(
+                lyrics: lyrics,
+                currentTime: playbackTime,
+                isLoading: lyricsLoading,
+                onLyricsSearch: {
+                    showLyricsSearch = true
+                }
+            )
+            .frame(maxHeight: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? .infinity : 330)
+            .frame(height: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? nil : 330)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showLyricsSearch) {
@@ -83,20 +71,13 @@ struct MacPlayerView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: karaoke.isKaraokeOn)
-        .onChange(of: karaoke.isKaraokeOn) { isOn in
-            // 进入跟唱：确保歌词面板可见（大画面依赖歌词区；决策上收 MacPlaybackGate）
-            if MacPlaybackGate.shouldAutoShowLyrics(isKaraokeOn: isOn) {
-                showLyrics = true
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
             favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
-            // 设置页改了歌词/睡眠定时器开关后同步按钮可见性
+            // 设置页改了睡眠定时器开关后同步按钮可见性
             let settings = DeleteSettings.load()
-            showLyricsButton = settings.showLyricsButton
             showSleepTimerButton = settings.showSleepTimerButton
         }
         .task(id: track?.stableId) {
@@ -282,20 +263,6 @@ struct MacPlayerView: View {
                 .disabled(track == nil)
                 .help("karaoke_mode_help".localized)
 
-                // 歌词面板开关（默认显示，设置页可隐藏）
-                if showLyricsButton {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showLyrics.toggle()
-                        }
-                    } label: {
-                        Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble")
-                            .font(.system(size: 16))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(showLyrics ? .accentColor : .secondary)
-                    .help("toggle_lyrics_help".localized)
-                }
             }
 
             Spacer()

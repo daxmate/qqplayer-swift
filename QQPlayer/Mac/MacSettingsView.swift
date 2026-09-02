@@ -65,11 +65,6 @@ struct MacSettingsView: View {
 
     private var playerControlsSection: some View {
         Section(Localized.playerControls) {
-            Toggle(Localized.showLyricsButton, isOn: $deleteSettings.showLyricsButton)
-                .onChange(of: deleteSettings.showLyricsButton) { _ in
-                    deleteSettings.save()
-                }
-
             Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
                 .onChange(of: deleteSettings.showSleepTimerButton) { _ in
                     deleteSettings.save()

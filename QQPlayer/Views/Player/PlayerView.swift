@@ -247,7 +247,6 @@ struct PlayerView: View {
                         }
                     },
                     showSleepTimerButton: settings.showSleepTimerButton,
-                    showLyricsButton: settings.showLyricsButton,
                     isLoadingLyrics: isLoadingLyrics,
                     sleepTimerEndDate: sleepTimerEndDate,
                     onStartSleepTimer: { minutes in

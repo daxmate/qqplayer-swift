@@ -170,15 +170,6 @@ struct SettingsView: View {
                 }
 
                 Section(Localized.playerControls) {
-                    Toggle(Localized.showLyricsButton, isOn: $deleteSettings.showLyricsButton)
-                        .onChange(of: deleteSettings.showLyricsButton) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                    Text(Localized.showLyricsButtonDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
                     Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
                         .onChange(of: deleteSettings.showSleepTimerButton) { _, _ in
                             deleteSettings.save()

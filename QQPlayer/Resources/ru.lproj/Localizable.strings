@@ -109,8 +109,6 @@
 "delete_folder_playlists_confirm" = "Удалить плейлисты";
 "keep_folder_playlists" = "Сохранить плейлисты";
 "player_controls" = "Элементы управления плеером";
-"show_lyrics_button" = "Показывать кнопку текста песни";
-"show_lyrics_button_description" = "Показывать кнопку текста песни в плеере, когда кнопка таймера сна отключена.";
 "show_sleep_timer_button" = "Показывать кнопку таймера сна";
 "show_sleep_timer_button_description" = "Заменить кнопку текста песни в плеере на кнопку таймера сна.";
 
@@ -480,9 +478,7 @@
 "load_library_failed" = "Не удалось загрузить библиотеку: %@";
 "not_playing" = "Не воспроизводится";
 "karaoke_mode_help" = "Режим караоке (скорость / цикл строки / цикл AB)";
-"toggle_lyrics_help" = "Показать или скрыть текст";
 "lyrics" = "Текст песни";
-"close_lyrics_panel" = "Закрыть панель текста";
 "lyrics_loading" = "Загрузка текста…";
 "instrumental_no_lyrics" = "Инструментал, без текста";
 "no_lyrics" = "Нет текста";

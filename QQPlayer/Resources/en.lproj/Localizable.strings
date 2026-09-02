@@ -121,8 +121,6 @@
 "delete_folder_playlists_confirm" = "Delete playlists";
 "keep_folder_playlists" = "Keep playlists";
 "player_controls" = "Player Controls";
-"show_lyrics_button" = "Show Lyrics Button";
-"show_lyrics_button_description" = "Show the lyrics button in the player when the sleep timer button is disabled.";
 "show_sleep_timer_button" = "Show Sleep Timer Button";
 "show_sleep_timer_button_description" = "Replace the lyrics button in the player with a sleep timer button.";
 
@@ -501,9 +499,7 @@
 "load_library_failed" = "Failed to load library: %@";
 "not_playing" = "Not Playing";
 "karaoke_mode_help" = "Karaoke mode (speed / single-line loop / AB loop)";
-"toggle_lyrics_help" = "Show or hide lyrics";
 "lyrics" = "Lyrics";
-"close_lyrics_panel" = "Close lyrics panel";
 "lyrics_loading" = "Loading lyrics…";
 "instrumental_no_lyrics" = "Instrumental, no lyrics";
 "no_lyrics" = "No lyrics";

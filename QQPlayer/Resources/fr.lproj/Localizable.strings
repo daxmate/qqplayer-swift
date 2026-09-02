@@ -109,8 +109,6 @@
 "delete_folder_playlists_confirm" = "Supprimer les playlists";
 "keep_folder_playlists" = "Conserver les playlists";
 "player_controls" = "Contrôles du lecteur";
-"show_lyrics_button" = "Afficher le bouton Paroles";
-"show_lyrics_button_description" = "Affiche le bouton des paroles dans le lecteur lorsque le bouton de minuterie de sommeil est désactivé.";
 "show_sleep_timer_button" = "Afficher la minuterie de sommeil";
 "show_sleep_timer_button_description" = "Remplace le bouton des paroles dans le lecteur par une minuterie de sommeil.";
 
@@ -483,9 +481,7 @@
 "load_library_failed" = "Échec du chargement de la bibliothèque : %@";
 "not_playing" = "Rien en lecture";
 "karaoke_mode_help" = "Mode karaoké (vitesse / boucle de ligne / boucle AB)";
-"toggle_lyrics_help" = "Afficher ou masquer les paroles";
 "lyrics" = "Paroles";
-"close_lyrics_panel" = "Fermer le panneau des paroles";
 "lyrics_loading" = "Chargement des paroles…";
 "instrumental_no_lyrics" = "Instrumental, sans paroles";
 "no_lyrics" = "Pas de paroles";

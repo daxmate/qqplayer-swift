@@ -164,8 +164,9 @@ struct MacPlaybackGateSegmentFinishedTests {
 }
 
 struct MacPlaybackGateKaraokeLayoutTests {
-    // 跟唱大画面布局决策（2026-09-01 用户需求）：播放区隐藏/歌词撑满/自动开面板/x 按钮语义。
-    // 手势交互（双击 toggle）无法单测，但布局与关闭决策抽纯函数锁定，防止后续改动悄悄破坏。
+    // 跟唱大画面布局决策（2026-09-01 用户需求）：播放区隐藏/歌词撑满。
+    // 手势交互（双击 toggle）无法单测，但布局决策抽纯函数锁定，防止后续改动悄悄破坏。
+    // 2026-09-02：歌词面板常驻（无关闭入口），shouldAutoShowLyrics/lyricsCloseAction 已随关闭入口一起删除。
 
     @Test("跟唱开启：播放区隐藏，空间让给歌词")
     func karaokeOnHidesPlayerSection() {
@@ -177,21 +178,5 @@ struct MacPlaybackGateKaraokeLayoutTests {
     func karaokeOnExpandsLyrics() {
         #expect(MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: true))
         #expect(!MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: false))
-    }
-
-    @Test("进入跟唱：自动显示歌词面板（大画面依赖歌词区）")
-    func karaokeOnAutoShowsLyrics() {
-        #expect(MacPlaybackGate.shouldAutoShowLyrics(isKaraokeOn: true))
-        #expect(!MacPlaybackGate.shouldAutoShowLyrics(isKaraokeOn: false))
-    }
-
-    @Test("跟唱中关闭按钮：退出跟唱复原（保留面板）")
-    func closeInKaraokeExitsKaraoke() {
-        #expect(MacPlaybackGate.lyricsCloseAction(isKaraokeOn: true) == .exitKaraokeKeepPanel)
-    }
-
-    @Test("非跟唱关闭按钮：关闭面板")
-    func closeNormalClosesPanel() {
-        #expect(MacPlaybackGate.lyricsCloseAction(isKaraokeOn: false) == .closePanel)
     }
 }

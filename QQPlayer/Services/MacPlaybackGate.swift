@@ -89,21 +89,4 @@ enum MacPlaybackGate {
     static func shouldExpandLyrics(isKaraokeOn: Bool) -> Bool {
         isKaraokeOn
     }
-
-    /// 进入跟唱时是否强制显示歌词面板（大画面依赖歌词区，面板被关时自动打开）
-    static func shouldAutoShowLyrics(isKaraokeOn: Bool) -> Bool {
-        isKaraokeOn
-    }
-
-    /// 歌词面板关闭按钮的决策：跟唱中 = 退出跟唱复原（保留面板）；否则 = 关闭面板
-    static func lyricsCloseAction(isKaraokeOn: Bool) -> LyricsCloseAction {
-        isKaraokeOn ? .exitKaraokeKeepPanel : .closePanel
-    }
-
-    enum LyricsCloseAction: Equatable {
-        /// 跟唱大画面：退出跟唱模式，播放区恢复，歌词面板保持开启
-        case exitKaraokeKeepPanel
-        /// 普通状态：关闭歌词面板
-        case closePanel
-    }
 }

@@ -14,7 +14,6 @@ struct MacLyricsView: View {
     let lyrics: Lyrics?
     let currentTime: TimeInterval
     let isLoading: Bool
-    let onClose: () -> Void
     /// 歌词搜索入口（播放页 sheet 弹出 MacLyricsSearchView）
     let onLyricsSearch: () -> Void
 
@@ -70,13 +69,7 @@ struct MacLyricsView: View {
             .buttonStyle(.plain)
             .foregroundColor(.secondary)
             .help("lyrics_search_title".localized)
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
-            .help("close_lyrics_panel".localized)
+            // 无关闭按钮：歌词常驻显示（2026-09-02 用户拍板：歌词是本 APP 第一重要功能）
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)

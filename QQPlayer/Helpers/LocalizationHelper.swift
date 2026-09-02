@@ -135,8 +135,6 @@ struct Localized {
     static let deleteFolderPlaylistsConfirm = "delete_folder_playlists_confirm".localized
     static let keepFolderPlaylists = "keep_folder_playlists".localized
     static let playerControls = "player_controls".localized
-    static let showLyricsButton = "show_lyrics_button".localized
-    static let showLyricsButtonDescription = "show_lyrics_button_description".localized
     static let showSleepTimerButton = "show_sleep_timer_button".localized
     static let showSleepTimerButtonDescription = "show_sleep_timer_button_description".localized
 

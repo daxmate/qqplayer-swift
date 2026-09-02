@@ -11,7 +11,6 @@ struct CollapsiblePlayerControls: View {
     let accentColor: Color
     let onSeek: (TimeInterval) -> Void
     let showSleepTimerButton: Bool
-    let showLyricsButton: Bool
     let isLoadingLyrics: Bool
     let sleepTimerEndDate: Date?
     let onStartSleepTimer: (Int) -> Void
@@ -131,9 +130,7 @@ struct CollapsiblePlayerControls: View {
     private var expandedSection: some View {
         VStack(spacing: 12) {
             mainToolRow
-            if showSleepTimerButton || showLyricsButton {
-                accessoryRow
-            }
+            accessoryRow
         }
         .padding(.top, 2)
     }
@@ -151,16 +148,14 @@ struct CollapsiblePlayerControls: View {
         .padding(.vertical, 8)
     }
 
-    /// 辅助行：定时 / 歌词（可开关），样式同主工具行
+    /// 辅助行：定时（可开关）/ 歌词（歌词第一重要，恒显示）
     private var accessoryRow: some View {
         HStack(spacing: 0) {
             if showSleepTimerButton {
                 sleepTimerButton
                 Spacer()
             }
-            if showLyricsButton {
-                lyricsButton
-            }
+            lyricsButton
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
