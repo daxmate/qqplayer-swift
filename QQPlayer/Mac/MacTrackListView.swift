@@ -31,6 +31,10 @@ struct MacTrackListView: View {
 
     /// 单击选中的行（单击=播放+选中，对齐 web/iOS 语义；多选待 A4）
     @State private var selectedRowID: String?
+    /// 双击去抖：同一首歌 500ms 内的重复播放请求忽略（双击=两次单击=两次 onPlay，
+    /// 第二次会撞上加载竞态导致跳到下一首——2026-09-02 用户实测）
+    @State private var lastPlayedTrackID: String?
+    @State private var lastPlayedAt = Date.distantPast
     @State private var favoriteIds: Set<String> = []
     @State private var playlists: [Playlist] = []
     @State private var showNewPlaylistAlert = false
@@ -231,6 +235,15 @@ struct MacTrackListView: View {
         // 吞掉行点击手势导致播放不触发，2026-09-02 用户实测）
         .onTapGesture {
             selectedRowID = track.stableId
+            // 双击去抖：同一首歌短时间重复点击只播一次
+            let now = Date()
+            if track.stableId == lastPlayedTrackID,
+               now.timeIntervalSince(lastPlayedAt) < 0.5 {
+                onSelect(track)
+                return
+            }
+            lastPlayedTrackID = track.stableId
+            lastPlayedAt = now
             onPlay(track, displayedTracks)
             onSelect(track)
         }
