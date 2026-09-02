@@ -819,13 +819,16 @@ class LibraryIndexer: NSObject, ObservableObject {
                 }
 
                 let allFileNames = musicFiles.map { $0.lastPathComponent }
-                // 下载预触发后 parse 以本地 IO 为主，4→6 适度提速
+                // 进度以分区后实际处理数为准：totalFiles 是全量（含 dataless），
+                // 用它做 musicFiles 下标会数组越界 fatal error——2026-09-02
+                // 主线程卡死根因（sample 定位 Array.subscript → assertionFailure）
+                let processTotal = musicFiles.count
                 let maxConcurrentFiles = 6
                 var completedCount = 0
                 var nextIndex = 0
 
                 await withTaskGroup(of: Void.self) { group in
-                    while nextIndex < min(maxConcurrentFiles, totalFiles) {
+                    while nextIndex < min(maxConcurrentFiles, processTotal) {
                         let url = musicFiles[nextIndex]
                         group.addTask { [weak self] in await self?.indexFile(url) }
                         nextIndex += 1
@@ -836,13 +839,13 @@ class LibraryIndexer: NSObject, ObservableObject {
 
                         guard generation == indexingGeneration else { return }
 
-                        if completedCount % 20 == 0 || completedCount == totalFiles {
-                            currentlyProcessing = allFileNames[min(completedCount, totalFiles - 1)]
-                            queuedFiles = Array(allFileNames.suffix(from: min(completedCount, totalFiles)))
-                            indexingProgress = Double(completedCount) / Double(totalFiles)
+                        if completedCount % 20 == 0 || completedCount == processTotal {
+                            currentlyProcessing = allFileNames[min(completedCount, processTotal - 1)]
+                            queuedFiles = Array(allFileNames.suffix(from: min(completedCount, processTotal)))
+                            indexingProgress = Double(completedCount) / Double(processTotal)
                         }
 
-                        if nextIndex < totalFiles {
+                        if nextIndex < processTotal {
                             let url = musicFiles[nextIndex]
                             group.addTask { [weak self] in await self?.indexFile(url) }
                             nextIndex += 1
