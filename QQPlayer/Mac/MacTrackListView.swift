@@ -14,21 +14,26 @@
 import AppKit
 import SwiftUI
 
-/// Table 行包装：携带排序用计算字段（artist 显示名经 resolver 解析）。
-/// macOS 13 的排序 TableColumn(value:) 要求行类型继承 NSObject。
+/// Table 行包装：携带排序字段（artist 显示名经 resolver 解析）。
+/// macOS 13+/26 SDK 的排序 TableColumn(value:) 与 SortDescriptor 都要求行类型
+/// 继承 NSObject 且排序 KeyPath 指向 @objc 存储属性（OC runtime 内省）——
+/// 用计算属性/纯 Swift 属性会运行时 fatal："must be introspectable by the
+/// objective-c runtime"（2026-09-02 用户实测）。
 private final class MacTrackTableRow: NSObject, Identifiable {
     let id: String
     let track: Track
-    let artistName: String
+    /// 排序/显示字段：@objc 存储属性（title/artist/duration）
+    @objc let title: String
+    @objc let artistName: String
+    @objc let durationMs: Int64
 
     init(id: String, track: Track, artistName: String) {
         self.id = id
         self.track = track
+        self.title = track.title
         self.artistName = artistName
+        self.durationMs = Int64(track.durationMs ?? 0)
     }
-
-    var title: String { track.title }
-    var durationMs: Int? { track.durationMs }
 }
 
 struct MacTrackListView: View {
