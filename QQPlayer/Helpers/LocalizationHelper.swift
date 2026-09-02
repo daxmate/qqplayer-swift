@@ -145,8 +145,16 @@ struct Localized {
 
     // MARK: - Settings Categories（web 版左导航分类对齐）
     static let settingsCategoryPlayback = "settings_category_playback".localized
+    static let settingsCategoryLibrary = "settings_category_library".localized
     static let settingsCategoryAppearance = "settings_category_appearance".localized
     static let settingsCategoryAbout = "settings_category_about".localized
+
+    // MARK: - Music Library（曲库文件夹）
+    static let libraryFolders = "library_folders".localized
+    static let addFolder = "add_folder".localized
+    static let removeFolder = "remove_folder".localized
+    static let addFolderPrompt = "add_folder_prompt".localized
+    static let libraryFolderDefaultHint = "library_folder_default_hint".localized
 
     // MARK: - Appearance（主题三态 + 强调色）
     static let appearanceTheme = "appearance_theme".localized

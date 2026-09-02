@@ -98,6 +98,14 @@
 
 /* Settings */
 
+/* Music library folders (设置 → 音乐库) */
+"settings_category_library" = "Music Library";
+"library_folders" = "Library Folders";
+"add_folder" = "Add Folder…";
+"remove_folder" = "Remove Folder";
+"add_folder_prompt" = "Select folders that contain music files";
+"library_folder_default_hint" = "Default library: ~/Music/QQPlayer (scanned when no folders are added)";
+
 /* Track list context menu (A3) */
 "show_artist" = "Go to Artist";
 "show_album" = "Go to Album";

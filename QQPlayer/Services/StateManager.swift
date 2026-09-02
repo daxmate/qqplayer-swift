@@ -515,6 +515,19 @@ class StateManager: @unchecked Sendable {
         #endif
     }
 
+    #if os(macOS)
+        /// macOS 曲库文件夹列表：设置页「音乐库」添加的外部文件夹；
+        /// 未配置（空数组）时回退默认 ~/Music/QQPlayer（对齐桌面端约定）。
+        func getMusicFolderURLs() -> [URL] {
+            let defaultURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Music", isDirectory: true)
+                .appendingPathComponent("QQPlayer", isDirectory: true)
+            let configured = DeleteSettings.load().libraryFolders
+            guard !configured.isEmpty else { return [defaultURL] }
+            return configured.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        }
+    #endif
+
     func checkiCloudAvailability() -> Bool {
         // Check if user is signed into iCloud
         guard FileManager.default.ubiquityIdentityToken != nil else {

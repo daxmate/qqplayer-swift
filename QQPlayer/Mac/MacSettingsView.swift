@@ -12,15 +12,17 @@ import AppKit
 import SwiftUI
 
 struct MacSettingsView: View {
-    /// 设置分类（web 版左导航语义；后续加音乐库/歌词/快捷键等分类时在此扩展）
+    /// 设置分类（web 版左导航语义；后续加歌词/快捷键等分类时在此扩展）
     private enum SettingsCategory: String, CaseIterable, Hashable {
         case playback
+        case library
         case appearance
         case about
 
         var title: String {
             switch self {
             case .playback: return Localized.settingsCategoryPlayback
+            case .library: return Localized.settingsCategoryLibrary
             case .appearance: return Localized.settingsCategoryAppearance
             case .about: return Localized.settingsCategoryAbout
             }
@@ -29,6 +31,7 @@ struct MacSettingsView: View {
         var icon: String {
             switch self {
             case .playback: return "play.circle"
+            case .library: return "music.note.list"
             case .appearance: return "paintbrush"
             case .about: return "info.circle"
             }
@@ -55,6 +58,8 @@ struct MacSettingsView: View {
                 switch selectedCategory {
                 case .playback:
                     MacPlaybackSettingsView(showEQSettings: $showEQSettings)
+                case .library:
+                    MacLibrarySettingsView()
                 case .appearance:
                     MacAppearanceSettingsView()
                 case .about:
@@ -198,6 +203,85 @@ private struct MacAppearanceSettingsView: View {
         }
         .buttonStyle(.plain)
         .help(Localized.accentName(preset.key))
+    }
+}
+
+// MARK: - 音乐库
+
+/// 音乐库分类：曲库文件夹管理（添加外部歌曲文件夹/移除，空列表 = 默认
+/// ~/Music/QQPlayer）。变化后重扫曲库（LibraryFoldersChanged 通知）。
+private struct MacLibrarySettingsView: View {
+    @State private var deleteSettings = DeleteSettings.load()
+
+    var body: some View {
+        Form {
+            Section {
+                if deleteSettings.libraryFolders.isEmpty {
+                    Label(Localized.libraryFolderDefaultHint, systemImage: "info.circle")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(deleteSettings.libraryFolders, id: \.self) { folder in
+                        HStack {
+                            Image(systemName: "folder")
+                                .foregroundColor(.secondary)
+                            Text((folder as NSString).expandingTildeInPath)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button(role: .destructive) {
+                                removeFolder(folder)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(Localized.removeFolder)
+                        }
+                    }
+                }
+            } header: {
+                Text(Localized.libraryFolders)
+            }
+
+            Section {
+                Button {
+                    pickFolders()
+                } label: {
+                    Label(Localized.addFolder, systemImage: "plus.circle")
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+            deleteSettings = DeleteSettings.load()
+        }
+    }
+
+    private func saveAndRescan(_ folders: [String]) {
+        var settings = deleteSettings
+        settings.libraryFolders = folders
+        settings.save()
+        deleteSettings = settings
+        // 触发主窗口重扫曲库
+        NotificationCenter.default.post(name: NSNotification.Name("LibraryFoldersChanged"), object: nil)
+    }
+
+    private func pickFolders() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.message = Localized.addFolderPrompt
+        panel.prompt = Localized.addFolder
+        guard panel.runModal() == .OK else { return }
+        let existing = Set(deleteSettings.libraryFolders)
+        let newPaths = panel.urls.map(\.path).filter { !existing.contains($0) }
+        guard !newPaths.isEmpty else { return }
+        saveAndRescan(deleteSettings.libraryFolders + newPaths)
+    }
+
+    private func removeFolder(_ folder: String) {
+        saveAndRescan(deleteSettings.libraryFolders.filter { $0 != folder })
     }
 }
 

@@ -98,6 +98,14 @@
 
 /* Settings */
 
+/* Music library folders (设置 → 音乐库) */
+"settings_category_library" = "音乐库";
+"library_folders" = "曲库文件夹";
+"add_folder" = "添加文件夹…";
+"remove_folder" = "移除文件夹";
+"add_folder_prompt" = "选择包含音乐文件的文件夹";
+"library_folder_default_hint" = "默认曲库：~/Music/QQPlayer（未添加文件夹时扫描此目录）";
+
 /* Track list context menu (A3) */
 "show_artist" = "进歌手";
 "show_album" = "进专辑";

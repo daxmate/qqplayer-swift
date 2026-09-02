@@ -151,6 +151,8 @@ struct DeleteSettings: Codable {
     var deleteFromLibraryOnly: Bool = true
     var lastLibraryScanDate: Date?
     var autoCreateFolderPlaylists: Bool = true
+    /// macOS 曲库文件夹列表（用户添加的外部歌曲文件夹；空 = 默认 ~/Music/QQPlayer）
+    var libraryFolders: [String] = []
     var showSleepTimerButton: Bool = false
 
     // Home screen section visibility & order
@@ -173,6 +175,7 @@ struct DeleteSettings: Codable {
         deleteFromLibraryOnly = try container.decodeIfPresent(Bool.self, forKey: .deleteFromLibraryOnly) ?? true
         lastLibraryScanDate = try container.decodeIfPresent(Date.self, forKey: .lastLibraryScanDate)
         autoCreateFolderPlaylists = try container.decodeIfPresent(Bool.self, forKey: .autoCreateFolderPlaylists) ?? true
+        libraryFolders = try container.decodeIfPresent([String].self, forKey: .libraryFolders) ?? []
         showSleepTimerButton = try container.decodeIfPresent(Bool.self, forKey: .showSleepTimerButton) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections

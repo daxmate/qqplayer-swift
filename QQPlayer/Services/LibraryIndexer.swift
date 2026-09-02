@@ -86,6 +86,7 @@ class LibraryIndexer: NSObject, ObservableObject {
 
         #if os(macOS)
             // macOS 数据源：FileManager 目录扫描（默认 ~/Music/QQPlayer）。
+            // 2026-09-02：支持设置页「音乐库」添加的多个外部文件夹。
             // MVP 策略：启动全扫 + 手动刷新；FSEvents 实时监控后补（调研报告 §3.5 风险 2）。
             startMacScan()
         #else
@@ -756,25 +757,30 @@ class LibraryIndexer: NSObject, ObservableObject {
                 isIndexing: isIndexing
             ) else { return }
 
-            guard let musicFolderURL = stateManager.getMusicFolderURL() else {
-                print("❌ macOS scan: no music folder configured")
-                isIndexing = false
-                return
-            }
+            // 多文件夹曲库：收集所有配置文件夹的音乐文件（去重后统一进度）
+            let folders = stateManager.getMusicFolderURLs()
+            print("📁 macOS scanning folders: \(folders.map(\.path))")
 
-            print("📁 macOS scanning music folder: \(musicFolderURL.path)")
             do {
-                let musicFiles = try await findMusicFiles(in: musicFolderURL)
+                var musicFiles: [URL] = []
+                var seen = Set<String>()
+                for folder in folders {
+                    let files = try await findMusicFiles(in: folder)
+                    for file in files where !seen.contains(file.path) {
+                        seen.insert(file.path)
+                        musicFiles.append(file)
+                    }
+                }
                 let totalFiles = musicFiles.count
                 print("📁 macOS found \(totalFiles) music files")
 
                 guard totalFiles > 0 else {
                     // 空目录也走 reconcile，清理已删除曲目（与 iOS 语义一致）。
                     guard generation == indexingGeneration else { return }
-                    await FileCleanupManager.shared.reconcileMissingFiles(in: [musicFolderURL])
+                    await FileCleanupManager.shared.reconcileMissingFiles(in: folders)
                     postPendingLibraryRefresh()
                     isIndexing = false
-                    print("❌ No music files found in \(musicFolderURL.path)")
+                    print("❌ No music files found in \(folders.map(\.path))")
                     return
                 }
 
@@ -820,7 +826,7 @@ class LibraryIndexer: NSObject, ObservableObject {
                 }
 
                 guard generation == indexingGeneration else { return }
-                await FileCleanupManager.shared.reconcileMissingFiles(in: [musicFolderURL])
+                await FileCleanupManager.shared.reconcileMissingFiles(in: folders)
                 postPendingLibraryRefresh()
 
                 isIndexing = false

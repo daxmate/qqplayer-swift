@@ -162,6 +162,11 @@ struct MacLibraryView: View {
             // 歌单管理（新建/重命名/删除/增删曲目）后刷新歌单列表与自动歌单计数
             reloadLibrary()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFoldersChanged"))) { _ in
+            // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）
+            reloadLibrary()
+            indexer.start()
+        }
     }
 
     // MARK: - Sidebar

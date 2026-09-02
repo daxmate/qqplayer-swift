@@ -172,6 +172,14 @@
 
 /* Settings */
 
+/* Music library folders (设置 → 音乐库) */
+"settings_category_library" = "音樂庫";
+"library_folders" = "曲庫資料夾";
+"add_folder" = "加入資料夾…";
+"remove_folder" = "移除資料夾";
+"add_folder_prompt" = "選擇包含音樂檔案的資料夾";
+"library_folder_default_hint" = "預設曲庫：~/Music/QQPlayer（未加入資料夾時掃描此目錄）";
+
 /* Track list context menu (A3) */
 "show_artist" = "進歌手";
 "show_album" = "進專輯";

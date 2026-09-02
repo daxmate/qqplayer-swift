@@ -86,6 +86,14 @@
 
 /* Settings */
 
+/* Music library folders (设置 → 音乐库) */
+"settings_category_library" = "Музыкальная библиотека";
+"library_folders" = "Папки библиотеки";
+"add_folder" = "Добавить папку…";
+"remove_folder" = "Удалить папку";
+"add_folder_prompt" = "Выберите папки с музыкальными файлами";
+"library_folder_default_hint" = "Библиотека по умолчанию: ~/Music/QQPlayer (сканируется, если папки не добавлены)";
+
 /* Track list context menu (A3) */
 "show_artist" = "К исполнителю";
 "show_album" = "К альбому";
