@@ -548,3 +548,10 @@
 "playlist_manage_rename" = "Rename";
 "playlist_manage_remove_from_playlist" = "Remove from Playlist";
 "playlist_manage_empty" = "This playlist is empty";
+
+// MARK: - Move to Trash (macOS)
+"move_to_trash" = "Move to Trash";
+"move_to_trash_confirm_single" = "Move “%@” to Trash? You can restore it from Trash.";
+"move_to_trash_confirm_multi" = "Move %d song(s) to Trash? You can restore them from Trash.";
+"move_to_trash_failed_count" = "%d song(s) could not be moved to Trash";
+"clear_selection_help" = "Clear selection";

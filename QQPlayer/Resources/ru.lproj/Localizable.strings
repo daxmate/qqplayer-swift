@@ -543,3 +543,10 @@
 "play_order_shuffle" = "Случайный порядок";
 "play_order_repeat_all" = "Повторять всё";
 "play_order_repeat_one" = "Повторять один";
+
+// MARK: - Move to Trash (macOS)
+"move_to_trash" = "Переместить в корзину";
+"move_to_trash_confirm_single" = "Переместить « %@ » в корзину? Вы сможете восстановить его из корзины.";
+"move_to_trash_confirm_multi" = "Переместить %d песни в корзину? Вы сможете восстановить их из корзины.";
+"move_to_trash_failed_count" = "Не удалось переместить %d песни в корзину";
+"clear_selection_help" = "Очистить выделение";

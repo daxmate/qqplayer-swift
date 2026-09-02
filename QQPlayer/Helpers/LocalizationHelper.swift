@@ -143,6 +143,22 @@ struct Localized {
     static let showAlbum = "show_album".localized
     static let locatePlayingTrack = "locate_playing_track".localized
 
+    // MARK: - Move to Trash（web 版「移到废纸篓」对齐，macOS 2026-09-02 A4）
+    static let moveToTrash = "move_to_trash".localized
+    static let moveToTrashFailedCount = "move_to_trash_failed_count".localized
+
+    static func moveToTrashConfirm(_ trackTitle: String) -> String {
+        return "move_to_trash_confirm_single".localized(with: trackTitle)
+    }
+
+    static func moveToTrashConfirm(count: Int) -> String {
+        return "move_to_trash_confirm_multi".localized(with: count)
+    }
+
+    static func moveToTrashFailed(count: Int) -> String {
+        return "move_to_trash_failed_count".localized(with: count)
+    }
+
     // MARK: - Settings Categories（web 版左导航分类对齐）
     static let settingsCategoryPlayback = "settings_category_playback".localized
     static let settingsCategoryLibrary = "settings_category_library".localized

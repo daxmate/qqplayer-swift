@@ -546,3 +546,10 @@
 "play_order_shuffle" = "Lecture aléatoire";
 "play_order_repeat_all" = "Répéter tout";
 "play_order_repeat_one" = "Répéter un morceau";
+
+// MARK: - Move to Trash (macOS)
+"move_to_trash" = "Déplacer vers la corbeille";
+"move_to_trash_confirm_single" = "Déplacer « %@ » vers la corbeille ? Vous pourrez le restaurer depuis la corbeille.";
+"move_to_trash_confirm_multi" = "Déplacer %d chanson(s) vers la corbeille ? Vous pourrez les restaurer depuis la corbeille.";
+"move_to_trash_failed_count" = "%d chanson(s) n'ont pas pu être déplacées vers la corbeille";
+"clear_selection_help" = "Effacer la sélection";

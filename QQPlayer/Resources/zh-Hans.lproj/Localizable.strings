@@ -584,3 +584,10 @@
 "playlist_manage_rename" = "重命名";
 "playlist_manage_remove_from_playlist" = "从歌单移除";
 "playlist_manage_empty" = "歌单里还没有歌曲";
+
+// MARK: - Move to Trash (macOS)
+"move_to_trash" = "移到废纸篓";
+"move_to_trash_confirm_single" = "将把《%@》移到废纸篓？可从废纸篓恢复。";
+"move_to_trash_confirm_multi" = "将把 %d 首歌移到废纸篓？可从废纸篓恢复。";
+"move_to_trash_failed_count" = "有 %d 首歌未能移到废纸篓";
+"clear_selection_help" = "清空选择";
