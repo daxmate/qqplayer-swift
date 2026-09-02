@@ -4,13 +4,32 @@
 //
 //  macOS track list (content column for the 歌曲 section). QQPlayerMac target only.
 //
-//  2026-09-02 A3：Table → List 重写——自定义表头支持列头三态排序
-//  （升序→降序→默认，web 版语义，TrackListSort 纯逻辑共享）与「定位当前
-//  播放」（ScrollViewReader scrollTo）；右键菜单补全：下一首播放 / 进歌手 /
-//  进专辑（可选回调，非 nil 才显示，播放列表 sheet 里可裁剪）。
+//  2026-09-02 三修：回归 SwiftUI Table——macOS 平台惯例「单击选中、双击播放」
+//  由 Table 原生 primaryAction 保证（AppKit NSTableView 底层），不再用手势模拟
+//  （List + onTapGesture 与选中手势冲突导致双击失效，教训：平台基础交互交给
+//  原生控件）。保留：列头原生排序（sortOrder）、右键菜单补全（contextMenu
+//  forSelectionType）、定位当前播放（选中 + 尽量滚动可见）、播放队列跟随排序。
 //
 
+import AppKit
 import SwiftUI
+
+/// Table 行包装：携带排序用计算字段（artist 显示名经 resolver 解析）。
+/// macOS 13 的排序 TableColumn(value:) 要求行类型继承 NSObject。
+private final class MacTrackTableRow: NSObject, Identifiable {
+    let id: String
+    let track: Track
+    let artistName: String
+
+    init(id: String, track: Track, artistName: String) {
+        self.id = id
+        self.track = track
+        self.artistName = artistName
+    }
+
+    var title: String { track.title }
+    var durationMs: Int? { track.durationMs }
+}
 
 struct MacTrackListView: View {
     let tracks: [Track]
@@ -29,45 +48,20 @@ struct MacTrackListView: View {
     var onShowArtist: ((Track) -> Void)?
     var onShowAlbum: ((Track) -> Void)?
 
-    /// 单击选中的行（单击=播放+选中，对齐 web/iOS 语义；多选待 A4）
-    @State private var selectedRowID: String?
-    /// 双击去抖：同一首歌 500ms 内的重复播放请求忽略（双击=两次单击=两次 onPlay，
-    /// 第二次会撞上加载竞态导致跳到下一首——2026-09-02 用户实测）
-    @State private var lastPlayedTrackID: String?
-    @State private var lastPlayedAt = Date.distantPast
+    @State private var selectedRows = Set<String>()
     @State private var favoriteIds: Set<String> = []
     @State private var playlists: [Playlist] = []
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
     @State private var pendingTrack: Track?
-    /// 列头排序（三态：升 → 降 → 默认）
-    @State private var sort = TrackListSort()
+    /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
+    /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
+    @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
+    /// 当前显示的排序后行（播放队列跟随，与 Table 显示一致）
+    @State private var displayedRows: [MacTrackTableRow] = []
 
-    private let trackNoWidth: CGFloat = 26
-    private let artistColumnWidth: CGFloat = 130
-    private let durationColumnWidth: CGFloat = 54
-    private let heartColumnWidth: CGFloat = 30
-    private let rowSpacing: CGFloat = 6
-
-    /// 排序后显示列表（默认顺序 = tracks 原序）
-    private var displayedTracks: [Track] {
-        guard let key = sort.key else { return tracks }
-        let direction = sort.direction ?? .ascending
-        let sorted = tracks.sorted { lhs, rhs in
-            let result: ComparisonResult
-            switch key {
-            case .title:
-                result = lhs.title.localizedStandardCompare(rhs.title)
-            case .artist:
-                let lhsName = artistNameResolver(lhs) ?? ""
-                let rhsName = artistNameResolver(rhs) ?? ""
-                result = lhsName.localizedStandardCompare(rhsName)
-            case .duration:
-                result = (lhs.durationMs ?? 0) < (rhs.durationMs ?? 0) ? .orderedAscending : .orderedDescending
-            }
-            return direction == .ascending ? result == .orderedAscending : result == .orderedDescending
-        }
-        return sorted
+    private var rows: [MacTrackTableRow] {
+        tracks.map { MacTrackTableRow(id: $0.stableId, track: $0, artistName: artistNameResolver($0) ?? "") }
     }
 
     var body: some View {
@@ -85,9 +79,9 @@ struct MacTrackListView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 0) {
-                headerRow
+                toolbarRow
                 Divider()
-                trackList
+                table
             }
             .alert("create_new_playlist".localized, isPresented: $showNewPlaylistAlert) {
                 TextField("playlist_name_placeholder".localized, text: $newPlaylistName)
@@ -97,6 +91,13 @@ struct MacTrackListView: View {
             .onAppear {
                 reloadFavorites()
                 reloadPlaylists()
+                syncDisplayedRows()
+            }
+            .onChange(of: sortOrder) { _ in
+                syncDisplayedRows()
+            }
+            .onChange(of: tracks.map(\.stableId)) { _ in
+                syncDisplayedRows()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
                 reloadFavorites()
@@ -107,173 +108,123 @@ struct MacTrackListView: View {
         }
     }
 
-    // MARK: - Header（列头：定位当前播放 + 三态排序按钮）
+    // MARK: - Toolbar（定位当前播放）
 
-    private var headerRow: some View {
-        HStack(spacing: rowSpacing) {
-            // 定位当前播放（web 版工具条按钮语义）
+    private var toolbarRow: some View {
+        HStack {
             Button {
                 locateActiveTrack()
             } label: {
-                Image(systemName: "location")
-                    .font(.system(size: 11))
-                    .frame(width: trackNoWidth)
+                Label(Localized.locatePlayingTrack, systemImage: "location")
+                    .font(.callout)
             }
             .buttonStyle(.borderless)
             .disabled(activeTrackId == nil)
-            .help("locate_playing_track".localized)
-
-            sortButton(.title, title: "title".localized, width: nil)
-
-            sortButton(.artist, title: "artist".localized, width: artistColumnWidth)
-
-            sortButton(.duration, title: "duration".localized, width: durationColumnWidth, trailing: true)
-
-            Color.clear.frame(width: heartColumnWidth)
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-        .background(Color.gray.opacity(0.06))
     }
 
-    @ViewBuilder
-    private func sortButton(_ key: TrackListSort.Key, title: String, width: CGFloat?, trailing: Bool = false) -> some View {
-        let isActive = sort.key == key
-        Button {
-            sort = sort.toggled(by: key)
-        } label: {
-            HStack(spacing: 3) {
-                if trailing { Spacer(minLength: 0) }
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(isActive ? .accentColor : .secondary)
-                    .lineLimit(1)
-                if isActive {
-                    Image(systemName: sort.direction == .ascending ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
+    // MARK: - Table
+
+    private var table: some View {
+        Table(displayedRows, selection: $selectedRows, sortOrder: $sortOrder) {
+            TableColumn("#") { row in
+                if row.track.stableId == activeTrackId {
+                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
                         .foregroundColor(.accentColor)
+                } else {
+                    Text(row.track.trackNo.map(String.init) ?? "")
+                        .foregroundColor(.secondary)
                 }
-                if !trailing { Spacer(minLength: 0) }
             }
-            .contentShape(Rectangle())
+            .width(32)
+
+            TableColumn("title".localized, value: \.title) { row in
+                Text(row.track.title)
+                    .fontWeight(row.track.stableId == activeTrackId ? .semibold : .regular)
+                    .lineLimit(1)
+            }
+
+            TableColumn("artist".localized, value: \.artistName) { row in
+                Text(row.artistName)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            TableColumn("album".localized) { row in
+                Text(albumTitle(for: row.track))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            TableColumn("duration".localized, value: \.durationMs) { row in
+                Text(MacTimeFormat.format(duration(for: row.track)))
+                    .foregroundColor(.secondary)
+                    .monospacedDigit()
+            }
+            .width(56)
+
+            TableColumn("") { row in
+                let isFavorite = favoriteIds.contains(row.track.stableId)
+                Button {
+                    try? AppCoordinator.shared.toggleFavorite(trackStableId: row.track.stableId)
+                } label: {
+                    Image(systemName: isFavorite ? "heart.fill" : "heart")
+                        .foregroundColor(isFavorite ? .pink : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help(isFavorite ? "remove_from_liked_songs".localized : "add_to_liked_songs".localized)
+            }
+            .width(32)
         }
-        .buttonStyle(.plain)
-        .frame(width: width, alignment: trailing ? .trailing : .leading)
-        .frame(maxWidth: width == nil ? .infinity : nil)
-        .help(title)
+        // macOS 惯例：单击选中、双击播放（Table primaryAction 原生实现，
+        // AppKit NSTableView 底层；勿改手势模拟）
+        .contextMenu(forSelectionType: String.self) { selectedIDs in
+            if let id = selectedIDs.first,
+               let row = displayedRows.first(where: { $0.id == id }) {
+                contextMenuItems(row.track)
+            }
+        } primaryAction: { selectedIDs in
+            if let id = selectedIDs.first,
+               let row = displayedRows.first(where: { $0.id == id }) {
+                play(row.track)
+            }
+        }
+        .onChange(of: locateRequestID) { _ in
+            // 定位当前播放：选中当前行（Table 无公开 scrollTo，选中高亮定位）
+            if let activeTrackId {
+                selectedRows = [activeTrackId]
+            }
+        }
     }
 
-    // MARK: - Track list
-
-    private var trackList: some View {
-        ScrollViewReader { proxy in
-            List {
-                ForEach(displayedTracks, id: \.stableId) { track in
-                    row(track)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
-                        .listRowSeparator(.hidden)
-                }
-            }
-            .listStyle(.inset(alternatesRowBackgrounds: true))
-            .environment(\.defaultMinListRowHeight, 26)
-            .onChange(of: locateRequestID) { _ in
-                // 定位请求（按钮点击后置位），滚动到当前播放行
-                if let activeTrackId {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        proxy.scrollTo(activeTrackId, anchor: .center)
-                    }
-                }
-            }
-        }
-    }
-
-    /// 定位请求信号：按钮点击时自增触发 onChange 滚动
+    /// 定位请求信号：按钮点击自增触发 onChange
     @State private var locateRequestID = 0
 
     private func locateActiveTrack() {
         locateRequestID += 1
     }
 
-    @ViewBuilder
-    private func row(_ track: Track) -> some View {
-        let isActive = track.stableId == activeTrackId
-        let isSelected = selectedRowID == track.stableId
-        HStack(spacing: rowSpacing) {
-            // # / 播放指示
-            Group {
-                if isActive {
-                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                        .foregroundColor(.accentColor)
-                } else {
-                    Text(track.trackNo.map(String.init) ?? "")
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(width: trackNoWidth, alignment: .leading)
-            .font(.callout)
+    // MARK: - Playback
 
-            Text(track.title)
-                .fontWeight(isActive ? .semibold : .regular)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(artistNameResolver(track) ?? "")
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .frame(width: artistColumnWidth, alignment: .leading)
-
-            Text(MacTimeFormat.format(duration(for: track)))
-                .foregroundColor(.secondary)
-                .monospacedDigit()
-                .frame(width: durationColumnWidth, alignment: .trailing)
-
-            favoriteButton(track)
-        }
-        .font(.callout)
-        .contentShape(Rectangle())
-        // 单击 = 播放 + 选中（web/iOS 语义；不用 List(selection:)——选中手势会
-        // 吞掉行点击手势导致播放不触发，2026-09-02 用户实测）
-        .onTapGesture {
-            selectedRowID = track.stableId
-            // 双击去抖：同一首歌短时间重复点击只播一次
-            let now = Date()
-            if track.stableId == lastPlayedTrackID,
-               now.timeIntervalSince(lastPlayedAt) < 0.5 {
-                onSelect(track)
-                return
-            }
-            lastPlayedTrackID = track.stableId
-            lastPlayedAt = now
-            onPlay(track, displayedTracks)
-            onSelect(track)
-        }
-        .contextMenu {
-            contextMenuItems(track, isActive: isActive)
-        }
-        .background(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+    private func play(_ track: Track) {
+        onPlay(track, displayedRows.map(\.track))
+        onSelect(track)
     }
 
-    @ViewBuilder
-    private func favoriteButton(_ track: Track) -> some View {
-        let isFavorite = favoriteIds.contains(track.stableId)
-        Button {
-            try? AppCoordinator.shared.toggleFavorite(trackStableId: track.stableId)
-        } label: {
-            Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .foregroundColor(isFavorite ? .pink : .secondary)
-        }
-        .buttonStyle(.plain)
-        .frame(width: heartColumnWidth)
-        .help(isFavorite ? "remove_from_liked_songs".localized : "add_to_liked_songs".localized)
+    /// 让显示行与排序状态同步（Table 内部按 sortOrder 重排，此处镜像供播放队列用）
+    private func syncDisplayedRows() {
+        displayedRows = rows.sorted(using: sortOrder)
     }
 
     // MARK: - Context menu（web 版 7 项对齐：播放/下一首播放/收藏/加歌单/进歌手/进专辑/歌单内移除）
 
     @ViewBuilder
-    private func contextMenuItems(_ track: Track, isActive: Bool) -> some View {
+    private func contextMenuItems(_ track: Track) -> some View {
         Button("play".localized) {
-            onPlay(track, displayedTracks)
-            onSelect(track)
+            play(track)
         }
 
         if let onPlayNext {
@@ -349,6 +300,16 @@ struct MacTrackListView: View {
         } catch {
             print("❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
         }
+    }
+
+    private func albumTitle(for track: Track) -> String {
+        guard let albumId = track.albumId,
+              let album = try? DatabaseManager.shared.read({ db in
+                  try Album.fetchOne(db, key: albumId)
+              }) else {
+            return ""
+        }
+        return album.title
     }
 
     private func duration(for track: Track) -> TimeInterval {
