@@ -760,12 +760,14 @@ class LibraryIndexer: NSObject, ObservableObject {
             // 多文件夹曲库：收集所有配置文件夹的音乐文件（去重后统一进度）
             let folders = stateManager.getMusicFolderURLs()
             print("📁 macOS scanning folders: \(folders.map(\.path))")
+            MacScanLogger.log("scan start, folders: \(folders.map(\.path))")
 
             do {
                 var musicFiles: [URL] = []
                 var seen = Set<String>()
                 for folder in folders {
                     let files = try await findMusicFiles(in: folder)
+                    MacScanLogger.log("folder \(folder.path): \(files.count) files")
                     for file in files where !seen.contains(file.path) {
                         seen.insert(file.path)
                         musicFiles.append(file)
@@ -773,6 +775,7 @@ class LibraryIndexer: NSObject, ObservableObject {
                 }
                 let totalFiles = musicFiles.count
                 print("📁 macOS found \(totalFiles) music files")
+                MacScanLogger.log("total files: \(totalFiles)")
 
                 guard totalFiles > 0 else {
                     // 空目录也走 reconcile，清理已删除曲目（与 iOS 语义一致）。
@@ -831,10 +834,12 @@ class LibraryIndexer: NSObject, ObservableObject {
 
                 isIndexing = false
                 print("✅ macOS scan completed. Found \(tracksFound) tracks.")
+                MacScanLogger.log("scan completed, tracksFound: \(tracksFound)")
 
                 await processFolderPlaylists(allMusicFiles: musicFiles)
             } catch {
                 print("❌ macOS scan failed: \(error)")
+                MacScanLogger.log("scan failed: \(error)")
                 isIndexing = false
             }
         }

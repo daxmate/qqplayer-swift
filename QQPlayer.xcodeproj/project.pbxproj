@@ -33,10 +33,10 @@
 		6CC3183EEB974716AC10BD10 /* ModelsRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9706677182164C8987546D81 /* ModelsRoundTripTests.swift */; };
 		6D7BB1D7A40944FD897AE350 /* PlayHistoryCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2386BA4DB497A8C3193F9 /* PlayHistoryCleanupTests.swift */; };
 		7C6C6B669A1CC3E35BBFAA8F /* AppearanceThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33DFA0B97C4C99D73B551FA /* AppearanceThemeTests.swift */; };
-		8D7CCB4C9D9ACEADAC09BEB5 /* TrackListSortTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDA6D0EA76690CAD0C6C0C1 /* TrackListSortTests.swift */; };
 		8002132EC97144E5830D01AA /* ArtistNameNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8CA665B2F1644A58CD4A39B /* ArtistNameNormalizerTests.swift */; };
 		894B5013D4F245E7A321C78B /* MusicAPIMockSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */; };
 		8B39816A2390441EA17F4B87 /* LyricsLRCLibFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F56C1D13EF47CCADFACA84 /* LyricsLRCLibFallbackTests.swift */; };
+		8D7CCB4C9D9ACEADAC09BEB5 /* TrackListSortTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDA6D0EA76690CAD0C6C0C1 /* TrackListSortTests.swift */; };
 		908024B804AD4AB99325E36B /* MacPlaybackGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */; };
 		90EF4EE0ACCD4186B034413C /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B70769B69D4FA3BD8ACBA0 /* MockURLProtocol.swift */; };
 		A1D0117D952345D1B1D9D76F /* SmartPlaylistUILogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AE1DBB52BD462D8FAA704D /* SmartPlaylistUILogicTests.swift */; };
@@ -158,13 +158,13 @@
 		B708099358914775F10BAE5F /* QQPlayerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = QQPlayerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7B70769B69D4FA3BD8ACBA0 /* MockURLProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
 		C33DFA0B97C4C99D73B551FA /* AppearanceThemeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppearanceThemeTests.swift; sourceTree = "<group>"; };
-		FCDA6D0EA76690CAD0C6C0C1 /* TrackListSortTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackListSortTests.swift; sourceTree = "<group>"; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkExtractionTests.swift; sourceTree = "<group>"; };
 		C6713EFB0F4A28ACE3266FB2 /* ModelCodableTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelCodableTests.swift; sourceTree = "<group>"; };
 		C8CA665B2F1644A58CD4A39B /* ArtistNameNormalizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtistNameNormalizerTests.swift; sourceTree = "<group>"; };
 		EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGestureLogicTests.swift; sourceTree = "<group>"; };
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
+		FCDA6D0EA76690CAD0C6C0C1 /* TrackListSortTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackListSortTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -175,6 +175,7 @@
 				Mac/MacAlbumArtistViews.swift,
 				Mac/MacAppearance.swift,
 				Mac/MacArtworkThumbnail.swift,
+				Mac/MacScanLogger.swift,
 				Mac/MacEQImportView.swift,
 				Mac/MacEQSettingsView.swift,
 				Mac/MacGraphicEQ10BandEditorView.swift,
@@ -231,6 +232,7 @@
 				Mac/MacAlbumArtistViews.swift,
 				Mac/MacAppearance.swift,
 				Mac/MacArtworkThumbnail.swift,
+				Mac/MacScanLogger.swift,
 				Mac/MacEQImportView.swift,
 				Mac/MacEQSettingsView.swift,
 				Mac/MacGraphicEQ10BandEditorView.swift,

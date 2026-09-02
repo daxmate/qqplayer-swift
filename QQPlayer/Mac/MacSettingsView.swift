@@ -276,7 +276,11 @@ private struct MacLibrarySettingsView: View {
         guard panel.runModal() == .OK else { return }
         let existing = Set(deleteSettings.libraryFolders)
         let newPaths = panel.urls.map(\.path).filter { !existing.contains($0) }
-        guard !newPaths.isEmpty else { return }
+        guard !newPaths.isEmpty else {
+            MacScanLogger.log("add folder: all selected already in list")
+            return
+        }
+        MacScanLogger.log("add folders: \(newPaths)")
         saveAndRescan(deleteSettings.libraryFolders + newPaths)
     }
 

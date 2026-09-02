@@ -172,6 +172,7 @@ struct MacLibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFoldersChanged"))) { _ in
             // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）。
             // 若正在扫描，start() 会被 guard 吞掉 → 标记等索引结束自动补扫。
+            MacScanLogger.log("LibraryFoldersChanged received, isIndexing=\(indexer.isIndexing)")
             reloadLibrary()
             if indexer.isIndexing {
                 rescanWhenIdle = true
