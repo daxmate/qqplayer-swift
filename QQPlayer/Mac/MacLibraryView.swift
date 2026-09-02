@@ -65,6 +65,8 @@ struct MacLibraryView: View {
     @State private var showWhatsNew = false
     /// 曲库文件夹在扫描中变更 → 索引结束后自动补扫
     @State private var rescanWhenIdle = false
+    /// 索引中增量刷新任务（防抖）
+    @State private var libraryRefreshTask: Task<Void, Never>?
 
     // Search state (sidebar search field + grouped results)
     @State private var searchText = ""
@@ -139,6 +141,17 @@ struct MacLibraryView: View {
                 }
             }
         }
+        .onReceive(indexer.$tracksFound) { _ in
+            // 索引中增量刷新：新解析完成的歌陆续出现在列表，不让用户干等
+            // （防抖 1.5s，避免每首歌都全量 reload）
+            libraryRefreshTask?.cancel()
+            guard indexer.isIndexing else { return }
+            libraryRefreshTask = Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard !Task.isCancelled else { return }
+                reloadLibrary()
+            }
+        }
         .onChange(of: searchText) { newValue in
             debounceTask?.cancel()
             debounceTask = Task {
@@ -151,6 +164,7 @@ struct MacLibraryView: View {
         .onDisappear {
             debounceTask?.cancel()
             searchTask?.cancel()
+            libraryRefreshTask?.cancel()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏变化后刷新“我喜欢的音乐”列表（含正在展示时的实时移除）
