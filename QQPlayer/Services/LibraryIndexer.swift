@@ -779,8 +779,11 @@ class LibraryIndexer: NSObject, ObservableObject {
 
                 // iCloud Drive dataless 文件预触发批量下载（系统队列并发），
                 // 避免 parse 到每个文件才逐个触发、全卡网络等待（2026-09-02 实测
-                // 161 文件 78 个 dataless，逐个触发是索引慢的根因）
-                let datalessCount = await Self.prefetchDatalessDownloads(musicFiles)
+                // 161 文件 78 个 dataless，逐个触发是索引慢的根因）。
+                // Task.detached：73+ 次 iCloud API 调用若同步跑在主线程会卡 UI 几秒
+                let datalessCount = await Task.detached {
+                    await Self.prefetchDatalessDownloads(musicFiles)
+                }.value
                 if datalessCount > 0 {
                     MacScanLogger.log("prefetch dataless downloads: \(datalessCount) files")
                 }

@@ -29,7 +29,8 @@ struct MacTrackListView: View {
     var onShowArtist: ((Track) -> Void)?
     var onShowAlbum: ((Track) -> Void)?
 
-    @State private var selectedRows = Set<String>()
+    /// 单击选中的行（单击=播放+选中，对齐 web/iOS 语义；多选待 A4）
+    @State private var selectedRowID: String?
     @State private var favoriteIds: Set<String> = []
     @State private var playlists: [Playlist] = []
     @State private var showNewPlaylistAlert = false
@@ -165,7 +166,6 @@ struct MacTrackListView: View {
             List {
                 ForEach(displayedTracks, id: \.stableId) { track in
                     row(track)
-                        .tag(track.stableId)
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
                         .listRowSeparator(.hidden)
                 }
@@ -193,7 +193,7 @@ struct MacTrackListView: View {
     @ViewBuilder
     private func row(_ track: Track) -> some View {
         let isActive = track.stableId == activeTrackId
-        let isSelected = selectedRows.contains(track.stableId)
+        let isSelected = selectedRowID == track.stableId
         HStack(spacing: rowSpacing) {
             // # / 播放指示
             Group {
@@ -227,8 +227,10 @@ struct MacTrackListView: View {
         }
         .font(.callout)
         .contentShape(Rectangle())
-        // 双击播放；单击选中由 List selection 管理
-        .onTapGesture(count: 2) {
+        // 单击 = 播放 + 选中（web/iOS 语义；不用 List(selection:)——选中手势会
+        // 吞掉行点击手势导致播放不触发，2026-09-02 用户实测）
+        .onTapGesture {
+            selectedRowID = track.stableId
             onPlay(track, displayedTracks)
             onSelect(track)
         }
