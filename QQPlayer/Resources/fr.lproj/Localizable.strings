@@ -93,6 +93,8 @@
 "remove_folder" = "Retirer le dossier";
 "add_folder_prompt" = "Sélectionnez les dossiers contenant de la musique";
 "library_folder_default_hint" = "Bibliothèque par défaut : ~/Music/QQPlayer (scannée si aucun dossier ajouté)";
+"library_file_types" = "Types de fichiers";
+"library_file_types_footer" = "Seuls les formats sélectionnés sont scannés. Désactiver un format retire ses morceaux de la bibliothèque au prochain scan (les fichiers restent sur le disque et reviennent si réactivés). Au moins un format doit rester activé.";
 
 /* Track list context menu (A3) */
 "show_artist" = "Voir l'artiste";

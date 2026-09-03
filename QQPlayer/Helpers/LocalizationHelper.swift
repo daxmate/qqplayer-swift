@@ -172,6 +172,10 @@ struct Localized {
     static let addFolderPrompt = "add_folder_prompt".localized
     static let libraryFolderDefaultHint = "library_folder_default_hint".localized
 
+    // MARK: - Music Library File Types（文件类型，web 版 audioExts 对齐）
+    static let libraryFileTypes = "library_file_types".localized
+    static let libraryFileTypesFooter = "library_file_types_footer".localized
+
     // MARK: - Appearance（主题三态 + 强调色）
     static let appearanceTheme = "appearance_theme".localized
     static let themeSystem = "theme_system".localized

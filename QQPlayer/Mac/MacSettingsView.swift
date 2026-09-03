@@ -250,11 +250,80 @@ private struct MacLibrarySettingsView: View {
                     Label(Localized.addFolder, systemImage: "plus.circle")
                 }
             }
+
+            // 文件类型（web 版「文件类型」chips 对齐，2026-09-03 B 组）：
+            // 多选 chips，至少保留一种；改动保存后触发曲库重扫（取消的格式
+            // 由扫描收尾 reconcile 从库移除，文件保留在磁盘，勾回重扫恢复）。
+            Section {
+                fileTypeChips
+            } header: {
+                Text(Localized.libraryFileTypes)
+            } footer: {
+                Text(Localized.libraryFileTypesFooter)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
+    }
+
+    /// 文件类型多选 chips。最后一个启用项不可取消（web 版至少保留一种语义）。
+    private var fileTypeChips: some View {
+        let enabled = Set(deleteSettings.audioExtensions)
+        return LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 84), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(LibraryAudioFormats.allSupported, id: \.self) { ext in
+                let isOn = enabled.contains(ext)
+                let isLastEnabled = isOn && enabled.count == 1
+                Button {
+                    guard !isLastEnabled else { return }
+                    toggleExtension(ext, currentlyEnabled: enabled)
+                } label: {
+                    Text("." + ext)
+                        .font(.system(.callout, design: .monospaced))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(isOn ? Color.accentColor.opacity(0.18) : Color.gray.opacity(0.1))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(isOn ? Color.accentColor : Color.gray.opacity(0.25), lineWidth: 1)
+                        )
+                        .foregroundColor(isOn ? Color.accentColor : .primary)
+                        .opacity(isLastEnabled ? 0.55 : 1)
+                }
+                .buttonStyle(.plain)
+                .help(isLastEnabled ? Localized.libraryFileTypesFooter : "")
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func toggleExtension(_ ext: String, currentlyEnabled: Set<String>) {
+        var settings = deleteSettings
+        var next = currentlyEnabled
+        if next.contains(ext) {
+            // 至少保留一种（web 版 toggleExt 语义：next.length 为 0 则不保存）
+            guard next.count > 1 else { return }
+            next.remove(ext)
+        } else {
+            next.insert(ext)
+        }
+        // 存小写不带点、按支持顺序排列（保证存储稳定）
+        settings.audioExtensions = LibraryAudioFormats.allSupported.filter { next.contains($0) }
+        settings.save()
+        deleteSettings = settings
+        // 触发主窗口重扫曲库（取消格式 → reconcile 移除该格式曲目）
+        NotificationCenter.default.post(name: .libraryScanCriteriaChanged, object: nil)
     }
 
     private func saveAndRescan(_ folders: [String]) {

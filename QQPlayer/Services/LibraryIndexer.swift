@@ -60,7 +60,9 @@ class LibraryIndexer: NSObject, ObservableObject {
         metadataQuery.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
 
         // Support all audio formats according to plan
-        let formats = ["*.flac", "*.mp3", "*.wav", "*.m4a", "*.aac", "*.opus", "*.ogg", "*.dsf", "*.dff"]
+        // （单一事实源 LibraryAudioFormats.allSupported；iOS 无文件类型设置 UI，
+        // NSMetadataQuery predicate 只按支持全集收——设置只影响 macOS 目录扫描）
+        let formats = LibraryAudioFormats.allSupported.map { "*." + $0 }
         let formatPredicates = formats.map { format in
             NSPredicate(format: "%K LIKE %@", NSMetadataItemFSNameKey, format)
         }
@@ -907,6 +909,14 @@ class LibraryIndexer: NSObject, ObservableObject {
                 do {
                     var musicFiles: [URL] = []
 
+                    // 文件类型设置（web 版 audioExts 对齐）：扫描只收录启用格式。
+                    // 默认全 9 种 = 历史行为；取消格式后此列表不含该格式 → 该格式
+                    // 文件不再入列，已入库曲目由 reconcile 收尾移除（2026-09-03 B 组）。
+                    let settings = DeleteSettings.load()
+                    let enabledExtensions = settings.audioExtensions.isEmpty
+                        ? LibraryAudioFormats.defaultEnabled
+                        : settings.audioExtensions
+
                     let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .nameKey]
                     let directoryEnumerator = FileManager.default.enumerator(
                         at: directory,
@@ -927,8 +937,7 @@ class LibraryIndexer: NSObject, ObservableObject {
                         }
 
                         let pathExtension = fileURL.pathExtension.lowercased()
-                        let supportedExtensions = ["flac", "mp3", "wav", "m4a", "aac", "opus", "ogg", "dsf", "dff"]
-                        if supportedExtensions.contains(pathExtension) {
+                        if enabledExtensions.contains(pathExtension) {
                             musicFiles.append(fileURL)
                         }
                     }
@@ -1076,8 +1085,9 @@ class LibraryIndexer: NSObject, ObservableObject {
     private func processMetadataItem(_ item: NSMetadataItem) async {
         guard let fileURL = item.value(forAttribute: NSMetadataItemURLKey) as? URL else { return }
         let ext = fileURL.pathExtension.lowercased()
-        let supportedFormats = ["flac", "mp3", "wav", "m4a", "aac", "opus", "ogg", "dsf", "dff"]
-        guard supportedFormats.contains(ext) else { return }
+        // iOS 侧：无文件类型设置 UI，按支持全集过滤（与 NSMetadataQuery predicate
+        // 同一事实源 LibraryAudioFormats.allSupported）
+        guard LibraryAudioFormats.allSupported.contains(ext) else { return }
 
         do {
             let stableId = try generateStableId(for: fileURL)

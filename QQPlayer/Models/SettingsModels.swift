@@ -10,6 +10,31 @@ extension Notification.Name {
     /// UserDefaults.didChangeNotification or every state save rebuilds the
     /// library hierarchy while audio is playing.
     static let qqplayerSettingsDidChange = Notification.Name("QQPlayerSettingsDidChange")
+
+    /// 曲库扫描条件变化（文件类型设置改动等）→ 需重扫曲库。与
+    /// LibraryFoldersChanged 分开：语义不同（文件夹增删 vs 收录条件变化），
+    /// 但消费方动作相同（reload + start，扫描中则排队）。
+    static let libraryScanCriteriaChanged = Notification.Name("LibraryScanCriteriaChanged")
+}
+
+/// 曲库可收录的音频扩展名（单一事实源）。
+///
+/// web 版（对齐对象）有 7 种（.mp3/.flac/.m4a/.wav/.ogg/.aac/.opus），但
+/// Swift 原生端播放引擎额外支持 Opus/OGG/DSD（SFBAudioEngine，macOS/iOS），
+/// 故收录全集为 9 种 = web 7 种 + dsf/dff。默认全选 = 与历史行为一致
+/// （2026-09-02 前硬编码过滤列表），用户可自行取消个别格式。
+enum LibraryAudioFormats {
+    /// 全部受支持扩展名（小写、不带点），顺序即设置页 chips 显示顺序
+    static let allSupported: [String] = ["mp3", "flac", "m4a", "wav", "ogg", "aac", "opus", "dsf", "dff"]
+
+    /// 设置未配置（首次启动/旧数据）时的默认启用集 = 全部
+    static let defaultEnabled: [String] = allSupported
+
+    /// 某路径是否属于当前启用收录格式（按扩展名，小写比较）。
+    static func isEnabled(path: String, enabled: [String]) -> Bool {
+        let ext = (path as NSString).pathExtension.lowercased()
+        return enabled.contains(ext)
+    }
 }
 
 #if os(iOS)
@@ -153,6 +178,10 @@ struct DeleteSettings: Codable {
     var autoCreateFolderPlaylists: Bool = true
     /// macOS 曲库文件夹列表（用户添加的外部歌曲文件夹；空 = 默认 ~/Music/QQPlayer）
     var libraryFolders: [String] = []
+    /// 曲库收录的音频扩展名（小写不带点，web 版「文件类型」chips 对齐）。
+    /// 默认全部支持格式；取消某格式后重扫会从曲库移除该格式曲目
+    /// （文件保留在磁盘，勾回重扫即恢复——web 版扫描缓存语义对齐）。
+    var audioExtensions: [String] = LibraryAudioFormats.defaultEnabled
     var showSleepTimerButton: Bool = false
 
     // Home screen section visibility & order
@@ -176,6 +205,11 @@ struct DeleteSettings: Codable {
         lastLibraryScanDate = try container.decodeIfPresent(Date.self, forKey: .lastLibraryScanDate)
         autoCreateFolderPlaylists = try container.decodeIfPresent(Bool.self, forKey: .autoCreateFolderPlaylists) ?? true
         libraryFolders = try container.decodeIfPresent([String].self, forKey: .libraryFolders) ?? []
+        // 兼容旧数据/未配置：decode 失败或为空列表时回落默认全集
+        // （空列表在旧格式里可能表示「未设置」，与「用户显式清空」区分——
+        // 保存路径保证至少保留一种，见 MacSettingsView 文件类型 chips）
+        let storedExts = try container.decodeIfPresent([String].self, forKey: .audioExtensions) ?? []
+        audioExtensions = storedExts.isEmpty ? LibraryAudioFormats.defaultEnabled : storedExts
         showSleepTimerButton = try container.decodeIfPresent(Bool.self, forKey: .showSleepTimerButton) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections

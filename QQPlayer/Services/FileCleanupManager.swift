@@ -19,25 +19,43 @@ class FileCleanupManager: ObservableObject {
     /// Reconciles only roots that the indexer successfully enumerated during
     /// this scan. This avoids treating an iCloud/authentication failure as an
     /// empty library while still removing files that were genuinely deleted.
+    ///
+    /// 移除两类曲目（2026-09-03 B 组「文件类型设置」对齐 web）：
+    /// 1. 文件已从磁盘删除（历史行为）
+    /// 2. 文件仍在磁盘、但扩展名已不在当前收录设置内（用户取消了该格式——
+    ///    web 版取消勾选后重扫即从曲库消失、文件保留；勾回重扫自动恢复。
+    ///    iOS 无此设置 UI，audioExtensions 恒为全量 → 本条永不触发）
     func reconcileMissingFiles(in successfullyScannedRoots: [URL]) async {
         let roots = successfullyScannedRoots.map(\.standardizedFileURL)
         guard !roots.isEmpty else { return }
 
+        // 文件类型设置单一事实源（默认全 9 种；macOS 设置页可裁剪）
+        let settings = DeleteSettings.load()
+        let enabledExtensions = settings.audioExtensions.isEmpty
+            ? LibraryAudioFormats.defaultEnabled
+            : settings.audioExtensions
+
         do {
             let tracks = try databaseManager.getAllTracks()
-            let missingTracks = tracks.filter { track in
+            let removedTracks = tracks.filter { track in
                 let trackURL = URL(fileURLWithPath: track.path).standardizedFileURL
                 let belongsToScannedRoot = roots.contains { isURL(trackURL, inside: $0) }
-                return belongsToScannedRoot && !FileManager.default.fileExists(atPath: trackURL.path)
+                guard belongsToScannedRoot else { return false }
+                let fileExists = FileManager.default.fileExists(atPath: trackURL.path)
+                if !fileExists {
+                    return true // 磁盘已删除
+                }
+                // 文件在但扩展名被取消收录 → 从曲库移除（文件保留，勾回重扫恢复）
+                return !LibraryAudioFormats.isEnabled(path: track.path, enabled: enabledExtensions)
             }
 
-            guard !missingTracks.isEmpty else {
+            guard !removedTracks.isEmpty else {
                 print("🧹 Scan reconciliation found no deleted files")
                 return
             }
 
-            print("🧹 Scan reconciliation removing \(missingTracks.count) deleted track(s)")
-            for track in missingTracks {
+            print("🧹 Scan reconciliation removing \(removedTracks.count) track(s) (missing file or format disabled)")
+            for track in removedTracks {
                 do {
                     try databaseManager.deleteTrack(byStableId: track.stableId)
                     print("🧹 Removed missing track: \(track.title)")

@@ -57,6 +57,7 @@
 		EE49A8EDD4423396C78DABE2 /* StableIdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6793C3A51095FE68378E031D /* StableIdTests.swift */; };
 		F1BB63FBDDBA0BCECD86FF7F /* LyricsSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BACA99F9A82CD834AFABADD /* LyricsSearchTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
+		B97C5DF1A6084DF592777461 /* LibraryAudioFormatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29106FE3DED649BD9D9CAFE2 /* LibraryAudioFormatsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -163,6 +164,7 @@
 		EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGestureLogicTests.swift; sourceTree = "<group>"; };
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
+		29106FE3DED649BD9D9CAFE2 /* LibraryAudioFormatsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryAudioFormatsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -512,6 +514,7 @@
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */,
 				C33DFA0B97C4C99D73B551FA /* AppearanceThemeTests.swift */,
 				09BA4C067F2B43F4A9FBF149 /* DatabasePathResolverTests.swift */,
+				29106FE3DED649BD9D9CAFE2 /* LibraryAudioFormatsTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -867,6 +870,7 @@
 				A1E2F3A4B5C6D7E8F9A0B1C2 /* ArtworkExtractionTests.swift in Sources */,
 				7C6C6B669A1CC3E35BBFAA8F /* AppearanceThemeTests.swift in Sources */,
 				4E4849B26C9142B8A27FCAE1 /* DatabasePathResolverTests.swift in Sources */,
+				B97C5DF1A6084DF592777461 /* LibraryAudioFormatsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

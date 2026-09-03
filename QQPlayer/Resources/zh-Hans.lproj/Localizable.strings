@@ -105,6 +105,8 @@
 "remove_folder" = "移除文件夹";
 "add_folder_prompt" = "选择包含音乐文件的文件夹";
 "library_folder_default_hint" = "默认曲库：~/Music/QQPlayer（未添加文件夹时扫描此目录）";
+"library_file_types" = "文件类型";
+"library_file_types_footer" = "仅扫描选中的格式。取消某格式后，下次扫描会从曲库移除该格式曲目（文件保留在磁盘，重新勾选即恢复）。至少需保留一种格式。";
 
 /* Track list context menu (A3) */
 "show_artist" = "进歌手";

@@ -199,6 +199,17 @@ struct MacLibraryView: View {
                 indexer.start()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .libraryScanCriteriaChanged)) { _ in
+            // 设置页「文件类型」改动后重扫曲库（取消的格式由 reconcile 收尾移除，
+            // 与 LibraryFoldersChanged 同款排队语义：扫描中则标记等索引结束补扫）。
+            MacScanLogger.log("libraryScanCriteriaChanged received, isIndexing=\(indexer.isIndexing)")
+            reloadLibrary()
+            if indexer.isIndexing {
+                rescanWhenIdle = true
+            } else {
+                indexer.start()
+            }
+        }
     }
 
     // MARK: - Sidebar
