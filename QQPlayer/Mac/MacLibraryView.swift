@@ -223,6 +223,11 @@ struct MacLibraryView: View {
                         .foregroundColor(.secondary)
                 } else {
                     Button {
+                        // 手动刷新语义收紧（2026-09-03 复查 A4 反馈）：先立即用 DB
+                        // 真值重载列表，再排队/启动扫描。之前只 start()——扫描被占用
+                        // 或启动被吞时列表不重读 DB，用户观感"点刷新没反应"；若曲库
+                        // 数据已被其它路径改掉（删除/回收站/iCloud），点一下立刻对齐。
+                        reloadLibrary()
                         // 2026-09-02 A4 修复：dataless 自动补扫在跑时 start() 会被
                         // guard !isIndexing 静默吞掉 → 手动刷新"没反应"。改为排队：
                         // 扫描结束后由 onReceive(isIndexing) 补一次重扫

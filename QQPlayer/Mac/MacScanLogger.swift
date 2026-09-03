@@ -31,6 +31,8 @@ enum MacScanLogger {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         } catch {}
         freopen(url.path, "a+", stderr)
+        // 重定向后 stderr 可能变全缓冲：设无缓冲，fatal/错误立即落盘
+        setvbuf(stderr, nil, _IONBF, 0)
     }
 
     /// print() 实际写 stdout 而非 stderr——只重定向 stderr 会让 🗑️/🗃️ print 日志
@@ -41,6 +43,10 @@ enum MacScanLogger {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         } catch {}
         freopen(url.path, "a+", stdout)
+        // freopen 后 stdout 对文件是全缓冲（≥4KB 才 flush）——零星 print（如单次
+        // deleteTrack 几行）会长期滞留在缓冲区、stdout.log 看起来"没动静"，误导
+        // 删除/刷新类问题排查（2026-09-03 复查踩到）。改行缓冲：print 即落盘。
+        setvbuf(stdout, nil, _IOLBF, 0)
     }
 
     /// 追加一行到指定日志文件（scan.log / trash.log 共用同一实现）

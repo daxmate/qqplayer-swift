@@ -73,10 +73,6 @@ struct MacTrackListView: View {
     /// 当前显示的排序后行（播放队列跟随，与 Table 显示一致）
     @State private var displayedRows: [MacTrackTableRow] = []
 
-    private var rows: [MacTrackTableRow] {
-        tracks.map { MacTrackTableRow(id: $0.stableId, track: $0, artistName: artistNameResolver($0) ?? "") }
-    }
-
     var body: some View {
         if tracks.isEmpty {
             VStack(spacing: 12) {
@@ -117,11 +113,16 @@ struct MacTrackListView: View {
                 reloadPlaylists()
                 syncDisplayedRows()
             }
-            .onChange(of: sortOrder) { _ in
-                syncDisplayedRows()
+            .onChange(of: sortOrder) { newSort in
+                // 用 onChange 传入的新排序重建，不用旧闭包捕获的 self.sortOrder
+                syncDisplayedRows(sort: newSort)
             }
-            .onChange(of: tracks.map(\.stableId)) { _ in
-                syncDisplayedRows()
+            .onChange(of: tracks) { newTracks in
+                // 关键修复（2026-09-03 现场探针定位）：onChange 闭包捕获的是变化前的
+                // 旧 self，读 self.tracks 会拿到删除前的旧数组 → 用旧数据重建会把刚
+                // 删掉的行“复活”，且后续重载不再触发 onChange，幽灵行直到重启才消失。
+                // 必须用 onChange 传入的 newTracks（新数据）重建。
+                syncDisplayedRows(tracks: newTracks)
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
                 reloadFavorites()
@@ -243,9 +244,19 @@ struct MacTrackListView: View {
     }
 
     /// 让显示行与排序状态同步（Table 内部按 sortOrder 重排，此处镜像供播放队列用）
-    /// 同时按显示顺序赋 displayIndex（# 列序号随排序刷新）
-    private func syncDisplayedRows() {
-        let sorted = rows.sorted(using: sortOrder)
+    /// 同时按显示顺序赋 displayIndex（# 列序号随排序刷新）。
+    /// 重要：从 onChange 事件调用时必须把「新值」作为参数传入（freshTracks/freshSort）。
+    /// onChange 闭包捕获的是变化前的旧 self，直接读 self.tracks/self.sortOrder 会拿到
+    /// 旧数据，导致刚删除的行被旧数组重建复活（2026-09-03 现场探针定位的幽灵行根因）。
+    private func syncDisplayedRows(
+        tracks freshTracks: [Track]? = nil,
+        sort freshSort: [SortDescriptor<MacTrackTableRow>]? = nil
+    ) {
+        let sourceTracks = freshTracks ?? tracks
+        let sourceSort = freshSort ?? sortOrder
+        let sorted = sourceTracks
+            .map { MacTrackTableRow(id: $0.stableId, track: $0, artistName: artistNameResolver($0) ?? "") }
+            .sorted(using: sourceSort)
         for (index, row) in sorted.enumerated() {
             row.displayIndex = index + 1
         }
