@@ -127,6 +127,21 @@ struct MacLibraryView: View {
             if WhatsNewStore.shared.shouldShowCurrent() {
                 showWhatsNew = true
             }
+            // FSEvents 实时监控（web 版 watchdog 对齐，2026-09-03 B 组）：
+            // 曲库文件夹内容变化（增删改/改名）→ 去抖 2s → 自动重扫。
+            // 监控根 = 当前配置文件夹集合；设置页增删文件夹后重启（下方通知）。
+            startFolderMonitoring()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFolderContentChanged"))) { _ in
+            // FSEvents 事件（已 2s 去抖，main 线程投递）→ 与 LibraryFoldersChanged
+            // 同款语义：reload 立即对齐 DB + 启动/排队重扫
+            MacScanLogger.log("LibraryFolderContentChanged received, isIndexing=\(indexer.isIndexing)")
+            reloadLibrary()
+            if indexer.isIndexing {
+                rescanWhenIdle = true
+            } else {
+                indexer.start()
+            }
         }
         .onReceive(indexer.$isIndexing) { isIndexing in
             if !isIndexing {
@@ -165,6 +180,7 @@ struct MacLibraryView: View {
             debounceTask?.cancel()
             searchTask?.cancel()
             libraryRefreshTask?.cancel()
+            MacFolderMonitor.shared.stop()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏变化后刷新“我喜欢的音乐”列表（含正在展示时的实时移除）
@@ -192,6 +208,8 @@ struct MacLibraryView: View {
             // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）。
             // 若正在扫描，start() 会被 guard 吞掉 → 标记等索引结束自动补扫。
             MacScanLogger.log("LibraryFoldersChanged received, isIndexing=\(indexer.isIndexing)")
+            // 监控根变化 → 重启 FSEvents（旧根目录已不在监听集合）
+            startFolderMonitoring()
             reloadLibrary()
             if indexer.isIndexing {
                 rescanWhenIdle = true
@@ -352,6 +370,22 @@ struct MacLibraryView: View {
             likedTracks = tracks.filter { favoriteIds.contains($0.stableId) }
         } catch {
             print("❌ macOS reloadLikedTracks failed: \(error)")
+        }
+    }
+
+    // MARK: - FSEvents 实时监控（web 版 watchdog 对齐，2026-09-03 B 组）
+
+    /// 启动/重启曲库文件夹实时监控。监控根 = 当前配置文件夹集合
+    /// （默认 ~/Music/QQPlayer + 设置页添加的外部文件夹，StateManager 归一）。
+    private func startFolderMonitoring() {
+        let folders = StateManager.shared.getMusicFolderURLs()
+        let paths = MacFolderWatchPolicy.relevantFolders(folders).map(\.path)
+        MacScanLogger.log("FSEvents watch start, folders: \(paths)")
+        MacFolderMonitor.shared.start(paths: paths) {
+            // 已在主线程（MacFolderMonitor 去抖后 main 投递）。经通知转发，
+            // 与 LibraryFoldersChanged 共用「reload + start/排队」语义，避免
+            // 此处重复实现扫描中排队逻辑。
+            NotificationCenter.default.post(name: NSNotification.Name("LibraryFolderContentChanged"), object: nil)
         }
     }
 
