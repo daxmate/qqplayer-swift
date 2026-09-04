@@ -38,5 +38,16 @@ struct QQPlayerMacApp: App {
             MacSettingsView()
                 .tint(MacAppearance.accentColor(forKey: deleteSettings.accentColorName))
         }
+        // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
+        .commands {
+            CommandGroup(after: .toolbar) {
+                Button {
+                    MacSearchAnythingState.shared.isOpen.toggle()
+                } label: {
+                    Text("search_any_menu".localized)
+                }
+                .keyboardShortcut("k", modifiers: .command)
+            }
+        }
     }
 }

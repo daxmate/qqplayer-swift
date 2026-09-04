@@ -164,8 +164,10 @@ struct Localized {
     // MARK: - Settings Categories（web 版左导航分类对齐）
     static let settingsCategoryPlayback = "settings_category_playback".localized
     static let settingsCategoryLibrary = "settings_category_library".localized
+    static let settingsCategoryDownload = "settings_category_download".localized
     static let settingsCategoryAppearance = "settings_category_appearance".localized
     static let settingsCategoryAbout = "settings_category_about".localized
+    static let settingsDownloadQuality = "settings_download_quality".localized
 
     // MARK: - Music Library（曲库文件夹）
     static let libraryFolders = "library_folders".localized

@@ -614,3 +614,22 @@
 "online_downloaded" = "已下载";
 "online_download_failed" = "下载失败";
 "online_download_failed_prefix" = "下载失败：%@";
+
+/* C 组：search anything + 设置下载分类 */
+"settings_category_download" = "下载";
+"settings_download_quality" = "下载音质";
+"settings_download_hint" = "在线下载的默认音质。文件保存到曲库文件夹（默认 ~/Music/QQPlayer），完成后自动出现在曲库。";
+"settings_quality_standard" = "128k";
+"settings_quality_exhigh" = "320k";
+"settings_quality_lossless" = "无损";
+"settings_quality_hires" = "Hi-Res";
+"search_any_menu" = "搜索一切";
+"search_any_placeholder" = "搜索歌曲、歌手、专辑或设置…";
+"search_any_loading" = "搜索中…";
+"search_any_no_results" = "没有匹配结果";
+"search_any_empty_hint" = "输入关键词：本地歌曲、在线歌曲（下载入曲库）、歌手、专辑或设置项";
+"search_badge_song" = "歌曲";
+"search_badge_online" = "在线";
+"search_badge_artist" = "歌手";
+"search_badge_album" = "专辑";
+"search_badge_setting" = "设置";

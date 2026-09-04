@@ -958,3 +958,22 @@
 "online_download_failed" = "下載失敗";
 "online_download_failed_prefix" = "下載失敗：%@";
 
+
+/* C 組：search anything + 設定下載分類 */
+"settings_category_download" = "下載";
+"settings_download_quality" = "下載音質";
+"settings_download_hint" = "線上下載的預設音質。檔案儲存到曲庫資料夾（預設 ~/Music/QQPlayer），完成後自動出現在曲庫。";
+"settings_quality_standard" = "128k";
+"settings_quality_exhigh" = "320k";
+"settings_quality_lossless" = "無損";
+"settings_quality_hires" = "Hi-Res";
+"search_any_menu" = "搜尋一切";
+"search_any_placeholder" = "搜尋歌曲、歌手、專輯或設定…";
+"search_any_loading" = "搜尋中…";
+"search_any_no_results" = "沒有相符結果";
+"search_any_empty_hint" = "輸入關鍵字：本地歌曲、線上歌曲（下載入曲庫）、歌手、專輯或設定項目";
+"search_badge_song" = "歌曲";
+"search_badge_online" = "線上";
+"search_badge_artist" = "歌手";
+"search_badge_album" = "專輯";
+"search_badge_setting" = "設定";

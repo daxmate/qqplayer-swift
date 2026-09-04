@@ -40,6 +40,8 @@ struct MacLibraryView: View {
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var indexer = LibraryIndexer.shared
     @StateObject private var progress = PlayerEngine.shared.progress
+    /// search anything 开关（⌘K 菜单命令与浮层共用同一单例）
+    @ObservedObject private var searchAnythingState = MacSearchAnythingState.shared
 
     @State private var section: MacLibrarySection = .tracks
     @State private var tracks: [Track] = []
@@ -133,6 +135,20 @@ struct MacLibraryView: View {
         .sheet(isPresented: $showOnlineSearch) {
             MacOnlineSearchView()
         }
+        // search anything（C 组②）：⌘K/菜单唤起的主窗内全屏搜索浮层（与侧栏搜索共存）
+        .overlay {
+            if searchAnythingState.isOpen {
+                MacSearchAnythingLayer(
+                    onPlayLocal: { playSearchSongs($0, queue: $1) },
+                    onPlayArtist: playArtist,
+                    onPlayAlbum: playAlbum,
+                    onOpenSettings: openSettingsCategory,
+                    artistNameResolver: { resolveArtistName(for: $0) }
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.12), value: searchAnythingState.isOpen)
         .task {
             reloadLibrary()
             if !indexer.isIndexing {
@@ -548,6 +564,17 @@ struct MacLibraryView: View {
         Task {
             await player.playTrack(track, queue: queue)
         }
+    }
+
+    /// search anything 设置行：打开系统设置窗口并定位到对应分类
+    private func openSettingsCategory(_ category: String) {
+        NotificationCenter.default.post(
+            name: NSNotification.Name("MacSettingsOpenCategory"),
+            object: nil,
+            userInfo: ["category": category]
+        )
+        // SwiftUI Settings scene 的官方唤起（App 菜单 Settings… 同款 action）
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     private func playSearchSongs(_ track: Track, queue: [Track]) {

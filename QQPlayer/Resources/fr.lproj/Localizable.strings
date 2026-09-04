@@ -577,3 +577,22 @@
 "online_download_failed" = "Échec du téléchargement";
 "online_download_failed_prefix" = "Échec du téléchargement : %@";
 
+
+/* C-group: search anything + settings download */
+"settings_category_download" = "Téléchargement";
+"settings_download_quality" = "Qualité de téléchargement";
+"settings_download_hint" = "Qualité par défaut des téléchargements en ligne. Les fichiers sont enregistrés dans votre dossier musical (par défaut ~/Music/QQPlayer) et apparaissent automatiquement dans la bibliothèque.";
+"settings_quality_standard" = "128 kbit/s";
+"settings_quality_exhigh" = "320 kbit/s";
+"settings_quality_lossless" = "Sans perte";
+"settings_quality_hires" = "Hi-Res";
+"search_any_menu" = "Recherche tout";
+"search_any_placeholder" = "Rechercher chansons, artistes, albums ou réglages…";
+"search_any_loading" = "Recherche…";
+"search_any_no_results" = "Aucun résultat";
+"search_any_empty_hint" = "Saisissez pour rechercher chansons locales et en ligne (télécharger dans la bibliothèque), artistes, albums ou réglages.";
+"search_badge_song" = "Chansons";
+"search_badge_online" = "En ligne";
+"search_badge_artist" = "Artistes";
+"search_badge_album" = "Albums";
+"search_badge_setting" = "Réglages";

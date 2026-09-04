@@ -16,6 +16,7 @@ struct MacSettingsView: View {
     private enum SettingsCategory: String, CaseIterable, Hashable {
         case playback
         case library
+        case download
         case appearance
         case about
 
@@ -23,6 +24,7 @@ struct MacSettingsView: View {
             switch self {
             case .playback: return Localized.settingsCategoryPlayback
             case .library: return Localized.settingsCategoryLibrary
+            case .download: return Localized.settingsCategoryDownload
             case .appearance: return Localized.settingsCategoryAppearance
             case .about: return Localized.settingsCategoryAbout
             }
@@ -32,6 +34,7 @@ struct MacSettingsView: View {
             switch self {
             case .playback: return "play.circle"
             case .library: return "music.note.list"
+            case .download: return "arrow.down.circle"
             case .appearance: return "paintbrush"
             case .about: return "info.circle"
             }
@@ -60,6 +63,8 @@ struct MacSettingsView: View {
                     MacPlaybackSettingsView(showEQSettings: $showEQSettings)
                 case .library:
                     MacLibrarySettingsView()
+                case .download:
+                    MacOnlineSettingsView()
                 case .appearance:
                     MacAppearanceSettingsView()
                 case .about:
@@ -76,6 +81,13 @@ struct MacSettingsView: View {
         // .qqplayerSettingsDidChange，这里重读。
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
+        }
+        // search anything 设置行：⌘K 浮层点击设置分类 → 打开本窗口并定位
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MacSettingsOpenCategory"))) { note in
+            if let raw = note.userInfo?["category"] as? String,
+               let category = SettingsCategory(rawValue: raw) {
+                selectedCategory = category
+            }
         }
     }
 }

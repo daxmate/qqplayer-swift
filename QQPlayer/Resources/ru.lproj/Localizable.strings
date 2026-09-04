@@ -574,3 +574,22 @@
 "online_download_failed" = "Ошибка загрузки";
 "online_download_failed_prefix" = "Ошибка загрузки: %@";
 
+
+/* C-group: search anything + settings download */
+"settings_category_download" = "Загрузки";
+"settings_download_quality" = "Качество загрузки";
+"settings_download_hint" = "Качество по умолчанию для онлайн-загрузок. Файлы сохраняются в вашу музыкальную папку (по умолчанию ~/Music/QQPlayer) и появляются в библиотеке автоматически.";
+"settings_quality_standard" = "128 кбит/с";
+"settings_quality_exhigh" = "320 кбит/с";
+"settings_quality_lossless" = "Без потерь";
+"settings_quality_hires" = "Hi-Res";
+"search_any_menu" = "Поиск всего";
+"search_any_placeholder" = "Поиск песен, исполнителей, альбомов или настроек…";
+"search_any_loading" = "Поиск…";
+"search_any_no_results" = "Ничего не найдено";
+"search_any_empty_hint" = "Введите запрос для поиска локальных и онлайн-песен (загрузка в библиотеку), исполнителей, альбомов или настроек.";
+"search_badge_song" = "Песни";
+"search_badge_online" = "Онлайн";
+"search_badge_artist" = "Исполнители";
+"search_badge_album" = "Альбомы";
+"search_badge_setting" = "Настройки";
