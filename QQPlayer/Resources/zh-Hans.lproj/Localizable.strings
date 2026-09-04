@@ -82,6 +82,8 @@
 /* Player */
 "playing_queue" = "播放队列";
 "no_songs_in_queue" = "队列中暂无歌曲";
+"queue_shuffle_disabled_hint" = "随机播放时不可手动排序";
+"queue_remove_from_queue" = "从队列移除";
 "no_track_selected" = "未选择曲目";
 
 /* Search */

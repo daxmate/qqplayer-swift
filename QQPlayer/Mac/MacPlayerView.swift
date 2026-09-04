@@ -36,6 +36,8 @@ struct MacPlayerView: View {
     @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
     /// 歌词搜索 sheet（手动指定歌词）
     @State private var showLyricsSearch = false
+    /// 播放队列面板（B 组队列排序持久化：可拖排/删除/点行跳转，重排即持久化）
+    @State private var showQueuePanel = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,6 +71,9 @@ struct MacPlayerView: View {
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showQueuePanel) {
+            MacQueuePanelView(player: player)
         }
         .animation(.easeInOut(duration: 0.25), value: karaoke.isKaraokeOn)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
@@ -251,6 +256,20 @@ struct MacPlayerView: View {
 
                 Divider().frame(height: 24)
 
+                // 播放队列（B 组队列排序持久化）：打开可拖排/删除/跳转的面板。
+                // 只有当前在播且非随机时队列面板才有意义——随机模式下播放顺序
+                // 由 shuffle 决定（isQueueReorderable=false，面板内提示）。
+                Button {
+                    showQueuePanel = true
+                } label: {
+                    Image(systemName: "list.number")
+                        .font(.system(size: 16))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+                .disabled(track == nil || player.playbackQueue.isEmpty)
+                .help("playing_queue".localized)
+
                 // 跟唱模式开关（双击歌词行的 iOS 语义在 Mac 上没有，给显式按钮）
                 Button {
                     karaoke.toggleKaraokeMode()
@@ -327,5 +346,125 @@ struct MacPlayerView: View {
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
         sleepTimerEndDate = nil
+    }
+}
+
+// MARK: - 播放队列面板（B 组队列排序持久化，2026-09-03）
+
+/// macOS 播放队列管理：显示当前队列，支持拖拽重排 / 移除（当前播放项除外）/
+/// 点行跳转。每次变更经 PlayerEngine.moveQueueItems/removeQueueItems/jumpToQueueIndex
+/// 立即持久化（savePlayerState 落盘 queueTrackIds），重启 restoreUIStateOnly 恢复——
+/// web 版 persistQueueOrder/applyQueueOrder 语义的 Swift 端形态（队列=播放引擎队列，
+/// 启动恢复 = 现成 QQPlayerState 恢复链路）。
+private struct MacQueuePanelView: View {
+    @ObservedObject var player: PlayerEngine
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            content
+        }
+        .frame(minWidth: 420, minHeight: 360)
+    }
+
+    private var header: some View {
+        HStack {
+            Text(Localized.playingQueue)
+                .font(.headline)
+            Spacer()
+            Button("close".localized) { dismiss() }
+                .keyboardShortcut(.cancelAction)
+        }
+        .padding(12)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if player.playbackQueue.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "music.note.list")
+                    .font(.system(size: 40))
+                    .foregroundColor(.secondary)
+                Text(Localized.noSongsInQueue)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: 0) {
+                if !player.isQueueReorderable {
+                    Text(Localized.queueShuffleDisabledHint)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                }
+                List {
+                    ForEach(Array(player.playbackQueue.enumerated()), id: \.element.stableId) { index, track in
+                        row(for: track, at: index)
+                    }
+                    // macOS List：onMove 直接支持鼠标拖拽重排（无需 iOS EditMode）
+                    .onMove(perform: player.moveQueueItems)
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    private func row(for track: Track, at index: Int) -> some View {
+        let isCurrent = index == player.currentIndex
+        return HStack(spacing: 10) {
+            Text("\(index + 1)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .monospacedDigit()
+                .frame(width: 28, alignment: .trailing)
+
+            if isCurrent {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
+                    .frame(width: 14)
+            } else {
+                Image(systemName: "line.3.horizontal")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 14)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.title)
+                    .fontWeight(isCurrent ? .semibold : .regular)
+                    .lineLimit(1)
+                if let artist = try? DatabaseManager.shared.getArtistDisplayName(
+                    forTrackStableId: track.stableId,
+                    fallbackArtistId: track.artistId
+                ) {
+                    Text(artist)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+
+            if !isCurrent {
+                Button {
+                    player.removeQueueItems(at: IndexSet(integer: index))
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(Localized.removeFromQueue)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !isCurrent else { return }
+            Task { await player.jumpToQueueIndex(index) }
+        }
     }
 }

@@ -136,6 +136,11 @@ struct MacLibraryView: View {
             // 曲库文件夹内容变化（增删改/改名）→ 去抖 2s → 自动重扫。
             // 监控根 = 当前配置文件夹集合；设置页增删文件夹后重启（下方通知）。
             startFolderMonitoring()
+            // 恢复上次播放状态（队列顺序 + 当前曲目，不自动播放）——B 组
+            // 队列持久化闭环：moveQueueItems/remove 后 savePlayerState 落盘
+            // queueTrackIds，冷启动经 restoreUIStateOnly 按键匹配还原队列顺序。
+            // 放在 reloadLibrary 之后保证 DB 曲目可查（restore 只认已入库 stableId）。
+            await player.restoreUIStateOnly()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFolderContentChanged"))) { _ in
             // FSEvents 事件（已 2s 去抖，main 线程投递）→ 与 LibraryFoldersChanged

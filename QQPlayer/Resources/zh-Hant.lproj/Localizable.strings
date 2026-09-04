@@ -149,6 +149,8 @@
 "playing_queue" = "播放佇列";
 
 "no_songs_in_queue" = "佇列中暫無歌曲";
+"queue_shuffle_disabled_hint" = "隨機播放時不可手動排序";
+"queue_remove_from_queue" = "從佇列移除";
 
 "no_track_selected" = "未選擇曲目";
 

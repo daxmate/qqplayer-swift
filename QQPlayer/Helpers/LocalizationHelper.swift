@@ -97,6 +97,8 @@ struct Localized {
     // MARK: - Player
     static let playingQueue = "playing_queue".localized
     static let noSongsInQueue = "no_songs_in_queue".localized
+    static let queueShuffleDisabledHint = "queue_shuffle_disabled_hint".localized
+    static let removeFromQueue = "queue_remove_from_queue".localized
     static let noTrackSelected = "no_track_selected".localized
 
     // MARK: - Search

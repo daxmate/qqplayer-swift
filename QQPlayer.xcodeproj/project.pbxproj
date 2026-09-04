@@ -60,6 +60,7 @@
 		F1BB63FBDDBA0BCECD86FF7F /* LyricsSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BACA99F9A82CD834AFABADD /* LyricsSearchTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
 		A3F6318079D84C76832E906B /* MacImportNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */; };
+		F5EA698EDC0C4A428FB7E77E /* QueueReorderMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,6 +170,7 @@
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
 		4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacImportNamingTests.swift; sourceTree = "<group>"; };
+		5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QueueReorderMathTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -527,6 +529,7 @@
 				29106FE3DED649BD9D9CAFE2 /* LibraryAudioFormatsTests.swift */,
 				DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */,
 				4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */,
+				5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -885,6 +888,7 @@
 				B97C5DF1A6084DF592777461 /* LibraryAudioFormatsTests.swift in Sources */,
 				61ADA96C0EB749499052A4CF /* MacFolderWatchPolicyTests.swift in Sources */,
 				A3F6318079D84C76832E906B /* MacImportNamingTests.swift in Sources */,
+				F5EA698EDC0C4A428FB7E77E /* QueueReorderMathTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

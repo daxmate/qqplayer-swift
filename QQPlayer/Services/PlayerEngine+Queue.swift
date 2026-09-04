@@ -6,6 +6,43 @@
 //
 import Foundation
 
+/// 队列手动重排的索引数学（纯函数，可单测——PlayerEngine.shared 单例 + @MainActor
+/// 无法在测试里安全实例化，索引修正是最容易回归的部分，抽出来锁定）。
+enum QueueReorderMath {
+    /// List onMove 落点修正：destination 是移除源项后的插入点。
+    /// - source 在 destination 前：移除源项使后续索引整体前移 1 → 插入点 = destination - 1
+    /// - source 在 destination 后：不受影响 → 插入点 = destination
+    static func insertIndex(sourceIndex: Int, destination: Int) -> Int {
+        sourceIndex < destination ? destination - 1 : destination
+    }
+
+    /// 移动后 currentIndex 应指向的索引（保持指向同一曲目）。
+    /// 规则（均以 sourceIndex 移除前的坐标系讨论）：
+    /// - source == current：当前曲被移动 → 新位置即 current 新址
+    /// - source < current && insertAt >= current：被移动项插到 current 之后/处 → current 前移 1
+    /// - source > current && insertAt <= current：被移动项从 current 后挪到 current 前 → current 后移 1
+    /// - 其余：current 不受影响
+    static func adjustedCurrentIndexAfterMove(sourceIndex: Int, insertAt: Int, currentIndex: Int) -> Int {
+        if sourceIndex == currentIndex {
+            return insertAt
+        }
+        if sourceIndex < currentIndex, insertAt >= currentIndex {
+            return currentIndex - 1
+        }
+        if sourceIndex > currentIndex, insertAt <= currentIndex {
+            return currentIndex + 1
+        }
+        return currentIndex
+    }
+
+    /// 移除若干项后 currentIndex 的修正（offsets 应已排除当前项；多选从尾往头删）。
+    static func adjustedCurrentIndexAfterRemoval(removedIndices: [Int], currentIndex: Int) -> Int {
+        removedIndices.reduce(currentIndex) { acc, removed in
+            removed < acc ? acc - 1 : acc
+        }
+    }
+}
+
 extension PlayerEngine {
     // MARK: - Index Normalization Helper
 
@@ -143,6 +180,73 @@ extension PlayerEngine {
     func insertNext(_ track: Track) {
         let insertIndex = currentIndex + 1
         playbackQueue.insert(track, at: min(insertIndex, playbackQueue.count))
+    }
+
+    // MARK: - Queue 手动重排（macOS 队列面板，2026-09-03 B 组对齐 web 队列持久化）
+
+    /// 移动队列一段（List onMove 语义）。修正 currentIndex 指向同一曲目；
+    /// 随机模式下禁止重排（队列顺序会被 shuffle 覆盖，UI 层 isQueueReorderable 拦截）。
+    /// 重排后立即 savePlayerState()——否则顺序只在 pause/stop 时才落盘，重启丢序。
+    func moveQueueItems(from source: IndexSet, to destination: Int) {
+        guard isQueueReorderable, let sourceIndex = source.first,
+              playbackQueue.indices.contains(sourceIndex) else { return }
+
+        let insertAt = QueueReorderMath.insertIndex(sourceIndex: sourceIndex, destination: destination)
+        guard insertAt >= 0, insertAt < playbackQueue.count, insertAt != sourceIndex else { return }
+
+        let moved = playbackQueue.remove(at: sourceIndex)
+        playbackQueue.insert(moved, at: insertAt)
+
+        currentIndex = QueueReorderMath.adjustedCurrentIndexAfterMove(
+            sourceIndex: sourceIndex,
+            insertAt: insertAt,
+            currentIndex: currentIndex
+        )
+        print("🔀 Queue reordered: \(moved.title) to \(insertAt), currentIndex=\(currentIndex)")
+        savePlayerState()
+    }
+
+    /// 从队列移除若干项（当前播放项不可移除——UI 已过滤，这里再兜底）。
+    /// 移除后立即持久化。
+    func removeQueueItems(at offsets: IndexSet) {
+        let removable = offsets.filter { $0 != currentIndex }
+        guard !removable.isEmpty else { return }
+
+        var newQueue = playbackQueue
+        for index in removable.sorted().reversed() {
+            newQueue.remove(at: index)
+        }
+        currentIndex = QueueReorderMath.adjustedCurrentIndexAfterRemoval(
+            removedIndices: Array(removable),
+            currentIndex: currentIndex
+        )
+        currentIndex = max(0, min(currentIndex, newQueue.count - 1))
+
+        playbackQueue = newQueue
+        normalizeIndexAndTrack()
+        print("🗑️ Queue items removed, remaining \(playbackQueue.count)")
+        savePlayerState()
+    }
+
+    /// 跳到队列指定项播放（队列面板点行）。等价 iOS QueueManagementView.jumpToTrack。
+    func jumpToQueueIndex(_ index: Int) async {
+        guard index >= 0, index < playbackQueue.count else { return }
+        currentIndex = index
+        let track = playbackQueue[index]
+        await loadTrack(track, preservePlaybackTime: false)
+        if usingSFBEngine && isPlaying {
+            playbackState = .playing
+            startPlaybackTimer()
+        } else {
+            play()
+        }
+        savePlayerState()
+    }
+
+    /// 队列可否手动重排：非空 + 非随机。随机模式下播放顺序由 shuffle 决定，
+    /// 手动重排无意义且会被 toggleShuffle 覆盖（web 版 canReorder 语义对齐）。
+    var isQueueReorderable: Bool {
+        !playbackQueue.isEmpty && !isShuffled
     }
 
     // MARK: - Playback Order Mode

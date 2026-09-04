@@ -70,6 +70,8 @@
 /* Player */
 "playing_queue" = "File de lecture";
 "no_songs_in_queue" = "Aucune musique dans la file";
+"queue_shuffle_disabled_hint" = "Réorganisation désactivée en mode aléatoire";
+"queue_remove_from_queue" = "Retirer de la file d'attente";
 "no_track_selected" = "Aucune piste sélectionnée";
 
 /* Search */

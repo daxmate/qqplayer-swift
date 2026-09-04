@@ -70,6 +70,8 @@
 /* Player */
 "playing_queue" = "Очередь воспроизведения";
 "no_songs_in_queue" = "Очередь пуста";
+"queue_shuffle_disabled_hint" = "Изменение порядка отключено в режиме перемешивания";
+"queue_remove_from_queue" = "Убрать из очереди";
 "no_track_selected" = "Трек не выбран";
 
 /* Search */

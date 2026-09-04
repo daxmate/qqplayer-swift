@@ -82,6 +82,8 @@
 /* Player */
 "playing_queue" = "Playing Queue";
 "no_songs_in_queue" = "No songs in queue";
+"queue_shuffle_disabled_hint" = "Reordering is disabled while shuffle is on";
+"queue_remove_from_queue" = "Remove from Queue";
 "no_track_selected" = "No track selected";
 
 /* Search */
