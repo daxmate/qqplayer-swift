@@ -28,6 +28,7 @@
 		50455E615D9FAE84C741EB6E /* FormatInfoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071C4A9B25AFB9B772D8625E /* FormatInfoTests.swift */; };
 		5C3389AA47637899080AFA31 /* EQFrequencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D963241E1B89FFA0906475 /* EQFrequencyTests.swift */; };
 		5DD1433176A94929971A3F64 /* MacIndexingGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC7716081AB4D7298E62155 /* MacIndexingGateTests.swift */; };
+		61ADA96C0EB749499052A4CF /* MacFolderWatchPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */; };
 		664B6BEF05384F2098030629 /* SmartPlaylistDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51C1329002F4C3E963D14AC /* SmartPlaylistDataTests.swift */; };
 		667F37CD3A564FC66FC620E4 /* PlaybackOrderModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AE00850E1369590B0BB09C7 /* PlaybackOrderModeTests.swift */; };
 		6CC3183EEB974716AC10BD10 /* ModelsRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9706677182164C8987546D81 /* ModelsRoundTripTests.swift */; };
@@ -58,7 +59,7 @@
 		EE49A8EDD4423396C78DABE2 /* StableIdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6793C3A51095FE68378E031D /* StableIdTests.swift */; };
 		F1BB63FBDDBA0BCECD86FF7F /* LyricsSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BACA99F9A82CD834AFABADD /* LyricsSearchTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
-		61ADA96C0EB749499052A4CF /* MacFolderWatchPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */; };
+		A3F6318079D84C76832E906B /* MacImportNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -163,10 +164,11 @@
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkExtractionTests.swift; sourceTree = "<group>"; };
 		C6713EFB0F4A28ACE3266FB2 /* ModelCodableTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelCodableTests.swift; sourceTree = "<group>"; };
 		C8CA665B2F1644A58CD4A39B /* ArtistNameNormalizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtistNameNormalizerTests.swift; sourceTree = "<group>"; };
+		DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacFolderWatchPolicyTests.swift; sourceTree = "<group>"; };
 		EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGestureLogicTests.swift; sourceTree = "<group>"; };
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
-		DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacFolderWatchPolicyTests.swift; sourceTree = "<group>"; };
+		4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacImportNamingTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -179,6 +181,8 @@
 				Mac/MacArtworkThumbnail.swift,
 				Mac/MacEQImportView.swift,
 				Mac/MacEQSettingsView.swift,
+				Mac/MacImportService.swift,
+				Mac/MacFolderMonitor.swift,
 				Mac/MacGraphicEQ10BandEditorView.swift,
 				Mac/MacHelpers.swift,
 				Mac/MacLibraryView.swift,
@@ -187,7 +191,6 @@
 				Mac/MacManualEQEditorView.swift,
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
-				Mac/MacFolderMonitor.swift,
 				Mac/MacScanLogger.swift,
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
@@ -237,6 +240,8 @@
 				Mac/MacArtworkThumbnail.swift,
 				Mac/MacEQImportView.swift,
 				Mac/MacEQSettingsView.swift,
+				Mac/MacImportService.swift,
+				Mac/MacFolderMonitor.swift,
 				Mac/MacGraphicEQ10BandEditorView.swift,
 				Mac/MacHelpers.swift,
 				Mac/MacLibraryView.swift,
@@ -245,7 +250,6 @@
 				Mac/MacManualEQEditorView.swift,
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
-				Mac/MacFolderMonitor.swift,
 				Mac/MacScanLogger.swift,
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
@@ -294,6 +298,7 @@
 				Services/LyricsSearch.swift,
 				Services/LyricsSearchCache.swift,
 				Services/LyricsSearchProvider.swift,
+				Services/MacImportNaming.swift,
 				Services/MacFolderWatchPolicy.swift,
 				Services/MacIndexingGate.swift,
 				Services/MacPlaybackGate.swift,
@@ -521,6 +526,7 @@
 				09BA4C067F2B43F4A9FBF149 /* DatabasePathResolverTests.swift */,
 				29106FE3DED649BD9D9CAFE2 /* LibraryAudioFormatsTests.swift */,
 				DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */,
+				4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -878,6 +884,7 @@
 				4E4849B26C9142B8A27FCAE1 /* DatabasePathResolverTests.swift in Sources */,
 				B97C5DF1A6084DF592777461 /* LibraryAudioFormatsTests.swift in Sources */,
 				61ADA96C0EB749499052A4CF /* MacFolderWatchPolicyTests.swift in Sources */,
+				A3F6318079D84C76832E906B /* MacImportNamingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -108,6 +108,11 @@
 "library_file_types" = "File Types";
 "library_file_types_footer" = "Only selected formats are scanned. Disabling a format removes its tracks from the library on the next scan (files are kept on disk and return when re-enabled). At least one format must stay enabled.";
 
+/* Drag & drop import (web 版拖拽对齐, B 组) */
+"drag_import_hint" = "Drop audio files here to import them";
+"drag_import_success_count" = "Imported %d file(s)";
+"drag_import_none" = "No audio files were imported";
+
 /* Track list context menu (A3) */
 "show_artist" = "Go to Artist";
 "show_album" = "Go to Album";

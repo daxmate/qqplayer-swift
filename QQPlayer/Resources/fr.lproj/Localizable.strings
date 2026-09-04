@@ -96,6 +96,11 @@
 "library_file_types" = "Types de fichiers";
 "library_file_types_footer" = "Seuls les formats sélectionnés sont scannés. Désactiver un format retire ses morceaux de la bibliothèque au prochain scan (les fichiers restent sur le disque et reviennent si réactivés). Au moins un format doit rester activé.";
 
+/* Drag & drop import (web 版拖拽对齐, B 组) */
+"drag_import_hint" = "Déposez des fichiers audio ici pour les importer";
+"drag_import_success_count" = "%d fichier(s) importé(s)";
+"drag_import_none" = "Aucun fichier audio importé";
+
 /* Track list context menu (A3) */
 "show_artist" = "Voir l'artiste";
 "show_album" = "Voir l'album";

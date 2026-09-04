@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Albums
 
@@ -309,6 +310,16 @@ struct MacPlaylistListView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        // 文件拖到歌单行 → 导入并加入该歌单（web 侧栏 drop 的
+                        // 等价物；B 组，2026-09-03）。行级 drop 优先于窗口级。
+                        .onDrop(
+                            of: [UTType.fileURL],
+                            isTargeted: nil
+                        ) { providers in
+                            guard let playlistId = playlist.id else { return false }
+                            handleDrop(on: providers, playlistId: playlistId)
+                            return true
+                        }
                     }
                 }
             }
@@ -331,6 +342,21 @@ struct MacPlaylistListView: View {
         .onAppear { reloadSmartCards() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
             reloadSmartCards()
+        }
+    }
+
+    /// 文件拖到歌单行：复制入曲库并加入该歌单（web 侧栏 drop 等价物）。
+    private func handleDrop(on providers: [NSItemProvider], playlistId: Int64) {
+        guard !providers.isEmpty else { return }
+        Task {
+            var urls: [URL] = []
+            for provider in providers {
+                if let url = await provider.loadFileURL() {
+                    urls.append(url)
+                }
+            }
+            guard !urls.isEmpty else { return }
+            await MacImportService.importFiles(urls, intoPlaylistId: playlistId)
         }
     }
 

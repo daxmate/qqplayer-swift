@@ -11,6 +11,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum MacLibrarySection: String, CaseIterable, Identifiable {
     case tracks = "songs"
@@ -67,6 +68,10 @@ struct MacLibraryView: View {
     @State private var rescanWhenIdle = false
     /// 索引中增量刷新任务（防抖）
     @State private var libraryRefreshTask: Task<Void, Never>?
+    /// 文件拖入导入（web 版拖拽对齐，B 组）：拖拽悬停高亮 + 完成后 toast
+    @State private var isDropTargeted = false
+    @State private var importToast: String?
+    @State private var importToastTask: Task<Void, Never>?
 
     // Search state (sidebar search field + grouped results)
     @State private var searchText = ""
@@ -227,6 +232,88 @@ struct MacLibraryView: View {
             } else {
                 indexer.start()
             }
+        }
+        // 文件拖入导入（web 版拖拽对齐，B 组）：
+        // 全窗口 drop 目标——Finder 音频文件拖进窗口任意位置 → 复制入曲库
+        .onDrop(
+            of: [UTType.fileURL],
+            isTargeted: $isDropTargeted
+        ) { providers in
+            handleDroppedFiles(providers)
+            return true
+        }
+        .overlay {
+            if isDropTargeted {
+                dropTargetHint
+            } else if let importToast {
+                importToastLabel(importToast)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .libraryImportFinished)) { note in
+            // 导入完成 toast（web 版 toast 对齐；歌单行 drop 复用同一通知）
+            let count = (note.userInfo?["count"] as? Int) ?? 0
+            showImportToast(Localized.dragImportSuccess(count: count))
+        }
+    }
+
+    // MARK: - 文件拖入导入（B 组）
+
+    /// 解析拖入的 fileURL providers → 导入曲库。窗口级兜底：
+    /// 拖到歌单行时行级 drop（MacPlaylistListView 行）先于本窗口级命中，
+    /// 此处只处理未被行消费的文件。
+    private func handleDroppedFiles(_ providers: [NSItemProvider]) {
+        guard !providers.isEmpty else { return }
+        Task {
+            var urls: [URL] = []
+            for provider in providers {
+                if let url = await provider.loadFileURL() {
+                    urls.append(url)
+                }
+            }
+            guard !urls.isEmpty else { return }
+            let result = await MacImportService.importFiles(urls)
+            if result.importedCount == 0 {
+                showImportToast(Localized.dragImportNone)
+            }
+        }
+    }
+
+    /// 拖拽悬停提示（web 版遮罩语义的轻量版）。
+    private var dropTargetHint: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+            .padding(12)
+            .overlay {
+                Text(Localized.dragImportHint)
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .allowsHitTesting(false)
+    }
+
+    private func importToastLabel(_ message: String) -> some View {
+        Text(message)
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.gray.opacity(0.3), lineWidth: 1))
+            .padding(.bottom, 40)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+    }
+
+    private func showImportToast(_ message: String) {
+        importToastTask?.cancel()
+        withAnimation { importToast = message }
+        importToastTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation { importToast = nil }
         }
     }
 

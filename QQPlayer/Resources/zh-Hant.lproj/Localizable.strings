@@ -182,6 +182,11 @@
 "library_file_types" = "檔案類型";
 "library_file_types_footer" = "僅掃描選取的格式。取消某格式後，下次掃描會從曲庫移除該格式曲目（檔案保留在磁碟，重新勾選即恢復）。至少需保留一種格式。";
 
+/* Drag & drop import (web 版拖拽對齊, B 組) */
+"drag_import_hint" = "將音訊檔案拖到這裡以匯入";
+"drag_import_success_count" = "已匯入 %d 個檔案";
+"drag_import_none" = "未匯入任何音訊檔案";
+
 /* Track list context menu (A3) */
 "show_artist" = "進歌手";
 "show_album" = "進專輯";

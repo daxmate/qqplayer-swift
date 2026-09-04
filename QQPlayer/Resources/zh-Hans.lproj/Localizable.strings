@@ -108,6 +108,11 @@
 "library_file_types" = "文件类型";
 "library_file_types_footer" = "仅扫描选中的格式。取消某格式后，下次扫描会从曲库移除该格式曲目（文件保留在磁盘，重新勾选即恢复）。至少需保留一种格式。";
 
+/* Drag & drop import (web 版拖拽对齐, B 组) */
+"drag_import_hint" = "将音频文件拖到此处以导入";
+"drag_import_success_count" = "已导入 %d 个文件";
+"drag_import_none" = "未导入任何音频文件";
+
 /* Track list context menu (A3) */
 "show_artist" = "进歌手";
 "show_album" = "进专辑";

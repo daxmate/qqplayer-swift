@@ -5,7 +5,9 @@
 //  Shared helpers for the macOS UI (QQPlayerMac target only).
 //
 
+import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 enum MacTimeFormat {
     /// "m:ss" — matches the iOS player label format.
@@ -14,6 +16,25 @@ enum MacTimeFormat {
         let minutes = Int(safeTime) / 60
         let seconds = Int(safeTime) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+extension NSItemProvider {
+    /// 把拖入的 fileURL provider 异步解出本地 URL（Finder 文件拖拽走
+    /// public.file-url，值为 NSURL/Data 两种形态都可能，双兼容）。
+    func loadFileURL() async -> URL? {
+        await withCheckedContinuation { continuation in
+            _ = loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                if let url = item as? URL {
+                    continuation.resume(returning: url)
+                } else if let data = item as? Data,
+                          let path = String(data: data, encoding: .utf8) {
+                    continuation.resume(returning: URL(fileURLWithPath: path))
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
     }
 }
 

@@ -15,6 +15,10 @@ extension Notification.Name {
     /// LibraryFoldersChanged 分开：语义不同（文件夹增删 vs 收录条件变化），
     /// 但消费方动作相同（reload + start，扫描中则排队）。
     static let libraryScanCriteriaChanged = Notification.Name("LibraryScanCriteriaChanged")
+
+    /// 文件拖入导入完成（B 组）：userInfo["count"] = 成功导入数。
+    /// MacLibraryView 监听后弹瞬时提示（对齐 web 版 toast 语义）。
+    static let libraryImportFinished = Notification.Name("LibraryImportFinished")
 }
 
 /// 曲库可收录的音频扩展名（单一事实源）。

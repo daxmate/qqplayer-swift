@@ -176,6 +176,13 @@ struct Localized {
     static let libraryFileTypes = "library_file_types".localized
     static let libraryFileTypesFooter = "library_file_types_footer".localized
 
+    // MARK: - Drag & Drop Import（文件拖入导入，web 版拖拽对齐）
+    static let dragImportHint = "drag_import_hint".localized
+    static let dragImportNone = "drag_import_none".localized
+    static func dragImportSuccess(count: Int) -> String {
+        "drag_import_success_count".localized(with: count)
+    }
+
     // MARK: - Appearance（主题三态 + 强调色）
     static let appearanceTheme = "appearance_theme".localized
     static let themeSystem = "theme_system".localized
