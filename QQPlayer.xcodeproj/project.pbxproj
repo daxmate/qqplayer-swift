@@ -51,6 +51,7 @@
 		B1A000000000000000000019 /* fr in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000013 /* fr */; };
 		B1A00000000000000000001A /* ru in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000014 /* ru */; };
 		B1C108FAF1AB4B1DBB94FE9B /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0399BDBD88CA4F6C9D2D731E /* WhatsNewTests.swift */; };
+		B723A369BE654B609494CF58 /* MacOnlineDownloadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E14D783B4AEB4D92A91DF32D /* MacOnlineDownloadServiceTests.swift */; };
 		B97C5DF1A6084DF592777461 /* LibraryAudioFormatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29106FE3DED649BD9D9CAFE2 /* LibraryAudioFormatsTests.swift */; };
 		C21A43E3C4B1AEB96EDDE12E /* ModelCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6713EFB0F4A28ACE3266FB2 /* ModelCodableTests.swift */; };
 		CA3755439F62402997608072 /* LyricsSearchCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 478898B985884E89AA416C7F /* LyricsSearchCacheTests.swift */; };
@@ -62,7 +63,6 @@
 		F5EA698EDC0C4A428FB7E77E /* QueueReorderMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */; };
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
-		B723A369BE654B609494CF58 /* MacOnlineDownloadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E14D783B4AEB4D92A91DF32D /* MacOnlineDownloadServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,10 +171,10 @@
 		C6713EFB0F4A28ACE3266FB2 /* ModelCodableTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelCodableTests.swift; sourceTree = "<group>"; };
 		C8CA665B2F1644A58CD4A39B /* ArtistNameNormalizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtistNameNormalizerTests.swift; sourceTree = "<group>"; };
 		DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacFolderWatchPolicyTests.swift; sourceTree = "<group>"; };
+		E14D783B4AEB4D92A91DF32D /* MacOnlineDownloadServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacOnlineDownloadServiceTests.swift; sourceTree = "<group>"; };
 		EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGestureLogicTests.swift; sourceTree = "<group>"; };
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
-		E14D783B4AEB4D92A91DF32D /* MacOnlineDownloadServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacOnlineDownloadServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -195,6 +195,7 @@
 				Mac/MacLyricsSearchView.swift,
 				Mac/MacLyricsView.swift,
 				Mac/MacManualEQEditorView.swift,
+				Mac/MacOnlineSearchView.swift,
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacScanLogger.swift,
@@ -254,6 +255,7 @@
 				Mac/MacLyricsSearchView.swift,
 				Mac/MacLyricsView.swift,
 				Mac/MacManualEQEditorView.swift,
+				Mac/MacOnlineSearchView.swift,
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacScanLogger.swift,

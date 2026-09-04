@@ -64,6 +64,8 @@ struct MacLibraryView: View {
     @State private var showArtistSheet = false
     /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
     @State private var showWhatsNew = false
+    /// 在线搜索下载面板（C 组①：web 版 /api/online/* 对齐，sheet 形态）
+    @State private var showOnlineSearch = false
     /// 曲库文件夹在扫描中变更 → 索引结束后自动补扫
     @State private var rescanWhenIdle = false
     /// 索引中增量刷新任务（防抖）
@@ -113,12 +115,23 @@ struct MacLibraryView: View {
                 }
                 .help(Localized.appearanceTheme)
             }
+            ToolbarItem {
+                Button {
+                    showOnlineSearch = true
+                } label: {
+                    Image(systemName: "icloud.and.arrow.down")
+                }
+                .help("online_search_title".localized)
+            }
         }
         .sheet(isPresented: $showWhatsNew) {
             WhatsNewView(onClose: {
                 WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
                 showWhatsNew = false
             })
+        }
+        .sheet(isPresented: $showOnlineSearch) {
+            MacOnlineSearchView()
         }
         .task {
             reloadLibrary()

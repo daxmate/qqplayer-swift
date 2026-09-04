@@ -564,3 +564,18 @@
 "move_to_trash_confirm_multi" = "Move %d song(s) to Trash? You can restore them from Trash.";
 "move_to_trash_failed_count" = "%d song(s) could not be moved to Trash";
 "clear_selection_help" = "Clear selection";
+
+/* C-group online search & download (web /api/online/* parity) */
+"online_search_title" = "Online Search & Download";
+"online_search_placeholder" = "Search NetEase Cloud Music...";
+"online_search_idle_hint" = "Search online songs and download them into your library. Files land in your default music folder and appear automatically.";
+"online_search_loading" = "Searching...";
+"online_search_no_results" = "No online results";
+"online_search_failed" = "Search failed. Please try again.";
+"online_search_retry" = "Retry";
+"online_download" = "Download";
+"online_downloading" = "Downloading...";
+"online_downloaded" = "Downloaded";
+"online_download_failed" = "Download failed";
+"online_download_failed_prefix" = "Download failed: %@";
+

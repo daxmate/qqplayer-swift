@@ -943,3 +943,18 @@
 "move_to_trash_confirm_multi" = "將把 %d 首歌移到垃圾桶？可從垃圾桶回復。";
 "move_to_trash_failed_count" = "有 %d 首歌未能移到垃圾桶";
 "clear_selection_help" = "清除選取";
+
+/* C 組線上搜尋下載（web 版 /api/online/* 對齊） */
+"online_search_title" = "線上搜尋下載";
+"online_search_placeholder" = "搜尋網易雲音樂...";
+"online_search_idle_hint" = "線上搜尋歌曲並下載到曲庫。下載存至預設音樂資料夾，完成後自動出現在曲庫。";
+"online_search_loading" = "搜尋中...";
+"online_search_no_results" = "沒有線上結果";
+"online_search_failed" = "線上搜尋失敗，請稍後重試";
+"online_search_retry" = "重試";
+"online_download" = "下載";
+"online_downloading" = "下載中...";
+"online_downloaded" = "已下載";
+"online_download_failed" = "下載失敗";
+"online_download_failed_prefix" = "下載失敗：%@";
+

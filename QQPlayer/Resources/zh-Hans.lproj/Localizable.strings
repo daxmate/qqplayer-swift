@@ -600,3 +600,17 @@
 "move_to_trash_confirm_multi" = "将把 %d 首歌移到废纸篓？可从废纸篓恢复。";
 "move_to_trash_failed_count" = "有 %d 首歌未能移到废纸篓";
 "clear_selection_help" = "清空选择";
+
+/* C 组在线搜索下载（web 版 /api/online/* 对齐） */
+"online_search_title" = "在线搜索下载";
+"online_search_placeholder" = "搜索网易云音乐...";
+"online_search_idle_hint" = "在线搜索歌曲并下载到曲库。下载落盘到默认音乐文件夹，完成后自动出现在曲库。";
+"online_search_loading" = "搜索中...";
+"online_search_no_results" = "没有在线结果";
+"online_search_failed" = "在线搜索失败，请稍后重试";
+"online_search_retry" = "重试";
+"online_download" = "下载";
+"online_downloading" = "下载中...";
+"online_downloaded" = "已下载";
+"online_download_failed" = "下载失败";
+"online_download_failed_prefix" = "下载失败：%@";

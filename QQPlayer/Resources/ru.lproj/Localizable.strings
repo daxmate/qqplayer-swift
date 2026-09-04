@@ -559,3 +559,18 @@
 "move_to_trash_confirm_multi" = "Переместить %d песни в корзину? Вы сможете восстановить их из корзины.";
 "move_to_trash_failed_count" = "Не удалось переместить %d песни в корзину";
 "clear_selection_help" = "Очистить выделение";
+
+/* C-group online search & download (web /api/online/* parity) */
+"online_search_title" = "Онлайн-поиск и загрузка";
+"online_search_placeholder" = "Искать в NetEase Cloud Music...";
+"online_search_idle_hint" = "Ищите песни онлайн и загружайте их в библиотеку. Файлы попадают в папку музыки по умолчанию и появляются автоматически.";
+"online_search_loading" = "Поиск...";
+"online_search_no_results" = "Нет онлайн-результатов";
+"online_search_failed" = "Поиск не удался. Попробуйте ещё раз.";
+"online_search_retry" = "Повторить";
+"online_download" = "Скачать";
+"online_downloading" = "Загрузка...";
+"online_downloaded" = "Загружено";
+"online_download_failed" = "Ошибка загрузки";
+"online_download_failed_prefix" = "Ошибка загрузки: %@";
+

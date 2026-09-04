@@ -562,3 +562,18 @@
 "move_to_trash_confirm_multi" = "Déplacer %d chanson(s) vers la corbeille ? Vous pourrez les restaurer depuis la corbeille.";
 "move_to_trash_failed_count" = "%d chanson(s) n'ont pas pu être déplacées vers la corbeille";
 "clear_selection_help" = "Effacer la sélection";
+
+/* C-group online search & download (web /api/online/* parity) */
+"online_search_title" = "Recherche et téléchargement en ligne";
+"online_search_placeholder" = "Rechercher sur NetEase Cloud Music...";
+"online_search_idle_hint" = "Recherchez des chansons en ligne et téléchargez-les dans votre bibliothèque. Les fichiers vont dans votre dossier musical par défaut et apparaissent automatiquement.";
+"online_search_loading" = "Recherche...";
+"online_search_no_results" = "Aucun résultat en ligne";
+"online_search_failed" = "Échec de la recherche. Réessayez.";
+"online_search_retry" = "Réessayer";
+"online_download" = "Télécharger";
+"online_downloading" = "Téléchargement...";
+"online_downloaded" = "Téléchargé";
+"online_download_failed" = "Échec du téléchargement";
+"online_download_failed_prefix" = "Échec du téléchargement : %@";
+
