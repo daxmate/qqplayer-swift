@@ -187,6 +187,11 @@ struct DeleteSettings: Codable {
     /// （文件保留在磁盘，勾回重扫即恢复——web 版扫描缓存语义对齐）。
     var audioExtensions: [String] = LibraryAudioFormats.defaultEnabled
     var showSleepTimerButton: Bool = false
+    /// 在线下载音质等级（standard/exhigh/lossless/hires，web download.defaultQuality 对齐；
+    /// 默认 exhigh=320k）。在线搜索下载用，见 NeteaseOnlineLogic。
+    var onlineDownloadQuality: String = NeteaseOnlineLogic.defaultLevel
+    /// 在线下载目标目录（空 = 默认曲库首目录，web download.downloadDir 语义）
+    var onlineDownloadDirectory: String = ""
 
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
@@ -215,6 +220,9 @@ struct DeleteSettings: Codable {
         let storedExts = try container.decodeIfPresent([String].self, forKey: .audioExtensions) ?? []
         audioExtensions = storedExts.isEmpty ? LibraryAudioFormats.defaultEnabled : storedExts
         showSleepTimerButton = try container.decodeIfPresent(Bool.self, forKey: .showSleepTimerButton) ?? false
+        onlineDownloadQuality = try container.decodeIfPresent(String.self, forKey: .onlineDownloadQuality)
+            ?? NeteaseOnlineLogic.defaultLevel
+        onlineDownloadDirectory = try container.decodeIfPresent(String.self, forKey: .onlineDownloadDirectory) ?? ""
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included
