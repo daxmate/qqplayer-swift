@@ -179,6 +179,9 @@ struct Localized {
     static let lyricsOffsetReset = "lyrics_offset_reset".localized
     static let lyricsOffsetHint = "lyrics_offset_hint".localized
 
+    // MARK: - Visualizer（播放页频谱，D4 web 版 visualizerEnabled 对齐）
+    static let visualizerEnabled = "visualizer_enabled".localized
+
     // MARK: - Music Library（曲库文件夹）
     static let libraryFolders = "library_folders".localized
     static let addFolder = "add_folder".localized

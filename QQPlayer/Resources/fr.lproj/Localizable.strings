@@ -121,6 +121,8 @@
 "lyrics_offset" = "Décalage des paroles";
 "lyrics_offset_reset" = "Réinitialiser";
 "lyrics_offset_hint" = "Une valeur positive retarde les paroles (elles apparaissent après l'audio). Réglez jusqu'à ce que la ligne surlignée corresponde au chant.";
+"visualizer_enabled" = "Visualiseur de spectre";
+
 "appearance_theme" = "Thème";
 "theme_system" = "Suivre le système";
 "theme_dark" = "Sombre";

@@ -198,6 +198,8 @@ struct DeleteSettings: Codable {
     var lyricShowTranslation: Bool = true
     /// 歌词整体延迟校准秒（>0 = 歌词比声音延后；web 版 lyric offset 对齐，默认 0）
     var lyricOffset: Double = 0
+    /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
+    var visualizerEnabled: Bool = true
 
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
@@ -232,6 +234,7 @@ struct DeleteSettings: Codable {
         lyricFontSize = try container.decodeIfPresent(Double.self, forKey: .lyricFontSize) ?? 15
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
+        visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

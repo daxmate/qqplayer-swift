@@ -129,6 +129,10 @@ private struct MacPlaybackSettingsView: View {
                     .onChange(of: deleteSettings.showSleepTimerButton) { _ in
                         deleteSettings.save()
                     }
+                Toggle(Localized.visualizerEnabled, isOn: $deleteSettings.visualizerEnabled)
+                    .onChange(of: deleteSettings.visualizerEnabled) { _ in
+                        deleteSettings.save()
+                    }
             }
         }
         .formStyle(.grouped)

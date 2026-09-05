@@ -207,6 +207,8 @@
 "lyrics_offset" = "歌詞延遲";
 "lyrics_offset_reset" = "歸零";
 "lyrics_offset_hint" = "正值讓歌詞延後顯示。校準到高亮行與演唱同步。";
+"visualizer_enabled" = "播放頁頻譜";
+
 "appearance_theme" = "主題";
 "theme_system" = "跟隨系統";
 "theme_dark" = "深色";

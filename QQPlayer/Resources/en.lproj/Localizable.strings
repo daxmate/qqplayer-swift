@@ -133,6 +133,8 @@
 "lyrics_offset" = "Lyrics delay";
 "lyrics_offset_reset" = "Reset";
 "lyrics_offset_hint" = "Positive values delay the lyrics (they appear later than the audio). Adjust until the highlighted line matches the singing.";
+"visualizer_enabled" = "Player spectrum visualizer";
+
 "appearance_theme" = "Theme";
 "theme_system" = "Follow System";
 "theme_dark" = "Dark";

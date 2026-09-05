@@ -205,7 +205,9 @@
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
+				Mac/MacSpectrumAnalyzer.swift,
 				Mac/MacTrackListView.swift,
+				Mac/MacVisualizerView.swift,
 				QQPlayerMacApp.swift,
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
@@ -268,7 +270,9 @@
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
+				Mac/MacSpectrumAnalyzer.swift,
 				Mac/MacTrackListView.swift,
+				Mac/MacVisualizerView.swift,
 				Models/AppearanceTheme.swift,
 				Models/DatabaseModels.swift,
 				Models/SettingsModels.swift,

@@ -133,6 +133,8 @@
 "lyrics_offset" = "歌词延迟";
 "lyrics_offset_reset" = "归零";
 "lyrics_offset_hint" = "正值让歌词延后显示。校准到高亮行与演唱同步。";
+"visualizer_enabled" = "播放页频谱";
+
 "appearance_theme" = "主题";
 "theme_system" = "跟随系统";
 "theme_dark" = "深色";

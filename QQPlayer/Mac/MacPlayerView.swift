@@ -34,6 +34,9 @@ struct MacPlayerView: View {
 
     /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：睡眠定时器隐藏）
     @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
+    /// 播放页频谱（D4，web Visualizer 对齐；设置「播放」分类开关，默认开）
+    @State private var visualizerEnabled: Bool = DeleteSettings.load().visualizerEnabled
+    @StateObject private var spectrumAnalyzer = MacSpectrumAnalyzer.shared
     /// 歌词搜索 sheet（手动指定歌词）
     @State private var showLyricsSearch = false
     /// 播放队列面板（B 组队列排序持久化：可拖排/删除/点行跳转，重排即持久化）
@@ -84,6 +87,8 @@ struct MacPlayerView: View {
             // 设置页改了睡眠定时器开关后同步按钮可见性
             let settings = DeleteSettings.load()
             showSleepTimerButton = settings.showSleepTimerButton
+            visualizerEnabled = settings.visualizerEnabled
+            updateSpectrumTap()
         }
         .task(id: track?.stableId) {
             guard let track else {
@@ -281,11 +286,39 @@ struct MacPlayerView: View {
 
             }
 
+            // 播放页频谱条（D4，web Visualizer 对齐——仅 native 引擎曲目有数据，
+            // SFB 曲目 Opus/OGG/DSD 无 tap 数据源，自动隐藏；跟唱大画面时本区隐藏）
+            if visualizerEnabled {
+                MacVisualizerView()
+                    .frame(width: 420, height: 44)
+                    .padding(.top, 2)
+            }
+
             Spacer()
         }
         .padding(.top, 24)
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: player.isPlaying) { _ in
+            updateSpectrumTap()
+        }
+        .onChange(of: track?.stableId) { _ in
+            updateSpectrumTap()
+        }
+    }
+
+    /// 频谱 tap 生命周期：播放中且 native 引擎 → 装 mainMixer tap；否则移除。
+    /// （SFB 曲目无 tap 数据源；暂停/切歌/关闭设置都走这里收尾）
+    private func updateSpectrumTap() {
+        guard visualizerEnabled else {
+            spectrumAnalyzer.removeTap()
+            return
+        }
+        if player.isPlaying, !player.usingSFBEngine {
+            spectrumAnalyzer.ensureTap(engine: player.audioEngine)
+        } else {
+            spectrumAnalyzer.removeTap()
+        }
     }
 
     // MARK: - Playback order
