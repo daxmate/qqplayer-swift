@@ -25,6 +25,8 @@ struct QQPlayerMacApp: App {
         ) { _ in
             PlayerEngine.shared.savePlayerState()
         }
+        // D 组键盘快捷键（web shortcuts.ts 对齐）：App 内全局监听，启动即装。
+        MacKeyboardShortcuts.install()
     }
 
     var body: some Scene {

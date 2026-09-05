@@ -187,7 +187,6 @@ struct MacPlayerView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
-                .keyboardShortcut(.leftArrow, modifiers: [.command])
 
                 Button(action: onPlayPause) {
                     Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
@@ -195,7 +194,6 @@ struct MacPlayerView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
-                .keyboardShortcut(.space)
 
                 Button(action: onNext) {
                     Image(systemName: "forward.fill")
@@ -203,7 +201,6 @@ struct MacPlayerView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
-                .keyboardShortcut(.rightArrow, modifiers: [.command])
 
                 Divider().frame(height: 24)
 
