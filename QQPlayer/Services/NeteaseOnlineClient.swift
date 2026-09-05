@@ -473,3 +473,55 @@ struct NeteaseOnlineClient: Sendable {
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
 }
+
+// MARK: - 专辑发行年份（web netease_provider.get_album_year / POST /eapi/song/detail）
+
+extension NeteaseOnlineClient {
+    /// 网易云歌曲详情 → 专辑发行年份（毫秒时间戳 → 年，UTC）。
+    ///
+    /// web 语义（netease_provider.get_album_year + /api/tags/album-year 路由）：
+    /// 查询失败/无数据/字段缺失 → 返回 null（不报错），只有参数缺失才 400；
+    /// Swift 侧参数恒有（Int），故任何失败都返回 nil，调用方不感知、不抛错。
+    /// 请求体：eapi POST /api/song/detail，payload = {header, e_r, ids}，
+    /// ids = json.dumps([song_id]) 的字符串形态（web 双编码，须逐字节对齐）。
+    func albumYear(songID: Int) async -> Int? {
+        do {
+            // web: json.dumps([str(song_id)]) → "[\"186016\"]"（payload 里是带转义的字符串值）
+            let idsJSON = "[\"\(songID)\"]"
+            let payload = OrderedJSON {
+                OrderedJSONEntry("header", requestHeader())
+                OrderedJSONEntry("e_r", true)
+                OrderedJSONEntry("ids", idsJSON)
+            }
+            let body = try eapiBody(uri: "/api/song/detail", payload: payload)
+            let url = URL(string: "\(apiDomain)/eapi/song/detail")!
+            let data = try await post(url: url, body: body)
+            let obj = try NeteaseEAPI.decrypt(data, contentType: "application/json")
+
+            guard let songs = obj["songs"] as? [[String: Any]],
+                  let first = songs.first,
+                  let album = first["album"] as? [String: Any] else {
+                return nil
+            }
+            // web 语义：publishTime 为数字且 > 0；bool 排除（isinstance(ts, bool)）
+            guard let tsNumber = album["publishTime"] as? NSNumber,
+                  CFGetTypeID(tsNumber) != CFBooleanGetTypeID() else {
+                return nil
+            }
+            let milliseconds = tsNumber.doubleValue
+            guard milliseconds > 0, milliseconds.isFinite else {
+                return nil
+            }
+            return Self.utcYear(fromMilliseconds: milliseconds)
+        } catch {
+            return nil
+        }
+    }
+
+    /// 毫秒时间戳 → UTC 年（web datetime.fromtimestamp(ts / 1000, timezone.utc).year 对齐）
+    private static func utcYear(fromMilliseconds milliseconds: Double) -> Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        return calendar.component(.year, from: Date(timeIntervalSince1970: milliseconds / 1000))
+    }
+}

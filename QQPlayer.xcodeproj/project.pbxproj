@@ -67,6 +67,8 @@
 		BD9D2F0C5F244AF7B19EA365 /* TagRenameLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */; };
 		DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82493F629B43819C248996 /* TagWriterTests.swift */; };
 		688EFD97F77D483A8D3F43FC /* GenreParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80880AAC1A14818BB717239 /* GenreParsingTests.swift */; };
+		CD50BD92D2D34BDCA9A0FE02 /* MusicBrainzClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65D14CDE95554D59A21E7BAA /* MusicBrainzClientTests.swift */; };
+		2455090EE99A4F4D8569A083 /* ScrapeLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116527FDD83542F88DB008E8 /* ScrapeLogicTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -183,6 +185,8 @@
 		96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TagRenameLogicTests.swift; sourceTree = "<group>"; };
 		1D82493F629B43819C248996 /* TagWriterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TagWriterTests.swift; sourceTree = "<group>"; };
 		E80880AAC1A14818BB717239 /* GenreParsingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GenreParsingTests.swift; sourceTree = "<group>"; };
+		65D14CDE95554D59A21E7BAA /* MusicBrainzClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicBrainzClientTests.swift; sourceTree = "<group>"; };
+		116527FDD83542F88DB008E8 /* ScrapeLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrapeLogicTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -571,6 +575,8 @@
 				96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */,
 				1D82493F629B43819C248996 /* TagWriterTests.swift */,
 				E80880AAC1A14818BB717239 /* GenreParsingTests.swift */,
+				65D14CDE95554D59A21E7BAA /* MusicBrainzClientTests.swift */,
+				116527FDD83542F88DB008E8 /* ScrapeLogicTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -936,6 +942,8 @@
 				BD9D2F0C5F244AF7B19EA365 /* TagRenameLogicTests.swift in Sources */,
 				DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */,
 				688EFD97F77D483A8D3F43FC /* GenreParsingTests.swift in Sources */,
+				CD50BD92D2D34BDCA9A0FE02 /* MusicBrainzClientTests.swift in Sources */,
+				2455090EE99A4F4D8569A083 /* ScrapeLogicTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

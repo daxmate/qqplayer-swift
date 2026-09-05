@@ -328,3 +328,135 @@ struct NeteaseOnlineClientTests {
         }
     }
 }
+
+// MARK: - albumYear（web netease_provider.get_album_year 补年份，E1-S2 新增）
+
+/// albumYear 请求捕获盒（跨 async 闭包捕获用）
+private final class CapturedRequestBox: @unchecked Sendable {
+    var value: URLRequest?
+    init() {}
+}
+
+extension NeteaseOnlineClientTests {
+    /// 标准 song/detail 成功响应（publishTime 毫秒 → 2015-01-01T00:00:00Z）
+    private static func songDetailBody(publishTime: Any? = 1420070400000, songsPresent: Bool = true) -> Data {
+        let album: [String: Any]
+        if let publishTime {
+            album = ["publishTime": publishTime]
+        } else {
+            album = [:]
+        }
+        let songs: [Any] = songsPresent ? [["album": album]] : []
+        let wrapper: [String: Any] = ["songs": songs]
+        return try! JSONSerialization.data(withJSONObject: wrapper)
+    }
+
+    private func makeYearTransport(body: Data, status: Int = 200, error: Error? = nil, capture: CapturedRequestBox? = nil) -> MockNetworkTransport {
+        MockNetworkTransport(
+            dataHandler: { request in
+                capture?.value = request
+                if let error {
+                    throw error
+                }
+                return (body, MockNetworkTransport.httpResponse(status: status))
+            },
+            redirectHandler: { _ in (200, [:], Data()) },
+            downloadHandler: { _, _ in }
+        )
+    }
+
+    // MARK: albumYear：正常路径
+
+    @Test("albumYear：mock song/detail 响应 → 返回 UTC 年（publishTime 毫秒 → 2015）")
+    func albumYearReturnsYear() async {
+        let transport = makeYearTransport(body: Self.songDetailBody())
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 186016)
+        #expect(year == 2015)
+    }
+
+    @Test("albumYear：请求体与 web 逐字节对齐（uri /api/song/detail + header/e_r/ids 顺序 + eapi 加密）")
+    func albumYearRequestBodyAlignsWithWeb() async {
+        let captured = CapturedRequestBox()
+        let transport = makeYearTransport(body: Self.songDetailBody(), capture: captured)
+        let client = NeteaseOnlineClient(transport: transport)
+        _ = await client.albumYear(songID: 186016)
+
+        guard let request = captured.value else {
+            Issue.record("未捕获到请求")
+            return
+        }
+        // eapi 端点：POST https://interface.music.163.com/eapi/song/detail（uri /api/song/detail）
+        #expect(request.url?.absoluteString == "https://interface.music.163.com/eapi/song/detail")
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
+        let cookie = request.value(forHTTPHeaderField: "Cookie") ?? ""
+        #expect(cookie.contains("os=pc"))
+        #expect(cookie.contains("MUSIC_U="))
+
+        let body = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+        #expect(body.hasPrefix("params="))
+        let params = String(body.dropFirst("params=".count))
+
+        // deviceId 随机 → 从 Cookie 取回，重建 web 期望报文（payload key 顺序：header/e_r/ids；
+        // ids = json.dumps(["186016"]) 双编码字符串）。加密后 hex 应与请求完全一致。
+        let deviceID = cookie.components(separatedBy: "; ")
+            .first { $0.hasPrefix("deviceId=") }?
+            .replacingOccurrences(of: "deviceId=", with: "") ?? ""
+        let expectedPayload =
+            #"{"header":{"os":"pc","appver":"3.1.19.204510","requestId":"0","osver":"Microsoft-Windows-11-Home-China-build-22631-64bit","deviceId":"\#(deviceID)","MUSIC_U":""},"e_r":true,"ids":"[\"186016\"]"}"#
+        #expect(params == NeteaseEAPI.encrypt(uri: "/api/song/detail", payloadJSON: expectedPayload))
+    }
+
+    @Test("albumYear：跨 UTC 年边界 → 取 UTC 年（本地时区不干扰）")
+    func albumYearUsesUTCTimezone() async {
+        // 2014-12-31T23:59:59.999Z（北京已是 2015-01-01）→ UTC 年 2014
+        let nearBoundary = Self.songDetailBody(publishTime: 1420070399999)
+        let transport = makeYearTransport(body: nearBoundary)
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 1)
+        #expect(year == 2014)
+    }
+
+    // MARK: albumYear：失败/无数据 → nil（不 throw）
+
+    @Test("albumYear：无 publishTime 字段 → nil")
+    func albumYearMissingPublishTimeReturnsNil() async {
+        let transport = makeYearTransport(body: Self.songDetailBody(publishTime: nil))
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 186016)
+        #expect(year == nil)
+    }
+
+    @Test("albumYear：publishTime 为 bool → nil（web isinstance(ts, bool) 排除）")
+    func albumYearBooleanPublishTimeReturnsNil() async {
+        let transport = makeYearTransport(body: Self.songDetailBody(publishTime: true))
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 186016)
+        #expect(year == nil)
+    }
+
+    @Test("albumYear：songs 空 / 无 album → nil")
+    func albumYearNoSongsReturnsNil() async {
+        let transport = makeYearTransport(body: Self.songDetailBody(songsPresent: false))
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 186016)
+        #expect(year == nil)
+    }
+
+    @Test("albumYear：HTTP 500 → nil（不 throw）")
+    func albumYearHTTPErrorReturnsNil() async {
+        let transport = makeYearTransport(body: Data(), status: 500)
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 186016)
+        #expect(year == nil)
+    }
+
+    @Test("albumYear：网络错误 → nil（不 throw）")
+    func albumYearNetworkErrorReturnsNil() async {
+        let transport = makeYearTransport(body: Data(), error: URLError(.timedOut))
+        let client = NeteaseOnlineClient(transport: transport)
+        let year = await client.albumYear(songID: 186016)
+        #expect(year == nil)
+    }
+}

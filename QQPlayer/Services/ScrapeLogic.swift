@@ -29,22 +29,46 @@ enum ScrapeLogic {
     /// paths 模式批量可写字段（web BATCH_WRITABLE_FIELDS）
     static let batchWritableFields: Set<String> = ["title", "artist", "album", "year", "genre"]
 
-    /// 候选合并：按 source_order 保序合并各源（web _merge_candidates）。S2 实现。
+    /// 候选合并：按 source_order 保序合并各源候选（web _merge_candidates）。
+    /// source_order 里出现的源按序取该源全部候选；空源/未知源跳过。
     static func mergedCandidates(
         netease: [ScrapeCandidate],
         musicbrainz: [ScrapeCandidate],
         sourceOrder: [String]
     ) -> [ScrapeCandidate] {
-        fatalError("S2 实现")
+        let sources: [String: [ScrapeCandidate]] = [
+            "netease": netease,
+            "musicbrainz": musicbrainz,
+        ]
+        var merged: [ScrapeCandidate] = []
+        for source in sourceOrder {
+            merged.append(contentsOf: sources[source] ?? [])
+        }
+        return merged
     }
 
-    /// 高置信度判定（web _is_high_confidence）。S2 实现。
+    /// 高置信度判定（web _is_high_confidence，paths 模式自动写入门槛）：
+    /// 候选空 → false；候选数 == 1 → true；文件 artist 空 → true（取首候选）；
+    /// 否则首候选 artist 与文件 artist 归一化匹配 → true。
     static func isHighConfidence(candidates: [ScrapeCandidate], fileArtist: String?) -> Bool {
-        fatalError("S2 实现")
+        if candidates.isEmpty {
+            return false
+        }
+        if candidates.count == 1 {
+            return true
+        }
+        let artist = fileArtist ?? ""
+        if artist.isEmpty {
+            return true
+        }
+        return MusicBrainzClient.artistMatches(candidates[0].artist ?? "", artist)
     }
 
-    /// query 构造：title 空回落文件名 stem（web routers/tags.py 语义）。S2 实现。
+    /// query 构造：title 非空 → title；空 → 文件名去扩展名取末段（web query = title or f.stem）
     static func searchQuery(title: String?, fileName: String) -> String {
-        fatalError("S2 实现")
+        if let title, !title.isEmpty {
+            return title
+        }
+        return URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
     }
 }
