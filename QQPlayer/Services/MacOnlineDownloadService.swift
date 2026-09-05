@@ -89,16 +89,28 @@ enum MacOnlineDownloadService {
         let quality = effectiveQuality(from: level ?? settings.onlineDownloadQuality)
 
         // 1. 取直链（Meting → cenguigui 兜底）
-        let info = try await client.playInfo(songID: song.id, level: quality)
+        let info: NeteasePlayInfo
+        do {
+            info = try await client.playInfo(songID: song.id, level: quality)
+        } catch {
+            print("❌ [在线下载] 直链获取失败 songID=\(song.id) level=\(quality): \(error)")
+            throw error
+        }
 
         // 2. 目标目录
         guard let directory = destinationDirectory(
             configuredDirectory: settings.onlineDownloadDirectory,
             libraryDirectories: libraryDirectoryPaths()
         ) else {
+            print("❌ [在线下载] 无可用下载目录（onlineDownloadDirectory=空且曲库目录列表为空）")
             throw NeteaseOnlineError.downloadFailed("no download directory")
         }
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            print("❌ [在线下载] 创建目录失败 \(directory.path): \(error)")
+            throw error
+        }
 
         // 3. 文件名 + 重名序号
         let baseName = NeteaseOnlineLogic.downloadFileName(
@@ -116,13 +128,23 @@ enum MacOnlineDownloadService {
         // 4. 流式下载（.part 原子改名，避免 FSEvents 收到半截文件）
         let partURL = destination.appendingPathExtension("part")
         let downloader: any NetworkTransport = transport ?? URLSessionNetworkTransport()
-        try await downloader.download(
-            url: info.url,
-            to: partURL,
-            timeout: 300,
-            headers: ["User-Agent": downloadUserAgent]
-        )
-        try fileManager.moveItem(at: partURL, to: destination)
+        do {
+            try await downloader.download(
+                url: info.url,
+                to: partURL,
+                timeout: 300,
+                headers: ["User-Agent": downloadUserAgent]
+            )
+        } catch {
+            print("❌ [在线下载] 文件下载失败 url=\(info.url.absoluteString): \(error)")
+            throw error
+        }
+        do {
+            try fileManager.moveItem(at: partURL, to: destination)
+        } catch {
+            print("❌ [在线下载] 落盘改名失败 \(partURL.path) → \(destination.path): \(error)")
+            throw error
+        }
 
         // 5. 入曲库信号（web 落盘后 watchdog 自动刷新；本地 FSEvents created 事件双保险）
         NotificationCenter.default.post(

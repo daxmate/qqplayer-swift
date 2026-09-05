@@ -227,7 +227,22 @@ struct MacOnlineSearchView: View {
                 guard !Task.isCancelled else { return }
                 failedIDs.insert(song.id)
                 downloadedIDs.remove(song.id)
-                errorMessage = "online_download_failed_prefix".localized(with: song.title)
+                // 诊断：底层错误打日志（stdout.log 可读），并在红字里附上原因，
+                // 便于区分直链服务不可用 / HTTP 拒绝 / 落盘失败等不同环节。
+                print("❌ [在线下载] 失败《\(song.title)》id=\(song.id): \(error)")
+                // errorMessage 是 String?：先拼好非可选字符串再整体赋值（不能 +=）。
+                var message = "online_download_failed_prefix".localized(with: song.title)
+                // noPlayURL 高频原因：VIP/版权受限歌曲 → 直链代理(200 空响应)与
+                // cenguigui 兜底都取不到 URL。给用户可理解的提示而非裸错误码。
+                if let ne = error as? NeteaseOnlineError, case .noPlayURL = ne {
+                    message += "（该歌曲暂无可用下载源，可能是会员/VIP或版权受限）"
+                } else {
+                    let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    if !reason.isEmpty {
+                        message += "（\(reason)）"
+                    }
+                }
+                errorMessage = message
             }
             downloadingIDs.remove(song.id)
         }

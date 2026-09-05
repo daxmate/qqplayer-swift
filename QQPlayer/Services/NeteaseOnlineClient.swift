@@ -240,7 +240,12 @@ struct URLSessionNetworkTransport: NetworkTransport {
         guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
             throw NeteaseOnlineError.httpError((response as? HTTPURLResponse)?.statusCode ?? -1)
         }
-        try FileManager.default.removeItem(at: destination) // 覆盖旧文件（临时同名残留）
+        // 只清理确实存在的 .part 残留（上次中断下载留下的同名文件）：
+        // 之前无条件 removeItem，正常无残留时抛 ENOENT(NSFileNoSuchFileError)，
+        // 导致每次下载都在落盘前失败（2026-09-05 线上日志定位）。
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
         try FileManager.default.moveItem(at: temporaryURL, to: destination)
     }
 }
