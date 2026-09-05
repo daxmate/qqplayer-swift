@@ -1073,7 +1073,12 @@
             seekTimeOffset = currentPosition
 
             if audioEngine.isRunning {
-                audioEngine.pause()
+                // 桌面端无 iOS 省电/后台挂起约束：只暂停播放节点，保留引擎运行。
+                // 引擎级 pause() 停掉整个渲染线程，恢复 play() 必须重新 start + 轮询
+                // 等 isRunning（音频硬件重启，外接声卡/蓝牙可达数百 ms）→ 用户感知
+                // "暂停再播放卡顿"（2026-09-05）。playerNode.pause() 保留引擎与已调度
+                // 缓冲，恢复走下方轻量重排路径，几乎无感。
+                playerNode.pause()
             }
             isPlaying = false
             playbackState = .paused
