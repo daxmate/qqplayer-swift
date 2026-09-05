@@ -16,6 +16,15 @@ struct QQPlayerMacApp: App {
         // 运行时报错/业务日志可离线读取（~/Library/Logs/QQPlayerMac/{stdout,stderr}.log）
         MacScanLogger.redirectStderr()
         MacScanLogger.redirectStdout()
+        // 退出兑底保存：播放状态周期 30s 落盘一次，⌘Q 距上次保存不足 30s 会丢
+        // 断点进度（web 版"页面关闭兑底"对齐，D 组恢复播放）——willTerminate 同步存一次。
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            PlayerEngine.shared.savePlayerState()
+        }
     }
 
     var body: some Scene {

@@ -975,6 +975,32 @@
                 return
             }
 
+            // 启动恢复（restoreUIStateOnly）只恢复 UI 不载音频：首次点播放时
+            // audioFile 为空 → 先补载当前曲并 seek 到断点再播（对齐 iOS play()）。
+            // hasRestoredState 由 ensurePlayerStateRestored() 置位：冷启动首播走
+            // ensure（loadTrack 保留时间 + seek）；中断/恢复后 audioFile 被清、
+            // 再次播放走 preserve 分支（playbackTime 不重置，seek 到断点）。
+            if audioFile == nil, currentTrack != nil, !isLoadingTrack {
+                Task {
+                    guard let track = currentTrack else { return }
+                    var loaded = true
+                    if hasRestoredState {
+                        let savedPosition = playbackTime
+                        loaded = await loadTrack(track, preservePlaybackTime: true)
+                        if loaded, savedPosition > 0 {
+                            await seek(to: savedPosition)
+                            print("✅ macOS restored position after reload: \(savedPosition)s")
+                        }
+                    } else {
+                        await ensurePlayerStateRestored()
+                    }
+                    if loaded {
+                        self.play()
+                    }
+                }
+                return
+            }
+
             // 决策上收：前置条件语义与 MacPlaybackGate.canStartPlayback 一一对应（有单测锁定）。
             guard let audioFile = audioFile,
                   MacPlaybackGate.canStartPlayback(
