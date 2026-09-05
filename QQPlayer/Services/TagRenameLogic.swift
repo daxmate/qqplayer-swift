@@ -19,15 +19,29 @@ import Foundation
 enum TagRenameLogic {
     static let defaultTemplate = "{artist} - {title}"
 
+    /// 模板渲染上下文（文件当前标签值；nil = 空占位）
+    struct Values {
+        var artist: String?
+        var title: String?
+        var album: String?
+        var track: Int?
+        var year: Int?
+
+        init(artist: String? = nil, title: String? = nil, album: String? = nil,
+             track: Int? = nil, year: Int? = nil) {
+            self.artist = artist
+            self.title = title
+            self.album = album
+            self.track = track
+            self.year = year
+        }
+    }
+
     /// 按模板渲染目标文件名（相对文件所在目录，可能含子目录路径段）。
     /// 返回 nil = 不改名。S1 实现。
     static func renderFileName(
         template: String?,
-        artist: String?,
-        title: String?,
-        album: String?,
-        track: Int?,
-        year: Int?,
+        values: Values,
         ext: String
     ) -> String? {
         fatalError("S1 实现：模板渲染纯逻辑（web target_filename 语义）")
