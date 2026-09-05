@@ -281,7 +281,7 @@ struct MusicBrainzClient {
 
     /// artist 匹配归一化（web _norm）：小写 + 去 \W_（保留字母/数字/CJK）
     private static func normalizedArtist(_ value: String) -> String {
-        value.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "_" }
+        value.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
     /// artist 归一化匹配（web _artist_matches(credit, artist)）：归一化后相等/互相包含；

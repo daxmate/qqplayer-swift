@@ -162,6 +162,12 @@ enum TagWriterService {
                     try fm.createDirectory(at: dir, withIntermediateDirectories: true)
                 }
             }
+            // SFB 0.13.0 写 MP4 无条件 setItem("covr", 空 list) → 无封面时产生损坏的
+            // 8 字节空 covr atom，AVFoundation 读到会放弃整个 iTunes metadata 解析
+            // （album/year/track 全丢）。落位前清理空壳（正常封面 covr 带 data 不受影响）。
+            if ext == "m4a" || ext == "mp4" {
+                try? MP4EmptyCovrStripper.stripEmptyCovrIfPresent(from: tmpURL)
+            }
             if fm.fileExists(atPath: targetURL.path) {
                 _ = try fm.replaceItemAt(targetURL, withItemAt: tmpURL)
             } else {

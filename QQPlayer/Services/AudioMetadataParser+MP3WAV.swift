@@ -236,6 +236,22 @@ extension AudioMetadataParser {
                             discNumber = await extractTrackOrDiscNumber(from: metadata)
                         }
 
+                        // iTunes/MP4 ©ALB/©day 无 commonKey（genreString 同款缺口 8-29 已拉
+                        // genre；album/year 同样只能按 identifier 拉——否则 SFB 写的 m4a
+                        // 标签读回 album/year 全丢）
+                        if album == nil &&
+                            (identifierValue.contains("%a9alb") || identifierValue.contains("©alb")) {
+                            album = try? await metadata.load(.stringValue)
+                            print("🎵 Found album from MP4 ©ALB: \(album ?? "nil")")
+                        }
+                        if year == nil &&
+                            (identifierValue.contains("%a9day") || identifierValue.contains("©day")) {
+                            if let yearString = try? await metadata.load(.stringValue) {
+                                year = Int(String(yearString.prefix(4)))
+                                print("🎤 Found year from MP4 ©day: \(yearString) → \(year ?? -1)")
+                            }
+                        }
+
                         // Debug: log unhandled tags that might contain artist info
                         if identifier.rawValue.contains("ART") || identifier.rawValue.contains("TPE") {
                             let value = try? await metadata.load(.stringValue)
