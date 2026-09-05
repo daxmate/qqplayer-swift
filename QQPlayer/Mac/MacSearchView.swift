@@ -181,6 +181,8 @@ struct MacSearchResultsView: View {
 // MARK: - Result rows
 
 private struct MacSearchSongRow: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     let track: Track
     let artistName: String?
     let isActive: Bool
@@ -193,7 +195,7 @@ private struct MacSearchSongRow: View {
                 Group {
                     if isActive {
                         Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(appAccentColor)
                     } else {
                         Image(systemName: "music.note")
                             .foregroundColor(.secondary)

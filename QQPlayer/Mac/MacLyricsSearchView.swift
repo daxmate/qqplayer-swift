@@ -10,6 +10,8 @@
 import SwiftUI
 
 struct MacLyricsSearchView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     let track: Track
     let onClose: () -> Void
     /// 应用搜索结果（选中候选）或恢复自动（nil）；由外层负责刷新歌词显示
@@ -71,7 +73,7 @@ struct MacLyricsSearchView: View {
                 HintCardView(
                     title: Localized.hintSearchTitle,
                     lines: [Localized.hintSearchMacLine1],
-                    accentColor: .accentColor,
+                    accentColor: appAccentColor,
                     onDismiss: {
                         withAnimation(.easeOut(duration: 0.3)) {
                             showHint = false
@@ -170,7 +172,7 @@ struct MacLyricsSearchView: View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 14))
-                .foregroundColor(.accentColor)
+                .foregroundColor(appAccentColor)
 
             Text("lyrics_search_manual_active".localized)
                 .font(.footnote)
@@ -267,12 +269,12 @@ struct MacLyricsSearchView: View {
                 if candidate.tlyric != nil {
                     Text("lyrics_search_translation_badge".localized)
                         .font(.caption2.weight(.bold))
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(appAccentColor)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.accentColor.opacity(0.6), lineWidth: 1)
+                                .stroke(appAccentColor.opacity(0.6), lineWidth: 1)
                         )
                         .help("lyrics_search_has_translation".localized)
                 }

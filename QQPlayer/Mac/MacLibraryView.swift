@@ -37,6 +37,8 @@ enum MacLibrarySection: String, CaseIterable, Identifiable {
 }
 
 struct MacLibraryView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var indexer = LibraryIndexer.shared
     @StateObject private var progress = PlayerEngine.shared.progress
@@ -315,7 +317,7 @@ struct MacLibraryView: View {
     /// 拖拽悬停提示（web 版遮罩语义的轻量版）。
     private var dropTargetHint: some View {
         RoundedRectangle(cornerRadius: 12)
-            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+            .strokeBorder(appAccentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .padding(12)
             .overlay {
                 Text(Localized.dragImportHint)

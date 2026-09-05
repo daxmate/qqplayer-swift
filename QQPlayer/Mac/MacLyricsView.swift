@@ -11,6 +11,8 @@
 import SwiftUI
 
 struct MacLyricsView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     let lyrics: Lyrics?
     let currentTime: TimeInterval
     let isLoading: Bool
@@ -34,7 +36,7 @@ struct MacLyricsView: View {
             // 对齐 iOS LyricsView：跟唱控制条常驻底部，无论歌词状态（加载中/纯文本/无歌词）都显示
             if karaoke.isKaraokeOn {
                 Divider()
-                KaraokeControlBar(accentColor: .accentColor)
+                KaraokeControlBar(accentColor: appAccentColor)
                     .padding(.vertical, 8)
                     .background(
                         LinearGradient(
@@ -174,7 +176,7 @@ struct MacLyricsView: View {
                             if let ab = karaoke.abLoop, karaoke.isKaraokeOn,
                                index == ab.a || index == ab.b {
                                 Circle()
-                                    .fill(Color.accentColor)
+                                    .fill(appAccentColor)
                                     .frame(width: 7, height: 7)
                                     .padding(.trailing, 26)
                             }

@@ -10,6 +10,8 @@
 import SwiftUI
 
 struct MacPlayerView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     let track: Track?
     let artistName: String?
     let isPlaying: Bool
@@ -218,7 +220,7 @@ struct MacPlayerView: View {
                         .font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(isPlayOrderActive ? .accentColor : .secondary)
+                .foregroundColor(isPlayOrderActive ? appAccentColor : .secondary)
                 .help(playOrderTitle)
 
                 // 当前曲目收藏（红心）
@@ -252,7 +254,7 @@ struct MacPlayerView: View {
                             .font(.system(size: 16))
                     }
                     .menuStyle(.borderlessButton)
-                    .foregroundColor(sleepTimerEndDate == nil ? .secondary : .accentColor)
+                    .foregroundColor(sleepTimerEndDate == nil ? .secondary : appAccentColor)
                     .help("sleep_timer".localized)
                 }
 
@@ -280,7 +282,7 @@ struct MacPlayerView: View {
                         .font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(karaoke.isKaraokeOn ? .accentColor : .secondary)
+                .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : .secondary)
                 .disabled(track == nil)
                 .help("karaoke_mode_help".localized)
 
@@ -387,6 +389,8 @@ struct MacPlayerView: View {
 /// web 版 persistQueueOrder/applyQueueOrder 语义的 Swift 端形态（队列=播放引擎队列，
 /// 启动恢复 = 现成 QQPlayerState 恢复链路）。
 private struct MacQueuePanelView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     @ObservedObject var player: PlayerEngine
     @Environment(\.dismiss) private var dismiss
 
@@ -455,7 +459,7 @@ private struct MacQueuePanelView: View {
             if isCurrent {
                 Image(systemName: "speaker.wave.2.fill")
                     .font(.caption)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(appAccentColor)
                     .frame(width: 14)
             } else {
                 Image(systemName: "line.3.horizontal")

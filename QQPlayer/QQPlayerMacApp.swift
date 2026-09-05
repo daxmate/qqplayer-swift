@@ -37,6 +37,8 @@ struct QQPlayerMacApp: App {
                 .toolbarBackground(.visible, for: .windowToolbar)
                 // 强调色：对齐 web 版 ACCENT_OPTIONS 预设，设置页切换后全局生效
                 .tint(MacAppearance.accentColor(forKey: deleteSettings.accentColorName))
+                // App 强调色环境值（Color.accentColor 在 macOS 跟随系统而非 App tint）
+                .environment(\.appAccentColor, MacAppearance.accentColor(forKey: deleteSettings.accentColorName))
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                     deleteSettings = DeleteSettings.load()
                 }
@@ -48,6 +50,7 @@ struct QQPlayerMacApp: App {
         Settings {
             MacSettingsView()
                 .tint(MacAppearance.accentColor(forKey: deleteSettings.accentColorName))
+                .environment(\.appAccentColor, MacAppearance.accentColor(forKey: deleteSettings.accentColorName))
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
         .commands {

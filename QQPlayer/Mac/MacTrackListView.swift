@@ -39,6 +39,8 @@ private final class MacTrackTableRow: NSObject, Identifiable {
 }
 
 struct MacTrackListView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     let tracks: [Track]
     let activeTrackId: String?
     let isPlaying: Bool
@@ -159,7 +161,7 @@ struct MacTrackListView: View {
             TableColumn("#") { row in
                 if row.track.stableId == activeTrackId {
                     Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(appAccentColor)
                 } else {
                     // 显示列表序号（1 起，随排序同步），不显示专辑 trackNo
                     Text("\(row.displayIndex)")

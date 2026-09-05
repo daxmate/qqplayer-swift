@@ -209,6 +209,8 @@ private struct MacLyricsSettingsView: View {
 
 /// 界面分类：外观主题三态（跟随系统/深色/浅色）+ 强调色 6 预设。
 private struct MacAppearanceSettingsView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     @State private var deleteSettings = DeleteSettings.load()
 
     /// 当前生效主题（含旧数据迁移推导），Picker 绑定。
@@ -274,7 +276,7 @@ private struct MacAppearanceSettingsView: View {
                     .overlay(
                         Circle()
                             .strokeBorder(
-                                isSelected ? Color.accentColor : Color.gray.opacity(0.3),
+                                isSelected ? appAccentColor : Color.gray.opacity(0.3),
                                 lineWidth: isSelected ? 3 : 1
                             )
                     )
@@ -295,6 +297,8 @@ private struct MacAppearanceSettingsView: View {
 /// 音乐库分类：曲库文件夹管理（添加外部歌曲文件夹/移除，空列表 = 默认
 /// ~/Music/QQPlayer）。变化后重扫曲库（LibraryFoldersChanged 通知）。
 private struct MacLibrarySettingsView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     @State private var deleteSettings = DeleteSettings.load()
 
     var body: some View {
@@ -376,13 +380,13 @@ private struct MacLibrarySettingsView: View {
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(isOn ? Color.accentColor.opacity(0.18) : Color.gray.opacity(0.1))
+                                .fill(isOn ? appAccentColor.opacity(0.18) : Color.gray.opacity(0.1))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(isOn ? Color.accentColor : Color.gray.opacity(0.25), lineWidth: 1)
+                                .strokeBorder(isOn ? appAccentColor : Color.gray.opacity(0.25), lineWidth: 1)
                         )
-                        .foregroundColor(isOn ? Color.accentColor : .primary)
+                        .foregroundColor(isOn ? appAccentColor : .primary)
                         .opacity(isLastEnabled ? 0.55 : 1)
                 }
                 .buttonStyle(.plain)

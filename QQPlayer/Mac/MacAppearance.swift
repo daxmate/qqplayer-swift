@@ -48,3 +48,18 @@ enum MacAppearance {
         )
     }
 }
+
+// MARK: - App 强调色环境值（macOS 上 Color.accentColor 跟随系统强调色而非 App
+// tint，显式使用处不随设置变化——2026-09-05 频谱/列表图标实锤）。自定义环境值
+// appAccentColor 由 App 根视图注入（随 DeleteSettings 刷新），内容区统一读它。
+
+private struct AppAccentColorKey: EnvironmentKey {
+    static let defaultValue: Color = .accentColor
+}
+
+extension EnvironmentValues {
+    var appAccentColor: Color {
+        get { self[AppAccentColorKey.self] }
+        set { self[AppAccentColorKey.self] = newValue }
+    }
+}

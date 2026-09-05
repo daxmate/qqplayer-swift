@@ -14,6 +14,8 @@ import SwiftUI
 
 /// 在线搜索面板（sheet 形态，参照 MacLyricsSearchView 异步搜索页写法）
 struct MacOnlineSearchView: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     @Environment(\.dismiss) private var dismiss
 
     @State private var query = ""
@@ -57,7 +59,7 @@ struct MacOnlineSearchView: View {
     private var header: some View {
         HStack {
             Image(systemName: "globe")
-                .foregroundColor(.accentColor)
+                .foregroundColor(appAccentColor)
             Text("online_search_title".localized)
                 .font(.headline)
             Spacer()
@@ -252,6 +254,8 @@ struct MacOnlineSearchView: View {
 // MARK: - 结果行
 
 private struct MacOnlineResultRow: View {
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
+    @Environment(\.appAccentColor) private var appAccentColor
     let song: NeteaseOnlineSong
     let isDownloading: Bool
     let isDownloaded: Bool
@@ -337,7 +341,7 @@ private struct MacOnlineResultRow: View {
     private var iconColor: Color {
         if isDownloaded { return .green }
         if didFail { return .red }
-        if isDownloading { return .accentColor }
+        if isDownloading { return appAccentColor }
         return .secondary
     }
 
