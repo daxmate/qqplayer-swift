@@ -5,18 +5,21 @@
 //  macOS manual playlist detail: track list with double-click playback
 //  (queue = playlist tracks), play-all, rename (alert), delete (confirmation
 //  alert), and per-track context actions (add to playlist / remove from
-//  playlist) via MacTrackListView's `playlistId` hook. QQPlayerMac target only.
+//  playlist) via MacTrackListView's `playlistId` hook.
+//  QQPlayerMac target only. 2026-09-05: converted from a popup sheet to an
+//  in-column content view (list area), per user feedback.
 //
 
 import SwiftUI
 
-struct MacPlaylistDetailSheet: View {
+struct MacManualPlaylistDetailView: View {
     let playlist: Playlist
     /// Plays the whole playlist (queue = playlist tracks), provided by the host.
     let onPlayAll: () -> Void
+    /// Pop back to the playlists page (also called after deleting the playlist).
+    let onExit: () -> Void
 
     @StateObject private var player = PlayerEngine.shared
-    @Environment(\.dismiss) private var dismiss
 
     @State private var currentTitle: String
     @State private var tracks: [Track] = []
@@ -25,19 +28,23 @@ struct MacPlaylistDetailSheet: View {
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
 
-    init(playlist: Playlist, onPlayAll: @escaping () -> Void) {
+    init(
+        playlist: Playlist,
+        onPlayAll: @escaping () -> Void,
+        onExit: @escaping () -> Void
+    ) {
         self.playlist = playlist
         self.onPlayAll = onPlayAll
+        self.onExit = onExit
         _currentTitle = State(initialValue: playlist.title)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
             content
         }
-        .padding()
-        .frame(minWidth: 560, minHeight: 420)
         .onAppear { loadTracks() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
             loadTracks()
@@ -59,15 +66,21 @@ struct MacPlaylistDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
+            Button(action: onExit) {
+                Label(Localized.back, systemImage: "chevron.left")
+            }
+            .buttonStyle(.borderless)
+            .help(Localized.back)
+
             MacArtworkThumbnail(
                 track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
-                size: 56,
-                cornerRadius: 8,
+                size: 48,
+                cornerRadius: 7,
                 placeholderIcon: "list.bullet.rectangle"
             )
             VStack(alignment: .leading, spacing: 2) {
                 Text(currentTitle)
-                    .font(.title2)
+                    .font(.title3)
                     .fontWeight(.bold)
                     .lineLimit(1)
                 Text(String(format: "track_count".localized, tracks.count))
@@ -76,7 +89,6 @@ struct MacPlaylistDetailSheet: View {
             }
             Spacer()
             Button("playlist_manage_play_all".localized) { onPlayAll() }
-                .keyboardShortcut(.return)
             Button("playlist_manage_rename".localized) {
                 renameText = currentTitle
                 showRenameAlert = true
@@ -84,9 +96,9 @@ struct MacPlaylistDetailSheet: View {
             Button(Localized.deletePlaylist, role: .destructive) {
                 showDeleteConfirm = true
             }
-            Button("close".localized) { dismiss() }
-                .keyboardShortcut(.cancelAction)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Content
@@ -136,7 +148,7 @@ struct MacPlaylistDetailSheet: View {
         do {
             try DatabaseManager.shared.deletePlaylist(playlistId: playlist.id ?? 0)
             NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
-            dismiss()
+            onExit()
         } catch {
             print("❌ deletePlaylist failed: \(error)")
         }
@@ -149,7 +161,7 @@ struct MacPlaylistDetailSheet: View {
             tracks = try DatabaseManager.shared.getTracksByStableIdsPreservingOrder(stableIds)
             isLoading = false
         } catch {
-            print("❌ MacPlaylistDetailSheet loadTracks failed: \(error)")
+            print("❌ MacManualPlaylistDetailView loadTracks failed: \(error)")
             isLoading = false
         }
     }

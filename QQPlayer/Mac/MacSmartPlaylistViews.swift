@@ -97,16 +97,18 @@ struct MacSmartPlaylistCardStrip: View {
     }
 }
 
-// MARK: - Detail sheet
+// MARK: - Detail content (in-column, 2026-09-05)
 
-/// Detail sheet for one automatic playlist. The decades kind first shows the
-/// bucket list; tapping a bucket swaps the content to that decade's tracks
-/// (back button in the header returns to the bucket list).
-struct MacSmartPlaylistDetailSheet: View {
+/// Inline detail for one automatic playlist, displayed in the content column
+/// (no popup sheet). A leading back button returns to the playlists page. The
+/// decades kind first shows the bucket list; tapping a bucket swaps the content
+/// to that decade's tracks (back returns to the bucket list).
+struct MacSmartPlaylistDetailView: View {
     let kind: SmartPlaylistKind
+    /// Pop one level: decade bucket → bucket list; root → playlists home page.
+    let onBack: () -> Void
 
     @StateObject private var player = PlayerEngine.shared
-    @Environment(\.dismiss) private var dismiss
 
     @State private var tracks: [Track] = []
     @State private var buckets: [DecadeBucketInfo] = []
@@ -116,34 +118,37 @@ struct MacSmartPlaylistDetailSheet: View {
     @State private var loadError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
             content
         }
-        .padding()
-        .frame(minWidth: 560, minHeight: 420)
         .onAppear { loadData() }
     }
 
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 12) {
-            if selectedBucket != nil {
-                Button {
-                    self.selectedBucket = nil
-                } label: {
-                    Label("back".localized, systemImage: "chevron.left")
+        HStack(spacing: 10) {
+            Button {
+                if selectedBucket != nil {
+                    selectedBucket = nil
+                } else {
+                    onBack()
                 }
+            } label: {
+                Label(Localized.back, systemImage: "chevron.left")
             }
+            .buttonStyle(.borderless)
+            .help(Localized.back)
             Text(title)
                 .font(.title2)
                 .fontWeight(.bold)
                 .lineLimit(1)
             Spacer()
-            Button("close".localized) { dismiss() }
-                .keyboardShortcut(.cancelAction)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     private var title: String {

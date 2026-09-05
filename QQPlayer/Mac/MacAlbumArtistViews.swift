@@ -252,26 +252,47 @@ struct MacArtistDetailSheet: View {
 
 // MARK: - Playlists
 
+/// 播放列表页详情目标：自动歌单（smart）或普通歌单（manual）。详情直接在
+/// 内容区展示（2026-09-05 用户反馈：不应弹 sheet，而应像其他列表一样显示在
+/// 列表/内容区），主页与详情在同一内容列内切换，返回按钮回到歌单主页。
+private enum MacPlaylistDetailTarget {
+    case smart(SmartPlaylistKind)
+    case manual(Playlist)
+}
+
 struct MacPlaylistListView: View {
     let playlists: [Playlist]
-    /// Plays the whole playlist (queue = playlist tracks), used by the detail sheet.
+    /// Plays the whole playlist (queue = playlist tracks), used by the manual detail.
     let onPlay: (Playlist) -> Void
 
     @State private var smartCards: [SmartPlaylistCardInfo] = []
     @State private var smartCoverTracks: [SmartPlaylistKind: [Track]] = [:]
-    @State private var showSmartSheet = false
-    @State private var selectedSmartKind: SmartPlaylistKind?
-    @State private var showPlaylistSheet = false
-    @State private var selectedPlaylist: Playlist?
+    @State private var detailTarget: MacPlaylistDetailTarget?
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
 
     var body: some View {
+        Group {
+            if let detailTarget {
+                detail(for: detailTarget)
+            } else {
+                home
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+            // 歌单变化 → 详情内重载（MacManualPlaylistDetailView 内部也监听），
+            // 主页可见时重算卡片计数/封面
+            reloadSmartCards()
+        }
+    }
+
+    // MARK: 主页（自动歌单卡片 + 普通歌单列表）
+
+    private var home: some View {
         VStack(spacing: 0) {
             // Pinned automatic playlists — always visible, never user-editable.
             MacSmartPlaylistCardStrip(cards: smartCards, coverTracks: smartCoverTracks) { kind in
-                selectedSmartKind = kind
-                showSmartSheet = true
+                detailTarget = .smart(kind)
             }
             Divider()
 
@@ -288,8 +309,7 @@ struct MacPlaylistListView: View {
                 Section {
                     ForEach(playlists, id: \.id) { playlist in
                         Button {
-                            selectedPlaylist = playlist
-                            showPlaylistSheet = true
+                            detailTarget = .manual(playlist)
                         } label: {
                             HStack(spacing: 10) {
                                 MacArtworkThumbnail(
@@ -324,24 +344,29 @@ struct MacPlaylistListView: View {
                 }
             }
         }
-        .sheet(isPresented: $showSmartSheet) {
-            if let kind = selectedSmartKind {
-                MacSmartPlaylistDetailSheet(kind: kind)
-            }
-        }
-        .sheet(isPresented: $showPlaylistSheet) {
-            if let playlist = selectedPlaylist {
-                MacPlaylistDetailSheet(playlist: playlist, onPlayAll: { onPlay(playlist) })
-            }
-        }
         .alert("create_new_playlist".localized, isPresented: $showNewPlaylistAlert) {
             TextField("playlist_name_placeholder".localized, text: $newPlaylistName)
             Button("create".localized) { createPlaylist() }
             Button("cancel".localized, role: .cancel) {}
         }
         .onAppear { reloadSmartCards() }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
-            reloadSmartCards()
+    }
+
+    // MARK: 详情（内容区直接展示，2026-09-05 起不再弹 sheet）
+
+    @ViewBuilder
+    private func detail(for target: MacPlaylistDetailTarget) -> some View {
+        switch target {
+        case .smart(let kind):
+            MacSmartPlaylistDetailView(kind: kind) {
+                detailTarget = nil
+            }
+        case .manual(let playlist):
+            MacManualPlaylistDetailView(
+                playlist: playlist,
+                onPlayAll: { onPlay(playlist) },
+                onExit: { detailTarget = nil }
+            )
         }
     }
 
