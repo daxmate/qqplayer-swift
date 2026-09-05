@@ -221,6 +221,7 @@ struct TagWriterTests {
             try db.execute(sql: """
                 INSERT INTO track (stable_id, title, path) VALUES (?, 'T', ?)
             """, arguments: [oldStable, oldPath])
+            try db.execute(sql: "INSERT INTO playlist (id, slug, title, created_at, updated_at) VALUES (1, 'p', 'P', 0, 0)")
             try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES (?)", arguments: [oldStable])
             try db.execute(sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 0, ?)", arguments: [oldStable])
             try db.execute(sql: "INSERT INTO play_history (track_stable_id, played_at) VALUES (?, 100)", arguments: [oldStable])

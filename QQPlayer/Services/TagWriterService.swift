@@ -94,20 +94,21 @@ enum TagWriterService {
             throw TagWriterError.fileNotReadable
         }
 
-        // 1. 渲染目标文件名（改名语义：用将写入的新值渲染，web save_tags 同）
+        // 1. 渲染目标文件名（仅当调用方给了 renameTemplate；nil = 不改名）
         let targetURL: URL
         let renamed: Bool
-        if let newName = TagRenameLogic.renderFileName(
-            template: request.renameTemplate,
-            values: TagRenameLogic.Values(
-                artist: request.artist,
-                title: request.title,
-                album: request.album,
-                track: request.trackNumber,
-                year: request.year
-            ),
-            ext: "." + ext
-        ) {
+        if let template = request.renameTemplate,
+           let newName = TagRenameLogic.renderFileName(
+               template: template,
+               values: TagRenameLogic.Values(
+                   artist: request.artist,
+                   title: request.title,
+                   album: request.album,
+                   track: request.trackNumber,
+                   year: request.year
+               ),
+               ext: "." + ext
+           ) {
             let candidate = url.deletingLastPathComponent().appendingPathComponent(newName)
             if candidate.standardizedFileURL != url.standardizedFileURL {
                 targetURL = dedupeTarget(candidate)
@@ -165,6 +166,10 @@ enum TagWriterService {
                 _ = try fm.replaceItemAt(targetURL, withItemAt: tmpURL)
             } else {
                 try fm.moveItem(at: tmpURL, to: targetURL)
+            }
+            // 改名完成：移除旧路径（web save_tags 的 f.unlink() 语义）
+            if renamed {
+                try? fm.removeItem(at: url)
             }
         } catch let error as TagWriterError {
             try? fm.removeItem(at: tmpURL)
