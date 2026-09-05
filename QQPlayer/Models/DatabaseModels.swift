@@ -43,6 +43,7 @@ struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
     var albumId: Int64?
     var artistId: Int64?
     var title: String
+    var genre: String?
     var trackNo: Int?
     var discNo: Int?
     var durationMs: Int?
@@ -67,7 +68,7 @@ struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
     nonisolated(unsafe) static let album = belongsTo(Album.self)
 
     enum CodingKeys: String, CodingKey {
-        case id, title, path
+        case id, title, genre, path
         case stableId = "stable_id"
         case albumId = "album_id"
         case artistId = "artist_id"

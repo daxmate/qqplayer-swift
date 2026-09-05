@@ -228,6 +228,7 @@ class DatabaseManager: @unchecked Sendable {
                     album_id INTEGER REFERENCES album(id) ON DELETE SET NULL,
                     artist_id INTEGER REFERENCES artist(id) ON DELETE SET NULL,
                     title TEXT NOT NULL COLLATE NOCASE,
+                    genre TEXT,
                     track_no INTEGER,
                     disc_no INTEGER,
                     duration_ms INTEGER,
@@ -394,6 +395,18 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// 老库 track 表补 genre 列（E1-S3）。幂等：列已存在直接跳过。
+    /// 独立成 internal：生产迁移（migrateDatabaseIfNeeded）与测试
+    /// （GenreParsingTests 老 schema → 补列 → 往返）共用同一实现，避免两处漂移。
+    static func addTrackGenreColumnIfNeeded(_ db: Database) throws {
+        if try !db.columns(in: "track").contains(where: { $0.name == "genre" }) {
+            try db.execute(sql: "ALTER TABLE track ADD COLUMN genre TEXT")
+            print("✅ Database: Added genre column to track table")
+        } else {
+            print("ℹ️ Database migration: genre column already exists")
+        }
+    }
+
     private func migrateDatabaseIfNeeded() throws {
         var stableIdRemapping: [String: String] = [:]
 
@@ -442,6 +455,11 @@ class DatabaseManager: @unchecked Sendable {
             } else {
                 print("ℹ️ Database migration: modification_date column already exists")
             }
+
+            // E1-S3: genre column (web 版歌曲对象已含 genre；老库补列，新库
+            // createTables 已含)。幂等：列已存在即跳过。独立成 internal 方法：
+            // 生产迁移与 GenreParsingTests 老库补列测试共用同一实现。
+            try Self.addTrackGenreColumnIfNeeded(db)
 
             // Migration: Add custom_cover_image_path column to playlist table
             do {

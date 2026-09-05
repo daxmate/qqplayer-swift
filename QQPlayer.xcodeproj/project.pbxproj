@@ -66,6 +66,7 @@
 		3E7AA689098645E3B0673D46 /* TestAudioFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */; };
 		BD9D2F0C5F244AF7B19EA365 /* TagRenameLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */; };
 		DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82493F629B43819C248996 /* TagWriterTests.swift */; };
+		688EFD97F77D483A8D3F43FC /* GenreParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80880AAC1A14818BB717239 /* GenreParsingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -181,6 +182,7 @@
 		B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestAudioFixtures.swift; sourceTree = "<group>"; };
 		96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TagRenameLogicTests.swift; sourceTree = "<group>"; };
 		1D82493F629B43819C248996 /* TagWriterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TagWriterTests.swift; sourceTree = "<group>"; };
+		E80880AAC1A14818BB717239 /* GenreParsingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GenreParsingTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -568,6 +570,7 @@
 				B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */,
 				96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */,
 				1D82493F629B43819C248996 /* TagWriterTests.swift */,
+				E80880AAC1A14818BB717239 /* GenreParsingTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -932,6 +935,7 @@
 				3E7AA689098645E3B0673D46 /* TestAudioFixtures.swift in Sources */,
 				BD9D2F0C5F244AF7B19EA365 /* TagRenameLogicTests.swift in Sources */,
 				DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */,
+				688EFD97F77D483A8D3F43FC /* GenreParsingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -36,6 +36,19 @@ extension AudioMetadataParser {
         return nil
     }
 
+    /// Genre 判定 + 取值（AVFoundation 域）：ID3 TCON（identifier "id3/TCON"）
+    /// 或 iTunes/MP4 ©gen（"itsk/%A9gen"，keySpace .iTunes 的 key 常以数值 4CC
+    /// 返回，不能按 key 字符串匹配——8-29 经验：显式按 identifier 拉）。
+    /// 非 genre 项直接返回 nil，不触发异步加载。
+    private static func genreString(from item: AVMetadataItem) async -> String? {
+        let identifier = item.identifier?.rawValue.lowercased()
+        let isGenreItem = identifier == "id3/tcon" ||
+            identifier == "itsk/%a9gen" ||
+            identifier == "itsk/©gen"
+        guard isGenreItem else { return nil }
+        return Self.normalizedGenre(try? await item.load(.stringValue))
+    }
+
     private static func extractTrackOrDiscNumber(from metadata: AVMetadataItem) async -> Int? {
         if let stringValue = try? await metadata.load(.stringValue),
            let parsed = parseSlashSeparatedNumber(stringValue) {
@@ -93,6 +106,7 @@ extension AudioMetadataParser {
         var artist: String?
         var album: String?
         var albumArtist: String?
+        var genre: String?
         var trackNumber: Int?
         var discNumber: Int?
         var year: Int?
@@ -136,6 +150,15 @@ extension AudioMetadataParser {
             // Check for additional ID3 tags
             for metadata in allMetadata {
                 try Task.checkCancellation()
+                // Genre first: AVAsset maps ID3 TCON to commonKey "type" (not a
+                // real common key) and iTunes ©gen has no commonKey at all, so
+                // neither reliably reaches the keyed branches below - match by
+                // identifier up front (8-29 lesson: pull explicitly, don't rely
+                // on commonKey).
+                if genre == nil, let genreValue = await Self.genreString(from: metadata) {
+                    genre = genreValue
+                    print("🎸 Found genre from \(metadata.identifier?.rawValue ?? "tag"): \(genreValue)")
+                }
                 if let key = metadata.commonKey?.rawValue {
                     switch key {
                     case "albumArtist":
@@ -281,12 +304,14 @@ extension AudioMetadataParser {
         print("   Artist: \(artist ?? "nil")")
         print("   Album: \(album ?? "nil")")
         print("   Album Artist: \(albumArtist ?? "nil")")
+        print("   Genre: \(genre ?? "nil")")
 
         return AudioMetadata(
             title: title,
             artist: artist,
             album: album,
             albumArtist: albumArtist,
+            genre: genre,
             trackNumber: trackNumber,
             discNumber: discNumber,
             year: year,
@@ -313,6 +338,7 @@ extension AudioMetadataParser {
         var title: String?
         var artist: String?
         var album: String?
+        var genre: String?
         let albumArtist: String? = nil
         let trackNumber: Int? = nil
         let discNumber: Int? = nil
@@ -362,6 +388,18 @@ extension AudioMetadataParser {
                     break
                 }
             }
+
+            // Genre has no commonKey (same as TYER/TDRC) - scan all metadata
+            // for the ID3 TCON frame / iTunes ©gen atom explicitly.
+            if genre == nil {
+                let allMetadata = try await asset.load(.metadata)
+                for item in allMetadata {
+                    guard genre == nil else { break }
+                    if let genreValue = await Self.genreString(from: item) {
+                        genre = genreValue
+                    }
+                }
+            }
         } catch {
             print("⚠️ Failed to read WAV metadata: \(error)")
         }
@@ -396,6 +434,7 @@ extension AudioMetadataParser {
             artist: artist,
             album: album,
             albumArtist: albumArtist,
+            genre: genre,
             trackNumber: trackNumber,
             discNumber: discNumber,
             year: year,

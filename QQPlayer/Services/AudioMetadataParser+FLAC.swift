@@ -14,6 +14,7 @@ extension AudioMetadataParser {
         var artist: String?
         var album: String?
         var albumArtist: String?
+        var genre: String?
         var trackNumber: Int?
         var discNumber: Int?
         var year: Int?
@@ -138,6 +139,7 @@ extension AudioMetadataParser {
                 artist = metadata["ARTIST"] ?? metadata["ARTISTE"]
                 album = metadata["ALBUM"]
                 albumArtist = metadata["ALBUMARTIST"]
+                genre = Self.normalizedGenre(metadata["GENRE"])
 
                 if let trackStr = metadata["TRACKNUMBER"] {
                     trackNumber = Int(trackStr)
@@ -176,6 +178,7 @@ extension AudioMetadataParser {
             artist: artist,
             album: album,
             albumArtist: albumArtist,
+            genre: genre,
             trackNumber: trackNumber,
             discNumber: discNumber,
             year: year,

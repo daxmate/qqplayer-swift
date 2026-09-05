@@ -14,6 +14,7 @@ struct AudioMetadata {
     let artist: String?
     let album: String?
     let albumArtist: String?
+    let genre: String?
     let trackNumber: Int?
     let discNumber: Int?
     let year: Int?
@@ -29,6 +30,14 @@ struct AudioMetadata {
 }
 
 class AudioMetadataParser {
+    /// Genre 归一化：去掉首尾空白；空串/纯空白 → nil。web 版缺失 genre 时默认 ""，
+    /// Swift 端统一用 nil 表达"无流派"（与其它可选字段语义一致），避免空串落库。
+    static func normalizedGenre(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     static func parseMetadata(from url: URL) async throws -> AudioMetadata {
         return try await parseAudioMetadataSync(from: url)
     }

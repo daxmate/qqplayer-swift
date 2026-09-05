@@ -1189,6 +1189,7 @@ class LibraryIndexer: NSObject, ObservableObject {
             albumId: album.id,
             artistId: artist.id,
             title: metadata.title ?? url.deletingPathExtension().lastPathComponent,
+            genre: metadata.genre,
             trackNo: metadata.trackNumber,
             discNo: metadata.discNumber,
             durationMs: metadata.durationMs,

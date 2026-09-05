@@ -32,6 +32,7 @@ extension AudioMetadataParser {
             let artist = metadata.artist
             let album = metadata.albumTitle
             let albumArtist = metadata.albumArtist
+            let genre = Self.normalizedGenre(metadata.genre)
             let trackNumber = metadata.trackNumber
             let discNumber = metadata.discNumber
             let year = metadata.releaseDate?.components(separatedBy: "-").first.flatMap { Int($0) }
@@ -48,6 +49,7 @@ extension AudioMetadataParser {
                 artist: artist,
                 album: album,
                 albumArtist: albumArtist,
+                genre: genre,
                 trackNumber: trackNumber,
                 discNumber: discNumber,
                 year: year,
@@ -168,6 +170,7 @@ extension AudioMetadataParser {
             artist: artist,
             album: nil,
             albumArtist: artist,
+            genre: nil,
             trackNumber: nil,
             discNumber: nil,
             year: nil,
