@@ -30,6 +30,7 @@
 //  - 若 renamed → DatabaseManager.moveTrack(from:to:) 迁移引用，再触发索引刷新
 
 import Foundation
+import SFBAudioEngine
 
 enum TagWriterError: Error, LocalizedError {
     /// 扩展名不在可写清单（wav/dsf/aiff/…）
@@ -80,8 +81,118 @@ enum TagWriterService {
     /// 可写标签格式（对齐 web TAG_WRITABLE_EXTS；大小写不敏感）
     static let writableExtensions: Set<String> = ["mp3", "m4a", "mp4", "flac", "ogg", "opus"]
 
-    /// 写标签（原子写 + 可选改名）。S1 实现。
+    /// 写标签（原子写 + 可选改名）。
+    /// 流程对齐 web tag_editor.save_tags：copy2 同目录临时文件 → 改临时文件 → 原子替换；
+    /// 任何一步失败原文件保持完好。
     static func writeTags(to url: URL, request: TagWriteRequest) throws -> TagWriteResult {
-        fatalError("S1 实现：SFB 写标签 + 原子写 + 改名；见文件头契约")
+        let fm = FileManager.default
+        let ext = url.pathExtension.lowercased()
+        guard writableExtensions.contains(ext) else {
+            throw TagWriterError.unsupportedFormat(ext.isEmpty ? "无扩展名" : ext)
+        }
+        guard fm.fileExists(atPath: url.path) else {
+            throw TagWriterError.fileNotReadable
+        }
+
+        // 1. 渲染目标文件名（改名语义：用将写入的新值渲染，web save_tags 同）
+        let targetURL: URL
+        let renamed: Bool
+        if let newName = TagRenameLogic.renderFileName(
+            template: request.renameTemplate,
+            values: TagRenameLogic.Values(
+                artist: request.artist,
+                title: request.title,
+                album: request.album,
+                track: request.trackNumber,
+                year: request.year
+            ),
+            ext: "." + ext
+        ) {
+            let candidate = url.deletingLastPathComponent().appendingPathComponent(newName)
+            if candidate.standardizedFileURL != url.standardizedFileURL {
+                targetURL = dedupeTarget(candidate)
+                renamed = true
+            } else {
+                targetURL = url
+                renamed = false
+            }
+        } else {
+            targetURL = url
+            renamed = false
+        }
+
+        // 2. 原子写：copy 到同目录临时文件（保留扩展名——SFB 按扩展名识别格式）
+        let tmpURL = url.deletingLastPathComponent()
+            .appendingPathComponent(".\(url.deletingPathExtension().lastPathComponent).tagtmp-\(UUID().uuidString.prefix(8)).\(ext)")
+        do {
+            try fm.copyItem(at: url, to: tmpURL)
+            // SFB 步骤放独立作用域：写完即释放文件句柄，再原子替换
+            do {
+                let audioFile = try SFBAudioEngine.AudioFile(readingPropertiesAndMetadataFrom: tmpURL)
+                let metadata = audioFile.metadata
+                if let title = request.title, !title.isEmpty { metadata.title = title }
+                if let artist = request.artist, !artist.isEmpty { metadata.artist = artist }
+                if let album = request.album, !album.isEmpty { metadata.albumTitle = album }
+                if let albumArtist = request.albumArtist, !albumArtist.isEmpty { metadata.albumArtist = albumArtist }
+                if let genre = request.genre, !genre.isEmpty { metadata.genre = genre }
+                if let year = request.year {
+                    // ⚠️ SFB 已知缺口（S0）：.mp3 的 releaseDate 必须完整 ISO8601，
+                    // date-only "2018" 会被内部 NSISO8601DateFormatter 拒 → 帧不写
+                    if ext == "mp3" {
+                        metadata.releaseDate = "\(year)-01-01T00:00:00Z"
+                    } else {
+                        metadata.releaseDate = String(year)
+                    }
+                }
+                if let track = request.trackNumber { metadata.trackNumber = track }
+                if request.removeCover {
+                    metadata.removeAllAttachedPictures()
+                } else if let coverData = request.coverData {
+                    metadata.removeAllAttachedPictures()
+                    metadata.attachPicture(AttachedPicture(imageData: coverData))
+                }
+                try audioFile.writeMetadata()
+            }
+
+            // 3. 原子落位：target == 原路径 → 原地替换；新路径（含子目录）→ mkdir + 移动
+            if renamed {
+                let dir = targetURL.deletingLastPathComponent()
+                if !fm.fileExists(atPath: dir.path) {
+                    try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                }
+            }
+            if fm.fileExists(atPath: targetURL.path) {
+                _ = try fm.replaceItemAt(targetURL, withItemAt: tmpURL)
+            } else {
+                try fm.moveItem(at: tmpURL, to: targetURL)
+            }
+        } catch let error as TagWriterError {
+            try? fm.removeItem(at: tmpURL)
+            throw error
+        } catch {
+            try? fm.removeItem(at: tmpURL)
+            throw TagWriterError.writeFailed(error.localizedDescription)
+        }
+
+        return TagWriteResult(
+            finalURL: targetURL,
+            renamed: renamed,
+            wroteCover: request.coverData != nil || request.removeCover
+        )
+    }
+
+    /// 目标已存在 → 加 (2)/(3) 序号，绝不覆盖（web _dedupe_target）
+    private static func dedupeTarget(_ candidate: URL) -> URL {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+        let dir = candidate.deletingLastPathComponent()
+        let stem = candidate.deletingPathExtension().lastPathComponent
+        let ext = candidate.pathExtension
+        var n = 2
+        while true {
+            let next = dir.appendingPathComponent("\(stem) (\(n)).\(ext)")
+            if !fm.fileExists(atPath: next.path) { return next }
+            n += 1
+        }
     }
 }

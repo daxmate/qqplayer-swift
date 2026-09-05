@@ -476,4 +476,39 @@ extension DatabaseManager {
             print("⚠️ Failed to remove external file bookmark: \(error.localizedDescription)")
         }
     }
+
+    // MARK: - 刮削改名引用迁移（E1 标签刮削）
+
+    /// 刮削改名后的库内引用迁移：把 track 行从旧路径迁到新路径（stable_id 重算），
+    /// 收藏/歌单/歌手关联/播放历史四表引用跟随新 stable_id（复用 mergeTrackReferences）。
+    ///
+    /// - 旧路径无 track（外部文件未入库/已被删）→ 无事发生（幂等）
+    /// - 新 stable_id 已被另一 track 占用（库中已有同路径曲目）→ 引用合并进已存在者后删除本行
+    ///   （对齐 upsertTrack 的 duplicates 语义）
+    /// - 不改文件系统、不发通知（调用方职责：TagWriterService 已完成原子改名，
+    ///   UI 层负责通知刷新）
+    func moveTrack(from oldPath: String, to newPath: String) throws {
+        let normalizedOld = Self.standardizedPath(oldPath)
+        let normalizedNew = Self.standardizedPath(newPath)
+        guard normalizedOld != normalizedNew else { return }
+        guard let track = try getTrack(byPath: normalizedOld) else { return }
+
+        let newStableId = Self.generatePathStableId(forPath: normalizedNew)
+        try write { db in
+            if let existing = try Track.filter(Column("stable_id") == newStableId).fetchOne(db),
+               existing.id != track.id {
+                // 目标已被库中另一曲目占用：合并引用过去，删除旧行
+                try self.mergeTrackReferences(db: db, from: track.stableId, to: newStableId)
+                try Track.filter(Column("id") == track.id).deleteAll(db)
+                print("🗂️ moveTrack: merged \(track.stableId) into existing \(newStableId)")
+            } else {
+                var updated = track
+                updated.path = normalizedNew
+                updated.stableId = newStableId
+                try updated.save(db)
+                try self.mergeTrackReferences(db: db, from: track.stableId, to: newStableId)
+                print("🗂️ moveTrack: \(normalizedOld) → \(normalizedNew) (stableId \(track.stableId) → \(newStableId))")
+            }
+        }
+    }
 }

@@ -63,6 +63,9 @@
 		F5EA698EDC0C4A428FB7E77E /* QueueReorderMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */; };
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
+		3E7AA689098645E3B0673D46 /* TestAudioFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */; };
+		BD9D2F0C5F244AF7B19EA365 /* TagRenameLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */; };
+		DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82493F629B43819C248996 /* TagWriterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -175,6 +178,9 @@
 		EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGestureLogicTests.swift; sourceTree = "<group>"; };
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
+		B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestAudioFixtures.swift; sourceTree = "<group>"; };
+		96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TagRenameLogicTests.swift; sourceTree = "<group>"; };
+		1D82493F629B43819C248996 /* TagWriterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TagWriterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -559,6 +565,9 @@
 				5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */,
 				979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */,
 				E14D783B4AEB4D92A91DF32D /* MacOnlineDownloadServiceTests.swift */,
+				B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */,
+				96597A96BFB54987AF618F36 /* TagRenameLogicTests.swift */,
+				1D82493F629B43819C248996 /* TagWriterTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -920,6 +929,9 @@
 				F5EA698EDC0C4A428FB7E77E /* QueueReorderMathTests.swift in Sources */,
 				FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */,
 				B723A369BE654B609494CF58 /* MacOnlineDownloadServiceTests.swift in Sources */,
+				3E7AA689098645E3B0673D46 /* TestAudioFixtures.swift in Sources */,
+				BD9D2F0C5F244AF7B19EA365 /* TagRenameLogicTests.swift in Sources */,
+				DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
