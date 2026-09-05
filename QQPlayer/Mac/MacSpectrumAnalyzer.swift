@@ -40,7 +40,9 @@ final class MacSpectrumAnalyzer: ObservableObject {
     /// 音频线程（process）与主线程（removeTap 置零）都会访问 → NSLock 保护。
     private var smoothed: [Float] = []
     private let lock = NSLock()
-    private let decayPerFrame: Float = 0.011
+    /// 每回调衰减量：mainMixer tap 按 IO 周期回调（实测 buffer ~4800 帧 ≈ 9-10Hz），
+    /// 0.05/回调 ≈ 0.45/s，从满到零约 2s——跟随音乐有活力又不闪跳。
+    private let decayPerFrame: Float = 0.05
 
     private init() {
         let log2n = vDSP_Length(log2(Float(fftSize)))
@@ -131,7 +133,10 @@ final class MacSpectrumAnalyzer: ObservableObject {
             let f0 = lowFreq * powf(highFreq / lowFreq, Float(b) / Float(binCount))
             let f1 = lowFreq * powf(highFreq / lowFreq, Float(b + 1) / Float(binCount))
             let i0 = max(1, Int(f0 / binWidth))
+            // min(usableBins, …) 截断后可能 i1 <= i0（高频段起点已超出可听上限）
+            // → 闭/开区间都会崩「Range requires lowerBound <= upperBound」（2026-09-05 真机实锤）
             let i1 = min(usableBins, max(i0 + 1, Int(f1 / binWidth)))
+            guard i1 > i0 else { continue }
             var sum: Float = 0
             var n = 0
             for i in i0 ..< i1 {
