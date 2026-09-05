@@ -163,11 +163,21 @@ struct Localized {
 
     // MARK: - Settings Categories（web 版左导航分类对齐）
     static let settingsCategoryPlayback = "settings_category_playback".localized
+    static let settingsCategoryLyrics = "settings_category_lyrics".localized
     static let settingsCategoryLibrary = "settings_category_library".localized
     static let settingsCategoryDownload = "settings_category_download".localized
     static let settingsCategoryAppearance = "settings_category_appearance".localized
     static let settingsCategoryAbout = "settings_category_about".localized
     static let settingsDownloadQuality = "settings_download_quality".localized
+
+    // MARK: - Lyrics（歌词设置，D3 web 版 lyric 设置对齐）
+    static let lyricsDisplay = "lyrics_display".localized
+    static let lyricsFontSize = "lyrics_font_size".localized
+    static let lyricsShowTranslation = "lyrics_show_translation".localized
+    static let lyricsCalibration = "lyrics_calibration".localized
+    static let lyricsOffset = "lyrics_offset".localized
+    static let lyricsOffsetReset = "lyrics_offset_reset".localized
+    static let lyricsOffsetHint = "lyrics_offset_hint".localized
 
     // MARK: - Music Library（曲库文件夹）
     static let libraryFolders = "library_folders".localized

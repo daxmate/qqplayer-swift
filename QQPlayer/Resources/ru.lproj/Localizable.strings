@@ -113,6 +113,14 @@
 "settings_category_playback" = "Воспроизведение";
 "settings_category_appearance" = "Оформление";
 "settings_category_about" = "О программе";
+"settings_category_lyrics" = "Текст";
+"lyrics_display" = "Отображение";
+"lyrics_font_size" = "Размер текста";
+"lyrics_show_translation" = "Показывать перевод";
+"lyrics_calibration" = "Калибровка";
+"lyrics_offset" = "Задержка текста";
+"lyrics_offset_reset" = "Сброс";
+"lyrics_offset_hint" = "Положительное значение задерживает текст (он появляется позже звука). Настройте так, чтобы выделенная строка совпадала с пением.";
 "appearance_theme" = "Тема";
 "theme_system" = "Как в системе";
 "theme_dark" = "Тёмная";

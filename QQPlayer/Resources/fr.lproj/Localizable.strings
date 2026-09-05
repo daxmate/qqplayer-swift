@@ -113,6 +113,14 @@
 "settings_category_playback" = "Lecture";
 "settings_category_appearance" = "Apparence";
 "settings_category_about" = "À propos";
+"settings_category_lyrics" = "Paroles";
+"lyrics_display" = "Affichage";
+"lyrics_font_size" = "Taille du texte";
+"lyrics_show_translation" = "Afficher la traduction";
+"lyrics_calibration" = "Calibrage";
+"lyrics_offset" = "Décalage des paroles";
+"lyrics_offset_reset" = "Réinitialiser";
+"lyrics_offset_hint" = "Une valeur positive retarde les paroles (elles apparaissent après l'audio). Réglez jusqu'à ce que la ligne surlignée corresponde au chant.";
 "appearance_theme" = "Thème";
 "theme_system" = "Suivre le système";
 "theme_dark" = "Sombre";

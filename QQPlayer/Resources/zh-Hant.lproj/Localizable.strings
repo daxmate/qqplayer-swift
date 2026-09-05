@@ -199,6 +199,14 @@
 "settings_category_playback" = "播放";
 "settings_category_appearance" = "介面";
 "settings_category_about" = "關於";
+"settings_category_lyrics" = "歌詞";
+"lyrics_display" = "顯示";
+"lyrics_font_size" = "歌詞字號";
+"lyrics_show_translation" = "顯示譯文";
+"lyrics_calibration" = "校準";
+"lyrics_offset" = "歌詞延遲";
+"lyrics_offset_reset" = "歸零";
+"lyrics_offset_hint" = "正值讓歌詞延後顯示。校準到高亮行與演唱同步。";
 "appearance_theme" = "主題";
 "theme_system" = "跟隨系統";
 "theme_dark" = "深色";

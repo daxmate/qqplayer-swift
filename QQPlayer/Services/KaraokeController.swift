@@ -88,6 +88,11 @@ final class KaraokeController: ObservableObject {
     /// → 重定位到当前实际行而不是触发句末自动停（2026-08-29：前向拖进度条被弹回旧句句首）
     private var lastTickTime: TimeInterval?
 
+    /// 歌词整体延迟校准（web 版 lyric offset 对齐，D3）：
+    /// >0 = 歌词比声音延后。所有行定位/句末判定用歌词轴时间（音频 t → t - offset）；
+    /// 跳句 seek 目标用音频轴时间（歌词 s → s + offset）。iOS 无此设置（恒 0，行为不变）。
+    var lyricOffset: TimeInterval = 0
+
     /// 缓存行无时间戳时的时间下界：播放时间永远不小于它 → 不触发重定位。
     /// （语义同旧 `-Double.greatestFiniteMagnitude` 魔法值，具名后可读）
     private static let noTimestampStart: TimeInterval = -Double.greatestFiniteMagnitude
@@ -229,7 +234,10 @@ final class KaraokeController: ObservableObject {
     /// 当前行取缓存行；无缓存时按播放时间定位。边界（首句上/末句下）不动作。
     func stepLine(delta: Int, currentTime: TimeInterval) {
         guard isKaraokeOn, !currentLines.isEmpty else { return }
-        let current = karaokeLine ?? LyricTiming.activeLineIndex(time: currentTime, in: currentLines)
+        let current = karaokeLine ?? LyricTiming.activeLineIndex(
+            time: currentTime - lyricOffset,
+            in: currentLines
+        )
         guard let current else { return }
         let target = current + delta
         guard currentLines.indices.contains(target),
@@ -255,13 +263,16 @@ final class KaraokeController: ObservableObject {
     /// 播放 tick：跟唱模式下检测句末并执行 句末自动停 / 单句循环 / AB 循环
     func handlePlaybackTick(time: TimeInterval, duration: TimeInterval) {
         guard isKaraokeOn, !currentLines.isEmpty else { return }
+        // 歌词轴时间：tick 的行定位/句末判定统一用（音频时间 - 歌词 offset）。
+        // offset>0 时句末判定延后等价——唱歌比歌词慢时不被误判提前停（web lyricTime 语义）。
+        let tickTime = time - lyricOffset
         // 待完成跳转：seek 异步生效前，tick 一律跳过（不重定位、不句末检测）。
         // 否则 tick 读到旧播放位置会把 karaokeLine 重定位回旧行，seek 生效后
         // 基于旧行误触发句末自动停，把播放拉回旧句（2026-08-31 点击跳转竞态根因）。
         if let pending = pendingJumpLine {
             // seek 已生效：播放时间到达目标行句首 → 解除 pending，走正常检测
             if let ts = currentLines.indices.contains(pending) ? currentLines[pending].timestamp : nil,
-               time >= ts {
+               tickTime >= ts {
                 pendingJumpLine = nil
                 pendingJumpDeadline = nil
             } else if let deadline = pendingJumpDeadline, Date() > deadline {
@@ -270,7 +281,7 @@ final class KaraokeController: ObservableObject {
                 print("⏭️ Karaoke pending jump timed out (line \(pending)) - relocating to actual position")
                 pendingJumpLine = nil
                 pendingJumpDeadline = nil
-                karaokeLine = LyricTiming.activeLineIndex(time: time, in: currentLines)
+                karaokeLine = LyricTiming.activeLineIndex(time: tickTime, in: currentLines)
             } else {
                 return
             }
@@ -279,28 +290,28 @@ final class KaraokeController: ObservableObject {
         // 用户主动前向 seek（进度条拖动）：相比上一 tick 大幅前跳（>1s；自然播放每 tick
         // 最多前进 0.25s，1x/慢速都远小于阈值）→ 重定位到当前实际行，不触发句末自动停。
         // 否则前向拖进度条会被「句末自动停」弹回旧句句首并暂停（2026-08-29 用户实测）。
-        if let last = lastTickTime, time - last > 1.0 {
-            karaokeLine = LyricTiming.activeLineIndex(time: time, in: currentLines)
-            lastTickTime = time
+        if let last = lastTickTime, tickTime - last > 1.0 {
+            karaokeLine = LyricTiming.activeLineIndex(time: tickTime, in: currentLines)
+            lastTickTime = tickTime
             return
         }
-        lastTickTime = time
+        lastTickTime = tickTime
         // 重定位：无缓存行，或时间回退到缓存行句首之前（前奏/回退；点击跳转走 jumpTo 显式更新）
         if let cachedLine = karaokeLine {
             let cachedStart = currentLines.indices.contains(cachedLine)
                 ? (currentLines[cachedLine].timestamp ?? Self.noTimestampStart)
                 : Self.noTimestampStart
-            if time < cachedStart {
-                karaokeLine = LyricTiming.activeLineIndex(time: time, in: currentLines)
+            if tickTime < cachedStart {
+                karaokeLine = LyricTiming.activeLineIndex(time: tickTime, in: currentLines)
             }
         } else {
-            karaokeLine = LyricTiming.activeLineIndex(time: time, in: currentLines)
+            karaokeLine = LyricTiming.activeLineIndex(time: tickTime, in: currentLines)
         }
         guard let line = karaokeLine else { return }
         // 句末未知（duration 未解析为 0 且是最后一句）→ 不判定句末，避免「time >= 0 恒真」
         // 每 tick 都触发句末自动停（点播放立刻又停，2026-08-29 用户实测）
         guard let end = lineEndTime(line: line, duration: duration) else { return }
-        guard time >= end else { return }
+        guard tickTime >= end else { return }
         handleLineEnd(line)
     }
 
@@ -359,7 +370,8 @@ final class KaraokeController: ObservableObject {
         pendingJumpLine = line
         pendingJumpDeadline = Date().addingTimeInterval(Self.pendingJumpTimeout)
         jumpQuietUntil = Date().addingTimeInterval(0.3)
-        let target = ts
+        // 目标行句首在音频轴 = 歌词时间 + offset（web audioTime 语义：校准后跳到歌词对应的声音位置）
+        let target = ts + lyricOffset
         Task { @MainActor in
             if play {
                 await actions?.seekAndPlay(to: target)

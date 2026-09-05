@@ -125,6 +125,14 @@
 "settings_category_playback" = "播放";
 "settings_category_appearance" = "界面";
 "settings_category_about" = "关于";
+"settings_category_lyrics" = "歌词";
+"lyrics_display" = "显示";
+"lyrics_font_size" = "歌词字号";
+"lyrics_show_translation" = "显示译文";
+"lyrics_calibration" = "校准";
+"lyrics_offset" = "歌词延迟";
+"lyrics_offset_reset" = "归零";
+"lyrics_offset_hint" = "正值让歌词延后显示。校准到高亮行与演唱同步。";
 "appearance_theme" = "主题";
 "theme_system" = "跟随系统";
 "theme_dark" = "深色";

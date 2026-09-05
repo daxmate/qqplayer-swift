@@ -19,6 +19,13 @@ struct MacLyricsView: View {
 
     @ObservedObject private var karaoke = KaraokeController.shared
 
+    /// 歌词设置（D3，web 版 lyric 设置对齐）：字号/译文行/整体延迟校准。
+    /// 启动与 qqplayerSettingsDidChange 时从 DeleteSettings 刷新；offset 同时
+    /// 注入 KaraokeController（跟唱 tick/跳句共用同一歌词时间轴）。
+    @State private var fontSize: Double = 15
+    @State private var showTranslation = true
+    @State private var lyricOffset: Double = 0
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -45,6 +52,12 @@ struct MacLyricsView: View {
                 endPoint: .bottom
             )
         )
+        .onAppear {
+            applyLyricSettings()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+            applyLyricSettings()
+        }
         // 页面级双击：跟唱模式开关（对齐 iOS LyricsView——highPriority 双击优先，
         // 行单击等双击判定失败后才触发；快速双击 = 切换模式且不触发行跳转）
         .highPriorityGesture(
@@ -53,6 +66,15 @@ struct MacLyricsView: View {
                     karaoke.toggleKaraokeMode()
                 }
         )
+    }
+
+    /// 读取歌词设置并应用：字号/译文行显示 + offset 注入 KaraokeController。
+    private func applyLyricSettings() {
+        let settings = DeleteSettings.load()
+        fontSize = settings.lyricFontSize
+        showTranslation = settings.lyricShowTranslation
+        lyricOffset = settings.lyricOffset
+        karaoke.lyricOffset = settings.lyricOffset
     }
 
     // MARK: - Header
@@ -115,21 +137,22 @@ struct MacLyricsView: View {
     // MARK: - Synced lyrics
 
     private func syncedView(_ lines: [LyricsLine]) -> some View {
-        let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines)
+        // 歌词轴时间（音频时间 - offset，web lyricTime 语义）：高亮行与跟唱 tick 同轴
+        let activeIndex = LyricTiming.activeLineIndex(time: currentTime - lyricOffset, in: lines)
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 10) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                         VStack(spacing: 2) {
                             Text(line.text)
-                                .font(.system(size: 15))
+                                .font(.system(size: fontSize))
                                 .foregroundColor(index == activeIndex ? .white : .secondary)
                                 .fontWeight(index == activeIndex ? .semibold : .regular)
                                 .multilineTextAlignment(.center)
                                 .id(index)
-                            if let translation = line.translation, !translation.isEmpty {
+                            if showTranslation, let translation = line.translation, !translation.isEmpty {
                                 Text(translation)
-                                    .font(.system(size: 12))
+                                    .font(.system(size: max(fontSize - 3, 9)))
                                     .foregroundColor(index == activeIndex ? .white.opacity(0.85) : Color.secondary.opacity(0.7))
                                     .multilineTextAlignment(.center)
                             }
@@ -180,7 +203,7 @@ struct MacLyricsView: View {
     private func plainView(_ text: String) -> some View {
         ScrollView {
             Text(text)
-                .font(.system(size: 14))
+                .font(.system(size: max(fontSize - 1, 9)))
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)

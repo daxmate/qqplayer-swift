@@ -15,6 +15,7 @@ struct MacSettingsView: View {
     /// 设置分类（web 版左导航语义；后续加歌词/快捷键等分类时在此扩展）
     private enum SettingsCategory: String, CaseIterable, Hashable {
         case playback
+        case lyrics
         case library
         case download
         case appearance
@@ -23,6 +24,7 @@ struct MacSettingsView: View {
         var title: String {
             switch self {
             case .playback: return Localized.settingsCategoryPlayback
+            case .lyrics: return Localized.settingsCategoryLyrics
             case .library: return Localized.settingsCategoryLibrary
             case .download: return Localized.settingsCategoryDownload
             case .appearance: return Localized.settingsCategoryAppearance
@@ -33,6 +35,7 @@ struct MacSettingsView: View {
         var icon: String {
             switch self {
             case .playback: return "play.circle"
+            case .lyrics: return "text.quote"
             case .library: return "music.note.list"
             case .download: return "arrow.down.circle"
             case .appearance: return "paintbrush"
@@ -61,6 +64,8 @@ struct MacSettingsView: View {
                 switch selectedCategory {
                 case .playback:
                     MacPlaybackSettingsView(showEQSettings: $showEQSettings)
+                case .lyrics:
+                    MacLyricsSettingsView()
                 case .library:
                     MacLibrarySettingsView()
                 case .download:
@@ -124,6 +129,69 @@ private struct MacPlaybackSettingsView: View {
                     .onChange(of: deleteSettings.showSleepTimerButton) { _ in
                         deleteSettings.save()
                     }
+            }
+        }
+        .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+            deleteSettings = DeleteSettings.load()
+        }
+    }
+}
+
+// MARK: - 歌词
+
+/// 歌词分类（D3，web 版 lyric 设置对齐，平台裁剪）：字号 / 译文行 / 整体延迟校准。
+/// 改动即 save() → .qqplayerSettingsDidChange → MacLyricsView.applyLyricSettings() 生效。
+private struct MacLyricsSettingsView: View {
+    @State private var deleteSettings = DeleteSettings.load()
+
+    var body: some View {
+        Form {
+            Section(Localized.lyricsDisplay) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(Localized.lyricsFontSize)
+                        Spacer()
+                        Text("\(Int(deleteSettings.lyricFontSize))pt")
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
+                    }
+                    Slider(value: $deleteSettings.lyricFontSize, in: 12 ... 22, step: 1)
+                        .onChange(of: deleteSettings.lyricFontSize) { _ in
+                            deleteSettings.save()
+                        }
+                }
+                Toggle(Localized.lyricsShowTranslation, isOn: $deleteSettings.lyricShowTranslation)
+                    .onChange(of: deleteSettings.lyricShowTranslation) { _ in
+                        deleteSettings.save()
+                    }
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(Localized.lyricsOffset)
+                        Spacer()
+                        Text(String(format: "%+.1f s", deleteSettings.lyricOffset))
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
+                        Button(Localized.lyricsOffsetReset) {
+                            deleteSettings.lyricOffset = 0
+                            deleteSettings.save()
+                        }
+                        .disabled(deleteSettings.lyricOffset == 0)
+                    }
+                    Slider(value: $deleteSettings.lyricOffset, in: -5 ... 5, step: 0.1)
+                        .onChange(of: deleteSettings.lyricOffset) { _ in
+                            deleteSettings.save()
+                        }
+                }
+            } header: {
+                Text(Localized.lyricsCalibration)
+            } footer: {
+                Text(Localized.lyricsOffsetHint)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)

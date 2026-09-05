@@ -192,6 +192,12 @@ struct DeleteSettings: Codable {
     var onlineDownloadQuality: String = NeteaseOnlineLogic.defaultLevel
     /// 在线下载目标目录（空 = 默认曲库首目录，web download.downloadDir 语义）
     var onlineDownloadDirectory: String = ""
+    /// 歌词字号（Mac 歌词面板正文；web 版 lyric fontSize 对齐，默认 15）
+    var lyricFontSize: Double = 15
+    /// 歌词译文行显示（web 版 lyric showZh 对齐，默认显示）
+    var lyricShowTranslation: Bool = true
+    /// 歌词整体延迟校准秒（>0 = 歌词比声音延后；web 版 lyric offset 对齐，默认 0）
+    var lyricOffset: Double = 0
 
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
@@ -223,6 +229,9 @@ struct DeleteSettings: Codable {
         onlineDownloadQuality = try container.decodeIfPresent(String.self, forKey: .onlineDownloadQuality)
             ?? NeteaseOnlineLogic.defaultLevel
         onlineDownloadDirectory = try container.decodeIfPresent(String.self, forKey: .onlineDownloadDirectory) ?? ""
+        lyricFontSize = try container.decodeIfPresent(Double.self, forKey: .lyricFontSize) ?? 15
+        lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
+        lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included
