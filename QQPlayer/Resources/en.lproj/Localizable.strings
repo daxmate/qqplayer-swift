@@ -589,6 +589,18 @@
 "online_download_failed" = "Download failed";
 "online_download_failed_prefix" = "Download failed: %@";
 
+/* E2 batch 2b: SongSea source + Quark scan login (web OnlineSearch/QuarkLoginModal parity) */
+"online_search_source_hint" = "Source: NetEase Cloud Music or SongSea (Gequhai)";
+"quark_login_title" = "Sign in to Quark";
+"quark_login_scan_hint" = "Open the Quark app and scan to sign in";
+"quark_login_countdown" = "QR code valid for %d s";
+"quark_login_expired" = "The QR code has expired";
+"quark_login_refresh" = "Refresh QR Code";
+"quark_login_error" = "Sign-in status error. Please try again.";
+"quark_login_required_hint" = "Needs Quark sign-in to download (the scan panel is open; downloads retry automatically after sign-in).";
+"quark_login_success" = "Signed in as %@";
+"quark_login_retrying" = "Retrying download…";
+
 
 /* C-group: search anything + settings download (web SearchAnything/settings parity) */
 "settings_category_download" = "Download";
@@ -622,6 +634,7 @@
 "batch_mode_paths" = "Scrapes the selected tracks (high-confidence matches only)";
 "batch_cancel_help" = "Stop the batch; completed tracks are kept";
 "source_netease" = "NetEase";
+"source_gequhai" = "SongSea";
 "source_musicbrainz" = "MusicBrainz";
 "tag_editor_title" = "Edit Tags / Scrape";
 "tag_editor_scraping" = "Searching candidates…";

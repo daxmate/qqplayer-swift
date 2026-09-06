@@ -625,6 +625,18 @@
 "online_download_failed" = "下载失败";
 "online_download_failed_prefix" = "下载失败：%@";
 
+/* E2 批2b：歌曲海源切换 + 夸克扫码登录 */
+"online_search_source_hint" = "来源：网易云或歌曲海（夸克网盘直链下载）";
+"quark_login_title" = "登录夸克网盘";
+"quark_login_scan_hint" = "打开夸克 App，扫一扫完成登录";
+"quark_login_countdown" = "二维码有效期 %d 秒";
+"quark_login_expired" = "二维码已过期";
+"quark_login_refresh" = "刷新二维码";
+"quark_login_error" = "登录状态异常，请重试";
+"quark_login_required_hint" = "需要登录夸克网盘才能下载（已为你打开扫码登录，登录后自动重试）";
+"quark_login_success" = "登录成功：%@";
+"quark_login_retrying" = "正在重试下载…";
+
 /* C 组：search anything + 设置下载分类 */
 "settings_category_download" = "下载";
 "settings_download_quality" = "下载音质";
@@ -657,6 +669,7 @@
 "batch_mode_paths" = "为选中的曲目刮削（仅高置信匹配）";
 "batch_cancel_help" = "停止批量刮削；已完成的曲目保留";
 "source_netease" = "网易云";
+"source_gequhai" = "歌曲海";
 "source_musicbrainz" = "MusicBrainz";
 "tag_editor_title" = "编辑标签/刮削";
 "tag_editor_scraping" = "正在搜索候选…";

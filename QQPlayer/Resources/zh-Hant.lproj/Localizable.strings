@@ -968,6 +968,18 @@
 "online_download_failed" = "下載失敗";
 "online_download_failed_prefix" = "下載失敗：%@";
 
+/* E2 批2b：歌曲海來源切換 + 夸克掃碼登入 */
+"online_search_source_hint" = "來源：網易雲或歌曲海（夸克網盤直鏈下載）";
+"quark_login_title" = "登入夸克網盤";
+"quark_login_scan_hint" = "打開夸克 App，掃一掃完成登入";
+"quark_login_countdown" = "QR Code 有效期 %d 秒";
+"quark_login_expired" = "QR Code 已過期";
+"quark_login_refresh" = "重新整理 QR Code";
+"quark_login_error" = "登入狀態異常，請重試";
+"quark_login_required_hint" = "下載前需先登入夸克網盤（已開啟掃碼登入，登入後自動重試）";
+"quark_login_success" = "登入成功：%@";
+"quark_login_retrying" = "正在重試下載…";
+
 
 /* C 組：search anything + 設定下載分類 */
 "settings_category_download" = "下載";
@@ -1001,6 +1013,7 @@
 "batch_mode_paths" = "為選中的曲目刮削（僅高可信度匹配）";
 "batch_cancel_help" = "停止批次刮削；已完成的曲目保留";
 "source_netease" = "網易雲";
+"source_gequhai" = "歌曲海";
 "source_musicbrainz" = "MusicBrainz";
 "tag_editor_title" = "編輯標籤/刮削";
 "tag_editor_scraping" = "正在搜尋候選…";

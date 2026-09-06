@@ -584,6 +584,18 @@
 "online_download_failed" = "Ошибка загрузки";
 "online_download_failed_prefix" = "Ошибка загрузки: %@";
 
+/* E2 batch 2b: источник SongSea + вход через скан Quark */
+"online_search_source_hint" = "Источник: NetEase Cloud Music или SongSea";
+"quark_login_title" = "Вход в Quark";
+"quark_login_scan_hint" = "Откройте приложение Quark и отсканируйте код для входа";
+"quark_login_countdown" = "QR-код действителен %d с";
+"quark_login_expired" = "Срок действия QR-кода истёк";
+"quark_login_refresh" = "Обновить QR-код";
+"quark_login_error" = "Ошибка входа. Попробуйте ещё раз.";
+"quark_login_required_hint" = "Для скачивания нужен вход в Quark (панель сканирования открыта; после входа загрузка повторится автоматически)";
+"quark_login_success" = "Выполнен вход: %@";
+"quark_login_retrying" = "Повторяем загрузку…";
+
 
 /* C-group: search anything + settings download */
 "settings_category_download" = "Загрузки";
@@ -617,6 +629,7 @@
 "batch_mode_paths" = "Скрапит выбранные треки (только с высокой уверенностью)";
 "batch_cancel_help" = "Остановить пакет; обработанные треки сохраняются";
 "source_netease" = "NetEase";
+"source_gequhai" = "SongSea";
 "source_musicbrainz" = "MusicBrainz";
 "tag_editor_title" = "Изменить теги / Скрапинг";
 "tag_editor_scraping" = "Поиск кандидатов…";
