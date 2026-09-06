@@ -72,6 +72,7 @@
 		D930D5CCE14643C39B3C4BD8 /* ScrapeBatchServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */; };
 		2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */; };
 		480D17A3DC334548AC99991D /* QuarkClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */; };
+		A4C35050DA3241BA8362E463 /* GequhaiClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AAFAC23CD6148598FDEB214 /* GequhaiClientTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -193,6 +194,7 @@
 		374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrapeBatchServiceTests.swift; sourceTree = "<group>"; };
 		DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeleteSettingsScrapingTests.swift; sourceTree = "<group>"; };
 		8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuarkClientTests.swift; sourceTree = "<group>"; };
+		4AAFAC23CD6148598FDEB214 /* GequhaiClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GequhaiClientTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -307,6 +309,7 @@
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
+				Services/GequhaiClient.swift,
 				Services/MP4EmptyCovrStripper.swift,
 				QQPlayerMacApp.swift,
 				Services/AppCoordinator.swift,
@@ -594,6 +597,7 @@
 				374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */,
 				DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */,
 				8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */,
+				4AAFAC23CD6148598FDEB214 /* GequhaiClientTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -964,6 +968,7 @@
 				D930D5CCE14643C39B3C4BD8 /* ScrapeBatchServiceTests.swift in Sources */,
 				2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */,
 				480D17A3DC334548AC99991D /* QuarkClientTests.swift in Sources */,
+				A4C35050DA3241BA8362E463 /* GequhaiClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
