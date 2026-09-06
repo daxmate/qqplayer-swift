@@ -934,9 +934,9 @@ struct QuarkClientTests {
         #expect((tokenBody?["passcode"] as? String)?.isEmpty == true)
         #expect(tokenBody?["support_visit_limit_private_share"] as? Bool == true)
 
-        // detail 请求断言（root pdir_fid=0）
+        // detail 请求断言（root pdir_fid=0；root 含目录 d1 → 递归多一次 detail 请求）
         let detailRequests = Self.requests(pathContaining: "/1/clouddrive/share/sharepage/detail")
-        #expect(detailRequests.count == 1)
+        #expect(detailRequests.count == 2)
         let detailRequest = detailRequests[0]
         #expect(detailRequest.httpMethod == "GET")
         #expect(Self.queryValue("ver", in: detailRequest) == "2")
@@ -1013,10 +1013,11 @@ struct QuarkClientTests {
 
         let (files, _) = await client.resolveShareVerbose("https://pan.quark.cn/s/abc")
 
-        // 去重：fid f1 只进一次；目录项自身进列表
+        // 去重：fid f1 只进一次；目录项自身进列表（含深度 3 层列出的 d3——
+        // 深度 guard 只限制递归，不限制已列出目录进列表）
         #expect(files.filter { $0.fid == "f1" }.count == 1)
         let fids = files.map(\.fid)
-        #expect(fids == ["f1", "d1", "d2", "deep"])   // d3 在深度 4 未被列出
+        #expect(fids == ["f1", "d1", "d2", "d3", "deep"])
 
         // detail 请求恰好 3 次（root/d1/d2），深度 4 不发请求
         let detailRequests = Self.requests(pathContaining: "/1/clouddrive/share/sharepage/detail")
