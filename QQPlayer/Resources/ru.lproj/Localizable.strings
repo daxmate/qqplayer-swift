@@ -642,3 +642,24 @@
 "batch_summary" = "Готово: записано %d, пропущено %d, ошибок %d";
 "batch_truncated" = "Обработаны только первые 100 треков";
 "batch_disabled_hint" = "Пакетный скрапинг выключен. Включите его в Настройки > Скрапинг.";
+/* Shortcuts settings (E4) */
+"settings_category_shortcuts" = "Сочетания клавиш";
+"shortcut_play_pause" = "Воспроизведение / Пауза";
+"shortcut_seek_back" = "Назад на 10 с";
+"shortcut_seek_forward" = "Вперёд на 10 с";
+"shortcut_prev_track" = "Предыдущий трек";
+"shortcut_next_track" = "Следующий трек";
+"shortcut_cycle_play_mode" = "Сменить режим воспроизведения";
+"shortcut_toggle_favorite" = "В избранное / из избранного";
+"shortcut_speed_down" = "Замедлить темп";
+"shortcut_speed_up" = "Ускорить темп";
+"shortcut_toggle_karaoke" = "Режим караоке";
+"shortcut_ab_toggle" = "Цикл AB";
+"shortcut_ab_end" = "Задать конец AB";
+"shortcuts_record" = "Записать";
+"shortcuts_cancel" = "Отмена";
+"shortcuts_reset" = "Сбросить";
+"shortcuts_reset_help" = "Вернуть сочетание по умолчанию";
+"shortcuts_recording" = "Нажмите новое сочетание… (Esc — отмена)";
+"shortcuts_conflict" = "Конфликт: уже используется %@";
+"shortcuts_footer_hint" = "Нажмите на сочетание, чтобы записать новое. Ввод текста в поля не перехватывается.";

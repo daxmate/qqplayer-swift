@@ -201,6 +201,12 @@ struct DeleteSettings: Codable {
     /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
     var visualizerEnabled: Bool = true
 
+    // MARK: - 快捷键重绑（E4，web shortcuts.ts settingKey 语义；key = shortcut id，
+    // 缺省 = 用出厂默认组合；与默认一致的绑定不存储）
+
+    /// 快捷键自定义绑定（keyCode/flags 存 Int——UInt16 不 Codable）
+    var shortcutBindings: [String: ShortcutCombo] = [:]
+
     // MARK: - E1 标签刮削（scraping namespace，web 版 scraping.* 对齐）
 
     /// 重命名模板（web scraping.rename_template；默认 "{artist} - {title}"）
@@ -244,6 +250,7 @@ struct DeleteSettings: Codable {
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
         visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
+        shortcutBindings = try container.decodeIfPresent([String: ShortcutCombo].self, forKey: .shortcutBindings) ?? [:]
         scrapingRenameTemplate = try container.decodeIfPresent(String.self, forKey: .scrapingRenameTemplate)
             ?? TagWriterService.defaultRenameTemplate
         scrapingSourceOrder = try container.decodeIfPresent([String].self, forKey: .scrapingSourceOrder)
@@ -323,5 +330,27 @@ extension Color {
         #else
             return "b11491" // Default violet
         #endif
+    }
+}
+
+// MARK: - 快捷键组合（E4；Mac-only 使用但定义在共享文件——纯值类型无 AppKit 依赖）
+
+/// 一个快捷键组合（keyCode + 修饰键 + 展示串）。
+/// 持久化字段：keyCode/flags 用于匹配（flags 只含 cmd/opt/ctrl/shift 位，
+/// capsLock/numericPad/function 等不计入）；display 供设置面板展示。
+struct ShortcutCombo: Codable, Equatable, Sendable {
+    /// NSEvent keyCode（UInt16 → Int 存储）
+    var keyCode: Int
+    /// 修饰键 rawValue 交集（只保留 cmd/option/control/shift）
+    var flags: Int
+    /// 展示文本（如 "⌘G" / "Space" / "←"）
+    var display: String
+
+    /// 修饰键是否为空（纯键）
+    var isPlain: Bool { flags == 0 }
+
+    /// 展示串与持久化共用；修改绑定后再读此字段渲染
+    static func == (lhs: ShortcutCombo, rhs: ShortcutCombo) -> Bool {
+        lhs.keyCode == rhs.keyCode && lhs.flags == rhs.flags
     }
 }

@@ -19,6 +19,7 @@ struct MacSettingsView: View {
         case library
         case download
         case scraping
+        case shortcuts
         case appearance
         case about
 
@@ -29,6 +30,7 @@ struct MacSettingsView: View {
             case .library: return Localized.settingsCategoryLibrary
             case .download: return Localized.settingsCategoryDownload
             case .scraping: return Localized.settingsCategoryScraping
+            case .shortcuts: return Localized.settingsCategoryShortcuts
             case .appearance: return Localized.settingsCategoryAppearance
             case .about: return Localized.settingsCategoryAbout
             }
@@ -41,6 +43,7 @@ struct MacSettingsView: View {
             case .library: return "music.note.list"
             case .download: return "arrow.down.circle"
             case .scraping: return "tag"
+            case .shortcuts: return "keyboard"
             case .appearance: return "paintbrush"
             case .about: return "info.circle"
             }
@@ -75,6 +78,8 @@ struct MacSettingsView: View {
                     MacOnlineSettingsView()
                 case .scraping:
                     MacScrapeSettingsView()
+                case .shortcuts:
+                    MacShortcutsSettingsView()
                 case .appearance:
                     MacAppearanceSettingsView()
                 case .about:

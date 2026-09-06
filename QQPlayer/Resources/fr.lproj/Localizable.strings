@@ -645,3 +645,24 @@
 "batch_summary" = "Terminé : %d écrites, %d ignorées, %d échouées";
 "batch_truncated" = "Seules les 100 premières pistes ont été traitées";
 "batch_disabled_hint" = "Le scraping par lot est désactivé. Activez-le dans Réglages > Scraping.";
+/* Shortcuts settings (E4) */
+"settings_category_shortcuts" = "Raccourcis";
+"shortcut_play_pause" = "Lecture / Pause";
+"shortcut_seek_back" = "Reculer de 10 s";
+"shortcut_seek_forward" = "Avancer de 10 s";
+"shortcut_prev_track" = "Piste précédente";
+"shortcut_next_track" = "Piste suivante";
+"shortcut_cycle_play_mode" = "Changer le mode de lecture";
+"shortcut_toggle_favorite" = "Ajouter / retirer des favoris";
+"shortcut_speed_down" = "Ralentir la vitesse";
+"shortcut_speed_up" = "Accélérer la vitesse";
+"shortcut_toggle_karaoke" = "Mode karaoké";
+"shortcut_ab_toggle" = "Boucle AB";
+"shortcut_ab_end" = "Définir la fin AB";
+"shortcuts_record" = "Enregistrer";
+"shortcuts_cancel" = "Annuler";
+"shortcuts_reset" = "Rétablir";
+"shortcuts_reset_help" = "Rétablir le raccourci par défaut";
+"shortcuts_recording" = "Appuyez sur un nouveau raccourci… (Échap pour annuler)";
+"shortcuts_conflict" = "Conflit : déjà utilisé par %@";
+"shortcuts_footer_hint" = "Cliquez sur un raccourci pour enregistrer une nouvelle combinaison. La saisie dans les champs de texte n'est jamais capturée.";
