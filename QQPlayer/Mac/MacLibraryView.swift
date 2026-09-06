@@ -53,6 +53,8 @@ struct MacLibraryView: View {
         raw: DeleteSettings.load().appearanceTheme,
         forceDarkMode: DeleteSettings.load().forceDarkMode
     )
+    /// 设置（工具栏迷你按钮可见性 = showMiniWindowButton，设置改动即时刷新）
+    @State private var deleteSettings = DeleteSettings.load()
     @State private var albums: [Album] = []
     @State private var artists: [Artist] = []
     @State private var playlists: [Playlist] = []
@@ -111,6 +113,18 @@ struct MacLibraryView: View {
         .navigationTitle("QQPlayer")
         .frame(minWidth: 1000, minHeight: 640)
         .toolbar {
+            // 迷你模式入口（v2：主窗 ⇄ 迷你互斥，仅主窗态可见此按钮；
+            // 可见性 = 设置「迷你窗与桌面歌词」分类开关）
+            ToolbarItem {
+                if deleteSettings.showMiniWindowButton {
+                    Button {
+                        DesktopWindowsManager.shared.enterMiniMode()
+                    } label: {
+                        Image(systemName: "pip.enter")
+                    }
+                    .help("enter_mini_mode".localized)
+                }
+            }
             ToolbarItem {
                 Button {
                     cycleTheme()
@@ -127,6 +141,9 @@ struct MacLibraryView: View {
                 }
                 .help("online_search_title".localized)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+            deleteSettings = DeleteSettings.load()
         }
         .sheet(isPresented: $showWhatsNew) {
             WhatsNewView(onClose: {

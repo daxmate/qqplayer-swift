@@ -201,12 +201,14 @@ struct DeleteSettings: Codable {
     /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
     var visualizerEnabled: Bool = true
 
-    // MARK: - E3 桌面浮窗（desktop windows，web 迷你窗/桌面歌词语义）
+    // MARK: - E3 桌面浮窗 v2（迷你模式：主窗 ⇄ 迷你窗+桌面歌词，用户 2026-09-06 拍板）
 
-    /// 迷你播放器悬浮窗启用（E3；默认关，设置开启后下次启动恢复开启）
-    var miniWindowEnabled: Bool = false
-    /// 桌面歌词悬浮窗启用（E3；默认关，设置开启后下次启动恢复开启）
-    var desktopLyricEnabled: Bool = false
+    /// 主界面显示「进入迷你模式」按钮（v2；默认开。仅控制主窗工具栏入口可见性，
+    /// 不直接开关窗口——窗口显隐是瞬态，启动恒回主窗态）
+    var showMiniWindowButton: Bool = true
+    /// 迷你模式中显示桌面歌词窗（v2；默认开。mini 窗内歌词按钮与设置页开关同源，
+    /// 进入迷你模式时按此值决定是否带出歌词窗；退出记忆，下次进入保持）
+    var miniLyricsEnabled: Bool = true
     /// 桌面歌词主行字号（E3，web desktopLyric.fontSize 对齐，默认 26；译文行按比例派生）
     var desktopLyricFontSize: Double = 26
 
@@ -259,8 +261,8 @@ struct DeleteSettings: Codable {
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
         visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
-        miniWindowEnabled = try container.decodeIfPresent(Bool.self, forKey: .miniWindowEnabled) ?? false
-        desktopLyricEnabled = try container.decodeIfPresent(Bool.self, forKey: .desktopLyricEnabled) ?? false
+        showMiniWindowButton = try container.decodeIfPresent(Bool.self, forKey: .showMiniWindowButton) ?? true
+        miniLyricsEnabled = try container.decodeIfPresent(Bool.self, forKey: .miniLyricsEnabled) ?? true
         desktopLyricFontSize = try container.decodeIfPresent(Double.self, forKey: .desktopLyricFontSize) ?? 26
         shortcutBindings = try container.decodeIfPresent([String: ShortcutCombo].self, forKey: .shortcutBindings) ?? [:]
         scrapingRenameTemplate = try container.decodeIfPresent(String.self, forKey: .scrapingRenameTemplate)

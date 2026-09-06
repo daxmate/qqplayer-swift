@@ -2,18 +2,26 @@
 //  MacDesktopWindowsManager.swift
 //  QQPlayer
 //
-//  桌面浮窗管理器（E3；QQPlayerMac target only）：迷你播放器窗 + 桌面歌词窗
+//  桌面浮窗管理器（E3→v2；QQPlayerMac target only）：迷你播放器窗 + 桌面歌词窗
 //  两个 NSPanel 悬浮窗的生命周期、frame 记忆与显隐收敛。
 //
-//  单一事实源：窗口显隐 = DeleteSettings 开关（miniWindowEnabled /
-//  desktopLyricEnabled）。设置页开关 / 菜单项 / 窗内关闭按钮都只写设置并 save()
-//  → .qqplayerSettingsDidChange → 本管理器 reconcile() 统一收敛（启动恢复、
-//  设置改动、窗内关闭走同一条路径，不重复实现）。
+//  v2 语义（用户 2026-09-06 拍板，主窗 ⇄ 迷你模式互斥）：
+//  - 主窗态：歌词在主窗内面板，不存在桌面歌词。
+//  - 迷你模式：主窗工具栏迷你按钮进入——主窗收起（orderOut），弹迷你窗 +
+//    桌面歌词窗（是否带歌词窗看 DeleteSettings.miniLyricsEnabled）。
+//  - 迷你窗内：点封面 = 返回主窗（收迷你窗 + 歌词窗，恢复主窗）；歌词按钮
+//    toggle miniLyricsEnabled（只影响歌词窗）。
+//  - 设置页「显示迷你窗按钮」只决定主窗工具栏入口可见性，不直接开关窗口；
+//    窗口显隐是瞬态——启动恒回主窗态，不自动弹窗（去掉 v1 重启恢复弹窗语义）。
+//  - 显隐收敛：歌词窗显隐 = 迷你模式激活 && miniLyricsEnabled；迷你窗显隐 =
+//    迷你模式激活。设置变化（miniLyricsEnabled）走 .qqplayerSettingsDidChange →
+//    reconcile()，与窗内按钮同一条路径，不重复实现。
 //
-//  形态说明（v1 待用户确认）：对齐 web 双窗（迷你窗 + 桌面歌词两个独立小窗），
-//  均为无边框 NSPanel：透明背景、置顶（.floating）、随窗口背景拖动、
-//  canJoinAllSpaces + fullScreenAuxiliary（全屏 app 之上也可见）、非激活面板
-//  （.nonactivatingPanel，点控件不抢前台 app 焦点）。关闭 = 隐藏不退出 app。
+//  形态说明（v1→v2）：原双窗独立共存改为互斥模式切换（web 迷你窗语义对齐：
+//  迷你模式是主窗的收起态，桌面歌词是迷你模式的歌词补位）。两窗均为无边框 NSPanel：
+//  透明背景、置顶（.floating）、随窗口背景拖动、canJoinAllSpaces +
+//  fullScreenAuxiliary（全屏 app 之上也可见）、非激活面板（.nonactivatingPanel，
+//  点控件不抢前台 app 焦点）。
 //
 import AppKit
 import SwiftUI
@@ -42,8 +50,9 @@ final class DesktopWindowsManager: ObservableObject {
         }
     }
 
-    /// 迷你窗/歌词窗当前显隐（菜单勾选态绑定；与 DeleteSettings 开关同步）
-    @Published private(set) var isMiniVisible = false
+    /// 迷你模式激活（迷你窗可见；主窗此时收起）。
+    @Published private(set) var isMiniActive = false
+    /// 桌面歌词窗显隐（仅迷你模式中可为 true；mini 窗歌词按钮点亮态绑定）。
     @Published private(set) var isLyricVisible = false
 
     private var miniPanel: NSPanel?
@@ -56,8 +65,8 @@ final class DesktopWindowsManager: ObservableObject {
 
     // MARK: - 生命周期
 
-    /// App 启动调用一次：监听设置变化 + 按 DeleteSettings 恢复窗口
-    /// （默认关不弹；用户开启过后下次启动自动恢复——任务拍板语义）。
+    /// App 启动调用一次：监听设置变化并收敛歌词窗显隐。
+    /// （v2：启动恒回主窗态，不自动弹迷你窗/歌词窗——显隐是瞬态操作。）
     func start() {
         guard !didStart else { return }
         didStart = true
@@ -70,56 +79,53 @@ final class DesktopWindowsManager: ObservableObject {
                 self?.reconcile()
             }
         }
+    }
+
+    // MARK: - 模式切换（主窗 ⇄ 迷你）
+
+    /// 进入迷你模式：收起主窗，弹迷你窗 + 桌面歌词窗（看 miniLyricsEnabled）。
+    func enterMiniMode() {
+        guard !isMiniActive else { return }
+        isMiniActive = true
+        hideMainWindow()
+        show(.mini)
         reconcile()
     }
 
-    // MARK: - 公开开关（菜单/视图调用：只写 DeleteSettings，收敛交给 reconcile）
-
-    func setMiniWindowEnabled(_ enabled: Bool) {
-        var settings = DeleteSettings.load()
-        guard settings.miniWindowEnabled != enabled else { return }
-        settings.miniWindowEnabled = enabled
-        settings.save()
-    }
-
-    func setDesktopLyricEnabled(_ enabled: Bool) {
-        var settings = DeleteSettings.load()
-        guard settings.desktopLyricEnabled != enabled else { return }
-        settings.desktopLyricEnabled = enabled
-        settings.save()
-    }
-
-    /// 唤起主窗口（迷你窗封面/标题/恢复按钮；找不到主窗时仅激活 app——
-    /// SwiftUI WindowGroup 无公开 API 重建已关闭主窗，用户 Dock 点开即可）。
+    /// 返回主窗（迷你窗封面/标题点击、Dock 重开）：收迷你窗 + 歌词窗，恢复主窗。
+    /// 幂等：主窗态调用仅激活 + 前置主窗，无副作用。
     func showMainWindow() {
+        if isMiniActive {
+            isMiniActive = false
+            panel(.mini)?.orderOut(nil)
+            panel(.lyric)?.orderOut(nil)
+            isLyricVisible = false
+        }
         NSApp.activate(ignoringOtherApps: true)
         if let window = Self.findMainWindow() {
             window.makeKeyAndOrderFront(nil)
         }
     }
 
-    // MARK: - 收敛（唯一映射设置 → 窗口显隐的地方）
+    /// 迷你模式内桌面歌词开关（mini 窗歌词按钮 / 设置页开关共用：只写设置，收敛交给 reconcile）。
+    func setMiniLyricsEnabled(_ enabled: Bool) {
+        var settings = DeleteSettings.load()
+        guard settings.miniLyricsEnabled != enabled else { return }
+        settings.miniLyricsEnabled = enabled
+        settings.save()
+    }
+
+    // MARK: - 收敛（歌词窗显隐 = 迷你模式激活 && miniLyricsEnabled）
 
     private func reconcile() {
         let settings = DeleteSettings.load()
-        apply(.mini, visible: settings.miniWindowEnabled)
-        apply(.lyric, visible: settings.desktopLyricEnabled)
-    }
-
-    private func apply(_ kind: PanelKind, visible: Bool) {
-        // private(set) @Published 经 keyPath 下标赋值会撞 immutable 检查，直接 switch 赋值
-        switch kind {
-        case .mini:
-            guard isMiniVisible != visible else { return }
-            isMiniVisible = visible
-        case .lyric:
-            guard isLyricVisible != visible else { return }
-            isLyricVisible = visible
-        }
-        if visible {
-            show(kind)
+        let wantLyric = isMiniActive && settings.miniLyricsEnabled
+        guard isLyricVisible != wantLyric else { return }
+        isLyricVisible = wantLyric
+        if wantLyric {
+            show(.lyric)
         } else {
-            panel(kind)?.orderOut(nil)
+            panel(.lyric)?.orderOut(nil)
         }
     }
 
@@ -243,6 +249,12 @@ final class DesktopWindowsManager: ObservableObject {
             return screen
         }
         return NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
+    }
+
+    /// 收起主窗（进入迷你模式时；orderOut 非 close，SwiftUI WindowGroup 状态保留）
+    private func hideMainWindow() {
+        guard let window = Self.findMainWindow() else { return }
+        window.orderOut(nil)
     }
 
     /// 主窗口定位：WindowGroup 的标题为「QQPlayer」；找不到退化为第一个非 panel 主窗口

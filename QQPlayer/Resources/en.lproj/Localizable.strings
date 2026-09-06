@@ -683,10 +683,11 @@
 "shortcuts_footer_hint" = "Click a shortcut to record a new combination. Typing in text fields is never captured.";
 
 /* E3 Desktop windows (mini player + desktop lyric) */
-"settings_category_desktop_lyric" = "Desktop Lyric";
-"mini_window_enabled" = "Enable mini window";
-"mini_window_enabled_hint" = "A compact always-on-top window for playback control. Closing the window turns this off; reopen it here or from the menu anytime.";
-"desktop_lyric_enabled" = "Enable desktop lyric";
+"settings_category_desktop_lyric" = "Mini Player & Desktop Lyric";
+"mini_window_button_enabled" = "Show mini window button";
+"mini_window_button_hint" = "Adds a mini-mode button to the main window toolbar. Clicking it hides the main window and opens the mini player with desktop lyrics.";
+"mini_lyrics_enabled" = "Show desktop lyrics in mini mode";
+"enter_mini_mode" = "Mini Mode";
 "desktop_lyric_font_size" = "Desktop lyric font size";
 "desktop_lyric_translation_hint" = "The translation line on the desktop lyric follows the “Show translation” switch in the Lyrics category.";
 "mini_restore" = "Back to main window";
