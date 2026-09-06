@@ -16,6 +16,7 @@ struct MacSettingsView: View {
     private enum SettingsCategory: String, CaseIterable, Hashable {
         case playback
         case lyrics
+        case desktopWindows
         case library
         case download
         case scraping
@@ -27,6 +28,9 @@ struct MacSettingsView: View {
             switch self {
             case .playback: return Localized.settingsCategoryPlayback
             case .lyrics: return Localized.settingsCategoryLyrics
+            // E3：桌面浮窗（迷你窗 + 桌面歌词）统一收纳；web 语义是迷你窗/桌面歌词
+            // 分开在顶栏与歌词设置组，分类形态待用户确认（v1 任务拍板新分类）
+            case .desktopWindows: return Localized.settingsCategoryDesktopLyric
             case .library: return Localized.settingsCategoryLibrary
             case .download: return Localized.settingsCategoryDownload
             case .scraping: return Localized.settingsCategoryScraping
@@ -40,6 +44,7 @@ struct MacSettingsView: View {
             switch self {
             case .playback: return "play.circle"
             case .lyrics: return "text.quote"
+            case .desktopWindows: return "macwindow"
             case .library: return "music.note.list"
             case .download: return "arrow.down.circle"
             case .scraping: return "tag"
@@ -72,6 +77,8 @@ struct MacSettingsView: View {
                     MacPlaybackSettingsView(showEQSettings: $showEQSettings)
                 case .lyrics:
                     MacLyricsSettingsView()
+                case .desktopWindows:
+                    MacDesktopWindowsSettingsView()
                 case .library:
                     MacLibrarySettingsView()
                 case .download:

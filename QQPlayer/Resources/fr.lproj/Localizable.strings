@@ -679,3 +679,14 @@
 "shortcuts_recording" = "Appuyez sur un nouveau raccourci… (Échap pour annuler)";
 "shortcuts_conflict" = "Conflit : déjà utilisé par %@";
 "shortcuts_footer_hint" = "Cliquez sur un raccourci pour enregistrer une nouvelle combinaison. La saisie dans les champs de texte n'est jamais capturée.";
+
+/* E3 Fenêtres de bureau (mini-fenêtre + paroles sur le bureau) */
+"settings_category_desktop_lyric" = "Paroles sur le bureau";
+"mini_window_enabled" = "Activer la mini-fenêtre";
+"mini_window_enabled_hint" = "Une petite fenêtre flottante et toujours au premier plan pour piloter la lecture. Fermer la fenêtre désactive cette option ; rouvrez-la ici ou depuis le menu à tout moment.";
+"desktop_lyric_enabled" = "Activer les paroles sur le bureau";
+"desktop_lyric_font_size" = "Taille du texte des paroles de bureau";
+"desktop_lyric_translation_hint" = "La ligne de traduction des paroles de bureau suit l'interrupteur « Afficher la traduction » de la catégorie Paroles.";
+"mini_restore" = "Revenir à la fenêtre principale";
+/* Desktop windows (E3) */
+"mini_window_no_track" = "Aucune lecture";
