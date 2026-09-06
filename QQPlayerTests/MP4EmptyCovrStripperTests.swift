@@ -111,8 +111,11 @@ struct MP4EmptyCovrStripperTests {
 
     @Test("空 covr（仅 8 字节头）→ 被删除且 moov/udta/meta/ilst size 各减 8")
     func stripsEmptyCovr() throws {
+        // 真实场景：SFB 写出的 ilst 中首个（唯一）covr 即空壳。生产解析遍历 ilst
+        // 找到第一个 covr 即 break → 空 covr 必须在正常 covr 之前才能被测到删除；
+        // 多 covr（正常在前空壳在后）不在生产支持语义内，不测。
         let emptyCovr = atom("covr", payload: Data())
-        let original = makeMP4(ilstItems: [normalCovrItem(), emptyCovr])
+        let original = makeMP4(ilstItems: [emptyCovr, normalCovrItem()])
         #expect(ilstCovrCount(original) == 2)
 
         let result = try strip(original)
