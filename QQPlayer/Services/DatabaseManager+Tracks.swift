@@ -511,4 +511,22 @@ extension DatabaseManager {
             }
         }
     }
+
+    // MARK: - 批量刮削目标查询（E1 标签刮削 library 模式）
+
+    /// 查「year 缺失 或 genre 缺失」的曲目（web 批量 library 模式：只处理
+    /// year 为空或 genre 为空 的歌曲）。year 存 album 表，genre 存 track 表——
+    /// 故 LEFT JOIN album 判定 album.year IS NULL OR track.genre IS NULL。
+    /// 查询失败抛 GRDB 错误（调用方 runBatch 原样上抛）。
+    func getTracksMissingYearOrGenre() throws -> [Track] {
+        return try read { db in
+            try Track.fetchAll(db, sql: """
+                SELECT track.* FROM track
+                LEFT JOIN album ON album.id = track.album_id
+                WHERE album.year IS NULL OR track.genre IS NULL
+                ORDER BY track.title
+            """)
+        }
+    }
+
 }
