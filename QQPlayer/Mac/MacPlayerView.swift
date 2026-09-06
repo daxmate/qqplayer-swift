@@ -116,6 +116,20 @@ struct MacPlayerView: View {
             KaraokeController.shared.setLyrics(lyrics?.syncedLyrics ?? [])
             lyricsLoading = false
         }
+        // 当前曲目标签被刮削保存（封面 forceRefreshArtwork 重写）后重拉封面
+        // （stableId 不变 task(id:) 不重载；2026-09-06 播放页封面不刷新修复）
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSNotification.Name("QQPlayerArtworkRefreshed")
+        )) { notification in
+            guard let stableId = track?.stableId,
+                  (notification.object as? String) == stableId else { return }
+            Task {
+                if let track {
+                    artwork = await ArtworkManager.shared.getArtwork(for: track)
+                    artworkTrackId = track.stableId
+                }
+            }
+        }
     }
 
     // MARK: - Player section

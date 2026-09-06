@@ -52,12 +52,25 @@ struct MacArtworkThumbnail: View {
                 }
             }
             .task(id: track?.stableId) {
-                guard let track else {
-                    image = nil
-                    return
-                }
-                image = await ArtworkManager.shared.getThumbnail(for: track, maxPixelSize: max(size * 2, 80))
+                await loadImage()
             }
+            // 标签保存（封面被 forceRefreshArtwork 重写）后，stableId 不变不会自动
+            // 重载 → 显式监听刷新通知重拉（2026-09-06 刮削保存封面后不刷新修复）
+            .onReceive(NotificationCenter.default.publisher(
+                for: NSNotification.Name("QQPlayerArtworkRefreshed")
+            )) { notification in
+                guard let stableId = track?.stableId,
+                      (notification.object as? String) == stableId else { return }
+                Task { await loadImage() }
+            }
+    }
+
+    private func loadImage() async {
+        guard let track else {
+            image = nil
+            return
+        }
+        image = await ArtworkManager.shared.getThumbnail(for: track, maxPixelSize: max(size * 2, 80))
     }
 }
 
@@ -105,6 +118,16 @@ struct MacArtworkCollage: View {
             }
             .task(id: tracks.map(\.stableId)) {
                 images = await Self.load(tracks: tracks, size: size)
+            }
+            // 封面被重写（标签保存刮削）后，stableId 不变不会自动重载 → 监听重拉
+            .onReceive(NotificationCenter.default.publisher(
+                for: NSNotification.Name("QQPlayerArtworkRefreshed")
+            )) { notification in
+                guard let refreshedId = notification.object as? String,
+                      tracks.contains(where: { $0.stableId == refreshedId }) else { return }
+                Task {
+                    images = await Self.load(tracks: tracks, size: size)
+                }
             }
     }
 

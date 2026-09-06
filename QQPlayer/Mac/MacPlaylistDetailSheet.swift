@@ -49,6 +49,11 @@ struct MacManualPlaylistDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
             loadTracks()
         }
+        // 曲目标签被编辑（刮削保存/批量刮削）后，歌单内曲目标题/歌手等来自 DB，
+        // 需重拉才显示新值（2026-09-06 单曲刮削后歌单详情不刷新修复）
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            loadTracks()
+        }
         .alert("playlist_manage_rename".localized, isPresented: $showRenameAlert) {
             TextField("playlist_name_placeholder".localized, text: $renameText)
             Button("save".localized) { renamePlaylist() }
