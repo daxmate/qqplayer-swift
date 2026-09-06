@@ -57,6 +57,10 @@ final class DesktopWindowsManager: ObservableObject {
 
     private var miniPanel: NSPanel?
     private var lyricPanel: NSPanel?
+    /// 各浮窗的 hosting view（强调色设置变化时重建 rootView 刷新）
+    private var panelHosts: [PanelKind: NSHostingView<AnyView>] = [:]
+    /// 当前已注入浮窗的强调色 key（变化时重建 rootView）
+    private var lastInjectedAccentName: String?
     private var settingsObserver: NSObjectProtocol?
     private var moveObservers: [NSObjectProtocol] = []
     private var didStart = false
@@ -70,6 +74,7 @@ final class DesktopWindowsManager: ObservableObject {
     func start() {
         guard !didStart else { return }
         didStart = true
+        lastInjectedAccentName = DeleteSettings.load().accentColorName
         settingsObserver = NotificationCenter.default.addObserver(
             forName: .qqplayerSettingsDidChange,
             object: nil,
@@ -118,6 +123,7 @@ final class DesktopWindowsManager: ObservableObject {
     // MARK: - 收敛（歌词窗显隐 = 迷你模式激活 && miniLyricsEnabled）
 
     private func reconcile() {
+        refreshPanelRootViews()
         let settings = DeleteSettings.load()
         let wantLyric = isMiniActive && settings.miniLyricsEnabled
         guard isLyricVisible != wantLyric else { return }
@@ -126,6 +132,18 @@ final class DesktopWindowsManager: ObservableObject {
             show(.lyric)
         } else {
             panel(.lyric)?.orderOut(nil)
+        }
+    }
+
+    /// 浮窗是手动 NSHostingView，不继承 App 场景（WindowGroup/Settings）的
+    /// .environment(\\.appAccentColor)/.tint 注入 → 强调色需在此显式注入；
+    /// 设置里改强调色后重建 rootView 使迷你窗控件跟随 App 强调色。
+    private func refreshPanelRootViews() {
+        let accentName = DeleteSettings.load().accentColorName
+        guard accentName != lastInjectedAccentName else { return }
+        lastInjectedAccentName = accentName
+        for (kind, host) in panelHosts {
+            host.rootView = AnyView(rootView(for: kind))
         }
     }
 
@@ -147,7 +165,8 @@ final class DesktopWindowsManager: ObservableObject {
 
     private func ensurePanel(_ kind: PanelKind) -> NSPanel {
         if let existing = panel(kind) { return existing }
-        let host = NSHostingView(rootView: rootView(for: kind))
+        let host = NSHostingView(rootView: AnyView(rootView(for: kind)))
+        panelHosts[kind] = host
         let panel = Self.makePanel(content: host, contentSize: kind.contentSize)
         switch kind {
         case .mini: miniPanel = panel
@@ -170,8 +189,15 @@ final class DesktopWindowsManager: ObservableObject {
     @ViewBuilder
     private func rootView(for kind: PanelKind) -> some View {
         switch kind {
-        case .mini: MacMiniPlayerView()
-        case .lyric: MacDesktopLyricView()
+        case .mini:
+            // 迷你窗控件（播放键/歌词点亮态）跟随 App 强调色：NSPanel 内容不继承
+            // App 场景注入，accent 在此显式注入（设置改动经 refreshPanelRootViews 重建）
+            let accent = MacAppearance.accentColor(forKey: DeleteSettings.load().accentColorName)
+            MacMiniPlayerView()
+                .environment(\.appAccentColor, accent)
+                .tint(accent)
+        case .lyric:
+            MacDesktopLyricView()
         }
     }
 

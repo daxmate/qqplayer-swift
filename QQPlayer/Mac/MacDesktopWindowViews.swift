@@ -39,16 +39,24 @@ struct MacMiniPlayerView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // 封面（点击返回主窗——v2 迷你模式与主窗互斥，封面是返回出口）
+            // 封面（点击返回主窗——v2 迷你模式与主窗互斥，封面是返回出口；
+            // hover 手型提示可点击）
             Button {
                 DesktopWindowsManager.shared.showMainWindow()
             } label: {
                 MacArtworkThumbnail(track: player.currentTrack, size: 76, cornerRadius: 8)
             }
             .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
-                // 标题 / 歌手（点击返回主窗）
+                // 标题 / 歌手（点击返回主窗，hover 手型同封面）
                 Button {
                     DesktopWindowsManager.shared.showMainWindow()
                 } label: {
@@ -65,6 +73,13 @@ struct MacMiniPlayerView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
 
                 // 进度滑杆（0.25s 刷新；拖动中冻结值，松手 seek）
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
