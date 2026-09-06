@@ -27,6 +27,8 @@ struct QQPlayerMacApp: App {
         }
         // D 组键盘快捷键（web shortcuts.ts 对齐）：App 内全局监听，启动即装。
         MacKeyboardShortcuts.install()
+        // E3 桌面浮窗：监听设置变化并恢复上次显隐状态（默认关不弹；开启过则重启恢复）。
+        DesktopWindowsManager.shared.start()
     }
 
     var body: some Scene {

@@ -201,6 +201,15 @@ struct DeleteSettings: Codable {
     /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
     var visualizerEnabled: Bool = true
 
+    // MARK: - E3 桌面浮窗（desktop windows，web 迷你窗/桌面歌词语义）
+
+    /// 迷你播放器悬浮窗启用（E3；默认关，设置开启后下次启动恢复开启）
+    var miniWindowEnabled: Bool = false
+    /// 桌面歌词悬浮窗启用（E3；默认关，设置开启后下次启动恢复开启）
+    var desktopLyricEnabled: Bool = false
+    /// 桌面歌词主行字号（E3，web desktopLyric.fontSize 对齐，默认 26；译文行按比例派生）
+    var desktopLyricFontSize: Double = 26
+
     // MARK: - 快捷键重绑（E4，web shortcuts.ts settingKey 语义；key = shortcut id，
     // 缺省 = 用出厂默认组合；与默认一致的绑定不存储）
 
@@ -250,6 +259,9 @@ struct DeleteSettings: Codable {
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
         visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
+        miniWindowEnabled = try container.decodeIfPresent(Bool.self, forKey: .miniWindowEnabled) ?? false
+        desktopLyricEnabled = try container.decodeIfPresent(Bool.self, forKey: .desktopLyricEnabled) ?? false
+        desktopLyricFontSize = try container.decodeIfPresent(Double.self, forKey: .desktopLyricFontSize) ?? 26
         shortcutBindings = try container.decodeIfPresent([String: ShortcutCombo].self, forKey: .shortcutBindings) ?? [:]
         scrapingRenameTemplate = try container.decodeIfPresent(String.self, forKey: .scrapingRenameTemplate)
             ?? TagWriterService.defaultRenameTemplate
