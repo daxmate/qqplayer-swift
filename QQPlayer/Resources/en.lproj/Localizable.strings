@@ -647,3 +647,24 @@
 "batch_summary" = "Done: %d written, %d skipped, %d failed";
 "batch_truncated" = "Only the first 100 tracks were processed";
 "batch_disabled_hint" = "Batch scraping is disabled. Enable it in Settings > Scraping.";
+/* Shortcuts settings (E4) */
+"settings_category_shortcuts" = "Shortcuts";
+"shortcut_play_pause" = "Play / Pause";
+"shortcut_seek_back" = "Seek Back 10s";
+"shortcut_seek_forward" = "Seek Forward 10s";
+"shortcut_prev_track" = "Previous Track";
+"shortcut_next_track" = "Next Track";
+"shortcut_cycle_play_mode" = "Cycle Play Mode";
+"shortcut_toggle_favorite" = "Toggle Favorite";
+"shortcut_speed_down" = "Speed Down";
+"shortcut_speed_up" = "Speed Up";
+"shortcut_toggle_karaoke" = "Karaoke Mode";
+"shortcut_ab_toggle" = "AB Loop";
+"shortcut_ab_end" = "Set AB End Point";
+"shortcuts_record" = "Record";
+"shortcuts_cancel" = "Cancel";
+"shortcuts_reset" = "Reset";
+"shortcuts_reset_help" = "Restore the default shortcut";
+"shortcuts_recording" = "Press a new shortcut… (Esc to cancel)";
+"shortcuts_conflict" = "Conflict: already used by %@";
+"shortcuts_footer_hint" = "Click a shortcut to record a new combination. Typing in text fields is never captured.";

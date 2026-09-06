@@ -682,3 +682,24 @@
 "batch_summary" = "完成：写入 %d，跳过 %d，失败 %d";
 "batch_truncated" = "仅处理了前 100 首";
 "batch_disabled_hint" = "批量刮削未开启，请在设置-刮削中开启";
+/* Shortcuts settings (E4) */
+"settings_category_shortcuts" = "快捷键";
+"shortcut_play_pause" = "播放 / 暂停";
+"shortcut_seek_back" = "快退 10 秒";
+"shortcut_seek_forward" = "快进 10 秒";
+"shortcut_prev_track" = "上一首";
+"shortcut_next_track" = "下一首";
+"shortcut_cycle_play_mode" = "播放顺序轮换";
+"shortcut_toggle_favorite" = "收藏 / 取消收藏";
+"shortcut_speed_down" = "倍速降档";
+"shortcut_speed_up" = "倍速升档";
+"shortcut_toggle_karaoke" = "跟唱模式";
+"shortcut_ab_toggle" = "AB 循环";
+"shortcut_ab_end" = "设 AB 终点";
+"shortcuts_record" = "录制";
+"shortcuts_cancel" = "取消";
+"shortcuts_reset" = "恢复默认";
+"shortcuts_reset_help" = "恢复出厂快捷键";
+"shortcuts_recording" = "按下新快捷键…（Esc 取消）";
+"shortcuts_conflict" = "冲突：已被「%@」占用";
+"shortcuts_footer_hint" = "点击快捷键可录制新组合；文本输入不受影响。";

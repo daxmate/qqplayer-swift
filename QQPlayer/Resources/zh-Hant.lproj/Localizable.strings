@@ -1026,3 +1026,24 @@
 "batch_summary" = "完成：已寫入 %d，已跳過 %d，失敗 %d";
 "batch_truncated" = "僅處理前 100 首";
 "batch_disabled_hint" = "批次刮削未開啟，請在設定-刮削中開啟";
+/* Shortcuts settings (E4) */
+"settings_category_shortcuts" = "快捷鍵";
+"shortcut_play_pause" = "播放 / 暫停";
+"shortcut_seek_back" = "快退 10 秒";
+"shortcut_seek_forward" = "快進 10 秒";
+"shortcut_prev_track" = "上一首";
+"shortcut_next_track" = "下一首";
+"shortcut_cycle_play_mode" = "播放順序輪換";
+"shortcut_toggle_favorite" = "收藏 / 取消收藏";
+"shortcut_speed_down" = "倍速降檔";
+"shortcut_speed_up" = "倍速升檔";
+"shortcut_toggle_karaoke" = "跟唱模式";
+"shortcut_ab_toggle" = "AB 循環";
+"shortcut_ab_end" = "設定 AB 終點";
+"shortcuts_record" = "錄製";
+"shortcuts_cancel" = "取消";
+"shortcuts_reset" = "恢復預設";
+"shortcuts_reset_help" = "恢復出廠快捷鍵";
+"shortcuts_recording" = "按下新快捷鍵…（Esc 取消）";
+"shortcuts_conflict" = "衝突：已被「%@」佔用";
+"shortcuts_footer_hint" = "點擊快捷鍵可錄製新組合；文字輸入不受影響。";
