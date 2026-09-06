@@ -455,15 +455,11 @@ class EQManager: ObservableObject {
     func exportPreset(_ preset: EQPreset) async throws -> String {
         let bands = try await loadBands(for: preset)
         let sortedBands = bands.sorted { $0.bandIndex < $1.bandIndex }
-
-        // Create GraphicEQ format string
-        var graphicEQString = "GraphicEQ: "
-        let bandStrings = sortedBands.map { band in
-            "\(Int(band.frequency)) \(band.gain)"
-        }
-        graphicEQString += bandStrings.joined(separator: "; ")
-
-        return graphicEQString
+        // 编码下沉 GraphicEQCodec（纯逻辑，可单测）
+        return GraphicEQCodec.encode(
+            frequencies: sortedBands.map(\.frequency),
+            gains: sortedBands.map(\.gain)
+        )
     }
 
     func createManualParametricPreset(name: String, bandCount: Int) async throws -> EQPreset {
@@ -485,56 +481,15 @@ class EQManager: ObservableObject {
     }
 
     func importGraphicEQPreset(from content: String, name: String) async throws -> EQPreset {
-        // Parse GraphicEQ format
-        let (frequencies, gains) = try parseGraphicEQString(content)
+        // 解析下沉 GraphicEQCodec（纯逻辑，可单测）
+        let parsed = try GraphicEQCodec.decode(content)
 
         // Validate we have data
-        guard !frequencies.isEmpty && frequencies.count == gains.count else {
+        guard !parsed.frequencies.isEmpty, parsed.frequencies.count == parsed.gains.count else {
             throw EQError.invalidImportData
         }
 
-        return try await createPreset(name: name, frequencies: frequencies, gains: gains, type: .imported)
-    }
-
-    private func parseGraphicEQString(_ content: String) throws -> ([Double], [Double]) {
-        // Find the GraphicEQ line
-        let lines = content.components(separatedBy: .newlines)
-        guard let graphicEQLine = lines.first(where: { $0.contains("GraphicEQ:") }) else {
-            throw EQError.invalidGraphicEQFormat
-        }
-
-        // Extract the data part after "GraphicEQ:"
-        guard let colonIndex = graphicEQLine.firstIndex(of: ":") else {
-            throw EQError.invalidGraphicEQFormat
-        }
-
-        let dataString = String(graphicEQLine[graphicEQLine.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
-
-        // Parse frequency-gain pairs separated by semicolons
-        let pairs = dataString.components(separatedBy: ";")
-
-        var frequencies: [Double] = []
-        var gains: [Double] = []
-
-        for pair in pairs {
-            let trimmedPair = pair.trimmingCharacters(in: .whitespaces)
-            let components = trimmedPair.components(separatedBy: .whitespaces)
-
-            guard components.count >= 2,
-                  let frequency = Double(components[0]),
-                  let gain = Double(components[1]) else {
-                continue
-            }
-
-            frequencies.append(frequency)
-            gains.append(gain)
-        }
-
-        guard !frequencies.isEmpty else {
-            throw EQError.invalidGraphicEQFormat
-        }
-
-        return (frequencies, gains)
+        return try await createPreset(name: name, frequencies: parsed.frequencies, gains: parsed.gains, type: .imported)
     }
 }
 
