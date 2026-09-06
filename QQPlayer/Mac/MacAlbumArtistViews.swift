@@ -284,6 +284,11 @@ struct MacPlaylistListView: View {
             // 主页可见时重算卡片计数/封面
             reloadSmartCards()
         }
+        // 刮削保存/批量刮削/重扫后：自动歌单卡片计数与封面可能变化（如年代分组），
+        // 主页可见时一并重算（2026-09-06 单曲刮削后不刷新修复）
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            reloadSmartCards()
+        }
     }
 
     // MARK: 主页（自动歌单卡片 + 普通歌单列表）

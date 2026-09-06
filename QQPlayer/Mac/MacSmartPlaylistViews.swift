@@ -124,6 +124,14 @@ struct MacSmartPlaylistDetailView: View {
             content
         }
         .onAppear { loadData() }
+        // 刮削保存/批量刮削/重扫后：自动歌单曲目与年代分组都要重算
+        // （2026-09-06：单曲刮削后自动歌单不刷新修复；decade 详情内也重载）
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            reloadAll()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+            reloadAll()
+        }
     }
 
     // MARK: Header
@@ -258,6 +266,24 @@ struct MacSmartPlaylistDetailView: View {
         } catch {
             loadError = Localized.smartLoadFailed
         }
+    }
+
+    /// 外部数据变化（刮削保存/批量刮削/重扫/歌单变更）后统一重载：
+    /// 普通自动歌单重拉曲目；年代歌单重拉分组，且在年代内层时同步重拉该年代曲目。
+    private func reloadAll() {
+        if kind == .decades {
+            if let selectedBucket {
+                loadData()
+                // 年份被刮削改动后原年代分组可能已消失 → 退回年代列表
+                if buckets.contains(where: { $0.key == selectedBucket.key }) {
+                    loadBucketTracks(selectedBucket)
+                } else {
+                    self.selectedBucket = nil
+                }
+                return
+            }
+        }
+        loadData()
     }
 
     private func play(_ track: Track, queue: [Track]) {

@@ -29,7 +29,7 @@
 //  - 入口：MacTrackListView 右键菜单第 8 项「编辑标签/刮削」（单曲）
 //
 //  ⚠️ 与 web 差异（Mac 拍板）：重命名是可开关的（web 保存总是按模板改名）；
-//    封面「使用候选封面」是显式按钮（web 点选候选即记录 cover_url）
+//  封面：点选候选即自动采用（web 同语义，2026-09-06 对齐修正）
 //
 //  QQPlayerMac target only。
 
@@ -197,7 +197,7 @@ struct MacTagEditorView: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
             Button {
-                useSelectedCover()
+                downloadCandidateCover()
             } label: {
                 Label("tag_editor_use_candidate_cover".localized, systemImage: "photo.badge.arrow.down")
                     .font(.caption)
@@ -343,7 +343,7 @@ struct MacTagEditorView: View {
             }
     }
 
-    // MARK: 候选区（netease / musicbrainz 两组）
+    // MARK: 候选区（netease / musicbrainz 两组，展示顺序跟随设置 scrapingSourceOrder）
 
     @ViewBuilder
     private var candidatesSection: some View {
@@ -361,21 +361,34 @@ struct MacTagEditorView: View {
                 .padding(.vertical, 18)
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    candidateGroup(
-                        title: "source_musicbrainz".localized,
-                        icon: "brain.head.profile",
-                        candidates: musicbrainzCandidates,
-                        source: "musicbrainz"
-                    )
-                    candidateGroup(
-                        title: "source_netease".localized,
-                        icon: "cloud",
-                        candidates: neteaseCandidates,
-                        source: "netease"
-                    )
+                    ForEach(orderedSources, id: \.self) { source in
+                        switch source {
+                        case "musicbrainz":
+                            candidateGroup(
+                                title: "source_musicbrainz".localized,
+                                icon: "brain.head.profile",
+                                candidates: musicbrainzCandidates,
+                                source: "musicbrainz"
+                            )
+                        default: // "netease"
+                            candidateGroup(
+                                title: "source_netease".localized,
+                                icon: "cloud",
+                                candidates: neteaseCandidates,
+                                source: "netease"
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /// 源展示顺序 = 设置 scrapingSourceOrder（默认 netease 优先）；设置含未知源时过滤
+    private var orderedSources: [String] {
+        let known: Set<String> = ["netease", "musicbrainz"]
+        let order = DeleteSettings.load().scrapingSourceOrder
+        return order.filter { known.contains($0) }
     }
 
     private func candidateGroup(
@@ -574,7 +587,14 @@ struct MacTagEditorView: View {
         }
         formAlbumArtist = candidate.albumArtist ?? ""
         selectedCoverURL = candidate.coverURL
-        coverState = .keep // 点选新候选：封面回到文件现状，等用户决定
+        // 点选候选 = 自动采用候选封面（web 语义对齐：点选即记录并使用 cover_url，
+        // 不需要额外按钮）。先回到文件现状，有 coverURL → 自动下载暂存（成功替换
+        // 预览；失败留 keep 并在表单底部红字提示，可手动「使用候选封面」重试）；
+        // 无 coverURL → 保持文件现状。
+        coverState = .keep
+        if let coverURL = candidate.coverURL {
+            downloadCandidateCover(from: coverURL)
+        }
         updateRenamePreview()
 
         // 网易云候选且表单 year 空 → 静默补年份（POST /api/tags/album-year 等价；
@@ -593,9 +613,10 @@ struct MacTagEditorView: View {
         }
     }
 
-    /// 「使用候选封面」：下载 coverURL → Data 暂存（保存时才写入文件）
-    private func useSelectedCover() {
-        guard let url = selectedCoverURL, !saving else { return }
+    /// 下载候选封面 → Data 暂存（保存时才写入文件）。点选候选行自动调用；
+    /// 「使用候选封面」按钮作为失败后的手动重试。
+    private func downloadCandidateCover(from url: URL? = nil) {
+        guard let url = url ?? selectedCoverURL, !saving else { return }
         let taskKey = "coverDownload"
         activeTasks[taskKey]?.cancel()
         activeTasks[taskKey] = Task {
@@ -675,7 +696,7 @@ struct MacTagEditorView: View {
                     migrated = try DatabaseManager.shared.getTrack(byPath: result.finalURL.path)
                 }
                 await MainActor.run {
-                    finishSaveSuccess(renamed: result.renamed, oldStableId: oldStableId, migrated: migrated)
+                    finishSaveSuccess(renamed: result.renamed, oldStableId: oldStableId, migrated: migrated, finalPath: result.finalURL.path)
                 }
             } catch {
                 await MainActor.run {
@@ -712,16 +733,31 @@ struct MacTagEditorView: View {
         return v.isEmpty ? nil : v
     }
 
-    private func finishSaveSuccess(renamed: Bool, oldStableId: String, migrated: Track?) {
+    private func finishSaveSuccess(renamed: Bool, oldStableId: String, migrated: Track?, finalPath: String) {
         saving = false
         if renamed, let migrated {
             followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: migrated)
         }
-        // 统一刷新（一次性；列表/播放页/专辑等全量重拉）
-        NotificationCenter.default.post(
-            name: NSNotification.Name("LibraryFolderContentChanged"),
-            object: nil
-        )
+        // 单文件入库同步：保存只改了文件，DB 里的 title/artist/album/genre/year 与
+        // 封面缓存仍是旧值 → 列表不刷新（旧实现只发 LibraryFolderContentChanged，
+        // 要等整库重扫扫到这首歌才更新，歌单/自动歌单详情容器还不监听）。
+        // 这里直接对该文件跑一次 indexer 单文件处理：解析 → upsert DB →
+        // forceRefreshArtwork（封面缓存）→ 完成后内部 post LibraryNeedsRefresh，
+        // 所有列表容器（主库/歌单详情/自动歌单/专辑卡）立即重拉新值。
+        Task {
+            _ = await LibraryIndexer.shared.processExternalFile(URL(fileURLWithPath: finalPath))
+            // DB 已同步到最新标签 → 把播放上下文（当前曲目/队列）替换成 DB 新行，
+            // 未改名时播放页标题/歌手也立即跟随（改名场景已在上面用 migrated 处理，
+            // 此处按 oldStableId 匹配为幂等 no-op）
+            if let fresh = try? DatabaseManager.shared.getTrack(byPath: finalPath) {
+                followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: fresh)
+            }
+            // 兜底补发（processExternalFile 提前返回/指纹未变时也保证列表刷新）
+            NotificationCenter.default.post(
+                name: NSNotification.Name("LibraryNeedsRefresh"),
+                object: nil
+            )
+        }
         // 成功反馈：短暂 flash 后自动关闭（web toast + close 语义）
         withAnimation { savedFlash = true }
         activeTasks["savedFlash"] = Task {
