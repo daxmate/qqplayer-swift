@@ -121,12 +121,49 @@ struct QQPlayerApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIScene.willDeactivateNotification)) { _ in
                     handleWillResignActive()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIScene.didActivateNotification)) { notification in
+                    // iOS 26 已知问题：CarPlay 场景连接/断开等 scene 切换后，主窗口
+                    // 的 safe area insets 可能不刷新（需旋转或后台切换才恢复），导致
+                    // safeAreaInset(edge: .bottom) 内容（迷你播放条）残留在错误 y 位置
+                    // （如屏幕中部）。延迟强制主窗口重新布局以纠正几何。
+                    // 仅处理 UIWindowScene（排除 CarPlay 模板场景自身）。
+                    guard notification.object is UIWindowScene else { return }
+                    refreshLayoutAfterSceneChange()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CarPlaySceneDidDisconnect"))) { _ in
+                    // CarPlay 断开但手机场景未重新激活时（didActivate 可能不触发）的兜底
+                    refreshLayoutAfterSceneChange()
+                }
                 .onOpenURL { url in
                     handleOpenURL(url)
                 }
                 .onContinueUserActivity("com.daxmate.qqplayer.play") { userActivity in
                     handleSiriIntent(userActivity)
                 }
+        }
+    }
+
+    /// iOS 26 scene 切换后 safe-area 不刷新的 workaround：延迟强制主窗口重新布局。
+    /// CarPlay 连接/断开会触发 scene 激活状态变化，SwiftUI 的 safeAreaInset 内容
+    /// （迷你播放条）可能因此残留在错误位置（如屏幕中部）。等 scene 几何稳定后
+    /// 强制 layout 一次即可纠正；幂等、无动画副作用。
+    @MainActor
+    private func refreshLayoutAfterSceneChange() {
+        Task { @MainActor in
+            // 等 scene 激活完成、窗口几何/safe area 最终确定后再刷（实测即时刷会过早）
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+            guard !Task.isCancelled else { return }
+            print("🔄 Scene change detected - forcing main window layout refresh (safe-area workaround)")
+            for scene in UIApplication.shared.connectedScenes {
+                guard let windowScene = scene as? UIWindowScene,
+                      windowScene.activationState == .foregroundActive else { continue }
+                for window in windowScene.windows {
+                    window.setNeedsLayout()
+                    window.layoutIfNeeded()
+                    window.rootViewController?.view.setNeedsLayout()
+                    window.rootViewController?.view.layoutIfNeeded()
+                }
+            }
         }
     }
 

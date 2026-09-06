@@ -53,6 +53,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         self.interfaceController = nil
 
         print("🚗 CarPlay disconnected")
+        // 通知主场景刷新布局：iOS 26 在 CarPlay 场景断开后可能不刷新主窗口
+        // safe area，导致 safeAreaInset 内容（迷你播放条）残留在错误位置。
+        NotificationCenter.default.post(name: NSNotification.Name("CarPlaySceneDidDisconnect"), object: nil)
         Task { @MainActor in
             SFBAudioEngineManager.shared.updateCarPlayStatus()
         }
