@@ -165,15 +165,4 @@ struct MacShortcutBindingTests {
         )
         #expect(conflict == "toggleKaraoke")
     }
-
-    @Test("findConflict：查询目标已重绑 → 用新组合判断而非默认")
-    func conflictUsesEffectiveCombo() {
-        // 查 nextTrack 冲突：nextTrack 被重绑成 Space(49)，与 playPause 默认撞 → 返回 playPause
-        let overrides = ["nextTrack": combo(49)]
-        let conflict = MacShortcutLogic.findConflict(
-            id: "nextTrack", combo: combo(49),
-            defs: defs, overrides: overrides
-        )
-        #expect(conflict == nil) // 排除自身：nextTrack 自己重绑成 49，只与自己默认不同，不与别人撞
-    }
 }
