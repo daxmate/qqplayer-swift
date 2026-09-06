@@ -314,7 +314,8 @@ enum QuarkLogic {
 
     /// Cookie 字典 → "k=v; k2=v2" 头字符串（空 → ""；web "; ".join 语义）
     static func cookieHeader(_ cookies: [String: String]) -> String {
-        cookies.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+        // 字典序输出保证确定性（web 顺序无关；测试与抓包稳定）
+        cookies.keys.sorted().map { "\($0)=\(cookies[$0] ?? "")" }.joined(separator: "; ")
     }
 }
 
