@@ -133,7 +133,24 @@ struct QuarkClientTests {
     }
 
     private static func bodyDict(of request: URLRequest) -> [String: Any]? {
-        guard let body = request.httpBody,
+        // URLSession 会把 httpBody 转成 httpBodyStream 再交给 URLProtocol——
+        // 直接读 httpBody 恒为 nil；这里兜底从 stream 重建
+        var body = request.httpBody
+        if body == nil, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var data = Data()
+            let bufferSize = 4096
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+            defer { buffer.deallocate() }
+            while stream.hasBytesAvailable {
+                let read = stream.read(buffer, maxLength: bufferSize)
+                if read <= 0 { break }
+                data.append(buffer, count: read)
+            }
+            body = data
+        }
+        guard let body,
               let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
             return nil
         }
@@ -860,13 +877,13 @@ struct QuarkClientTests {
     private static func installShareHandler(list: [[String: Any]], total: Int? = nil) {
         let itemsJSON = list
         QuarkMockURLProtocol.handler = { request in
-            if request.url?.path == "/share/sharepage/token" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/token" {
                 return QuarkMockURLProtocol.response(
                     #"{"code":0,"data":{"stoken":"sTok-1"}}"#,
                     for: request
                 )
             }
-            if request.url?.path == "/share/sharepage/detail" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/detail" {
                 let body: [String: Any] = [
                     "code": 0,
                     "data": ["list": itemsJSON],
@@ -901,7 +918,7 @@ struct QuarkClientTests {
         #expect(files.count == 3)
 
         // token 请求断言
-        let tokenRequests = Self.requests(pathContaining: "/share/sharepage/token")
+        let tokenRequests = Self.requests(pathContaining: "/1/clouddrive/share/sharepage/token")
         #expect(tokenRequests.count == 1)
         let tokenRequest = tokenRequests[0]
         #expect(tokenRequest.httpMethod == "POST")
@@ -918,7 +935,7 @@ struct QuarkClientTests {
         #expect(tokenBody?["support_visit_limit_private_share"] as? Bool == true)
 
         // detail 请求断言（root pdir_fid=0）
-        let detailRequests = Self.requests(pathContaining: "/share/sharepage/detail")
+        let detailRequests = Self.requests(pathContaining: "/1/clouddrive/share/sharepage/detail")
         #expect(detailRequests.count == 1)
         let detailRequest = detailRequests[0]
         #expect(detailRequest.httpMethod == "GET")
@@ -952,13 +969,13 @@ struct QuarkClientTests {
         let client = Self.makeClient(cookieFile: Self.tempCookieURL("share-rec"))
         // 按 pdir_fid 分发各层目录内容
         QuarkMockURLProtocol.handler = { request in
-            if request.url?.path == "/share/sharepage/token" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/token" {
                 return QuarkMockURLProtocol.response(
                     #"{"code":0,"data":{"stoken":"sTok"}}"#,
                     for: request
                 )
             }
-            if request.url?.path == "/share/sharepage/detail" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/detail" {
                 let pdirFid = Self.queryValue("pdir_fid", in: request) ?? ""
                 let list: [[String: Any]]
                 switch pdirFid {
@@ -1002,7 +1019,7 @@ struct QuarkClientTests {
         #expect(fids == ["f1", "d1", "d2", "deep"])   // d3 在深度 4 未被列出
 
         // detail 请求恰好 3 次（root/d1/d2），深度 4 不发请求
-        let detailRequests = Self.requests(pathContaining: "/share/sharepage/detail")
+        let detailRequests = Self.requests(pathContaining: "/1/clouddrive/share/sharepage/detail")
         #expect(detailRequests.count == 3)
         let pdirFids = detailRequests.compactMap { Self.queryValue("pdir_fid", in: $0) }
         #expect(pdirFids == ["0", "d1", "d2"])
@@ -1013,13 +1030,13 @@ struct QuarkClientTests {
         QuarkMockURLProtocol.reset()
         let client = Self.makeClient(cookieFile: Self.tempCookieURL("share-page"))
         QuarkMockURLProtocol.handler = { request in
-            if request.url?.path == "/share/sharepage/token" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/token" {
                 return QuarkMockURLProtocol.response(
                     #"{"code":0,"data":{"stoken":"sTok"}}"#,
                     for: request
                 )
             }
-            if request.url?.path == "/share/sharepage/detail" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/detail" {
                 let page = Int(Self.queryValue("_page", in: request) ?? "1") ?? 1
                 // page1 满 50 条（total 55 → 需翻页）；page2 余 5 条（batch<50 → 停）
                 let start = (page - 1) * 50
@@ -1046,7 +1063,7 @@ struct QuarkClientTests {
         let (files, _) = await client.resolveShareVerbose("https://pan.quark.cn/s/abc")
 
         #expect(files.count == 55)
-        let detailRequests = Self.requests(pathContaining: "/share/sharepage/detail")
+        let detailRequests = Self.requests(pathContaining: "/1/clouddrive/share/sharepage/detail")
         #expect(detailRequests.count == 2)
         #expect(Self.queryValue("_page", in: detailRequests[0]) == "1")
         #expect(Self.queryValue("_page", in: detailRequests[1]) == "2")
@@ -1079,7 +1096,7 @@ struct QuarkClientTests {
         // 3) detail 接口 HTTP 500
         QuarkMockURLProtocol.reset()
         QuarkMockURLProtocol.handler = { request in
-            if request.url?.path == "/share/sharepage/token" {
+            if request.url?.path == "/1/clouddrive/share/sharepage/token" {
                 return QuarkMockURLProtocol.response(
                     #"{"code":0,"data":{"stoken":"sTok"}}"#,
                     for: request
@@ -1172,7 +1189,7 @@ struct QuarkClientTests {
 
         let request = QuarkMockURLProtocol.receivedRequests.first
         #expect(request?.httpMethod == "POST")
-        #expect(request?.url?.path == "/file/download")
+        #expect(request?.url?.path == "/1/clouddrive/file/download")
         #expect(Self.queryValue("entry", in: request!) == "ft")
         #expect(Self.queryValue("fr", in: request!) == "pc")
         #expect(Self.queryValue("pr", in: request!) == "ucpro")
@@ -1296,7 +1313,7 @@ struct QuarkClientTests {
         await client.refreshPUUS()
 
         let request = QuarkMockURLProtocol.receivedRequests.first
-        #expect(request?.url?.path == "/config")
+        #expect(request?.url?.path == "/1/clouddrive/config")
         #expect(Self.queryValue("pr", in: request!) == "ucpro")
         #expect(Self.queryValue("fr", in: request!) == "pc")
         #expect(request?.url?.host == "drive-pc.quark.cn")
