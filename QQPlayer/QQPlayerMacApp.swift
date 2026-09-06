@@ -7,8 +7,17 @@
 //
 import SwiftUI
 
+/// 迷你模式点 Dock 图标 → 回主窗（收起迷你窗/歌词窗；主窗态下幂等无副作用）。
+final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        DesktopWindowsManager.shared.showMainWindow()
+        return true
+    }
+}
+
 @main
 struct QQPlayerMacApp: App {
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     @State private var deleteSettings = DeleteSettings.load()
 
     init() {

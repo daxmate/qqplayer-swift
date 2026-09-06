@@ -718,10 +718,11 @@
 "shortcuts_footer_hint" = "点击快捷键可录制新组合；文本输入不受影响。";
 
 /* E3 桌面浮窗（迷你窗 + 桌面歌词） */
-"settings_category_desktop_lyric" = "桌面歌词";
-"mini_window_enabled" = "启用迷你窗";
-"mini_window_enabled_hint" = "置顶的迷你播放器小窗，可控制播放。关闭窗口即关闭此开关，可随时在本页或菜单重新打开。";
-"desktop_lyric_enabled" = "启用桌面歌词";
+"settings_category_desktop_lyric" = "迷你窗与桌面歌词";
+"mini_window_button_enabled" = "在主界面显示迷你窗按钮";
+"mini_window_button_hint" = "在主窗口工具栏显示「进入迷你模式」按钮。点击后收起主窗口，打开迷你播放器与桌面歌词。";
+"mini_lyrics_enabled" = "在迷你模式中显示桌面歌词";
+"enter_mini_mode" = "迷你模式";
 "desktop_lyric_font_size" = "桌面歌词字号";
 "desktop_lyric_translation_hint" = "桌面歌词的译文行显示跟随「歌词」分类中的「显示译文」开关。";
 "mini_restore" = "返回主窗口";

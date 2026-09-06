@@ -2,16 +2,18 @@
 //  MacDesktopWindowViews.swift
 //  QQPlayer
 //
-//  桌面浮窗内容视图（E3；QQPlayerMac target only）：
+//  桌面浮窗内容视图（E3→v2；QQPlayerMac target only）：
 //  - MacMiniPlayerView：迷你播放器（web mini.html 语义）——封面 + 标题/歌手 +
-//    上一首/播放暂停/下一首 + 进度滑杆（拖动 seek）；点标题区唤起主窗口
+//    上一首/播放暂停/下一首 + 进度滑杆（拖动 seek）+ 桌面歌词开关；
+//    点封面/标题 = 返回主窗（v2：迷你模式与主窗互斥，封面是唯一显式出口）
 //  - MacDesktopLyricView：桌面歌词（web desktop-lyric.html 语义）——当前句大字 +
 //    译文行（跟随「歌词」分类译文偏好），字号读 DeleteSettings.desktopLyricFontSize；
 //    无歌词/无播放时占位不打扰
 //
 //  两视图都由 DesktopWindowsManager 置于透明无边框置顶 NSPanel 中；
 //  数据源：PlayerEngine.shared + KaraokeController.shared（主窗播放时注入歌词，
-//  桌面歌词仅在有歌词注入时显示内容——v1 语义，待用户确认）。
+//  桌面歌词仅在有歌词注入时显示内容）。v2：桌面歌词只存在于迷你模式（主窗态
+//  歌词在窗内面板，不产生桌面歌词）；显隐收敛见 MacDesktopWindowsManager。
 //
 
 import AppKit
@@ -23,6 +25,8 @@ struct MacMiniPlayerView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @ObservedObject private var player = PlayerEngine.shared
+    /// 桌面浮窗管理器（歌词按钮点亮态 = isLyricVisible）
+    @ObservedObject private var desktopWindows = DesktopWindowsManager.shared
     /// 当前曲目歌手名（Track 无 artist 冗余字段，按 stableId 查库解析）
     @State private var artistName = ""
     /// 拖动进度条中的暂存值（松手才 seek）
@@ -35,7 +39,7 @@ struct MacMiniPlayerView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // 封面（点击唤起主窗口）
+            // 封面（点击返回主窗——v2 迷你模式与主窗互斥，封面是返回出口）
             Button {
                 DesktopWindowsManager.shared.showMainWindow()
             } label: {
@@ -44,7 +48,7 @@ struct MacMiniPlayerView: View {
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 6) {
-                // 标题 / 歌手（点击唤起主窗口）
+                // 标题 / 歌手（点击返回主窗）
                 Button {
                     DesktopWindowsManager.shared.showMainWindow()
                 } label: {
@@ -100,6 +104,15 @@ struct MacMiniPlayerView: View {
                         Task { @MainActor in await player.nextTrack() }
                     }
                     Spacer()
+                    // 桌面歌词开关（点亮 = 歌词窗可见；只写设置，收敛在管理器）
+                    controlButton(
+                        "quote.bubble",
+                        size: 14,
+                        accent: desktopWindows.isLyricVisible ? appAccentColor : nil
+                    ) {
+                        DesktopWindowsManager.shared.setMiniLyricsEnabled(!DeleteSettings.load().miniLyricsEnabled)
+                    }
+                    .help("mini_lyrics_enabled".localized)
                 }
                 .padding(.top, 1)
             }
