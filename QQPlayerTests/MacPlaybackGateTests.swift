@@ -164,19 +164,32 @@ struct MacPlaybackGateSegmentFinishedTests {
 }
 
 struct MacPlaybackGateKaraokeLayoutTests {
-    // 跟唱大画面布局决策（2026-09-01 用户需求）：播放区隐藏/歌词撑满。
+    // 歌词大画面布局决策：播放区隐藏/歌词撑满（2026-09-01 跟唱 / 2026-09-06
+    // 双击纯放大拆分为独立 isLyricsExpanded 维度——两者任一成立都进大画面）。
     // 手势交互（双击 toggle）无法单测，但布局决策抽纯函数锁定，防止后续改动悄悄破坏。
     // 2026-09-02：歌词面板常驻（无关闭入口），shouldAutoShowLyrics/lyricsCloseAction 已随关闭入口一起删除。
 
     @Test("跟唱开启：播放区隐藏，空间让给歌词")
     func karaokeOnHidesPlayerSection() {
-        #expect(MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: true))
-        #expect(!MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: false))
+        #expect(MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: true, isLyricsExpanded: false))
+        #expect(!MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: false, isLyricsExpanded: false))
+    }
+
+    @Test("双击放大歌词：播放区同样隐藏（不跟唱也进大画面）")
+    func lyricsExpandedHidesPlayerSection() {
+        #expect(MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: false, isLyricsExpanded: true))
+        #expect(!MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: false, isLyricsExpanded: false))
     }
 
     @Test("跟唱开启：歌词区撑满整个区域")
     func karaokeOnExpandsLyrics() {
-        #expect(MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: true))
-        #expect(!MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: false))
+        #expect(MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: true, isLyricsExpanded: false))
+        #expect(!MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: false, isLyricsExpanded: false))
+    }
+
+    @Test("双击放大歌词：歌词区同样撑满")
+    func lyricsExpandedExpandsLyrics() {
+        #expect(MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: false, isLyricsExpanded: true))
+        #expect(!MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: false, isLyricsExpanded: false))
     }
 }

@@ -78,15 +78,15 @@ enum MacPlaybackGate {
         return true
     }
 
-    // MARK: - 跟唱大画面布局决策（2026-09-01 用户需求：跟唱时播放区隐藏、歌词撑满）
+    // MARK: - 歌词大画面布局决策（2026-09-01 跟唱撑满 / 2026-09-06 双击纯放大拆分）
 
-    /// 跟唱大画面：播放区是否隐藏（跟唱开启时把空间让给歌词区）
-    static func shouldHidePlayerSection(isKaraokeOn: Bool) -> Bool {
-        isKaraokeOn
+    /// 播放区是否隐藏（跟唱开启 或 双击放大歌词 时把空间让给歌词区）
+    static func shouldHidePlayerSection(isKaraokeOn: Bool, isLyricsExpanded: Bool) -> Bool {
+        isKaraokeOn || isLyricsExpanded
     }
 
-    /// 跟唱大画面：歌词区是否撑满整个 detail 区域（非跟唱固定 330 高）
-    static func shouldExpandLyrics(isKaraokeOn: Bool) -> Bool {
-        isKaraokeOn
+    /// 歌词区是否撑满整个 detail 区域（跟唱/放大时；普通态用面板高度 330 可拖）
+    static func shouldExpandLyrics(isKaraokeOn: Bool, isLyricsExpanded: Bool) -> Bool {
+        isKaraokeOn || isLyricsExpanded
     }
 }
