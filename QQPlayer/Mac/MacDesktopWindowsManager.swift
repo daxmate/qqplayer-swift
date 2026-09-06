@@ -54,6 +54,8 @@ final class DesktopWindowsManager: ObservableObject {
     @Published private(set) var isMiniActive = false
     /// 桌面歌词窗显隐（仅迷你模式中可为 true；mini 窗歌词按钮点亮态绑定）。
     @Published private(set) var isLyricVisible = false
+    /// 模式状态机（决策单一事实源；isMiniActive/isLyricVisible 与之恒镜像，UI 绑定用）
+    private var mode = DesktopWindowModeState()
 
     private var miniPanel: NSPanel?
     private var lyricPanel: NSPanel?
@@ -90,8 +92,8 @@ final class DesktopWindowsManager: ObservableObject {
 
     /// 进入迷你模式：收起主窗，弹迷你窗 + 桌面歌词窗（看 miniLyricsEnabled）。
     func enterMiniMode() {
-        guard !isMiniActive else { return }
-        isMiniActive = true
+        guard mode.enterMini() else { return }
+        isMiniActive = mode.isMiniActive
         hideMainWindow()
         show(.mini)
         reconcile()
@@ -100,11 +102,11 @@ final class DesktopWindowsManager: ObservableObject {
     /// 返回主窗（迷你窗封面/标题点击、Dock 重开）：收迷你窗 + 歌词窗，恢复主窗。
     /// 幂等：主窗态调用仅激活 + 前置主窗，无副作用。
     func showMainWindow() {
-        if isMiniActive {
+        if mode.showMainWindow() {
             isMiniActive = false
+            isLyricVisible = false
             panel(.mini)?.orderOut(nil)
             panel(.lyric)?.orderOut(nil)
-            isLyricVisible = false
         }
         NSApp.activate(ignoringOtherApps: true)
         if let window = Self.findMainWindow() {
@@ -125,10 +127,9 @@ final class DesktopWindowsManager: ObservableObject {
     private func reconcile() {
         refreshPanelRootViews()
         let settings = DeleteSettings.load()
-        let wantLyric = isMiniActive && settings.miniLyricsEnabled
-        guard isLyricVisible != wantLyric else { return }
-        isLyricVisible = wantLyric
-        if wantLyric {
+        guard mode.reconcile(miniLyricsEnabled: settings.miniLyricsEnabled) else { return }
+        isLyricVisible = mode.isLyricVisible
+        if isLyricVisible {
             show(.lyric)
         } else {
             panel(.lyric)?.orderOut(nil)

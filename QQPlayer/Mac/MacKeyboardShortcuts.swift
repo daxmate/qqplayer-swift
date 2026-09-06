@@ -26,15 +26,8 @@
 import AppKit
 import SwiftUI
 
-/// 快捷键组合的修饰键常量（与 NSEvent.ModifierFlags rawValue 一致）
-enum ShortcutModifier {
-    static let shift = Int(NSEvent.ModifierFlags.shift.rawValue)      // 1<<17
-    static let control = Int(NSEvent.ModifierFlags.control.rawValue)  // 1<<18
-    static let option = Int(NSEvent.ModifierFlags.option.rawValue)    // 1<<19
-    static let command = Int(NSEvent.ModifierFlags.command.rawValue)  // 1<<20
-    /// 匹配/录制时只保留这四个修饰位（capsLock/numericPad/function 等忽略）
-    static let relevantMask = shift | control | option | command
-}
+// ShortcutModifier 常量已下沉 QQPlayer/Services/MacShortcutLogic.swift（无 AppKit，可单测）；
+// 本文件经 MacShortcutLogic 转调——决策单一事实源（2026-09-07 测试补写）。
 
 /// 键盘快捷键定义（E4 表驱动；action 一律 @MainActor——NSEvent monitor 在主线程）
 struct MacShortcutDef {
@@ -54,51 +47,12 @@ enum MacKeyboardShortcuts {
 
     // MARK: - 快捷键定义表（web SHORTCUTS 对齐子集；labelKey 本地化）
 
-    /// 修饰键展示符号（顺序 ⌃⌥⇧⌘）
-    private static func modifierPrefix(_ combo: ShortcutCombo) -> String {
-        var prefix = ""
-        if combo.flags & ShortcutModifier.control != 0 { prefix += "⌃" }
-        if combo.flags & ShortcutModifier.option != 0 { prefix += "⌥" }
-        if combo.flags & ShortcutModifier.shift != 0 { prefix += "⇧" }
-        if combo.flags & ShortcutModifier.command != 0 { prefix += "⌘" }
-        return prefix
-    }
-
     /// 纯逻辑：keyCode + 修饰位 → 展示文本（⌃⌥⇧⌘ 前缀 + 键名；未知键 → "Key N"）。
     /// 设置面板录制后展示与列表渲染共用（行为单一事实源）。
+    /// 实现下沉 QQPlayer/Services/MacShortcutLogic.swift（无 AppKit 可单测），此处仅转调。
     static func displayText(keyCode: Int, flags: Int) -> String {
-        let combo = ShortcutCombo(keyCode: keyCode, flags: flags, display: "")
-        return modifierPrefix(combo) + Self.keyName(keyCode)
+        MacShortcutLogic.displayText(keyCode: keyCode, flags: flags)
     }
-
-    /// keyCode → 键名（本表涉及键 + 通用字母/数字/符号/方向键）
-    static func keyName(_ keyCode: Int) -> String {
-        // ANSI 字母/数字（macOS 固定 keyCode 布局）
-        if let char = ansiKeyChar[keyCode] { return char }
-        switch keyCode {
-        case 49: return "Space"
-        case 123: return "←"
-        case 124: return "→"
-        case 125: return "↓"
-        case 126: return "↑"
-        case 51: return "⌫"
-        case 53: return "Esc"
-        case 36: return "↩"
-        case 48: return "Tab"
-        case 33: return "["
-        case 30: return "]"
-        default: return "Key \(keyCode)"
-        }
-    }
-
-    private static let ansiKeyChar: [Int: String] = [
-        0: "A", 11: "B", 8: "C", 2: "D", 14: "E", 3: "F", 5: "G", 4: "H",
-        34: "I", 38: "J", 40: "K", 37: "L", 46: "M", 45: "N", 31: "O",
-        35: "P", 12: "Q", 15: "R", 1: "S", 17: "T", 32: "U", 9: "V",
-        13: "W", 7: "X", 16: "Y", 6: "Z",
-        18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6",
-        26: "7", 28: "8", 25: "9", 29: "0",
-    ]
 
     /// 快捷键定义表（顺序 = 设置面板展示顺序；分组注释保持可读）
     static let allDefs: [MacShortcutDef] = [
@@ -229,24 +183,27 @@ enum MacKeyboardShortcuts {
         return loaded
     }
 
-    /// 某快捷键当前生效组合（覆盖优先，缺省用默认）
+    /// 某快捷键当前生效组合（覆盖优先，缺省用默认）；决策下沉 MacShortcutLogic
     static func effectiveCombo(for def: MacShortcutDef) -> ShortcutCombo {
-        currentOverrides()[def.id] ?? def.defaultCombo
+        MacShortcutLogic.effectiveCombo(id: def.id, defaultCombo: def.defaultCombo, overrides: currentOverrides())
     }
 
-    /// 是否被用户自定义过（面板「恢复默认」按钮状态用）
+    /// 是否被用户自定义过（面板「恢复默认」按钮状态用）；决策下沉 MacShortcutLogic
     static func isCustomized(_ id: String) -> Bool {
-        currentOverrides()[id] != nil
+        MacShortcutLogic.isCustomized(id: id, overrides: currentOverrides())
     }
 
     /// 录制保存：== 默认 → 删绑定（恢复默认语义）；否则写入。返回新生效组合。
+    /// == 默认判定下沉 MacShortcutLogic.bindingToStore（锁 ShortcutCombo == 语义）。
     @discardableResult
     static func saveBinding(id: String, combo: ShortcutCombo) -> ShortcutCombo {
         var settings = DeleteSettings.load()
-        if let def = allDefs.first(where: { $0.id == id }),
-           combo.keyCode == def.defaultCombo.keyCode,
-           combo.flags == def.defaultCombo.flags {
-            settings.shortcutBindings.removeValue(forKey: id)
+        if let def = allDefs.first(where: { $0.id == id }) {
+            if let store = MacShortcutLogic.bindingToStore(id: id, combo: combo, defaultCombo: def.defaultCombo) {
+                settings.shortcutBindings[id] = store
+            } else {
+                settings.shortcutBindings.removeValue(forKey: id)
+            }
         } else {
             settings.shortcutBindings[id] = combo
         }
@@ -264,21 +221,16 @@ enum MacKeyboardShortcuts {
     // MARK: - 冲突检测（纯逻辑：对比其它快捷键的有效组合）
 
     /// 新组合与「除 id 外的全部快捷键有效组合」冲突 → 返回冲突的快捷键 id。
+    /// 决策下沉 MacShortcutLogic.findConflict（defs 去 action 化传纯数据）。
     @discardableResult
     static func findConflict(for id: String, combo: ShortcutCombo) -> String? {
-        for def in allDefs where def.id != id {
-            let other = effectiveCombo(for: def)
-            if other.keyCode == combo.keyCode, other.flags == combo.flags {
-                return def.id
-            }
-        }
-        return nil
+        let defs = allDefs.map { (id: $0.id, defaultCombo: $0.defaultCombo) }
+        return MacShortcutLogic.findConflict(id: id, combo: combo, defs: defs, overrides: currentOverrides())
     }
 
-    /// 录制输入 → 合法组合？（过滤纯修饰键按下：keyCode 落在修饰键区）
+    /// 录制输入 → 合法组合？（过滤纯修饰键按下：keyCode 落在修饰键区）；决策下沉 MacShortcutLogic
     static func isModifierKeyCode(_ keyCode: Int) -> Bool {
-        // ⇧16/56 58? ANSI：shift 56/60、ctrl 59/62、opt 58/61、cmd 55/54
-        [54, 55, 56, 58, 59, 60, 61, 62, 63].contains(keyCode)
+        MacShortcutLogic.isModifierKeyCode(keyCode)
     }
 
     // MARK: - 事件处理
@@ -301,9 +253,11 @@ enum MacKeyboardShortcuts {
         return nil
     }
 
-    /// 只保留 cmd/opt/ctrl/shift 位（capsLock/numericPad/function 忽略）
+    /// 只保留 cmd/opt/ctrl/shift 位（capsLock/numericPad/function 忽略）。
+    /// relevantMask 位全在 deviceIndependent 保留区 → 先裁剪 deviceIndependent 再 &
+    /// 与直接 & relevantMask 等价；归一化决策下沉 MacShortcutLogic.normalizeForRecording。
     private static func normalizedFlags(_ flags: NSEvent.ModifierFlags) -> Int {
-        Int(flags.intersection(.deviceIndependentFlagsMask).rawValue) & ShortcutModifier.relevantMask
+        MacShortcutLogic.normalizeForRecording(Int(flags.intersection(.deviceIndependentFlagsMask).rawValue))
     }
 
     /// 录制时归一化修饰键（供设置面板调用）

@@ -73,6 +73,8 @@
 		2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */; };
 		480D17A3DC334548AC99991D /* QuarkClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */; };
 		A4C35050DA3241BA8362E463 /* GequhaiClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AAFAC23CD6148598FDEB214 /* GequhaiClientTests.swift */; };
+		774CD57CA2B84AB6BE12F194 /* DesktopWindowModeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1077ED0C414F45BC676C09 /* DesktopWindowModeStateTests.swift */; };
+		E90C7A42116E48608F2F5069 /* MacShortcutLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -195,6 +197,8 @@
 		DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeleteSettingsScrapingTests.swift; sourceTree = "<group>"; };
 		8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuarkClientTests.swift; sourceTree = "<group>"; };
 		4AAFAC23CD6148598FDEB214 /* GequhaiClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GequhaiClientTests.swift; sourceTree = "<group>"; };
+		9B1077ED0C414F45BC676C09 /* DesktopWindowModeStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DesktopWindowModeStateTests.swift; sourceTree = "<group>"; };
+		CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacShortcutLogicTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -318,6 +322,8 @@
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
 				Services/GequhaiClient.swift,
+				Services/MacShortcutLogic.swift,
+				Services/DesktopWindowModeState.swift,
 				Services/MP4EmptyCovrStripper.swift,
 				QQPlayerMacApp.swift,
 				Services/AppCoordinator.swift,
@@ -606,6 +612,8 @@
 				DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */,
 				8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */,
 				4AAFAC23CD6148598FDEB214 /* GequhaiClientTests.swift */,
+				9B1077ED0C414F45BC676C09 /* DesktopWindowModeStateTests.swift */,
+				CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -977,6 +985,8 @@
 				2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */,
 				480D17A3DC334548AC99991D /* QuarkClientTests.swift in Sources */,
 				A4C35050DA3241BA8362E463 /* GequhaiClientTests.swift in Sources */,
+				774CD57CA2B84AB6BE12F194 /* DesktopWindowModeStateTests.swift in Sources */,
+				E90C7A42116E48608F2F5069 /* MacShortcutLogicTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
