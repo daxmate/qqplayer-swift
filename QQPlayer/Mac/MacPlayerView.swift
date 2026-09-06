@@ -7,6 +7,7 @@
 //  QQPlayerMac target only.
 //
 
+import AppKit
 import SwiftUI
 
 struct MacPlayerView: View {
@@ -44,26 +45,51 @@ struct MacPlayerView: View {
     /// 播放队列面板（B 组队列排序持久化：可拖排/删除/点行跳转，重排即持久化）
     @State private var showQueuePanel = false
 
+    /// 歌词大画面（2026-09-06 用户拍板：双击=纯放大，不再绑定跟唱；跟唱经 🎤 按钮）
+    @State private var lyricsExpanded = false
+    /// 歌词面板高度（普通态 330；可拖分隔条调节，UserDefaults 记忆）
+    @State private var lyricsPanelHeight: CGFloat = 330
+    /// 分隔条拖动起始高度（拖动中非 nil）
+    @State private var dragStartPanelHeight: CGFloat?
+    /// 歌词面板高度持久化 key
+    private static let lyricsPanelHeightKey = "QQPlayer.lyricsPanelHeight"
+
+    /// 播放区是否隐藏/歌词是否撑满：跟唱或放大（决策上收 MacPlaybackGate，有测试）
+    private var isLyricsFullscreen: Bool {
+        MacPlaybackGate.shouldExpandLyrics(
+            isKaraokeOn: karaoke.isKaraokeOn,
+            isLyricsExpanded: lyricsExpanded
+        )
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // 跟唱大画面：隐藏播放区，把空间全部让给歌词区（决策上收 MacPlaybackGate，有测试）
-            if !MacPlaybackGate.shouldHidePlayerSection(isKaraokeOn: karaoke.isKaraokeOn) {
-                playerSection
-            }
-            // 歌词常驻显示（2026-09-02 用户拍板：歌词是本 APP 第一重要功能，不提供隐藏入口）
-            Divider()
-            MacLyricsView(
-                lyrics: lyrics,
-                currentTime: playbackTime,
-                isLoading: lyricsLoading,
-                onLyricsSearch: {
-                    showLyricsSearch = true
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                if !MacPlaybackGate.shouldHidePlayerSection(
+                    isKaraokeOn: karaoke.isKaraokeOn,
+                    isLyricsExpanded: lyricsExpanded
+                ) {
+                    playerSection
+                    lyricsResizeHandle(containerHeight: geo.size.height)
                 }
-            )
-            .frame(maxHeight: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? .infinity : 330)
-            .frame(height: MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: karaoke.isKaraokeOn) ? nil : 330)
+                MacLyricsView(
+                    lyrics: lyrics,
+                    currentTime: playbackTime,
+                    isLoading: lyricsLoading,
+                    isFullscreen: isLyricsFullscreen,
+                    onToggleExpand: handleLyricsDoubleTap,
+                    onLyricsSearch: {
+                        showLyricsSearch = true
+                    }
+                )
+                .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            let saved = UserDefaults.standard.double(forKey: Self.lyricsPanelHeightKey)
+            lyricsPanelHeight = saved > 0 ? CGFloat(saved) : 330
+        }
         .sheet(isPresented: $showLyricsSearch) {
             if let track = player.currentTrack {
                 MacLyricsSearchView(
@@ -80,7 +106,7 @@ struct MacPlayerView: View {
         .sheet(isPresented: $showQueuePanel) {
             MacQueuePanelView(player: player)
         }
-        .animation(.easeInOut(duration: 0.25), value: karaoke.isKaraokeOn)
+        .animation(.easeInOut(duration: 0.25), value: isLyricsFullscreen)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
             favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
@@ -130,6 +156,56 @@ struct MacPlayerView: View {
                 }
             }
         }
+    }
+
+    // MARK: - 歌词大画面交互（2026-09-06 用户拍板：双击=放大；跟唱经 🎤 按钮）
+
+    /// 双击歌词：普通态 → 放大（不进跟唱）；放大/跟唱态 → 退出并缩回。
+    /// 跟唱中双击 = 退跟唱 + 缩回（用户：双击和话筒都可退出）。
+    private func handleLyricsDoubleTap() {
+        if karaoke.isKaraokeOn {
+            karaoke.setKaraokeOn(false)
+            lyricsExpanded = false
+        } else if lyricsExpanded {
+            lyricsExpanded = false
+        } else {
+            lyricsExpanded = true
+        }
+    }
+
+    /// 播放区与歌词区之间的可拖分隔条（仅普通态显示；跟唱/放大时歌词撑满无分隔）
+    private func lyricsResizeHandle(containerHeight: CGFloat) -> some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.12))
+            .frame(height: 6)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeUpDown.set()
+                } else {
+                    NSCursor.arrow.set()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        if dragStartPanelHeight == nil {
+                            dragStartPanelHeight = lyricsPanelHeight
+                        }
+                        // 向上拖 = 歌词变高（container 顶部往下是播放区，需给播放区留最小空间）
+                        let start = dragStartPanelHeight ?? lyricsPanelHeight
+                        let maxHeight = max(180, containerHeight - 360)
+                        lyricsPanelHeight = min(max(start - value.translation.height, 140), maxHeight)
+                    }
+                    .onEnded { _ in
+                        if let start = dragStartPanelHeight {
+                            let maxHeight = max(180, containerHeight - 360)
+                            lyricsPanelHeight = min(max(start, 140), maxHeight)
+                        }
+                        dragStartPanelHeight = nil
+                        UserDefaults.standard.set(Double(lyricsPanelHeight), forKey: Self.lyricsPanelHeightKey)
+                    }
+            )
     }
 
     // MARK: - Player section

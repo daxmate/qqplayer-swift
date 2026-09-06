@@ -24,17 +24,15 @@ private final class MacTrackTableRow: NSObject, Identifiable {
     let track: Track
     /// 当前列表显示序号（随排序同步刷新；非 @objc——不参与排序比较）
     var displayIndex: Int = 0
-    /// 排序/显示字段：@objc 存储属性（title/artist/duration）
+    /// 排序/显示字段：@objc 存储属性（title/artist）
     @objc let title: String
     @objc let artistName: String
-    @objc let durationMs: Int64
 
     init(id: String, track: Track, artistName: String) {
         self.id = id
         self.track = track
         self.title = track.title
         self.artistName = artistName
-        self.durationMs = Int64(track.durationMs ?? 0)
     }
 }
 
@@ -202,15 +200,8 @@ struct MacTrackListView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-
-            TableColumn("duration".localized, value: \.durationMs) { row in
-                Text(MacTimeFormat.format(duration(for: row.track)))
-                    .foregroundColor(.secondary)
-                    .monospacedDigit()
-            }
-            .width(56)
-            // 2026-09-02 用户拍板：不显示心形列——收藏入口收敛到右键菜单/播放页红心，
-            // 否则行内红心让右键「加入喜欢」失去意义
+            // 2026-09-06 用户拍板：不显示时长列（播放区进度条已有时长信息，
+            // 列表行去掉更简洁）——同时移除 durationMs 排序字段/辅助方法
         }
         // macOS 惯例：单击选中、双击播放（Table primaryAction 原生实现，
         // AppKit NSTableView 底层；勿改手势模拟）
@@ -534,10 +525,5 @@ struct MacTrackListView: View {
             return ""
         }
         return album.title
-    }
-
-    private func duration(for track: Track) -> TimeInterval {
-        guard let ms = track.durationMs else { return 0 }
-        return Double(ms) / 1000.0
     }
 }

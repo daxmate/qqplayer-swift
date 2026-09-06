@@ -16,6 +16,10 @@ struct MacLyricsView: View {
     let lyrics: Lyrics?
     let currentTime: TimeInterval
     let isLoading: Bool
+    /// 是否大画面（跟唱或双击放大）：控制跟唱 mic 入口显示（普通态 mic 在播放区控制行）
+    let isFullscreen: Bool
+    /// 双击歌词：由宿主决定（普通态放大 / 放大态缩回 / 跟唱态退跟唱+缩回）
+    let onToggleExpand: () -> Void
     /// 歌词搜索入口（播放页 sheet 弹出 MacLyricsSearchView）
     let onLyricsSearch: () -> Void
 
@@ -60,12 +64,12 @@ struct MacLyricsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             applyLyricSettings()
         }
-        // 页面级双击：跟唱模式开关（对齐 iOS LyricsView——highPriority 双击优先，
-        // 行单击等双击判定失败后才触发；快速双击 = 切换模式且不触发行跳转）
+        // 页面级双击：纯放大/缩回切换（2026-09-06 用户拍板：双击 ≠ 跟唱，跟唱经 mic 按钮）。
+        // highPriority 双击优先，行单击等双击判定失败后才触发；快速双击不触发行跳转。
         .highPriorityGesture(
             TapGesture(count: 2)
                 .onEnded {
-                    karaoke.toggleKaraokeMode()
+                    onToggleExpand()
                 }
         )
     }
@@ -86,6 +90,19 @@ struct MacLyricsView: View {
             Label("lyrics".localized, systemImage: "quote.bubble")
                 .font(.headline)
             Spacer()
+            // 跟唱开关（2026-09-06 用户拍板：双击=放大不绑跟唱，跟唱入口放歌词区）。
+            // 大画面（跟唱/放大）时显示：普通态 mic 在播放区控制行，避免重复。
+            if isFullscreen {
+                Button {
+                    karaoke.toggleKaraokeMode()
+                } label: {
+                    Image(systemName: karaoke.isKaraokeOn ? "mic.fill" : "mic")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help("karaoke_mode_help".localized)
+            }
             Button(action: onLyricsSearch) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14, weight: .semibold))
