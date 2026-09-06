@@ -166,6 +166,7 @@ struct Localized {
     static let settingsCategoryLyrics = "settings_category_lyrics".localized
     static let settingsCategoryLibrary = "settings_category_library".localized
     static let settingsCategoryDownload = "settings_category_download".localized
+    static let settingsCategoryScraping = "settings_category_scraping".localized
     static let settingsCategoryAppearance = "settings_category_appearance".localized
     static let settingsCategoryAbout = "settings_category_about".localized
     static let settingsDownloadQuality = "settings_download_quality".localized

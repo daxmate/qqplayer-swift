@@ -193,6 +193,14 @@ extension DatabaseManager {
         }
     }
 
+    /// 按 id 查专辑（标签编辑表单的专辑 year 兜底用：文件解析无 year 时
+    /// 用 track.albumId → Album.year 预填）。查无 → nil。
+    func getAlbum(byId albumId: Int64) throws -> Album? {
+        return try read { db in
+            try Album.fetchOne(db, key: albumId)
+        }
+    }
+
     func getAlbumsByArtistId(_ artistId: Int64) throws -> [Album] {
         return try read { db in
             return try Album.fetchAll(

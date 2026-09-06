@@ -69,6 +69,8 @@
 		F5EA698EDC0C4A428FB7E77E /* QueueReorderMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3F0AF2AAB04E498EC02738 /* QueueReorderMathTests.swift */; };
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
+		D930D5CCE14643C39B3C4BD8 /* ScrapeBatchServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */; };
+		2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -187,6 +189,8 @@
 		EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGestureLogicTests.swift; sourceTree = "<group>"; };
 		F61CF6A266D54083A0F86E76 /* MusicAPIMockSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicAPIMockSupport.swift; sourceTree = "<group>"; };
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
+		374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrapeBatchServiceTests.swift; sourceTree = "<group>"; };
+		DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeleteSettingsScrapingTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -213,12 +217,14 @@
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacScanLogger.swift,
+				Mac/MacScrapeBatchProgressView.swift,
 				Mac/MacScrapeSettingsView.swift,
 				Mac/MacSearchAnythingLayer.swift,
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacTagEditorCandidateRow.swift,
 				Mac/MacTagEditorView.swift,
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
@@ -280,12 +286,14 @@
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacScanLogger.swift,
+				Mac/MacScrapeBatchProgressView.swift,
 				Mac/MacScrapeSettingsView.swift,
 				Mac/MacSearchAnythingLayer.swift,
 				Mac/MacSearchView.swift,
 				Mac/MacSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacTagEditorCandidateRow.swift,
 				Mac/MacTagEditorView.swift,
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
@@ -578,6 +586,8 @@
 				84856156762B44449849B90C /* GenreParsingTests.swift */,
 				6EB4AC50856B4C358B306CF3 /* MusicBrainzClientTests.swift */,
 				E512404FBD414617AA1CCAFE /* ScrapeLogicTests.swift */,
+				374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */,
+				DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -945,6 +955,8 @@
 				2437A464FF244D84B4247248 /* GenreParsingTests.swift in Sources */,
 				26405C6B916442DD89637772 /* MusicBrainzClientTests.swift in Sources */,
 				493CDCE26A354328B23160B5 /* ScrapeLogicTests.swift in Sources */,
+				D930D5CCE14643C39B3C4BD8 /* ScrapeBatchServiceTests.swift in Sources */,
+				2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

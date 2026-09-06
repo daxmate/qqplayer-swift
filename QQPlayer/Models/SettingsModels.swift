@@ -201,6 +201,15 @@ struct DeleteSettings: Codable {
     /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
     var visualizerEnabled: Bool = true
 
+    // MARK: - E1 标签刮削（scraping namespace，web 版 scraping.* 对齐）
+
+    /// 重命名模板（web scraping.rename_template；默认 "{artist} - {title}"）
+    var scrapingRenameTemplate: String = TagWriterService.defaultRenameTemplate
+    /// 刮削源优先级（web scraping.source_order；默认 netease 优先）
+    var scrapingSourceOrder: [String] = ["netease", "musicbrainz"]
+    /// 批量刮削开关（web scraping.batch_enabled；默认关，关时批量入口隐藏+服务拒接）
+    var scrapingBatchEnabled: Bool = false
+
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
 
@@ -235,6 +244,11 @@ struct DeleteSettings: Codable {
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
         visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
+        scrapingRenameTemplate = try container.decodeIfPresent(String.self, forKey: .scrapingRenameTemplate)
+            ?? TagWriterService.defaultRenameTemplate
+        scrapingSourceOrder = try container.decodeIfPresent([String].self, forKey: .scrapingSourceOrder)
+            ?? ["netease", "musicbrainz"]
+        scrapingBatchEnabled = try container.decodeIfPresent(Bool.self, forKey: .scrapingBatchEnabled) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

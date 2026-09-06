@@ -63,6 +63,12 @@ struct MacTrackListView: View {
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
     @State private var pendingTrack: Track?
+    /// 单曲编辑/刮削（右键菜单第 8 项）
+    @State private var showTagEditor = false
+    @State private var tagEditorTrack: Track?
+    /// 批量刮削（右键多选 >1）
+    @State private var showBatchScrape = false
+    @State private var batchScrapePaths: [String] = []
     /// 移到废纸篓（web 版「移到废纸篓」对齐，2026-09-02 A4）：确认弹窗状态
     @State private var showTrashConfirm = false
     @State private var pendingTrashTracks: [Track] = []
@@ -131,6 +137,15 @@ struct MacTrackListView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
                 reloadPlaylists()
+            }
+            // 标签编辑/刮削 sheet（单曲右键第 8 项）与批量刮削 sheet（多选右键）
+            .sheet(isPresented: $showTagEditor) {
+                if let tagEditorTrack {
+                    MacTagEditorView(track: tagEditorTrack)
+                }
+            }
+            .sheet(isPresented: $showBatchScrape) {
+                MacScrapeBatchProgressView(paths: batchScrapePaths, libraryMode: false)
             }
         }
     }
@@ -201,12 +216,18 @@ struct MacTrackListView: View {
         // AppKit NSTableView 底层；勿改手势模拟）
         .contextMenu(forSelectionType: String.self) { selectedIDs in
             if selectedIDs.count > 1 {
-                // 多选：批量移到废纸篓（web 版多选批量对齐，歌单详情内同样可用——
-                // deleteTrack 自动清理歌单引用，PlaylistsChanged 刷新）
+                // 多选：批量刮削 + 批量移到废纸篓（web 版多选批量对齐，歌单详情内同样可用）
                 let tracks = displayedRows
                     .filter { selectedIDs.contains($0.id) }
                     .map(\.track)
                 if !tracks.isEmpty {
+                    Button {
+                        batchScrapePaths = tracks.map(\.path)
+                        showBatchScrape = true
+                    } label: {
+                        Label("context_batch_scrape".localized, systemImage: "tag")
+                    }
+                    Divider()
                     Button(role: .destructive) {
                         requestTrash(tracks)
                     } label: {
@@ -323,6 +344,15 @@ struct MacTrackListView: View {
             Button("show_album".localized) {
                 onShowAlbum(track)
             }
+        }
+
+        // 编辑标签/刮削（web 版对齐，第 8 项）：单曲编辑弹窗（自动刮削+表单+保存改名）
+        Divider()
+        Button {
+            tagEditorTrack = track
+            showTagEditor = true
+        } label: {
+            Label("context_edit_tags".localized, systemImage: "tag")
         }
 
         // 移到废纸篓（web 版对齐，全场景）：send2trash 语义 = 系统废纸篓可恢复，
