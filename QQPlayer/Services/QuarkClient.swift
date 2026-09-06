@@ -242,7 +242,12 @@ enum QuarkLogic {
             for segment in splitCookieSegments(header) {
                 guard let eq = segment.firstIndex(of: "=") else { continue }
                 let name = String(segment[..<eq]).trimmingCharacters(in: .whitespaces)
-                guard !name.isEmpty else { continue }
+                // 合法 cookie 名不含 ;/,/空白（属性段如 "; Path=/" 是无 name 的垃圾，
+                // 直接跳过——web httpx 对这类头也会忽略）
+                guard !name.isEmpty,
+                      !name.contains(";"),
+                      !name.contains(","),
+                      !name.contains(" ") else { continue }
                 var value = String(segment[segment.index(after: eq)...])
                 if let semicolon = value.firstIndex(of: ";") {
                     value = String(value[..<semicolon])
