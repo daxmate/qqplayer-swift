@@ -71,6 +71,7 @@
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
 		D930D5CCE14643C39B3C4BD8 /* ScrapeBatchServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */; };
 		2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */; };
+		480D17A3DC334548AC99991D /* QuarkClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -191,6 +192,7 @@
 		F678A568561549268E2A63CD /* MacPlaybackGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPlaybackGateTests.swift; sourceTree = "<group>"; };
 		374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrapeBatchServiceTests.swift; sourceTree = "<group>"; };
 		DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeleteSettingsScrapingTests.swift; sourceTree = "<group>"; };
+		8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuarkClientTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -361,6 +363,7 @@
 				"Services/PlayerEngine+Queue.swift",
 				"Services/PlayerEngine+SFB.swift",
 				Services/PlayHistoryRecorder.swift,
+				Services/QuarkClient.swift,
 				Services/ScrapeBatchService.swift,
 				Services/ScrapeLogic.swift,
 				Services/SFBAudioEngineManager.swift,
@@ -590,6 +593,7 @@
 				E512404FBD414617AA1CCAFE /* ScrapeLogicTests.swift */,
 				374B180B0B3049AFB058E058 /* ScrapeBatchServiceTests.swift */,
 				DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */,
+				8013045DA1F74CD7877D81AB /* QuarkClientTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -959,6 +963,7 @@
 				493CDCE26A354328B23160B5 /* ScrapeLogicTests.swift in Sources */,
 				D930D5CCE14643C39B3C4BD8 /* ScrapeBatchServiceTests.swift in Sources */,
 				2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */,
+				480D17A3DC334548AC99991D /* QuarkClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
