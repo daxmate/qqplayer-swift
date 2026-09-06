@@ -20,15 +20,10 @@ class CloudDownloadManager: NSObject, ObservableObject {
     private var isQueryRunning = false
 
     // Track if we've detected systematic iCloud failures
-    private var hasDetectedSystematicFailure = false
-    private var consecutiveFailures = 0
-    private var lastFailureTime: Date?
-    // Per-file failure dedup: repeated failures of the SAME file within the
-    // window count once — only distinct files accumulate toward the
-    // threshold. A single slow/large download must never trip offline mode.
-    private var lastFailureURL: URL?
-    private let maxConsecutiveFailures = 3
-    private let failureResetTime: TimeInterval = 300 // 5 minutes
+    // （2026-09-07 决策上收 CloudFailureDetector 纯逻辑，可单测；本类只执行副作用）
+    private var failureDetector = CloudFailureDetector()
+
+    private var hasDetectedSystematicFailure: Bool { failureDetector.hasDetectedSystematicFailure }
 
     override init() {
         super.init()
@@ -76,33 +71,11 @@ class CloudDownloadManager: NSObject, ObservableObject {
 
     @MainActor
     func detectSystematicFailure(for url: URL? = nil) {
-        // Reset failure count if enough time has passed since last failure
-        if let lastFailure = lastFailureTime, Date().timeIntervalSince(lastFailure) > failureResetTime {
-            consecutiveFailures = 0
-            lastFailureURL = nil
-            print("🔄 Resetting failure count after \(Int(failureResetTime / 60)) minutes")
-        }
-
-        // Deduplicate per file: the same file failing repeatedly within the
-        // window (e.g. one large download that keeps timing out) is a single
-        // failure, not many. Only distinct files accumulate. A nil URL
-        // (external report without file context) always counts.
-        if let url = url, url == lastFailureURL {
-            lastFailureTime = Date()
-            print("⏭️ Same file already counted in failure window: \(url.lastPathComponent) - not incrementing")
-            return
-        }
-
-        consecutiveFailures += 1
-        lastFailureTime = Date()
-        lastFailureURL = url
-
-        let fileSuffix = url.map { " for \($0.lastPathComponent)" } ?? ""
-        print("⚠️ iCloud failure detected (\(consecutiveFailures)/\(maxConsecutiveFailures))\(fileSuffix)")
-
-        if consecutiveFailures >= maxConsecutiveFailures && !hasDetectedSystematicFailure {
-            hasDetectedSystematicFailure = true
-            print("🚨 Systematic iCloud failure detected after \(maxConsecutiveFailures) consecutive failures - switching to offline mode")
+        // 判定（窗口重置/同文件去重/阈值）全部在 CloudFailureDetector（纯逻辑，可单测）；
+        // 此处仅执行切离线的副作用。触发瞬间保留 🚨 日志（stdout.log 诊断用）。
+        let triggered = failureDetector.recordFailure(url: url, now: Date())
+        if triggered {
+            print("🚨 Systematic iCloud failure detected after \(failureDetector.maxConsecutiveFailures) consecutive failures - switching to offline mode")
             AppCoordinator.shared.handleiCloudAuthenticationError()
             Task {
                 await updateQueryForAuthStatus()
@@ -112,21 +85,14 @@ class CloudDownloadManager: NSObject, ObservableObject {
 
     @MainActor
     func resetFailureCount() {
-        if consecutiveFailures > 0 {
-            consecutiveFailures = 0
-            print("✅ Reset iCloud failure count - successful operation detected")
-        }
-        lastFailureTime = nil
-        lastFailureURL = nil
+        failureDetector.recordSuccess()
+        print("✅ Reset iCloud failure count - successful operation detected")
     }
 
     @MainActor
     func attemptRecovery() {
         print("🔄 Attempting recovery from offline mode...")
-        hasDetectedSystematicFailure = false
-        consecutiveFailures = 0
-        lastFailureTime = nil
-        lastFailureURL = nil
+        failureDetector.reset()
 
         // Restart the metadata query if needed
         Task {

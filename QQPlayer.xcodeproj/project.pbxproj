@@ -76,6 +76,9 @@
 		774CD57CA2B84AB6BE12F194 /* DesktopWindowModeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1077ED0C414F45BC676C09 /* DesktopWindowModeStateTests.swift */; };
 		E90C7A42116E48608F2F5069 /* MacShortcutLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */; };
 		B314F6033C3E4B1684A9F418 /* MP4EmptyCovrStripperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49BB9355B73D45668502AE0A /* MP4EmptyCovrStripperTests.swift */; };
+		6BEE379F884E4A0BBC713FA8 /* CloudFailureDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */; };
+		0814F39A47A44E6DAE6D2D57 /* GraphicEQCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */; };
+		16674A64391C4915BCE3853F /* StateManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -201,6 +204,9 @@
 		9B1077ED0C414F45BC676C09 /* DesktopWindowModeStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DesktopWindowModeStateTests.swift; sourceTree = "<group>"; };
 		CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacShortcutLogicTests.swift; sourceTree = "<group>"; };
 		49BB9355B73D45668502AE0A /* MP4EmptyCovrStripperTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MP4EmptyCovrStripperTests.swift; sourceTree = "<group>"; };
+		DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudFailureDetectorTests.swift; sourceTree = "<group>"; };
+		FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GraphicEQCodecTests.swift; sourceTree = "<group>"; };
+		FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StateManagerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -324,6 +330,8 @@
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
 				Services/GequhaiClient.swift,
+				Services/GraphicEQCodec.swift,
+				Services/CloudFailureDetector.swift,
 				Services/MacShortcutLogic.swift,
 				Services/DesktopWindowModeState.swift,
 				Services/MP4EmptyCovrStripper.swift,
@@ -617,6 +625,9 @@
 				9B1077ED0C414F45BC676C09 /* DesktopWindowModeStateTests.swift */,
 				CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */,
 				49BB9355B73D45668502AE0A /* MP4EmptyCovrStripperTests.swift */,
+				DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */,
+				FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */,
+				FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -991,6 +1002,9 @@
 				774CD57CA2B84AB6BE12F194 /* DesktopWindowModeStateTests.swift in Sources */,
 				E90C7A42116E48608F2F5069 /* MacShortcutLogicTests.swift in Sources */,
 				B314F6033C3E4B1684A9F418 /* MP4EmptyCovrStripperTests.swift in Sources */,
+				6BEE379F884E4A0BBC713FA8 /* CloudFailureDetectorTests.swift in Sources */,
+				0814F39A47A44E6DAE6D2D57 /* GraphicEQCodecTests.swift in Sources */,
+				16674A64391C4915BCE3853F /* StateManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
