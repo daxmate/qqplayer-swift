@@ -32,7 +32,10 @@ struct QQPlayerMacApp: App {
             object: nil,
             queue: .main
         ) { _ in
-            PlayerEngine.shared.savePlayerState()
+            // willTerminate 在主线程回调且必须同步写完（Task 异步可能来不及落盘）
+            MainActor.assumeIsolated {
+                PlayerEngine.shared.savePlayerState()
+            }
         }
         // D 组键盘快捷键（web shortcuts.ts 对齐）：App 内全局监听，启动即装。
         MacKeyboardShortcuts.install()

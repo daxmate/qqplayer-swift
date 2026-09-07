@@ -24,7 +24,7 @@ extension NSItemProvider {
     /// public.file-url，值为 NSURL/Data 两种形态都可能，双兼容）。
     func loadFileURL() async -> URL? {
         await withCheckedContinuation { continuation in
-            _ = loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                 if let url = item as? URL {
                     continuation.resume(returning: url)
                 } else if let data = item as? Data,

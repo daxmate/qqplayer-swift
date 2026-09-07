@@ -103,16 +103,24 @@ final class MacSpectrumAnalyzer: ObservableObject {
             imagp[k] = samples[2 * k + 1]
         }
 
-        // 前向 FFT（zrip 原地：输出仍在这两个数组）
-        var split = DSPSplitComplex(realp: &realp, imagp: &imagp)
+        // 前向 FFT（zrip 原地：输出仍在这两个数组）。DSPSplitComplex 的
+        // realp/imagp 指针须存活到调用结束——用 withUnsafeMutableBufferPointer
+        // 圈定作用域（不能直接传 &array：inout 临时指针不保证存活）
         let log2n = vDSP_Length(log2(Float(fftSize)))
-        vDSP_fft_zrip(fftSetup, &split, 1, log2n, FFTDirection(kFFTDirection_Forward))
-
-        // |X|² 取前半有效 bin（0...N/2-1），再除 N 开方得幅度
         var magnitudes = [Float](repeating: 0, count: fftSize / 2)
-        magnitudes.withUnsafeMutableBufferPointer { mp in
-            var splitOut = DSPSplitComplex(realp: &realp, imagp: &imagp)
-            vDSP_zvmags(&splitOut, 1, mp.baseAddress!, 1, vDSP_Length(fftSize / 2))
+        realp.withUnsafeMutableBufferPointer { realBuf in
+            imagp.withUnsafeMutableBufferPointer { imagBuf in
+                guard let realBase = realBuf.baseAddress, let imagBase = imagBuf.baseAddress else { return }
+                var split = DSPSplitComplex(realp: realBase, imagp: imagBase)
+                vDSP_fft_zrip(fftSetup, &split, 1, log2n, FFTDirection(kFFTDirection_Forward))
+
+                // |X|² 取前半有效 bin（0...N/2-1），再除 N 开方得幅度
+                magnitudes.withUnsafeMutableBufferPointer { mp in
+                    guard let mpBase = mp.baseAddress else { return }
+                    var splitOut = DSPSplitComplex(realp: realBase, imagp: imagBase)
+                    vDSP_zvmags(&splitOut, 1, mpBase, 1, vDSP_Length(fftSize / 2))
+                }
+            }
         }
         var scale = Float(1.0) / Float(fftSize)
         vDSP_vsmul(magnitudes, 1, &scale, &magnitudes, 1, vDSP_Length(fftSize / 2))

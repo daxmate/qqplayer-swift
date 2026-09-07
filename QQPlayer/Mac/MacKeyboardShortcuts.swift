@@ -154,8 +154,10 @@ enum MacKeyboardShortcuts {
                 object: nil,
                 queue: .main
             ) { _ in
-                // 通知在主线程队列投递；Swift 5 模式下直接清缓存即可
-                overrides = nil
+                // 通知在主线程队列投递；assumeIsolated 保留同步清缓存语义（Swift 6 安全）
+                MainActor.assumeIsolated {
+                    overrides = nil
+                }
             }
         }
     }

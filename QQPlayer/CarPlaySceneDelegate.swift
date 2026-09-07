@@ -45,11 +45,14 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         setupPlayerStateObserver()
     }
 
-    // CPTemplateApplicationSceneDelegate 的正式实现（didDisconnect）。编译器
-    // "nearly matches didSelect" 是启发式误报——签名与协议一致，系统按
-    // didDisconnect 语义调用（CarPlay 断开时清理状态）。勿改签名。（2026-08-30 警告清理）
+    // CPTemplateApplicationSceneDelegate 的正式实现（didDisconnect，无 window 变体）。
+    // ⚠️ 签名坑：Swift 导入协议时该方法的 label 是整段 `didDisconnectInterfaceController`，
+    // 不是 `didDisconnect`（与 didConnect 不同，didConnect 无 window 变体 label 是 didConnect）。
+    // 若写成 didDisconnect: 则未匹配任何协议要求 → 方法不被 @objc 化 → CarPlay 断开时
+    // 系统回调不到这里（断开通知永不发送）；编译器还会报 "nearly matches didSelect" 警告。
+    // 勿改回 didDisconnect: 签名。（2026-09-07 实测 iOS 26.5 SDK 定位）
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
-                                  didDisconnect interfaceController: CPInterfaceController) {
+                                  didDisconnectInterfaceController interfaceController: CPInterfaceController) {
         self.interfaceController = nil
 
         print("🚗 CarPlay disconnected")

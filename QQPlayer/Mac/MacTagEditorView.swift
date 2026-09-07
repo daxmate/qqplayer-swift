@@ -686,17 +686,20 @@ struct MacTagEditorView: View {
                     to: URL(fileURLWithPath: originalPath),
                     request: request
                 )
-                var migrated: Track?
                 if result.renamed {
                     // 改名 → moveTrack 迁移引用（幂等；文件已改名但迁移失败 → 提示重扫）
                     try DatabaseManager.shared.moveTrack(
                         from: originalPath,
                         to: result.finalURL.path
                     )
-                    migrated = try DatabaseManager.shared.getTrack(byPath: result.finalURL.path)
-                }
-                await MainActor.run {
-                    finishSaveSuccess(renamed: result.renamed, oldStableId: oldStableId, migrated: migrated, finalPath: result.finalURL.path)
+                    let migrated = try DatabaseManager.shared.getTrack(byPath: result.finalURL.path)
+                    await MainActor.run {
+                        finishSaveSuccess(renamed: true, oldStableId: oldStableId, migrated: migrated, finalPath: result.finalURL.path)
+                    }
+                } else {
+                    await MainActor.run {
+                        finishSaveSuccess(renamed: false, oldStableId: oldStableId, migrated: nil, finalPath: result.finalURL.path)
+                    }
                 }
             } catch {
                 await MainActor.run {
