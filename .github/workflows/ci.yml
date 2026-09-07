@@ -49,19 +49,40 @@ jobs:
       # （本机已验证等价命令：iPhone 17 Pro 上 xcodebuild test 全绿，9 tests / 2 suites）
       - name: Test (xcodebuild test, iOS simulator)
         run: |
+          set -o pipefail
           DEVICE="$(xcrun simctl list devices available | grep -oE 'iPhone [^(]+' | head -1 | sed 's/ *$//')"
           if [ -z "$DEVICE" ]; then
             echo "❌ 无可用 iPhone 模拟器（xcrun simctl list devices available）"
             exit 1
           fi
           echo "Using simulator: $DEVICE"
+          # tee 落盘供下一步零容忍警告检测；pipefail 保证 xcodebuild 失败不被管道吞掉
           xcodebuild test \
             -project QQPlayer.xcodeproj \
             -scheme QQPlayer \
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -derivedDataPath build/DerivedData \
             -only-testing:QQPlayerTests \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-ios.log
+
+      # 编译警告零容忍（2026-09-08 用户立规矩）：源码警告（路径含 /QQPlayer/ 或 /QQPlayerTests/）
+      # + 工程级警告（行尾含 "(in target ...)"，如缺 LSApplicationCategory）一律拦截，当场清零。
+      # 排除 appintentsmetadataprocessor 的 "Metadata extraction skipped"（无 AppIntents 依赖的
+      # 正常工具提示，非编译警告）。三方 SPM 包（路径在 SourcePackages/checkouts）不拦——改不到。
+      - name: Check zero warnings (source + target-level)
+        run: |
+          set -euo pipefail
+          WARN="$(grep -E 'warning:' /tmp/xcodebuild-ios.log \
+            | grep -v 'Metadata extraction skipped' \
+            | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
+            | sort -u || true)"
+          if [ -n "$WARN" ]; then
+            echo "❌ 检测到编译警告（零容忍纪律，须当场清零）："
+            printf '%s\n' "$WARN"
+            echo "提示：Debug 增量编译会掩盖存量警告，本地请用 Release + 全 target 全量编译核对"
+            exit 1
+          fi
+          echo "✅ 无源码/工程级编译警告"
 
   macos:
     name: macOS (build QQPlayerMac + 资源产物断言)
@@ -87,12 +108,30 @@ jobs:
 
       - name: Build QQPlayerMac
         run: |
+          set -o pipefail
+          # tee 落盘供下一步零容忍警告检测；pipefail 保证 build 失败不被管道吞掉
           xcodebuild build \
             -project QQPlayer.xcodeproj \
             -scheme QQPlayerMac \
             -configuration Debug \
             -derivedDataPath build/DerivedDataMac \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-macos.log
+
+      # 编译警告零容忍（同 swift job）：macOS target 源码同在 QQPlayer/ 目录，覆盖 QQPlayer/Mac/*
+      - name: Check zero warnings (source + target-level)
+        run: |
+          set -euo pipefail
+          WARN="$(grep -E 'warning:' /tmp/xcodebuild-macos.log \
+            | grep -v 'Metadata extraction skipped' \
+            | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
+            | sort -u || true)"
+          if [ -n "$WARN" ]; then
+            echo "❌ 检测到编译警告（零容忍纪律，须当场清零）："
+            printf '%s\n' "$WARN"
+            echo "提示：Debug 增量编译会掩盖存量警告，本地请用 Release + 全 target 全量编译核对"
+            exit 1
+          fi
+          echo "✅ 无源码/工程级编译警告"
 
       - name: Assert app resources (AppIcon + Assets.car)
         run: |
