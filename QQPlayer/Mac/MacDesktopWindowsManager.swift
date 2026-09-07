@@ -177,9 +177,9 @@ final class DesktopWindowsManager: ObservableObject {
             forName: NSWindow.didMoveNotification,
             object: panel,
             queue: .main
-        ) { [weak self, weak panel] _ in
+        ) { [weak panel] _ in
             Task { @MainActor in
-                guard let self, let panel else { return }
+                guard let panel else { return }
                 UserDefaults.standard.set(NSStringFromRect(panel.frame), forKey: kind.frameKey)
             }
         }
