@@ -1,623 +1,374 @@
-# QQPlayer (iOS)
+# QQPlayer 🎵
 
 > **fork 声明**：本项目基于 [Cosmos Music Player](https://github.com/clquwu/Cosmos-Music-Player)（GPL-3.0，作者 Raphael Boullay Le Fur）二次开发，详见 [NOTICE.md](NOTICE.md)。本仓库整体以 GPL-3.0 发布。
 
+QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发烧友与外语学习者打造。
+
+- 支持 FLAC、WAV、M4A、MP3、Opus、OGG、DSD（DoP / PCM 转换）、DSF 等格式
+- 内建图形均衡器、ReplayGain 音量标准化、双源歌词、跟唱练习（倍速 / AB 循环）
+- iOS 端深度整合 Apple 生态：iCloud Drive / 本地双存储、CarPlay、Siri、主屏幕小组件
+- macOS 原生版（QQPlayerMac）提供桌面级体验：本地曲库扫描、在线搜索下载（网易云 / 歌曲海 + 夸克网盘）、标签刮削（MusicBrainz）、迷你模式与桌面歌词窗
+
 ---
 
-# QQPlayer 🎵
+## 平台矩阵
+
+| 平台 | 形态 | 版本 | 系统要求 |
+|------|------|------|----------|
+| 📱 iOS | App Store「QQPlayer」（iPhone / iPad，付费买断·无内购） | **1.0.0** | iOS 18.5+ |
+| 🖥️ macOS | QQPlayerMac 原生应用（仓库内 target，自行构建） | 随仓库迭代 | macOS 13.0+ |
+
+- **iOS 与 macOS 共享同一套 Core 逻辑**（数据库、播放引擎、歌词 / 跟唱、均衡器、元数据解析、本地化），两平台行为一致、同步演进。
+- 仓库：<https://github.com/daxmate/qqplayer-swift>（原 qqplayer-ios，2026-08-30 更名）
 
 ---
-
-QQPlayer 是一款高品质音乐播放器，同时支持 iCloud Drive 同步与本地存储，让用户可以灵活地管理自己的音乐。应用专为 iOS 与 Apple 生态打造，完整支持 CarPlay。
-
-一款为 iOS 打造的发烧级音乐播放器，支持 FLAC、WAV、M4A、MP3、Opus、OGG、DSD、DSF 等格式，具备 Apple CarPlay、DSD 播放（DoP 与 PCM 转换）、双存储方案（iCloud / 本地）、歌单管理、歌手信息整合、图形均衡器与多语言支持等高级特性。
 
 ## 功能 ✨
 
-### 🎤 跟唱练习（本项目新增）
-- **跟唱模式**：逐句练习，每句播完自动暂停（可开关），适合练听力 / 跟读
-- **倍速变速**：0.5x ~ 2.0x 变速不变调（基于 AVAudioUnitTimePitch），点击菜单选择
-- **单句循环 / AB 区间循环**：对任意一句或一段区间反复精听
-- **逐句控制**：上一句 / 下一句 / 点句跳转播放，句末检测驱动自动暂停
-- **跟唱控制条**：仅在歌词全屏页出现，双击歌词切换跟唱模式
+### 🎧 双平台共享（Core）
 
-### 📝 歌词系统（本项目新增）
-- **双源候选**：网易云（eapi 协议，含中文翻译双行显示）+ LRCLIB，自动择优
-- **歌词搜索页**：手动搜索挑选歌词，指定后持久化保存，可一键恢复自动匹配
-- **小歌词窗口**：三行迷你歌词（当前句主题色高亮），点击或左滑进入全屏歌词页
-- **全屏歌词页**：右滑滑入滑出，当前句高亮 + 自动滚动，背景半透明光晕
-- **搜索缓存**：歌词搜索结果本地缓存（TTL 7 天），离线秒出
+**音频播放**
+- 高品质无损播放：FLAC、WAV、M4A、MP3、Opus、OGG、DSD（DoP / PCM）、DSF
+- **双引擎架构**：AVAudioEngine 原生引擎 + SFBAudioEngine（Opus / OGG / DSD 等格式解码与元数据读写），按格式自动路由
+- **ReplayGain**：自动音量归一化，听感一致
+- **图形均衡器**：内置预设 + 自定义滑杆编辑 + 手动 / GraphicEQ 文本编辑，实时生效
+- 内嵌封面读取：FLAC / MP3 / WAV / M4A / DSF 元数据封面提取与缓存
 
-### 📊 智能歌单（本项目新增）
-- **自动歌单**：基于播放历史自动生成（播放列表页置顶卡片 + 详情页）
-- **年代分组**：50s ~ 20s 按年代自动归类（Apple Music Decades 粒度）
-- **播放历史记录**：完整播放埋点，驱动智能推荐
+**歌词与跟唱**
+- 双源歌词：网易云（eapi 协议，中文翻译双行）+ LRCLIB，自动择优，手动搜索指定后持久化
+- 跟唱模式：逐句练习、句末自动暂停、倍速 0.5x–2.0x（变速不变调）、单句循环 / AB 区间循环、点击歌词跳转
+- 歌词缓存（TTL 7 天），离线秒出
 
-### 🎛️ 播放体验（本项目新增）
-- **全屏播放页**：封面 + 歌词 + 控制区弹性布局，封面下拉关闭，左缘横滑切歌（封面跟手滑出滑入）
-- **折叠控制容器**：进度条 + 播放三键常驻，上滑展开更多按钮，下滑收起
-- **播放顺序四态轮换**：顺序 / 单曲 / 列表循环 / 随机，一键循环切换
-- **合并透明控制区**：播放顺序 / 歌单 / 输出源合并为透明容器，任意位置可滑
+**音乐管理**
+- GRDB（SQLite）曲库：歌手 / 专辑 / 曲目 / 歌单 / 播放历史，文件指纹（stableId）幂等索引
+- 智能歌单：由播放历史驱动（最近添加 / 最近播放 / 常听排行 / 年代分组）
+- 播放顺序四态（顺序 / 单曲 / 列表循环 / 随机）、收藏、睡眠定时器
+- 中文体验：歌手简繁归一（日文假名免疫）、繁体中文本地化
 
-### 🇨🇳 中文体验（本项目新增）
-- **歌手简繁归一**：显示层自动归一简繁体（日文假名免疫），列表 / 详情 / 搜索全覆盖
-- **繁体中文完整本地化**：zh-Hant（台湾用词校对），zh-Hans 简体同步
-- **深色模式开关**：可手动覆盖系统外观（含自动歌单 / 封面拼贴适配）
+**工程**
+- 共享 Core 层：45 个 A 类服务 / 模型直接共享，16 个 iOS 专属 B 类以 `#if os(iOS)` 隔离
+- **600+ 自动化测试**（Swift Testing）+ GitHub Actions CI（lint/format + iOS 单测 + macOS 构建与资源断言）
+- 5 语言本地化：简体中文 / 繁体中文 / English / Français / Русский
 
-### 🚗 Apple CarPlay 集成
-- **完整 CarPlay 支持**：为车内安全音乐控制提供原生 CarPlay 界面
-- **标签页导航**：快速访问全部歌曲、收藏、歌单与浏览等分区
-- **专辑封面展示**：高质量封面，支持 aspect-fill 裁剪与占位图
-- **正在播放界面**：完整的播放控制，包括播放/暂停、切歌与进度拖动
-- **无缝同步**：手机与 CarPlay 之间播放状态实时同步
-- **多语言支持**：CarPlay 界面完整本地化
+---
 
-### 🎧 音频播放
-- **高品质无损支持**：原生支持无损 FLAC、WAV 音频文件，以及 MP3
-- **图形均衡器**：基于文本的 GraphicEQ 支持，实现精确的音频定制
-- **自定义 EQ 配置**：配置并保存多套 GraphicEQ 设置
-- **Siri 集成**：通过语音控制音乐播放
-- **ReplayGain 支持**：自动音量归一化，带来一致的听感
-- **内嵌封面**：从 FLAC、MP3、WAV 元数据中读取并展示专辑封面
-- **高级音频引擎**：基于 AVFoundation 构建，保证最优音质
+### 📱 iOS（App Store 版）
 
-### 📚 音乐库管理
-- **双存储支持**：可选 iCloud Drive（跨设备同步）或本地存储（仅限本机）
-- **iCloud Drive 集成**：使用 iCloud 存储时音乐文件自动跨设备同步
-- **本地文件支持**：完整支持存储在 App Documents 文件夹中的音乐文件
-- **智能曲库索引**：自动发现并索引来自两种存储位置的音乐文件
-- **元数据提取**：从 FLAC、MP3、WAV 文件中读取歌手、专辑、标题等元数据
-- **离线优先**：本地文件完全离线可用，无需联网
+**🎤 跟唱练习**
+- 全屏歌词双击切换跟唱模式：逐句练习、每句播完自动暂停（可开关）
+- 倍速变速 0.5x–2.0x、单句循环 / AB 区间循环、上一句 / 下一句 / 点句跳转
+- 跟唱控制条常驻歌词全屏页
 
-### 👤 歌手信息
-- **双 API 集成**：整合 Discogs 与 Spotify API，获取全面的歌手资料
-- **歌手档案**：丰富的歌手生平与信息
-- **高清图片**：歌手照片与专辑封面
-- **备选来源**："歌手不对？"功能可切换数据来源
-- **智能缓存**：高效缓存系统，支持离线访问
+**📝 歌词系统**
+- 双源候选（网易云 eapi 含中文翻译双行 + LRCLIB）自动择优，可手动指定并一键恢复自动匹配
+- 三行迷你歌词窗（当前句高亮），点击 / 左滑进入全屏歌词页（自动滚动、背景光晕）
+- 搜索缓存本地持久化（TTL 7 天）
 
-### 🎤 Siri 语音控制
-- **完整语音集成**：通过 Siri 语音命令控制音乐播放
-- **智能识别**：对歌单与歌曲名称支持模糊匹配，容忍发音差异
-- **完整控制**：可通过语音播放收藏、歌单、指定歌曲或全部音乐
-- **无缝体验**：合理的队列管理与播放状态同步
+**📊 智能歌单**
+- 自动歌单卡片 + 详情页，年代分组（50s ~ 20s），完整播放历史埋点驱动
 
-#### 支持的 Siri 命令
+**🎛️ 播放体验**
+- 全屏播放页：封面 + 歌词 + 控制区弹性布局，下拉关闭，左缘横滑切歌
+- 折叠控制容器：进度条与播放键常驻，上滑展开更多控制
+- 合并透明控制区：播放顺序 / 歌单 / 输出源
+- 深色模式开关（可手动覆盖系统外观）
+- 中断恢复：来电 / 其他 App 打断播放后，从实际播放位置继续
 
-**英文命令：**
-- "Hey Siri, play my music on QQPlayer"
-- "Hey Siri, play my favorites on QQPlayer"
-- "Hey Siri, play [playlist name] on QQPlayer"
-- "Hey Siri, play [song name] on QQPlayer"
+**🚗 CarPlay**
+- 原生 CarPlay 支持（entitlement 已启用）：标签页导航、正在播放界面、专辑封面、手机与车机播放状态实时同步、界面完整本地化
 
-**法文命令：**
-- "Dis Siri, joue ma musique sur QQPlayer"
-- "Dis Siri, joue mes favoris sur QQPlayer"
-- "Dis Siri, joue la playlist [nom] sur QQPlayer"
-- "Dis Siri, joue [nom de chanson] sur QQPlayer"
+**🎧 均衡器与音频**
+- 10 段常用预设 + 自定义滑杆编辑器（新增）
+- GraphicEQ 文本 / 手动编辑，多套配置保存切换
+- ReplayGain、内嵌封面、后台播放
 
-### 🌍 国际化
-- **多语言支持**：简体中文、繁体中文、英文、法文、俄文
-- **界面本地化**：完整的 UI 翻译系统
-- **文化适配**：正确的复数形式与日期格式
-- **易于扩展**：模块化系统，可方便地添加新语言
+**💡 功能发现系统（新增）**
+- 首次使用气泡提示 + 帮助中心 + 新功能（WhatsNew）弹窗，上手零门槛
 
-### ☁️ 存储方案
-- **iCloud Drive**：音乐、收藏与歌单跨设备自动同步
-- **本地存储**：音乐直接存放在设备本地，无需 iCloud
-- **灵活选择**：两种存储方式可同时混用
-- **离线模式**：无网络时功能完整可用（尤其配合本地文件）
-- **智能降级**：优雅处理网络连接异常
-- **认证管理**：使用云端功能时提供稳健的 iCloud 认证
+**📚 音乐库管理**
+- 双存储：iCloud Drive（跨设备同步）或本地 Documents，可混用
+- 智能索引自动发现音乐，离线优先
+
+**👤 歌手信息**
+- Spotify + Discogs 双源（可选 API key，见「依赖 📦」），歌手生平、照片，缓存离线可用，支持「歌手不对？」切换来源
+
+**🎤 Siri**
+- AppIntents + 意图扩展：支持「播放我的音乐 / 收藏 / 歌单 / 指定歌曲」等命令，名称模糊匹配（示例：*"Hey Siri, play my favorites on QQPlayer"* / *"Dis Siri, joue mes favoris sur QQPlayer"*）
+
+**🌍 国际化与存储**
+- 5 语言本地化；iCloud / 本地双存储灵活混用；无网络完整可用（本地文件）
+
+**🧩 系统集成**
+- 主屏幕小组件（PlayerWidget）、分享扩展（Share）、CarPlay、Siri
+
+---
+
+### 🖥️ macOS（QQPlayerMac 原生版）
+
+> 纯 SwiftUI 原生桌面应用，与 iOS 共享 Core。默认曲库目录 `~/Music/QQPlayer`，可添加任意外部文件夹。
+
+**📂 本地曲库**
+- 本地文件夹扫描 + 索引（FileManager 全扫），设置页管理多个曲库文件夹，默认目录始终在扫
+- **FSEvents 实时监控**：文件夹增删改自动重扫（去抖 2s），新增歌曲即播
+- **iCloud Drive dataless 文件处理**：跳过未落地文件 + 预触发批量下载实体化 + 下载完成自动补扫，索引不被云端文件卡死
+- 文件类型设置（chips 多选，按启用格式过滤，取消格式自动移出索引不删文件）
+- 索引中增量刷新（新解析的歌陆续出现）、扫描诊断日志（`~/Library/Logs/QQPlayerMac/scan.log`）
+- **拖入导入**：拖文件到窗口或歌单行即导入并加入歌单
+- **多选批量管理**：⌘ / ⇧ 多选 + 右键批量「移到废纸篓」（`FileManager.trashItem`，可恢复），删除联动清理歌单 / 收藏引用与播放队列（当前播放被删自动续播）
+
+**🎧 播放**
+- SFBAudioEngine 全格式播放（Opus / OGG / DSD→PCM / FLAC 等），DSD 曲目播放
+- **播放页频谱可视化**（FFT 实时分析）与歌词面板同屏
+- 恢复播放：启动后从上次断点续播（不自动播放）
+- 媒体键桥接（MPRemoteCommandCenter / MPNowPlayingInfoCenter）
+- 倍速、跟唱、AB 循环与 iOS 一致（KaraokeController 共享）
+
+**📝 歌词**
+- 歌词面板常驻（当前行高亮 + 自动居中，点击行跳转 / 设 AB 终点）
+- 歌词搜索页（双源候选手动指定 / 恢复自动）、歌词设置（字号 / 译文行 / 整体延迟校准）
+- 歌词是 App 第一重要功能，不提供隐藏入口
+
+**🎛️ 均衡器（EQ）**
+- 引擎级接线（AVAudioEngine + SFB 双链路），10 段滑杆编辑器 + 手动参数式编辑器（0–16 段 / 频率 / Q 值）+ GraphicEQ 文本导入，导出即复制
+
+**🔍 在线搜索下载（macOS 独有）**
+- 网易云在线客户端（共享 eapi 层，与 iOS 歌词同一套加密协议）：搜索 → 播放直链 / 下载
+- **歌曲海（Gequhai）** 搜索源 + **夸克网盘** 直链下载：二维码扫码登录、分享链接解析、音质挑选
+- 源切换（网易云 / 歌曲海），下载编排 `.part` 原子落盘 → 自动入曲库（重名自动递增序号）
+- **SearchAnything 全屏搜索**（⌘K）：本地歌曲 / 在线下载 / 歌手 / 专辑 / 设置分类一处直达
+- 设置「下载」分类：音质档位、下载目录
+
+**🏷️ 标签刮削（macOS 独有）**
+- 右键「编辑标签 / 刮削」：MusicBrainz（recording 降级链）+ 网易云双源候选，点选即用（含封面）
+- 字段：标题 / 歌手 / 专辑 / 年份（网易云惰性补全）/ 风格 / 曲目号 / 专辑歌手，重命名模板（`{artist}/{title}`…，自动去重与子目录）
+- 写标签引擎基于 SFBAudioEngine 原生元数据写入（MP3 / M4A / FLAC / OGG / Opus），原子写落盘不损坏文件
+- 批量刮削：设置页一键整库或选区批量，高置信度自动写入（100 首上限）
+- genre 全链路：解析器读取 → 数据库落库 → 展示 / 编辑
+
+**🪟 窗口与交互**
+- 三栏布局（侧边栏 / 列表 / 内容区），歌单详情内容区内嵌（非弹窗）
+- **迷你模式 v2**：主窗工具栏一键切迷你播放器 + **桌面歌词窗**（主窗 ⇄ 迷你互斥，歌词开关 / 封面点击返回主窗 / 跟随 App 强调色）
+- 播放队列面板：可拖排、删除、点行跳转，重排即落盘、冷启动恢复
+- 快捷键：表驱动定义 + 设置页**录制 UI**（Space / ← → / ⌘← → / R / F / G / A / B / [ ] 等，冲突检测）
+- 自动歌单 4 卡 + 年代 drill-down；歌单管理（新建 / 重命名 / 删除 / 右键添加）
+- 侧边栏搜索（歌曲 / 专辑 / 歌手 / 歌单分组）+ 双击播放（macOS 原生 primaryAction）
+- 列表交互：列头三态排序、定位当前播放、右键菜单补全
+- 主题三态（浅 / 深 / 跟随系统）+ 强调色 6 预设（全局 NSApp 生效）
+- 设置窗口系统化（Settings scene，⌘,），左侧分类导航；封面 artwork 全接入（专辑 / 歌单 / 搜索行 + `cover.jpg` 兜底）
+- 帮助中心 / 新功能弹窗（WhatsNew）/ 首次提示气泡
+- 运行时日志落盘（`~/Library/Logs/QQPlayerMac/stdout.log` 等），问题可直接读日志定位
+
+---
 
 ## 技术架构 🏗️
 
-### 核心组件
-
-#### 服务层
-- **AppCoordinator**：应用主协调器，管理所有服务与初始化
-- **PlayerEngine**：高级音频播放引擎，支持后台播放与 GraphicEQ 处理
-- **DatabaseManager**：基于 SQLite/GRDB 的本地数据库，支持迁移
-- **StateManager**：iCloud 状态同步与本地持久化
-- **LibraryIndexer**：自动发现与索引音乐文件
-
-#### API 集成
-- **DiscogsAPI**：从 Discogs 数据库获取丰富的歌手信息
-- **SpotifyAPI**：基于 OAuth2 认证的备选歌手数据
-- **HybridMusicAPI**：服务之间的智能回退机制
-
-#### 数据管理
-- **CloudDownloadManager**：处理 iCloud Drive 文件操作
-- **FileCleanupManager**：管理从 iCloud Drive 删除文件的本地清理
-- **ArtworkManager**：从两种存储类型中提取并缓存专辑封面
-
-### 数据库结构
-
-```sql
--- 歌手表
-CREATE TABLE artist (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL COLLATE NOCASE
-);
-
--- 专辑表
-CREATE TABLE album (
-    id INTEGER PRIMARY KEY,
-    artist_id INTEGER REFERENCES artist(id) ON DELETE CASCADE,
-    title TEXT NOT NULL COLLATE NOCASE,
-    year INTEGER,
-    album_artist TEXT COLLATE NOCASE
-);
-
--- 曲目表
-CREATE TABLE track (
-    id INTEGER PRIMARY KEY,
-    stable_id TEXT NOT NULL UNIQUE,
-    album_id INTEGER REFERENCES album(id) ON DELETE SET NULL,
-    artist_id INTEGER REFERENCES artist(id) ON DELETE SET NULL,
-    title TEXT NOT NULL COLLATE NOCASE,
-    track_no INTEGER,
-    disc_no INTEGER,
-    duration_ms INTEGER,
-    sample_rate INTEGER,
-    bit_depth INTEGER,
-    channels INTEGER,
-    path TEXT NOT NULL,
-    file_size INTEGER,
-    replaygain_track_gain REAL,
-    replaygain_album_gain REAL,
-    replaygain_track_peak REAL,
-    replaygain_album_peak REAL,
-    has_embedded_art INTEGER DEFAULT 0
-);
-
--- 收藏表
-CREATE TABLE favorite (
-    track_stable_id TEXT PRIMARY KEY
-);
-
--- 歌单表
-CREATE TABLE playlist (
-    id INTEGER PRIMARY KEY,
-    slug TEXT NOT NULL UNIQUE,
-    title TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    last_played_at INTEGER DEFAULT 0
-);
-
--- 歌单条目表
-CREATE TABLE playlist_item (
-    playlist_id INTEGER REFERENCES playlist(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    track_stable_id TEXT NOT NULL,
-    PRIMARY KEY (playlist_id, position)
-);
+```
+QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
+        │                                  │
+        └──────────► 共享 Core ◄───────────┘
+   （Services / Models / Helpers，45 A 类直接共享 + 16 B 类 #if os(iOS)）
+        │
+        ├── iOS 专属：Views/（SwiftUI）、CarPlaySceneDelegate、PlayerWidget / Share / SiriIntentsExtension
+        └── macOS 专属：Mac/（35 个视图与窗口文件，经 target 白名单编译）
 ```
 
-## 安装说明 🚀
+### 双入口
+- **QQPlayerApp.swift**：iOS 入口，编排初始化、iCloud 状态机、Siri / CarPlay / 小组件
+- **QQPlayerMacApp.swift**：macOS 入口（含 `Settings` scene）
+
+### 核心组件（服务层单例 + NotificationCenter 事件总线，轻 MVVM）
+- **PlayerEngine**：AVAudioEngine 高级播放内核（后台播放、无缝预加载、ReplayGain、EQ 接入、NowPlaying / 远程控制、播放状态持久化、CarPlay 协同）；macOS 分支遇 Opus / OGG / DSD 委托 SFB 引擎，双引擎统一桥接
+- **SFBAudioEngineManager**：SFBAudioEngine 封装——Opus / Vorbis / DSD 解码、DSD→PCM / DoP、EQ 处理图附加、元数据读写
+- **DatabaseManager**：GRDB 数据访问层——曲库 CRUD + 逐列 ALTER 迁移 + 搜索（归一化分词）+ 去重合并 + 歌单 / 收藏 / 播放历史
+- **LibraryIndexer**：曲库扫描与索引——iOS 用 NSMetadataQuery（iCloud），macOS 用 FileManager 目录扫描 + FSEvents 监控；元数据解析（时长 / 采样率 / 位深 / ReplayGain / 封面 / genre）
+- **KaraokeController**：跟唱决策（句级推进、倍速、单句循环、AB 区间、句末自动暂停、延迟校准）——共享纯逻辑 + iOS 震动反馈隔离
+- **LyricsManager / LyricsSearch / LyricsParsing**：歌词内嵌提取（FLAC Vorbis / ID3 USLT+SYLT / DSF）、网易云 eapi + LRCLIB 在线获取、磁盘缓存
+- **NeteaseOnlineClient**：网易云共享客户端（eapi 加密 / 搜索 / 直链 / 歌曲详情补年份）——iOS 歌词与 macOS 在线下载共用同一层
+- **QuarkClient / GequhaiClient**（macOS）：夸克网盘扫码登录与直链解析、歌曲海搜索（web 桌面版 provider 移植）
+- **TagWriterService / TagRenameLogic / MusicBrainzClient / ScrapeLogic**（macOS）：标签刮削写回（SFBAudioEngine 原生写入 + 原子落盘 + 改名模板）
+- **EQManager**：图形 EQ——预设管理、运行时频率 / 增益应用到双引擎
+- **StateManager**：iCloud + 本地状态同步（收藏 / 歌单 / 播放器状态），原子写、损坏文件隔离
+- **ArtworkManager**：封面提取（内嵌 / 文件头解析）+ 内存 + 磁盘缓存
+- **CloudDownloadManager / FileCleanupManager**（iOS）：iCloud 文件按需落地与一致性清理
+- **HybridMusicAPI / SpotifyAPI / DiscogsAPI**（iOS）：歌手资料——Spotify 优先、Discogs 兜底 + 磁盘缓存
+- **AudioMetadataParser**：FLAC / MP3 / WAV / M4A / DSF 分域解析（含 genre、MP4 空 covr 清理）
+
+### 数据库结构（GRDB / SQLite，迁移式演进）
+核心表：`artist`（歌手）、`album`（专辑，含年份 / 专辑歌手）、`track`（曲目：文件指纹 stableId、时长 / 采样率 / 位深 / 声道、路径、ReplayGain、genre、内嵌封面标记）、`favorite`（收藏）、`playlist` / `playlist_item`（歌单与有序条目）、`play_history`（播放历史，驱动智能歌单）。曲库以文件 SHA-256 指纹（stableId）幂等索引，重命名 / 移动文件可自愈迁移。
+
+### 平台隔离约定
+- iOS 专属能力（AVAudioSession、UIKit、CarPlay、WidgetKit、AppIntents、iCloud）以 `#if os(iOS)` 收敛在共享文件内或独立文件中
+- macOS target 通过显式文件白名单（membershipExceptions）只编译 Mac/ + 共享 Core，iOS 视图不进入 macOS 构建
+
+### 测试与 CI
+- QQPlayerTests 54 个测试文件，覆盖共享 Core 与双平台决策逻辑（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析等）
+- CI（GitHub Actions）：swiftlint + swiftformat → iOS 模拟器 `xcodebuild test` → macOS `QQPlayerMac` 构建 + 产物资源断言
+
+---
+
+## 安装与构建 🚀
 
 ### 环境要求
-- **Xcode**：最新稳定版（建议 Xcode 15+）
-- **Swift**：6+
-- **iOS 部署目标**：iOS 18.5+
-- **Git**：用于版本管理
-- **有效的 Apple 开发者账号**：使用 iCloud 能力所必需
-- **真机设备**：物理 iOS 设备（测试 iCloud 功能所必需）
+- **Xcode** 16+（推荐 Xcode 26+；项目使用 folder-synchronized groups 与 Swift 6 严格并发，日常开发与 CI 均基于 Xcode 26）
+- **Git**
+- iOS 端：有效的 Apple 开发者账号（iCloud / CarPlay / Siri 能力签名）与真机（iCloud 功能需要）
 
-### 安装步骤
+### 📱 iOS（App Store 版同源）
 
-1. **克隆仓库**
-   ```bash
-   git clone git@github.com:daxmate/qqplayer-ios.git
-   cd qqplayer-ios
-   ```
+```bash
+git clone git@github.com:daxmate/qqplayer-swift.git
+cd qqplayer-swift
+```
 
-2. **配置环境变量**
-   - 复制 `.env.template` 为 `.env`
-   - 填入你的 API 凭据：
-   ```bash
-   SPOTIFY_CLIENT_ID=your_spotify_client_id
-   SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-   DISCOGS_CONSUMER_KEY=your_discogs_consumer_key
-   DISCOGS_CONSUMER_SECRET=your_discogs_consumer_secret
-   ```
+1. 打开 `QQPlayer.xcodeproj`，选择 **QQPlayer** scheme
+2. 选择你的开发团队（签名需要：iCloud 容器 `iCloud.com.daxmate.qqplayer.ios`、App Group `group.com.daxmate.qqplayer.ios`、CarPlay / Siri entitlements）
+3. 真机运行（iOS 18.5+）；单测可 `⌘U` 或命令行 `xcodebuild test -scheme QQPlayer`
+4. **添加音乐**（二选一或混用）：
+   - iCloud Drive：文件放入「iCloud Drive → QQPlayer」
+   - 本地：文件放入「我的 iPhone → QQPlayer」（应用内「文件」导入亦可）
+5. 首次启动自动扫描索引，即可开听
 
-3. **申请 API Key**
+> 可选：歌手信息使用 Spotify / Discogs 时配置 API key（见下）。
 
-   **Spotify API Key：**
-   - 访问 [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/applications)
-   - 创建一个新应用
-   - 将 Client ID 与 Client Secret 复制到 `.env` 文件
+### 🖥️ macOS（QQPlayerMac）
 
-   **Discogs API Key：**
-   - 访问 [Discogs Developer Settings](https://www.discogs.com/settings/developers)
-   - 创建一个新应用
-   - 将 Consumer Key 与 Consumer Secret 复制到 `.env` 文件
+1. 打开 `QQPlayer.xcodeproj`，选择 **QQPlayerMac** scheme，直接 Run（无需开发者账号；应用非沙盒，直接读取本地文件夹）
+2. 默认扫描 `~/Music/QQPlayer`（首次启动自动创建），把音乐放进去即自动入曲库；也可以在 **设置 → 音乐库** 添加外部文件夹，或直接把文件**拖入窗口 / 歌单行**导入
+3. 在线下载：工具栏云下载按钮（网易云 / 歌曲海；夸克源首次需扫码登录）；标签刮削：曲库列表右键「编辑标签 / 刮削」
 
-4. **配置 iCloud**
-   - 确保你的 Apple 开发者账号已开通 iCloud 能力
-   - 应用使用容器：`iCloud.com.daxmate.qqplayer.ios`
-   - 如需修改，请在工程设置中更新 Bundle Identifier
+> 命令行构建：`xcodebuild build -scheme QQPlayerMac -derivedDataPath build/DerivedDataMac`（先 `unset CC CXX` 避免 Homebrew gcc 劫持 SPM 编译）。
 
-5. **构建并运行**
-   - 在 Xcode 中打开 `QQPlayer.xcodeproj`
-   - 选择你的开发团队
-   - 在真机上构建并运行（iCloud 功能需要真机）
+### 🔑 环境变量（全部可选）
 
-### 首次启动设置
+复制 `.env.template` 为 `.env` 并填入所需凭据；`.env` 需随构建加入 App bundle（或使用 Xcode 环境变量）。以下 key **全部可选**——未配置不会导致崩溃：歌手网络资料自动降级（缓存仍可用），其余功能不受影响：
 
-1. **登录 iCloud**（可选）：仅当需要跨设备同步时才登录
-2. **添加音乐**：选择你偏好的存储方式：
-   - **iCloud Drive**：将音乐文件放入 "iCloud Drive → QQPlayer" 文件夹
-   - **本地存储**：将音乐文件放入 "我的 iPhone → QQPlayer" 文件夹
-3. **曲库同步**：应用会自动检测并索引两个位置的音乐
-4. **开始使用**：创建歌单，尽情欣赏你的音乐！
+```bash
+SPOTIFY_CLIENT_ID=
+SPOTIFY_CLIENT_SECRET=
+DISCOGS_CONSUMER_KEY=
+DISCOGS_CONSUMER_SECRET=
+```
 
-## 使用指南 📱
-
-### 添加音乐
-
-你有两种存储方式可选：
-
-#### 方式一：iCloud Drive（跨设备同步）
-1. 打开 iOS 设备上的"文件"应用
-2. 进入 "iCloud Drive" → "QQPlayer"
-3. 将 FLAC、MP3 或 WAV 音乐文件放入此文件夹
-4. 文件将同步到登录同一 iCloud 账号的所有设备
-
-#### 方式二：本地存储（仅限本机）
-1. 打开 iOS 设备上的"文件"应用
-2. 进入 "我的 iPhone" → "QQPlayer"
-3. 将 FLAC、MP3 或 WAV 音乐文件放入此文件夹
-4. 文件仅保留在本设备（无需 iCloud）
-
-**混合存储**：两种方式可以同时使用——应用会从两个位置自动发现并索引音乐！
-
-### 使用图形均衡器
-1. **进入 EQ**：在正在播放界面点击均衡器图标
-2. **输入 GraphicEQ 文本**：以文本格式输入你的 GraphicEQ 设置
-3. **应用设置**：保存自定义的 GraphicEQ 配置
-4. **多套配置**：创建并在多套 GraphicEQ 设置之间切换
-5. **开关切换**：随时启用或停用均衡器，且不丢失设置
-
-GraphicEQ 格式允许你针对特定频率做增益调节，实现精确的音频控制。
-
-### 创建歌单
-1. 在歌单分区点击 "+" 按钮
-2. 输入歌单名称
-3. 从曲库中添加歌曲
-4. 歌单自动跨设备同步
-
-### 查看歌手信息
-1. 在曲库中进入任意歌手
-2. 查看来自 Discogs/Spotify 的丰富歌手资料
-3. 点击"歌手不对？"切换数据来源
-4. 歌手数据会缓存，可离线查看
-
-### 使用 Siri 语音控制
-1. **启用 Siri**：确保设备设置中已开启 Siri
-2. **授予权限**：在弹窗中允许 QQPlayer 使用 Siri
-3. **语音命令**：使用上文列出的任意支持的命令
-4. **智能匹配**：不用担心发音是否标准——应用对名称使用模糊匹配
-
-### 语言设置
-应用自动跟随设备的语言设置。目前支持：
-- 简体中文（zh-Hans）
-- 繁体中文（zh-Hant）
-- 英文（en）
-- 法文（fr）
-- 俄文（ru）
+---
 
 ## 依赖 📦
 
 ### Swift 包
-- **GRDB**：SQLite 数据库管理
-- **Foundation**：核心系统框架
-- **AVFoundation**：音频播放引擎与音频处理
-- **SwiftUI**：现代 UI 框架
-- **Combine**：响应式编程
+- **SFBAudioEngine**（sbooth，0.13.0）：Opus / OGG / DSD 等格式解码、DSD→PCM / DoP、元数据读写（含标签刮削写回引擎）
+- **GRDB.swift**：SQLite 数据访问（曲库 / 歌单 / 播放历史）
 
-### API 服务
-- **Spotify Web API**：歌手信息与元数据
-- **Discogs API**：综合音乐数据库
-- **iCloud Drive API**：跨设备同步
+### 系统框架
+SwiftUI、Combine、AVFoundation / AVFAudio、UIKit（iOS）/ AppKit（macOS）、MediaPlayer（macOS 媒体键）、CarPlay（iOS）、Intents / AppIntents（iOS）、WidgetKit（iOS）、UniformTypeIdentifiers、CryptoKit、ImageIO
+
+### 在线服务（按功能启用，无强制 key）
+| 服务 | 用途 | 平台 | API Key |
+|------|------|------|---------|
+| 网易云音乐（eapi） | 同步歌词（含中文翻译）、在线搜索下载源 | 双平台 | 无 |
+| LRCLIB | 歌词兜底源 | 双平台 | 无 |
+| MusicBrainz + Cover Art Archive + iTunes Search | 标签刮削候选源 | macOS | 无 |
+| 歌曲海（Gequhai） | 在线搜索源（结果指向夸克分享） | macOS | 无 |
+| 夸克网盘 | 在线下载直链（扫码登录） | macOS | 无 |
+| Spotify / Discogs | iOS 歌手资料（双源 + 缓存） | iOS | **可选** |
+
+---
 
 ## 目录结构 📂
 
 ```
+QQPlayer.xcodeproj            # 工程（QQPlayer iOS / QQPlayerMac 双 target 与 scheme）
 QQPlayer/
-├── Services/           # 核心业务逻辑服务
-│   ├── AppCoordinator.swift
-│   ├── PlayerEngine.swift
-│   ├── EQManager.swift
-│   ├── KaraokeController.swift
-│   ├── LyricsManager.swift
-│   ├── DatabaseManager.swift
-│   ├── StateManager.swift
-│   ├── LibraryIndexer.swift
-│   ├── SpotifyAPI.swift
-│   ├── DiscogsAPI.swift
-│   └── HybridMusicAPI.swift
-├── Views/              # SwiftUI 视图
-│   ├── Library/
-│   ├── Artists/
-│   ├── Albums/
-│   ├── Playlists/
-│   ├── Player/
-│   ├── Equalizer/
-│   └── Utility/
-├── ViewModels/         # 视图模型
-├── Models/             # 数据模型
-│   ├── DatabaseModels.swift
-│   ├── StateModels.swift
-│   ├── EqualizerModels.swift
-│   └── SettingsModels.swift
-├── Helpers/            # 工具类
-│   ├── LocalizationHelper.swift
-│   └── EnvironmentLoader.swift
-└── Resources/          # 本地化文件
-    ├── zh-Hans.lproj/
-    ├── zh-Hant.lproj/
-    ├── en.lproj/
-    ├── fr.lproj/
-    └── ru.lproj/
+├── QQPlayerApp.swift         # iOS 入口
+├── QQPlayerMacApp.swift      # macOS 入口（Settings scene）
+├── CarPlaySceneDelegate.swift / CarPlay+Playback.swift
+├── ContentView.swift
+├── Mac/                      # macOS UI（三栏、播放页、迷你模式、在线搜索、刮削编辑器等 35 文件）
+├── Services/                 # 共享 Core：播放引擎 / 歌词 / 跟唱 / EQ / 索引 / 在线客户端 / 刮削等
+├── Models/                   # 共享数据模型（Database / Settings / State / SFB）
+├── Views/                    # iOS SwiftUI 视图（Library / Player / Playlists / Artists / Albums / Utility）
+├── ViewModels/               # TutorialViewModel 等
+├── Helpers/                  # EnvironmentLoader / LocalizationHelper / ObjCExceptionCatcher
+├── Resources/                # 5 语言本地化（zh-Hans / zh-Hant / en / fr / ru）
+├── Assets.xcassets
+└── QQPlayer.entitlements
+PlayerWidget/                 # iOS 主屏幕小组件
+Share/                        # iOS 分享扩展
+SiriIntentsExtension/         # iOS Siri 意图扩展
+QQPlayerTests/                # Swift Testing 单测（54 文件，含 Fixtures 与 Mock）
+QQPlayerSiriTests/            # Siri 集成测试（需 Xcode 27 SDK，CI 已豁免）
+scripts/                      # 工程工具（add-test-file.py / add-grdb-to-tests.py / gen-zh-hant.py / pbxproj-membership.py / git-hooks）
+.github/workflows/ci.yml      # CI：lint/format + iOS 单测 + macOS 构建与资源断言
+LICENSE / NOTICE.md / PRIVACY.md
 ```
 
-另外还有 `SiriIntentsExtension/`（Siri 意图扩展）、`PlayerWidget/`（小组件）与 `Share/`（分享扩展）等独立 target。
+---
 
-# 参与贡献 🤝
+## 参与贡献 🤝
 
-欢迎为本项目贡献代码！请遵循以下准则，共同维护高质量的代码库。
+欢迎贡献代码、翻译与 issue 反馈！
 
-## 环境要求
+- **分支流程**：从 `main` 建 `feat/xxx` 或 `fix/xxx` 分支 → 提交 → PR 合入 `main`（CI 必须绿）
+- **提交信息**：conventional commits——`feat(scope): 描述` / `fix(scope): 描述` / `docs` / `refactor` / `test` / `chore`（scope 如 `mac`、`ios`、`lyrics`、`carplay`）
+- **代码风格**：提交前跑 `swiftlint lint` 与 `swiftformat --lint .`（双 target 都须通过）
+- **测试**：共享逻辑与双平台决策逻辑必须配 Swift Testing 单测；新测试文件用 `python3 scripts/add-test-file.py <文件>` 注册进 QQPlayerTests target；涉及共享 Services 新文件时同步登记 QQPlayerMac target 文件白名单（pbxproj membershipExceptions）与 iOS 侧（synchronized folder 自动包含）
+- **改动范围**：macOS 新 UI 文件放 `QQPlayer/Mac/`；iOS 专属放 `Views/` 或扩展 target；共享逻辑放 `Services/`
+- **本地化**：新 UI 文案补全 5 语言 key（zh-Hans / zh-Hant / en / fr / ru）
+- 注意：GitHub Actions 的 iOS 单测在模拟器运行；涉及 iCloud / CarPlay / 真机行为请在真机验证并在 PR 描述注明
 
-- **Xcode**：最新稳定版（建议 Xcode 15+）
-- **Swift**：6+
-- **iOS 部署目标**：iOS 18.5+
-- **Git**：用于版本管理
-- **真机设备**：物理 iOS 设备（测试 iCloud 功能所必需）
-
-## 开发流程
-
-1. 从 `main` 创建功能分支：
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. 遵循编码规范进行修改
-
-3. 提交更改：
-   ```bash
-   git add .
-   git commit -m "feat: add new feature description"
-   ```
-
-4. 推送到你的 fork 并创建 Pull Request
-
-## 编码规范
-
-### Swift 风格
-- 遵循 [Swift API Design Guidelines](https://swift.org/documentation/api-design-guidelines/)
-- 使用 SwiftLint 保证格式一致（提交前运行 `swiftlint`）
-- 尽可能优先使用 `let` 而非 `var`
-- 使用有意义的变量与函数名
-- 为公开 API 添加文档注释
-
-### 代码组织
-- 使用 `// MARK: -` 注释对相关功能分组
-- 尽量保持文件不超过 300 行
-- 使用扩展按功能组织代码
-- 遵循 MVC/MVVM 架构模式
-
-### 示例：
-```swift
-// MARK: - View Lifecycle
-override func viewDidLoad() {
-    super.viewDidLoad()
-    setupUI()
-    configureBindings()
-}
-
-// MARK: - Private Methods
-private func setupUI() {
-    // Implementation
-}
-```
-
-## Pull Request 规范
-
-### 提交之前
-- [ ] 代码有完善的文档
-- [ ] UI 变更附截图/GIF
-- [ ] 在真机上测试过 iCloud 功能
-- [ ] 环境变量已正确配置
-
-### PR 描述模板
-```markdown
-## Description
-简要描述改动内容
-
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-
-## Testing
-- [ ] Tested on iOS device
-- [ ] iCloud sync functionality verified
-- [ ] API integrations working
-
-## Screenshots
-(如有)
-```
-
-## 提交信息格式
-
-使用 conventional commits 格式：
-```
-type(scope): description
-
-feat(auth): add biometric login support
-fix(network): resolve timeout issues
-docs(readme): update installation instructions
-```
-
-类型：`feat`、`fix`、`docs`、`style`、`refactor`、`test`、`chore`
-
-## 问题反馈
-
-报告问题时请包含：
-- iOS 版本与设备型号
-- Xcode 版本
-- Swift 版本
-- 复现步骤
-- 预期行为与实际行为
-- 崩溃日志或错误信息
-- 如有可能附上截图
-- iCloud 账号状态
-
-## 代码评审流程
-
-1. 所有 PR 至少需要一次评审
-2. 及时响应评审意见
-3. 保持 PR 聚焦且规模合理
-4. 回复评论并按需更新代码
-5. 确保所有测试通过且功能在真机上可用
-
-## 重点贡献方向
-
-### 国际化
-添加新语言：
-
-1. 在 `Resources/` 中创建新的 `.lproj` 文件夹
-2. 复制 `en.lproj/Localizable.strings` 作为模板
-3. 将所有字符串翻译为目标语言
-4. 如需要，更新 `LocalizationHelper.swift` 以支持区域格式
-5. 用新语言测试 UI
-
-### API 集成
-添加新的音乐 API：
-
-1. 在 `Services/` 中创建新的服务文件
-2. 实现所需协议
-3. 更新 `HybridMusicAPI.swift` 接入新服务
-4. 添加适当的错误处理与缓存
-5. 更新环境变量文档
-
-### 音频处理
-增强音频功能：
-
-1. 扩展 `PlayerEngine.swift` 实现核心音频功能
-2. 更新 `EQManager.swift` 实现 EQ 相关功能
-3. 确保实时处理保持音频质量
-4. 使用各种音频格式与采样率测试
-5. 记录新增的音频处理能力
-
-感谢你的贡献！🚀
+---
 
 ## 安全与隐私 🔒
 
-- **灵活存储**：音乐文件存储在设备本地或用户个人的 iCloud Drive
-- **用户自主**：完全掌控音乐文件的存储位置（本地或云端）
-- **API Key**：通过环境变量安全加载
-- **无追踪**：不收集或追踪任何用户数据
-- **离线优先**：无需联网即可完整使用（尤其配合本地存储）
-- **加密同步**：iCloud 同步使用 Apple 端到端加密
-- **无外部服务器**：音乐文件永远不会离开你的设备/iCloud 账号
+- **本地播放器**：无账号系统、无广告 SDK、无统计分析、无第三方追踪、无数据收集
+- **音乐文件不离开设备**：仅存储在设备本地或你自己的 iCloud Drive（由 Apple 服务同步，适用 Apple 隐私政策）
+- **网络请求仅发最小必要信息**：播放歌曲并请求歌词 / 刮削时，向第三方服务（网易云、LRCLIB、MusicBrainz 等）发送**歌曲标题与歌手名**用于匹配，结果仅保存在本地
+- **API Key**：通过环境变量注入（可选），不硬编码、不上传
+- **离线优先**：本地文件与歌词缓存完全离线可用
+- 完整隐私政策（中英双语，App Store 提交版本）见 **[PRIVACY.md](PRIVACY.md)**
 
-## 疑难排查 🔧
+---
 
-### 常见问题
+## 常见问题 🔧
 
-**音乐不显示：**
-- iCloud 文件：检查 iCloud Drive 是否已启用并登录
-- 本地文件：确认文件位于本地的 "QQPlayer" 文件夹
-- 确认文件为 FLAC、MP3 或 WAV 格式
-- 尝试在应用内手动同步
-- 同时检查 iCloud Drive 与 "我的 iPhone" 两个位置
+**iOS：看不到导入的音乐？**
+检查文件位置（iCloud Drive → QQPlayer 或 我的 iPhone → QQPlayer）、格式是否为支持的音频，并确认 iCloud 已登录（iCloud 文件首次需下载落地）。
 
-**歌手信息缺失：**
-- 检查网络连接
-- 确认 API Key 配置正确
-- 尝试"歌手不对？"功能切换备选来源
+**macOS：曲库是空的？**
+确认音乐在曲库文件夹（默认 `~/Music/QQPlayer`）或已添加的外部文件夹内；可在设置中「立即扫描」或查看 `~/Library/Logs/QQPlayerMac/scan.log`。
 
-**均衡器不生效：**
-- 确认均衡器已启用（开关打开）
-- 检查音频输出是否被外部限制（耳机安全音量、音量上限等）
-- 应用自定义设置前先尝试重置为预设
-- 若更改未立即生效，重启播放
+**macOS：下载歌曲失败？**
+查看面板红字原因——会员 / VIP / 版权受限歌曲（网易云）无可用源属正常；夸克源需先扫码登录。
 
-**歌单同步异常：**
-- 确认 iCloud Drive 有足够存储空间
-- 检查设备网络连接
-- 尝试退出并重新登录 iCloud
+**歌词不显示 / 显示原文无翻译？**
+先手动搜索指定歌词（搜索页），或检查网络；网易云头部带 credits 的歌词会被识别为纯歌词页。
 
-**Siri 不工作：**
-- 确认设置 → Siri 与搜索中已启用 Siri
-- 在弹窗中允许 QQPlayer 使用 Siri
-- 尝试说出 "QQPlayer" 帮助 Siri 识别应用
-- 重启应用刷新 Siri 词库
-- 首次配置 Siri 时确保设备联网
+**歌手信息空白？（iOS）**
+网络歌手资料需要 Spotify / Discogs API key（可选配置）；未配置时无网络档案，不影响播放与曲库。
 
-## 环境变量 🔧
+**报告问题**：请说明平台与版本（iOS / macOS、App 版本号）、复现步骤、预期与实际行为；macOS 可附 `~/Library/Logs/QQPlayerMac/` 下的日志。
 
-运行本项目需要在 `.env` 文件中添加以下环境变量：
+---
 
-```bash
-# Spotify API Keys (Required)
-SPOTIFY_CLIENT_ID=your_spotify_client_id
-SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+## 致谢 🎨
 
-# Discogs API Keys (Required)
-DISCOGS_CONSUMER_KEY=your_discogs_consumer_key
-DISCOGS_CONSUMER_SECRET=your_discogs_consumer_secret
-```
+- **上游项目**：[Cosmos Music Player](https://github.com/clquwu/Cosmos-Music-Player) 及其作者 [@clquwu](https://github.com/clquwu)（Raphael Boullay Le Fur）——本项目基于其 GPL-3.0 开源代码二次开发，fork 与修改声明见 [NOTICE.md](NOTICE.md)
+- **歌词 API**：[LRCLIB](https://github.com/tranxuanthang/lrclib)（作者 tranxuanthang）
+- **音频引擎**：[SFBAudioEngine](https://github.com/sbooth/SFBAudioEngine)（作者 sbooth）
+- **数据层**：[GRDB.swift](https://github.com/groue/GRDB.swift)（作者 groue）
+- 元数据与资料服务：MusicBrainz、Cover Art Archive、Discogs、Spotify——我们与这些服务无任何经济关联，仅为提供更好的使用体验
 
-### 获取 API Key
+---
 
-**Spotify API Key：**
-- 访问 [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/applications)
-- 创建一个新应用
-- 将 Client ID 与 Client Secret 复制到 `.env` 文件
+## 作者与联系 👥
 
-**Discogs API Key：**
-- 访问 [Discogs Developer Settings](https://www.discogs.com/settings/developers)
-- 创建一个新应用
-- 将 Consumer Key 与 Consumer Secret 复制到 `.env` 文件
+- **维护者：daxmate**（<https://github.com/daxmate>）
+- 问题、需求与建议：请在仓库提交 **issue**（<https://github.com/daxmate/qqplayer-swift/issues>）
+- 上游作者联系方式见 [NOTICE.md](NOTICE.md)（仅供上游项目相关事宜）
 
-## 附录 📋
-
-我们使用 Spotify 和 Discogs 获取歌手详情，使用 LRCLIB 获取同步歌词。我们与这些服务没有任何经济关联——只是想为你提供最好的使用体验。
-
-### 致谢 🎨
-
-- **上游项目**：特别感谢 [Cosmos Music Player](https://github.com/clquwu/Cosmos-Music-Player) 及其作者 [@clquwu](https://github.com/clquwu)（Raphael Boullay Le Fur）——本项目基于其 GPL-3.0 开源代码二次开发
-- **歌词 API**：特别感谢 [LRCLIB](https://github.com/tranxuanthang/lrclib) 项目（作者 tranxuanthang）
-
-## 作者 👥
-
-- [@clquwu](https://github.com/clquwu) - 上游（Cosmos Music Player）主要开发者
-- 本项目由 daxmate 基于 Cosmos Music Player 二次开发维护
-
-## 联系方式 📧
-
-上游作者：
-- **邮箱**：raphaelboullaylefur@proton.me
-- **Discord**：clarityhs
-
-## 支持 💬
-
-遇到问题、疑问或功能需求：
-- 在仓库中提交 issue
-- 查阅上方疑难排查章节
-- 确保安装的是最新版本
-- 如需直接联系上游，可通过邮箱或 Discord
+---
 
 ## 许可证 📄
 
-本项目基于 GNU GPL-3.0 许可发布，详见 [LICENSE](LICENSE) 文件。
+本项目基于 **GNU GPL-3.0** 许可发布，详见 [LICENSE](LICENSE) 与 [NOTICE.md](NOTICE.md)。
 
 ---
 
