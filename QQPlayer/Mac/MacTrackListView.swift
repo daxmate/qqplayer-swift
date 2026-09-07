@@ -213,14 +213,19 @@ struct MacTrackListView: View {
                     .map(\.track)
                 if !tracks.isEmpty {
                     Button {
-                        batchScrapePaths = tracks.map(\.path)
-                        showBatchScrape = true
+                        let paths = tracks.map(\.path)
+                        presentAfterMenuDismisses {
+                            batchScrapePaths = paths
+                            showBatchScrape = true
+                        }
                     } label: {
                         Label("context_batch_scrape".localized, systemImage: "tag")
                     }
                     Divider()
                     Button(role: .destructive) {
-                        requestTrash(tracks)
+                        presentAfterMenuDismisses {
+                            requestTrash(tracks)
+                        }
                     } label: {
                         Label(Localized.moveToTrash, systemImage: "trash")
                     }
@@ -319,29 +324,37 @@ struct MacTrackListView: View {
             }
             Divider()
             Button("create_new_playlist".localized) {
-                pendingTrack = track
-                newPlaylistName = ""
-                showNewPlaylistAlert = true
+                presentAfterMenuDismisses {
+                    pendingTrack = track
+                    newPlaylistName = ""
+                    showNewPlaylistAlert = true
+                }
             }
         }
 
         if let onShowArtist {
             Divider()
             Button("show_artist".localized) {
-                onShowArtist(track)
+                presentAfterMenuDismisses {
+                    onShowArtist(track)
+                }
             }
         }
         if let onShowAlbum {
             Button("show_album".localized) {
-                onShowAlbum(track)
+                presentAfterMenuDismisses {
+                    onShowAlbum(track)
+                }
             }
         }
 
         // 编辑标签/刮削（web 版对齐，第 8 项）：单曲编辑弹窗（自动刮削+表单+保存改名）
         Divider()
         Button {
-            tagEditorTrack = track
-            showTagEditor = true
+            presentAfterMenuDismisses {
+                tagEditorTrack = track
+                showTagEditor = true
+            }
         } label: {
             Label("context_edit_tags".localized, systemImage: "tag")
         }
@@ -350,7 +363,9 @@ struct MacTrackListView: View {
         // deleteTrack 同时清理歌单/收藏引用（歌单内删除后从歌单消失属预期）
         Divider()
         Button(role: .destructive) {
-            requestTrash([track])
+            presentAfterMenuDismisses {
+                requestTrash([track])
+            }
         } label: {
             Label(Localized.moveToTrash, systemImage: "trash")
         }
@@ -525,5 +540,18 @@ struct MacTrackListView: View {
             return ""
         }
         return album.title
+    }
+
+    // MARK: - Context-menu modal 延迟呈现（macOS SwiftUI 已知 bug workaround）
+
+    /// 右键菜单（context menu）自身以 modal 形式呈现，点击菜单项时菜单仍在收起动画
+    /// 中；此刻若同步触发 sheet/alert，会与菜单 dismiss 冲突 → 弹窗卡成空白小窗
+    /// （2026-09-07 用户实测：刮削弹窗只出初始小白块后永久卡住；偶发时菜单先收完
+    /// 则正常，即「之前一会儿就恢复」）。所有从右键菜单触发的弹窗统一延迟到菜单
+    /// 完全收起后再呈现（社区标准 workaround，~0.15s 无感）。
+    private func presentAfterMenuDismisses(_ action: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            action()
+        }
     }
 }
