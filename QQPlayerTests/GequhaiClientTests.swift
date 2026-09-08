@@ -786,17 +786,19 @@ struct GequhaiClientTests {
         #expect(info.size == 4_200_000)
         #expect(info.ext == ".mp3")
 
-        // 请求顺序：gequhai play → quark token → detail → download（4 个）
+        // 请求顺序：gequhai play → quark token → detail → config（取直链前 __puus 保活）
+        // → download（5 个；config 为 2026-09-08 getDownloadURL 前 refreshPUUS 接入）
         let urls = GequhaiMockURLProtocol.receivedRequests.compactMap { $0.url?.absoluteString }
-        #expect(urls.count == 4)
+        #expect(urls.count == 5)
         #expect(urls[0].contains("www.gequhai.com/play/123456"))
         #expect(urls[1].contains("drive-pc.quark.cn"))
         #expect(urls[1].contains("/share/sharepage/token"))
         #expect(urls[2].contains("/share/sharepage/detail"))
-        #expect(urls[3].contains("/file/download"))
+        #expect(urls[3].contains("/1/clouddrive/config"))
+        #expect(urls[4].contains("/file/download"))
 
         // download 请求字段（fids/fids_token/pwd_id/stoken——web 逐字）
-        let downloadRequest = GequhaiMockURLProtocol.receivedRequests[3]
+        let downloadRequest = GequhaiMockURLProtocol.receivedRequests[4]
         let body = Self.bodyDict(of: downloadRequest)
         #expect(body?["fids"] as? [String] == ["f-mp3"])
         #expect(body?["fids_token"] as? [String] == ["tok-mp3"])
@@ -822,7 +824,8 @@ struct GequhaiClientTests {
         // 不经过 gequhai play 页
         let firstURL = GequhaiMockURLProtocol.receivedRequests[0].url?.absoluteString ?? ""
         #expect(firstURL.contains("drive-pc.quark.cn"))
-        #expect(GequhaiMockURLProtocol.receivedRequests.count == 3)
+        // token → detail → config（取直链前 __puus 保活）→ download
+        #expect(GequhaiMockURLProtocol.receivedRequests.count == 4)
         Self.removeFileIfExists(cookieFile)
     }
 
@@ -847,7 +850,7 @@ struct GequhaiClientTests {
 
         #expect(info.ext == ".flac")
         #expect(info.fileName == "晴天.flac")
-        let body = Self.bodyDict(of: GequhaiMockURLProtocol.receivedRequests[3])
+        let body = Self.bodyDict(of: GequhaiMockURLProtocol.receivedRequests[4])
         #expect(body?["fids_token"] as? [String] == ["tok-flac"])
         Self.removeFileIfExists(cookieFile)
     }
