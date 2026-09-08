@@ -155,8 +155,15 @@ protocol NetworkTransport: Sendable {
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse)
     /// GET 且不跟随重定向：302 时返回响应头 Location（Meting 直链语义）
     func getWithoutRedirect(url: URL, timeout: TimeInterval) async throws -> (statusCode: Int, headers: [String: String], body: Data)
-    /// 流式下载到文件（跟随重定向）
-    func download(url: URL, to destination: URL, timeout: TimeInterval, headers: [String: String]) async throws
+    /// 流式下载到文件（跟随重定向）；progress 回调 (completed, total) 字节数，
+    /// total 未知时传 0 由调用方处理
+    func download(
+        url: URL,
+        to destination: URL,
+        timeout: TimeInterval,
+        headers: [String: String],
+        progress: (@Sendable (Int64, Int64) -> Void)?
+    ) async throws
 }
 
 /// 重定向捕获 delegate：302 时记录 Location 并取消跟随（Meting 直链）
@@ -181,6 +188,97 @@ private final class RedirectCapturingDelegate: NSObject, URLSessionTaskDelegate,
         _redirectLocation = request.url?.absoluteString
         lock.unlock()
         completionHandler(nil) // 取消跟随
+    }
+}
+
+/// 下载进度 delegate：URLSessionDownloadDelegate 桥 async（进度回调 + 落盘 + 错误）。
+/// 生命周期：perform(_:) 挂起 CheckedContinuation，didCompleteWithError（终态回调）恢复；
+/// delegate 被 session 弱引用 → 整个请求期间由调用方局部变量强引用保活。
+/// ⚠️ didFinishDownloadingTo 返回后系统即删除临时文件：必须当场搬到本方临时目录
+/// （保存 URL 供恢复后再读会踩已删除文件——2026-09 B1 进度改造时规避）。
+private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    /// 下载结果（临时文件已搬到本方 staging 目录 + 原始响应）
+    struct DownloadOutcome {
+        var temporaryURL: URL
+        var response: URLResponse?
+    }
+
+    private let progress: (@Sendable (Int64, Int64) -> Void)?
+    private let lock = NSLock()
+    private var stagedURL: URL?
+    private var continuation: CheckedContinuation<DownloadOutcome, Error>?
+
+    init(progress: (@Sendable (Int64, Int64) -> Void)?) {
+        self.progress = progress
+    }
+
+    /// 发起下载任务并等待终态（didCompleteWithError 恢复）
+    func perform(_ task: URLSessionDownloadTask) async throws -> DownloadOutcome {
+        try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+            self.continuation = continuation
+            lock.unlock()
+            task.resume()
+        }
+    }
+
+    // MARK: URLSessionDownloadDelegate
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        guard let progress else { return }
+        // total 未知（NSURLSessionTransferSizeUnknown=-1）→ 传 0（调用方处理）
+        let total = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : 0
+        progress(totalBytesWritten, total)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        // 临时文件在本方法返回后即被系统删除：立刻搬到本方 staging 目录（同卷 move 便宜）
+        let staged = FileManager.default.temporaryDirectory
+            .appendingPathComponent("QQPlayerDL-\(UUID().uuidString).part")
+        try? FileManager.default.moveItem(at: location, to: staged)
+        lock.lock()
+        stagedURL = staged
+        lock.unlock()
+    }
+
+    // MARK: URLSessionTaskDelegate
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        lock.lock()
+        let staged = stagedURL
+        stagedURL = nil
+        let continuation = self.continuation
+        self.continuation = nil
+        let taskResponse = task.response
+        lock.unlock()
+
+        guard let continuation else { return }
+        if let error {
+            if let staged {
+                try? FileManager.default.removeItem(at: staged)
+            }
+            continuation.resume(throwing: error)
+            return
+        }
+        guard let staged else {
+            continuation.resume(throwing: NeteaseOnlineError.invalidResponse)
+            return
+        }
+        continuation.resume(returning: DownloadOutcome(temporaryURL: staged, response: taskResponse))
     }
 }
 
@@ -229,7 +327,8 @@ struct URLSessionNetworkTransport: NetworkTransport {
         url: URL,
         to destination: URL,
         timeout: TimeInterval,
-        headers: [String: String]
+        headers: [String: String],
+        progress: (@Sendable (Int64, Int64) -> Void)?
     ) async throws {
         // 诊断打点（2026-09-08 歌曲海下载 412/auth miss 排查）：记录实际发出的
         // 请求头概况（Cookie 只打长度不打值）与 URL 前缀，对照直链签名绑定。
@@ -247,9 +346,21 @@ struct URLSessionNetworkTransport: NetworkTransport {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        let (temporaryURL, response) = try await URLSession.shared.download(for: request)
-        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        // delegate 实现拿 didWriteData 进度；临时文件由 delegate 当场搬到 staging
+        // （URLSession.shared.download 拿不到进度回调，2026-09 B1 进度圆环打基础）
+        let delegate = DownloadProgressDelegate(progress: progress)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = timeout
+        configuration.timeoutIntervalForResource = timeout + 10
+        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+
+        let temporaryURL: URL
+        let statusCode: Int
+        let outcome = try await delegate.perform(session.downloadTask(with: request))
+        temporaryURL = outcome.temporaryURL
+        statusCode = (outcome.response as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200 ..< 300).contains(statusCode) else {
             // 诊断打点（2026-09-08）：非 2xx 读响应体——夸克 CDN 403 返回 XML
             // （如 "require login [auth miss]"），仅打状态码无法区分原因。
             if let body = try? String(contentsOf: temporaryURL, encoding: .utf8) {
@@ -257,6 +368,7 @@ struct URLSessionNetworkTransport: NetworkTransport {
             } else {
                 print("❌ [网络下载] HTTP \(statusCode)（响应体不可读）")
             }
+            try? FileManager.default.removeItem(at: temporaryURL)
             throw NeteaseOnlineError.httpError(statusCode)
         }
         // 只清理确实存在的 .part 残留（上次中断下载留下的同名文件）：
