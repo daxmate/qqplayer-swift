@@ -37,7 +37,7 @@ struct DeviceIDBase32Tests {
         #expect(DeviceID.base32Decode("MZXW6YQ") == Data("foob".utf8))
         #expect(DeviceID.base32Decode("MZXW6YTBOI") == Data("foobar".utf8))
         #expect(DeviceID.base32Decode("mzxw6ytboi") == Data("foobar".utf8)) // 小写
-        #expect(DeviceID.base32Decode("MZXW6===") == Data("fo".utf8)) // 带填充
+        #expect(DeviceID.base32Decode("MZXQ====") == Data("fo".utf8)) // 带填充（MZXQ = "fo"，补 4 填充位）
     }
 
     @Test("base32 解码拒绝非法字符/非零填充位")
