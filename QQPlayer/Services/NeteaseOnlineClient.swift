@@ -231,6 +231,17 @@ struct URLSessionNetworkTransport: NetworkTransport {
         timeout: TimeInterval,
         headers: [String: String]
     ) async throws {
+        // 诊断打点（2026-09-08 歌曲海下载 412/auth miss 排查）：记录实际发出的
+        // 请求头概况（Cookie 只打长度不打值）与 URL 前缀，对照直链签名绑定。
+        let headerSummary = headers.keys.sorted().map { key -> String in
+            let value = headers[key] ?? ""
+            if key == "Cookie" {
+                return "Cookie=<长度\(value.count)>"
+            }
+            return "\(key)=\(value)"
+        }.joined(separator: ", ")
+        print("ℹ️ [网络下载] urlHost=\(url.host ?? "?") url=\(url.absoluteString.prefix(140))… headers=\(headerSummary)")
+
         var request = URLRequest(url: url)
         request.timeoutInterval = timeout
         for (key, value) in headers {
@@ -238,7 +249,15 @@ struct URLSessionNetworkTransport: NetworkTransport {
         }
         let (temporaryURL, response) = try await URLSession.shared.download(for: request)
         guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
-            throw NeteaseOnlineError.httpError((response as? HTTPURLResponse)?.statusCode ?? -1)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            // 诊断打点（2026-09-08）：非 2xx 读响应体——夸克 CDN 403 返回 XML
+            // （如 "require login [auth miss]"），仅打状态码无法区分原因。
+            if let body = try? String(contentsOf: temporaryURL, encoding: .utf8) {
+                print("❌ [网络下载] HTTP \(statusCode) body=\(body.prefix(300))")
+            } else {
+                print("❌ [网络下载] HTTP \(statusCode)（响应体不可读）")
+            }
+            throw NeteaseOnlineError.httpError(statusCode)
         }
         // 只清理确实存在的 .part 残留（上次中断下载留下的同名文件）：
         // 之前无条件 removeItem，正常无残留时抛 ENOENT(NSFileNoSuchFileError)，
