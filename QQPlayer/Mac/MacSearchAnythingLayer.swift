@@ -43,6 +43,8 @@ struct MacSearchAnythingLayer: View {
     @State private var downloadedIDs: Set<Int> = []
     @State private var failedIDs: Set<Int> = []
     @State private var statusMessage: String?
+    /// 在线行下载进度（song.id → 0-1 或 nil=不确定；B2 进度圆环）
+    @State private var downloadProgress: [Int: Double?] = [:]
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -315,7 +317,8 @@ struct MacSearchAnythingLayer: View {
             } else if failedIDs.contains(song.id) {
                 Image(systemName: "exclamationmark.circle.fill").foregroundColor(.red)
             } else if downloadingIDs.contains(song.id) {
-                ProgressView().controlSize(.small)
+                // B2：确定进度/不确定转圈（替代系统 ProgressView）
+                DownloadProgressRing(progress: downloadProgress[song.id] ?? nil, size: 16)
             } else {
                 Image(systemName: "icloud.and.arrow.down").foregroundColor(.secondary)
             }
@@ -431,10 +434,20 @@ struct MacSearchAnythingLayer: View {
         guard !downloadingIDs.contains(song.id) else { return }
         downloadingIDs.insert(song.id)
         failedIDs.remove(song.id)
+        downloadProgress[song.id] = nil // 刚开始（total 未知）→ 不确定态
         statusMessage = nil
         Task {
             do {
-                _ = try await MacOnlineDownloadService.download(song: song)
+                _ = try await MacOnlineDownloadService.download(
+                    song: song,
+                    progress: { done, total in
+                        // 进度回调可能在后台线程 → hop 主线程落 @State（B2）
+                        let p: Double? = total > 0 ? Double(done) / Double(total) : nil
+                        DispatchQueue.main.async {
+                            downloadProgress[song.id] = p
+                        }
+                    }
+                )
                 downloadedIDs.insert(song.id)
                 failedIDs.remove(song.id)
             } catch {
@@ -443,6 +456,7 @@ struct MacSearchAnythingLayer: View {
                 statusMessage = "online_download_failed_prefix".localized(with: song.title)
             }
             downloadingIDs.remove(song.id)
+            downloadProgress.removeValue(forKey: song.id) // 下载结束清进度（B2）
         }
     }
 
