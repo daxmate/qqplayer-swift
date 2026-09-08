@@ -981,6 +981,11 @@
 "quark_login_retrying" = "正在重試下載…";
 
 
+/* B2 批：線上搜尋歷史（合併清單） */
+"online_search_history_title" = "最近搜尋";
+"online_search_clear_history" = "清空";
+"online_search_history_delete_help" = "刪除此記錄";
+
 /* C 組：search anything + 設定下載分類 */
 "settings_category_download" = "下載";
 "settings_download_quality" = "下載音質";
@@ -989,6 +994,17 @@
 "settings_quality_exhigh" = "320k";
 "settings_quality_lossless" = "無損";
 "settings_quality_hires" = "Hi-Res";
+/* B2 批：下載設定擴充（歌曲海音質/下載引擎/aria2/限速） */
+"settings_download_quark_quality" = "歌曲海音質";
+"settings_download_engine" = "下載引擎";
+"settings_download_engine_builtin" = "內建";
+"settings_download_engine_aria2" = "aria2";
+"settings_download_engine_hint" = "內建 = 直接下載；aria2 = 交給 aria2 下載";
+"settings_download_aria2_rpc" = "aria2 RPC 位址";
+"settings_download_aria2_secret" = "aria2 Secret";
+"settings_download_aria2_secret_placeholder" = "如 dax";
+"settings_download_max_speed" = "限速（MB/s）";
+"settings_download_max_speed_hint" = "0 = 不限速";
 "search_any_menu" = "搜尋一切";
 "search_any_placeholder" = "搜尋歌曲、歌手、專輯或設定…";
 "search_any_loading" = "搜尋中…";

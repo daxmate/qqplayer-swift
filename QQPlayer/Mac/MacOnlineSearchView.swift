@@ -11,11 +11,15 @@
 //
 //  源切换（web OnlineSearch.vue src-seg 对齐）：顶部 segmented 网易云（默认，
 //  行为与既有完全一致）/ 歌曲海。歌曲海搜索走 GequhaiClient（失败返回 [] 不抛，
-//  web 语义）；下载 = GequhaiClient.downloadInfo(quality:"mp3") → 夸克签名直链 →
-//  MacOnlineDownloadService.downloadDirect（.part 原子落盘，完成 post
+//  web 语义）；下载 = GequhaiClient.downloadInfo(quality: settings.quarkQuality) →
+//  夸克签名直链 → MacOnlineDownloadService.downloadDirect（.part 原子落盘，完成 post
 //  LibraryFolderContentChanged 刷新曲库）。401/未登录 → 弹 MacQuarkLoginView
 //  扫码登录，登录成功自动重试刚才的下载（web OnlineSearch.vue 401 → QuarkLoginModal
 //  → 成功重试 语义对齐）。
+//
+//  B2 批（2026-09）：搜索历史（网易云/歌曲海合并列表，UserDefaults，上限 10；点历史项
+//  = 填词 + 切源 + 立即搜索）+ 下载进度圆环（行尾 downloading → DownloadProgressRing，
+//  网易云/歌曲海统一；进度回调后台线程 → 主线程落 @State，下载结束清 rowID）。
 //
 
 import SwiftUI
@@ -41,6 +45,14 @@ struct MacOnlineSearchView: View {
     /// 歌曲海客户端（qurark 直链走同一实例；登录 cookie 归文件管，登录面板换
     /// 实例后下载自动带上新 cookie）
     @State private var gequhaiClient = GequhaiClient()
+    /// 搜索历史（B2：网易云/歌曲海合并列表；UserDefaults 上限 10，store 见 MacSearchHistoryStore）
+    @State private var history: [SearchHistoryEntry] = MacSearchHistoryStore.load()
+    /// 历史行 hover 高亮 id（删除按钮显隐）
+    @State private var hoveredHistoryID: String?
+    /// 行下载进度（rowID → 0-1 确定 / nil 不确定；下载结束清 rowID，B2）
+    @State private var downloadProgress: [String: Double?] = [:]
+    /// 历史项点击填词后抑制下一次 query 防抖（避免重复搜索）
+    @State private var suppressNextQueryDebounce = false
 
     private enum Status {
         case idle
@@ -141,6 +153,11 @@ struct MacOnlineSearchView: View {
             }
         }
         .onChange(of: query) { _ in
+            // 历史项点击已立即搜索（suppress 消费一次，见 applyHistory）
+            guard !suppressNextQueryDebounce else {
+                suppressNextQueryDebounce = false
+                return
+            }
             // 400ms 防抖（web OnlineSearch 对齐）
             searchTask?.cancel()
             searchTask = Task {
@@ -157,7 +174,12 @@ struct MacOnlineSearchView: View {
     private var content: some View {
         switch status {
         case .idle:
-            idleView
+            // B2：历史非空 → 最近搜索列表；空 → 既有 idle 提示
+            if history.isEmpty {
+                idleView
+            } else {
+                historyView
+            }
         case .loading:
             VStack(spacing: 10) {
                 ProgressView()
@@ -204,6 +226,105 @@ struct MacOnlineSearchView: View {
         }
     }
 
+    // MARK: - 搜索历史（B2）
+
+    /// 历史列表（标题行「最近搜索」+ 清空按钮；行 = 图标 + keyword + 来源标签 +
+    /// hover 删除；点击 = 填词 + 切源 + 立即搜索）
+    private var historyView: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("online_search_history_title".localized)
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button("online_search_clear_history".localized) {
+                    history = MacSearchHistoryStore.clear()
+                    hoveredHistoryID = nil
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            List {
+                ForEach(history) { entry in
+                    historyRow(entry)
+                }
+            }
+            .listStyle(.inset)
+        }
+    }
+
+    private func historyRow(_ entry: SearchHistoryEntry) -> some View {
+        HStack(spacing: 8) {
+            // 左侧内容区点击 = 应用历史（与行尾删除按钮 hit 区分离，避免误触发）
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 12)
+                Text(entry.keyword)
+                    .lineLimit(1)
+                Text(sourceDisplayName(entry.source))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                applyHistoryEntry(entry)
+            }
+
+            Spacer()
+
+            if hoveredHistoryID == entry.id {
+                Button {
+                    deleteHistoryEntry(entry)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("online_search_history_delete_help".localized)
+            }
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            hoveredHistoryID = hovering ? entry.id : nil
+        }
+    }
+
+    /// 历史删除（无需二次确认，低风险 UI 操作）
+    private func deleteHistoryEntry(_ entry: SearchHistoryEntry) {
+        guard let index = history.firstIndex(where: { $0.id == entry.id }) else { return }
+        history = MacSearchHistoryStore.remove(at: index)
+        if hoveredHistoryID == entry.id {
+            hoveredHistoryID = nil
+        }
+    }
+
+    /// 点历史项 = 填词 + 切到该项来源 + 立即搜索（web 语义；抑制防抖避免双搜）
+    private func applyHistoryEntry(_ entry: SearchHistoryEntry) {
+        searchTask?.cancel()
+        let target = OnlineSource(rawValue: entry.source) ?? .netease
+        if query != entry.keyword {
+            suppressNextQueryDebounce = true
+            query = entry.keyword
+        }
+        if source != target {
+            source = target // onChange(source) → switchSource：query 非空立即重搜
+        } else {
+            startSearch()
+        }
+    }
+
+    /// 历史行来源标签（复用 segmented 文案：网易云/歌曲海）
+    private func sourceDisplayName(_ source: String) -> String {
+        source == OnlineSource.gequhai.rawValue ? "source_gequhai".localized : "source_netease".localized
+    }
+
     private var resultsList: some View {
         List(results) { item in
             MacOnlineResultRow(
@@ -211,6 +332,7 @@ struct MacOnlineSearchView: View {
                 isDownloading: downloadingIDs.contains(item.id),
                 isDownloaded: downloadedIDs.contains(item.id),
                 didFail: failedIDs.contains(item.id),
+                progress: progressValue(for: item.id),
                 onDownload: { download(item) }
             )
         }
@@ -227,6 +349,11 @@ struct MacOnlineSearchView: View {
                     .padding(.bottom, 8)
             }
         }
+    }
+
+    /// 行进度取值（rowID → 0-1 或 nil=不确定；B2）
+    private func progressValue(for rowID: String) -> Double? {
+        downloadProgress[rowID] ?? nil
     }
 
     // MARK: - 搜索
@@ -260,6 +387,8 @@ struct MacOnlineSearchView: View {
         status = .loading
         errorMessage = nil
         searchSeq += 1
+        // B2：真正提交（query 非空、seq 递增处）记入历史（同词去重置顶、更新来源）
+        history = MacSearchHistoryStore.add(keyword: q, source: source.rawValue)
         let seq = searchSeq
         searchTask = Task {
             switch source {
@@ -302,10 +431,20 @@ struct MacOnlineSearchView: View {
         guard !downloadingIDs.contains(rowID) else { return }
         downloadingIDs.insert(rowID)
         failedIDs.remove(rowID)
+        downloadProgress[rowID] = nil // 刚开始（total 未知）→ 不确定态
         errorMessage = nil
         Task {
             do {
-                _ = try await MacOnlineDownloadService.download(song: song)
+                _ = try await MacOnlineDownloadService.download(
+                    song: song,
+                    progress: { done, total in
+                        // 进度回调可能在后台线程 → hop 主线程落 @State（B2）
+                        let p: Double? = total > 0 ? Double(done) / Double(total) : nil
+                        DispatchQueue.main.async {
+                            downloadProgress[rowID] = p
+                        }
+                    }
+                )
                 guard !Task.isCancelled else { return }
                 downloadedIDs.insert(rowID)
                 failedIDs.remove(rowID)
@@ -331,6 +470,7 @@ struct MacOnlineSearchView: View {
                 errorMessage = message
             }
             downloadingIDs.remove(rowID)
+            downloadProgress.removeValue(forKey: rowID) // 下载结束清进度（B2）
         }
     }
 
@@ -341,21 +481,30 @@ struct MacOnlineSearchView: View {
         guard !downloadingIDs.contains(rowID) else { return }
         downloadingIDs.insert(rowID)
         failedIDs.remove(rowID)
+        downloadProgress[rowID] = nil // 刚开始（total 未知）→ 不确定态
         if !isRetryAfterLogin {
             errorMessage = nil
         }
         Task {
             do {
-                // 音质固定 "mp3"（web download.quarkQuality 默认 mp3；Mac 侧设置项
-                // 未排期，先按默认值——见批内汇报）
-                let info = try await gequhaiClient.downloadInfo(songID: song.id, quality: "mp3")
+                // 音质读设置 quarkQuality（B2 排期；默认 mp3，web download.quarkQuality
+                // 语义对齐——旧注释「固定 mp3、设置未排期」已由 B2 设置面板闭合）
+                let quality = DeleteSettings.load().quarkQuality
+                let info = try await gequhaiClient.downloadInfo(songID: song.id, quality: quality)
                 guard let url = URL(string: info.urlString) else {
                     throw GequhaiDownloadError.quarkFailed("invalid download URL: \(info.urlString)")
                 }
                 _ = try await MacOnlineDownloadService.downloadDirect(
                     url: url,
                     headers: info.headers,
-                    suggestedFileName: info.fileName
+                    suggestedFileName: info.fileName,
+                    progress: { done, total in
+                        // 进度回调可能在后台线程 → hop 主线程落 @State（B2）
+                        let p: Double? = total > 0 ? Double(done) / Double(total) : nil
+                        DispatchQueue.main.async {
+                            downloadProgress[rowID] = p
+                        }
+                    }
                 )
                 guard !Task.isCancelled else { return }
                 downloadedIDs.insert(rowID)
@@ -395,6 +544,7 @@ struct MacOnlineSearchView: View {
                 }
             }
             downloadingIDs.remove(rowID)
+            downloadProgress.removeValue(forKey: rowID) // 下载结束清进度（B2）
         }
     }
 
@@ -490,6 +640,8 @@ private struct MacOnlineResultRow: View {
     let isDownloading: Bool
     let isDownloaded: Bool
     let didFail: Bool
+    /// 行下载进度（0-1；nil = 不确定态，B2）
+    let progress: Double?
     let onDownload: () -> Void
 
     var body: some View {
@@ -507,10 +659,15 @@ private struct MacOnlineResultRow: View {
 
             Spacer()
 
+            // B2：下载中 → 进度圆环（确定进度/不确定转圈）；完成/失败/待下载图标不变
             Button(action: onDownload) {
-                Image(systemName: iconName)
-                    .foregroundColor(iconColor)
-                    .frame(width: 18)
+                if isDownloading {
+                    DownloadProgressRing(progress: progress, size: 18)
+                } else {
+                    Image(systemName: iconName)
+                        .foregroundColor(iconColor)
+                        .frame(width: 18)
+                }
             }
             .buttonStyle(.plain)
             .disabled(isDownloading)
@@ -553,14 +710,12 @@ private struct MacOnlineResultRow: View {
     private var iconName: String {
         if isDownloaded { return "checkmark.circle.fill" }
         if didFail { return "exclamationmark.circle.fill" }
-        if isDownloading { return "arrow.down.circle" }
-        return "icloud.and.arrow.down"
+        return "icloud.and.arrow.down" // downloading 走圆环（iconName 不再含下载中态）
     }
 
     private var iconColor: Color {
         if isDownloaded { return .green }
         if didFail { return .red }
-        if isDownloading { return appAccentColor }
         return .secondary
     }
 
