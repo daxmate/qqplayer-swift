@@ -180,6 +180,22 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
 
+                // S2 M1-UI：局域网同步设置（Client 侧：主机列表/扫码/手输配对）
+                Section {
+                    NavigationLink(destination: SyncSettingsView()) {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(.blue)
+                                .font(.system(size: 20))
+                            Text("sync_settings_entry".localized)
+                        }
+                    }
+                } header: {
+                    Text("sync_settings".localized)
+                } footer: {
+                    Text("sync_settings_footer".localized)
+                }
+
                 Section {
                     ForEach($deleteSettings.homeSections) { $section in
                         HStack {

@@ -110,5 +110,7 @@
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>扫描二维码以与您自己的 QQPlayer 设备配对并同步（仅限您授权的配对操作）。</string>
 </dict>
 </plist>
