@@ -131,6 +131,14 @@ enum QuarkClientError: Error, LocalizedError, Equatable {
 // MARK: - 纯逻辑（web 语义对齐，可单测）
 
 enum QuarkLogic {
+    /// query 值表单编码（web urllib.parse.urlencode → quote_plus 语义）：
+    /// 保留 ALPHA/DIGIT/-._~，空格 → '+',其余（含 + / =）百分号编码。
+    static func formQueryValue(_ value: String) -> String {
+        let allowed = CharacterSet(charactersIn:
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~ ")
+        let kept = value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+        return kept.replacingOccurrences(of: " ", with: "+")
+    }
     /// 可接受的音频扩展（web AUDIO_EXTS，小写带点）
     static let audioExtensions: Set<String> = [
         ".mp3", ".flac", ".m4a", ".wav", ".ape", ".ogg", ".aac", ".wma", ".opus",
@@ -604,8 +612,15 @@ struct QuarkClient {
                 pwdID: pwdID, stoken: stoken, pdirFid: "0", depth: 1,
                 files: &files, seen: &seen
             )
+            print("✅ [夸克 resolve] 分享解析成功 shareURL=\(shareURL) files=\(files.count) stoken=\(stoken.prefix(8))…")
             return (files, stoken)
         } catch {
+            // 诊断打点（2026-09-08 歌曲海下载 shareEmptyOrExpired 排查）：
+            // resolve 失败原因曾被完全吞掉（web 语义失败返回空数组），UI 只能看到
+            // shareEmptyOrExpired；这里把真实环节错误打出来（invalidShareURL /
+            // stoken 获取失败 HTTP/目录列表失败/业务 message 等）。
+            let detail = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            print("❌ [夸克 resolve] 分享解析失败 shareURL=\(shareURL) error=\(detail)")
             return ([], "")
         }
     }
@@ -627,6 +642,11 @@ struct QuarkClient {
         guard cookieFileExists else {
             throw QuarkClientError.loginRequired
         }
+        // 会话保活（2026-09-08 歌曲海下载 403 auth miss 修复）：扫码登录只存
+        // 6 个 cookie，下载 CDN 校验需要的 __puus 仅由 /config 接口 Set-Cookie
+        // 下发（Max-Age 24h）；refreshPUUS 此前定义了但从未被调用 → 下载必然
+        // auth miss。每次取直链前刷一次保活（失败静默，不影响主流程）。
+        await refreshPUUS()
         guard let pwdID = QuarkLogic.shareToken(from: shareURL) else {
             throw QuarkClientError.invalidShareURL(shareURL)
         }
@@ -655,9 +675,14 @@ struct QuarkClient {
         if http.statusCode == 401 || http.statusCode == 403 {
             // ⚠️ 不删 cookie 文件：401/403 可能是凭证不全或参数问题，未必是登录失效；
             // 删文件会导致扫码-下载-重扫死循环（web 注释原文）
+            // 诊断打点（2026-09-08）：403 body 常含真实原因（如 41020 token 校验异常）
+            let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+            print("❌ [夸克直链] 取直链被拒 status=\(http.statusCode) body=\(bodyPreview)")
             throw QuarkClientError.loginRequired
         }
         guard (200 ..< 300).contains(http.statusCode) else {
+            let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+            print("❌ [夸克直链] 取直链 HTTP 失败 status=\(http.statusCode) body=\(bodyPreview)")
             throw QuarkClientError.httpStatus(http.statusCode)
         }
         let payload = try Self.decode(data)
@@ -667,6 +692,7 @@ struct QuarkClient {
         let businessCode = (payload["code"] as? NSNumber)?.intValue
         if statusCode != 200 && businessCode != 0 {
             let message = payload["message"] as? String ?? ""
+            print("❌ [夸克直链] 取直链业务失败 status=\(statusCode ?? -1) code=\(businessCode ?? -1) message=\(message)")
             let detail = message.isEmpty ? "" : ": \(message)"
             throw QuarkClientError.serverMessage("获取下载直链失败\(detail)")
         }
@@ -684,6 +710,9 @@ struct QuarkClient {
             "Origin": "https://pan.quark.cn",
             "Cookie": QuarkLogic.cookieHeader(jar),
         ]
+        // 诊断打点（2026-09-08）：Cookie 值不打（日志卫生），只打是否携带；
+        // url 截断（签名 URL 含 token，全量无意义且刷屏）
+        print("✅ [夸克直链] 取直链成功 url=\(downloadURLString.prefix(140))… cookie=\(downloadHeaders["Cookie"]?.isEmpty == false ? "携带(\(downloadHeaders["Cookie"]?.count ?? 0)字符)" : "无")")
         return QuarkDownload(urlString: downloadURLString, headers: downloadHeaders)
     }
 
@@ -944,6 +973,9 @@ struct QuarkClient {
     private func getJSON(url: URL, headers: [String: String]) async throws -> [String: Any] {
         let (data, http) = try await perform(makeRequest(url: url, headers: headers))
         guard (200 ..< 300).contains(http.statusCode) else {
+            // 诊断打点（2026-09-08）：400/401 响应体带服务端真实原因（参数缺失提示等）
+            let bodyPreview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
+            print("❌ [夸克 GET] HTTP \(http.statusCode) url=\(url.absoluteString) body=\(bodyPreview)")
             throw QuarkClientError.httpStatus(http.statusCode)
         }
         return try Self.decode(data)
@@ -958,6 +990,9 @@ struct QuarkClient {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, http) = try await perform(request)
         guard (200 ..< 300).contains(http.statusCode) else {
+            // 诊断打点（2026-09-08）：400/401 响应体带服务端真实原因（参数缺失提示等）
+            let bodyPreview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
+            print("❌ [夸克 POST] HTTP \(http.statusCode) url=\(url.absoluteString) body=\(bodyPreview)")
             throw QuarkClientError.httpStatus(http.statusCode)
         }
         return try Self.decode(data)
@@ -974,11 +1009,24 @@ struct QuarkClient {
 
     // MARK: - 工具
 
-    /// base + path + query → URL（query 值自动百分号编码）
+    /// base + path + query → URL（query 值按 web urllib.parse.urlencode 的
+    /// quote_plus 语义编码）。
+    ///
+    /// ⚠️ 不能用 URLComponents.queryItems / URLQueryItem：它按 RFC 3986 把
+    /// '+' 与 '/' 视为 query 合法字符不编码，而夸克服务端按
+    /// x-www-form-urlencoded 解码（'+' → 空格），stoken 等 base64 值会被篡改
+    /// → HTTP 400「非法 token」→ resolve 空 → shareEmptyOrExpired
+    /// （2026-09-08 歌曲海下载全挂根因；web 端 httpx params 用 quote_plus
+    /// 无此问题，纯 Swift 移植差异）。
     private static func url(_ base: String, _ path: String, query: [String: String]) -> URL {
         var components = URLComponents(string: base + path)!
         if !query.isEmpty {
-            components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+            let encoded = query
+                .map { key, value in
+                    "\(QuarkLogic.formQueryValue(key))=\(QuarkLogic.formQueryValue(value))"
+                }
+                .joined(separator: "&")
+            components.percentEncodedQuery = encoded
         }
         return components.url!
     }
