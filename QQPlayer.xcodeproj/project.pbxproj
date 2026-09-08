@@ -87,6 +87,9 @@
 		D7BCBAA537724D45B7C2195B /* DeviceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8555114F6DD4E75BBEFEE94 /* DeviceStoreTests.swift */; };
 		E6C1DB0A33E7465C8C77A131 /* SyncQRCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB16C6D1F5F499DB836D594 /* SyncQRCodecTests.swift */; };
 		44A3BCC6C42646F7BA9FC4D8 /* SyncPairingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2504A7C57858439CBA86F638 /* SyncPairingFlowTests.swift */; };
+		7267C657D66D4E89983B0E0C /* SyncFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58493343A9E4674BE6DA1DA /* SyncFrameTests.swift */; };
+		DFCDAB74FA28465E8CC02A66 /* SyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */; };
+		4A3DC9577BE64896BD673B39 /* SyncPeerSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -223,6 +226,9 @@
 		C8555114F6DD4E75BBEFEE94 /* DeviceStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceStoreTests.swift; sourceTree = "<group>"; };
 		2EB16C6D1F5F499DB836D594 /* SyncQRCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncQRCodecTests.swift; sourceTree = "<group>"; };
 		2504A7C57858439CBA86F638 /* SyncPairingFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingFlowTests.swift; sourceTree = "<group>"; };
+		E58493343A9E4674BE6DA1DA /* SyncFrameTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameTests.swift; sourceTree = "<group>"; };
+		CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCryptoTests.swift; sourceTree = "<group>"; };
+		E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerSessionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -668,6 +674,9 @@
 				C8555114F6DD4E75BBEFEE94 /* DeviceStoreTests.swift */,
 				2EB16C6D1F5F499DB836D594 /* SyncQRCodecTests.swift */,
 				2504A7C57858439CBA86F638 /* SyncPairingFlowTests.swift */,
+				E58493343A9E4674BE6DA1DA /* SyncFrameTests.swift */,
+				CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */,
+				E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1053,6 +1062,9 @@
 				D7BCBAA537724D45B7C2195B /* DeviceStoreTests.swift in Sources */,
 				E6C1DB0A33E7465C8C77A131 /* SyncQRCodecTests.swift in Sources */,
 				44A3BCC6C42646F7BA9FC4D8 /* SyncPairingFlowTests.swift in Sources */,
+				7267C657D66D4E89983B0E0C /* SyncFrameTests.swift in Sources */,
+				DFCDAB74FA28465E8CC02A66 /* SyncCryptoTests.swift in Sources */,
+				4A3DC9577BE64896BD673B39 /* SyncPeerSessionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
