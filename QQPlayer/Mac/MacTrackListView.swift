@@ -36,6 +36,17 @@ private final class MacTrackTableRow: NSObject, Identifiable {
     }
 }
 
+// MARK: - 列表右键弹窗（2026-09-08 白框修复：.sheet(isPresented:) 的 content 闭包
+// 读另一个 @State（tagEditorTrack）存在时序竞态——present 瞬间可能读到 nil →
+// 弹出空内容 sheet（白框）且不自动刷新。改用 .sheet(item:) 由 SwiftUI 保证
+// item 非空时才 present、content 直接拿 item，消除竞态。
+
+/// 批量刮削请求（paths 数组的 Identifiable 包装，供 .sheet(item:) 使用）
+private struct BatchScrapeRequest: Identifiable {
+    let id = UUID()
+    let paths: [String]
+}
+
 struct MacTrackListView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
@@ -61,12 +72,10 @@ struct MacTrackListView: View {
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
     @State private var pendingTrack: Track?
-    /// 单曲编辑/刮削（右键菜单第 8 项）
-    @State private var showTagEditor = false
+    /// 单曲编辑/刮削（右键菜单第 8 项）——.sheet(item:) 直接驱动，见文件头注释
     @State private var tagEditorTrack: Track?
-    /// 批量刮削（右键多选 >1）
-    @State private var showBatchScrape = false
-    @State private var batchScrapePaths: [String] = []
+    /// 批量刮削（右键多选 >1）——.sheet(item:) 直接驱动，见文件头注释
+    @State private var batchScrapeRequest: BatchScrapeRequest?
     /// 移到废纸篓（web 版「移到废纸篓」对齐，2026-09-02 A4）：确认弹窗状态
     @State private var showTrashConfirm = false
     @State private var pendingTrashTracks: [Track] = []
@@ -137,13 +146,11 @@ struct MacTrackListView: View {
                 reloadPlaylists()
             }
             // 标签编辑/刮削 sheet（单曲右键第 8 项）与批量刮削 sheet（多选右键）
-            .sheet(isPresented: $showTagEditor) {
-                if let tagEditorTrack {
-                    MacTagEditorView(track: tagEditorTrack)
-                }
+            .sheet(item: $tagEditorTrack) { track in
+                MacTagEditorView(track: track)
             }
-            .sheet(isPresented: $showBatchScrape) {
-                MacScrapeBatchProgressView(paths: batchScrapePaths, libraryMode: false)
+            .sheet(item: $batchScrapeRequest) { request in
+                MacScrapeBatchProgressView(paths: request.paths, libraryMode: false)
             }
         }
     }
@@ -215,8 +222,7 @@ struct MacTrackListView: View {
                     Button {
                         let paths = tracks.map(\.path)
                         presentAfterMenuDismisses {
-                            batchScrapePaths = paths
-                            showBatchScrape = true
+                            batchScrapeRequest = BatchScrapeRequest(paths: paths)
                         }
                     } label: {
                         Label("context_batch_scrape".localized, systemImage: "tag")
@@ -353,7 +359,6 @@ struct MacTrackListView: View {
         Button {
             presentAfterMenuDismisses {
                 tagEditorTrack = track
-                showTagEditor = true
             }
         } label: {
             Label("context_edit_tags".localized, systemImage: "tag")
@@ -545,10 +550,10 @@ struct MacTrackListView: View {
     // MARK: - Context-menu modal 延迟呈现（macOS SwiftUI 已知 bug workaround）
 
     /// 右键菜单（context menu）自身以 modal 形式呈现，点击菜单项时菜单仍在收起动画
-    /// 中；此刻若同步触发 sheet/alert，会与菜单 dismiss 冲突 → 弹窗卡成空白小窗
-    /// （2026-09-07 用户实测：刮削弹窗只出初始小白块后永久卡住；偶发时菜单先收完
-    /// 则正常，即「之前一会儿就恢复」）。所有从右键菜单触发的弹窗统一延迟到菜单
-    /// 完全收起后再呈现（社区标准 workaround，~0.15s 无感）。
+    /// 中；此刻若同步触发 sheet/alert，会与菜单 dismiss 冲突 → 弹窗卡成空白小窗。
+    /// 所有从右键菜单触发的弹窗统一延迟到菜单完全收起后再呈现（~0.15s 无感）。
+    /// 注：白框根因另有其因（.sheet(isPresented:) 的 item 竞态，2026-09-08 已改
+    /// .sheet(item:)）；此延迟仍保留——菜单 tracking 冲突独立存在，两类叠加才致“永久卡”。
     private func presentAfterMenuDismisses(_ action: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             action()
