@@ -36,7 +36,13 @@ struct MockNetworkTransport: NetworkTransport {
         try redirectHandler(url)
     }
 
-    func download(url: URL, to destination: URL, timeout: TimeInterval, headers: [String: String]) async throws {
+    func download(
+        url: URL,
+        to destination: URL,
+        timeout: TimeInterval,
+        headers: [String: String],
+        progress: (@Sendable (Int64, Int64) -> Void)?
+    ) async throws {
         try downloadHandler(url, destination)
     }
 }

@@ -79,6 +79,7 @@
 		6BEE379F884E4A0BBC713FA8 /* CloudFailureDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */; };
 		0814F39A47A44E6DAE6D2D57 /* GraphicEQCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */; };
 		16674A64391C4915BCE3853F /* StateManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */; };
+		9AFDA6102599474FA9895BC3 /* MacAria2ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D555434727943E692856C7E /* MacAria2ClientTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -207,6 +208,7 @@
 		DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudFailureDetectorTests.swift; sourceTree = "<group>"; };
 		FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GraphicEQCodecTests.swift; sourceTree = "<group>"; };
 		FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StateManagerTests.swift; sourceTree = "<group>"; };
+		5D555434727943E692856C7E /* MacAria2ClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacAria2ClientTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -372,6 +374,7 @@
 				Services/LyricsSearch.swift,
 				Services/LyricsSearchCache.swift,
 				Services/LyricsSearchProvider.swift,
+				Services/MacAria2Client.swift,
 				Services/MacFolderWatchPolicy.swift,
 				Services/MacImportNaming.swift,
 				Services/MacIndexingGate.swift,
@@ -628,6 +631,7 @@
 				DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */,
 				FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */,
 				FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */,
+				5D555434727943E692856C7E /* MacAria2ClientTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1005,6 +1009,7 @@
 				6BEE379F884E4A0BBC713FA8 /* CloudFailureDetectorTests.swift in Sources */,
 				0814F39A47A44E6DAE6D2D57 /* GraphicEQCodecTests.swift in Sources */,
 				16674A64391C4915BCE3853F /* StateManagerTests.swift in Sources */,
+				9AFDA6102599474FA9895BC3 /* MacAria2ClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

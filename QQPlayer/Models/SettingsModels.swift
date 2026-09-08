@@ -192,6 +192,19 @@ struct DeleteSettings: Codable {
     var onlineDownloadQuality: String = NeteaseOnlineLogic.defaultLevel
     /// 在线下载目标目录（空 = 默认曲库首目录，web download.downloadDir 语义）
     var onlineDownloadDirectory: String = ""
+
+    // MARK: - 下载引擎（web download.* 对齐，2026-09 B1 下载引擎批）
+
+    /// 下载引擎（httpx=内置 HTTP | aria2，web download.engine 对齐；默认内置）
+    var downloadEngine: String = "httpx"
+    /// aria2 RPC 地址（web download.aria2Rpc 对齐；默认本机 daemon）
+    var aria2Rpc: String = "http://localhost:6800/jsonrpc"
+    /// aria2 RPC secret（web download.aria2Secret 对齐）
+    var aria2Secret: String = ""
+    /// 下载限速 MB/s（0=不限速；web download.maxSpeed 对齐——注意 web 单位是 MB/s）
+    var downloadMaxSpeed: Double = 0
+    /// 歌曲海（夸克）下载音质（mp3|flac，web download.quarkQuality 对齐；macOS 现在写死 mp3）
+    var quarkQuality: String = "mp3"
     /// 歌词字号（Mac 歌词面板正文；web 版 lyric fontSize 对齐，默认 15）
     var lyricFontSize: Double = 15
     /// 歌词译文行显示（web 版 lyric showZh 对齐，默认显示）
@@ -257,6 +270,12 @@ struct DeleteSettings: Codable {
         onlineDownloadQuality = try container.decodeIfPresent(String.self, forKey: .onlineDownloadQuality)
             ?? NeteaseOnlineLogic.defaultLevel
         onlineDownloadDirectory = try container.decodeIfPresent(String.self, forKey: .onlineDownloadDirectory) ?? ""
+        downloadEngine = try container.decodeIfPresent(String.self, forKey: .downloadEngine) ?? "httpx"
+        aria2Rpc = try container.decodeIfPresent(String.self, forKey: .aria2Rpc)
+            ?? "http://localhost:6800/jsonrpc"
+        aria2Secret = try container.decodeIfPresent(String.self, forKey: .aria2Secret) ?? ""
+        downloadMaxSpeed = try container.decodeIfPresent(Double.self, forKey: .downloadMaxSpeed) ?? 0
+        quarkQuality = try container.decodeIfPresent(String.self, forKey: .quarkQuality) ?? "mp3"
         lyricFontSize = try container.decodeIfPresent(Double.self, forKey: .lyricFontSize) ?? 15
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
