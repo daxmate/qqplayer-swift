@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# pre-commit hook: 提交前自动检查 Swift 代码 lint/format（防 CI 连红）
+# pre-commit hook: 提交前自动检查 Swift 代码 lint/format + 编译警告（防 CI 连红/警告堆积）
 #   swiftformat --lint（暂存 .swift）+ swiftlint lint（暂存 .swift）
-# 工具缺失时警告放行（CI 兜底），避免首次 clone 未装工具时阻塞提交
+#   + 编译警告零容忍（2026-09-08 用户立）：增量 xcodebuild + 警告扫描
+#     耗时（DerivedData 热缓存实测）：QQPlayerMac ~6s / QQPlayer ~52s
+#     远快于 CI（~10min），本地先拦，CI 检测保留作最终兜底
+# 放行策略：
+#   lint 工具缺失 → 放行（CI 兜底）；xcodebuild 不可用 → 放行（CI 兜底）
+#   xcodebuild 编译失败 → 阻止（编译错误本就不该提交）；确属环境问题
+#   （Xcode 占用/DerivedData 锁）可用 SKIP_WARNING_CHECK=1 绕过，CI 仍兜底
+# 注：QQPlayerTests 测试文件不在 build 产物内，其警告由 CI test 编译兜底
 set -u
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -25,12 +32,72 @@ if [ -n "$swift_files" ]; then
     # shellcheck disable=SC2086
     swiftlint lint $swift_files || fail=1
   fi
+
+  # ---- 编译警告检测（增量）----
+  # 与 CI .github/workflows/ci.yml 的 Check zero warnings 同一过滤逻辑：
+  # 源码警告（路径含 /QQPlayer/ 或 /QQPlayerTests/）+ 工程级警告（"(in target ...)"）
+  # 命中即拦；排除 appintents "Metadata extraction skipped" 无害工具提示。
+  # 增量编译只重编变更文件 → 扫到的警告 = 本次提交引入的警告（存量已清零）。
+  if [ "${SKIP_WARNING_CHECK:-0}" = "1" ]; then
+    echo "⚠️  SKIP_WARNING_CHECK=1——跳过编译警告检测（CI 仍兜底）"
+  elif ! command -v xcodebuild >/dev/null 2>&1; then
+    echo "⚠️  xcodebuild 不可用，跳过编译警告检测（CI 会兜底）"
+  else
+    check_scheme() {
+      local scheme=$1 log=$2 dest=$3
+      echo "→ 编译警告检测（$scheme 增量编译）"
+      xcodebuild build -project QQPlayer.xcodeproj -scheme "$scheme" \
+        -configuration Debug -destination "$dest" CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$log"
+      local build_status=${PIPESTATUS[0]}
+      if [ "$build_status" -ne 0 ]; then
+        echo "❌ $scheme 编译失败——编译错误不该进提交"
+        echo "   确属环境问题（Xcode 占用/DerivedData 锁）可用 SKIP_WARNING_CHECK=1 绕过，CI 仍兜底"
+        return 1
+      fi
+      local warn
+      warn="$(grep -E 'warning:' "$log" \
+        | grep -v 'Metadata extraction skipped' \
+        | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
+        | sort -u || true)"
+      if [ -n "$warn" ]; then
+        echo "❌ $scheme 检出编译警告（零容忍，须当场清零）："
+        printf '%s\n' "$warn"
+        return 1
+      fi
+      echo "  ✅ $scheme 无源码/工程级编译警告"
+      return 0
+    }
+
+    # scheme 选择：QQPlayer/Mac/* 与 QQPlayerMacApp.swift 只进 Mac target；
+    # QQPlayer/Services/* 双 target 共享（保险起见两都编，Mac 空增量仅 ~6s）；
+    # 其余 QQPlayer/* 与 QQPlayerTests/* 归 iOS（QQPlayer scheme，~52s）
+    need_ios=0
+    need_mac=0
+    for f in $swift_files; do
+      case "$f" in
+        QQPlayer/Mac/* | QQPlayer/QQPlayerMacApp.swift) need_mac=1 ;;
+        QQPlayer/Services/*) need_ios=1; need_mac=1 ;;
+        *) need_ios=1 ;;
+      esac
+    done
+    if [ "$need_ios" -eq 1 ]; then
+      check_scheme QQPlayer /tmp/precommit-warn-ios.log 'generic/platform=iOS' || fail=1
+    fi
+    if [ "$need_mac" -eq 1 ]; then
+      check_scheme QQPlayerMac /tmp/precommit-warn-mac.log 'platform=macOS' || fail=1
+    fi
+    if [ "$need_ios" -eq 0 ] && [ "$need_mac" -eq 0 ]; then
+      # 理论上不可达（swift_files 非空必落某分支），防御性兜底
+      check_scheme QQPlayer /tmp/precommit-warn-ios.log 'generic/platform=iOS' || fail=1
+    fi
+  fi
 fi
 
 if [ "$fail" -ne 0 ]; then
   echo ""
-  echo "❌ lint/format 未通过，提交已阻止。请先运行："
+  echo "❌ lint/format 或编译警告未通过，提交已阻止。请先处理："
   echo "   swiftformat . && swiftlint lint --fix"
+  echo "   编译警告按零容忍纪律当场清零（本地排查用 Release + 全 target 全量编译核对）"
   exit 1
 fi
 
