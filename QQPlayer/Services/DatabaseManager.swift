@@ -371,6 +371,24 @@ class DatabaseManager: @unchecked Sendable {
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_stable_id)")
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at)")
 
+            // 局域网同步配对记录（S2, M1；docs/lan-sync-design.md §7）。
+            // 新表对旧库亦生效：createTables 每次启动都跑（CREATE TABLE IF
+            // NOT EXISTS 幂等），旧库下次启动自动补表（与 eq_* / play_history
+            // 新增表同一模式，无需 ALTER）。列定义与 DeviceStore 的 upsert SQL
+            // 及 PeerDevice(Codable, FetchableRecord, PersistableRecord) 对齐。
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_device (
+                    peer_id TEXT PRIMARY KEY,
+                    peer_public_key TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    paired_at INTEGER NOT NULL,
+                    last_seen_at INTEGER NOT NULL,
+                    notes TEXT,
+                    updated_at INTEGER NOT NULL
+                )
+            """)
+
             // Migration: Add last_played_at column if it doesn't exist
             do {
                 try db.execute(sql: """
