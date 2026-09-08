@@ -139,7 +139,10 @@ struct MacOnlineSearchView: View {
                 .foregroundColor(.secondary)
             TextField("online_search_placeholder".localized, text: $query)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit { startSearch() }
+                .onSubmit {
+                    startSearch()
+                    recordHistory()
+                }
             if !query.isEmpty {
                 Button {
                     query = ""
@@ -387,8 +390,6 @@ struct MacOnlineSearchView: View {
         status = .loading
         errorMessage = nil
         searchSeq += 1
-        // B2：真正提交（query 非空、seq 递增处）记入历史（同词去重置顶、更新来源）
-        history = MacSearchHistoryStore.add(keyword: q, source: source.rawValue)
         let seq = searchSeq
         searchTask = Task {
             switch source {
@@ -413,9 +414,20 @@ struct MacOnlineSearchView: View {
         }
     }
 
+    /// 显式提交才记历史（B2 修正 2026-09-08 晚）：防抖自动搜索（输入中间态停顿）
+    /// 不记——否则 "馬と鹿" 的打字过程会留下 "馬" "馬と" 等中间词；只在用户
+    /// 回车提交或对结果发起下载（确认这个词有用）时记录。
+    private func recordHistory() {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        history = MacSearchHistoryStore.add(keyword: q, source: source.rawValue)
+    }
+
     // MARK: - 下载分发
 
     private func download(_ item: OnlineItem) {
+        // 下载 = 对当前搜索词的强确认信号 → 补记历史（同词去重置顶、更新来源）
+        recordHistory()
         switch item {
         case .netease(let song):
             downloadNetease(song)
