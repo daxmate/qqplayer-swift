@@ -1002,7 +1002,7 @@
 "settings_download_engine_hint" = "內建 = 直接下載；aria2 = 交給 aria2 下載";
 "settings_download_aria2_rpc" = "aria2 RPC 位址";
 "settings_download_aria2_secret" = "aria2 Secret";
-"settings_download_aria2_secret_placeholder" = "如 dax";
+"settings_download_aria2_secret_placeholder" = "輸入 RPC secret（可留空）";
 "settings_download_max_speed" = "限速（MB/s）";
 "settings_download_max_speed_hint" = "0 = 不限速";
 "search_any_menu" = "搜尋一切";
