@@ -32,7 +32,8 @@ struct DeviceStoreTests {
         peerID: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRST",
         displayName: String = "MacBook Pro",
         role: PeerRole = .host,
-        pairedAt: Int64 = 1_700_000_000
+        pairedAt: Int64 = 1_700_000_000,
+        notes: String? = nil
     ) -> PeerDevice {
         PeerDevice(
             peerID: peerID,
@@ -41,7 +42,7 @@ struct DeviceStoreTests {
             role: role,
             pairedAt: pairedAt,
             lastSeenAt: pairedAt,
-            notes: nil
+            notes: notes
         )
     }
 
