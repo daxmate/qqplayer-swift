@@ -112,5 +112,11 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>扫描二维码以与您自己的 QQPlayer 设备配对并同步（仅限您授权的配对操作）。</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于发现并连接同一局域网内的 QQPlayer 设备（Mac/Windows/NAS），以配对并同步音乐库。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_qqplayer-sync._tcp</string>
+	</array>
 </dict>
 </plist>
