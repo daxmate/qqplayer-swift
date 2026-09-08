@@ -21,6 +21,7 @@ struct MacSettingsView: View {
         case download
         case scraping
         case shortcuts
+        case sync
         case appearance
         case about
 
@@ -35,6 +36,8 @@ struct MacSettingsView: View {
             case .download: return Localized.settingsCategoryDownload
             case .scraping: return Localized.settingsCategoryScraping
             case .shortcuts: return Localized.settingsCategoryShortcuts
+            // S2 M1-UI：局域网同步中心（Host 侧身份/QR + 已配对设备）
+            case .sync: return "settings_category_sync".localized
             case .appearance: return Localized.settingsCategoryAppearance
             case .about: return Localized.settingsCategoryAbout
             }
@@ -49,6 +52,7 @@ struct MacSettingsView: View {
             case .download: return "arrow.down.circle"
             case .scraping: return "tag"
             case .shortcuts: return "keyboard"
+            case .sync: return "arrow.triangle.2.circlepath"
             case .appearance: return "paintbrush"
             case .about: return "info.circle"
             }
@@ -87,6 +91,8 @@ struct MacSettingsView: View {
                     MacScrapeSettingsView()
                 case .shortcuts:
                     MacShortcutsSettingsView()
+                case .sync:
+                    MacSyncSettingsView()
                 case .appearance:
                     MacAppearanceSettingsView()
                 case .about:
