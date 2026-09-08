@@ -1188,13 +1188,18 @@ struct QuarkClientTests {
         #expect(download.headers["Origin"] == "https://pan.quark.cn")
         #expect(download.headers["Cookie"] == "pan_us=abc123")
 
-        let request = QuarkMockURLProtocol.receivedRequests.first
-        #expect(request?.httpMethod == "POST")
-        #expect(request?.url?.path == "/1/clouddrive/file/download")
-        #expect(Self.queryValue("entry", in: request!) == "ft")
-        #expect(Self.queryValue("fr", in: request!) == "pc")
-        #expect(Self.queryValue("pr", in: request!) == "ucpro")
-        let body = Self.bodyDict(of: request!)
+        // 请求序列：config（取直链前 __puus 保活）→ file/download
+        let requests = QuarkMockURLProtocol.receivedRequests
+        #expect(requests.count == 2)
+        #expect(requests[0].httpMethod == "GET")
+        #expect(requests[0].url?.path == "/1/clouddrive/config")
+        let request = requests[1]
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.path == "/1/clouddrive/file/download")
+        #expect(Self.queryValue("entry", in: request) == "ft")
+        #expect(Self.queryValue("fr", in: request) == "pc")
+        #expect(Self.queryValue("pr", in: request) == "ucpro")
+        let body = Self.bodyDict(of: request)
         #expect(body?["fids"] as? [String] == ["f1"])
         #expect(body?["fids_token"] as? [String] == ["tok-f1"])
         #expect(body?["pwd_id"] as? String == "abc123")

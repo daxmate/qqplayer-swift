@@ -642,14 +642,15 @@ struct QuarkClient {
         guard cookieFileExists else {
             throw QuarkClientError.loginRequired
         }
+        guard let pwdID = QuarkLogic.shareToken(from: shareURL) else {
+            throw QuarkClientError.invalidShareURL(shareURL)
+        }
         // 会话保活（2026-09-08 歌曲海下载 403 auth miss 修复）：扫码登录只存
         // 6 个 cookie，下载 CDN 校验需要的 __puus 仅由 /config 接口 Set-Cookie
         // 下发（Max-Age 24h）；refreshPUUS 此前定义了但从未被调用 → 下载必然
         // auth miss。每次取直链前刷一次保活（失败静默，不影响主流程）。
+        // 位置在 shareToken 校验后：URL 非法直接抛，不做无谓保活请求。
         await refreshPUUS()
-        guard let pwdID = QuarkLogic.shareToken(from: shareURL) else {
-            throw QuarkClientError.invalidShareURL(shareURL)
-        }
         let jar = loadCookies()
         var headers = driveHeaders(cookies: jar)
         headers["Origin"] = "https://pan.quark.cn"
