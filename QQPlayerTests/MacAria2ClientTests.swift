@@ -112,6 +112,27 @@ struct MacAria2ClientTests {
         }
     }
 
+    /// 读请求体：URLSession 在自定义 URLProtocol 下会把 httpBody 转成
+    /// httpBodyStream（httpBody 变 nil，CI 实测）——双兼容（2026-09-08 B1 CI 修复）
+    private func requestBodyData(_ request: URLRequest) -> Data? {
+        if let body = request.httpBody {
+            return body
+        }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
+
     // MARK: MacAria2Logic.addUriOptions
 
     @Test("opts：dir/out 恒在；限速 0 不加 max-download-limit；headers 空不加 header")
@@ -258,7 +279,7 @@ struct MacAria2ClientTests {
         #expect(request.url?.absoluteString == "http://localhost:6800/jsonrpc")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
 
-        let body = try #require(request.httpBody)
+        let body = try #require(requestBodyData(request))
         let json = try JSONSerialization.jsonObject(with: body)
         let object = try #require(json as? [String: Any])
         #expect(object["jsonrpc"] as? String == "2.0")
@@ -294,7 +315,7 @@ struct MacAria2ClientTests {
         )
 
         let request = try #require(Aria2MockURLProtocol.receivedRequests.first)
-        let body = try #require(request.httpBody)
+        let body = try #require(requestBodyData(request))
         let json = try JSONSerialization.jsonObject(with: body)
         let object = try #require(json as? [String: Any])
         let params = try #require(object["params"] as? [Any])
@@ -421,7 +442,7 @@ struct MacAria2ClientTests {
         // 服务层 try? 调用，客户端不应抛
         try await makeClient().remove(gid: "gid-1")
         let request = try #require(Aria2MockURLProtocol.receivedRequests.first)
-        let body = try #require(request.httpBody)
+        let body = try #require(requestBodyData(request))
         let json = try JSONSerialization.jsonObject(with: body)
         let object = try #require(json as? [String: Any])
         #expect(object["method"] as? String == "aria2.remove")
