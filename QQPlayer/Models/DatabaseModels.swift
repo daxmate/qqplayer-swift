@@ -56,6 +56,12 @@ struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
     /// Optional so databases created by older app versions decode safely and
     /// receive a one-time metadata refresh on their next library scan.
     var modificationDate: Int64?
+    /// SHA-256 of the audio file contents: the cross-device song identity
+    /// (sync manifest reconciliation key, lan-sync-design §6.1/§7). Computed
+    /// once at ingest; NULL means "not fingerprinted yet" (lazy backfill for
+    /// pre-existing libraries, mirrors modificationDate's optional pattern so
+    /// databases created by older app versions decode safely).
+    var contentHash: String?
     var replaygainTrackGain: Double?
     var replaygainAlbumGain: Double?
     var replaygainTrackPeak: Double?
@@ -79,6 +85,7 @@ struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
         case bitDepth = "bit_depth"
         case channels, fileSize = "file_size"
         case modificationDate = "modification_date"
+        case contentHash = "content_hash"
         case replaygainTrackGain = "replaygain_track_gain"
         case replaygainAlbumGain = "replaygain_album_gain"
         case replaygainTrackPeak = "replaygain_track_peak"
