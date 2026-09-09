@@ -50,8 +50,18 @@ enum MusicFolderResolver {
         let defaultURL = macDefaultFolderURL(homeDirectory: homeDirectory)
         var folders = [defaultURL]
         let defaultPath = defaultURL.standardizedFileURL.path
+        let homePath = homeDirectory.standardizedFileURL.path
         for path in extraFolderPaths {
-            let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+            // ~ 展开基于注入的 homeDirectory（而非系统真实 home），保证可注入可测
+            let expanded: String
+            if path == "~" {
+                expanded = homePath
+            } else if path.hasPrefix("~/") {
+                expanded = homePath + "/" + String(path.dropFirst(2))
+            } else {
+                expanded = path
+            }
+            let url = URL(fileURLWithPath: expanded)
             if url.standardizedFileURL.path != defaultPath {
                 folders.append(url)
             }

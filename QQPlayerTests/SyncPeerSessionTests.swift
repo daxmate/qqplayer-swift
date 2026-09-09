@@ -486,10 +486,14 @@ struct SyncPeerSessionTests {
 
     @Test("握手超时：host 等不到 client hello → handshakeTimeout")
     func handshakeTimeout() async throws {
-        let fixture = SessionFixture.make(config: SyncSessionConfiguration(handshakeTimeout: 0.05))
+        let fixture = SessionFixture.make(config: SyncSessionConfiguration(handshakeTimeout: 0.1))
         fixture.hostSession.handleTransportReady()
         #expect(fixture.hostSession.phase == .waitingForPeerHello)
-        try await Task.sleep(for: .milliseconds(200))
+        // 轮询等待超时关闭：asyncAfter 在 CI 模拟器高负载下可能延迟，不依赖精确 sleep
+        let deadline = Date().addingTimeInterval(3)
+        while fixture.hostSession.phase != .closed, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         #expect(fixture.hostSession.phase == .closed)
         #expect(fixture.hostSession.closeReason == .handshakeTimeout)
     }
