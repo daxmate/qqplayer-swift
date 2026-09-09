@@ -97,6 +97,9 @@
 		989932778B8244E8A40BB55C /* SyncFileReceiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */; };
 		764E26B5B1F843A1BBD6E730 /* SyncPairingApprovalModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */; };
 		38EB3426D50B4F76974C9593 /* SyncAutoConnectLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A14A219331C4000A169C65A /* SyncAutoConnectLogicTests.swift */; };
+		897EFB35C2054CA38FA34B28 /* SyncChangeLogStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 166B1E7DA449477EBCA4230E /* SyncChangeLogStoreTests.swift */; };
+		34046868D0884A84860348DD /* SyncLWWReconcileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359C7CD87E9B4C3EB94A8002 /* SyncLWWReconcileTests.swift */; };
+		7384F64DB2D94681BD673E27 /* SyncChangeLogFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE216B5989546A0BB77E2C2 /* SyncChangeLogFrameTests.swift */; };
 		7CC264D55E4D4AC0B668C8C9 /* TrackContentHashTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B4D41BE71C4359A35B92CF /* TrackContentHashTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -244,6 +247,9 @@
 		A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileReceiverTests.swift; sourceTree = "<group>"; };
 		F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingApprovalModelTests.swift; sourceTree = "<group>"; };
 		5A14A219331C4000A169C65A /* SyncAutoConnectLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncAutoConnectLogicTests.swift; sourceTree = "<group>"; };
+		166B1E7DA449477EBCA4230E /* SyncChangeLogStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncChangeLogStoreTests.swift; sourceTree = "<group>"; };
+		359C7CD87E9B4C3EB94A8002 /* SyncLWWReconcileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLWWReconcileTests.swift; sourceTree = "<group>"; };
+		3FE216B5989546A0BB77E2C2 /* SyncChangeLogFrameTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncChangeLogFrameTests.swift; sourceTree = "<group>"; };
 		A4B4D41BE71C4359A35B92CF /* TrackContentHashTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackContentHashTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -470,6 +476,12 @@
 				Sync/SyncPeerSession.swift,
 				Sync/SyncQRCodec.swift,
 				Sync/SyncSessionModels.swift,
+				Sync/SyncChangeLogApplier.swift,
+				Sync/SyncChangeLogPeer.swift,
+				Sync/SyncChangeLogStore.swift,
+				Sync/SyncDataSnapshots.swift,
+				Sync/SyncDataSyncModels.swift,
+				Sync/SyncLWWReconcile.swift,
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/PlayerGestureLogic.swift,
 				Views/Utility/HintCardView.swift,
@@ -712,6 +724,9 @@
 				A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */,
 				F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */,
 				5A14A219331C4000A169C65A /* SyncAutoConnectLogicTests.swift */,
+				166B1E7DA449477EBCA4230E /* SyncChangeLogStoreTests.swift */,
+				359C7CD87E9B4C3EB94A8002 /* SyncLWWReconcileTests.swift */,
+				3FE216B5989546A0BB77E2C2 /* SyncChangeLogFrameTests.swift */,
 				A4B4D41BE71C4359A35B92CF /* TrackContentHashTests.swift */,
 			);
 			path = QQPlayerTests;
@@ -1108,6 +1123,9 @@
 				989932778B8244E8A40BB55C /* SyncFileReceiverTests.swift in Sources */,
 				764E26B5B1F843A1BBD6E730 /* SyncPairingApprovalModelTests.swift in Sources */,
 				38EB3426D50B4F76974C9593 /* SyncAutoConnectLogicTests.swift in Sources */,
+				897EFB35C2054CA38FA34B28 /* SyncChangeLogStoreTests.swift in Sources */,
+				34046868D0884A84860348DD /* SyncLWWReconcileTests.swift in Sources */,
+				7384F64DB2D94681BD673E27 /* SyncChangeLogFrameTests.swift in Sources */,
 				7CC264D55E4D4AC0B668C8C9 /* TrackContentHashTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

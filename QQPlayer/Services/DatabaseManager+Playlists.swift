@@ -137,7 +137,28 @@ extension DatabaseManager {
                 isFolderSynced: false,
                 lastFolderSync: nil
             )
-            return try playlist.insertAndFetch(db)!
+            let inserted = try playlist.insertAndFetch(db)!
+            // S2 M4-1：手动歌单新建 → outbox upsert（同一事务）。folder-synced 歌单
+            // 由本地扫描器派生（folder_path 是设备本地路径），不参与跨端 LWW。
+            let snapshot = SyncPlaylistSnapshot(
+                slug: inserted.slug,
+                title: inserted.title,
+                createdAt: inserted.createdAt,
+                updatedAt: inserted.updatedAt,
+                lastPlayedAt: inserted.lastPlayedAt,
+                folderPath: inserted.folderPath,
+                isFolderSynced: inserted.isFolderSynced,
+                lastFolderSync: inserted.lastFolderSync,
+                customCoverImagePath: inserted.customCoverImagePath
+            )
+            try SyncChangeLogStore.record(
+                db,
+                entity: .playlist,
+                rowKey: snapshot.rowKey,
+                op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+            )
+            return inserted
         }
     }
 
@@ -255,15 +276,51 @@ extension DatabaseManager {
             let playlistItem = PlaylistItem(playlistId: playlistId, position: maxPosition + 1, trackStableId: trackStableId)
             print("🎵 Creating playlist item with position \(maxPosition + 1)")
             try playlistItem.insert(db)
+            // S2 M4-1：手动歌单项新增 → outbox upsert（同一事务）。folder-synced
+            // 歌单内容由本地扫描派生，不入跨端同步。
+            if let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db),
+               !playlist.isFolderSynced {
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .playlistItem,
+                    rowKey: SyncPlaylistItemSnapshot(
+                        playlistSlug: playlist.slug,
+                        position: playlistItem.position,
+                        trackStableId: playlistItem.trackStableId
+                    ).rowKey,
+                    op: .upsert,
+                    payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistItemSnapshot(
+                        playlistSlug: playlist.slug,
+                        position: playlistItem.position,
+                        trackStableId: playlistItem.trackStableId
+                    ))
+                )
+            }
             print("✅ Successfully added track to playlist")
         }
     }
 
     func removeFromPlaylist(playlistId: Int64, trackStableId: String) throws {
         try write { db in
-            _ = try PlaylistItem
+            let deleted = try PlaylistItem
                 .filter(Column("playlist_id") == playlistId && Column("track_stable_id") == trackStableId)
                 .deleteAll(db)
+            // S2 M4-1：手动歌单项删除 → outbox delete（行键稳定 = slug|track）。
+            if deleted > 0,
+               let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db),
+               !playlist.isFolderSynced {
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .playlistItem,
+                    rowKey: SyncPlaylistItemSnapshot(
+                        playlistSlug: playlist.slug,
+                        position: 0,
+                        trackStableId: trackStableId
+                    ).rowKey,
+                    op: .delete,
+                    payloadJSON: nil
+                )
+            }
         }
     }
 
@@ -308,6 +365,30 @@ extension DatabaseManager {
                     .updateAll(db, Column("position").set(to: index))
             }
 
+            // S2 M4-1：手动歌单重排 → 全量 upsert（同一事务；位置是载荷字段，行键
+            // slug|track 稳定，同键多版本由 LWW updated_at 收敛）。folder-synced 跳过。
+            if let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db),
+               !playlist.isFolderSynced {
+                let finalItems = try PlaylistItem
+                    .filter(Column("playlist_id") == playlistId)
+                    .order(Column("position"))
+                    .fetchAll(db)
+                for item in finalItems {
+                    let snapshot = SyncPlaylistItemSnapshot(
+                        playlistSlug: playlist.slug,
+                        position: item.position,
+                        trackStableId: item.trackStableId
+                    )
+                    try SyncChangeLogStore.record(
+                        db,
+                        entity: .playlistItem,
+                        rowKey: snapshot.rowKey,
+                        op: .upsert,
+                        payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+                    )
+                }
+            }
+
             print("✅ Successfully reordered playlist items")
         }
     }
@@ -332,8 +413,31 @@ extension DatabaseManager {
     func deletePlaylist(playlistId: Int64) throws {
         print("🗑️ Database: Deleting playlist with ID - \(playlistId)")
         let deletedCount = try write { db in
+            // 先取歌单（记录 delete 行键用；folder-synced 歌单不入同步，但删除时
+            // 若曾是手动歌单转 folder（历史遗留）也不补记——v1 只同步手动歌单生命周期）
+            let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db)
+            if let playlist, !playlist.isFolderSynced {
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .playlist,
+                    rowKey: playlist.slug,
+                    op: .delete,
+                    payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
+                        slug: playlist.slug,
+                        title: playlist.title,
+                        createdAt: playlist.createdAt,
+                        updatedAt: playlist.updatedAt,
+                        lastPlayedAt: playlist.lastPlayedAt,
+                        folderPath: playlist.folderPath,
+                        isFolderSynced: playlist.isFolderSynced,
+                        lastFolderSync: playlist.lastFolderSync,
+                        customCoverImagePath: playlist.customCoverImagePath
+                    ))
+                )
+            }
+
             // Check if this is a folder-synced playlist
-            if let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db),
+            if let playlist,
                let folderPath = playlist.folderPath,
                playlist.isFolderSynced {
                 // Normalize to just the folder name to avoid container UUID issues
@@ -371,12 +475,36 @@ extension DatabaseManager {
         print("✏️ Database: Renaming playlist \(playlistId) to '\(newTitle)'")
         let now = Int64(Date().timeIntervalSince1970)
         let updatedCount = try write { db in
-            return try Playlist
+            let updated = try Playlist
                 .filter(Column("id") == playlistId)
                 .updateAll(db,
                            Column("title").set(to: newTitle),
                            Column("updated_at").set(to: now)
                 )
+            // S2 M4-1：手动歌单改名 → outbox upsert（slug 不变 = 行键稳定）。
+            // folder-synced 歌单（本地扫描器派生）不入同步。
+            if updated > 0,
+               let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db),
+               !playlist.isFolderSynced {
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .playlist,
+                    rowKey: playlist.slug,
+                    op: .upsert,
+                    payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
+                        slug: playlist.slug,
+                        title: playlist.title,
+                        createdAt: playlist.createdAt,
+                        updatedAt: playlist.updatedAt,
+                        lastPlayedAt: playlist.lastPlayedAt,
+                        folderPath: playlist.folderPath,
+                        isFolderSynced: playlist.isFolderSynced,
+                        lastFolderSync: playlist.lastFolderSync,
+                        customCoverImagePath: playlist.customCoverImagePath
+                    ))
+                )
+            }
+            return updated
         }
         print("✏️ Database: Updated \(updatedCount) playlist(s)")
     }
@@ -458,12 +586,35 @@ extension DatabaseManager {
         print("🎨 Database: Updating playlist \(playlistId) custom cover to '\(imagePath ?? "nil")'")
         let now = Int64(Date().timeIntervalSince1970)
         let updatedCount = try write { db in
-            return try Playlist
+            let updated = try Playlist
                 .filter(Column("id") == playlistId)
                 .updateAll(db,
                            Column("custom_cover_image_path").set(to: imagePath),
                            Column("updated_at").set(to: now)
                 )
+            // S2 M4-1：手动歌单封面变更 → outbox upsert（歌单结构的一部分）。
+            if updated > 0,
+               let playlist = try Playlist.filter(Column("id") == playlistId).fetchOne(db),
+               !playlist.isFolderSynced {
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .playlist,
+                    rowKey: playlist.slug,
+                    op: .upsert,
+                    payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
+                        slug: playlist.slug,
+                        title: playlist.title,
+                        createdAt: playlist.createdAt,
+                        updatedAt: playlist.updatedAt,
+                        lastPlayedAt: playlist.lastPlayedAt,
+                        folderPath: playlist.folderPath,
+                        isFolderSynced: playlist.isFolderSynced,
+                        lastFolderSync: playlist.lastFolderSync,
+                        customCoverImagePath: playlist.customCoverImagePath
+                    ))
+                )
+            }
+            return updated
         }
         print("🎨 Database: Updated \(updatedCount) playlist(s) custom cover")
     }

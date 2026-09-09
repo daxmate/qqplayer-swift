@@ -399,6 +399,34 @@ class DatabaseManager: @unchecked Sendable {
                 )
             """)
 
+            // 局域网同步播放数据（S2, M4-1；docs/lan-sync-design.md §6.2/§7）。
+            // 新表对旧库亦生效：createTables 每次启动都跑（CREATE TABLE IF
+            // NOT EXISTS 幂等），旧库下次启动自动补表（同 sync_device 模式）。
+            // 模型见 Sync/SyncDataSyncModels.swift；存储/对账见 SyncChangeLogStore.swift。
+            // - sync_outbox：本地变更日志（每端一份），LWW 键 = (entity, row_key)，
+            //   updated_at 毫秒；payload_json = 该行完整数据快照（对端胜出可直接应用）。
+            // - sync_cursor：per-peer 游标（peer_id = DeviceID，last_outbox_id = 对端已消费的
+            //   本端 outbox 最大 id）。拉取增量与推送应答共用。
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_outbox (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity TEXT NOT NULL,
+                    row_key TEXT NOT NULL,
+                    op TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    payload_json TEXT
+                )
+            """)
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sync_outbox_entity_row ON sync_outbox(entity, row_key)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sync_outbox_updated ON sync_outbox(updated_at)")
+
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_cursor (
+                    peer_id TEXT PRIMARY KEY,
+                    last_outbox_id INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+
             // Migration: Add last_played_at column if it doesn't exist
             do {
                 try db.execute(sql: """
