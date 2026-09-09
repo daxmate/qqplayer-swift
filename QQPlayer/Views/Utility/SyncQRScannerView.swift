@@ -248,36 +248,32 @@ struct SyncQRScannerView: View {
             }
             return
         }
-        let device = PeerDevice(
-            candidate: approved,
-            role: .host,
-            pairedAt: Int64(Date().timeIntervalSince1970)
-        )
-        do {
-            try deviceStore.upsert(device)
-            // 扫码候选 → 回连候选（publicKey/sessionNonce QR 路径必有值）
-            guard let publicKeyRaw = approved.publicKeyRaw,
-                  let sessionNonce = approved.sessionNonce
-            else {
-                flow = .outcome(.storeFailed("sync_connect_missing_candidate".localized))
-                return
-            }
-            let pairingCandidate = SyncPairingCandidate(
-                deviceID: approved.deviceID,
-                publicKeyRaw: publicKeyRaw,
-                sessionNonce: sessionNonce,
-                hostName: approved.displayName
-            )
-            autoConnect.start(
-                candidate: pairingCandidate,
-                expectedPeerDeviceID: approved.deviceID,
-                hostName: approved.displayName,
-                clientName: UIDevice.current.name
-            )
-            flow = .connecting
-        } catch {
-            flow = .outcome(.storeFailed(error.localizedDescription))
+        // ⚠️ 不在此预写本地信任记录（2026-09-09 真机 bug 根因）：M1 时代"扫码即
+        // 本地信任"遗留——预写后客户端握手发现本地已有该 host 公钥 → 误判"已配对"
+        // → 跳过 pairRequest 直接 ready（iPhone 显示配对完成），而 Mac 端查自己
+        // 信任表无此 client → 一直等 pairRequest → 永不弹窗/落库，直到超时。
+        // 配对记录只在 Mac 批准后由协议层落库（SyncPeerSession 收到 approved
+        // 时 savePeer），此处仅启动自动回连。
+        // 扫码候选 → 回连候选（publicKey/sessionNonce QR 路径必有值）
+        guard let publicKeyRaw = approved.publicKeyRaw,
+              let sessionNonce = approved.sessionNonce
+        else {
+            flow = .outcome(.storeFailed("sync_connect_missing_candidate".localized))
+            return
         }
+        let pairingCandidate = SyncPairingCandidate(
+            deviceID: approved.deviceID,
+            publicKeyRaw: publicKeyRaw,
+            sessionNonce: sessionNonce,
+            hostName: approved.displayName
+        )
+        autoConnect.start(
+            candidate: pairingCandidate,
+            expectedPeerDeviceID: approved.deviceID,
+            hostName: approved.displayName,
+            clientName: UIDevice.current.name
+        )
+        flow = .connecting
     }
 
     @MainActor

@@ -189,8 +189,13 @@ extension SyncPeerSession {
             return closeEffectsLocked(.storageError("\(error)"))
         }
         do {
-            if let knownPublicKey {
-                // 已配对：pinning 验证 host 签名（host hello 必须绑定本端 ID）
+            // ⚠️ 直通 ready 仅限「无扫码候选的普通重连」：本地信任记录存在 ≠ 对方也
+            // 信任本端（2026-09-09 真机 bug：iOS 曾预写本地记录 → 客户端误判已配对
+            // → 跳过 pairRequest 直接 ready，而 host 查自己信任表无此 client → 一直
+            // 等 pairRequest → 永不弹窗/落库）。带 candidate = 用户本次扫码配对意图，
+            // 必须走 pairRequest 让 host 批准（host 有记录则 approvePairing 覆盖）。
+            if let knownPublicKey, pairingCandidate == nil {
+                // 已配对重连：pinning 验证 host 签名（host hello 必须绑定本端 ID）
                 try SyncHandshake.verifyHello(
                     hello,
                     signerPublicKeyRaw: knownPublicKey,
@@ -203,7 +208,7 @@ extension SyncPeerSession {
                 applyReadyTransitionLocked(effects: &effects)
                 return effects
             }
-            // 未配对：须有匹配的扫码候选（候选公钥即 QR 信任根）
+            // 扫码配对（有候选）或未配对：候选公钥即 QR 信任根 → 发 pairRequest
             guard let candidate = pairingCandidate, candidate.deviceID == hello.deviceID else {
                 return closeEffectsLocked(.peerUntrusted(hello.deviceID))
             }
