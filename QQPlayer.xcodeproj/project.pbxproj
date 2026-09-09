@@ -90,6 +90,8 @@
 		7267C657D66D4E89983B0E0C /* SyncFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58493343A9E4674BE6DA1DA /* SyncFrameTests.swift */; };
 		DFCDAB74FA28465E8CC02A66 /* SyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */; };
 		4A3DC9577BE64896BD673B39 /* SyncPeerSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */; };
+		654104936B8F474D860A0A53 /* MusicFolderResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748A6C7A05F14D14BD5CFDF3 /* MusicFolderResolverTests.swift */; };
+		D0D130688EF041C6A93CDB0E /* MusicDirectoryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBFC25ED578483EB80B651B /* MusicDirectoryScannerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -229,6 +231,8 @@
 		E58493343A9E4674BE6DA1DA /* SyncFrameTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameTests.swift; sourceTree = "<group>"; };
 		CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCryptoTests.swift; sourceTree = "<group>"; };
 		E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerSessionTests.swift; sourceTree = "<group>"; };
+		748A6C7A05F14D14BD5CFDF3 /* MusicFolderResolverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicFolderResolverTests.swift; sourceTree = "<group>"; };
+		6EBFC25ED578483EB80B651B /* MusicDirectoryScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicDirectoryScannerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -409,6 +413,8 @@
 				Services/MacOnlineDownloadService.swift,
 				Services/MacPlaybackGate.swift,
 				Services/MusicBrainzClient.swift,
+				Services/MusicDirectoryScanner.swift,
+				Services/MusicFolderResolver.swift,
 				Services/NeteaseLyricsProvider.swift,
 				Services/NeteaseOnlineClient.swift,
 				Services/PlaybackModels.swift,
@@ -677,6 +683,8 @@
 				E58493343A9E4674BE6DA1DA /* SyncFrameTests.swift */,
 				CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */,
 				E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */,
+				748A6C7A05F14D14BD5CFDF3 /* MusicFolderResolverTests.swift */,
+				6EBFC25ED578483EB80B651B /* MusicDirectoryScannerTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1065,6 +1073,8 @@
 				7267C657D66D4E89983B0E0C /* SyncFrameTests.swift in Sources */,
 				DFCDAB74FA28465E8CC02A66 /* SyncCryptoTests.swift in Sources */,
 				4A3DC9577BE64896BD673B39 /* SyncPeerSessionTests.swift in Sources */,
+				654104936B8F474D860A0A53 /* MusicFolderResolverTests.swift in Sources */,
+				D0D130688EF041C6A93CDB0E /* MusicDirectoryScannerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

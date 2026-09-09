@@ -507,10 +507,15 @@ class StateManager: @unchecked Sendable {
         #if os(macOS)
             // macOS 无 iCloud 容器语义（MVP）：沿用桌面端约定，默认 ~/Music/QQPlayer。
             // 用户拍板（2026-08-30）：音乐库 = 本地文件夹扫描，默认路径 ~/Music/QQPlayer。
-            return FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Music", isDirectory: true)
-                .appendingPathComponent("QQPlayer", isDirectory: true)
+            // 决策上收 MusicFolderResolver（A0-prep：行为不变重构）。
+            return MusicFolderResolver.macDefaultFolderURL(
+                homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+            )
         #else
+            // A0 过渡：iCloud 为次位置，迁移完成后移除。此入口当前仍返回次位置
+            // （iCloud ubiquity 容器 Documents）——iOS NSMetadataQuery 主扫 scope 与
+            // iCloud 数据操作（FileCleanupManager/AppCoordinator+iCloud）依赖它，行为不变；
+            // 主位置（本地沙盒 Documents）见 iosMusicFolderLocations()。
             return getAppFolderURL()
         #endif
     }
@@ -518,22 +523,27 @@ class StateManager: @unchecked Sendable {
     #if os(macOS)
         /// macOS 曲库文件夹列表：默认 ~/Music/QQPlayer 始终在列，加上设置页
         /// 「音乐库」添加的外部文件夹（多根共存，去重）。对齐用户期望：添加
-        /// 新路径不冲掉默认目录。
+        /// 新路径不冲掉默认目录。决策上收 MusicFolderResolver（A0-prep：行为不变）。
         func getMusicFolderURLs() -> [URL] {
-            let defaultURL = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Music", isDirectory: true)
-                .appendingPathComponent("QQPlayer", isDirectory: true)
-            var folders = [defaultURL]
-            let defaultPath = defaultURL.standardizedFileURL.path
-            for path in DeleteSettings.load().libraryFolders {
-                let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
-                if url.standardizedFileURL.path != defaultPath {
-                    folders.append(url)
-                }
-            }
-            return folders
+            MusicFolderResolver.macFolderURLs(
+                homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+                extraFolderPaths: DeleteSettings.load().libraryFolders
+            )
         }
     #endif
+
+    /// iOS 音乐位置决策（A0 过渡：主 = 本地沙盒 Documents，次 = iCloud ubiquity 容器
+    /// Documents；现阶段两处都扫，行为不变）。供 LibraryIndexer iOS 扫描使用；迁移
+    /// 完成后主扫切主位置、次位置移除，只需改 MusicFolderResolver.iosLocations。
+    func iosMusicFolderLocations() -> MusicFolderResolver.IOSLocations {
+        let documentsDirectory = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        )[0]
+        return MusicFolderResolver.iosLocations(
+            documentsDirectory: documentsDirectory,
+            ubiquityContainerURL: iCloudContainerURL
+        )
+    }
 
     func checkiCloudAvailability() -> Bool {
         // Check if user is signed into iCloud

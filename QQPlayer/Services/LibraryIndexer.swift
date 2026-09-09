@@ -144,6 +144,9 @@ class LibraryIndexer: NSObject, ObservableObject {
 
     /// Reads the music folder URL away from the main actor, since the first
     /// call forces the ubiquity container to resolve.
+    /// A0 过渡：iOS 主扫（NSMetadataQuery ubiquity scope）路径保持不动——iCloud
+    /// dataless 实体化依赖此 scope；此处仍取 iCloud ubiquity 容器 Documents（次位置），
+    /// 迁移完成前不切换到本地主位置。
     nonisolated private func resolveMusicFolderURL() async -> URL? {
         stateManager.getMusicFolderURL()
     }
@@ -452,6 +455,8 @@ class LibraryIndexer: NSObject, ObservableObject {
         // The query completed successfully, so it is safe to reconcile only
         // the iCloud root it actually scanned. Never infer deletion from a
         // failed or unavailable root. Only a current scan may finalize.
+        // A0 过渡：iCloud 为次位置，迁移完成后移除（此处 reconcile 的是 ubiquity 根，
+        // 主扫路径不切换，行为不变）。
         guard generation == indexingGeneration else { return }
         if AppCoordinator.shared.iCloudStatus == .available,
            let musicFolderURL = stateManager.getMusicFolderURL() {
@@ -477,8 +482,12 @@ class LibraryIndexer: NSObject, ObservableObject {
         // First, copy any new files from shared container to Documents
         await copyFilesFromSharedContainer()
 
-        // Scan iCloud folder if available
-        if let iCloudMusicFolderURL = stateManager.getMusicFolderURL() {
+        // A0 过渡：iCloud 为次位置，迁移完成后移除。iOS fallback 仍双扫（行为不变）——
+        // 次位置 iCloud ubiquity 容器 Documents 可用才扫，主位置本地沙盒 Documents 恒扫。
+        let locations = stateManager.iosMusicFolderLocations()
+
+        // Scan iCloud folder (secondary, A0 过渡) if available
+        if let iCloudMusicFolderURL = locations.secondary {
             print("📁 Scanning iCloud folder: \(iCloudMusicFolderURL.path)")
             do {
                 let iCloudFiles = try await findMusicFiles(in: iCloudMusicFolderURL)
@@ -492,8 +501,8 @@ class LibraryIndexer: NSObject, ObservableObject {
             }
         }
 
-        // Scan local Documents folder
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        // Scan local Documents folder (primary)
+        let documentsPath = locations.primary
         print("📱 Scanning local Documents folder: \(documentsPath.path)")
         do {
             let localFiles = try await findMusicFiles(in: documentsPath)
@@ -679,7 +688,16 @@ class LibraryIndexer: NSObject, ObservableObject {
     }
 
     private func scanLocalDocuments() async {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        // A0 过渡：iOS 本地 Documents 为音乐主位置（resolver.primary）。offline 场景
+        // 不解析 iCloud 容器（避免 auth error 后再次触发 ubiquity resolve——历史行为
+        // 只扫 documentDirectory），容器传 nil 仅取主位置，语义等价。
+        let documentsDirectory = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        )[0]
+        let documentsPath = MusicFolderResolver.iosLocations(
+            documentsDirectory: documentsDirectory,
+            ubiquityContainerURL: nil
+        ).primary
 
         do {
             let musicFiles = try await findMusicFiles(in: documentsPath)
@@ -903,51 +921,17 @@ class LibraryIndexer: NSObject, ObservableObject {
         return (local, dataless)
     }
 
+    /// 递归扫描目录下的音乐文件（共享实现 MusicDirectoryScanner，iOS/macOS 同一套
+    /// 过滤/隐藏/常规文件规则）。文件类型设置（web 版 audioExts 对齐）：扫描只收录
+    /// 启用格式；默认全 9 种 = 历史行为（2026-09-03 B 组）。A0-prep 前是 LibraryIndexer
+    /// 私有实现，抽取共享后行为逐条一致（含 enumerator 失败返回空、遍历错误抛出）。
     private func findMusicFiles(in directory: URL) async throws -> [URL] {
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                do {
-                    var musicFiles: [URL] = []
-
-                    // 文件类型设置（web 版 audioExts 对齐）：扫描只收录启用格式。
-                    // 默认全 9 种 = 历史行为；取消格式后此列表不含该格式 → 该格式
-                    // 文件不再入列，已入库曲目由 reconcile 收尾移除（2026-09-03 B 组）。
-                    let settings = DeleteSettings.load()
-                    let enabledExtensions = settings.audioExtensions.isEmpty
-                        ? LibraryAudioFormats.defaultEnabled
-                        : settings.audioExtensions
-
-                    let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .nameKey]
-                    let directoryEnumerator = FileManager.default.enumerator(
-                        at: directory,
-                        includingPropertiesForKeys: resourceKeys,
-                        options: [.skipsHiddenFiles]
-                    )
-
-                    guard let enumerator = directoryEnumerator else {
-                        continuation.resume(returning: musicFiles)
-                        return
-                    }
-
-                    for case let fileURL as URL in enumerator {
-                        let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
-
-                        guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else {
-                            continue
-                        }
-
-                        let pathExtension = fileURL.pathExtension.lowercased()
-                        if enabledExtensions.contains(pathExtension) {
-                            musicFiles.append(fileURL)
-                        }
-                    }
-
-                    continuation.resume(returning: musicFiles)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let settings = DeleteSettings.load()
+        let enabledExtensions = MusicDirectoryScanner.enabledExtensions(from: settings)
+        return try await MusicDirectoryScanner.audioFiles(
+            in: directory,
+            enabledExtensions: enabledExtensions
+        )
     }
 
     /// One unit of scan work, safe to run concurrently off the main actor.
