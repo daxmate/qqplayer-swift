@@ -131,10 +131,13 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             return
         }
         do {
-            // 远端批 → SyncChangeLogRow（wire entry 无本地 id，转成 id=nil 行供对账）
+            // 远端批 → SyncChangeLogRow（保留远端 outbox id：merge 排序键
+            // (updated_at, id) 需要它来保证同 ms 多行按远端落库序确定性排序——
+            // playlist upsert 先于其 playlist_item 应用，否则 item 因歌单未到
+            // 被静默跳过。wire id 0（本无 id）转 nil。）
             let remoteRows = payload.entries.map {
                 SyncChangeLogRow(
-                    id: nil,
+                    id: $0.id > 0 ? $0.id : nil,
                     entity: SyncChangeEntity(rawValue: $0.entity) ?? .favorite,
                     rowKey: $0.rowKey,
                     op: SyncChangeOp(rawValue: $0.op) ?? .upsert,
