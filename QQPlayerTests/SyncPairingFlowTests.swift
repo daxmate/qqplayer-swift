@@ -122,7 +122,7 @@ struct SyncPairingFlowTests {
     // MARK: - SyncDeviceList（列表数据源）
 
     private func makeDevice(
-        peerID: String = "ABCDEFG234567ABCDEFG234567ABCDEFG234567ABCDEFG23",
+        peerID: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRST",
         displayName: String = "主机",
         role: PeerRole,
         publicKey: String = "ZmFrZUtleQ=="
@@ -159,7 +159,7 @@ struct SyncPairingFlowTests {
     func shortIDTextFormat() {
         let device = makeDevice(role: .host)
         let text = SyncDeviceList.shortIDText(device)
-        #expect(text == "ABCDEFG … 23")
+        #expect(text == "ABCDEFG … RST")
     }
 
     @Test("shortIDText：非规范 ID → nil（展示层自行兜底）")

@@ -209,8 +209,9 @@ struct SyncPeerSessionTests {
         #expect(received.count == 1)
         #expect(received[0].type == .fileChunk)
         #expect(received[0].payload == chunk)
-        // 线上帧无破坏性截断（加密后仍小于 16MB 上限）
-        #expect(fixture.hostChannel.sentLog.first!.count == chunk.count + SyncFrame.headerLength + 28)
+        // 线上帧无破坏性截断（加密后仍小于 16MB 上限）；sentLog 含握手帧，
+        // 数据帧是最后一条（first = 握手 hello）
+        #expect(fixture.hostChannel.sentLog.last!.count == chunk.count + SyncFrame.headerLength + 28)
     }
 
     @Test("ready 前 sendApplicationFrame 抛错")

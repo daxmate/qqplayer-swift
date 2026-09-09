@@ -342,9 +342,12 @@ struct SyncCryptoTests {
         #expect(throws: SyncHandshakeError.replayOrOutOfOrder) {
             _ = try receiver.open(f1, aad: aad)
         }
-        // 乱序（跳过 f2 直接投 f3）→ 拒
+        // 乱序（跳过 f2 直接投 f3）→ 拒：需独立 receiver 构造“期望 2 却来 3”场景
+        // （上面的 receiver 已成功收 f1/f2，期望计数已到 3，f3 此时是合法下一帧）
+        var outOfOrderReceiver = SyncCipher(key: key)
+        _ = try outOfOrderReceiver.open(f1, aad: aad) // openedCount = 1，期望 2
         #expect(throws: SyncHandshakeError.replayOrOutOfOrder) {
-            _ = try receiver.open(f3, aad: aad)
+            _ = try outOfOrderReceiver.open(f3, aad: aad) // nonce 3 ≠ 期望 2 → 拒
         }
     }
 
@@ -424,11 +427,14 @@ struct SyncCryptoTests {
         // 重放（nonce 已消耗）→ 不命中
         #expect(registry.matchingNonce(for: request) == nil)
 
-        // 错签（换 nonce 签名的请求）对无关 nonce 不命中
+        // 错签（换身份签名的请求）对无关 nonce 不命中：otherRequest 签的是
+        // 另一个 nonce（16 字节），与注册的 8 字节 nonce 无关 → 不命中。
+        // （若 otherRequest 签的恰是注册 nonce，命中并消耗是符合语义的——
+        //   注册表只防 nonce 重用；签名者身份由握手层“请求身份 == 握手身份”校验）
         let other = SyncIdentity.generate()
         let otherRequest = try SyncPairingMessages.makePairRequest(
             identity: other,
-            sessionNonce: Data(count: 8)
+            sessionNonce: Data(count: 16)
         )
         registry.register(Data(count: 8))
         #expect(registry.matchingNonce(for: otherRequest) == nil)
