@@ -56,12 +56,16 @@ struct SyncChangeLogFrameTests {
     // MARK: - 会话层往返
 
     /// 一套独立往返环境：双 ready 会话 + host/client 各自内存 DB + 双 SyncChangeLogPeer。
+    /// ⚠️ host/client peer 都必须强持有：SyncChangeLogPeer 以 [weak self] 挂接会话
+    /// onApplicationFrame，若创建后即弃（`_ =`），ARC 会释放 peer → host 永不
+    /// 应答 pull，往返测试全挂（2026-09-10 CI 红修复）。
     private struct PeerHarness {
         let fixture: SessionFixture
         let hostQueue: DatabaseQueue
         let clientQueue: DatabaseQueue
         let hostStore: SyncChangeLogStore
         let clientStore: SyncChangeLogStore
+        let hostPeer: SyncChangeLogPeer
         let clientPeer: SyncChangeLogPeer
     }
 
@@ -75,7 +79,7 @@ struct SyncChangeLogFrameTests {
         try clientManager.createTables()
         let hostStore = SyncChangeLogStore(database: hostManager)
         let clientStore = SyncChangeLogStore(database: clientManager)
-        _ = SyncChangeLogPeer(
+        let hostPeer = SyncChangeLogPeer(
             session: fixture.hostSession,
             store: hostStore,
             applier: SyncChangeLogApplier(database: hostManager),
@@ -89,7 +93,8 @@ struct SyncChangeLogFrameTests {
         )
         return PeerHarness(
             fixture: fixture, hostQueue: hostQueue, clientQueue: clientQueue,
-            hostStore: hostStore, clientStore: clientStore, clientPeer: clientPeer
+            hostStore: hostStore, clientStore: clientStore,
+            hostPeer: hostPeer, clientPeer: clientPeer
         )
     }
 
