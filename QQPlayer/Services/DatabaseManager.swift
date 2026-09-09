@@ -95,6 +95,15 @@ class DatabaseManager: @unchecked Sendable {
         try createTables()
         try migrateDatabaseIfNeeded()
 
+        // M3-1: content_hash 存量惰性回填（一次性，UserDefaults 门；失败不置位，
+        // 下次启动重试）。放共享启动路径 setupDatabase（iOS+Mac 都走这里），
+        // 必须在 migrateDatabaseIfNeeded 之后——老库先补列才能查 content_hash。
+        do {
+            try backfillTrackContentHashesIfNeeded()
+        } catch {
+            print("⚠️ Database: content_hash backfill failed (will retry next launch): \(error)")
+        }
+
         // Split combined multi-artist rows ("A; B") left by the old parser
         // (issue #16), then heal libraries where deleted tracks left empty
         // artists/albums behind (issue #74). Both are idempotent and cheap,
@@ -238,6 +247,7 @@ class DatabaseManager: @unchecked Sendable {
                     path TEXT NOT NULL,
                     file_size INTEGER,
                     modification_date INTEGER,
+                    content_hash TEXT,
                     replaygain_track_gain REAL,
                     replaygain_album_gain REAL,
                     replaygain_track_peak REAL,
@@ -425,6 +435,19 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// 老库 track 表补 content_hash 列（M3-1，跨端同步对账键 = 文件内容 SHA-256）。
+    /// 幂等：列已存在直接跳过。
+    /// 独立成 internal：生产迁移（migrateDatabaseIfNeeded）与测试
+    /// （TrackContentHashTests 老 schema → 补列 → 往返）共用同一实现，避免两处漂移。
+    static func addTrackContentHashColumnIfNeeded(_ db: Database) throws {
+        if try !db.columns(in: "track").contains(where: { $0.name == "content_hash" }) {
+            try db.execute(sql: "ALTER TABLE track ADD COLUMN content_hash TEXT")
+            print("✅ Database: Added content_hash column to track table")
+        } else {
+            print("ℹ️ Database migration: content_hash column already exists")
+        }
+    }
+
     private func migrateDatabaseIfNeeded() throws {
         var stableIdRemapping: [String: String] = [:]
 
@@ -478,6 +501,12 @@ class DatabaseManager: @unchecked Sendable {
             // createTables 已含)。幂等：列已存在即跳过。独立成 internal 方法：
             // 生产迁移与 GenreParsingTests 老库补列测试共用同一实现。
             try Self.addTrackGenreColumnIfNeeded(db)
+
+            // M3-1: content_hash column (跨端同步对账键；入库时算一次，存量惰性
+            // 回填见 backfillTrackContentHashesIfNeeded)。新库 createTables 已含，
+            // 老库此处补列。幂等：列已存在即跳过。独立成 internal 方法：生产迁移
+            // 与 TrackContentHashTests 老库补列测试共用同一实现。
+            try Self.addTrackContentHashColumnIfNeeded(db)
 
             // Migration: Add custom_cover_image_path column to playlist table
             do {
@@ -654,6 +683,15 @@ class DatabaseManager: @unchecked Sendable {
             } catch {
                 print("⚠️ Database migration: Failed to create UNIQUE index on stable_id: \(error)")
             }
+
+            // M3-1: content_hash 索引（manifest 对账按内容指纹查同歌，设计 §7）。
+            // 幂等：CREATE INDEX IF NOT EXISTS；列刚由上方 ALTER 补上，必存在。
+            do {
+                try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_track_content_hash ON track(content_hash)")
+                print("✅ Database: Created index on track.content_hash")
+            } catch {
+                print("⚠️ Database migration: Failed to create index on content_hash: \(error)")
+            }
         }
 
         migrateExternalFileBookmarkKeys(stableIdRemapping)
@@ -705,6 +743,61 @@ class DatabaseManager: @unchecked Sendable {
 
     func write<T>(_ operation: @escaping (Database) throws -> T) throws -> T {
         return try dbWriter.write(operation)
+    }
+
+    // MARK: - content_hash（M3-1）
+
+    /// 文件存在则流式计算 SHA-256；不存在/读失败返回 nil（调用方按"未指纹"
+    /// 处理，后续 upsert 或惰性回填会再试）。复用 Sync/SyncFileChecksum（共享实现，
+    /// 协议目录只读），不另起哈希逻辑。
+    static func contentHashIfFilePresent(atPath path: String) -> String? {
+        guard FileManager.default.fileExists(atPath: path) else { return nil }
+        return try? SyncFileChecksum.sha256Hex(ofFile: URL(fileURLWithPath: path))
+    }
+
+    /// content_hash 存量惰性回填（带一次性 UserDefaults 门）。独立 key，仿
+    /// legacyMigrationKey 模式：失败不置位 → 下次启动重试。触发点在 setupDatabase
+    /// （iOS+Mac 共享启动路径）。文件 IO 全部在写事务外，绝不长时间占住 GRDB writer
+    /// （audit 纪律：写事务内不做文件 IO）。
+    func backfillTrackContentHashesIfNeeded() throws {
+        let key = "database.contentHashBackfillCompleted.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        try backfillMissingContentHashes()
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// 回填核心（internal 供测试直调，绕开 UserDefaults 门）：扫 content_hash IS NULL
+    /// 行 → 文件存在则算 SHA-256 → 批量 UPDATE。幂等：再跑一遍无 NULL 行可补，不崩。
+    func backfillMissingContentHashes() throws {
+        struct PendingFill {
+            let id: Int64
+            let hash: String
+        }
+
+        // Phase 1: 只读事务取候选（无文件 IO）。
+        let candidates = try read { db in
+            try Track.filter(sql: "content_hash IS NULL").fetchAll(db)
+        }
+
+        // Phase 2: 事务外逐文件哈希（syscalls 不碰 GRDB writer）。
+        var pending: [PendingFill] = []
+        for track in candidates {
+            guard let id = track.id else { continue }
+            guard let hash = Self.contentHashIfFilePresent(atPath: track.path) else { continue }
+            pending.append(PendingFill(id: id, hash: hash))
+        }
+        guard !pending.isEmpty else { return }
+
+        // Phase 3: 短写事务批量落库。
+        try write { db in
+            for fill in pending {
+                try db.execute(
+                    sql: "UPDATE track SET content_hash = ? WHERE id = ?",
+                    arguments: [fill.hash, fill.id]
+                )
+            }
+        }
+        print("✅ Database: Backfilled content_hash for \(pending.count) track(s)")
     }
 
     // SwiftUI rows call getArtistDisplayName on every render - cache the

@@ -13,10 +13,18 @@ extension DatabaseManager {
 
     func upsertTrack(_ track: Track) throws {
         defer { invalidateArtistDisplayNameCache() }
-        var savedTrack: Track?
-        try write { db in
-            var trackToSave = track
+        var trackToSave = track
 
+        // M3-1: 入库时算一次 content_hash（跨端歌曲身份 = 文件内容 SHA-256）。
+        // 已存在（非 nil）不重算；文件缺失/读失败保持 nil，由惰性回填
+        // （backfillTrackContentHashesIfNeeded）或下次入库补。哈希在写事务外
+        // （audit 纪律：文件 IO 不进写事务）。
+        if trackToSave.contentHash == nil {
+            trackToSave.contentHash = Self.contentHashIfFilePresent(atPath: trackToSave.path)
+        }
+        var savedTrack: Track?
+
+        try write { db in
             // A metadata refresh builds a new Track value with the same
             // stable ID. Reuse the existing primary key so GRDB performs an
             // UPDATE, preserving favorites, playlists and every other
@@ -494,6 +502,16 @@ extension DatabaseManager {
         guard let track = try getTrack(byPath: normalizedOld) else { return }
 
         let newStableId = Self.generatePathStableId(forPath: normalizedNew)
+        // M3-1: 改名不改内容——已有 content_hash 原样保留（内容没变）；为 nil
+        // （老库行）在写事务外顺手补算（文件刚改名必存在），避免改名后因惰性回填
+        // 已跑过而永久 NULL。audit 纪律：文件 IO 不进写事务。合并分支会删掉本行，
+        // 该罕见路径下多算一次无害。
+        let contentHashToFill: String?
+        if track.contentHash == nil {
+            contentHashToFill = Self.contentHashIfFilePresent(atPath: normalizedNew)
+        } else {
+            contentHashToFill = nil
+        }
         try write { db in
             if let existing = try Track.filter(Column("stable_id") == newStableId).fetchOne(db),
                existing.id != track.id {
@@ -505,6 +523,9 @@ extension DatabaseManager {
                 var updated = track
                 updated.path = normalizedNew
                 updated.stableId = newStableId
+                if let contentHashToFill {
+                    updated.contentHash = contentHashToFill
+                }
                 try updated.save(db)
                 try self.mergeTrackReferences(db: db, from: track.stableId, to: newStableId)
                 print("🗂️ moveTrack: \(normalizedOld) → \(normalizedNew) (stableId \(track.stableId) → \(newStableId))")
