@@ -122,7 +122,7 @@ struct SyncPairingFlowTests {
     // MARK: - SyncDeviceList（列表数据源）
 
     private func makeDevice(
-        peerID: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRST",
+        peerID: String = DeviceID.base32Encode(Data(repeating: 7, count: 32)), // 确定性合法 52 字符 ID
         displayName: String = "主机",
         role: PeerRole,
         publicKey: String = "ZmFrZUtleQ=="
@@ -157,9 +157,12 @@ struct SyncPairingFlowTests {
 
     @Test("shortIDText：合法全量 ID → 首组 … 末组")
     func shortIDTextFormat() {
-        let device = makeDevice(role: .host)
+        // 52 字符 base32 的末字符低 4 bit 必须为 0（编码器保证）；手工字面量易踩坑，用编码器生成
+        let id = DeviceID.base32Encode(Data(repeating: 7, count: 32))
+        let device = makeDevice(peerID: id, role: .host)
         let text = SyncDeviceList.shortIDText(device)
-        #expect(text == "ABCDEFG … RST")
+        // formatted 按 7 切：首组 = 前 7 字符，末组 = 后 3 字符（52 = 7×7 + 3）
+        #expect(text == "\(id.prefix(7)) … \(id.suffix(3))")
     }
 
     @Test("shortIDText：非规范 ID → nil（展示层自行兜底）")
