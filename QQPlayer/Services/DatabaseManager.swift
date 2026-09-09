@@ -303,7 +303,8 @@ class DatabaseManager: @unchecked Sendable {
                     last_played_at INTEGER DEFAULT 0,
                     folder_path TEXT,
                     is_folder_synced BOOLEAN DEFAULT 0,
-                    last_folder_sync INTEGER
+                    last_folder_sync INTEGER,
+                    custom_cover_image_path TEXT
                 )
             """)
 
