@@ -51,17 +51,24 @@ struct SyncFileReceiverTests {
         SyncFrame(type: .fileAck, payload: try SyncFilePayloadCodec.encode(ack))
     }
 
+    /// 回调日志（引用语义盒子）。⚠️ 不能把数组按值随 tuple 返回：闭包捕获的 var 是
+    /// 装箱存储，return 时拷贝的是当时的空值，之后闭包 append 只写 box——测试侧永远
+    /// 读不到（曾致全套 ack/outcome 断言全盲，CI 全红）。class 承载引用共享。
+    private final class ReceiverLog {
+        var acks: [FileAckPayload] = []
+        var outcomes: [SyncFileReceiver.Outcome] = []
+    }
+
     /// 一套可直驱的 receiver：client 会话就绪，receiver 落盘到临时目录。
     private func makeReceiver(_ name: String = "song.bin") throws
-        -> (receiver: SyncFileReceiver, dir: URL, acks: [FileAckPayload], outcomes: [SyncFileReceiver.Outcome]) {
+        -> (receiver: SyncFileReceiver, dir: URL, log: ReceiverLog) {
         let fixture = SessionFixture.pairedHandshake()
         let dir = try makeTempDir()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
-        var acks: [FileAckPayload] = []
-        var outcomes: [SyncFileReceiver.Outcome] = []
-        receiver.onAckSent = { acks.append($0) }
-        receiver.onCompletion = { outcomes.append($0) }
-        return (receiver, dir, acks, outcomes)
+        let log = ReceiverLog()
+        receiver.onAckSent = { log.acks.append($0) }
+        receiver.onCompletion = { log.outcomes.append($0) }
+        return (receiver, dir, log)
     }
 
     private func fileExists(_ dir: URL, _ name: String) -> Bool {
@@ -73,7 +80,7 @@ struct SyncFileReceiverTests {
     @Test("篡改块：中途改某 chunk 数据 → 校验失败 checksumMismatch、.part 删除")
     func tamperedChunkChecksumMismatch() throws {
         let source = pseudoRandomData(300_000) // 2 块
-        let (receiver, dir, acks, outcomes) = try makeReceiver()
+        let (receiver, dir, log) = try makeReceiver()
         let fileID = "tamper"
         let name = "song.bin"
 
@@ -95,9 +102,9 @@ struct SyncFileReceiverTests {
             fileID: fileID, offset: SyncFileTransfer.chunkSize, data: Data(tampered)
         )))
 
-        #expect(acks.last?.error == .checksumMismatch)
-        #expect(acks.last?.fileID == fileID)
-        #expect(outcomes == [.failed(.checksumMismatch(fileID))])
+        #expect(log.acks.last?.error == .checksumMismatch)
+        #expect(log.acks.last?.fileID == fileID)
+        #expect(log.outcomes == [.failed(.checksumMismatch(fileID))])
         #expect(!fileExists(dir, name + ".part"))
         #expect(!fileExists(dir, name))
     }
@@ -107,7 +114,7 @@ struct SyncFileReceiverTests {
     @Test("乱序块：跳过 offset 0 直接发块 1 → protocolError 中止")
     func outOfOrderChunkProtocolError() throws {
         let source = pseudoRandomData(300_000)
-        let (receiver, dir, acks, outcomes) = try makeReceiver()
+        let (receiver, dir, log) = try makeReceiver()
         let fileID = "order"
 
         receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
@@ -121,9 +128,9 @@ struct SyncFileReceiverTests {
             data: Data(source.prefix(Int(SyncFileTransfer.chunkSize)))
         )))
 
-        #expect(acks.last?.error == .protocolError)
-        guard case let .failed(.protocolError(id, _))? = outcomes.last else {
-            Issue.record("期望 protocolError，实际 \(String(describing: outcomes))")
+        #expect(log.acks.last?.error == .protocolError)
+        guard case let .failed(.protocolError(id, _))? = log.outcomes.last else {
+            Issue.record("期望 protocolError，实际 \(String(describing: log.outcomes))")
             return
         }
         #expect(id == fileID)
@@ -134,7 +141,7 @@ struct SyncFileReceiverTests {
     @Test("超长块（> chunkSize）→ protocolError 中止")
     func oversizedChunkProtocolError() throws {
         let source = pseudoRandomData(300_000)
-        let (receiver, _, acks, _) = try makeReceiver()
+        let (receiver, _, log) = try makeReceiver()
         let fileID = "oversize"
 
         receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
@@ -146,7 +153,7 @@ struct SyncFileReceiverTests {
             fileID: fileID, offset: 0,
             data: pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 1)
         )))
-        #expect(acks.last?.error == .protocolError)
+        #expect(log.acks.last?.error == .protocolError)
         #expect(!receiver.isActive)
     }
 
@@ -155,7 +162,7 @@ struct SyncFileReceiverTests {
     @Test("receiver 不收 ack：静默忽略，后续正常收完")
     func ackFrameIgnored() throws {
         let source = pseudoRandomData(1_000) // 单块内
-        let (receiver, _, acks, outcomes) = try makeReceiver()
+        let (receiver, _, log) = try makeReceiver()
         let fileID = "ackin"
         let name = "song.bin"
 
@@ -163,8 +170,8 @@ struct SyncFileReceiverTests {
         receiver.handleInboundFrame(try ackFrame(FileAckPayload(
             fileID: "stray", receivedBytes: 0, done: false, error: .none
         )))
-        #expect(acks.isEmpty)
-        #expect(outcomes.isEmpty)
+        #expect(log.acks.isEmpty)
+        #expect(log.outcomes.isEmpty)
 
         // 正常传输不受影响
         receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
@@ -175,10 +182,10 @@ struct SyncFileReceiverTests {
         receiver.handleInboundFrame(try chunkFrame(FileChunkPayload(
             fileID: fileID, offset: 0, data: source
         )))
-        #expect(acks.last?.done == true)
-        #expect(acks.last?.receivedBytes == Int64(source.count))
-        guard case let .received(finalURL)? = outcomes.last else {
-            Issue.record("期望 received，实际 \(String(describing: outcomes))")
+        #expect(log.acks.last?.done == true)
+        #expect(log.acks.last?.receivedBytes == Int64(source.count))
+        guard case let .received(finalURL)? = log.outcomes.last else {
+            Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
             return
         }
         #expect(try Data(contentsOf: finalURL) == source)
@@ -189,7 +196,7 @@ struct SyncFileReceiverTests {
     @Test("非法 meta（chunkSize 0 / 坏 sha / name 含路径 / 负 totalSize / 0 字节非空 sha）→ protocolError")
     func invalidMetaProtocolError() throws {
         let source = pseudoRandomData(1_000)
-        let (receiver, _, acks, outcomes) = try makeReceiver()
+        let (receiver, _, log) = try makeReceiver()
         let validSha = SyncFileChecksum.sha256Hex(of: source)
 
         let invalidMetas: [(FileMetaPayload, String)] = [
@@ -216,10 +223,10 @@ struct SyncFileReceiverTests {
         ]
         for (meta, label) in invalidMetas {
             receiver.handleInboundFrame(try metaFrame(meta))
-            #expect(acks.last?.error == .protocolError, "\(label) 应 protocolError")
-            #expect(acks.last?.fileID == meta.fileID)
+            #expect(log.acks.last?.error == .protocolError, "\(label) 应 protocolError")
+            #expect(log.acks.last?.fileID == meta.fileID)
         }
-        #expect(outcomes.isEmpty) // 非法 meta 未开始传输 → 无本地结论
+        #expect(log.outcomes.isEmpty) // 非法 meta 未开始传输 → 无本地结论
         #expect(!receiver.isActive)
     }
 
@@ -227,13 +234,13 @@ struct SyncFileReceiverTests {
 
     @Test("无 meta 先到块 → protocolError ack")
     func chunkWithoutMetaProtocolError() throws {
-        let (receiver, _, acks, outcomes) = try makeReceiver()
+        let (receiver, _, log) = try makeReceiver()
         receiver.handleInboundFrame(try chunkFrame(FileChunkPayload(
             fileID: "orphan", offset: 0, data: pseudoRandomData(100)
         )))
-        #expect(acks.last?.error == .protocolError)
-        #expect(acks.last?.fileID == "orphan")
-        #expect(outcomes.isEmpty)
+        #expect(log.acks.last?.error == .protocolError)
+        #expect(log.acks.last?.fileID == "orphan")
+        #expect(log.outcomes.isEmpty)
     }
 
     // MARK: 同 fileID 新 meta = 发送端重启（传输中）
@@ -241,7 +248,7 @@ struct SyncFileReceiverTests {
     @Test("传输中同 fileID 新 meta（startOffset=0）→ 重启从头收，最终一致")
     func sameFileMetaRestart() throws {
         let source = pseudoRandomData(300_000) // 2 块
-        let (receiver, dir, acks, outcomes) = try makeReceiver()
+        let (receiver, dir, log) = try makeReceiver()
         let fileID = "restart"
         let name = "song.bin"
         let meta = FileMetaPayload(fileID: fileID, name: name, totalSize: Int64(source.count),
@@ -264,9 +271,9 @@ struct SyncFileReceiverTests {
             data: Data(source.dropFirst(Int(SyncFileTransfer.chunkSize)))
         )))
 
-        #expect(acks.last?.done == true)
-        guard case let .received(finalURL)? = outcomes.last else {
-            Issue.record("期望 received，实际 \(String(describing: outcomes))")
+        #expect(log.acks.last?.done == true)
+        guard case let .received(finalURL)? = log.outcomes.last else {
+            Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
             return
         }
         #expect(try Data(contentsOf: finalURL) == source)
@@ -278,22 +285,22 @@ struct SyncFileReceiverTests {
     @Test("无 .part 且 startOffset>0 → resumeMismatch（resume 数据源缺失）")
     func resumeWithoutPartMismatch() throws {
         let source = pseudoRandomData(300_000)
-        let (receiver, _, acks, outcomes) = try makeReceiver()
+        let (receiver, _, log) = try makeReceiver()
         receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
             fileID: "nopart", name: "song.bin", totalSize: Int64(source.count),
             chunkSize: SyncFileTransfer.chunkSize,
             sha256Hex: SyncFileChecksum.sha256Hex(of: source),
             startOffset: SyncFileTransfer.chunkSize
         )))
-        #expect(acks.last?.error == .resumeMismatch)
-        #expect(outcomes == [.failed(.resumeMismatch("nopart"))])
+        #expect(log.acks.last?.error == .resumeMismatch)
+        #expect(log.outcomes == [.failed(.resumeMismatch("nopart"))])
     }
 
     @Test(".part 已含全部字节（上一轮收齐未改名）→ meta 直达校验改名 done")
     func resumePartCompleteVerifyAndRename() throws {
         // 收齐未改名只能发生在块边界收齐瞬间（startOffset == totalSize == 块整数倍）
         let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize)) // 1 整块
-        let (receiver, dir, acks, outcomes) = try makeReceiver()
+        let (receiver, dir, log) = try makeReceiver()
         let fileID = "complete-part"
         let name = "song.bin"
         // .part 已收齐（模拟收完最后一块但未及改名的中断）
@@ -306,9 +313,9 @@ struct SyncFileReceiverTests {
             sha256Hex: SyncFileChecksum.sha256Hex(of: source),
             startOffset: Int64(source.count)
         )))
-        #expect(acks.last?.done == true)
-        guard case let .received(finalURL)? = outcomes.last else {
-            Issue.record("期望 received，实际 \(String(describing: outcomes))")
+        #expect(log.acks.last?.done == true)
+        guard case let .received(finalURL)? = log.outcomes.last else {
+            Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
             return
         }
         #expect(try Data(contentsOf: finalURL) == source)
@@ -318,12 +325,15 @@ struct SyncFileReceiverTests {
     @Test(".part 已含全部字节但 sha 不符 → 删 .part + checksumMismatch")
     func resumePartCompleteChecksumMismatch() throws {
         let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize))
-        let (receiver, dir, acks, outcomes) = try makeReceiver()
+        let (receiver, dir, log) = try makeReceiver()
         let fileID = "bad-part"
         let name = "song.bin"
-        // .part 是损坏数据（与声明 sha 不符）
+        // .part 是损坏数据（与声明 sha 不符）——注意 pseudoRandomData 每次调用同种子
+        // 确定性输出，直接再调一次得到的是相同数据，必须先翻转字节再落盘
         let partURL = dir.appendingPathComponent(name + ".part")
-        try pseudoRandomData(Int(SyncFileTransfer.chunkSize)).write(to: partURL)
+        var corrupted = pseudoRandomData(Int(SyncFileTransfer.chunkSize))
+        corrupted[0] ^= 0xFF
+        try corrupted.write(to: partURL)
 
         receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
             fileID: fileID, name: name, totalSize: Int64(source.count),
@@ -331,8 +341,8 @@ struct SyncFileReceiverTests {
             sha256Hex: SyncFileChecksum.sha256Hex(of: source),
             startOffset: Int64(source.count)
         )))
-        #expect(acks.last?.error == .checksumMismatch)
-        #expect(outcomes == [.failed(.checksumMismatch(fileID))])
+        #expect(log.acks.last?.error == .checksumMismatch)
+        #expect(log.outcomes == [.failed(.checksumMismatch(fileID))])
         #expect(!fileExists(dir, name + ".part"))
         #expect(!fileExists(dir, name))
     }
