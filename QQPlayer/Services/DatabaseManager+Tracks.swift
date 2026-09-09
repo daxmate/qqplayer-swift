@@ -382,6 +382,14 @@ extension DatabaseManager {
         try write { db in
             let favorite = Favorite(trackStableId: trackStableId)
             try favorite.insert(db)
+            // S2 M4-1：收藏 upsert → outbox（同一事务，业务行与变更日志原子提交）
+            try SyncChangeLogStore.record(
+                db,
+                entity: .favorite,
+                rowKey: trackStableId,
+                op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: trackStableId))
+            )
             print("🗃️ Database: Successfully inserted favorite")
         }
     }
@@ -394,6 +402,14 @@ extension DatabaseManager {
         try write { db in
             for trackStableId in trackStableIds {
                 try Favorite(trackStableId: trackStableId).insert(db)
+                // S2 M4-1：批量恢复也是真实收藏变更（iCloud 恢复/导入）→ 逐条 outbox
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .favorite,
+                    rowKey: trackStableId,
+                    op: .upsert,
+                    payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: trackStableId))
+                )
             }
         }
         print("🗃️ Database: Inserted \(trackStableIds.count) favorite(s) in one transaction")
@@ -402,7 +418,18 @@ extension DatabaseManager {
     func removeFromFavorites(trackStableId: String) throws {
         print("🗃️ Database: Removing from favorites - \(trackStableId)")
         let deletedCount = try write { db in
-            return try Favorite.filter(Column("track_stable_id") == trackStableId).deleteAll(db)
+            let count = try Favorite.filter(Column("track_stable_id") == trackStableId).deleteAll(db)
+            // S2 M4-1：仅实际删除时记 outbox delete（0 行 = 本就没有，无需同步删除）
+            if count > 0 {
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .favorite,
+                    rowKey: trackStableId,
+                    op: .delete,
+                    payloadJSON: nil
+                )
+            }
+            return count
         }
         print("🗃️ Database: Deleted \(deletedCount) favorite(s)")
     }

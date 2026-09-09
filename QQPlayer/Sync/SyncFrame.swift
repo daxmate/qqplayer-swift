@@ -15,6 +15,9 @@
 //  类型表（v1）：0=handshake 1=pair_request 2=pair_response 3=ping
 //   4=file_meta 5=file_chunk 6=file_ack 7=bye（4-6 由 M2b 文件传输使用，
 //   M2a 会话层只转发给 onApplicationFrame 回调）。
+//  类型表（v2，M4-1 增量追加）：8=change_log_pull 9=change_log_push（播放数据
+//  同步增量拉取/推送；payload 为 JSON，会话层解密后同样经 onApplicationFrame
+//  转发，由 SyncChangeLogPeer 解码并接 LWW 对账，见 SyncChangeLogPeer.swift）。
 //
 
 import Foundation
@@ -45,6 +48,8 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     case fileChunk = 5
     case fileAck = 6
     case bye = 7
+    case changeLogPull = 8
+    case changeLogPush = 9
 }
 
 /// 帧 flags（bit0 = encrypted）。

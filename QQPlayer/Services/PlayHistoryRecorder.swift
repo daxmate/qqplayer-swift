@@ -86,6 +86,20 @@ final class PlayHistoryRecorder {
                 )
                 try entry.insert(db)
                 insertedId = db.lastInsertedRowID
+                // S2 M4-1：新播放会话 → outbox upsert（初始态，时长为 0；会话 settle 时
+                // 再记最终态）。与业务行同事务：原子提交，防丢变更。
+                let snapshot = SyncPlayHistorySnapshot(
+                    trackStableId: entry.trackStableId,
+                    playedAt: entry.playedAt,
+                    playDurationMs: 0
+                )
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .playHistory,
+                    rowKey: snapshot.rowKey,
+                    op: .upsert,
+                    payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+                )
             }
         } catch {
             print("⚠️ PlayHistoryRecorder: 写入播放记录失败: \(error)")
@@ -152,6 +166,32 @@ final class PlayHistoryRecorder {
     private func settleSession(endingAt playbackTime: Double) {
         guard activeSessionTrackStableId != nil else { return }
         accumulateDuration(until: playbackTime)
+        // S2 M4-1：会话落定 → outbox upsert 最终态（含累计时长）。用 recordId 回读
+        // 行拿准确 play_duration_ms；失败只影响变更日志（已记的初始态仍可同步，
+        // 时长以 LWW 大者胜收敛），不影响播放主流程。
+        if let recordId = activeRecordId, let trackStableId = activeSessionTrackStableId {
+            do {
+                try database.write { db in
+                    guard let row = try PlayHistoryEntry.filter(Column("id") == recordId).fetchOne(db) else {
+                        return
+                    }
+                    let snapshot = SyncPlayHistorySnapshot(
+                        trackStableId: trackStableId,
+                        playedAt: row.playedAt,
+                        playDurationMs: row.playDurationMs
+                    )
+                    try SyncChangeLogStore.record(
+                        db,
+                        entity: .playHistory,
+                        rowKey: snapshot.rowKey,
+                        op: .upsert,
+                        payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+                    )
+                }
+            } catch {
+                print("⚠️ PlayHistoryRecorder: 同步变更日志写入失败: \(error)")
+            }
+        }
         activeSessionTrackStableId = nil
         sessionStartWallTime = .distantPast
         activeRecordId = nil
