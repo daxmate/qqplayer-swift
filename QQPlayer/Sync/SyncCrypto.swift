@@ -297,12 +297,18 @@ struct SyncCipher {
 enum SyncPairingMessages {
     /// Client 构造 PairRequest：clientDeviceID / clientPublicKey 取自身份，
     /// nonceSignature = signingKey() 对 sessionNonce 原始字节签名。
-    static func makePairRequest(identity: SyncIdentity, sessionNonce: Data) throws -> PairRequest {
+    /// clientName：本机展示名（可选；Host 批准卡/落库展示用，不参与验签）。
+    static func makePairRequest(
+        identity: SyncIdentity,
+        sessionNonce: Data,
+        clientName: String? = nil
+    ) throws -> PairRequest {
         let signature = try identity.signingKey().signature(for: sessionNonce)
         return PairRequest(
             clientDeviceID: identity.deviceID,
             clientPublicKey: identity.publicKeyRaw.base64EncodedString(),
-            nonceSignature: signature.base64EncodedString()
+            nonceSignature: signature.base64EncodedString(),
+            clientName: clientName
         )
     }
 

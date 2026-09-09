@@ -372,11 +372,34 @@ struct SyncCryptoTests {
         let request = try SyncPairingMessages.makePairRequest(identity: client, sessionNonce: nonce)
         #expect(request.clientDeviceID == client.deviceID)
         #expect(Data(base64Encoded: request.clientPublicKey) == client.publicKeyRaw)
+        #expect(request.clientName == nil) // 不带名 = 旧端行为
         // 结构校验通过
         try SyncPairingMessages.validate(request)
         // 签名确实是对 nonce 的 Ed25519 签名
         let verified = try SyncPairingMessages.verifyNonceSignature(request, nonce: nonce)
         #expect(verified)
+    }
+
+    @Test("makePairRequest 带 clientName：随请求携带、不破坏验签")
+    func makePairRequestCarriesClientName() throws {
+        let client = SyncIdentity.generate()
+        let nonce = Data((0 ..< 16).map { UInt8($0) })
+        let request = try SyncPairingMessages.makePairRequest(
+            identity: client,
+            sessionNonce: nonce,
+            clientName: "张超的 iPhone"
+        )
+        #expect(request.clientName == "张超的 iPhone")
+        // clientName 不参与验签输入：结构校验 + nonce 验签仍通过
+        try SyncPairingMessages.validate(request)
+        #expect(try SyncPairingMessages.verifyNonceSignature(request, nonce: nonce))
+        // 空格名原样携带（trim 语义归消费方/Host 落库）
+        let spaced = try SyncPairingMessages.makePairRequest(
+            identity: client,
+            sessionNonce: nonce,
+            clientName: "  "
+        )
+        #expect(spaced.clientName == "  ")
     }
 
     @Test("PairRequest 结构校验反例：ID/公钥指纹不符、坏 base64、坏 nonce 签名")

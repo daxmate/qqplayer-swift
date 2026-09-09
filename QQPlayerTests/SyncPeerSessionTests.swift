@@ -144,6 +144,75 @@ struct SyncPeerSessionTests {
         #expect(!fixture.clientTrust.contains(deviceID: fixture.hostIdentity.deviceID))
     }
 
+    @Test("配对流：client 携 clientName 过线 → Host 批准落库 displayName 取 clientName")
+    func pairingFlowClientNamePersisted() throws {
+        // client 会话配置携带本机展示名（iOS 调用方从 UIDevice 注入）
+        var config = SyncSessionConfiguration()
+        config.clientDisplayName = "张超的 iPhone"
+        let fixture = SessionFixture.make(config: config)
+        let nonce = Data((20 ..< 36).map { UInt8($0) })
+        fixture.hostSession.pairingNonces?.register(nonce)
+        fixture.clientSession.setPairingExpectations(
+            expectedPeerDeviceID: nil,
+            candidate: SyncPairingCandidate(
+                deviceID: fixture.hostIdentity.deviceID,
+                publicKeyRaw: fixture.hostIdentity.publicKeyRaw,
+                sessionNonce: nonce,
+                hostName: "MacBook Pro"
+            )
+        )
+        let expectedClientID = fixture.clientIdentity.deviceID
+        // Host 侧批准卡模型接线：pending → 卡（displayName 解析）→ approve
+        fixture.hostSession.pairApprovalHandler = { session, pending in
+            #expect(pending.request.clientName == "张超的 iPhone")
+            #expect(pending.request.clientDeviceID == expectedClientID)
+            let card = pending.makeApprovalCard(isReplacement: false)
+            #expect(card.displayName == "张超的 iPhone") // clientName 优先
+            session.approvePairing(displayName: card.rawClientName)
+        }
+
+        fixture.hostSession.handleTransportReady()
+        fixture.clientSession.handleTransportReady()
+
+        #expect(fixture.hostSession.phase == .ready)
+        #expect(fixture.clientSession.phase == .ready)
+        // 批准落库 displayName = clientName（trim 后非空）
+        let clientRecord = fixture.hostTrust.savedDevices.last
+        #expect(clientRecord?.displayName == "张超的 iPhone")
+        #expect(clientRecord?.role == .client)
+    }
+
+    @Test("配对流：clientName 空白 → 批准卡/落库回退 suggestedDisplayName")
+    func pairingFlowBlankClientNameFallsBack() throws {
+        var config = SyncSessionConfiguration()
+        config.clientDisplayName = "   "
+        let fixture = SessionFixture.make(config: config)
+        let nonce = Data((40 ..< 56).map { UInt8($0) })
+        fixture.hostSession.pairingNonces?.register(nonce)
+        fixture.clientSession.setPairingExpectations(
+            expectedPeerDeviceID: nil,
+            candidate: SyncPairingCandidate(
+                deviceID: fixture.hostIdentity.deviceID,
+                publicKeyRaw: fixture.hostIdentity.publicKeyRaw,
+                sessionNonce: nonce,
+                hostName: "MacBook"
+            )
+        )
+        fixture.hostSession.pairApprovalHandler = { session, pending in
+            // 空白名 → approvalDisplayName 回退 suggestedDisplayName（ID 分组短格式）
+            let card = pending.makeApprovalCard(isReplacement: false)
+            #expect(card.displayName == pending.suggestedDisplayName)
+            // 空白 clientName 不入库：approvePairing nil/空 → 回退 DeviceID 分组格式
+            session.approvePairing(displayName: card.rawClientName)
+        }
+        fixture.hostSession.handleTransportReady()
+        fixture.clientSession.handleTransportReady()
+
+        #expect(fixture.hostSession.phase == .ready)
+        let clientRecord = fixture.hostTrust.savedDevices.last
+        #expect(clientRecord?.displayName == DeviceID.formatted(fixture.clientIdentity.deviceID))
+    }
+
     @Test("配对流：host 无 nonce 注册 → 拒绝（无效 nonce 签名）")
     func pairingFlowWithoutRegisteredNonceRejected() throws {
         let fixture = SessionFixture.make()

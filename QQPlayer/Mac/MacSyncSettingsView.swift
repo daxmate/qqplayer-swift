@@ -30,6 +30,8 @@ struct MacSyncSettingsView: View {
     @State private var devicesError: String?
     /// 待撤销配对的设备（nil = 无待确认删除）
     @State private var pendingUnpair: PeerDevice?
+    /// S2 接线：Host 监听服务（页面可见期间运行；收到配对请求 → 页内批准卡）
+    @StateObject private var hostService = MacSyncHostService()
 
     private let deviceStore = DeviceStore()
 
@@ -40,6 +42,26 @@ struct MacSyncSettingsView: View {
 
     var body: some View {
         Form {
+            // MARK: 配对请求批准（S2 接线：M2a 网络请求到达 → 页内批准卡）
+            if let pending = hostService.pendingCard {
+                Section {
+                    MacPairApprovalCardView(
+                        candidate: pending.makePeerCandidate(receivedAt: Date().timeIntervalSince1970),
+                        onApprove: {
+                            hostService.approvePending()
+                            reloadDevices()
+                        },
+                        onReject: {
+                            hostService.rejectPending()
+                            reloadDevices()
+                        }
+                    )
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("sync_pairing_request_header".localized)
+                }
+            }
+
             // MARK: 本机身份与二维码
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -114,18 +136,23 @@ struct MacSyncSettingsView: View {
         .formStyle(.grouped)
         .onAppear {
             loadIdentityIfNeeded()
+            startHostServiceIfNeeded()
             reloadDevices()
+        }
+        .onDisappear {
+            // 页面不可见 = 停止监听 + 取消活动会话（同步中心只在可见期间收配对）
+            hostService.stop()
         }
         .alert(
             "sync_load_failed_title".localized,
             isPresented: Binding(
-                get: { identityError != nil || devicesError != nil },
-                set: { if !$0 { identityError = nil; devicesError = nil } }
+                get: { identityError != nil || devicesError != nil || hostService.startError != nil },
+                set: { if !$0 { identityError = nil; devicesError = nil; hostService.clearStartError() } }
             )
         ) {
             Button(Localized.ok) {}
         } message: {
-            Text(identityError ?? devicesError ?? "")
+            Text(identityError ?? devicesError ?? hostService.startError ?? "")
         }
         .confirmationDialog(
             "sync_unpair_confirm_title".localized,
@@ -212,13 +239,26 @@ struct MacSyncSettingsView: View {
         guard identity == nil else { return }
         do {
             identity = try SyncIdentityStore().loadOrCreateIdentity()
-            refreshQR()
         } catch {
             identityError = error.localizedDescription
         }
     }
 
+    /// 身份就绪后启动 Host 监听；随后生成首张 QR 并把其 nonce 注册进监听器。
+    @MainActor
+    private func startHostServiceIfNeeded() {
+        guard identity != nil, !hostService.isRunning else { return }
+        hostService.onDevicesChanged = { [self] in
+            reloadDevices()
+        }
+        hostService.start(identity: identity, deviceName: hostName)
+        refreshQR()
+    }
+
     /// 生成新 nonce + 载荷并重绘二维码（每次调用换一张新码）。
+    /// S2 接线：新码的 sessionNonce 同步注册进运行中的监听器（不注册则
+    /// 客户端带签名 nonce 回连时验签无源 → 配对必被拒）。
+    @MainActor
     private func refreshQR() {
         guard let identity else { return }
         let payload = PairQRPayloadFactory.make(
@@ -230,6 +270,7 @@ struct MacSyncSettingsView: View {
             let json = try SyncQRCodec.encode(payload)
             qrPayload = payload
             qrImage = SyncQRImageFactory.make(from: json)
+            hostService.registerQRNonce(nonceBase64: payload.sessionNonce)
         } catch {
             identityError = error.localizedDescription
         }
