@@ -159,7 +159,7 @@ struct DeviceStoreTests {
     func columnContract() throws {
         let (_, dbQueue) = try Self.makeStore()
         let device = Self.sampleDevice(notes: "书房主机")
-        let store = try DeviceStore(database: DatabaseManager(dbWriter: dbQueue))
+        let store = DeviceStore(database: DatabaseManager(dbWriter: dbQueue))
         try store.upsert(device)
 
         try dbQueue.read { db in
