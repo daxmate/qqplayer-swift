@@ -150,6 +150,10 @@ struct GenreParsingTests {
             let columnNames = try db.columns(in: "track").map(\.name)
             #expect(columnNames.contains("genre"))
             try DatabaseManager.addTrackGenreColumnIfNeeded(db)
+            // M3-1: Track.save 的 INSERT 恒含 content_hash 列，而生产路径
+            // （migrateDatabaseIfNeeded）在任何入库前都会补该列——模拟老库需
+            // 同步补上，否则下方 genre 往返的 upsert 会因缺列失败。
+            try DatabaseManager.addTrackContentHashColumnIfNeeded(db)
         }
 
         try manager.upsertTrack(Track(stableId: "legacy-1", title: "Legacy Genre", genre: "Rock", path: "/m/legacy.flac"))
