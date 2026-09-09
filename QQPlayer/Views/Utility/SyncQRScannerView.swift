@@ -2,28 +2,31 @@
 //  SyncQRScannerView.swift
 //  QQPlayer
 //
-//  局域网同步（S2, M1-UI）iOS 扫码配对页：
+//  局域网同步（S2, M1-UI + S2 接线）iOS 扫码配对页：
 //  1. AVCaptureSession 扫 Host 二维码 → 文本 → SyncPairingFlow.qrEvent
 //     组装事件 → PairingStateMachine.handle（协议版本/ID/公钥/指纹/一次性
 //     nonce 校验全在机器内，失败展示 failed 原因）
 //  2. awaitingConfirmation → SyncPairConfirmCardView 确认页 → 用户确认
 //     userConfirmedOnClient → approved → 本端落库 host 记录（publicKey 有值，
 //     直接 DeviceStore.upsert role=.host）
-//  3. 主机侧批准在 M2a 网络握手前无法发生：本页到 client approved + 本地
-//     落库即止，成功文案不承诺双向配对完成。
+//  3. 落库成功后进入「连接主机」态（S2 接线）：SyncAutoConnectController 浏览
+//     → 找到 QR 主机 → 带扫码候选 connect → 会话推进 → ready = 配对完成
+//     （成功态 dismiss）；被拒/超时/未发现 = 失败态展示原因 + [重试]/[完成]。
+//     本地记录失败时保留（TOFU 已知主机，用户可手动删）。
 //
 //  状态机实例由本页持有（每进入一次扫描 = 一次配对流程）；nonce 过期由
-//  expireCheck 驱动（页面停留期间展示 awaiting 超时提示由 M2a 补计时器，
-//  本里程碑 expired 态仅经确认时机器内建检查可达——保持机器事件面完整）。
+//  expireCheck 驱动。
 //
 
 import AVFoundation
 import SwiftUI
+import UIKit
 
 /// iOS 扫码配对页。
 struct SyncQRScannerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var controller = SyncScannerController()
+    @StateObject private var autoConnect = SyncAutoConnectController()
     @State private var machine = PairingStateMachine()
     @State private var flow: SyncScanFlow = .scanning
     @State private var processing = false
@@ -36,6 +39,8 @@ struct SyncQRScannerView: View {
                 scanningBody
             case let .awaitingConfirm(candidate):
                 confirmBody(candidate)
+            case .connecting:
+                connectingBody
             case let .outcome(outcome):
                 SyncPairOutcomeView(
                     symbol: outcome.symbol,
@@ -60,6 +65,7 @@ struct SyncQRScannerView: View {
         }
         .onDisappear {
             controller.stop()
+            autoConnect.stop()
         }
     }
 
@@ -135,6 +141,75 @@ struct SyncQRScannerView: View {
         }
     }
 
+    // MARK: - 连接态（确认后自动回连）
+
+    private var connectingBody: some View {
+        Group {
+            switch autoConnect.state {
+            case .discovering:
+                SyncConnectProgressView(
+                    symbol: "wifi",
+                    text: "sync_connect_browsing".localized
+                )
+            case let .connecting(hostName):
+                SyncConnectProgressView(
+                    symbol: "wifi",
+                    text: "sync_connect_connecting_host".localized(with: hostName)
+                )
+            case .awaitingApproval:
+                SyncConnectProgressView(
+                    symbol: "iphone.and.arrow.forward",
+                    text: "sync_connect_waiting_approval".localized
+                )
+            case let .paired(hostName):
+                pairedBody(hostName)
+            case let .failed(failure):
+                failedBody(failure)
+            }
+        }
+    }
+
+    private func pairedBody(_ hostName: String) -> some View {
+        SyncPairOutcomeView(
+            symbol: "checkmark.circle.fill",
+            title: "sync_connect_paired_title".localized,
+            message: "sync_connect_paired_message".localized(with: hostName),
+            actionTitle: Localized.done,
+            onAction: { dismiss() },
+            symbolColor: .green
+        )
+    }
+
+    private func failedBody(_ failure: SyncConnectFailure) -> some View {
+        let outcome = SyncPairOutcome(connectFailure: failure, hostName: nil)
+        return VStack(spacing: 14) {
+            Image(systemName: outcome.symbol)
+                .font(.system(size: 52))
+                .foregroundStyle(outcome.symbolColor)
+            Text(outcome.title)
+                .font(.title3)
+                .fontWeight(.semibold)
+            Text(outcome.message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("sync_connect_retry".localized) {
+                    autoConnect.retry()
+                }
+                .buttonStyle(.borderedProminent)
+                Button(Localized.done) {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.top, 4)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+    }
+
     // MARK: - 动作
 
     /// 扫到文本：解析 → 状态机 → 呈现（awaiting 卡 / failed 原因）。
@@ -163,7 +238,7 @@ struct SyncQRScannerView: View {
         }
     }
 
-    /// 用户确认 → approved → 本地落库 host（本端信任建立；主机侧批准待 M2a）。
+    /// 用户确认 → approved → 本地落库 host（TOFU 信任建立）→ 自动回连主机。
     @MainActor
     private func confirm(_ candidate: PeerCandidate) {
         machine.handle(.userConfirmedOnClient(at: Date().timeIntervalSince1970))
@@ -180,7 +255,26 @@ struct SyncQRScannerView: View {
         )
         do {
             try deviceStore.upsert(device)
-            flow = .outcome(.addedAwaitingHost(name: approved.displayName))
+            // 扫码候选 → 回连候选（publicKey/sessionNonce QR 路径必有值）
+            guard let publicKeyRaw = approved.publicKeyRaw,
+                  let sessionNonce = approved.sessionNonce
+            else {
+                flow = .outcome(.storeFailed("sync_connect_missing_candidate".localized))
+                return
+            }
+            let pairingCandidate = SyncPairingCandidate(
+                deviceID: approved.deviceID,
+                publicKeyRaw: publicKeyRaw,
+                sessionNonce: sessionNonce,
+                hostName: approved.displayName
+            )
+            autoConnect.start(
+                candidate: pairingCandidate,
+                expectedPeerDeviceID: approved.deviceID,
+                hostName: approved.displayName,
+                clientName: UIDevice.current.name
+            )
+            flow = .connecting
         } catch {
             flow = .outcome(.storeFailed(error.localizedDescription))
         }
@@ -195,15 +289,17 @@ struct SyncQRScannerView: View {
     @MainActor
     private func handleOutcomeAction(_ outcome: SyncPairOutcome) {
         switch outcome {
-        case .addedAwaitingHost, .manualApprovedAwaitingHost, .storeFailed:
+        case .addedAwaitingHost, .manualApprovedAwaitingHost, .storeFailed, .paired:
             dismiss()
-        case .invalidQRCode, .failed, .expired:
+        case .invalidQRCode, .failed, .expired,
+             .hostNotFound, .connectRejected, .connectTimedOut, .connectFailed:
             resetToScan()
         }
     }
 
     @MainActor
     private func resetToScan() {
+        autoConnect.stop()
         machine = PairingStateMachine()
         flow = .scanning
         processing = false
@@ -211,19 +307,43 @@ struct SyncQRScannerView: View {
     }
 }
 
+// MARK: - 连接中进度视图
+
+/// 自动回连进行中提示（spinner + 说明）。
+private struct SyncConnectProgressView: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Label(text, systemImage: symbol)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity)
+    }
+}
+
 // MARK: - 页面流程状态
 
 /// 扫码页流程（驱动 UI 呈现；状态机是真源，此处为视图快照）。
+/// .connecting = 确认后自动回连（具体推进态由 SyncAutoConnectController.state 驱动）。
 enum SyncScanFlow: Equatable {
     case scanning
     case awaitingConfirm(PeerCandidate)
+    case connecting
     case outcome(SyncPairOutcome)
 }
 
 /// 扫码/手输配对结果（成功/失败原因，均已本地化好文案的展示值）。
 /// 扫码与手输两页共用；区分「已落库待主机批准」与「手输待连接补全」。
 enum SyncPairOutcome: Equatable {
-    /// 扫码 approved：已落库 host 记录，等待主机侧批准（M2a）
+    /// 扫码 approved：已落库 host 记录，等待主机侧批准（M2a 前旧文案；
+    /// S2 接线起扫码确认后自动回连，不再产生此值——保留兼容）
     case addedAwaitingHost(name: String)
     /// 手输 approved：无公钥未落库，等待主机批准 + 首次连接补全公钥（M2）
     case manualApprovedAwaitingHost(name: String)
@@ -231,31 +351,48 @@ enum SyncPairOutcome: Equatable {
     case failed(PairingFailure)
     case expired(String)
     case storeFailed(String)
+    /// 自动回连成功（配对完成；主机列表已含该主机）
+    case paired(name: String)
+    /// 自动回连失败：未发现目标主机
+    case hostNotFound(hostName: String?)
+    /// 自动回连失败：Mac 拒绝配对
+    case connectRejected(reason: String?)
+    /// 自动回连失败：等待批准超时
+    case connectTimedOut
+    /// 自动回连失败：连接/握手等其他错误
+    case connectFailed(detail: String?)
 
     var symbol: String {
         switch self {
-        case .addedAwaitingHost, .manualApprovedAwaitingHost: return "checkmark.circle.fill"
-        case .invalidQRCode, .storeFailed: return "exclamationmark.triangle.fill"
+        case .addedAwaitingHost, .manualApprovedAwaitingHost, .paired: return "checkmark.circle.fill"
+        case .invalidQRCode, .storeFailed, .connectFailed: return "exclamationmark.triangle.fill"
         case .failed: return "xmark.circle.fill"
         case .expired: return "clock.badge.xmark"
+        case .hostNotFound: return "wifi.exclamationmark"
+        case .connectRejected: return "xmark.circle.fill"
+        case .connectTimedOut: return "clock.badge.xmark"
         }
     }
 
     var symbolColor: Color {
         switch self {
-        case .addedAwaitingHost, .manualApprovedAwaitingHost: return .green
-        case .invalidQRCode, .storeFailed, .expired: return .orange
-        case .failed: return .red
+        case .addedAwaitingHost, .manualApprovedAwaitingHost, .paired: return .green
+        case .invalidQRCode, .storeFailed, .expired, .hostNotFound, .connectTimedOut: return .orange
+        case .failed, .connectFailed, .connectRejected: return .red
         }
     }
 
     var title: String {
         switch self {
-        case .addedAwaitingHost, .manualApprovedAwaitingHost: return "sync_added_title".localized
+        case .addedAwaitingHost, .manualApprovedAwaitingHost, .paired: return "sync_added_title".localized
         case .invalidQRCode: return "sync_scan_failed_title".localized
         case let .failed(failure): return failure.localizedKey.localized
         case .expired: return "sync_expired_title".localized
         case .storeFailed: return "sync_store_failed_title".localized
+        case .hostNotFound: return "sync_connect_host_not_found_title".localized
+        case .connectRejected: return "sync_connect_rejected_title".localized
+        case .connectTimedOut: return "sync_connect_timed_out_title".localized
+        case .connectFailed: return "sync_connect_failed_title".localized
         }
     }
 
@@ -274,13 +411,36 @@ enum SyncPairOutcome: Equatable {
             return "sync_expired_message".localized
         case let .storeFailed(detail):
             return detail
+        case let .paired(name):
+            return "sync_connect_paired_message".localized(with: name)
+        case let .hostNotFound(hostName):
+            if let hostName, !hostName.isEmpty {
+                return "sync_connect_host_not_found_message".localized(with: hostName)
+            }
+            return "sync_connect_host_not_found_message_none".localized
+        case let .connectRejected(reason):
+            if let reason, !reason.isEmpty {
+                return "sync_connect_rejected_message_detail".localized(with: reason)
+            }
+            return "sync_connect_rejected_message".localized
+        case .connectTimedOut:
+            return "sync_connect_timed_out_message".localized
+        case let .connectFailed(detail):
+            if let detail, !detail.isEmpty {
+                return "sync_connect_failed_message_detail".localized(with: detail)
+            }
+            return "sync_connect_failed_message".localized
         }
     }
 
     var actionTitle: String? {
         switch self {
-        case .addedAwaitingHost, .manualApprovedAwaitingHost, .storeFailed: return Localized.done
+        case .addedAwaitingHost, .manualApprovedAwaitingHost, .storeFailed:
+            return Localized.done
         case .invalidQRCode, .failed, .expired: return "sync_scan_again".localized
+        case .paired, .hostNotFound, .connectRejected, .connectTimedOut, .connectFailed:
+            // 自动回连终端态不走 outcome 按钮（paired/failed 有专属布局）
+            return nil
         }
     }
 }

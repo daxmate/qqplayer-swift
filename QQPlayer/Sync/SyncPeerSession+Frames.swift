@@ -218,7 +218,8 @@ extension SyncPeerSession {
             // QR 信任成立 → 发 PairRequest（对 candidate.sessionNonce 签名）
             let request = try SyncPairingMessages.makePairRequest(
                 identity: localIdentity,
-                sessionNonce: candidate.sessionNonce
+                sessionNonce: candidate.sessionNonce,
+                clientName: config.clientDisplayName
             )
             let payload = try JSONEncoder().encode(request)
             let frameData = try encodedFrame(type: .pairRequest, encrypted: false, payload: payload)

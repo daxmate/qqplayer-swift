@@ -75,6 +75,33 @@ struct PairingModelsTests {
         #expect(decoded == original)
     }
 
+    @Test("PairRequest clientName 编解码往返（S2 接线新增可选字段）")
+    func pairRequestClientNameRoundtrip() throws {
+        let original = PairRequest(
+            clientDeviceID: "CLIENT-ID-52-CHARACTERS-PLACEHOLDER",
+            clientPublicKey: Data(repeating: 3, count: 32).base64EncodedString(),
+            nonceSignature: Data(repeating: 4, count: 64).base64EncodedString(),
+            clientName: "张超的 iPhone"
+        )
+        let data = try JSONEncoder().encode(original)
+        // wire 键名为 camelCase clientName
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["clientName"] as? String == "张超的 iPhone")
+        let decoded = try JSONDecoder().decode(PairRequest.self, from: data)
+        #expect(decoded == original)
+        #expect(decoded.clientName == "张超的 iPhone")
+    }
+
+    @Test("PairRequest 缺 clientName 字段也能解码（向后兼容旧端）")
+    func pairRequestDecodesWithoutClientName() throws {
+        let withoutKey = Data(#"{"clientDeviceID":"ID","clientPublicKey":"a2V5","nonceSignature":"c2ln"}"#.utf8)
+        let decoded = try JSONDecoder().decode(PairRequest.self, from: withoutKey)
+        #expect(decoded.clientName == nil)
+        // 显式 null 同样解码为 nil
+        let withNull = Data(#"{"clientDeviceID":"ID","clientPublicKey":"a2V5","nonceSignature":"c2ln","clientName":null}"#.utf8)
+        #expect(try JSONDecoder().decode(PairRequest.self, from: withNull).clientName == nil)
+    }
+
     @Test("PairResponse JSON 往返一致（approved + reason 有值）")
     func pairResponseRoundtripWithReason() throws {
         let original = PairResponse(approved: false, reason: "用户拒绝")

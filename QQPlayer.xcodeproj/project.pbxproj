@@ -95,6 +95,8 @@
 		A9009D8D82934ACCBC88EDED /* SyncPeerSessionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AB5CC22AC440D1A35D6E4F /* SyncPeerSessionTestSupport.swift */; };
 		8535FC8A0DAA410EBA90A8B6 /* SyncFileTransferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ABF345D3C9E42A784A4C7D2 /* SyncFileTransferTests.swift */; };
 		989932778B8244E8A40BB55C /* SyncFileReceiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */; };
+		764E26B5B1F843A1BBD6E730 /* SyncPairingApprovalModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */; };
+		38EB3426D50B4F76974C9593 /* SyncAutoConnectLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A14A219331C4000A169C65A /* SyncAutoConnectLogicTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -239,6 +241,8 @@
 		B4AB5CC22AC440D1A35D6E4F /* SyncPeerSessionTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerSessionTestSupport.swift; sourceTree = "<group>"; };
 		5ABF345D3C9E42A784A4C7D2 /* SyncFileTransferTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileTransferTests.swift; sourceTree = "<group>"; };
 		A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileReceiverTests.swift; sourceTree = "<group>"; };
+		F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingApprovalModelTests.swift; sourceTree = "<group>"; };
+		5A14A219331C4000A169C65A /* SyncAutoConnectLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncAutoConnectLogicTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -280,6 +284,7 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncHostService.swift,
 				Mac/MacSyncSettingsView.swift,
 				Mac/MacTagEditorCandidateRow.swift,
 				Mac/MacTagEditorView.swift,
@@ -358,6 +363,7 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncHostService.swift,
 				Mac/MacSyncSettingsView.swift,
 				Mac/MacTagEditorCandidateRow.swift,
 				Mac/MacTagEditorView.swift,
@@ -451,9 +457,16 @@
 				Sync/DeviceStore.swift,
 				Sync/PairingModels.swift,
 				Sync/PairingStateMachine.swift,
+				Sync/SyncCrypto.swift,
+				Sync/SyncFrame.swift,
 				Sync/SyncIdentity.swift,
+				Sync/SyncListener.swift,
+				Sync/SyncPairingApprovalModel.swift,
 				Sync/SyncPairingFlow.swift,
+				"Sync/SyncPeerSession+Frames.swift",
+				Sync/SyncPeerSession.swift,
 				Sync/SyncQRCodec.swift,
+				Sync/SyncSessionModels.swift,
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/PlayerGestureLogic.swift,
 				Views/Utility/HintCardView.swift,
@@ -694,6 +707,8 @@
 				B4AB5CC22AC440D1A35D6E4F /* SyncPeerSessionTestSupport.swift */,
 				5ABF345D3C9E42A784A4C7D2 /* SyncFileTransferTests.swift */,
 				A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */,
+				F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */,
+				5A14A219331C4000A169C65A /* SyncAutoConnectLogicTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1087,6 +1102,8 @@
 				A9009D8D82934ACCBC88EDED /* SyncPeerSessionTestSupport.swift in Sources */,
 				8535FC8A0DAA410EBA90A8B6 /* SyncFileTransferTests.swift in Sources */,
 				989932778B8244E8A40BB55C /* SyncFileReceiverTests.swift in Sources */,
+				764E26B5B1F843A1BBD6E730 /* SyncPairingApprovalModelTests.swift in Sources */,
+				38EB3426D50B4F76974C9593 /* SyncAutoConnectLogicTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

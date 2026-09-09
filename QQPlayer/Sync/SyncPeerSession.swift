@@ -49,7 +49,9 @@ final class SyncPeerSession: @unchecked Sendable {
     /// approvePairing/rejectPairing）
     var pairApprovalHandler: ((SyncPeerSession, PendingPairRequest) -> Void)?
 
-    private let config: SyncSessionConfiguration
+    // 会话握手配置（extension 文件（Frames）读取 clientDisplayName 发
+    // PairRequest 用，故 internal）
+    let config: SyncSessionConfiguration
     private let lock = NSLock()
     private var frameDecoder = SyncFrameDecoder()
 

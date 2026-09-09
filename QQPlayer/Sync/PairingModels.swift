@@ -46,6 +46,17 @@ struct PairRequest: Codable, Equatable, Sendable {
     var clientDeviceID: String
     var clientPublicKey: String // base64
     var nonceSignature: String // base64
+    /// 客户端展示名（S2 接线新增，可选；仅用于 Host 批准卡/落库展示名，
+    /// 不作安全凭据）。旧端缺失该字段解码为 nil，向后兼容。
+    var clientName: String?
+
+    /// 兼容既有调用点：clientName 缺省为 nil（旧端行为）。
+    init(clientDeviceID: String, clientPublicKey: String, nonceSignature: String, clientName: String? = nil) {
+        self.clientDeviceID = clientDeviceID
+        self.clientPublicKey = clientPublicKey
+        self.nonceSignature = nonceSignature
+        self.clientName = clientName
+    }
 }
 
 /// Host → Client 的配对答复（4.1 步骤 6；M2 传输层返回）。
