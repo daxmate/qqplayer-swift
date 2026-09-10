@@ -12,6 +12,15 @@
 //    （挡「根内软链指向根外」）。任一不过 → 计入 failed，**绝不读曲库之外的文件**。
 //  - 请求路径原样回填 failed.relativePath，方便请求方定位。
 //
+//  M4-2b 多根（aligned 歌词随歌同步，§6.3）：
+//  - 歌词走**单一命名空间的第二个根**——`@lyrics/{歌曲 content_hash}.json` 解析到
+//    `lyricsRoot`（SyncFetchRoots），其余路径仍只认 `libraryRoot`。
+//  - 歌词文件在盘上的名字是 `{本端 stableId}.json`，与 wire 路径不同名，由注入的
+//    `lyricsFileNameProvider`（wire 路径 → 库文件名）给出；**只接受单段文件名**，
+//    再经同一套「根内包含性 + 软链逃逸」校验——注入方给不出合法名 = notFound，
+//    绝不用它拼出根外路径。
+//  - 未配置 lyricsRoot 时，`@lyrics/...` 一律 notFound（不落回曲库根尝试）。
+//
 //  串行推进：v1 单飞——一个 responder 同时只服务一个请求（已在服务中收到新请求
 //  则忽略；会话上下一个请求由调用方在上一个 onResultSent 之后发起）。
 //  推完一个文件（SyncFileSender.onCompletion）才发下一个；本类不并发发多个 transfer。
@@ -40,10 +49,12 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     }
 
     private let session: SyncPeerSession
-    private let libraryRoot: URL
+    private let roots: SyncFetchRoots
     private let fileManager: FileManager
     /// 相对路径 → content_hash（本端事实；缺失时回落到现算 SHA-256，用于 fileID）
     private let contentHashProvider: ((String) -> String?)?
+    /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）
+    private let lyricsFileNameProvider: ((String) -> String?)?
     private let lock = NSLock()
 
     /// 一次拉取的结论已发出（含全失败/空请求的场景）。
@@ -73,16 +84,33 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
 
     // MARK: init
 
-    init(
+    /// 单根初始化（M4-2b 之前的调用点/测试保持不变：歌词命名空间不服务）。
+    convenience init(
         session: SyncPeerSession,
         libraryRoot: URL,
         fileManager: FileManager = .default,
         contentHashProvider: ((String) -> String?)? = nil
     ) {
+        self.init(
+            session: session,
+            roots: .libraryOnly(libraryRoot),
+            fileManager: fileManager,
+            contentHashProvider: contentHashProvider
+        )
+    }
+
+    init(
+        session: SyncPeerSession,
+        roots: SyncFetchRoots,
+        fileManager: FileManager = .default,
+        contentHashProvider: ((String) -> String?)? = nil,
+        lyricsFileNameProvider: ((String) -> String?)? = nil
+    ) {
         self.session = session
-        self.libraryRoot = libraryRoot
+        self.roots = roots
         self.fileManager = fileManager
         self.contentHashProvider = contentHashProvider
+        self.lyricsFileNameProvider = lyricsFileNameProvider
         attachHandlers()
     }
 
@@ -95,14 +123,27 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
 
     // MARK: 解析计划（纯逻辑 + 只读磁盘检查，可单测）
 
-    /// 请求路径 → 可推送文件 + 失败记录。
-    /// - 重复路径只处理一次（首个生效）：能解析者按**规范化相对路径**判重
-    ///   （与 Generator 对账键同口径，故 "song.flac" 与 "./song.flac" 视为同一文件），
-    ///   非法/越界请求按原始字符串判重
-    /// - 非法/越界/不存在/非常规文件/软链逃逸 → failed（不读曲库之外）
+    /// 请求路径 → 可推送文件 + 失败记录（单根版，保留给既有调用点/测试）。
     static func makePlan(
         relativePaths: [String],
         root: URL,
+        fileManager: FileManager = .default
+    ) -> Plan {
+        makePlan(relativePaths: relativePaths, roots: .libraryOnly(root), fileManager: fileManager)
+    }
+
+    /// 请求路径 → 可推送文件 + 失败记录（多根版）。
+    /// - 歌词命名空间（`@lyrics/...`）：wire 路径 → 注入映射给出本端库文件名 →
+    ///   在 `lyricsRoot` 内解析；未配置根 / 映射不到 / 文件名非法 → notFound。
+    /// - 其余路径：曲库根内解析（原语义不变）。
+    /// - 重复路径只处理一次（首个生效）：能解析者按**规范化相对路径**判重
+    ///   （与 Generator 对账键同口径，故 "song.flac" 与 "./song.flac" 视为同一文件），
+    ///   非法/越界请求按原始字符串判重
+    /// - 非法/越界/不存在/非常规文件/软链逃逸 → failed（不读任何根之外的文件）
+    static func makePlan(
+        relativePaths: [String],
+        roots: SyncFetchRoots,
+        lyricsFileNameProvider: ((String) -> String?)? = nil,
         fileManager: FileManager = .default
     ) -> Plan {
         var plan = Plan()
@@ -110,47 +151,81 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
         var seenResolved: Set<String> = []
         /// 解析即被拒的请求（无规范化形式可用）：按原始字符串判重
         var seenRejected: Set<String> = []
-        let realRoot = root.resolvingSymlinksInPath().standardizedFileURL
-        let rootPrefix = realRoot.path.hasSuffix("/") ? realRoot.path : realRoot.path + "/"
+
+        /// 记一条失败（按原始请求串判重）。
+        func reject(_ raw: String, _ reason: String) {
+            guard seenRejected.insert(raw).inserted else { return }
+            plan.failures.append(SyncFileFetchFailure(relativePath: raw, reason: reason))
+        }
 
         for raw in relativePaths {
+            let normalized = SyncManifestGenerator.normalizeRelativePath(raw)
+            let isLyrics = SyncLyricsNamespace.isLyricsPath(raw)
+
+            // ① 选根 + 定「根内相对路径」
+            let root: URL
+            let pathWithinRoot: String
+            if isLyrics {
+                guard let normalized, SyncLyricsNamespace.songContentHash(fromWirePath: normalized) != nil else {
+                    reject(raw, SyncFetchFailureReason.invalidPath)
+                    continue
+                }
+                guard let lyricsRoot = roots.lyricsRoot else {
+                    reject(raw, SyncFetchFailureReason.notFound)
+                    continue
+                }
+                // 注入映射：wire 路径 → 本端库文件名；只接受单段合法名
+                guard let fileName = lyricsFileNameProvider?(normalized),
+                      let relativeName = SyncManifestGenerator.normalizeRelativePath(fileName),
+                      !relativeName.contains("/")
+                else {
+                    reject(raw, SyncFetchFailureReason.notFound)
+                    continue
+                }
+                root = lyricsRoot
+                pathWithinRoot = relativeName
+            } else {
+                root = roots.libraryRoot
+                pathWithinRoot = normalized ?? raw
+            }
+
+            guard seenResolved.insert(normalized ?? raw).inserted else { continue }
+
             let url: URL
-            switch SyncLibraryPathResolver.resolve(relativePath: raw, root: root) {
+            switch SyncLibraryPathResolver.resolve(relativePath: pathWithinRoot, root: root) {
             case let .rejected(reason):
-                guard seenRejected.insert(raw).inserted else { continue }
-                plan.failures.append(SyncFileFetchFailure(relativePath: raw, reason: reason))
+                reject(raw, reason)
                 continue
             case let .resolved(resolved):
                 url = resolved
             }
 
-            let normalized = SyncManifestGenerator.normalizeRelativePath(raw) ?? raw
-            guard seenResolved.insert(normalized).inserted else { continue }
-
-            var isDirectory: ObjCBool = false
-            guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
-                plan.failures.append(
-                    SyncFileFetchFailure(relativePath: raw, reason: SyncFetchFailureReason.notFound)
-                )
+            if let failure = Self.failureForFile(at: url, root: root, fileManager: fileManager) {
+                reject(raw, failure)
                 continue
             }
-            guard !isDirectory.boolValue else {
-                plan.failures.append(
-                    SyncFileFetchFailure(relativePath: raw, reason: SyncFetchFailureReason.notRegularFile)
-                )
-                continue
-            }
-            // 软链逃逸防御：解析真实路径后必须仍在曲库根内
-            let realTarget = url.resolvingSymlinksInPath().standardizedFileURL
-            guard realTarget.path.hasPrefix(rootPrefix) else {
-                plan.failures.append(
-                    SyncFileFetchFailure(relativePath: raw, reason: SyncFetchFailureReason.outOfRoot)
-                )
-                continue
-            }
-            plan.files.append(RequestedFile(relativePath: normalized, url: url))
+            plan.files.append(RequestedFile(relativePath: normalized ?? raw, url: url))
         }
         return plan
+    }
+
+    /// 磁盘侧三道校验（存在 / 常规文件 / 软链不逃逸出根）。通过 = nil。
+    static func failureForFile(at url: URL, root: URL, fileManager: FileManager = .default) -> String? {
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+            return SyncFetchFailureReason.notFound
+        }
+        guard !isDirectory.boolValue else {
+            return SyncFetchFailureReason.notRegularFile
+        }
+        // 软链逃逸防御：解析真实路径后必须仍在根内
+        let realRoot = root.resolvingSymlinksInPath().standardizedFileURL
+        let rootPrefix = realRoot.path.hasSuffix("/") ? realRoot.path : realRoot.path + "/"
+        let realTarget = url.resolvingSymlinksInPath().standardizedFileURL
+        guard realTarget.path.hasPrefix(rootPrefix) else {
+            return SyncFetchFailureReason.outOfRoot
+        }
+        return nil
     }
 
     // MARK: 中止
@@ -178,7 +253,8 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
 
         let plan = Self.makePlan(
             relativePaths: request.relativePaths,
-            root: libraryRoot,
+            roots: roots,
+            lyricsFileNameProvider: lyricsFileNameProvider,
             fileManager: fileManager
         )
 
@@ -223,9 +299,12 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     }
 
     /// 单个文件推送（fileID = content_hash，缺失则现算 SHA-256）。
+    /// 歌词文件不在曲库根的 content_hash 表里（那是音频路径→指纹），直接现算。
     private func push(_ file: RequestedFile) {
         let fileID: String?
-        if let provided = contentHashProvider?(file.relativePath), !provided.isEmpty {
+        if SyncLyricsNamespace.isLyricsPath(file.relativePath) {
+            fileID = try? SyncFileChecksum.sha256Hex(ofFile: file.url)
+        } else if let provided = contentHashProvider?(file.relativePath), !provided.isEmpty {
             fileID = provided
         } else {
             fileID = try? SyncFileChecksum.sha256Hex(ofFile: file.url)
@@ -236,10 +315,16 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
             return
         }
         do {
+            // 歌词文件：线上名用 wire 路径末段（`{歌曲 content_hash}.json`）而非盘上名
+            // （`{本端 stableId}.json`）——两端对同一首歌看到同一个名字，接收侧才能把
+            // 收到的东西对回自己请求过的条目；两端均对 name 做单段校验。
+            let transferName = SyncLyricsNamespace.isLyricsPath(file.relativePath)
+                ? (file.relativePath as NSString).lastPathComponent
+                : file.url.lastPathComponent
             try ensureSender().send(
                 fileURL: file.url,
                 fileID: fileID,
-                name: file.url.lastPathComponent
+                name: transferName
             )
         } catch {
             record(path: file.relativePath, failureReason: SyncFetchFailureReason.sendFailed)

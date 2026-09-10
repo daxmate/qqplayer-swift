@@ -9,6 +9,9 @@
 //      collection.filter；content_hash / stableId 走 DatabaseManager 现有入口
 //      （getTrack(byPath:) 命中即用；未指纹回落到 contentHashIfFilePresent）
 //    - 拉取：SyncLibraryFetchResponder（越界拒读 + 串行 SyncFileSender 推送）
+//    - aligned 歌词（M4-2b）：manifest 多带一批 `@lyrics/{歌曲 content_hash}.json`
+//      （SyncAlignedLyricsManifest），拉取时经 SyncFetchRoots 的歌词根服务；
+//      越界/软链逃逸仍一律拒（两个根各自校验）。
 //
 //  本文件只做「本端事实 → 协议钩子」的装配，不含协议逻辑（那些在 Sync/ 下的
 //  共享文件里，可单测）；IO/DB 细节集中在此，Mac target 编译，iOS target 排除。
@@ -30,6 +33,9 @@ final class MacSyncLibraryHost: @unchecked Sendable {
 
     private let database: DatabaseManager
     private let fileManager: FileManager
+    /// aligned 歌词库 + content_hash 映射（Part A 单一入口；歌词随歌同步）
+    private let lyricsStore: AlignedLyricsStore
+    private let lyricsMapping: SyncLyricsContentMapping
     private let lock = NSLock()
     private var manifestPeer: SyncManifestPeer?
     private var responder: SyncLibraryFetchResponder?
@@ -43,12 +49,17 @@ final class MacSyncLibraryHost: @unchecked Sendable {
         libraryRoot: URL,
         rootName: String? = nil,
         database: DatabaseManager = .shared,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        lyricsStore: AlignedLyricsStore = .shared,
+        lyricsMapping: SyncLyricsContentMapping? = nil
     ) {
         self.libraryRoot = libraryRoot
         self.rootName = rootName ?? libraryRoot.lastPathComponent
         self.database = database
         self.fileManager = fileManager
+        self.lyricsStore = lyricsStore
+        // 默认走 M4-2a 的 SyncContentHashResolver（stable_id ↔ content_hash）
+        self.lyricsMapping = lyricsMapping ?? .live(database: database)
     }
 
     // MARK: 接线 / 拆除
@@ -67,10 +78,13 @@ final class MacSyncLibraryHost: @unchecked Sendable {
 
         let responder = SyncLibraryFetchResponder(
             session: session,
-            libraryRoot: libraryRoot,
+            roots: SyncFetchRoots(libraryRoot: libraryRoot, lyricsRoot: lyricsRoot),
             fileManager: fileManager,
             contentHashProvider: { [weak self] relativePath in
                 self?.contentHash(relativePath: relativePath)
+            },
+            lyricsFileNameProvider: { [weak self] wirePath in
+                self?.lyricsFileName(wirePath: wirePath)
             }
         )
         responder.onResultSent = { [weak self] result in self?.onFetchResult?(result) }
@@ -101,11 +115,27 @@ final class MacSyncLibraryHost: @unchecked Sendable {
     func manifest(collection: SyncCollection, members: SyncCollectionMembers = SyncCollectionMembers()) -> [ManifestEntry] {
         SyncLocalLibraryScanner.entries(
             in: libraryRoot,
+            lyricsStore: lyricsStore,
+            lyricsMapping: lyricsMapping,
             collection: collection,
             members: members,
             database: database,
             fileManager: fileManager
         )
+    }
+
+    /// aligned 歌词根：与 `AlignedLyricsStore` 同一目录（库目录不可解析 → nil，
+    /// 即本次不服务歌词命名空间）。
+    var lyricsRoot: URL? { lyricsStore.directory }
+
+    /// wire 歌词路径 → 本端库文件名（`@lyrics/{歌曲 content_hash}.json` → `{stableId}.json`）。
+    /// 拿不到本端歌曲 / 形态非法 → nil（应答器按 notFound 处理，绝不拼根外路径）。
+    private func lyricsFileName(wirePath: String) -> String? {
+        guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
+              let stableId = lyricsMapping.stableIdForContentHash(songHash),
+              AlignedLyricsStore.isValidStableId(stableId)
+        else { return nil }
+        return "\(stableId).json"
     }
 
     /// 扫描曲库根 → manifest 生成输入（共享采集器，iOS 对账侧同一口径）。

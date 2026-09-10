@@ -69,6 +69,26 @@ struct SyncContentHashResolver {
     }
 }
 
+// MARK: - 歌词同步映射的生产实现（M4-2b）
+
+/// aligned 歌词随歌同步的 content_hash 映射：复用本文件上面的
+/// `SyncContentHashResolver`（M4-2a），不新写 SQL。
+extension SyncLyricsContentMapping {
+    /// 生产实现：本地 stableId ↔ 歌曲 content_hash（查不到 / 指纹未回填 = nil，
+    /// 与 M4-2a 同一语义）。
+    static func live(database: DatabaseManager) -> SyncLyricsContentMapping {
+        let resolver = SyncContentHashResolver(database: database)
+        return SyncLyricsContentMapping(
+            contentHashForStableId: { stableId in
+                (try? resolver.contentHash(forTrackStableId: stableId)) ?? nil
+            },
+            stableIdForContentHash: { contentHash in
+                (try? resolver.trackStableId(forContentHash: contentHash)) ?? nil
+            }
+        )
+    }
+}
+
 // MARK: - 行内歌曲引用提取
 
 /// 从被同步实体行里提取"它引用的歌曲本地 stableId"；不引用歌曲的实体（歌单）返回 nil。
