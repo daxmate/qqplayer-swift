@@ -392,7 +392,8 @@ struct AlignedLyricsSyncTests {
             Issue.record("期望 done，实际 \(harness.controller.state)")
             return
         }
-        #expect(!summary.deleted.contains("@lyrics/\(songHash).json"))
+        // v2 §12b-7：删除不跨端传播——summary 里没有删除通道，对端缺的歌词恒为零动作。
+        #expect(summary.requested.isEmpty && summary.completed.isEmpty)
 
         // 规划层：即使全库镜像配置，歌词条目也永不进删除计划
         let plan = SyncLibrarySyncPlanner.plan(
@@ -402,7 +403,8 @@ struct AlignedLyricsSyncTests {
             ],
             configuration: SyncLibrarySyncConfiguration()
         )
-        #expect(plan.deletes.isEmpty)
+        #expect(plan.fetchRequest == nil)
+        #expect(plan.unchanged.isEmpty)
     }
 
     @Test("端到端：歌词同步不影响 manual 与 network 存储")
