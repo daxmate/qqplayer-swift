@@ -753,28 +753,50 @@ do {
     check(false, "⑭ 抛错：\(error)")
 }
 
-
 // MARK: - ⑭ changeLog 删除不传播策略
 
 section("⑭ changeLog 删除不传播：发送侧过滤 + 接收侧忽略（v2 §12b-7）")
 
 do {
     // ① 发送侧：delete 不上线（本地 outbox 照记）。
-    //    生产接线：SyncChangeLogPeer.handlePull 在 wireEntries 之前 filter，
+    //    生产接线：SyncChangeLogPeer.handlePull → SyncChangeLogDeletionPolicy.transmittableIndexes，
     //    应答游标仍推进到 maxOutboxID，onPullHandled 计数 = 过滤前的 outbox 增量行数。
-    let outboxOps = ["upsert", "delete", "upsert"]
-    let wireOps = outboxOps.filter { SyncChangeLogDeletionPolicy.isTransmittable(op: $0) }
-    checkEqual(wireOps, ["upsert", "upsert"], "发送侧：混合序列 [upsert, delete, upsert] 过滤后只留 upsert")
-    checkEqual(outboxOps.count, 3, "发送侧：本端 outbox 增量行数 = 过滤前条目数（含被过滤的 delete），计数不受影响")
-    checkEqual(wireOps.count, 2, "发送侧：wire 条目数 = outbox 行数 - 被过滤 delete 数")
+    func policyRow(_ key: String, _ op: String) -> SyncChangeLogPolicyRow {
+        SyncChangeLogPolicyRow(entity: "favorite", rowKey: key, op: op)
+    }
 
-    let deleteOnlyOps = ["delete", "delete"]
-    check(
-        deleteOnlyOps.filter { SyncChangeLogDeletionPolicy.isTransmittable(op: $0) }.isEmpty,
+    let deleteOnly = [policyRow("a", "delete"), policyRow("b", "delete")]
+    checkEqual(
+        SyncChangeLogDeletionPolicy.transmittableIndexes(rows: deleteOnly),
+        [],
         "发送侧：纯 delete 序列上线条目为空（永不上线）"
     )
-    check(
-        SyncChangeLogDeletionPolicy.isTransmittable(op: "play_history"),
+
+    let addThenRemove = [policyRow("a", "upsert"), policyRow("a", "delete")]
+    checkEqual(
+        SyncChangeLogDeletionPolicy.transmittableIndexes(rows: addThenRemove),
+        [],
+        "发送侧：同键 upsert→delete（末尾 delete）时更早的 upsert 也不上线（不复活已删状态）"
+    )
+
+    let removeThenAdd = [policyRow("a", "delete"), policyRow("a", "upsert")]
+    checkEqual(
+        SyncChangeLogDeletionPolicy.transmittableIndexes(rows: removeThenAdd),
+        [1],
+        "发送侧：同键 delete→upsert（末尾 upsert）时只过滤 delete，最新状态照上"
+    )
+
+    let mixedKeys = [policyRow("a", "upsert"), policyRow("b", "upsert"), policyRow("a", "delete")]
+    checkEqual(
+        SyncChangeLogDeletionPolicy.transmittableIndexes(rows: mixedKeys),
+        [1],
+        "发送侧：键间互不影响（A 键末尾 delete → A 键全部不上线，B 键照上）"
+    )
+
+    checkEqual(addThenRemove.count, 2, "发送侧：本端 outbox 增量行数 = 过滤前条目数（含被过滤的 delete），计数不受影响")
+    checkEqual(
+        SyncChangeLogDeletionPolicy.transmittableIndexes(rows: [policyRow("a", "play_history")]),
+        [0],
         "发送侧：非 delete 的 op 不误伤（不拦）"
     )
 

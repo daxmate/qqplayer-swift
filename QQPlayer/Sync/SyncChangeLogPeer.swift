@@ -7,7 +7,8 @@
 //
 //  ⚠️ v2 语义修订（2026-09-10 用户拍板，docs/lan-sync-design.md §6.2 / §12b-7）：
 //  **不再有删除传播**——本地 outbox 照常记录 delete（本地事务完整），但
-//  ① 发送侧：delete 变更不上线（应答 pull 前过滤）；
+//  ① 发送侧：delete 变更不上线（应答 pull 前过滤）；同一键在本批末尾是 delete 时，
+//    其更早的 upsert 也不上线（否则对端会复活一个本端已删除的状态，且永无纠正机会）；
 //  ② 接收侧：收到 delete（可能来自旧 peer）一律忽略，拦截在 localize **之前**
 //     （delete 行没有歌曲载荷，若先进 localize 会被判成"本地缺歌"挂起，永远等不到
 //     歌到位 → 垃圾数据 + 语义错乱），不进 localize / pendingStore / LWW，也不删本地行。
@@ -122,8 +123,14 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             let entries = try store.entries(after: request.cursor)
             let lastID = try store.maxOutboxID()
             // v2（§12b-7）：删除不跨端传播——本地 outbox 照记 delete（本地事务完整），
-            // 但 delete 不上线；上线前按策略过滤。
-            let transmittable = entries.filter { SyncChangeLogDeletionPolicy.isTransmittable(op: $0.op) }
+            // 但 delete 不上线；且同一键在本批末尾是 delete 时，其更早的 upsert 也不上线
+            // （否则会在对端复活一个本端已删除的状态，而 delete 永不上线 → 无法纠正）。
+            // 判定集中在 SyncChangeLogDeletionPolicy（纯逻辑单一事实源）。
+            let transmittable = SyncChangeLogDeletionPolicy
+                .transmittableIndexes(rows: entries.map {
+                    SyncChangeLogPolicyRow(entity: $0.entity, rowKey: $0.rowKey, op: $0.op)
+                })
+                .map { entries[$0] }
             // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
             let wireEntries = try mapper.wireEntries(transmittable)
             // 游标仍推进到 maxOutboxID（含被过滤的 delete 行）：被过滤的行永不重发。

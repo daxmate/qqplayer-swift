@@ -66,6 +66,22 @@ struct SyncChangeLogFrameTests {
         #expect(SyncChangeLogDeletionPolicy.isTransmittable(op: SyncChangeOp.upsert.rawValue))
         #expect(SyncChangeLogDeletionPolicy.shouldIgnore(op: SyncChangeOp.delete.rawValue))
         #expect(!SyncChangeLogDeletionPolicy.shouldIgnore(op: SyncChangeOp.upsert.rawValue))
+
+        // 批次抑制：同一键在本批末尾是 delete 时，其更早的 upsert 也不上线
+        func row(_ key: String, _ op: SyncChangeOp) -> SyncChangeLogPolicyRow {
+            SyncChangeLogPolicyRow(entity: SyncChangeEntity.favorite.rawValue, rowKey: key, op: op.rawValue)
+        }
+        #expect(
+            SyncChangeLogDeletionPolicy.transmittableIndexes(rows: [row("a", .upsert), row("a", .delete)]) == []
+        )
+        #expect(
+            SyncChangeLogDeletionPolicy.transmittableIndexes(rows: [row("a", .delete), row("a", .upsert)]) == [1]
+        )
+        #expect(
+            SyncChangeLogDeletionPolicy.transmittableIndexes(
+                rows: [row("a", .upsert), row("b", .upsert), row("a", .delete)]
+            ) == [1]
+        )
     }
 
     // MARK: - 会话层往返
