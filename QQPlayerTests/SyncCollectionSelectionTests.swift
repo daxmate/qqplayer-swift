@@ -285,7 +285,10 @@ struct SyncCollectionDiffPlannerTests {
 
     @Test("对端缺 → 推；本端缺 → 拉；两侧一致 → 跳过")
     func directions() {
-        let local = manifest([("Album/push.flac", hashA), ("Album/pull.flac", hashB), ("Album/same.flac", hashA)])
+        // local 只持有 push + same；pull 只在远端（本端缺 → 拉）。
+        // ⚠️ 2026-09-11 修正：原先 local 里多写了一条 pull.flac，而两侧同 hash
+        // ⇒ 判据只能是「一致」而非「本端缺」，与用例名/其余断言矛盾（CI 929 用例唯一红点）。
+        let local = manifest([("Album/push.flac", hashA), ("Album/same.flac", hashA)])
         let remote = manifest([("Album/same.flac", hashA), ("Album/pull.flac", hashB)])
         let expected = ["Album/pull.flac", "Album/push.flac", "Album/same.flac"]
 

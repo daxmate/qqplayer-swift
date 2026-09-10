@@ -1741,6 +1741,39 @@ do {
     check(false, "㉗ 抛错：\(error)")
 }
 
+// MARK: - ㉘ R3a 双向差集纯逻辑（三方向一次覆盖）
+
+section("㉘ R3a：双向差集纯逻辑（对端缺→推 / 本端缺→拉 / 一致→跳过 / 对端独有→仅记账）")
+do {
+    // 与 CI 用例 `SyncCollectionSelectionTests` ③ 双向差集 同款直接数据：
+    // local 只持有 push + same（pull 只在远端）。
+    // 2026-09-11：CI 红点（本端多写一条 pull.flac → 两侧同 hash 必判「一致」）的本地兜底断言。
+    let local = [entry("Album/push.flac", hash: "a"), entry("Album/same.flac", hash: "b")]
+    let remote = [
+        entry("Album/same.flac", hash: "b"),
+        entry("Album/pull.flac", hash: "c"),
+        entry("Album/device-only.flac", hash: "d"),
+    ]
+    let diff = SyncCollectionDiffPlanner.plan(
+        expected: ["Album/pull.flac", "Album/push.flac", "Album/same.flac"],
+        local: local,
+        remote: remote
+    )
+    checkEqual(diff.toPush, ["Album/push.flac"], "对端缺 → 推")
+    checkEqual(diff.toPull, ["Album/pull.flac"], "本端缺 → 拉")
+    checkEqual(diff.unchanged, ["Album/same.flac"], "两侧一致 → 跳过")
+    checkEqual(diff.remoteOnlyIgnored, ["Album/device-only.flac"], "对端独有 → 仅记账（不传播删除）")
+    checkEqual(diff.missingBoth, [], "期望里两侧都有实体 → 无 missingBoth")
+
+    let differs = SyncCollectionDiffPlanner.plan(
+        expected: ["Album/x.flac"],
+        local: [entry("Album/x.flac", hash: "old")],
+        remote: [entry("Album/x.flac", hash: "new")]
+    )
+    checkEqual(differs.toPush, ["Album/x.flac"], "内容不同 → 只推（发起方权威）")
+    checkEqual(differs.toPull, [], "内容不同 → 不回拉")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")
