@@ -73,6 +73,16 @@ enum LibraryAudioFormats {
     static let defaultEnabled: [String] = ["flac", "mp3", "m4a", "wav", "opus", "ogg", "dsf", "dff", "aac"]
 }
 
+// MARK: - SyncLyricsContentMapping.live（生产在 SyncChangeLogMapping.swift，未被 harness 编入）
+//
+// 生产实现走 SyncContentHashResolver（GRDB）；harness 的 DatabaseManager 是内存桩，无
+// content_hash 查询，故这里给出等价签名的空映射——需要映射的断言由夹具显式注入
+// （main.swift 的 mapping(of:)），不走本默认值。
+
+extension SyncLyricsContentMapping {
+    static func live(database: DatabaseManager) -> SyncLyricsContentMapping { .unresolved }
+}
+
 // MARK: - LibraryIndexer（生产为 @MainActor 服务；harness 记录调用）
 
 final class LibraryIndexer: @unchecked Sendable {

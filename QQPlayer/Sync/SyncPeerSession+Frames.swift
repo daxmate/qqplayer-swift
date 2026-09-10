@@ -301,7 +301,8 @@ extension SyncPeerSession {
         case .bye:
             return closeEffectsLocked(.receivedBye)
         case .fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush,
-             .manifestRequest, .manifestResponse, .syncFetchRequest, .syncFetchResult:
+             .manifestRequest, .manifestResponse, .syncFetchRequest, .syncFetchResult,
+             .libraryPushAnnounce:
             let delivered = SyncFrame(type: frame.type, flags: [], payload: plaintext)
             return [.notifyAppFrame(delivered)]
         case .handshake, .pairRequest, .pairResponse:
