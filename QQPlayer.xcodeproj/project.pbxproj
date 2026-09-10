@@ -104,6 +104,7 @@
 		257B32530D54485790DEBC0F /* SandboxMigrationPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232B84C1DF4D44DA846B68A7 /* SandboxMigrationPlannerTests.swift */; };
 		82B90AFDE199482DA72E01A9 /* SyncManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C2C48AB2B64DB0AFA50B99 /* SyncManifestTests.swift */; };
 		437D437B1D2E4915BAFA73F0 /* SyncManifestReconcileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CF31D097704931BC2CD358 /* SyncManifestReconcileTests.swift */; };
+		7742F0E2E1244D558454A5D0 /* SyncChangeLogContentMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A408589CE4344B52BD29A01D /* SyncChangeLogContentMapTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -257,6 +258,7 @@
 		232B84C1DF4D44DA846B68A7 /* SandboxMigrationPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SandboxMigrationPlannerTests.swift; sourceTree = "<group>"; };
 		36C2C48AB2B64DB0AFA50B99 /* SyncManifestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncManifestTests.swift; sourceTree = "<group>"; };
 		F6CF31D097704931BC2CD358 /* SyncManifestReconcileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncManifestReconcileTests.swift; sourceTree = "<group>"; };
+		A408589CE4344B52BD29A01D /* SyncChangeLogContentMapTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncChangeLogContentMapTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -471,6 +473,8 @@
 				Sync/DeviceStore.swift,
 				Sync/PairingModels.swift,
 				Sync/PairingStateMachine.swift,
+				Sync/SyncChangeLogMapping.swift,
+				Sync/SyncChangeLogPendingStore.swift,
 				Sync/SyncCrypto.swift,
 				Sync/SyncFileChecksum.swift,
 				Sync/SyncFrame.swift,
@@ -742,6 +746,7 @@
 				232B84C1DF4D44DA846B68A7 /* SandboxMigrationPlannerTests.swift */,
 				36C2C48AB2B64DB0AFA50B99 /* SyncManifestTests.swift */,
 				F6CF31D097704931BC2CD358 /* SyncManifestReconcileTests.swift */,
+				A408589CE4344B52BD29A01D /* SyncChangeLogContentMapTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1144,6 +1149,7 @@
 				257B32530D54485790DEBC0F /* SandboxMigrationPlannerTests.swift in Sources */,
 				82B90AFDE199482DA72E01A9 /* SyncManifestTests.swift in Sources */,
 				437D437B1D2E4915BAFA73F0 /* SyncManifestReconcileTests.swift in Sources */,
+				7742F0E2E1244D558454A5D0 /* SyncChangeLogContentMapTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -37,6 +37,10 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     private let session: SyncPeerSession
     private let store: SyncChangeLogStore
     private let applier: SyncChangeLogApplier
+    /// 跨端歌曲引用映射（发送侧填 contentHash / 接收侧本地化，M4-2a）。
+    private let mapper: SyncChangeLogMapper
+    /// 本地还没有该歌时挂起远端变更，歌到后由 SyncChangeLogReplay 重放。
+    private let pendingStore: SyncChangeLogPendingStore
     /// 本端视角的对端 Device ID（sync_cursor.peer_id；推进游标用）。
     let peerID: String
 
@@ -44,6 +48,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPullHandled: ((SyncChangeLogPullRequest, Int) -> Void)?
     /// push 应用完成（applied 行数；锁外触发）。
     var onPushApplied: ((Int) -> Void)?
+    /// push 中因本地缺歌而挂起的行数（锁外触发；0 = 无挂起）。
+    var onPushSuspended: ((Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
 
@@ -61,6 +67,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         self.session = session
         self.store = store
         self.applier = applier
+        self.mapper = SyncChangeLogMapper(database: applier.database)
+        self.pendingStore = SyncChangeLogPendingStore(database: applier.database)
         self.peerID = peerID
         attachHandlers()
     }
@@ -103,17 +111,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         do {
             let entries = try store.entries(after: request.cursor)
             let lastID = try store.maxOutboxID()
-            let wireEntries = entries.map {
-                SyncChangeLogWireEntry(
-                    id: $0.id ?? 0,
-                    entity: $0.entity,
-                    rowKey: $0.rowKey,
-                    op: $0.op,
-                    updatedAtMs: $0.updatedAtMs,
-                    contentHash: nil, // M3-1 未合入；M4-2 收口 content_hash 映射
-                    payloadJSON: $0.payloadJSON
-                )
-            }
+            // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
+            let wireEntries = try mapper.wireEntries(entries)
             let response = SyncChangeLogPushPayload(entries: wireEntries, lastOutboxID: lastID)
             try session.sendApplicationFrame(type: .changeLogPush, payload: JSONEncoder().encode(response))
             onPullHandled?(request, entries.count)
@@ -131,19 +130,23 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             return
         }
         do {
-            // 远端批 → SyncChangeLogRow（保留远端 outbox id：merge 排序键
-            // (updated_at, id) 需要它来保证同 ms 多行按远端落库序确定性排序——
-            // playlist upsert 先于其 playlist_item 应用，否则 item 因歌单未到
-            // 被静默跳过。wire id 0（本无 id）转 nil。）
-            let remoteRows = payload.entries.map {
-                SyncChangeLogRow(
-                    id: $0.id > 0 ? $0.id : nil,
-                    entity: SyncChangeEntity(rawValue: $0.entity) ?? .favorite,
-                    rowKey: $0.rowKey,
-                    op: SyncChangeOp(rawValue: $0.op) ?? .upsert,
-                    updatedAtMs: $0.updatedAtMs,
-                    payloadJSON: $0.payloadJSON
-                )
+            // 远端批 → 本地行（保留远端 outbox id：merge 排序键 (updated_at, id)
+            // 需要它来保证同 ms 多行按远端落库序确定性排序——playlist upsert 先于
+            // 其 playlist_item 应用，否则 item 因歌单未到被静默跳过。wire id 0（本无
+            // id）转 nil）。
+            // M4-2a：先按 content_hash 把歌曲引用本地化（row_key/payload 换成
+            // 本端 stableId）再对账——LWW 键 = (entity, row_key)，两端 stableId
+            // 不同，不本地化就对不上键；本地还没这首歌的行挂起，不丢。
+            var remoteRows: [SyncChangeLogRow] = []
+            var suspended = 0
+            for entry in payload.entries {
+                switch try mapper.localize(entry) {
+                case .mapped(let row), .passThrough(let row):
+                    remoteRows.append(row)
+                case .suspended(let contentHash, let remoteRow):
+                    try pendingStore.suspend(remoteRow, contentHash: contentHash)
+                    suspended += 1
+                }
             }
             // 本地批：逐键取本端该键最新一行（对账代表本端事实）
             var localRows: [SyncChangeLogRow] = []
@@ -156,9 +159,10 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // LWW 合并 → 应用远端胜出行
             let mergeResult = SyncLWWReconcile.merge(localRows: localRows, remoteRows: remoteRows)
             let applied = try applier.apply(mergeResult.applyRemote)
-            // 推进本端对该 peer 的游标
+            // 推进本端对该 peer 的游标（挂起行已持久化，游标可安全推进：数据不丢）
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
+            onPushSuspended?(suspended)
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
         }

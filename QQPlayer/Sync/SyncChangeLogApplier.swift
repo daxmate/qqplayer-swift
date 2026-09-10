@@ -11,8 +11,9 @@
 //  - play_history：row_key = "\(trackStableId)|\(playedAt)"。upsert = 本地按
 //    (track_stable_id, played_at) 匹配：存在则更新 play_duration_ms（快照值，
 //    LWW 已判远端胜，直接覆盖），不存在则 INSERT（行 id 本地自增）；
-//    delete = DELETE 匹配行。注意：远端快照不含跨端歌曲键（content_hash 映射
-//    M4-2 收口），v1 用本地 stableId 兜底，见 SyncLWWReconcile 文件头。
+//    delete = DELETE 匹配行。注意：远端快照不含跨端歌曲键，M4-2a 起由
+//    SyncChangeLogMapper 在应用前改写为本地 stableId（本地缺歌则挂起，见
+//    SyncChangeLogMapping.swift）。
 //  - playlist：row_key = slug。upsert = 按 slug 查本地，存在则更新标题/封面等
 //    字段（保留本地 id 与 FK 完整性），不存在则 INSERT（自增 id）；folder-synced
 //    远端歌单（本地扫描派生语义）直接按快照应用，由对端捕获侧已跳过产生。
@@ -33,7 +34,8 @@ import Foundation
 @preconcurrency import GRDB
 
 struct SyncChangeLogApplier {
-    private let database: DatabaseManager
+    /// internal（M4-2a）：会话层用它构造跨端映射器/挂起存储（同一库连接）。
+    let database: DatabaseManager
 
     /// playback_position 落点（v1 可选注入；nil = 丢弃并打印调试日志）。
     /// 生产接线（写 UserDefaults QQPlayerState / 未来 DB 行）留 M4-2。

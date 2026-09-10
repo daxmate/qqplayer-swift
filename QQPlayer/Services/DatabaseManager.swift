@@ -428,6 +428,28 @@ class DatabaseManager: @unchecked Sendable {
                 )
             """)
 
+            // 局域网同步挂起变更（S2, M4-2a）：“远端变更引用的歌曲本地还没有”时
+            // 挂起在此（row_key = content_hash），歌曲入库后重放，不丢数据。
+            // 模型/存储/重放见 Sync/SyncChangeLogPendingStore.swift，映射见
+            // Sync/SyncChangeLogMapping.swift。唯一索引 (entity, row_key,
+            // remote_row_key) = 挂起行幂等 upsert 的冲突目标（重复拉取不产生重复行）。
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_pending_change (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity TEXT NOT NULL,
+                    row_key TEXT NOT NULL,
+                    remote_row_key TEXT NOT NULL,
+                    op TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    payload_json TEXT
+                )
+            """)
+            try db.execute(sql: """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_pending_identity
+                ON sync_pending_change(entity, row_key, remote_row_key)
+            """)
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sync_pending_row_key ON sync_pending_change(row_key)")
+
             // Migration: Add last_played_at column if it doesn't exist
             do {
                 try db.execute(sql: """

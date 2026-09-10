@@ -11,7 +11,8 @@
 //    播放位置上下文）的本地写入点先落 outbox，再异步同步给 peer。
 //  - LWW 键 = (entity, row_key)；同键冲突用 updated_at(毫秒) 大者胜。
 //  - row_key 使用本地 stableId 或业务行唯一键（v1）；跨端 content_hash 映射
-//    由 M4-2 收口（载荷预留 contentHash 字段，见 SyncChangeLogEntry）。
+//    已收口（M4-2a：载荷 contentHash 字段承载跨端身份，收发两侧双向映射，本地
+//    缺歌时挂起至歌曲到位重放，见 SyncChangeLogMapping / SyncChangeLogPendingStore）。
 //
 //  新增表对齐 DatabaseManager.createTables（幂等 IF NOT EXISTS，旧库启动自动
 //  补表，同 sync_device 模式）；模型 struct 独立于此文件，不动 DatabaseModels.swift
@@ -120,7 +121,8 @@ struct SyncChangeLogPushPayload: Codable, Equatable, Sendable {
 }
 
 /// 线上 outbox 行（changeLogPush 的 entry）。
-/// contentHash：跨端歌曲引用键（M3-1 未合入，v1 恒 nil；M4-2 收口映射）。
+/// contentHash：跨端歌曲引用键（M4-2a 已收口：发送侧填本地 track 指纹，接收侧
+/// 映射回本地 stableId，缺歌挂起重放，见 SyncChangeLogMapping）。
 struct SyncChangeLogWireEntry: Codable, Equatable, Sendable {
     var id: Int64
     var entity: String
