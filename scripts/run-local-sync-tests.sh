@@ -41,6 +41,8 @@ SOURCES=(
   QQPlayer/Sync/SyncManifestReconciler.swift
   QQPlayer/Sync/SyncManifestPeer.swift
   QQPlayer/Sync/SyncCollection.swift
+  QQPlayer/Sync/SyncCollectionSelection.swift
+  QQPlayer/Sync/SyncCollectionSyncCoordinator.swift
   QQPlayer/Sync/SyncLibrarySyncModels.swift
   QQPlayer/Sync/SyncLibraryFetchResponder.swift
   QQPlayer/Sync/SyncLocalLibraryProvider.swift

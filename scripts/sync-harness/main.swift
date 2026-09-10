@@ -1383,6 +1383,364 @@ do {
     check(false, "㉑ 抛错：\(error)")
 }
 
+// MARK: - ㉒ R3a 编排夹具
+
+/// 设备侧收到的 manifest_request 计数（R3a：空选择集必须为 0）。
+var r3aManifestRequests = 0
+
+/// R3a 编排夹具：Mac 描述器 + 设备被动端 + 注入曲库事实 + 编排器。
+struct CollectionScenario {
+    let fixture: SessionFixture
+    let macRoot: URL
+    let deviceRoot: URL
+    let macSink: SinkSpy
+    let deviceSink: SinkSpy
+    let deviceHost: SyncLibraryPassiveHost
+    let coordinator: SyncCollectionSyncCoordinator
+}
+
+func makeCollectionScenario(
+    selection: SyncCollectionSelection,
+    macFiles: [(String, Data)] = [],
+    deviceFiles: [(String, Data)] = [],
+    playlists: [String: [SyncCollectionTrackFact]] = [:],
+    knownPaths: [String: SyncCollectionTrackFact] = [:],
+    lyricsWirePaths: Set<String> = [],
+    macLyrics: [(stableId: String, lyrics: Lyrics)] = [],
+    macLyricsMapping: SyncLyricsContentMapping = .unresolved,
+    deviceLyricsMapping: SyncLyricsContentMapping = .unresolved
+) throws -> CollectionScenario {
+    let fixture = SessionFixture.pairedHandshake()
+    let macRoot = try tempRoot("r3a-mac")
+    let deviceRoot = try tempRoot("r3a-device")
+    for (path, data) in macFiles { try writeFile(path, in: macRoot, data: data) }
+    for (path, data) in deviceFiles { try writeFile(path, in: deviceRoot, data: data) }
+
+    let macLyricsStore = AlignedLyricsStore(directory: try tempRoot("r3a-mac-lyrics"))
+    for item in macLyrics { try macLyricsStore.write(item.lyrics, forStableId: item.stableId) }
+    let deviceLyricsStore = AlignedLyricsStore(directory: try tempRoot("r3a-device-lyrics"))
+
+    r3aManifestRequests = 0
+    let deviceSink = SinkSpy()
+    let deviceHost = SyncLibraryPassiveHost(
+        libraryRoot: deviceRoot,
+        sink: deviceSink,
+        database: DatabaseManager(),
+        lyricsStore: deviceLyricsStore,
+        lyricsMapping: deviceLyricsMapping
+    )
+    check(deviceHost.attach(to: fixture.clientSession), "设备被动端接线")
+    // 设备侧入站帧计数（挂在链首；链式转发不影响被动端）
+    let devicePriorHandler = fixture.clientSession.onApplicationFrame
+    fixture.clientSession.onApplicationFrame = { frame in
+        if frame.type == .manifestRequest { r3aManifestRequests += 1 }
+        devicePriorHandler?(frame)
+    }
+
+    let macSink = SinkSpy()
+    let macManager = DatabaseManager()
+    let descriptor = SyncLocalLibraryDescriptor(
+        libraryRoot: macRoot,
+        rootName: "R3a 测试 Mac",
+        lyricsRoot: macLyricsStore.directory,
+        sourceFiles: { SyncLocalLibraryScanner.sourceFiles(in: macRoot, database: macManager) },
+        lyricsEntries: {
+            SyncAlignedLyricsManifest.entries(store: macLyricsStore, mapping: macLyricsMapping)
+        },
+        contentHash: { relativePath in
+            DatabaseManager.contentHashIfFilePresent(
+                atPath: macRoot.appendingPathComponent(relativePath).path
+            )
+        },
+        lyricsFileName: { wirePath in
+            guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
+                  let stableId = macLyricsMapping.stableIdForContentHash(songHash)
+            else { return nil }
+            return "\(stableId).json"
+        }
+    )
+    let coordinator = SyncCollectionSyncCoordinator(
+        session: fixture.hostSession,
+        descriptor: descriptor,
+        selection: selection,
+        facts: MemoryCollectionFacts(
+            playlists: playlists,
+            knownPaths: knownPaths,
+            lyricsWirePaths: lyricsWirePaths
+        ),
+        sink: macSink,
+        lyricsStore: macLyricsStore,
+        lyricsMapping: macLyricsMapping
+    )
+    try coordinator.start()
+    return CollectionScenario(
+        fixture: fixture,
+        macRoot: macRoot,
+        deviceRoot: deviceRoot,
+        macSink: macSink,
+        deviceSink: deviceSink,
+        deviceHost: deviceHost,
+        coordinator: coordinator
+    )
+}
+
+// MARK: - ㉓ 选中歌单 → 设备缺歌自动推送补齐
+
+section("㉓ R3a：选中歌单 → 设备缺歌自动推送补齐（含已一致跳过）")
+do {
+    let same = silentData(0xC1, count: 4_000)
+    let fresh = silentData(0xC2, count: 200_000)
+    let sameHash = try sha256Hex(of: same)
+    let freshHash = try sha256Hex(of: fresh)
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [("Album/keep.flac", same), ("Album/new.flac", fresh)],
+        deviceFiles: [("Album/keep.flac", same)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(stableId: "s-keep", relativePath: "Album/keep.flac", contentHash: sameHash),
+                SyncCollectionTrackFact(stableId: "s-new", relativePath: "Album/new.flac", contentHash: freshHash),
+            ],
+        ]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.plannedPush, ["Album/new.flac"], "设备缺 → 计划推送")
+    checkEqual(report.plannedPull, [String](), "无需拉取")
+    checkEqual(report.skipped, ["Album/keep.flac"], "已一致 → 跳过")
+    check(report.isComplete, "编排完全成功")
+    checkEqual(report.pushed, ["Album/new.flac"], "推送账目")
+    checkEqual(report.pullFailed, [SyncFileFetchFailure](), "拉取无失败")
+    checkEqual(report.transferCount, 1, "本次仅一次传输")
+    checkEqual(r3aManifestRequests, 2, "一次计划 + 一次推送各请求一次 manifest")
+
+    let landed = scenario.deviceRoot.appendingPathComponent("Album/new.flac")
+    checkEqual(
+        try sha256Hex(of: try Data(contentsOf: landed)),
+        freshHash,
+        "补齐文件落位且内容 SHA-256 一致"
+    )
+    checkEqual(
+        scenario.deviceSink.indexed,
+        [landed.path],
+        "落位文件走既有入库入口"
+    )
+    check(
+        scenario.deviceRoot.appendingPathComponent("Album/keep.flac").isFileURL,
+        "设备既有文件未被动过"
+    )
+    checkEqual(report.remoteOnlyIgnored, [String](), "无对端独有条目")
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉓ 抛错：\(error)")
+}
+
+// MARK: - ㉔ Mac 缺歌 → 从设备自动拉取补齐
+
+section("㉔ R3a：Mac 缺歌 → 从设备自动拉取补齐")
+do {
+    let deviceOnly = silentData(0xC3, count: 120_000)
+    let deviceOnlyHash = try sha256Hex(of: deviceOnly)
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [],
+        deviceFiles: [("Album/from-device.flac", deviceOnly)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-dev",
+                    relativePath: "Album/from-device.flac",
+                    contentHash: deviceOnlyHash
+                ),
+            ],
+        ]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.plannedPush, [String](), "本端无可推内容")
+    checkEqual(report.plannedPull, ["Album/from-device.flac"], "本端缺 → 计划拉取")
+    checkEqual(report.pulled, ["Album/from-device.flac"], "拉取账目")
+    check(report.isComplete, "编排完全成功")
+    checkEqual(report.transferCount, 1, "本次仅一次传输")
+
+    let landed = scenario.macRoot.appendingPathComponent("Album/from-device.flac")
+    checkEqual(
+        try sha256Hex(of: try Data(contentsOf: landed)),
+        deviceOnlyHash,
+        "补齐文件落位本端且内容 SHA-256 一致"
+    )
+    checkEqual(scenario.macSink.indexed, [landed.path], "落位文件走既有入库入口")
+    checkEqual(
+        (try? FileManager.default.contentsOfDirectory(
+            atPath: scenario.macRoot.appendingPathComponent(".sync-incoming").path
+        )) ?? [],
+        [],
+        "落地目录无残渣"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉔ 抛错：\(error)")
+}
+
+// MARK: - ㉕ 两端已一致 → 零传输；对端独有 → 不传播删除
+
+section("㉕ R3a：两端已一致 → 零传输；对端独有 → 本端保留（不传播删除）")
+do {
+    let same = silentData(0xC4, count: 6_000)
+    let deviceOnly = silentData(0xC5, count: 2_000)
+    let sameHash = try sha256Hex(of: same)
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [("Album/same.flac", same)],
+        deviceFiles: [("Album/same.flac", same), ("Imported/device-only.flac", deviceOnly)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-same",
+                    relativePath: "Album/same.flac",
+                    contentHash: sameHash
+                ),
+            ],
+        ]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.plannedPush, [String](), "无推送")
+    checkEqual(report.plannedPull, [String](), "无拉取")
+    checkEqual(report.skipped, ["Album/same.flac"], "已一致 → 跳过")
+    checkEqual(report.transferCount, 0, "两端已一致 → 零传输")
+    checkEqual(r3aManifestRequests, 1, "零传输只请求一次 manifest（计划）")
+    checkEqual(
+        report.remoteOnlyIgnored,
+        ["Imported/device-only.flac"],
+        "对端独有 → 仅记账"
+    )
+    checkEqual(scenario.macSink.indexed, [String](), "本端无落位")
+    checkEqual(scenario.deviceSink.indexed, [String](), "设备无落位")
+    check(
+        FileManager.default.fileExists(
+            atPath: scenario.deviceRoot.appendingPathComponent("Imported/device-only.flac").path
+        ),
+        "对端独有文件保留（不传播删除）"
+    )
+    check(
+        !FileManager.default.fileExists(
+            atPath: scenario.macRoot.appendingPathComponent("Imported/device-only.flac").path
+        ),
+        "不把对端独有内容复制过来（选择集之外）"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉕ 抛错：\(error)")
+}
+
+// MARK: - ㉖ 空选择集 → 不推不拉
+
+section("㉖ R3a：空选择集 → 不推不拉（连 manifest 都不请求）")
+do {
+    let macData = silentData(0xC6, count: 3_000)
+    let deviceData = silentData(0xC7, count: 3_000)
+    let macHash = try sha256Hex(of: macData)
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists([]),
+        macFiles: [("Album/mac.flac", macData)],
+        deviceFiles: [("Album/device.flac", deviceData)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-mac",
+                    relativePath: "Album/mac.flac",
+                    contentHash: macHash
+                ),
+            ],
+        ]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "空选择集直接 done")
+    check(report.isEmptySelection, "账目标记空选择集")
+    check(!report.didRequestPeerManifest, "不请求对端 manifest")
+    checkEqual(r3aManifestRequests, 0, "设备一个 manifest 请求都没收到")
+    checkEqual(report.plannedPush, [String](), "不推")
+    checkEqual(report.plannedPull, [String](), "不拉")
+    checkEqual(report.transferCount, 0, "零传输")
+    checkEqual(scenario.macSink.indexed, [String](), "本端无落位")
+    checkEqual(scenario.deviceSink.indexed, [String](), "设备无落位")
+    check(
+        FileManager.default.fileExists(
+            atPath: scenario.deviceRoot.appendingPathComponent("Album/device.flac").path
+        ),
+        "设备文件保留"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉖ 抛错：\(error)")
+}
+
+// MARK: - ㉗ 选中歌单 + 歌词随歌补齐
+
+section("㉗ R3a：选中歌单 → 歌词随歌补齐（wire 命名空间 + 对端 stableId 落位）")
+do {
+    let song = silentData(0xC8, count: 90_000)
+    let songHash = try sha256Hex(of: song)
+    let wirePath = SyncLyricsNamespace.wirePath(songContentHash: songHash)!
+
+    var macFixture = LyricsFixture()
+    macFixture.songHashByStableId = ["mac-sid": songHash]
+    var deviceFixture = LyricsFixture()
+    deviceFixture.songHashByStableId = ["device-sid": songHash]
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [("Album/with-lyrics.flac", song)],
+        deviceFiles: [],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "mac-sid",
+                    relativePath: "Album/with-lyrics.flac",
+                    contentHash: songHash
+                ),
+            ],
+        ],
+        lyricsWirePaths: [wirePath],
+        macLyrics: [(stableId: "mac-sid", lyrics: sampleLyrics("R3a 随歌歌词"))],
+        macLyricsMapping: mapping(of: macFixture),
+        deviceLyricsMapping: mapping(of: deviceFixture)
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(
+        report.plannedPush,
+        [wirePath, "Album/with-lyrics.flac"].sorted(),
+        "推送计划含歌词 wire 路径 + 歌曲"
+    )
+    checkEqual(report.pushed.sorted(), report.plannedPush, "全部送达")
+    check(report.isComplete, "编排完全成功")
+    checkEqual(
+        scenario.deviceSink.indexed.map { ($0 as NSString).lastPathComponent },
+        ["with-lyrics.flac"],
+        "只有歌曲走进库入口（歌词不走曲库入库）"
+    )
+    check(
+        FileManager.default.fileExists(
+            atPath: scenario.deviceRoot.appendingPathComponent("Album/with-lyrics.flac").path
+        ),
+        "歌曲落位设备"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉗ 抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")
