@@ -196,11 +196,12 @@ final class SyncPeerSession: @unchecked Sendable {
     // MARK: ready 后发送
 
     /// 发送业务帧（file_meta/file_chunk/file_ack + change_log_pull/change_log_push
-    /// + manifest_request/manifest_response；加密）。未 ready / 类型非法抛错。
+    /// + manifest_request/manifest_response + sync_fetch_request/sync_fetch_result；加密）。
+    /// 未 ready / 类型非法抛错。
     func sendApplicationFrame(type: SyncFrameType, payload: Data) throws {
         guard [
             .fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush,
-            .manifestRequest, .manifestResponse,
+            .manifestRequest, .manifestResponse, .syncFetchRequest, .syncFetchResult,
         ].contains(type) else {
             throw SyncFrameError.invalidType(type.rawValue)
         }

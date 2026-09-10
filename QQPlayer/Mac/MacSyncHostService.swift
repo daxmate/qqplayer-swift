@@ -40,6 +40,15 @@ final class MacSyncHostService: ObservableObject {
     private let trustStore = DeviceStore()
     private var listener: SyncListener?
     private var pendingSession: SyncPeerSession?
+    /// 已就绪会话的曲库接线（M3-3b：manifest 应答 + 按路径拉取推送）。
+    /// 每个 ready 会话一份；会话关闭/服务停止时拆除。
+    private var libraryHost: MacSyncLibraryHost?
+    /// 曲库根（注入便于测试/多根演进；默认 ~/Music/QQPlayer，与 macOS 扫描默认一致）。
+    var libraryRootProvider: () -> URL = {
+        MusicFolderResolver.macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+    }
+    /// 拉取结论（诊断/UI 用；M6 接进度展示）。
+    var onFetchResult: ((SyncFetchResult) -> Void)?
 
     // MARK: 生命周期（页面 .onAppear / .onDisappear）
 
@@ -70,6 +79,20 @@ final class MacSyncHostService: ObservableObject {
                 }
             }
         }
+        // 会话进入 ready（配对完成）→ 接曲库；任何状态下线 → 拆除接线
+        listener.onSessionStateChange = { [weak self] session, phase in
+            Task { @MainActor in
+                self?.handleSessionPhase(session, phase: phase)
+            }
+        }
+        listener.onSessionClosed = { [weak self] session, _ in
+            Task { @MainActor in
+                guard let self, let host = self.libraryHost else { return }
+                _ = session
+                host.detach()
+                self.libraryHost = nil
+            }
+        }
         do {
             try listener.start(port: 0)
             self.listener = listener
@@ -82,11 +105,35 @@ final class MacSyncHostService: ObservableObject {
 
     /// 停止监听并关闭全部活动会话（页面消失/切走）。
     func stop() {
+        libraryHost?.detach()
+        libraryHost = nil
         listener?.stop()
         listener = nil
         pendingSession = nil
         pendingCard = nil
         isRunning = false
+    }
+
+    // MARK: 会话 ↔ 曲库接线（M3-3b）
+
+    /// 会话阶段变化：ready（已配对）→ 建接线；closed → 拆接线。
+    private func handleSessionPhase(_ session: SyncPeerSession, phase: SyncSessionPhase) {
+        switch phase {
+        case .ready:
+            guard libraryHost == nil else { return } // v1 单会话接线
+            let host = MacSyncLibraryHost(libraryRoot: libraryRootProvider())
+            host.onFetchResult = { [weak self] result in
+                Task { @MainActor in self?.onFetchResult?(result) }
+            }
+            // 曲库根不存在 → 不接线（宁可不服务，也不回空 manifest 害对端误删）
+            guard host.attach(to: session) else { return }
+            libraryHost = host
+        case .closed:
+            libraryHost?.detach()
+            libraryHost = nil
+        default:
+            break
+        }
     }
 
     /// 把当前展示 QR 的 sessionNonce（base64 → Data）注册进运行中 listener。

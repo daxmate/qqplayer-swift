@@ -21,6 +21,10 @@
 //  类型表（v3，M3-3a 增量追加）：10=manifest_request 11=manifest_response（文件
 //  同步 manifest 拉取/应答；payload 为 JSON，会话层解密后经 onApplicationFrame
 //  转发，由 SyncManifestPeer 解码，见 SyncManifestPeer.swift）。
+//  类型表（v4，M3-3b 增量追加）：12=sync_fetch_request 13=sync_fetch_result（文件
+//  同步「按路径拉取」请求/结果；payload 为 JSON，会话层解密后同样经
+//  onApplicationFrame 转发，Host 侧由 SyncLibraryFetchResponder 应答、Client 侧由
+//  SyncLibrarySyncController 消费，见 SyncLibrarySyncModels.swift）。
 
 import Foundation
 
@@ -54,6 +58,8 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     case changeLogPush = 9
     case manifestRequest = 10
     case manifestResponse = 11
+    case syncFetchRequest = 12
+    case syncFetchResult = 13
 }
 
 /// 帧 flags（bit0 = encrypted）。
