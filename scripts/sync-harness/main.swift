@@ -217,7 +217,10 @@ do {
     )
 
     let plan = SyncLibraryFetchResponder.makePlan(
-        relativePaths: ["/etc/passwd", "../outside.flac", "", "missing.flac", "escape.flac", "alias.flac", "inside.flac", "alias.flac"],
+        relativePaths: [
+            "/etc/passwd", "../outside.flac", "", "", "missing.flac", "escape.flac",
+            "alias.flac", "./inside.flac", "inside.flac", "alias.flac",
+        ],
         root: planRoot
     )
     let reasons = Dictionary(uniqueKeysWithValues: plan.failures.map { ($0.relativePath, $0.reason) })
@@ -226,8 +229,9 @@ do {
     checkEqual(reasons[""], SyncFetchFailureReason.invalidPath, "空路径 → invalidPath")
     checkEqual(reasons["missing.flac"], SyncFetchFailureReason.notFound, "不存在 → notFound")
     checkEqual(reasons["escape.flac"], SyncFetchFailureReason.outOfRoot, "软链逃逸 → outOfRoot")
+    checkEqual(plan.failures.count, 5, "重复的非法请求只报一次失败")
     checkEqual(plan.files.map(\.relativePath), ["alias.flac", "inside.flac"], "根内文件（含根内软链）放行")
-    checkEqual(plan.files.count, 2, "重复请求只处理一次")
+    checkEqual(plan.files.count, 2, "重复请求只处理一次（含 ./ 前缀等价路径）")
 } catch {
     check(false, "应答器计划抛错：\(error)")
 }
