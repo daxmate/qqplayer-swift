@@ -18,7 +18,9 @@
 //  类型表（v2，M4-1 增量追加）：8=change_log_pull 9=change_log_push（播放数据
 //  同步增量拉取/推送；payload 为 JSON，会话层解密后同样经 onApplicationFrame
 //  转发，由 SyncChangeLogPeer 解码并接 LWW 对账，见 SyncChangeLogPeer.swift）。
-//
+//  类型表（v3，M3-3a 增量追加）：10=manifest_request 11=manifest_response（文件
+//  同步 manifest 拉取/应答；payload 为 JSON，会话层解密后经 onApplicationFrame
+//  转发，由 SyncManifestPeer 解码，见 SyncManifestPeer.swift）。
 
 import Foundation
 
@@ -50,6 +52,8 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     case bye = 7
     case changeLogPull = 8
     case changeLogPush = 9
+    case manifestRequest = 10
+    case manifestResponse = 11
 }
 
 /// 帧 flags（bit0 = encrypted）。
