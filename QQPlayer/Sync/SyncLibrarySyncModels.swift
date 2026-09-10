@@ -114,6 +114,37 @@ enum SyncFetchCodec {
 
 // MARK: - 路径解析（纯逻辑，无 IO）
 
+// MARK: - 根表（M4-2b：曲库根 + 歌词根）
+
+/// 应答端可服务的根集合（纯值）：
+/// - `libraryRoot`：曲库根（对账键基准，原有语义不变）
+/// - `lyricsRoot`：aligned 歌词根（nil = 本端不服务歌词命名空间）
+///
+/// wire 路径仍是**单一命名空间**：`@lyrics/...` 归歌词根，其余归曲库根
+/// （理由见 SyncAlignedLyrics.swift 头部）。安全属性 = 每个根各自做
+/// 包含性 + 软链校验，与单根时同样严——命名空间本身不放松任何检查。
+struct SyncFetchRoots: Equatable, Sendable {
+    var libraryRoot: URL
+    var lyricsRoot: URL?
+
+    init(libraryRoot: URL, lyricsRoot: URL? = nil) {
+        self.libraryRoot = libraryRoot
+        self.lyricsRoot = lyricsRoot
+    }
+
+    /// 只有曲库根（歌词同步关闭；`@lyrics/` 请求一律 notFound）。
+    static func libraryOnly(_ root: URL) -> SyncFetchRoots {
+        SyncFetchRoots(libraryRoot: root, lyricsRoot: nil)
+    }
+
+    /// 该相对路径归属的根：歌词命名空间 → lyricsRoot（未配置 = nil）；其余 → libraryRoot。
+    /// 判定只看**规范化后**的路径前缀，`./@lyrics/x.json` 也算歌词路径。
+    func root(forRelativePath relativePath: String) -> URL? {
+        guard SyncLyricsNamespace.isLyricsPath(relativePath) else { return libraryRoot }
+        return lyricsRoot
+    }
+}
+
 /// 曲库根内路径解析：请求来的相对路径 → 绝对 URL，或明确拒绝原因。
 /// **纯路径数学**（规范化 + 包含性判定），不读磁盘——存在性由调用方补。
 enum SyncLibraryPathResolver {
@@ -121,6 +152,18 @@ enum SyncLibraryPathResolver {
     enum Resolution: Equatable {
         case resolved(URL)
         case rejected(String) // SyncFetchFailureReason 取值
+    }
+
+    /// 解析一条请求路径（多根版）：先按命名空间选根，再做根内解析。
+    /// - 歌词命名空间但本端未配置歌词根 → notFound（本端确实没有这个文件）
+    static func resolve(relativePath: String, roots: SyncFetchRoots) -> Resolution {
+        guard let root = roots.root(forRelativePath: relativePath) else {
+            // 歌词命名空间未接线：路径语法可能合法，但本端没有这个词根
+            return SyncLyricsNamespace.isLyricsPath(relativePath)
+                ? .rejected(SyncFetchFailureReason.notFound)
+                : .rejected(SyncFetchFailureReason.invalidPath)
+        }
+        return resolve(relativePath: relativePath, root: root)
     }
 
     /// 解析一条请求路径。

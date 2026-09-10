@@ -75,4 +75,45 @@ enum SyncLocalLibraryScanner {
             members: members
         )
     }
+
+    // MARK: - 曲库 + aligned 歌词（M4-2b）
+
+    /// 曲库根 + aligned 歌词库 → 全量 manifest 条目（不含集合过滤）。
+    /// 歌词条目经 `SyncAlignedLyricsManifest`（wire 路径 = `@lyrics/{歌曲 content_hash}.json`），
+    /// lyricsStore 为 nil / 映射未解析时自动为空——**不影响曲库条目的既有口径**。
+    static func entries(
+        in root: URL,
+        lyricsStore: AlignedLyricsStore?,
+        lyricsMapping: SyncLyricsContentMapping,
+        database: DatabaseManager = .shared,
+        fileManager: FileManager = .default
+    ) -> [ManifestEntry] {
+        let library = entries(in: root, database: database, fileManager: fileManager)
+        guard let lyricsStore else { return library }
+        return library + SyncAlignedLyricsManifest.entries(store: lyricsStore, mapping: lyricsMapping)
+    }
+
+    /// 曲库根 + aligned 歌词库 → 集合过滤后的 manifest 条目
+    /// （Host 应答 manifest / Client 本地对账清单统一走这里，保证两端同口径）。
+    static func entries(
+        in root: URL,
+        lyricsStore: AlignedLyricsStore?,
+        lyricsMapping: SyncLyricsContentMapping,
+        collection: SyncCollection,
+        members: SyncCollectionMembers = SyncCollectionMembers(),
+        database: DatabaseManager = .shared,
+        fileManager: FileManager = .default
+    ) -> [ManifestEntry] {
+        guard let lyricsStore else {
+            return entries(in: root, collection: collection, members: members, database: database, fileManager: fileManager)
+        }
+        let all = entries(
+            in: root,
+            lyricsStore: lyricsStore,
+            lyricsMapping: lyricsMapping,
+            database: database,
+            fileManager: fileManager
+        )
+        return collection.filter(all, members: members)
+    }
 }

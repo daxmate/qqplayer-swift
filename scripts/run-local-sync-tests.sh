@@ -3,8 +3,9 @@
 #
 # 为什么存在：iOS 单测走 xcodebuild + 模拟器（CI 兜底），而"不许启模拟器"的纪律下
 # 本地无法真跑 QQPlayerTests。本脚本用 swiftc 直编**生产源码**（QQPlayer/Sync/* 纯
-# 逻辑 + MusicDirectoryScanner）+ scripts/sync-harness 的夹具，真跑与测试套件同构的
-# 断言（帧编解码/路径解析/应答器计划/控制器状态机与对账/四条端到端场景）。
+# 逻辑 + MusicDirectoryScanner + aligned 歌词库）+ scripts/sync-harness 的夹具，真跑与
+# 测试套件同构的断言（帧编解码/路径解析/应答器计划/控制器状态机与对账/四种端到端场景/
+# M4-2b 歌词库与随歌同步）。
 #
 # 覆盖不到的（由 CI 的 xcodebuild test 兜底）：Swift Testing 套件本体、iOS/Mac
 # target 的特有代码路径（LibraryIndexer 真实现、MacSyncLibraryHost 装配）。
@@ -41,6 +42,9 @@ SOURCES=(
   QQPlayer/Sync/SyncLibraryFetchResponder.swift
   QQPlayer/Sync/SyncLocalLibraryScanner.swift
   QQPlayer/Sync/SyncLibrarySyncController.swift
+  QQPlayer/Sync/SyncAlignedLyrics.swift
+  QQPlayer/Services/LyricsModels.swift
+  QQPlayer/Services/AlignedLyricsStore.swift
   QQPlayer/Services/MusicDirectoryScanner.swift
   scripts/sync-harness/Stubs.swift
   scripts/sync-harness/HarnessSupport.swift

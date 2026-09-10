@@ -3,7 +3,8 @@
 //
 //  用 swiftc 直编生产源码 + 本目录夹具，真跑与 QQPlayerTests 同构的断言：
 //  帧 12/13 编解码、请求路径规范化/解析、应答器解析计划、控制器状态机/对账映射、
-//  以及四条端到端场景（拉取一致性 / 远端已删删除 / 私有区保护 / 越界拒绝）。
+//  四条既有端到端场景（拉取一致性 / 远端已删删除 / 私有区保护 / 越界拒绝），
+//  以及 M4-2b（aligned 歌词库 / 随歌同步 / 越界拒读 / 只补不删）。
 //
 //  运行：scripts/run-local-sync-tests.sh
 //
@@ -90,12 +91,42 @@ struct Harness {
     let hostResponder: SyncLibraryFetchResponder
     let sink: SinkSpy
     let controller: SyncLibrarySyncController
+    /// 两端 aligned 歌词库（M4-2b）
+    let hostLyricsStore: AlignedLyricsStore
+    let clientLyricsStore: AlignedLyricsStore
+}
+
+/// aligned 歌词夹具：歌曲 stableId ↔ 歌曲 content_hash + 要预置的歌词文件。
+struct LyricsFixture {
+    var songHashByStableId: [String: String] = [:]
+    var files: [(stableId: String, lyrics: Lyrics)] = []
+}
+
+/// 内存映射（harness 里模拟两端 DB 的 stable_id ↔ content_hash）。
+func mapping(of fixture: LyricsFixture?) -> SyncLyricsContentMapping {
+    guard let fixture else { return .unresolved }
+    let table = fixture.songHashByStableId
+    return SyncLyricsContentMapping(
+        contentHashForStableId: { table[$0] },
+        stableIdForContentHash: { hash in table.first { $0.value == hash }?.key }
+    )
+}
+
+func sampleLyrics(_ text: String) -> Lyrics {
+    Lyrics(
+        plainLyrics: text,
+        syncedLyrics: [LyricsLine(timestamp: 1.0, text: text)],
+        isInstrumental: false,
+        source: .lrclib
+    )
 }
 
 func makeHarness(
     sourceFiles: [(String, Data)] = [],
     targetFiles: [(String, Data)] = [],
-    protectedPaths: Set<String> = []
+    protectedPaths: Set<String> = [],
+    hostLyrics: LyricsFixture? = nil,
+    clientLyrics: LyricsFixture? = nil
 ) throws -> Harness {
     let fixture = SessionFixture.pairedHandshake()
     let sourceRoot = try tempRoot("src")
@@ -103,13 +134,39 @@ func makeHarness(
     for (path, data) in sourceFiles { try writeFile(path, in: sourceRoot, data: data) }
     for (path, data) in targetFiles { try writeFile(path, in: targetRoot, data: data) }
 
+    let hostLyricsStore = AlignedLyricsStore(directory: try tempRoot("host-lyrics"))
+    let clientLyricsStore = AlignedLyricsStore(directory: try tempRoot("client-lyrics"))
+    for (stableId, lyrics) in (hostLyrics?.files ?? []) {
+        try hostLyricsStore.write(lyrics, forStableId: stableId)
+    }
+    for (stableId, lyrics) in (clientLyrics?.files ?? []) {
+        try clientLyricsStore.write(lyrics, forStableId: stableId)
+    }
+    let hostMapping = mapping(of: hostLyrics)
+    let clientMapping = mapping(of: clientLyrics)
+
     let hostManager = DatabaseManager()
     let hostManifestPeer = SyncManifestPeer(session: fixture.hostSession)
     hostManifestPeer.localRootName = { "测试 Mac 曲库" }
     hostManifestPeer.localManifestProvider = { collection in
-        SyncLocalLibraryScanner.entries(in: sourceRoot, collection: collection, database: hostManager)
+        SyncLocalLibraryScanner.entries(
+            in: sourceRoot,
+            lyricsStore: hostLyricsStore,
+            lyricsMapping: hostMapping,
+            collection: collection,
+            database: hostManager
+        )
     }
-    let hostResponder = SyncLibraryFetchResponder(session: fixture.hostSession, libraryRoot: sourceRoot)
+    let hostResponder = SyncLibraryFetchResponder(
+        session: fixture.hostSession,
+        roots: SyncFetchRoots(libraryRoot: sourceRoot, lyricsRoot: hostLyricsStore.directory),
+        lyricsFileNameProvider: { wirePath in
+            guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
+                  let stableId = hostMapping.stableIdForContentHash(songHash)
+            else { return nil }
+            return "\(stableId).json"
+        }
+    )
 
     let sink = SinkSpy()
     var configuration = SyncLibrarySyncConfiguration()
@@ -119,7 +176,9 @@ func makeHarness(
         libraryRoot: targetRoot,
         sink: sink,
         configuration: configuration,
-        database: DatabaseManager()
+        database: DatabaseManager(),
+        lyricsStore: clientLyricsStore,
+        lyricsMapping: clientMapping
     )
     try controller.start()
 
@@ -130,7 +189,9 @@ func makeHarness(
         hostManifestPeer: hostManifestPeer,
         hostResponder: hostResponder,
         sink: sink,
-        controller: controller
+        controller: controller,
+        hostLyricsStore: hostLyricsStore,
+        clientLyricsStore: clientLyricsStore
     )
 }
 
@@ -410,6 +471,327 @@ do {
     _ = hostResponder
 } catch {
     check(false, "端到端④ 抛错：\(error)")
+}
+
+// MARK: - ⑧ aligned 歌词库单一入口（Part A）
+
+section("⑧ aligned 歌词库：读/写/删/枚举 + 类型标记")
+do {
+    let store = AlignedLyricsStore(directory: try tempRoot("aligned-store"))
+    let lyrics = sampleLyrics("第一行\n第二行")
+    try store.write(lyrics, forStableId: "sid-1")
+    try store.write(sampleLyrics("B"), forStableId: "sid-2")
+
+    let readBack = try store.read(forStableId: "sid-1")
+    checkEqual(readBack?.plainLyrics, lyrics.plainLyrics, "写入后可读回（形态与 manual 同构）")
+    checkEqual(readBack?.source, .lrclib, "source 字段随文件保留")
+    checkEqual(store.stableIds(), ["sid-1", "sid-2"], "枚举按 stableId 升序")
+    checkEqual(store.entries().count, 2, "entries 含两条")
+    check(store.contains(forStableId: "sid-1"), "contains 命中")
+    check(try store.read(forStableId: "nope") == nil, "未写入的 stableId 读出 nil")
+
+    try store.delete(forStableId: "sid-1")
+    check(!store.contains(forStableId: "sid-1"), "删除后文件消失")
+    try store.delete(forStableId: "sid-1")
+    check(true, "重复删除幂等")
+    checkEqual(store.stableIds(), ["sid-2"], "删除后枚举只剩一条")
+
+    var caught = false
+    do { try store.write(lyrics, forStableId: "../escape") } catch { caught = true }
+    check(caught, "非法 stableId（含 /）拒绝写入（防路径穿越）")
+    checkEqual(AlignedLyricsStore.isValidStableId(".."), false, "stableId = .. 非法")
+
+    // 接收侧安装：先校验可解码，再字节原样落位
+    let incoming = try tempRoot("lyrics-incoming")
+    let good = incoming.appendingPathComponent("good.json")
+    try JSONEncoder().encode(sampleLyrics("收到的歌词")).write(to: good)
+    try store.install(receivedFileAt: good, forStableId: "sid-9")
+    checkEqual(try store.read(forStableId: "sid-9")?.plainLyrics, "收到的歌词", "install 安装收到的歌词文件")
+    check(!FileManager.default.fileExists(atPath: good.path), "install 是移动（不留临时文件）")
+
+    let bad = incoming.appendingPathComponent("bad.json")
+    try Data("not json".utf8).write(to: bad)
+    var installCaught = false
+    do { try store.install(receivedFileAt: bad, forStableId: "sid-10") } catch { installCaught = true }
+    check(installCaught, "install 拒绝坏字节（不写坏库）")
+    check(!store.contains(forStableId: "sid-10"), "坏字节未落库")
+
+    // 类型标记：只有 aligned 参与同步
+    check(LyricsStoreKind.aligned.synchronizesWithLibrary, "aligned 参与同步")
+    check(!LyricsStoreKind.manual.synchronizesWithLibrary, "manual 不参与同步")
+    check(!LyricsStoreKind.network.synchronizesWithLibrary, "network 不参与同步")
+    checkEqual(LyricsStoreKind.synchronizedKinds, [.aligned], "参与同步的种类只有 aligned")
+    let dirNames = Set(LyricsStoreKind.allCases.map(\.directoryName))
+    checkEqual(dirNames.count, 3, "三类歌词库目录命名空间互不重叠")
+} catch {
+    check(false, "⑧ 抛错：\(error)")
+}
+
+// MARK: - ⑨ 歌词命名空间 + manifest 纳入
+
+section("⑨ 歌词命名空间 + manifest 含歌词条目")
+do {
+    checkEqual(
+        SyncLyricsNamespace.wirePath(songContentHash: "abc123"),
+        "@lyrics/abc123.json",
+        "歌曲 content_hash → wire 路径"
+    )
+    checkEqual(
+        SyncLyricsNamespace.songContentHash(fromWirePath: "@lyrics/abc123.json"),
+        "abc123",
+        "wire 路径 → 歌曲 content_hash"
+    )
+    check(SyncLyricsNamespace.isLyricsPath("./@lyrics/abc123.json"), "./ 前缀仍识别为歌词路径")
+    check(!SyncLyricsNamespace.isLyricsPath("Album/01.flac"), "曲库路径不是歌词路径")
+    for bad in ["@lyrics/../x.json", "@lyrics/a/b.json", "@lyrics/.json", "@lyrics/abc123.flac"] {
+        check(
+            SyncLyricsNamespace.songContentHash(fromWirePath: bad) == nil,
+            "非法歌词路径取不到 hash：\(bad)"
+        )
+    }
+
+    let store = AlignedLyricsStore(directory: try tempRoot("manifest-lyrics"))
+    try store.write(sampleLyrics("有指纹"), forStableId: "s1")
+    try store.write(sampleLyrics("无指纹"), forStableId: "s2")
+    let mapping = SyncLyricsContentMapping(
+        contentHashForStableId: { ["s1": "hash-1"][$0] },
+        stableIdForContentHash: { $0 == "hash-1" ? "s1" : nil }
+    )
+    let entries = SyncAlignedLyricsManifest.entries(store: store, mapping: mapping)
+    checkEqual(entries.count, 1, "指纹缺失的歌词条目不进 manifest")
+    checkEqual(entries.first?.relativePath, "@lyrics/hash-1.json", "manifest 路径 = @lyrics/{歌曲 content_hash}.json")
+    checkEqual(entries.first?.stableId, "s1", "manifest 携带本端 stableId（单端引用）")
+    check(entries.first?.contentHash?.isEmpty == false, "manifest contentHash = 歌词文件自身 SHA-256")
+
+    let filtered = SyncAlignedLyricsManifest.entries(
+        store: store,
+        mapping: mapping,
+        collection: .tracks(["s1"])
+    )
+    checkEqual(filtered.map(\.relativePath), ["@lyrics/hash-1.json"], "歌词条目受同一集合过滤")
+    let filteredOut = SyncAlignedLyricsManifest.entries(
+        store: store,
+        mapping: mapping,
+        collection: .tracks(["other"])
+    )
+    check(filteredOut.isEmpty, "未入选集合的歌词条目不出现")
+
+    let noMapping = SyncAlignedLyricsManifest.entries(store: store, mapping: .unresolved)
+    check(noMapping.isEmpty, "映射未解析时歌词不同步（开关默认关）")
+} catch {
+    check(false, "⑨ 抛错：\(error)")
+}
+
+// MARK: - ⑩ 歌词路径越界 / 软链逃逸仍被拒
+
+section("⑩ 歌词根：越界与软链逃逸仍被拒")
+do {
+    let lyricsRoot = try tempRoot("lyr-root")
+    let outsideRoot = try tempRoot("lyr-outside")
+    let outsideFile = try writeFile("secret.json", in: outsideRoot, data: Data("{}".utf8))
+    try Data("{}".utf8).write(to: lyricsRoot.appendingPathComponent("s1.json"))
+    try FileManager.default.createSymbolicLink(
+        at: lyricsRoot.appendingPathComponent("escape.json"),
+        withDestinationURL: outsideFile
+    )
+    let roots = SyncFetchRoots(libraryRoot: try tempRoot("lyr-lib"), lyricsRoot: lyricsRoot)
+
+    func provider(_ wirePath: String) -> String? {
+        guard let hash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath) else { return nil }
+        switch hash {
+        case "s1": return "s1.json"
+        case "escape": return "escape.json"
+        case "outside": return "../" + outsideRoot.lastPathComponent + "/secret.json"
+        case "absolute": return outsideFile.path
+        default: return nil
+        }
+    }
+
+    let plan = SyncLibraryFetchResponder.makePlan(
+        relativePaths: [
+            "@lyrics/s1.json", "@lyrics/escape.json", "@lyrics/outside.json",
+            "@lyrics/absolute.json", "@lyrics/missing.json", "@lyrics/../etc/passwd", "@lyrics/a/b.json",
+            "@lyrics/s1.json",
+        ],
+        roots: roots,
+        lyricsFileNameProvider: provider
+    )
+    let reasons = Dictionary(plan.failures.map { ($0.relativePath, $0.reason) }, uniquingKeysWith: { a, _ in a })
+    checkEqual(plan.files.map(\.relativePath), ["@lyrics/s1.json"], "歌词根内文件放行（含重复请求去重）")
+    checkEqual(reasons["@lyrics/escape.json"], SyncFetchFailureReason.outOfRoot, "歌词根内软链指向根外 → outOfRoot")
+    checkEqual(
+        reasons["@lyrics/outside.json"],
+        SyncFetchFailureReason.notFound,
+        "映射给出带 .. 的名字 → 拒（绝不拿它拼根外路径）"
+    )
+    checkEqual(reasons["@lyrics/absolute.json"], SyncFetchFailureReason.notFound, "映射给出绝对路径 → 拒")
+    checkEqual(reasons["@lyrics/missing.json"], SyncFetchFailureReason.notFound, "映射不到 → notFound")
+    checkEqual(reasons["@lyrics/../etc/passwd"], SyncFetchFailureReason.invalidPath, "带 .. 的歌词路径 → invalidPath")
+    checkEqual(reasons["@lyrics/a/b.json"], SyncFetchFailureReason.invalidPath, "嵌套歌词路径 → invalidPath")
+    checkEqual(plan.files.map(\.url), [lyricsRoot.appendingPathComponent("s1.json")], "解析到歌词根内绝对 URL")
+
+    // 未配置歌词根：歌词请求一律 notFound（不落回曲库根尝试）
+    let noLyrics = SyncLibraryFetchResponder.makePlan(
+        relativePaths: ["@lyrics/s1.json"],
+        roots: .libraryOnly(roots.libraryRoot),
+        lyricsFileNameProvider: provider
+    )
+    checkEqual(
+        noLyrics.failures.map(\.reason),
+        [SyncFetchFailureReason.notFound],
+        "未接线歌词根 → notFound（不读曲库根）"
+    )
+    check(!FileManager.default.fileExists(atPath: roots.libraryRoot.appendingPathComponent("@lyrics/s1.json").path), "曲库根内不会出现歌词副本")
+} catch {
+    check(false, "⑩ 抛错：\(error)")
+}
+
+// MARK: - ⑪ 端到端：歌词随歌同步（映射落盘 / 无歌丢弃）
+
+section("⑪ 端到端：aligned 歌词随歌同步 → 落本端歌词库")
+do {
+    let song = silentData(0x61, count: 4_096)
+    let songHash = try SyncFileChecksum.sha256Hex(ofFile: {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("hash-helper-\(UUID().uuidString)")
+        try? song.write(to: url)
+        return url
+    }())
+    var hostLyrics = LyricsFixture()
+    hostLyrics.songHashByStableId = ["host-sid": songHash]
+    hostLyrics.files = [("host-sid", sampleLyrics("随歌同步的歌词"))]
+
+    var clientLyrics = LyricsFixture()
+    clientLyrics.songHashByStableId = ["client-sid": songHash]
+
+    let harness = try makeHarness(
+        sourceFiles: [("Album/01 Song.flac", song)],
+        hostLyrics: hostLyrics,
+        clientLyrics: clientLyrics
+    )
+    let installed = try harness.clientLyricsStore.read(forStableId: "client-sid")
+    checkEqual(installed?.plainLyrics, "随歌同步的歌词", "歌词按 content_hash 映射落到本端 stableId（不是对端 stableId）")
+    check(!harness.clientLyricsStore.contains(forStableId: "host-sid"), "不按对端 stableId 落库")
+    checkEqual(harness.sink.indexed.count, 1, "曲库文件仍经入库入口（歌词不走曲库入库）")
+    if case let .done(summary) = harness.controller.state {
+        check(summary.completed.contains("@lyrics/\(songHash).json"), "summary.completed 含歌词条目")
+        check(summary.orphanLyricsSkipped.isEmpty, "无孤儿歌词")
+    } else {
+        check(false, "状态应为 done，实际 \(harness.controller.state)")
+    }
+    check(FileManager.default.fileExists(atPath: harness.targetRoot.appendingPathComponent("Album/01 Song.flac").path), "歌曲同时落盘")
+    let incoming = harness.targetRoot.appendingPathComponent(".sync-incoming")
+    let leftovers = (try? FileManager.default.contentsOfDirectory(atPath: incoming.path)) ?? []
+    checkEqual(leftovers, [], "落地目录无残渣")
+} catch {
+    check(false, "⑪ 抛错：\(error)")
+}
+
+// MARK: - ⑫ 端到端：本端无对应歌曲 → 丢弃不写孤儿
+
+section("⑫ 端到端：本端没有对应歌曲 → 歌词不落库（不写孤儿）")
+do {
+    let song = silentData(0x62, count: 4_096)
+    let tempHashFile = FileManager.default.temporaryDirectory.appendingPathComponent("hash-helper-\(UUID().uuidString)")
+    try song.write(to: tempHashFile)
+    let songHash = try SyncFileChecksum.sha256Hex(ofFile: tempHashFile)
+
+    var hostLyrics = LyricsFixture()
+    hostLyrics.songHashByStableId = ["host-sid": songHash]
+    hostLyrics.files = [("host-sid", sampleLyrics("孤立歌词"))]
+
+    // 客户端映射里没有这首歌（模拟新设备首轮：歌还没入库）
+    var clientLyrics = LyricsFixture()
+    clientLyrics.songHashByStableId = [:]
+
+    let harness = try makeHarness(
+        sourceFiles: [],
+        hostLyrics: hostLyrics,
+        clientLyrics: clientLyrics
+    )
+    checkEqual(harness.clientLyricsStore.stableIds(), [], "未落任何歌词（不写孤儿）")
+    if case let .done(summary) = harness.controller.state {
+        checkEqual(summary.orphanLyricsSkipped, ["@lyrics/\(songHash).json"], "记账为 orphanLyricsSkipped")
+    } else {
+        check(false, "状态应为 done，实际 \(harness.controller.state)")
+    }
+    let incoming = harness.targetRoot.appendingPathComponent(".sync-incoming")
+    let leftovers = (try? FileManager.default.contentsOfDirectory(atPath: incoming.path)) ?? []
+    checkEqual(leftovers, [], "丢弃后落地目录无残渣")
+} catch {
+    check(false, "⑫ 抛错：\(error)")
+}
+
+// MARK: - ⑬ 端到端：对端已删 → 本端歌词保留（不传播删除）
+
+section("⑬ 端到端：对端已删 → 本端 aligned 歌词保留（删除不传播）")
+do {
+    let song = silentData(0x63, count: 4_096)
+    let tempHashFile = FileManager.default.temporaryDirectory.appendingPathComponent("hash-helper-\(UUID().uuidString)")
+    try song.write(to: tempHashFile)
+    let songHash = try SyncFileChecksum.sha256Hex(ofFile: tempHashFile)
+
+    var clientLyrics = LyricsFixture()
+    clientLyrics.songHashByStableId = ["client-sid": songHash]
+    clientLyrics.files = [("client-sid", sampleLyrics("要保留的歌词"))]
+
+    // 对端已经把这首歌（连同它的歌词）删掉了
+    let harness = try makeHarness(
+        sourceFiles: [],
+        targetFiles: [("Album/gone.flac", song)],
+        clientLyrics: clientLyrics
+    )
+    checkEqual(harness.clientLyricsStore.stableIds(), ["client-sid"], "远端没有的歌词不被删")
+    checkEqual(
+        try harness.clientLyricsStore.read(forStableId: "client-sid")?.plainLyrics,
+        "要保留的歌词",
+        "歌词内容原样保留（删除只由本端用户发起）"
+    )
+    if case let .done(summary) = harness.controller.state {
+        check(!summary.deleted.contains("@lyrics/\(songHash).json"), "歌词条目不进 deleted 清单")
+        check(!summary.orphanLyricsSkipped.contains("@lyrics/\(songHash).json"), "本端已有的歌词不会被当孤儿丢弃")
+    } else {
+        check(false, "状态应为 done，实际 \(harness.controller.state)")
+    }
+
+    // 规划层：远端缺失的歌词条目永不转化为删除（含全库镜像 .all 配置）
+    let plan = SyncLibrarySyncPlanner.plan(
+        remote: SyncManifestResponse(entries: []),
+        local: [entry("@lyrics/\(songHash).json", hash: "h", stableId: "client-sid")],
+        configuration: SyncLibrarySyncConfiguration()
+    )
+    checkEqual(plan.deletes.map(\.relativePath), [], "规划层：歌词条目永不进 deletes（不传播删除）")
+} catch {
+    check(false, "⑬ 抛错：\(error)")
+}
+
+section("⑭ 隔离：删歌不动歌词库；manual / network 不被触")
+do {
+    let documents = try tempRoot("documents")
+    let alignedDir = documents.appendingPathComponent("lyrics-aligned")
+    let manualDir = documents.appendingPathComponent("lyrics-manual")
+    let networkDir = documents.appendingPathComponent("lyrics-cache/tracks")
+    for dir in [alignedDir, manualDir, networkDir] {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+    let manualFile = manualDir.appendingPathComponent("sid.json")
+    let networkFile = networkDir.appendingPathComponent("sid.json")
+    try Data("manual".utf8).write(to: manualFile)
+    try Data("network".utf8).write(to: networkFile)
+
+    let store = AlignedLyricsStore(directory: alignedDir)
+    try store.write(sampleLyrics("本端已有"), forStableId: "sid")
+
+    // 生产 sink 已不耦合歌词库（构造无需注入 store）：删歌不连带清歌词
+    let trackFile = documents.appendingPathComponent("track.flac")
+    try silentData(0x01, count: 32).write(to: trackFile)
+    LibraryIndexerSyncSink().deleteLocalFile(at: trackFile, stableId: "sid")
+
+    check(store.contains(forStableId: "sid"), "删歌不连带删 aligned 歌词（删除不传播）")
+    checkEqual(store.stableIds(), ["sid"], "aligned 库内容不变")
+    checkEqual(try String(contentsOf: manualFile, encoding: .utf8), "manual", "manual 歌词未被动过")
+    checkEqual(try String(contentsOf: networkFile, encoding: .utf8), "network", "network 缓存未被动过")
+} catch {
+    check(false, "⑭ 抛错：\(error)")
 }
 
 // MARK: - 汇总
