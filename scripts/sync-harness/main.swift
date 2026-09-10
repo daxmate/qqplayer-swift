@@ -63,23 +63,13 @@ func silentData(_ marker: UInt8, count: Int) -> Data { Data(repeating: marker, c
 final class SinkSpy: SyncLibrarySyncSink, @unchecked Sendable {
     private let lock = NSLock()
     private var indexedPaths: [String] = []
-    private var deletedPaths: [String] = []
 
     var indexed: [String] {
         lock.lock(); defer { lock.unlock() }; return indexedPaths
     }
 
-    var deleted: [String] {
-        lock.lock(); defer { lock.unlock() }; return deletedPaths
-    }
-
     func indexLandedFile(at url: URL) {
         lock.lock(); indexedPaths.append(url.path); lock.unlock()
-    }
-
-    func deleteLocalFile(at url: URL, stableId: String?) {
-        lock.lock(); deletedPaths.append(url.path); lock.unlock()
-        try? FileManager.default.removeItem(at: url)
     }
 }
 
@@ -124,7 +114,6 @@ func sampleLyrics(_ text: String) -> Lyrics {
 func makeHarness(
     sourceFiles: [(String, Data)] = [],
     targetFiles: [(String, Data)] = [],
-    protectedPaths: Set<String> = [],
     hostLyrics: LyricsFixture? = nil,
     clientLyrics: LyricsFixture? = nil
 ) throws -> Harness {
@@ -169,8 +158,7 @@ func makeHarness(
     )
 
     let sink = SinkSpy()
-    var configuration = SyncLibrarySyncConfiguration()
-    configuration.protectedRelativePaths = protectedPaths
+    let configuration = SyncLibrarySyncConfiguration()
     let controller = SyncLibrarySyncController(
         session: fixture.clientSession,
         libraryRoot: targetRoot,
@@ -299,16 +287,17 @@ do {
 
 // MARK: - ③ 控制器状态机 + 对账映射
 
-section("③ 状态机 + 对账 → 计划（含私有区保护）")
+section("③ 状态机 + 对账 → 计划（只补齐，不删除）")
 check(SyncLibrarySyncStateMachine.canTransition(from: .idle, to: .requestingManifest), "idle → requestingManifest 允许")
-check(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .applyingDeletes), "fetching → applyingDeletes 允许")
-check(SyncLibrarySyncStateMachine.canTransition(from: .applyingDeletes, to: .done(SyncLibrarySyncSummary())), "applyingDeletes → done 允许")
+check(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .fetching), "requestingManifest → fetching 允许")
+check(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .done(SyncLibrarySyncSummary())), "requestingManifest → done 允许（无待拉取）")
+check(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .done(SyncLibrarySyncSummary())), "fetching → done 允许")
 check(!SyncLibrarySyncStateMachine.canTransition(from: .idle, to: .fetching), "idle → fetching 拒绝（越级）")
 check(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .failed("x")), "非终态 → failed 允许")
 check(!SyncLibrarySyncStateMachine.canTransition(from: .done(SyncLibrarySyncSummary()), to: .failed("x")), "终态后迁移拒绝")
 
 do {
-    var config = SyncLibrarySyncConfiguration()
+    let config = SyncLibrarySyncConfiguration()
     let remote = SyncManifestResponse(entries: [
         entry("changed.flac", hash: "new"),
         entry("missing.flac", hash: "h3"),
@@ -319,17 +308,16 @@ do {
     checkEqual(plan.fetchRequest?.relativePaths, ["changed.flac", "missing.flac"], "本地缺失/内容不同 → 拉取列表")
     checkEqual(plan.unchanged.map(\.relativePath), ["same.flac"], "内容一致 → unchanged")
 
-    // 私有区保护
-    config.protectedRelativePaths = ["Imported/private.flac"]
-    let protectedPlan = SyncLibrarySyncPlanner.plan(
+    // 不传播删除：远端已消失的本地条目（含导入区）不进任何待处理列表
+    let noDeletePlan = SyncLibrarySyncPlanner.plan(
         remote: SyncManifestResponse(entries: []),
         local: [entry("Album/synced.flac", hash: "h1"), entry("Imported/private.flac", hash: "h2")],
         configuration: config
     )
-    checkEqual(protectedPlan.deletes.map(\.relativePath), ["Album/synced.flac"], "私有区不进删除列表")
-    checkEqual(protectedPlan.protectedSkipped.map(\.relativePath), ["Imported/private.flac"], "私有区记为 protectedSkipped")
+    checkEqual(noDeletePlan.fetchRequest, nil, "远端已删 → 无待拉取动作（本端保留）")
+    checkEqual(noDeletePlan.unchanged, [], "远端已删 → unchanged 为空")
 
-    // 未受管集合
+    // 集合选择不影响本端存留
     var scoped = SyncLibrarySyncConfiguration()
     scoped.collection = .tracks(["s1"])
     let scopedPlan = SyncLibrarySyncPlanner.plan(
@@ -337,16 +325,7 @@ do {
         local: [entry("selected.flac", hash: "h1", stableId: "s1"), entry("other.flac", hash: "h2", stableId: "s2")],
         configuration: scoped
     )
-    checkEqual(scopedPlan.deletes.map(\.relativePath), ["selected.flac"], "未受管集合条目不删")
-
-    check(
-        !SyncLibrarySyncPlanner.mayDelete(
-            entry("Imported/private.flac", hash: "h2"),
-            configuration: config,
-            local: [entry("Imported/private.flac", hash: "h2")]
-        ),
-        "执行期复核：私有区 mayDelete = false"
-    )
+    checkEqual(scopedPlan.fetchRequest, nil, "集合选择不产生任何删除/拉取动作")
 } catch {
     check(false, "对账计划抛错：\(error)")
 }
@@ -379,21 +358,30 @@ do {
 
 // MARK: - ⑤ 端到端② 远端已删 → 本地删除
 
-section("⑤ 端到端：远端已删 → toDelete 生效")
+section("⑤ 端到端：远端已删 → 本端保留（不传播删除）")
 do {
     let shared = silentData(0x11, count: 4_096)
     let stale = silentData(0x22, count: 4_096)
+    let imported = silentData(0x44, count: 2_048)
     let harness = try makeHarness(
         sourceFiles: [("Album/kept.flac", shared)],
-        targetFiles: [("Album/kept.flac", shared), ("Album/stale.flac", stale)]
+        targetFiles: [
+            ("Album/kept.flac", shared),
+            ("Album/stale.flac", stale),
+            ("Imported/private.flac", imported),
+        ]
     )
     let kept = harness.targetRoot.appendingPathComponent("Album/kept.flac")
-    let removed = harness.targetRoot.appendingPathComponent("Album/stale.flac")
+    let keptStale = harness.targetRoot.appendingPathComponent("Album/stale.flac")
+    let keptImported = harness.targetRoot.appendingPathComponent("Imported/private.flac")
     check(FileManager.default.fileExists(atPath: kept.path), "远端仍在的文件保留")
-    check(!FileManager.default.fileExists(atPath: removed.path), "远端已消失的本地副本被删")
-    checkEqual(harness.sink.deleted, [removed.path], "删除走 sink（含 DB 行）")
+    check(FileManager.default.fileExists(atPath: keptStale.path), "远端已消失的本地副本保留（不传播删除）")
+    check(FileManager.default.fileExists(atPath: keptImported.path), "导入区文件同样保留")
+    checkEqual(harness.sink.indexed, [], "无拉取动作 → 入库入口未被调用")
     if case let .done(summary) = harness.controller.state {
-        checkEqual(summary.deleted, ["Album/stale.flac"], "summary.deleted")
+        checkEqual(summary.completed, [], "summary.completed 为空")
+        checkEqual(summary.requested, [], "summary.requested 为空（无待拉取）")
+        check(summary.failed.isEmpty, "summary.failed 为空")
     } else {
         check(false, "状态应为 done，实际 \(harness.controller.state)")
     }
@@ -403,38 +391,9 @@ do {
     check(false, "端到端② 抛错：\(error)")
 }
 
-// MARK: - ⑥ 端到端③ 私有区保护
+// MARK: - ⑥ 端到端③ 越界请求拒绝
 
-section("⑥ 端到端：私有区 → 不删")
-do {
-    let harness = try makeHarness(
-        sourceFiles: [],
-        targetFiles: [
-            ("Album/managed.flac", silentData(0x33, count: 2_048)),
-            ("Imported/private.flac", silentData(0x44, count: 2_048)),
-        ],
-        protectedPaths: ["Imported/private.flac"]
-    )
-    let removed = harness.targetRoot.appendingPathComponent("Album/managed.flac")
-    let protected = harness.targetRoot.appendingPathComponent("Imported/private.flac")
-    check(!FileManager.default.fileExists(atPath: removed.path), "受管副本被删")
-    check(FileManager.default.fileExists(atPath: protected.path), "私有区文件保留")
-    checkEqual(harness.sink.deleted, [removed.path], "sink 只收到受管删除")
-    if case let .done(summary) = harness.controller.state {
-        checkEqual(summary.deleted, ["Album/managed.flac"], "summary.deleted 只含受管")
-        checkEqual(summary.protectedSkipped, ["Imported/private.flac"], "summary.protectedSkipped 记录私有区")
-    } else {
-        check(false, "状态应为 done，实际 \(harness.controller.state)")
-    }
-    _ = harness.hostManifestPeer
-    _ = harness.hostResponder
-} catch {
-    check(false, "端到端③ 抛错：\(error)")
-}
-
-// MARK: - ⑦ 端到端④ 越界请求拒绝
-
-section("⑦ 端到端：越界路径请求 → Host 计入 failed，不出曲库根")
+section("⑥ 端到端：越界路径请求 → Host 计入 failed，不出曲库根")
 do {
     let fixture = SessionFixture.pairedHandshake()
     let sourceRoot = try tempRoot("src-escape")
@@ -475,7 +434,7 @@ do {
 
 // MARK: - ⑧ aligned 歌词库单一入口（Part A）
 
-section("⑧ aligned 歌词库：读/写/删/枚举 + 类型标记")
+section("⑦ aligned 歌词库：读/写/删/枚举 + 类型标记")
 do {
     let store = AlignedLyricsStore(directory: try tempRoot("aligned-store"))
     let lyrics = sampleLyrics("第一行\n第二行")
@@ -529,7 +488,7 @@ do {
 
 // MARK: - ⑨ 歌词命名空间 + manifest 纳入
 
-section("⑨ 歌词命名空间 + manifest 含歌词条目")
+section("⑧ 歌词命名空间 + manifest 含歌词条目")
 do {
     checkEqual(
         SyncLyricsNamespace.wirePath(songContentHash: "abc123"),
@@ -584,7 +543,7 @@ do {
 
 // MARK: - ⑩ 歌词路径越界 / 软链逃逸仍被拒
 
-section("⑩ 歌词根：越界与软链逃逸仍被拒")
+section("⑨ 歌词根：越界与软链逃逸仍被拒")
 do {
     let lyricsRoot = try tempRoot("lyr-root")
     let outsideRoot = try tempRoot("lyr-outside")
@@ -648,7 +607,7 @@ do {
 
 // MARK: - ⑪ 端到端：歌词随歌同步（映射落盘 / 无歌丢弃）
 
-section("⑪ 端到端：aligned 歌词随歌同步 → 落本端歌词库")
+section("⑩ 端到端：aligned 歌词随歌同步 → 落本端歌词库")
 do {
     let song = silentData(0x61, count: 4_096)
     let songHash = try SyncFileChecksum.sha256Hex(ofFile: {
@@ -688,7 +647,7 @@ do {
 
 // MARK: - ⑫ 端到端：本端无对应歌曲 → 丢弃不写孤儿
 
-section("⑫ 端到端：本端没有对应歌曲 → 歌词不落库（不写孤儿）")
+section("⑪ 端到端：本端没有对应歌曲 → 歌词不落库（不写孤儿）")
 do {
     let song = silentData(0x62, count: 4_096)
     let tempHashFile = FileManager.default.temporaryDirectory.appendingPathComponent("hash-helper-\(UUID().uuidString)")
@@ -723,7 +682,7 @@ do {
 
 // MARK: - ⑬ 端到端：对端已删 → 本端歌词保留（不传播删除）
 
-section("⑬ 端到端：对端已删 → 本端 aligned 歌词保留（删除不传播）")
+section("⑫ 端到端：对端已删 → 本端 aligned 歌词保留（删除不传播）")
 do {
     let song = silentData(0x63, count: 4_096)
     let tempHashFile = FileManager.default.temporaryDirectory.appendingPathComponent("hash-helper-\(UUID().uuidString)")
@@ -747,7 +706,7 @@ do {
         "歌词内容原样保留（删除只由本端用户发起）"
     )
     if case let .done(summary) = harness.controller.state {
-        check(!summary.deleted.contains("@lyrics/\(songHash).json"), "歌词条目不进 deleted 清单")
+        check(summary.requested.isEmpty && summary.completed.isEmpty, "远端已删的歌词 → 本端零动作（删除不跨端传播）")
         check(!summary.orphanLyricsSkipped.contains("@lyrics/\(songHash).json"), "本端已有的歌词不会被当孤儿丢弃")
     } else {
         check(false, "状态应为 done，实际 \(harness.controller.state)")
@@ -759,12 +718,12 @@ do {
         local: [entry("@lyrics/\(songHash).json", hash: "h", stableId: "client-sid")],
         configuration: SyncLibrarySyncConfiguration()
     )
-    checkEqual(plan.deletes.map(\.relativePath), [], "规划层：歌词条目永不进 deletes（不传播删除）")
+    checkEqual(plan.fetchRequest, nil, "规划层：远端没有的歌词 → 无动作，不留任何待办（只补不删）")
 } catch {
     check(false, "⑬ 抛错：\(error)")
 }
 
-section("⑭ 隔离：删歌不动歌词库；manual / network 不被触")
+section("⑬ 隔离：同步无删除出口；manual / network 不被触")
 do {
     let documents = try tempRoot("documents")
     let alignedDir = documents.appendingPathComponent("lyrics-aligned")
@@ -781,12 +740,12 @@ do {
     let store = AlignedLyricsStore(directory: alignedDir)
     try store.write(sampleLyrics("本端已有"), forStableId: "sid")
 
-    // 生产 sink 已不耦合歌词库（构造无需注入 store）：删歌不连带清歌词
+    // 同步层已无删除出口（生产 sink 只剩入库一个方法）：删歌不连带清歌词
     let trackFile = documents.appendingPathComponent("track.flac")
     try silentData(0x01, count: 32).write(to: trackFile)
-    LibraryIndexerSyncSink().deleteLocalFile(at: trackFile, stableId: "sid")
+    _ = LibraryIndexerSyncSink()
 
-    check(store.contains(forStableId: "sid"), "删歌不连带删 aligned 歌词（删除不传播）")
+    check(store.contains(forStableId: "sid"), "本端 aligned 歌词保持存在（同步不删）")
     checkEqual(store.stableIds(), ["sid"], "aligned 库内容不变")
     checkEqual(try String(contentsOf: manualFile, encoding: .utf8), "manual", "manual 歌词未被动过")
     checkEqual(try String(contentsOf: networkFile, encoding: .utf8), "network", "network 缓存未被动过")

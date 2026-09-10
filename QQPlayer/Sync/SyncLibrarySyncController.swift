@@ -3,20 +3,16 @@
 //  QQPlayer
 //
 //  局域网同步（S2, M3-3b）Client 侧文件同步控制器：ready 后拉 manifest →
-//  本地清单对账 → 按路径请求拉取（Host 串行推送）→ 删除远端已消失项（受保护
-//  范围除外）→ 落盘 + 走既有入库入口。
+//  本地清单对账 → 按路径请求拉取（Host 串行推送）→ 落盘 + 走既有入库入口。
 //
 //  状态机（每态回调 onStateChange，UI 留 M6）：
-//    idle → requestingManifest → fetching → applyingDeletes → done / failed
-//  （无可拉取文件时 requestingManifest → applyingDeletes 直落；纯逻辑见
+//    idle → requestingManifest → fetching → done / failed
+//  （无可拉取文件时 requestingManifest → done 直落；纯逻辑见
 //   SyncLibrarySyncStateMachine）
 //
-//  删除语义（§6.1 硬要求，本文件是执行点）：
-//  只删「同步集合内 + 非私有区」的本地条目——范围由
-//  SyncManifestReconciler.deleteScope(collection:members:localEntries:protectedRelativePaths:)
-//  推导，执行前再用同一 scope 复核一次（计划与执行之间本地可能变化）。
-//  **私有区（文件 App 导入 / 未配对来源）绝不出现在删除路径上**。
-//  protectedRelativePaths 的来源（导入标记 / 同步账本）由调用方注入，本文件不自造。
+//  同步语义（§6.1 硬要求，本文件是执行点）：**不传播删除**——任一端删除歌曲都是
+//  本地事务：对端 manifest 里没有、而本端已有的文件**一律保留**（既不删文件也不删
+//  曲库行）。同步只做「补齐缺失 + 内容不同则更新」；因此本文件不存在删除执行路径。
 //
 //  落地：文件先落曲库根内的隐藏落地目录（同步扫描跳过隐藏文件，不会被误当曲库内容），
 //  收齐校验通过（SyncFileReceiver 已做 SHA-256）后移入相对路径位置，再交给
@@ -26,8 +22,7 @@
 //  - 本地清单 = 曲库文件 + aligned 歌词（`@lyrics/{歌曲 content_hash}.json`），
 //    两者走同一套对账 / 集合过滤；**歌词只参与「补齐缺失 / 内容不同则更新」**。
 //  - **不传播删除（2026-09-10 用户拍板）**：任一端删歌/删歌词只在本地生效，
-//    绝不能因对端多出/缺失而删本端内容——因此歌词条目被显式挡在删除计划之外
-//    （见 SyncLibrarySyncPlanner.plan），本控制器不提供任何歌词删除路径。
+//    绝不能因对端多出/缺失而删本端内容——本控制器不提供任何删除路径。
 //  - 收到歌词文件：经 content_hash → 本端 stableId 映射后交给 `AlignedLyricsStore`
 //    安装（不落进曲库根、不写孤儿）。本端歌曲还没入库（同一轮同步里歌比歌词先到）
 //    → 暂存到本轮收尾再试一次；仍解析不出 → **丢弃**（歌词是依附歌曲的内容，
@@ -49,8 +44,6 @@ enum SyncLibrarySyncState: Equatable, Sendable {
     case requestingManifest
     /// 已发拉取请求，等对端串行推送 + 结果帧
     case fetching
-    /// 正在执行删除（受保护范围已过滤）
-    case applyingDeletes
     case done(SyncLibrarySyncSummary)
     case failed(String)
 }
@@ -63,16 +56,12 @@ struct SyncLibrarySyncSummary: Equatable, Sendable {
     var completed: [String] = []
     /// 对端报告的失败项
     var failed: [SyncFileFetchFailure] = []
-    /// 已删除的本地相对路径
-    var deleted: [String] = []
-    /// 因私有区/未受管豁免而未删的本地条目（审计用）
-    var protectedSkipped: [String] = []
     /// 收到但本端无对应歌曲、未落库的 aligned 歌词（丢弃；下次同步自愈，审计用）
     var orphanLyricsSkipped: [String] = []
 
     /// 本次是否动了本端歌词库（诊断用）。
     var touchedLyrics: Bool {
-        (completed + deleted + failed.map(\.relativePath) + orphanLyricsSkipped)
+        (completed + failed.map(\.relativePath) + orphanLyricsSkipped)
             .contains { SyncLyricsNamespace.isLyricsPath($0) }
     }
 }
@@ -83,9 +72,10 @@ enum SyncLibrarySyncStateMachine {
         switch (from, to) {
         case (.idle, .requestingManifest): return true
         case (.requestingManifest, .fetching): return true
-        case (.requestingManifest, .applyingDeletes): return true
-        case (.fetching, .applyingDeletes): return true
-        case (.applyingDeletes, .done): return true
+        // 无待拉取条目：对账后直接收尾
+        case (.requestingManifest, .done): return true
+        // 拉取完成（含对端结果帧）：收尾
+        case (.fetching, .done): return true
         default:
             // 任何非终态都可能失败
             if case .failed = to {
@@ -107,11 +97,8 @@ enum SyncLibrarySyncStateMachine {
 
 /// 控制器配置。
 struct SyncLibrarySyncConfiguration: Sendable, Equatable {
-    /// 同步集合（v1 默认全库镜像）
+    /// 同步集合（v1 默认全库）
     var collection: SyncCollection = .all
-    /// 私有区：本端非同步来源（文件 App 导入 / 未配对来源）——**永不删除**。
-    /// 来源（导入标记 / 同步账本）由调用方注入；v1 默认空集（等 M6 接账本）。
-    var protectedRelativePaths: Set<String> = []
     /// 落地目录名（曲库根内，隐藏目录——同步扫描跳过隐藏文件）
     var incomingDirectoryName: String = ".sync-incoming"
 }
@@ -120,87 +107,48 @@ struct SyncLibrarySyncConfiguration: Sendable, Equatable {
 struct SyncLibrarySyncPlan: Equatable, Sendable {
     /// 要请求对端推送的文件（nil = 无需拉取）
     var fetchRequest: SyncFetchRequest?
-    /// 要删除的本地条目（已过 deleteScope）
-    var deletes: [ManifestEntry] = []
-    /// 因私有区豁免被跳过的本地条目（不删，审计）
-    var protectedSkipped: [ManifestEntry] = []
     /// 内容一致的远端条目
     var unchanged: [ManifestEntry] = []
 }
 
 enum SyncLibrarySyncPlanner {
-    /// 远端 manifest + 本地清单 → 动作计划。
+    /// 远端 manifest + 本地清单 → 动作计划（**只补齐，不删除**）。
+    /// 对端没有、而本端已有的条目一律保留（§6 语义修订：删除不跨端传播），
+    /// 因此计划里不存在删除动作。
     static func plan(
         remote: SyncManifestResponse,
         local: [ManifestEntry],
-        configuration: SyncLibrarySyncConfiguration,
-        members: SyncCollectionMembers = SyncCollectionMembers()
+        configuration: SyncLibrarySyncConfiguration
     ) -> SyncLibrarySyncPlan {
-        let scope = SyncManifestReconciler.deleteScope(
-            collection: configuration.collection,
-            members: members,
-            localEntries: local,
-            protectedRelativePaths: configuration.protectedRelativePaths
-        )
         let reconciliation = SyncManifestReconciler.reconcile(
             remote: remote.entries,
-            local: local,
-            deleteScope: scope
+            local: local
         )
         let paths = SyncFetchRequest.normalize(reconciliation.toFetch.map(\.relativePath))
         return SyncLibrarySyncPlan(
             fetchRequest: paths.isEmpty
                 ? nil
                 : SyncFetchRequest(collection: configuration.collection, relativePaths: paths),
-            // 歌词条目**只补不删**（§6 语义修订 2026-09-10：删除不跨端传播）。
-            // 对端没带某条歌词 = 本端保留现状，不作为「远端已删」处理；
-            // 删歌词永远是用户在本端自己的动作，不由同步推导。
-            deletes: reconciliation.toDelete.filter { !SyncLyricsNamespace.isLyricsPath($0.relativePath) },
-            protectedSkipped: reconciliation.protectedSkipped,
             unchanged: reconciliation.unchanged
         )
-    }
-
-    /// 执行期复核：该条目此刻是否仍归同步管（私有区/未受管 → false）。
-    static func mayDelete(
-        _ entry: ManifestEntry,
-        configuration: SyncLibrarySyncConfiguration,
-        members: SyncCollectionMembers = SyncCollectionMembers(),
-        local: [ManifestEntry]
-    ) -> Bool {
-        SyncManifestReconciler.deleteScope(
-            collection: configuration.collection,
-            members: members,
-            localEntries: local,
-            protectedRelativePaths: configuration.protectedRelativePaths
-        ).manages(entry.relativePath)
     }
 }
 
 // MARK: - 落盘副作用出口（生产实现注入；测试用 spy）
 
-/// 同步结果的本地副作用：入库（走既有入口）/ 删除。
+/// 同步结果的本地副作用：入库（走既有入口）。
 /// 非 async：会话线程同步驱动，实现内部自行 hop 主线程（fire-and-forget）。
 protocol SyncLibrarySyncSink: Sendable {
     /// 一个文件已落盘到位 → 走既有入库入口。
     func indexLandedFile(at url: URL)
-    /// 删除本地副本（文件 + 曲库行）。
-    func deleteLocalFile(at url: URL, stableId: String?)
 }
 
-/// 生产实现：入库复用 LibraryIndexer 既有入口；删除走 FileManager + DatabaseManager。
-/// **不碰 aligned 歌词**（§6 语义修订 2026-09-10：删除不传播，删歌不连带清歌词）。
+/// 生产实现：入库复用 LibraryIndexer 既有入口。
+/// **无删除出口**（§6 语义修订 2026-09-10：删除不传播）。
 final class LibraryIndexerSyncSink: SyncLibrarySyncSink, @unchecked Sendable {
     func indexLandedFile(at url: URL) {
         Task { @MainActor in
             _ = await LibraryIndexer.shared.processExternalFile(url)
-        }
-    }
-
-    func deleteLocalFile(at url: URL, stableId: String?) {
-        try? FileManager.default.removeItem(at: url)
-        if let stableId {
-            try? DatabaseManager.shared.deleteTrack(byStableId: stableId)
         }
     }
 }
@@ -218,7 +166,6 @@ final class SyncLibrarySyncController: @unchecked Sendable {
     private let libraryRoot: URL
     private let sink: SyncLibrarySyncSink
     private let configuration: SyncLibrarySyncConfiguration
-    private let members: SyncCollectionMembers
     private let database: DatabaseManager
     private let fileManager: FileManager
     /// aligned 歌词库（Part A 单一入口）+ content_hash 映射（歌词同步开关）
@@ -233,8 +180,6 @@ final class SyncLibrarySyncController: @unchecked Sendable {
     // 锁保护状态
     private var stateValue: SyncLibrarySyncState = .idle
     private var summary = SyncLibrarySyncSummary()
-    private var pendingDeletes: [ManifestEntry] = []
-    private var localEntriesAtPlan: [ManifestEntry] = []
     /// 文件名 → 期望的相对路径（串行推送下按名回收；同名多路径取请求序首个未匹配）
     private var expectedByFileName: [String: [String]] = [:]
     /// 已收到、但本端歌曲尚未入库的歌词文件（本轮收尾再试一次映射）
@@ -252,7 +197,6 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         libraryRoot: URL,
         sink: SyncLibrarySyncSink = LibraryIndexerSyncSink(),
         configuration: SyncLibrarySyncConfiguration = SyncLibrarySyncConfiguration(),
-        members: SyncCollectionMembers = SyncCollectionMembers(),
         database: DatabaseManager = .shared,
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
@@ -262,7 +206,6 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         self.libraryRoot = libraryRoot
         self.sink = sink
         self.configuration = configuration
-        self.members = members
         self.database = database
         self.fileManager = fileManager
         self.lyricsStore = lyricsStore
@@ -349,23 +292,20 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         let plan = SyncLibrarySyncPlanner.plan(
             remote: response,
             local: local,
-            configuration: configuration,
-            members: members
+            configuration: configuration
         )
 
         lock.lock()
-        localEntriesAtPlan = local
-        pendingDeletes = plan.deletes
-        summary.protectedSkipped = plan.protectedSkipped.map(\.relativePath)
         if let request = plan.fetchRequest {
             summary.requested = request.relativePaths
             expectedByFileName = Self.expectedPathsByName(request.relativePaths)
         }
+        let finished = summary
         lock.unlock()
 
         guard let request = plan.fetchRequest else {
-            // 无差异/无需拉取：直接进删除阶段（状态机允许 requestingManifest → applyingDeletes）
-            applyDeletes()
+            // 无可拉取条目（含「对端少的本端自己保留」）：直接收尾
+            transition(to: .done(finished))
             return
         }
         transition(to: .fetching)
@@ -396,6 +336,7 @@ final class SyncLibrarySyncController: @unchecked Sendable {
                     withIntermediateDirectories: true
                 )
                 if fileManager.fileExists(atPath: destination.path) {
+                    // 内容不同 → 更新：同路径旧副本就地替换（本端事务，非删除传播）
                     try? fileManager.removeItem(at: destination)
                 }
                 try fileManager.moveItem(at: url, to: destination)
@@ -418,7 +359,7 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         }
     }
 
-    // MARK: 结果帧 → 删除 → 收尾
+    // MARK: 结果帧 → 收尾
 
     private func attachResultHandler() {
         priorAppHandler = session.onApplicationFrame
@@ -441,51 +382,20 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         lock.lock()
         summary.failed = result.failed
         lock.unlock()
-        applyDeletes()
+        finalize()
     }
 
-    /// 删除阶段：先收尾暂存歌词（此时同轮落下的歌多已入库），再逐个复核 deleteScope
-    /// （私有区/未受管绝不删）后执行。
-    /// **不含歌词条目**：歌词只补不删（见 SyncLibrarySyncPlanner.plan）。
-    private func applyDeletes() {
+    /// 收尾：先兜现暂存歌词（此时同轮先落下的歌多已入库），再落终态。
+    /// **无删除阶段**（§6 语义修订：删除不跨端传播）。
+    private func finalize() {
         flushPendingLyrics()
-        transition(to: .applyingDeletes)
-
-        lock.lock()
-        let deletes = pendingDeletes
-        let local = localEntriesAtPlan
-        lock.unlock()
-
-        for entry in deletes {
-            let allowed = SyncLibrarySyncPlanner.mayDelete(
-                entry,
-                configuration: configuration,
-                members: members,
-                local: local
-            )
-            guard allowed else {
-                lock.lock()
-                if !summary.protectedSkipped.contains(entry.relativePath) {
-                    summary.protectedSkipped.append(entry.relativePath)
-                }
-                lock.unlock()
-                continue
-            }
-            let url = libraryRoot.appendingPathComponent(entry.relativePath)
-            sink.deleteLocalFile(at: url, stableId: entry.stableId)
-            try? fileManager.removeItem(at: url) // 幂等：sink 实现可能已删
-            lock.lock()
-            summary.deleted.append(entry.relativePath)
-            lock.unlock()
-        }
-
         lock.lock()
         let finished = summary
         lock.unlock()
         transition(to: .done(finished))
     }
 
-    // MARK: 歌词落地 / 清理（M4-2b）
+    // MARK: 歌词落地（M4-2b）
 
     private enum LyricsInstallOutcome {
         /// 已写进本端歌词库

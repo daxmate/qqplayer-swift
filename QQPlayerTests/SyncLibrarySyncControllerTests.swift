@@ -3,10 +3,10 @@
 //  QQPlayerTests
 //
 //  S2 M3-3b Client 侧控制器纯逻辑：
-//  - 状态机流转合法性（idle→requestingManifest→fetching→applyingDeletes→done/failed）
+//  - 状态机流转合法性（idle→requestingManifest→fetching→done / failed；
+//    无可拉取条目时 requestingManifest→done 直落）
 //  - 对账 → 请求列表映射（missing / 内容不同 → 拉取；一致 → unchanged）
-//  - 删除范围：私有区绝不删、未受管集合（tracks/playlists）不删
-//  - 执行期复核 mayDelete 与计划一致
+//  - 不传播删除：远端已消失的本地条目不进任何待处理列表、不被删除
 //  - 文件名回收映射（同名多路径按请求序）
 //  - 未 ready 会话 start() 必须抛错
 //  端到端（真跑传输）见 SyncLibrarySyncE2ETests.swift。
@@ -24,13 +24,9 @@ struct SyncLibrarySyncControllerTests {
         ManifestEntry(relativePath: path, size: 10, mtimeMs: 0, contentHash: hash, stableId: stableId)
     }
 
-    private func configuration(
-        collection: SyncCollection = .all,
-        protected: Set<String> = []
-    ) -> SyncLibrarySyncConfiguration {
+    private func configuration(collection: SyncCollection = .all) -> SyncLibrarySyncConfiguration {
         var config = SyncLibrarySyncConfiguration()
         config.collection = collection
-        config.protectedRelativePaths = protected
         return config
     }
 
@@ -40,9 +36,8 @@ struct SyncLibrarySyncControllerTests {
     func stateMachineTransitions() {
         #expect(SyncLibrarySyncStateMachine.canTransition(from: .idle, to: .requestingManifest))
         #expect(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .fetching))
-        #expect(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .applyingDeletes))
-        #expect(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .applyingDeletes))
-        #expect(SyncLibrarySyncStateMachine.canTransition(from: .applyingDeletes, to: .done(SyncLibrarySyncSummary())))
+        #expect(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .done(SyncLibrarySyncSummary())))
+        #expect(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .done(SyncLibrarySyncSummary())))
 
         // 越级/重复
         #expect(!SyncLibrarySyncStateMachine.canTransition(from: .idle, to: .fetching))
@@ -75,8 +70,8 @@ struct SyncLibrarySyncControllerTests {
             configuration: configuration()
         )
         #expect(plan.fetchRequest?.relativePaths == ["changed.flac", "missing.flac"])
+        #expect(plan.fetchRequest?.collection == .all) // 集合透传到拉取请求
         #expect(plan.unchanged.map(\.relativePath) == ["same.flac"])
-        #expect(plan.deletes.isEmpty)
     }
 
     @Test("对账映射：无差异 → 不发拉取请求")
@@ -88,41 +83,29 @@ struct SyncLibrarySyncControllerTests {
             configuration: configuration()
         )
         #expect(plan.fetchRequest == nil)
-        #expect(plan.deletes.isEmpty)
+        #expect(plan.unchanged.map(\.relativePath) == ["a.flac"])
     }
 
-    @Test("对账映射：远端已消失 → 进删除列表（受管范围内）")
-    func planCollectsDeletes() {
-        let local = [entry("gone.flac", hash: "h1", stableId: "s1"), entry("kept.flac", hash: "h2")]
+    @Test("★不传播删除：远端已消失的本地条目不进任何待处理列表、不被删除")
+    func planIgnoresRemoteRemovedLocally() {
+        let local = [
+            entry("gone.flac", hash: "h1", stableId: "s1"),
+            entry("kept.flac", hash: "h2"),
+            entry("Imported/manual.m4a", hash: "h3"),
+        ]
         let remote = [entry("kept.flac", hash: "h2")]
         let plan = SyncLibrarySyncPlanner.plan(
             remote: SyncManifestResponse(entries: remote),
             local: local,
             configuration: configuration()
         )
-        #expect(plan.deletes.map(\.relativePath) == ["gone.flac"])
-        #expect(plan.deletes.first?.stableId == "s1")
+        // 没有待拉取动作（对端少的条目不是同步的事），本端文件一律保留
+        #expect(plan.fetchRequest == nil)
+        #expect(plan.unchanged.map(\.relativePath) == ["kept.flac"])
     }
 
-    // MARK: - 私有区 / 未受管保护
-
-    @Test("私有区条目绝不进删除列表（远端全消失也不删）")
-    func privateZoneIsProtected() {
-        let local = [
-            entry("Album/synced.flac", hash: "h1"),
-            entry("Imported/private.flac", hash: "h2"),
-        ]
-        let plan = SyncLibrarySyncPlanner.plan(
-            remote: SyncManifestResponse(entries: []),
-            local: local,
-            configuration: configuration(protected: ["Imported/private.flac"])
-        )
-        #expect(plan.deletes.map(\.relativePath) == ["Album/synced.flac"])
-        #expect(plan.protectedSkipped.map(\.relativePath) == ["Imported/private.flac"])
-    }
-
-    @Test("未受管集合（tracks 选择）内的本地条目不被删")
-    func unmanagedCollectionIsNotDeleted() {
+    @Test("不传播删除：集合选择不影响本端存留（远端空 → 无动作）")
+    func planIgnoresCollectionScopeForDeletion() {
         let local = [
             entry("selected.flac", hash: "h1", stableId: "s1"),
             entry("other.flac", hash: "h2", stableId: "s2"),
@@ -132,20 +115,8 @@ struct SyncLibrarySyncControllerTests {
             local: local,
             configuration: configuration(collection: .tracks(["s1"]))
         )
-        #expect(plan.deletes.map(\.relativePath) == ["selected.flac"])
-        // 未入选不受管 = 静默忽略（既不删也不报）
-        #expect(plan.protectedSkipped.isEmpty)
-    }
-
-    @Test("执行期复核 mayDelete：私有区/未受管一律 false")
-    func executionRecheckMatchesPlan() {
-        let local = [
-            entry("Album/synced.flac", hash: "h1", stableId: "s1"),
-            entry("Imported/private.flac", hash: "h2", stableId: "s2"),
-        ]
-        let config = configuration(protected: ["Imported/private.flac"])
-        #expect(SyncLibrarySyncPlanner.mayDelete(local[0], configuration: config, local: local))
-        #expect(!SyncLibrarySyncPlanner.mayDelete(local[1], configuration: config, local: local))
+        #expect(plan.fetchRequest == nil)
+        #expect(plan.unchanged.isEmpty)
     }
 
     // MARK: - 文件名回收
