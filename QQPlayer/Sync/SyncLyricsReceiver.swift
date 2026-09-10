@@ -15,7 +15,7 @@
 //  - 收尾之后再到的歌词：不暂存，直接按「映射得到就装、映射不到就丢」处理。
 //  - **不传播删除**：本类型不存在删除本端歌词的路径。
 //
-//  调用方（SyncLibrarySyncController / SyncLibraryPassiveHost）只负责把 Outcome
+//  调用方（SyncLibraryPullController / SyncLibraryPassiveHost）只负责把 Outcome
 //  计入自己的账目与回调，不再各自实现一遍安装/暂存/丢弃逻辑。
 //
 

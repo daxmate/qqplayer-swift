@@ -7,6 +7,9 @@
 # 测试套件同构的断言（帧编解码/路径解析/应答器计划/控制器状态机与对账/三条端到端场景：
 # 拉取一致、远端已删不传播、越界拒绝 + M4-2b 歌词库与随歌同步）。
 #
+# R1b-2 起：发起方恒为 Mac（SyncLibraryPushController / SyncLibraryPullController），
+# 旧 iOS 主动拉取控制器（SyncLibrarySyncController）已退役。
+#
 # 覆盖不到的（由 CI 的 xcodebuild test 兜底）：Swift Testing 套件本体、iOS/Mac
 # target 的特有代码路径（LibraryIndexer 真实现、MacSyncLibraryHost 装配）。
 #
@@ -42,10 +45,12 @@ SOURCES=(
   QQPlayer/Sync/SyncLibraryFetchResponder.swift
   QQPlayer/Sync/SyncLocalLibraryProvider.swift
   QQPlayer/Sync/SyncLibraryPushModels.swift
+  QQPlayer/Sync/SyncLibrarySink.swift
+  QQPlayer/Sync/SyncLibraryPushController.swift
+  QQPlayer/Sync/SyncLibraryPullController.swift
   QQPlayer/Sync/SyncLyricsReceiver.swift
   QQPlayer/Sync/SyncLibraryPassiveHost.swift
   QQPlayer/Sync/SyncLocalLibraryScanner.swift
-  QQPlayer/Sync/SyncLibrarySyncController.swift
   QQPlayer/Sync/SyncAlignedLyrics.swift
   QQPlayer/Services/LyricsModels.swift
   QQPlayer/Services/AlignedLyricsStore.swift

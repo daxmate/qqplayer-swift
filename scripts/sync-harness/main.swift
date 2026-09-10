@@ -75,13 +75,16 @@ final class SinkSpy: SyncLibrarySyncSink, @unchecked Sendable {
 
 struct Harness {
     let fixture: SessionFixture
+    /// 设备侧曲库（被拉取的内容源）
     let sourceRoot: URL
+    /// Mac 侧曲库（落位目标）
     let targetRoot: URL
-    let hostManifestPeer: SyncManifestPeer
-    let hostResponder: SyncLibraryFetchResponder
+    /// 设备侧被动端（应答 manifest / 按路径回推 / 接收推送）
+    let deviceHost: SyncLibraryPassiveHost
     let sink: SinkSpy
-    let controller: SyncLibrarySyncController
-    /// 两端 aligned 歌词库（M4-2b）
+    /// Mac 侧拉取控制器（R1b-2 取代旧 iOS 主动控制器）
+    let controller: SyncLibraryPullController
+    /// 两端 aligned 歌词库（M4-2b）：host = 设备侧，client = Mac 侧
     let hostLyricsStore: AlignedLyricsStore
     let clientLyricsStore: AlignedLyricsStore
 }
@@ -134,37 +137,45 @@ func makeHarness(
     let hostMapping = mapping(of: hostLyrics)
     let clientMapping = mapping(of: clientLyrics)
 
-    let hostManager = DatabaseManager()
-    let hostManifestPeer = SyncManifestPeer(session: fixture.hostSession)
-    hostManifestPeer.localRootName = { "测试 Mac 曲库" }
-    hostManifestPeer.localManifestProvider = { collection in
-        SyncLocalLibraryScanner.entries(
-            in: sourceRoot,
-            lyricsStore: hostLyricsStore,
-            lyricsMapping: hostMapping,
-            collection: collection,
-            database: hostManager
-        )
-    }
-    let hostResponder = SyncLibraryFetchResponder(
-        session: fixture.hostSession,
-        roots: SyncFetchRoots(libraryRoot: sourceRoot, lyricsRoot: hostLyricsStore.directory),
-        lyricsFileNameProvider: { wirePath in
+    // 设备侧：被动端（应答 manifest + 按路径回推），与 R1b-1 iOS 装配同构
+    let deviceHost = SyncLibraryPassiveHost(
+        libraryRoot: sourceRoot,
+        rootName: "测试设备曲库",
+        sink: SinkSpy(),
+        database: DatabaseManager(),
+        lyricsStore: hostLyricsStore,
+        lyricsMapping: hostMapping
+    )
+    _ = deviceHost.attach(to: fixture.clientSession)
+
+    // Mac 侧：拉取控制器（发起方恒为 Mac）
+    let sink = SinkSpy()
+    let macManager = DatabaseManager()
+    let descriptor = SyncLocalLibraryDescriptor(
+        libraryRoot: targetRoot,
+        rootName: "测试 Mac 曲库",
+        lyricsRoot: clientLyricsStore.directory,
+        sourceFiles: { SyncLocalLibraryScanner.sourceFiles(in: targetRoot, database: macManager) },
+        lyricsEntries: {
+            SyncAlignedLyricsManifest.entries(store: clientLyricsStore, mapping: clientMapping)
+        },
+        contentHash: { relativePath in
+            DatabaseManager.contentHashIfFilePresent(
+                atPath: targetRoot.appendingPathComponent(relativePath).path
+            )
+        },
+        lyricsFileName: { wirePath in
             guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
-                  let stableId = hostMapping.stableIdForContentHash(songHash)
+                  let stableId = clientMapping.stableIdForContentHash(songHash)
             else { return nil }
             return "\(stableId).json"
         }
     )
-
-    let sink = SinkSpy()
-    let configuration = SyncLibrarySyncConfiguration()
-    let controller = SyncLibrarySyncController(
-        session: fixture.clientSession,
-        libraryRoot: targetRoot,
+    let controller = SyncLibraryPullController(
+        session: fixture.hostSession,
+        descriptor: descriptor,
         sink: sink,
-        configuration: configuration,
-        database: DatabaseManager(),
+        configuration: SyncLibraryPullConfiguration(),
         lyricsStore: clientLyricsStore,
         lyricsMapping: clientMapping
     )
@@ -174,8 +185,7 @@ func makeHarness(
         fixture: fixture,
         sourceRoot: sourceRoot,
         targetRoot: targetRoot,
-        hostManifestPeer: hostManifestPeer,
-        hostResponder: hostResponder,
+        deviceHost: deviceHost,
         sink: sink,
         controller: controller,
         hostLyricsStore: hostLyricsStore,
@@ -288,44 +298,55 @@ do {
 // MARK: - ③ 控制器状态机 + 对账映射
 
 section("③ 状态机 + 对账 → 计划（只补齐，不删除）")
-check(SyncLibrarySyncStateMachine.canTransition(from: .idle, to: .requestingManifest), "idle → requestingManifest 允许")
-check(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .fetching), "requestingManifest → fetching 允许")
-check(SyncLibrarySyncStateMachine.canTransition(from: .requestingManifest, to: .done(SyncLibrarySyncSummary())), "requestingManifest → done 允许（无待拉取）")
-check(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .done(SyncLibrarySyncSummary())), "fetching → done 允许")
-check(!SyncLibrarySyncStateMachine.canTransition(from: .idle, to: .fetching), "idle → fetching 拒绝（越级）")
-check(SyncLibrarySyncStateMachine.canTransition(from: .fetching, to: .failed("x")), "非终态 → failed 允许")
-check(!SyncLibrarySyncStateMachine.canTransition(from: .done(SyncLibrarySyncSummary()), to: .failed("x")), "终态后迁移拒绝")
+check(SyncLibraryPullStateMachine.canTransition(from: .idle, to: .requestingManifest), "idle → requestingManifest 允许")
+check(SyncLibraryPullStateMachine.canTransition(from: .requestingManifest, to: .fetching), "requestingManifest → fetching 允许")
+check(SyncLibraryPullStateMachine.canTransition(from: .requestingManifest, to: .done(SyncLibraryPullSummary())), "requestingManifest → done 允许（无待拉取）")
+check(SyncLibraryPullStateMachine.canTransition(from: .fetching, to: .done(SyncLibraryPullSummary())), "fetching → done 允许")
+check(!SyncLibraryPullStateMachine.canTransition(from: .idle, to: .fetching), "idle → fetching 拒绝（越级）")
+check(SyncLibraryPullStateMachine.canTransition(from: .fetching, to: .failed("x")), "非终态 → failed 允许")
+check(!SyncLibraryPullStateMachine.canTransition(from: .done(SyncLibraryPullSummary()), to: .failed("x")), "终态后迁移拒绝")
+
+check(SyncLibraryPushStateMachine.canTransition(from: .idle, to: .requestingManifest), "推送：idle → requestingManifest 允许")
+check(SyncLibraryPushStateMachine.canTransition(from: .requestingManifest, to: .done(SyncLibraryPushSummary())), "推送：requestingManifest → done 允许（全部已一致）")
+check(SyncLibraryPushStateMachine.canTransition(from: .requestingManifest, to: .pushing), "推送：requestingManifest → pushing 允许")
+check(SyncLibraryPushStateMachine.canTransition(from: .pushing, to: .done(SyncLibraryPushSummary())), "推送：pushing → done 允许")
+check(!SyncLibraryPushStateMachine.canTransition(from: .idle, to: .pushing), "推送：idle → pushing 拒绝（越级）")
+check(!SyncLibraryPushStateMachine.canTransition(from: .done(SyncLibraryPushSummary()), to: .failed("x")), "推送：终态后迁移拒绝")
 
 do {
-    let config = SyncLibrarySyncConfiguration()
     let remote = SyncManifestResponse(entries: [
         entry("changed.flac", hash: "new"),
         entry("missing.flac", hash: "h3"),
         entry("same.flac", hash: "h1"),
     ])
     let local = [entry("same.flac", hash: "h1"), entry("changed.flac", hash: "old")]
-    let plan = SyncLibrarySyncPlanner.plan(remote: remote, local: local, configuration: config)
-    checkEqual(plan.fetchRequest?.relativePaths, ["changed.flac", "missing.flac"], "本地缺失/内容不同 → 拉取列表")
+    let plan = SyncLibraryPullPlanner.plan(
+        remote: remote,
+        local: local,
+        selection: .all
+    )
+    checkEqual(plan.relativePaths, ["changed.flac", "missing.flac"], "本地缺失/内容不同 → 拉取列表")
     checkEqual(plan.unchanged.map(\.relativePath), ["same.flac"], "内容一致 → unchanged")
 
     // 不传播删除：远端已消失的本地条目（含导入区）不进任何待处理列表
-    let noDeletePlan = SyncLibrarySyncPlanner.plan(
+    let noDeletePlan = SyncLibraryPullPlanner.plan(
         remote: SyncManifestResponse(entries: []),
         local: [entry("Album/synced.flac", hash: "h1"), entry("Imported/private.flac", hash: "h2")],
-        configuration: config
+        selection: .all
     )
-    checkEqual(noDeletePlan.fetchRequest, nil, "远端已删 → 无待拉取动作（本端保留）")
+    checkEqual(noDeletePlan.relativePaths, [], "远端已删 → 无待拉取动作（本端保留）")
     checkEqual(noDeletePlan.unchanged, [], "远端已删 → unchanged 为空")
 
     // 集合选择不影响本端存留
-    var scoped = SyncLibrarySyncConfiguration()
-    scoped.collection = .tracks(["s1"])
-    let scopedPlan = SyncLibrarySyncPlanner.plan(
-        remote: SyncManifestResponse(entries: []),
-        local: [entry("selected.flac", hash: "h1", stableId: "s1"), entry("other.flac", hash: "h2", stableId: "s2")],
-        configuration: scoped
+    let scopedPlan = SyncLibraryPullPlanner.plan(
+        remote: SyncManifestResponse(entries: [
+            entry("selected.flac", hash: "h1", stableId: "s1"),
+            entry("other.flac", hash: "h2", stableId: "s2"),
+        ]),
+        local: [],
+        selection: .relativePaths(["other.flac"])
     )
-    checkEqual(scopedPlan.fetchRequest, nil, "集合选择不产生任何删除/拉取动作")
+    checkEqual(scopedPlan.relativePaths, ["other.flac"], "显式选择集只拉入选路径（不产生删除）")
 } catch {
     check(false, "对账计划抛错：\(error)")
 }
@@ -350,8 +371,7 @@ do {
     } else {
         check(false, "状态应为 done，实际 \(harness.controller.state)")
     }
-    _ = harness.hostManifestPeer
-    _ = harness.hostResponder
+    _ = harness.deviceHost
 } catch {
     check(false, "端到端① 抛错：\(error)")
 }
@@ -385,8 +405,7 @@ do {
     } else {
         check(false, "状态应为 done，实际 \(harness.controller.state)")
     }
-    _ = harness.hostManifestPeer
-    _ = harness.hostResponder
+    _ = harness.deviceHost
 } catch {
     check(false, "端到端② 抛错：\(error)")
 }
@@ -713,12 +732,12 @@ do {
     }
 
     // 规划层：远端缺失的歌词条目永不转化为删除（含全库镜像 .all 配置）
-    let plan = SyncLibrarySyncPlanner.plan(
+    let plan = SyncLibraryPullPlanner.plan(
         remote: SyncManifestResponse(entries: []),
         local: [entry("@lyrics/\(songHash).json", hash: "h", stableId: "client-sid")],
-        configuration: SyncLibrarySyncConfiguration()
+        selection: .all
     )
-    checkEqual(plan.fetchRequest, nil, "规划层：远端没有的歌词 → 无动作，不留任何待办（只补不删）")
+    checkEqual(plan.relativePaths, [], "规划层：远端没有的歌词 → 无动作，不留任何待办（只补不删）")
 } catch {
     check(false, "⑬ 抛错：\(error)")
 }
@@ -1188,6 +1207,180 @@ do {
     _ = unavailable
 } catch {
     check(false, "⑲ 抛错：\(error)")
+}
+
+// MARK: - ⑳ 推送方向对账（纯逻辑，R1b-2 块①）
+
+section("⑳ 推送方向对账：本端选择集为准（缺则推 / 一致则跳 / 对端多的不动）")
+do {
+    let localEntries = [
+        entry("Album/changed.flac", hash: "new"),
+        entry("Album/missing.flac", hash: "h3"),
+        entry("Album/same.flac", hash: "h1"),
+        entry("@lyrics/h1.json", hash: "lh1"),
+    ]
+    let remoteEntries = [
+        entry("Album/changed.flac", hash: "old"),
+        entry("Album/same.flac", hash: "h1"),
+        entry("Album/device-only.flac", hash: "h9"),
+    ]
+    let plan = SyncLibraryPushPlanner.plan(local: localEntries, remote: remoteEntries)
+    checkEqual(
+        plan.toPush.map(\.relativePath),
+        ["@lyrics/h1.json", "Album/changed.flac", "Album/missing.flac"],
+        "对端缺该路径或内容不同 → 计划推送（升序）"
+    )
+    checkEqual(plan.unchanged.map(\.relativePath), ["Album/same.flac"], "同路径 + content_hash 相同 → 跳过")
+    check(
+        !plan.toPush.contains { $0.relativePath == "Album/device-only.flac" }
+            && !plan.unchanged.contains { $0.relativePath == "Album/device-only.flac" },
+        "对端多出来的条目 → 什么都不做（不传播删除）"
+    )
+    checkEqual(
+        SyncLibraryPushPlanner.plan(
+            local: [entry("Album/x.flac", hash: nil)],
+            remote: [entry("Album/x.flac", hash: "h")]
+        ).toPush.map(\.relativePath),
+        ["Album/x.flac"],
+        "本端指纹缺失 → 保守推送（绝不误判一致）"
+    )
+    checkEqual(
+        SyncLibraryPushPlanner.plan(
+            local: [entry("Album/x.flac", hash: "h")],
+            remote: [entry("Album/x.flac", hash: nil)]
+        ).toPush.map(\.relativePath),
+        ["Album/x.flac"],
+        "对端指纹缺失 → 保守推送"
+    )
+
+    let selection = SyncLibraryPushSelection.relativePaths(["B/2.flac", "A/1.flac", "../escape.flac", "A/1.flac"])
+    checkEqual(selection.normalizedPaths, ["A/1.flac", "B/2.flac"], "选择集规范化（拒非法 / 去重 / 升序）")
+    checkEqual(
+        SyncLibraryPushSelection.relativePaths(["Album/same.flac"]).filter(localEntries).map(\.relativePath),
+        ["Album/same.flac"],
+        "选择集过滤：命中显式路径"
+    )
+    checkEqual(SyncLibraryPushSelection.all.filter(localEntries).count, localEntries.count, "全库选择集不过滤")
+}
+
+// MARK: - ㉑ 端到端：Mac 推送 → 设备接收
+
+section("㉑ 端到端：Mac 推送 → 设备落位 + 入库（跳过已一致 / 不传播删除 / 歌词随歌）")
+do {
+    let sameSong = silentData(0xB1, count: 5_000)
+    let deviceOld = silentData(0xB2, count: 3_000)
+    let deviceOnly = silentData(0xB3, count: 1_000)
+    let deviceRoot = try tempRoot("push-device")
+    try writeFile("Album/same.flac", in: deviceRoot, data: sameSong)
+    try writeFile("Album/update.flac", in: deviceRoot, data: deviceOld)
+    try writeFile("Imported/device-only.flac", in: deviceRoot, data: deviceOnly)
+
+    let macRoot = try tempRoot("push-mac")
+    try writeFile("Album/same.flac", in: macRoot, data: sameSong)
+    let newSong = silentData(0xB4, count: 300_000)
+    try writeFile("Pushed/new.flac", in: macRoot, data: newSong)
+    let updatedSong = silentData(0xB5, count: 3_500)
+    try writeFile("Album/update.flac", in: macRoot, data: updatedSong)
+    let newHash = try sha256Hex(of: newSong)
+    let updatedHash = try sha256Hex(of: updatedSong)
+
+    let macLyrics = AlignedLyricsStore(directory: try tempRoot("push-mac-lyrics"))
+    try macLyrics.write(sampleLyrics("随歌推送的歌词"), forStableId: "mac-sid")
+    var macFixture = LyricsFixture()
+    macFixture.songHashByStableId = ["mac-sid": newHash]
+    var deviceFixture = LyricsFixture()
+    deviceFixture.songHashByStableId = ["device-sid": newHash]
+    let macMapping = mapping(of: macFixture)
+    let deviceMapping = mapping(of: deviceFixture)
+
+    let fixture = SessionFixture.pairedHandshake()
+    let deviceSink = SinkSpy()
+    let deviceLyrics = AlignedLyricsStore(directory: try tempRoot("push-device-lyrics"))
+    let deviceHost = SyncLibraryPassiveHost(
+        libraryRoot: deviceRoot,
+        sink: deviceSink,
+        database: DatabaseManager(),
+        lyricsStore: deviceLyrics,
+        lyricsMapping: deviceMapping
+    )
+    check(deviceHost.attach(to: fixture.clientSession), "设备被动端接线")
+
+    let macManager = DatabaseManager()
+    let descriptor = SyncLocalLibraryDescriptor(
+        libraryRoot: macRoot,
+        rootName: "测试 Mac",
+        lyricsRoot: macLyrics.directory,
+        sourceFiles: { SyncLocalLibraryScanner.sourceFiles(in: macRoot, database: macManager) },
+        lyricsEntries: { SyncAlignedLyricsManifest.entries(store: macLyrics, mapping: macMapping) },
+        contentHash: { relativePath in
+            DatabaseManager.contentHashIfFilePresent(
+                atPath: macRoot.appendingPathComponent(relativePath).path
+            )
+        },
+        lyricsFileName: { wirePath in
+            guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
+                  let stableId = macMapping.stableIdForContentHash(songHash)
+            else { return nil }
+            return "\(stableId).json"
+        }
+    )
+    let push = SyncLibraryPushController(session: fixture.hostSession, descriptor: descriptor)
+    try push.start()
+
+    let lyricsWire = "@lyrics/\(newHash).json"
+    if case let .done(summary) = push.state {
+        checkEqual(
+            summary.planned,
+            [lyricsWire, "Album/update.flac", "Pushed/new.flac"].sorted(),
+            "推送计划（升序）"
+        )
+        checkEqual(summary.skipped, ["Album/same.flac"], "已一致条目跳过（不重复传）")
+        checkEqual(
+            summary.completed,
+            [lyricsWire, "Album/update.flac", "Pushed/new.flac"].sorted(),
+            "全部确认送达"
+        )
+        checkEqual(summary.failed, [], "推送无失败")
+        check(summary.isFullSuccess, "推送账目 isFullSuccess")
+    } else {
+        check(false, "推送状态应为 done，实际 \(push.state)")
+    }
+
+    let newLanded = deviceRoot.appendingPathComponent("Pushed/new.flac")
+    check(FileManager.default.fileExists(atPath: newLanded.path), "推送的新歌落位")
+    if FileManager.default.fileExists(atPath: newLanded.path) {
+        checkEqual(try SyncFileChecksum.sha256Hex(ofFile: newLanded), newHash, "新歌落位内容 SHA-256 一致")
+    }
+    checkEqual(
+        try SyncFileChecksum.sha256Hex(ofFile: deviceRoot.appendingPathComponent("Album/update.flac")),
+        updatedHash,
+        "同路径文件就地替换为新内容（内容不同则更新）"
+    )
+    check(
+        FileManager.default.fileExists(atPath: deviceRoot.appendingPathComponent("Imported/device-only.flac").path),
+        "对端未声明的本端文件保留（不传播删除）"
+    )
+    checkEqual(
+        deviceSink.indexed.sorted(),
+        [deviceRoot.appendingPathComponent("Album/update.flac").path, newLanded.path].sorted(),
+        "落位文件均走既有入库入口（歌词不走曲库入库）"
+    )
+    checkEqual(
+        try deviceLyrics.read(forStableId: "device-sid")?.plainLyrics,
+        "随歌推送的歌词",
+        "歌词按歌曲 content_hash 映射落到设备 stableId"
+    )
+    check(!deviceLyrics.contains(forStableId: "mac-sid"), "不按 Mac 侧 stableId 落库")
+    checkEqual(
+        (try? FileManager.default.contentsOfDirectory(
+            atPath: deviceRoot.appendingPathComponent(".sync-incoming").path
+        )) ?? [],
+        [],
+        "落地目录无残渣"
+    )
+    deviceHost.detach()
+} catch {
+    check(false, "㉑ 抛错：\(error)")
 }
 
 // MARK: - 汇总
