@@ -60,6 +60,9 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     case manifestResponse = 11
     case syncFetchRequest = 12
     case syncFetchResult = 13
+    /// R1b-1（2026-09-11）Mac 推送声明：Mac → 设备，声明即将推送的文件与目标相对路径。
+    /// 载荷 `SyncLibraryPushAnnounce`（Sync/SyncLibraryPushModels.swift）。10-13 保持不动，新增从 14 起。
+    case libraryPushAnnounce = 14
 }
 
 /// 帧 flags（bit0 = encrypted）。

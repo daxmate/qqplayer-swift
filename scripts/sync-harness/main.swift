@@ -830,6 +830,366 @@ do {
     check(SyncChangeLogDeletionPolicy.isDelete(op: "delete"), "字符串 \"delete\" 判为删除")
 }
 
+// MARK: - ⑮ 推送声明模型 + 认领表（纯逻辑，R1b-1）
+
+/// 收结果帧的小夹具（假 Mac 侧收 sync_fetch_result）。
+final class ResultTap {
+    private let lock = NSLock()
+    private var stored: SyncFetchResult?
+    private var prior: ((SyncFrame) -> Void)?
+
+    init(session: SyncPeerSession) {
+        prior = session.onApplicationFrame
+        session.onApplicationFrame = { [weak self] frame in
+            guard let self else { return }
+            if frame.type == .syncFetchResult,
+               let decoded = try? SyncFetchCodec.decode(SyncFetchResult.self, from: frame.payload) {
+                self.lock.lock()
+                self.stored = decoded
+                self.lock.unlock()
+            }
+            self.prior?(frame)
+        }
+    }
+
+    var value: SyncFetchResult? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+}
+
+/// 内存数据的 SHA-256（与落到磁盘后的文件哈希同口径）。
+func sha256Hex(of data: Data) throws -> String {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("qqp-hash-\(UUID().uuidString)")
+    try data.write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    return try SyncFileChecksum.sha256Hex(ofFile: url)
+}
+
+section("⑮ 推送声明模型 + 认领表（纯逻辑）")
+do {
+    check(
+        SyncPushEntry.make(relativePath: "../escape.flac", fileID: "h", sha256Hex: "h", size: 1) == nil,
+        "`..` 逃逸路径不能构造声明条目"
+    )
+    check(
+        SyncPushEntry.make(relativePath: "/abs.flac", fileID: "h", sha256Hex: "h", size: 1) == nil,
+        "绝对路径不能构造声明条目"
+    )
+    check(
+        SyncPushEntry.make(relativePath: "Album/.hidden.flac", fileID: "h", sha256Hex: "h", size: 1) == nil,
+        "隐藏文件（点开头）不能构造声明条目"
+    )
+    checkEqual(
+        SyncPushEntry.make(relativePath: "Album/./01.flac", fileID: "h", sha256Hex: "h", size: 1)?.relativePath,
+        "Album/01.flac",
+        "声明路径规范化（与对账键同口径）"
+    )
+    let good = SyncPushEntry.make(relativePath: "Album/01 Song.flac", fileID: "abc", sha256Hex: "abc", size: 10)
+    checkEqual(good?.transferName, "01 Song.flac", "传输名 = 路径末段（单段）")
+    check(good?.isStructurallyValid == true, "自洽条目通过结构校验")
+
+    let dup = SyncPushEntry(
+        relativePath: "Album/01.flac", transferName: "01.flac", fileID: "a", sha256Hex: "a", size: 1
+    )
+    let invalid = SyncPushEntry(
+        relativePath: "../x.flac", transferName: "x.flac", fileID: "b", sha256Hex: "b", size: 1
+    )
+    let announce = SyncLibraryPushAnnounce(entries: [dup, invalid, dup])
+    checkEqual(announce.entries.map(\.relativePath), ["Album/01.flac"], "声明构造：非法丢弃 + 同路径去重")
+    check(!announce.isEmpty, "声明非空")
+    check(SyncLibraryPushAnnounce(entries: []).isEmpty, "空声明 isEmpty")
+
+    let a = SyncPushEntry(relativePath: "A/dup.flac", transferName: "dup.flac", fileID: "a", sha256Hex: "a", size: 1)
+    let b = SyncPushEntry(relativePath: "B/dup.flac", transferName: "dup.flac", fileID: "b", sha256Hex: "b", size: 1)
+    var table = SyncPushClaimTable(entries: [a, b])
+    checkEqual(table.claim(transferName: "dup.flac"), "A/dup.flac", "同名多路径：首个未认领")
+    checkEqual(table.claim(transferName: "dup.flac"), "B/dup.flac", "同名多路径：第二个未认领")
+    check(table.claim(transferName: "dup.flac") == nil, "认领完 → nil")
+    check(table.isEmpty, "认领表已取空")
+    var unknownTable = SyncPushClaimTable(entries: [a])
+    check(
+        unknownTable.claim(transferName: "unknown.flac") == nil,
+        "未声明的传输名 → nil（不落位）"
+    )
+
+    let payload = try SyncPushCodec.encode(announce)
+    checkEqual(try SyncPushCodec.decode(SyncLibraryPushAnnounce.self, from: payload), announce, "帧 14 载荷编解码往返")
+    checkEqual(SyncFrameType.libraryPushAnnounce.rawValue, 14, "新帧从 14 起编号")
+    checkEqual(SyncFrameType.syncFetchResult.rawValue, 13, "既有帧值语义不变（10-13 保持）")
+} catch {
+    check(false, "⑮ 抛错：\(error)")
+}
+
+// MARK: - ⑯ 被动端：应答 Mac 的 manifest / 文件请求
+
+section("⑯ 被动端：应答 Mac 的 manifest / 文件请求（含越界拒读）")
+do {
+    let song = silentData(0x71, count: 300_000)
+    let songHash = try sha256Hex(of: song)
+    let deviceRoot = try tempRoot("device-lib")
+    try writeFile("Album/01 Song.flac", in: deviceRoot, data: song)
+    try writeFile("Imported/device-only.flac", in: deviceRoot, data: silentData(0x72, count: 1_024))
+    let outsideRoot = try tempRoot("device-outside")
+    let outsideFile = try writeFile("secret.flac", in: outsideRoot, data: silentData(0x77, count: 32))
+    try FileManager.default.createSymbolicLink(
+        at: deviceRoot.appendingPathComponent("escape.flac"),
+        withDestinationURL: outsideFile
+    )
+    let deviceLyrics = AlignedLyricsStore(directory: try tempRoot("device-lyrics"))
+    try deviceLyrics.write(sampleLyrics("设备侧对齐歌词"), forStableId: "dev-sid")
+    var fixtureMap = LyricsFixture()
+    fixtureMap.songHashByStableId = ["dev-sid": songHash]
+    let deviceMapping = mapping(of: fixtureMap)
+
+    let fixture = SessionFixture.pairedHandshake()
+    let sink = SinkSpy()
+    let host = SyncLibraryPassiveHost(
+        libraryRoot: deviceRoot,
+        sink: sink,
+        database: DatabaseManager(),
+        lyricsStore: deviceLyrics,
+        lyricsMapping: deviceMapping
+    )
+    check(host.attach(to: fixture.clientSession), "被动端接线成功（应答 + 接收）")
+
+    // ① Mac 请求 manifest → 本端应答（曲库 + 歌词命名空间，升序）
+    let macPeer = SyncManifestPeer(session: fixture.hostSession)
+    var manifestResponse: SyncManifestResponse?
+    macPeer.onManifestReceived = { manifestResponse = $0 }
+    try macPeer.requestManifest()
+    checkEqual(
+        manifestResponse?.entries.map(\.relativePath) ?? [],
+        ["@lyrics/\(songHash).json", "Album/01 Song.flac", "Imported/device-only.flac"],
+        "manifest 应答 = 本端曲库 + aligned 歌词（升序）"
+    )
+
+    // ② Mac 请求文件（从设备下载）→ 本端回推内容 + 越界一律拒
+    let macIncoming = try tempRoot("mac-incoming")
+    let macReceiver = SyncFileReceiver(session: fixture.hostSession, directory: macIncoming)
+    var macReceived: [SyncFileReceiver.Outcome] = []
+    macReceiver.onCompletion = { macReceived.append($0) }
+    let resultTap = ResultTap(session: fixture.hostSession)
+    let request = SyncFetchRequest(
+        collection: .all,
+        relativePaths: ["Album/01 Song.flac", "/etc/passwd", "../escape.flac", "escape.flac", "Album/missing.flac"]
+    )
+    try fixture.hostSession.sendApplicationFrame(
+        type: .syncFetchRequest,
+        payload: try SyncFetchCodec.encode(request)
+    )
+    checkEqual(resultTap.value?.completed, ["Album/01 Song.flac"], "回推完成清单")
+    let reasons = Dictionary(
+        uniqueKeysWithValues: (resultTap.value?.failed ?? []).map { ($0.relativePath, $0.reason) }
+    )
+    checkEqual(reasons["/etc/passwd"], SyncFetchFailureReason.invalidPath, "绝对路径 → invalidPath（越界拒读）")
+    checkEqual(reasons["../escape.flac"], SyncFetchFailureReason.invalidPath, "`..` → invalidPath（越界拒读）")
+    checkEqual(reasons["escape.flac"], SyncFetchFailureReason.outOfRoot, "软链逃逸 → outOfRoot（越界拒读）")
+    checkEqual(reasons["Album/missing.flac"], SyncFetchFailureReason.notFound, "不存在 → notFound")
+    let downloaded = macIncoming.appendingPathComponent("01 Song.flac")
+    checkEqual(try SyncFileChecksum.sha256Hex(ofFile: downloaded), songHash, "回推内容 SHA-256 与源一致")
+    checkEqual(macReceived.count, 1, "Mac 侧收到 1 个文件")
+
+    check(!FileManager.default.fileExists(atPath: deviceRoot.appendingPathComponent("Imported/device-only.flac").path) == false, "本端文件未被应答流程改动")
+    host.detach()
+    _ = sink
+} catch {
+    check(false, "⑯ 抛错：\(error)")
+}
+
+// MARK: - ⑰ 端到端：Mac 推送 → 本端接收落库
+
+section("⑰ 端到端：Mac 推送 → 本端接收落位 + 入库（不传播删除）")
+do {
+    let deviceRoot = try tempRoot("push-device")
+    let keepMe = silentData(0x81, count: 2_048)
+    let replacedOld = silentData(0x82, count: 2_048)
+    try writeFile("Imported/device-only.flac", in: deviceRoot, data: keepMe)
+    try writeFile("Album/tobe-updated.flac", in: deviceRoot, data: replacedOld)
+
+    let macRoot = try tempRoot("push-mac")
+    let newSong = silentData(0x83, count: 300_000)
+    let newURL = try writeFile("Pushed/new.flac", in: macRoot, data: newSong)
+    let newHash = try SyncFileChecksum.sha256Hex(ofFile: newURL)
+    let updatedSong = silentData(0x84, count: 3_000)
+    let updatedURL = try writeFile("Album/tobe-updated.flac", in: macRoot, data: updatedSong)
+    let updatedHash = try SyncFileChecksum.sha256Hex(ofFile: updatedURL)
+
+    let newEntry = SyncPushEntry(
+        relativePath: "Pushed/new.flac", transferName: "new.flac", fileID: newHash, sha256Hex: newHash,
+        size: Int64(newSong.count)
+    )
+    let updateEntry = SyncPushEntry(
+        relativePath: "Album/tobe-updated.flac", transferName: "tobe-updated.flac", fileID: updatedHash,
+        sha256Hex: updatedHash, size: Int64(updatedSong.count)
+    )
+
+    let fixture = SessionFixture.pairedHandshake()
+    let sink = SinkSpy()
+    let host = SyncLibraryPassiveHost(libraryRoot: deviceRoot, sink: sink, database: DatabaseManager())
+    check(host.attach(to: fixture.clientSession), "被动端接线成功")
+
+    let sender = SyncFileSender(session: fixture.hostSession)
+    var sendOutcomes: [SyncFileSender.Outcome] = []
+    sender.onCompletion = { sendOutcomes.append($0) }
+
+    // 声明 → 串行推送两个文件（新歌 + 同路径更新）
+    try fixture.hostSession.sendApplicationFrame(
+        type: .libraryPushAnnounce,
+        payload: try SyncPushCodec.encode(SyncLibraryPushAnnounce(entries: [newEntry, updateEntry]))
+    )
+    try sender.send(fileURL: newURL, fileID: newHash, name: newEntry.transferName)
+    try sender.send(fileURL: updatedURL, fileID: updatedHash, name: updateEntry.transferName)
+
+    let pushedLanded = deviceRoot.appendingPathComponent("Pushed/new.flac")
+    check(FileManager.default.fileExists(atPath: pushedLanded.path), "推送的新歌已落位")
+    checkEqual(try SyncFileChecksum.sha256Hex(ofFile: pushedLanded), newHash, "落位内容 SHA-256 一致")
+    checkEqual(
+        try SyncFileChecksum.sha256Hex(ofFile: deviceRoot.appendingPathComponent("Album/tobe-updated.flac")),
+        updatedHash,
+        "同路径文件就地替换为新内容（内容不同则更新）"
+    )
+    check(
+        FileManager.default.fileExists(atPath: deviceRoot.appendingPathComponent("Imported/device-only.flac").path),
+        "对端未声明的本端文件保留（不传播删除）"
+    )
+    checkEqual(
+        sink.indexed.sorted(),
+        [pushedLanded.path, deviceRoot.appendingPathComponent("Album/tobe-updated.flac").path].sorted(),
+        "落位文件均走既有入库入口"
+    )
+    checkEqual(sendOutcomes.count, 2, "两次推送均完成")
+    let summary = host.summary
+    checkEqual(summary.landed.sorted(), ["Album/tobe-updated.flac", "Pushed/new.flac"], "账目 landed")
+    checkEqual(summary.undeclaredTransfers, [], "无未声明传输")
+    checkEqual(summary.failed, [], "无失败")
+    checkEqual(summary.announcedEntries, 2, "本批声明条目数")
+    checkEqual(summary.accountedEntries, 2, "本批已处理条目数")
+    check(summary.batchCompleted, "本批已收尾")
+
+    // 未声明的传输：不落位、不索引、临时文件清理
+    let strayURL = try writeFile("Stray/orphan.flac", in: macRoot, data: silentData(0x85, count: 1_000))
+    let strayHash = try SyncFileChecksum.sha256Hex(ofFile: strayURL)
+    try fixture.hostSession.sendApplicationFrame(
+        type: .libraryPushAnnounce,
+        payload: try SyncPushCodec.encode(SyncLibraryPushAnnounce(entries: []))
+    )
+    try sender.send(fileURL: strayURL, fileID: strayHash, name: "orphan.flac")
+    check(
+        !FileManager.default.fileExists(atPath: deviceRoot.appendingPathComponent("Stray/orphan.flac").path),
+        "未声明的传输不落位"
+    )
+    checkEqual(host.summary.undeclaredTransfers, ["orphan.flac"], "未声明传输记账")
+    checkEqual(sink.indexed.count, 2, "未声明传输不进入库入口")
+    let incomingLeftovers = (
+        try? FileManager.default.contentsOfDirectory(
+            atPath: deviceRoot.appendingPathComponent(".sync-incoming").path
+        )
+    ) ?? []
+    checkEqual(incomingLeftovers, [], "落地目录无残渣")
+    host.detach()
+} catch {
+    check(false, "⑰ 抛错：\(error)")
+}
+
+// MARK: - ⑱ 端到端：推送歌词（随歌安装 / 无歌丢弃）
+
+section("⑱ 端到端：推送 aligned 歌词 → 随歌安装；本端无歌 → 丢弃不写孤儿")
+do {
+    let song = silentData(0x91, count: 4_096)
+    let songHash = try sha256Hex(of: song)
+    let deviceRoot = try tempRoot("lyrics-device")
+    let deviceLyrics = AlignedLyricsStore(directory: try tempRoot("lyrics-device-store"))
+    var fixtureMap = LyricsFixture()
+    fixtureMap.songHashByStableId = ["device-sid": songHash]
+    let deviceMapping = mapping(of: fixtureMap)
+
+    let macRoot = try tempRoot("lyrics-mac")
+    let lyricsURL = try writeFile(
+        "@lyrics-src.json",
+        in: macRoot,
+        data: try JSONEncoder().encode(sampleLyrics("推送过来的对齐歌词"))
+    )
+    let lyricsFileHash = try SyncFileChecksum.sha256Hex(ofFile: lyricsURL)
+    let lyricsEntry = SyncPushEntry(
+        relativePath: "@lyrics/\(songHash).json",
+        transferName: "\(songHash).json",
+        fileID: songHash,
+        sha256Hex: lyricsFileHash,
+        size: 0
+    )
+    let orphanEntry = SyncPushEntry(
+        relativePath: "@lyrics/\(String(repeating: "f", count: 64)).json",
+        transferName: "\(String(repeating: "f", count: 64)).json",
+        fileID: String(repeating: "f", count: 64),
+        sha256Hex: lyricsFileHash,
+        size: 0
+    )
+
+    let fixture = SessionFixture.pairedHandshake()
+    let sink = SinkSpy()
+    let host = SyncLibraryPassiveHost(
+        libraryRoot: deviceRoot,
+        sink: sink,
+        database: DatabaseManager(),
+        lyricsStore: deviceLyrics,
+        lyricsMapping: deviceMapping
+    )
+    check(host.attach(to: fixture.clientSession), "被动端接线成功")
+    let sender = SyncFileSender(session: fixture.hostSession)
+
+    try fixture.hostSession.sendApplicationFrame(
+        type: .libraryPushAnnounce,
+        payload: try SyncPushCodec.encode(SyncLibraryPushAnnounce(entries: [lyricsEntry, orphanEntry]))
+    )
+    try sender.send(fileURL: lyricsURL, fileID: songHash, name: lyricsEntry.transferName)
+    try sender.send(fileURL: lyricsURL, fileID: orphanEntry.fileID, name: orphanEntry.transferName)
+
+    checkEqual(
+        try deviceLyrics.read(forStableId: "device-sid")?.plainLyrics,
+        "推送过来的对齐歌词",
+        "歌词按歌曲 content_hash 映射落到本端 stableId"
+    )
+    checkEqual(sink.indexed, [], "歌词不走曲库入库入口")
+    checkEqual(host.summary.discardedLyrics, [orphanEntry.relativePath], "本端无对应歌曲的歌词丢弃并记账")
+    checkEqual(deviceLyrics.stableIds(), ["device-sid"], "不写孤儿歌词（库内只有映射到的条目）")
+    checkEqual(
+        (try? FileManager.default.contentsOfDirectory(
+            atPath: deviceRoot.appendingPathComponent(".sync-incoming").path
+        )) ?? [],
+        [],
+        "落地目录无残渣"
+    )
+    host.detach()
+} catch {
+    check(false, "⑱ 抛错：\(error)")
+}
+
+// MARK: - ⑲ 被动端：曲库根不存在 → 不接线
+
+section("⑲ 被动端：曲库根不存在 → 不接线（绝不回空 manifest）")
+do {
+    let missingRoot = FileManager.default.temporaryDirectory
+        .appendingPathComponent("qqp-missing-\(UUID().uuidString)", isDirectory: true)
+    let fixture = SessionFixture.pairedHandshake()
+    let host = SyncLibraryPassiveHost(libraryRoot: missingRoot, sink: SinkSpy(), database: DatabaseManager())
+    check(!host.attach(to: fixture.clientSession), "曲库根不存在 → 不接线")
+    check(!host.isAttached, "接线态为 false")
+
+    let macPeer = SyncManifestPeer(session: fixture.hostSession)
+    var manifestResponse: SyncManifestResponse?
+    var unavailable = false
+    macPeer.onManifestReceived = { manifestResponse = $0 }
+    macPeer.onProviderUnavailable = { unavailable = true }
+    try macPeer.requestManifest()
+    checkEqual(manifestResponse?.entries.count ?? -1, -1, "未接线 → 不应答 manifest（不回空表）")
+    _ = unavailable
+} catch {
+    check(false, "⑲ 抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

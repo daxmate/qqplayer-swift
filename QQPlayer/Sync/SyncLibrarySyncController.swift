@@ -21,6 +21,9 @@
 //  M4-2b aligned 歌词随歌同步（§6.3 + 2026-09-10 语义修订）：
 //  - 本地清单 = 曲库文件 + aligned 歌词（`@lyrics/{歌曲 content_hash}.json`），
 //    两者走同一套对账 / 集合过滤；**歌词只参与「补齐缺失 / 内容不同则更新」**。
+//  - R1b-1（2026-09-11）：歌词的「安装 / 暂存重试 / 孤儿丢弃」已提炼为共用的
+//    `SyncLyricsReceiver`（被动端 `SyncLibraryPassiveHost` 同一实现），本文件只
+//    负责把结论计入账目——**不存在第二套歌词落库路径**。
 //  - **不传播删除（2026-09-10 用户拍板）**：任一端删歌/删歌词只在本地生效，
 //    绝不能因对端多出/缺失而删本端内容——本控制器不提供任何删除路径。
 //  - 收到歌词文件：经 content_hash → 本端 stableId 映射后交给 `AlignedLyricsStore`
@@ -176,16 +179,14 @@ final class SyncLibrarySyncController: @unchecked Sendable {
     private var manifestPeer: SyncManifestPeer?
     private var receiver: SyncFileReceiver?
     private var priorAppHandler: ((SyncFrame) -> Void)?
+    /// 歌词接收安装编排（与被动端共用同一实现，R1b-1 提炼）
+    private var lyricsReceiver: SyncLyricsReceiver
 
     // 锁保护状态
     private var stateValue: SyncLibrarySyncState = .idle
     private var summary = SyncLibrarySyncSummary()
     /// 文件名 → 期望的相对路径（串行推送下按名回收；同名多路径取请求序首个未匹配）
     private var expectedByFileName: [String: [String]] = [:]
-    /// 已收到、但本端歌曲尚未入库的歌词文件（本轮收尾再试一次映射）
-    private var pendingLyrics: [(wirePath: String, fileURL: URL)] = []
-    /// 本轮是否已收尾（收尾后到的歌词不再暂存，直接丢弃 + 记账）
-    private var passFinalized = false
 
     /// 每态回调（会话线程触发）。
     var onStateChange: ((SyncLibrarySyncState) -> Void)?
@@ -210,6 +211,11 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         self.fileManager = fileManager
         self.lyricsStore = lyricsStore
         self.lyricsMapping = lyricsMapping
+        self.lyricsReceiver = SyncLyricsReceiver(
+            lyricsStore: lyricsStore,
+            lyricsMapping: lyricsMapping,
+            fileManager: fileManager
+        )
     }
 
     var state: SyncLibrarySyncState {
@@ -261,9 +267,12 @@ final class SyncLibrarySyncController: @unchecked Sendable {
         self.receiver = receiver
 
         attachResultHandler()
-        lock.lock()
-        passFinalized = false
-        lock.unlock()
+        // 每轮重置歌词编排状态（与重构前「本轮未收尾」等价）
+        lyricsReceiver = SyncLyricsReceiver(
+            lyricsStore: lyricsStore,
+            lyricsMapping: lyricsMapping,
+            fileManager: fileManager
+        )
         transition(to: .requestingManifest)
         do {
             try peer.requestManifest(collection: configuration.collection)
@@ -276,6 +285,7 @@ final class SyncLibrarySyncController: @unchecked Sendable {
     /// 中止（会话关闭 / 用户取消）：停收文件，状态落 failed。
     func cancel() {
         receiver?.cancel()
+        lyricsReceiver.cancel()
         transition(to: .failed("cancelled"))
     }
 
@@ -397,88 +407,38 @@ final class SyncLibrarySyncController: @unchecked Sendable {
 
     // MARK: 歌词落地（M4-2b）
 
-    private enum LyricsInstallOutcome {
-        /// 已写进本端歌词库
-        case installed
-        /// 本端还没有对应歌曲（暂存重试 / 最终丢弃）
-        case orphan
-        /// 解码或写盘失败
-        case failed
+    /// 收到一个歌词文件：交给共用编排（安装 / 暂存 / 丢弃），本类只记账 + 回调。
+    private func acceptLyricsFile(from tempURL: URL, wirePath: String) {
+        apply(lyricsOutcome: lyricsReceiver.receive(tempURL: tempURL, wirePath: wirePath))
     }
 
-    /// 收到一个歌词文件：映射 + 安装；映射不到时按本轮是否收尾决定「暂存」或「丢弃」。
-    private func acceptLyricsFile(from tempURL: URL, wirePath: String) {
-        switch installLyricsFile(tempURL, wirePath: wirePath) {
-        case .installed:
+    /// 歌词编排结论 → 本控制器账目（completed / orphanLyricsSkipped / failed）。
+    private func apply(lyricsOutcome: SyncLyricsReceiver.Outcome) {
+        switch lyricsOutcome {
+        case let .installed(wirePath):
             lock.lock()
             summary.completed.append(wirePath)
             lock.unlock()
             onFileApplied?(wirePath)
-        case .orphan:
-            var shouldDiscard = false
+        case .pending:
+            break // 本端歌曲还没入库：本轮收尾时再试一次映射
+        case let .discarded(wirePath):
             lock.lock()
-            if passFinalized {
-                summary.orphanLyricsSkipped.append(wirePath)
-                shouldDiscard = true
-            } else {
-                pendingLyrics.append((wirePath: wirePath, fileURL: tempURL))
-            }
+            summary.orphanLyricsSkipped.append(wirePath)
             lock.unlock()
-            if shouldDiscard {
-                // 不放孤儿文件；下次同步远端 manifest 仍在 → 重新拉到（自愈）
-                try? fileManager.removeItem(at: tempURL)
-            }
-        case .failed:
+        case let .failed(wirePath):
             lock.lock()
             summary.failed.append(
                 SyncFileFetchFailure(relativePath: wirePath, reason: SyncFetchFailureReason.sendFailed)
             )
             lock.unlock()
-            try? fileManager.removeItem(at: tempURL)
-        }
-    }
-
-    /// 单次安装尝试：wire 路径 → 歌曲 content_hash → 本端 stableId → 歌词库安装。
-    private func installLyricsFile(_ tempURL: URL, wirePath: String) -> LyricsInstallOutcome {
-        guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
-              let stableId = lyricsMapping.stableIdForContentHash(songHash)
-        else { return .orphan }
-        do {
-            try lyricsStore.install(receivedFileAt: tempURL, forStableId: stableId)
-            return .installed
-        } catch {
-            return .failed
         }
     }
 
     /// 本轮收尾：暂存歌词再试一次映射（同轮先落下的歌此时已入库），仍不行则丢弃。
     private func flushPendingLyrics() {
-        lock.lock()
-        passFinalized = true
-        let pending = pendingLyrics
-        pendingLyrics = []
-        lock.unlock()
-
-        for item in pending {
-            switch installLyricsFile(item.fileURL, wirePath: item.wirePath) {
-            case .installed:
-                lock.lock()
-                summary.completed.append(item.wirePath)
-                lock.unlock()
-                onFileApplied?(item.wirePath)
-            case .orphan:
-                lock.lock()
-                summary.orphanLyricsSkipped.append(item.wirePath)
-                lock.unlock()
-                try? fileManager.removeItem(at: item.fileURL)
-            case .failed:
-                lock.lock()
-                summary.failed.append(
-                    SyncFileFetchFailure(relativePath: item.wirePath, reason: SyncFetchFailureReason.sendFailed)
-                )
-                lock.unlock()
-                try? fileManager.removeItem(at: item.fileURL)
-            }
+        for outcome in lyricsReceiver.flushPending() {
+            apply(lyricsOutcome: outcome)
         }
     }
 

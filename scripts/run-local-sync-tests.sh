@@ -40,6 +40,10 @@ SOURCES=(
   QQPlayer/Sync/SyncCollection.swift
   QQPlayer/Sync/SyncLibrarySyncModels.swift
   QQPlayer/Sync/SyncLibraryFetchResponder.swift
+  QQPlayer/Sync/SyncLocalLibraryProvider.swift
+  QQPlayer/Sync/SyncLibraryPushModels.swift
+  QQPlayer/Sync/SyncLyricsReceiver.swift
+  QQPlayer/Sync/SyncLibraryPassiveHost.swift
   QQPlayer/Sync/SyncLocalLibraryScanner.swift
   QQPlayer/Sync/SyncLibrarySyncController.swift
   QQPlayer/Sync/SyncAlignedLyrics.swift
