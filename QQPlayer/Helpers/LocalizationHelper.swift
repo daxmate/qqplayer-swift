@@ -240,7 +240,7 @@ struct Localized {
     static let addYourMusic = "add_your_music".localized
     static let howToAddMusic = "how_to_add_music".localized
     static let openFilesApp = "open_files_app".localized
-    static let navigateToIcloudDrive = "navigate_to_icloud_drive".localized
+    static let navigateToOnMyIphone = "navigate_to_on_my_iphone".localized
     static let findQQPlayerFolder = "find_qqplayer_folder".localized
     static let addYourMusicInstruction = "add_your_music_instruction".localized
 
@@ -254,7 +254,7 @@ struct Localized {
 
     // MARK: - Tutorial Instructions
     static let findOpenFilesApp = "find_open_files_app".localized
-    static let tapIcloudDriveSidebar = "tap_icloud_drive_sidebar".localized
+    static let tapOnMyIphoneSidebar = "tap_on_my_iphone_sidebar".localized
     static let lookForQQPlayerFolder = "look_for_qqplayer_folder".localized
     static let copyMusicFiles = "copy_music_files".localized
 

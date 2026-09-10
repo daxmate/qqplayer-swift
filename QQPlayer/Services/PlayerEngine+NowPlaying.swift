@@ -421,7 +421,6 @@
 
             do {
                 let url = URL(fileURLWithPath: track.path)
-                try await cloudDownloadManager.ensureLocal(url)
 
                 let artwork: MPMediaItemArtwork? = try await withCheckedThrowingContinuation { continuation in
                     DispatchQueue.global(qos: .utility).async {

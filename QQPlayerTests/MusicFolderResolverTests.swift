@@ -3,11 +3,10 @@
 //
 //  音乐文件夹位置决策纯逻辑防回归测试（MusicFolderResolver）。
 //
-//  背景（2026-09 A0-prep）：iOS 音乐数据现存 iCloud ubiquity 容器（Cosmos 遗留），
-//  将切到本地沙盒 Documents。A0 = 代码准备：决策上收为纯函数、行为不变——iOS 仍
-//  双扫（本地沙盒 Documents 主 + iCloud ubiquity 容器 Documents 次），macOS 默认
-//  ~/Music/QQPlayer + 设置页外部文件夹（多根去重）。任何改动让 iOS 主位置丢失 /
-//  macOS 默认目录丢失都会让曲库变空，故锁定。
+//  背景（M3-2，2026-09-10）：iOS 音乐存储已迁移到本地沙盒 Documents（退役 iCloud
+//  ubiquity 容器双位置）——iOS 唯一位置 = 沙盒 Documents（LibraryIndexer 直接
+//  FileManager 扫 Documents）；macOS 默认 ~/Music/QQPlayer + 设置页外部文件夹
+//  （多根去重）。任何改动让 macOS 默认目录丢失都会让曲库变空，故锁定。
 
 import Foundation
 import Testing
@@ -15,53 +14,16 @@ import Testing
 @testable import QQPlayer
 
 struct MusicFolderResolverTests {
-    // MARK: - iOS 位置决策
+    // MARK: - iOS 唯一位置（M3-2：沙盒 Documents，退役 ubiquity 双位置）
 
-    @Test("iOS：主位置 = 本地沙盒 Documents（传入目录原样返回）")
-    func iosPrimaryIsDocumentsDirectory() {
-        let docs = URL(fileURLWithPath: "/sandbox/Documents")
-        let container = URL(fileURLWithPath: "/container")
-        let locations = MusicFolderResolver.iosLocations(
-            documentsDirectory: docs,
-            ubiquityContainerURL: container
-        )
-        #expect(locations.primary == docs)
-    }
-
-    @Test("iOS：次位置 = ubiquity 容器 Documents 子目录（Cosmos 遗留布局）")
-    func iosSecondaryIsUbiquityDocuments() {
-        let docs = URL(fileURLWithPath: "/sandbox/Documents")
-        let container = URL(fileURLWithPath: "/private/var/mobile/container")
-        let locations = MusicFolderResolver.iosLocations(
-            documentsDirectory: docs,
-            ubiquityContainerURL: container
-        )
-        #expect(locations.secondary == container.appendingPathComponent("Documents", isDirectory: true))
-        #expect(locations.secondary?.path == "/private/var/mobile/container/Documents")
-    }
-
-    @Test("iOS：无 ubiquity 容器（未登录 iCloud）→ 次位置为 nil，主位置不受影响")
-    func iosNoContainerMeansNoSecondary() {
-        let docs = URL(fileURLWithPath: "/sandbox/Documents")
-        let locations = MusicFolderResolver.iosLocations(
-            documentsDirectory: docs,
-            ubiquityContainerURL: nil
-        )
-        #expect(locations.secondary == nil)
-        #expect(locations.primary == docs)
-    }
-
-    @Test("iOS：双扫语义——次位置可用时两处都在（A0 过渡行为基线）")
-    func iosBothLocationsWhenContainerAvailable() {
-        let docs = URL(fileURLWithPath: "/sandbox/Documents")
-        let container = URL(fileURLWithPath: "/container")
-        let locations = MusicFolderResolver.iosLocations(
-            documentsDirectory: docs,
-            ubiquityContainerURL: container
-        )
-        // 现阶段两处都扫；迁移完成后此断言会变（主位置唯一），改动点即 A0 过渡点。
-        #expect(locations.secondary != nil)
-        #expect(locations.primary.path.hasSuffix("/Documents"))
+    @Test("iOS：唯一位置 = 沙盒 Documents（不再有 iCloud 次位置概念）")
+    func iosSingleLocationIsDocuments() {
+        // iosDocumentsDirectoryURL 直接读 FileManager 沙盒 Documents——断言其语义
+        // 为 documentDirectory（不抛、路径以 Documents 结尾）。
+        let url = MusicFolderResolver.iosDocumentsDirectoryURL()
+        #expect(url.lastPathComponent == "Documents")
+        let fileManagerDocs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        #expect(url == fileManagerDocs)
     }
 
     // MARK: - macOS 默认目录

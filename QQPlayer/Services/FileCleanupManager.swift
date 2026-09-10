@@ -2,7 +2,8 @@
 //  FileCleanupManager.swift
 //  QQPlayer
 //
-//  Manages cleanup of iCloud files that were deleted from iCloud Drive
+//  Manages cleanup of library files deleted from disk (Documents / external
+//  security-scoped files). M3-2: iCloud cleanup semantics retired.
 //
 
 import Foundation
@@ -17,8 +18,8 @@ class FileCleanupManager: ObservableObject {
     private init() {}
 
     /// Reconciles only roots that the indexer successfully enumerated during
-    /// this scan. This avoids treating an iCloud/authentication failure as an
-    /// empty library while still removing files that were genuinely deleted.
+    /// this scan. This avoids treating an unavailable root as an empty library
+    /// while still removing files that were genuinely deleted.
     ///
     /// 移除两类曲目（2026-09-03 B 组「文件类型设置」对齐 web）：
     /// 1. 文件已从磁盘删除（历史行为）
@@ -76,13 +77,9 @@ class FileCleanupManager: ObservableObject {
     func checkForOrphanedFiles() async {
         print("🧹 Checking for library files that no longer exist...")
 
-        let iCloudFolderURL = stateManager.getMusicFolderURL()
+        // M3-2：退役 iCloud 容器——内部文件 = 本地 Documents（沙盒）内的文件；
+        // 外部文件 = share/document picker 引入的安全域文件（走书签校验）。
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        if let iCloudFolderURL {
-            print("🧹 iCloud folder URL: \(iCloudFolderURL.path)")
-        } else {
-            print("🧹 No iCloud folder available; reconciling local and external files")
-        }
 
         do {
             // Get all tracks from database
@@ -96,22 +93,7 @@ class FileCleanupManager: ObservableObject {
                 print("🧹 Checking track: \(trackURL.lastPathComponent)")
                 print("🧹   Path: \(trackURL.path)")
 
-                // Check if this is an internal file (iCloud/Documents) or external file
-                let isInCurrentiCloudFolder = iCloudFolderURL.map {
-                    isURL(trackURL, inside: $0)
-                } ?? false
-                let isICloudFile = isInCurrentiCloudFolder || trackURL.path.contains("/Mobile Documents/")
-
-                // iCloud paths can temporarily disappear while signed out or
-                // offline. Absence is only authoritative while the container
-                // is available; otherwise preserve the user's database row.
-                if isICloudFile && AppCoordinator.shared.iCloudStatus != .available {
-                    print("🧹 Skipping unavailable iCloud path: \(trackURL.lastPathComponent)")
-                    continue
-                }
-
-                let isInternalFile = isICloudFile ||
-                    isURL(trackURL, inside: documentsURL) ||
+                let isInternalFile = isURL(trackURL, inside: documentsURL) ||
                     trackURL.path.contains("/Documents/")
                 print("🧹   Is internal file: \(isInternalFile)")
 
@@ -123,8 +105,8 @@ class FileCleanupManager: ObservableObject {
                     if fileExists {
                         print("🧹 ✅ Internal file exists (keeping): \(trackURL.lastPathComponent)")
                     } else {
-                        // Check if this is a local Documents file with an old container path
-                        if trackURL.path.contains("/Documents/") && !isInCurrentiCloudFolder {
+                        // Check if this is a local Documents file with a moved path
+                        if trackURL.path.contains("/Documents/") {
                             // Try to find the file in the current Documents directory
                             let filename = trackURL.lastPathComponent
                             let newURL = documentsURL.appendingPathComponent(filename)

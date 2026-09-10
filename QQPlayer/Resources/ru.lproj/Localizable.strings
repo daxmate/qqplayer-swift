@@ -23,7 +23,7 @@
 "songs_count_plural" = "%d песен";
 "created_date" = "Создан %@";
 "no_songs_found" = "Песни не найдены";
-"your_music_will_appear_here" = "Чтобы добавить музыку:\n\n1. Откройте приложение «Файлы» (или нажмите «Добавить песни»)\n2. Выберите одно из мест:\n   • iCloud Drive → папка QQPlayer\n   • На iPhone → QQPlayer\n3. Перетащите музыкальные файлы в выбранную папку";
+"your_music_will_appear_here" = "Чтобы добавить музыку:\n\n1. Откройте приложение «Файлы» (или нажмите «Добавить песни»)\n2. Перейдите в «На iPhone» → QQPlayer\n3. Скопируйте музыкальные файлы в эту папку";
 "create_first_playlist" = "Создайте свой первый плейлист, чтобы начать";
 
 /* General UI strings */
@@ -184,9 +184,9 @@
 "icloud_drive_message" = "iCloud Drive позволяет получать доступ к музыкальным файлам с любого устройства и синхронизирует избранное.";
 "if_icloud_enabled_continue" = "Если iCloud Drive включён, можете продолжить";
 "add_your_music" = "Добавьте свою музыку";
-"how_to_add_music" = "Вы можете добавлять музыкальные файлы как в iCloud Drive (синхронизация между устройствами), так и локально (только на этом устройстве):";
+"how_to_add_music" = "Добавляйте файлы в папку QQPlayer на этом устройстве («Файлы» → «На iPhone» → QQPlayer):";
 "open_files_app" = "Откройте приложение «Файлы»";
-"navigate_to_icloud_drive" = "Перейдите в iCloud Drive";
+"navigate_to_on_my_iphone" = "Перейдите в «На iPhone»";
 "find_qqplayer_folder" = "Найдите папку QQPlayer";
 "add_your_music_instruction" = "Добавьте свою музыку";
 
@@ -200,7 +200,7 @@
 
 /* Tutorial Instructions */
 "find_open_files_app" = "Найдите и откройте приложение «Файлы» на устройстве";
-"tap_icloud_drive_sidebar" = "Выберите «iCloud Drive» или «На iPhone» в боковом меню";
+"tap_on_my_iphone_sidebar" = "Выберите «На iPhone» в боковом меню, затем папку QQPlayer";
 "look_for_qqplayer_folder" = "Найдите папку «QQPlayer» и откройте её";
 "copy_music_files" = "Скопируйте FLAC- или MP3-файлы в эту папку";
 
@@ -384,7 +384,7 @@
 "feature_guide_dark_mode_title" = "Тёмная тема";
 "feature_guide_dark_mode_detail" = "Настройки → Оформление → Принудительная тёмная тема, чтобы переопределить системную";
 "feature_guide_import_title" = "Импорт музыкальных файлов";
-"feature_guide_import_detail" = "Поместите файлы в папку QQPlayer в приложении «Файлы» (iCloud Drive или на этом iPhone) или коснитесь «Открыть файлы» в медиатеке";
+"feature_guide_import_detail" = "Поместите файлы в папку QQPlayer на этом устройстве («Файлы» → «На iPhone» → QQPlayer) или коснитесь «Открыть файлы» в медиатеке";
 
 
 /* Sleep Timer */

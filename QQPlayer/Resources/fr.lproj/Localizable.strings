@@ -23,7 +23,7 @@
 "songs_count_plural" = "%d musiques";
 "created_date" = "Créée le %@";
 "no_songs_found" = "Aucune musique trouvée";
-"your_music_will_appear_here" = "Pour ajouter vos musiques :\n\n1. Ouvrez l'app Fichiers (ou appuyez sur 'Ouvrir Fichiers')\n2. Choisissez soit :\n   • iCloud Drive → dossier QQPlayer\n   • Sur mon iPhone → QQPlayer\n3. Glissez vos musiques dans l'un des deux emplacements";
+"your_music_will_appear_here" = "Pour ajouter vos musiques :\n\n1. Ouvrez l\'app Fichiers (ou appuyez sur \'Ouvrir Fichiers\')\n2. Allez dans \'Sur mon iPhone\' → QQPlayer\n3. Copiez vos musiques dans ce dossier";
 "create_first_playlist" = "Créez votre première playlist pour commencer";
 
 /* General UI strings */
@@ -184,9 +184,9 @@
 "icloud_drive_message" = "iCloud Drive vous permet d'accéder à vos fichiers musicaux depuis n'importe quel appareil et garde vos favoris synchronisés.";
 "if_icloud_enabled_continue" = "Si iCloud Drive est activé, vous pouvez continuer";
 "add_your_music" = "Ajoutez votre musique";
-"how_to_add_music" = "Vous pouvez ajouter vos musiques soit dans iCloud (synchronisé sur vos appareils) ou localement :";
+"how_to_add_music" = "Ajoutez vos musiques dans le dossier QQPlayer de cet appareil (Fichiers → \'Sur mon iPhone\' → QQPlayer) :";
 "open_files_app" = "Ouvrir l'app Fichiers";
-"navigate_to_icloud_drive" = "Naviguer vers iCloud Drive";
+"navigate_to_on_my_iphone" = "Allez dans \'Sur mon iPhone\'";
 "find_qqplayer_folder" = "Trouver le dossier QQPlayer";
 "add_your_music_instruction" = "Ajoutez votre musique";
 
@@ -200,7 +200,7 @@
 
 /* Tutorial Instructions */
 "find_open_files_app" = "Trouvez et ouvrez l'app Fichiers";
-"tap_icloud_drive_sidebar" = "Choisissez 'iCloud Drive' ou 'Sur mon iPhone' dans la barre latérale";
+"tap_on_my_iphone_sidebar" = "Choisissez \'Sur mon iPhone\' dans la barre latérale, puis le dossier QQPlayer";
 "look_for_qqplayer_folder" = "Trouvez le dossier 'QQPlayer' et ouvrez-le";
 "copy_music_files" = "Copiez vos fichiers FLAC ou MP3 dans ce dossier";
 
@@ -384,7 +384,7 @@
 "feature_guide_dark_mode_title" = "Mode sombre";
 "feature_guide_dark_mode_detail" = "Réglages → Apparence → Forcer le mode sombre pour remplacer l'apparence du système";
 "feature_guide_import_title" = "Import de fichiers musicaux";
-"feature_guide_import_detail" = "Placez vos fichiers dans le dossier QQPlayer de l'app Fichiers (iCloud Drive ou sur mon iPhone), ou touchez Ouvrir des fichiers dans la bibliothèque";
+"feature_guide_import_detail" = "Placez vos fichiers dans le dossier QQPlayer de cet appareil (Fichiers → \'Sur mon iPhone\' → QQPlayer), ou touchez Ouvrir des fichiers dans la bibliothèque";
 
 
 /* Sleep Timer */

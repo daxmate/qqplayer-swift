@@ -122,7 +122,7 @@
                 }
 
                 do {
-                    try await self.cloudDownloadManager.ensureLocal(url)
+                    // M3-2：本地沙盒文件无需 iCloud 实体化；缺失由 openNativeAudioFile 失败路径处理
                     try Task.checkCancellation()
 
                     let file = try await self.openNativeAudioFile(at: url, qos: .utility)
