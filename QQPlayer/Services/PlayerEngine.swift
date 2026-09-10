@@ -129,7 +129,6 @@ class PlayerEngine: NSObject, ObservableObject {
     var currentSecurityScopedURL: URL?
 
     let databaseManager = DatabaseManager.shared
-    let cloudDownloadManager = CloudDownloadManager.shared
 
     // Enhanced Control Center synchronization (replaces MPNowPlayingSession approach)
 

@@ -28,9 +28,6 @@ struct ContentView: View {
                 showWhatsNew: $showWhatsNew,
                 onRefresh: refreshLibrary
             ))
-            .modifier(OverlayModifier(
-                appCoordinator: appCoordinator
-            ))
             .modifier(SheetModifier(
                 appCoordinator: appCoordinator,
                 showTutorial: $showTutorial,
@@ -186,20 +183,6 @@ struct LifecycleModifier: ViewModifier {
     }
 }
 
-struct OverlayModifier: ViewModifier {
-    let appCoordinator: AppCoordinator
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .top) {
-                if appCoordinator.isInitialized && appCoordinator.iCloudStatus == .offline {
-                    OfflineStatusView()
-                        .padding(.top)
-                }
-            }
-    }
-}
-
 struct SheetModifier: ViewModifier {
     let appCoordinator: AppCoordinator
     @Binding var showTutorial: Bool
@@ -232,16 +215,6 @@ struct SheetModifier: ViewModifier {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .accentColor(settings.backgroundColorChoice.color)
-            }
-            .alert(Localized.libraryOutOfSync, isPresented: .init(
-                get: { appCoordinator.showSyncAlert },
-                set: { appCoordinator.showSyncAlert = $0 }
-            )) {
-                Button(Localized.ok) {
-                    appCoordinator.showSyncAlert = false
-                }
-            } message: {
-                Text(Localized.librarySyncMessage)
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()

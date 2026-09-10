@@ -2,8 +2,8 @@
 //  AppCoordinatorModels.swift
 //  QQPlayer
 //
-//  AppCoordinator 配套顶层类型：Dictionary 工具扩展、iCloud 状态枚举、
-//  协调器错误枚举。
+//  AppCoordinator 配套顶层类型：Dictionary 工具扩展、协调器错误枚举。
+//  M3-2：iCloudStatus 枚举随 iCloud 状态机退役删除。
 //
 
 extension Dictionary {
@@ -18,46 +18,13 @@ extension Dictionary {
     }
 }
 
-enum iCloudStatus: Equatable {
-    case available
-    case notSignedIn
-    case containerUnavailable
-    case offline
-    case authenticationRequired
-    case error(Error)
-
-    static func == (lhs: iCloudStatus, rhs: iCloudStatus) -> Bool {
-        switch (lhs, rhs) {
-        case (.available, .available),
-             (.notSignedIn, .notSignedIn),
-             (.containerUnavailable, .containerUnavailable),
-             (.offline, .offline),
-             (.authenticationRequired, .authenticationRequired):
-            return true
-        case (.error, .error):
-            return true
-        default:
-            return false
-        }
-    }
-}
-
 enum AppCoordinatorError: Error {
-    case iCloudNotAvailable
-    case iCloudNotSignedIn
-    case iCloudContainerInaccessible
     case databaseError
     case indexingError
     case playlistNotFound
 
     var localizedDescription: String {
         switch self {
-        case .iCloudNotAvailable:
-            return "iCloud Drive is not available on this device."
-        case .iCloudNotSignedIn:
-            return "Please sign in to iCloud to use this app. Go to Settings > [Your Name] > iCloud and enable iCloud Drive."
-        case .iCloudContainerInaccessible:
-            return "Cannot access iCloud Drive. Please check your internet connection and iCloud Drive settings."
         case .databaseError:
             return "Database error occurred."
         case .indexingError:

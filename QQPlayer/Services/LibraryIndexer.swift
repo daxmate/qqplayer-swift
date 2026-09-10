@@ -2,7 +2,9 @@
 //  LibraryIndexer.swift
 //  QQPlayer
 //
-//  Indexes audio files (FLAC, MP3, WAV, AAC, Opus, Vorbis, DSD) in iCloud Drive using NSMetadataQuery
+//  Indexes audio files (FLAC, MP3, WAV, AAC, Opus, Vorbis, DSD) in the iOS
+//  sandbox Documents folder (M3-2: migrated off the iCloud ubiquity container)
+//  or the macOS music folders, using FileManager directory scans.
 //
 
 import AVFoundation
@@ -40,48 +42,8 @@ class LibraryIndexer: NSObject, ObservableObject {
     /// it belongs to a run that has since been cancelled.
     private var indexingGeneration = 0
 
-    private let metadataQuery = NSMetadataQuery()
     private let databaseManager = DatabaseManager.shared
     private let stateManager = StateManager.shared
-
-    override init() {
-        super.init()
-        setupMetadataQuery()
-    }
-
-    private func setupMetadataQuery() {
-        metadataQuery.delegate = self
-
-        // The search scope is NOT resolved here. This runs from init(), which
-        // happens on the main actor while the app launches, and asking
-        // StateManager for the music folder forces the ubiquity container to
-        // resolve - a call Apple documents as unsafe for the main thread.
-        // start() narrows the scope later, off the main actor.
-        metadataQuery.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
-
-        // Support all audio formats according to plan
-        // （单一事实源 LibraryAudioFormats.allSupported；iOS 无文件类型设置 UI，
-        // NSMetadataQuery predicate 只按支持全集收——设置只影响 macOS 目录扫描）
-        let formats = LibraryAudioFormats.allSupported.map { "*." + $0 }
-        let formatPredicates = formats.map { format in
-            NSPredicate(format: "%K LIKE %@", NSMetadataItemFSNameKey, format)
-        }
-        metadataQuery.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: formatPredicates)
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(queryDidGatherInitialResults),
-            name: NSNotification.Name.NSMetadataQueryDidFinishGathering,
-            object: metadataQuery
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(queryDidUpdate),
-            name: NSNotification.Name.NSMetadataQueryDidUpdate,
-            object: metadataQuery
-        )
-    }
 
     func start() {
         guard !isIndexing else { return }
@@ -92,63 +54,29 @@ class LibraryIndexer: NSObject, ObservableObject {
             // MVP 策略：启动全扫 + 手动刷新；FSEvents 实时监控后补（调研报告 §3.5 风险 2）。
             startMacScan()
         #else
-            // Attempt recovery from offline mode when manually syncing
-            CloudDownloadManager.shared.attemptRecovery()
-
+            // iOS 数据源：FileManager 扫描沙盒 Documents（M3-2 切主扫，退役
+            // NSMetadataQuery/iCloud ubiquity 路径）。启动全扫 + 手动刷新。
             isIndexing = true
             indexingProgress = 0.0
             tracksFound = 0
 
-            // Copy any new files from share extension first
-            Task {
-                await copyFilesFromSharedContainer()
-            }
-
             let generation = indexingGeneration
 
             Task {
-                // Resolve the container off the main actor, then start the query
-                // back on it - NSMetadataQuery needs a run loop. Both the resolve
-                // and the diagnostic directory listing used to run inline here, on
-                // the main thread, during launch.
-                let musicFolderURL = await resolveMusicFolderURL()
+                // Copy any new files from share extension first
+                await copyFilesFromSharedContainer()
 
-                // stop() or switchToOfflineMode() may have run while the container
-                // was resolving. Without this the query would be started again just
-                // after being stopped, leaving an iCloud query alive in offline
-                // mode and racing the local scan.
+                // stop() or switchToOfflineMode() may have run while the shared
+                // container was being processed. Without this the scan would run
+                // again just after being stopped.
                 guard generation == indexingGeneration, isIndexing else {
-                    print("🛑 Metadata query start cancelled - indexing was stopped")
+                    print("🛑 iOS scan cancelled - indexing was stopped")
                     return
                 }
 
-                if let musicFolderURL {
-                    metadataQuery.searchScopes = [musicFolderURL]
-                }
-                metadataQuery.start()
-
-                // Add a timeout to trigger fallback if NSMetadataQuery doesn't work
-                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-                print("Timeout check: resultCount=\(metadataQuery.resultCount), isIndexing=\(isIndexing)")
-                // The generation check matters as much as isIndexing here: a switch
-                // to offline mode sets isIndexing back to true for its own scan, and
-                // without this the fallback would run alongside it.
-                guard generation == indexingGeneration else { return }
-                if metadataQuery.resultCount == 0 && isIndexing {
-                    print("NSMetadataQuery timeout - triggering fallback scan")
-                    await fallbackToDirectScan()
-                }
+                await scanLocalDocuments(generation: generation)
             }
         #endif
-    }
-
-    /// Reads the music folder URL away from the main actor, since the first
-    /// call forces the ubiquity container to resolve.
-    /// A0 过渡：iOS 主扫（NSMetadataQuery ubiquity scope）路径保持不动——iCloud
-    /// dataless 实体化依赖此 scope；此处仍取 iCloud ubiquity 容器 Documents（次位置），
-    /// 迁移完成前不切换到本地主位置。
-    nonisolated private func resolveMusicFolderURL() async -> URL? {
-        stateManager.getMusicFolderURL()
     }
 
     func startOfflineMode() {
@@ -158,14 +86,14 @@ class LibraryIndexer: NSObject, ObservableObject {
         indexingProgress = 0.0
         tracksFound = 0
 
+        let generation = indexingGeneration
         Task {
-            await scanLocalDocuments()
+            await scanLocalDocuments(generation: generation)
         }
     }
 
     func stop() {
         indexingGeneration &+= 1
-        metadataQuery.stop()
         isIndexing = false
     }
 
@@ -187,15 +115,6 @@ class LibraryIndexer: NSObject, ObservableObject {
         return FileFingerprint(
             modificationDate: Self.modificationTimestamp(values.contentModificationDate),
             fileSize: values.fileSize.map(Int64.init)
-        )
-    }
-
-    private func metadataFingerprint(for item: NSMetadataItem) -> FileFingerprint {
-        let modificationDate = item.value(forAttribute: NSMetadataItemFSContentChangeDateKey) as? Date
-        let fileSize = (item.value(forAttribute: NSMetadataItemFSSizeKey) as? NSNumber)?.int64Value
-        return FileFingerprint(
-            modificationDate: Self.modificationTimestamp(modificationDate),
-            fileSize: fileSize
         )
     }
 
@@ -391,218 +310,6 @@ class LibraryIndexer: NSObject, ObservableObject {
         }
     }
 
-    @objc private func queryDidGatherInitialResults() {
-        print("🔍 NSMetadataQuery gathered initial results: \(metadataQuery.resultCount) items")
-        for i in 0 ..< metadataQuery.resultCount {
-            if let item = metadataQuery.result(at: i) as? NSMetadataItem,
-               let url = item.value(forAttribute: NSMetadataItemURLKey) as? URL {
-                print("  Found: \(url.lastPathComponent)")
-            }
-        }
-        Task {
-            await processQueryResults()
-        }
-    }
-
-    @objc private func queryDidUpdate() {
-        Task {
-            await processQueryResults()
-        }
-    }
-
-    private func processQueryResults() async {
-        // Capture the generation this run belongs to. stop() bumps it, so a
-        // scan superseded by switchToOfflineMode() (or another stop) must not
-        // touch shared state afterwards - in particular it must not flip
-        // isIndexing back to false and hide the offline scan.
-        let generation = indexingGeneration
-        guard generation == indexingGeneration else { return }
-
-        metadataQuery.disableUpdates()
-        defer { metadataQuery.enableUpdates() }
-
-        let itemCount = metadataQuery.resultCount
-
-        if itemCount == 0 {
-            // Only the current scan may start the fallback; a query stopped by
-            // switchToOfflineMode() must not run a full direct scan alongside
-            // the offline scan.
-            guard generation == indexingGeneration else { return }
-            print("NSMetadataQuery found 0 results, falling back to direct file system scan")
-            await fallbackToDirectScan()
-            return
-        }
-
-        var processedCount = 0
-
-        for i in 0 ..< itemCount {
-            // Bail out of a superseded scan instead of letting it run to
-            // completion: the new scan owns isIndexing from here on.
-            guard generation == indexingGeneration else { return }
-            guard let item = metadataQuery.result(at: i) as? NSMetadataItem else { continue }
-
-            await processMetadataItem(item)
-
-            processedCount += 1
-            // Throttle progress updates and yield so the UI stays responsive
-            // during large imports
-            if processedCount % 10 == 0 || processedCount == itemCount {
-                indexingProgress = Double(processedCount) / Double(itemCount)
-            }
-            await Task.yield()
-        }
-
-        // The query completed successfully, so it is safe to reconcile only
-        // the iCloud root it actually scanned. Never infer deletion from a
-        // failed or unavailable root. Only a current scan may finalize.
-        // A0 过渡：iCloud 为次位置，迁移完成后移除（此处 reconcile 的是 ubiquity 根，
-        // 主扫路径不切换，行为不变）。
-        guard generation == indexingGeneration else { return }
-        if AppCoordinator.shared.iCloudStatus == .available,
-           let musicFolderURL = stateManager.getMusicFolderURL() {
-            await FileCleanupManager.shared.reconcileMissingFiles(in: [musicFolderURL])
-        }
-        postPendingLibraryRefresh()
-
-        isIndexing = false
-        print("Library indexing completed. Found \(tracksFound) tracks.")
-    }
-
-    private func fallbackToDirectScan() async {
-        // Same generation guard as processQueryResults(): if this scan was
-        // superseded while it was being dispatched, do nothing.
-        let generation = indexingGeneration
-        guard generation == indexingGeneration else { return }
-
-        print("🔄 Starting fallback direct scan of both iCloud and local folders")
-
-        var allMusicFiles: [URL] = []
-        var successfullyScannedRoots: [URL] = []
-
-        // First, copy any new files from shared container to Documents
-        await copyFilesFromSharedContainer()
-
-        // A0 过渡：iCloud 为次位置，迁移完成后移除。iOS fallback 仍双扫（行为不变）——
-        // 次位置 iCloud ubiquity 容器 Documents 可用才扫，主位置本地沙盒 Documents 恒扫。
-        let locations = stateManager.iosMusicFolderLocations()
-
-        // Scan iCloud folder (secondary, A0 过渡) if available
-        if let iCloudMusicFolderURL = locations.secondary {
-            print("📁 Scanning iCloud folder: \(iCloudMusicFolderURL.path)")
-            do {
-                let iCloudFiles = try await findMusicFiles(in: iCloudMusicFolderURL)
-                print("📁 Found \(iCloudFiles.count) files in iCloud folder")
-                allMusicFiles.append(contentsOf: iCloudFiles)
-                if AppCoordinator.shared.iCloudStatus == .available {
-                    successfullyScannedRoots.append(iCloudMusicFolderURL)
-                }
-            } catch {
-                print("⚠️ Failed to scan iCloud folder: \(error)")
-            }
-        }
-
-        // Scan local Documents folder (primary)
-        let documentsPath = locations.primary
-        print("📱 Scanning local Documents folder: \(documentsPath.path)")
-        do {
-            let localFiles = try await findMusicFiles(in: documentsPath)
-            print("📱 Found \(localFiles.count) files in local Documents folder")
-            for file in localFiles {
-                print("  📄 Local file: \(file.lastPathComponent)")
-            }
-            allMusicFiles.append(contentsOf: localFiles)
-            successfullyScannedRoots.append(documentsPath)
-        } catch {
-            print("⚠️ Failed to scan local Documents folder: \(error)")
-        }
-
-        let totalFiles = allMusicFiles.count
-        print("📁 Total music files found (iCloud + local): \(totalFiles)")
-
-        guard totalFiles > 0 else {
-            // Only a current scan may finalize; a superseded one must not
-            // touch isIndexing or schedule a library refresh.
-            guard generation == indexingGeneration else { return }
-            // An empty, successfully enumerated root is meaningful: all of
-            // its former tracks may have been deleted.
-            await FileCleanupManager.shared.reconcileMissingFiles(in: successfullyScannedRoots)
-            postPendingLibraryRefresh()
-            isIndexing = false
-            print("❌ No music files found in any location")
-            return
-        }
-
-        // Set initial queue. Guard again so a superseded scan does not
-        // overwrite the queue a newer scan is showing.
-        guard generation == indexingGeneration else { return }
-        await MainActor.run {
-            queuedFiles = allMusicFiles.map { $0.lastPathComponent }
-            currentlyProcessing = ""
-        }
-
-        let allFileNames = allMusicFiles.map { $0.lastPathComponent }
-
-        // Parse and persist with bounded concurrency. Each file's work runs off
-        // the main actor, so metadata reads and the per-track SQLite writes no
-        // longer serialize behind (and block) UI work - previously a 90-file
-        // first run spent ~20s with the main thread pinned. The cap keeps
-        // memory and the single GRDB writer from being swamped.
-        let maxConcurrentFiles = 4
-        var completedCount = 0
-        var nextIndex = 0
-
-        await withTaskGroup(of: Void.self) { group in
-            while nextIndex < min(maxConcurrentFiles, totalFiles) {
-                let url = allMusicFiles[nextIndex]
-                group.addTask { [weak self] in await self?.indexFile(url) }
-                nextIndex += 1
-            }
-
-            while await group.next() != nil {
-                completedCount += 1
-
-                // Stop feeding a superseded scan; remaining in-flight files
-                // drain harmlessly and the finalization guard below skips all
-                // state changes.
-                guard generation == indexingGeneration else { return }
-
-                // Throttle @Published updates: rebuilding the 2000-element
-                // queuedFiles array per file made SwiftUI re-diff the whole list
-                // for every import - a major cause of freezes on large libraries
-                if completedCount % 20 == 0 || completedCount == totalFiles {
-                    currentlyProcessing = allFileNames[min(completedCount, totalFiles - 1)]
-                    queuedFiles = Array(allFileNames.suffix(from: min(completedCount, totalFiles)))
-                    indexingProgress = Double(completedCount) / Double(totalFiles)
-                }
-
-                if nextIndex < totalFiles {
-                    let url = allMusicFiles[nextIndex]
-                    group.addTask { [weak self] in await self?.indexFile(url) }
-                    nextIndex += 1
-                }
-            }
-        }
-
-        // Clear processing state when done
-        await MainActor.run {
-            currentlyProcessing = ""
-            queuedFiles = []
-        }
-
-        // Only a current scan may finalize: a stale one must not set
-        // isIndexing = false over an offline scan nor reconcile files it no
-        // longer owns.
-        guard generation == indexingGeneration else { return }
-        await FileCleanupManager.shared.reconcileMissingFiles(in: successfullyScannedRoots)
-        postPendingLibraryRefresh()
-
-        isIndexing = false
-        print("✅ Direct scan completed. Found \(tracksFound) tracks from both iCloud and local folders.")
-
-        // Process folder playlists after scan completion
-        await processFolderPlaylists(allMusicFiles: allMusicFiles)
-    }
-
     private func processFolderPlaylists(allMusicFiles: [URL]) async {
         guard DeleteSettings.load().autoCreateFolderPlaylists else {
             print("📁 Folder playlist auto-creation disabled in settings - skipping")
@@ -617,11 +324,15 @@ class LibraryIndexer: NSObject, ObservableObject {
             let parentFolder = fileURL.deletingLastPathComponent()
             let folderPath = parentFolder.path
 
-            // Skip if it's directly in Documents or iCloud root
+            // Skip if it's directly in the music root（Documents / macOS 曲库根）
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.path
-            let iCloudMusicPath = stateManager.getMusicFolderURL()?.path
+            #if os(macOS)
+                let musicRootPath = stateManager.getMusicFolderURL()?.path
+            #else
+                let musicRootPath = documentsPath
+            #endif
 
-            if folderPath == documentsPath || folderPath == iCloudMusicPath {
+            if folderPath == documentsPath || folderPath == musicRootPath {
                 continue
             }
 
@@ -687,25 +398,23 @@ class LibraryIndexer: NSObject, ObservableObject {
         }
     }
 
-    private func scanLocalDocuments() async {
-        // A0 过渡：iOS 本地 Documents 为音乐主位置（resolver.primary）。offline 场景
-        // 不解析 iCloud 容器（避免 auth error 后再次触发 ubiquity resolve——历史行为
-        // 只扫 documentDirectory），容器传 nil 仅取主位置，语义等价。
+    /// iOS 主扫/offline 统一入口（M3-2 起 = 唯一主扫）：FileManager 扫沙盒
+    /// Documents。带 generation guard，与 macOS scanMusicFolder 同一套取消语义。
+    private func scanLocalDocuments(generation: Int) async {
+        // M3-2：iOS 音乐唯一位置 = 沙盒 Documents，无 iCloud 次位置。
         let documentsDirectory = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask
         )[0]
-        let documentsPath = MusicFolderResolver.iosLocations(
-            documentsDirectory: documentsDirectory,
-            ubiquityContainerURL: nil
-        ).primary
+
+        guard generation == indexingGeneration else { return }
 
         do {
-            let musicFiles = try await findMusicFiles(in: documentsPath)
+            let musicFiles = try await findMusicFiles(in: documentsDirectory)
 
             let totalFiles = musicFiles.count
 
-            // Same bounded-concurrency treatment as the iCloud fallback scan so
-            // offline first runs don't serialize every file behind the main actor.
+            // Same bounded-concurrency treatment as the macOS scan so first
+            // runs don't serialize every file behind the main actor.
             let maxConcurrentFiles = 4
             var processedFiles = 0
             var nextIndex = 0
@@ -719,6 +428,9 @@ class LibraryIndexer: NSObject, ObservableObject {
 
                 while await group.next() != nil {
                     processedFiles += 1
+
+                    guard generation == indexingGeneration else { return }
+
                     if processedFiles % 10 == 0 || processedFiles == totalFiles {
                         indexingProgress = Double(processedFiles) / Double(totalFiles)
                     }
@@ -731,15 +443,17 @@ class LibraryIndexer: NSObject, ObservableObject {
                 }
             }
 
-            await FileCleanupManager.shared.reconcileMissingFiles(in: [documentsPath])
+            // Only a current scan may finalize.
+            guard generation == indexingGeneration else { return }
+            await FileCleanupManager.shared.reconcileMissingFiles(in: [documentsDirectory])
             postPendingLibraryRefresh()
 
             await MainActor.run {
                 isIndexing = false
-                print("Offline library scan completed. Found \(tracksFound) tracks.")
+                print("✅ iOS library scan completed. Found \(tracksFound) tracks.")
             }
 
-            // Process folder playlists after offline scan
+            // Process folder playlists after scan completion
             await processFolderPlaylists(allMusicFiles: musicFiles)
         } catch {
             await MainActor.run {
@@ -935,68 +649,19 @@ class LibraryIndexer: NSObject, ObservableObject {
     }
 
     /// One unit of scan work, safe to run concurrently off the main actor.
-    /// The iCloud status is re-read per file rather than snapshotted so a
-    /// mid-scan auth failure still halts further iCloud reads.
+    /// M3-2：iOS 已退役 ubiquity 主扫，与 macOS 一样全部按本地文件处理（沙盒
+    /// Documents / 用户添加文件夹），无鉴权/下载门。
     nonisolated private func indexFile(_ fileURL: URL) async {
-        #if os(macOS)
-            // macOS：用户添加的文件夹（含 iCloud Drive 路径）一律按本地文件处理——
-            // Mobile Documents 判断是 iOS 容器语义；Mac 的 iCloud Drive 在本地
-            // 文件系统直接可读，无鉴权/下载门（2026-09-02 用户添加 iOS 版 iCloud
-            // 曲库全被跳过的根因）。
-            await processLocalFile(fileURL)
-        #else
-            let isLocalFile = !fileURL.path.contains("Mobile Documents")
-
-            if !isLocalFile {
-                let status = await AppCoordinator.shared.iCloudStatus
-                let isAvailable = await AppCoordinator.shared.isiCloudAvailable
-                if status == .authenticationRequired || !isAvailable {
-                    print("🚫 Skipping iCloud file processing - iCloud authentication required: \(fileURL.lastPathComponent)")
-                    return
-                }
-            }
-
-            await processLocalFile(fileURL)
-        #endif
+        await processLocalFile(fileURL)
     }
 
     nonisolated private func processLocalFile(_ fileURL: URL) async {
         do {
             print("🎵 Starting to process file: \(fileURL.lastPathComponent)")
 
-            #if os(macOS)
-                // macOS 本地文件：dataless 已在 scanMusicFolder 分区时过滤，
-                // 此处全是本地已实体化文件，无 iCloud 下载步骤
-                print("📱 Processing local file (macOS): \(fileURL.lastPathComponent)")
-            #else
-                let isLocalFile = !fileURL.path.contains("Mobile Documents")
-
-                // Only try to download from iCloud if it's actually an iCloud file
-                if !isLocalFile {
-                    do {
-                        try await CloudDownloadManager.shared.ensureLocal(fileURL)
-                        print("✅ iCloud file ensured local: \(fileURL.lastPathComponent)")
-                    } catch {
-                        print("⚠️ Failed to ensure iCloud file is local: \(fileURL.lastPathComponent) - \(error)")
-
-                        // Check for authentication errors
-                        if let cloudError = error as? CloudDownloadError {
-                            switch cloudError {
-                            case .authenticationRequired, .accessDenied:
-                                print("🔐 Authentication error in LibraryIndexer - switching to offline mode")
-                                await AppCoordinator.shared.handleiCloudAuthenticationError()
-                                return // Skip this file
-                            default:
-                                break
-                            }
-                        }
-
-                        // Continue processing even if download fails (for other errors)
-                    }
-                } else {
-                    print("📱 Processing local file (no iCloud download needed): \(fileURL.lastPathComponent)")
-                }
-            #endif
+            // M3-2：iOS/macOS 统一按本地文件处理（iOS 沙盒 Documents / macOS 用户
+            // 添加文件夹），无 iCloud 实体化/下载门。macOS dataless 文件已在
+            // scanMusicFolder 分区时过滤。
 
             print("🆔 Generating stable ID for: \(fileURL.lastPathComponent)")
             let stableId = try generateStableId(for: fileURL)
@@ -1028,9 +693,6 @@ class LibraryIndexer: NSObject, ObservableObject {
                 sourceDescription: "file"
             )
 
-            // Check if file is downloaded (for iCloud files)
-            await checkDownloadStatus(for: fileURL)
-
         } catch LibraryIndexerError.parseTimeout {
             print("⏰ Timeout parsing audio file: \(fileURL.lastPathComponent)")
             print("❌ Skipping file due to parsing timeout")
@@ -1038,71 +700,6 @@ class LibraryIndexer: NSObject, ObservableObject {
             print("❌ Failed to process local track at \(fileURL.lastPathComponent): \(error)")
             print("❌ Error type: \(type(of: error))")
             print("❌ Error details: \(String(describing: error))")
-        }
-    }
-
-    nonisolated private func checkDownloadStatus(for fileURL: URL) async {
-        do {
-            let resourceValues = try fileURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey, .isUbiquitousItemKey])
-
-            if let isUbiquitous = resourceValues.isUbiquitousItem, isUbiquitous {
-                if let downloadStatus = resourceValues.ubiquitousItemDownloadingStatus {
-                    switch downloadStatus {
-                    case .notDownloaded:
-                        print("File not downloaded: \(fileURL.lastPathComponent)")
-                        // Trigger download
-                        try FileManager.default.startDownloadingUbiquitousItem(at: fileURL)
-                    case .downloaded:
-                        print("File is downloaded: \(fileURL.lastPathComponent)")
-                    case .current:
-                        print("File is current: \(fileURL.lastPathComponent)")
-                    default:
-                        print("Unknown download status for: \(fileURL.lastPathComponent)")
-                    }
-                }
-            }
-        } catch {
-            print("Failed to check download status for \(fileURL.lastPathComponent): \(error)")
-        }
-    }
-
-    private func processMetadataItem(_ item: NSMetadataItem) async {
-        guard let fileURL = item.value(forAttribute: NSMetadataItemURLKey) as? URL else { return }
-        let ext = fileURL.pathExtension.lowercased()
-        // iOS 侧：无文件类型设置 UI，按支持全集过滤（与 NSMetadataQuery predicate
-        // 同一事实源 LibraryAudioFormats.allSupported）
-        guard LibraryAudioFormats.allSupported.contains(ext) else { return }
-
-        do {
-            let stableId = try generateStableId(for: fileURL)
-            let fingerprint = metadataFingerprint(for: item)
-            let existingTrack = try existingTrack(stableId: stableId, path: fileURL.path)
-
-            if let existingTrack, !needsMetadataRefresh(existingTrack, fingerprint: fingerprint) {
-                return
-            }
-            if existingTrack != nil {
-                print("🔄 iCloud file changed; reparsing metadata: \(fileURL.lastPathComponent)")
-            }
-
-            if DeleteSettings.isTrackExcluded(stableId) {
-                return
-            }
-
-            try await CloudDownloadManager.shared.ensureLocal(fileURL)
-
-            let parsedFile = try await parseAudioFile(at: fileURL, stableId: stableId)
-            try await saveParsedFile(
-                parsedFile,
-                replacing: existingTrack,
-                sourceDescription: "iCloud file"
-            )
-
-            // Check if file is downloaded (for iCloud files)
-            await checkDownloadStatus(for: fileURL)
-
-        } catch {
-            print("Failed to process track at \(fileURL): \(error)")
         }
     }
 
@@ -1669,11 +1266,5 @@ class LibraryIndexer: NSObject, ObservableObject {
             print("❌ Failed to resolve bookmark for track \(track.title): \(error)")
             return nil
         }
-    }
-}
-
-extension LibraryIndexer: NSMetadataQueryDelegate {
-    nonisolated func metadataQuery(_ query: NSMetadataQuery, replacementObjectForResultObject result: NSMetadataItem) -> Any {
-        return result
     }
 }

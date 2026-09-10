@@ -17,7 +17,6 @@ private enum ArtworkSwipeDirection: Equatable {
 struct PlayerView: View {
     @StateObject private var playerEngine = PlayerEngine.shared
     @StateObject private var artworkManager = ArtworkManager.shared
-    @StateObject private var cloudDownloadManager = CloudDownloadManager.shared
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var currentArtwork: UIImage?
     @State private var nextArtwork: UIImage?

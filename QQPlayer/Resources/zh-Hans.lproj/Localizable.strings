@@ -23,7 +23,7 @@
 "songs_count_plural" = "%d 首歌曲";
 "created_date" = "创建于 %@";
 "no_songs_found" = "未找到歌曲";
-"your_music_will_appear_here" = "如何添加你的无损音乐：\n\n1. 打开 iOS 自带的「文件」App（或点击下方“打开文件”按钮）\n2. 找到以下任意路径：\n   • iCloud 云盘 → QQPlayer 文件夹\n   • 我的 iPhone → QQPlayer\n3. 将你的音乐文件移动或拷贝到上述文件夹中即可";
+"your_music_will_appear_here" = "如何添加你的无损音乐：\n\n1. 打开 iOS 自带的「文件」App（或点击下方“打开文件”按钮）\n2. 进入「我的 iPhone」→「QQPlayer」\n3. 将你的音乐文件移动或拷贝到该文件夹中即可";
 "create_first_playlist" = "创建你的第一个播放列表开始听歌吧";
 
 /* 自动歌单 */
@@ -190,9 +190,9 @@
 "icloud_drive_message" = "启用 iCloud 云盘后，你可以在任何设备上访问你的音乐库并保持配置同步。";
 "if_icloud_enabled_continue" = "如果已启用 iCloud 云盘，请点击继续";
 "add_your_music" = "添加你的本地音乐";
-"how_to_add_music" = "你可以将音乐文件放入 iCloud 云盘 (多端同步)，或者仅存入本机 (纯本地播放)：";
+"how_to_add_music" = "请将音乐文件放入本机「文件」App 的 QQPlayer 文件夹（我的 iPhone → QQPlayer）：";
 "open_files_app" = "打开「文件」App";
-"navigate_to_icloud_drive" = "进入「iCloud 云盘」";
+"navigate_to_on_my_iphone" = "进入「我的 iPhone」";
 "find_qqplayer_folder" = "找到「QQPlayer」文件夹";
 "add_your_music_instruction" = "导入你的音乐";
 
@@ -206,7 +206,7 @@
 
 /* Tutorial Instructions */
 "find_open_files_app" = "在手机桌面上找到并打开蓝色的「文件」App";
-"tap_icloud_drive_sidebar" = "在浏览页面选择「iCloud 云盘」或「我的 iPhone」";
+"tap_on_my_iphone_sidebar" = "在浏览页面选择「我的 iPhone」，再进入「QQPlayer」文件夹";
 "look_for_qqplayer_folder" = "找到名为「QQPlayer」的文件夹并点开";
 "copy_music_files" = "将你的 DSD、FLAC、WAV 等无损文件拷贝进这个文件夹";
 
@@ -436,7 +436,7 @@
 "feature_guide_dark_mode_title" = "深色模式开关";
 "feature_guide_dark_mode_detail" = "设置 → 外观 → 强制深色模式，可覆盖系统外观";
 "feature_guide_import_title" = "文件导入";
-"feature_guide_import_detail" = "将音乐文件放入 iOS「文件」App 的 QQPlayer 文件夹（iCloud 云盘或本机），或在媒体库点击「打开文件」直接导入";
+"feature_guide_import_detail" = "将音乐文件放入本机「文件」App 的 QQPlayer 文件夹（我的 iPhone → QQPlayer），或在媒体库点击「打开文件」直接导入";
 
 
 /* 播放顺序 */

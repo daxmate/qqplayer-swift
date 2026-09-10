@@ -23,7 +23,7 @@
 "songs_count_plural" = "%d songs";
 "created_date" = "Created %@";
 "no_songs_found" = "No songs found";
-"your_music_will_appear_here" = "To add your music:\n\n1. Open the Files app (or tap 'Add Songs')\n2. Choose either:\n   • iCloud Drive → QQPlayer folder\n   • On My iPhone → QQPlayer\n3. Drag your music files into either location";
+"your_music_will_appear_here" = "To add your music:\n\n1. Open the Files app (or tap \'Add Songs\')\n2. Go to \'On My iPhone\' → QQPlayer\n3. Copy your music files into that folder";
 "create_first_playlist" = "Create your first playlist to get started";
 
 /* Smart playlists (automatic playlists) */
@@ -196,9 +196,9 @@
 "icloud_drive_message" = "iCloud Drive lets you access your music files from any device and keeps your favorites synced.";
 "if_icloud_enabled_continue" = "If iCloud Drive is enabled, you can continue";
 "add_your_music" = "Add Your Music";
-"how_to_add_music" = "You can add music files to either iCloud Drive (syncs across devices) or locally (this device only):";
+"how_to_add_music" = "Add music files to the QQPlayer folder on this device (Files app → \'On My iPhone\' → QQPlayer):";
 "open_files_app" = "Open Files App";
-"navigate_to_icloud_drive" = "Navigate to iCloud Drive";
+"navigate_to_on_my_iphone" = "Go to \'On My iPhone\'";
 "find_qqplayer_folder" = "Find QQPlayer Folder";
 "add_your_music_instruction" = "Add Your Music";
 
@@ -212,7 +212,7 @@
 
 /* Tutorial Instructions */
 "find_open_files_app" = "Find and open the Files app on your device";
-"tap_icloud_drive_sidebar" = "Choose 'iCloud Drive' or 'On My iPhone' in the sidebar";
+"tap_on_my_iphone_sidebar" = "Choose \'On My iPhone\' in the sidebar, then the QQPlayer folder";
 "look_for_qqplayer_folder" = "Find the 'QQPlayer' folder and open it";
 "copy_music_files" = "Copy your FLAC or MP3 files into this folder";
 
@@ -396,7 +396,7 @@
 "feature_guide_dark_mode_title" = "Dark mode toggle";
 "feature_guide_dark_mode_detail" = "Settings → Appearance → Force Dark Mode to override the system appearance";
 "feature_guide_import_title" = "Importing music files";
-"feature_guide_import_detail" = "Put music files into the QQPlayer folder in the iOS Files app (iCloud Drive or On My iPhone), or tap Open Files in the library";
+"feature_guide_import_detail" = "Put music files into the QQPlayer folder on this device (Files app → \'On My iPhone\' → QQPlayer), or tap Open Files in the library";
 
 
 /* Sleep Timer */

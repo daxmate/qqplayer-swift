@@ -124,7 +124,6 @@
                     url = URL(fileURLWithPath: track.path)
                 }
 
-                try await cloudDownloadManager.ensureLocal(url)
                 guard isCurrentLoad(generation) else { return false }
 
                 // Remove file protection to prevent background stalls

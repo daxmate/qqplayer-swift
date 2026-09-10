@@ -21,7 +21,6 @@ struct PlayerState: Codable {
 }
 
 enum StateManagerError: Error {
-    case iCloudNotAvailable
     case fileNotFound
     case invalidData
 }

@@ -19,19 +19,11 @@ class AppCoordinator: ObservableObject {
     static let shared = AppCoordinator()
 
     @Published var isInitialized = false
-    @Published var initializationError: Error?
-    @Published var isiCloudAvailable = false
-    @Published var iCloudStatus: iCloudStatus = .offline
-
-    @Published var showSyncAlert = false
-
-    var isInitialSyncCompleted = false
 
     let databaseManager = DatabaseManager.shared
     let stateManager = StateManager.shared
     let libraryIndexer = LibraryIndexer.shared
     let playerEngine = PlayerEngine.shared
-    let cloudDownloadManager = CloudDownloadManager.shared
     let fileCleanupManager = FileCleanupManager.shared
 
     private var cancellables = Set<AnyCancellable>()
@@ -43,23 +35,18 @@ class AppCoordinator: ObservableObject {
     func initialize() async {
         print("🚀 AppCoordinator.initialize() started")
 
-        // Resolve the iCloud container once, off the main actor, before
-        // anything asks for it. Everything downstream then hits the cache.
+        // Cosmos → QQPlayer rebrand: rename legacy data paths once so
+        // playlists/favorites/player-state created by older installs stay
+        // readable and don't linger under the old names in the Files app.
         await Task.detached(priority: .userInitiated) {
-            StateManager.shared.prewarmiCloudContainer()
-            // Cosmos → QQPlayer rebrand: rename legacy data paths once so
-            // playlists/favorites/player-state created by older installs stay
-            // readable and don't linger under the old names in the Files app.
             StateManager.shared.migrateLegacyPaths()
         }.value
 
-        // Check iCloud status
-        let status = await checkiCloudStatus()
-        iCloudStatus = status
-        writeICloudDiagnostic("final status = \(status)")
-
-        // Notify CloudDownloadManager about status change
-        NotificationCenter.default.post(name: NSNotification.Name("iCloudAuthStatusChanged"), object: nil)
+        // M3-2：一次性 iCloud → 沙盒存量迁移（幂等可断点；无 iCloud 数据时自动跳过）。
+        // 必须在首次扫描前跑完，确保 LibraryIndexer 主扫只面对沙盒 Documents。
+        #if os(iOS)
+            _ = await SandboxMusicMigrator.shared.runIfNeeded()
+        #endif
 
         // Check if we should auto-scan based on last scan date
         var settings = DeleteSettings.load()
@@ -72,62 +59,14 @@ class AppCoordinator: ObservableObject {
             print("⏭️ Recent app launch - skipping automatic scan (use manual sync button)")
         }
 
-        switch status {
-        case .available:
-            isiCloudAvailable = true
-            await forceiCloudFolderCreation()
-            await syncFavorites()
-
-            // Only auto-scan if it's been a while or never scanned
-            if shouldAutoScan {
-                await startLibraryIndexing()
-                settings.lastLibraryScanDate = Date()
-                settings.save()
-            }
-            print("App initialized with iCloud sync")
-
-        case .notSignedIn:
-            isiCloudAvailable = false
-            initializationError = AppCoordinatorError.iCloudNotSignedIn
-            // Still initialize in local mode for functionality
-            if shouldAutoScan {
-                await startOfflineLibraryIndexing()
-                settings.lastLibraryScanDate = Date()
-                settings.save()
-            }
-            print("App initialized in local mode - iCloud not signed in")
-
-        case .containerUnavailable, .error:
-            isiCloudAvailable = false
-            initializationError = AppCoordinatorError.iCloudContainerInaccessible
-            // Still initialize in local mode for functionality
-            if shouldAutoScan {
-                await startOfflineLibraryIndexing()
-                settings.lastLibraryScanDate = Date()
-                settings.save()
-            }
-            print("App initialized in local mode - iCloud container unavailable")
-
-        case .authenticationRequired:
-            isiCloudAvailable = false
-            showSyncAlert = true
-            if shouldAutoScan {
-                await startOfflineLibraryIndexing()
-                settings.lastLibraryScanDate = Date()
-                settings.save()
-            }
-            print("App initialized in local mode - iCloud authentication required")
-
-        case .offline:
-            isiCloudAvailable = false
-            // No error - this is true offline mode
-            if shouldAutoScan {
-                await startOfflineLibraryIndexing()
-                settings.lastLibraryScanDate = Date()
-                settings.save()
-            }
-            print("App initialized in offline mode")
+        // M3-2：退役 iCloud 状态机后本地沙盒是唯一数据源，不再区分 online/offline
+        // 分支——统一走本地主扫（FileManager 扫沙盒 Documents）。
+        if shouldAutoScan {
+            await startLibraryIndexing()
+            settings.lastLibraryScanDate = Date()
+            settings.save()
         }
+        print("App initialized with local sandbox music library")
 
         // Restore UI state only to show user what was playing without interrupting other apps
         Task {
@@ -160,12 +99,6 @@ class AppCoordinator: ObservableObject {
 
     private func startLibraryIndexing() async {
         libraryIndexer.start()
-    }
-
-    private func startOfflineLibraryIndexing() async {
-        // In offline mode, we don't use NSMetadataQuery (iCloud specific)
-        // Instead, we scan the app's Documents directory for music files
-        libraryIndexer.startOfflineMode()
     }
 
     private func setupBindings() {
