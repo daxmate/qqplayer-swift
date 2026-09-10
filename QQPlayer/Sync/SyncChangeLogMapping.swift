@@ -5,6 +5,11 @@
 //  局域网同步（S2, M4-2a）跨端歌曲引用映射收口：本地 stable_id ↔ content_hash
 //  双向解析 + 线上 entry 的本地化改写。
 //
+//  ⚠️ v2 语义修订（2026-09-10，docs/lan-sync-design.md §6.2 / §12b-7）：**不再有删除
+//  传播**——delete 变更在 SyncChangeLogPeer 层就被拦掉（发送侧过滤 / 接收侧忽略），
+//  不会走到本文件的映射变换；本文件只对 upsert 行做映射。若被传入 delete 行，仍按
+//  原样变换（纯 op 无关变换），但这不是任何生产路径。
+//
 //  语义（docs/lan-sync-design.md §6.2："跨端同步载荷引用 content_hash，同步层
 //  做双向映射"）：
 //  - 发送侧（SyncChangeLogPeer.handlePull）：outbox 行 → wire entry 时按行内歌曲

@@ -6,6 +6,8 @@
 //  - 新表迁移幂等：createTables 连跑两次不炸（旧库启动自动补表语义）
 //  - outbox 捕获：收藏增删 / 播放历史写入 / 歌单与歌单项变更 → 同事务落
 //    sync_outbox（entity/row_key/op/updated_at/payload_json）
+//    （v2 2026-09-10 §12b-7：本地 delete **照常记录**——本地事务完整；只是该行不上线，
+//     发送侧由 SyncChangeLogDeletionPolicy 过滤，接收侧一律忽略）
 //  - 游标与增量拉取：cursor 默认 0、setCursor upsert、entries(after:) 增量、
 //    maxOutboxID
 //
@@ -92,6 +94,7 @@ struct SyncChangeLogStoreTests {
             #expect(rows[1].entity == SyncChangeEntity.favorite.rawValue)
             #expect(rows[1].rowKey == "fav-1")
             #expect(rows[1].op == SyncChangeOp.delete.rawValue)
+            // v2：本地照记 delete（本地删除是本地事务），该行不上线
         }
     }
 
@@ -193,7 +196,7 @@ struct SyncChangeLogStoreTests {
             let rows = try Self.outboxRows(db)
             #expect(rows.count == 3)
             #expect(rows[2].op == SyncChangeOp.delete.rawValue)
-            #expect(rows[2].rowKey == playlist.slug)
+            #expect(rows[2].rowKey == playlist.slug) // v2：本地照记 delete，不上线
         }
     }
 
@@ -226,6 +229,7 @@ struct SyncChangeLogStoreTests {
             let rows = try Self.outboxRows(db)
             let itemDeletes = rows.filter { $0.entity == SyncChangeEntity.playlistItem.rawValue && $0.op == SyncChangeOp.delete.rawValue }
             #expect(itemDeletes.count == 1)
+            // v2：本地照记 delete（不上线）
             #expect(itemDeletes[0].rowKey == "\(playlist.slug)|item-1")
         }
     }
