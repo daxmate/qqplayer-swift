@@ -5,13 +5,12 @@
 //  S2 M3-3b 端到端（内存回环会话，无模拟器/无网络）：
 //    Host 侧 = SyncManifestPeer（manifest 提供者）+ SyncLibraryFetchResponder（按路径推送）
 //              —— 与 MacSyncLibraryHost 的装配同构（后者 Mac target only，测试侧手工装配）
-//    Client 侧 = SyncLibrarySyncController（对账 → 拉取 → 删除 → 落盘 + 入库 sink）
+//    Client 侧 = SyncLibrarySyncController（对账 → 拉取 → 落盘 + 入库 sink）
 //
-//  覆盖任务包块④四条：
+//  覆盖三条：
 //    ① 客户端缺 1 个文件 → 拉取后本地存在且 SHA-256 与源一致 + 入库入口被调用
-//    ② 远端已删（本地多出且在受管集合内）→ toDelete 生效，本地副本被删
-//    ③ 私有区/未受管路径 → 不删
-//    ④ 越界路径请求（含 `..`）→ Host 计入 failed，不出曲库根
+//    ② 远端已删 → **本端一条都不删**（含原"受管"路径与"导入"路径），同步正常 done
+//    ③ 越界路径请求（含 `..`）→ Host 计入 failed，不出曲库根
 //
 //  fixture 复用 SyncPeerSessionTestSupport.swift（SessionFixture 双 ready 回环）。
 //
@@ -22,12 +21,11 @@ import Testing
 
 @testable import QQPlayer
 
-// MARK: - 落盘/删除 spy（入库入口断言用）
+// MARK: - 落盘 spy（入库入口断言用）
 
 private final class SyncSinkSpy: SyncLibrarySyncSink, @unchecked Sendable {
     private let lock = NSLock()
     private var indexedPaths: [String] = []
-    private var deletedPaths: [String] = []
 
     var indexed: [String] {
         lock.lock()
@@ -35,23 +33,10 @@ private final class SyncSinkSpy: SyncLibrarySyncSink, @unchecked Sendable {
         return indexedPaths
     }
 
-    var deleted: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return deletedPaths
-    }
-
     func indexLandedFile(at url: URL) {
         lock.lock()
         indexedPaths.append(url.path)
         lock.unlock()
-    }
-
-    func deleteLocalFile(at url: URL, stableId: String?) {
-        lock.lock()
-        deletedPaths.append(url.path)
-        lock.unlock()
-        try? FileManager.default.removeItem(at: url)
     }
 }
 
@@ -98,8 +83,7 @@ struct SyncLibrarySyncE2ETests {
 
     private func makeHarness(
         sourceFiles: [(String, Data)] = [],
-        targetFiles: [(String, Data)] = [],
-        protectedPaths: Set<String> = []
+        targetFiles: [(String, Data)] = []
     ) throws -> Harness {
         let fixture = SessionFixture.pairedHandshake()
         let sourceRoot = try makeTempRoot("src")
@@ -122,8 +106,7 @@ struct SyncLibrarySyncE2ETests {
 
         // Client 装配
         let sink = SyncSinkSpy()
-        var configuration = SyncLibrarySyncConfiguration()
-        configuration.protectedRelativePaths = protectedPaths
+        let configuration = SyncLibrarySyncConfiguration()
         let controller = SyncLibrarySyncController(
             session: fixture.clientSession,
             libraryRoot: targetRoot,
@@ -167,64 +150,42 @@ struct SyncLibrarySyncE2ETests {
         #expect(summary.requested == ["Album/01 Song.flac"])
     }
 
-    // MARK: ② 远端已删 → 本地删除
+    // MARK: ② 远端已删 → 本端不删（不传播删除）
 
-    @Test("端到端：远端已删（本地多出且受管）→ toDelete 生效，本地副本被删")
-    func deletesRemoteRemovedFile() throws {
+    @Test("★端到端：远端已删 → 本端一条都不删（受管路径与导入路径全部保留）")
+    func keepsRemoteRemovedFilesLocally() throws {
         let shared = silentData(0x11, count: 4_096)
         let stale = silentData(0x22, count: 4_096)
+        let imported = silentData(0x44, count: 2_048)
         let harness = try makeHarness(
             sourceFiles: [("Album/kept.flac", shared)],
             targetFiles: [
                 ("Album/kept.flac", shared),
                 ("Album/stale.flac", stale),
+                ("Imported/manual.m4a", imported),
             ]
         )
 
         let kept = harness.targetRoot.appendingPathComponent("Album/kept.flac")
-        let removed = harness.targetRoot.appendingPathComponent("Album/stale.flac")
+        let staleURL = harness.targetRoot.appendingPathComponent("Album/stale.flac")
+        let importedURL = harness.targetRoot.appendingPathComponent("Imported/manual.m4a")
+        // 远端仍有 → 一致；远端没有 → 本端保留（本地事务，绝不跨端删除）
         #expect(FileManager.default.fileExists(atPath: kept.path))
-        #expect(!FileManager.default.fileExists(atPath: removed.path))
-        #expect(harness.sink.deleted == [removed.path])
+        #expect(FileManager.default.fileExists(atPath: staleURL.path))
+        #expect(FileManager.default.fileExists(atPath: importedURL.path))
+        // 无拉取动作：不落位、不入库
+        #expect(harness.sink.indexed.isEmpty)
 
         guard case let .done(summary) = harness.controller.state else {
             Issue.record("期望 done，实际 \(harness.controller.state)")
             return
         }
-        #expect(summary.deleted == ["Album/stale.flac"])
         #expect(summary.completed.isEmpty)
+        #expect(summary.failed.isEmpty)
+        #expect(summary.requested.isEmpty)
     }
 
-    // MARK: ③ 私有区保护
-
-    @Test("端到端：私有区/未受管路径 → 不删（受管副本照删）")
-    func protectsPrivateZone() throws {
-        let managed = silentData(0x33, count: 2_048)
-        let priv = silentData(0x44, count: 2_048)
-        let harness = try makeHarness(
-            sourceFiles: [],
-            targetFiles: [
-                ("Album/managed.flac", managed),
-                ("Imported/private.flac", priv),
-            ],
-            protectedPaths: ["Imported/private.flac"]
-        )
-
-        let removed = harness.targetRoot.appendingPathComponent("Album/managed.flac")
-        let protected = harness.targetRoot.appendingPathComponent("Imported/private.flac")
-        #expect(!FileManager.default.fileExists(atPath: removed.path))
-        #expect(FileManager.default.fileExists(atPath: protected.path))
-        #expect(harness.sink.deleted == [removed.path])
-
-        guard case let .done(summary) = harness.controller.state else {
-            Issue.record("期望 done，实际 \(harness.controller.state)")
-            return
-        }
-        #expect(summary.deleted == ["Album/managed.flac"])
-        #expect(summary.protectedSkipped == ["Imported/private.flac"])
-    }
-
-    // MARK: ④ 越界请求拒绝
+    // MARK: ③ 越界请求拒绝
 
     @Test("端到端：越界路径请求（绝对/`..`）→ Host 计入 failed，绝不出曲库根")
     func rejectsOutOfRootFetchRequests() throws {

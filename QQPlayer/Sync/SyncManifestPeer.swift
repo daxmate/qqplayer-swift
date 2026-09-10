@@ -7,13 +7,14 @@
 //  把对端回到的 manifest_response 解码 → 交给上层（M3-3b 接对账）。
 //
 //  **本文件只做分发，不做端到端接线**（M3-3b 负责：曲库根/manifest 生成器接入、
-//  收到响应后跑 SyncManifestReconciler、toFetch 走 SyncFileSender 拉取、toDelete
-//  走删除确认）。与 SyncChangeLogPeer 同构：链式挂接会话 onApplicationFrame
-//  （先己后彼），结束用 enabled 开关静默自己（不拆链）。
+//  收到响应后跑 SyncManifestReconciler、toFetch 走 SyncFileSender 拉取）。与
+//  SyncChangeLogPeer 同构：链式挂接会话 onApplicationFrame（先己后彼），结束用
+//  enabled 开关静默自己（不拆链）。
 //
 //  安全选择：本地 manifest 提供者缺省（未接线）时**不应答**——空 manifest 会被
-//  对端解读为"远端文件全部消失"，进而产出 toDelete 删掉对端整个同步集合。
-//  宁可让请求方超时，也绝不回空表。
+//  对端解读为"远端曲库是空的"，据此对该端曲库做出错误判断（漏拉/误判为已同步）。
+//  宁可让请求方超时，也绝不回空表。（同步不传播删除，故不存在"误删"风险；此处
+//  兜的是"误判为空库"。）
 //
 
 import Foundation

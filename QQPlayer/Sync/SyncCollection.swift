@@ -13,8 +13,9 @@
 //  过滤只做"条目 → 是否属于集合"的判定：歌单 → 歌曲 stableId 的展开是 DB 侧事实，
 //  由调用方以 SyncCollectionMembers 注入（纯值），保证本文件可单测、零 IO。
 //
-//  删除语义配套：SyncManifestReconciler.deleteScope(...) 用同一 filter 推导
-//  "本地哪些条目归同步管"，未入选的本地条目（私有区）永不出现在 toDelete。
+//  同步语义（不传播删除）：集合只决定"对端要拉哪些文件"，不影响本端文件的存留
+//  ——未入选集合的本地条目既不拉取也不删除。Host 侧应答 manifest 时同样用本
+//  filter 收口（SyncLocalLibraryScanner.entries(in:collection:members:)）。
 //
 
 import Foundation

@@ -19,12 +19,11 @@ import Testing
 
 @testable import QQPlayer
 
-// MARK: - 落盘/删除 spy
+// MARK: - 落盘 spy
 
 private final class LyricsSinkSpy: SyncLibrarySyncSink, @unchecked Sendable {
     private let lock = NSLock()
     private var indexedPaths: [String] = []
-    private var deletedPaths: [String] = []
 
     var indexed: [String] {
         lock.lock()
@@ -32,23 +31,10 @@ private final class LyricsSinkSpy: SyncLibrarySyncSink, @unchecked Sendable {
         return indexedPaths
     }
 
-    var deleted: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return deletedPaths
-    }
-
     func indexLandedFile(at url: URL) {
         lock.lock()
         indexedPaths.append(url.path)
         lock.unlock()
-    }
-
-    func deleteLocalFile(at url: URL, stableId: String?) {
-        lock.lock()
-        deletedPaths.append(url.path)
-        lock.unlock()
-        try? FileManager.default.removeItem(at: url)
     }
 }
 
@@ -274,7 +260,6 @@ struct AlignedLyricsSyncTests {
     private func makeHarness(
         sourceFiles: [(String, Data)] = [],
         targetFiles: [(String, Data)] = [],
-        protectedPaths: Set<String> = [],
         hostMapping: SyncLyricsContentMapping = .unresolved,
         clientMapping: SyncLyricsContentMapping = .unresolved,
         hostLyrics: [(String, Lyrics)] = [],
@@ -319,8 +304,7 @@ struct AlignedLyricsSyncTests {
         )
 
         let sink = LyricsSinkSpy()
-        var configuration = SyncLibrarySyncConfiguration()
-        configuration.protectedRelativePaths = protectedPaths
+        let configuration = SyncLibrarySyncConfiguration()
         let controller = SyncLibrarySyncController(
             session: fixture.clientSession,
             libraryRoot: targetRoot,
