@@ -62,6 +62,28 @@ final class LoopbackTransport: SyncPeerTransport, @unchecked Sendable {
     }
 }
 
+// MARK: - R3a 曲库事实桩（选择集展开器注入）
+
+/// 内存曲库事实（歌单 → 曲目 → content_hash/相对路径）：harness 里模拟 Mac 侧 DB。
+/// `playlists[id]` 缺席 = 歌单不存在（展开器据此记入 unknownPlaylistIDs）。
+struct MemoryCollectionFacts: SyncCollectionFactsProviding {
+    var playlists: [String: [SyncCollectionTrackFact]] = [:]
+    var knownPaths: [String: SyncCollectionTrackFact] = [:]
+    var lyricsWirePaths: Set<String> = []
+
+    func tracks(inPlaylist playlistID: String) -> [SyncCollectionTrackFact]? {
+        playlists[playlistID]
+    }
+
+    func track(atRelativePath relativePath: String) -> SyncCollectionTrackFact? {
+        knownPaths[relativePath]
+    }
+
+    func hasLyrics(atWirePath wirePath: String) -> Bool {
+        lyricsWirePaths.contains(wirePath)
+    }
+}
+
 // MARK: - 双 ready 会话夹具
 
 struct SessionFixture {
