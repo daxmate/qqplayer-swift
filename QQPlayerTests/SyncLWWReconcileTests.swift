@@ -7,7 +7,8 @@
 //  - merge：远端独有键全应用；同键时间序大者胜；平局 delete 压 upsert、
 //    upsert vs upsert 本端胜、delete vs delete 不应用；本端更新则不应用
 //  - SyncChangeLogApplier：favorite/play_history/playlist/playlist_item 的
-//    upsert/delete 落本地业务表（含幂等：重复应用不炸、delete 无对象跳过）
+//    upsert 落本地业务表（含幂等：重复应用不炸）；v2（2026-09-10 §12b-7）删除不跨端
+//    传播 → delete 在应用层入口被丢弃（不删本地行），断言方向相应改为"被忽略"
 //
 //  fixture 走 DatabaseManager.init(dbWriter:) + createTables()（内存库真实路径）。
 //
@@ -67,6 +68,8 @@ struct SyncLWWReconcileTests {
             Self.row(id: 10, rowKey: "a", updatedAtMs: 500),
             Self.row(id: 11, rowKey: "b", op: .delete, updatedAtMs: 600),
         ]
+        // 注：v2（§12b-7）起 wire 层的 delete 已在上游（SyncChangeLogPeer）被拦，
+        // 此断言锁的是 merge 纯函数本身对 delete 行的处理规则（不再有生产路径会走到）。
         let result = SyncLWWReconcile.merge(localRows: [], remoteRows: remote)
         #expect(result.applyRemote.count == 2)
         #expect(result.localWins.isEmpty)
@@ -126,7 +129,7 @@ struct SyncLWWReconcileTests {
 
     // MARK: - Applier（favorite）
 
-    @Test("Applier favorite：upsert 落行可重复应用；delete 删行且无对象时跳过")
+    @Test("Applier favorite：upsert 落行可重复应用；delete 被忽略（不删本地行）")
     func applierFavorite() throws {
         let dbQueue = try DatabaseQueue()
         let manager = DatabaseManager(dbWriter: dbQueue)
@@ -145,19 +148,21 @@ struct SyncLWWReconcileTests {
             #expect(count == 1)
         }
 
+        // v2（§12b-7）：删除不跨端传播——delete 行在应用层入口被丢弃，本地行保留
         let delete = SyncChangeLogRow(
             entity: .favorite, rowKey: "t1", op: .delete, updatedAtMs: 200, payloadJSON: nil
         )
-        #expect(try applier.apply([delete]) == 1)
+        #expect(try applier.apply([delete]) == 0) // 不算应用
         let favCount = try dbQueue.read { db in try Favorite.fetchCount(db) }
-        #expect(favCount == 0)
-        // 无对象可删 → false（不算失败，不算应用）
+        #expect(favCount == 1) // 本地收藏行未被删
+        // 重复应用同样忽略（幂等）
         #expect(try applier.apply([delete]) == 0)
+        #expect(try dbQueue.read { db in try Favorite.fetchCount(db) } == 1)
     }
 
     // MARK: - Applier（play_history）
 
-    @Test("Applier play_history：无本地行插入，同 (track, played_at) 行更新时长；delete 删匹配行")
+    @Test("Applier play_history：无本地行插入，同 (track, played_at) 行更新时长；delete 被忽略（不删本地行）")
     func applierPlayHistory() throws {
         let dbQueue = try DatabaseQueue()
         let manager = DatabaseManager(dbWriter: dbQueue)
@@ -192,18 +197,18 @@ struct SyncLWWReconcileTests {
             #expect(row?.playDurationMs == 8000)
         }
 
-        // delete → 删匹配行
+        // v2（§12b-7）：delete 被忽略 → 本地播放历史行保留
         let delete = SyncChangeLogRow(
             entity: .playHistory, rowKey: "hist-1|1000", op: .delete, updatedAtMs: 9000, payloadJSON: nil
         )
-        #expect(try applier.apply([delete]) == 1)
+        #expect(try applier.apply([delete]) == 0)
         let historyCount = try dbQueue.read { db in try PlayHistoryEntry.fetchCount(db) }
-        #expect(historyCount == 0)
+        #expect(historyCount == 1)
     }
 
     // MARK: - Applier（playlist + playlist_item）
 
-    @Test("Applier playlist：按 slug upsert（存在更新/缺失插入）；delete 删行（级联 items）")
+    @Test("Applier playlist：按 slug upsert（存在更新/缺失插入）；delete 被忽略（歌单与 items 都保留）")
     func applierPlaylist() throws {
         let dbQueue = try DatabaseQueue()
         let manager = DatabaseManager(dbWriter: dbQueue)
@@ -237,19 +242,18 @@ struct SyncLWWReconcileTests {
             #expect(count == 1)
         }
 
-        // playlist delete → 删歌单（FK cascade 删 items）
+        // v2（§12b-7）：delete 被忽略 → 歌单与 items 都保留（不再有跨端删除级联）
         let delete = SyncChangeLogRow(
             entity: .playlist, rowKey: "mix", op: .delete, updatedAtMs: 2000, payloadJSON: nil
         )
-        // delete 需要 payload（按 slug 查行）——捕获侧 delete 带快照，这里补快照
         let deleteWithSnapshot = SyncChangeLogRow(
             entity: .playlist, rowKey: "mix", op: .delete, updatedAtMs: 2000,
             payloadJSON: try SyncSnapshotCodec.encode(snapshot)
         )
-        #expect(try applier.apply([delete, deleteWithSnapshot]) == 1)
+        #expect(try applier.apply([delete, deleteWithSnapshot]) == 0)
         let playlistCount = try dbQueue.read { db in try Playlist.fetchCount(db) }
         let itemCount = try dbQueue.read { db in try PlaylistItem.fetchCount(db) }
-        #expect(playlistCount == 0)
-        #expect(itemCount == 0)
+        #expect(playlistCount == 1)
+        #expect(itemCount == 1)
     }
 }

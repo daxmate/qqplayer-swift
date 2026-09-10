@@ -45,6 +45,9 @@ SOURCES=(
   QQPlayer/Sync/SyncAlignedLyrics.swift
   QQPlayer/Services/LyricsModels.swift
   QQPlayer/Services/AlignedLyricsStore.swift
+  # v2 §12b-7「删除不跨端传播」单一事实源：纯 op 字符串判定，无 GRDB 依赖，
+  # 可直接进无模拟器 harness（真跑断言）。
+  QQPlayer/Sync/SyncChangeLogDeletionPolicy.swift
   QQPlayer/Services/MusicDirectoryScanner.swift
   scripts/sync-harness/Stubs.swift
   scripts/sync-harness/HarnessSupport.swift

@@ -5,6 +5,14 @@
 //  局域网同步（S2, M4-1）播放数据 changeLog 帧的会话层处理器：把对端推来的
 //  change_log_pull / change_log_push 解码 → 接 LWW 对账逻辑 → 应用胜出条目。
 //
+//  ⚠️ v2 语义修订（2026-09-10 用户拍板，docs/lan-sync-design.md §6.2 / §12b-7）：
+//  **不再有删除传播**——本地 outbox 照常记录 delete（本地事务完整），但
+//  ① 发送侧：delete 变更不上线（应答 pull 前过滤）；
+//  ② 接收侧：收到 delete（可能来自旧 peer）一律忽略，拦截在 localize **之前**
+//     （delete 行没有歌曲载荷，若先进 localize 会被判成"本地缺歌"挂起，永远等不到
+//     歌到位 → 垃圾数据 + 语义错乱），不进 localize / pendingStore / LWW，也不删本地行。
+//  删除判定集中在 SyncChangeLogDeletionPolicy.swift（纯逻辑单一事实源）。
+//
 //  协议语义（docs/lan-sync-design.md §6.2；v1 单 Host-单 Client）：
 //  - change_log_pull(cursor)：对端请求本端 outbox 中 id > cursor 的增量。
 //    应答 = change_log_push(entries, lastOutboxID)。处理 = 本端从 store 取
@@ -50,6 +58,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPushApplied: ((Int) -> Void)?
     /// push 中因本地缺歌而挂起的行数（锁外触发；0 = 无挂起）。
     var onPushSuspended: ((Int) -> Void)?
+    /// push 中被忽略的 delete 行数（v2 删除不传播；锁外触发；0 = 无忽略）。
+    var onPushIgnoredDeletes: ((Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
 
@@ -111,10 +121,15 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         do {
             let entries = try store.entries(after: request.cursor)
             let lastID = try store.maxOutboxID()
+            // v2（§12b-7）：删除不跨端传播——本地 outbox 照记 delete（本地事务完整），
+            // 但 delete 不上线；上线前按策略过滤。
+            let transmittable = entries.filter { SyncChangeLogDeletionPolicy.isTransmittable(op: $0.op) }
             // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
-            let wireEntries = try mapper.wireEntries(entries)
+            let wireEntries = try mapper.wireEntries(transmittable)
+            // 游标仍推进到 maxOutboxID（含被过滤的 delete 行）：被过滤的行永不重发。
             let response = SyncChangeLogPushPayload(entries: wireEntries, lastOutboxID: lastID)
             try session.sendApplicationFrame(type: .changeLogPush, payload: JSONEncoder().encode(response))
+            // 计数语义保持不变 = "本端 outbox 增量行数"（含被过滤的 delete），与 wire 条目数无关。
             onPullHandled?(request, entries.count)
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_pull 应答失败：\(error)"))
@@ -139,7 +154,15 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // 不同，不本地化就对不上键；本地还没这首歌的行挂起，不丢。
             var remoteRows: [SyncChangeLogRow] = []
             var suspended = 0
+            var ignoredDeletes = 0
             for entry in payload.entries {
+                // v2（§12b-7）：删除不传播——收到 delete 一律忽略，且必须在 localize
+                // 之前拦截（见文件头注释：否则会被误判为"本地缺歌"挂起）。
+                if SyncChangeLogDeletionPolicy.shouldIgnore(op: entry.op) {
+                    ignoredDeletes += 1
+                    print("ℹ️ SyncChangeLogPeer: 忽略远端删除（删除不跨端传播）entity=\(entry.entity) rowKey=\(entry.rowKey)")
+                    continue
+                }
                 switch try mapper.localize(entry) {
                 case .mapped(let row), .passThrough(let row):
                     remoteRows.append(row)
@@ -163,6 +186,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
             onPushSuspended?(suspended)
+            onPushIgnoredDeletes?(ignoredDeletes)
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
         }

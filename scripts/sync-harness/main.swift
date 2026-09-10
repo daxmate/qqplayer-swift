@@ -753,6 +753,61 @@ do {
     check(false, "⑭ 抛错：\(error)")
 }
 
+
+// MARK: - ⑭ changeLog 删除不传播策略
+
+section("⑭ changeLog 删除不传播：发送侧过滤 + 接收侧忽略（v2 §12b-7）")
+
+do {
+    // ① 发送侧：delete 不上线（本地 outbox 照记）。
+    //    生产接线：SyncChangeLogPeer.handlePull 在 wireEntries 之前 filter，
+    //    应答游标仍推进到 maxOutboxID，onPullHandled 计数 = 过滤前的 outbox 增量行数。
+    let outboxOps = ["upsert", "delete", "upsert"]
+    let wireOps = outboxOps.filter { SyncChangeLogDeletionPolicy.isTransmittable(op: $0) }
+    checkEqual(wireOps, ["upsert", "upsert"], "发送侧：混合序列 [upsert, delete, upsert] 过滤后只留 upsert")
+    checkEqual(outboxOps.count, 3, "发送侧：本端 outbox 增量行数 = 过滤前条目数（含被过滤的 delete），计数不受影响")
+    checkEqual(wireOps.count, 2, "发送侧：wire 条目数 = outbox 行数 - 被过滤 delete 数")
+
+    let deleteOnlyOps = ["delete", "delete"]
+    check(
+        deleteOnlyOps.filter { SyncChangeLogDeletionPolicy.isTransmittable(op: $0) }.isEmpty,
+        "发送侧：纯 delete 序列上线条目为空（永不上线）"
+    )
+    check(
+        SyncChangeLogDeletionPolicy.isTransmittable(op: "play_history"),
+        "发送侧：非 delete 的 op 不误伤（不拦）"
+    )
+
+    // ② 接收侧：delete 一律忽略（拦截在 localize 之前，不进挂起表、不进 LWW、不删本地行）。
+    let inboundOps = ["upsert", "delete", "delete", "upsert"]
+    let keptOps = inboundOps.filter { !SyncChangeLogDeletionPolicy.shouldIgnore(op: $0) }
+    checkEqual(keptOps, ["upsert", "upsert"], "接收侧：delete 被忽略、upsert 不受影响")
+    checkEqual(inboundOps.count - keptOps.count, 2, "接收侧：被忽略的 delete 计数 = 2（不挂起、不删本地行）")
+    check(
+        !SyncChangeLogDeletionPolicy.shouldIgnore(op: "play_history"),
+        "接收侧：非 delete 的 op 不误伤（不被忽略）"
+    )
+
+    // ③ 同一事实源三处消费点语义一致（发送过滤 / 接收忽略 / 应用层兜底）。
+    let deleteOp = SyncChangeLogDeletionPolicy.deleteOperation
+    check(SyncChangeLogDeletionPolicy.isDelete(op: deleteOp), "isDelete(delete) = true")
+    check(!SyncChangeLogDeletionPolicy.isDelete(op: "upsert"), "isDelete(upsert) = false")
+    check(!SyncChangeLogDeletionPolicy.isTransmittable(op: deleteOp), "发送侧：delete 不上线")
+    check(SyncChangeLogDeletionPolicy.shouldIgnore(op: deleteOp), "接收侧：delete 一律忽略")
+    check(
+        SyncChangeLogDeletionPolicy.shouldIgnore(op: deleteOp)
+            == !SyncChangeLogDeletionPolicy.isTransmittable(op: deleteOp),
+        "发送侧过滤与接收侧忽略同源同判（delete 恒真，upsert 恒假）"
+    )
+
+    // ④ 线协议 op 常量：本 harness 无法编 SyncChangeOp（SyncDataSyncModels.swift 依赖
+    //    GRDB 的 Database/Column/Record，而 GRDBShim 只提供两个空协议）→ 退回纯字符串
+    //    断言，不硬塞依赖；与 SyncChangeOp.delete.rawValue 的真实对齐由 QQPlayerTests
+    //    契约用例（SyncChangeLogFrameTests.deletionPolicyContract）在 CI 兜底。
+    checkEqual(SyncChangeLogDeletionPolicy.deleteOperation, "delete", "线协议 delete op 字符串 = \"delete\"")
+    check(SyncChangeLogDeletionPolicy.isDelete(op: "delete"), "字符串 \"delete\" 判为删除")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

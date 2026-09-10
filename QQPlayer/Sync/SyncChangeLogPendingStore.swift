@@ -7,6 +7,11 @@
 //  表（行键 = content_hash），等该歌曲入库（Track 保存且带 content_hash）后由
 //  SyncChangeLogReplay 重新本地化 → LWW 对账 → 应用，成功后清理挂起行。
 //
+//  ⚠️ v2 语义修订（2026-09-10，docs/lan-sync-design.md §6.2 / §12b-7）：**不再有删除
+//  传播**——挂起机制只服务"歌正在传输中、播放数据先到"的竞态兜底（只延迟应用、不删
+//  数据）；delete 变更在 Peer 层就被拦掉，不会再进挂起表。SyncChangeLogReplay 对
+//  历史遗留库里的 delete 挂起行做防御性跳过并清理（见其实现）。
+//
 //  语义：
 //  - 挂起键 = (entity, content_hash, remote_row_key)：同一远端事实重复拉取时幂等
 //    upsert，只在远端 updated_at 不更旧时覆盖（与 outbox 的"同键取最新"一致）。
@@ -127,6 +132,9 @@ final class SyncChangeLogPendingStore: @unchecked Sendable {
 ///
 /// 与 change_log_push 应用路径共用同一套映射 + 对账语义（SyncChangeLogMapper /
 /// SyncLWWReconcile / SyncChangeLogApplier），因此重放结果与"该变更晚一步到达"等价。
+///
+/// v2（§12b-7）：只重放 upsert 挂起行；delete 挂起行（历史遗留）直接丢弃并清理，
+/// 保证没有任何路径会让 delete 类变更被延后应用。
 enum SyncChangeLogReplay {
     /// 重放某 content_hash 的挂起变更。
     /// - Returns: 实际应用的业务行数（0 = 无挂起变更 / 本端胜出）。
@@ -140,9 +148,22 @@ enum SyncChangeLogReplay {
         let mapper = SyncChangeLogMapper(database: database)
         let logStore = SyncChangeLogStore(database: database)
 
+        // 0) 防御（v2 §12b-7）：历史遗留库可能存有 delete 挂起行（旧语义下 delete 也会
+        //    挂起）。删除不跨端传播 → 直接丢弃并清理，绝不本地化、绝不应用（也就不会
+        //    删掉本地业务行）。
+        let obsoleteDeleteIDs = pending.compactMap { item -> Int64? in
+            SyncChangeLogDeletionPolicy.shouldIgnore(op: item.op) ? item.id : nil
+        }
+        if !obsoleteDeleteIDs.isEmpty {
+            try pendingStore.delete(ids: obsoleteDeleteIDs)
+            print("ℹ️ SyncChangeLogReplay: 丢弃 \(obsoleteDeleteIDs.count) 条历史 delete 挂起行（删除不跨端传播）")
+        }
+        let applicable = pending.filter { !SyncChangeLogDeletionPolicy.shouldIgnore(op: $0.op) }
+        guard !applicable.isEmpty else { return 0 }
+
         // 1) 重新本地化（歌曲已入库，此时应能映射到本地 stableId）
         var localizable: [(pendingID: Int64, row: SyncChangeLogRow)] = []
-        for item in pending {
+        for item in applicable {
             guard let id = item.id else { continue }
             let entry = SyncChangeLogWireEntry(
                 id: 0,

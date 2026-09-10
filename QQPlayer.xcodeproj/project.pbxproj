@@ -487,6 +487,7 @@
 				Sync/PairingModels.swift,
 				Sync/PairingStateMachine.swift,
 				Sync/SyncAlignedLyrics.swift,
+				Sync/SyncChangeLogDeletionPolicy.swift,
 				Sync/SyncChangeLogMapping.swift,
 				Sync/SyncChangeLogPendingStore.swift,
 				Sync/SyncCrypto.swift,
