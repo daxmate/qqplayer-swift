@@ -96,7 +96,9 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     // MARK: 解析计划（纯逻辑 + 只读磁盘检查，可单测）
 
     /// 请求路径 → 可推送文件 + 失败记录。
-    /// - 重复路径只处理一次（首个生效）
+    /// - 重复路径只处理一次（首个生效）：能解析者按**规范化相对路径**判重
+    ///   （与 Generator 对账键同口径，故 "song.flac" 与 "./song.flac" 视为同一文件），
+    ///   非法/越界请求按原始字符串判重
     /// - 非法/越界/不存在/非常规文件/软链逃逸 → failed（不读曲库之外）
     static func makePlan(
         relativePaths: [String],
@@ -104,21 +106,26 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
         fileManager: FileManager = .default
     ) -> Plan {
         var plan = Plan()
-        var seen: Set<String> = []
+        /// 能解析的请求：按规范化相对路径判重
+        var seenResolved: Set<String> = []
+        /// 解析即被拒的请求（无规范化形式可用）：按原始字符串判重
+        var seenRejected: Set<String> = []
         let realRoot = root.resolvingSymlinksInPath().standardizedFileURL
         let rootPrefix = realRoot.path.hasSuffix("/") ? realRoot.path : realRoot.path + "/"
 
         for raw in relativePaths {
-            guard seen.insert(raw).inserted else { continue }
-
             let url: URL
             switch SyncLibraryPathResolver.resolve(relativePath: raw, root: root) {
             case let .rejected(reason):
+                guard seenRejected.insert(raw).inserted else { continue }
                 plan.failures.append(SyncFileFetchFailure(relativePath: raw, reason: reason))
                 continue
             case let .resolved(resolved):
                 url = resolved
             }
+
+            let normalized = SyncManifestGenerator.normalizeRelativePath(raw) ?? raw
+            guard seenResolved.insert(normalized).inserted else { continue }
 
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
@@ -141,7 +148,6 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
                 )
                 continue
             }
-            let normalized = SyncManifestGenerator.normalizeRelativePath(raw) ?? raw
             plan.files.append(RequestedFile(relativePath: normalized, url: url))
         }
         return plan
