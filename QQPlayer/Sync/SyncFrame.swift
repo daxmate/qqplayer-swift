@@ -23,8 +23,8 @@
 //  转发，由 SyncManifestPeer 解码，见 SyncManifestPeer.swift）。
 //  类型表（v4，M3-3b 增量追加）：12=sync_fetch_request 13=sync_fetch_result（文件
 //  同步「按路径拉取」请求/结果；payload 为 JSON，会话层解密后同样经
-//  onApplicationFrame 转发，Host 侧由 SyncLibraryFetchResponder 应答、Client 侧由
-//  SyncLibrarySyncController 消费，见 SyncLibrarySyncModels.swift）。
+//  onApplicationFrame 转发，Host 侧由 SyncLibraryFetchResponder 应答、发起侧（Mac）由
+//  SyncLibraryPullController 消费，见 SyncLibrarySyncModels.swift）。
 
 import Foundation
 

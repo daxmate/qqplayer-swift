@@ -247,14 +247,17 @@ struct AlignedLyricsSyncTests {
 
     private struct Harness {
         let fixture: SessionFixture
+        /// 设备侧曲库（内容源）
         let sourceRoot: URL
+        /// Mac 侧曲库（落位目标）
         let targetRoot: URL
         let hostLyricsStore: AlignedLyricsStore
         let clientLyricsStore: AlignedLyricsStore
         let sink: LyricsSinkSpy
-        let controller: SyncLibrarySyncController
-        let hostManifestPeer: SyncManifestPeer
-        let hostResponder: SyncLibraryFetchResponder
+        /// Mac 侧拉取控制器（R1b-2：发起方恒为 Mac）
+        let controller: SyncLibraryPullController
+        /// 设备侧被动端（应答 manifest / 按路径回推）
+        let deviceHost: SyncLibraryPassiveHost
     }
 
     private func makeHarness(
@@ -281,36 +284,45 @@ struct AlignedLyricsSyncTests {
         let clientManager = DatabaseManager(dbWriter: try DatabaseQueue())
         try clientManager.createTables()
 
-        let hostManifestPeer = SyncManifestPeer(session: fixture.hostSession)
-        hostManifestPeer.localRootName = { "测试 Mac 曲库" }
-        hostManifestPeer.localManifestProvider = { collection in
-            SyncLocalLibraryScanner.entries(
-                in: sourceRoot,
-                lyricsStore: hostLyricsStore,
-                lyricsMapping: hostMapping,
-                collection: collection,
-                database: hostManager
-            )
-        }
-        let hostResponder = SyncLibraryFetchResponder(
-            session: fixture.hostSession,
-            roots: SyncFetchRoots(libraryRoot: sourceRoot, lyricsRoot: hostLyricsStore.directory),
-            lyricsFileNameProvider: { wirePath in
+        // 设备侧装配（iOS 单一被动入口：应答 manifest + 按路径回推）
+        let deviceHost = SyncLibraryPassiveHost(
+            libraryRoot: sourceRoot,
+            sink: LyricsSinkSpy(),
+            database: hostManager,
+            lyricsStore: hostLyricsStore,
+            lyricsMapping: hostMapping
+        )
+        _ = deviceHost.attach(to: fixture.clientSession)
+
+        // Mac 侧装配（发起方）：拉取控制器 + 曲库描述符（含 aligned 歌词命名空间）
+        let sink = LyricsSinkSpy()
+        let descriptor = SyncLocalLibraryDescriptor(
+            libraryRoot: targetRoot,
+            rootName: "测试 Mac 曲库",
+            lyricsRoot: clientLyricsStore.directory,
+            sourceFiles: {
+                SyncLocalLibraryScanner.sourceFiles(in: targetRoot, database: clientManager)
+            },
+            lyricsEntries: {
+                SyncAlignedLyricsManifest.entries(store: clientLyricsStore, mapping: clientMapping)
+            },
+            contentHash: { relativePath in
+                DatabaseManager.contentHashIfFilePresent(
+                    atPath: targetRoot.appendingPathComponent(relativePath).path
+                )
+            },
+            lyricsFileName: { wirePath in
                 guard let hash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
-                      let stableId = hostMapping.stableIdForContentHash(hash)
+                      let stableId = clientMapping.stableIdForContentHash(hash)
                 else { return nil }
                 return "\(stableId).json"
             }
         )
-
-        let sink = LyricsSinkSpy()
-        let configuration = SyncLibrarySyncConfiguration()
-        let controller = SyncLibrarySyncController(
-            session: fixture.clientSession,
-            libraryRoot: targetRoot,
+        let controller = SyncLibraryPullController(
+            session: fixture.hostSession,
+            descriptor: descriptor,
             sink: sink,
-            configuration: configuration,
-            database: clientManager,
+            configuration: SyncLibraryPullConfiguration(),
             lyricsStore: clientLyricsStore,
             lyricsMapping: clientMapping
         )
@@ -324,8 +336,7 @@ struct AlignedLyricsSyncTests {
             clientLyricsStore: clientLyricsStore,
             sink: sink,
             controller: controller,
-            hostManifestPeer: hostManifestPeer,
-            hostResponder: hostResponder
+            deviceHost: deviceHost
         )
     }
 
@@ -396,14 +407,14 @@ struct AlignedLyricsSyncTests {
         #expect(summary.requested.isEmpty && summary.completed.isEmpty)
 
         // 规划层：即使全库镜像配置，歌词条目也永不进删除计划
-        let plan = SyncLibrarySyncPlanner.plan(
+        let plan = SyncLibraryPullPlanner.plan(
             remote: SyncManifestResponse(entries: []),
             local: [
                 ManifestEntry(relativePath: "@lyrics/\(songHash).json", size: 10, mtimeMs: 0, contentHash: "h", stableId: "client-sid"),
             ],
-            configuration: SyncLibrarySyncConfiguration()
+            selection: .all
         )
-        #expect(plan.fetchRequest == nil)
+        #expect(plan.relativePaths.isEmpty)
         #expect(plan.unchanged.isEmpty)
     }
 

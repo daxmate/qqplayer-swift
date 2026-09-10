@@ -145,7 +145,9 @@ struct SyncPushFailure: Equatable, Sendable {
     var detail: String?
 }
 
-/// 推送接收侧失败原因（本地字符串常量，跨版本可加不可改）。
+/// 推送链路失败原因（本地字符串常量，跨版本可加不可改）。
+/// R1b-2 起含**两端**取值：接收侧（receiveFailed / invalidPath / landFailed）
+/// 与发送侧（sendFailed / localFileUnavailable）。
 enum SyncPushFailureReason {
     /// 传输本体失败（SyncFileReceiver 终态；含校验不符/IO/断连）
     static let receiveFailed = "receive_failed"
@@ -153,13 +155,17 @@ enum SyncPushFailureReason {
     static let invalidPath = "invalid_path"
     /// 落位失败（建目录/移动/替换失败）或歌词写盘失败
     static let landFailed = "land_failed"
+    /// 发送侧：停等传输终态失败（对端 ack 报错 / 会话断连 / 发送帧失败）
+    static let sendFailed = "send_failed"
+    /// 发送侧：本端拿不到可发送实体（路径非法 / 歌词映射缺失 / 文件不存在或不可读）
+    static let localFileUnavailable = "local_file_unavailable"
 }
 
 // MARK: - 认领表（纯逻辑，可单测）
 
 /// 接收端认领表：`file_meta.name` → 声明的目标相对路径。
 /// - 同名多路径（两个目录下同名文件）：按声明顺序取首个未被认领的（与
-///   `SyncLibrarySyncController.expectedPathsByName` 同策略，v1 单飞传输下唯一可判）；
+///   `SyncLibraryPullController.expectedPathsByName` 同策略，v1 单飞传输下唯一可判）；
 /// - 未声明过的名字 / 已认领完：返回 nil（接收端不落位，交清理）。
 struct SyncPushClaimTable: Equatable {
     private var remaining: [String: [String]] = [:]

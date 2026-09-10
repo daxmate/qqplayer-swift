@@ -38,16 +38,17 @@
 //     content_hash/stableId 映射注入**，Mac 与 iOS 各自装配；Mac 侧退化为薄包装
 //     （`MacSyncLibraryHost`，公开 API 与行为零变化）。
 //   - 「Mac 推送 → 本端接收落库」契约与编排（新帧 14 `library_push_announce` +
-//     落盘/入库/歌词安装）提炼为 `SyncLibraryPassiveHost`（被动端装配，iOS 用；
-//     Mac 侧发起端 PushController 属 R1b-2）。
-//   - 歌词接收安装（暂存重试 / 孤儿丢弃）从 SyncLibrarySyncController 提炼为
-//     `SyncLyricsReceiver`（控制器与被动端共用同一实现）。
+//     落盘/入库/歌词安装）提炼为 `SyncLibraryPassiveHost`（被动端装配，iOS 用）。
+//   - 歌词接收安装（暂存重试 / 孤儿丢弃）从旧主动控制器提炼为 `SyncLyricsReceiver`
+//     （拉取控制器与被动端共用同一实现）。
 //
-//  【待 R1b-2 退役（本包不动）】
-//   - SyncLibrarySyncController + SyncLibrarySyncPlanner + SyncLibrarySyncStateMachine
-//     + SyncLibrarySyncConfiguration（iOS 主动拉取流程）→ 由 Mac 侧 Push/PullController 取代
-//   - MacSyncHostService 中对主动流程的引用（若 R1b-2 引入 Mac 发起控制器时一并调整）
-//   - QQPlayerTests 既有 SyncLibrarySync* 用例与 harness 对应断言（随退役一并调整）
+//  【R1b-2（2026-09-11）已退役 / 取代（本节为收口记录）】
+//   - 旧 iOS 主动拉取链路（SyncLibrarySyncController + 其 planner / state machine /
+//     configuration）已删除；发起方恒为 Mac —— `SyncLibraryPushController`（推送到设备）
+//     / `SyncLibraryPullController`（从设备下载）承接，iOS 侧只留 `SyncLibraryPassiveHost`
+//     单一被动入口（无 App 层装配引用，无需改线）。
+//   - 落库出口（SyncLibrarySyncSink / LibraryIndexerSyncSink）搬到 `SyncLibrarySink.swift`。
+//   - 既有测试与 harness 断言已改指新控制器（见 scripts/run-local-sync-tests.sh）。
 //
 //  ════════════════════════════════════════════════════════════════════════════
 //

@@ -3,9 +3,8 @@
 //  QQPlayerTests
 //
 //  S2 M3-3b 端到端（内存回环会话，无模拟器/无网络）：
-//    Host 侧 = SyncManifestPeer（manifest 提供者）+ SyncLibraryFetchResponder（按路径推送）
-//              —— 与 MacSyncLibraryHost 的装配同构（后者 Mac target only，测试侧手工装配）
-//    Client 侧 = SyncLibrarySyncController（对账 → 拉取 → 落盘 + 入库 sink）
+//    设备侧 = SyncLibraryPassiveHost（应答 manifest + 按路径回推，iOS 单一被动入口）
+//    Mac 侧 = SyncLibraryPullController（R1b-2：发起方恒为 Mac）
 //
 //  覆盖三条：
 //    ① 客户端缺 1 个文件 → 拉取后本地存在且 SHA-256 与源一致 + 入库入口被调用
@@ -48,15 +47,17 @@ struct SyncLibrarySyncE2ETests {
 
     private struct Harness {
         let fixture: SessionFixture
+        /// 设备侧曲库（内容源，被动端）
         let sourceRoot: URL
+        /// Mac 侧曲库（落位目标）
         let targetRoot: URL
-        let hostManager: DatabaseManager
-        let clientManager: DatabaseManager
-        /// 必须强持有：peer/responder 以 [weak self] 挂接会话，创建后即弃会被 ARC 释放
-        let hostManifestPeer: SyncManifestPeer
-        let hostResponder: SyncLibraryFetchResponder
+        let deviceManager: DatabaseManager
+        let macManager: DatabaseManager
+        /// 必须强持有：被动端以 [weak self] 挂接会话，创建后即弃会被 ARC 释放
+        let deviceHost: SyncLibraryPassiveHost
         let sink: SyncSinkSpy
-        let controller: SyncLibrarySyncController
+        /// Mac 侧拉取控制器（R1b-2：发起方恒为 Mac）
+        let controller: SyncLibraryPullController
     }
 
     private func makeTempRoot(_ tag: String) throws -> URL {
@@ -91,28 +92,36 @@ struct SyncLibrarySyncE2ETests {
         for (path, data) in sourceFiles { try writeFile(path, in: sourceRoot, data: data) }
         for (path, data) in targetFiles { try writeFile(path, in: targetRoot, data: data) }
 
-        let hostManager = DatabaseManager(dbWriter: try DatabaseQueue())
-        try hostManager.createTables()
-        let clientManager = DatabaseManager(dbWriter: try DatabaseQueue())
-        try clientManager.createTables()
+        let deviceManager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try deviceManager.createTables()
+        let macManager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try macManager.createTables()
 
-        // Host 装配（与 MacSyncLibraryHost.attach 同构）
-        let hostManifestPeer = SyncManifestPeer(session: fixture.hostSession)
-        hostManifestPeer.localRootName = { "测试 Mac 曲库" }
-        hostManifestPeer.localManifestProvider = { collection in
-            SyncLocalLibraryScanner.entries(in: sourceRoot, collection: collection, database: hostManager)
-        }
-        let hostResponder = SyncLibraryFetchResponder(session: fixture.hostSession, libraryRoot: sourceRoot)
+        // 设备侧装配（与 iOS `SyncLibraryPassiveHost` 装配同构：应答 manifest + 按路径回推）
+        let deviceHost = SyncLibraryPassiveHost(
+            libraryRoot: sourceRoot,
+            sink: SyncSinkSpy(),
+            database: deviceManager
+        )
+        _ = deviceHost.attach(to: fixture.clientSession)
 
-        // Client 装配
+        // Mac 侧装配（发起方）：拉取控制器 + 曲库描述符（测试用临时歌词库，不同步歌词）
         let sink = SyncSinkSpy()
-        let configuration = SyncLibrarySyncConfiguration()
-        let controller = SyncLibrarySyncController(
-            session: fixture.clientSession,
+        let lyricsStore = AlignedLyricsStore(directory: try makeTempRoot("mac-lyrics"))
+        let descriptor = SyncLocalLibraryDescriptor.live(
             libraryRoot: targetRoot,
+            rootName: "测试 Mac 曲库",
+            database: macManager,
+            lyricsStore: lyricsStore,
+            lyricsMapping: .unresolved
+        )
+        let controller = SyncLibraryPullController(
+            session: fixture.hostSession,
+            descriptor: descriptor,
             sink: sink,
-            configuration: configuration,
-            database: clientManager
+            configuration: SyncLibraryPullConfiguration(),
+            lyricsStore: lyricsStore,
+            lyricsMapping: .unresolved
         )
         try controller.start()
 
@@ -120,10 +129,9 @@ struct SyncLibrarySyncE2ETests {
             fixture: fixture,
             sourceRoot: sourceRoot,
             targetRoot: targetRoot,
-            hostManager: hostManager,
-            clientManager: clientManager,
-            hostManifestPeer: hostManifestPeer,
-            hostResponder: hostResponder,
+            deviceManager: deviceManager,
+            macManager: macManager,
+            deviceHost: deviceHost,
             sink: sink,
             controller: controller
         )
