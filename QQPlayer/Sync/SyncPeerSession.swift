@@ -195,10 +195,13 @@ final class SyncPeerSession: @unchecked Sendable {
 
     // MARK: ready 后发送
 
-    /// 发送业务帧（file_meta/file_chunk/file_ack + change_log_pull/change_log_push；
-    /// 加密）。未 ready / 类型非法抛错。
+    /// 发送业务帧（file_meta/file_chunk/file_ack + change_log_pull/change_log_push
+    /// + manifest_request/manifest_response；加密）。未 ready / 类型非法抛错。
     func sendApplicationFrame(type: SyncFrameType, payload: Data) throws {
-        guard [.fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush].contains(type) else {
+        guard [
+            .fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush,
+            .manifestRequest, .manifestResponse,
+        ].contains(type) else {
             throw SyncFrameError.invalidType(type.rawValue)
         }
         try sendEncryptedFrame(type: type, payload: payload)
