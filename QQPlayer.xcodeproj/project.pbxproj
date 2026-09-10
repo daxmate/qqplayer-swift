@@ -105,6 +105,10 @@
 		82B90AFDE199482DA72E01A9 /* SyncManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C2C48AB2B64DB0AFA50B99 /* SyncManifestTests.swift */; };
 		437D437B1D2E4915BAFA73F0 /* SyncManifestReconcileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CF31D097704931BC2CD358 /* SyncManifestReconcileTests.swift */; };
 		7742F0E2E1244D558454A5D0 /* SyncChangeLogContentMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A408589CE4344B52BD29A01D /* SyncChangeLogContentMapTests.swift */; };
+		D956C32FFE134089BAE458BE /* SyncLibrarySyncModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E504D7F2C1B94F6A83FF13FB /* SyncLibrarySyncModelsTests.swift */; };
+		DA214B1D04F9434D87EF6827 /* SyncLibraryFetchResponderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928958225EDF47E8AB8B5B1A /* SyncLibraryFetchResponderTests.swift */; };
+		72DB7287DA424F5C92C43099 /* SyncLibrarySyncControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB494AFBF864E16BD1D1FBE /* SyncLibrarySyncControllerTests.swift */; };
+		B4858B95EB1A40EB9411630F /* SyncLibrarySyncE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EDD51D26A7A4199963039A0 /* SyncLibrarySyncE2ETests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -259,6 +263,10 @@
 		36C2C48AB2B64DB0AFA50B99 /* SyncManifestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncManifestTests.swift; sourceTree = "<group>"; };
 		F6CF31D097704931BC2CD358 /* SyncManifestReconcileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncManifestReconcileTests.swift; sourceTree = "<group>"; };
 		A408589CE4344B52BD29A01D /* SyncChangeLogContentMapTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncChangeLogContentMapTests.swift; sourceTree = "<group>"; };
+		E504D7F2C1B94F6A83FF13FB /* SyncLibrarySyncModelsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLibrarySyncModelsTests.swift; sourceTree = "<group>"; };
+		928958225EDF47E8AB8B5B1A /* SyncLibraryFetchResponderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLibraryFetchResponderTests.swift; sourceTree = "<group>"; };
+		0DB494AFBF864E16BD1D1FBE /* SyncLibrarySyncControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLibrarySyncControllerTests.swift; sourceTree = "<group>"; };
+		2EDD51D26A7A4199963039A0 /* SyncLibrarySyncE2ETests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLibrarySyncE2ETests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -301,6 +309,7 @@
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
 				Mac/MacSyncHostService.swift,
+				Mac/MacSyncLibraryHost.swift,
 				Mac/MacSyncSettingsView.swift,
 				Mac/MacTagEditorCandidateRow.swift,
 				Mac/MacTagEditorView.swift,
@@ -380,6 +389,7 @@
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
 				Mac/MacSyncHostService.swift,
+				Mac/MacSyncLibraryHost.swift,
 				Mac/MacSyncSettingsView.swift,
 				Mac/MacTagEditorCandidateRow.swift,
 				Mac/MacTagEditorView.swift,
@@ -477,9 +487,14 @@
 				Sync/SyncChangeLogPendingStore.swift,
 				Sync/SyncCrypto.swift,
 				Sync/SyncFileChecksum.swift,
+				Sync/SyncFileSender.swift,
+				Sync/SyncFileTransferModels.swift,
 				Sync/SyncFrame.swift,
 				Sync/SyncIdentity.swift,
+				Sync/SyncLibraryFetchResponder.swift,
+				Sync/SyncLibrarySyncModels.swift,
 				Sync/SyncListener.swift,
+				Sync/SyncLocalLibraryScanner.swift,
 				Sync/SyncPairingApprovalModel.swift,
 				Sync/SyncPairingFlow.swift,
 				"Sync/SyncPeerSession+Frames.swift",
@@ -747,6 +762,10 @@
 				36C2C48AB2B64DB0AFA50B99 /* SyncManifestTests.swift */,
 				F6CF31D097704931BC2CD358 /* SyncManifestReconcileTests.swift */,
 				A408589CE4344B52BD29A01D /* SyncChangeLogContentMapTests.swift */,
+				E504D7F2C1B94F6A83FF13FB /* SyncLibrarySyncModelsTests.swift */,
+				928958225EDF47E8AB8B5B1A /* SyncLibraryFetchResponderTests.swift */,
+				0DB494AFBF864E16BD1D1FBE /* SyncLibrarySyncControllerTests.swift */,
+				2EDD51D26A7A4199963039A0 /* SyncLibrarySyncE2ETests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1150,6 +1169,10 @@
 				82B90AFDE199482DA72E01A9 /* SyncManifestTests.swift in Sources */,
 				437D437B1D2E4915BAFA73F0 /* SyncManifestReconcileTests.swift in Sources */,
 				7742F0E2E1244D558454A5D0 /* SyncChangeLogContentMapTests.swift in Sources */,
+				D956C32FFE134089BAE458BE /* SyncLibrarySyncModelsTests.swift in Sources */,
+				DA214B1D04F9434D87EF6827 /* SyncLibraryFetchResponderTests.swift in Sources */,
+				72DB7287DA424F5C92C43099 /* SyncLibrarySyncControllerTests.swift in Sources */,
+				B4858B95EB1A40EB9411630F /* SyncLibrarySyncE2ETests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

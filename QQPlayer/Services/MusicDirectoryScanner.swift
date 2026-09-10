@@ -27,38 +27,38 @@ enum MusicDirectoryScanner {
     /// - 扩展名：小写比较，命中 enabledExtensions
     /// - 错误语义与旧 findMusicFiles 一致：enumerator 创建失败返回空数组（不抛错）；
     ///   遍历中 resourceValues 读取失败 → 抛出终止
+    /// 同步版扫描（目录枚举与 resourceValues 读取本身就是同步 API）：供「必须在
+    /// 当前调用栈里立刻拿到结果」的场景用（如会话线程上的 manifest 提供者）。
+    /// 规则与 audioFiles(in:enabledExtensions:) 逐条一致——后者只是本函数的
+    /// 后台队列包装（错误语义同旧实现：enumerator 创建失败 → 空数组；遍历中
+    /// resourceValues 读取失败 → 抛出）。
+    static func audioFilesSync(in root: URL, enabledExtensions: [String]) throws -> [URL] {
+        var musicFiles: [URL] = []
+        let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .nameKey]
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: resourceKeys,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return musicFiles
+        }
+        for case let fileURL as URL in enumerator {
+            let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
+            guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else { continue }
+            if enabledExtensions.contains(fileURL.pathExtension.lowercased()) {
+                musicFiles.append(fileURL)
+            }
+        }
+        return musicFiles
+    }
+
     static func audioFiles(in root: URL, enabledExtensions: [String]) async throws -> [URL] {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 do {
-                    var musicFiles: [URL] = []
-
-                    let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .nameKey]
-                    let directoryEnumerator = FileManager.default.enumerator(
-                        at: root,
-                        includingPropertiesForKeys: resourceKeys,
-                        options: [.skipsHiddenFiles]
+                    continuation.resume(
+                        returning: try audioFilesSync(in: root, enabledExtensions: enabledExtensions)
                     )
-
-                    guard let enumerator = directoryEnumerator else {
-                        continuation.resume(returning: musicFiles)
-                        return
-                    }
-
-                    for case let fileURL as URL in enumerator {
-                        let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
-
-                        guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else {
-                            continue
-                        }
-
-                        let pathExtension = fileURL.pathExtension.lowercased()
-                        if enabledExtensions.contains(pathExtension) {
-                            musicFiles.append(fileURL)
-                        }
-                    }
-
-                    continuation.resume(returning: musicFiles)
                 } catch {
                     continuation.resume(throwing: error)
                 }
