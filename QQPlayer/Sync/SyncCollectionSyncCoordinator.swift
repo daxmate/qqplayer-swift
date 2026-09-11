@@ -12,11 +12,17 @@
 //  决策 7：**绝不跨端删除**——对端多出来的条目**什么都不做**（只记账，不动手）。
 //  决策 6：发起方恒为 Mac，两个方向都在 Mac 上编排。
 //
+//  R3b（2026-09-11）追加第 ③.5 步：每个方向传输完**跟着歌把该歌的播放数据带过去**
+//  （决策 8「跟歌走」）——由注入的 `SyncPlaybackCarryDriving` 执行（生产实现
+//  `SyncPlaybackCarryPeer`，走既有帧 8/9 原语 + 既有映射/LWW/落库路径）；
+//  未注入 = 不携带（R3a 行为零变化）。
+//
 //  一次编排 = 计划 + 两个方向（顺序执行）：
 //    ① 展开选择集（`SyncCollectionExpander`，注入取曲库事实）
 //    ② 取本端（Mac）manifest；请求对端（设备）manifest（帧 10/11）
 //    ③ 两侧按选中集合收口 → 算差集：**对端缺 → 推**（`SyncLibraryPushController`）、
 //       **本端缺 → 拉**（`SyncLibraryPullController`）
+//    ③.5 每个方向收尾时：R3b 携带该方向**成功传输**的歌的播放数据（跟歌走）
 //    ④ 汇总账目（`SyncCollectionSyncReport`）交调用方（M6 UI 只消费，不在此实现）
 //
 //  为什么顺序执行而不是并行：两个方向共用**一个会话**（帧 4-14 的停等传输、
@@ -174,8 +180,16 @@ struct SyncCollectionSyncReport: Equatable, Sendable {
     var pullSkipped: [String] = []
     /// 拉取阶段中止原因（nil = 未中止）
     var pullAbortReason: String?
+    /// 对端回报送达的相对路径（`sync_fetch_result.completed`；升序；诊断/携带定范围用）
+    var reportedPulled: [String] = []
     /// 是否请求过对端 manifest（空选择集 = false）
     var didRequestPeerManifest: Bool = false
+    /// R3b：播放数据「跟歌走」——推送方向已带走的歌曲相对路径（升序）
+    var playbackCarriedPush: [String] = []
+    /// R3b：播放数据「跟歌走」——拉取方向请求带回的歌曲相对路径（升序）
+    var playbackCarriedPull: [String] = []
+    /// R3b：播放数据携带失败原因（nil = 未失败 / 未接线）
+    var playbackCarryError: String?
 
     /// 本次实际传输的文件数（诊断/UI）。
     var transferCount: Int { pushed.count + pulled.count }
@@ -214,6 +228,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     private let sink: SyncLibrarySyncSink
     private let lyricsStore: AlignedLyricsStore
     private let lyricsMapping: SyncLyricsContentMapping
+    /// R3b：播放数据「跟歌走」驱动（nil = 不携带；R3a 行为零变化）。
+    private let playbackCarry: (any SyncPlaybackCarryDriving)?
     private let fileManager: FileManager
 
     private let lock = NSLock()
@@ -221,6 +237,13 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     private var stage: Stage = .idle
     private var reportValue = SyncCollectionSyncReport()
     private var expansionValue = SyncCollectionExpansion()
+    /// 计划阶段取回的对端 manifest 条目（R3b 携带时算「对端持有」的身份集合）。
+    private var peerManifestEntriesValue: [ManifestEntry] = []
+    /// R3b：各方向**已确认传输**的相对路径（完成回调收集，传输序；去重）。
+    /// 为什么不用控制器 summary：拉取侧的 `summary.completed` 会晚于 `.done` 回调
+    /// （见 `report` 文档），阶段收尾时现读会拿到空集合 → 携带永远不触发。
+    private var pushTransferredValue: [String] = []
+    private var pullTransferredValue: [String] = []
 
     private var manifestPeer: SyncManifestPeer?
     private var pushController: SyncLibraryPushController?
@@ -243,6 +266,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         sink: SyncLibrarySyncSink = LibraryIndexerSyncSink(),
         lyricsStore: AlignedLyricsStore = .shared,
         lyricsMapping: SyncLyricsContentMapping? = nil,
+        playbackCarry: (any SyncPlaybackCarryDriving)? = nil,
         fileManager: FileManager = .default
     ) {
         self.session = session
@@ -254,6 +278,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         self.sink = sink
         self.lyricsStore = lyricsStore
         self.lyricsMapping = lyricsMapping ?? .unresolved
+        self.playbackCarry = playbackCarry
         self.fileManager = fileManager
     }
 
@@ -286,6 +311,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             snapshot.pulled = summary.completed
             snapshot.pullFailed = summary.failed
             snapshot.pullSkipped = summary.unchanged
+            snapshot.reportedPulled = summary.reportedCompleted.sorted()
         }
         return snapshot
     }
@@ -386,6 +412,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         reportValue.skipped = diff.unchanged
         reportValue.missingBoth = diff.missingBoth
         reportValue.remoteOnlyIgnored = diff.remoteOnlyIgnored
+        peerManifestEntriesValue = response.entries
         // 后续（控制器自己的）manifest 响应不再触发本类计划
         let peer = manifestPeer
         manifestPeer = nil
@@ -420,7 +447,10 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             fileManager: fileManager
         )
         controller.onStateChange = { [weak self] state in self?.handlePushState(state) }
-        controller.onFilePushed = { [weak self] path in self?.onFileTransferred?(path) }
+        controller.onFilePushed = { [weak self] path in
+            self?.onFileTransferred?(path)
+            self?.recordTransferred(path, direction: .push)
+        }
         lock.lock()
         pushController = controller
         lock.unlock()
@@ -459,6 +489,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             return
         }
         lock.unlock()
+        carryPlaybackData(direction: .push)
         beginPull()
     }
 
@@ -493,7 +524,10 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             fileManager: fileManager
         )
         controller.onStateChange = { [weak self] state in self?.handlePullState(state) }
-        controller.onFileApplied = { [weak self] path in self?.onFileTransferred?(path) }
+        controller.onFileApplied = { [weak self] path in
+            self?.onFileTransferred?(path)
+            self?.recordTransferred(path, direction: .pull)
+        }
         lock.lock()
         pullController = controller
         lock.unlock()
@@ -530,7 +564,58 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             return
         }
         lock.unlock()
+        carryPlaybackData(direction: .pull)
         finishStage()
+    }
+
+    // MARK: R3b 播放数据「跟歌走」
+
+    /// 一个方向收尾后：把该方向**成功传输**的歌的播放数据带过去（决策 8）。
+    /// 未注入驱动 / 无成功传输 = 直接返回（行为与 R3a 一致）；失败只记账，不影响编排终态。
+    private func carryPlaybackData(direction: SyncPlaybackCarryDirection) {
+        guard let driver = playbackCarry else { return }
+        let pulled = report.reportedPulled
+        lock.lock()
+        let transferred = direction == .push
+            ? pushTransferredValue
+            // 拉取方向：以对端回报的送达集为准（阶段收尾时已可用）；本端落位回调会晚于
+            // 结果帧，两边取并集兜底（任一先到时都能得到完整集合）。
+            : Array(Set(pullTransferredValue).union(pulled)).sorted()
+        let peerEntries = peerManifestEntriesValue
+        lock.unlock()
+        guard !transferred.isEmpty else { return }
+        do {
+            let plan = try direction == .push
+                ? driver.carryPush(transferredPaths: transferred, peerEntries: peerEntries)
+                : driver.carryPull(transferredPaths: transferred, peerEntries: peerEntries)
+            lock.lock()
+            if direction == .push {
+                reportValue.playbackCarriedPush = plan.carriedPaths
+            } else {
+                reportValue.playbackCarriedPull = plan.carriedPaths
+            }
+            lock.unlock()
+        } catch {
+            lock.lock()
+            if reportValue.playbackCarryError == nil {
+                reportValue.playbackCarryError = "\(error)"
+            }
+            lock.unlock()
+        }
+    }
+
+    /// 记一条已确认传输的相对路径（完成回调；去重保持传输序）。
+    private func recordTransferred(_ relativePath: String, direction: SyncPlaybackCarryDirection) {
+        lock.lock()
+        defer { lock.unlock() }
+        switch direction {
+        case .push:
+            guard !pushTransferredValue.contains(relativePath) else { return }
+            pushTransferredValue.append(relativePath)
+        case .pull:
+            guard !pullTransferredValue.contains(relativePath) else { return }
+            pullTransferredValue.append(relativePath)
+        }
     }
 
     // MARK: 收尾

@@ -47,6 +47,12 @@ struct SyncLibraryPullSummary: Equatable, Sendable {
     var failed: [SyncFileFetchFailure] = []
     /// 内容一致、无需拉取的对端条目（升序；诊断用）
     var unchanged: [String] = []
+    /// 对端**回报送达**的相对路径（`sync_fetch_result.completed`；诊断/账目用）。
+    /// 语义 = 对端本批确实送出的文件（对端每发送成功一个文件都会收到本端 done ack，
+    /// 即本端已收齐并校验通过）。⚠️ 与 `completed` 的区别：本端的**落位/入库回调**
+    /// 会晚于该结果帧（接收方先回 ack 再回调，见 SyncFileReceiver 的动作序），
+    /// 因此阶段收尾时该集合先于 `completed` 可用（R3b 跟歌走携带用它定范围）。
+    var reportedCompleted: [String] = []
     /// 收到但本端无对应歌曲、未落库的 aligned 歌词（丢弃；下次同步自愈，审计用）
     var orphanLyricsSkipped: [String] = []
 
@@ -54,8 +60,7 @@ struct SyncLibraryPullSummary: Equatable, Sendable {
     var touchedLyrics: Bool {
         (completed + failed.map(\.relativePath) + orphanLyricsSkipped)
             .contains { SyncLyricsNamespace.isLyricsPath($0) }
-    }
-}
+    }}
 
 /// 状态迁移合法性（纯逻辑，可单测）。
 enum SyncLibraryPullStateMachine {
@@ -395,6 +400,7 @@ final class SyncLibraryPullController: @unchecked Sendable {
         }
         lock.lock()
         summaryValue.failed = result.failed
+        summaryValue.reportedCompleted = result.completed
         lock.unlock()
         finalize()
     }

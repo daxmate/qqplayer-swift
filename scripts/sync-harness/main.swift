@@ -1397,6 +1397,8 @@ struct CollectionScenario {
     let deviceSink: SinkSpy
     let deviceHost: SyncLibraryPassiveHost
     let coordinator: SyncCollectionSyncCoordinator
+    /// R3b 携带替身（未注入 = nil）
+    let carryDriver: CarrySpyDriver?
 }
 
 func makeCollectionScenario(
@@ -1408,7 +1410,9 @@ func makeCollectionScenario(
     lyricsWirePaths: Set<String> = [],
     macLyrics: [(stableId: String, lyrics: Lyrics)] = [],
     macLyricsMapping: SyncLyricsContentMapping = .unresolved,
-    deviceLyricsMapping: SyncLyricsContentMapping = .unresolved
+    deviceLyricsMapping: SyncLyricsContentMapping = .unresolved,
+    carryFacts: MemoryCarryFacts = MemoryCarryFacts(),
+    injectCarry: Bool = false
 ) throws -> CollectionScenario {
     let fixture = SessionFixture.pairedHandshake()
     let macRoot = try tempRoot("r3a-mac")
@@ -1459,6 +1463,7 @@ func makeCollectionScenario(
             return "\(stableId).json"
         }
     )
+    let carryDriver = injectCarry ? CarrySpyDriver(facts: carryFacts) : nil
     let coordinator = SyncCollectionSyncCoordinator(
         session: fixture.hostSession,
         descriptor: descriptor,
@@ -1470,7 +1475,8 @@ func makeCollectionScenario(
         ),
         sink: macSink,
         lyricsStore: macLyricsStore,
-        lyricsMapping: macLyricsMapping
+        lyricsMapping: macLyricsMapping,
+        playbackCarry: carryDriver
     )
     try coordinator.start()
     return CollectionScenario(
@@ -1480,7 +1486,8 @@ func makeCollectionScenario(
         macSink: macSink,
         deviceSink: deviceSink,
         deviceHost: deviceHost,
-        coordinator: coordinator
+        coordinator: coordinator,
+        carryDriver: carryDriver
     )
 }
 
@@ -1772,6 +1779,263 @@ do {
     )
     checkEqual(differs.toPush, ["Album/x.flac"], "内容不同 → 只推（发起方权威）")
     checkEqual(differs.toPull, [], "内容不同 → 不回拉")
+}
+
+// MARK: - ㉙ R3b：跟歌走计划器（纯逻辑，三条硬规则）
+
+section("㉙ R3b：跟歌走计划器（只带传输过的歌 / 两端共有才带 / 不传删除）")
+// 纯逻辑（无 IO）：不需要 do/catch。
+do {
+    let favoriteRow = SyncPlaybackCarryRow(
+        outboxID: 1, entity: "favorite", rowKey: "s-one", op: "upsert", updatedAtMs: 1_000,
+        payloadJSON: "{\"track_stable_id\":\"s-one\"}"
+    )
+    let historyRow = SyncPlaybackCarryRow(
+        outboxID: 2, entity: "play_history", rowKey: "s-one|1700000000000", op: "upsert", updatedAtMs: 1_001,
+        payloadJSON: "{}"
+    )
+    let otherSongRow = SyncPlaybackCarryRow(
+        outboxID: 3, entity: "favorite", rowKey: "s-other", op: "upsert", updatedAtMs: 1_002
+    )
+    let facts = MemoryCarryFacts(
+        tracks: [
+            "A/one.flac": SyncCollectionTrackFact(stableId: "s-one", relativePath: "A/one.flac", contentHash: "h-one"),
+            "A/two.flac": SyncCollectionTrackFact(stableId: "s-two", relativePath: "A/two.flac", contentHash: "h-two"),
+            "A/three.flac": SyncCollectionTrackFact(stableId: "s-three", relativePath: "A/three.flac", contentHash: nil),
+            "B/untransferred.flac": SyncCollectionTrackFact(
+                stableId: "s-other", relativePath: "B/untransferred.flac", contentHash: "h-other"
+            ),
+        ],
+        rows: [
+            "s-one": [favoriteRow, historyRow],
+            "s-two": [SyncPlaybackCarryRow(
+                outboxID: 4, entity: "favorite", rowKey: "s-two", op: "upsert", updatedAtMs: 1_003
+            )],
+            "s-other": [otherSongRow],
+        ]
+    )
+    let scope = SyncPlaybackCarryScope(
+        direction: .push,
+        transferredPaths: ["A/three.flac", "A/two.flac", "@lyrics/h-one.json", "A/one.flac", "A/nowhere.flac"],
+        peerContentHashes: ["h-one"]
+    )
+    let plan = SyncPlaybackCarryPlanner.plan(scope: scope, facts: facts)
+
+    checkEqual(plan.scopePaths, ["@lyrics/h-one.json", "A/nowhere.flac", "A/one.flac", "A/three.flac", "A/two.flac"], "传输路径规范化 + 去重 + 升序")
+    checkEqual(plan.carriedPaths, ["A/one.flac"], "只带本轮传输且两端共有且有数据的歌")
+    checkEqual(plan.entries.map(\.outboxID), [1, 2], "携带条目 = 本端该歌的播放数据行（按变更序）")
+    checkEqual(plan.entries.map(\.contentHash), ["h-one", "h-one"], "条目身份键 = 歌曲 content_hash")
+    checkEqual(plan.entries.first?.reconciliationKey, "favorite\u{1F}s-one", "对账键 = entity + row_key")
+    checkEqual(plan.lyricsPathsIgnored, ["@lyrics/h-one.json"], "歌词路径不承载播放数据")
+    checkEqual(plan.skippedUnknownPath, ["A/nowhere.flac"], "本端查不到路径 → 记账跳过")
+    checkEqual(plan.skippedUnfingerprinted, ["A/three.flac"], "未指纹 → 无法配对，跳过")
+    checkEqual(plan.skippedNotPaired, ["A/two.flac"], "对端没有该指纹 → 不带（两端共有才带）")
+    check(!plan.entries.contains { $0.rowKey == "s-other" }, "未传输的歌的播放数据不带（不做全库对账）")
+
+    // 删除不上线（决策 7）：同键 upsert→delete 在本批末尾 = 整键不上线
+    let deleteFacts = MemoryCarryFacts(
+        tracks: ["A/gone.flac": SyncCollectionTrackFact(stableId: "s-gone", relativePath: "A/gone.flac", contentHash: "h-gone")],
+        rows: [
+            "s-gone": [
+                SyncPlaybackCarryRow(outboxID: 10, entity: "favorite", rowKey: "s-gone", op: "upsert", updatedAtMs: 1),
+                SyncPlaybackCarryRow(outboxID: 11, entity: "favorite", rowKey: "s-gone", op: "delete", updatedAtMs: 2),
+            ],
+        ]
+    )
+    let deletePlan = SyncPlaybackCarryPlanner.plan(
+        scope: SyncPlaybackCarryScope(direction: .push, transferredPaths: ["A/gone.flac"], peerContentHashes: ["h-gone"]),
+        facts: deleteFacts
+    )
+    checkEqual(deletePlan.entries, [SyncPlaybackCarryEntry](), "取消收藏（delete）不上线")
+    checkEqual(deletePlan.skippedNoPlaybackData, ["A/gone.flac"], "只剩 delete → 记为无数据可带")
+
+    // 配对前提：传输完成后对端身份 = 对端 manifest ∪ 本轮传输歌曲指纹
+    let afterTransfer = SyncPlaybackCarryScope.afterTransfer(
+        direction: .push,
+        transferredPaths: ["A/one.flac", "@lyrics/h-one.json"],
+        peerEntries: [entry("A/one.flac", hash: nil)], // 传输前对端没有/未指纹
+        facts: facts
+    )
+    check(afterTransfer.peerContentHashes.contains("h-one"), "传输完成后把本轮传输歌曲的指纹并入对端身份集合")
+    checkEqual(
+        SyncPlaybackCarryPlanner.plan(scope: afterTransfer, facts: facts).carriedPaths,
+        ["A/one.flac"],
+        "只看对端 manifest 会误判未配对 → 并入后正常携带"
+    )
+
+    // 拉取方向只做配对范围（载荷由数据所有者产生）
+    let pullPlan = SyncPlaybackCarryPlanner.pairingPlan(
+        scope: SyncPlaybackCarryScope(direction: .pull, transferredPaths: ["A/one.flac", "A/two.flac"], peerContentHashes: ["h-one"]),
+        facts: facts
+    )
+    checkEqual(pullPlan.carriedPaths, ["A/one.flac"], "拉取方向：请求范围为两端共有的歌")
+    checkEqual(pullPlan.entries, [SyncPlaybackCarryEntry](), "拉取方向本端不发出条目")
+    checkEqual(pullPlan.skippedNotPaired, ["A/two.flac"], "拉取方向同样只认两端共有")
+
+    // 同指纹多路径 → 只带一次
+    let dupFacts = MemoryCarryFacts(
+        tracks: [
+            "A/dup-a.flac": SyncCollectionTrackFact(stableId: "s-dup", relativePath: "A/dup-a.flac", contentHash: "h-dup"),
+            "A/dup-b.flac": SyncCollectionTrackFact(stableId: "s-dup", relativePath: "A/dup-b.flac", contentHash: "h-dup"),
+        ],
+        rows: ["s-dup": [SyncPlaybackCarryRow(outboxID: 20, entity: "favorite", rowKey: "s-dup", op: "upsert", updatedAtMs: 1)]]
+    )
+    let dupPlan = SyncPlaybackCarryPlanner.plan(
+        scope: SyncPlaybackCarryScope(direction: .push, transferredPaths: ["A/dup-b.flac", "A/dup-a.flac"], peerContentHashes: ["h-dup"]),
+        facts: dupFacts
+    )
+    checkEqual(dupPlan.entries.count, 1, "同一首歌（同指纹）多路径只带一次")
+    checkEqual(dupPlan.carriedPaths, ["A/dup-a.flac"], "首见路径获胜（路径升序确定性）")
+}
+
+// MARK: - ㉙ R3b：编排端到端——推送方向跟歌走
+
+section("㉚ R3b：推送阶段结束 → 跟歌带播放数据（只带传输过的歌）")
+do {
+    let pushed = silentData(0xD1, count: 80_000)
+    let pushedHash = try sha256Hex(of: pushed)
+    let otherMacOnly = silentData(0xD2, count: 5_000)
+    let otherHash = try sha256Hex(of: otherMacOnly)
+
+    let carryFacts = MemoryCarryFacts(
+        tracks: [
+            "Album/new.flac": SyncCollectionTrackFact(stableId: "mac-new", relativePath: "Album/new.flac", contentHash: pushedHash),
+            "Album/not-selected.flac": SyncCollectionTrackFact(
+                stableId: "mac-other", relativePath: "Album/not-selected.flac", contentHash: otherHash
+            ),
+        ],
+        rows: [
+            "mac-new": [
+                SyncPlaybackCarryRow(outboxID: 1, entity: "favorite", rowKey: "mac-new", op: "upsert", updatedAtMs: 1_000),
+                SyncPlaybackCarryRow(outboxID: 2, entity: "play_history", rowKey: "mac-new|1700000000000", op: "upsert", updatedAtMs: 1_001),
+            ],
+            // 未选中的歌也有播放数据 → 不在本轮传输集合里，绝不携带
+            "mac-other": [SyncPlaybackCarryRow(outboxID: 3, entity: "favorite", rowKey: "mac-other", op: "upsert", updatedAtMs: 1_002)],
+        ]
+    )
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [("Album/new.flac", pushed), ("Album/not-selected.flac", otherMacOnly)],
+        deviceFiles: [],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(stableId: "mac-new", relativePath: "Album/new.flac", contentHash: pushedHash),
+            ],
+        ],
+        carryFacts: carryFacts,
+        injectCarry: true
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.pushed, ["Album/new.flac"], "只推选中集合里的缺歌")
+    checkEqual(report.playbackCarriedPush, ["Album/new.flac"], "接入：推送方向只带本轮传输的歌")
+    checkEqual(report.playbackCarriedPull, [String](), "本轮无拉取 → 无拉取携带")
+    check(report.playbackCarryError == nil, "携带无错误")
+    checkEqual(scenario.carryDriver?.pushCarryPlans.count, 1, "推送携带恰好触发一次")
+    let plan = scenario.carryDriver?.lastPushPlan
+    checkEqual(plan?.entries.map(\.rowKey), ["mac-new", "mac-new|1700000000000"], "携带条目 = 该歌在 Mac 的播放数据行")
+    checkEqual(plan?.entries.map(\.contentHash), [pushedHash, pushedHash], "条目身份键 = 歌曲 content_hash")
+    check(
+        !(plan?.entries.contains { $0.rowKey == "mac-other" } ?? true),
+        "未传输的歌数据不携带（不做全库对账）"
+    )
+    checkEqual(plan?.skippedNotPaired, [String](), "本轮传输的歌已完成配对（对端 manifest ∪ 传输指纹）")
+    check(
+        FileManager.default.fileExists(atPath: scenario.deviceRoot.appendingPathComponent("Album/new.flac").path),
+        "歌确实已送达对端"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉙ 抛错：\(error)")
+}
+
+// MARK: - ㉚ R3b：编排端到端——拉取方向请求范围
+
+section("㉛ R3b：拉取阶段结束 → 请求对端带回这批歌的播放数据")
+do {
+    let deviceOnly = silentData(0xD3, count: 60_000)
+    let deviceHash = try sha256Hex(of: deviceOnly)
+
+    let carryFacts = MemoryCarryFacts(
+        tracks: [
+            "Album/from-device.flac": SyncCollectionTrackFact(
+                stableId: "mac-pulled", relativePath: "Album/from-device.flac", contentHash: deviceHash
+            ),
+        ]
+    )
+
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [],
+        deviceFiles: [("Album/from-device.flac", deviceOnly)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(stableId: "dev-sid", relativePath: "Album/from-device.flac", contentHash: deviceHash),
+            ],
+        ],
+        carryFacts: carryFacts,
+        injectCarry: true
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.pulled, ["Album/from-device.flac"], "歌已拉到本端")
+    checkEqual(report.playbackCarriedPull, ["Album/from-device.flac"], "接入：拉取方向请求范围为两端共有的歌")
+    checkEqual(report.playbackCarriedPush, [String](), "本轮无推送 → 无推送携带")
+    checkEqual(scenario.carryDriver?.pullCarryPlans.count, 1, "拉取携带恰好触发一次")
+    checkEqual(scenario.carryDriver?.lastPullPlan?.entries, [SyncPlaybackCarryEntry](), "拉取方向本端不发条目")
+    check(report.playbackCarryError == nil, "携带无错误")
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉚ 抛错：\(error)")
+}
+
+// MARK: - ㉛ R3b：零传输 / 未接线 → 不携带（R3a 行为零变化）
+
+section("㉜ R3b：零传输不出发携带；未接线保持 R3a 行为")
+do {
+    let same = silentData(0xD4, count: 4_000)
+    let sameHash = try sha256Hex(of: same)
+    let carryFacts = MemoryCarryFacts(
+        tracks: ["Album/same.flac": SyncCollectionTrackFact(stableId: "mac-same", relativePath: "Album/same.flac", contentHash: sameHash)],
+        rows: ["mac-same": [SyncPlaybackCarryRow(outboxID: 1, entity: "favorite", rowKey: "mac-same", op: "upsert", updatedAtMs: 1)]]
+    )
+
+    let wired = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [("Album/same.flac", same)],
+        deviceFiles: [("Album/same.flac", same)],
+        playlists: ["p1": [SyncCollectionTrackFact(stableId: "mac-same", relativePath: "Album/same.flac", contentHash: sameHash)]],
+        carryFacts: carryFacts,
+        injectCarry: true
+    )
+    checkEqual(wired.coordinator.report.transferCount, 0, "两端已一致 → 零传输")
+    checkEqual(wired.carryDriver?.pushCarryPlans.count, 0, "零传输不触发推送携带")
+    checkEqual(wired.carryDriver?.pullCarryPlans.count, 0, "零传输不触发拉取携带")
+    checkEqual(wired.coordinator.report.playbackCarriedPush, [String](), "账目无推送携带")
+    wired.deviceHost.detach()
+
+    let unWired = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [],
+        deviceFiles: [("Album/only-device.flac", silentData(0xD5, count: 9_000))],
+        playlists: ["p1": [SyncCollectionTrackFact(
+            stableId: "dev-sid",
+            relativePath: "Album/only-device.flac",
+            contentHash: try sha256Hex(of: silentData(0xD5, count: 9_000))
+        )]],
+        injectCarry: false
+    )
+    check(unWired.carryDriver == nil, "未注入驱动")
+    check(unWired.coordinator.report.playbackCarriedPush.isEmpty, "未接线：账目无推送携带（R3a 行为）")
+    check(unWired.coordinator.report.playbackCarriedPull.isEmpty, "未接线：账目无拉取携带（R3a 行为）")
+    check(unWired.coordinator.report.playbackCarryError == nil, "未接线不报错")
+    checkEqual(unWired.coordinator.report.pulled, ["Album/only-device.flac"], "传输行为不受影响")
+    unWired.deviceHost.detach()
+} catch {
+    check(false, "㉜ 抛错：\(error)")
 }
 
 // MARK: - 汇总
