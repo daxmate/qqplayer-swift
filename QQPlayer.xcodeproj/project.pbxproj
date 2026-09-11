@@ -120,6 +120,7 @@
 		C0C8865B22B44FA6BE1F8D2D /* SyncUIStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */; };
 		F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */; };
 		0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */; };
+		29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -289,6 +290,7 @@
 		6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIStateTests.swift; sourceTree = "<group>"; };
 		1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferDirectionTests.swift; sourceTree = "<group>"; };
 		7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPlaylistMembersTests.swift; sourceTree = "<group>"; };
+		1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerLibraryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -542,6 +544,8 @@
 				Sync/SyncLyricsReceiver.swift,
 				Sync/SyncPairingApprovalModel.swift,
 				Sync/SyncPairingFlow.swift,
+				Sync/SyncPeerLibraryClient.swift,
+				Sync/SyncPeerLibraryModels.swift,
 				"Sync/SyncPeerSession+Frames.swift",
 				Sync/SyncPeerSession.swift,
 				Sync/SyncPlaybackCarryPeer.swift,
@@ -824,6 +828,7 @@
 				6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */,
 				1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */,
 				7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */,
+				1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1242,6 +1247,7 @@
 				C0C8865B22B44FA6BE1F8D2D /* SyncUIStateTests.swift in Sources */,
 				F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */,
 				0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */,
+				29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -5,6 +5,8 @@
 //  帧 12/13 编解码、请求路径规范化/解析、应答器解析计划、控制器状态机/对账映射、
 //  四条既有端到端场景（拉取一致性 / 远端已删删除 / 私有区保护 / 越界拒绝），
 //  以及 M4-2b（aligned 歌词库 / 随歌同步 / 越界拒读 / 只补不删）。
+//  覆盖还包括 T7（单向差集与 download 方向）、R3a/R3b（歌单补齐 / 跟歌走）与
+//  T9（㊱-㊴：对端内容清单帧 15/16 —— 编解码 / 纯逻辑 / 内存回环端到端 / 客户端健壮性）。
 //
 //  运行：scripts/run-local-sync-tests.sh
 //
@@ -2182,6 +2184,414 @@ do {
     scenario.deviceHost.detach()
 } catch {
     check(false, "㉟ 抛错：\(error)")
+}
+
+// MARK: - T9 对端内容清单（帧 15/16）：编解码 / 纯逻辑 / 端到端 / 客户端健壮性
+
+/// async 断言的载体（harness 顶层是同步代码，用信号量等待 Task）。
+final class AsyncBox<T>: @unchecked Sendable {
+    var value: T?
+    var error: Error?
+}
+
+func runAsync<T>(_ box: AsyncBox<T>, _ body: @escaping () async throws -> T) {
+    let semaphore = DispatchSemaphore(value: 0)
+    Task {
+        do { box.value = try await body() } catch { box.error = error }
+        semaphore.signal()
+    }
+    semaphore.wait()
+}
+
+/// T9 纯逻辑夹具：乱序 + 同 id 歌单 + 同路径曲目 + 一个非法 scope。
+func t9Catalog() -> SyncPeerLibraryCatalog {
+    SyncPeerLibraryCatalog(
+        playlists: [
+            SyncPeerPlaylistItem(id: "rock", name: "Rock", trackCount: 1),
+            SyncPeerPlaylistItem(id: "jazz", name: "Jazz", trackCount: 2),
+            SyncPeerPlaylistItem(id: "jazz", name: "Jazz 撞名", trackCount: 99),
+        ],
+        tracks: [
+            SyncPeerTrackItem(
+                relativePath: "Rock/01 c.flac", title: "C", artistName: "Cherry",
+                sizeBytes: 300, contentHash: "h3"
+            ),
+            SyncPeerTrackItem(
+                relativePath: "Jazz/02 b.flac", title: "Blue Moon", artistName: "Bob",
+                sizeBytes: 200, contentHash: "h2"
+            ),
+            SyncPeerTrackItem(
+                relativePath: "Jazz/01 a.flac", title: "A Song", artistName: nil,
+                sizeBytes: 100, contentHash: nil
+            ),
+            SyncPeerTrackItem(
+                relativePath: "Jazz/01 a.flac", title: "重复行", artistName: "dup",
+                sizeBytes: 100, contentHash: "dup"
+            ),
+        ],
+        trackPathsByPlaylist: [
+            "jazz": ["Jazz/01 a.flac", "Jazz/02 b.flac"],
+            "rock": ["Rock/01 c.flac"],
+        ]
+    )
+}
+
+section("㊱ T9：帧 15/16 编号 + 载荷编解码（含非法载荷）")
+do {
+    checkEqual(SyncFrameType.peerLibraryRequest.rawValue, 15, "peer_library_request = 15（10-14 冻结）")
+    checkEqual(SyncFrameType.peerLibraryResponse.rawValue, 16, "peer_library_response = 16")
+
+    let request = SyncPeerLibraryRequestPayload(
+        scope: "tracks", playlistID: "jazz", query: "blue",
+        offset: 2, limit: 10, requestID: 42
+    )
+    let encoded = try SyncPeerLibraryCodec.encode(request)
+    let decoded = try SyncPeerLibraryCodec.decode(SyncPeerLibraryRequestPayload.self, from: encoded)
+    checkEqual(decoded, request, "请求载荷 JSON 往返一致")
+    checkEqual(try SyncPeerLibraryCodec.encode(decoded), encoded, "同一载荷两次编码字节一致（线上确定性）")
+
+    let response = SyncPeerLibraryResponsePayload(
+        requestID: 42,
+        scope: "tracks",
+        total: 3,
+        items: [
+            .track(SyncPeerTrackItem(
+                relativePath: "A/x.flac", title: "X", artistName: nil, sizeBytes: 10, contentHash: nil
+            )),
+            .playlist(SyncPeerPlaylistItem(id: "jazz", name: "Jazz", trackCount: 2)),
+        ],
+        hasMore: true,
+        libraryTrackCount: 9,
+        librarySizeBytes: 1_234,
+        truncated: false
+    )
+    let responseData = try SyncPeerLibraryCodec.encode(response)
+    let decodedResponse = try SyncPeerLibraryCodec.decode(SyncPeerLibraryResponsePayload.self, from: responseData)
+    checkEqual(decodedResponse, response, "响应载荷（联合条目）往返一致")
+    checkEqual(decodedResponse.trackItems.map(\.relativePath), ["A/x.flac"], "联合条目取曲目视图")
+    checkEqual(decodedResponse.playlistItems.map(\.id), ["jazz"], "联合条目取歌单视图")
+    let json = String(data: responseData, encoding: .utf8) ?? ""
+    check(json.contains("\"kind\":\"track\""), "联合条目线上带判别字段 kind")
+
+    // 非法载荷：条目缺判别字段 / 未知判别值 → 解码失败（不静默生成错数据）
+    let missingKind = Data(
+        #"{"requestID":1,"scope":"tracks","total":0,"items":[{"id":"x"}],"hasMore":false,"libraryTrackCount":0,"librarySizeBytes":0,"truncated":false}"#.utf8
+    )
+    var missingKindFailed = false
+    do { _ = try SyncPeerLibraryCodec.decode(SyncPeerLibraryResponsePayload.self, from: missingKind) } catch {
+        missingKindFailed = true
+    }
+    check(missingKindFailed, "条目缺 kind → 解码失败")
+
+    let unknownKind = Data(
+        #"{"requestID":1,"scope":"tracks","total":0,"items":[{"kind":"album"}],"hasMore":false,"libraryTrackCount":0,"librarySizeBytes":0,"truncated":false}"#.utf8
+    )
+    var unknownKindFailed = false
+    do { _ = try SyncPeerLibraryCodec.decode(SyncPeerLibraryResponsePayload.self, from: unknownKind) } catch {
+        unknownKindFailed = true
+    }
+    check(unknownKindFailed, "未知 kind → 解码失败")
+} catch {
+    check(false, "㊱ 抛错：\(error)")
+}
+
+section("㊲ T9：内容清单纯逻辑（排序/去重/分页/筛选/钳制/非法 scope）")
+do {
+    let catalog = t9Catalog()
+    checkEqual(catalog.playlists.map(\.id), ["jazz", "rock"], "歌单按 name 升序 + 同 id 去重")
+    checkEqual(
+        catalog.tracks.map(\.relativePath),
+        ["Jazz/01 a.flac", "Jazz/02 b.flac", "Rock/01 c.flac"],
+        "曲目按 relativePath 升序 + 同路径去重"
+    )
+    checkEqual(catalog.trackCount, 3, "曲库总曲目数（摘要）")
+    checkEqual(catalog.totalSizeBytes, 600, "曲库总大小（摘要）")
+
+    // 分页
+    let page1 = catalog.response(for: SyncPeerLibraryRequestPayload(
+        scope: "tracks", offset: 0, limit: 2, requestID: 1
+    ))
+    checkEqual(page1.total, 3, "分页 total = 全集条数")
+    checkEqual(page1.items.count, 2, "第 1 页条数 = limit")
+    check(page1.hasMore, "第 1 页 hasMore")
+    checkEqual(page1.libraryTrackCount, 3, "摘要随页恒返回")
+    let page2 = catalog.response(for: SyncPeerLibraryRequestPayload(
+        scope: "tracks", offset: 2, limit: 2, requestID: 2
+    ))
+    checkEqual(page2.items.count, 1, "第 2 页条数（尾页）")
+    check(!page2.hasMore, "尾页 hasMore = false")
+    checkEqual(
+        (page1.trackItems + page2.trackItems).map(\.relativePath),
+        ["Jazz/01 a.flac", "Jazz/02 b.flac", "Rock/01 c.flac"],
+        "两页拼接 = 全集（无重无漏）"
+    )
+    let pageOutOfRange = catalog.response(for: SyncPeerLibraryRequestPayload(
+        scope: "tracks", offset: 99, limit: 10, requestID: 3
+    ))
+    checkEqual(pageOutOfRange.items.count, 0, "越界 offset → 空页")
+    check(!pageOutOfRange.hasMore, "越界 offset → hasMore=false")
+
+    let playlistPage = catalog.response(for: SyncPeerLibraryRequestPayload(
+        scope: "playlists", offset: 0, limit: 1, requestID: 4
+    ))
+    checkEqual(playlistPage.playlistItems.map(\.id), ["jazz"], "歌单分页")
+    checkEqual(playlistPage.total, 2, "歌单总数")
+    check(playlistPage.hasMore, "歌单还有下一页")
+
+    // 筛选（对端做 contains 匹配：标题 / 歌手 / 相对路径，大小写不敏感）
+    func tracks(liking query: String) -> [String] {
+        catalog.response(for: SyncPeerLibraryRequestPayload(
+            scope: "tracks", query: query, offset: 0, limit: 50, requestID: 5
+        )).trackItems.map(\.relativePath)
+    }
+    checkEqual(tracks(liking: "blue"), ["Jazz/02 b.flac"], "query 命中标题（大小写不敏感）")
+    checkEqual(tracks(liking: "CHERRY"), ["Rock/01 c.flac"], "query 命中歌手")
+    checkEqual(tracks(liking: "rock/"), ["Rock/01 c.flac"], "query 命中相对路径")
+    checkEqual(tracks(liking: "zzz"), [], "query 无命中 → 空清单")
+
+    func tracks(inPlaylist playlistID: String) -> [String] {
+        catalog.response(for: SyncPeerLibraryRequestPayload(
+            scope: "tracks", playlistID: playlistID, offset: 0, limit: 50, requestID: 6
+        )).trackItems.map(\.relativePath)
+    }
+    checkEqual(tracks(inPlaylist: "jazz"), ["Jazz/01 a.flac", "Jazz/02 b.flac"], "playlistID 过滤（jazz）")
+    checkEqual(tracks(inPlaylist: "rock"), ["Rock/01 c.flac"], "playlistID 过滤（rock）")
+    checkEqual(tracks(inPlaylist: "nope"), [], "未知歌单 → 空清单")
+    checkEqual(tracks(inPlaylist: "a/b"), [], "非法歌单标识 → 空清单（绝不回落全库）")
+
+    // 非法 scope / 越界参数 / 不可信字符串
+    let badScope = catalog.response(for: SyncPeerLibraryRequestPayload(
+        scope: "albums", offset: 0, limit: 50, requestID: 7
+    ))
+    checkEqual(badScope.total, 0, "非法 scope → total 0")
+    checkEqual(badScope.items.count, 0, "非法 scope → 空清单")
+    checkEqual(badScope.libraryTrackCount, 3, "非法 scope → 摘要仍返回")
+    checkEqual(badScope.requestID, 7, "响应回显 requestID")
+
+    let clampProbe = SyncPeerLibraryRequestPayload(scope: "tracks", offset: -5, limit: 0, requestID: 8)
+    checkEqual(clampProbe.clampedLimit, 1, "limit <= 0 → 钳到 1")
+    checkEqual(clampProbe.clampedOffset, 0, "offset < 0 → 钳到 0")
+    checkEqual(
+        SyncPeerLibraryRequestPayload(scope: "tracks", limit: 9_999, requestID: 9).clampedLimit,
+        500,
+        "limit > 500 → 钳到 500"
+    )
+    checkEqual(
+        SyncPeerLibraryRequestPayload(scope: "tracks", offset: 0, limit: 9999, requestID: 10)
+            .clampedLimit, 500, "超大 limit 应答侧收口"
+    )
+    let hugeQuery = String(repeating: "x", count: 5_000)
+    checkEqual(
+        SyncPeerLibraryRequestPayload(scope: "tracks", query: hugeQuery, requestID: 11)
+            .normalizedQuery?.count,
+        SyncPeerLibraryRequestPayload.maxQueryLength,
+        "超长 query 截断到上限"
+    )
+    check(
+        SyncPeerLibraryRequestPayload(scope: "tracks", query: "   ", requestID: 12).normalizedQuery == nil,
+        "空白 query → 不过滤"
+    )
+}
+
+section("㊳ T9：端到端（内存回环）— Mac 客户端取对端内容清单")
+do {
+    let fixture = SessionFixture.pairedHandshake()
+    let deviceRoot = try tempRoot("t9-device")
+    let catalog = SyncPeerLibraryCatalog(
+        playlists: [
+            SyncPeerPlaylistItem(id: "jazz", name: "Jazz", trackCount: 2),
+            SyncPeerPlaylistItem(id: "rock", name: "Rock", trackCount: 1),
+            SyncPeerPlaylistItem(id: "@favorites", name: "收藏", trackCount: 1),
+        ],
+        tracks: [
+            SyncPeerTrackItem(
+                relativePath: "Jazz/01 a.flac", title: "A Song", artistName: "Alice",
+                sizeBytes: 1_000, contentHash: "h1"
+            ),
+            SyncPeerTrackItem(
+                relativePath: "Jazz/02 b.flac", title: "Blue Moon", artistName: "Bob",
+                sizeBytes: 2_000, contentHash: "h2"
+            ),
+            SyncPeerTrackItem(
+                relativePath: "Rock/01 c.flac", title: "Cherry", artistName: "Carol",
+                sizeBytes: 4_000, contentHash: nil
+            ),
+        ],
+        trackPathsByPlaylist: [
+            "jazz": ["Jazz/01 a.flac", "Jazz/02 b.flac"],
+            "rock": ["Rock/01 c.flac"],
+            "@favorites": ["Jazz/02 b.flac"],
+        ]
+    )
+    // 设备侧（被动端）：内容清单 provider = 内存清单
+    let deviceHost = SyncLibraryPassiveHost(
+        libraryRoot: deviceRoot,
+        rootName: "测试设备曲库",
+        sink: SinkSpy(),
+        database: DatabaseManager(),
+        lyricsStore: AlignedLyricsStore(directory: try tempRoot("t9-lyrics")),
+        peerLibraryProvider: { catalog }
+    )
+    check(deviceHost.attach(to: fixture.clientSession), "被动端接线成功")
+
+    // Mac 侧（发起端）：内容清单客户端
+    let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: 3)
+
+    let playlistsBox = AsyncBox<[SyncPeerPlaylistItem]>()
+    runAsync(playlistsBox) { try await client.fetchPlaylists() }
+    check(playlistsBox.error == nil, "歌单清单请求无错误（\(String(describing: playlistsBox.error))）")
+    checkEqual(
+        playlistsBox.value?.map(\.id) ?? [],
+        ["jazz", "rock", "@favorites"],
+        "歌单清单（按 name 升序；收藏伪歌单同列其中）"
+    )
+    checkEqual(playlistsBox.value?.first(where: { $0.id == "jazz" })?.trackCount, 2, "歌单曲目数随清单返回")
+
+    let summaryBox = AsyncBox<(trackCount: Int, sizeBytes: Int64)>()
+    runAsync(summaryBox) { try await client.fetchLibrarySummary() }
+    checkEqual(summaryBox.value?.trackCount, 3, "摘要：对端曲库总曲目数")
+    checkEqual(summaryBox.value?.sizeBytes, 7_000, "摘要：对端曲库总大小")
+
+    let firstPageBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(firstPageBox) {
+        try await client.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 2)
+    }
+    checkEqual(firstPageBox.value?.total, 3, "曲目页 total")
+    checkEqual(firstPageBox.value?.items.count, 2, "曲目页第 1 页条数")
+    check(firstPageBox.value?.hasMore == true, "曲目页 hasMore")
+    checkEqual(
+        firstPageBox.value?.trackItems.first.map { [$0.title ?? "", $0.artistName ?? "", "\($0.sizeBytes)", $0.contentHash ?? ""] },
+        ["A Song", "Alice", "1000", "h1"],
+        "曲目条目的标题/歌手/大小/指纹跨端一致"
+    )
+
+    let secondPageBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(secondPageBox) {
+        try await client.fetchTracks(playlistID: nil, query: nil, offset: 2, limit: 2)
+    }
+    checkEqual(
+        (firstPageBox.value?.trackItems ?? []) + (secondPageBox.value?.trackItems ?? []),
+        catalog.tracks,
+        "两页拼接 = 对端全集（客户端按 offset 翻页）"
+    )
+
+    let queryBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(queryBox) {
+        try await client.fetchTracks(playlistID: nil, query: "moon", offset: 0, limit: 50)
+    }
+    checkEqual(queryBox.value?.trackItems.map(\.relativePath), ["Jazz/02 b.flac"], "query 过滤在对端执行")
+
+    let playlistBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(playlistBox) {
+        try await client.fetchTracks(playlistID: "jazz", query: nil, offset: 0, limit: 50)
+    }
+    checkEqual(
+        playlistBox.value?.trackItems.map(\.relativePath),
+        ["Jazz/01 a.flac", "Jazz/02 b.flac"],
+        "playlistID 过滤在对端执行"
+    )
+
+    let favoritesBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(favoritesBox) {
+        try await client.fetchTracks(
+            playlistID: SyncCollectionSelection.favoritesPlaylistID,
+            query: nil, offset: 0, limit: 50
+        )
+    }
+    checkEqual(
+        favoritesBox.value?.trackItems.map(\.relativePath),
+        ["Jazz/02 b.flac"],
+        "收藏伪歌单（@favorites）过滤"
+    )
+
+    // 注册点 3 的实证：没有控制器/重传，全靠会话分发到 responder
+    check(client.pendingRequestCount == 0, "响应到达后在途表清空")
+    deviceHost.detach()
+} catch {
+    check(false, "㊳ 抛错：\(error)")
+}
+
+section("㊴ T9：客户端健壮性（超时不悬挂 / 取消 / 会话关闭）")
+do {
+    // 对端不接线（没有任何 responder 应答）→ 必须超时抛错，绝不永久等待
+    let silent = SessionFixture.pairedHandshake()
+    let timeoutClient = SyncPeerLibraryClient(session: silent.hostSession, timeout: 0.3)
+    let timeoutBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(timeoutBox) {
+        try await timeoutClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
+    }
+    checkEqual(
+        timeoutBox.error as? SyncPeerLibraryClient.ClientError,
+        .timeout,
+        "对端不答 → 超时抛错"
+    )
+    check(timeoutClient.pendingRequestCount == 0, "超时后在途表清空（不悬挂）")
+
+    // UI 取消 → 在途请求立即抛 .cancelled（不等超时）
+    let cancelFixture = SessionFixture.pairedHandshake()
+    let cancelClient = SyncPeerLibraryClient(session: cancelFixture.hostSession, timeout: 30)
+    let cancelBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    let cancelSemaphore = DispatchSemaphore(value: 0)
+    Task {
+        do {
+            cancelBox.value = try await cancelClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
+        } catch {
+            cancelBox.error = error
+        }
+        cancelSemaphore.signal()
+    }
+    Thread.sleep(forTimeInterval: 0.05)
+    cancelClient.cancel()
+    cancelSemaphore.wait()
+    checkEqual(
+        cancelBox.error as? SyncPeerLibraryClient.ClientError,
+        .cancelled,
+        "cancel() 立即唤醒在途请求"
+    )
+
+    // 会话关闭 → 在途请求立即失败（不等超时）
+    let closedFixture = SessionFixture.pairedHandshake()
+    let closedClient = SyncPeerLibraryClient(session: closedFixture.hostSession, timeout: 30)
+    let closedBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    let closedSemaphore = DispatchSemaphore(value: 0)
+    Task {
+        do {
+            closedBox.value = try await closedClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
+        } catch {
+            closedBox.error = error
+        }
+        closedSemaphore.signal()
+    }
+    Thread.sleep(forTimeInterval: 0.05)
+    closedFixture.hostSession.cancel(reason: .userCancelled)
+    closedSemaphore.wait()
+    checkEqual(
+        closedBox.error as? SyncPeerLibraryClient.ClientError,
+        .sessionClosed,
+        "会话关闭 → 在途请求立即失败"
+    )
+
+    // 未 ready 的会话 → 立即抛 sessionNotReady（不静默挂起）
+    let idleChannel = LoopbackTransport()
+    let idleSession = SyncPeerSession(
+        role: .host,
+        localIdentity: SyncIdentity.generate(),
+        trustStore: MemoryTrustStore(),
+        config: SyncSessionConfiguration(),
+        pairingNonces: SyncPairingNonceRegistry(),
+        transport: idleChannel
+    )
+    idleChannel.session = idleSession
+    let idleClient = SyncPeerLibraryClient(session: idleSession, timeout: 5)
+    let idleBox = AsyncBox<SyncPeerLibraryResponsePayload>()
+    runAsync(idleBox) {
+        try await idleClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
+    }
+    checkEqual(
+        idleBox.error as? SyncPeerLibraryClient.ClientError,
+        .sessionNotReady,
+        "未 ready 会话 → sessionNotReady"
+    )
 }
 
 // MARK: - 汇总

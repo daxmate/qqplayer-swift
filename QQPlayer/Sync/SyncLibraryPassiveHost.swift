@@ -4,11 +4,14 @@
 //
 //  R1b-1（2026-09-11）同步方向改造 · **被动端装配**（发起方恒为 Mac，移动端纯被动）。
 //
-//  一个已配对会话的被动端能力，两件事：
+//  一个已配对会话的被动端能力，三件事：
 //   ① 应答 Mac 的请求（本文件不实现协议细节，全部走共用实现）：
 //      - `manifest_request`（帧 10）→ 本端曲库清单（含 aligned 歌词条目）→ `manifest_response`
 //      - `sync_fetch_request`（帧 12）→ 越界拒读 + 串行推送本端文件 → `sync_fetch_result`
 //        这两个能力由 `SyncLocalLibraryProvider` 提供（Mac 侧同一实现，见其文件头映射稿）。
+//      - `peer_library_request`（帧 15）→ 本端**内容清单**（歌单/曲目 + 摘要）→
+//        `peer_library_response`（帧 16）；由 `SyncPeerLibraryResponder` 提供（T9，
+//        供 Mac 侧 T10 在「从设备下载」方向展示对端内容）。
 //   ② 接收 Mac 的推送并落库：
 //      - `library_push_announce`（帧 14）→ 建认领表（传输名 → 目标相对路径）
 //      - 既有停等传输（帧 4/5/6，`SyncFileReceiver`）→ SHA-256 校验后落在
@@ -75,11 +78,15 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     /// 歌单成员表 provider（T7b）：应答 `.playlists` manifest 时按需求值
     /// （同一张表也决定了 Mac 侧「按歌单下载」能从本端拿回哪些文件）。
     private let membersProvider: () -> SyncCollectionMembers
+    /// 内容清单 provider（T9）：应答 `peer_library_request`（帧 15）时按需求值。
+    private let peerLibraryProvider: () -> SyncPeerLibraryCatalog
     /// 歌词接收编排：**每批声明重建**（暂存/收尾语义按批界定，与主动流程单轮等价）
     private var lyricsReceiver: SyncLyricsReceiver
     private let lock = NSLock()
 
     private var receiver: SyncFileReceiver?
+    /// 内容清单应答器（T9；attach 时创建，detach 时静默）
+    private var libraryResponder: SyncPeerLibraryResponder?
     private var priorAppHandler: ((SyncFrame) -> Void)?
     private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
 
@@ -115,7 +122,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
         lyricsMapping: SyncLyricsContentMapping? = nil,
-        membersProvider: (() -> SyncCollectionMembers)? = nil
+        membersProvider: (() -> SyncCollectionMembers)? = nil,
+        peerLibraryProvider: (() -> SyncPeerLibraryCatalog)? = nil
     ) {
         let mapping = lyricsMapping ?? .live(database: database)
         self.libraryRoot = libraryRoot
@@ -129,6 +137,12 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         // 可注入固定表供测试（不碰 DB）。局部量传给闭包，不捕获 self（无引用环）。
         let members = membersProvider ?? DatabaseSyncCollectionFacts.liveMembersProvider(database: database)
         self.membersProvider = members
+        // T9：默认接真实 DB 内容清单（歌单/曲目 + 摘要）；可注入固定清单供测试
+        // （不碰 DB）。同样赋给局部量，闭包不捕获 self。
+        self.peerLibraryProvider = peerLibraryProvider ?? DatabaseSyncPeerLibraryFacts.catalogProvider(
+            database: database,
+            libraryRoot: libraryRoot
+        )
         self.lyricsReceiver = SyncLyricsReceiver(
             lyricsStore: lyricsStore,
             lyricsMapping: mapping,
@@ -180,8 +194,16 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
             self?.handleTransfer(outcome)
         }
 
+        // T9：内容清单应答（帧 15 → 帧 16）。先建（它接在既有链尾），再挂本类 handler——
+        // 链序为「本类 → responder → 更早的链」，本类只挑 `library_push_announce`。
+        let libraryResponder = SyncPeerLibraryResponder(
+            session: session,
+            catalogProvider: peerLibraryProvider
+        )
+
         lock.lock()
         self.receiver = receiver
+        self.libraryResponder = libraryResponder
         priorAppHandler = session.onApplicationFrame
         priorClosedHandler = session.onClosed
         lock.unlock()
@@ -209,10 +231,13 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     func detach() {
         lock.lock()
         let receiver = self.receiver
+        let libraryResponder = self.libraryResponder
         self.receiver = nil
+        self.libraryResponder = nil
         claims = SyncPushClaimTable()
         lock.unlock()
         receiver?.cancel()
+        libraryResponder?.detach()
         lyricsReceiver.cancel()
         provider.detach()
     }
