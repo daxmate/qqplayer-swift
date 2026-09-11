@@ -1232,6 +1232,13 @@
 "sync_run_selection_total_library" = "整個媒體庫 · %d 首 · 約 %@";
 "sync_run_execute_section" = "執行同步";
 "sync_run_start" = "開始同步";
+
+/* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
+"sync_run_panel_title" = "同步";
+"sync_run_upload" = "上傳到 iPhone";
+"sync_run_upload_help" = "把本機有的歌推送過去（對端缺的會補上）";
+"sync_run_download" = "從 iPhone 下載";
+"sync_run_download_help" = "以 iPhone 的清單為準，把本機缺的歌拉回來";
 "sync_run_cancel" = "取消";
 "sync_run_phase_disconnected" = "未連線";
 "sync_run_phase_idle" = "可以開始同步";

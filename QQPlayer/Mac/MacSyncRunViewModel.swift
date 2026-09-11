@@ -79,6 +79,8 @@ final class MacSyncRunViewModel: ObservableObject {
     @Published private(set) var now = Date()
     /// 同步进行中会话断开（UI 提示用）。
     @Published private(set) var didDisconnectWhileRunning = false
+    /// 最近一次/进行中的传输方向（nil = 还没跑过）。
+    @Published private(set) var runDirection: SyncTransferDirection?
 
     // MARK: 内部状态
 
@@ -333,8 +335,13 @@ final class MacSyncRunViewModel: ObservableObject {
 
     // MARK: - 同步执行
 
-    /// 开始一次同步（仅在 `startAvailability == .ready` 时有效）。
-    func startSync() {
+    /// 上传到移动端（Mac → iPhone；仅在 `startAvailability == .ready` 时有效）。
+    func startUpload() { start(direction: .upload) }
+
+    /// 从移动端下载（iPhone → Mac；仅在 `startAvailability == .ready` 时有效）。
+    func startDownload() { start(direction: .download) }
+
+    private func start(direction: SyncTransferDirection) {
         refreshAvailability()
         guard startAvailability == .ready else { return }
         guard let session = hostCenter.activeSession else {
@@ -360,9 +367,10 @@ final class MacSyncRunViewModel: ObservableObject {
             Task { @MainActor in self?.handlePeerManifest(from: coordinator) }
         }
         self.coordinator = coordinator
+        runDirection = direction
 
         do {
-            try coordinator.start()
+            try coordinator.start(direction: direction)
         } catch {
             errorMessage = "\(error)"
         }

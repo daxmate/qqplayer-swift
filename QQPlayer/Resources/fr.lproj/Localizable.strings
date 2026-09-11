@@ -835,6 +835,13 @@
 "sync_run_selection_total_library" = "Bibliothèque entière · %d morceaux · environ %@";
 "sync_run_execute_section" = "Synchronisation";
 "sync_run_start" = "Démarrer la synchronisation";
+
+/* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
+"sync_run_panel_title" = "Synchronisation";
+"sync_run_upload" = "Envoyer vers l'iPhone";
+"sync_run_upload_help" = "Envoyer les morceaux présents sur ce Mac vers l'iPhone";
+"sync_run_download" = "Télécharger depuis l'iPhone";
+"sync_run_download_help" = "Rapatrier sur ce Mac les morceaux présents sur l'iPhone";
 "sync_run_cancel" = "Annuler";
 "sync_run_phase_disconnected" = "Non connecté";
 "sync_run_phase_idle" = "Prêt à synchroniser";

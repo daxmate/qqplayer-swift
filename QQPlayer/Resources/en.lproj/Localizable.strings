@@ -837,6 +837,13 @@
 "sync_run_selection_total_library" = "Entire library · %d songs · about %@";
 "sync_run_execute_section" = "Sync";
 "sync_run_start" = "Start Sync";
+
+/* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
+"sync_run_panel_title" = "Sync";
+"sync_run_upload" = "Upload to iPhone";
+"sync_run_upload_help" = "Send songs this Mac has to your iPhone (missing songs are pushed)";
+"sync_run_download" = "Download from iPhone";
+"sync_run_download_help" = "Bring songs from your iPhone to this Mac (the iPhone list is the source of truth)";
 "sync_run_cancel" = "Cancel";
 "sync_run_phase_disconnected" = "Not connected";
 "sync_run_phase_idle" = "Ready to sync";
