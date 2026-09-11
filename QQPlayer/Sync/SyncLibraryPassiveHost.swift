@@ -72,6 +72,9 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     private let fileManager: FileManager
     private let lyricsStore: AlignedLyricsStore
     private let lyricsMapping: SyncLyricsContentMapping
+    /// 歌单成员表 provider（T7b）：应答 `.playlists` manifest 时按需求值
+    /// （同一张表也决定了 Mac 侧「按歌单下载」能从本端拿回哪些文件）。
+    private let membersProvider: () -> SyncCollectionMembers
     /// 歌词接收编排：**每批声明重建**（暂存/收尾语义按批界定，与主动流程单轮等价）
     private var lyricsReceiver: SyncLyricsReceiver
     private let lock = NSLock()
@@ -111,7 +114,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         database: DatabaseManager = .shared,
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
-        lyricsMapping: SyncLyricsContentMapping? = nil
+        lyricsMapping: SyncLyricsContentMapping? = nil,
+        membersProvider: (() -> SyncCollectionMembers)? = nil
     ) {
         let mapping = lyricsMapping ?? .live(database: database)
         self.libraryRoot = libraryRoot
@@ -121,6 +125,10 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         self.fileManager = fileManager
         self.lyricsStore = lyricsStore
         self.lyricsMapping = mapping
+        // T7b：默认接真实 DB 歌单成员表（`slug` → stableId 集合 + `@favorites`）；
+        // 可注入固定表供测试（不碰 DB）。局部量传给闭包，不捕获 self（无引用环）。
+        let members = membersProvider ?? DatabaseSyncCollectionFacts.liveMembersProvider(database: database)
+        self.membersProvider = members
         self.lyricsReceiver = SyncLyricsReceiver(
             lyricsStore: lyricsStore,
             lyricsMapping: mapping,
@@ -132,7 +140,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
             database: database,
             fileManager: fileManager,
             lyricsStore: lyricsStore,
-            lyricsMapping: mapping
+            lyricsMapping: mapping,
+            members: members
         )
         self.provider = SyncLocalLibraryProvider(descriptor: descriptor, fileManager: fileManager)
         provider.onFetchResult = { [weak self] result in self?.onFetchResult?(result) }

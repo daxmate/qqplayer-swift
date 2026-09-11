@@ -85,6 +85,10 @@ struct SyncLocalLibraryDescriptor {
     var contentHash: (String) -> String?
     /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）
     var lyricsFileName: (String) -> String?
+    /// 歌单标识 → 成员 stableId 集合（T7b）：应答 `.playlists` manifest 时按需求值。
+    /// 缺省空表 = 「歌单过滤不出内容」（接 DB 的装配方负责注入真实表，见
+    /// `DatabaseSyncCollectionFacts.liveMembersProvider(database:)`）。
+    var members: () -> SyncCollectionMembers
 
     init(
         libraryRoot: URL,
@@ -93,7 +97,8 @@ struct SyncLocalLibraryDescriptor {
         sourceFiles: @escaping () -> [SyncManifestSourceFile],
         lyricsEntries: @escaping () -> [ManifestEntry] = { [] },
         contentHash: @escaping (String) -> String? = { _ in nil },
-        lyricsFileName: @escaping (String) -> String? = { _ in nil }
+        lyricsFileName: @escaping (String) -> String? = { _ in nil },
+        members: (() -> SyncCollectionMembers)? = nil
     ) {
         self.libraryRoot = libraryRoot
         self.rootName = rootName
@@ -102,6 +107,7 @@ struct SyncLocalLibraryDescriptor {
         self.lyricsEntries = lyricsEntries
         self.contentHash = contentHash
         self.lyricsFileName = lyricsFileName
+        self.members = members ?? { SyncCollectionMembers() }
     }
 }
 
@@ -109,13 +115,18 @@ extension SyncLocalLibraryDescriptor {
     /// 生产装配（Mac / iOS 通用）：曲库根 + 歌词库 + DB 既有入口。
     /// - 扫描/指纹：`SyncLocalLibraryScanner`（惰性回填语义）
     /// - 歌词：`AlignedLyricsStore`（仅 aligned）+ stable_id ↔ content_hash 映射
+    /// - Parameter members: 歌单成员表 provider（T7b）。**应答 manifest 的装配方必须
+    ///   传真实实现**（Mac：`MacSyncLibraryHost` / iOS：`SyncLibraryPassiveHost`），
+    ///   否则 `.playlists` 集合会被滤成空清单。nil（缺省）= 空表，供发起端装配与
+    ///   测试/harness 保持改造前行为。
     static func live(
         libraryRoot: URL,
         rootName: String? = nil,
         database: DatabaseManager = .shared,
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
-        lyricsMapping: SyncLyricsContentMapping? = nil
+        lyricsMapping: SyncLyricsContentMapping? = nil,
+        members: (() -> SyncCollectionMembers)? = nil
     ) -> SyncLocalLibraryDescriptor {
         let mapping = lyricsMapping ?? .live(database: database)
         return SyncLocalLibraryDescriptor(
@@ -145,7 +156,8 @@ extension SyncLocalLibraryDescriptor {
                       AlignedLyricsStore.isValidStableId(stableId)
                 else { return nil }
                 return "\(stableId).json"
-            }
+            },
+            members: members
         )
     }
 }
@@ -239,12 +251,31 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
     // MARK: manifest
 
     /// 本端曲库根全量 manifest 经集合过滤后的条目（供 SyncManifestPeer 应答）。
+    /// - Parameter members: 歌单成员表（T7b）。`nil`（缺省）= 按需构建：只有
+    ///   `.playlists` 集合会向 descriptor 求值，`.all` / `.tracks` 零 DB 查询。
     func manifest(
         collection: SyncCollection,
-        members: SyncCollectionMembers = SyncCollectionMembers()
+        members: SyncCollectionMembers? = nil
     ) -> [ManifestEntry] {
         let library = SyncManifestGenerator.generate(files: descriptor.sourceFiles())
-        return collection.filter(library + descriptor.lyricsEntries(), members: members)
+        return collection.filter(
+            library + descriptor.lyricsEntries(),
+            members: members ?? resolvedMembers(for: collection)
+        )
+    }
+
+    /// 集合 → 歌单成员表（T7b）：**只有 `.playlists` 的非空选择需要 DB 展开**。
+    ///
+    /// 为什么按需求值而不是装配时构建/缓存：
+    /// - 求值点在会话线程（应答 manifest 是同步调用），无关集合上不能白跑 DB；
+    /// - 歌单成员随用户编辑而变，缓存会引入失效窗口；而每次同步只发一次
+    ///   manifest 请求，按需读的是本地索引查询（每歌单一次 `getPlaylistItems`），
+    ///   总量 = 歌单数，成本与「一次请求」成正比，可接受（详情见任务报告）。
+    private func resolvedMembers(for collection: SyncCollection) -> SyncCollectionMembers {
+        guard collection.kind == .playlists, !collection.ids.isEmpty else {
+            return SyncCollectionMembers()
+        }
+        return descriptor.members()
     }
 
     /// 扫描曲库根 → manifest 生成输入（诊断/测试用）。

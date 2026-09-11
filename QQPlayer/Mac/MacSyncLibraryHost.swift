@@ -30,6 +30,8 @@ final class MacSyncLibraryHost: @unchecked Sendable {
     let rootName: String
 
     private let provider: SyncLocalLibraryProvider
+    /// 歌单成员表 provider（T7b）：应答 `.playlists` manifest 时按需求值。
+    private let membersProvider: () -> SyncCollectionMembers
     private let lock = NSLock()
 
     /// 一次拉取的结论（诊断/UI 用；M6 接进度展示）。
@@ -53,10 +55,15 @@ final class MacSyncLibraryHost: @unchecked Sendable {
         database: DatabaseManager = .shared,
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
-        lyricsMapping: SyncLyricsContentMapping? = nil
+        lyricsMapping: SyncLyricsContentMapping? = nil,
+        membersProvider: (() -> SyncCollectionMembers)? = nil
     ) {
         self.libraryRoot = libraryRoot
         self.rootName = rootName ?? libraryRoot.lastPathComponent
+        // T7b：默认接真实 DB 歌单成员表（`slug` → stableId 集合 + `@favorites`）。
+        // 可注入：单测 / harness 用固定成员表（不碰 DB）。
+        let members = membersProvider ?? DatabaseSyncCollectionFacts.liveMembersProvider(database: database)
+        self.membersProvider = members
         // 默认走 M4-2a 的 SyncContentHashResolver（stable_id ↔ content_hash）
         let descriptor = SyncLocalLibraryDescriptor.live(
             libraryRoot: libraryRoot,
@@ -64,7 +71,10 @@ final class MacSyncLibraryHost: @unchecked Sendable {
             database: database,
             fileManager: fileManager,
             lyricsStore: lyricsStore,
-            lyricsMapping: lyricsMapping
+            lyricsMapping: lyricsMapping,
+            // 赋给局部量再注入：闭包不捕获 self，避免 host ← provider ← descriptor
+            // ← members 的引用环。
+            members: members
         )
         self.provider = SyncLocalLibraryProvider(descriptor: descriptor, fileManager: fileManager)
         provider.onFetchResult = { [weak self] result in
@@ -92,9 +102,11 @@ final class MacSyncLibraryHost: @unchecked Sendable {
     // MARK: manifest（会话线程同步调用）
 
     /// 曲库根全量 manifest 经集合过滤后的条目（供 SyncManifestPeer 应答）。
+    /// - Parameter members: 显式成员表（测试/诊断覆盖用）；`nil`（缺省）= 走本实例
+    ///   装配的成员表（T7b：生产 = 真实歌单成员，且只在 `.playlists` 时求值）。
     func manifest(
         collection: SyncCollection,
-        members: SyncCollectionMembers = SyncCollectionMembers()
+        members: SyncCollectionMembers? = nil
     ) -> [ManifestEntry] {
         provider.manifest(collection: collection, members: members)
     }
