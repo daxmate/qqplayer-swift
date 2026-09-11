@@ -39,20 +39,31 @@ struct IOSPassiveSyncCenterTests {
 
     // MARK: - 候选目标
 
-    @Test("targets：名称匹配的已配对主机排前，落单 endpoint 兜底在后")
+    @Test("targets：只对已配对主机建目标（未配对端点不尝试），名称匹配者优先")
     func targetsPrefersNameMatch() {
         let targets = IOSPassiveReconnectLogic.targets(
             discovered: [makeHost("Mac-Studio"), makeHost("MacBook-Air")],
             pairedHosts: [makePeer("PEER-A", name: "MacBook-Air")]
         )
-        #expect(targets.count == 2)
+        // Mac-Studio 未配对 → 不产生目标：广播名不作凭据，也不拿未配对端点
+        // 去撞 pinning（只会以 peerUntrusted 白连一次）
+        #expect(targets.count == 1)
         #expect(targets.first == IOSPassiveSyncTarget(
             peerID: "PEER-A",
             hostName: "MacBook-Air",
             endpoint: makeHost("MacBook-Air").endpoint
         ))
-        #expect(targets.last?.hostName == "Mac-Studio")
-        #expect(targets.last?.peerID == "PEER-A")
+    }
+
+    @Test("targets：主机改名（无名称匹配）→ 剩余端点按发现顺序兜底，身份仍挂同一 peerID")
+    func targetsFallsBackToLeftoverEndpoints() {
+        let targets = IOSPassiveReconnectLogic.targets(
+            discovered: [makeHost("Mac-Studio"), makeHost("Renamed-Mac")],
+            pairedHosts: [makePeer("PEER-A", name: "MacBook-Air")]
+        )
+        #expect(targets.count == 2)
+        #expect(targets.allSatisfy { $0.peerID == "PEER-A" })
+        #expect(targets.map(\.hostName) == ["Mac-Studio", "Renamed-Mac"])
     }
 
     @Test("targets：名称匹配 case-insensitive（复用 SyncConnectLogic.matches 口径）")
