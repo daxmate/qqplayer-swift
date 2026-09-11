@@ -182,4 +182,55 @@ struct TrackContentHashTests {
         // 第二次回填：无 NULL 可补 → 不崩（幂等）
         try manager.backfillMissingContentHashes()
     }
+
+    // MARK: - 回填 × iCloud dataless（云端未下载）
+
+    /// 插入一行 content_hash 为 NULL 的存量曲目（绕过 upsertTrack 的即时哈希）。
+    private func insertNullHashTrack(_ dbQueue: DatabaseQueue, stableId: String, path: String) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path) VALUES (?, ?, ?)",
+                arguments: [stableId, stableId, path]
+            )
+        }
+    }
+
+    @Test("回填：iCloud 云端未下载（isLocallyAvailable=false）→ 跳过、返回跳过数>0、content_hash 仍 NULL")
+    func backfillSkipsDatalessCloudTracks() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+
+        let url = try writeTempFile(named: "cloudonly.bin", byte: 0x22)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try insertNullHashTrack(dbQueue, stableId: "bf-cloud-skipped", path: url.path)
+
+        let skipped = try manager.backfillMissingContentHashes(isLocallyAvailable: { _ in false })
+        #expect(skipped == 1)
+
+        let cloudOnly: Track? = try dbQueue.read { db in
+            try Track.filter(Column("stable_id") == "bf-cloud-skipped").fetchOne(db)
+        }
+        #expect(cloudOnly?.contentHash == nil)
+    }
+
+    @Test("回填：云端文件下载完成后（isLocallyAvailable=true）→ 补齐、跳过数归零")
+    func backfillFillsAfterCloudDownload() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+
+        let url = try writeTempFile(named: "clouddownloaded.bin", byte: 0x33)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try insertNullHashTrack(dbQueue, stableId: "bf-cloud-filled", path: url.path)
+
+        let skipped = try manager.backfillMissingContentHashes(isLocallyAvailable: { _ in true })
+        #expect(skipped == 0)
+
+        let filled: Track? = try dbQueue.read { db in
+            try Track.filter(Column("stable_id") == "bf-cloud-filled").fetchOne(db)
+        }
+        let expected = try SyncFileChecksum.sha256Hex(ofFile: url)
+        #expect(filled?.contentHash == expected)
+    }
 }
