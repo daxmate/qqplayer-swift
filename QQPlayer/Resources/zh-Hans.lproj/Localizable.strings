@@ -830,3 +830,27 @@
 "sync_connect_failed_message_detail" = "连接失败：%@";
 "sync_connect_missing_candidate" = "此二维码缺少安全数据，请重新扫码。";
 "sync_connect_retry" = "重试";
+
+// MARK: - 局域网同步 · iOS 被动端状态（M6 T4/T5）
+"sync_passive_section" = "接收同步";
+"sync_passive_footer" = "本机应答 Mac 的请求并接收它推送的歌曲；在 Mac 上打开同步页即可连接。";
+"sync_passive_state_idle" = "未连接";
+"sync_passive_state_unpaired" = "未配对 Mac";
+"sync_passive_state_searching" = "正在查找你的 Mac…";
+"sync_passive_state_connecting" = "正在连接 %@…";
+"sync_passive_state_connected" = "已连接 %@";
+"sync_passive_fail_identity" = "无法读取本机的同步身份。";
+"sync_passive_fail_not_found" = "当前网络下没有找到 %@。";
+"sync_passive_fail_not_found_generic" = "当前网络下没有找到你的 Mac。";
+"sync_passive_fail_timeout" = "Mac 未在规定时间内响应。";
+"sync_passive_fail_rejected" = "Mac 拒绝了本次连接。";
+"sync_passive_fail_connection" = "连接失败。";
+"sync_passive_detail" = "详情：%@";
+"sync_passive_progress_received" = "已接收 %d 个文件";
+"sync_passive_progress_batch" = "最近一批：%d 项";
+"sync_passive_progress_failures" = "%d 项失败";
+"sync_passive_reconnect" = "重连";
+"sync_passive_reason_transfer" = "传输失败";
+"sync_passive_reason_path" = "路径非法";
+"sync_passive_reason_save" = "写入失败";
+"sync_passive_reason_other" = "失败";

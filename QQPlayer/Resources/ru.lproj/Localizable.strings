@@ -774,3 +774,27 @@
 "sync_connect_failed_message_detail" = "Ошибка подключения: %@";
 "sync_connect_missing_candidate" = "В этом QR-коде отсутствуют данные безопасности. Отсканируйте ещё раз.";
 "sync_connect_retry" = "Повторить";
+
+// MARK: - Синхронизация по локальной сети · состояние пассивной стороны iOS (M6 T4/T5)
+"sync_passive_section" = "Приём синхронизации";
+"sync_passive_footer" = "iPhone отвечает Mac и принимает отправленные им песни. Откройте синхронизацию на Mac, чтобы подключиться.";
+"sync_passive_state_idle" = "Не подключено";
+"sync_passive_state_unpaired" = "Нет сопряжённого Mac";
+"sync_passive_state_searching" = "Поиск вашего Mac…";
+"sync_passive_state_connecting" = "Подключение к %@…";
+"sync_passive_state_connected" = "Подключено к %@";
+"sync_passive_fail_identity" = "Не удалось загрузить идентификатор синхронизации iPhone.";
+"sync_passive_fail_not_found" = "Не удалось найти %@ в этой сети.";
+"sync_passive_fail_not_found_generic" = "Не удалось найти ваш Mac в этой сети.";
+"sync_passive_fail_timeout" = "Mac не ответил вовремя.";
+"sync_passive_fail_rejected" = "Mac отклонил подключение.";
+"sync_passive_fail_connection" = "Не удалось подключиться.";
+"sync_passive_detail" = "Подробности: %@";
+"sync_passive_progress_received" = "Получено файлов: %d";
+"sync_passive_progress_batch" = "Последняя партия: %d";
+"sync_passive_progress_failures" = "Ошибок: %d";
+"sync_passive_reconnect" = "Подключиться снова";
+"sync_passive_reason_transfer" = "Ошибка передачи";
+"sync_passive_reason_path" = "Неверный путь";
+"sync_passive_reason_save" = "Не удалось сохранить";
+"sync_passive_reason_other" = "Ошибка";

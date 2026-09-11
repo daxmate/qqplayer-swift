@@ -777,3 +777,27 @@
 "sync_connect_failed_message_detail" = "Échec de la connexion : %@";
 "sync_connect_missing_candidate" = "Ce code QR ne contient pas les données de sécurité. Veuillez scanner à nouveau.";
 "sync_connect_retry" = "Réessayer";
+
+// MARK: - Synchronisation réseau local · état du côté passif iOS (M6 T4/T5)
+"sync_passive_section" = "Réception de la synchronisation";
+"sync_passive_footer" = "Votre iPhone répond au Mac et reçoit les morceaux qu'il envoie. Ouvrez la synchronisation sur le Mac pour vous connecter.";
+"sync_passive_state_idle" = "Non connecté";
+"sync_passive_state_unpaired" = "Aucun Mac jumelé";
+"sync_passive_state_searching" = "Recherche de votre Mac…";
+"sync_passive_state_connecting" = "Connexion à %@…";
+"sync_passive_state_connected" = "Connecté à %@";
+"sync_passive_fail_identity" = "Impossible de charger l'identité de synchronisation de cet iPhone.";
+"sync_passive_fail_not_found" = "Impossible de trouver %@ sur ce réseau.";
+"sync_passive_fail_not_found_generic" = "Impossible de trouver votre Mac sur ce réseau.";
+"sync_passive_fail_timeout" = "Le Mac n'a pas répondu à temps.";
+"sync_passive_fail_rejected" = "Le Mac a refusé la connexion.";
+"sync_passive_fail_connection" = "Échec de la connexion.";
+"sync_passive_detail" = "Détail : %@";
+"sync_passive_progress_received" = "Fichiers reçus : %d";
+"sync_passive_progress_batch" = "Dernier lot : %d";
+"sync_passive_progress_failures" = "Échecs : %d";
+"sync_passive_reconnect" = "Reconnecter";
+"sync_passive_reason_transfer" = "Échec du transfert";
+"sync_passive_reason_path" = "Chemin invalide";
+"sync_passive_reason_save" = "Impossible d'enregistrer";
+"sync_passive_reason_other" = "Échec";

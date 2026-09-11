@@ -91,6 +91,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct QQPlayerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appCoordinator = AppCoordinator.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         if #available(iOS 26.0, *) {
@@ -137,6 +138,11 @@ struct QQPlayerApp: App {
                 .onOpenURL { url in
                     handleOpenURL(url)
                 }
+                // 局域网同步（M6·T4）：Mac 是唯一发起方，本端只在前台保持回连
+                // 并应答/接收（App 级被动同步中心，与扫码流程无关）。
+                .onChange(of: scenePhase) { _, phase in
+                    handleScenePhase(phase)
+                }
                 .onContinueUserActivity("com.daxmate.qqplayer.play") { userActivity in
                     handleSiriIntent(userActivity)
                 }
@@ -164,6 +170,21 @@ struct QQPlayerApp: App {
                     window.rootViewController?.view.layoutIfNeeded()
                 }
             }
+        }
+    }
+
+    /// 局域网同步被动端跟随 App 前后台：前台回连、后台断开（唯一生命周期入口，
+    /// 不依赖扫码流程）。
+    private func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            IOSPassiveSyncCenter.shared.start()
+        case .background:
+            IOSPassiveSyncCenter.shared.stop()
+        case .inactive:
+            break // 瞬时中断（控制中心/来电横幅）不拆会话
+        @unknown default:
+            break
         }
     }
 

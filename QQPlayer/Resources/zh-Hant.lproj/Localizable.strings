@@ -1174,3 +1174,27 @@
 "sync_connect_failed_message_detail" = "連線失敗：%@";
 "sync_connect_missing_candidate" = "此 QR Code 缺少安全資料，請重新掃描。";
 "sync_connect_retry" = "重試";
+
+// MARK: - 區域網路同步 · iOS 被動端狀態（M6 T4/T5）
+"sync_passive_section" = "接收同步";
+"sync_passive_footer" = "本機回應 Mac 的要求並接收它推送的歌曲；在 Mac 上開啟同步頁即可連線。";
+"sync_passive_state_idle" = "未連線";
+"sync_passive_state_unpaired" = "未配對 Mac";
+"sync_passive_state_searching" = "正在尋找你的 Mac…";
+"sync_passive_state_connecting" = "正在連線 %@…";
+"sync_passive_state_connected" = "已連線 %@";
+"sync_passive_fail_identity" = "無法讀取本機的同步身分。";
+"sync_passive_fail_not_found" = "目前網路下沒有找到 %@。";
+"sync_passive_fail_not_found_generic" = "目前網路下沒有找到你的 Mac。";
+"sync_passive_fail_timeout" = "Mac 未在規定時間內回應。";
+"sync_passive_fail_rejected" = "Mac 拒絕了本次連線。";
+"sync_passive_fail_connection" = "連線失敗。";
+"sync_passive_detail" = "詳情：%@";
+"sync_passive_progress_received" = "已接收 %d 個檔案";
+"sync_passive_progress_batch" = "最近一批：%d 項";
+"sync_passive_progress_failures" = "%d 項失敗";
+"sync_passive_reconnect" = "重新連線";
+"sync_passive_reason_transfer" = "傳輸失敗";
+"sync_passive_reason_path" = "路徑無效";
+"sync_passive_reason_save" = "寫入失敗";
+"sync_passive_reason_other" = "失敗";

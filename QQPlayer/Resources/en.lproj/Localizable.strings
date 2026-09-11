@@ -779,3 +779,27 @@
 "sync_connect_failed_message_detail" = "Connection failed: %@";
 "sync_connect_missing_candidate" = "This QR code is missing security data. Please scan again.";
 "sync_connect_retry" = "Retry";
+
+// MARK: - 局域网同步 · iOS 被动端状态（M6 T4/T5）
+"sync_passive_section" = "Receiving Sync";
+"sync_passive_footer" = "Your iPhone answers your Mac and receives the songs it sends. Open Sync on your Mac to connect.";
+"sync_passive_state_idle" = "Not connected";
+"sync_passive_state_unpaired" = "No paired Mac";
+"sync_passive_state_searching" = "Looking for your Mac…";
+"sync_passive_state_connecting" = "Connecting to %@…";
+"sync_passive_state_connected" = "Connected to %@";
+"sync_passive_fail_identity" = "Couldn't load this iPhone's sync identity.";
+"sync_passive_fail_not_found" = "Couldn't find %@ on this network.";
+"sync_passive_fail_not_found_generic" = "Couldn't find your Mac on this network.";
+"sync_passive_fail_timeout" = "The Mac didn't respond in time.";
+"sync_passive_fail_rejected" = "The Mac declined the connection.";
+"sync_passive_fail_connection" = "Connection failed.";
+"sync_passive_detail" = "Detail: %@";
+"sync_passive_progress_received" = "Received %d file(s)";
+"sync_passive_progress_batch" = "Last batch: %d item(s)";
+"sync_passive_progress_failures" = "%d failed";
+"sync_passive_reconnect" = "Reconnect";
+"sync_passive_reason_transfer" = "Transfer failed";
+"sync_passive_reason_path" = "Invalid path";
+"sync_passive_reason_save" = "Couldn't save file";
+"sync_passive_reason_other" = "Failed";
