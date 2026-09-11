@@ -431,6 +431,7 @@
 				Services/BuiltinEQPresets.swift,
 				Services/CloudDownloadError.swift,
 				Services/CloudDownloadManager.swift,
+				Services/CloudFileAvailability.swift,
 				Services/DatabaseManager.swift,
 				"Services/DatabaseManager+Library.swift",
 				"Services/DatabaseManager+Playlists.swift",
