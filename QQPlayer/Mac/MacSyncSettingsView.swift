@@ -21,6 +21,10 @@ import Foundation
 import SwiftUI
 
 /// macOS 同步中心设置页（QQPlayerMac target only）。
+///
+/// M6 T1：本页**不再拥有服务生命周期**——监听归 App 级 `SyncHostCenter.shared`
+/// （App 启动即 start；开关关闭时 stop）。本页只做控制面：读状态 / 展示批准卡 /
+/// 注册 QR nonce / 批准或拒绝。
 struct MacSyncSettingsView: View {
     @State private var identity: SyncIdentity?
     @State private var identityError: String?
@@ -30,8 +34,9 @@ struct MacSyncSettingsView: View {
     @State private var devicesError: String?
     /// 待撤销配对的设备（nil = 无待确认删除）
     @State private var pendingUnpair: PeerDevice?
-    /// S2 接线：Host 监听服务（页面可见期间运行；收到配对请求 → 页内批准卡）
-    @StateObject private var hostService = MacSyncHostService()
+    /// S2 接线：App 级 Host 监听中心（**同一个 shared 实例**，生命周期不归本页；
+    /// 收到配对请求 → 页内批准卡）
+    @ObservedObject private var hostCenter = SyncHostCenter.shared
 
     private let deviceStore = DeviceStore()
 
@@ -43,16 +48,16 @@ struct MacSyncSettingsView: View {
     var body: some View {
         Form {
             // MARK: 配对请求批准（S2 接线：M2a 网络请求到达 → 页内批准卡）
-            if let pending = hostService.pendingCard {
+            if let pending = hostCenter.pendingCard {
                 Section {
                     MacPairApprovalCardView(
                         candidate: pending.makePeerCandidate(receivedAt: Date().timeIntervalSince1970),
                         onApprove: {
-                            hostService.approvePending()
+                            hostCenter.approvePending()
                             reloadDevices()
                         },
                         onReject: {
-                            hostService.rejectPending()
+                            hostCenter.rejectPending()
                             reloadDevices()
                         }
                     )
@@ -136,23 +141,24 @@ struct MacSyncSettingsView: View {
         .formStyle(.grouped)
         .onAppear {
             loadIdentityIfNeeded()
-            startHostServiceIfNeeded()
+            // 监听生命周期归 SyncHostCenter（App 启动即常驻）；本页只挂控制面回调。
+            hostCenter.onDevicesChanged = { [self] in
+                reloadDevices()
+            }
             reloadDevices()
-        }
-        .onDisappear {
-            // 页面不可见 = 停止监听 + 取消活动会话（同步中心只在可见期间收配对）
-            hostService.stop()
+            // 展示首张 QR（identity 就绪才生成；nonce 注册见 refreshQR）
+            refreshQR()
         }
         .alert(
             "sync_load_failed_title".localized,
             isPresented: Binding(
-                get: { identityError != nil || devicesError != nil || hostService.startError != nil },
-                set: { if !$0 { identityError = nil; devicesError = nil; hostService.clearStartError() } }
+                get: { identityError != nil || devicesError != nil || hostCenter.startError != nil },
+                set: { if !$0 { identityError = nil; devicesError = nil; hostCenter.clearStartError() } }
             )
         ) {
             Button(Localized.ok) {}
         } message: {
-            Text(identityError ?? devicesError ?? hostService.startError ?? "")
+            Text(identityError ?? devicesError ?? hostCenter.startError ?? "")
         }
         .confirmationDialog(
             "sync_unpair_confirm_title".localized,
@@ -244,20 +250,10 @@ struct MacSyncSettingsView: View {
         }
     }
 
-    /// 身份就绪后启动 Host 监听；随后生成首张 QR 并把其 nonce 注册进监听器。
-    @MainActor
-    private func startHostServiceIfNeeded() {
-        guard identity != nil, !hostService.isRunning else { return }
-        hostService.onDevicesChanged = { [self] in
-            reloadDevices()
-        }
-        hostService.start(identity: identity, deviceName: hostName)
-        refreshQR()
-    }
-
     /// 生成新 nonce + 载荷并重绘二维码（每次调用换一张新码）。
     /// S2 接线：新码的 sessionNonce 同步注册进运行中的监听器（不注册则
     /// 客户端带签名 nonce 回连时验签无源 → 配对必被拒）。
+    /// 监听器未运行（开关关闭 / 启动失败）时静默忽略（与旧行为一致）。
     @MainActor
     private func refreshQR() {
         guard let identity else { return }
@@ -270,7 +266,7 @@ struct MacSyncSettingsView: View {
             let json = try SyncQRCodec.encode(payload)
             qrPayload = payload
             qrImage = SyncQRImageFactory.make(from: json)
-            hostService.registerQRNonce(nonceBase64: payload.sessionNonce)
+            hostCenter.registerQRNonce(nonceBase64: payload.sessionNonce)
         } catch {
             identityError = error.localizedDescription
         }
