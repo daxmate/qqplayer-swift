@@ -41,6 +41,11 @@ struct QQPlayerMacApp: App {
         MacKeyboardShortcuts.install()
         // E3 桌面浮窗：监听设置变化并恢复上次显隐状态（默认关不弹；开启过则重启恢复）。
         DesktopWindowsManager.shared.start()
+        // M6 T1：局域网同步 Host 常驻监听——App 启动即开始（设置页只做控制面，
+        // 生命周期归 SyncHostCenter）。“允许局域网设备连接”关掉时不启动。
+        MainActor.assumeIsolated {
+            SyncHostCenter.shared.start()
+        }
     }
 
     var body: some Scene {

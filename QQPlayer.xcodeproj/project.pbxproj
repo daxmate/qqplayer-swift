@@ -113,6 +113,9 @@
 		30DAB1A7F72143F896180405 /* SyncCollectionSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E06019C08F5412791218224 /* SyncCollectionSelectionTests.swift */; };
 		F509CE704B874046A117356D /* SyncPlaybackCarryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF21C43F4174C609117D18D /* SyncPlaybackCarryTests.swift */; };
 		B01A8A177CE44A4484B46943 /* CloudFileAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D697F84D4C3D44EB8CE908CC /* CloudFileAvailabilityTests.swift */; };
+		927A311E85E5427693DF752C /* SyncHostGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10FFC85C5D4466FAD034239 /* SyncHostGateTests.swift */; };
+		46D2B1D5E2E4466192FA8EBD /* SyncSelectionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FFFEF803FD44399B1EDAE9 /* SyncSelectionStoreTests.swift */; };
+		E44328AAA9624714A16DB4EA /* DatabaseSyncCollectionFactsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F65B1643956046EA9AB503C3 /* DatabaseSyncCollectionFactsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -275,6 +278,9 @@
 		3E06019C08F5412791218224 /* SyncCollectionSelectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCollectionSelectionTests.swift; sourceTree = "<group>"; };
 		DEF21C43F4174C609117D18D /* SyncPlaybackCarryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPlaybackCarryTests.swift; sourceTree = "<group>"; };
 		D697F84D4C3D44EB8CE908CC /* CloudFileAvailabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudFileAvailabilityTests.swift; sourceTree = "<group>"; };
+		D10FFC85C5D4466FAD034239 /* SyncHostGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncHostGateTests.swift; sourceTree = "<group>"; };
+		D0FFFEF803FD44399B1EDAE9 /* SyncSelectionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncSelectionStoreTests.swift; sourceTree = "<group>"; };
+		F65B1643956046EA9AB503C3 /* DatabaseSyncCollectionFactsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DatabaseSyncCollectionFactsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -316,6 +322,7 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncCoordinatorFactory.swift,
 				Mac/MacSyncHostService.swift,
 				Mac/MacSyncLibraryHost.swift,
 				Mac/MacSyncSettingsView.swift,
@@ -323,6 +330,7 @@
 				Mac/MacTagEditorView.swift,
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
+				Mac/SyncHostCenter.swift,
 				QQPlayerMacApp.swift,
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
@@ -396,6 +404,7 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncCoordinatorFactory.swift,
 				Mac/MacSyncHostService.swift,
 				Mac/MacSyncLibraryHost.swift,
 				Mac/MacSyncSettingsView.swift,
@@ -403,6 +412,7 @@
 				Mac/MacTagEditorView.swift,
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
+				Mac/SyncHostCenter.swift,
 				Models/AppearanceTheme.swift,
 				Models/DatabaseModels.swift,
 				Models/SettingsModels.swift,
@@ -410,6 +420,7 @@
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
 				Services/AlignedLyricsStore.swift,
+				Services/DatabaseSyncCollectionFacts.swift,
 				Services/GequhaiClient.swift,
 				Services/GraphicEQCodec.swift,
 				Services/CloudFailureDetector.swift,
@@ -486,6 +497,8 @@
 				Services/SpotifyAPI.swift,
 				Services/StateManager.swift,
 				Services/StateManagerModels.swift,
+				Services/SyncHostGate.swift,
+				Services/SyncSelectionStore.swift,
 				Services/TagRenameLogic.swift,
 				Services/TagWriterService.swift,
 				Services/WhatsNew.swift,
@@ -793,6 +806,9 @@
 				3E06019C08F5412791218224 /* SyncCollectionSelectionTests.swift */,
 				DEF21C43F4174C609117D18D /* SyncPlaybackCarryTests.swift */,
 				D697F84D4C3D44EB8CE908CC /* CloudFileAvailabilityTests.swift */,
+				D10FFC85C5D4466FAD034239 /* SyncHostGateTests.swift */,
+				D0FFFEF803FD44399B1EDAE9 /* SyncSelectionStoreTests.swift */,
+				F65B1643956046EA9AB503C3 /* DatabaseSyncCollectionFactsTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1204,6 +1220,9 @@
 				30DAB1A7F72143F896180405 /* SyncCollectionSelectionTests.swift in Sources */,
 				F509CE704B874046A117356D /* SyncPlaybackCarryTests.swift in Sources */,
 				B01A8A177CE44A4484B46943 /* CloudFileAvailabilityTests.swift in Sources */,
+				927A311E85E5427693DF752C /* SyncHostGateTests.swift in Sources */,
+				46D2B1D5E2E4466192FA8EBD /* SyncSelectionStoreTests.swift in Sources */,
+				E44328AAA9624714A16DB4EA /* DatabaseSyncCollectionFactsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
