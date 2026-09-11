@@ -263,24 +263,48 @@ struct SyncPlaybackCarryTests {
         #expect(deviceCursor == 0, "未发帧，游标不动")
     }
 
-    @Test("两端共有才带：对端没有该 content_hash → 不携带")
+    @Test("两端共有才带：传输完成后对端身份 = manifest ∪ 本批传输指纹；未传输的歌一律不参与")
     func carrySkipsUnpairedSongs() throws {
         let harness = try makeHarness()
+        // a 本轮传输；b 只在本地有播放数据、本轮不传（对端 manifest 里也没有它的指纹）
         try Self.insertTrack(
             harness.macManager, stableId: "s-a", contentHash: "h-a",
             root: harness.macRoot, relative: "Album/a.flac"
         )
+        try Self.insertTrack(
+            harness.macManager, stableId: "s-b", contentHash: "h-b",
+            root: harness.macRoot, relative: "Album/b.flac"
+        )
         try Self.record(harness.macManager, entity: .favorite, rowKey: "s-a", op: .upsert, updatedAtMs: 400)
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-b", op: .upsert, updatedAtMs: 401)
 
-        // 对端 manifest 里没有该指纹，且传输路径里的歌在本端也未指纹/不存在
+        // 对端 manifest 是**传输前**快照：没有 a 的指纹（歌刚推过去），另有别的歌。
         let plan = try harness.macCarry.carryPush(
             transferredPaths: ["Album/a.flac", "Album/unknown.flac", "@lyrics/h-a.json"],
             peerEntries: [ManifestEntry(relativePath: "Other/x.flac", size: 1, mtimeMs: 0, contentHash: "h-other")]
         )
-        #expect(plan.entries.isEmpty)
-        #expect(plan.skippedNotPaired == ["Album/a.flac"], "对端 manifest 未含该指纹（且非本轮传输 → 不并入）")
+        // 本轮传输完成 = 两端共有 → 携带（只看对端 manifest 会把刚同步过去的歌误判成未配对）
+        #expect(plan.carriedPaths == ["Album/a.flac"])
+        #expect(plan.entries.map(\.contentHash) == ["h-a"])
+        // 未传输的歌：一条都不带（不做全库播放数据对账）
+        #expect(plan.songs.map(\.relativePath) == ["Album/a.flac"])
+        #expect(!plan.entries.contains { $0.contentHash == "h-b" }, "未传输的歌的播放数据不上线")
+        // 记账明细：本端查不到的路径 / 歌词 wire 路径
         #expect(plan.skippedUnknownPath == ["Album/unknown.flac"])
         #expect(plan.lyricsPathsIgnored == ["@lyrics/h-a.json"])
+
+        // 纯计划器口径（对端身份显式给定、不含本批传输指纹）：对端没有该 content_hash → 不携带
+        let facts = SyncPlaybackCarryDatabaseFacts(database: harness.macManager, libraryRoot: harness.macRoot)
+        let scoped = SyncPlaybackCarryPlanner.plan(
+            scope: SyncPlaybackCarryScope(
+                direction: .push,
+                transferredPaths: ["Album/a.flac"],
+                peerContentHashes: ["h-other"]
+            ),
+            facts: facts
+        )
+        #expect(scoped.entries.isEmpty, "两端共有才带：对端没有该指纹 → 不携带")
+        #expect(scoped.skippedNotPaired == ["Album/a.flac"])
     }
 
     // MARK: - 拉取方向
