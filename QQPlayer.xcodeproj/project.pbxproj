@@ -118,6 +118,7 @@
 		E44328AAA9624714A16DB4EA /* DatabaseSyncCollectionFactsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F65B1643956046EA9AB503C3 /* DatabaseSyncCollectionFactsTests.swift */; };
 		6E19A3F12750456392F66625 /* IOSPassiveSyncCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */; };
 		C0C8865B22B44FA6BE1F8D2D /* SyncUIStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */; };
+		F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -285,6 +286,7 @@
 		F65B1643956046EA9AB503C3 /* DatabaseSyncCollectionFactsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DatabaseSyncCollectionFactsTests.swift; sourceTree = "<group>"; };
 		04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IOSPassiveSyncCenterTests.swift; sourceTree = "<group>"; };
 		6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIStateTests.swift; sourceTree = "<group>"; };
+		1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferDirectionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -818,6 +820,7 @@
 				F65B1643956046EA9AB503C3 /* DatabaseSyncCollectionFactsTests.swift */,
 				04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */,
 				6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */,
+				1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1234,6 +1237,7 @@
 				E44328AAA9624714A16DB4EA /* DatabaseSyncCollectionFactsTests.swift in Sources */,
 				6E19A3F12750456392F66625 /* IOSPassiveSyncCenterTests.swift in Sources */,
 				C0C8865B22B44FA6BE1F8D2D /* SyncUIStateTests.swift in Sources */,
+				F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

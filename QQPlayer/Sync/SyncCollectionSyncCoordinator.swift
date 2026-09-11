@@ -2,7 +2,7 @@
 //  SyncCollectionSyncCoordinator.swift
 //  QQPlayer
 //
-//  R3a（2026-09-11）同步方向改造 · **选中集合的一套补齐编排**（Mac 发起，双向补齐）。
+//  T7（2026-09-11）同步方向改造 · **选中集合的单向补齐编排**（Mac 发起，方向由用户显式选择）。
 //
 //  ════════════════════════════════════════════════════════════════════════════
 //  语义（docs/lan-sync-design.md §6.1 + §12b 决策 6-10）
@@ -17,29 +17,28 @@
 //  `SyncPlaybackCarryPeer`，走既有帧 8/9 原语 + 既有映射/LWW/落库路径）；
 //  未注入 = 不携带（R3a 行为零变化）。
 //
-//  一次编排 = 计划 + 两个方向（顺序执行）：
+//  一次编排 = 计划 + **一个方向**：
 //    ① 展开选择集（`SyncCollectionExpander`，注入取曲库事实）
-//    ② 取本端（Mac）manifest；请求对端（设备）manifest（帧 10/11）
-//    ③ 两侧按选中集合收口 → 算差集：**对端缺 → 推**（`SyncLibraryPushController`）、
-//       **本端缺 → 拉**（`SyncLibraryPullController`）
-//    ③.5 每个方向收尾时：R3b 携带该方向**成功传输**的歌的播放数据（跟歌走）
-//    ④ 汇总账目（`SyncCollectionSyncReport`）交调用方（M6 UI 只消费，不在此实现）
+//    ② 请求对端（设备）manifest（帧 10/11）——请求集合按方向取
+//       （`SyncCollectionSelection.remoteRequestCollection(for:)`）
+//    ③ 按方向算期望集合（`SyncExpectedPlanner`）→ 单向差集（`SyncCollectionDiffPlanner`）
+//       : upload = **对端缺 → 推**（`SyncLibraryPushController`），不拉
+//       : download = **本端缺 → 拉**（`SyncLibraryPullController`，**以对端清单为准**），不推
+//    ③.5 方向收尾时：R3b 携带该方向**成功传输**的歌的播放数据（跟歌走）
+//    ④ 汇总账目（`SyncCollectionSyncReport`，含 `direction`）交调用方（UI 只消费）
 //
-//  为什么顺序执行而不是并行：两个方向共用**一个会话**（帧 4-14 的停等传输、
-//  manifest 钩子链），并行会互相穿插；串行唯一确定。推送先行：决策 9 的主场景是
-//  「设备端缺歌补齐」，先把设备补上，再补本端缺的（两个方向互不依赖）。
+//  为什么不再先推后拉（T7 修正）：
+//  - 旧语义「一次开始 → 双向补齐」的对账基准恒为本端展开结果 → **对端独有的歌
+//    永远拉不回来**（期望集合里根本没它们）；且 `.all` 展开为空 → 差集恒空 → 空转。
+//  - 「上传 / 下载」是用户显式选择的两个**独立操作**，不该混跑。
 //
 //  本类**不重写传输层**：全部文件字节走既有 `SyncFileSender` / `SyncFileReceiver` /
 //  `SyncLibraryFetchResponder`，本类只做「选哪些、先后、记账」。
 //
-//  ⚠️ 已知限制（记账已兜、行为无害）：
-//  两个控制器**各自**在会话上挂 manifest 钩子（链式转发，都看得到 manifest_response）。
-//  推送阶段结束后，其钩子仍在链上：若推送有失败项，本端拉取阶段的对端 manifest
-//  响应会让推送控制器**重排一次计划**（失败项重试）。传输层面两个方向互不干扰
-//  （推 = Mac→设备，拉 = 设备→Mac，各自停等且接收端 SHA-256 校验），因此无害；
-//  但账目必须按「最终值」取（本类在收尾时重新读取两个控制器的 summary），
-//  否则重试完成的文件会漏记。彻底消除需给两个控制器的 manifest 钩子加终态守卫
-//  （改 R1b-2 既有文件，非本包范围，留给 maintainer 决策）。
+//  ⚠️ T7 后：一次编排只创建一个控制器（upload 只推 / download 只拉），所以「两个控制器
+//  的 manifest 钩子互相干扰」的旧问题不再出现（不再有跨方向重排）；账目仍按「最终值」
+//  取（收尾时现读控制器 summary，见 `report` 文档），因为控制器的落盘/入库账目可能
+//  晚于其 `.done` 回调。
 //
 //  线程：会话线程同步驱动（内存回环下 `start()` 会在本调用内跑到终态）；
 //  状态/账目用锁保护，回调一律锁外触发。
@@ -49,11 +48,14 @@ import Foundation
 
 // MARK: - 差集（纯逻辑，可单测）
 
-/// 选中集合下的一次双向差集（对账键 = relativePath，身份键 = content_hash）。
+/// 选中集合下的一次**单向**差集（对账键 = relativePath，身份键 = content_hash）。
+///
+/// T7（2026-09-11）：差集按方向收窄——`toPush` 只在 upload 产出、`toPull` 只在
+/// download 产出；两个方向**不可能同时非空**（用户显式选了一个方向就是只跑它）。
 struct SyncCollectionDiff: Equatable, Sendable {
-    /// 对端缺 / 内容不同 → 推送（升序）
+    /// 对端缺 / 内容不同 → 推送（升序；**仅 upload**）
     var toPush: [String] = []
-    /// 本端缺 → 拉取（升序）
+    /// 本端缺 → 拉取（升序；**仅 download**）
     var toPull: [String] = []
     /// 两侧都有且内容一致 → 零传输（升序）
     var unchanged: [String] = []
@@ -61,26 +63,40 @@ struct SyncCollectionDiff: Equatable, Sendable {
     var missingBoth: [String] = []
     /// 对端多出来的条目（不在选中集合内）→ **什么都不做**（决策 7；仅记账）
     var remoteOnlyIgnored: [String] = []
+    /// download：两侧都有但内容不同 → **不覆盖本端**（保守：本端保留，仅记账）
+    var conflictingKept: [String] = []
+    /// download：本端有、对端没有 → 什么都不做（**不推也不删**，仅记账）
+    var localOnlySkipped: [String] = []
+    /// upload：对端有、本端没有 → 什么都不做（**不拉**，仅记账）
+    var peerOnlySkipped: [String] = []
 
     /// 本次要动的路径总数（诊断/UI）。
     var transferCount: Int { toPush.count + toPull.count }
 }
 
 enum SyncCollectionDiffPlanner {
-    /// 双向差集（纯函数）：`expected` = 选中集合展开出的期望路径，
+    /// **单向**差集（纯函数）：`expected` = 本次对账基准（见 `SyncExpectedPlanner`），
     /// `local` / `remote` = **全量** manifest（本端 / 对端）。
     ///
-    /// 判定（与既有两个 planner 逐字一致的内容判据：双侧 contentHash 非空且相等 = 一致）：
-    /// - 两侧都有：一致 → `unchanged`；不同 → `toPush`（**发起方权威**，不做「拉回来
-    ///   再覆盖」——否则同一路径会来回互相覆盖，永不稳定）
+    /// 判定（内容判据与既有 planner 逐字一致：双侧 contentHash 非空且相等 = 一致）：
+    ///
+    /// upload（只推，**不产生 toPull**）：
+    /// - 两侧都有：一致 → `unchanged`；不同 → `toPush`（**本端权威**）
     /// - 只有本端有 → `toPush`（对端缺 → 补齐）
+    /// - 只有对端有 → `peerOnlySkipped`（上传方向不往回拉，仅记账）
+    ///
+    /// download（只拉，**不产生 toPush**）：
+    /// - 两侧都有：一致 → `unchanged`；不同 → `conflictingKept`（**不覆盖本端**）
     /// - 只有对端有 → `toPull`（本端缺 → 补齐）
-    /// - 两侧都没有 → `missingBoth`（不伪造、不动手）
-    /// - 对端多出的条目 → `remoteOnlyIgnored`（**不传播删除**）
+    /// - 只有本端有 → `localOnlySkipped`（下载方向不推也不删，仅记账）
+    ///
+    /// 两方向共通：两侧都没有 → `missingBoth`（不伪造、不动手）；
+    /// 对端多出的条目 → `remoteOnlyIgnored`（**不传播删除**）。
     static func plan(
         expected: [String],
         local: [ManifestEntry],
-        remote: [ManifestEntry]
+        remote: [ManifestEntry],
+        direction: SyncTransferDirection
     ) -> SyncCollectionDiff {
         var localByPath: [String: ManifestEntry] = [:]
         for entry in local { localByPath[entry.relativePath] = entry } // later wins（最终快照）
@@ -90,17 +106,29 @@ enum SyncCollectionDiffPlanner {
         var diff = SyncCollectionDiff()
         let wanted = Set(expected)
         for path in wanted.sorted() {
-            switch (localByPath[path], remoteByPath[path]) {
+            let localEntry = localByPath[path]
+            let remoteEntry = remoteByPath[path]
+            switch (localEntry, remoteEntry) {
             case let (localEntry?, remoteEntry?):
                 if SyncManifestReconciler.contentMatches(local: localEntry, remote: remoteEntry) {
                     diff.unchanged.append(path)
-                } else {
+                } else if direction == .upload {
                     diff.toPush.append(path)
+                } else {
+                    diff.conflictingKept.append(path)
                 }
             case (_?, nil):
-                diff.toPush.append(path)
+                if direction == .upload {
+                    diff.toPush.append(path)
+                } else {
+                    diff.localOnlySkipped.append(path)
+                }
             case (nil, _?):
-                diff.toPull.append(path)
+                if direction == .upload {
+                    diff.peerOnlySkipped.append(path)
+                } else {
+                    diff.toPull.append(path)
+                }
             case (nil, nil):
                 diff.missingBoth.append(path)
             }
@@ -114,10 +142,12 @@ enum SyncCollectionDiffPlanner {
 
 // MARK: - 配置 / 状态 / 账目
 
-/// 编排配置（选择集之外的参数）。
+/// 编排配置（选择集 + 方向之外的参数）。
+///
+/// T7：原先的 `remoteCollection` 配置项已移除——对端请求集合现在由
+/// `SyncCollectionSelection.remoteRequestCollection(for:)` **按方向**唯一确定
+/// （可配置 = 可能配错，方向语义必须是单一事实源）。
 struct SyncCollectionSyncConfiguration: Equatable, Sendable {
-    /// 请求对端 manifest 用的集合（v1 恒 `.all`：选择在**本端**执行，见决策 10）
-    var remoteCollection: SyncCollection = .all
     /// 落地目录名（曲库根内隐藏目录；透传拉取控制器）
     var incomingDirectoryName: String = ".sync-incoming"
 }
@@ -146,9 +176,11 @@ enum SyncCollectionSyncState: Equatable, Sendable {
 
 /// 编排设置集后的账目（M6 UI 直接消费；本类不做 UI）。
 struct SyncCollectionSyncReport: Equatable, Sendable {
-    /// 计划推送的相对路径（升序）
+    /// 本次编排的传输方向（用户显式选择；`start(direction:)` 写入，UI 据此展示）
+    var direction: SyncTransferDirection = .upload
+    /// 计划推送的相对路径（升序；非空仅当 `direction == .upload`）
     var plannedPush: [String] = []
-    /// 计划拉取的相对路径（升序）
+    /// 计划拉取的相对路径（升序；非空仅当 `direction == .download`）
     var plannedPull: [String] = []
     /// 两侧一致、零传输（升序）
     var skipped: [String] = []
@@ -156,6 +188,12 @@ struct SyncCollectionSyncReport: Equatable, Sendable {
     var missingBoth: [String] = []
     /// 对端多出的条目（升序；**不传播删除**，仅记账）
     var remoteOnlyIgnored: [String] = []
+    /// download：两侧都有但内容不同 → **本端保留**（不覆盖；UI 展示「已存在但内容不同」）
+    var conflictingKept: [String] = []
+    /// download：本端有、对端没有 → 既不下推也不删（仅记账）
+    var localOnlySkipped: [String] = []
+    /// upload：对端有、本端没有 → 不拉回（仅记账）
+    var peerOnlySkipped: [String] = []
     /// 展开时未解析的曲目数（未指纹 / 未入库）
     var unresolvedCount: Int = 0
     /// 展开时忽略的未知/非法歌单标识（升序）
@@ -235,6 +273,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     private let lock = NSLock()
     private var stateValue: SyncCollectionSyncState = .idle
     private var stage: Stage = .idle
+    /// T7：本次编排的传输方向（`start(direction:)` 写入；计划/执行阶段据此收窄）。
+    private var directionValue: SyncTransferDirection = .upload
     private var reportValue = SyncCollectionSyncReport()
     private var expansionValue = SyncCollectionExpansion()
     /// 计划阶段取回的对端 manifest 条目（R3b 携带时算「对端持有」的身份集合）。
@@ -325,13 +365,19 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
 
     // MARK: 生命周期
 
-    /// 开始一次编排（会话必须已 ready）：展开选择集 → 请求对端 manifest → 推 → 拉。
-    func start() throws {
+    /// 开始一次**单向**编排（会话必须已 ready）：
+    /// 展开选择集 → 请求对端 manifest（集合按方向取）→ 算单向差集 → upload 只推 / download 只拉。
+    ///
+    /// ⚠️ `direction` 有默认值 `.upload` **仅为兼容冻结的调用点**（`QQPlayer/Mac/`
+    /// 属 T8 UI 批次，本批禁改）；生产调用点应显式传方向（UI 让用户选）。
+    func start(direction: SyncTransferDirection = .upload) throws {
         guard session.isReady else { throw StartError.sessionNotReady }
 
         let expansion = SyncCollectionExpander.expand(selection: selection, facts: facts)
         lock.lock()
+        directionValue = direction
         expansionValue = expansion
+        reportValue.direction = direction
         reportValue.unresolvedCount = expansion.unresolvedCount
         reportValue.unknownPlaylistIDs = expansion.unknownPlaylistIDs
         reportValue.isEmptySelection = expansion.isEmptySelection
@@ -361,7 +407,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         lock.unlock()
 
         do {
-            try peer.requestManifest(collection: configuration.remoteCollection)
+            // 方向敏感：upload 恒 `.all`（本端展开选择）；download 让对端先按集合收口
+            try peer.requestManifest(collection: selection.remoteRequestCollection(for: direction))
         } catch {
             failPlanning("请求 manifest 失败：\(error)")
             throw error
@@ -395,15 +442,26 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         lock.lock()
         let isPlanning = stage == .planning
         let expansion = expansionValue
+        let direction = directionValue
         lock.unlock()
         guard isPlanning else { return } // 幂等：只认计划阶段的第一次响应
 
         onPeerManifestReceived?(response)
 
+        // T7：期望集合（对账基准）按方向取——upload 看本端/本端展开，download 看对端清单/选择集本身。
+        let local = localManifest()
+        let expected = SyncExpectedPlanner.expected(
+            selection: selection,
+            direction: direction,
+            expansion: expansion,
+            localManifest: local,
+            remoteManifest: response.entries
+        )
         let diff = SyncCollectionDiffPlanner.plan(
-            expected: expansion.relativePaths,
-            local: localManifest(),
-            remote: response.entries
+            expected: expected,
+            local: local,
+            remote: response.entries,
+            direction: direction
         )
 
         lock.lock()
@@ -412,6 +470,9 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         reportValue.skipped = diff.unchanged
         reportValue.missingBoth = diff.missingBoth
         reportValue.remoteOnlyIgnored = diff.remoteOnlyIgnored
+        reportValue.conflictingKept = diff.conflictingKept
+        reportValue.localOnlySkipped = diff.localOnlySkipped
+        reportValue.peerOnlySkipped = diff.peerOnlySkipped
         peerManifestEntriesValue = response.entries
         // 后续（控制器自己的）manifest 响应不再触发本类计划
         let peer = manifestPeer
@@ -420,7 +481,20 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         peer?.onManifestReceived = nil
         peer?.onDecodeFailure = nil
 
-        beginPush()
+        beginTransfers()
+    }
+
+    /// T7：按方向只走一个阶段（upload → 推；download → 拉），不再先推后拉。
+    private func beginTransfers() {
+        lock.lock()
+        let direction = directionValue
+        lock.unlock()
+        switch direction {
+        case .upload:
+            beginPush()
+        case .download:
+            beginPull()
+        }
     }
 
     private func beginPush() {
@@ -432,7 +506,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         let planned = reportValue.plannedPush
         guard !planned.isEmpty else {
             lock.unlock()
-            beginPull()
+            finishStage()
             return
         }
         stage = .pushing
@@ -463,7 +537,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
                 reportValue.pushAbortReason = "启动推送失败：\(error)"
             }
             lock.unlock()
-            beginPull()
+            finishStage()
             return
         }
         // 内存回环：start() 内可能已跑完终态 → 补一次（handlePushState 幂等）
@@ -480,7 +554,6 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         case .done:
             break // 结果账目由 `report` 实时合并控制器 summary
         case let .failed(reason):
-            // 推送中止不阻断拉取（方向独立）
             if reportValue.pushAbortReason == nil {
                 reportValue.pushAbortReason = reason
             }
@@ -490,16 +563,17 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         }
         lock.unlock()
         carryPlaybackData(direction: .push)
-        beginPull()
+        finishStage()
     }
 
     private func beginPull() {
         lock.lock()
-        guard stage == .planning || stage == .pushing else {
+        guard stage == .planning else {
             lock.unlock()
             return
         }
         let planned = reportValue.plannedPull
+        let direction = directionValue
         guard !planned.isEmpty else {
             lock.unlock()
             finishStage()
@@ -510,7 +584,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         emit(state: .pulling)
 
         var pullConfiguration = SyncLibraryPullConfiguration()
-        pullConfiguration.collection = configuration.remoteCollection
+        // T7：拉取时向对端请求的集合与计划阶段同一映射（download 下对端已按集合收口）
+        pullConfiguration.collection = selection.remoteRequestCollection(for: direction)
         pullConfiguration.selection = .relativePaths(planned)
         pullConfiguration.incomingDirectoryName = configuration.incomingDirectoryName
 

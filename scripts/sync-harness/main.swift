@@ -1403,6 +1403,7 @@ struct CollectionScenario {
 
 func makeCollectionScenario(
     selection: SyncCollectionSelection,
+    direction: SyncTransferDirection = .upload,
     macFiles: [(String, Data)] = [],
     deviceFiles: [(String, Data)] = [],
     playlists: [String: [SyncCollectionTrackFact]] = [:],
@@ -1478,7 +1479,7 @@ func makeCollectionScenario(
         lyricsMapping: macLyricsMapping,
         playbackCarry: carryDriver
     )
-    try coordinator.start()
+    try coordinator.start(direction: direction)
     return CollectionScenario(
         fixture: fixture,
         macRoot: macRoot,
@@ -1500,8 +1501,10 @@ do {
     let sameHash = try sha256Hex(of: same)
     let freshHash = try sha256Hex(of: fresh)
 
+    // T7：upload 方向（只推不拉）
     let scenario = try makeCollectionScenario(
         selection: .playlists(["p1"]),
+        direction: .upload,
         macFiles: [("Album/keep.flac", same), ("Album/new.flac", fresh)],
         deviceFiles: [("Album/keep.flac", same)],
         playlists: [
@@ -1514,6 +1517,7 @@ do {
 
     let report = scenario.coordinator.report
     check(scenario.coordinator.state == .done, "编排终态 done")
+    check(report.direction == .upload, "账目方向 = upload")
     checkEqual(report.plannedPush, ["Album/new.flac"], "设备缺 → 计划推送")
     checkEqual(report.plannedPull, [String](), "无需拉取")
     checkEqual(report.skipped, ["Album/keep.flac"], "已一致 → 跳过")
@@ -1544,31 +1548,33 @@ do {
     check(false, "㉓ 抛错：\(error)")
 }
 
-// MARK: - ㉔ Mac 缺歌 → 从设备自动拉取补齐
+// MARK: - ㉔ Mac 缺歌 → 从设备下载补齐（T7：download 方向）
 
-section("㉔ R3a：Mac 缺歌 → 从设备自动拉取补齐")
+section("㉔ T7：download — Mac 缺歌 → 从设备拉取补齐（以对端清单为准）")
 do {
     let deviceOnly = silentData(0xC3, count: 120_000)
     let deviceOnlyHash = try sha256Hex(of: deviceOnly)
 
+    // download × `.relativePaths`：期望集合 = 选择集本身的路径（本端展开会把本端
+    // 没有的歌判为 unresolved → 不能用展开结果）。
     let scenario = try makeCollectionScenario(
-        selection: .playlists(["p1"]),
+        selection: .relativePaths(["Album/from-device.flac"]),
+        direction: .download,
         macFiles: [],
         deviceFiles: [("Album/from-device.flac", deviceOnly)],
-        playlists: [
-            "p1": [
-                SyncCollectionTrackFact(
-                    stableId: "s-dev",
-                    relativePath: "Album/from-device.flac",
-                    contentHash: deviceOnlyHash
-                ),
-            ],
+        knownPaths: [
+            "Album/from-device.flac": SyncCollectionTrackFact(
+                stableId: "s-dev",
+                relativePath: "Album/from-device.flac",
+                contentHash: deviceOnlyHash
+            ),
         ]
     )
 
     let report = scenario.coordinator.report
     check(scenario.coordinator.state == .done, "编排终态 done")
-    checkEqual(report.plannedPush, [String](), "本端无可推内容")
+    check(report.direction == .download, "账目方向 = download")
+    checkEqual(report.plannedPush, [String](), "download 不产生推送计划")
     checkEqual(report.plannedPull, ["Album/from-device.flac"], "本端缺 → 计划拉取")
     checkEqual(report.pulled, ["Album/from-device.flac"], "拉取账目")
     check(report.isComplete, "编排完全成功")
@@ -1750,9 +1756,9 @@ do {
 
 // MARK: - ㉘ R3a 双向差集纯逻辑（三方向一次覆盖）
 
-section("㉘ R3a：双向差集纯逻辑（对端缺→推 / 本端缺→拉 / 一致→跳过 / 对端独有→仅记账）")
+section("㉘ T7：单向差集纯逻辑（upload 只推 / download 只拉 / 冲突各按其方向处理）")
 do {
-    // 与 CI 用例 `SyncCollectionSelectionTests` ③ 双向差集 同款直接数据：
+    // 与 CI 用例 `SyncCollectionSelectionTests` 同款直接数据：
     // local 只持有 push + same（pull 只在远端）。
     // 2026-09-11：CI 红点（本端多写一条 pull.flac → 两侧同 hash 必判「一致」）的本地兜底断言。
     let local = [entry("Album/push.flac", hash: "a"), entry("Album/same.flac", hash: "b")]
@@ -1761,24 +1767,54 @@ do {
         entry("Album/pull.flac", hash: "c"),
         entry("Album/device-only.flac", hash: "d"),
     ]
-    let diff = SyncCollectionDiffPlanner.plan(
-        expected: ["Album/pull.flac", "Album/push.flac", "Album/same.flac"],
-        local: local,
-        remote: remote
-    )
-    checkEqual(diff.toPush, ["Album/push.flac"], "对端缺 → 推")
-    checkEqual(diff.toPull, ["Album/pull.flac"], "本端缺 → 拉")
-    checkEqual(diff.unchanged, ["Album/same.flac"], "两侧一致 → 跳过")
-    checkEqual(diff.remoteOnlyIgnored, ["Album/device-only.flac"], "对端独有 → 仅记账（不传播删除）")
-    checkEqual(diff.missingBoth, [], "期望里两侧都有实体 → 无 missingBoth")
+    let expected = ["Album/pull.flac", "Album/push.flac", "Album/same.flac"]
 
+    // upload：只推；本端缺的那条**不许拉**（方向语义）
+    let upload = SyncCollectionDiffPlanner.plan(
+        expected: expected,
+        local: local,
+        remote: remote,
+        direction: .upload
+    )
+    checkEqual(upload.toPush, ["Album/push.flac"], "对端缺 → 推")
+    checkEqual(upload.toPull, [], "upload 不产生 toPull")
+    checkEqual(upload.peerOnlySkipped, ["Album/pull.flac"], "upload：对端有本端无 → 仅记账")
+    checkEqual(upload.unchanged, ["Album/same.flac"], "两侧一致 → 跳过")
+    checkEqual(upload.remoteOnlyIgnored, ["Album/device-only.flac"], "对端独有 → 仅记账（不传播删除）")
+    checkEqual(upload.missingBoth, [], "期望里两侧都有实体 → 无 missingBoth")
+
+    // download：只拉；本端有对端缺的那条**不推不删**
+    let download = SyncCollectionDiffPlanner.plan(
+        expected: expected,
+        local: local,
+        remote: remote,
+        direction: .download
+    )
+    checkEqual(download.toPull, ["Album/pull.flac"], "本端缺 → 拉")
+    checkEqual(download.toPush, [], "download 不产生 toPush")
+    checkEqual(download.localOnlySkipped, ["Album/push.flac"], "download：本端有对端无 → 不动手")
+    checkEqual(download.unchanged, ["Album/same.flac"], "两侧一致 → 跳过")
+
+    let differsLocal = [entry("Album/x.flac", hash: "old")]
+    let differsRemote = [entry("Album/x.flac", hash: "new")]
     let differs = SyncCollectionDiffPlanner.plan(
         expected: ["Album/x.flac"],
-        local: [entry("Album/x.flac", hash: "old")],
-        remote: [entry("Album/x.flac", hash: "new")]
+        local: differsLocal,
+        remote: differsRemote,
+        direction: .upload
     )
-    checkEqual(differs.toPush, ["Album/x.flac"], "内容不同 → 只推（发起方权威）")
-    checkEqual(differs.toPull, [], "内容不同 → 不回拉")
+    checkEqual(differs.toPush, ["Album/x.flac"], "upload 内容不同 → 推（发起方权威）")
+    checkEqual(differs.toPull, [], "upload 内容不同 → 不回拉")
+
+    let conflict = SyncCollectionDiffPlanner.plan(
+        expected: ["Album/x.flac"],
+        local: differsLocal,
+        remote: differsRemote,
+        direction: .download
+    )
+    checkEqual(conflict.conflictingKept, ["Album/x.flac"], "download 内容不同 → 本端保留（不覆盖）")
+    checkEqual(conflict.toPush, [], "download 内容不同 → 不推")
+    checkEqual(conflict.toPull, [], "download 内容不同 → 不拉")
 }
 
 // MARK: - ㉙ R3b：跟歌走计划器（纯逻辑，三条硬规则）
@@ -1967,13 +2003,14 @@ do {
     )
 
     let scenario = try makeCollectionScenario(
-        selection: .playlists(["p1"]),
+        selection: .relativePaths(["Album/from-device.flac"]),
+        direction: .download,
         macFiles: [],
         deviceFiles: [("Album/from-device.flac", deviceOnly)],
-        playlists: [
-            "p1": [
-                SyncCollectionTrackFact(stableId: "dev-sid", relativePath: "Album/from-device.flac", contentHash: deviceHash),
-            ],
+        knownPaths: [
+            "Album/from-device.flac": SyncCollectionTrackFact(
+                stableId: "dev-sid", relativePath: "Album/from-device.flac", contentHash: deviceHash
+            ),
         ],
         carryFacts: carryFacts,
         injectCarry: true
@@ -1981,6 +2018,7 @@ do {
 
     let report = scenario.coordinator.report
     check(scenario.coordinator.state == .done, "编排终态 done")
+    check(report.direction == .download, "账目方向 = download")
     checkEqual(report.pulled, ["Album/from-device.flac"], "歌已拉到本端")
     checkEqual(report.playbackCarriedPull, ["Album/from-device.flac"], "接入：拉取方向请求范围为两端共有的歌")
     checkEqual(report.playbackCarriedPush, [String](), "本轮无推送 → 无推送携带")
@@ -2018,14 +2056,17 @@ do {
     wired.deviceHost.detach()
 
     let unWired = try makeCollectionScenario(
-        selection: .playlists(["p1"]),
+        selection: .relativePaths(["Album/only-device.flac"]),
+        direction: .download,
         macFiles: [],
         deviceFiles: [("Album/only-device.flac", silentData(0xD5, count: 9_000))],
-        playlists: ["p1": [SyncCollectionTrackFact(
-            stableId: "dev-sid",
-            relativePath: "Album/only-device.flac",
-            contentHash: try sha256Hex(of: silentData(0xD5, count: 9_000))
-        )]],
+        knownPaths: [
+            "Album/only-device.flac": SyncCollectionTrackFact(
+                stableId: "dev-sid",
+                relativePath: "Album/only-device.flac",
+                contentHash: try sha256Hex(of: silentData(0xD5, count: 9_000))
+            ),
+        ],
         injectCarry: false
     )
     check(unWired.carryDriver == nil, "未注入驱动")
@@ -2036,6 +2077,111 @@ do {
     unWired.deviceHost.detach()
 } catch {
     check(false, "㉜ 抛错：\(error)")
+}
+
+// MARK: - ㉝ T7：两个方向端到端（`.all` 不再空转 / 冲突不覆盖）
+
+section("㉝ T7：upload × .all 不空转（本端全量为期望）")
+do {
+    let same = silentData(0xE1, count: 5_000)
+    let macOnly = silentData(0xE2, count: 70_000)
+    let macOnlyHash = try sha256Hex(of: macOnly)
+
+    let scenario = try makeCollectionScenario(
+        selection: .all,
+        direction: .upload,
+        macFiles: [("Album/mac-only.flac", macOnly), ("Album/same.flac", same)],
+        deviceFiles: [("Album/same.flac", same), ("Imported/device-only.flac", silentData(0xE3, count: 3_000))]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    check(report.isLibraryWide, "账目：库级选择")
+    checkEqual(report.plannedPush, ["Album/mac-only.flac"], "全库 upload 产出非空计划（修空转）")
+    checkEqual(report.plannedPull, [String](), "upload 不拉")
+    checkEqual(report.skipped, ["Album/same.flac"], "已一致 → 跳过")
+    checkEqual(report.remoteOnlyIgnored, ["Imported/device-only.flac"], "对端独有 → 仅记账")
+    checkEqual(report.pushed, ["Album/mac-only.flac"], "推送账目")
+    check(
+        !FileManager.default.fileExists(
+            atPath: scenario.macRoot.appendingPathComponent("Imported/device-only.flac").path
+        ),
+        "upload 不把对端独有内容拉回本端"
+    )
+    checkEqual(
+        try sha256Hex(of: try Data(contentsOf: scenario.deviceRoot.appendingPathComponent("Album/mac-only.flac"))),
+        macOnlyHash,
+        "补齐文件落位设备且内容一致"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉝ 抛错：\(error)")
+}
+
+section("㉞ T7：download × .all 拉对端独有（本端没有的歌能拉回来）")
+do {
+    let same = silentData(0xE4, count: 5_000)
+    let deviceOnly = silentData(0xE5, count: 65_000)
+    let deviceOnlyHash = try sha256Hex(of: deviceOnly)
+
+    let scenario = try makeCollectionScenario(
+        selection: .all,
+        direction: .download,
+        macFiles: [("Album/same.flac", same), ("Album/mac-only.flac", silentData(0xE6, count: 2_000))],
+        deviceFiles: [("Album/same.flac", same), ("Imported/device-only.flac", deviceOnly)]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.plannedPull, ["Imported/device-only.flac"], "全库 download 产出非空计划（对端独有 → 拉）")
+    checkEqual(report.plannedPush, [String](), "download 不推")
+    checkEqual(report.skipped, ["Album/same.flac"], "已一致 → 跳过")
+    // download × .all 的期望集合 = 对端清单 → 本端独有文件根本不在期望内（不在对账范围），
+    // 既不推也不删；只有「期望内」的路径才会进 localOnlySkipped。
+    checkEqual(report.localOnlySkipped, [String](), "期望（=对端清单）之外的本端文件不参与对账")
+    checkEqual(report.pulled, ["Imported/device-only.flac"], "拉取账目")
+    checkEqual(
+        try sha256Hex(of: try Data(contentsOf: scenario.macRoot.appendingPathComponent("Imported/device-only.flac"))),
+        deviceOnlyHash,
+        "对端独有的歌落到本端且内容一致"
+    )
+    check(
+        FileManager.default.fileExists(
+            atPath: scenario.macRoot.appendingPathComponent("Album/mac-only.flac").path
+        ),
+        "本端独有文件保留（download 不删不推）"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉞ 抛错：\(error)")
+}
+
+section("㉟ T7：download 内容冲突 → 本端保留（不覆盖）")
+do {
+    let macVersion = silentData(0xE7, count: 4_000)
+    let deviceVersion = silentData(0xE8, count: 4_000)
+
+    let scenario = try makeCollectionScenario(
+        selection: .all,
+        direction: .download,
+        macFiles: [("Album/x.flac", macVersion)],
+        deviceFiles: [("Album/x.flac", deviceVersion)]
+    )
+
+    let report = scenario.coordinator.report
+    check(scenario.coordinator.state == .done, "编排终态 done")
+    checkEqual(report.conflictingKept, ["Album/x.flac"], "内容不同 → 本端保留（仅记账）")
+    checkEqual(report.plannedPull, [String](), "冲突不拉取")
+    checkEqual(report.plannedPush, [String](), "冲突不推送")
+    checkEqual(report.transferCount, 0, "冲突 → 零传输")
+    checkEqual(
+        try sha256Hex(of: try Data(contentsOf: scenario.macRoot.appendingPathComponent("Album/x.flac"))),
+        try sha256Hex(of: macVersion),
+        "本端文件内容未被覆盖"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㉟ 抛错：\(error)")
 }
 
 // MARK: - 汇总
