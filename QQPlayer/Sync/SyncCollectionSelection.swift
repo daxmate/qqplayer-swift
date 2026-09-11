@@ -34,6 +34,20 @@
 
 import Foundation
 
+// MARK: - 传输方向（T7 2026-09-11：用户显式选择，二者不混跑）
+
+/// 一次同步的传输方向（**用户显式选择**；一次编排只跑一个方向，不混跑）。
+///
+/// 为什么要有方向：R3a 的「一次开始 → 先推后拉双向补齐」在对账基准上必然偏袒本端
+/// （期望集合恒为本端展开结果）→ 对端独有的歌永远拉不回来；且 `.all` 空转。
+/// T7 把方向提成显式参数：上传 = 只推（本端权威），下载 = 只拉（**以对端清单为准**）。
+enum SyncTransferDirection: Equatable, Sendable {
+    /// 上传到移动端：本端有、对端缺 → 推送（本端权威）。
+    case upload
+    /// 从移动端下载：对端有、本端缺 → 拉取（**以对端清单为准**）。
+    case download
+}
+
 // MARK: - 选择集
 
 /// 本端同步选择集（R3a 决策 9；`.all` 为 v1 兼容）。
@@ -389,5 +403,93 @@ extension SyncCollectionExpansion {
         return entries
             .filter { wanted.contains($0.relativePath) }
             .sorted { $0.relativePath < $1.relativePath }
+    }
+}
+
+// MARK: - 传输方向 → 对端请求集合（T7，纯函数）
+
+extension SyncCollectionSelection {
+    /// 选择集 → **对端 manifest 请求集合**（方向敏感；纯函数，零 IO）。
+    ///
+    /// 为什么方向敏感：
+    /// - **upload**：选择在**本端**执行（本端展开选择集），对端只需要回全量清单
+    ///   供对账 → 恒 `.all`。
+    /// - **download**：期望集合以**对端清单**为准，所以过滤必须在**对端**先做：
+    ///   对端按歌单标识（Mac 侧 = `Playlist.slug`，与 M4-1 changeLog rowKey 同口径）
+    ///   收口后再回清单，本端拿回来的就是「该歌单在对端持有的全部文件」。
+    ///   相对路径选择集无法在对端表达（对端 manifest 过滤器只认 stableId 集合）
+    ///   → 回全量清单，差异由本端按路径对账（见 `SyncExpectedPlanner`）。
+    ///
+    /// ⚠️ 依赖：download × `.playlists` 要求对端能解析歌单标识（被动端装配需注入
+    /// 歌单成员；对端解析不出 → 回空清单 → 本端拉不到东西，不误删、不伪造）。
+    func remoteRequestCollection(for direction: SyncTransferDirection) -> SyncCollection {
+        switch (self, direction) {
+        case (.all, _):
+            return .all
+        case let (.playlists(raw), .download):
+            return .playlists(SyncCollectionSelection.normalizePlaylistIDs(raw))
+        case (.playlists, .upload), (.relativePaths, _):
+            return .all
+        }
+    }
+}
+
+// MARK: - 期望集合（对账基准）按方向取（T7，纯函数）
+
+/// 一次编排的**期望集合来源**（对账基准；决定「谁缺谁」的判定方向）。
+enum SyncExpectedSource: Equatable, Sendable {
+    /// 本端全量 manifest 的路径（upload × `.all`：修「全库空转」）。
+    case localManifest
+    /// 本端选择集展开结果（upload × `.playlists` / `.relativePaths`）。
+    case expansion
+    /// 对端 manifest 的全部路径（download × `.all` / `.playlists`，对端已按集合收口）。
+    case remoteManifest
+    /// 选择集本身的相对路径（download × `.relativePaths`：对账键就是 relativePath，
+    /// **不能**用本端展开结果——本端没有的歌正是要拉的那些）。
+    case selectionPaths
+}
+
+enum SyncExpectedPlanner {
+    /// 选择集 × 方向 → 期望集合来源（纯函数）。
+    static func source(
+        selection: SyncCollectionSelection,
+        direction: SyncTransferDirection
+    ) -> SyncExpectedSource {
+        switch (selection, direction) {
+        case (.all, .upload):
+            return .localManifest
+        case (.playlists, .upload), (.relativePaths, .upload):
+            return .expansion
+        case (.all, .download), (.playlists, .download):
+            return .remoteManifest
+        case (.relativePaths, .download):
+            return .selectionPaths
+        }
+    }
+
+    /// 期望相对路径集合（升序、去重；纯函数）。
+    ///
+    /// 调用时机：拿到**对端 manifest** 之后（download 的两条路都依赖对端清单）。
+    /// `expansion` 只在 `selectionPaths` 之外的路径上参与，`localManifest` 只在
+    /// upload × `.all` 时参与——两个入参都给全，由 `source` 决定用哪个。
+    static func expected(
+        selection: SyncCollectionSelection,
+        direction: SyncTransferDirection,
+        expansion: SyncCollectionExpansion,
+        localManifest: [ManifestEntry],
+        remoteManifest: [ManifestEntry]
+    ) -> [String] {
+        let paths: [String]
+        switch source(selection: selection, direction: direction) {
+        case .localManifest:
+            paths = localManifest.map(\.relativePath)
+        case .expansion:
+            paths = expansion.relativePaths
+        case .remoteManifest:
+            paths = remoteManifest.map(\.relativePath)
+        case .selectionPaths:
+            paths = selection.relativePaths ?? []
+        }
+        return Array(Set(paths)).sorted()
     }
 }

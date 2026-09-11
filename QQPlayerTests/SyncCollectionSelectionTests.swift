@@ -2,14 +2,15 @@
 //  SyncCollectionSelectionTests.swift
 //  QQPlayerTests
 //
-//  R3a（2026-09-11）选择集模型 + 展开器 + 双向差集（纯逻辑）：
+//  R3a + T7（2026-09-11）选择集模型 + 展开器 + **单向**差集（纯逻辑）：
 //  - 选择集规范化（去空白/丢非法/去重/升序）
 //  - 空选择集语义 = 不推不拉（≠ 全库）
 //  - 未知/非法歌单标识 → 忽略 + 记账（不抛）
 //  - 展开器：歌单→曲目→content_hash→相对路径；歌词随歌纳入；
 //    未指纹/未入库 → 跳过 + unresolved 记账（不中止整批、不伪造路径）
-//  - 差集方向：对端缺→推、本端缺→拉、一致→跳过、内容不同→推（发起方权威）、
-//    对端独有→忽略（不传播删除）
+//  - 差集方向（T7）：upload 只推（本端缺对端有不拉）、download 只拉
+//    （对端独有 → 拉）、一致 → 跳过、内容不同 → upload 推 / download 本端保留、
+//    对端独有（期望之外）→ 忽略（不传播删除）
 //
 //  fixture：内存事实注入（不启模拟器、不碰 DB 单例）。
 //
@@ -275,62 +276,100 @@ struct SyncCollectionExpanderTests {
     }
 }
 
-// MARK: - ③ 双向差集
+// MARK: - ③ 单向差集（T7：方向显式）
 
-@Suite("R3a 双向差集")
+@Suite("T7 单向差集")
 struct SyncCollectionDiffPlannerTests {
     private func manifest(_ pairs: [(String, String?)]) -> [ManifestEntry] {
         pairs.map { ManifestEntry(relativePath: $0.0, size: 10, mtimeMs: 0, contentHash: $0.1) }
     }
 
-    @Test("对端缺 → 推；本端缺 → 拉；两侧一致 → 跳过")
-    func directions() {
-        // local 只持有 push + same；pull 只在远端（本端缺 → 拉）。
-        // ⚠️ 2026-09-11 修正：原先 local 里多写了一条 pull.flac，而两侧同 hash
-        // ⇒ 判据只能是「一致」而非「本端缺」，与用例名/其余断言矛盾（CI 929 用例唯一红点）。
+    @Test("upload：对端缺 → 推；本端缺 → 不拉（仅记账）；两侧一致 → 跳过")
+    func uploadDirections() {
+        // local 只持有 push + same；pull 只在远端（upload 方向**不许拉**）。
         let local = manifest([("Album/push.flac", hashA), ("Album/same.flac", hashA)])
         let remote = manifest([("Album/same.flac", hashA), ("Album/pull.flac", hashB)])
         let expected = ["Album/pull.flac", "Album/push.flac", "Album/same.flac"]
 
-        let diff = SyncCollectionDiffPlanner.plan(expected: expected, local: local, remote: remote)
+        let diff = SyncCollectionDiffPlanner.plan(
+            expected: expected, local: local, remote: remote, direction: .upload
+        )
 
         #expect(diff.toPush == ["Album/push.flac"])
-        #expect(diff.toPull == ["Album/pull.flac"])
+        #expect(diff.toPull.isEmpty)
+        #expect(diff.peerOnlySkipped == ["Album/pull.flac"])
         #expect(diff.unchanged == ["Album/same.flac"])
         #expect(diff.missingBoth.isEmpty)
         #expect(diff.remoteOnlyIgnored.isEmpty)
     }
 
-    @Test("内容不同 → 只推不回拉（发起方权威，避免来回互相覆盖）")
-    func contentDiffersPushesOnly() {
+    @Test("download：对端独有 → 拉；本端独有 → 不推不删（仅记账）")
+    func downloadDirections() {
+        let local = manifest([("Album/local-only.flac", hashA), ("Album/same.flac", hashA)])
+        let remote = manifest([("Album/same.flac", hashA), ("Album/peer-only.flac", hashB)])
+        let expected = ["Album/peer-only.flac", "Album/local-only.flac", "Album/same.flac"]
+
+        let diff = SyncCollectionDiffPlanner.plan(
+            expected: expected, local: local, remote: remote, direction: .download
+        )
+
+        #expect(diff.toPull == ["Album/peer-only.flac"])
+        #expect(diff.toPush.isEmpty)
+        #expect(diff.localOnlySkipped == ["Album/local-only.flac"])
+        #expect(diff.unchanged == ["Album/same.flac"])
+    }
+
+    @Test("内容不同：upload → 只推（本端权威）；download → 本端保留、不覆盖")
+    func contentDiffersPerDirection() {
         let local = manifest([("Album/x.flac", hashA)])
         let remote = manifest([("Album/x.flac", hashB)])
 
-        let diff = SyncCollectionDiffPlanner.plan(expected: ["Album/x.flac"], local: local, remote: remote)
+        let upload = SyncCollectionDiffPlanner.plan(
+            expected: ["Album/x.flac"], local: local, remote: remote, direction: .upload
+        )
+        #expect(upload.toPush == ["Album/x.flac"])
+        #expect(upload.toPull.isEmpty)
+        #expect(upload.unchanged.isEmpty)
 
-        #expect(diff.toPush == ["Album/x.flac"])
-        #expect(diff.toPull.isEmpty)
-        #expect(diff.unchanged.isEmpty)
+        let download = SyncCollectionDiffPlanner.plan(
+            expected: ["Album/x.flac"], local: local, remote: remote, direction: .download
+        )
+        #expect(download.conflictingKept == ["Album/x.flac"])
+        #expect(download.toPush.isEmpty)
+        #expect(download.toPull.isEmpty)
+        #expect(download.transferCount == 0)
     }
 
-    @Test("任一侧未指纹（content_hash 为 nil）→ 保守判为需推送")
-    func unknownHashPushes() {
-        let local = manifest([("Album/x.flac", nil)])
-        let remote = manifest([("Album/x.flac", hashA)])
+    @Test("任一侧未指纹（content_hash 为 nil）→ upload 保守判为需推送；download 保守判为本端保留")
+    func unknownHashPerDirection() {
+        let localUnknown = manifest([("Album/x.flac", nil)])
+        let remoteKnown = manifest([("Album/x.flac", hashA)])
         #expect(
-            SyncCollectionDiffPlanner.plan(expected: ["Album/x.flac"], local: local, remote: remote).toPush
-                == ["Album/x.flac"]
+            SyncCollectionDiffPlanner
+                .plan(expected: ["Album/x.flac"], local: localUnknown, remote: remoteKnown, direction: .upload)
+                .toPush == ["Album/x.flac"]
+        )
+        #expect(
+            SyncCollectionDiffPlanner
+                .plan(expected: ["Album/x.flac"], local: localUnknown, remote: remoteKnown, direction: .download)
+                .conflictingKept == ["Album/x.flac"]
         )
 
         let localKnown = manifest([("Album/x.flac", hashA)])
         let remoteUnknown = manifest([("Album/x.flac", nil)])
         #expect(
-            SyncCollectionDiffPlanner.plan(expected: ["Album/x.flac"], local: localKnown, remote: remoteUnknown).toPush
-                == ["Album/x.flac"]
+            SyncCollectionDiffPlanner
+                .plan(expected: ["Album/x.flac"], local: localKnown, remote: remoteUnknown, direction: .upload)
+                .toPush == ["Album/x.flac"]
+        )
+        #expect(
+            SyncCollectionDiffPlanner
+                .plan(expected: ["Album/x.flac"], local: localKnown, remote: remoteUnknown, direction: .download)
+                .conflictingKept == ["Album/x.flac"]
         )
     }
 
-    @Test("对端独有 → 只记账、不动手（绝不跨端删除）")
+    @Test("对端独有 → 只记账、不动手（绝不跨端删除；两方向一致）")
     func remoteOnlyIgnored() {
         let local = manifest([("Album/keep.flac", hashA)])
         let remote = manifest([
@@ -339,18 +378,23 @@ struct SyncCollectionDiffPlannerTests {
             ("Imported/device-only-2.flac", nil),
         ])
 
-        let diff = SyncCollectionDiffPlanner.plan(expected: ["Album/keep.flac"], local: local, remote: remote)
-
-        #expect(diff.unchanged == ["Album/keep.flac"])
-        #expect(diff.toPush.isEmpty)
-        #expect(diff.toPull.isEmpty)
-        #expect(diff.remoteOnlyIgnored == ["Imported/device-only-2.flac", "Imported/device-only.flac"])
-        #expect(diff.transferCount == 0)
+        for direction in [SyncTransferDirection.upload, .download] {
+            let diff = SyncCollectionDiffPlanner.plan(
+                expected: ["Album/keep.flac"], local: local, remote: remote, direction: direction
+            )
+            #expect(diff.unchanged == ["Album/keep.flac"])
+            #expect(diff.toPush.isEmpty)
+            #expect(diff.toPull.isEmpty)
+            #expect(diff.remoteOnlyIgnored == ["Imported/device-only-2.flac", "Imported/device-only.flac"])
+            #expect(diff.transferCount == 0)
+        }
     }
 
     @Test("期望路径两侧都没有实体 → missingBoth（不伪造、不动手）")
     func missingBoth() {
-        let diff = SyncCollectionDiffPlanner.plan(expected: ["Album/ghost.flac"], local: [], remote: [])
+        let diff = SyncCollectionDiffPlanner.plan(
+            expected: ["Album/ghost.flac"], local: [], remote: [], direction: .upload
+        )
         #expect(diff.missingBoth == ["Album/ghost.flac"])
         #expect(diff.transferCount == 0)
     }
@@ -361,7 +405,8 @@ struct SyncCollectionDiffPlannerTests {
         let diff = SyncCollectionDiffPlanner.plan(
             expected: ["Album/c.flac", "Album/a.flac", "Album/b.flac"],
             local: local,
-            remote: []
+            remote: [],
+            direction: .upload
         )
         #expect(diff.toPush == ["Album/a.flac", "Album/b.flac", "Album/c.flac"])
     }
