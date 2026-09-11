@@ -67,6 +67,11 @@ struct MacSyncSettingsView: View {
                 }
             }
 
+            // MARK: 同步操作四区（M6 T3：连接状态 / 内容选择 / 执行 / 结果）
+            // 放在「现有三区」之上（docs/m6-sync-ui-plan.md §5.2）。批准卡仍留在最顶：
+            // 它只在有待批准请求时出现，且需要用户立刻表态（滚下去才看到反而更糟）。
+            MacSyncRunSection(hostCenter: hostCenter)
+
             // MARK: 本机身份与二维码
             Section {
                 VStack(alignment: .leading, spacing: 12) {
