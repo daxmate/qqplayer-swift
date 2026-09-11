@@ -28,6 +28,16 @@ class DatabaseManager: @unchecked Sendable {
     private let maxRetries = 2
     private let retryDelay: UInt64 = 500_000_000 // 0.5 seconds in nanoseconds
 
+    // content_hash 惰性回填的专用后台队列（串行）：主线程零文件 IO——dataless
+    // iCloud 文件的读取会触发云端下载并长时间阻塞，绝不能在启动路径同步跑。
+    private static let contentHashBackfillQueue = DispatchQueue(
+        label: "com.daxmate.qqplayer.content-hash-backfill",
+        qos: .utility
+    )
+    /// 防重复入队（只在 setupDatabase 调用一次；锁保护以兼容重试路径）。
+    private let contentHashBackfillEnqueueLock = NSLock()
+    private var contentHashBackfillEnqueued = false
+
     static func generatePathStableId(forPath path: String) -> String {
         let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
         let digest = SHA256.hash(data: normalizedPath.data(using: .utf8) ?? Data())
@@ -75,6 +85,27 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// 把 content_hash 回填丢到专用后台串行队列（启动路径**不阻塞主线程**）。
+    /// 失败只打印不抛：UserDefaults 门未置位 → 下次启动自动重试。
+    private func scheduleContentHashBackfillInBackground() {
+        contentHashBackfillEnqueueLock.lock()
+        if contentHashBackfillEnqueued {
+            contentHashBackfillEnqueueLock.unlock()
+            return
+        }
+        contentHashBackfillEnqueued = true
+        contentHashBackfillEnqueueLock.unlock()
+
+        let manager = self
+        Self.contentHashBackfillQueue.async {
+            do {
+                try manager.backfillTrackContentHashesIfNeeded()
+            } catch {
+                print("⚠️ Database: content_hash backfill failed (will retry next launch): \(error)")
+            }
+        }
+    }
+
     private func setupDatabase() throws {
         let databaseURL = try getDatabaseURL()
 
@@ -95,14 +126,11 @@ class DatabaseManager: @unchecked Sendable {
         try createTables()
         try migrateDatabaseIfNeeded()
 
-        // M3-1: content_hash 存量惰性回填（一次性，UserDefaults 门；失败不置位，
-        // 下次启动重试）。放共享启动路径 setupDatabase（iOS+Mac 都走这里），
-        // 必须在 migrateDatabaseIfNeeded 之后——老库先补列才能查 content_hash。
-        do {
-            try backfillTrackContentHashesIfNeeded()
-        } catch {
-            print("⚠️ Database: content_hash backfill failed (will retry next launch): \(error)")
-        }
+        // M3-1: content_hash 存量惰性回填已**移出启动主线程**——dataless（云端未下载）
+        // iCloud 文件的 FileHandle.read 会触发云端下载并长时间阻塞（实测 20+ 分钟
+        // 不返回）→ 主线程卡死、App 无响应。改为专用串行队列后台执行（见
+        // scheduleContentHashBackfillInBackground）。
+        scheduleContentHashBackfillInBackground()
 
         // Split combined multi-artist rows ("A; B") left by the old parser
         // (issue #16), then heal libraries where deleted tracks left empty
@@ -801,25 +829,46 @@ class DatabaseManager: @unchecked Sendable {
     /// 文件存在则流式计算 SHA-256；不存在/读失败返回 nil（调用方按"未指纹"
     /// 处理，后续 upsert 或惰性回填会再试）。复用 Sync/SyncFileChecksum（共享实现，
     /// 协议目录只读），不另起哈希逻辑。
-    static func contentHashIfFilePresent(atPath path: String) -> String? {
+    ///
+    /// iCloud dataless（云端未下载）文件同样返回 nil 并**不读取内容**——流式读取会
+    /// 触发云端下载并长时间阻塞（实测 20+ 分钟不返回），是启动主线程卡死的根因。
+    /// 可用性判定注入以便单测；默认走唯一判定 CloudFileAvailability。
+    static func contentHashIfFilePresent(
+        atPath path: String,
+        isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
+    ) -> String? {
         guard FileManager.default.fileExists(atPath: path) else { return nil }
-        return try? SyncFileChecksum.sha256Hex(ofFile: URL(fileURLWithPath: path))
+        let url = URL(fileURLWithPath: path)
+        guard isLocallyAvailable(url) else { return nil }
+        return try? SyncFileChecksum.sha256Hex(ofFile: url)
     }
 
     /// content_hash 存量惰性回填（带一次性 UserDefaults 门）。独立 key，仿
-    /// legacyMigrationKey 模式：失败不置位 → 下次启动重试。触发点在 setupDatabase
-    /// （iOS+Mac 共享启动路径）。文件 IO 全部在写事务外，绝不长时间占住 GRDB writer
-    /// （audit 纪律：写事务内不做文件 IO）。
+    /// legacyMigrationKey 模式：失败不置位 → 下次启动重试。
+    ///
+    /// ⚠️ 不再在启动主线程调用——见 scheduleContentHashBackfillInBackground()
+    /// （dataless iCloud 文件会阻塞主线程）。
     func backfillTrackContentHashesIfNeeded() throws {
         let key = "database.contentHashBackfillCompleted.v1"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
-        try backfillMissingContentHashes()
+        let skippedCloudOnly = try backfillMissingContentHashes()
+        // 有因云端未下载跳过的曲目 → 不置门，下次启动（文件可能已下载完）重试。
+        // 文件真不存在的旧行为不变：不算跳过，照常置门（已处理）。
+        guard skippedCloudOnly == 0 else {
+            print("⏭️ Database: content_hash backfill skipped \(skippedCloudOnly) cloud-only track(s); will retry next launch")
+            return
+        }
         UserDefaults.standard.set(true, forKey: key)
     }
 
     /// 回填核心（internal 供测试直调，绕开 UserDefaults 门）：扫 content_hash IS NULL
-    /// 行 → 文件存在则算 SHA-256 → 批量 UPDATE。幂等：再跑一遍无 NULL 行可补，不崩。
-    func backfillMissingContentHashes() throws {
+    /// 行 → 文件存在且本地已实体化则算 SHA-256 → 批量 UPDATE。幂等：再跑一遍无 NULL
+    /// 行可补，不崩。
+    /// - Returns: 因 iCloud 云端未下载被跳过的曲目数（文件不存在的旧行为不计入）。
+    @discardableResult
+    func backfillMissingContentHashes(
+        isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
+    ) throws -> Int {
         struct PendingFill {
             let id: Int64
             let hash: String
@@ -832,12 +881,23 @@ class DatabaseManager: @unchecked Sendable {
 
         // Phase 2: 事务外逐文件哈希（syscalls 不碰 GRDB writer）。
         var pending: [PendingFill] = []
+        var skippedCloudOnly = 0
         for track in candidates {
             guard let id = track.id else { continue }
-            guard let hash = Self.contentHashIfFilePresent(atPath: track.path) else { continue }
+            // 文件真不存在：旧行为（按已处理跳过，不计入云端跳过数）。
+            guard FileManager.default.fileExists(atPath: track.path) else { continue }
+            // 云端未下载：不读内容（会阻塞），计入跳过数，下次重试。
+            guard isLocallyAvailable(URL(fileURLWithPath: track.path)) else {
+                skippedCloudOnly += 1
+                continue
+            }
+            guard let hash = Self.contentHashIfFilePresent(
+                atPath: track.path,
+                isLocallyAvailable: isLocallyAvailable
+            ) else { continue }
             pending.append(PendingFill(id: id, hash: hash))
         }
-        guard !pending.isEmpty else { return }
+        guard !pending.isEmpty else { return skippedCloudOnly }
 
         // Phase 3: 短写事务批量落库。
         try write { db in
@@ -849,6 +909,7 @@ class DatabaseManager: @unchecked Sendable {
             }
         }
         print("✅ Database: Backfilled content_hash for \(pending.count) track(s)")
+        return skippedCloudOnly
     }
 
     // SwiftUI rows call getArtistDisplayName on every render - cache the
