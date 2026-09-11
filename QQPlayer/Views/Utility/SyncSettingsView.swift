@@ -20,6 +20,8 @@ struct SyncSettingsView: View {
     @State private var hosts: [PeerDevice] = []
     @State private var loadError: String?
     @State private var pendingUnpair: PeerDevice?
+    /// App 级被动同步中心（Mac 推送接收状态；T4/T5）
+    @ObservedObject private var passiveSync = IOSPassiveSyncCenter.shared
 
     private let deviceStore = DeviceStore()
 
@@ -56,6 +58,15 @@ struct SyncSettingsView: View {
 
     private var settingsList: some View {
         List {
+            // MARK: 接收同步（Mac → 本机推送的落地状态）
+            Section {
+                passiveSyncRow
+            } header: {
+                Text("sync_passive_section".localized)
+            } footer: {
+                Text("sync_passive_footer".localized)
+            }
+
             // MARK: 本机
             Section {
                 if let identity {
@@ -118,7 +129,87 @@ struct SyncSettingsView: View {
         .onAppear {
             loadIdentityIfNeeded()
             reloadHosts()
+            // 幂等：进页时确保被动端在跑（配对完成后也由此重新检查主机）
+            passiveSync.start()
         }
+    }
+
+    // MARK: - 接收同步状态
+
+    private var passiveSyncRow: some View {
+        let presentation = IOSPassiveSyncPresenter.presentation(
+            state: passiveSync.state,
+            summary: passiveSync.summary,
+            hasPairedHost: passiveSync.pairedHostCount > 0
+        )
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: presentation.symbol)
+                    .font(.system(size: 20))
+                    .foregroundStyle(passiveSync.state.isConnected ? Color.green : Color.secondary)
+                    .frame(width: 26)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(localizedTitle(presentation))
+                        .fontWeight(.medium)
+                    if let detail = localizedDetail(presentation) {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                if presentation.canReconnect {
+                    Button("sync_passive_reconnect".localized) {
+                        passiveSync.reconnectNow()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.callout)
+                }
+            }
+
+            if presentation.receivedFiles > 0 {
+                Text("sync_passive_progress_received".localized(with: presentation.receivedFiles))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if presentation.lastBatchEntries > 0 {
+                Text("sync_passive_progress_batch".localized(with: presentation.lastBatchEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !presentation.failures.isEmpty {
+                Text("sync_passive_progress_failures".localized(with: presentation.failures.count))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                ForEach(Array(presentation.failures.prefix(3).enumerated()), id: \.offset) { _, failure in
+                    Text(failureLine(failure))
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func localizedTitle(_ presentation: IOSPassiveSyncPresentation) -> String {
+        guard let arg = presentation.titleArg else { return presentation.titleKey.localized }
+        return presentation.titleKey.localized(with: arg)
+    }
+
+    private func localizedDetail(_ presentation: IOSPassiveSyncPresentation) -> String? {
+        guard let key = presentation.detailKey else { return nil }
+        guard let arg = presentation.detailArg else { return key.localized }
+        return key.localized(with: arg)
+    }
+
+    private func failureLine(_ failure: SyncPushFailure) -> String {
+        let path = failure.relativePath.isEmpty ? "—" : failure.relativePath
+        return "\(path) · \(IOSPassiveSyncPresenter.reasonKey(failure.reason).localized)"
     }
 
     // MARK: - 行

@@ -53,8 +53,14 @@ enum SyncConnectState: Equatable {
     }
 }
 
-/// 自动回连决策纯逻辑（主机挑选 / 会话结果映射）。
+/// 自动回连决策纯逻辑（主机挑选 / 名称匹配 / 会话结果映射）。
 enum SyncConnectLogic {
+    /// Bonjour 服务名匹配（case-insensitive）——**唯一口径**：扫码回连的主机挑选
+    /// 与 M6 被动端回连的候选排序共用本函数，避免两处各写一份比较规则。
+    static func matches(hostName: String, expected: String) -> Bool {
+        hostName.compare(expected, options: .caseInsensitive) == .orderedSame
+    }
+
     /// 从浏览结果挑 QR 对应主机：服务名与 QR hostName case-insensitive 匹配
     /// 优先；无匹配返回第一个结果（expectedPeerDeviceID pinning 兜底安全）；
     /// 结果为空返回 nil。
@@ -63,9 +69,7 @@ enum SyncConnectLogic {
         qrHostName: String
     ) -> SyncDiscoveredHost? {
         guard !hosts.isEmpty else { return nil }
-        if let matched = hosts.first(where: {
-            $0.name.compare(qrHostName, options: .caseInsensitive) == .orderedSame
-        }) {
+        if let matched = hosts.first(where: { matches(hostName: $0.name, expected: qrHostName) }) {
             return matched
         }
         return hosts.first
