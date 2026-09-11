@@ -832,6 +832,13 @@
 "sync_run_selection_total_library" = "Вся медиатека · %d песен · около %@";
 "sync_run_execute_section" = "Синхронизация";
 "sync_run_start" = "Начать синхронизацию";
+
+/* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
+"sync_run_panel_title" = "Синхронизация";
+"sync_run_upload" = "Загрузить на iPhone";
+"sync_run_upload_help" = "Отправить песни, которые есть на этом Mac, на iPhone";
+"sync_run_download" = "Скачать с iPhone";
+"sync_run_download_help" = "Перенести песни с iPhone на этот Mac (список iPhone — источник истины)";
 "sync_run_cancel" = "Отмена";
 "sync_run_phase_disconnected" = "Нет подключения";
 "sync_run_phase_idle" = "Готово к синхронизации";

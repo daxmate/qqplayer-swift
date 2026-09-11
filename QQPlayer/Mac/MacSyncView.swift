@@ -379,10 +379,19 @@ struct MacSyncRunSection: View {
                         model.cancelSync()
                     }
                 } else {
-                    Button("sync_run_start".localized) {
-                        model.startSync()
+                    // 两个方向是用户显式选择的独立操作（2026-09-11 拍板）：
+                    // 上传 = 本端有对端缺 → 推送；下载 = 以对端清单为准 → 拉取。
+                    Button("sync_run_upload".localized) {
+                        model.startUpload()
                     }
                     .disabled(!model.startAvailability.canStart)
+                    .help("sync_run_upload_help".localized)
+
+                    Button("sync_run_download".localized) {
+                        model.startDownload()
+                    }
+                    .disabled(!model.startAvailability.canStart)
+                    .help("sync_run_download_help".localized)
                 }
 
                 Text(phaseText)

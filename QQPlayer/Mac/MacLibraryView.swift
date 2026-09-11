@@ -72,6 +72,9 @@ struct MacLibraryView: View {
     @State private var showWhatsNew = false
     /// 在线搜索下载面板（C 组①：web 版 /api/online/* 对齐，sheet 形态）
     @State private var showOnlineSearch = false
+
+    /// 同步面板（主窗口工具栏入口；同步只能由桌面端发起——用户 2026-09-11 拍板）
+    @State private var showSyncPanel = false
     /// 曲库文件夹在扫描中变更 → 索引结束后自动补扫
     @State private var rescanWhenIdle = false
     /// 索引中增量刷新任务（防抖）
@@ -141,6 +144,15 @@ struct MacLibraryView: View {
                 }
                 .help("online_search_title".localized)
             }
+            // 局域网同步入口（重要功能常驻主界面；同步只能由桌面端发起）
+            ToolbarItem {
+                Button {
+                    showSyncPanel = true
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+                .help("sync_run_panel_title".localized)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
@@ -153,6 +165,10 @@ struct MacLibraryView: View {
         }
         .sheet(isPresented: $showOnlineSearch) {
             MacOnlineSearchView()
+        }
+        .sheet(isPresented: $showSyncPanel) {
+            MacSyncPanel()
+                .frame(minWidth: 620, minHeight: 560)
         }
         // search anything（C 组②）：⌘K/菜单唤起的主窗内全屏搜索浮层（与侧栏搜索共存）
         .overlay {
@@ -704,6 +720,25 @@ struct MacLibraryView: View {
             player.pause()
         } else {
             player.play()
+        }
+    }
+}
+
+// MARK: - 同步面板（主窗口工具栏入口）
+
+/// 主窗口工具栏弹出的同步面板。
+///
+/// 内容**复用**设置页同一套四区（`MacSyncRunSection`）——同步界面只允许一份实现，
+/// 避免「设置里一套、主界面一套」的行为漂移（封面解析散落多处的教训）。
+/// 同步只能由桌面端发起；「上传到 iPhone」与「从 iPhone 下载」是面板里的两个独立按钮。
+private struct MacSyncPanel: View {
+    var body: some View {
+        NavigationStack {
+            Form {
+                MacSyncRunSection(hostCenter: .shared)
+            }
+            .formStyle(.grouped)
+            .navigationTitle("sync_run_panel_title".localized)
         }
     }
 }
