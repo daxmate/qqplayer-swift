@@ -40,6 +40,11 @@ SOURCES=(
   QQPlayer/Sync/SyncManifestGenerator.swift
   QQPlayer/Sync/SyncManifestReconciler.swift
   QQPlayer/Sync/SyncManifestPeer.swift
+  # T9「对端内容清单」（帧 15/16）：载荷 + 纯逻辑清单/分页 + 应答端 + 客户端（Mac）
+  QQPlayer/Sync/SyncPeerLibraryModels.swift
+  QQPlayer/Sync/SyncPeerLibraryCatalog.swift
+  QQPlayer/Sync/SyncPeerLibraryResponder.swift
+  QQPlayer/Sync/SyncPeerLibraryClient.swift
   QQPlayer/Sync/SyncCollection.swift
   QQPlayer/Sync/SyncCollectionSelection.swift
   QQPlayer/Sync/SyncCollectionSyncCoordinator.swift

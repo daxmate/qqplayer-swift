@@ -25,6 +25,10 @@
 //  同步「按路径拉取」请求/结果；payload 为 JSON，会话层解密后同样经
 //  onApplicationFrame 转发，Host 侧由 SyncLibraryFetchResponder 应答、发起侧（Mac）由
 //  SyncLibraryPullController 消费，见 SyncLibrarySyncModels.swift）。
+//  类型表（v5，T9 增量追加）：15=peer_library_request 16=peer_library_response（对端
+//  **内容清单**：歌单列表 / 曲目列表 + 摘要；payload 为 JSON，会话层解密后经
+//  onApplicationFrame 转发，被动端由 SyncPeerLibraryResponder 应答、Mac 侧由
+//  SyncPeerLibraryClient 消费，见 SyncPeerLibraryModels.swift）。
 
 import Foundation
 
@@ -63,6 +67,12 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     /// R1b-1（2026-09-11）Mac 推送声明：Mac → 设备，声明即将推送的文件与目标相对路径。
     /// 载荷 `SyncLibraryPushAnnounce`（Sync/SyncLibraryPushModels.swift）。10-13 保持不动，新增从 14 起。
     case libraryPushAnnounce = 14
+    /// T9（2026-09-12）对端内容清单请求：请求对端的歌单列表 / 曲目列表（+ 摘要）。
+    /// 载荷 `SyncPeerLibraryRequestPayload`（Sync/SyncPeerLibraryModels.swift）。10-14 保持不动。
+    case peerLibraryRequest = 15
+    /// T9（2026-09-12）对端内容清单响应：一页条目 + 曲库摘要（恒返回）。
+    /// 载荷 `SyncPeerLibraryResponsePayload`（Sync/SyncPeerLibraryModels.swift）。
+    case peerLibraryResponse = 16
 }
 
 /// 帧 flags（bit0 = encrypted）。

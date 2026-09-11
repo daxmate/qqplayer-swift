@@ -96,6 +96,23 @@ enum DatabaseSyncCollectionFacts {
     }
 }
 
+// MARK: - DatabaseSyncPeerLibraryFacts（生产在 Services/，未被 harness 编入）
+//
+// T9（2026-09-12）起 `SyncLibraryPassiveHost` 的默认内容清单 provider 走
+// `DatabaseSyncPeerLibraryFacts.catalogProvider(database:libraryRoot:)`（生产实现查
+// 真 DB 的 track/playlist 表）。harness 的 DatabaseManager 是内存桩、没有歌单/曲目表，
+// 故这里给出等价签名的**空清单**——harness 的端到端断言显式注入内存清单
+// （main.swift 的 SyncPeerLibraryCatalog），不走本默认值。
+enum DatabaseSyncPeerLibraryFacts {
+    static func catalogProvider(
+        database: DatabaseManager,
+        libraryRoot: URL,
+        favoritesName: String? = nil
+    ) -> () -> SyncPeerLibraryCatalog {
+        { SyncPeerLibraryCatalog() }
+    }
+}
+
 // MARK: - LibraryIndexer（生产为 @MainActor 服务；harness 记录调用）
 
 final class LibraryIndexer: @unchecked Sendable {
