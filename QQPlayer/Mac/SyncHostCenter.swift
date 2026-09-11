@@ -127,7 +127,13 @@ final class SyncHostCenter: ObservableObject {
         do {
             identity = try identityProvider()
         } catch {
-            startError = error.localizedDescription
+            // 文案回归：`SyncIdentityError` 不是 `LocalizedError`，直接取
+            // `localizedDescription` 会让用户看到
+            // 「The operation couldn't be completed. (QQPlayer.SyncIdentityError error 0.)」
+            // 这种技术文案 → 回到改造前页面用的本地化键（用户可读），
+            // 原始 error 细节只进日志、不进 alert（与仓库既有 print 诊断惯例一致）。
+            print("❌ SyncHostCenter identity load failed: \(error)")
+            startError = "sync_identity_missing_error".localized
             return
         }
         // 清理可能残留的接线（listener 为 nil 时无副作用；identity 失败路径不走到这里）。
