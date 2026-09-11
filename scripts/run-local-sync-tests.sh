@@ -43,6 +43,8 @@ SOURCES=(
   QQPlayer/Sync/SyncCollection.swift
   QQPlayer/Sync/SyncCollectionSelection.swift
   QQPlayer/Sync/SyncCollectionSyncCoordinator.swift
+  # R3b「跟歌走」计划器：纯逻辑（不依赖 GRDB），随编排一起真跑。
+  QQPlayer/Sync/SyncPlaybackCarryPlan.swift
   QQPlayer/Sync/SyncLibrarySyncModels.swift
   QQPlayer/Sync/SyncLibraryFetchResponder.swift
   QQPlayer/Sync/SyncLocalLibraryProvider.swift

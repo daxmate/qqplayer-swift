@@ -84,6 +84,73 @@ struct MemoryCollectionFacts: SyncCollectionFactsProviding {
     }
 }
 
+// MARK: - R3b 携带事实桩 + 携带替身
+
+/// 内存携带事实（模拟 Mac 侧 DB：相对路径 → 曲目事实；stableId → 播放数据行）。
+struct MemoryCarryFacts: SyncPlaybackCarryFactsProviding {
+    /// 相对路径 → 曲目事实
+    var tracks: [String: SyncCollectionTrackFact] = [:]
+    /// 本端 stableId → 待携带播放数据行（未过滤 delete）
+    var rows: [String: [SyncPlaybackCarryRow]] = [:]
+
+    func trackFact(atRelativePath relativePath: String) -> SyncCollectionTrackFact? {
+        tracks[relativePath]
+    }
+
+    func playbackRows(forTrackStableId stableId: String) -> [SyncPlaybackCarryRow] {
+        rows[stableId] ?? []
+    }
+}
+
+/// R3b 携带替身（无模拟器 harness 用）：跑**真实**计划器（纯逻辑），只记录计划、不发帧。
+final class CarrySpyDriver: SyncPlaybackCarryDriving, @unchecked Sendable {
+    private let facts: SyncPlaybackCarryFactsProviding
+    private let lock = NSLock()
+    private var pushPlans: [SyncPlaybackCarryPlan] = []
+    private var pullPlans: [SyncPlaybackCarryPlan] = []
+
+    init(facts: SyncPlaybackCarryFactsProviding) {
+        self.facts = facts
+    }
+
+    var pushCarryPlans: [SyncPlaybackCarryPlan] {
+        lock.lock(); defer { lock.unlock() }; return pushPlans
+    }
+
+    var pullCarryPlans: [SyncPlaybackCarryPlan] {
+        lock.lock(); defer { lock.unlock() }; return pullPlans
+    }
+
+    /// 最近一次推送携带计划（nil = 从未触发）。
+    var lastPushPlan: SyncPlaybackCarryPlan? { pushCarryPlans.last }
+    /// 最近一次拉取携带计划（nil = 从未触发）。
+    var lastPullPlan: SyncPlaybackCarryPlan? { pullCarryPlans.last }
+
+    func carryPush(transferredPaths: [String], peerEntries: [ManifestEntry]) throws -> SyncPlaybackCarryPlan {
+        let scope = SyncPlaybackCarryScope.afterTransfer(
+            direction: .push,
+            transferredPaths: transferredPaths,
+            peerEntries: peerEntries,
+            facts: facts
+        )
+        let plan = SyncPlaybackCarryPlanner.plan(scope: scope, facts: facts)
+        lock.lock(); pushPlans.append(plan); lock.unlock()
+        return plan
+    }
+
+    func carryPull(transferredPaths: [String], peerEntries: [ManifestEntry]) throws -> SyncPlaybackCarryPlan {
+        let scope = SyncPlaybackCarryScope.afterTransfer(
+            direction: .pull,
+            transferredPaths: transferredPaths,
+            peerEntries: peerEntries,
+            facts: facts
+        )
+        let plan = SyncPlaybackCarryPlanner.pairingPlan(scope: scope, facts: facts)
+        lock.lock(); pullPlans.append(plan); lock.unlock()
+        return plan
+    }
+}
+
 // MARK: - 双 ready 会话夹具
 
 struct SessionFixture {
