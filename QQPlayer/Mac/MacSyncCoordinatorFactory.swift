@@ -56,8 +56,21 @@ enum MacSyncCoordinatorFactory {
         selection: SyncCollectionSelection,
         libraryRoot: URL
     ) -> SyncCollectionSyncCoordinator {
-        let descriptor = SyncLocalLibraryDescriptor.live(libraryRoot: libraryRoot)
-        let facts = DatabaseSyncCollectionFacts(libraryRoot: libraryRoot)
+        let database = DatabaseManager.shared
+        // 歌词跨端映射：**一处创建、三处共用**（descriptor 的 manifest 侧 / facts 的
+        // 「本端有无该歌词」判定 / 拉取侧 SyncLyricsReceiver 的落库映射），
+        // 避免三处各建一套而口径漂移。
+        let lyricsMapping = SyncLyricsContentMapping.live(database: database)
+        let descriptor = SyncLocalLibraryDescriptor.live(
+            libraryRoot: libraryRoot,
+            database: database,
+            lyricsMapping: lyricsMapping
+        )
+        let facts = DatabaseSyncCollectionFacts(
+            database: database,
+            libraryRoot: libraryRoot,
+            lyricsMapping: lyricsMapping
+        )
         let peerID = session.peerHelloValue?.deviceID ?? ""
 
         return SyncCollectionSyncCoordinator(
@@ -67,6 +80,10 @@ enum MacSyncCoordinatorFactory {
             facts: facts,
             sink: LibraryIndexerSyncSink(),
             lyricsStore: .shared,
+            // ⚠️ 必须显式传映射：coordinator 缺省是 `.unresolved`（两端都解析不出），
+            // 会让拉取侧 `SyncLyricsReceiver.install` 把对端发来的歌词全判为 orphan
+            // → iPhone 的歌同步到 Mac 时歌词永远不落库。
+            lyricsMapping: lyricsMapping,
             playbackCarry: peerID.isEmpty
                 ? nil
                 : SyncPlaybackCarryPeer(session: session, libraryRoot: libraryRoot, peerID: peerID)
