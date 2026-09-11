@@ -83,6 +83,19 @@ extension SyncLyricsContentMapping {
     static func live(database: DatabaseManager) -> SyncLyricsContentMapping { .unresolved }
 }
 
+// MARK: - DatabaseSyncCollectionFacts.liveMembersProvider（生产在 Services/，未被 harness 编入）
+//
+// T7b（2026-09-11）起 `SyncLibraryPassiveHost` / `SyncLocalLibraryProvider` 的默认歌单
+// 成员表走 `DatabaseSyncCollectionFacts.liveMembersProvider(database:)`（生产实现走
+// GRDB 查歌单）。harness 的 DatabaseManager 是内存桩、没有歌单表，故这里给出等价签名
+// 的空成员表——harness 断言不覆盖 `.playlists` 收口径（该路径由 QQPlayerTests 的
+// `SyncPlaylistMembersTests` 真跑 GRDB 覆盖），行为与 T7b 之前一致（空表）。
+enum DatabaseSyncCollectionFacts {
+    static func liveMembersProvider(database: DatabaseManager) -> () -> SyncCollectionMembers {
+        { SyncCollectionMembers() }
+    }
+}
+
 // MARK: - LibraryIndexer（生产为 @MainActor 服务；harness 记录调用）
 
 final class LibraryIndexer: @unchecked Sendable {

@@ -147,3 +147,73 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
         return (try? resolver.contentHash(forTrackStableId: stableId)) ?? nil
     }
 }
+
+// MARK: - 歌单成员表（T7b，2026-09-11）
+
+extension DatabaseSyncCollectionFacts {
+    /// 歌单标识 → 成员曲目 stableId 集合（**纯 DB 读、绝不抛**）。
+    ///
+    /// 为什么需要：会话侧应答 manifest 时用 `SyncCollection.filter(entries, members:)`
+    /// 按歌单收口（T7 的 `.playlists` 请求）。此前 `SyncCollectionMembers` 全仓只有
+    /// 默认空值，没有任何生产填充点 → `.playlists` 的 `selectedStableIds` 恒为空集 →
+    /// 应答端回**空清单** → 「按歌单上传/下载」静默空转。本工厂是该成员表的
+    /// **生产唯一构建点**（口径与 `tracks(inPlaylist:)` 逐条对齐，不另起一套查询）。
+    ///
+    /// 口径：
+    /// - 真实歌单：`getAllPlaylists()` → **slug** 作标识（= M4-1 changeLog playlist
+    ///   行的 rowKey 形态，跨端可解释），成员 = `getPlaylistItems()` 的 `trackStableId`
+    /// - 收藏：保留标识 `SyncCollectionSelection.favoritesPlaylistID`（`@favorites`）
+    ///   → `getFavoriteTracks()`
+    /// - 空歌单 / 空收藏：**显式留键 + 空集**（消费方「查不到 = 空集」语义不变，
+    ///   留键只为让调用方/诊断能区分「已知歌单但没歌」与「不知道这个歌单」）
+    /// - 单条不成：slug 非法 / 无行 id / 成员查询抛错 → 只跳过该歌单，不炸整批
+    /// - 全库查询失败（`getAllPlaylists` / `getFavoriteTracks` 抛错）→ 返回空成员表，
+    ///   降级为「按歌单过滤不出内容」而不是崩（与 `SyncCollectionFactsProviding`
+    ///   「实现方必须不抛」同口径）
+    /// - 同 slug 撞名（历史数据）→ 并集：多算条目是安全侧（多传），漏算是危险侧
+    static func buildMembers(database: DatabaseManager = .shared) -> SyncCollectionMembers {
+        var stableIdsByPlaylist: [String: Set<String>] = [:]
+
+        // 决策 9：收藏视为特殊歌单，走同一套展开规则。
+        if let favorites = try? database.getFavoriteTracks() {
+            stableIdsByPlaylist[SyncCollectionSelection.favoritesPlaylistID] =
+                SyncCollectionMembers.includedStableIds(favorites.map(\.stableId))
+        }
+
+        if let playlists = try? database.getAllPlaylists() {
+            for playlist in playlists {
+                let slug = playlist.slug.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard SyncCollectionSelection.isValidPlaylistID(slug),
+                      let playlistRowID = playlist.id,
+                      let items = try? database.getPlaylistItems(playlistId: playlistRowID)
+                else {
+                    continue
+                }
+                stableIdsByPlaylist[slug, default: []].formUnion(
+                    SyncCollectionMembers.includedStableIds(items.map(\.trackStableId))
+                )
+            }
+        }
+
+        return SyncCollectionMembers(stableIdsByPlaylist: stableIdsByPlaylist)
+    }
+
+    /// 应答路径用的**惰性**成员表 provider（供 descriptor 注入）。
+    ///
+    /// 为什么是闭包而不是立即构建的值：manifest 应答发生在会话线程（NW 队列）上，
+    /// 且每次同步只请求一次 —— 求值必须推迟到真的需要（`.playlists` 集合）时，
+    /// 让 `.all` / `.tracks` 请求零 DB 查询（见 `SyncLocalLibraryProvider.members(for:)`）。
+    static func liveMembersProvider(
+        database: DatabaseManager = .shared
+    ) -> () -> SyncCollectionMembers {
+        { buildMembers(database: database) }
+    }
+}
+
+extension SyncCollectionMembers {
+    /// 成员 stableId 归一：丢空串（空 stableId 不可能是成员，且会让 `selectedStableIds`
+    /// 多出一个永不命中的键），保证集合内容确定。
+    static func includedStableIds(_ raw: [String]) -> Set<String> {
+        Set(raw.filter { !$0.isEmpty })
+    }
+}

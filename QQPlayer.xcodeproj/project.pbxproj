@@ -119,6 +119,7 @@
 		6E19A3F12750456392F66625 /* IOSPassiveSyncCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */; };
 		C0C8865B22B44FA6BE1F8D2D /* SyncUIStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */; };
 		F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */; };
+		0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -287,6 +288,7 @@
 		04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IOSPassiveSyncCenterTests.swift; sourceTree = "<group>"; };
 		6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIStateTests.swift; sourceTree = "<group>"; };
 		1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferDirectionTests.swift; sourceTree = "<group>"; };
+		7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPlaylistMembersTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -821,6 +823,7 @@
 				04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */,
 				6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */,
 				1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */,
+				7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1238,6 +1241,7 @@
 				6E19A3F12750456392F66625 /* IOSPassiveSyncCenterTests.swift in Sources */,
 				C0C8865B22B44FA6BE1F8D2D /* SyncUIStateTests.swift in Sources */,
 				F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */,
+				0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
