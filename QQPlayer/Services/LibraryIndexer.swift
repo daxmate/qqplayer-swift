@@ -616,20 +616,16 @@ class LibraryIndexer: NSObject, ObservableObject {
     /// 返回 (本地文件, dataless 数)。无 iCloud entitlement 时无法主动触发
     /// 下载（2026-09-02 实测 startDownloadingUbiquitousItem 无效），dataless
     /// 文件只跳过不等待，下载完成后由 autoscheduleRescan 补扫入列。
+    ///
+    /// 判定统一走 CloudFileAvailability（单一事实源）；本方法行为与提取前逐字一致。
     nonisolated private static func partitionLocalFiles(_ files: [URL]) async -> ([URL], Int) {
         var local: [URL] = []
         var dataless = 0
         for file in files {
-            let values = try? file.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey])
-            if values?.isUbiquitousItem == true {
-                if let status = values?.ubiquitousItemDownloadingStatus,
-                   status == .downloaded || status == .current {
-                    local.append(file)
-                } else {
-                    dataless += 1
-                }
-            } else {
+            if CloudFileAvailability.isLocallyAvailable(file) {
                 local.append(file)
+            } else {
+                dataless += 1
             }
         }
         return (local, dataless)
