@@ -124,6 +124,7 @@
 		0D287FAC426D48308372B848 /* SyncUIDirectionContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */; };
 		AB852F651B4D4DD8A5FD1098 /* SyncDeviceListModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */; };
 		118C9A5DF75149AF8833A06C /* LocalDeviceNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D205D9CFB244729C6A74EE /* LocalDeviceNameTests.swift */; };
+		9E3CED434D384BAE965F52AE /* SyncCollectionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC5058067B2D43CF8366428C /* SyncCollectionCoordinatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -297,6 +298,7 @@
 		63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIDirectionContentTests.swift; sourceTree = "<group>"; };
 		B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDeviceListModelTests.swift; sourceTree = "<group>"; };
 		68D205D9CFB244729C6A74EE /* LocalDeviceNameTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalDeviceNameTests.swift; sourceTree = "<group>"; };
+		AC5058067B2D43CF8366428C /* SyncCollectionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCollectionCoordinatorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -849,6 +851,7 @@
 				63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */,
 				B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */,
 				68D205D9CFB244729C6A74EE /* LocalDeviceNameTests.swift */,
+				AC5058067B2D43CF8366428C /* SyncCollectionCoordinatorTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1271,6 +1274,7 @@
 				0D287FAC426D48308372B848 /* SyncUIDirectionContentTests.swift in Sources */,
 				AB852F651B4D4DD8A5FD1098 /* SyncDeviceListModelTests.swift in Sources */,
 				118C9A5DF75149AF8833A06C /* LocalDeviceNameTests.swift in Sources */,
+				9E3CED434D384BAE965F52AE /* SyncCollectionCoordinatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
