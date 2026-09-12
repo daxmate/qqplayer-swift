@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IntentPhrases</key>
+	<array>
+		<dict>
+			<key>IntentName</key>
+			<string>INPlayMediaIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>在 QQPlayer 上播放我的音樂</string>
+				<string>在 QQPlayer 上播放我的收藏</string>
+			</array>
+		</dict>
+		<dict>
+			<key>IntentName</key>
+			<string>INAddMediaIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>在 QQPlayer 中將這首歌加入我的最愛</string>
+				<string>在 QQPlayer 中將這首歌加入播放清單</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

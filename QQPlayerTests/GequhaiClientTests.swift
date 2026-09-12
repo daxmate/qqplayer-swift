@@ -114,7 +114,8 @@ struct GequhaiClientTests {
     private static func makeClient(cookieFile: URL = tempCookieURL()) -> GequhaiClient {
         let quark = QuarkClient(
             sleep: { _ in },
-            cookieFileURL: cookieFile,
+            cookieStore: QuarkFileCookieStore(fileURL: cookieFile),
+            legacyCookieFileURL: nil,
             protocolClasses: [GequhaiMockURLProtocol.self]
         )
         return GequhaiClient(

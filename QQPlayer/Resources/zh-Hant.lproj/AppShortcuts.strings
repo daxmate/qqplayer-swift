@@ -1,0 +1,22 @@
+/*
+  AppShortcuts.strings (繁體中文)
+  QQPlayer
+
+  QQPlayerAppShortcuts.swift 中 App Shortcuts 的 Siri 呼叫短語。
+  key 必須與英文短語完全一致（${applicationName} 為 App 名稱佔位符），
+  僅 value 為在地化短語；台灣用詞：繼續聆聽／最愛／播放清單／產生。
+*/
+
+"Resume playback in ${applicationName}" = "在 ${applicationName} 中繼續播放";
+"Resume my music in ${applicationName}" = "在 ${applicationName} 中繼續播放我的音樂";
+"Continue playing in ${applicationName}" = "在 ${applicationName} 中繼續聆聽";
+
+"Like this song in ${applicationName}" = "在 ${applicationName} 中將這首歌加入收藏";
+"Add this song to favorites in ${applicationName}" = "在 ${applicationName} 中將這首歌加入最愛";
+"Add this song to my favorites in ${applicationName}" = "在 ${applicationName} 中將這首歌加入我的最愛";
+"Add this song to Liked Songs in ${applicationName}" = "在 ${applicationName} 中將這首歌加入喜愛歌曲";
+"Add the current song to favorites in ${applicationName}" = "在 ${applicationName} 中將目前歌曲加入最愛";
+
+"Make me a mix in ${applicationName}" = "在 ${applicationName} 中替我製作混音";
+"Generate a mix in ${applicationName}" = "在 ${applicationName} 中產生混音";
+"Play me something new in ${applicationName}" = "在 ${applicationName} 中播放一些新歌";

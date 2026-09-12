@@ -6,19 +6,96 @@ on:
   pull_request:
   workflow_dispatch:
 
+# 最小权限：本 workflow 只需读代码（actions/cache 自行鉴权），
+# 不授予写仓库/PR/issue 的 GITHUB_TOKEN 权限。
+permissions:
+  contents: read
+
+# 同一分支连推只保留最新一次 run（旧 run 取消），避免密集 push 并行跑多份占满 runner。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   swift:
     name: Swift (swiftlint + swiftformat + xcodebuild test)
     # 单元测试（Swift Testing，QQPlayerTests target）+ lint/format 检查。
     # 配置在仓库根 .swiftlint.yml / .swiftformat，swiftlint/swiftformat 自动发现。
-    # 注意：QQPlayerSiriTests（UI 集成测试）依赖上游 Xcode 27 的 AppIntentsTesting 框架，
-    # 当前 Xcode 26 SDK 无此框架编译不过，已从 scheme Test action 移除，不参与 CI。
+    #
+    # ⚠️ QQPlayerSiriTests 不参与本 job，且**在本地也无法编译**（可核查证据）：
+    #   该 target 的 4 个文件都 `import AppIntentsTesting`
+    #     （BaseTestCase.swift:12 / EntityQueryTests.swift:9 /
+    #       IntentExecutionTests.swift:9 / SpotlightTests.swift:10），
+    #   而 Xcode 26.6 的 iPhoneSimulator26.5.sdk **不提供 AppIntentsTesting 框架**：
+    #     $ ls /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/
+    #       → XCTest.framework  XCUIAutomation.framework  Testing.framework（无 AppIntentsTesting）
+    #     $ find /Applications/Xcode.app -iname "*AppIntentsTesting*"
+    #       → 无输出
+    #   因此它既不在任何 scheme 的 Testables 里（QQPlayer.xcscheme 唯一 Testable = QQPlayerTests），
+    #   也无法被 xcodebuild 编译——不是「本 job 偷懒」，而是当前工具链硬限制。
+    #   为不让这条线静默烂掉，下一个 step 跑 scripts/siri-tests-guard.py：
+    #   结构级守护（文件齐备 + 测试字符串索引的 intent/entity/enum 名仍可解析）
+    #   + 金丝雀（工具链出现 AppIntentsTesting 即失败，提醒接回 scheme/CI）。
+    #   测试文件本身**不允许删除或静默降级**。
+    timeout-minutes: 90
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install tools
-        run: brew install swiftlint swiftformat
+      # lint 工具锁版本（2026-09-12）：`brew install` 不锁版本，swiftlint/swiftformat
+      # 规则集随上游最新版漂移，会在无关提交上突然连红。改为固定发布的 release 资产，
+      # 并**自校验版本号**——资产布局或版本不符一律当场失败，绝不静默退回别的版本。
+      #
+      # 资产取舍（已核对 GitHub release 清单，非推测）：
+      #   - SwiftLint.arm64.zip / SwiftLint.amd64.zip / *.msi 是 **Windows** 包
+      #     （解包只得 `swiftlint.exe`），macOS 官方分发只有 SwiftLint.pkg；
+      #     portable_swiftlint.zip 是 Linux 静态二进制——三者都不能用于 macos runner。
+      #   - SwiftFormat 的 swiftformat.zip 是 macOS 二进制（解包得 `swiftformat`）。
+      # 因此 SwiftLint 走 .pkg（sudo installer）+ 动态解析出来的可执行路径，
+      # 而不是写死安装目录（pkg 的 install-location 不保证固定）。
+      - name: Install pinned lint tools
+        env:
+          SWIFTLINT_VERSION: 0.65.1
+          SWIFTFORMAT_VERSION: 0.62.1
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/lintbin"
+          mkdir -p "$BIN"
+
+          # ① SwiftLint：macOS 官方 pkg
+          curl -fsSL -o "$RUNNER_TEMP/SwiftLint.pkg" \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/SwiftLint.pkg"
+          sudo installer -pkg "$RUNNER_TEMP/SwiftLint.pkg" -target /
+          SL_FOUND="$(command -v swiftlint || true)"
+          if [ -z "$SL_FOUND" ]; then
+            SL_FOUND="$(find /usr/local/bin /opt/homebrew/bin /usr/local/swiftlint -maxdepth 2 -type f -name swiftlint 2>/dev/null | head -1)"
+          fi
+          test -n "$SL_FOUND" || { echo "❌ pkg 安装后未找到 swiftlint 可执行文件"; exit 1; }
+
+          # ② SwiftFormat：release zip → 目录内找可执行文件（布局变化也不会静默用错版本）
+          curl -fsSL -o "$RUNNER_TEMP/sf.zip" \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
+          unzip -qo "$RUNNER_TEMP/sf.zip" -d "$RUNNER_TEMP/sf"
+          SF_BIN="$(find "$RUNNER_TEMP/sf" -type f -name swiftformat | head -1)"
+          test -n "$SF_BIN" || { echo "❌ SwiftFormat 发布包内未找到 swiftformat"; exit 1; }
+          chmod +x "$SF_BIN"
+
+          # ③ 版本自校验（不匹配即失败，绝不“差不多就先用”）
+          SL_ACTUAL="$("$SL_FOUND" version)"
+          [ "$SL_ACTUAL" = "$SWIFTLINT_VERSION" ] \
+            || { echo "❌ swiftlint 版本不是 $SWIFTLINT_VERSION，实际：$SL_ACTUAL"; exit 1; }
+          SF_ACTUAL="$("$SF_BIN" --version)"
+          [ "$SF_ACTUAL" = "$SWIFTFORMAT_VERSION" ] \
+            || { echo "❌ swiftformat 版本不是 $SWIFTFORMAT_VERSION，实际：$SF_ACTUAL"; exit 1; }
+
+          ln -sf "$SL_FOUND" "$BIN/swiftlint"
+          ln -sf "$SF_BIN" "$BIN/swiftformat"
+          echo "$BIN" >> "$GITHUB_PATH"
+          "$BIN/swiftlint" version
+          "$BIN/swiftformat" --version
+
+      - name: Guard Siri/AppIntents test line (structural)
+        run: python3 scripts/siri-tests-guard.py
 
       - name: Lint (swiftlint)
         run: swiftlint lint
@@ -93,6 +170,7 @@ jobs:
     # 其中图标类问题可用产物断言抓住：AppIcon.icns / Assets.car 必须在 app 里。
     # 编译级验证无法覆盖布局/行为，macOS 单测 target 后续补齐。
     runs-on: macos-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 

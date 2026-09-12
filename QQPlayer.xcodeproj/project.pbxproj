@@ -129,6 +129,7 @@
 		466C14BA600D4D7497084EF7 /* SyncTransferIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974C894436AF4E578EE2EC08 /* SyncTransferIdentityTests.swift */; };
 		BB85D13CEC074A14850EF54A /* SyncFrameChainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */; };
 		DA6D9D12AC8D47B482852CD9 /* PlaybackAsyncGuardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */; };
+		550DD54B596E4E9E8323273A /* QuarkCookieStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49E84C40C24946AC9BA9B911 /* QuarkCookieStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -307,6 +308,7 @@
 		974C894436AF4E578EE2EC08 /* SyncTransferIdentityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferIdentityTests.swift; sourceTree = "<group>"; };
 		044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameChainTests.swift; sourceTree = "<group>"; };
 		6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackAsyncGuardsTests.swift; sourceTree = "<group>"; };
+		49E84C40C24946AC9BA9B911 /* QuarkCookieStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuarkCookieStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -866,6 +868,7 @@
 				974C894436AF4E578EE2EC08 /* SyncTransferIdentityTests.swift */,
 				044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */,
 				6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */,
+				49E84C40C24946AC9BA9B911 /* QuarkCookieStoreTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1293,6 +1296,7 @@
 				466C14BA600D4D7497084EF7 /* SyncTransferIdentityTests.swift in Sources */,
 				BB85D13CEC074A14850EF54A /* SyncFrameChainTests.swift in Sources */,
 				DA6D9D12AC8D47B482852CD9 /* PlaybackAsyncGuardsTests.swift in Sources */,
+				550DD54B596E4E9E8323273A /* QuarkCookieStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1743,6 +1747,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QQPlayerMac-Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "用于发现并连接同一局域网内的 QQPlayer 设备（Mac/Windows/NAS），以配对并同步音乐库。";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1768,6 +1774,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QQPlayerMac-Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "用于发现并连接同一局域网内的 QQPlayer 设备（Mac/Windows/NAS），以配对并同步音乐库。";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

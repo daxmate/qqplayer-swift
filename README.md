@@ -48,7 +48,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 **工程**
 - 共享 Core 层：**132 个服务 / 模型文件直接共享给双平台**（`Services` / `Models` / `Helpers` / `Sync` 共 136 个，其中 132 个进 macOS 构建：117 个无平台分支 + 15 个含 `#if os(iOS)` 隔离段），4 个 iOS 专属 Core 文件（沙盒迁移执行器、中断恢复策略、iOS 同步浏览 / 被动应答）不进 macOS 构建
-- **936 个自动化测试用例**（86 个测试文件 / 100 个 suite，Swift Testing）+ GitHub Actions CI（lint/format + iOS 单测 + macOS 构建与资源断言 + 编译警告零容忍）
+- **自动化测试**（Swift Testing）：**104 个测试文件**（口径：`ls QQPlayerTests/*.swift | wc -l`，含 Fixtures/Mock 等辅助文件；104/104 全部注册进 QQPlayerTests target 的 Sources phase）。用例/suite 数以 CI 实测为准——最近一次实测 **1115 个用例 / 130 个 suite** 全过（run 34687194257），计数口径为 Swift Testing 日志行 `Test run with N tests in M suites passed`（XCTest 汇总行 `Executed 0 tests` 是空壳统计，不代表覆盖）+ GitHub Actions CI（lint/format + iOS 单测 + macOS 构建与资源断言 + 编译警告零容忍）
 - 5 语言本地化：简体中文 / 繁体中文 / English / Français / Русский
 
 ---
@@ -280,9 +280,9 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 - macOS target 通过显式文件白名单（membershipExceptions，去重后 178 个文件条目）只编译 Mac/ + 共享 Core，iOS 视图不进入 macOS 构建
 
 ### 测试与 CI
-- QQPlayerTests：**83 个测试文件 / 936 个用例 / 100 个 suite**，覆盖共享 Core 与双平台决策逻辑（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析、局域网同步全链等）
+- QQPlayerTests：**104 个测试文件**（口径：`ls QQPlayerTests/*.swift | wc -l`，含 Fixtures/Mock 辅助文件；注册完整性 104/104），用例与 suite 数以 CI 日志为准（最近实测 **1115 个用例 / 130 个 suite**，run 34687194257），覆盖共享 Core 与双平台决策逻辑（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析、局域网同步全链等）
 - 无模拟器 harness：`scripts/run-local-sync-tests.sh` 用 `swiftc` 直编生产源码（Sync 纯逻辑 + 扫描器）真跑断言，覆盖帧编解码 / 路径解析 / 应答器计划 / 控制器状态机 / 端到端场景
-- CI（GitHub Actions）三个环节：① swiftlint + swiftformat ② iOS 模拟器 `xcodebuild test`（936 用例）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step
+- CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（最近实测 1115 用例）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step
 - 本地提交钩子（`scripts/git-hooks/pre-commit`）同样拦截增量编译警告，不等 CI
 
 ---
@@ -386,10 +386,11 @@ QQPlayer/
 PlayerWidget/                 # iOS 主屏幕小组件
 Share/                        # iOS 分享扩展
 SiriIntentsExtension/         # iOS Siri 意图扩展
-QQPlayerTests/                # Swift Testing 单测（83 测试文件 + Fixtures/Mock，936 用例）
+QQPlayerTests/                # Swift Testing 单测（104 测试文件 + Fixtures/Mock；用例数口径见「测试与 CI」）
 QQPlayerSiriTests/            # Siri 集成测试（需 Xcode 27 SDK，CI 已豁免）
-scripts/                      # 工程工具（xcbuild.sh 统一构建入口 / add-test-file.py / add-grdb-to-tests.py / gen-zh-hant.py /
-                              #   pbxproj-membership.py / run-local-sync-tests.sh / sync-harness / git-hooks）
+scripts/                      # 工程工具（xcbuild.sh 统一构建入口 / add-test-file.py / gen-zh-hant.py /
+                              #   pbxproj-membership.py / run-local-sync-tests.sh / siri-tests-guard.py / sync-harness / git-hooks）
+#   （add-grdb-to-tests.py 遗留一次性工具，目的已达成，等 maintainer 清理，见文件头说明）
 .env.template                 # 可选 API Key 模板（复制为 .env）
 build.sh                      # iOS 一键构建 / 真机安装脚本
 .github/workflows/ci.yml      # CI：lint/format + iOS 单测 + macOS 构建与资源断言（含编译警告零容忍）

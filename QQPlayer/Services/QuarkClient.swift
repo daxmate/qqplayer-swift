@@ -10,9 +10,13 @@
 //  - 扫码登录：login_qrcode()（uop.quark.cn，浏览器 UA）生成二维码内容 →
 //    login_status(qr_id) 由调用方每 2s 轮询（本层只做单次查询）→ 扫码成功拿
 //    service_ticket → GET pan.quark.cn/account/info 换会话 Cookie → 持久化到本地文件
-//  - Cookie 持久化：会话 cookie 存 Application Support/QQPlayerMac/quark_cookies.json
-//    （0600 权限原子写；web _persist_cookies 语义）。每次请求都从文件重载 cookie，
+//  - Cookie 持久化：会话 cookie 存系统钥匙串（kSecClassGenericPassword，
+//    service/account 见 QuarkKeychainCookieStore；与 SyncIdentity 同步私钥同款
+//    系统安全存储，不再落明文盘）。每次请求都从钥匙串重载 cookie，
 //    登录态变更（扫码/退出）立即可见（web _get_drive_client 语义）
+//  - 旧版明文文件（Application Support/QQPlayerMac/quark_cookies.json）首次读取时
+//    迁入钥匙串并安全删除（migrateLegacyCookieFileIfNeeded）；迁移/钥匙串失败有
+//    日志，并保留旧文件降级可读（不静默丢登录态）
 //  - 分享解析：resolve_share(share_url) 匿名列文件（sharepage/token + sharepage/detail，
 //    目录型分享递归进入深度 ≤3、翻页、fid 去重）；分享失败返回空数组不抛（web 语义）
 //  - ⚠️ stoken 绑定 share_fid_token：下载直链必须用同一次 resolve_share_verbose 返回的
@@ -30,7 +34,7 @@
 //
 //  结构与 MusicBrainzClient 同款：struct + init 注入 protocolClasses（URLProtocol mock）
 //  + sleep（预留节流钩子；web quark provider 无内部 sleep——扫码 2s 轮询由调用方负责，
-//  本层 sleep 仅对齐既有骨架，暂无非零调用点）+ cookieFileURL 注入（便于测试）。
+//  本层 sleep 仅对齐既有骨架，暂无非零调用点）+ cookieStore 注入（便于测试）。
 //
 //  纯逻辑抽到 QuarkLogic（防回归单测）：share token 提取、扩展名、目录判定、
 //  pick_file 降级决策、Set-Cookie 解析、cookie 序列化/反序列化（含损坏兜底）。
@@ -356,6 +360,168 @@ private final class QuarkQRTokenBox: @unchecked Sendable {
     }
 }
 
+/// 旧明文 cookie 文件迁移的「只跑一次」旗标（进程内；class 引用语义，
+/// 保证同一 QuarkClient 值拷贝间共享；多次调用只有第一次返回 true）。
+private final class QuarkLegacyMigrationState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
+    func beginOnce() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !done else { return false }
+        done = true
+        return true
+    }
+}
+
+/// 旧版明文 cookie 文件 → 系统安全存储的一次性迁移（与 QuarkClient 解耦，便于单测）。
+/// 安全性要点：凭据一旦成功写入钥匙串，旧明文文件立即安全删除；
+/// 写入失败时**保留**旧文件（降级可读，不静默丢登录态），错误描述带回给调用方记日志。
+enum QuarkCookieMigration {
+    enum Outcome: Equatable {
+        /// 旧文件不存在，无需迁移
+        case noLegacyFile
+        /// 已迁入安全存储并删除明文文件（迁移项数）
+        case migrated(Int)
+        /// 安全存储已有凭据：仅清理残留明文文件
+        case alreadyInStore
+        /// 旧文件空/损坏：无凭据可迁，直接删除
+        case discardedEmptyLegacy
+        /// 写入安全存储失败：**保留**明文文件，带上错误描述
+        case failed(String)
+    }
+
+    static func migrateIfNeeded(
+        store: any QuarkCookieStoring,
+        legacyFileURL: URL
+    ) -> Outcome {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: legacyFileURL.path) else { return .noLegacyFile }
+        guard let data = try? Data(contentsOf: legacyFileURL),
+              let jar = QuarkLogic.cookies(from: data), !jar.isEmpty else {
+            // 旧文件为空/损坏：无凭据可迁
+            removeFileSecurely(legacyFileURL)
+            return .discardedEmptyLegacy
+        }
+        if (try? store.loadCookiesData()) != nil {
+            // 安全存储已有凭据：旧明文文件已无用（残留 = 历史遗留）
+            removeFileSecurely(legacyFileURL)
+            return .alreadyInStore
+        }
+        guard let json = QuarkLogic.cookiesData(jar) else {
+            return .failed("cookie 序列化失败")
+        }
+        do {
+            try store.saveCookiesData(json)
+            removeFileSecurely(legacyFileURL)
+            return .migrated(jar.count)
+        } catch {
+            return .failed(String(describing: error))
+        }
+    }
+
+    /// 安全删除明文文件：先用随机字节覆盖原长度（best-effort——APFS 写时复制下
+    /// 不保证物理归零），再删除。任意步骤失败都只忽略，不影响主流程。
+    static func removeFileSecurely(_ url: URL) {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        if let attrs = try? fileManager.attributesOfItem(atPath: url.path),
+           let size = (attrs[.size] as? NSNumber)?.intValue, size > 0,
+           let handle = try? FileHandle(forWritingTo: url) {
+            var noise = Data(count: size)
+            noise.withUnsafeMutableBytes { buffer in
+                if let base = buffer.baseAddress {
+                    _ = SecRandomCopyBytes(kSecRandomDefault, size, base)
+                }
+            }
+            do {
+                try handle.write(contentsOf: noise)
+                try handle.synchronize()
+                try handle.close()
+            } catch {
+                try? handle.close()
+            }
+        }
+        try? fileManager.removeItem(at: url)
+    }
+}
+
+// MARK: - Cookie 持久化后端（明文文件 → 系统安全存储）
+
+/// 会话 cookie 持久化抽象。生产走系统钥匙串（QuarkKeychainCookieStore）；
+/// 测试注入文件后端（QuarkFileCookieStore）或故障桩，避免测试触碰真实钥匙串。
+protocol QuarkCookieStoring: AnyObject {
+    /// 读原始 cookie JSON；无条目返回 nil。抛错 = 系统异常（非「找不到」）。
+    func loadCookiesData() throws -> Data?
+    /// 写原始 cookie JSON（upsert 语义：已存在则整体替换）。
+    func saveCookiesData(_ data: Data) throws
+    /// 删条目；不存在视为成功（幂等）。
+    func deleteCookies() throws
+}
+
+/// 钥匙串实现：复用同步身份同一套 Security 封装（SystemKeychainStore），
+/// 条目 service "com.daxmate.qqplayer.quark" / account "cookies"。
+/// 夸克会话 cookie 可读取用户网盘文件，与同步私钥同属凭据，一律不落明文盘。
+final class QuarkKeychainCookieStore: QuarkCookieStoring {
+    static let service = "com.daxmate.qqplayer.quark"
+    static let account = "cookies"
+
+    private let keychain: SystemKeychainStore
+
+    init(keychain: SystemKeychainStore = SystemKeychainStore()) {
+        self.keychain = keychain
+    }
+
+    func loadCookiesData() throws -> Data? {
+        try keychain.loadData(service: Self.service, account: Self.account)
+    }
+
+    func saveCookiesData(_ data: Data) throws {
+        try keychain.saveData(data, service: Self.service, account: Self.account)
+    }
+
+    func deleteCookies() throws {
+        try keychain.deleteData(service: Self.service, account: Self.account)
+    }
+}
+
+/// 文件实现：**仅供测试注入**（生产不再写明文 cookie 文件）。
+/// 写入语义与旧行为一致（0600 + .tmp 原子替换），保证既有回归用例语义不变。
+final class QuarkFileCookieStore: QuarkCookieStoring {
+    let fileURL: URL
+
+    init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
+    func loadCookiesData() throws -> Data? {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+        return try Data(contentsOf: fileURL)
+    }
+
+    func saveCookiesData(_ data: Data) throws {
+        let fileManager = FileManager.default
+        let directory = fileURL.deletingLastPathComponent()
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        // 旧实现：写同目录 .tmp → chmod 0600 → replace/move
+        let tmpURL = directory.appendingPathComponent("quark_cookies.json.tmp")
+        try data.write(to: tmpURL)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: tmpURL.path
+        )
+        if fileManager.fileExists(atPath: fileURL.path) {
+            _ = try fileManager.replaceItemAt(fileURL, withItemAt: tmpURL)
+        } else {
+            try fileManager.moveItem(at: tmpURL, to: fileURL)
+        }
+    }
+
+    func deleteCookies() throws {
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+}
+
 // MARK: - 客户端
 
 struct QuarkClient {
@@ -384,9 +550,11 @@ struct QuarkClient {
     static let maxShareDepth = 3              // 目录递归深度上限，防炸
     static let sharePageSize = 50
 
-    /// Cookie 文件默认路径：Application Support/QQPlayerMac/quark_cookies.json
+    /// 旧版明文 cookie 文件默认路径：Application Support/QQPlayerMac/quark_cookies.json
     /// （与 DatabasePathResolver macDatabaseURL 同目录惯例；web 存 Application
-    /// Support/qqplayer——Mac 端沿用 QQPlayerMac 目录）。路径注入便于测试。
+    /// Support/qqplayer——Mac 端沿用 QQPlayerMac 目录）。
+    /// ⚠️ **已不再是主存储**：仅作迁移来源与降级读路径（主存储在钥匙串
+    /// QuarkKeychainCookieStore）；路径注入便于测试。
     /// ⚠️ 本默认值仅供 macOS 运行期使用：iOS 沙盒无 homeDirectoryForCurrentUser
     /// （macOS-only API），fallback 用临时目录保证双平台可编译（iOS 不调用默认值）。
     static func defaultCookieFileURL() -> URL {
@@ -409,8 +577,15 @@ struct QuarkClient {
     /// protocolClasses（MusicBrainzClient 同款）。
     private let protocolClasses: [AnyClass]?
 
-    /// Cookie 文件路径（注入便于测试；默认 App Support/QQPlayerMac/quark_cookies.json）
-    let cookieFileURL: URL
+    /// 会话 cookie 持久化后端（默认系统钥匙串；测试注入文件/故障桩）。
+    private let cookieStore: any QuarkCookieStoring
+
+    /// 旧版明文 cookie 文件路径：仅作**迁移来源**与降级读路径；
+    /// nil = 不迁移（测试注入文件后端时）。默认 App Support/QQPlayerMac/quark_cookies.json。
+    let legacyCookieFileURL: URL?
+
+    /// 旧文件迁移只尝试一次（避免每次请求都扫盘）
+    private let legacyMigrationState = QuarkLegacyMigrationState()
 
     /// qr_id → token 进程内映射（web 模块级 _QR_TOKENS）
     private let qrTokens = QuarkQRTokenBox()
@@ -419,11 +594,13 @@ struct QuarkClient {
         sleep: @escaping (TimeInterval) async throws -> Void = {
             try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000))
         },
-        cookieFileURL: URL = QuarkClient.defaultCookieFileURL(),
+        cookieStore: any QuarkCookieStoring = QuarkKeychainCookieStore(),
+        legacyCookieFileURL: URL? = QuarkClient.defaultCookieFileURL(),
         protocolClasses: [AnyClass]? = nil
     ) {
         self.sleep = sleep
-        self.cookieFileURL = cookieFileURL
+        self.cookieStore = cookieStore
+        self.legacyCookieFileURL = legacyCookieFileURL
         self.protocolClasses = protocolClasses
     }
 
@@ -526,7 +703,7 @@ struct QuarkClient {
     /// 非 200 / success=false → 清掉失效 cookie（web 手动检查状态码，无 raise）；
     /// JSON 解析失败/网络抖动 → 保留文件下次再试（web except ValueError/HTTPError 对齐）。
     func loginState() async -> (loggedIn: Bool, nickname: String?) {
-        guard cookieFileExists else {
+        guard hasStoredCookies else {
             return (false, nil)
         }
         let url = Self.url(Self.panBase, "/account/info", query: [:])
@@ -639,7 +816,7 @@ struct QuarkClient {
         shareFidToken: String,
         stoken: String
     ) async throws -> QuarkDownload {
-        guard cookieFileExists else {
+        guard hasStoredCookies else {
             throw QuarkClientError.loginRequired
         }
         guard let pwdID = QuarkLogic.shareToken(from: shareURL) else {
@@ -723,7 +900,7 @@ struct QuarkClient {
     /// GET /1/clouddrive/config（alist#830 方案），服务端会重新下发 __puus；
     /// 只有确认重新下发才持久化，避免误删旧值。失败静默（web 语义）。
     func refreshPUUS() async {
-        guard cookieFileExists else { return }
+        guard hasStoredCookies else { return }
         do {
             var jar = loadCookies()
             jar.removeValue(forKey: "__puus")   // 不带 __puus 请求，触发服务端重发
@@ -869,44 +1046,77 @@ struct QuarkClient {
         )
     }
 
-    // MARK: - Cookie 文件存取（web _load_cookies_into / _persist_cookies / _clear_cookie_file）
+    // MARK: - Cookie 存取（web _load_cookies_into / _persist_cookies / _clear_cookie_file）
 
-    private var cookieFileExists: Bool {
-        FileManager.default.fileExists(atPath: cookieFileURL.path)
+    private var hasStoredCookies: Bool {
+        if (try? cookieStore.loadCookiesData()) != nil { return true }
+        // 除級：钥匙串失败时看旧明文文件（迁移失败会保留该文件）
+        guard let legacy = legacyCookieFileURL else { return false }
+        return FileManager.default.fileExists(atPath: legacy.path)
     }
 
-    /// 从 cookie 文件重载（web 每次请求都重载，登录态变更立即可见）；
-    /// 文件缺失/损坏/非字符串值 → 空字典（web except (OSError, ValueError) return 对齐）
+    /// 从安全存储重载（web 每次请求都重载，登录态变更立即可见）；
+    /// 条目缺失/损坏/非字符串值 → 空字典（web except (OSError, ValueError) return 对齐）。
+    /// 除級顺序：钥匙串 → 旧明文文件（迁移失败时保留的可读副本）→ 空。
     private func loadCookies() -> [String: String] {
-        guard let data = try? Data(contentsOf: cookieFileURL) else { return [:] }
-        return QuarkLogic.cookies(from: data) ?? [:]
+        migrateLegacyCookieFileIfNeeded()
+        if let data = try? cookieStore.loadCookiesData(), let jar = QuarkLogic.cookies(from: data) {
+            return jar
+        }
+        if let legacy = legacyCookieFileURL,
+           let data = try? Data(contentsOf: legacy),
+           let jar = QuarkLogic.cookies(from: data) {
+            return jar
+        }
+        return [:]
     }
 
-    /// 持久化 cookie 文件（0600 权限，原子写入；web _persist_cookies 语义：
-    /// 写同目录 .tmp → chmod 0600 → os.replace）
+    /// 持久化 cookie（写入钥匙串；web _persist_cookies 语义：整体替换）。
+    /// 写失败不降级为明文盘写入（凭据不落明文）——记日志后上抛，由调用方决定。
     private func saveCookies(_ cookies: [String: String]) throws {
         guard let data = QuarkLogic.cookiesData(cookies) else {
             throw QuarkClientError.invalidResponse
         }
-        let fileManager = FileManager.default
-        let directory = cookieFileURL.deletingLastPathComponent()
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        // web：COOKIE_FILE.with_suffix(".json.tmp")
-        let tmpURL = directory.appendingPathComponent("quark_cookies.json.tmp")
-        try data.write(to: tmpURL)
-        try fileManager.setAttributes(
-            [.posixPermissions: 0o600], ofItemAtPath: tmpURL.path
-        )
-        if fileManager.fileExists(atPath: cookieFileURL.path) {
-            _ = try fileManager.replaceItemAt(cookieFileURL, withItemAt: tmpURL)
-        } else {
-            try fileManager.moveItem(at: tmpURL, to: cookieFileURL)
+        do {
+            try cookieStore.saveCookiesData(data)
+        } catch {
+            print("❌ [夸克会话] 写入钥匙串失败（不落明文降级）: \(error)")
+            throw error
         }
     }
 
-    /// 删除 cookie 文件（web _clear_cookie_file，missing_ok）
+    /// 删除已存 cookie（web _clear_cookie_file，missing_ok）
     private func deleteCookieFile() {
-        try? FileManager.default.removeItem(at: cookieFileURL)
+        do {
+            try cookieStore.deleteCookies()
+        } catch {
+            print("⚠️ [夸克会话] 删除钥匙串条目失败: \(error)")
+        }
+        // 旧明文文件存在时一并清掉（已失效凭据不应继续留在盘上）
+        if let legacy = legacyCookieFileURL {
+            QuarkCookieMigration.removeFileSecurely(legacy)
+        }
+    }
+
+    // MARK: - 明文文件迁移（旧版 → 钥匙串）
+
+    /// 旧版明文 cookie 文件首次读取时迁入钥匙串，迁完安全删除文件（细节见
+    /// QuarkCookieMigration；本方法只保证只跑一次 + 落日志）。
+    private func migrateLegacyCookieFileIfNeeded() {
+        guard let legacy = legacyCookieFileURL else { return }
+        guard legacyMigrationState.beginOnce() else { return }
+        switch QuarkCookieMigration.migrateIfNeeded(store: cookieStore, legacyFileURL: legacy) {
+        case .noLegacyFile:
+            break
+        case let .migrated(count):
+            print("✅ [夸克会话] 旧明文 cookie 已迁入钥匙串（\(count) 项），已删除明文文件")
+        case .alreadyInStore:
+            print("🔒 [夸克会话] 钥匙串已有凭据，已清理残留明文文件")
+        case .discardedEmptyLegacy:
+            print("🔒 [夸克会话] 旧明文文件无可迁移凭据，已删除")
+        case let .failed(message):
+            print("⚠️ [夸克会话] 迁移钥匙串失败，保留明文文件降级可读: \(message)")
+        }
     }
 
     // MARK: - 请求头（web 逐字段）

@@ -1,0 +1,9 @@
+/*
+  InfoPlist.strings (Français)
+  QQPlayer
+
+  Localise les demandes d'autorisation d'Info.plist (QQPlayer/Info.plist).
+*/
+
+"NSCameraUsageDescription" = "Scannez un code QR pour appairer et synchroniser vos propres appareils QQPlayer (uniquement pour les appairages que vous autorisez).";
+"NSLocalNetworkUsageDescription" = "Sert à détecter et connecter les appareils QQPlayer (Mac/Windows/NAS) du même réseau local, afin d'appairer et synchroniser votre bibliothèque musicale.";
