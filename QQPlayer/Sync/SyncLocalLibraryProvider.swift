@@ -237,6 +237,7 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
 
     /// 拆除接线（会话关闭 / 服务停止）：manifest 提供者置 nil（未接线 → 不应答，
     /// 绝不回空表）+ 中止进行中的推送。
+    /// 两个挂接组件都显式让出会话链位（各自释放也会自动摘除，这里只是不等 GC 时机）。
     func detach() {
         lock.lock()
         let peer = manifestPeer
@@ -244,7 +245,9 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
         manifestPeer = nil
         self.responder = nil
         lock.unlock()
+        peer?.detach()
         peer?.localManifestProvider = nil
+        responder?.detach()
         responder?.cancel()
     }
 

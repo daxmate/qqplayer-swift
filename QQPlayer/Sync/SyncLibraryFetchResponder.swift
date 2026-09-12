@@ -27,8 +27,9 @@
 //  内存回环测试下整条链是同步递归的（与 M2b 既有风格一致），真实网络下每步由
 //  ack 异步驱动。
 //
-//  会话槽位链式挂接（先己后彼）：onApplicationFrame 收 sync_fetch_request，
-//  onClosed 清服务态；结束用 enabled 开关静默自己，不拆链。
+//  会话槽位挂接统一走 `SyncSessionAttachment`（分发链，见 SyncPeerSession+Frames.swift）：
+//  onApplicationFrame 收 sync_fetch_request，onClosed 清服务态；本实例释放只静默自己，
+//  **不牵连链上其它 handler**（🟡F1）。
 //
 
 import Foundation
@@ -62,11 +63,9 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     /// sync_fetch_request 载荷解码失败（协议违例，诊断用）。
     var onDecodeFailure: ((String) -> Void)?
 
-    // MARK: 会话槽位链式挂接
+    // MARK: 会话槽位挂接（分发链）
 
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
-    private var forwardingEnabled = true
+    private var attachment: SyncSessionAttachment?
 
     // MARK: 锁保护状态
 
@@ -111,7 +110,12 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
         self.fileManager = fileManager
         self.contentHashProvider = contentHashProvider
         self.lyricsFileNameProvider = lyricsFileNameProvider
-        attachHandlers()
+        attachment = SyncSessionAttachment(
+            session: session,
+            owner: self,
+            onFrame: { [weak self] frame in self?.handleInboundFrame(frame) },
+            onClosed: { [weak self] _ in self?.handleSessionClosed() }
+        )
     }
 
     /// 是否正在服务一个请求（诊断/测试用）。
@@ -410,26 +414,9 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
         lock.unlock()
     }
 
-    // MARK: 会话槽位挂接（链式：先己后彼；结束用开关静默，不拆链）
-
-    private func attachHandlers() {
-        priorAppHandler = session.onApplicationFrame
-        priorClosedHandler = session.onClosed
-        session.onApplicationFrame = { [weak self] frame in
-            guard let self, self.forwardingEnabled else {
-                self?.priorAppHandler?(frame)
-                return
-            }
-            self.handleInboundFrame(frame)
-            self.priorAppHandler?(frame)
-        }
-        session.onClosed = { [weak self] reason in
-            guard let self, self.forwardingEnabled else {
-                self?.priorClosedHandler?(reason)
-                return
-            }
-            self.handleSessionClosed()
-            self.priorClosedHandler?(reason)
-        }
+    /// 停止收帧（会话关闭 / 服务停止）：静默自己并让出链位（幂等）。
+    /// 不调用也会在本实例释放时自动摘除。与 `cancel()`（中止进行中的推送）互不依赖。
+    func detach() {
+        attachment?.detach()
     }
 }

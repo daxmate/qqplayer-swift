@@ -44,55 +44,113 @@ extension DeviceStore: SyncTrustStore {
 
 /// Host 侧一次性 QR nonce 池：UI 展示"添加设备"QR 时注册 nonce，
 /// 收到 pair_request 后逐一验签，命中即消耗（防重放）。线程安全。
+///
+/// 🟡F2 修复：nonce 有**有效期**（缺省与扫码侧状态机 `PairingStateMachine` 同一常量），
+/// 过期即作废（惰性清理：注册 / 取数 / 验签时顺手清）。修复前无 TTL：`removeAll()`
+/// 全仓无调用点，展示过的旧 QR 在 App 生命周期内一直可以发起配对。
+/// 清理入口见 `SyncHostCenter`（展示新码 / 配对完成 / 停止监听）。
 final class SyncPairingNonceRegistry: @unchecked Sendable {
-    private let lock = NSLock()
-    private var pending: [Data] = []
+    /// 缺省有效期：取配对状态机的缺省 TTL（单一事实源，避免两处各写一个 300 漂移）。
+    static let defaultNonceTTL: TimeInterval = PairingStateMachine().nonceTTL
 
-    /// 当前未消耗 nonce 数。
+    private struct Entry {
+        let nonce: Data
+        let registeredAt: Date
+    }
+
+    private let lock = NSLock()
+    private let nonceTTL: TimeInterval
+    private let now: () -> Date
+    private var pending: [Entry] = []
+
+    /// - Parameters:
+    ///   - nonceTTL: 有效期（秒）。
+    ///   - now: 时钟（测试注入假时钟；缺省系统时间）。
+    init(
+        nonceTTL: TimeInterval = SyncPairingNonceRegistry.defaultNonceTTL,
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.nonceTTL = nonceTTL
+        self.now = now
+    }
+
+    /// 当前未过期的 nonce 数（顺手清过期项）。
     var pendingCount: Int {
         lock.lock()
         defer { lock.unlock() }
+        purgeExpiredLocked()
         return pending.count
     }
 
-    /// 注册一个 nonce（去重幂等）。
+    /// 注册一个 nonce。重复注册同一个 = 刷新有效期（同一张码重新展示的场景）；
+    /// 空 nonce 忽略。
     func register(_ nonce: Data) {
+        guard !nonce.isEmpty else { return }
         lock.lock()
         defer { lock.unlock() }
-        guard !nonce.isEmpty, !pending.contains(nonce) else { return }
-        pending.append(nonce)
+        purgeExpiredLocked()
+        let stamp = now()
+        if let index = pending.firstIndex(where: { $0.nonce == nonce }) {
+            pending[index] = Entry(nonce: nonce, registeredAt: stamp)
+            return
+        }
+        pending.append(Entry(nonce: nonce, registeredAt: stamp))
     }
 
     /// 消耗一个 nonce（配对完成后作废）。
     func consume(_ nonce: Data) {
         lock.lock()
         defer { lock.unlock() }
-        pending.removeAll { $0 == nonce }
+        pending.removeAll { $0.nonce == nonce }
     }
 
-    /// 清空（UI 关闭配对流）。
+    /// 作废指定 nonce（展示新码 → 旧码立即失效，不等 TTL）。
+    func remove(_ nonce: Data) {
+        consume(nonce)
+    }
+
+    /// 清空（配对流关闭 / 停止监听）。
     func removeAll() {
         lock.lock()
         defer { lock.unlock() }
         pending.removeAll()
     }
 
-    /// 用 PairRequest 的公钥对每个 pending nonce 验签，首个命中即消耗并返回；
-    /// 全部不中返回 nil（= 无效/过期 nonce 签名）。
+    /// 清理已过期 nonce，返回清掉的条数（诊断/测试用）。
+    @discardableResult
+    func purgeExpired() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return purgeExpiredLocked()
+    }
+
+    /// 用 PairRequest 的公钥对每个**未过期**的 pending nonce 验签，首个命中即消耗并返回；
+    /// 全部不中（含全部已过期）返回 nil（= 无效/过期 nonce 签名 → 会话按
+    /// `pairingRejected` 明确失败，不静默成功）。
     func matchingNonce(for request: PairRequest) -> Data? {
         lock.lock()
         defer { lock.unlock() }
+        purgeExpiredLocked()
         guard let publicKeyData = Data(base64Encoded: request.clientPublicKey),
               let signature = Data(base64Encoded: request.nonceSignature)
         else { return nil }
         guard let publicKey = try? Curve25519.Signing.PublicKey(rawRepresentation: publicKeyData) else {
             return nil
         }
-        for nonce in pending where publicKey.isValidSignature(signature, for: nonce) {
-            pending.removeAll { $0 == nonce }
-            return nonce
+        for entry in pending where publicKey.isValidSignature(signature, for: entry.nonce) {
+            pending.removeAll { $0.nonce == entry.nonce }
+            return entry.nonce
         }
         return nil
+    }
+
+    /// 锁内：清掉已过期项（调用方持锁）。
+    @discardableResult
+    private func purgeExpiredLocked() -> Int {
+        let stamp = now()
+        let before = pending.count
+        pending.removeAll { stamp.timeIntervalSince($0.registeredAt) > nonceTTL }
+        return before - pending.count
     }
 }
 

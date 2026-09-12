@@ -53,9 +53,8 @@ final class SyncPeerLibraryClient: @unchecked Sendable {
     private var nextRequestID: UInt64 = 1
     private var isActive = true
 
-    /// 会话槽位链式挂接
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
+    /// 会话槽位挂接（分发链）
+    private var attachment: SyncSessionAttachment?
 
     /// 收到「无对应在途请求」的响应（重复/过期；仅诊断，不参与协议）。
     var onUnexpectedResponse: ((SyncPeerLibraryResponsePayload) -> Void)?
@@ -67,7 +66,18 @@ final class SyncPeerLibraryClient: @unchecked Sendable {
     init(session: SyncPeerSession, timeout: TimeInterval = 10) {
         self.session = session
         self.timeout = timeout
-        attachHandlers()
+        attachment = SyncSessionAttachment(
+            session: session,
+            owner: self,
+            onFrame: { [weak self] frame in self?.handleInboundFrameIfActive(frame) },
+            onClosed: { [weak self] _ in self?.handleSessionClosed() }
+        )
+    }
+
+    /// 停止收帧（会话关闭 / 本实例退役）：静默自己并让出链位（幂等）。
+    /// 不调用也会在本实例释放时自动摘除。
+    func detach() {
+        attachment?.detach()
     }
 
     deinit {
@@ -210,6 +220,19 @@ final class SyncPeerLibraryClient: @unchecked Sendable {
         }
     }
 
+    private func handleInboundFrameIfActive(_ frame: SyncFrame) {
+        lock.lock()
+        let active = isActive
+        lock.unlock()
+        guard active else { return }
+        handleInboundFrame(frame)
+    }
+
+    private func handleSessionClosed() {
+        failAllPending(.sessionClosed)
+        onSessionClosed?()
+    }
+
     private func handleInboundFrame(_ frame: SyncFrame) {
         guard frame.type == .peerLibraryResponse else { return }
         guard let response = try? SyncPeerLibraryCodec.decode(
@@ -235,35 +258,6 @@ final class SyncPeerLibraryClient: @unchecked Sendable {
         lock.unlock()
         for waiter in waiters {
             waiter.resume(throwing: error)
-        }
-    }
-
-    // MARK: 会话槽位挂接（链式：先己后彼；不拆链）
-
-    private func attachHandlers() {
-        lock.lock()
-        priorAppHandler = session.onApplicationFrame
-        priorClosedHandler = session.onClosed
-        lock.unlock()
-        session.onApplicationFrame = { [weak self] frame in
-            guard let self else { return }
-            self.lock.lock()
-            let enabled = self.isActive
-            let prior = self.priorAppHandler
-            self.lock.unlock()
-            if enabled {
-                self.handleInboundFrame(frame)
-            }
-            prior?(frame)
-        }
-        session.onClosed = { [weak self] reason in
-            guard let self else { return }
-            self.lock.lock()
-            let prior = self.priorClosedHandler
-            self.lock.unlock()
-            self.failAllPending(.sessionClosed)
-            self.onSessionClosed?()
-            prior?(reason)
         }
     }
 }

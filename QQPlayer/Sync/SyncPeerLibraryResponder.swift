@@ -13,9 +13,9 @@
 //  - **钳制在应答侧**：limit 1...500、offset >= 0（请求来自对端 = 不可信输入）。
 //  - 摘要（曲目数/总大小）随每次响应返回（UI 顶部展示不依赖分页）。
 //
-//  线程：会话线程（NW 队列）同步驱动；无内部可变状态，故无需锁。
-//  会话槽位链式挂接（先己后彼；结束时用开关静默自己，不拆链）——与
-//  `SyncManifestPeer` / `SyncLibraryFetchResponder` 同风格。
+//  线程：会话线程（NW 队列）同步驱动；无内部可变状态（已无锁）。
+//  会话槽位挂接统一走 `SyncSessionAttachment`（分发链，见 SyncPeerSession+Frames.swift）：
+//  本实例释放只静默自己，**不牵连链上其它 handler**（🟡F1）。
 //
 
 import Foundation
@@ -32,23 +32,24 @@ final class SyncPeerLibraryResponder: @unchecked Sendable {
     /// 已回应答（测试/诊断用）。
     var onResponseSent: ((SyncPeerLibraryResponsePayload) -> Void)?
 
-    // MARK: 会话槽位链式挂接
+    // MARK: 会话槽位挂接（分发链）
 
-    private let lock = NSLock()
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var forwardingEnabled = true
+    private var attachment: SyncSessionAttachment?
 
     init(session: SyncPeerSession, catalogProvider: @escaping () -> SyncPeerLibraryCatalog) {
         self.session = session
         self.catalogProvider = catalogProvider
-        attachHandlers()
+        attachment = SyncSessionAttachment(
+            session: session,
+            owner: self,
+            onFrame: { [weak self] frame in self?.handleInboundFrame(frame) }
+        )
     }
 
-    /// 停止应答（会话关闭 / 服务停止）：静默自己并让出链位（不拆链）。
+    /// 停止应答（会话关闭 / 服务停止）：静默自己并让出链位（幂等）。
+    /// 不调用也会在本实例释放时自动摘除。
     func detach() {
-        lock.lock()
-        forwardingEnabled = false
-        lock.unlock()
+        attachment?.detach()
     }
 
     // MARK: 帧入口（会话 onApplicationFrame 转发）
@@ -73,24 +74,5 @@ final class SyncPeerLibraryResponder: @unchecked Sendable {
         // 会话已断/未就绪：发不出去也只能忽略（不抛，不影响会话状态机）
         try? session.sendApplicationFrame(type: .peerLibraryResponse, payload: payload)
         onResponseSent?(response)
-    }
-
-    // MARK: 会话槽位挂接（链式：先己后彼；结束用开关静默，不拆链）
-
-    private func attachHandlers() {
-        lock.lock()
-        priorAppHandler = session.onApplicationFrame
-        lock.unlock()
-        session.onApplicationFrame = { [weak self] frame in
-            guard let self else { return }
-            self.lock.lock()
-            let enabled = self.forwardingEnabled
-            let prior = self.priorAppHandler
-            self.lock.unlock()
-            if enabled {
-                self.handleInboundFrame(frame)
-            }
-            prior?(frame)
-        }
     }
 }

@@ -71,6 +71,10 @@ final class SyncHostCenter: ObservableObject {
     /// 已 attach 的 ready 会话（同步控制面读）。会话关闭 / stop 后为 nil。
     private(set) var activeSession: SyncPeerSession?
 
+    /// 当前展示中的 QR nonce（🟡F2）：展示新码时作废上一张——同一时刻只有一张码可用，
+    /// 不再像修复前那样把展示过的 nonce 一直留在池里（无 TTL + 无清理入口）。
+    private var displayedQRNonce: Data?
+
     /// 设备列表已变化（批准落库后触发；设置页 reloadDevices()）。
     var onDevicesChanged: (() -> Void)?
     /// 拉取结论（诊断/UI 用；M6 T3 接进度展示）。
@@ -188,6 +192,7 @@ final class SyncHostCenter: ObservableObject {
 
     /// 停止监听并关闭全部活动会话（开关关闭 / App 退出）。
     func stop() {
+        discardQRNonce()
         libraryHost?.detach()
         libraryHost = nil
         listener?.stop()
@@ -287,9 +292,22 @@ final class SyncHostCenter: ObservableObject {
 
     /// 把当前展示 QR 的 sessionNonce（base64 → Data）注册进运行中 listener。
     /// 每次展示/刷新新码调用；未运行（开关关闭 / 启动失败）时静默忽略。
+    /// 注册新码同时作废上一张展示码（旧码立即失效，不等 TTL）。
     func registerQRNonce(nonceBase64: String) {
         guard isRunning, let nonce = Data(base64Encoded: nonceBase64), !nonce.isEmpty else { return }
-        listener?.pairingNonces.register(nonce)
+        guard let registry = listener?.pairingNonces else { return }
+        if let previous = displayedQRNonce, previous != nonce {
+            registry.remove(previous)
+        }
+        registry.register(nonce)
+        displayedQRNonce = nonce
+    }
+
+    /// 作废当前展示码 + 清空 nonce 池（QR 面板关闭 / 配对完成 / 停止监听）。
+    /// 之后拿旧 QR 回连 → 验签无源 → 会话按 `pairingRejected` 明确失败（不静默成功）。
+    func discardQRNonce() {
+        listener?.pairingNonces.removeAll()
+        displayedQRNonce = nil
     }
 
     /// 用户点「批准」：以 clientName 为展示名落库（空自动回退 ID 短格式，
@@ -301,11 +319,14 @@ final class SyncHostCenter: ObservableObject {
         session.approvePairing(displayName: card.rawClientName)
         pendingCard = nil
         pendingSession = nil
+        // 配对完成：展示码连同池里其它存货一并作废（下次配对需重新展示新码）
+        discardQRNonce()
         onDevicesChanged?()
     }
 
     /// 用户点「拒绝」：回复拒绝并关闭会话。
     func rejectPending() {
+        defer { discardQRNonce() }
         guard let session = pendingSession else {
             pendingCard = nil
             pendingSession = nil

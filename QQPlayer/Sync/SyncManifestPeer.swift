@@ -8,8 +8,9 @@
 //
 //  **本文件只做分发，不做端到端接线**（M3-3b 负责：曲库根/manifest 生成器接入、
 //  收到响应后跑 SyncManifestReconciler、toFetch 走 SyncFileSender 拉取）。与
-//  SyncChangeLogPeer 同构：链式挂接会话 onApplicationFrame（先己后彼），结束用
-//  enabled 开关静默自己（不拆链）。
+//  SyncChangeLogPeer 同构：挂接会话 onApplicationFrame（先己后彼）——挂接与释放
+//  语义统一走 `SyncSessionAttachment`（会话事件分发链，见 SyncPeerSession+Frames.swift）：
+//  本实例释放**不得**让链上更早的 handler 收不到帧（🟡F1）。
 //
 //  安全选择：本地 manifest 提供者缺省（未接线）时**不应答**——空 manifest 会被
 //  对端解读为"远端曲库是空的"，据此对该端曲库做出错误判断（漏拉/误判为已同步）。
@@ -39,13 +40,22 @@ final class SyncManifestPeer: @unchecked Sendable {
     /// 收到请求但本地提供者未接线（未应答；诊断用）。
     var onProviderUnavailable: (() -> Void)?
 
-    // 会话槽位链式挂接
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var forwardingEnabled = true
+    // 会话槽位挂接（分发链）
+    private var attachment: SyncSessionAttachment?
 
     init(session: SyncPeerSession) {
         self.session = session
-        attachHandlers()
+        attachment = SyncSessionAttachment(
+            session: session,
+            owner: self,
+            onFrame: { [weak self] frame in self?.handleInboundFrame(frame) }
+        )
+    }
+
+    /// 停止收帧（会话结束 / 本轮结束）：静默自己并让出链位（幂等）。
+    /// 不调用也会在**本实例释放时自动摘除**；无论哪种，链上其它 handler 都不受影响。
+    func detach() {
+        attachment?.detach()
     }
 
     // MARK: 对外 API
@@ -108,17 +118,4 @@ final class SyncManifestPeer: @unchecked Sendable {
         onManifestReceived?(response)
     }
 
-    // MARK: 会话槽位挂接（链式：先己后彼；结束用开关静默，不拆链）
-
-    private func attachHandlers() {
-        priorAppHandler = session.onApplicationFrame
-        session.onApplicationFrame = { [weak self] frame in
-            guard let self, self.forwardingEnabled else {
-                self?.priorAppHandler?(frame)
-                return
-            }
-            self.handleInboundFrame(frame)
-            self.priorAppHandler?(frame)
-        }
-    }
 }
