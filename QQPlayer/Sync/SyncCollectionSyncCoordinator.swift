@@ -434,20 +434,36 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
 
     /// 计划阶段「等对端清单」的超时兜底（`configuration.peerManifestTimeout` `<= 0` = 不启用）。
     ///
-    /// 幂等守卫 = `stage == .planning`：迟到响应（`handlePeerManifest` 同款守卫）、
-    /// 用户取消（`stage` 已 `.finished`）、已进入推送，都不受这次到点检查影响。
-    /// 触发走既有失败通道（锁外，`failPlanning` 自带 `stage != .finished` 守卫）。
+    /// 幂等与竞态：判定与置终态**必须一次持锁完成**（`failPlanningWhileWaitingForManifest`）——
+    /// 先解锁再置终态的话，对端 manifest 可能恰好在这两步之间抢进
+    /// （`handlePeerManifest` → `beginPush` → `stage = .pushing`），随后本次到点检查仍会把
+    /// 一个**已经在推**的编排置成 `.finished` + `emit(.failed(超时))`：面板报「超时失败」
+    /// 而文件其实还在传，且收尾被 `stage != .finished` 挡掉、永远不会报 `.done`。
     private func schedulePeerManifestTimeout() {
         let seconds = configuration.peerManifestTimeout
         guard seconds > 0 else { return }
         manifestTimeoutQueue.asyncAfter(deadline: .now() + seconds) { [weak self] in
             guard let self else { return }
-            self.lock.lock()
-            let stillPlanning = self.stage == .planning
-            self.lock.unlock()
-            guard stillPlanning else { return }
-            self.failPlanning("等待设备清单超时（请确认 iPhone 上的 QQPlayer 在前台并已连接）")
+            self.failPlanningWhileWaitingForManifest("等待设备清单超时（请确认 iPhone 上的 QQPlayer 在前台并已连接）")
         }
+    }
+
+    /// 仅当**仍在等对端清单**时落失败：判定（`stage == .planning`）与置终态在**同一次持锁内**
+    /// 完成，保证与 `handlePeerManifest` / `beginPush` / `beginPull` 的 `stage` 迁移互斥、不打架。
+    ///
+    /// 与 `failPlanning` 的区别：后者只看「本轮未收尾」（迟到响应后的解码失败等场景仍需它），
+    /// 本方法额外要求「仍处计划态」——已应答（进入推送/拉取）、已收尾、已取消的编排，
+    /// 到点检查一律不得动手。回调仍锁外触发（与既有写法一致）。
+    private func failPlanningWhileWaitingForManifest(_ reason: String) {
+        lock.lock()
+        guard stage == .planning else {
+            lock.unlock()
+            return
+        }
+        stage = .finished
+        manifestPeer = nil
+        lock.unlock()
+        emit(state: .failed(reason))
     }
 
     /// 中止（会话关闭 / 用户取消）：停发/停收，落 failed。
