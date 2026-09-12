@@ -109,7 +109,10 @@ struct SyncCollectionCoordinatorTests {
         data: Data,
         stableId: String,
         attachDeviceHost: Bool,
-        configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration()
+        configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration(),
+        /// 在 `start(direction:)` **之前**配置编排器（S2 竞态用例：注入阻塞回调，
+        /// 复现「清单已到、差集还没算完」这段窗口）。
+        configureCoordinator: ((SyncCollectionSyncCoordinator) -> Void)? = nil
     ) throws -> Scenario {
         let fixture = SessionFixture.pairedHandshake()
 
@@ -178,6 +181,7 @@ struct SyncCollectionCoordinatorTests {
             lyricsStore: macLyricsStore,
             lyricsMapping: .unresolved
         )
+        configureCoordinator?(coordinator)
         try coordinator.start(direction: .upload)
 
         return Scenario(
@@ -291,5 +295,67 @@ struct SyncCollectionCoordinatorTests {
         #expect(coordinator.state == .done)
         #expect(failureReason(coordinator.state) == nil)
         #expect(coordinator.report.pushed == [relativePath])
+    }
+
+    // MARK: ④ S2：清单已到 vs 计划态超时（回归：清单到了仍被判超时 + 一条文件都不传）
+
+    @Test("S2 竞态：清单已到（计划途中越过超时点）→ 不得判超时、文件必须照传")
+    func peerManifestArrivalBeatsTimeoutCheck() throws {
+        var configuration = SyncCollectionSyncConfiguration()
+        configuration.peerManifestTimeout = Self.tinyTimeout
+        // 在「清单已到、差集还没算完」这段窗口里阻塞（越过超时点）：到点检查恰好落在
+        // handlePeerManifest 解锁后、beginTransfers 之前——修复前会判超时并置终态，
+        // 随后的 beginPush 被守挡住 = 一条文件都不传。
+        // 断言的是契约（状态 / 账目），不是耗时；阻塞上限只用来复现窗口。
+        let blockUntil = Date().addingTimeInterval(Self.tinyTimeout + 2.0)
+        let relativePath = "Album/race-manifest.flac"
+        let scenario = try makeScenario(
+            relativePath: relativePath,
+            data: silentData(0xC9, count: 8_000),
+            stableId: "s-rm",
+            attachDeviceHost: true,
+            configuration: configuration,
+            configureCoordinator: { coordinator in
+                coordinator.onPeerManifestReceived = { _ in
+                    while Date() < blockUntil { Thread.sleep(forTimeInterval: 0.02) }
+                }
+            }
+        )
+        let coordinator = scenario.coordinator
+
+        #expect(failureReason(coordinator.state) == nil, "清单已到 → 不得落「超时」失败")
+        #expect(coordinator.state == .done)
+        #expect(coordinator.report.pushed == [relativePath], "文件必须真的传出（一条都不传 = 缺陷现象）")
+    }
+
+    // MARK: ⑤ S4：重入保护（进行中拒绝第二轮）
+
+    @Test("S4：进行中重入被拒（alreadyRunning）且不覆盖进行中的编排")
+    func rejectsReentrantStart() throws {
+        var configuration = SyncCollectionSyncConfiguration()
+        // 只验证重入守卫；超时给得足够大，不让它参与本用例。
+        configuration.peerManifestTimeout = 30
+        let scenario = try makeScenario(
+            relativePath: "Album/reentry.flac",
+            data: silentData(0xCA, count: 8_000),
+            stableId: "s-re",
+            attachDeviceHost: false, // 对端不应答 → 停在计划态（= 进行中）
+            configuration: configuration
+        )
+        let coordinator = scenario.coordinator
+        #expect(coordinator.state == .planning)
+        #expect(coordinator.report.direction == .upload)
+
+        var startError: SyncCollectionSyncCoordinator.StartError?
+        do {
+            try coordinator.start(direction: .download)
+        } catch let error as SyncCollectionSyncCoordinator.StartError {
+            startError = error
+        } catch {
+            startError = nil
+        }
+        #expect(startError == .alreadyRunning)
+        #expect(coordinator.state == .planning, "重入被拒 → 进行中的状态不变")
+        #expect(coordinator.report.direction == .upload, "重入被拒 → 方向不被第二轮覆盖")
     }
 }

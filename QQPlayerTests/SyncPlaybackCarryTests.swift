@@ -205,12 +205,13 @@ struct SyncPlaybackCarryTests {
         #expect(history.map(\.trackStableId) == ["d-a"])
         #expect(history.first?.playDurationMs == 4_242)
 
-        // 帧 9 的游标口径（与既有应答一致；v1 设备游标惰性，见 SyncPlaybackCarryPeer 文件头）
+        // 帧 9 的游标口径 = 本批实际末行 id（S3；本用例批内未带上全部 outbox 行时，
+        // 它可能小于 outbox 全局末尾。v1 设备游标惰性，见 SyncPlaybackCarryPeer 文件头）
         let cursor = try harness.deviceStore.cursor(forPeer: harness.fixture.hostIdentity.deviceID)
         let maxOutboxID = try harness.deviceStore.maxOutboxID()
         let macMaxOutboxID = try SyncChangeLogStore(database: harness.macManager).maxOutboxID()
         #expect(maxOutboxID == 0)
-        #expect(cursor == macMaxOutboxID)
+        #expect(cursor == macMaxOutboxID, "本用例批内含全部 outbox 行 → 本批末行 = 全局末尾")
     }
 
     @Test("本地缺歌挂起不丢：设备未入库该歌 → 挂起；入库后重放应用")
@@ -361,5 +362,39 @@ struct SyncPlaybackCarryTests {
         #expect(wire.contentHash == "h-a")
         #expect(wire.payloadJSON == "{\"x\":1}")
         #expect(entry.reconciliationKey.hasPrefix("play_history"), "对账键 = entity + row_key")
+    }
+
+    // MARK: - S3：carryPush 的游标口径
+
+    @Test("S3：carryPush 游标 = 本批实际末行 id（不是 outbox 全局末尾）；空批不发帧不动游标")
+    func carryPushCursorIsBatchTail() throws {
+        let harness = try makeHarness(deviceTracks: [("d-a", "h-a", "Album/a.flac")])
+        try Self.insertTrack(
+            harness.macManager, stableId: "s-a", contentHash: "h-a",
+            root: harness.macRoot, relative: "Album/a.flac"
+        )
+        try Self.insertTrack(
+            harness.macManager, stableId: "s-z", contentHash: "h-z",
+            root: harness.macRoot, relative: "Album/z.flac"
+        )
+        // id 1 = 本轮传输的歌 a（要带）；id 2/3 = 本轮**不传**的歌 z（不得被本批游标越过）
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-a", op: .upsert, updatedAtMs: 100)
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-z", op: .upsert, updatedAtMs: 101)
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-z", op: .upsert, updatedAtMs: 102)
+        let macStore = SyncChangeLogStore(database: harness.macManager)
+        #expect(try macStore.maxOutboxID() == 3)
+
+        let plan = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(plan.entries.map(\.outboxID) == [1], "批内只有本轮传输的歌 a 的行")
+
+        let cursor = try harness.deviceStore.cursor(forPeer: harness.fixture.hostIdentity.deviceID)
+        #expect(cursor == 1, "游标 = 本批实际末行（修复前 = outbox 全局末尾 3，越过未发出的歌 z）")
+
+        // 已知边界（v1 惰性游标下无影响）；见 SyncPlaybackCarryPeer 文件头边界 2：
+        // 批内末行更早时游标会回退（本端没有「已推给该 peer 的位置」的反向记录）。
+        try harness.deviceStore.setCursor(forPeer: harness.fixture.hostIdentity.deviceID, lastOutboxID: 5)
+        _ = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        let afterSecondPush = try harness.deviceStore.cursor(forPeer: harness.fixture.hostIdentity.deviceID)
+        #expect(afterSecondPush == 1, "游标跟本批末行走（批内末行 1 < 已记下的 5 → 回退；2/3 号行未被越过）")
     }
 }

@@ -250,11 +250,17 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     enum StartError: Error, Equatable {
         /// 会话未 ready（未配对/已关闭）
         case sessionNotReady
+        /// 已有编排在进行中（S4：重入保护；上一轮未收尾时不允许开新一轮）
+        case alreadyRunning
     }
 
     private enum Stage {
         case idle
         case planning
+        /// 对端清单已到（已在同一临界区内从 `.planning` 迁出）。
+        /// S2（2026-09-12 审计）：存在的唯一理由 = 让「清单已到」对到点检查可见，
+        /// 从而「正在开始传输」与「计划态超时失败」互斥。
+        case planned
         case pushing
         case pulling
         case finished
@@ -295,6 +301,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     private var pullTransferredValue: [String] = []
 
     private var manifestPeer: SyncManifestPeer?
+    /// 计划态到点检查的待触发闭包（S4：可取消，不留待触发的 20s 闭包）。
+    private var manifestTimeoutItem: DispatchWorkItem?
     private var pushController: SyncLibraryPushController?
     private var pullController: SyncLibraryPullController?
 
@@ -379,8 +387,19 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     ///
     /// ⚠️ `direction` 有默认值 `.upload` **仅为兼容冻结的调用点**（`QQPlayer/Mac/`
     /// 属 T8 UI 批次，本批禁改）；生产调用点应显式传方向（UI 让用户选）。
+    /// ⚠️ 上一轮未收尾（进行中）时**拒绝重入**：`StartError.alreadyRunning`（S4）。
     func start(direction: SyncTransferDirection = .upload) throws {
         guard session.isReady else { throw StartError.sessionNotReady }
+        // S4（2026-09-12 审计）：重入保护——只有 idle / finished 能开新一轮。进行中
+        // （planning / planned / pushing / pulling）再进来会把 stage、控制器、账目
+        // 全部覆盖，且上一轮的收尾回调会被当成新一轮的终态上报（两轮编排串成一条
+        // 状态流，账目互相污染）。
+        lock.lock()
+        guard stage == .idle || stage == .finished else {
+            lock.unlock()
+            throw StartError.alreadyRunning
+        }
+        lock.unlock()
 
         let expansion = SyncCollectionExpander.expand(selection: selection, facts: facts)
         lock.lock()
@@ -421,6 +440,10 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         manifestPeer = peer
         lock.unlock()
 
+        // S2（2026-09-12 审计修复）：到点检查必须在**发请求之前**就位——否则「发送」这段
+        // 本身不受超时约束，且响应同步到达时（内存回环 / 局域网极快）到点检查永远晚于
+        // 计划阶段 → 窗口无法复现也守不住。取消/收尾会取消该 item（见 cancel）。
+        schedulePeerManifestTimeout()
         do {
             // 方向敏感：upload 恒 `.all`（本端展开选择）；download 让对端先按集合收口
             try peer.requestManifest(collection: selection.remoteRequestCollection(for: direction))
@@ -428,8 +451,6 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             failPlanning("请求 manifest 失败：\(error)")
             throw error
         }
-        // 请求成功后挂一次性到点检查：对端不应答（App 切后台）时不许无限期停在计划态。
-        schedulePeerManifestTimeout()
     }
 
     /// 计划阶段「等对端清单」的超时兜底（`configuration.peerManifestTimeout` `<= 0` = 不启用）。
@@ -442,10 +463,24 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     private func schedulePeerManifestTimeout() {
         let seconds = configuration.peerManifestTimeout
         guard seconds > 0 else { return }
-        manifestTimeoutQueue.asyncAfter(deadline: .now() + seconds) { [weak self] in
+        let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.failPlanningWhileWaitingForManifest("等待设备清单超时（请确认 iPhone 上的 QQPlayer 在前台并已连接）")
         }
+        lock.lock()
+        manifestTimeoutItem = item
+        lock.unlock()
+        manifestTimeoutQueue.asyncAfter(deadline: .now() + seconds, execute: item)
+    }
+
+    /// 取消**尚未触发**的到点检查（S4：每次编排后不再留一个最多 `peerManifestTimeout`
+    /// （默认 20s）的待触发闭包）。幂等；锁外调用。
+    private func cancelPeerManifestTimeout() {
+        lock.lock()
+        let item = manifestTimeoutItem
+        manifestTimeoutItem = nil
+        lock.unlock()
+        item?.cancel()
     }
 
     /// 仅当**仍在等对端清单**时落失败：判定（`stage == .planning`）与置终态在**同一次持锁内**
@@ -456,18 +491,30 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     /// 到点检查一律不得动手。回调仍锁外触发（与既有写法一致）。
     private func failPlanningWhileWaitingForManifest(_ reason: String) {
         lock.lock()
+        // S2：`stage == .planning` 是唯一的「仍在等清单」判据；`handlePeerManifest`
+        // 在**同一临界区**内就把 stage 迁到 `.planned`（不再停在 `.planning`），
+        // 因此「清单已到并开始传输」与本次到点失败互斥：清单一到，本方法必被守挡住。
         guard stage == .planning else {
             lock.unlock()
             return
         }
         stage = .finished
+        let peer = manifestPeer
         manifestPeer = nil
+        let item = manifestTimeoutItem
+        manifestTimeoutItem = nil
         lock.unlock()
+        peer?.onManifestReceived = nil
+        peer?.onDecodeFailure = nil
+        item?.cancel()
         emit(state: .failed(reason))
     }
 
     /// 中止（会话关闭 / 用户取消）：停发/停收，落 failed。
     func cancel() {
+        // S4（2026-09-12 审计）：收尾彻底——取消未触发的到点检查，并清掉 manifest
+        // 请求的钩子与引用（否则每次编排后都留一个待触发闭包，已取消的编排仍握着 peer）。
+        cancelPeerManifestTimeout()
         lock.lock()
         guard stage != .finished else {
             lock.unlock()
@@ -476,7 +523,11 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         stage = .finished
         let push = pushController
         let pull = pullController
+        let peer = manifestPeer
+        manifestPeer = nil
         lock.unlock()
+        peer?.onManifestReceived = nil
+        peer?.onDecodeFailure = nil
         push?.cancel()
         pull?.cancel()
         emit(state: .failed("cancelled"))
@@ -494,8 +545,19 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         let isPlanning = stage == .planning
         let expansion = expansionValue
         let direction = directionValue
+        if isPlanning {
+            // S2（2026-09-12 审计修复）：在**同一临界区**内从 `.planning` 迁出
+            // （`.planned`）。本方法解锁后还要算期望集合/差集（全库 stat，耗时），
+            // 这段时间里到点检查若抢到锁就会看到一个「清单已到但仍在计划态」的编排，
+            // → 判超时 + 置终态 → 随后的 beginTransfers 被守挡住 = 一条文件都不传。
+            // 迁出后到点检查只可能看到 .planned / .pushing / .pulling / .finished，
+            // 「清单已到并开始传输」与「计划态超时失败」从此互斥。
+            stage = .planned
+        }
         lock.unlock()
         guard isPlanning else { return } // 幂等：只认计划阶段的第一次响应
+        // 清单已到：到点检查不再需要（幂等；已触发的 item 不受影响）。
+        cancelPeerManifestTimeout()
 
         onPeerManifestReceived?(response)
 
@@ -550,7 +612,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
 
     private func beginPush() {
         lock.lock()
-        guard stage == .planning else {
+        guard stage == .planned else {
             lock.unlock()
             return
         }
@@ -619,7 +681,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
 
     private func beginPull() {
         lock.lock()
-        guard stage == .planning else {
+        guard stage == .planned else {
             lock.unlock()
             return
         }
@@ -755,6 +817,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         }
         stage = .finished
         lock.unlock()
+        cancelPeerManifestTimeout() // S4：收尾不留待触发的到点检查
 
         let finalReport = report
         if let abort = finalReport.pushAbortReason, finalReport.pullAbortReason == nil {
@@ -775,8 +838,14 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             return
         }
         stage = .finished
+        let peer = manifestPeer
         manifestPeer = nil
+        let item = manifestTimeoutItem
+        manifestTimeoutItem = nil
         lock.unlock()
+        peer?.onManifestReceived = nil
+        peer?.onDecodeFailure = nil
+        item?.cancel()
         emit(state: .failed(reason))
     }
 

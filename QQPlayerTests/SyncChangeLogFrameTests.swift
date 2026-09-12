@@ -329,6 +329,66 @@ struct SyncChangeLogFrameTests {
             #expect(playlist?.title == "Client Newer")
         }
     }
+
+    // MARK: - S1：拉取应答的游标口径（取批与取末尾同事务 + 本批末行）
+
+    @Test("S1：分页应答游标 = 本批实际末行 id；批外未发出的 upsert 行不得被越过")
+    func pullCursorStopsAtBatchTail() throws {
+        let harness = try makeHarness()
+
+        // host outbox 写 600 条（> 一页 500）：第 3 条是同键 delete（会被删除策略过滤
+        // 不上线，允许被越过），其余为 upsert。
+        try harness.hostQueue.write { db in
+            for index in 1 ... 600 {
+                let rowKey = "fav-\(index)"
+                let op: SyncChangeOp
+                let payloadJSON: String?
+                if index == 3 {
+                    op = .delete
+                    payloadJSON = nil
+                } else {
+                    op = .upsert
+                    payloadJSON = try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: rowKey))
+                }
+                try SyncChangeLogStore.record(
+                    db,
+                    entity: .favorite,
+                    rowKey: rowKey,
+                    op: op,
+                    payloadJSON: payloadJSON,
+                    updatedAtMs: Int64(1000 + index)
+                )
+            }
+        }
+        #expect(try harness.hostStore.maxOutboxID() == 600)
+
+        let pushed = R2ValueBox<SyncChangeLogPushPayload>()
+        let priorHandler = harness.fixture.clientSession.onApplicationFrame
+        harness.fixture.clientSession.onApplicationFrame = { frame in
+            priorHandler?(frame)
+            if frame.type == .changeLogPush {
+                pushed.value = try? JSONDecoder().decode(SyncChangeLogPushPayload.self, from: frame.payload)
+            }
+        }
+
+        try harness.clientPeer.sendPull()
+
+        let payload = try #require(pushed.value)
+        #expect(payload.entries.count == 499, "一页 500 行，其中 1 行 delete 被过滤不上线")
+        #expect(payload.lastOutboxID == 500, "游标 = 本批实际末行（修复前 = outbox 全局末尾 600）")
+        #expect(payload.entries.map(\.id).max() == 500)
+        #expect(!payload.entries.contains { $0.op == SyncChangeOp.delete.rawValue })
+
+        // 不变量：批外**未发出**的 upsert 行不得被游标越过（否则第 501 行起永久不再同步）
+        let rest = try harness.hostStore.entries(after: payload.lastOutboxID)
+        #expect(rest.first?.id == 501, "批外第一行仍可被下一轮取到")
+        #expect(rest.count == 100, "批外 100 条一条不少")
+
+        // 第二轮：从本批末行继续 → 剩下的行全部能取到（批内被过滤的 delete 允许被越过）
+        let second = try harness.hostStore.page(after: payload.lastOutboxID)
+        #expect(second.rows.map(\.id) == Array(501 ... 600))
+        #expect(second.lastOutboxID == 600, "末页游标 = outbox 末尾")
+    }
 }
 
 // MARK: - 测试辅助

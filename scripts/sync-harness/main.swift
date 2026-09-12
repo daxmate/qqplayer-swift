@@ -1426,7 +1426,10 @@ func makeCollectionScenario(
     /// M6 用来看「点开始后等对端」这段时序的上报状态）。默认 true = 既有行为。
     attachDeviceHost: Bool = true,
     /// 编排配置（默认值 = 既有行为不变；㊶ 注入极小 `peerManifestTimeout`）。
-    configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration()
+    configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration(),
+    /// 在 `start(direction:)` **之前**配置编排器（㊸ S2 竞态用例：注入阻塞回调，
+    /// 复现「清单已到、差集还没算完」这段窗口）。
+    configureCoordinator: ((SyncCollectionSyncCoordinator) -> Void)? = nil
 ) throws -> CollectionScenario {
     let fixture = SessionFixture.pairedHandshake()
     let macRoot = try tempRoot("r3a-mac")
@@ -1495,6 +1498,7 @@ func makeCollectionScenario(
         lyricsMapping: macLyricsMapping,
         playbackCarry: carryDriver
     )
+    configureCoordinator?(coordinator)
     try coordinator.start(direction: direction)
     return CollectionScenario(
         fixture: fixture,
@@ -2725,6 +2729,112 @@ do {
     scenario.deviceHost.detach()
 } catch {
     check(false, "㊷ 抛错：\(error)")
+}
+
+// MARK: - ㊸ S2：清单已到 vs 计划态超时（回归：清单到了仍被判超时 + 一条文件都不传）
+
+section("㊸ S2：对端清单已到（计划途中越过超时点）→ 不得判超时、文件必须照传")
+do {
+    let data = silentData(0xC9, count: 8_000)
+    let hash = try sha256Hex(of: data)
+    var configuration = SyncCollectionSyncConfiguration()
+    configuration.peerManifestTimeout = 0.3
+    // 精确复现审计窗口：`onPeerManifestReceived` 在**清单已到、差集还没算完**时锁外触发，
+    // 在这里阻塞 1.0s（> 0.3s 超时点）→ 到点检查恰好落在「handlePeerManifest 解锁后、
+    // beginTransfers 之前」这段窗口里。
+    let blockUntil = Date().addingTimeInterval(1.0)
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        direction: .upload,
+        macFiles: [("Album/race-manifest.flac", data)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-rm",
+                    relativePath: "Album/race-manifest.flac",
+                    contentHash: hash
+                ),
+            ],
+        ],
+        configuration: configuration,
+        configureCoordinator: { coordinator in
+            coordinator.onPeerManifestReceived = { _ in
+                while Date() < blockUntil { Thread.sleep(forTimeInterval: 0.02) }
+            }
+        }
+    )
+
+    checkEqual(failureReason(scenario.coordinator.state), nil, "清单已到 → 不得落「超时」失败")
+    checkEqual(scenario.coordinator.state, .done, "清单已到 → 编排跑完（未被超时误杀）")
+    checkEqual(
+        scenario.coordinator.report.pushed,
+        ["Album/race-manifest.flac"],
+        "文件必须真的传出（一条都不传 = 缺陷现象）"
+    )
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㊸ 抛错：\(error)")
+}
+
+// MARK: - ㊹ S4：start 重入保护 + cancel 收尾
+
+section("㊹ S4：重入保护（进行中拒绝第二轮）+ cancel 后状态不被到点检查改写")
+do {
+    let data = silentData(0xCA, count: 8_000)
+    let hash = try sha256Hex(of: data)
+    var configuration = SyncCollectionSyncConfiguration()
+    configuration.peerManifestTimeout = 0.3
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        direction: .upload,
+        macFiles: [("Album/reentry.flac", data)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-re",
+                    relativePath: "Album/reentry.flac",
+                    contentHash: hash
+                ),
+            ],
+        ],
+        attachDeviceHost: false,
+        configuration: configuration
+    )
+
+    checkEqual(scenario.coordinator.state, .planning, "第一轮停在等对端清单")
+    checkEqual(scenario.coordinator.report.direction, .upload, "第一轮方向 = upload")
+
+    // 进行中再 start（反向）→ 必须拒绝，不覆盖进行中的编排
+    var startError: SyncCollectionSyncCoordinator.StartError?
+    do {
+        try scenario.coordinator.start(direction: .download)
+        check(false, "进行中重入未被拒绝（应抛 alreadyRunning）")
+    } catch let error as SyncCollectionSyncCoordinator.StartError {
+        startError = error
+    } catch {
+        check(false, "重入抛了非 StartError：\(error)")
+    }
+    checkEqual(startError, .alreadyRunning, "进行中重入 → alreadyRunning")
+    checkEqual(scenario.coordinator.state, .planning, "重入被拒 → 进行中的状态不变")
+    checkEqual(scenario.coordinator.report.direction, .upload, "重入被拒 → 方向不被第二轮覆盖")
+
+    // cancel 后：越过超时点，状态不得被到点检查（或任何迟到回调）改写
+    scenario.coordinator.cancel()
+    checkEqual(scenario.coordinator.state, .failed("cancelled"), "cancel → 落 failed(cancelled)")
+    Thread.sleep(forTimeInterval: 0.6)
+    checkEqual(scenario.coordinator.state, .failed("cancelled"), "越过超时点后仍为 cancelled（未被改写）")
+    checkEqual(scenario.coordinator.report.pushed, [], "取消的编排不得传出任何文件")
+
+    // 终态之后允许再开新一轮（守卫只拦进行中，不把编排器锁死）
+    do {
+        try scenario.coordinator.start(direction: .upload)
+        check(true, "终态后可再开新一轮")
+    } catch {
+        check(false, "终态后重开抛错：\(error)")
+    }
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㊹ 抛错：\(error)")
 }
 
 // MARK: - 汇总
