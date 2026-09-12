@@ -98,10 +98,10 @@ final class SyncHostCenter: ObservableObject {
         try SyncIdentityStore().loadOrCreateIdentity()
     }
 
-    /// 本机展示名（Bonjour 友好名优先，回落到进程主机名；与设置页 QR hostName 同源）。
-    var deviceNameProvider: () -> String = {
-        Host.current().localizedName ?? ProcessInfo.processInfo.hostName
-    }
+    /// 本机展示名（Bonjour 友好名；与设置页 QR hostName 同源）。
+    /// 默认取 `LocalDeviceNameStore`：用户命过名用用户的名，否则回落系统默认名
+    /// （macOS = `Host.current().localizedName ?? 主机名`，与提升前逐字等价）。
+    var deviceNameProvider: () -> String = { LocalDeviceNameStore.shared.name }
 
     init(defaults: UserDefaults = .standard, trustStore: DeviceStore = DeviceStore()) {
         self.defaults = defaults
@@ -144,6 +144,8 @@ final class SyncHostCenter: ObservableObject {
             trustStore: trustStore,
             deviceName: deviceNameProvider()
         )
+        // host 侧握手 hello 也携带本机展示名（iPhone 侧据此展示/落库 Mac 的名字）
+        listener.sessionConfig.clientDisplayName = LocalDeviceNameStore.shared.name
         // 待批准回调在 listener 串行队列触发 → 主线程上抛
         listener.pairApprovalHandler = { [weak self] session, pending in
             Task { @MainActor in
@@ -213,6 +215,8 @@ final class SyncHostCenter: ObservableObject {
                 peerID: peerID,
                 connectedAt: Date()
             )
+            // 对端 hello 带新展示名 → 刷新信任表 + 当前展示名（改名后不必重配对）
+            applyPeerHelloDisplayName(session.peerHelloValue?.name, peerID: peerID)
             let host = MacSyncLibraryHost(libraryRoot: libraryRootProvider())
             host.onFetchResult = { [weak self] result in
                 Task { @MainActor in self?.onFetchResult?(result) }
@@ -236,6 +240,26 @@ final class SyncHostCenter: ObservableObject {
         connectedSession = nil
         connectedPeer = nil
         activeSession = nil
+    }
+
+    /// 对端 hello 携带展示名且与信任表现有 display_name 不同 → 刷新 display_name
+    /// （只动这一列）→ 重取展示名刷新 `connectedPeer` → 通知设置页刷新设备列表。
+    /// 纯展示字段：空白名 / 存储失败只记日志，绝不影响会话接线（连接状态以会话为准）。
+    private func applyPeerHelloDisplayName(_ rawName: String?, peerID: String) {
+        guard !peerID.isEmpty, let rawName else { return }
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        guard let existing = (try? trustStore.byPeerID(peerID)) ?? nil,
+              existing.displayName != name
+        else { return }
+        do {
+            try trustStore.updateDisplayName(peerID: peerID, name: name)
+        } catch {
+            print("❌ SyncHostCenter updateDisplayName failed: \(error)")
+            return
+        }
+        connectedPeer?.displayName = displayName(forPeerID: peerID)
+        onDevicesChanged?()
     }
 
     /// 对端展示名：优先已配对设备记录，查不到回落 Device ID 分组格式。

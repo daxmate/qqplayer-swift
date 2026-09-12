@@ -111,7 +111,8 @@ extension SyncPeerSession {
                 role: SyncHello.roleHost,
                 identity: localIdentity,
                 peerDeviceID: hello.deviceID,
-                ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation
+                ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation,
+                name: config.clientDisplayName
             )
             var effects = [Effect.send(try encodedHandshakeFrame(myHello))]
             if knownPublicKey != nil {

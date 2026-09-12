@@ -70,6 +70,31 @@ final class DeviceStore: @unchecked Sendable {
         }
     }
 
+    /// 仅更新展示名（对端 hello 携带新名时刷新；其余列一律不动）。
+    ///
+    /// - peerID 不存在 → 幂等无操作（不新增行）
+    /// - name trim 后为空/纯空白 → 非法名，不写
+    /// - trim 后与现有一致 → 不写（避免 updated_at 无谓刷新）
+    func updateDisplayName(peerID: String, name: String) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        try database.write { db in
+            guard let existing = try PeerDevice
+                .filter(Column("peer_id") == peerID)
+                .fetchOne(db)
+            else { return }
+            guard existing.displayName != trimmed else { return }
+            try db.execute(
+                sql: """
+                UPDATE sync_device
+                SET display_name = ?, updated_at = ?
+                WHERE peer_id = ?
+                """,
+                arguments: [trimmed, Int64(Date().timeIntervalSince1970), peerID]
+            )
+        }
+    }
+
     /// 全部配对记录（按 displayName 排序，稳定展示顺序）。
     func all() throws -> [PeerDevice] {
         try database.read { db in
