@@ -726,6 +726,14 @@
 "sync_replacement_badge" = "Replaces existing pairing";
 "sync_approve" = "Approve";
 "sync_reject" = "Reject";
+
+"sync_devices_section" = "Devices";
+"sync_devices_footer" = "The selected device is the target for this sync. A device shows as online only while QQPlayer is open on it (Settings → Sync).";
+"sync_devices_empty" = "No paired mobile devices yet. Scan the QR code above with QQPlayer on your phone to pair.";
+"sync_devices_target_badge" = "Sync target";
+"sync_device_status_online" = "Online";
+"sync_device_status_offline" = "Offline";
+"sync_device_offline_hint" = "Open QQPlayer on that device → Settings → Sync.";
 "sync_scan_qr" = "Scan QR Code";
 "sync_manual_input" = "Enter ID Manually";
 "sync_scan_hint" = "Point the camera at the QR code shown in Sync on your Mac.";

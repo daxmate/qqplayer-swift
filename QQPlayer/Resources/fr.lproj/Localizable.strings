@@ -724,6 +724,14 @@
 "sync_replacement_badge" = "Remplace l'appairage existant";
 "sync_approve" = "Approuver";
 "sync_reject" = "Refuser";
+
+"sync_devices_section" = "Appareils";
+"sync_devices_footer" = "L’appareil sélectionné est la cible de cette synchronisation. Un appareil n’apparaît en ligne que lorsque QQPlayer y est ouvert (Réglages → Synchronisation).";
+"sync_devices_empty" = "Aucun appareil mobile appairé pour l’instant. Scannez le code QR ci-dessus avec QQPlayer sur votre téléphone pour appairer.";
+"sync_devices_target_badge" = "Cible de synchronisation";
+"sync_device_status_online" = "En ligne";
+"sync_device_status_offline" = "Hors ligne";
+"sync_device_offline_hint" = "Ouvrez QQPlayer sur cet appareil → Réglages → Synchronisation.";
 "sync_scan_qr" = "Scanner le code QR";
 "sync_manual_input" = "Saisir l'ID manuellement";
 "sync_scan_hint" = "Visez le code QR affiché dans Synchronisation sur votre Mac.";
