@@ -84,8 +84,12 @@ struct IndexingGateTests {
         let elapsed = Date().timeIntervalSince(started)
 
         #expect(outcome == .timedOut)
+        // 下界：不得早于 policy 放行（0.2s，留 50ms 抖动余量）
         #expect(elapsed >= 0.15)
-        #expect(elapsed < 5)
+        // 上界只用来抓「永久挂起 / 忙等」回归，不能当作精确计时断言：
+        // CI 模拟器的定时器实测被节流到 10-16s（见 549f1bb 同源问题），
+        // 本用例实测 12.2s（run 34702157359）→ 放宽到 60s（真挂起会撑死整个用例）
+        #expect(elapsed < 60)
     }
 
     @Test("超时后索引才回落也不再重复唤醒（resume 只发生一次）")

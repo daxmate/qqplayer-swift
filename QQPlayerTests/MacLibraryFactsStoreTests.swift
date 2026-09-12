@@ -122,6 +122,8 @@ private func settle(_ rounds: Int = 50) async {
 /// 轮询等待条件成立（超时即返回末次结果）。
 /// CI 慢机上「固定轮次 yield」不足以保证异步补齐已落库 → 用超时轮询替代，
 /// 语义仍是「等到补齐完成」，不引入 sleep 猜测。
+/// 轮询间隙用 5ms 休眠（不是紧贴 Task.yield 自旋）：这是测试主 actor 上的等待，
+/// 自旋会把主 actor 饿死，连带把同套件其它计时敏感用例拖红（run 34702157359 实例）。
 @MainActor
 private func waitUntil(
     timeout: TimeInterval = 5,
@@ -130,7 +132,7 @@ private func waitUntil(
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if condition() { return true }
-        await Task.yield()
+        try? await Task.sleep(nanoseconds: 5_000_000)
     }
     return condition()
 }
