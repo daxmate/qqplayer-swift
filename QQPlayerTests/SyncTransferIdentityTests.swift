@@ -505,7 +505,7 @@ struct SyncTransferIdentityTests {
         // 等超时回调落地：轮询而非固定 sleep——CI runner 线程饥饿时，注入的 0.15s 定时器
         // 可能远晚于标称时间才被调度，固定 sleep 会假失败（2026-09-12 CI 实测）。
         let timedOut = await waitUntil { outcome.value != nil }
-        #expect(timedOut, "等待 file_ack 超时未在 10s 内落地")
+        #expect(timedOut, "等待 file_ack 超时未在 60s 内落地")
 
         guard case let .failed(error)? = outcome.value else {
             Issue.record("期望超时失败，实际 \(String(describing: outcome.value))")
@@ -520,14 +520,16 @@ struct SyncTransferIdentityTests {
         #expect(!sender.isActive) // 状态已清 → 可重试
     }
 
-    /// CI 线程饥饿下的等待：轮询到条件成立（默认 10s 上限）。
+    /// CI 调度延迟下的等待：轮询到条件成立（默认 60s 上限）。
     ///
-    /// 为什么不用固定 `Task.sleep`：注入超时（0.15s/0.2s）虽短，但 CI runner 上定时器
-    /// 可能远晚于标称时间才被调度 → 固定 sleep 会假失败（2026-09-12 CI 实测）。
-    /// 条件始终不成立时返回 false，由调用方的 #expect 给出可读失败信息（真缺陷不被掩盖）。
+    /// 为什么不用固定 `Task.sleep`，也不是“等一会儿就断言”：注入超时（0.15s/0.2s）在
+    /// 本机 0.2s 内到点，但 **CI 模拟器里实测被推迟 10～16s**（后台应用 + 大量并行用例
+    /// 下 `DispatchQueue.global(qos: .utility)` 的 asyncAfter 会被节流；2026-09-12
+    /// 两轮 CI 实测：11.134s / 16.5s）。故窗口取 60s（≥3× 最差观测），条件成立即返回
+    /// （本机仍 ~0.2s），条件始终不成立则返回 false，由调用方 #expect 给出可读失败信息。
     @discardableResult
     private func waitUntil(
-        timeout: TimeInterval = 10,
+        timeout: TimeInterval = 60,
         _ condition: () -> Bool
     ) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
@@ -558,9 +560,9 @@ struct SyncTransferIdentityTests {
         #expect(fixture.clientSession.phase == .waitingForPairResponse)
         #expect(fixture.hostSession.phase == .waitingForPairApproval)
 
-        // 同上：轮询到 client 因握手超时关闭（CI 定时器调度可能远晚于标称 0.2s）
+        // 同上：轮询到 client 因握手超时关闭（CI 定时器节流下可能需 10s+）
         let closed = await waitUntil { fixture.clientSession.phase == .closed }
-        #expect(closed, "握手超时未在 10s 内关闭 client 会话")
+        #expect(closed, "握手超时未在 60s 内关闭 client 会话")
 
         #expect(fixture.clientSession.phase == .closed)
         #expect(fixture.clientSession.closeReason == .handshakeTimeout)
