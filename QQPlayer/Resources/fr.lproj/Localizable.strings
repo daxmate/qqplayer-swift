@@ -866,6 +866,7 @@
 "sync_run_reason_not_connected" = "Connectez d'abord votre iPhone (Réglages → Synchronisation).";
 "sync_run_reason_library_unavailable" = "Le dossier de musique de ce Mac est indisponible : la synchronisation est désactivée.";
 "sync_run_reason_empty_selection" = "Sélectionnez des playlists ou des morceaux à synchroniser.";
+"sync_run_reason_already_running" = "Une synchronisation est déjà en cours : annulez-la ou attendez qu'elle se termine.";
 "sync_run_reason_unavailable" = "Fichier indisponible";
 "sync_run_result_section" = "Dernier résultat";
 "sync_run_result_none" = "Aucune synchronisation effectuée pour l'instant.";

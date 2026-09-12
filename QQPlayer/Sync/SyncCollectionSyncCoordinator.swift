@@ -394,6 +394,12 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         stage = .planning
         reportValue.didRequestPeerManifest = true
         lock.unlock()
+        // M6 修复（2026-09-12）：计划态必须**上报**（不只是置内部 stage）。
+        // 等对端 manifest 的这段时间若不上报，UI 侧 `state` 仍是 `.idle`：
+        // `SyncUIStartGate.isRunning`（= 非终态）看的是上报状态 → 面板渲染开始键却
+        // 按「正在运行」禁用 = 灰键 + 零解释 + 无法取消（用户实测现象）。
+        // 锁外调用，与既有 `.pushing` / `.pulling` 写法一致（回调绝不持锁触发）。
+        emit(state: .planning)
 
         let peer = SyncManifestPeer(session: session)
         peer.onManifestReceived = { [weak self] response in

@@ -1263,6 +1263,7 @@
 "sync_run_reason_not_connected" = "請先在 iPhone 上連線（設定 → 同步）。";
 "sync_run_reason_library_unavailable" = "這台 Mac 的媒體庫資料夾無法使用，暫時無法同步。";
 "sync_run_reason_empty_selection" = "請先選取要同步的播放列表或歌曲。";
+"sync_run_reason_already_running" = "同步正在進行中，請先取消或等待完成。";
 "sync_run_reason_unavailable" = "檔案無法使用";
 "sync_run_result_section" = "最近一次結果";
 "sync_run_result_none" = "還沒有同步記錄。";

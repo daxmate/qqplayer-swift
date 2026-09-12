@@ -648,8 +648,12 @@ struct MacSyncRunSection: View {
     /// 不能开始的原因（可开始 / 同步中 = nil）。
     private var availabilityHint: String? {
         switch model.startAvailability {
-        case .ready, .alreadyRunning:
+        case .ready:
             return nil
+        case .alreadyRunning:
+            // 禁用按钮**永远有解释**。正常跑起来时渲染的是取消键（`phase.isBusy`），
+            // 该分支只在「非 busy 却被判定为正在运行」的病态态下可见（防御性文案）。
+            return "sync_run_reason_already_running".localized
         case .notPaired:
             return "sync_run_reason_not_paired".localized
         case .notConnected:

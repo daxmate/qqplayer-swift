@@ -1415,7 +1415,10 @@ func makeCollectionScenario(
     macLyricsMapping: SyncLyricsContentMapping = .unresolved,
     deviceLyricsMapping: SyncLyricsContentMapping = .unresolved,
     carryFacts: MemoryCarryFacts = MemoryCarryFacts(),
-    injectCarry: Bool = false
+    injectCarry: Bool = false,
+    /// 设备被动端是否接线（false = 对端**不应答** manifest → 编排停在计划态，
+    /// M6 用来看「点开始后等对端」这段时序的上报状态）。默认 true = 既有行为。
+    attachDeviceHost: Bool = true
 ) throws -> CollectionScenario {
     let fixture = SessionFixture.pairedHandshake()
     let macRoot = try tempRoot("r3a-mac")
@@ -1436,12 +1439,14 @@ func makeCollectionScenario(
         lyricsStore: deviceLyricsStore,
         lyricsMapping: deviceLyricsMapping
     )
-    check(deviceHost.attach(to: fixture.clientSession), "设备被动端接线")
-    // 设备侧入站帧计数（挂在链首；链式转发不影响被动端）
-    let devicePriorHandler = fixture.clientSession.onApplicationFrame
-    fixture.clientSession.onApplicationFrame = { frame in
-        if frame.type == .manifestRequest { r3aManifestRequests += 1 }
-        devicePriorHandler?(frame)
+    if attachDeviceHost {
+        check(deviceHost.attach(to: fixture.clientSession), "设备被动端接线")
+        // 设备侧入站帧计数（挂在链首；链式转发不影响被动端）
+        let devicePriorHandler = fixture.clientSession.onApplicationFrame
+        fixture.clientSession.onApplicationFrame = { frame in
+            if frame.type == .manifestRequest { r3aManifestRequests += 1 }
+            devicePriorHandler?(frame)
+        }
     }
 
     let macSink = SinkSpy()
@@ -2592,6 +2597,46 @@ do {
         .sessionNotReady,
         "未 ready 会话 → sessionNotReady"
     )
+}
+
+// MARK: - ㊵ M6 计划态上报（回归：面板灰键无解释）
+
+section("㊵ M6：start 后等对端 manifest 期间 → 上报 .planning（回归：灰键 + 无法取消）")
+do {
+    // 对端**不接线**（不应答 manifest）→ 编排停在「已请求、等应答」的计划态，
+    // 这正是用户点「上传到 iPhone」后的时序（M6 缺陷：此时内部只置 stage，从不上报）。
+    let data = silentData(0xC6, count: 8_000)
+    let hash = try sha256Hex(of: data)
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        direction: .upload,
+        macFiles: [("Album/plan.flac", data)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-plan",
+                    relativePath: "Album/plan.flac",
+                    contentHash: hash
+                ),
+            ],
+        ],
+        attachDeviceHost: false
+    )
+
+    checkEqual(scenario.coordinator.state, .planning, "等对端 manifest 期间上报 .planning")
+    check(
+        !SyncCollectionSyncState.isTerminal(scenario.coordinator.state),
+        "计划态非终态（UI 据此渲染取消键，不再把开始键禁用）"
+    )
+    check(scenario.coordinator.report.didRequestPeerManifest, "已向对端发出 manifest 请求")
+    checkEqual(scenario.coordinator.report.direction, .upload, "账目方向 = upload")
+
+    // 计划态必须可取消（缺陷现象之一：灰键不可点 → 没有退出路径）。
+    scenario.coordinator.cancel()
+    checkEqual(scenario.coordinator.state, .failed("cancelled"), "计划态可取消（落 failed）")
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㊵ 抛错：\(error)")
 }
 
 // MARK: - 汇总
