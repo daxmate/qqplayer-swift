@@ -34,6 +34,8 @@ enum SyncUIStartAvailability: Equatable, Sendable {
     case libraryUnavailable
     /// 正在同步中
     case alreadyRunning
+    /// 还没选同步方向（T10：方向是面板第一屏，未选方向 = 不知道传哪一端的内容）
+    case noDirection
     /// 选择集为空（空选择 = 不推不拉）
     case emptySelection
 
@@ -43,14 +45,17 @@ enum SyncUIStartAvailability: Equatable, Sendable {
 
 /// 可用性判定（无副作用）。
 enum SyncUIStartGate {
-    /// 判定顺序（先到先返回）：未配对 → 未连接 → 会话不可用 → 同步中 → 空选择 → 可开始。
+    /// 判定顺序（先到先返回）：未配对 → 未连接 → 会话不可用 → 同步中 → 未选方向 →
+    /// 空选择 → 可开始。
     /// 为什么要这个顺序：连接类原因优先——它们对用户来说是「先解决这个」的前置条件，
-    /// 未连接时空选择没有意义（提示先连线）。
+    /// 未连接时空选择没有意义（提示先连线）；方向（T10）排在选择集之前——
+    /// 方向决定内容源，选方向前「选了什么」根本还没意义。
     static func evaluate(
         hasPairedDevice: Bool,
         isConnected: Bool,
         hasSession: Bool,
         isRunning: Bool,
+        hasDirection: Bool = true,
         isEmptySelection: Bool
     ) -> SyncUIStartAvailability {
         if !isConnected {
@@ -58,6 +63,7 @@ enum SyncUIStartGate {
         }
         guard hasSession else { return .libraryUnavailable }
         if isRunning { return .alreadyRunning }
+        if !hasDirection { return .noDirection }
         if isEmptySelection { return .emptySelection }
         return .ready
     }

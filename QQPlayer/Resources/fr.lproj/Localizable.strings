@@ -866,3 +866,29 @@
 "sync_run_result_unresolved" = "%d morceaux sans empreinte : ignorés.";
 "sync_run_result_empty_selection" = "Aucune sélection : rien n'a été transféré.";
 "sync_run_result_no_deletion" = "La synchronisation ne supprime jamais de morceaux, sur aucun appareil.";
+
+// T10 (2026-09-12) sens d'abord · la source de contenu suit le sens
+"sync_run_direction_section" = "Sens de synchronisation";
+"sync_run_direction_upload" = "Envoyer vers l'iPhone";
+"sync_run_direction_upload_detail" = "Envoyer les morceaux de ce Mac vers votre iPhone.";
+"sync_run_direction_download" = "Télécharger depuis l'iPhone";
+"sync_run_direction_download_detail" = "Rapatrier les morceaux de votre iPhone vers ce Mac.";
+"sync_run_direction_footer" = "Choisissez d'abord un sens : la liste ci-dessous affiche alors le contenu de cet appareil.";
+"sync_run_direction_hint" = "Choisissez un sens de synchronisation ci-dessus pour voir ce qui peut être synchronisé.";
+"sync_run_direction_download_target" = "iPhone";
+"sync_run_reason_no_direction" = "Choisissez d'abord un sens de synchronisation.";
+"sync_run_selection_section_local" = "À synchroniser · sur ce Mac";
+"sync_run_selection_section_peer" = "À synchroniser · sur votre iPhone";
+"sync_run_peer_needs_connection" = "Connectez d'abord votre iPhone (Réglages → Synchronisation).";
+"sync_run_library_row_title_peer" = "Tout le contenu de %@";
+"sync_run_library_confirm_message_download" = "Cela téléchargera environ %@ (%d morceaux) depuis votre iPhone. Cela peut être long et occuper beaucoup d'espace. Continuer ?";
+"sync_run_playlists_loading" = "Chargement des playlists…";
+"sync_peer_summary" = "Bibliothèque %@ · %d morceaux · environ %@";
+"sync_peer_summary_loading" = "Lecture de la bibliothèque de l'iPhone…";
+"sync_peer_summary_unknown" = "Taille de la bibliothèque %@ indisponible.";
+"sync_peer_retry" = "Réessayer";
+"sync_peer_error_not_connected" = "Non connecté à votre iPhone.";
+"sync_peer_error_session" = "La connexion a pris fin. Reconnectez-vous et réessayez.";
+"sync_peer_error_timeout" = "Votre iPhone n'a pas répondu à temps.";
+"sync_peer_error_cancelled" = "Requête annulée.";
+"sync_peer_error_other" = "Impossible de charger le contenu de votre iPhone.";

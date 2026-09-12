@@ -2,15 +2,22 @@
 //  MacSyncView.swift
 //  QQPlayer
 //
-//  M6（T3，2026-09-11）macOS「同步」页 —— **同步操作四区**（QQPlayerMac target only）：
-//  A 连接状态区 / B 内容选择区（三级）/ C 执行区 / D 结果区（最近一次）。
+//  M6（T3，2026-09-11；T10 2026-09-12 方向优先改造）macOS「同步」页 —— **同步操作区**
+//  （QQPlayerMac target only）：
+//  A 连接状态区 / B 方向区（T10 新增，面板第一屏）/ C 内容选择区（随方向切数据源）/
+//  D 执行区 / E 结果区（最近一次）。
+//
+//  T10 的用户反馈（2026-09-12）：「我明明是从 iPhone 上下载，但是显示的内容是本地的
+//  曲库」→ 本文件把**方向**提到内容之前：未选方向时内容区只显示引导，选定后内容
+//  面板整体切到对应一端（上传 = 本端 Mac；下载 = 对端 iPhone）。
 //
 //  与 `MacSyncSettingsView` 的分工：那个文件是同步页的**壳**（配对批准卡 / 本机身份
 //  与二维码 / 已配对设备），本文件只补上「真的把歌同步过去」的操作面，由前者在
-//  `Form` 内渲染（`MacSyncRunSection`）。⚠️ 新增内容一律放这里，别把 340 行的壳继续吹大。
+//  `Form` 内渲染（`MacSyncRunSection`）。⚠️ 新增内容一律放这里。
 //
 //  纪律：本文件**只做展示**——能不能开始 / 现在什么阶段 / 进度多少 / 结果怎么算，
-//  全部来自 `MacSyncRunViewModel` + `SyncUIState`（纯逻辑，有单测）。View 里不写判断。
+//  全部来自 `MacSyncRunViewModel` + `MacSyncContentModel` + `SyncUIState` /
+//  `SyncUIDirectionContent`（纯逻辑，有单测）。View 里不写判断。
 //
 //  macOS 13 兼容：不使用 macOS 14+ API（`onChange` 单参数闭包、不用
 //  `ContentUnavailableView`）。
@@ -18,10 +25,13 @@
 
 import SwiftUI
 
-/// 同步操作四区（在 `MacSyncSettingsView` 的 `Form` 内渲染）。
+/// 同步操作区（在 `MacSyncSettingsView` 的 `Form` 内渲染）。
 struct MacSyncRunSection: View {
     @ObservedObject var hostCenter: SyncHostCenter
+    /// 执行侧（阶段 / 进度 / 结果）。
     @StateObject private var model: MacSyncRunViewModel
+    /// 内容侧（方向 / 内容源 / 选项 / 选择集）。
+    @StateObject private var content: MacSyncContentModel
 
     /// 全曲库二次确认（Q4 决策：全库必须确认）。
     @State private var showLibraryWideConfirm = false
@@ -34,17 +44,20 @@ struct MacSyncRunSection: View {
 
     /// ⚠️ 默认值是 `nil` 而不是 `.shared`：View 的 init 是非隔离上下文，
     /// 默认实参里直接引用 `@MainActor` 的 `.shared` 会报隔离错报（Swift 6 下是错误）
-    /// （与 `MacSyncRunViewModel` 同一处理）。
+    /// （与两个 ViewModel 同一处理）。
     @MainActor
     init(hostCenter: SyncHostCenter? = nil) {
         let center = hostCenter ?? .shared
+        let contentModel = MacSyncContentModel(hostCenter: center)
         _hostCenter = ObservedObject(wrappedValue: center)
-        _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center))
+        _content = StateObject(wrappedValue: contentModel)
+        _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center, content: contentModel))
     }
 
     var body: some View {
         Group {
             connectionSection
+            directionSection
             selectionSection
             runSection
             resultSection
@@ -52,6 +65,7 @@ struct MacSyncRunSection: View {
         .onAppear { model.onAppear() }
         .onDisappear {
             searchTask?.cancel()
+            content.onDisappear()
             model.onDisappear()
         }
         .confirmationDialog(
@@ -60,7 +74,7 @@ struct MacSyncRunSection: View {
             titleVisibility: .visible
         ) {
             Button("sync_run_library_confirm_action".localized) {
-                model.setLibraryWide()
+                content.setLibraryWide()
             }
             Button(Localized.cancel, role: .cancel) {}
         } message: {
@@ -148,62 +162,169 @@ struct MacSyncRunSection: View {
             : "sync_run_not_connected_hint".localized
     }
 
-    // MARK: - B 内容选择区
+    // MARK: - B 方向区（T10：面板第一屏）
+
+    @ViewBuilder
+    private var directionSection: some View {
+        Section {
+            directionRow(
+                .upload,
+                title: "sync_run_direction_upload".localized,
+                detail: "sync_run_direction_upload_detail".localized
+            )
+            directionRow(
+                .download,
+                title: "sync_run_direction_download".localized,
+                detail: "sync_run_direction_download_detail".localized
+            )
+        } header: {
+            Text("sync_run_direction_section".localized)
+        } footer: {
+            Text("sync_run_direction_footer".localized)
+        }
+    }
+
+    /// 方向行（单选；选中态用勾 + 底色，与内容区的「全曲库」行同一视觉语言）。
+    private func directionRow(
+        _ direction: SyncTransferDirection,
+        title: String,
+        detail: String
+    ) -> some View {
+        let selected = model.direction == direction
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .fontWeight(selected ? .medium : .regular)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(selected ? Color.accentColor.opacity(0.12) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { model.selectDirection(direction) }
+    }
+
+    // MARK: - C 内容选择区（随方向切数据源）
 
     @ViewBuilder
     private var selectionSection: some View {
         Section {
-            Picker("", selection: modeBinding) {
-                Text("sync_run_mode_library".localized).tag(SyncUISelectionMode.library)
-                Text("sync_run_mode_playlists".localized).tag(SyncUISelectionMode.playlists)
-                Text("sync_run_mode_tracks".localized).tag(SyncUISelectionMode.tracks)
+            if !content.hasDirection {
+                // 方向未选：**不显示任何一端的内容**（T10 核心修复点）。
+                Label("sync_run_direction_hint".localized, systemImage: "arrow.up.arrow.down.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else if content.needsPeerConnection {
+                Label("sync_run_peer_needs_connection".localized, systemImage: "wifi.slash")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                if content.source == .peer {
+                    peerSummaryRow
+                }
+                contentModePicker
+                switch content.selectionMode {
+                case .library:
+                    libraryRow
+                case .playlists:
+                    playlistList
+                case .tracks:
+                    trackList
+                }
+                selectionTotals
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            switch model.selectionMode {
-            case .library:
-                libraryRow
-            case .playlists:
-                playlistList
-            case .tracks:
-                trackList
-            }
-
-            selectionTotals
         } header: {
-            Text("sync_run_selection_section".localized)
+            Text(contentHeader)
         } footer: {
             Text("sync_run_selection_footer".localized)
         }
     }
 
+    /// 内容区标题标明**内容来自哪一端**（用户反馈的错配点，标题就写清楚）。
+    private var contentHeader: String {
+        switch content.source {
+        case .local: return "sync_run_selection_section_local".localized
+        case .peer: return "sync_run_selection_section_peer".localized
+        case .none: return "sync_run_selection_section".localized
+        }
+    }
+
+    /// 对端曲库摘要（懒加载列表的替代：只放一行「N 首 · 约 X GB」）。
+    @ViewBuilder
+    private var peerSummaryRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "iphone")
+                .foregroundStyle(.secondary)
+            if let facts = content.peerFacts {
+                Text("sync_peer_summary".localized(with: peerName, facts.trackCount, facts.sizeText))
+                    .font(.callout)
+            } else if content.summaryState.isLoading {
+                Text("sync_peer_summary_loading".localized)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                // 摘要拿不到不阻塞列表（占位即可；列表自己有失败态 + 重试）。
+                Text("sync_peer_summary_unknown".localized(with: peerName))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// 对端显示名（空则回落通用「iPhone」）。
+    private var peerName: String {
+        let name = model.connectedPeer?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "sync_run_direction_download_target".localized : name
+    }
+
+    @ViewBuilder
+    private var contentModePicker: some View {
+        Picker("", selection: modeBinding) {
+            Text("sync_run_mode_library".localized).tag(SyncUISelectionMode.library)
+            Text("sync_run_mode_playlists".localized).tag(SyncUISelectionMode.playlists)
+            Text("sync_run_mode_tracks".localized).tag(SyncUISelectionMode.tracks)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
     /// 模式切换：全曲库先弹二次确认，用户在确认框里点头才真正切过去。
     private var modeBinding: Binding<SyncUISelectionMode> {
         Binding(
-            get: { model.selectionMode },
+            get: { content.selectionMode },
             set: { mode in
                 switch mode {
                 case .library:
-                    libraryWidePreview = model.libraryWidePreview()
+                    libraryWidePreview = content.libraryWidePreview()
                     showLibraryWideConfirm = true
                 case .playlists:
-                    model.setPlaylistsMode()
+                    content.setPlaylistsMode()
                 case .tracks:
-                    model.setTracksMode()
+                    content.setTracksMode()
                 }
             }
         )
     }
 
     private var libraryRow: some View {
-        let selected = model.selection.isLibraryWide
-        let summary = model.selectionSummary
+        let selected = content.selection.isLibraryWide
+        let summary = content.selectionSummary
         return HStack(spacing: 10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(selected ? Color.accentColor : Color.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text("sync_run_library_row_title".localized)
+                Text(libraryRowTitle)
                 Text(
                     selected
                         ? "sync_run_library_row_detail".localized(with: summary.trackCount, summary.sizeText)
@@ -218,30 +339,44 @@ struct MacSyncRunSection: View {
         .contentShape(Rectangle())
         .onTapGesture {
             guard !selected else { return }
-            libraryWidePreview = model.libraryWidePreview()
+            libraryWidePreview = content.libraryWidePreview()
             showLibraryWideConfirm = true
         }
     }
 
+    /// 全曲库行标题：下载方向明确写「iPhone 的全部歌曲」（避免又看成本端曲库）。
+    private var libraryRowTitle: String {
+        content.source == .peer
+            ? "sync_run_library_row_title_peer".localized(with: peerName)
+            : "sync_run_library_row_title".localized
+    }
+
     @ViewBuilder
     private var playlistList: some View {
-        if model.playlistOptions.isEmpty {
-            Text("sync_run_playlists_empty".localized)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        } else {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(model.playlistOptions) { option in
-                    Toggle(isOn: playlistBinding(option.id)) {
-                        HStack(spacing: 8) {
-                            Text(option.title)
-                            Spacer()
-                            Text("sync_run_songs_count".localized(with: option.trackCount))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+        switch content.playlistState {
+        case .idle, .loading:
+            loadingRow("sync_run_playlists_loading")
+        case let .failed(error):
+            failureRow(error)
+        case .loaded:
+            if content.playlistOptions.isEmpty {
+                Text("sync_run_playlists_empty".localized)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(content.playlistOptions) { option in
+                        Toggle(isOn: playlistBinding(option.id)) {
+                            HStack(spacing: 8) {
+                                Text(option.title)
+                                Spacer()
+                                Text("sync_run_songs_count".localized(with: option.trackCount))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        .toggleStyle(.checkbox)
                     }
-                    .toggleStyle(.checkbox)
                 }
             }
         }
@@ -249,10 +384,10 @@ struct MacSyncRunSection: View {
 
     private func playlistBinding(_ id: String) -> Binding<Bool> {
         Binding(
-            get: { model.selectedPlaylistIDs.contains(id) },
+            get: { content.selectedPlaylistIDs.contains(id) },
             set: { isOn in
-                guard isOn != model.selectedPlaylistIDs.contains(id) else { return }
-                model.togglePlaylist(id)
+                guard isOn != content.selectedPlaylistIDs.contains(id) else { return }
+                content.togglePlaylist(id)
             }
         )
     }
@@ -260,20 +395,20 @@ struct MacSyncRunSection: View {
     @ViewBuilder
     private var trackList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextField("sync_run_track_search_placeholder".localized, text: $model.trackQuery)
+            TextField("sync_run_track_search_placeholder".localized, text: $content.trackQuery)
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: model.trackQuery) { _ in
+                .onChange(of: content.trackQuery) { _ in
                     searchTask?.cancel()
                     searchTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        try? await Task.sleep(nanoseconds: SyncUIContentLimits.searchDebounceNanoseconds)
                         guard !Task.isCancelled else { return }
-                        model.reloadTracks(reset: true)
+                        content.applySearch()
                     }
                 }
 
-            if model.trackOptions.isEmpty {
+            if content.trackOptions.isEmpty {
                 Text(
-                    model.isLoadingTracks
+                    content.isLoadingTracks
                         ? "sync_run_tracks_loading".localized
                         : "sync_run_tracks_empty".localized
                 )
@@ -282,53 +417,97 @@ struct MacSyncRunSection: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(model.trackOptions) { option in
-                            Toggle(isOn: trackBinding(option.relativePath)) {
-                                HStack(spacing: 8) {
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(option.title)
-                                        if let artist = option.artistName, !artist.isEmpty {
-                                            Text(artist)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    Spacer()
-                                    if let size = option.fileSize, size > 0 {
-                                        Text(SyncUISizeText.humanReadable(bytes: size))
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                    }
+                        ForEach(Array(content.trackOptions.enumerated()), id: \.element.id) { index, option in
+                            trackRow(option)
+                                .onAppear {
+                                    // 滚到底自动续页（懒加载；对端分页取下一页）。
+                                    guard index == content.trackOptions.count - 1 else { return }
+                                    content.loadMoreTracks()
                                 }
-                            }
-                            .toggleStyle(.checkbox)
                         }
                     }
                 }
                 .frame(maxHeight: 240)
 
-                if model.hasMoreTracks {
+                if content.isLoadingTracks {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if content.hasMoreTracks {
                     Button("sync_run_tracks_load_more".localized) {
-                        model.reloadTracks(reset: false)
+                        content.loadMoreTracks()
                     }
                 }
+            }
+
+            if let error = content.tracksState.failure, error.isUserVisibleFailure {
+                failureRow(error)
             }
         }
     }
 
+    private func trackRow(_ option: SyncUITrackOption) -> some View {
+        Toggle(isOn: trackBinding(option.relativePath)) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(option.title)
+                    if let artist = option.artistName, !artist.isEmpty {
+                        Text(artist)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                if let size = option.fileSize, size > 0 {
+                    Text(SyncUISizeText.humanReadable(bytes: size))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .toggleStyle(.checkbox)
+    }
+
     private func trackBinding(_ relativePath: String) -> Binding<Bool> {
         Binding(
-            get: { model.selectedTrackPaths.contains(relativePath) },
+            get: { content.selectedTrackPaths.contains(relativePath) },
             set: { isOn in
-                guard isOn != model.selectedTrackPaths.contains(relativePath) else { return }
-                model.toggleTrack(relativePath)
+                guard isOn != content.selectedTrackPaths.contains(relativePath) else { return }
+                content.toggleTrack(relativePath)
             }
         )
     }
 
+    /// 加载中一行。
+    private func loadingRow(_ key: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(key.localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// 失败一行（原因 + 重试）。
+    private func failureRow(_ error: SyncUIPeerContentError) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+            Text(error.messageKey.localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("sync_peer_retry".localized) {
+                content.retryPeerContent()
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
     @ViewBuilder
     private var selectionTotals: some View {
-        let summary = model.selectionSummary
+        let summary = content.selectionSummary
         VStack(alignment: .leading, spacing: 2) {
             if summary.isEmpty {
                 Text("sync_run_selection_empty".localized)
@@ -354,7 +533,7 @@ struct MacSyncRunSection: View {
     }
 
     private var selectionTotalText: String {
-        let summary = model.selectionSummary
+        let summary = content.selectionSummary
         if summary.isLibraryWide {
             return "sync_run_selection_total_library".localized(with: summary.trackCount, summary.sizeText)
         }
@@ -368,7 +547,7 @@ struct MacSyncRunSection: View {
         return "sync_run_selection_total_tracks".localized(with: summary.trackCount, summary.sizeText)
     }
 
-    // MARK: - C 执行区
+    // MARK: - D 执行区
 
     @ViewBuilder
     private var runSection: some View {
@@ -379,19 +558,13 @@ struct MacSyncRunSection: View {
                         model.cancelSync()
                     }
                 } else {
-                    // 两个方向是用户显式选择的独立操作（2026-09-11 拍板）：
-                    // 上传 = 本端有对端缺 → 推送；下载 = 以对端清单为准 → 拉取。
-                    Button("sync_run_upload".localized) {
-                        model.startUpload()
+                    // T10：方向已在第一屏选定 → 这里是**一个**按方向命名的开始键
+                    // （两个独立方向键会在「已选下载却点上传」时自相矛盾）。
+                    Button(startButtonTitle) {
+                        model.startSync()
                     }
                     .disabled(!model.startAvailability.canStart)
-                    .help("sync_run_upload_help".localized)
-
-                    Button("sync_run_download".localized) {
-                        model.startDownload()
-                    }
-                    .disabled(!model.startAvailability.canStart)
-                    .help("sync_run_download_help".localized)
+                    .help(startButtonHelp)
                 }
 
                 Text(phaseText)
@@ -431,6 +604,22 @@ struct MacSyncRunSection: View {
         }
     }
 
+    /// 开始键标题：按当前方向命名（未选方向 = 通用「开始同步」，此时按钮禁用）。
+    private var startButtonTitle: String {
+        switch model.direction {
+        case .none: return "sync_run_start".localized
+        case .some(.upload): return "sync_run_upload".localized
+        case .some(.download): return "sync_run_download".localized
+        }
+    }
+
+    private var startButtonHelp: String {
+        switch model.direction {
+        case .some(.download): return "sync_run_download_help".localized
+        default: return "sync_run_upload_help".localized
+        }
+    }
+
     /// 阶段文案（非失败态）。
     private var phaseText: String {
         switch model.phase {
@@ -467,12 +656,14 @@ struct MacSyncRunSection: View {
             return "sync_run_reason_not_connected".localized
         case .libraryUnavailable:
             return "sync_run_reason_library_unavailable".localized
+        case .noDirection:
+            return "sync_run_reason_no_direction".localized
         case .emptySelection:
             return "sync_run_reason_empty_selection".localized
         }
     }
 
-    // MARK: - D 结果区
+    // MARK: - E 结果区
 
     @ViewBuilder
     private var resultSection: some View {

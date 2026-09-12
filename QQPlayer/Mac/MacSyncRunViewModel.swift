@@ -2,14 +2,20 @@
 //  MacSyncRunViewModel.swift
 //  QQPlayer
 //
-//  M6（T3，2026-09-11）Mac 同步页**执行侧视图模型**（QQPlayerMac target only）。
+//  M6（T3，2026-09-11；T10 2026-09-12 改造）Mac 同步页**执行侧视图模型**
+//  （QQPlayerMac target only）。
 //
 //  职责（契约 C4）：把一个 ready 会话 + 用户选择集，驱动成一次可见的同步：
 //  - 装配：`MacSyncCoordinatorFactory.make(session:selection:)`（**唯一装配入口**：
 //    曲库根 / 描述符 / sink / 歌词映射一律走它，本文件不另建一套路径或 DB 口径）
 //  - 订阅：`onStateChange` / `onFileTransferred` / `onPeerManifestReceived`
-//  - 发布：阶段、进度、结果摘要、选择集与选择集规模（供四区 UI 消费）
+//  - 发布：阶段、进度、结果摘要（供执行区 / 结果区 UI 消费）
 //  - 判定：全部委托 `SyncUIState`（纯逻辑，可单测）；本文件只做 IO 与线程搬运
+//
+//  ⚠️ T10 分工（与 `MacSyncContentModel` 的边界）：本类型只管**跑**一次同步；
+//  「同步什么」（方向 / 内容源 / 选项 / 选择集）在 `MacSyncContentModel`。两者由
+//  View 同时持有；内容侧的 `objectWillChange` 会驱动本类型刷新按钮可用性。
+//  T10 新增：**方向是开始同步的前置**（`selectDirection` → 未选方向时按钮禁用）。
 //
 //  线程（硬要求）：协调器的回调在**会话线程**触发 → 一律 `Task { @MainActor in }`
 //  回到主线程再改 `@Published`（本类是 `@MainActor`）。
@@ -25,28 +31,20 @@
 //
 //  为什么不做单测：本文件属 `QQPlayer/Mac/`（iOS 单测 target 看不到它，仓库也没有
 //  macOS 单测 target）→ 靠编译 + 代码审查覆盖；其中可测的判定全部在
-//  `SyncUIState`（共享 Core，QQPlayerTests 真跑）。
+//  `SyncUIState` / `SyncUIDirectionContent`（共享 Core，QQPlayerTests 真跑）。
 //
 
 import Combine
 import Foundation
-import GRDB
 
 @MainActor
 final class MacSyncRunViewModel: ObservableObject {
-    /// 单曲级列表每页条数（懒加载；量大不分页会卡主线程）。
-    static let trackPageSize = 100
-    /// 单曲级搜索结果上限（搜索走 DB 的 ranked search，不再分页）。
-    static let trackSearchLimit = 200
-
     // MARK: 依赖
 
     private let hostCenter: SyncHostCenter
-    private let selectionStore: SyncSelectionStore
-    private let database: DatabaseManager
+    /// 内容侧（方向 / 内容源 / 选择集）。
+    private let content: MacSyncContentModel
     private let deviceStore: DeviceStore
-    /// 曲库根（相对路径口径；与 `MacSyncCoordinatorFactory` / `MacSyncLibraryHost` 同源）。
-    private let libraryRoot: URL
     private let makeCoordinator: (SyncPeerSession, SyncCollectionSelection) -> SyncCollectionSyncCoordinator
 
     // MARK: 发布状态
@@ -59,21 +57,7 @@ final class MacSyncRunViewModel: ObservableObject {
     @Published private(set) var progress: SyncUIProgress = .idle
     /// 最近一次同步的结果摘要（nil = 还没跑过）。
     @Published private(set) var reportSummary: SyncUIReportSummary?
-    /// 当前选择集（唯一事实源；持久化到 `SyncSelectionStore`）。
-    @Published private(set) var selection: SyncCollectionSelection = .playlists([])
-    /// 选择集规模摘要（底部合计 / 全库二次确认文案）。
-    @Published private(set) var selectionSummary: SyncUISelectionSummary = .empty
-    /// 歌单选项（含「收藏」伪歌单）。
-    @Published private(set) var playlistOptions: [SyncUIPlaylistOption] = []
-    /// 单曲级选项（当前页 / 搜索结果）。
-    @Published private(set) var trackOptions: [SyncUITrackOption] = []
-    /// 单曲级是否还有下一页。
-    @Published private(set) var hasMoreTracks = false
-    /// 单曲级正在加载。
-    @Published private(set) var isLoadingTracks = false
-    /// 单曲级搜索词（View 绑定；变化后调用 `reloadTracks(reset: true)`）。
-    @Published var trackQuery = ""
-    /// 集合错误（加载失败等；UI 弹一次）。
+    /// 执行期错误（装配失败等；UI 弹一次）。
     @Published private(set) var errorMessage: String?
     /// 每秒更新（连接时长展示用）。
     @Published private(set) var now = Date()
@@ -81,26 +65,22 @@ final class MacSyncRunViewModel: ObservableObject {
     @Published private(set) var didDisconnectWhileRunning = false
     /// 最近一次/进行中的传输方向（nil = 还没跑过）。
     @Published private(set) var runDirection: SyncTransferDirection?
+    /// 用户选定的同步方向（T10：面板第一屏；未选 = nil → 不能开始）。
+    @Published private(set) var direction: SyncTransferDirection?
 
     // MARK: 内部状态
 
     private var coordinator: SyncCollectionSyncCoordinator?
     private var transferredCount = 0
     private var currentPath: String?
-    private var didLoadOnce = false
-    private var trackOffset = 0
-    private var libraryFacts: SyncUILibraryFacts = .empty
-    private var artistNamesByStableId: [String: String] = [:]
     private var cancellables = Set<AnyCancellable>()
     private var tickTask: Task<Void, Never>?
     private var reportRefreshTask: Task<Void, Never>?
 
     init(
         hostCenter: SyncHostCenter? = nil,
-        selectionStore: SyncSelectionStore = SyncSelectionStore(),
-        database: DatabaseManager = .shared,
+        content: MacSyncContentModel,
         deviceStore: DeviceStore = DeviceStore(),
-        libraryRoot: URL? = nil,
         makeCoordinator: @escaping (SyncPeerSession, SyncCollectionSelection) -> SyncCollectionSyncCoordinator = {
             MacSyncCoordinatorFactory.make(session: $0, selection: $1)
         }
@@ -110,18 +90,20 @@ final class MacSyncRunViewModel: ObservableObject {
         // （Swift 6 语言模式下是错误）→ 在 init 体内（MainActor）解析。
         let center = hostCenter ?? .shared
         self.hostCenter = center
-        self.selectionStore = selectionStore
-        self.database = database
+        self.content = content
         self.deviceStore = deviceStore
-        self.libraryRoot = libraryRoot ?? MusicFolderResolver.macDefaultFolderURL(
-            homeDirectory: FileManager.default.homeDirectoryForCurrentUser
-        )
         self.makeCoordinator = makeCoordinator
         // 监听中心变化（连接/断开/开关）→ 主线程刷新可用性与运行态。
         // objectWillChange 是**变更前**通知 → 用 Task 排到主线程队列尾，读到的就是新值。
         center.objectWillChange
             .sink { [weak self] _ in
                 Task { @MainActor in self?.hostDidChange() }
+            }
+            .store(in: &cancellables)
+        // 内容变化（选方向 / 勾选 / 换内容源）→ 刷新按钮可用性。
+        content.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.refreshAvailability() }
             }
             .store(in: &cancellables)
     }
@@ -149,17 +131,6 @@ final class MacSyncRunViewModel: ObservableObject {
         set { hostCenter.allowsLANConnections = newValue }
     }
 
-    /// 当前选择集模式（三级）。
-    var selectionMode: SyncUISelectionMode {
-        SyncUISelectionMode.mode(for: selection)
-    }
-
-    /// 已选歌单标识（歌单级多选态）。
-    var selectedPlaylistIDs: Set<String> { Set(selection.playlistIDs ?? []) }
-
-    /// 已选相对路径（单曲级多选态）。
-    var selectedTrackPaths: Set<String> { Set(selection.relativePaths ?? []) }
-
     /// 中断提示（掉线中止 / 用户取消 / 无）。
     var interruption: SyncUIInterruption {
         SyncUIInterruption.resolve(phase: phase, didDisconnectWhileRunning: didDisconnectWhileRunning)
@@ -178,16 +149,8 @@ final class MacSyncRunViewModel: ObservableObject {
 
     // MARK: - 生命周期
 
-    /// 页面出现：载入上次选择 + 列表 + 可用性（幂等：第二次起只刷新）。
+    /// 页面出现：刷新可用性 + 计时。内容（方向/清单）由内容侧自己管。
     func onAppear() {
-        if !didLoadOnce {
-            didLoadOnce = true
-            let stored = selectionStore.load()
-            selection = stored
-            reloadPlaylists()
-            reloadTracks(reset: true)
-            estimateSelection()
-        }
         refreshAvailability()
         if isConnected { startTicking() } else { stopTicking() }
     }
@@ -200,140 +163,25 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 弹一次错误。
     func clearError() { errorMessage = nil }
 
-    // MARK: - 选择集
+    // MARK: - 方向（面板第一屏）
 
-    /// 切到「全曲库」模式（View 二次确认后才调）。
-    func setLibraryWide() {
-        setMode(.library)
-    }
-
-    /// 切到歌单级（保留已勾选的歌单）。
-    func setPlaylistsMode() {
-        setMode(.playlists)
-    }
-
-    /// 切到单曲级（保留已勾选的单曲）。
-    func setTracksMode() {
-        setMode(.tracks)
-    }
-
-    /// 勾选 / 取消勾选一个歌单。
-    func togglePlaylist(_ id: String) {
-        var picks = selectedPlaylistIDs
-        if picks.contains(id) { picks.remove(id) } else { picks.insert(id) }
-        applyPicks(mode: .playlists, playlistIDs: picks, trackPaths: selectedTrackPaths)
-    }
-
-    /// 勾选 / 取消勾选一首歌。
-    func toggleTrack(_ relativePath: String) {
-        var picks = selectedTrackPaths
-        if picks.contains(relativePath) { picks.remove(relativePath) } else { picks.insert(relativePath) }
-        applyPicks(mode: .tracks, playlistIDs: selectedPlaylistIDs, trackPaths: picks)
-    }
-
-    /// 手动指定单曲集合（替换整个单曲级选择）。
-    func setManualTracks(_ relativePaths: [String]) {
-        applyPicks(mode: .tracks, playlistIDs: selectedPlaylistIDs, trackPaths: Set(relativePaths))
-    }
-
-    /// 清空选择（不推不拉）。
-    func clearSelection() {
-        applyPicks(mode: .playlists, playlistIDs: [], trackPaths: [])
-    }
-
-    /// 全曲库选择的规模预览（二次确认文案；会按需加载全库合计）。
-    func libraryWidePreview() -> SyncUISelectionSummary {
-        loadLibraryFacts()
-        return SyncUISelectionSummarizer.make(
-            selection: .all,
-            playlists: playlistOptions,
-            tracks: trackOptions,
-            library: libraryFacts
-        )
-    }
-
-    /// 重算选择集规模（选项加载/选择变化后调用）。
-    func estimateSelection() {
-        if selection.isLibraryWide { loadLibraryFacts() }
-        selectionSummary = SyncUISelectionSummarizer.make(
-            selection: selection,
-            playlists: playlistOptions,
-            tracks: trackOptions,
-            library: libraryFacts
-        )
-    }
-
-    // MARK: - 数据加载
-
-    /// 重载歌单选项（含「收藏」伪歌单；每项带曲目数与大小合计）。
-    func reloadPlaylists() {
-        var options: [SyncUIPlaylistOption] = []
-
-        let favorites = (try? database.getFavoriteTracks()) ?? []
-        options.append(
-            SyncUIPlaylistOption(
-                id: SyncCollectionSelection.favoritesPlaylistID,
-                title: "sync_run_favorites".localized,
-                trackCount: favorites.count,
-                totalBytes: totalBytes(of: favorites),
-                missingSizeCount: favorites.filter { ($0.fileSize ?? 0) <= 0 }.count
-            )
-        )
-
-        // 一次取全库曲目建索引，避免「每个歌单成员一次查询」把主线程拖住。
-        let tracksByStableId = Dictionary(
-            ((try? database.getAllTracks()) ?? []).map { ($0.stableId, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        let playlists = (try? database.getAllPlaylists()) ?? []
-        for playlist in playlists {
-            guard let playlistID = playlist.id,
-                  let items = try? database.getPlaylistItems(playlistId: playlistID)
-            else { continue }
-            let members = items.compactMap { tracksByStableId[$0.trackStableId] }
-            options.append(
-                SyncUIPlaylistOption(
-                    id: playlist.slug,
-                    title: playlist.title,
-                    trackCount: members.count,
-                    totalBytes: totalBytes(of: members),
-                    missingSizeCount: members.filter { ($0.fileSize ?? 0) <= 0 }.count
-                )
-            )
-        }
-        playlistOptions = options
-        estimateSelection()
-    }
-
-    /// 单曲级列表：`reset` 重头加载第一页（或按搜索词搜），否则追加下一页。
-    func reloadTracks(reset: Bool) {
-        if reset { trackOffset = 0 }
-        isLoadingTracks = true
-        defer { isLoadingTracks = false }
-
-        let query = trackQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        let page: [Track]
-        if query.isEmpty {
-            page = (try? database.getTracksPaginated(limit: Self.trackPageSize, offset: trackOffset)) ?? []
-        } else {
-            page = (try? database.searchTracks(query: query, limit: Self.trackSearchLimit)) ?? []
-        }
-        loadArtistNamesIfNeeded(for: page)
-
-        let options = page.compactMap(trackOption(for:))
-        if reset || !query.isEmpty {
-            trackOptions = options
-            trackOffset = options.count
-            hasMoreTracks = query.isEmpty && page.count == Self.trackPageSize
-        } else {
-            trackOptions += options
-            trackOffset += options.count
-            hasMoreTracks = page.count == Self.trackPageSize
-        }
-        estimateSelection()
+    /// 选定同步方向：内容源整体切换（内容侧负责清空/重建选择集），并刷新可用性。
+    func selectDirection(_ direction: SyncTransferDirection) {
+        self.direction = direction
+        content.switchDirection(to: direction)
+        refreshAvailability()
     }
 
     // MARK: - 同步执行
+
+    /// 按当前方向开始同步（View 的唯一入口；未选方向 = 什么都不做）。
+    func startSync() {
+        guard let direction else { return }
+        switch direction {
+        case .upload: startUpload()
+        case .download: startDownload()
+        }
+    }
 
     /// 上传到移动端（Mac → iPhone；仅在 `startAvailability == .ready` 时有效）。
     func startUpload() { start(direction: .upload) }
@@ -356,7 +204,7 @@ final class MacSyncRunViewModel: ObservableObject {
         reportSummary = nil
         errorMessage = nil
 
-        let coordinator = makeCoordinator(session, selection)
+        let coordinator = makeCoordinator(session, content.selection)
         coordinator.onStateChange = { [weak self] state in
             Task { @MainActor in self?.handleState(state, from: coordinator) }
         }
@@ -429,20 +277,6 @@ final class MacSyncRunViewModel: ObservableObject {
 
     // MARK: - 内部
 
-    private func setMode(_ mode: SyncUISelectionMode) {
-        applyPicks(mode: mode, playlistIDs: selectedPlaylistIDs, trackPaths: selectedTrackPaths)
-    }
-
-    /// 唯一的选择集写入口：算选择集 → 持久化 → 重算摘要 → 刷新可用性。
-    /// 持久化只在**非空**时发生（空选择不覆盖上次勾选：中途切模式不会把存档清空）。
-    private func applyPicks(mode: SyncUISelectionMode, playlistIDs: Set<String>, trackPaths: Set<String>) {
-        let next = SyncUISelectionMode.selection(mode: mode, playlistIDs: playlistIDs, trackPaths: trackPaths)
-        selection = next
-        if !next.isEmptySelection { selectionStore.save(next) }
-        estimateSelection()
-        refreshAvailability()
-    }
-
     private func refreshAvailability() {
         let running = coordinator.map { !SyncCollectionSyncState.isTerminal($0.state) } ?? false
         startAvailability = SyncUIStartGate.evaluate(
@@ -450,7 +284,8 @@ final class MacSyncRunViewModel: ObservableObject {
             isConnected: isConnected,
             hasSession: hostCenter.activeSession != nil,
             isRunning: running,
-            isEmptySelection: selection.isEmptySelection
+            hasDirection: direction != nil,
+            isEmptySelection: content.selection.isEmptySelection
         )
     }
 
@@ -503,48 +338,5 @@ final class MacSyncRunViewModel: ObservableObject {
     private func stopTicking() {
         tickTask?.cancel()
         tickTask = nil
-    }
-
-    private func loadLibraryFacts() {
-        let count = (try? database.getTrackCount()) ?? 0
-        let bytes = (try? database.read { db in
-            try Int64.fetchOne(db, sql: "SELECT COALESCE(SUM(file_size), 0) FROM track")
-        }) ?? 0
-        libraryFacts = SyncUILibraryFacts(trackCount: count, totalBytes: bytes)
-    }
-
-    private func loadArtistNamesIfNeeded(for page: [Track]) {
-        let missing = page.filter { artistNamesByStableId[$0.stableId] == nil }
-        guard !missing.isEmpty else { return }
-        let fallback = Dictionary(
-            missing.compactMap { track in track.artistId.map { (track.stableId, $0) } },
-            uniquingKeysWith: { first, _ in first }
-        )
-        let names = (try? database.getArtistDisplayNames(
-            forTrackStableIds: missing.map(\.stableId),
-            fallbackArtistIdsByStableId: fallback
-        )) ?? [:]
-        artistNamesByStableId.merge(names) { _, new in new }
-    }
-
-    private func trackOption(for track: Track) -> SyncUITrackOption? {
-        guard let relativePath = SyncManifestGenerator.relativePath(
-            of: URL(fileURLWithPath: track.path),
-            baseDirectory: libraryRoot
-        ) else {
-            return nil
-        }
-        return SyncUITrackOption(
-            relativePath: relativePath,
-            title: track.title,
-            artistName: artistNamesByStableId[track.stableId],
-            fileSize: track.fileSize
-        )
-    }
-
-    private func totalBytes(of tracks: [Track]) -> Int64 {
-        tracks.reduce(Int64(0)) { total, track in
-            total + max(0, track.fileSize ?? 0)
-        }
     }
 }

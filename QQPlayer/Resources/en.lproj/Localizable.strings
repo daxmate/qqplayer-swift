@@ -868,3 +868,29 @@
 "sync_run_result_unresolved" = "%d songs aren't fingerprinted yet and were skipped.";
 "sync_run_result_empty_selection" = "Nothing was selected, so nothing was transferred.";
 "sync_run_result_no_deletion" = "Syncing never deletes songs on either device.";
+
+// T10（2026-09-12）方向优先 · 内容源随方向切换
+"sync_run_direction_section" = "Sync Direction";
+"sync_run_direction_upload" = "Upload to iPhone";
+"sync_run_direction_upload_detail" = "Send songs from this Mac to your iPhone.";
+"sync_run_direction_download" = "Download from iPhone";
+"sync_run_direction_download_detail" = "Bring songs from your iPhone to this Mac.";
+"sync_run_direction_footer" = "Pick a direction first — the list below then shows that device's content.";
+"sync_run_direction_hint" = "Choose a sync direction above to see what can be synced.";
+"sync_run_direction_download_target" = "iPhone";
+"sync_run_reason_no_direction" = "Choose a sync direction first.";
+"sync_run_selection_section_local" = "What to Sync · On This Mac";
+"sync_run_selection_section_peer" = "What to Sync · On Your iPhone";
+"sync_run_peer_needs_connection" = "Connect your iPhone first (Settings → Sync).";
+"sync_run_library_row_title_peer" = "Everything on %@";
+"sync_run_library_confirm_message_download" = "This downloads about %@ across %d songs from your iPhone. It can take a long time and use a lot of storage. Continue?";
+"sync_run_playlists_loading" = "Loading playlists…";
+"sync_peer_summary" = "%@ library · %d songs · about %@";
+"sync_peer_summary_loading" = "Loading your iPhone's library…";
+"sync_peer_summary_unknown" = "%@ library size unavailable.";
+"sync_peer_retry" = "Try Again";
+"sync_peer_error_not_connected" = "Not connected to your iPhone.";
+"sync_peer_error_session" = "The connection ended. Reconnect and try again.";
+"sync_peer_error_timeout" = "Your iPhone didn't respond in time.";
+"sync_peer_error_cancelled" = "Request cancelled.";
+"sync_peer_error_other" = "Couldn't load your iPhone's content.";
