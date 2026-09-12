@@ -79,6 +79,8 @@ struct MacLibraryView: View {
     @State private var rescanWhenIdle = false
     /// 索引中增量刷新任务（防抖）
     @State private var libraryRefreshTask: Task<Void, Never>?
+    /// 曲库全量重载任务句柄（审计 M2：四表读移出主线程，prev 同名任务作废）
+    @State private var libraryLoadTask: Task<Void, Never>?
     /// 文件拖入导入（web 版拖拽对齐，B 组）：拖拽悬停高亮 + 完成后 toast
     @State private var isDropTargeted = false
     @State private var importToast: String?
@@ -254,6 +256,7 @@ struct MacLibraryView: View {
             debounceTask?.cancel()
             searchTask?.cancel()
             libraryRefreshTask?.cancel()
+            libraryLoadTask?.cancel()
             MacFolderMonitor.shared.stop()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
@@ -321,7 +324,19 @@ struct MacLibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: .libraryImportFinished)) { note in
             // 导入完成 toast（web 版 toast 对齐；歌单行 drop 复用同一通知）
             let count = (note.userInfo?["count"] as? Int) ?? 0
-            showImportToast(Localized.dragImportSuccess(count: count))
+            let skipped = (note.userInfo?["skipped"] as? Int) ?? 0
+            // 审计 D2：跳过数以前写而不读（用户只看到「已导入 0 首」）→ 上屏
+            if count > 0, skipped > 0 {
+                showImportToast(Localized.dragImportPartial(imported: count, skipped: skipped))
+            } else {
+                showImportToast(Localized.dragImportSuccess(count: count))
+            }
+        }
+        // 曲库加载失败上屏（审计 M6：loadError 以前只写不读 → 用户只看到空曲库）
+        .alert("error".localized, isPresented: libraryLoadErrorBinding) {
+            Button(Localized.ok, role: .cancel) { loadError = nil }
+        } message: {
+            Text(loadError ?? "")
         }
     }
 
@@ -341,7 +356,10 @@ struct MacLibraryView: View {
             }
             guard !urls.isEmpty else { return }
             let result = await MacImportService.importFiles(urls)
-            if result.importedCount == 0 {
+            if result.importedCount == 0, result.skippedCount > 0 {
+                // 全部被跳过（格式不支持/非文件 URL）：告知跳过数，而非笼统「未导入」
+                showImportToast(Localized.dragImportSkipped(count: result.skippedCount))
+            } else if result.importedCount == 0 {
                 showImportToast(Localized.dragImportNone)
             }
         }
@@ -506,18 +524,44 @@ struct MacLibraryView: View {
 
     // MARK: - Data
 
+    /// 曲库加载：四表全量读在全局执行器上跑（审计 M2——以前同步跑在主线程，
+    /// 且由 7+ 处通知反复触发）。拿到快照后先预取卡片事实再落表，
+    /// 卡片渲染时计数已就位（不闪 0）。
     private func reloadLibrary() {
-        do {
-            tracks = try DatabaseManager.shared.getAllTracks()
-            albums = try DatabaseManager.shared.getAllAlbums()
-            artists = try DatabaseManager.shared.getAllArtists()
-            playlists = try DatabaseManager.shared.getAllPlaylists()
-            loadError = nil
-        } catch {
-            loadError = "load_library_failed".localized(with: error.localizedDescription)
-            print("❌ macOS reloadLibrary failed: \(error)")
+        libraryLoadTask?.cancel()
+        // 曲库数据可能已变：作废在途事实（旧值保留到预取完，不闪 0）
+        MacLibraryFactsStore.shared.invalidate()
+        libraryLoadTask = Task { @MainActor in
+            let loaded = await MacLibraryLoader.load()
+            guard !Task.isCancelled else { return }
+            switch loaded {
+            case .success(let snapshot):
+                await MacLibraryFactsStore.shared.preload(
+                    tracks: snapshot.tracks,
+                    albums: snapshot.albums,
+                    artists: snapshot.artists,
+                    playlists: snapshot.playlists
+                )
+                guard !Task.isCancelled else { return }
+                tracks = snapshot.tracks
+                albums = snapshot.albums
+                artists = snapshot.artists
+                playlists = snapshot.playlists
+                loadError = nil
+            case .failure(let error):
+                loadError = "load_library_failed".localized(with: error.localizedDescription)
+                print("❌ macOS reloadLibrary failed: \(error)")
+            }
+            reloadLikedTracks()
         }
-        reloadLikedTracks()
+    }
+
+    /// 加载失败弹窗开关（审计 M6）
+    private var libraryLoadErrorBinding: Binding<Bool> {
+        Binding(
+            get: { loadError != nil },
+            set: { if !$0 { loadError = nil } }
+        )
     }
 
     private func reloadLikedTracks() {

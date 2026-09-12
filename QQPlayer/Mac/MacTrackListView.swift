@@ -66,6 +66,8 @@ struct MacTrackListView: View {
     var onShowArtist: ((Track) -> Void)?
     var onShowAlbum: ((Track) -> Void)?
 
+    /// 曲库卡片事实缓存（审计 M2：body 里的同步全量 DB 查询→缓存/异步）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
     @State private var selectedRows = Set<String>()
     @State private var favoriteIds: Set<String> = []
     @State private var playlists: [Playlist] = []
@@ -80,6 +82,10 @@ struct MacTrackListView: View {
     @State private var showTrashConfirm = false
     @State private var pendingTrashTracks: [Track] = []
     @State private var trashFailureAlert: String?
+    /// 批量移到废纸篓的执行任务句柄（可取消：进度条上的取消按钮）
+    @State private var trashTask: Task<Void, Never>?
+    /// 批量删除进度（nil = 无进行中的批次）；磁盘/DB 在全局执行器上跑，回主线程落表
+    @State private var trashProgress: MacTrashService.Progress?
     /// 播放器（删除当前播放曲目时切下一首/停止）
     @StateObject private var player = PlayerEngine.shared
     /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
@@ -169,6 +175,22 @@ struct MacTrackListView: View {
             .buttonStyle(.borderless)
             .disabled(activeTrackId == nil)
             Spacer()
+            // 批量删除进度 + 取消（审计 H1：修复前磁盘/DB 逐首同步跑在主线程、
+            // 窗口卡死且无法取消——现在执行在后台，主线程只显示进度并允许取消）
+            if let trashProgress {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("\(trashProgress.done)/\(trashProgress.total)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                    Button("cancel".localized) {
+                        trashTask?.cancel()
+                    }
+                    .controlSize(.small)
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
@@ -404,42 +426,33 @@ struct MacTrackListView: View {
         guard !tracks.isEmpty else { return }
         pendingTrashTracks = []
 
-        Task { @MainActor in
-            let fm = FileManager.default
-            let deletedStableIds = Set(tracks.map(\.stableId))
-            var failedCount = 0
-            var deletedAny = false
+        // 整批 stableId：沿用修复前语义（本地即时移除 + 播放队列联动都按整批算，
+        // 失败项随后由 LibraryNeedsRefresh 重载回列表）
+        let items = tracks.map {
+            MacTrashService.Item(stableId: $0.stableId, title: $0.title, path: $0.path)
+        }
+        let deletedStableIds = Set(items.map(\.stableId))
 
-            for track in tracks {
-                let url = URL(fileURLWithPath: track.path)
-                MacTrashLogger.log("开始处理: \(track.title) | path=\(track.path)")
-                // web 语义：磁盘文件不存在（已丢）→ 照常清理引用计入 deleted；
-                // trash 失败且文件还在 → errors（保留曲目）；库内 → 移系统废纸篓
-                if fm.fileExists(atPath: url.path) {
-                    do {
-                        try fm.trashItem(at: url, resultingItemURL: nil)
-                        MacTrashLogger.log("trashItem 成功: \(track.title)")
-                    } catch {
-                        failedCount += 1
-                        let msg = "🗑️ moveToTrash failed for \(track.title): \(error)"
-                        print(msg)
-                        MacTrashLogger.log(msg)
-                        continue
+        // 重入保护：上一批仍在跑时先取消它（避免两次批次交错写同一批状态）
+        trashTask?.cancel()
+        trashProgress = MacTrashService.Progress(done: 0, total: items.count)
+        trashTask = Task { @MainActor in
+            // 磁盘 trash + DB 删除走 MacTrashService（nonisolated async → 全局执行器）：
+            // 修复前整批在主 actor 上同步执行，多选数百首/iCloud dataless 文件会把窗口
+            // 卡死数十秒且无法取消（审计 H1）。主线程只负责落 @State 与发通知。
+            let outcome = await MacTrashService.trash(
+                items: items,
+                environment: .live(log: { MacTrashLogger.log($0) }),
+                onProgress: { done, total in
+                    DispatchQueue.main.async {
+                        trashProgress = MacTrashService.Progress(done: done, total: total)
                     }
-                } else {
-                    MacTrashLogger.log("文件不存在(磁盘已丢): \(track.path)")
                 }
-                do {
-                    try DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
-                    deletedAny = true
-                    MacTrashLogger.log("deleteTrack 成功: \(track.title)")
-                } catch {
-                    failedCount += 1
-                    let msg = "🗑️ deleteTrack failed for \(track.title): \(error)"
-                    print(msg)
-                    MacTrashLogger.log(msg)
-                }
-            }
+            )
+            let failedCount = outcome.failedCount
+            let deletedAny = outcome.deletedAny
+            trashProgress = nil
+            trashTask = nil
 
             // 通知先发（UI 立即刷新），播放队列联动后置（SFB 引擎切歌/加载可能耗时，
             // 若 await 在通知前，加载慢会拖住曲库刷新——用户 2026-09-02 反馈删除不刷新）
@@ -538,13 +551,8 @@ struct MacTrackListView: View {
     }
 
     private func albumTitle(for track: Track) -> String {
-        guard let albumId = track.albumId,
-              let album = try? DatabaseManager.shared.read({ db in
-                  try Album.fetchOne(db, key: albumId)
-              }) else {
-            return ""
-        }
-        return album.title
+        // 审计 M2：以前每个可见行每帧一次 `Album.fetchOne` → 读缓存（预取已就位）
+        facts.albumTitle(forTrack: track)
     }
 
     // MARK: - Context-menu modal 延迟呈现（macOS SwiftUI 已知 bug workaround）

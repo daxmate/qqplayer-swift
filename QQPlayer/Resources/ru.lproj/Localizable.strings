@@ -104,6 +104,8 @@
 "drag_import_hint" = "Перетащите аудиофайлы сюда для импорта";
 "drag_import_success_count" = "Импортировано файлов: %d";
 "drag_import_none" = "Аудиофайлы не импортированы";
+"drag_import_skipped_count" = "Пропущено неподдерживаемых файлов: %d";
+"drag_import_partial_count" = "Импортировано файлов: %1$d, пропущено: %2$d";
 
 /* Track list context menu (A3) */
 "show_artist" = "К исполнителю";
@@ -527,6 +529,9 @@
 "library_empty" = "Библиотека пуста";
 "library_empty_hint" = "Нажмите «Обновить библиотеку» внизу слева, чтобы просканировать ~/Music/QQPlayer";
 "load_library_failed" = "Не удалось загрузить библиотеку: %@";
+"album_load_failed" = "Не удалось открыть альбом: %@";
+"artist_load_failed" = "Не удалось открыть исполнителя: %@";
+"playlist_create_failed" = "Не удалось создать плейлист: %@";
 "not_playing" = "Не воспроизводится";
 "karaoke_mode_help" = "Режим караоке (скорость / цикл строки / цикл AB)";
 "lyrics" = "Текст песни";

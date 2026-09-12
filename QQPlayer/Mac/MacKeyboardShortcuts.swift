@@ -240,7 +240,7 @@ enum MacKeyboardShortcuts {
     /// 返回 nil = 事件已消费；返回 event = 放行。
     private static func handle(_ event: NSEvent) -> NSEvent? {
         // 文本输入焦点 → 全部放行（打字不触发快捷键）
-        if NSApp.keyWindow?.firstResponder is NSTextView {
+        if isTextInputFocused() {
             return event
         }
 
@@ -251,8 +251,23 @@ enum MacKeyboardShortcuts {
         }) else {
             return event
         }
+        // 长按过滤（审计 M1）：非 seek 类忽略键盘自动重复（否则播放/暂停、收藏、
+        // 跟唱、AB、播放顺序轮换会被连发；收藏长按一次可反复写库）。
+        // 事件仍然消费（返回 nil）——该键属于本监听，不流回响应链。
+        guard MacShortcutLogic.shouldRunAction(id: def.id, isARepeat: event.isARepeat) else {
+            return nil
+        }
         def.action()
         return nil
+    }
+
+    /// 文本输入焦点守卫（审计 L1）：除 keyWindow 外还要看 modal 窗口——设置/告警窗口
+    /// 持焦点时 keyWindow 可能仍是主窗（或迷你模式 orderOut 后为 nil）。本地 monitor 在
+    /// 事件派发给窗口前拿到事件，这里是唯一的文本保护网。
+    private static func isTextInputFocused() -> Bool {
+        if NSApp.keyWindow?.firstResponder is NSTextView { return true }
+        if NSApp.modalWindow?.firstResponder is NSTextView { return true }
+        return false
     }
 
     /// 只保留 cmd/opt/ctrl/shift 位（capsLock/numericPad/function 忽略）。

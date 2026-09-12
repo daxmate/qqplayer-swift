@@ -130,6 +130,10 @@
 		BB85D13CEC074A14850EF54A /* SyncFrameChainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */; };
 		DA6D9D12AC8D47B482852CD9 /* PlaybackAsyncGuardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */; };
 		550DD54B596E4E9E8323273A /* QuarkCookieStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49E84C40C24946AC9BA9B911 /* QuarkCookieStoreTests.swift */; };
+		80D97109995B419C96A88ABE /* MacTrashServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A09853AF4E84CADBE0F7DA1 /* MacTrashServiceTests.swift */; };
+		F2C512CF67BF40C09103E579 /* MacLibraryFactsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */; };
+		3293AC27D12C405B88E3BADE /* MacSpectrumDSPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */; };
+		FA75A213C9F140FE84BC8E3A /* MacSyncClientPoolPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -309,6 +313,10 @@
 		044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameChainTests.swift; sourceTree = "<group>"; };
 		6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackAsyncGuardsTests.swift; sourceTree = "<group>"; };
 		49E84C40C24946AC9BA9B911 /* QuarkCookieStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuarkCookieStoreTests.swift; sourceTree = "<group>"; };
+		6A09853AF4E84CADBE0F7DA1 /* MacTrashServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrashServiceTests.swift; sourceTree = "<group>"; };
+		A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryFactsStoreTests.swift; sourceTree = "<group>"; };
+		E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSpectrumDSPTests.swift; sourceTree = "<group>"; };
+		580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSyncClientPoolPolicyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -509,8 +517,12 @@
 				Services/MacFolderWatchPolicy.swift,
 				Services/MacImportNaming.swift,
 				Services/MacIndexingGate.swift,
+				Services/MacLibraryFactsStore.swift,
 				Services/MacOnlineDownloadService.swift,
 				Services/MacPlaybackGate.swift,
+				Services/MacSpectrumDSP.swift,
+				Services/MacSyncClientPoolPolicy.swift,
+				Services/MacTrashService.swift,
 				Services/MusicBrainzClient.swift,
 				Services/MusicDirectoryScanner.swift,
 				Services/MusicFolderResolver.swift,
@@ -869,6 +881,10 @@
 				044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */,
 				6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */,
 				49E84C40C24946AC9BA9B911 /* QuarkCookieStoreTests.swift */,
+				6A09853AF4E84CADBE0F7DA1 /* MacTrashServiceTests.swift */,
+				A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */,
+				E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */,
+				580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1297,6 +1313,10 @@
 				BB85D13CEC074A14850EF54A /* SyncFrameChainTests.swift in Sources */,
 				DA6D9D12AC8D47B482852CD9 /* PlaybackAsyncGuardsTests.swift in Sources */,
 				550DD54B596E4E9E8323273A /* QuarkCookieStoreTests.swift in Sources */,
+				80D97109995B419C96A88ABE /* MacTrashServiceTests.swift in Sources */,
+				F2C512CF67BF40C09103E579 /* MacLibraryFactsStoreTests.swift in Sources */,
+				3293AC27D12C405B88E3BADE /* MacSpectrumDSPTests.swift in Sources */,
+				FA75A213C9F140FE84BC8E3A /* MacSyncClientPoolPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

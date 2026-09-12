@@ -114,4 +114,17 @@ enum MacShortcutLogic {
         }
         return nil
     }
+
+    // MARK: - 键盘自动重复策略（2026-09-12 审计 B4 · M1）
+
+    /// 允许「长按连发」（`NSEvent.isARepeat`）的快捷键 id：只有 seek 类希望重复
+    /// （按住 ←/→ 连续快退/快进）。其余全是 toggle / 轮换类——播放暂停、收藏、
+    /// 跟唱、AB 循环、播放顺序轮换——重复会来回抖动、反复写库。
+    static let repeatableShortcutIds: Set<String> = ["seekBack", "seekForward"]
+
+    /// 收到一次按键事件后是否应执行 action：非重复事件一律执行；
+    /// 自动重复事件仅 repeatable 类执行（其余仍由监听消费，不冒泡给响应链）。
+    static func shouldRunAction(id: String, isARepeat: Bool) -> Bool {
+        !isARepeat || repeatableShortcutIds.contains(id)
+    }
 }

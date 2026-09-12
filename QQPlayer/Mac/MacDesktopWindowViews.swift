@@ -32,6 +32,8 @@ struct MacMiniPlayerView: View {
     /// 拖动进度条中的暂存值（松手才 seek）
     @State private var scrubValue: Double = 0
     @State private var scrubbing = false
+    /// 本视图是否已在光标栈上压入 pointingHand（审计 L2：push/pop 成对健壮性）
+    @State private var cursorPushed = false
 
     private var duration: TimeInterval {
         player.duration > 0 ? player.duration : 1
@@ -48,11 +50,7 @@ struct MacMiniPlayerView: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
+                updateCursor(hovering: hovering)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -74,11 +72,7 @@ struct MacMiniPlayerView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    if hovering {
-                        NSCursor.pointingHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
+                    updateCursor(hovering: hovering)
                 }
 
                 // 进度滑杆（0.25s 刷新；拖动中冻结值，松手 seek）
@@ -148,6 +142,23 @@ struct MacMiniPlayerView: View {
                 forTrackStableId: track.stableId,
                 fallbackArtistId: track.artistId
             )) ?? ""
+        }
+        // 光标栈兜底（审计 L2）：面板被 orderOut/视图被卸载时 onHover(false) 可能不送达，
+        // 若不弹出则整个 App 后续任意窗口都会显示手型光标
+        .onDisappear {
+            updateCursor(hovering: false)
+        }
+    }
+
+    /// hover 手型光标（审计 L2）：用标志记录栈上是否有本视图压入的一项，
+    /// 保证 push/pop 严格成对（重复 hover(true) / 孤立 hover(false) 都不会失衡）。
+    private func updateCursor(hovering: Bool) {
+        if hovering, !cursorPushed {
+            NSCursor.pointingHand.push()
+            cursorPushed = true
+        } else if !hovering, cursorPushed {
+            NSCursor.pop()
+            cursorPushed = false
         }
     }
 

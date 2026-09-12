@@ -116,6 +116,8 @@
 "drag_import_hint" = "Drop audio files here to import them";
 "drag_import_success_count" = "Imported %d file(s)";
 "drag_import_none" = "No audio files were imported";
+"drag_import_skipped_count" = "Skipped %d unsupported file(s)";
+"drag_import_partial_count" = "Imported %1$d file(s), skipped %2$d";
 
 /* Track list context menu (A3) */
 "show_artist" = "Go to Artist";
@@ -548,6 +550,9 @@
 "library_empty" = "Library is empty";
 "library_empty_hint" = "Click “Refresh Library” at the bottom left to scan ~/Music/QQPlayer";
 "load_library_failed" = "Failed to load library: %@";
+"album_load_failed" = "Couldn't open this album: %@";
+"artist_load_failed" = "Couldn't open this artist: %@";
+"playlist_create_failed" = "Couldn't create the playlist: %@";
 "not_playing" = "Not Playing";
 "karaoke_mode_help" = "Karaoke mode (speed / single-line loop / AB loop)";
 "lyrics" = "Lyrics";

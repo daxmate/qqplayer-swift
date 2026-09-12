@@ -104,11 +104,12 @@ enum MacImportService {
             }
         }
 
-        // 瞬时反馈（web toast 语义）：成功数投给主窗口显示
+        // 瞬时反馈（web toast 语义）：成功数 + 跳过数投给主窗口显示
+        // （审计 D2：skippedCount 以前写而不读——拖入不支持格式时用户只看到「已导入 0 首」）
         NotificationCenter.default.post(
             name: .libraryImportFinished,
             object: nil,
-            userInfo: ["count": result.importedCount]
+            userInfo: ["count": result.importedCount, "skipped": result.skippedCount]
         )
 
         // 触发曲库重扫收录（若正在扫描，通知处理器会排队；FSEvents created 事件双保险）

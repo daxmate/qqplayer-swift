@@ -74,15 +74,22 @@ final class MacSyncPeerClientPool {
     }
 
     /// 取消在途请求并换一个新客户端（旧客户端保留在池里，帧链不断）。
+    /// 审计 M5：退役实例有上限（`MacSyncClientPoolPolicy.maxRetiredPerSession`）——
+    /// 修复前只追加、只在会话关闭时清空，反复切上传/下载会持续堆积。
     @discardableResult
     func replace(for session: SyncPeerSession) -> SyncPeerLibraryClient {
         let key = ObjectIdentifier(session)
         if let old = clients[key] {
             old.cancel()
-            retired[key, default: []].append(old)
+            retired[key] = MacSyncClientPoolPolicy.retiring(retired[key] ?? [], appending: old)
         }
         clients[key] = nil
         return client(for: session)
+    }
+
+    /// 当前保活的退役实例数（诊断/测试用）
+    func retiredCount(for session: SyncPeerSession) -> Int {
+        retired[ObjectIdentifier(session)]?.count ?? 0
     }
 
     /// 会话关闭：链已无意义（会话本身死了），整批释放。

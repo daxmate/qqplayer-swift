@@ -413,6 +413,15 @@ struct MacPlayerView: View {
         .onChange(of: track?.stableId) { _ in
             updateSpectrumTap()
         }
+        // 视图离场/回场收尾（2026-09-12 审计 L4）：修复前 tap 只由 isPlaying/切歌/
+        // 设置变更驱动——主窗进迷你模式或播放页长期不可见时，音频线程 FFT 与
+        // 30fps 主线程发布照旧跑。离场摘 tap（幂等），回场按当前状态重装。
+        .onAppear {
+            updateSpectrumTap()
+        }
+        .onDisappear {
+            spectrumAnalyzer.removeTap()
+        }
     }
 
     /// 频谱 tap 生命周期：播放中且 native 引擎 → 装 mainMixer tap；否则移除。

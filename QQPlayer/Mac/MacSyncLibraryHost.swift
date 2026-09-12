@@ -13,9 +13,10 @@
 //    - 本文件只做「本端事实 → 描述符」的注入与生命周期（attach/detach）转发
 //
 //  ⚠️ 行为零变化约束（R1b-1 硬要求）：本文件的公开 API（libraryRoot / rootName /
-//  init / attach / detach / manifest / lyricsRoot / sourceFiles / onFetchResult /
-//  onProviderUnavailable）与语义保持与重构前完全一致——曲库根不存在仍拒绝接线，
-//  manifest 仍走 SyncLocalLibraryScanner 同口径，越界/软链仍一律拒。
+//  init / attach / detach / manifest / lyricsRoot / sourceFiles / onFetchResult）
+//  与语义保持与重构前完全一致——曲库根不存在仍拒绝接线，manifest 仍走
+//  SyncLocalLibraryScanner 同口径，越界/软链仍一律拒。
+//  （2026-09-12 审计 D1：无消费点的 onProviderUnavailable 已删，见下）
 //
 //  线程：会话线程（NW 队列）上会被同步调用（provider 立即要答案），因此本类不是
 //  @MainActor；状态用锁保护。扫描是同步的（本地目录枚举，v1 接受）。
@@ -41,13 +42,10 @@ final class MacSyncLibraryHost: @unchecked Sendable {
     }
 
     /// 对端请求了 manifest 但本地未接线（诊断）。
-    var onProviderUnavailable: (() -> Void)? {
-        get { lock.lock(); defer { lock.unlock() }; return providerUnavailableHandler }
-        set { lock.lock(); providerUnavailableHandler = newValue; lock.unlock() }
-    }
+    /// 2026-09-12 审计 D1：该属性全仓无任何赋值/读取点（只有自身转发）——属「声明为
+    /// 诊断用但没人接」的死链，已按死代码处置删除。
 
     private var fetchResultHandler: ((SyncFetchResult) -> Void)?
-    private var providerUnavailableHandler: (() -> Void)?
 
     init(
         libraryRoot: URL,
@@ -79,9 +77,6 @@ final class MacSyncLibraryHost: @unchecked Sendable {
         self.provider = SyncLocalLibraryProvider(descriptor: descriptor, fileManager: fileManager)
         provider.onFetchResult = { [weak self] result in
             self?.onFetchResult?(result)
-        }
-        provider.onProviderUnavailable = { [weak self] in
-            self?.onProviderUnavailable?()
         }
     }
 

@@ -35,6 +35,9 @@ struct MacOnlineSearchView: View {
     @State private var results: [OnlineItem] = []
     @State private var status: Status = .idle
     @State private var searchTask: Task<Void, Never>?
+    /// 行级下载任务句柄（rowID → Task；审计 L5：修复前无句柄，关 sheet 后在途下载
+    /// 继续跑并写已卸载视图的 @State）
+    @State private var downloadTasks: [String: Task<Void, Never>] = [:]
     @State private var searchSeq = 0
     @State private var downloadingIDs: Set<String> = []
     @State private var downloadedIDs: Set<String> = []
@@ -93,6 +96,12 @@ struct MacOnlineSearchView: View {
         }
         .onDisappear {
             searchTask?.cancel()
+            // 审计 L5：sheet 关闭 → 取消所有在途下载（下载服务自行管理落盘，
+            // 取消只停止状态回调，不会损坏已下载内容）
+            for task in downloadTasks.values {
+                task.cancel()
+            }
+            downloadTasks.removeAll()
         }
     }
 
@@ -445,7 +454,7 @@ struct MacOnlineSearchView: View {
         failedIDs.remove(rowID)
         downloadProgress[rowID] = nil // 刚开始（total 未知）→ 不确定态
         errorMessage = nil
-        Task {
+        downloadTasks[rowID] = Task {
             do {
                 _ = try await MacOnlineDownloadService.download(
                     song: song,
@@ -483,6 +492,7 @@ struct MacOnlineSearchView: View {
             }
             downloadingIDs.remove(rowID)
             downloadProgress.removeValue(forKey: rowID) // 下载结束清进度（B2）
+            downloadTasks.removeValue(forKey: rowID)
         }
     }
 
@@ -497,7 +507,7 @@ struct MacOnlineSearchView: View {
         if !isRetryAfterLogin {
             errorMessage = nil
         }
-        Task {
+        downloadTasks[rowID] = Task {
             do {
                 // 音质读设置 quarkQuality（B2 排期；默认 mp3，web download.quarkQuality
                 // 语义对齐——旧注释「固定 mp3、设置未排期」已由 B2 设置面板闭合）
@@ -557,6 +567,7 @@ struct MacOnlineSearchView: View {
             }
             downloadingIDs.remove(rowID)
             downloadProgress.removeValue(forKey: rowID) // 下载结束清进度（B2）
+            downloadTasks.removeValue(forKey: rowID)
         }
     }
 

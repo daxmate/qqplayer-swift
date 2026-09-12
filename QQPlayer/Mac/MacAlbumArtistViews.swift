@@ -22,16 +22,22 @@ struct MacAlbumGridView: View {
 
     private let gridColumns = [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)]
 
+    /// 专辑卡事实缓存（审计 M2：以前每张卡每帧 2 次整表查询）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    /// 进专辑失败提示（审计 L7：以前只 print）
+    @State private var openError: String?
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: gridColumns, spacing: 16) {
                 ForEach(albums, id: \.id) { album in
+                    let albumFacts = facts.albumFacts(for: album)
                     Button {
                         openAlbum(album)
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             MacArtworkThumbnailFill(
-                                track: MacArtworkResolver.representativeTrack(forAlbum: album),
+                                track: albumFacts.representativeTrack,
                                 cornerRadius: 8,
                                 placeholderIcon: "square.stack"
                             )
@@ -39,7 +45,7 @@ struct MacAlbumGridView: View {
                                 .font(.callout)
                                 .fontWeight(.medium)
                                 .lineLimit(1)
-                            Text(album.albumArtist ?? String(format: "track_count".localized, albumTrackCount(album)))
+                            Text(album.albumArtist ?? String(format: "track_count".localized, albumFacts.trackCount))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -49,6 +55,11 @@ struct MacAlbumGridView: View {
                 }
             }
             .padding(16)
+        }
+        .alert("error".localized, isPresented: openErrorBinding) {
+            Button(Localized.ok, role: .cancel) { openError = nil }
+        } message: {
+            Text(openError ?? "")
         }
         .sheet(isPresented: $showAlbumSheet) {
             if let album = selectedAlbum {
@@ -62,6 +73,14 @@ struct MacAlbumGridView: View {
         }
     }
 
+    /// 失败弹窗开关（审计 L7）
+    private var openErrorBinding: Binding<Bool> {
+        Binding(
+            get: { openError != nil },
+            set: { if !$0 { openError = nil } }
+        )
+    }
+
     private func openAlbum(_ album: Album) {
         do {
             let tracks = try DatabaseManager.shared.getTracksByAlbumId(album.id ?? 0)
@@ -69,12 +88,10 @@ struct MacAlbumGridView: View {
             selectedAlbum = album
             showAlbumSheet = true
         } catch {
+            // 审计 L7：不再只 print（用户点卡无任何反应）
+            openError = "album_load_failed".localized(with: error.localizedDescription)
             print("❌ openAlbum failed: \(error)")
         }
-    }
-
-    private func albumTrackCount(_ album: Album) -> Int {
-        (try? DatabaseManager.shared.getTracksByAlbumId(album.id ?? 0).count) ?? 0
     }
 }
 
@@ -147,6 +164,11 @@ struct MacArtistListView: View {
     /// 详情 sheet 开关（父视图持有，支持「右键 → 进歌手」外部触发）
     @Binding var showArtistSheet: Bool
 
+    /// 歌手行曲目数缓存（审计 M2：以前每行每帧 1 次整表查询）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    /// 进歌手失败提示（审计 L7）
+    @State private var openError: String?
+
     var body: some View {
         List(artists, id: \.id) { artist in
             Button {
@@ -158,13 +180,18 @@ struct MacArtistListView: View {
                     Text(artist.name)
                         .lineLimit(1)
                     Spacer()
-                    Text(String(format: "track_count".localized, artistTrackCount(artist)))
+                    Text(String(format: "track_count".localized, facts.artistTrackCount(for: artist)))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+        }
+        .alert("error".localized, isPresented: openErrorBinding) {
+            Button(Localized.ok, role: .cancel) { openError = nil }
+        } message: {
+            Text(openError ?? "")
         }
         .sheet(isPresented: $showArtistSheet) {
             if let artist = selectedArtist {
@@ -178,6 +205,14 @@ struct MacArtistListView: View {
         }
     }
 
+    /// 失败弹窗开关（审计 L7）
+    private var openErrorBinding: Binding<Bool> {
+        Binding(
+            get: { openError != nil },
+            set: { if !$0 { openError = nil } }
+        )
+    }
+
     private func openArtist(_ artist: Artist) {
         do {
             let tracks = try DatabaseManager.shared.getTracksByArtistId(artist.id ?? 0)
@@ -185,12 +220,10 @@ struct MacArtistListView: View {
             selectedArtist = artist
             showArtistSheet = true
         } catch {
+            // 审计 L7：不再只 print（用户点行无任何反应）
+            openError = "artist_load_failed".localized(with: error.localizedDescription)
             print("❌ openArtist failed: \(error)")
         }
-    }
-
-    private func artistTrackCount(_ artist: Artist) -> Int {
-        (try? DatabaseManager.shared.getTracksByArtistId(artist.id ?? 0).count) ?? 0
     }
 }
 
@@ -270,6 +303,12 @@ struct MacPlaylistListView: View {
     @State private var detailTarget: MacPlaylistDetailTarget?
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
+    /// 歌单行事实缓存（审计 M2：以前每行每帧 2–3 次查询）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    /// 卡片条重算任务句柄（审计 M2）
+    @State private var smartTask: Task<Void, Never>?
+    /// 新建歌单失败提示（审计 L7：以前弹窗静默关闭）
+    @State private var createError: String?
 
     var body: some View {
         Group {
@@ -313,12 +352,13 @@ struct MacPlaylistListView: View {
 
                 Section {
                     ForEach(playlists, id: \.id) { playlist in
+                        let playlistFacts = facts.playlistFacts(for: playlist)
                         Button {
                             detailTarget = .manual(playlist)
                         } label: {
                             HStack(spacing: 10) {
                                 MacArtworkThumbnail(
-                                    track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
+                                    track: playlistFacts.representativeTrack,
                                     size: 36,
                                     cornerRadius: 6,
                                     placeholderIcon: "list.bullet.rectangle"
@@ -326,11 +366,9 @@ struct MacPlaylistListView: View {
                                 Text(playlist.title)
                                     .lineLimit(1)
                                 Spacer()
-                                if let itemCount = try? DatabaseManager.shared.getPlaylistItems(playlistId: playlist.id ?? 0).count {
-                                    Text(String(format: "track_count".localized, itemCount))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                                Text(String(format: "track_count".localized, playlistFacts.itemCount))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             .contentShape(Rectangle())
                         }
@@ -354,7 +392,21 @@ struct MacPlaylistListView: View {
             Button("create".localized) { createPlaylist() }
             Button("cancel".localized, role: .cancel) {}
         }
+        .alert("error".localized, isPresented: createErrorBinding) {
+            Button(Localized.ok, role: .cancel) { createError = nil }
+        } message: {
+            Text(createError ?? "")
+        }
         .onAppear { reloadSmartCards() }
+        .onDisappear { smartTask?.cancel() }
+    }
+
+    /// 失败弹窗开关（审计 L7）
+    private var createErrorBinding: Binding<Bool> {
+        Binding(
+            get: { createError != nil },
+            set: { if !$0 { createError = nil } }
+        )
     }
 
     // MARK: 详情（内容区直接展示，2026-09-05 起不再弹 sheet）
@@ -397,25 +449,29 @@ struct MacPlaylistListView: View {
             _ = try DatabaseManager.shared.createPlaylist(title: title)
             NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
         } catch {
+            // 审计 L7：不再弹窗静默关闭——用户至少知道没建成
+            createError = "playlist_create_failed".localized(with: error.localizedDescription)
             print("❌ MacPlaylistListView createPlaylist failed: \(error)")
         }
     }
 
+    /// 卡片条取数（审计 M2：一次 5 次查询，以前同步跑在 onAppear / 通知回调里）
     private func reloadSmartCards() {
-        do {
-            smartCards = try SmartPlaylistStore.cardInfos()
-            var covers: [SmartPlaylistKind: [Track]] = [:]
-            for kind in SmartPlaylistKind.allCases {
-                covers[kind] = try SmartPlaylistStore.coverTracks(for: kind, limit: 4)
+        smartTask?.cancel()
+        smartTask = Task { @MainActor in
+            let payload = await MacSmartPlaylistLoader.cardStrip()
+            guard !Task.isCancelled else { return }
+            guard let payload else {
+                // Keep the four cards visible with zero counts on failure.
+                smartCards = SmartPlaylistKind.allCases.map {
+                    SmartPlaylistCardInfo(kind: $0, title: $0.rawValue, count: 0)
+                }
+                smartCoverTracks = [:]
+                print("❌ MacPlaylistListView smart cardInfos failed")
+                return
             }
-            smartCoverTracks = covers
-        } catch {
-            // Keep the four cards visible with zero counts on failure.
-            smartCards = SmartPlaylistKind.allCases.map {
-                SmartPlaylistCardInfo(kind: $0, title: $0.rawValue, count: 0)
-            }
-            smartCoverTracks = [:]
-            print("❌ MacPlaylistListView smart cardInfos failed: \(error)")
+            smartCards = payload.cards
+            smartCoverTracks = payload.covers
         }
     }
 }
