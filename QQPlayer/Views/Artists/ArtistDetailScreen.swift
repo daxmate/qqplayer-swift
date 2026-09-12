@@ -16,6 +16,8 @@ struct ArtistDetailScreen: View {
     /// artistTracks 缓存：一次查询入库，LibraryNeedsRefresh 时刷新（替代 body 每次访问查 5 次 DB）
     @State private var cachedArtistTracks: [Track] = []
     @State private var artistTracksLoaded = false
+    /// artistAlbums 缓存：同 artistTracks（修前是计算属性，单次渲染最多 4 次同步 DB 查询）
+    @State private var cachedArtistAlbums: [Album] = []
 
     private var playerEngine: PlayerEngine {
         appCoordinator.playerEngine
@@ -66,8 +68,16 @@ struct ArtistDetailScreen: View {
     }
 
     private var artistAlbums: [Album] {
-        guard let artistId = artist.id else { return [] }
-        return (try? appCoordinator.databaseManager.getAlbumsByArtistId(artistId)) ?? []
+        // 已缓存：直接返回（body 不再触发 DB 查询）
+        cachedArtistAlbums
+    }
+
+    private func loadArtistAlbums() {
+        guard let artistId = artist.id else {
+            cachedArtistAlbums = []
+            return
+        }
+        cachedArtistAlbums = (try? appCoordinator.databaseManager.getAlbumsByArtistId(artistId)) ?? []
     }
 
     var body: some View {
@@ -91,10 +101,12 @@ struct ArtistDetailScreen: View {
         .onAppear {
             loadArtistData()
             loadArtistTracks()
+            loadArtistAlbums()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
-            // 曲库刷新后重建曲目缓存（替代计算属性每次访问查库）
+            // 曲库刷新后重建曲目/专辑缓存（替代计算属性每次访问查库）
             loadArtistTracks()
+            loadArtistAlbums()
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
@@ -238,7 +250,7 @@ struct ArtistDetailScreen: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             if isLoading {
-                ProgressView("Fetching artist info...")
+                ProgressView("fetching_artist_info".localized)
             }
             playButtons
         }
@@ -370,7 +382,7 @@ struct ArtistDetailScreen: View {
             HStack {
                 Text(Localized.songs).font(.title3).fontWeight(.bold)
                 Spacer()
-                Text("\(artistTracks.count) song\(artistTracks.count == 1 ? "" : "s")")
+                Text(Localized.songsCount(artistTracks.count))
                     .font(.body).foregroundColor(.secondary)
             }
             .padding(.horizontal)
@@ -417,7 +429,7 @@ struct ArtistDetailScreen: View {
             HStack {
                 Text(Localized.albums).font(.title3).fontWeight(.bold)
                 Spacer()
-                Text("\(artistAlbums.count) album\(artistAlbums.count == 1 ? "" : "s")")
+                Text(Localized.albumsCount(artistAlbums.count))
                     .font(.body).foregroundColor(.secondary)
             }
             .padding(.horizontal)

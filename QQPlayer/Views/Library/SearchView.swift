@@ -107,7 +107,7 @@ struct SearchView: View {
                             Image(systemName: "magnifyingglass")
                                 .foregroundColor(.secondary)
 
-                            TextField("Search your library", text: $searchText)
+                            TextField("search_placeholder".localized, text: $searchText)
                                 .textFieldStyle(PlainTextFieldStyle())
                                 .autocorrectionDisabled()
                                 .focused($isSearchFocused)
@@ -172,7 +172,7 @@ struct SearchView: View {
                                 .scaleEffect(1.2)
                                 .progressViewStyle(CircularProgressViewStyle(tint: settings.backgroundColorChoice.color))
 
-                            Text("Searching...")
+                            Text("search_any_loading".localized)
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }

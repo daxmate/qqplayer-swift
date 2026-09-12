@@ -134,6 +134,8 @@
 		F2C512CF67BF40C09103E579 /* MacLibraryFactsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */; };
 		3293AC27D12C405B88E3BADE /* MacSpectrumDSPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */; };
 		FA75A213C9F140FE84BC8E3A /* MacSyncClientPoolPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */; };
+		FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */; };
+		BF033716D78646F7A2CF1FAB /* IndexingGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -317,6 +319,8 @@
 		A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryFactsStoreTests.swift; sourceTree = "<group>"; };
 		E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSpectrumDSPTests.swift; sourceTree = "<group>"; };
 		580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSyncClientPoolPolicyTests.swift; sourceTree = "<group>"; };
+		1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavoriteBatchLogicTests.swift; sourceTree = "<group>"; };
+		38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IndexingGateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -501,9 +505,11 @@
 				Services/EQManager.swift,
 				Services/EQModels.swift,
 				Services/ExternalFileBookmarkStore.swift,
+				Services/FavoriteBatchLogic.swift,
 				Services/FileCleanupManager.swift,
 				Services/HintSystem.swift,
 				Services/HybridMusicAPI.swift,
+				Services/IndexingGate.swift,
 				Services/InterruptionDiagnostics.swift,
 				Services/KaraokeController.swift,
 				Services/LibraryIndexer.swift,
@@ -885,6 +891,8 @@
 				A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */,
 				E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */,
 				580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */,
+				1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */,
+				38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1317,6 +1325,8 @@
 				F2C512CF67BF40C09103E579 /* MacLibraryFactsStoreTests.swift in Sources */,
 				3293AC27D12C405B88E3BADE /* MacSpectrumDSPTests.swift in Sources */,
 				FA75A213C9F140FE84BC8E3A /* MacSyncClientPoolPolicyTests.swift in Sources */,
+				FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */,
+				BF033716D78646F7A2CF1FAB /* IndexingGateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

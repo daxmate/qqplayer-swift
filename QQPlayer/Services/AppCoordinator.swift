@@ -164,12 +164,60 @@ class AppCoordinator: ObservableObject {
             print("❤️ Added to favorites: \(trackStableId)")
         }
 
+        try favoriteDidChange(trackStableId: trackStableId)
+    }
+
+    /// 幂等设置收藏状态 —— 单曲/批量/Siri 共用的唯一入口（审计 B5 · 🔴-1）。
+    /// 与 toggleFavorite 的区别：不是取反，而是「设为指定状态」；已是目标状态时不写库。
+    /// - Returns: true 表示状态确实变了（写库 + 通知 + 持久化）。
+    @discardableResult
+    func setFavorite(trackStableId: String, isFavorite wanted: Bool) throws -> Bool {
+        guard try isFavorite(trackStableId: trackStableId) != wanted else { return false }
+        try toggleFavorite(trackStableId: trackStableId)
+        return true
+    }
+
+    /// 批量幂等收藏 —— 「加入喜欢 / 移出喜欢」菜单项的唯一入口（审计 B5 · 🔴-1）。
+    /// 文案即目标状态：目标为「已喜欢」时，已喜欢的曲目保持喜欢（绝不取反）。
+    /// - Returns: 实际发生变更的曲目数。
+    @discardableResult
+    func setFavorites(trackStableIds: [String], isFavorite wanted: Bool) throws -> Int {
+        guard !trackStableIds.isEmpty else { return 0 }
+
+        let toChange = try FavoriteBatchLogic.stableIdsNeedingChange(
+            trackStableIds,
+            desired: wanted,
+            isFavorite: { try self.isFavorite(trackStableId: $0) }
+        )
+        guard !toChange.isEmpty else {
+            print("❤️ Bulk favorite: nothing to change (\(trackStableIds.count) selected)")
+            return 0
+        }
+
+        if wanted {
+            try databaseManager.addToFavorites(trackStableIds: toChange)
+        } else {
+            for trackStableId in toChange {
+                try databaseManager.removeFromFavorites(trackStableId: trackStableId)
+            }
+        }
+
+        print("❤️ Bulk favorite: \(toChange.count)/\(trackStableIds.count) changed → \(wanted ? "liked" : "unliked")")
+        try favoriteDidChange(trackStableId: toChange.last)
+        return toChange.count
+    }
+
+    /// 收藏变更后的统一收尾：通知观察者 + 持久化（本地 / iCloud）。
+    /// toggle 与批量路径共用，避免两套副作用。
+    private func favoriteDidChange(trackStableId: String?) throws {
         // Notify observers that favorites changed
         NotificationCenter.default.post(name: NSNotification.Name("FavoritesChanged"), object: nil)
 
         // Verify the database operation worked
-        let isNowLiked = try databaseManager.isFavorite(trackStableId: trackStableId)
-        print("📊 Track is now liked after toggle: \(isNowLiked)")
+        if let trackStableId {
+            let isNowLiked = try databaseManager.isFavorite(trackStableId: trackStableId)
+            print("📊 Track is now liked after toggle: \(isNowLiked)")
+        }
 
         // Get current favorites count from database
         let currentFavorites = try databaseManager.getFavorites()

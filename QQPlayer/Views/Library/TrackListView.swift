@@ -105,15 +105,16 @@ struct TrackListView: View {
         selectedTracks = Set(sortedTracks.map { $0.stableId })
     }
 
+    /// 批量收藏：文案即目标状态（「加入喜欢」= 全部设为已喜欢），幂等，不是逐曲取反（审计 B5 · 🔴-1）。
     private func bulkAddToLikedSongs() {
-        // 先建 stableId → Track 字典，避免对每个选中曲目 O(n) first(where:)（总 O(n²)）
-        let tracksByStableId = Dictionary(uniqueKeysWithValues: sortedTracks.map { ($0.stableId, $0) })
-        for trackId in selectedTracks {
-            if let track = tracksByStableId[trackId] {
-                try? appCoordinator.toggleFavorite(trackStableId: track.stableId)
-            }
-        }
+        let desired = FavoriteBatchLogic.desiredState(isLikedContext: isLikedSongsScreen)
+        _ = try? appCoordinator.setFavorites(trackStableIds: selectedTracksInListOrder(), isFavorite: desired)
         exitBulkMode()
+    }
+
+    /// 选中曲目按列表顺序（selectedTracks 是 Set，顺序不稳定；顺便消灭逐个 O(n) first(where:)）
+    private func selectedTracksInListOrder() -> [String] {
+        sortedTracks.map(\.stableId).filter { selectedTracks.contains($0) }
     }
 
     private func bulkDelete() {

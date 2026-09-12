@@ -425,12 +425,12 @@ struct LyricsView: View {
                 }
 
                 VStack(spacing: 12) {
-                    Text("Instrumental")
+                    Text("lyrics_empty_instrumental_title".localized)
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
 
-                    Text("This track has no lyrics")
+                    Text("lyrics_empty_instrumental_subtitle".localized)
                         .font(.callout)
                         .foregroundColor(.secondary)
                 }
@@ -534,12 +534,12 @@ struct LyricsView: View {
                 }
 
                 VStack(spacing: 12) {
-                    Text("No Lyrics Available")
+                    Text("lyrics_empty_not_found_title".localized)
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
 
-                    Text("Lyrics not found for this track")
+                    Text("lyrics_empty_not_found_subtitle".localized)
                         .font(.callout)
                         .foregroundColor(.secondary)
                 }
@@ -642,12 +642,12 @@ struct LyricsView: View {
                 }
 
                 VStack(spacing: 12) {
-                    Text("Loading Lyrics")
+                    Text("lyrics_empty_loading_title".localized)
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
 
-                    Text("Fetching from metadata and online sources")
+                    Text("lyrics_empty_loading_subtitle".localized)
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)

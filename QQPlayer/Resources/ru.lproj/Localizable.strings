@@ -21,6 +21,8 @@
 "playlist" = "Плейлист";
 "songs_count_singular" = "%d песня";
 "songs_count_plural" = "%d песен";
+"albums_count_singular" = "%d альбом";
+"albums_count_plural" = "%d альбомов";
 "created_date" = "Создан %@";
 "no_songs_found" = "Песни не найдены";
 "your_music_will_appear_here" = "Чтобы добавить музыку:\n\n1. Откройте приложение «Файлы» (или нажмите «Добавить песни»)\n2. Перейдите в «На iPhone» → QQPlayer\n3. Скопируйте музыкальные файлы в эту папку";
@@ -55,11 +57,13 @@
 /* Artist/Album/Track Info */
 "no_artists_found" = "Исполнители не найдены";
 "artists_will_appear" = "Исполнители появятся здесь после добавления музыки в медиатеку";
+"fetching_artist_info" = "Загрузка информации об исполнителе...";
 "no_albums_found" = "Альбомы не найдены";
 "albums_will_appear" = "Альбомы появятся здесь после добавления музыки в медиатеку";
 "artist" = "Исполнитель";
 "album" = "Альбом";
 "track_number" = "%d";
+"disc_number" = "Диск %d";
 "play" = "Воспроизвести";
 "shuffle" = "Перемешать";
 "wrong_artist" = "Неверный исполнитель?";
@@ -326,6 +330,7 @@
 "failed_to_create" = "Не удалось создать: %@";
 "failed_to_export" = "Не удалось экспортировать пресет";
 "failed_to_delete" = "Не удалось удалить пресет";
+"failed_to_save" = "Не удалось сохранить изменения";
 
 /* EQ Band Information */
 "band_count_info" = "%d полос (уменьшено с %d)";
@@ -538,6 +543,38 @@
 "lyrics_loading" = "Загрузка текста…";
 "instrumental_no_lyrics" = "Инструментал, без текста";
 "no_lyrics" = "Нет текста";
+
+/* Караоке, мини-текст и поиск текста (B5: добавлено в ru) */
+"karaoke_play" = "Воспроизвести";
+"karaoke_pause" = "Пауза";
+"karaoke_previous_line" = "Предыдущая строка";
+"karaoke_next_line" = "Следующая строка";
+"karaoke_single_line_loop" = "Цикл одной строки";
+"karaoke_ab_loop" = "Цикл AB";
+"karaoke_ab_loop_hint" = "Коснитесь, чтобы задать текущую строку началом, коснитесь строки текста для конца; коснитесь снова для выхода";
+"karaoke_ab_end_hint" = "Коснитесь текста, чтобы задать конец AB";
+"karaoke_speed_label" = "Скорость %.1f";
+"lyrics_mini_loading" = "Загрузка текста…";
+"lyrics_mini_none" = "Нет текста";
+"lyrics_search_title" = "Поиск текста";
+"lyrics_search_close" = "Закрыть поиск текста";
+"lyrics_search_song_title" = "Название песни";
+"lyrics_search_artist" = "Исполнитель (необязательно)";
+"lyrics_search_button" = "Поиск";
+"lyrics_search_manual_active" = "Текст задан вручную";
+"lyrics_search_restore_auto" = "Вернуть автоматический";
+"lyrics_search_searching" = "Поиск…";
+"lyrics_search_no_results" = "Текст не найден. Попробуйте другое название или исполнителя.";
+"lyrics_search_translation_badge" = "П";
+"lyrics_search_has_translation" = "Содержит китайский перевод";
+"lyrics_search_enter_title" = "Введите название песни";
+"lyrics_search_apply_failed" = "Не удалось применить. Попробуйте ещё раз.";
+"lyrics_empty_loading_title" = "Загрузка текста";
+"lyrics_empty_loading_subtitle" = "Поиск в метаданных и онлайн-источниках";
+"lyrics_empty_instrumental_title" = "Инструментал";
+"lyrics_empty_instrumental_subtitle" = "У этой композиции нет текста";
+"lyrics_empty_not_found_title" = "Текст недоступен";
+"lyrics_empty_not_found_subtitle" = "Текст для этой композиции не найден";
 "track_count" = "%d треков";
 "search_placeholder" = "Поиск в библиотеке";
 "search_clear" = "Очистить поиск";
@@ -565,6 +602,11 @@
 "playlist_manage_rename" = "Переименовать";
 "playlist_manage_remove_from_playlist" = "Удалить из плейлиста";
 "playlist_manage_empty" = "В этом плейлисте пока нет песен";
+
+/* Обложка плейлиста (B5: добавлено в ru) */
+"playlist_cover" = "Обложка плейлиста";
+"change_cover_image" = "Изменить обложку";
+"remove_custom_cover" = "Удалить свою обложку";
 "play_order_sequential" = "Последовательное воспроизведение";
 "play_order_shuffle" = "Случайный порядок";
 "play_order_repeat_all" = "Повторять всё";
@@ -603,11 +645,28 @@
 "quark_login_success" = "Выполнен вход: %@";
 "quark_login_retrying" = "Повторяем загрузку…";
 
+/* История онлайн-поиска (B5: добавлено в ru) */
+"online_search_history_title" = "Недавние запросы";
+"online_search_clear_history" = "Очистить";
+"online_search_history_delete_help" = "Удалить эту запись";
+
 
 /* C-group: search anything + settings download */
 "settings_category_download" = "Загрузки";
 "settings_download_quality" = "Качество загрузки";
 "settings_download_hint" = "Качество по умолчанию для онлайн-загрузок. Файлы сохраняются в вашу музыкальную папку (по умолчанию ~/Music/QQPlayer) и появляются в библиотеке автоматически.";
+
+/* Настройки загрузки (B5: добавлено в ru) */
+"settings_download_quark_quality" = "Качество SongSea";
+"settings_download_engine" = "Движок загрузки";
+"settings_download_engine_builtin" = "Встроенный";
+"settings_download_engine_aria2" = "aria2";
+"settings_download_engine_hint" = "Встроенный = скачивать напрямую; aria2 = передать в aria2";
+"settings_download_aria2_rpc" = "Адрес RPC aria2";
+"settings_download_aria2_secret" = "Секрет aria2";
+"settings_download_aria2_secret_placeholder" = "Введите секрет RPC (можно оставить пустым)";
+"settings_download_max_speed" = "Ограничение скорости (МБ/с)";
+"settings_download_max_speed_hint" = "0 = без ограничений";
 "settings_quality_standard" = "128 кбит/с";
 "settings_quality_exhigh" = "320 кбит/с";
 "settings_quality_lossless" = "Без потерь";
@@ -744,6 +803,7 @@
 "sync_scan_hint" = "Наведите камеру на QR-код в разделе «Синхронизация» на Mac.";
 "sync_scan_subhint" = "Код содержит имя Mac и его защитный отпечаток. Ничего не отправляется до вашего подтверждения.";
 "sync_camera_denied" = "Для сканирования кодов сопряжения нужен доступ к камере. Разрешите его в настройках.";
+"sync_camera_unavailable" = "Камера недоступна";
 "sync_open_settings" = "Открыть настройки";
 "sync_confirm_pair_title" = "Подтвердить сопряжение";
 "sync_confirm_pair_caption" = "Вы связываетесь с этим устройством";

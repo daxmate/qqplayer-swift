@@ -46,8 +46,6 @@ struct LibraryView: View {
     @State private var syncToastIcon = "checkmark.circle.fill"
     @State private var syncToastColor = Color.green
     @State private var showMusicPicker = false
-    /// 等待索引完成（continuation，onChange(isIndexing) 唤醒；替代 while + sleep 忙等轮询）
-    @State private var indexingWaitContinuation: CheckedContinuation<Void, Never>?
 
     // Helper function to show sync feedback
     private func showSyncFeedback(trackCountBefore: Int, trackCountAfter: Int) {
@@ -468,13 +466,6 @@ struct LibraryView: View {
         .background(.clear)
         .toolbarBackground(.clear, for: .navigationBar)
         .toolbarBackground(.clear, for: .automatic)
-        .onChange(of: libraryIndexer.isIndexing) { _, isIndexing in
-            // 索引完成：唤醒等待中的同步（替代 while + sleep 忙等轮询）
-            if !isIndexing, let continuation = indexingWaitContinuation {
-                indexingWaitContinuation = nil
-                continuation.resume()
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
         }
@@ -561,13 +552,12 @@ struct LibraryView: View {
         }
     }
 
-    /// 统一同步入口（按钮与下拉刷新共用）：isRefreshing 互斥 + 无轮询等待索引完成。
-    /// 正在索引时通过 continuation 挂起，isIndexing 变 false 时由 onChange 唤醒。
+    /// 统一同步入口（按钮与下拉刷新共用）：isRefreshing 互斥 + 无忙等等待索引完成。
+    /// 等待索引走 IndexingGate（唯一实现，带超时兜底）：索引异常时不会再永久卡住同步按钮。
     private func runSync() async {
-        if libraryIndexer.isIndexing {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                indexingWaitContinuation = continuation
-            }
+        let outcome = await IndexingGate.waitUntilIdle(libraryIndexer)
+        if outcome == .timedOut {
+            print("⏱️ LibrarySync: indexing wait timed out — proceeding without waiting")
         }
 
         // For pull-to-refresh, use manual sync if available, otherwise just refresh

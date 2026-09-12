@@ -87,9 +87,9 @@ struct ContentView: View {
         let trackCountBefore = tracks.count
         await appCoordinator.manualSync()
 
-        // Wait for indexer to finish processing if it's currently running
-        while libraryIndexer.isIndexing {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        // 等索引跑完（IndexingGate = 唯一实现，无忙等；超时兜底不阻塞用户）
+        if await IndexingGate.waitUntilIdle(libraryIndexer) == .timedOut {
+            print("⏱️ ContentView: indexing wait timed out — refreshing anyway")
         }
 
         await refreshLibrary()
@@ -100,9 +100,9 @@ struct ContentView: View {
     @Sendable private func performRefresh() async -> (before: Int, after: Int) {
         let trackCountBefore = tracks.count
 
-        // Wait for indexer to finish processing if it's currently running
-        while libraryIndexer.isIndexing {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        // 等索引跑完（IndexingGate = 唯一实现，无忙等；超时兜底不阻塞用户）
+        if await IndexingGate.waitUntilIdle(libraryIndexer) == .timedOut {
+            print("⏱️ ContentView: indexing wait timed out — refreshing anyway")
         }
 
         await refreshLibrary()

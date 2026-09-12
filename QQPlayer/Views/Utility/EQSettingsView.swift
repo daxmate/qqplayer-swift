@@ -54,7 +54,7 @@ struct EQSettingsView: View {
                                 Text(preset.name)
                                     .font(.headline)
 
-                                Text("Manual Parametric EQ")
+                                Text(Localized.eqManualParametric)
                                     .font(.caption)
                                     .foregroundColor(.green)
                             }
@@ -105,7 +105,7 @@ struct EQSettingsView: View {
                     }
                 }
 
-                Button("Create Manual EQ") {
+                Button(Localized.eqCreateManual) {
                     showingCreateManual = true
                 }
                 .foregroundColor(.green)

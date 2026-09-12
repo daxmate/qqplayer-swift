@@ -287,6 +287,15 @@ struct Localized {
         }
     }
 
+    /// 专辑数（歌手详情页「N 张专辑」）：英文单复数分开，与 songsCount 同款
+    static func albumsCount(_ count: Int) -> String {
+        if count == 1 {
+            return "albums_count_singular".localized(with: count)
+        } else {
+            return "albums_count_plural".localized(with: count)
+        }
+    }
+
     static func createdDate(_ dateString: String) -> String {
         return "created_date".localized(with: dateString)
     }
