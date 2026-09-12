@@ -30,6 +30,12 @@ import CoreImage.CIFilterBuiltins
 import Foundation
 import SwiftUI
 
+extension Notification.Name {
+    /// 同步中心设备列表变化（审计 M4）：SyncHostCenter 的单槽回调不再直接捕获 View 值，
+    /// 改为转发这个热点通知，由视图侧（.onReceive）自己重载。
+    static let macSyncDevicesChanged = Notification.Name("MacSyncDevicesChanged")
+}
+
 /// macOS 同步中心（设置页「同步」分类 + 工具栏同步面板共用）。
 struct MacSyncCenterView: View {
     @State private var identity: SyncIdentity?
@@ -65,12 +71,19 @@ struct MacSyncCenterView: View {
             loadIdentityIfNeeded()
             // 监听生命周期归 SyncHostCenter（App 启动即常驻）；本视图只挂控制面回调。
             // ⚠️ 单槽回调：整个 App 仅此一处挂接（两个入口共用本视图）。
-            hostCenter.onDevicesChanged = { [self] in
-                reloadDevices()
+            // 审计 M4：槽位不再捕获本 View 值（struct）——修复前 `{ [self] in reloadDevices() }`
+            // 形成 单例 → 闭包 → View 副本 → 单例 的强引用环（每开一次面板滞留一份 View
+            // 及其 qrImage 位图/设备数组），且面板关闭后槽位仍指向已卸载副本，回调会写
+            // 一个不再安装到视图上的 @State（静默无效）。改发无状态通知，订阅方是活视图。
+            hostCenter.onDevicesChanged = {
+                NotificationCenter.default.post(name: .macSyncDevicesChanged, object: nil)
             }
             reloadDevices()
             // 展示首张 QR（identity 就绪才生成；nonce 注册见 refreshQR）
             refreshQR()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .macSyncDevicesChanged)) { _ in
+            reloadDevices()
         }
         // 连接状态变化（移动端连上/断开）→ 重算在线态与默认选中
         .onChange(of: hostCenter.connectedPeer?.peerID) { _ in

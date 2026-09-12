@@ -116,6 +116,8 @@ struct MacSmartPlaylistDetailView: View {
     @State private var bucketTracks: [Track] = []
     @State private var isLoading = true
     @State private var loadError: String?
+    /// 重算任务句柄（审计 M2：全量重算移出主线程后可取消）
+    @State private var loadTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -124,6 +126,7 @@ struct MacSmartPlaylistDetailView: View {
             content
         }
         .onAppear { loadData() }
+        .onDisappear { loadTask?.cancel() }
         // 刮削保存/批量刮削/重扫后：自动歌单曲目与年代分组都要重算
         // （2026-09-06：单曲刮削后自动歌单不刷新修复；decade 详情内也重载）
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
@@ -240,30 +243,52 @@ struct MacSmartPlaylistDetailView: View {
     // MARK: Data
 
     private func loadData() {
+        loadTask?.cancel()
         isLoading = true
         loadError = nil
-        do {
-            switch kind {
-            case .recentAdded:
-                tracks = try SmartPlaylistStore.recentAddedTracks()
-            case .recentPlayed:
-                tracks = try SmartPlaylistStore.recentPlayedTracks()
-            case .topPlayed:
-                tracks = try SmartPlaylistStore.topPlayedTracks().map(\.track)
-            case .decades:
-                buckets = try SmartPlaylistStore.decadeBuckets()
+        let kind = self.kind
+        let bucket = kind == .decades ? selectedBucket : nil
+        loadTask = Task { @MainActor in
+            // 审计 M2：全量重算（recentAdded/topPlayed/decadeBuckets）以前在
+            // 通知回调里同步跑在主线程 → 现在在全局执行器上取数
+            let payload = await MacSmartPlaylistLoader.load(kind: kind)
+            guard !Task.isCancelled else { return }
+            switch payload {
+            case .success(.tracks(let loaded)):
+                tracks = loaded
+                isLoading = false
+            case .success(.buckets(let loaded)):
+                buckets = loaded
+                isLoading = false
+                // 年代内层：同步重拉该年代曲目；原年代分组已消失 → 退回年代列表
+                if let bucket {
+                    if loaded.contains(where: { $0.key == bucket.key }) {
+                        await refreshBucketTracks(bucket)
+                    } else {
+                        selectedBucket = nil
+                        bucketTracks = []
+                    }
+                }
+            case .failure:
+                loadError = Localized.smartLoadFailed
+                isLoading = false
             }
-            isLoading = false
-        } catch {
-            loadError = Localized.smartLoadFailed
-            isLoading = false
         }
     }
 
     private func loadBucketTracks(_ bucket: DecadeBucketInfo) {
-        do {
-            bucketTracks = try SmartPlaylistStore.tracks(inDecade: bucket.key)
-        } catch {
+        Task { @MainActor in
+            await refreshBucketTracks(bucket)
+        }
+    }
+
+    /// 单年代曲目取数（审计 M2：同上，非主线程）
+    private func refreshBucketTracks(_ bucket: DecadeBucketInfo) async {
+        let loaded = await MacSmartPlaylistLoader.bucketTracks(key: bucket.key)
+        guard !Task.isCancelled else { return }
+        if let loaded {
+            bucketTracks = loaded
+        } else {
             loadError = Localized.smartLoadFailed
         }
     }
@@ -271,18 +296,6 @@ struct MacSmartPlaylistDetailView: View {
     /// 外部数据变化（刮削保存/批量刮削/重扫/歌单变更）后统一重载：
     /// 普通自动歌单重拉曲目；年代歌单重拉分组，且在年代内层时同步重拉该年代曲目。
     private func reloadAll() {
-        if kind == .decades {
-            if let selectedBucket {
-                loadData()
-                // 年份被刮削改动后原年代分组可能已消失 → 退回年代列表
-                if buckets.contains(where: { $0.key == selectedBucket.key }) {
-                    loadBucketTracks(selectedBucket)
-                } else {
-                    self.selectedBucket = nil
-                }
-                return
-            }
-        }
         loadData()
     }
 
@@ -297,6 +310,56 @@ struct MacSmartPlaylistDetailView: View {
             forTrackStableId: track.stableId,
             fallbackArtistId: track.artistId
         )
+    }
+}
+
+/// 自动歌单取数（nonisolated async → 全量重算在全局执行器上，不占主线程）。
+/// 审计 M2：这些 `SmartPlaylistStore` 调用以前直接跑在 body/通知回调里。
+enum MacSmartPlaylistLoader {
+    enum Payload {
+        case tracks([Track])
+        case buckets([DecadeBucketInfo])
+    }
+
+    /// 卡片条数据（计数 + 封面代表曲目）
+    struct CardStripPayload {
+        var cards: [SmartPlaylistCardInfo]
+        var covers: [SmartPlaylistKind: [Track]]
+    }
+
+    static func load(kind: SmartPlaylistKind) async -> Result<Payload, Error> {
+        do {
+            switch kind {
+            case .recentAdded:
+                return .success(.tracks(try SmartPlaylistStore.recentAddedTracks()))
+            case .recentPlayed:
+                return .success(.tracks(try SmartPlaylistStore.recentPlayedTracks()))
+            case .topPlayed:
+                return .success(.tracks(try SmartPlaylistStore.topPlayedTracks().map(\.track)))
+            case .decades:
+                return .success(.buckets(try SmartPlaylistStore.decadeBuckets()))
+            }
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    static func bucketTracks(key: String) async -> [Track]? {
+        try? SmartPlaylistStore.tracks(inDecade: key)
+    }
+
+    /// 卡片条（一次取数：5 次查询集中在后台）
+    static func cardStrip() async -> CardStripPayload? {
+        do {
+            let cards = try SmartPlaylistStore.cardInfos()
+            var covers: [SmartPlaylistKind: [Track]] = [:]
+            for kind in SmartPlaylistKind.allCases {
+                covers[kind] = try SmartPlaylistStore.coverTracks(for: kind, limit: 4)
+            }
+            return CardStripPayload(cards: cards, covers: covers)
+        } catch {
+            return nil
+        }
     }
 }
 

@@ -116,6 +116,8 @@
 "drag_import_hint" = "将音频文件拖到此处以导入";
 "drag_import_success_count" = "已导入 %d 个文件";
 "drag_import_none" = "未导入任何音频文件";
+"drag_import_skipped_count" = "已跳过 %d 个不支持的文件";
+"drag_import_partial_count" = "已导入 %1$d 个文件，跳过 %2$d 个";
 
 /* Track list context menu (A3) */
 "show_artist" = "进歌手";
@@ -584,6 +586,9 @@
 "library_empty" = "音乐库为空";
 "library_empty_hint" = "点击左下角「刷新音乐库」扫描 ~/Music/QQPlayer";
 "load_library_failed" = "加载音乐库失败：%@";
+"album_load_failed" = "打开专辑失败：%@";
+"artist_load_failed" = "打开歌手失败：%@";
+"playlist_create_failed" = "新建歌单失败：%@";
 "not_playing" = "未在播放";
 "karaoke_mode_help" = "跟唱模式（倍速 / 单句循环 / AB 循环）";
 "lyrics" = "歌词";

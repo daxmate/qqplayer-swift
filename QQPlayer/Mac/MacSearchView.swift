@@ -234,11 +234,14 @@ private struct MacSearchAlbumRow: View {
     let album: Album
     let onOpen: () -> Void
 
+    /// 卡片事实缓存（审计 M2：以前每行每帧一次整表查询）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
+
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 8) {
                 MacArtworkThumbnail(
-                    track: MacArtworkResolver.representativeTrack(forAlbum: album),
+                    track: facts.albumFacts(for: album).representativeTrack,
                     size: 28,
                     cornerRadius: 4,
                     placeholderIcon: "square.stack"
@@ -265,6 +268,9 @@ private struct MacSearchArtistRow: View {
     let artist: Artist
     let onOpen: () -> Void
 
+    /// 歌手曲目数缓存（审计 M2）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
+
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 8) {
@@ -277,7 +283,7 @@ private struct MacSearchArtistRow: View {
 
                 Spacer()
 
-                Text(String(format: "track_count".localized, artistTrackCount()))
+                Text(String(format: "track_count".localized, facts.artistTrackCount(for: artist)))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -285,21 +291,21 @@ private struct MacSearchArtistRow: View {
         }
         .buttonStyle(.plain)
     }
-
-    private func artistTrackCount() -> Int {
-        (try? DatabaseManager.shared.getTracksByArtistId(artist.id ?? 0).count) ?? 0
-    }
 }
 
 private struct MacSearchPlaylistRow: View {
     let playlist: Playlist
     let onOpen: () -> Void
 
+    /// 歌单事实缓存（审计 M2）
+    @ObservedObject private var facts = MacLibraryFactsStore.shared
+
     var body: some View {
+        let playlistFacts = facts.playlistFacts(for: playlist)
         Button(action: onOpen) {
             HStack(spacing: 8) {
                 MacArtworkThumbnail(
-                    track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
+                    track: playlistFacts.representativeTrack,
                     size: 28,
                     cornerRadius: 4,
                     placeholderIcon: "list.bullet.rectangle"
@@ -310,11 +316,9 @@ private struct MacSearchPlaylistRow: View {
 
                 Spacer()
 
-                if let itemCount = try? DatabaseManager.shared.getPlaylistItems(playlistId: playlist.id ?? 0).count {
-                    Text(String(format: "track_count".localized, itemCount))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                Text(String(format: "track_count".localized, playlistFacts.itemCount))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             .contentShape(Rectangle())
         }

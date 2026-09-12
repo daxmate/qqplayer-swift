@@ -202,6 +202,14 @@ struct Localized {
     static func dragImportSuccess(count: Int) -> String {
         "drag_import_success_count".localized(with: count)
     }
+    /// 导入被跳过的文件数（不支持的格式/网络 URL；审计 D2：写而不读 → 接上）
+    static func dragImportSkipped(count: Int) -> String {
+        "drag_import_skipped_count".localized(with: count)
+    }
+    /// 部分导入（既导入又跳过）
+    static func dragImportPartial(imported: Int, skipped: Int) -> String {
+        "drag_import_partial_count".localized(with: imported, skipped)
+    }
 
     // MARK: - Appearance（主题三态 + 强调色）
     static let appearanceTheme = "appearance_theme".localized

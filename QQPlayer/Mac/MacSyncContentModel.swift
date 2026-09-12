@@ -79,6 +79,9 @@ final class MacSyncContentModel: ObservableObject {
     private let local: MacSyncLocalContentProvider
     private var peer: MacSyncPeerContentProvider?
     private var loadTask: Task<Void, Never>?
+    /// 对端摘要请求句柄（审计 L6：修复前只有歌单/曲目两条存入 loadTask，摘要靠
+    /// generation 丢弃结果——不对称，取消时也照应不到）
+    private var summaryTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -160,6 +163,8 @@ final class MacSyncContentModel: ObservableObject {
         generation += 1
         loadTask?.cancel()
         loadTask = nil
+        summaryTask?.cancel()
+        summaryTask = nil
         peer?.cancelInFlight()
     }
 
@@ -291,6 +296,8 @@ final class MacSyncContentModel: ObservableObject {
         generation += 1
         loadTask?.cancel()
         loadTask = nil
+        summaryTask?.cancel()
+        summaryTask = nil
         peer?.cancelInFlight()
         peer = nil
         playlistOptions = []
@@ -394,7 +401,8 @@ final class MacSyncContentModel: ObservableObject {
         guard let peer else { return }
         let generation = self.generation
         summaryState = .loading
-        Task { @MainActor [weak self] in
+        summaryTask?.cancel()
+        summaryTask = Task { @MainActor [weak self] in
             do {
                 let facts = try await peer.loadSummary()
                 guard let self, self.generation == generation else { return }

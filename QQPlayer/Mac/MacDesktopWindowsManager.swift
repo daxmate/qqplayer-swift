@@ -138,7 +138,9 @@ final class DesktopWindowsManager: ObservableObject {
 
     /// 浮窗是手动 NSHostingView，不继承 App 场景（WindowGroup/Settings）的
     /// .environment(\\.appAccentColor)/.tint 注入 → 强调色需在此显式注入；
-    /// 设置里改强调色后重建 rootView 使迷你窗控件跟随 App 强调色。
+    /// **重建条件只有强调色**（2026-09-12 审计 L3：原注释写「设置变化重建 rootView」
+    /// 与实现不符——其余设置项由浮窗内部自订阅 .qqplayerSettingsDidChange 刷新，
+    /// 不需要重建整个 rootView；这里只负责强调色。
     private func refreshPanelRootViews() {
         let accentName = DeleteSettings.load().accentColorName
         guard accentName != lastInjectedAccentName else { return }
@@ -183,6 +185,8 @@ final class DesktopWindowsManager: ObservableObject {
                 UserDefaults.standard.set(NSStringFromRect(panel.frame), forKey: kind.frameKey)
             }
         }
+        // 观察者从不显式移除（2026-09-12 审计 L3 核实）：面板 isReleasedWhenClosed=false
+        // 且 ensurePanel 每 kind 只建一次 → 观察者与面板同生共死，数量有界，无泄漏。
         moveObservers.append(token)
         return panel
     }
