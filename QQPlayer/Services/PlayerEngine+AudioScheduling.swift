@@ -502,6 +502,15 @@
             isPlaying = false
             playbackState = .stopped
             stopPlaybackTimer()
+            // 位置归零（2026-09-12 审计 P1）：曲终后 playbackTime 停在 ≈ duration 时会被
+            // savePlayerState / 冷启动恢复持久化，下次点播放即落入「末尾帧被拒 + isPlaying=true」
+            // 的假播放终态——这也是该 bug 跨启动复现的原因。
+            // （iOS 有位置型曲终兜底 checkIfTrackEnded，不受此影响，故只改 macOS 分支。）
+            playbackTime = 0
+            seekTimeOffset = 0
+            nodeTimelineStartSampleTime = 0
+            lastKnownPlaybackPosition = 0
+            lastKnownPlaybackPositionUpdatedAt = Date()
             if usingSFBEngine {
                 sfbAudioManager.stop()
             } else {

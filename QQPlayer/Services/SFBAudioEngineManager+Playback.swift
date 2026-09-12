@@ -227,16 +227,12 @@
             isPlaying = false
             updateTimer?.invalidate()
 
-            // Deactivate audio session to ensure system knows audio is paused
-            // This should fix Control Center button state issues
-            do {
-                let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
-                print("✅ Audio session deactivated on pause")
-            } catch {
-                print("⚠️ Failed to deactivate audio session on pause: \(error)")
-            }
-
+            // ⚠️ 不在此 deactivate 音频会话（2026-09-12 审计 P3）：系统已按「我们仍关注音频」
+            // 判定中断投递，主动 setActive(false) 会让 .ended（.shouldResume）不再送达
+            // （被挂起后永远停在暂停态，如 CarPlay 导航播报/来电后）。主引擎对这条路径有
+            // 明确相反的纪律与踩坑记录：PlayerEngine+AudioSession.swift 的中断处理
+            // （"Do NOT deactivate the audio session here…"）与 PlaybackControl.swift 的
+            // "NEVER deactivate session during cleanup"。native 暂停路径也从不 deactivate。
             print("✅ SFBAudioEngineManager paused")
         }
 
@@ -355,10 +351,7 @@
 
         // MARK: - EQ Support
 
-        /// Returns whether EQ is supported for this playback engine
-        static func supportsEQ() -> Bool {
-            return true
-        }
+        // supportsEQ() 已删除（2026-09-12 审计死代码 ⚰️-5）：全仓 grep 仅命中定义处，零调用方。
 
         /// Update EQ settings from EQManager (applies to native SFBAudioEngine EQ)
         func updateEQSettings() {

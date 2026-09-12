@@ -85,6 +85,8 @@
 "queue_shuffle_disabled_hint" = "Reordering is disabled while shuffle is on";
 "queue_remove_from_queue" = "Remove from Queue";
 "no_track_selected" = "No track selected";
+"playback_error_generic" = "Can't play this track. The file may be missing or in an unsupported format.";
+"playback_error_dsd_unsupported" = "Can't play this DSD file. Try a lower DSD rate (DSD64) or convert it to FLAC.";
 
 /* Search */
 "search_your_music_library" = "Search your music library";

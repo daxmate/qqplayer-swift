@@ -73,6 +73,8 @@
 "queue_shuffle_disabled_hint" = "Réorganisation désactivée en mode aléatoire";
 "queue_remove_from_queue" = "Retirer de la file d'attente";
 "no_track_selected" = "Aucune piste sélectionnée";
+"playback_error_generic" = "Impossible de lire cette piste. Le fichier est peut-être introuvable ou dans un format non pris en charge.";
+"playback_error_dsd_unsupported" = "Impossible de lire ce fichier DSD. Essayez un débit DSD inférieur (DSD64) ou convertissez-le en FLAC.";
 
 /* Search */
 "search_your_music_library" = "Rechercher dans votre bibliothèque musicale";

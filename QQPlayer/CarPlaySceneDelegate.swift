@@ -42,7 +42,13 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         let tabBarTemplate = CPTabBarTemplate(templates: [allSongsTemplate, favoritesTemplate, playlistsTemplate, browseTemplate])
         interfaceController.setRootTemplate(tabBarTemplate, animated: true, completion: nil)
 
-        setupPlayerStateObserver()
+        // 曾在此 setupPlayerStateObserver()（监听 "PlayerStateChanged" 只 print 一行）：
+        // 已删除（2026-09-12 审计 P7）——该闭包无任何状态同步副作用，而 addObserver 的
+        // token 从未保存/移除、didConnect 每次调用再注册一个 → CarPlay 反复插拔线性累积
+        // observer（每次 NowPlaying 更新都会 post 一次）。CarPlay 的 Now Playing 态由
+        // MPNowPlayingInfoCenter + MPRemoteCommandCenter 驱动（见
+        // PlayerEngine+NowPlaying.updateNowPlayingInfoEnhanced 里同步写入的 playbackState 与
+        // 已启用的 remote commands），不需要额外通知桥。
     }
 
     // CPTemplateApplicationSceneDelegate 的正式实现（didDisconnect，无 window 变体）。
@@ -73,16 +79,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
             excludingFormats: incompatibleFormats
         )) ?? []
         allSongsOffset = allSongsTracks.count
-    }
-
-    private func setupPlayerStateObserver() {
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("PlayerStateChanged"),
-            object: nil,
-            queue: .main
-        ) { _ in
-            print("🎛️ Player state changed - CarPlay will sync automatically")
-        }
     }
 
     // MARK: - Tab Creation

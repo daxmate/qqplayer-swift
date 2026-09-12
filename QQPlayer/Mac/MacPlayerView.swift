@@ -106,6 +106,22 @@ struct MacPlayerView: View {
         .sheet(isPresented: $showQueuePanel) {
             MacQueuePanelView(player: player)
         }
+        .overlay(alignment: .top) {
+            // 播放失败提示（2026-09-12 审计 P8）：载入失败不再静默（Opus/DSD 以前是
+            // "点了完全无反应"）。文案由引擎统一上报，5 秒后自动消失。
+            if let message = player.playbackErrorMessage {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Color.red.opacity(0.9)))
+                    .padding(.top, 10)
+                    .allowsHitTesting(false)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: player.playbackErrorMessage)
         .animation(.easeInOut(duration: 0.25), value: isLyricsFullscreen)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
@@ -474,7 +490,7 @@ struct MacPlayerView: View {
 // MARK: - 播放队列面板（B 组队列排序持久化，2026-09-03）
 
 /// macOS 播放队列管理：显示当前队列，支持拖拽重排 / 移除（当前播放项除外）/
-/// 点行跳转。每次变更经 PlayerEngine.moveQueueItems/removeQueueItems/jumpToQueueIndex
+/// 点行跳转。每次变更经 PlayerEngine.moveQueueItems/removeQueueItem(stableId:)/jumpToQueueIndex
 /// 立即持久化（savePlayerState 落盘 queueTrackIds），重启 restoreUIStateOnly 恢复——
 /// web 版 persistQueueOrder/applyQueueOrder 语义的 Swift 端形态（队列=播放引擎队列，
 /// 启动恢复 = 现成 QQPlayerState 恢复链路）。
@@ -576,7 +592,9 @@ private struct MacQueuePanelView: View {
 
             if !isCurrent {
                 Button {
-                    player.removeQueueItems(at: IndexSet(integer: index))
+                    // 按 stableId 移除（2026-09-12 审计 P2）：渲染期下标与引擎数组可能不一致，
+                    // 旧写法把 ForEach 的 index 直接传给 removeQueueItems(at:) 会越界/错位。
+                    player.removeQueueItem(stableId: track.stableId)
                 } label: {
                     Image(systemName: "minus.circle")
                         .foregroundColor(.secondary)

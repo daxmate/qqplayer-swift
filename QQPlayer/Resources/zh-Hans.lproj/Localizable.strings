@@ -85,6 +85,8 @@
 "queue_shuffle_disabled_hint" = "随机播放时不可手动排序";
 "queue_remove_from_queue" = "从队列移除";
 "no_track_selected" = "未选择曲目";
+"playback_error_generic" = "无法播放这首歌曲，文件可能已丢失或格式不受支持。";
+"playback_error_dsd_unsupported" = "无法播放此 DSD 文件，请尝试较低码率（DSD64）或转换为 FLAC。";
 
 /* Search */
 "search_your_music_library" = "搜索你的媒体库";
