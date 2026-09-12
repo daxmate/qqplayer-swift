@@ -732,13 +732,31 @@ struct MacLibraryView: View {
 /// 避免「设置里一套、主界面一套」的行为漂移（封面解析散落多处的教训）。
 /// 同步只能由桌面端发起；「上传到 iPhone」与「从 iPhone 下载」是面板里的两个独立按钮。
 private struct MacSyncPanel: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            header
+
             Form {
                 MacSyncRunSection(hostCenter: .shared)
             }
             .formStyle(.grouped)
-            .navigationTitle("sync_run_panel_title".localized)
         }
+    }
+
+    /// 与其它 Mac sheet 一致的标题栏：标题 + 关闭按钮（Esc 也可关）。
+    /// 原先只有 `navigationTitle`——用户从工具栏打开面板后**没有任何关闭途径**
+    /// （macOS 的 sheet 不会自动给关闭按钮，也没有默认 Esc 取消）。
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text("sync_run_panel_title".localized)
+                .font(.title2)
+                .fontWeight(.bold)
+            Spacer()
+            Button("close".localized) { dismiss() }
+                .keyboardShortcut(.cancelAction)
+        }
+        .padding()
     }
 }
