@@ -150,6 +150,9 @@ enum SyncCollectionDiffPlanner {
 struct SyncCollectionSyncConfiguration: Equatable, Sendable {
     /// 落地目录名（曲库根内隐藏目录；透传拉取控制器）
     var incomingDirectoryName: String = ".sync-incoming"
+    /// 计划阶段**等对端清单**的上限（秒）。对端 App 不在前台就不会应答，
+    /// 没有上限 = 用户看到「点开始后一直等」。`<= 0` = 不启用超时。
+    var peerManifestTimeout: TimeInterval = 20
 }
 
 /// 一次编排的进度状态。
@@ -269,6 +272,12 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     /// R3b：播放数据「跟歌走」驱动（nil = 不携带；R3a 行为零变化）。
     private let playbackCarry: (any SyncPlaybackCarryDriving)?
     private let fileManager: FileManager
+
+    /// 等对端清单的超时定时（专用串行队列，与 `SyncPeerLibraryClient.timeoutQueue` 同款）。
+    private let manifestTimeoutQueue = DispatchQueue(
+        label: "qqplayer.sync.collection.manifest-timeout",
+        qos: .utility
+    )
 
     private let lock = NSLock()
     private var stateValue: SyncCollectionSyncState = .idle
@@ -418,6 +427,26 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         } catch {
             failPlanning("请求 manifest 失败：\(error)")
             throw error
+        }
+        // 请求成功后挂一次性到点检查：对端不应答（App 切后台）时不许无限期停在计划态。
+        schedulePeerManifestTimeout()
+    }
+
+    /// 计划阶段「等对端清单」的超时兜底（`configuration.peerManifestTimeout` `<= 0` = 不启用）。
+    ///
+    /// 幂等守卫 = `stage == .planning`：迟到响应（`handlePeerManifest` 同款守卫）、
+    /// 用户取消（`stage` 已 `.finished`）、已进入推送，都不受这次到点检查影响。
+    /// 触发走既有失败通道（锁外，`failPlanning` 自带 `stage != .finished` 守卫）。
+    private func schedulePeerManifestTimeout() {
+        let seconds = configuration.peerManifestTimeout
+        guard seconds > 0 else { return }
+        manifestTimeoutQueue.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let stillPlanning = self.stage == .planning
+            self.lock.unlock()
+            guard stillPlanning else { return }
+            self.failPlanning("等待设备清单超时（请确认 iPhone 上的 QQPlayer 在前台并已连接）")
         }
     }
 

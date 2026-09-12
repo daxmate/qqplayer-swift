@@ -42,6 +42,12 @@ func section(_ title: String) {
     print("\n▶︎ \(title)")
 }
 
+/// `.failed(reason)` 的失败原因（非失败态 = nil；㊶ 断言「原因含超时」用）。
+func failureReason(_ state: SyncCollectionSyncState) -> String? {
+    if case let .failed(reason) = state { return reason }
+    return nil
+}
+
 // MARK: - 夹具
 
 func tempRoot(_ tag: String) throws -> URL {
@@ -1418,7 +1424,9 @@ func makeCollectionScenario(
     injectCarry: Bool = false,
     /// 设备被动端是否接线（false = 对端**不应答** manifest → 编排停在计划态，
     /// M6 用来看「点开始后等对端」这段时序的上报状态）。默认 true = 既有行为。
-    attachDeviceHost: Bool = true
+    attachDeviceHost: Bool = true,
+    /// 编排配置（默认值 = 既有行为不变；㊶ 注入极小 `peerManifestTimeout`）。
+    configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration()
 ) throws -> CollectionScenario {
     let fixture = SessionFixture.pairedHandshake()
     let macRoot = try tempRoot("r3a-mac")
@@ -1481,6 +1489,7 @@ func makeCollectionScenario(
             knownPaths: knownPaths,
             lyricsWirePaths: lyricsWirePaths
         ),
+        configuration: configuration,
         sink: macSink,
         lyricsStore: macLyricsStore,
         lyricsMapping: macLyricsMapping,
@@ -2637,6 +2646,48 @@ do {
     scenario.deviceHost.detach()
 } catch {
     check(false, "㊵ 抛错：\(error)")
+}
+
+// MARK: - ㊶ 计划阶段等对端清单超时（回归：对端不应答 → 有界失败，不无限干等）
+
+section("㊶ 计划阶段等对端清单超时（对端不应答 → 有界失败）")
+do {
+    let data = silentData(0xC7, count: 8_000)
+    let hash = try sha256Hex(of: data)
+    // 注入极小超时（0.3s）+ 对端**不接线**（不应答 manifest）= 用户实测的「点开始后一直等」。
+    var configuration = SyncCollectionSyncConfiguration()
+    configuration.peerManifestTimeout = 0.3
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        direction: .upload,
+        macFiles: [("Album/timeout.flac", data)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-timeout",
+                    relativePath: "Album/timeout.flac",
+                    contentHash: hash
+                ),
+            ],
+        ],
+        attachDeviceHost: false,
+        configuration: configuration
+    )
+
+    checkEqual(scenario.coordinator.state, .planning, "请求刚发出时仍在计划态（未提前判超时）")
+    check(scenario.coordinator.report.didRequestPeerManifest, "已向对端发出 manifest 请求")
+
+    // **有界等待**：轮询上限 ~3s（0.3s 超时足够触发）；绝不无限等
+    let deadline = Date().addingTimeInterval(3)
+    while Date() < deadline, !SyncCollectionSyncState.isTerminal(scenario.coordinator.state) {
+        Thread.sleep(forTimeInterval: 0.05)
+    }
+    let reason = failureReason(scenario.coordinator.state)
+    check(reason != nil, "有界等待内落到终态 .failed（不无限停在计划态）")
+    check(reason?.contains("超时") == true, "失败原因含「超时」：\(reason ?? "nil")")
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㊶ 抛错：\(error)")
 }
 
 // MARK: - 汇总
