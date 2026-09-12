@@ -21,6 +21,10 @@
 //  帧值语义：10-13 保持不动；本包新增从 **14** 起（14 = library_push_announce）。
 //  本包只定义「接收侧可用的声明」，**发起端（Mac PushController）属 R1b-2**。
 //
+//  R1b-2 之后本文件同时承载 **push/pull 共用**的两块纯逻辑（同一份实现，防两端漂移）：
+//  - `SyncPushClaimTable`：接收端认领表（传输级身份 → 目标相对路径）
+//  - `SyncLibraryLanding`：落位的唯一文件系统实现（原子替换，失败保留本端原文件）
+//
 //  不传播删除（§12b 决策 7）：声明只描述「要送到哪里」，协议里不存在删除指令；
 //  接收端也不因声明/落盘失败而删除本端任何既有内容。
 //
@@ -161,29 +165,107 @@ enum SyncPushFailureReason {
     static let localFileUnavailable = "local_file_unavailable"
 }
 
-// MARK: - 认领表（纯逻辑，可单测）
+// MARK: - 认领表（纯逻辑，可单测；push/pull 唯一实现）
 
-/// 接收端认领表：`file_meta.name` → 声明的目标相对路径。
-/// - 同名多路径（两个目录下同名文件）：按声明顺序取首个未被认领的（与
-///   `SyncLibraryPullController.expectedPathsByName` 同策略，v1 单飞传输下唯一可判）；
-/// - 未声明过的名字 / 已认领完：返回 nil（接收端不落位，交清理）。
+/// 接收端认领表：**传输级身份**（`fileID` / `sha256`）→ 声明的目标相对路径。
+///
+/// 为什么不能用传输名当键（2026-09-12 审计 🔴T1）：同名不同目录的两个文件
+/// （`A/01 Song.flac` / `B/01 Song.flac`）按名认领会退化成「取首个未认领」；
+/// 发送端跳过发送失败的条目时，后一条的字节会被写到前一条的路径并入库（静默错位）。
+/// 传输名只在**无歧义**（剩余条目里同名唯一）时兜底，用于对端尚未指纹、
+/// 期望表拿不到身份的条目（`manifest.contentHash == nil`）。
 struct SyncPushClaimTable: Equatable {
-    private var remaining: [String: [String]] = [:]
+    /// 未认领条目（保持声明顺序：同身份/同名条目的先后按声明序）
+    private var remaining: [SyncPushEntry]
 
     init(entries: [SyncPushEntry] = []) {
-        for entry in entries {
-            remaining[entry.transferName, default: []].append(entry.relativePath)
-        }
+        remaining = entries
     }
 
-    /// 认领一个传输名 → 目标相对路径（取走即移除）。
-    mutating func claim(transferName: String) -> String? {
-        guard var paths = remaining[transferName], !paths.isEmpty else { return nil }
-        let path = paths.removeFirst()
-        remaining[transferName] = paths.isEmpty ? nil : paths
-        return path
+    /// 认领一个传输 → 目标相对路径（取走即移除）；认不到 → nil（接收端不落位）。
+    /// 匹配顺序：
+    /// 1. `fileID` 或 `sha256` 命中；同身份多条（同内容多路径）时优先传输名一致者；
+    /// 2. 身份认不到、但剩余条目里该传输名**唯一** → 按名认领（对端未指纹的兜底）；
+    /// 3. 其余（同名多条且身份不匹配）→ nil：**不猜**，宁可不落位也不错位。
+    mutating func claim(fileID: String, sha256Hex: String, transferName: String) -> String? {
+        if let index = remaining.firstIndex(where: {
+            $0.identityMatches(fileID: fileID, sha256Hex: sha256Hex)
+        }) {
+            let sameName = remaining.firstIndex {
+                $0.identityMatches(fileID: fileID, sha256Hex: sha256Hex) && $0.transferName == transferName
+            }
+            return remaining.remove(at: sameName ?? index).relativePath
+        }
+        guard let index = uniqueIndex(forTransferName: transferName) else { return nil }
+        return remaining.remove(at: index).relativePath
     }
+
+    /// 失败归因：传输失败（无落位）时按身份找到并取走声明条目 → 相对路径（认不到 → nil）。
+    /// 失败错误只带 `fileID`（`SyncFileTransferError` 各文件级分支），故按 fileID 匹配。
+    mutating func claimFailure(fileID: String, sha256Hex: String = "") -> String? {
+        guard let index = remaining.firstIndex(where: {
+            $0.identityMatches(fileID: fileID, sha256Hex: sha256Hex)
+        }) else { return nil }
+        return remaining.remove(at: index).relativePath
+    }
+
+    /// 尚未认领的声明条目相对路径（会话结束收尾时按它记失败终态）。
+    var remainingRelativePaths: [String] { remaining.map(\.relativePath) }
 
     /// 是否还有未认领的条目。
     var isEmpty: Bool { remaining.isEmpty }
+
+    /// 该传输名在剩余条目里唯一出现时的下标（0 条 / 多条 → nil）。
+    private func uniqueIndex(forTransferName transferName: String) -> Int? {
+        let matches = remaining.indices.filter { remaining[$0].transferName == transferName }
+        return matches.count == 1 ? matches[0] : nil
+    }
+}
+
+extension SyncPushEntry {
+    /// 传输级身份命中（`fileID` 或 `sha256` 任一精确相等；空值不参与匹配）。
+    func identityMatches(fileID: String, sha256Hex: String) -> Bool {
+        let idHit = !fileID.isEmpty && self.fileID == fileID
+        let shaHit = !sha256Hex.isEmpty && self.sha256Hex == sha256Hex
+        return idHit || shaHit
+    }
+
+    /// 拉取方向的认领键：请求路径 + 对端 manifest 身份。
+    /// 对端尚未指纹（`contentHash` nil）→ 身份留空，只能按「同名唯一」兜底认领。
+    static func claimKey(relativePath: String, contentHash: String?, size: Int64) -> SyncPushEntry? {
+        guard let normalized = SyncManifestGenerator.normalizeRelativePath(relativePath) else { return nil }
+        let name = (normalized as NSString).lastPathComponent
+        let hash = contentHash ?? ""
+        return SyncPushEntry(
+            relativePath: normalized,
+            transferName: name,
+            fileID: hash,
+            sha256Hex: hash,
+            size: size
+        )
+    }
+}
+
+// MARK: - 原子落位（文件系统唯一实现，push/pull 共用）
+
+/// 落位：把落地目录里的临时文件搬到目标相对路径（**唯一**实现，防两份漂移）。
+///
+/// 语义（2026-09-12 审计 🟡T3）：目标已存在时**不先删**——用 `replaceItemAt` 原子替换；
+/// 任何失败都不改动目标既有文件（**本端原文件必须保留**），错误交调用方记账。
+/// 临时文件的清理由调用方决定（失败时通常丢弃，`.part` 语义不适用本层）。
+enum SyncLibraryLanding {
+    /// 原子落位：`source`（落地目录临时文件）→ `destination`。
+    /// - 目标不存在：`moveItem`（同卷重命名）
+    /// - 目标已存在：`replaceItemAt`（原子替换；失败时目标保持原样）
+    static func moveAtomically(
+        from source: URL,
+        to destination: URL,
+        fileManager: FileManager = .default
+    ) throws {
+        if fileManager.fileExists(atPath: destination.path) {
+            _ = try fileManager.replaceItemAt(destination, withItemAt: source)
+        } else {
+            try fileManager.moveItem(at: source, to: destination)
+        }
+    }
 }

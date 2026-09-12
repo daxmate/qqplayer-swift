@@ -932,13 +932,24 @@ do {
     let a = SyncPushEntry(relativePath: "A/dup.flac", transferName: "dup.flac", fileID: "a", sha256Hex: "a", size: 1)
     let b = SyncPushEntry(relativePath: "B/dup.flac", transferName: "dup.flac", fileID: "b", sha256Hex: "b", size: 1)
     var table = SyncPushClaimTable(entries: [a, b])
-    checkEqual(table.claim(transferName: "dup.flac"), "A/dup.flac", "同名多路径：首个未认领")
-    checkEqual(table.claim(transferName: "dup.flac"), "B/dup.flac", "同名多路径：第二个未认领")
-    check(table.claim(transferName: "dup.flac") == nil, "认领完 → nil")
+    checkEqual(
+        table.claim(fileID: "b", sha256Hex: "b", transferName: "dup.flac"),
+        "B/dup.flac",
+        "同名多路径：按身份认领（不看到达序，🟡→🔴T1）"
+    )
+    checkEqual(
+        table.claim(fileID: "a", sha256Hex: "a", transferName: "dup.flac"),
+        "A/dup.flac",
+        "同名多路径：身份对应条目"
+    )
+    check(
+        table.claim(fileID: "c", sha256Hex: "c", transferName: "dup.flac") == nil,
+        "身份不符且同名多条 → nil（不猜，宁可不错位）"
+    )
     check(table.isEmpty, "认领表已取空")
     var unknownTable = SyncPushClaimTable(entries: [a])
     check(
-        unknownTable.claim(transferName: "unknown.flac") == nil,
+        unknownTable.claim(fileID: "unknown", sha256Hex: "unknown", transferName: "unknown.flac") == nil,
         "未声明的传输名 → nil（不落位）"
     )
 
@@ -2773,12 +2784,271 @@ do {
     )
     scenario.deviceHost.detach()
 } catch {
-    check(false, "㊸ 抛错：\(error)")
+    check(false, "㊸ S2 抛错：\(error)")
 }
 
-// MARK: - ㊹ S4：start 重入保护 + cancel 收尾
+// MARK: - ㊹ 审计 B1（W2 包）：身份认领 / 批次终态 / 落位原子性 / 解码与超时
 
-section("㊹ S4：重入保护（进行中拒绝第二轮）+ cancel 后状态不被到点检查改写")
+section("㊹ 审计 B1 W2：身份认领（同名不错位）+ 批次终态 + 原子落位 + 解码/超时")
+do {
+    // ① 认领表（纯逻辑）：身份优先，同名多条不按到达序猜
+    let dupA = SyncPushEntry(
+        relativePath: "A/01 Song.flac", transferName: "01 Song.flac",
+        fileID: "hashA", sha256Hex: "hashA", size: 1
+    )
+    let dupB = SyncPushEntry(
+        relativePath: "B/01 Song.flac", transferName: "01 Song.flac",
+        fileID: "hashB", sha256Hex: "hashB", size: 1
+    )
+    var claimTable = SyncPushClaimTable(entries: [dupA, dupB])
+    checkEqual(
+        claimTable.claim(fileID: "hashB", sha256Hex: "hashB", transferName: "01 Song.flac"),
+        "B/01 Song.flac",
+        "🔴T1 认领按身份：B 的字节不落到 A"
+    )
+    checkEqual(
+        claimTable.claim(fileID: "hashA", sha256Hex: "hashA", transferName: "01 Song.flac"),
+        "A/01 Song.flac",
+        "🔴T1 认领按身份：A 认出自己的条目"
+    )
+    var ambiguousTable = SyncPushClaimTable(entries: [dupA, dupB])
+    check(
+        ambiguousTable.claim(fileID: "hashX", sha256Hex: "hashX", transferName: "01 Song.flac") == nil,
+        "🔴T1 身份不符且同名多条 → 拒绝落位（不猜）"
+    )
+    let unknownEntry = SyncPushEntry(
+        relativePath: "C/only.flac", transferName: "only.flac", fileID: "", sha256Hex: "", size: 1
+    )
+    var fallbackTable = SyncPushClaimTable(entries: [unknownEntry])
+    checkEqual(
+        fallbackTable.claim(fileID: "x", sha256Hex: "x", transferName: "only.flac"),
+        "C/only.flac",
+        "🔴T1 对端未指纹：同名唯一时按名兜底（仍不错位）"
+    )
+    var failureTable = SyncPushClaimTable(entries: [dupA, dupB])
+    checkEqual(failureTable.claimFailure(fileID: "hashA"), "A/01 Song.flac", "失败按身份归因到条目")
+
+    // ② 推送方向端到端：同名前一条发送失败被跳过 → 后一条仍落到自己路径
+    let pushDeviceRoot = try tempRoot("w2-push-device")
+    let pushMacRoot = try tempRoot("w2-push-mac")
+    let pushDataA = silentData(0xA1, count: 4_096)
+    let pushDataB = silentData(0xB2, count: 4_096)
+    let pushURLB = try writeFile("B/01 Song.flac", in: pushMacRoot, data: pushDataB)
+    let pushHashB = try SyncFileChecksum.sha256Hex(ofFile: pushURLB)
+    let pushEntryA = SyncPushEntry(
+        relativePath: "A/01 Song.flac", transferName: "01 Song.flac",
+        fileID: "hashA", sha256Hex: "hashA", size: Int64(pushDataA.count)
+    )
+    let pushEntryB = SyncPushEntry(
+        relativePath: "B/01 Song.flac", transferName: "01 Song.flac",
+        fileID: pushHashB, sha256Hex: pushHashB, size: Int64(pushDataB.count)
+    )
+    let pushFixture = SessionFixture.pairedHandshake()
+    let pushHost = SyncLibraryPassiveHost(
+        libraryRoot: pushDeviceRoot,
+        sink: SinkSpy(),
+        database: DatabaseManager()
+    )
+    check(pushHost.attach(to: pushFixture.clientSession), "推送接收端接线")
+    try pushFixture.hostSession.sendApplicationFrame(
+        type: .libraryPushAnnounce,
+        payload: try SyncPushCodec.encode(SyncLibraryPushAnnounce(entries: [pushEntryA, pushEntryB]))
+    )
+    let pushSender = SyncFileSender(session: pushFixture.hostSession)
+    try pushSender.send(fileURL: pushURLB, fileID: pushHashB, name: pushEntryB.transferName)
+    let landedB = pushDeviceRoot.appendingPathComponent("B/01 Song.flac")
+    check(FileManager.default.fileExists(atPath: landedB.path), "🔴T1 B 已落位")
+    checkEqual(try SyncFileChecksum.sha256Hex(ofFile: landedB), pushHashB, "🔴T1 B 内容正确")
+    check(
+        !FileManager.default.fileExists(atPath: pushDeviceRoot.appendingPathComponent("A/01 Song.flac").path),
+        "🔴T1 A 路径不得出现 B 的字节"
+    )
+    checkEqual(pushHost.summary.landed, ["B/01 Song.flac"], "🔴T1 账目只记 B")
+    pushHost.detach()
+
+    // ③ 拉取方向端到端：同名前一条不可读被跳过 → 后一条仍落到自己路径
+    let pullDeviceRoot = try tempRoot("w2-pull-device")
+    let pullTargetRoot = try tempRoot("w2-pull-target")
+    let pullDataA = silentData(0xC3, count: 3_000)
+    let pullDataB = silentData(0xD4, count: 3_000)
+    let pullURLA = try writeFile("A/01 Song.flac", in: pullDeviceRoot, data: pullDataA)
+    _ = try writeFile("B/01 Song.flac", in: pullDeviceRoot, data: pullDataB)
+    try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: pullURLA.path)
+    let pullFixture = SessionFixture.pairedHandshake()
+    let pullDeviceHost = SyncLibraryPassiveHost(
+        libraryRoot: pullDeviceRoot,
+        sink: SinkSpy(),
+        database: DatabaseManager()
+    )
+    check(pullDeviceHost.attach(to: pullFixture.clientSession), "拉取应答端接线")
+    let pullSink = SinkSpy()
+    let pullMacManager = DatabaseManager()
+    let pullDescriptor = SyncLocalLibraryDescriptor(
+        libraryRoot: pullTargetRoot,
+        rootName: "测试 Mac 曲库",
+        sourceFiles: { SyncLocalLibraryScanner.sourceFiles(in: pullTargetRoot, database: pullMacManager) },
+        contentHash: { relativePath in
+            DatabaseManager.contentHashIfFilePresent(
+                atPath: pullTargetRoot.appendingPathComponent(relativePath).path
+            )
+        }
+    )
+    let pullController = SyncLibraryPullController(
+        session: pullFixture.hostSession,
+        descriptor: pullDescriptor,
+        sink: pullSink
+    )
+    try pullController.start()
+    let pullLandedB = pullTargetRoot.appendingPathComponent("B/01 Song.flac")
+    check(FileManager.default.fileExists(atPath: pullLandedB.path), "🔴T1 拉取：B 已落位")
+    check(try Data(contentsOf: pullLandedB) == pullDataB, "🔴T1 拉取：B 内容正确")
+    check(
+        !FileManager.default.fileExists(atPath: pullTargetRoot.appendingPathComponent("A/01 Song.flac").path),
+        "🔴T1 拉取：A 路径不得出现 B 的字节"
+    )
+    try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: pullURLA.path)
+    pullDeviceHost.detach()
+
+    // ④ 批次账目：落位失败也让条目进终态 → 本批必然收尾
+    let batchRoot = try tempRoot("w2-batch")
+    _ = try writeFile("Blocked", in: batchRoot, data: Data([0x01]))
+    let blockedURL = try writeFile("blocked.flac", in: try tempRoot("w2-batch-mac"), data: silentData(0x55, count: 512))
+    let blockedHash = try SyncFileChecksum.sha256Hex(ofFile: blockedURL)
+    let blockedEntry = SyncPushEntry(
+        relativePath: "Blocked/x.flac", transferName: "x.flac",
+        fileID: blockedHash, sha256Hex: blockedHash, size: 512
+    )
+    let batchFixture = SessionFixture.pairedHandshake()
+    let batchHost = SyncLibraryPassiveHost(
+        libraryRoot: batchRoot,
+        sink: SinkSpy(),
+        database: DatabaseManager()
+    )
+    check(batchHost.attach(to: batchFixture.clientSession), "批次用例接线")
+    try batchFixture.hostSession.sendApplicationFrame(
+        type: .libraryPushAnnounce,
+        payload: try SyncPushCodec.encode(SyncLibraryPushAnnounce(entries: [blockedEntry]))
+    )
+    let batchSender = SyncFileSender(session: batchFixture.hostSession)
+    try batchSender.send(fileURL: blockedURL, fileID: blockedHash, name: blockedEntry.transferName)
+    check(batchHost.summary.batchCompleted, "🟡T2 落位失败也收尾（旧实现永远为假）")
+    checkEqual(batchHost.summary.accountedEntries, 1, "🟡T2 失败条目计入已处理")
+    checkEqual(batchHost.summary.failed.first?.relativePath, "Blocked/x.flac", "🟡T2 失败归属到声明路径")
+    batchHost.detach()
+
+    // ⑤ 会话结束：未送达条目记失败终态，本批仍收尾
+    let abandonRoot = try tempRoot("w2-abandon")
+    let abandonMac = try tempRoot("w2-abandon-mac")
+    let abandonURL = try writeFile("A/a.flac", in: abandonMac, data: silentData(0x31, count: 2_048))
+    let abandonHash = try SyncFileChecksum.sha256Hex(ofFile: abandonURL)
+    let abandonEntryA = SyncPushEntry(
+        relativePath: "A/a.flac", transferName: "a.flac",
+        fileID: abandonHash, sha256Hex: abandonHash, size: 2_048
+    )
+    let abandonEntryB = SyncPushEntry(
+        relativePath: "B/b.flac", transferName: "b.flac", fileID: "hashB", sha256Hex: "hashB", size: 512
+    )
+    let abandonFixture = SessionFixture.pairedHandshake()
+    let abandonHost = SyncLibraryPassiveHost(
+        libraryRoot: abandonRoot,
+        sink: SinkSpy(),
+        database: DatabaseManager()
+    )
+    check(abandonHost.attach(to: abandonFixture.clientSession), "会话结束用例接线")
+    try abandonFixture.hostSession.sendApplicationFrame(
+        type: .libraryPushAnnounce,
+        payload: try SyncPushCodec.encode(SyncLibraryPushAnnounce(entries: [abandonEntryA, abandonEntryB]))
+    )
+    let abandonSender = SyncFileSender(session: abandonFixture.hostSession)
+    try abandonSender.send(fileURL: abandonURL, fileID: abandonHash, name: abandonEntryA.transferName)
+    check(!abandonHost.summary.batchCompleted, "🟡T2 只到一条时本批还开着")
+    abandonFixture.hostSession.handleTransportClosed()
+    check(abandonHost.summary.batchCompleted, "🟡T2 会话结束 → 本批收尾")
+    check(abandonHost.summary.failed.map(\.relativePath).contains("B/b.flac"), "🟡T2 未送达条目归属到声明路径")
+
+    // ⑥ 落位原子性（单一实现）：失败保留本端原文件
+    let landingRoot = try tempRoot("w2-landing")
+    let oldData = Data(repeating: 0x11, count: 64)
+    let landingDest = try writeFile("Album/song.flac", in: landingRoot, data: oldData)
+    let missingSource = landingRoot.appendingPathComponent(".sync-incoming/ghost.flac")
+    var atomicThrew = false
+    do {
+        try SyncLibraryLanding.moveAtomically(from: missingSource, to: landingDest)
+    } catch {
+        atomicThrew = true
+    }
+    check(atomicThrew, "🟡T3 源缺失 → 替换失败")
+    checkEqual(try Data(contentsOf: landingDest), oldData, "🟡T3 失败保留本端原文件（不再先删后移）")
+    let incomingNew = try writeFile(".sync-incoming/new.flac", in: landingRoot, data: Data(repeating: 0x22, count: 64))
+    try SyncLibraryLanding.moveAtomically(from: incomingNew, to: landingDest)
+    checkEqual(try Data(contentsOf: landingDest), Data(repeating: 0x22, count: 64), "🟡T3 目标已存在 → 原子替换")
+
+    // ⑦ file_meta 解码失败 → 回 protocolError（不再静默悬挂）
+    let metaDir = try tempRoot("w2-meta")
+    let metaFixture = SessionFixture.pairedHandshake()
+    let metaReceiver = SyncFileReceiver(session: metaFixture.clientSession, directory: metaDir)
+    var metaAcks: [FileAckPayload] = []
+    metaReceiver.onAckSent = { metaAcks.append($0) }
+    try metaFixture.hostSession.sendApplicationFrame(
+        type: .fileMeta,
+        payload: Data(#"{"fileID":"abc","name":123,"totalSize":"x"}"#.utf8)
+    )
+    checkEqual(metaAcks.last?.fileID, "abc", "🟡T4 解码失败仍能取出 fileID")
+    checkEqual(metaAcks.last?.error, FileTransferErrorCode.protocolError, "🟡T4 回 protocolError（旧实现静默）")
+    check(!metaReceiver.isActive, "🟡T4 状态清空")
+
+    // ⑧ 发送端 ack 超时 → 失败并清状态
+    let timeoutFixture = SessionFixture.pairedHandshake()
+    let timeoutURL = try writeFile("src.bin", in: try tempRoot("w2-timeout"), data: silentData(0x5A, count: 1_024))
+    let timeoutSender = SyncFileSender(session: timeoutFixture.hostSession, ackTimeout: 0.2)
+    var timeoutOutcome: SyncFileSender.Outcome?
+    timeoutSender.onCompletion = { timeoutOutcome = $0 }
+    try timeoutSender.send(fileURL: timeoutURL, fileID: "w2-timeout", name: "src.bin")
+    check(timeoutSender.isActive, "🟡T4 已发 meta 等 ack")
+    Thread.sleep(forTimeInterval: 0.9)
+    var timedOut = false
+    if case let .failed(.protocolError(fileID, reason))? = timeoutOutcome {
+        timedOut = fileID == "w2-timeout" && reason.contains("超时")
+    }
+    check(timedOut, "🟡T4 无 ack → 超时失败")
+    check(!timeoutSender.isActive, "🟡T4 超时后状态已清（可重试）")
+
+    // ⑨ 续传对齐 truncate 失败 → 明确失败（不静默按错误偏移续写）
+    let realignDir = try tempRoot("w2-realign")
+    let partName = "s.bin"
+    let partURL = realignDir.appendingPathComponent(partName + ".part")
+    try Data(repeating: 0x33, count: 100).write(to: partURL)
+    let realignFixture = SessionFixture.pairedHandshake()
+    let realignReceiver = SyncFileReceiver(session: realignFixture.clientSession, directory: realignDir)
+    var realignAcks: [FileAckPayload] = []
+    realignReceiver.onAckSent = { realignAcks.append($0) }
+    var realignOutcome: SyncFileReceiver.Outcome?
+    realignReceiver.onCompletion = { realignOutcome = $0 }
+    realignReceiver.partAlignmentHook = { _, _ in
+        throw SyncFileTransferError.ioError("注入的对齐失败")
+    }
+    realignReceiver.handleInboundFrame(try SyncFrame(
+        type: .fileMeta,
+        payload: try SyncFilePayloadCodec.encode(FileMetaPayload(
+            fileID: "w2-realign",
+            name: partName,
+            totalSize: 1_024,
+            chunkSize: 64,
+            sha256Hex: String(repeating: "a", count: 64),
+            startOffset: 64
+        ))
+    ))
+    checkEqual(realignAcks.last?.error, FileTransferErrorCode.ioError, "🟡T5 对齐失败 → ioError ack（旧实现回 progress）")
+    checkEqual(realignAcks.last?.receivedBytes, 0, "🟡T5 不谎报已收字节")
+    checkEqual(realignOutcome, .failed(.ioError("w2-realign")), "🟡T5 终态为失败")
+    check(FileManager.default.fileExists(atPath: partURL.path), "🟡T5 .part 保留（可重试）")
+} catch {
+    check(false, "㊹ W2 抛错：\(error)")
+}
+
+// MARK: - ㊺ S4：start 重入保护 + cancel 收尾
+
+section("㊺ S4：重入保护（进行中拒绝第二轮）+ cancel 后状态不被到点检查改写")
 do {
     let data = silentData(0xCA, count: 8_000)
     let hash = try sha256Hex(of: data)
@@ -2834,7 +3104,7 @@ do {
     }
     scenario.deviceHost.detach()
 } catch {
-    check(false, "㊹ 抛错：\(error)")
+    check(false, "㊺ 抛错：\(error)")
 }
 
 // MARK: - 汇总

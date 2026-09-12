@@ -333,11 +333,25 @@ final class SyncPeerSession: @unchecked Sendable {
     private func handleDeadline() {
         lock.lock()
         var effects: [Effect] = []
-        if phaseValue == .waitingForPeerHello || phaseValue == .waitingForPairRequest {
+        if Self.phaseNeedsHandshakeDeadline(phaseValue) {
             effects.append(contentsOf: closeEffectsLocked(.handshakeTimeout))
         }
         lock.unlock()
         flush(effects)
+    }
+
+    /// 进入 `ready` 之前的等待阶段（需要超时兜底的）：
+    /// - `waitingForPeerHello` / `waitingForPairRequest`：等对端 hello / pair_request
+    /// - `waitingForPairResponse`：client 已发 pair_request，等主机答复（2026-09-12 审计
+    ///   🟡T4：之前该阶段无超时，主机不回就永远卡在“配对中”）
+    /// - `waitingForPairApproval` **故意不含**：等用户在弹窗上决定，不受超时约束
+    static func phaseNeedsHandshakeDeadline(_ phase: SyncSessionPhase) -> Bool {
+        switch phase {
+        case .waitingForPeerHello, .waitingForPairRequest, .waitingForPairResponse:
+            return true
+        default:
+            return false
+        }
     }
 
     // MARK: 效果执行（锁外）
@@ -359,5 +373,13 @@ final class SyncPeerSession: @unchecked Sendable {
                 onApplicationFrame?(frame)
             }
         }
+        // 握手超时兜底（2026-09-12 审计 🟡T4）：进入 ready 之前的等待阶段必须始终挂着超时——
+        // 阶段迁移在 Frames 扩展里各自 cancel/arm，这里是**唯一收口**：漏挂的补上
+        // （人工批准阶段除外，见 `phaseNeedsHandshakeDeadline`）。
+        lock.lock()
+        if deadlineItem == nil, Self.phaseNeedsHandshakeDeadline(phaseValue) {
+            scheduleDeadlineLocked()
+        }
+        lock.unlock()
     }
 }

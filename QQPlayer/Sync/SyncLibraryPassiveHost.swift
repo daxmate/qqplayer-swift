@@ -93,6 +93,10 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     // 锁保护状态
     private var claims = SyncPushClaimTable()
     private var summaryValue = SyncLibraryPassiveSummary()
+    /// 本批已进终态的声明条目相对路径（成功/失败/丢弃；每条只计一次）
+    private var processedPaths: Set<String> = []
+    /// 本批收尾是否已跑（幂等：一批恰一次）
+    private var batchFinished = false
 
     /// 有文件已落位并交给入库入口（进度回调；锁外触发）。
     var onFileLanded: ((String) -> Void)?
@@ -227,8 +231,10 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         return true
     }
 
-    /// 拆除接线（会话关闭 / 服务停止）：停止接收 + 中止应答 + 丢弃暂存临时文件。
+    /// 拆除接线（会话关闭 / 服务停止）：先给本批未送达条目落终态并收尾（否则暂存歌词被丢），
+    /// 然后停收 + 中止应答 + 丢弃暂存临时文件。
     func detach() {
+        abandonOpenBatch(reason: "会话结束，未收到该条目")
         lock.lock()
         let receiver = self.receiver
         let libraryResponder = self.libraryResponder
@@ -253,6 +259,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         }
         lock.lock()
         claims = SyncPushClaimTable(entries: announce.entries)
+        processedPaths = []
+        batchFinished = false
         summaryValue.accountedEntries = 0
         summaryValue.announcedEntries = announce.entries.count
         summaryValue.batchCompleted = false
@@ -275,27 +283,58 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
 
     private func handleTransfer(_ outcome: SyncFileReceiver.Outcome) {
         switch outcome {
-        case let .received(url):
-            receive(url: url)
+        case let .received(file):
+            receive(file)
         case let .failed(error):
+            // 传输失败（无落位）：按传输级身份归因到声明条目 → **失败也进终态账目**
+            // （否则本批永远“未完成”→ 收尾/暂存歌词永远不跑，见 2026-09-12 审计 🟡T2）
+            let attributed = attributeFailure(error)
             lock.lock()
             summaryValue.failed.append(
                 SyncPushFailure(
-                    relativePath: "",
+                    relativePath: attributed ?? "",
                     reason: SyncPushFailureReason.receiveFailed,
                     detail: "\(error)"
                 )
             )
             lock.unlock()
+            if let attributed {
+                accountEntry(attributed)
+            }
         }
     }
 
-    /// 一个文件收齐（SyncFileReceiver 已做 SHA-256 校验）→ 认领 → 落位 / 安装歌词。
-    private func receive(url: URL) {
-        let transferName = url.lastPathComponent
+    /// 传输错误 → 所属声明条目相对路径（错误里带 fileID；认不到 → nil）。
+    private func attributeFailure(_ error: SyncFileTransferError) -> String? {
+        guard let fileID = Self.fileID(of: error), !fileID.isEmpty else { return nil }
+        lock.lock()
+        defer { lock.unlock() }
+        return claims.claimFailure(fileID: fileID)
+    }
+
+    /// 传输本端错误里的 fileID（文件级错误都带；无标识的前置错误 → nil）。
+    static func fileID(of error: SyncFileTransferError) -> String? {
+        switch error {
+        case let .ioError(id), let .diskFull(id), let .checksumMismatch(id),
+             let .resumeMismatch(id), let .cancelled(id), let .sessionClosed(id):
+            return id
+        case let .protocolError(id, _):
+            return id
+        case .sessionNotReady, .fileUnavailable, .transferInProgress, .invalidArgument, .sendFailed:
+            return nil
+        }
+    }
+
+    /// 一个文件就绪（SyncFileReceiver 已做 SHA-256 校验）→ 按身份认领 → 落位 / 安装歌词。
+    private func receive(_ file: SyncFileReceiver.ReceivedFile) {
+        let transferName = file.url.lastPathComponent
 
         lock.lock()
-        let claimed = claims.claim(transferName: transferName)
+        let claimed = claims.claim(
+            fileID: file.fileID,
+            sha256Hex: file.sha256Hex,
+            transferName: transferName
+        )
         if claimed == nil {
             summaryValue.undeclaredTransfers.append(transferName)
         }
@@ -303,16 +342,16 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
 
         guard let relativePath = claimed else {
             // 未声明过的传输：不落位、不索引（清掉落地目录里的临时文件）
-            try? fileManager.removeItem(at: url)
+            try? fileManager.removeItem(at: file.url)
             return
         }
 
         if SyncLyricsNamespace.isLyricsPath(relativePath) {
-            applyLyrics(lyricsReceiver.receive(tempURL: url, wirePath: relativePath))
+            applyLyrics(lyricsReceiver.receive(tempURL: file.url, wirePath: relativePath))
         } else {
-            land(fileAt: url, relativePath: relativePath)
+            land(fileAt: file.url, relativePath: relativePath)
         }
-        accountOne()
+        accountEntry(relativePath)
     }
 
     /// 把收到的曲库文件移入目标相对路径并交给既有入库入口。
@@ -334,11 +373,9 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
                 at: destination.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            if fileManager.fileExists(atPath: destination.path) {
-                // 内容不同 → 更新：同路径旧副本就地替换（本端事务，非删除传播）
-                try? fileManager.removeItem(at: destination)
-            }
-            try fileManager.moveItem(at: url, to: destination)
+            // 原子替换（目标已存在也不先删）：失败时本端原文件保留；单一实现见
+            // `SyncLibraryLanding`（与拉取控制器共用）
+            try SyncLibraryLanding.moveAtomically(from: url, to: destination, fileManager: fileManager)
         } catch {
             lock.lock()
             summaryValue.failed.append(
@@ -384,21 +421,54 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
 
     // MARK: 批次收尾
 
-    /// 一条声明条目已处理（落位 / 丢弃 / 失败）——全部处理完 → 收尾。
-    private func accountOne() {
+    /// 一条声明条目进终态（成功落位 / 歌词安装或丢弃 / 失败）——每条只计一次；
+    /// 全部条目都有终态 → 收尾（幂等）。
+    private func accountEntry(_ relativePath: String) {
         lock.lock()
-        summaryValue.accountedEntries += 1
+        let inserted = processedPaths.insert(relativePath).inserted
+        summaryValue.accountedEntries = processedPaths.count
         let done = summaryValue.announcedEntries > 0
-            && summaryValue.accountedEntries >= summaryValue.announcedEntries
+            && processedPaths.count >= summaryValue.announcedEntries
         lock.unlock()
-        if done {
+        if inserted, done {
             finishBatch()
         }
     }
 
+    /// 会话结束 / 拆除：本批未收尾且仍有未认领条目 → 按「未收到」记失败终态，
+    /// 保证每条 announced 条目都有终态、本批仍恰收尾一次（🟡T2）。
+    private func abandonOpenBatch(reason: String) {
+        lock.lock()
+        let batchOpen = !batchFinished && summaryValue.announcedEntries > 0
+        if batchOpen {
+            for path in claims.remainingRelativePaths {
+                summaryValue.failed.append(
+                    SyncPushFailure(
+                        relativePath: path,
+                        reason: SyncPushFailureReason.receiveFailed,
+                        detail: reason
+                    )
+                )
+                processedPaths.insert(path)
+            }
+            summaryValue.accountedEntries = processedPaths.count
+        }
+        lock.unlock()
+        guard batchOpen else { return }
+        finishBatch()
+    }
+
     /// 批次收尾：暂存歌词再试一次映射（此时同批先落下的歌已入库），再落终态。
+    /// **一批恰一次**（`batchFinished` 幂等门）——重复调用（后续传输 / 会话关闭）不再触发。
     /// **无删除阶段**（§6.1 + §12b 决策 7：删除不跨端传播）。
     private func finishBatch() {
+        lock.lock()
+        guard !batchFinished else {
+            lock.unlock()
+            return
+        }
+        batchFinished = true
+        lock.unlock()
         for outcome in lyricsReceiver.flushPending() {
             applyLyrics(outcome)
         }

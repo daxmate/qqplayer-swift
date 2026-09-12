@@ -29,9 +29,21 @@ import Foundation
 final class SyncFileReceiver: @unchecked Sendable {
     /// 一轮传输的本地结论（每轮恰一次，锁外触发）。
     enum Outcome: Equatable, Sendable {
-        /// 文件已就绪（幂等 done / 收齐改名后）
-        case received(URL)
+        /// 文件已就绪（幂等 done / 收齐改名后）；带**传输级身份**供上层按身份认领落位
+        case received(ReceivedFile)
         case failed(SyncFileTransferError)
+    }
+
+    /// 已就绪文件（URL + 传输级身份：`fileID` / 全文件 SHA-256）。
+    /// 接收侧上层（推送被动端 / 拉取控制器）据此按身份认领目标路径——**不得只靠文件名**
+    /// （同名不同目录会错位，见 2026-09-12 审计 🔴T1）。
+    struct ReceivedFile: Equatable, Sendable {
+        /// 传输唯一 ID（= `file_meta.fileID`）
+        let fileID: String
+        /// 全文件 SHA-256 小写 hex（已校验与磁盘一致）
+        let sha256Hex: String
+        /// 落盘文件 URL（落地目录内）
+        let url: URL
     }
 
     private let session: SyncPeerSession
@@ -43,6 +55,9 @@ final class SyncFileReceiver: @unchecked Sendable {
     var onCompletion: ((Outcome) -> Void)?
     /// 每次发出 ack 的钩子（诊断/测试断言用）。
     var onAckSent: ((FileAckPayload) -> Void)?
+
+    /// 断点对齐实现注入（**测试用**：覆盖 truncate 失败路径；nil = 真实 FileHandle）。
+    var partAlignmentHook: ((_ partURL: URL, _ offset: Int64) throws -> Void)?
 
     // MARK: 会话槽位链式挂接
 
@@ -116,7 +131,11 @@ final class SyncFileReceiver: @unchecked Sendable {
         switch frame.type {
         case .fileMeta:
             guard let meta = try? SyncFilePayloadCodec.decode(FileMetaPayload.self, from: frame.payload) else {
-                return // meta 解码失败无 fileID 可回，静默（协议损坏由会话层兜底）
+                // meta 解码失败：与 file_chunk 策略对齐——能从原始 JSON 里取出 fileID 就回
+                // protocolError 让发送端干净失败（取不到 → 靠发送端 ack 超时兜底，同样不悬挂）
+                guard let fileID = Self.extractFileID(from: frame.payload), !fileID.isEmpty else { return }
+                abortActive(fileID: fileID, reason: "file_meta 解码失败")
+                return
             }
             runLocked { [meta] in self.processMetaLocked(meta) }
         case .fileChunk:
@@ -139,6 +158,29 @@ final class SyncFileReceiver: @unchecked Sendable {
         default:
             break
         }
+    }
+
+    /// 解码失败的 meta：从原始 JSON 里尽量取出 fileID（不可信输入，只取字符串），
+    /// 取到则回 protocolError 并中止同 fileID 的进行中传输（发送端据此干净失败）。
+    private func abortActive(fileID: String, reason: String) {
+        runLocked {
+            guard let current = self.active, current.fileID == fileID else {
+                // 没有同名进行中传输：只回 ack（发送端在等 meta 的 ack）
+                return [.sendAck(self.ack(fileID: fileID, receivedBytes: 0, error: .protocolError))]
+            }
+            self.active = nil
+            self.closeHandle(current)
+            return [.sendAck(self.ack(fileID: fileID, receivedBytes: current.received, error: .protocolError)),
+                    .finish(.failed(.protocolError(fileID, reason)))]
+        }
+    }
+
+    /// 从 meta 原始载荷里局部提取 `fileID`（字段类型损坏时严格解码会整体失败）。
+    static func extractFileID(from payload: Data) -> String? {
+        guard let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
+              let fileID = object["fileID"] as? String
+        else { return nil }
+        return fileID
     }
 
     // MARK: 锁内状态机
@@ -172,7 +214,7 @@ final class SyncFileReceiver: @unchecked Sendable {
            fileSize(finalURL) == meta.totalSize,
            (try? SyncFileChecksum.sha256Hex(ofFile: finalURL).lowercased()) == sha {
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: meta.totalSize, done: true)),
-                    .finish(.received(finalURL))]
+                    .finish(.received(ReceivedFile(fileID: meta.fileID, sha256Hex: sha, url: finalURL)))]
         }
 
         // 空文件：无块可收，确保最终文件存在且为 0 字节（M3 manifest 需要空条目）后直接
@@ -194,7 +236,9 @@ final class SyncFileReceiver: @unchecked Sendable {
                 }
             }
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, done: true)),
-                    .finish(.received(finalURL))]
+                    .finish(.received(ReceivedFile(fileID: meta.fileID,
+                                                   sha256Hex: SyncFileChecksum.emptyHex,
+                                                   url: finalURL)))]
         }
 
         let rawPart = partSize(partURL) ?? 0
@@ -216,11 +260,17 @@ final class SyncFileReceiver: @unchecked Sendable {
                     .finish(.failed(.resumeMismatch(meta.fileID)))]
         }
         // 续写前统一对齐：.part 尾部若有半块残留（异常中断在写块中途）→ truncate 到
-        // 块边界。续写与“收齐未改名”两条路径共用，保证后续整文件校验读的是干净数据
-        if rawPart > alignedPart {
-            if let handle = try? FileHandle(forWritingTo: partURL) {
-                try? handle.truncate(atOffset: UInt64(alignedPart))
-                try? handle.close()
+        // 块边界。续写与“收齐未改名”两条路径共用，保证后续整文件校验读的是干净数据。
+        // 失败**绝不静默继续**（2026-09-12 审计 🟡T5）：对齐不成就意味着后续块按错误偏移
+        // 追加（把可定位的 IO 错误伪装成 checksumMismatch）→ 直接失败，`.part` 保留可重试。
+        if meta.startOffset > 0, rawPart > alignedPart {
+            do {
+                try realignPart(partURL, to: alignedPart)
+            } catch {
+                let code = errorCode(for: error)
+                print("⚠️ SyncFileReceiver: .part 断点对齐失败（fileID=\(meta.fileID) 目标偏移=\(alignedPart)）：\(error)")
+                return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: code)),
+                        .finish(.failed(localError(code, fileID: meta.fileID)))]
             }
         }
 
@@ -326,7 +376,9 @@ final class SyncFileReceiver: @unchecked Sendable {
                     .finish(.failed(.ioError(fileID)))]
         }
         return [.sendAck(ack(fileID: fileID, receivedBytes: totalSize, done: true)),
-                .finish(.received(finalURL))]
+                .finish(.received(ReceivedFile(fileID: fileID,
+                                               sha256Hex: sha256Hex.lowercased(),
+                                               url: finalURL)))]
     }
 
     // MARK: 校验与辅助（锁内调用）
@@ -351,6 +403,18 @@ final class SyncFileReceiver: @unchecked Sendable {
             return meta.sha256Hex.lowercased() == SyncFileChecksum.emptyHex
         }
         return true
+    }
+
+    /// 断点对齐（truncate 到块边界）：`.part` 尾部半块残留 → 截到 `offset`。
+    /// 可注入覆盖（测试覆盖失败路径）；生产路径为真实 FileHandle。
+    private func realignPart(_ partURL: URL, to offset: Int64) throws {
+        if let hook = partAlignmentHook {
+            try hook(partURL, offset)
+            return
+        }
+        let handle = try FileHandle(forWritingTo: partURL)
+        defer { try? handle.close() }
+        try handle.truncate(atOffset: UInt64(offset))
     }
 
     /// 对齐到块边界（断点/truncate 语义的唯一对齐入口）。

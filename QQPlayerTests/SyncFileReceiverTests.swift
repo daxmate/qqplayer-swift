@@ -184,10 +184,11 @@ struct SyncFileReceiverTests {
         )))
         #expect(log.acks.last?.done == true)
         #expect(log.acks.last?.receivedBytes == Int64(source.count))
-        guard case let .received(finalURL)? = log.outcomes.last else {
+        guard case let .received(receivedFile)? = log.outcomes.last else {
             Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
     }
 
@@ -272,10 +273,11 @@ struct SyncFileReceiverTests {
         )))
 
         #expect(log.acks.last?.done == true)
-        guard case let .received(finalURL)? = log.outcomes.last else {
+        guard case let .received(receivedFile)? = log.outcomes.last else {
             Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!fileExists(dir, name + ".part"))
     }
@@ -314,10 +316,11 @@ struct SyncFileReceiverTests {
             startOffset: Int64(source.count)
         )))
         #expect(log.acks.last?.done == true)
-        guard case let .received(finalURL)? = log.outcomes.last else {
+        guard case let .received(receivedFile)? = log.outcomes.last else {
             Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!fileExists(dir, name + ".part"))
     }
