@@ -63,8 +63,6 @@ final class MacSyncRunViewModel: ObservableObject {
     @Published private(set) var now = Date()
     /// 同步进行中会话断开（UI 提示用）。
     @Published private(set) var didDisconnectWhileRunning = false
-    /// 最近一次/进行中的传输方向（nil = 还没跑过）。
-    @Published private(set) var runDirection: SyncTransferDirection?
     /// 用户选定的同步方向（T10：面板第一屏；未选 = nil → 不能开始）。
     @Published private(set) var direction: SyncTransferDirection?
 
@@ -215,7 +213,6 @@ final class MacSyncRunViewModel: ObservableObject {
             Task { @MainActor in self?.handlePeerManifest(from: coordinator) }
         }
         self.coordinator = coordinator
-        runDirection = direction
 
         do {
             try coordinator.start(direction: direction)
