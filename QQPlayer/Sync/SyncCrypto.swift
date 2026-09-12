@@ -72,6 +72,12 @@ struct SyncHello: Codable, Equatable, Sendable {
     var ephemeralPublicKey: String
     /// Ed25519 签名（64B）base64，输入 = ephemeralPub ‖ peerDeviceID ‖ role
     var signature: String
+    /// 发送方展示名（本机设备名，如 "dax's iPhone"）。
+    /// **纯展示、不参与签名**（签名输入只含 ephemeralPub ‖ peerDeviceID ‖ role）：
+    /// 篡改名字不会破坏验签，只影响对端展示/落库的 display_name——
+    /// 语义与 `PairRequest.clientName` 一致（Host 落库展示用）。
+    /// 旧端无该字段 → 解码得 nil（合成的 Codable 用 decodeIfPresent），语义 = 不带名。
+    var name: String?
 
     /// ephemeral 公钥 raw（解码失败返回 nil）
     var ephemeralPublicKeyRaw: Data? {
@@ -95,11 +101,13 @@ enum SyncHandshake {
     /// 构造本方 hello（role 决定方向语义；deviceID = identity 的 ID）。
     /// peerDeviceID 传"签名方以为的对端 ID"（host 必须传 client ID；client
     /// 已配对/扫码路径传 host ID，未知可传空串）。
+    /// name：本机展示名（两端都可带；纯展示、不进签名输入，nil = 不带名）。
     static func makeHello(
         role: String,
         identity: SyncIdentity,
         peerDeviceID: String,
-        ephemeralPublicKeyRaw: Data
+        ephemeralPublicKeyRaw: Data,
+        name: String? = nil
     ) throws -> SyncHello {
         guard ephemeralPublicKeyRaw.count == 32 else {
             throw SyncHandshakeError.invalidKeyData
@@ -115,7 +123,8 @@ enum SyncHandshake {
             deviceID: identity.deviceID,
             peerDeviceID: peerDeviceID,
             ephemeralPublicKey: ephemeralPublicKeyRaw.base64EncodedString(),
-            signature: signature.base64EncodedString()
+            signature: signature.base64EncodedString(),
+            name: name
         )
     }
 

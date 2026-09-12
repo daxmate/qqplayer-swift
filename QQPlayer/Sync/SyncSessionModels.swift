@@ -144,8 +144,9 @@ enum SyncSessionCloseReason: Equatable, Sendable {
 struct SyncSessionConfiguration: Sendable, Equatable {
     /// 等待对端响应（hello/pair_request）的超时
     var handshakeTimeout: TimeInterval = 10
-    /// 客户端本机展示名（client 角色发 PairRequest 时携带；host 角色忽略）。
-    /// 名字由调用方注入（iOS 用 UIDevice.current.name），共享/纯逻辑文件不触 UIKit。
+    /// 本机展示名（两端会话配置均可注入：host 发 hello / client 发 hello + PairRequest
+    /// 时携带；名字由调用方注入——iOS 用 `LocalDeviceNameStore.shared.name`，
+    /// 共享/纯逻辑文件不触 UIKit）。纯展示字段，不参与签名。
     var clientDisplayName: String?
 }
 

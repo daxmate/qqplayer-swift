@@ -49,8 +49,8 @@ final class SyncPeerSession: @unchecked Sendable {
     /// approvePairing/rejectPairing）
     var pairApprovalHandler: ((SyncPeerSession, PendingPairRequest) -> Void)?
 
-    // 会话握手配置（extension 文件（Frames）读取 clientDisplayName 发
-    // PairRequest 用，故 internal）
+    // 会话握手配置（extension 文件（Frames）与本文件读取 clientDisplayName：
+    // 两端发 hello / client 发 PairRequest 携带本机展示名，故 internal）
     let config: SyncSessionConfiguration
     private let lock = NSLock()
     private var frameDecoder = SyncFrameDecoder()
@@ -139,7 +139,8 @@ final class SyncPeerSession: @unchecked Sendable {
                     role: SyncHello.roleClient,
                     identity: localIdentity,
                     peerDeviceID: peerBinding,
-                    ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation
+                    ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation,
+                    name: config.clientDisplayName
                 )
                 effects.append(.send(try encodedHandshakeFrame(hello)))
                 scheduleDeadlineLocked()
