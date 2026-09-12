@@ -178,8 +178,10 @@ final class SyncLibraryPullController: @unchecked Sendable {
     // 锁保护状态
     private var stateValue: SyncLibraryPullState = .idle
     private var summaryValue = SyncLibraryPullSummary()
-    /// 文件名 → 期望的相对路径（串行推送下按名回收；同名多路径按请求序）
-    private var expectedByFileName: [String: [String]] = [:]
+    /// 认领表：请求条目的**传输级身份**（对端 manifest `contentHash`）→ 目标相对路径。
+    /// 不用文件名当键（同名不同目录会错位，见 2026-09-12 审计 🔴T1）——与推送侧
+    /// 共用同一份 `SyncPushClaimTable` 实现。
+    private var claims = SyncPushClaimTable()
 
     /// 每态回调（会话线程触发，锁外）。
     var onStateChange: ((SyncLibraryPullState) -> Void)?
@@ -302,7 +304,18 @@ final class SyncLibraryPullController: @unchecked Sendable {
         summaryValue.unchanged = plan.unchanged.map(\.relativePath)
         if !plan.relativePaths.isEmpty {
             summaryValue.requested = plan.relativePaths
-            expectedByFileName = Self.expectedPathsByName(plan.relativePaths)
+            // 认领键 = 请求路径 + 对端 manifest 身份（应答端 fileID 就是同一个 content_hash）；
+            // 对端未指纹（contentHash nil）的条目身份留空，只能按「同名唯一」兜底认领
+            let remoteByPath = Dictionary(response.entries.map { ($0.relativePath, $0) },
+                                          uniquingKeysWith: { _, last in last })
+            claims = SyncPushClaimTable(entries: plan.relativePaths.compactMap { path in
+                let remoteEntry = remoteByPath[path]
+                return SyncPushEntry.claimKey(
+                    relativePath: path,
+                    contentHash: remoteEntry?.contentHash,
+                    size: remoteEntry?.size ?? 0
+                )
+            })
         }
         lock.unlock()
 
@@ -325,19 +338,30 @@ final class SyncLibraryPullController: @unchecked Sendable {
 
     private func handleTransfer(_ outcome: SyncFileReceiver.Outcome) {
         switch outcome {
-        case let .received(url):
-            guard let relativePath = takeExpectedPath(forFileName: url.lastPathComponent) else {
-                return // 未请求过的文件：不落位（留在落地目录）
+        case let .received(file):
+            guard let relativePath = claimReceived(file) else {
+                return // 未请求过的文件（身份/名字都对不上）：不落位（留在落地目录）
             }
             if SyncLyricsNamespace.isLyricsPath(relativePath) {
-                apply(lyricsOutcome: lyricsReceiver.receive(tempURL: url, wirePath: relativePath))
+                apply(lyricsOutcome: lyricsReceiver.receive(tempURL: file.url, wirePath: relativePath))
                 return
             }
-            land(fileAt: url, relativePath: relativePath)
+            land(fileAt: file.url, relativePath: relativePath)
         case .failed:
             // 单文件失败由对端 sync_fetch_result 归集（本端不重复记账）
             break
         }
+    }
+
+    /// 按**传输级身份**认领收到的文件 → 目标相对路径（认不到 → nil）。
+    private func claimReceived(_ file: SyncFileReceiver.ReceivedFile) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return claims.claim(
+            fileID: file.fileID,
+            sha256Hex: file.sha256Hex,
+            transferName: file.url.lastPathComponent
+        )
     }
 
     private func land(fileAt url: URL, relativePath: String) {
@@ -358,11 +382,9 @@ final class SyncLibraryPullController: @unchecked Sendable {
                 at: destination.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            if fileManager.fileExists(atPath: destination.path) {
-                // 内容不同 → 更新：同路径旧副本就地替换（本端事务，非删除传播）
-                try? fileManager.removeItem(at: destination)
-            }
-            try fileManager.moveItem(at: url, to: destination)
+            // 原子替换（目标已存在也不先删）——失败保留本端原文件（单一实现见
+            // `SyncLibraryLanding`，与推送被动端共用）
+            try SyncLibraryLanding.moveAtomically(from: url, to: destination, fileManager: fileManager)
         } catch {
             lock.lock()
             summaryValue.failed.append(
@@ -440,26 +462,6 @@ final class SyncLibraryPullController: @unchecked Sendable {
     }
 
     // MARK: 辅助
-
-    /// 文件名 → 期望相对路径列表（按请求序）。同名多路径按序取首个未匹配。
-    static func expectedPathsByName(_ relativePaths: [String]) -> [String: [String]] {
-        var byName: [String: [String]] = [:]
-        for path in relativePaths {
-            let name = (path as NSString).lastPathComponent
-            byName[name, default: []].append(path)
-        }
-        return byName
-    }
-
-    /// 取一个期望路径（同名多路径按序），取走即从期待表移除。
-    private func takeExpectedPath(forFileName name: String) -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard var paths = expectedByFileName[name], !paths.isEmpty else { return nil }
-        let path = paths.removeFirst()
-        expectedByFileName[name] = paths.isEmpty ? nil : paths
-        return path
-    }
 
     private func transition(to newState: SyncLibraryPullState) {
         lock.lock()

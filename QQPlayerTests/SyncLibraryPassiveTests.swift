@@ -362,8 +362,8 @@ struct SyncLibraryPassiveTests {
 
     // MARK: ⑤ 声明模型 / 认领表
 
-    @Test("推送声明模型：路径拒绝逃逸/隐藏名，认领表同名取首个未认领")
-    func pushModelsRejectUnsafePathsAndClaimByName() throws {
+    @Test("推送声明模型：路径拒绝逃逸/隐藏名，认领表按传输级身份认领（同名不错位）")
+    func pushModelsRejectUnsafePathsAndClaimByIdentity() throws {
         #expect(SyncPushEntry.make(relativePath: "../escape.flac", fileID: "h", sha256Hex: "h", size: 1) == nil)
         #expect(SyncPushEntry.make(relativePath: "/abs.flac", fileID: "h", sha256Hex: "h", size: 1) == nil)
         #expect(SyncPushEntry.make(relativePath: "Album/.hidden.flac", fileID: "h", sha256Hex: "h", size: 1) == nil)
@@ -384,9 +384,9 @@ struct SyncLibraryPassiveTests {
         let a = SyncPushEntry(relativePath: "A/dup.flac", transferName: "dup.flac", fileID: "a", sha256Hex: "a", size: 1)
         let b = SyncPushEntry(relativePath: "B/dup.flac", transferName: "dup.flac", fileID: "b", sha256Hex: "b", size: 1)
         var table = SyncPushClaimTable(entries: [a, b])
-        #expect(table.claim(transferName: "dup.flac") == "A/dup.flac")
-        #expect(table.claim(transferName: "dup.flac") == "B/dup.flac")
-        #expect(table.claim(transferName: "dup.flac") == nil)
+        #expect(table.claim(fileID: "b", sha256Hex: "b", transferName: "dup.flac") == "B/dup.flac")
+        #expect(table.claim(fileID: "a", sha256Hex: "a", transferName: "dup.flac") == "A/dup.flac")
+        #expect(table.claim(fileID: "c", sha256Hex: "c", transferName: "dup.flac") == nil)
         #expect(table.isEmpty)
 
         // 帧 14 新编号；既有帧值语义不动

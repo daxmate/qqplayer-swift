@@ -72,10 +72,11 @@ struct SyncFileTransferTests {
         try sender.send(fileURL: sourceURL, fileID: "t1", name: "song.bin")
 
         #expect(senderOutcome == .succeeded)
-        guard case let .received(finalURL)? = receiverOutcome else {
+        guard case let .received(receivedFile)? = receiverOutcome else {
             Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
         // 2 块：262144 + 尾块
@@ -107,10 +108,11 @@ struct SyncFileTransferTests {
         try sender.send(fileURL: sourceURL, fileID: "t2", name: "big.bin")
 
         #expect(senderOutcome == .succeeded)
-        guard case let .received(finalURL)? = receiverOutcome else {
+        guard case let .received(receivedFile)? = receiverOutcome else {
             Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
         #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 5)
@@ -139,10 +141,11 @@ struct SyncFileTransferTests {
         try sender.send(fileURL: sourceURL, fileID: "t3", name: "empty.dat")
 
         #expect(senderOutcome == .succeeded)
-        guard case let .received(finalURL)? = receiverOutcome else {
+        guard case let .received(receivedFile)? = receiverOutcome else {
             Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(FileManager.default.fileExists(atPath: finalURL.path))
         #expect(try Data(contentsOf: finalURL).isEmpty)
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
@@ -218,10 +221,11 @@ struct SyncFileTransferTests {
 
         #expect(senderOutcome == .succeeded)
         #expect(acks.first?.receivedBytes == chunkSize) // 首 ack = 对齐后完整字节（truncate 生效）
-        guard case let .received(finalURL)? = phase2Outcome else {
+        guard case let .received(receivedFile)? = phase2Outcome else {
             Issue.record("期望 received，实际 \(String(describing: phase2Outcome))")
             return
         }
+        let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
     }
@@ -262,7 +266,11 @@ struct SyncFileTransferTests {
         // 第二轮：startOffset=0 从头重传（receiver 删残留 .part 重建）→ 成功
         try sender.send(fileURL: sourceURL, fileID: fileID, name: name, startOffset: 0)
         #expect(outcomes.last == .succeeded)
-        #expect(receiverOutcomes.last == .received(receiverDir.appendingPathComponent(name)))
+        if case let .received(receivedFile)? = receiverOutcomes.last {
+            #expect(receivedFile.url == receiverDir.appendingPathComponent(name))
+        } else {
+            Issue.record("期望 received，实际 \(String(describing: receiverOutcomes))")
+        }
         let finalURL = receiverDir.appendingPathComponent(name)
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!FileManager.default.fileExists(atPath: partURL.path))
@@ -296,11 +304,11 @@ struct SyncFileTransferTests {
         try sender.send(fileURL: sourceURL, fileID: "idem", name: "song.bin")
 
         #expect(senderOutcome == .succeeded)
-        guard case let .received(returnedURL)? = receiverOutcome else {
+        guard case let .received(returnedFile)? = receiverOutcome else {
             Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
             return
         }
-        #expect(returnedURL == finalURL)
+        #expect(returnedFile.url == finalURL)
         #expect(try Data(contentsOf: finalURL) == source)
         // 未被重写（mtime 保持旧值）；0 个块帧（没重传）
         let mtime = (try FileManager.default.attributesOfItem(atPath: finalURL.path))[.modificationDate] as? Date

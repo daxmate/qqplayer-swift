@@ -18,7 +18,8 @@
 //  并发：@unchecked Sendable + NSLock。帧回调内只迁移状态，发帧/回调在锁外执行
 //  （内存回环同步投递下 ack 会同步重入本对象：持锁发帧必死锁）。
 //  会话回调槽位链式挂接（先己后彼），结束用 enabled 开关静默自己，不拆链。
-//  v1 限制：停等无 ack 超时——对端失联靠会话断连（onClosed）兜底，超时留 M4。
+//  停等 ack **有超时**（2026-09-12 审计 🟡T4）：对端没回应（meta 解码失败静默 /
+//  对端卡死）→ 超时按 `protocolError` 终止本轮、清状态（可重试），不留悬挂。
 //
 
 import Foundation
@@ -33,6 +34,8 @@ final class SyncFileSender: @unchecked Sendable {
 
     private let session: SyncPeerSession
     private let lock = NSLock()
+    /// 等待 file_ack 的超时（秒；0 = 禁用，测试用）
+    private let ackTimeout: TimeInterval
 
     /// 传输结论回调（锁外触发）。
     var onCompletion: ((Outcome) -> Void)?
@@ -56,6 +59,8 @@ final class SyncFileSender: @unchecked Sendable {
     }
 
     private var active: Active?
+    /// ack 超时调度（锁保护）
+    private var ackDeadlineItem: DispatchWorkItem?
 
     /// 当前进行中传输的 fileID（nil = 空闲；诊断用）。
     var activeFileID: String? {
@@ -70,10 +75,13 @@ final class SyncFileSender: @unchecked Sendable {
         return active != nil
     }
 
-    // MARK: init
+    /// 默认 ack 超时：LAN 上 256KB 块远快于此；超时说明对端不再推进（静默丢帧/卡死）。
+    static let defaultAckTimeout: TimeInterval = 30
 
-    init(session: SyncPeerSession) {
+    /// init
+    init(session: SyncPeerSession, ackTimeout: TimeInterval = SyncFileSender.defaultAckTimeout) {
         self.session = session
+        self.ackTimeout = ackTimeout
         attachHandlers()
     }
 
@@ -134,6 +142,7 @@ final class SyncFileSender: @unchecked Sendable {
                               name: resolvedName, handle: nil, lastAckBytes: nil)
         lock.lock()
         active = transfer
+        scheduleAckDeadlineLocked()
         lock.unlock()
 
         let meta = FileMetaPayload(fileID: fileID, name: resolvedName, totalSize: size,
@@ -232,12 +241,40 @@ final class SyncFileSender: @unchecked Sendable {
             return terminateLocked(.fileUnavailable("源文件比声明短（传输未完已到文件尾）"), current: current)
         }
 
-        // 记推进基线 → 发块（发帧在锁外执行）
+        // 记推进基线 → 发块（发帧在锁外执行）；重挂 ack 超时（每块都是一次新的等待）
         var updated = current
         updated.handle = active?.handle
         updated.lastAckBytes = ack.receivedBytes
         active = updated
+        scheduleAckDeadlineLocked()
         return [.sendChunk(FileChunkPayload(fileID: current.fileID, offset: offset, data: data))]
+    }
+
+    // MARK: ack 超时
+
+    /// 重挂 ack 超时（锁内调用；0 = 禁用）。
+    private func scheduleAckDeadlineLocked() {
+        cancelAckDeadlineLocked()
+        guard ackTimeout > 0 else { return }
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.handleAckDeadline()
+        }
+        ackDeadlineItem = workItem
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + ackTimeout, execute: workItem)
+    }
+
+    private func cancelAckDeadlineLocked() {
+        ackDeadlineItem?.cancel()
+        ackDeadlineItem = nil
+    }
+
+    /// 超时：对端不再推进 → 按协议违例终止本轮并**清状态**（调用方可重试，不留悬挂）。
+    private func handleAckDeadline() {
+        if let outcome = terminateActive(
+            .protocolError(activeID() ?? "", "等待 file_ack 超时（\(ackTimeout)s）")
+        ) {
+            onCompletion?(outcome)
+        }
     }
 
     // MARK: 辅助
@@ -245,6 +282,7 @@ final class SyncFileSender: @unchecked Sendable {
     /// 终止当前传输（锁内调用）：清状态 + 关文件；error = nil 表示成功。
     private func terminateLocked(_ error: SyncFileTransferError?, current: Active) -> [Action] {
         active = nil
+        cancelAckDeadlineLocked()
         try? current.handle?.close()
         if let error {
             return [.finish(.failed(error))]
@@ -259,6 +297,7 @@ final class SyncFileSender: @unchecked Sendable {
         guard let current = active else { return nil }
         if let fileID, current.fileID != fileID { return nil }
         active = nil
+        cancelAckDeadlineLocked()
         try? current.handle?.close()
         return .failed(error)
     }
