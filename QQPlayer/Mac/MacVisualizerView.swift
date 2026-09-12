@@ -3,7 +3,7 @@
 //  QQPlayer
 //
 //  macOS player spectrum visualizer (D4, web 版 Visualizer 对齐——bars 起步)。
-//  画 32 段对数频谱条（MacSpectrumAnalyzer 数据），TimelineView ~30fps 驱动。
+//  画 32 段对数频谱条（MacSpectrumAnalyzer 数据），数据到达即重绘（~30fps）。
 //  QQPlayerMac target only.
 //
 
@@ -13,15 +13,19 @@ import SwiftUI
 /// 颜色跟随设置强调色（web 版强调色语义）：Color.accentColor 在 macOS 上跟随
 /// 系统强调色而非 App tint，故直接读 MacAppearance.accentColor(forKey:)（2026-09-05）。
 ///
-/// ⚠️ 高频数据隔离（2026-09-08 白框 bug 排查中的健壮性改进，非根因修复）：
-/// levels 是 @Published 且每 30fps 在主线程赋值——若用 @ObservedObject 订阅，body 会
-/// 每帧重算、播放期间窗口持续 invalid，与窗口 layout 冲突时加剧 AppKit layout 递归
-/// （layoutSubtreeWithOldSize 嵌套 15+ 层，排查时实测）。故：① 只单项订阅低频的
-/// isActive；② 绘制时直读共享 analyzer 的 levels（不进 SwiftUI 依赖图）；
-/// ③ 不活跃时整体移除 TimelineView（不再 opacity 透明空转 30fps）。
+/// ⚠️ 重绘驱动（2026-09-12 修「播放中频谱条恒为最低高度、贴成一条虚线」）：
+/// 2026-09-08 曾把数据订阅换成「直读 levels + TimelineView(.animation) 驱动」，
+/// 当时的理由是减少每帧 body 重算（那条 layout 递归结论后来被推翻，白框根因是
+/// sheet 的 item 时序竞态）。改完的后果：数据到达不再触发 SwiftUI 失效，重绘只剩
+/// TimelineView 调度一条路——播放中 32 根条常年停在最低高度 2pt，肉眼像一条虚线。
+/// 现改回**数据驱动重绘**：订阅 levels（@Published，~30fps 节流）作为绘制输入，
+/// 数据一变即重绘。本视图是叶子节点，body 只有 Group + Canvas，逐帧重算负担可忽略。
+/// 保留 2026-09-08 的合理部分：不活跃时整体不绘制（不空转 Canvas）。
 struct MacVisualizerView: View {
     /// 是否正在输出频谱数据（播放中 native 引擎曲目）
     @State private var isActive = false
+    /// 当前频谱数据（~30fps 发布；作为绘制输入，数据驱动重绘）
+    @State private var levels: [Float] = []
     /// 当前强调色（设置页改动经 qqplayerSettingsDidChange 刷新）
     @State private var accentColor: Color = MacAppearance.accentColor(
         forKey: DeleteSettings.load().accentColorName
@@ -30,23 +34,23 @@ struct MacVisualizerView: View {
     var body: some View {
         Group {
             if isActive {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
-                    Canvas { context, size in
-                        drawBars(in: &context, size: size)
-                    }
+                Canvas { context, size in
+                    drawBars(in: &context, size: size)
                 }
             }
         }
         .onReceive(MacSpectrumAnalyzer.shared.$isActive) { isActive = $0 }
-        .onAppear { isActive = MacSpectrumAnalyzer.shared.isActive }
+        .onReceive(MacSpectrumAnalyzer.shared.$levels) { levels = $0 }
+        .onAppear {
+            isActive = MacSpectrumAnalyzer.shared.isActive
+            levels = MacSpectrumAnalyzer.shared.levels
+        }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             accentColor = MacAppearance.accentColor(forKey: DeleteSettings.load().accentColorName)
         }
     }
 
     private func drawBars(in context: inout GraphicsContext, size: CGSize) {
-        // 直读共享数据源：高频读取不走 @ObservedObject（避免每帧 body 重算触发 layout 风暴）
-        let levels = MacSpectrumAnalyzer.shared.levels
         guard !levels.isEmpty, size.width > 0, size.height > 0 else { return }
 
         let spacing: CGFloat = 2
