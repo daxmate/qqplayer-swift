@@ -703,6 +703,9 @@
 "sync_this_device_section" = "Cet appareil";
 "sync_device_id" = "ID de l'appareil";
 "sync_device_id_short" = "ID %@";
+"sync_device_name" = "Nom de l'appareil";
+"sync_device_name_placeholder" = "Par exemple : Mon iPhone";
+"sync_device_name_hint" = "Laissez vide pour utiliser le nom système de l'appareil. Ce nom sert à la synchronisation sur le réseau local.";
 "sync_qr_scan_hint" = "Sur votre iPhone : Réglages → Synchronisation → Ajouter un hôte → Scanner le code QR, puis visez ce code. Actualiser affiche un nouveau code.";
 "sync_refresh_qr" = "Actualiser le code";
 "sync_paired_devices" = "Appareils appairés";
@@ -763,7 +766,7 @@
 "sync_failure_invalid_public_key" = "La clé de sécurité dans ce code n'est pas valide.";
 "sync_failure_fingerprint_mismatch" = "L'ID d'appareil ne correspond pas à sa clé de sécurité.";
 "sync_failure_not_awaiting" = "Aucun appairage en attente de confirmation.";
-"sync_client_identity_footer" = "Cet ID identifie cet iPhone auprès de vos Mac.";
+"sync_client_identity_footer" = "Cet ID identifie cet iPhone auprès de vos Mac. Le nom de l'appareil apparaît dans la liste des appareils de synchronisation de votre Mac.";
 "sync_load_failed_title" = "Erreur de synchronisation";
 "sync_pairing_request_header" = "Demande d'appairage";
 "sync_identity_missing_error" = "Impossible de charger l'identité de synchronisation de ce Mac. Veuillez réessayer.";

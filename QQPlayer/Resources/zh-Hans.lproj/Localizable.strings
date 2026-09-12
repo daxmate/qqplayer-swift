@@ -756,6 +756,9 @@
 "sync_this_device_section" = "本机设备";
 "sync_device_id" = "设备 ID";
 "sync_device_id_short" = "ID %@";
+"sync_device_name" = "本机名称";
+"sync_device_name_placeholder" = "例如：我的 iPhone";
+"sync_device_name_hint" = "留空则使用系统设备名；这个名称会用于局域网同步。";
 "sync_qr_scan_hint" = "在 iPhone 上：设置 → 同步 → 添加主机 → 扫码配对，对准此码即可。每次刷新会生成新码。";
 "sync_refresh_qr" = "刷新二维码";
 "sync_paired_devices" = "已配对设备";
@@ -816,7 +819,7 @@
 "sync_failure_invalid_public_key" = "此码中的安全密钥无效。";
 "sync_failure_fingerprint_mismatch" = "设备 ID 与安全密钥不匹配。";
 "sync_failure_not_awaiting" = "当前没有等待确认的配对。";
-"sync_client_identity_footer" = "此 ID 用于向您的 Mac 标识这台 iPhone。";
+"sync_client_identity_footer" = "此 ID 用于向您的 Mac 标识这台 iPhone；本机名称会显示在您 Mac 的同步设备列表里。";
 "sync_load_failed_title" = "同步出错";
 "sync_pairing_request_header" = "配对请求";
 "sync_identity_missing_error" = "无法加载本机同步身份，请重试。";

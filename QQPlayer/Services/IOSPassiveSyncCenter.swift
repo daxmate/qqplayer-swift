@@ -261,6 +261,14 @@
         private let libraryRoot: () -> URL
         private let clientName: () -> String?
 
+        /// 默认本机名来源（握手 hello / 配对请求携带的展示名）：
+        /// 用户命名（`LocalDeviceNameStore`）优先，未命名回落系统设备名。
+        /// 抽成静态函数是为了让 iOS 测试 target 能注入独立 store 锁定这条接线
+        /// （不必建会话 / DB）；生产默认值即本函数。
+        nonisolated static func defaultClientName(store: LocalDeviceNameStore = .shared) -> String? {
+            store.name
+        }
+
         private var browser: SyncBrowser?
         private var session: SyncPeerSession?
         private var passiveHost: SyncLibraryPassiveHost?
@@ -281,7 +289,7 @@
             identityStore: SyncIdentityStore = SyncIdentityStore(),
             deviceStore: DeviceStore = DeviceStore(),
             libraryRoot: @escaping () -> URL = { MusicFolderResolver.iosDocumentsDirectoryURL() },
-            clientName: @escaping () -> String? = { UIDevice.current.name }
+            clientName: @escaping () -> String? = { IOSPassiveSyncCenter.defaultClientName() }
         ) {
             self.identityStore = identityStore
             self.deviceStore = deviceStore

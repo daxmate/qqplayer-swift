@@ -159,6 +159,26 @@ struct LocalDeviceNameTests {
         #expect(b.name == "默认B")
     }
 
+    // MARK: - iOS 接线：clientName 注入走本机名 store
+
+    @Test("IOSPassiveSyncCenter.defaultClientName：命名/清空跟随 store，未命名回落系统默认")
+    func passiveCenterClientNameFollowsStore() throws {
+        let (defaults, suite) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = Self.makeNameStore(defaults: defaults, systemDefault: "系统默认名")
+
+        // 未命名 → 系统默认名（生产：UIDevice.current.name）
+        #expect(IOSPassiveSyncCenter.defaultClientName(store: store) == "系统默认名")
+
+        // 用户命名 → 上报用户的名（握手 hello 携带）
+        store.setName("dax's iPhone")
+        #expect(IOSPassiveSyncCenter.defaultClientName(store: store) == "dax's iPhone")
+
+        // 清空 → 回落系统默认名
+        store.setName(nil)
+        #expect(IOSPassiveSyncCenter.defaultClientName(store: store) == "系统默认名")
+    }
+
     // MARK: - SyncHello 向后兼容
 
     @Test("SyncHello：旧 JSON（无 name 键）解码出 name == nil")

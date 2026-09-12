@@ -1100,6 +1100,9 @@
 "sync_this_device_section" = "本機裝置";
 "sync_device_id" = "裝置 ID";
 "sync_device_id_short" = "ID %@";
+"sync_device_name" = "本機名稱";
+"sync_device_name_placeholder" = "例如：我的 iPhone";
+"sync_device_name_hint" = "留空則使用系統裝置名稱；這個名稱會用於區域網路同步。";
 "sync_qr_scan_hint" = "在 iPhone 上：設定 → 同步 → 加入主機 → 掃碼配對，對準此碼即可。每次重新整理會產生新碼。";
 "sync_refresh_qr" = "重新整理二維碼";
 "sync_paired_devices" = "已配對裝置";
@@ -1160,7 +1163,7 @@
 "sync_failure_invalid_public_key" = "此碼中的安全金鑰無效。";
 "sync_failure_fingerprint_mismatch" = "裝置 ID 與安全金鑰不符。";
 "sync_failure_not_awaiting" = "目前沒有等待確認的配對。";
-"sync_client_identity_footer" = "此 ID 用於向您的 Mac 識別這台 iPhone。";
+"sync_client_identity_footer" = "此 ID 用於向您的 Mac 識別這台 iPhone；本機名稱會顯示在您 Mac 的同步裝置列表裡。";
 "sync_load_failed_title" = "同步發生錯誤";
 "sync_pairing_request_header" = "配對請求";
 "sync_identity_missing_error" = "無法載入本機同步身分，請重試。";
