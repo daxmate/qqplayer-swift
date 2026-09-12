@@ -1121,6 +1121,14 @@
 "sync_replacement_badge" = "將取代現有配對";
 "sync_approve" = "核准";
 "sync_reject" = "拒絕";
+
+"sync_devices_section" = "裝置";
+"sync_devices_footer" = "選取的裝置是本次同步的目標。裝置上開啟 QQPlayer（設定 → 同步）時才會顯示為線上。";
+"sync_devices_empty" = "還沒有配對的行動裝置。用手機上的 QQPlayer 掃描上方 QR Code 即可配對。";
+"sync_devices_target_badge" = "本次同步目標";
+"sync_device_status_online" = "線上";
+"sync_device_status_offline" = "離線";
+"sync_device_offline_hint" = "在該裝置上開啟 QQPlayer → 設定 → 同步。";
 "sync_scan_qr" = "掃碼配對";
 "sync_manual_input" = "手動輸入 ID";
 "sync_scan_hint" = "將相機對準 Mac「同步」中顯示的二維碼。";

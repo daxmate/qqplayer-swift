@@ -721,6 +721,14 @@
 "sync_replacement_badge" = "Заменит существующее сопряжение";
 "sync_approve" = "Одобрить";
 "sync_reject" = "Отклонить";
+
+"sync_devices_section" = "Устройства";
+"sync_devices_footer" = "Выбранное устройство — цель этой синхронизации. Устройство отображается как «в сети», только когда на нём открыт QQPlayer (Настройки → Синхронизация).";
+"sync_devices_empty" = "Сопряжённых мобильных устройств пока нет. Отсканируйте QR-код выше в QQPlayer на телефоне, чтобы выполнить сопряжение.";
+"sync_devices_target_badge" = "Цель синхронизации";
+"sync_device_status_online" = "В сети";
+"sync_device_status_offline" = "Не в сети";
+"sync_device_offline_hint" = "Откройте QQPlayer на этом устройстве → Настройки → Синхронизация.";
 "sync_scan_qr" = "Сканировать QR-код";
 "sync_manual_input" = "Ввести ID вручную";
 "sync_scan_hint" = "Наведите камеру на QR-код в разделе «Синхронизация» на Mac.";

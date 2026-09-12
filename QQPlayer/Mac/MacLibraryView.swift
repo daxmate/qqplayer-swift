@@ -728,9 +728,10 @@ struct MacLibraryView: View {
 
 /// 主窗口工具栏弹出的同步面板。
 ///
-/// 内容**复用**设置页同一套四区（`MacSyncRunSection`）——同步界面只允许一份实现，
-/// 避免「设置里一套、主界面一套」的行为漂移（封面解析散落多处的教训）。
-/// 同步只能由桌面端发起；「上传到 iPhone」与「从 iPhone 下载」是面板里的两个独立按钮。
+/// 内容**完全复用**设置页同一个 `MacSyncCenterView`（M6 T11）——同步界面只允许一份
+/// 实现，避免「设置里一套、主界面一套」的行为漂移（封面解析散落多处的教训）：
+/// 配对批准卡 / 设备区 / 同步四区 / 本机身份与二维码 / 已配对设备，两处逐字一致。
+/// 同步只能由桌面端发起；方向与内容在面板内选择。
 private struct MacSyncPanel: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -739,7 +740,7 @@ private struct MacSyncPanel: View {
             header
 
             Form {
-                MacSyncRunSection(hostCenter: .shared)
+                MacSyncCenterView()
             }
             .formStyle(.grouped)
         }

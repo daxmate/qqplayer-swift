@@ -777,6 +777,14 @@
 "sync_replacement_badge" = "将替换现有配对";
 "sync_approve" = "批准";
 "sync_reject" = "拒绝";
+
+"sync_devices_section" = "设备";
+"sync_devices_footer" = "选中的设备是本次同步的目标。设备上打开 QQPlayer（设置 → 同步）时才会显示为在线。";
+"sync_devices_empty" = "还没有配对的移动设备。用手机上的 QQPlayer 扫描上方二维码即可配对。";
+"sync_devices_target_badge" = "本次同步目标";
+"sync_device_status_online" = "在线";
+"sync_device_status_offline" = "离线";
+"sync_device_offline_hint" = "在该设备上打开 QQPlayer → 设置 → 同步。";
 "sync_scan_qr" = "扫码配对";
 "sync_manual_input" = "手动输入 ID";
 "sync_scan_hint" = "将相机对准 Mac「同步」中显示的二维码。";

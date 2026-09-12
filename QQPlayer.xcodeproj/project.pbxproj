@@ -122,6 +122,7 @@
 		0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */; };
 		29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */; };
 		0D287FAC426D48308372B848 /* SyncUIDirectionContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */; };
+		AB852F651B4D4DD8A5FD1098 /* SyncDeviceListModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -293,6 +294,7 @@
 		7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPlaylistMembersTests.swift; sourceTree = "<group>"; };
 		1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerLibraryTests.swift; sourceTree = "<group>"; };
 		63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIDirectionContentTests.swift; sourceTree = "<group>"; };
+		B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDeviceListModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -334,6 +336,7 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncCenterView.swift,
 				Mac/MacSyncContentModel.swift,
 				Mac/MacSyncCoordinatorFactory.swift,
 				Mac/MacSyncLibraryHost.swift,
@@ -420,6 +423,7 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncCenterView.swift,
 				Mac/MacSyncContentModel.swift,
 				Mac/MacSyncCoordinatorFactory.swift,
 				Mac/MacSyncLibraryHost.swift,
@@ -517,6 +521,7 @@
 				Services/SpotifyAPI.swift,
 				Services/StateManager.swift,
 				Services/StateManagerModels.swift,
+				Services/SyncDeviceListModel.swift,
 				Services/SyncHostGate.swift,
 				Services/SyncSelectionStore.swift,
 				Services/SyncUIDirectionContent.swift,
@@ -839,6 +844,7 @@
 				7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */,
 				1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */,
 				63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */,
+				B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1259,6 +1265,7 @@
 				0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */,
 				29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */,
 				0D287FAC426D48308372B848 /* SyncUIDirectionContentTests.swift in Sources */,
+				AB852F651B4D4DD8A5FD1098 /* SyncDeviceListModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
