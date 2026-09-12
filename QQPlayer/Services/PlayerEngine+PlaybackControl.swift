@@ -1162,6 +1162,10 @@
         /// （2026-09-01 跟唱跳转链路实测：PlayerEngineKaraokeActions → play → connect）
         /// static：extension 不允许实例存储属性；PlayerEngine 是单例，语义等价
         private static var macEngineGraphFormat: AVAudioFormat?
+        /// 缓存所属的引擎实例（弱引用）：媒体服务重置 / recreateAudioEngine / resetAudioEngineForNative
+        /// 都会换成新引擎——此时缓存 format 可能相同，但新引擎图上一条连线都没有，
+        /// 必须重连（否则 playerNode 没接到 mixer = 无声）。
+        private static weak var macEngineGraphOwner: AVAudioEngine?
 
         private func ensureMacAudioEngineSetup(with format: AVAudioFormat?) {
             if !audioEngine.attachedNodes.contains(playerNode) {
@@ -1178,10 +1182,31 @@
                 || !audioEngine.attachedNodes.contains(eqManager.currentEQNode!) {
                 eqManager.setAudioEngine(audioEngine)
             }
-            // 同 format 已 connect 过：跳过重复 connect（幂等，但每次调用都同步等音频线程）
-            if Self.macEngineGraphFormat == format {
+            // 幂等跳过：只有「同 format **且同引擎实例**」才跳过（connect 是同步重操作，
+            // 每次调用都等音频线程；但引擎换过就必须重连）
+            if Self.macEngineGraphFormat == format, Self.macEngineGraphOwner === audioEngine {
                 return
             }
+
+            // ⚠️ 重连必须在**引擎停止**状态下做（2026-09-12 用户实测崩溃）：
+            // 换歌时输入格式会变（mp3 库混采样率极常见：至少还有你-林忆莲.mp3 44.1kHz →
+            // 死ぬのがいいわ-藤井風.mp3 48kHz），而 loadTrack 只 pause 了引擎。在未停止的引擎上
+            // 改连接格式，AVAudioEngine 内部走 UpdateGraphAfterReconfig → 输出链初始化失败
+            // （AVAEInternal.h:104 … error -10868 = kAudioUnitErr_FormatNotSupported）→
+            // connect(_:to:format:) 抛 **ObjC 异常**，Swift 捕不到 → 直接崩进程。
+            // 日志实锤：nextTrack(autoplay:) → play() → ensureMacAudioEngineSetup → connect。
+            // 无条件 stop（不用 isRunning 判断：pause 后 isRunning 已为 false，但那种状态同样会崩）。
+            // 对齐 iOS reconfigureAudioEngineForNewFormat（先 stop 再重连）；调用方 play()
+            // 随后会自己 start（if !audioEngine.isRunning 分支）。
+            //
+            // 无爆音是构造上保证的：停引擎前先确认播放节点已停 → 停掉的是一个**没有任何
+            // 音频在渲染**的引擎，不会在波形中途截断（那个才是爆音的来源）。调用方
+            // loadTrack 已经 playerNode.stop()，这里再兜一次以防其它调用路径。
+            if playerNode.isPlaying {
+                playerNode.stop()
+            }
+            audioEngine.stop()
+
             // playerNode → timePitch（倍速）→ EQ → mainMixer（EQ 节点存在时；
             // 对齐 iOS connectPlaybackChain）。AVAudioEngine owns the mainMixer →
             // outputNode connection and negotiates the hardware format.
@@ -1194,6 +1219,7 @@
             }
             audioEngine.prepare()
             Self.macEngineGraphFormat = format
+            Self.macEngineGraphOwner = audioEngine
         }
     }
 #endif
