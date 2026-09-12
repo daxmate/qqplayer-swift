@@ -121,6 +121,7 @@
 		F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */; };
 		0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */; };
 		29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */; };
+		0D287FAC426D48308372B848 /* SyncUIDirectionContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -291,6 +292,7 @@
 		1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferDirectionTests.swift; sourceTree = "<group>"; };
 		7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPlaylistMembersTests.swift; sourceTree = "<group>"; };
 		1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerLibraryTests.swift; sourceTree = "<group>"; };
+		63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIDirectionContentTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -332,8 +334,11 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncContentModel.swift,
 				Mac/MacSyncCoordinatorFactory.swift,
 				Mac/MacSyncLibraryHost.swift,
+				Mac/MacSyncLocalContentProvider.swift,
+				Mac/MacSyncPeerContentProvider.swift,
 				Mac/MacSyncRunViewModel.swift,
 				Mac/MacSyncSettingsView.swift,
 				Mac/MacSyncView.swift,
@@ -415,8 +420,11 @@
 				Mac/MacShortcutsSettingsView.swift,
 				Mac/MacSmartPlaylistViews.swift,
 				Mac/MacSpectrumAnalyzer.swift,
+				Mac/MacSyncContentModel.swift,
 				Mac/MacSyncCoordinatorFactory.swift,
 				Mac/MacSyncLibraryHost.swift,
+				Mac/MacSyncLocalContentProvider.swift,
+				Mac/MacSyncPeerContentProvider.swift,
 				Mac/MacSyncRunViewModel.swift,
 				Mac/MacSyncSettingsView.swift,
 				Mac/MacSyncView.swift,
@@ -511,6 +519,7 @@
 				Services/StateManagerModels.swift,
 				Services/SyncHostGate.swift,
 				Services/SyncSelectionStore.swift,
+				Services/SyncUIDirectionContent.swift,
 				Services/SyncUIState.swift,
 				Services/TagRenameLogic.swift,
 				Services/TagWriterService.swift,
@@ -829,6 +838,7 @@
 				1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */,
 				7D7468D3DE3C488F97BDC096 /* SyncPlaylistMembersTests.swift */,
 				1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */,
+				63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1248,6 +1258,7 @@
 				F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */,
 				0C0FB96E4F7143F198995359 /* SyncPlaylistMembersTests.swift in Sources */,
 				29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */,
+				0D287FAC426D48308372B848 /* SyncUIDirectionContentTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

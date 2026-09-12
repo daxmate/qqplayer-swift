@@ -1263,3 +1263,29 @@
 "sync_run_result_unresolved" = "%d 首尚未建立指紋，本次略過。";
 "sync_run_result_empty_selection" = "沒有選取任何內容，因此沒有傳輸。";
 "sync_run_result_no_deletion" = "同步不會刪除任何一端的歌曲。";
+
+// T10（2026-09-12）方向優先 · 內容來源隨方向切換
+"sync_run_direction_section" = "同步方向";
+"sync_run_direction_upload" = "從本機上傳到 iPhone";
+"sync_run_direction_upload_detail" = "把 Mac 上的歌曲傳到 iPhone。";
+"sync_run_direction_download" = "從 iPhone 下載到本機";
+"sync_run_direction_download_detail" = "把 iPhone 上的歌曲拉到 Mac。";
+"sync_run_direction_footer" = "先選方向——下面的清單會顯示那一端的內容。";
+"sync_run_direction_hint" = "請先在上面選擇同步方向，再選擇要同步的內容。";
+"sync_run_direction_download_target" = "iPhone";
+"sync_run_reason_no_direction" = "請先選擇同步方向。";
+"sync_run_selection_section_local" = "同步內容 · 本機 Mac";
+"sync_run_selection_section_peer" = "同步內容 · iPhone";
+"sync_run_peer_needs_connection" = "請先連接 iPhone（iPhone 上：設定 → 同步）。";
+"sync_run_library_row_title_peer" = "%@ 上的全部歌曲";
+"sync_run_library_confirm_message_download" = "這會從 iPhone 下載約 %@（共 %d 首歌曲），可能耗時較長並佔用較多儲存空間。要繼續嗎？";
+"sync_run_playlists_loading" = "正在載入播放列表…";
+"sync_peer_summary" = "%@ 曲庫 · %d 首 · 約 %@";
+"sync_peer_summary_loading" = "正在讀取 iPhone 曲庫…";
+"sync_peer_summary_unknown" = "%@ 曲庫大小暫不可用。";
+"sync_peer_retry" = "重試";
+"sync_peer_error_not_connected" = "尚未連接 iPhone。";
+"sync_peer_error_session" = "連線已中斷，請重新連接後再試。";
+"sync_peer_error_timeout" = "iPhone 沒有及時回應。";
+"sync_peer_error_cancelled" = "請求已取消。";
+"sync_peer_error_other" = "無法讀取 iPhone 的內容。";

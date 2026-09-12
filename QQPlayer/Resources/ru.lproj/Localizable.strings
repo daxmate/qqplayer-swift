@@ -863,3 +863,29 @@
 "sync_run_result_unresolved" = "%d песен ещё без отпечатка — пропущены.";
 "sync_run_result_empty_selection" = "Ничего не выбрано, передача не выполнялась.";
 "sync_run_result_no_deletion" = "Синхронизация никогда не удаляет песни ни на одном устройстве.";
+
+// T10（2026-09-12）направление сначала · источник содержимого зависит от направления
+"sync_run_direction_section" = "Направление синхронизации";
+"sync_run_direction_upload" = "Загрузить на iPhone";
+"sync_run_direction_upload_detail" = "Отправить песни с этого Mac на iPhone.";
+"sync_run_direction_download" = "Скачать с iPhone";
+"sync_run_direction_download_detail" = "Перенести песни с iPhone на этот Mac.";
+"sync_run_direction_footer" = "Сначала выберите направление — список ниже покажет содержимое выбранного устройства.";
+"sync_run_direction_hint" = "Выберите направление синхронизации выше, чтобы увидеть, что можно синхронизировать.";
+"sync_run_direction_download_target" = "iPhone";
+"sync_run_reason_no_direction" = "Сначала выберите направление синхронизации.";
+"sync_run_selection_section_local" = "Что синхронизировать · на этом Mac";
+"sync_run_selection_section_peer" = "Что синхронизировать · на iPhone";
+"sync_run_peer_needs_connection" = "Сначала подключите iPhone (Настройки → Синхронизация).";
+"sync_run_library_row_title_peer" = "Всё на %@";
+"sync_run_library_confirm_message_download" = "Будет скачано около %@ (%d песен) с вашего iPhone. Это может занять много времени и места. Продолжить?";
+"sync_run_playlists_loading" = "Загрузка плейлистов…";
+"sync_peer_summary" = "Медиатека %@ · %d песен · около %@";
+"sync_peer_summary_loading" = "Чтение медиатеки iPhone…";
+"sync_peer_summary_unknown" = "Размер медиатеки %@ недоступен.";
+"sync_peer_retry" = "Повторить";
+"sync_peer_error_not_connected" = "Нет подключения к iPhone.";
+"sync_peer_error_session" = "Соединение прервано. Подключитесь снова и повторите.";
+"sync_peer_error_timeout" = "iPhone не ответил вовремя.";
+"sync_peer_error_cancelled" = "Запрос отменён.";
+"sync_peer_error_other" = "Не удалось загрузить содержимое iPhone.";
