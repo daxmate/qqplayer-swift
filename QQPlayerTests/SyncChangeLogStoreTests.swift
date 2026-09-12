@@ -294,4 +294,34 @@ struct SyncChangeLogStoreTests {
         try store.setCursor(forPeer: peer, lastOutboxID: 3)
         #expect(try store.cursor(forPeer: peer) == 3)
     }
+
+    // MARK: - S1：分页游标（取批 + 本批末行 id）
+
+    @Test("S1 契约：page 的 lastOutboxID = 本批末行；批外行不被越过；空批/越末尾不动游标")
+    func pageCursorIsBatchTail() throws {
+        let (manager, _) = try Self.makeManager()
+        let store = SyncChangeLogStore(database: manager)
+        try manager.addToFavorites(trackStableIds: (1 ... 5).map { "p\($0)" })
+
+        let first = try store.page(after: 0, limit: 2)
+        #expect(first.rows.map(\.id) == [1, 2])
+        #expect(first.lastOutboxID == 2, "游标 = 本批实际末行（不是 outbox 末尾 5）")
+        #expect(try store.maxOutboxID() == 5, "outbox 里仍有批外行")
+
+        let second = try store.page(after: first.lastOutboxID, limit: 2)
+        #expect(second.rows.map(\.id) == [3, 4])
+        #expect(second.lastOutboxID == 4)
+
+        let third = try store.page(after: second.lastOutboxID, limit: 2)
+        #expect(third.rows.map(\.id) == [5])
+        #expect(third.lastOutboxID == 5, "末页游标 = outbox 末尾")
+
+        let empty = try store.page(after: 5, limit: 2)
+        #expect(empty.rows.isEmpty)
+        #expect(empty.lastOutboxID == 5, "无增量 → 不推进（保持传入的 cursor）")
+
+        let beyond = try store.page(after: 99, limit: 2)
+        #expect(beyond.rows.isEmpty)
+        #expect(beyond.lastOutboxID == 99, "越过末尾也不回退游标")
+    }
 }

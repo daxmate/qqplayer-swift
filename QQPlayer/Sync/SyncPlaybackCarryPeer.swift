@@ -24,11 +24,14 @@
 //  1. 帧 8/9 **没有歌维度字段**，且 §12b 修订不允许改帧语义 → 「只带这次传输的歌」
 //     在**发送侧**强制（推送方向由计划器收口）；拉取方向沿用既有**游标增量**语义
 //     （对端 outbox 中 > 本端游标的行），按 content_hash 本地化，本地缺歌挂起不丢。
-//  2. 推送批次是**歌维度子集**，但帧 9 的 `lastOutboxID` 只有"本端 outbox 末尾"一种
-//     口径（与 `SyncChangeLogPeer.handlePull` 应答一致）→ 回执方（设备）的游标被推进
-//     到本端 outbox 末尾。v1 该游标是**惰性的**（移动端纯被动、永不主动 pull，
-//     §12b 决策 6）；若 v2 引入移动端主动 pull，需把 carry 与游标语义分开（见报告
-//     「遗留问题」）。carry 本身不是游标驱动：每次传输按当前 outbox 重新计算。
+//  2. 推送批次是**歌维度子集**，帧 9 的 `lastOutboxID` 只有「本批实际末行 id」一种口径
+//     （S3，2026-09-12 审计修复：与 `SyncChangeLogPeer.handlePull` 应答同口径；
+//     空批不发帧、不动游标）→ 回执方（设备）的游标被推进到本批末行。
+//     ⚠️ 批内末行可能小于对端已记下的位置（早先的批推得更靠后）→ 游标会回退；
+//     本端没有「已推给该 peer 的位置」的反向记录，无法做单调保护。
+//     v1 该游标是**惰性的**（移动端纯被动、永不主动 pull，§12b 决策 6）；若 v2 引入
+//     移动端主动 pull，必须把 carry 与游标语义分开（见报告「遗留问题」）。
+//     carry 本身不是游标驱动：每次传输按当前 outbox 重新计算。
 //  3. `playback_position` 不在 `SyncChangeEntity.v1Synced`（本地载体 = UserDefaults），
 //     不参与本携带；歌单结构（playlist 行）非歌维度，走决策 9 的选择集同步。
 //
@@ -169,11 +172,20 @@ final class SyncPlaybackCarryPeer: SyncPlaybackCarryDriving, @unchecked Sendable
             facts: facts
         )
         let plan = SyncPlaybackCarryPlanner.plan(scope: scope, facts: facts)
+        // 空批 = 不发帧（不产生空批次噪音），**也不动对端游标**。
         guard !plan.entries.isEmpty else { return plan }
+        // S3（2026-09-12 审计修复）：`lastOutboxID` = **本批实际最后一行 outbox id**，
+        // 与 `SyncChangeLogPeer.handlePull` 应答同口径（不再取 outbox 全局末尾——
+        // 那会把本批没带的行的游标越过去）。
+        // ⚠️ 已知边界（v1 惰性游标下无影响）：批内末行可能**小于**对端已记下的位置
+        // （早先的批推得更靠后）→ 游标会回退；`sync_cursor` 的键是「该游标描述的是
+        // **谁**的 outbox」，本端查不到「已推给该 peer 的位置」这种反向记录，
+        // 因此无法在本端做单调保护。v2 若引入移动端主动 pull，须把 carry 与游标
+        // 语义分开（见文件头边界 2）。
+        let batchLastID = plan.entries.map(\.outboxID).max() ?? 0
         let payload = SyncChangeLogPushPayload(
             entries: plan.entries.map(Self.wireEntry),
-            // 与 SyncChangeLogPeer.handlePull 应答同口径（本端 outbox 末尾）；见文件头边界 2。
-            lastOutboxID: try store.maxOutboxID()
+            lastOutboxID: batchLastID
         )
         try session.sendApplicationFrame(
             type: .changeLogPush,
