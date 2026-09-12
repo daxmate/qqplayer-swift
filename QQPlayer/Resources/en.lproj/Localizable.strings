@@ -705,6 +705,9 @@
 "sync_this_device_section" = "This Device";
 "sync_device_id" = "Device ID";
 "sync_device_id_short" = "ID %@";
+"sync_device_name" = "Device Name";
+"sync_device_name_placeholder" = "For example: My iPhone";
+"sync_device_name_hint" = "Leave blank to use the system device name. This name is used for local network sync.";
 "sync_qr_scan_hint" = "On your iPhone: Settings → Sync → Add Host → Scan QR Code, then point it at this code. Refresh shows a fresh code each time.";
 "sync_refresh_qr" = "Refresh Code";
 "sync_paired_devices" = "Paired Devices";
@@ -765,7 +768,7 @@
 "sync_failure_invalid_public_key" = "The security key in this code isn't valid.";
 "sync_failure_fingerprint_mismatch" = "The Device ID doesn't match its security key.";
 "sync_failure_not_awaiting" = "No pairing is waiting for confirmation.";
-"sync_client_identity_footer" = "This ID identifies this iPhone to your Macs.";
+"sync_client_identity_footer" = "This ID identifies this iPhone to your Macs. The device name appears in your Mac's sync device list.";
 "sync_load_failed_title" = "Sync Error";
 "sync_pairing_request_header" = "Pairing Request";
 "sync_identity_missing_error" = "Couldn't load this Mac's sync identity. Please try again.";

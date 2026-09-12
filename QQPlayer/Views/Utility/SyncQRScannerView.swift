@@ -271,7 +271,7 @@ struct SyncQRScannerView: View {
             candidate: pairingCandidate,
             expectedPeerDeviceID: approved.deviceID,
             hostName: approved.displayName,
-            clientName: UIDevice.current.name
+            clientName: LocalDeviceNameStore.shared.name
         )
         flow = .connecting
     }

@@ -700,6 +700,9 @@
 "sync_this_device_section" = "Это устройство";
 "sync_device_id" = "ID устройства";
 "sync_device_id_short" = "ID %@";
+"sync_device_name" = "Имя устройства";
+"sync_device_name_placeholder" = "Например: Мой iPhone";
+"sync_device_name_hint" = "Оставьте пустым, чтобы использовать системное имя устройства. Это имя используется для синхронизации в локальной сети.";
 "sync_qr_scan_hint" = "На iPhone: Настройки → Синхронизация → Добавить хост → Сканировать QR-код — наведите камеру на этот код. Обновление создаёт новый код.";
 "sync_refresh_qr" = "Обновить код";
 "sync_paired_devices" = "Связанные устройства";
@@ -760,7 +763,7 @@
 "sync_failure_invalid_public_key" = "Защитный ключ в этом коде недопустим.";
 "sync_failure_fingerprint_mismatch" = "ID устройства не совпадает с его защитным ключом.";
 "sync_failure_not_awaiting" = "Нет сопряжения, ожидающего подтверждения.";
-"sync_client_identity_footer" = "Этот ID идентифицирует этот iPhone для ваших Mac.";
+"sync_client_identity_footer" = "Этот ID идентифицирует этот iPhone для ваших Mac. Имя устройства отображается в списке устройств синхронизации на вашем Mac.";
 "sync_load_failed_title" = "Ошибка синхронизации";
 "sync_pairing_request_header" = "Запрос сопряжения";
 "sync_identity_missing_error" = "Не удалось загрузить идентичность синхронизации этого Mac. Повторите попытку.";

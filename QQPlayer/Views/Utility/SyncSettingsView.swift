@@ -17,6 +17,8 @@ import SwiftUI
 struct SyncSettingsView: View {
     @State private var identity: SyncIdentity?
     @State private var identityError: String?
+    /// 本机展示名（进入页面/保存后从 `LocalDeviceNameStore` 刷新；用户可改）
+    @State private var deviceName = ""
     @State private var hosts: [PeerDevice] = []
     @State private var loadError: String?
     @State private var pendingUnpair: PeerDevice?
@@ -69,6 +71,19 @@ struct SyncSettingsView: View {
 
             // MARK: 本机
             Section {
+                // 本机名称（用户可改；改的是握手 hello 携带的展示名 → Mac 设备列表显示名）
+                NavigationLink {
+                    SyncDeviceNameEditorView(initialName: deviceName) {
+                        deviceName = LocalDeviceNameStore.shared.name
+                    }
+                } label: {
+                    LabeledContent("sync_device_name".localized) {
+                        Text(deviceName)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
                 if let identity {
                     LabeledContent("sync_this_device".localized) {
                         Text("sync_device_id_short".localized(with: shortID(identity.deviceID)))
@@ -129,6 +144,8 @@ struct SyncSettingsView: View {
         .onAppear {
             loadIdentityIfNeeded()
             reloadHosts()
+            // 本机名称：每次进页都从 store 取值（编辑页返回也走这里刷新）
+            deviceName = LocalDeviceNameStore.shared.name
             // 幂等：进页时确保被动端在跑（配对完成后也由此重新检查主机）
             passiveSync.start()
         }
