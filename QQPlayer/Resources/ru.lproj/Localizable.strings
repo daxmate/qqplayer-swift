@@ -863,6 +863,7 @@
 "sync_run_reason_not_connected" = "Сначала подключите iPhone (Настройки → Синхронизация).";
 "sync_run_reason_library_unavailable" = "Папка музыки на этом Mac недоступна, синхронизация выключена.";
 "sync_run_reason_empty_selection" = "Выберите плейлисты или песни для синхронизации.";
+"sync_run_reason_already_running" = "Синхронизация уже выполняется — отмените её или дождитесь завершения.";
 "sync_run_reason_unavailable" = "Файл недоступен";
 "sync_run_result_section" = "Последний результат";
 "sync_run_result_none" = "Синхронизаций ещё не было.";

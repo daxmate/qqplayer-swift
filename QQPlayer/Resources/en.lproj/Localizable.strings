@@ -868,6 +868,7 @@
 "sync_run_reason_not_connected" = "Connect your iPhone first (Settings → Sync).";
 "sync_run_reason_library_unavailable" = "This Mac's music folder isn't available, so syncing is turned off.";
 "sync_run_reason_empty_selection" = "Select playlists or songs to sync.";
+"sync_run_reason_already_running" = "A sync is already in progress — cancel it or wait for it to finish.";
 "sync_run_reason_unavailable" = "File unavailable";
 "sync_run_result_section" = "Last Result";
 "sync_run_result_none" = "No sync has run yet.";

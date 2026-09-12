@@ -919,6 +919,7 @@
 "sync_run_reason_not_connected" = "请先在 iPhone 上连接（设置 → 同步）。";
 "sync_run_reason_library_unavailable" = "这台 Mac 的曲库目录不可用，暂时无法同步。";
 "sync_run_reason_empty_selection" = "请先选择要同步的歌单或歌曲。";
+"sync_run_reason_already_running" = "同步正在进行中，请先取消或等待完成。";
 "sync_run_reason_unavailable" = "文件不可用";
 "sync_run_result_section" = "最近一次结果";
 "sync_run_result_none" = "还没有同步记录。";
