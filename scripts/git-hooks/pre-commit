@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # pre-commit hook: 提交前自动检查 Swift 代码 lint/format + 编译警告（防 CI 连红/警告堆积）
 #   swiftformat --lint（暂存 .swift）+ swiftlint lint（暂存 .swift）
-#   + 编译警告零容忍（2026-09-08 用户立）：增量 xcodebuild + 警告扫描
+#   + 编译警告零容忍（2026-09-08 用户立）：增量编译 + 警告扫描
+#     构建一律走 scripts/xcbuild.sh（统一入口：共享 SPM 缓存 + 按工作区隔离的 DerivedData）
+#     —— 裸 xcodebuild 会在新 DerivedData 下重建空 SourcePackages、重新 clone 全部 SPM 依赖，
+#     慢网络下报 “Could not resolve package dependencies” 把提交拦死（2026-09-12 实测，被迫绕过）。
 #     耗时（DerivedData 热缓存实测）：QQPlayerMac ~6s / QQPlayer ~52s
 #     远快于 CI（~10min），本地先拦，CI 检测保留作最终兜底
 # 放行策略：
 #   lint 工具缺失 → 放行（CI 兜底）；xcodebuild 不可用 → 放行（CI 兜底）
+#   scripts/xcbuild.sh 缺失/不可执行 → 放行（CI 兜底）
 #   xcodebuild 编译失败 → 阻止（编译错误本就不该提交）；确属环境问题
 #   （Xcode 占用/DerivedData 锁）可用 SKIP_WARNING_CHECK=1 绕过，CI 仍兜底
 # 注：QQPlayerTests 测试文件不在 build 产物内，其警告由 CI test 编译兜底
@@ -42,11 +46,13 @@ if [ -n "$swift_files" ]; then
     echo "⚠️  SKIP_WARNING_CHECK=1——跳过编译警告检测（CI 仍兜底）"
   elif ! command -v xcodebuild >/dev/null 2>&1; then
     echo "⚠️  xcodebuild 不可用，跳过编译警告检测（CI 会兜底）"
+  elif [ ! -x scripts/xcbuild.sh ]; then
+    echo "⚠️  scripts/xcbuild.sh 不可用，跳过编译警告检测（CI 会兜底）"
   else
     check_scheme() {
       local scheme=$1 log=$2 dest=$3
-      echo "→ 编译警告检测（$scheme 增量编译）"
-      xcodebuild build -project QQPlayer.xcodeproj -scheme "$scheme" \
+      echo "→ 编译警告检测（$scheme 增量编译，走 scripts/xcbuild.sh）"
+      scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "$scheme" \
         -configuration Debug -destination "$dest" CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$log"
       local build_status=${PIPESTATUS[0]}
       if [ "$build_status" -ne 0 ]; then
