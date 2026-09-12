@@ -324,10 +324,9 @@ enum SandboxMigrationPlanner {
                 under: sandboxRoot
             ).path
             do {
-                let newStableId = DatabaseManager.generatePathStableId(forPath: newPath)
-                try databaseManager.migrateTrackStableIdAndPath(
+                // 路径变更 = stableId 重算，走同一迁移入口（D5）
+                try databaseManager.migrateTrackForMovedFile(
                     oldStableId: pathSwitch.trackStableId,
-                    newStableId: newStableId,
                     newPath: newPath
                 )
                 print("📦 SandboxMigration: switched DB path → \(newPath)")

@@ -535,9 +535,12 @@ class DatabaseManager: @unchecked Sendable {
         // startup latency on 2000+ track libraries. Run them once and record
         // completion; upsertTrack's runtime dedup keeps new duplicates in
         // check afterwards (audit: two full-table scans per launch).
-        let legacyMigrationKey = "database.legacyTrackMigrationsCompleted.v2"
-        let needsLegacyMigration = !UserDefaults.standard.bool(forKey: legacyMigrationKey)
-        var didRunLegacyMigration = false
+        //
+        // D1：完成门只在**两个迁移块都成功**时置位（见 LegacyTrackMigrationGate）。
+        // 此前任一块失败也上锁 → 半迁移状态永久固化。
+        let needsLegacyMigration = !LegacyTrackMigrationGate.isCompleted()
+        var pathDedupSucceeded = false
+        var stableIdMigrationSucceeded = false
 
         try write { db in
             // Migration: Add folder sync columns to playlist table
@@ -667,33 +670,21 @@ class DatabaseManager: @unchecked Sendable {
                         let keep = sorted.first!
 
                         for duplicate in sorted.dropFirst() {
-                            try db.execute(
-                                sql: "UPDATE OR IGNORE favorite SET track_stable_id = ? WHERE track_stable_id = ?",
-                                arguments: [keep.stableId, duplicate.stableId]
-                            )
-                            try db.execute(
-                                sql: "UPDATE playlist_item SET track_stable_id = ? WHERE track_stable_id = ?",
-                                arguments: [keep.stableId, duplicate.stableId]
-                            )
-                            try db.execute(
-                                sql: "UPDATE OR IGNORE track_artist SET track_stable_id = ? WHERE track_stable_id = ?",
-                                arguments: [keep.stableId, duplicate.stableId]
-                            )
-                            try db.execute(sql: "DELETE FROM favorite WHERE track_stable_id = ?", arguments: [duplicate.stableId])
-                            try db.execute(sql: "DELETE FROM playlist_item WHERE track_stable_id = ?", arguments: [duplicate.stableId])
-                            try db.execute(sql: "DELETE FROM track_artist WHERE track_stable_id = ?", arguments: [duplicate.stableId])
-                            // Duplicate rows are the SAME physical file, so their play
-                            // history records real plays of the kept song - migrate it
-                            // to the kept stable ID instead of dropping it (P0-3)
-                            try db.execute(
-                                sql: "UPDATE play_history SET track_stable_id = ? WHERE track_stable_id = ?",
-                                arguments: [keep.stableId, duplicate.stableId]
+                            // D3/D6：四表引用迁移走唯一入口（含 OR IGNORE + 清残留），
+                            // 与 upsertTrack / moveTrack / migrateTrackStableIdAndPath 同源。
+                            // 同 path 的重复行指向同一物理文件，其 play_history 是真实播放
+                            // 记录 → 迁移到保留行的 stable ID（P0-3）。
+                            try TrackIdentityMigration.migrateDatabaseReferences(
+                                db,
+                                from: duplicate.stableId,
+                                to: keep.stableId
                             )
                             try Track.filter(Column("id") == duplicate.id).deleteAll(db)
                         }
 
                         print("✅ Database: Removed \(duplicates.count - 1) duplicate track row(s) for path: \(path)")
                     }
+                    pathDedupSucceeded = true
                 } catch {
                     print("⚠️ Database migration: Path duplicate cleanup failed: \(error)")
                 }
@@ -716,27 +707,13 @@ class DatabaseManager: @unchecked Sendable {
                             arguments: [newStableId, track.id]
                         )
 
-                        try db.execute(
-                            sql: "UPDATE OR IGNORE favorite SET track_stable_id = ? WHERE track_stable_id = ?",
-                            arguments: [newStableId, track.stableId]
-                        )
-
-                        try db.execute(
-                            sql: "UPDATE playlist_item SET track_stable_id = ? WHERE track_stable_id = ?",
-                            arguments: [newStableId, track.stableId]
-                        )
-
-                        try db.execute(
-                            sql: "UPDATE OR IGNORE track_artist SET track_stable_id = ? WHERE track_stable_id = ?",
-                            arguments: [newStableId, track.stableId]
-                        )
-                        try db.execute(sql: "DELETE FROM track_artist WHERE track_stable_id = ?", arguments: [track.stableId])
-
-                        // Play history follows the song to its new path-based ID
-                        // instead of being orphaned (P0-3)
-                        try db.execute(
-                            sql: "UPDATE play_history SET track_stable_id = ? WHERE track_stable_id = ?",
-                            arguments: [newStableId, track.stableId]
+                        // D3/D6：四表引用迁移走唯一入口（此前 playlist_item 是裸
+                        // UPDATE → 主键冲突会中断循环、让该行之后的所有曲目停在
+                        // 旧 id，而完成门已置位 = 永久不再重试）
+                        try TrackIdentityMigration.migrateDatabaseReferences(
+                            db,
+                            from: track.stableId,
+                            to: newStableId
                         )
 
                         stableIdRemapping[track.stableId] = newStableId
@@ -748,11 +725,12 @@ class DatabaseManager: @unchecked Sendable {
                     } else {
                         print("ℹ️ Database: Stable IDs already path-based")
                     }
+                    stableIdMigrationSucceeded = true
                 } catch {
                     print("⚠️ Database migration: Path-based stable ID migration failed: \(error)")
-                    // Don't throw - allow app to continue and re-index will handle it
                 }
-                didRunLegacyMigration = true
+                // D1：只有当前次两步都成功才上锁；失败 → 保持未置位，下次启动重试
+                // （两步均幂等，重跑不会重复副作用）。
             }
 
             // Add UNIQUE constraint to stable_id to prevent duplicates
@@ -773,46 +751,21 @@ class DatabaseManager: @unchecked Sendable {
             }
         }
 
-        migrateExternalFileBookmarkKeys(stableIdRemapping)
-
-        // Only mark completion after the write transaction committed, so a
-        // failed migration is retried on the next launch.
-        if didRunLegacyMigration {
-            UserDefaults.standard.set(true, forKey: legacyMigrationKey)
+        // D3：文件侧引用（书签键 / 三个歌词目录 / 封面映射）走 stableId 变更唯一入口。
+        // 这里替代了原先只迁书签键的 private migrateExternalFileBookmarkKeys——后者
+        // 与旧库迁移路径下的歌词/封面映射丢失同源（审计 🟡-1）。
+        if !stableIdRemapping.isEmpty {
+            TrackIdentityMigration.migrateFileReferences(remapping: stableIdRemapping)
         }
-    }
 
-    private func migrateExternalFileBookmarkKeys(_ stableIdRemapping: [String: String]) {
-        guard !stableIdRemapping.isEmpty else { return }
-
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let bookmarksURL = documentsURL.appendingPathComponent("ExternalFileBookmarks.plist")
-
-        guard FileManager.default.fileExists(atPath: bookmarksURL.path) else { return }
-
-        do {
-            let data = try Data(contentsOf: bookmarksURL)
-            guard var bookmarks = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Data] else {
-                return
-            }
-
-            var updatedCount = 0
-            for (oldStableId, newStableId) in stableIdRemapping {
-                guard let bookmarkData = bookmarks.removeValue(forKey: oldStableId) else {
-                    continue
-                }
-
-                bookmarks[newStableId] = bookmarkData
-                updatedCount += 1
-            }
-
-            guard updatedCount > 0 else { return }
-
-            let updatedData = try PropertyListSerialization.data(fromPropertyList: bookmarks, format: .xml, options: 0)
-            try updatedData.write(to: bookmarksURL, options: .atomic)
-            print("✅ Database: Migrated \(updatedCount) external bookmark stable IDs")
-        } catch {
-            print("⚠️ Database migration: Failed to migrate external bookmark stable IDs: \(error)")
+        // Only mark completion after the write transaction committed AND both
+        // migration blocks succeeded (D1), so a failed/partial migration is
+        // retried on the next launch.
+        if LegacyTrackMigrationGate.shouldMarkCompleted(
+            pathDedupSucceeded: pathDedupSucceeded,
+            stableIdMigrationSucceeded: stableIdMigrationSucceeded
+        ) {
+            LegacyTrackMigrationGate.markCompleted()
         }
     }
 
@@ -1052,5 +1005,34 @@ final class DatabaseSuspensionCoordinator {
         print(shouldSuspend
             ? "🛑 Database suspended (backgrounded, not playing)"
             : "▶️ Database resumed")
+    }
+}
+
+// MARK: - 旧库迁移完成门（审计 2026-09-12 D1）
+
+/// `migrateDatabaseIfNeeded` 的两步全表迁移（同路径去重 + filename→path stableId）
+/// 的完成门 —— **唯一决策点**。
+///
+/// 语义：只有两步都成功才允许上锁。此前只要进入过迁移块就置位，任一步失败
+/// （例如 stable_id 更新撞 `idx_track_stable_id` 中断循环）都会被永久固化，
+/// 之后不再重试 → 半迁移状态：部分行停在旧 filename id，其 favorite /
+/// playlist_item / play_history 与后续新入库的 path id 分叉。
+///
+/// 键提到 v3：v2 时代可能已被失败路径误置位的库因此重跑一次
+/// （两步迁移均幂等，重跑只多一次启动成本）。
+enum LegacyTrackMigrationGate {
+    static let completionKey = "database.legacyTrackMigrationsCompleted.v3"
+
+    /// 完成门判定（纯函数，可单测）。
+    static func shouldMarkCompleted(pathDedupSucceeded: Bool, stableIdMigrationSucceeded: Bool) -> Bool {
+        pathDedupSucceeded && stableIdMigrationSucceeded
+    }
+
+    static func isCompleted(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: completionKey)
+    }
+
+    static func markCompleted(defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: completionKey)
     }
 }

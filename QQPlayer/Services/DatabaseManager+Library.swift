@@ -32,12 +32,12 @@ extension DatabaseManager {
         return try read { db in
             // 简繁归一：query 生成两种字形变体（当前方向转换 + 反向转换），
             // 简体 UI 下输"周杰伦"也能匹配库里"周傑倫"（反之对称）
-            let patterns = ArtistNameNormalizer.searchVariants(of: query).map { "%\($0)%" }
+            let patterns = ArtistNameNormalizer.searchVariants(of: query).map { self.likePattern(for: $0) }
             var request = Artist.all()
             if patterns.count == 1 {
-                request = request.filter(Column("name").like(patterns[0]))
+                request = request.filter(Column("name").like(patterns[0], escape: "\\"))
             } else {
-                let conditions = patterns.map { Column("name").like($0) }
+                let conditions = patterns.map { Column("name").like($0, escape: "\\") }
                 request = request.filter(conditions.dropFirst().reduce(conditions[0]) { $0 || $1 })
             }
             return try request
@@ -219,9 +219,10 @@ extension DatabaseManager {
 
     func searchAlbums(query: String, limit: Int = 30) throws -> [Album] {
         return try read { db in
-            let pattern = "%\(query)%"
+            // D8：与其他搜索共用同一转义入口（用户输 `%`/`_` 不再命中整库）
+            let pattern = self.likePattern(for: query)
             return try Album
-                .filter(Column("title").like(pattern))
+                .filter(Column("title").like(pattern, escape: "\\"))
                 .order(Column("title"))
                 .limit(limit)
                 .fetchAll(db)
@@ -392,11 +393,17 @@ extension DatabaseManager {
     /// Escapes `%`, `_` and `\` so user input is matched literally instead of
     /// acting as LIKE wildcards (audit: unescaped LIKE pattern matched the
     /// whole library for a `%` query).
-    private func escapeLikePattern(_ pattern: String) -> String {
+    /// LIKE 通配符转义（与曲目搜索同源；调用方必须配 `.like(..., escape: "\\")`）。
+    func escapeLikePattern(_ pattern: String) -> String {
         pattern
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "%", with: "\\%")
             .replacingOccurrences(of: "_", with: "\\_")
+    }
+
+    /// 两侧通配的 LIKE 模式（= 任一字段搜索的唯一入口，避免调用方各拼 `"%\(q)%"`）。
+    func likePattern(for query: String) -> String {
+        "%\(escapeLikePattern(query))%"
     }
 
     private func rankedTrackSearch(in db: Database, query: String, limit: Int?) throws -> [Track] {
@@ -464,9 +471,9 @@ extension DatabaseManager {
 
     func searchAlbums(query: String) throws -> [Album] {
         return try read { db in
-            let searchPattern = "%\(query)%"
+            let searchPattern = self.likePattern(for: query)
             return try Album
-                .filter(Column("title").like(searchPattern))
+                .filter(Column("title").like(searchPattern, escape: "\\"))
                 .order(Column("title"))
                 .fetchAll(db)
         }
@@ -475,12 +482,12 @@ extension DatabaseManager {
     func searchArtists(query: String) throws -> [Artist] {
         return try read { db in
             // 简繁归一：与 searchArtists(query:limit:) 一致，query 生成两种字形变体
-            let patterns = ArtistNameNormalizer.searchVariants(of: query).map { "%\($0)%" }
+            let patterns = ArtistNameNormalizer.searchVariants(of: query).map { self.likePattern(for: $0) }
             var request = Artist.all()
             if patterns.count == 1 {
-                request = request.filter(Column("name").like(patterns[0]))
+                request = request.filter(Column("name").like(patterns[0], escape: "\\"))
             } else {
-                let conditions = patterns.map { Column("name").like($0) }
+                let conditions = patterns.map { Column("name").like($0, escape: "\\") }
                 request = request.filter(conditions.dropFirst().reduce(conditions[0]) { $0 || $1 })
             }
             return try request
@@ -491,9 +498,9 @@ extension DatabaseManager {
 
     func searchPlaylists(query: String) throws -> [Playlist] {
         return try read { db in
-            let searchPattern = "%\(query)%"
+            let searchPattern = self.likePattern(for: query)
             return try Playlist
-                .filter(Column("title").like(searchPattern))
+                .filter(Column("title").like(searchPattern, escape: "\\"))
                 .order(Column("title"))
                 .fetchAll(db)
         }

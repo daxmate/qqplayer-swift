@@ -38,30 +38,44 @@ class FileCleanupManager: ObservableObject {
 
         do {
             let tracks = try databaseManager.getAllTracks()
-            let removedTracks = tracks.filter { track in
+            // 两类移除原因分开：文件真没了 → 全量删除；仅格式不收录 → 只移除曲目行
+            // （D7：文件与用户数据都保留，勾回格式重扫即恢复）
+            let removals: [(track: Track, fileMissing: Bool)] = tracks.compactMap { track in
                 let trackURL = URL(fileURLWithPath: track.path).standardizedFileURL
                 let belongsToScannedRoot = roots.contains { isURL(trackURL, inside: $0) }
-                guard belongsToScannedRoot else { return false }
+                guard belongsToScannedRoot else { return nil }
                 let fileExists = FileManager.default.fileExists(atPath: trackURL.path)
                 if !fileExists {
-                    return true // 磁盘已删除
+                    return (track, true) // 磁盘已删除
                 }
                 // 文件在但扩展名被取消收录 → 从曲库移除（文件保留，勾回重扫恢复）
-                return !LibraryAudioFormats.isEnabled(path: track.path, enabled: enabledExtensions)
+                guard !LibraryAudioFormats.isEnabled(path: track.path, enabled: enabledExtensions) else {
+                    return nil
+                }
+                return (track, false)
             }
 
-            guard !removedTracks.isEmpty else {
+            guard !removals.isEmpty else {
                 print("🧹 Scan reconciliation found no deleted files")
                 return
             }
 
-            print("🧹 Scan reconciliation removing \(removedTracks.count) track(s) (missing file or format disabled)")
-            for track in removedTracks {
+            let missingCount = removals.filter { $0.fileMissing }.count
+            print("🧹 Scan reconciliation removing \(removals.count) track(s) (\(missingCount) missing file, \(removals.count - missingCount) format disabled)")
+            for removal in removals {
                 do {
-                    try databaseManager.deleteTrack(byStableId: track.stableId)
-                    print("🧹 Removed missing track: \(track.title)")
+                    if removal.fileMissing {
+                        try databaseManager.deleteTrack(byStableId: removal.track.stableId)
+                        print("🧹 Removed missing track: \(removal.track.title)")
+                    } else {
+                        // D7：取消收录的格式 → 文件与收藏/歌单/播放历史全部保留，
+                        // 只把曲目行从库中移除（重扫入库后同一 stableId 自动重新关联）。
+                        // 此前走的是全量 deleteTrack，勾回格式后收藏与歌单成员资格永久丢失。
+                        try databaseManager.removeTrackFromLibrary(byStableId: removal.track.stableId)
+                        print("🧹 Removed format-disabled track from library (file and references kept): \(removal.track.title)")
+                    }
                 } catch {
-                    print("🧹 Failed to remove missing track \(track.title): \(error)")
+                    print("🧹 Failed to remove missing track \(removal.track.title): \(error)")
                 }
             }
 
@@ -118,10 +132,9 @@ class FileCleanupManager: ObservableObject {
 
                                 // Update the track's path in the database
                                 do {
-                                    let newStableId = DatabaseManager.generatePathStableId(forPath: newURL.path)
-                                    try databaseManager.migrateTrackStableIdAndPath(
+                                    // 路径变更 = stableId 重算，走同一迁移入口（D5）
+                                    try databaseManager.migrateTrackForMovedFile(
                                         oldStableId: track.stableId,
-                                        newStableId: newStableId,
                                         newPath: newURL.path
                                     )
                                     print("🧹 ✅ Updated path for: \(filename)")
@@ -205,9 +218,18 @@ class FileCleanupManager: ObservableObject {
         return await checkBookmarkAccessibility(for: fileURL, stableId: stableId)
     }
 
+    /// 书签解析结果：**必须区分「没有书签」与「书签读不出来」**（D2）。
+    /// 前者是事实（可据此判定文件真没了），后者是未知——清理路径必须保守保留曲目。
+    private enum BookmarkResolution {
+        case resolved(URL)
+        case missing
+        case unknown(Error)
+    }
+
     private func checkBookmarkAccessibility(for fileURL: URL, stableId: String) async -> Bool {
         // Check document picker bookmarks (now using stableId as key)
-        if let resolvedURL = await resolveDocumentPickerBookmark(for: stableId) {
+        switch await resolveDocumentPickerBookmark(for: stableId) {
+        case .resolved(let resolvedURL):
             // Bookmark found! Check if file is still accessible
             if resolvedURL.path != fileURL.path {
                 print("🧹     File has been moved from \(fileURL.path) to \(resolvedURL.path) - bookmark is tracking it ✅")
@@ -219,6 +241,15 @@ class FileCleanupManager: ObservableObject {
                 print("🧹     External file is accessible via bookmark ✅")
             }
             return isAccessible
+
+        case .unknown(let error):
+            // D2：书签 plist 在但读不出来 = 未知，**绝不能当作“无书签”去删曲目**
+            // （一次非原子写的截断曾让全部书签不可解析 → 库里外部文件被批量误删）。
+            print("🧹     ⚠️ Bookmark store unreadable - keeping track conservatively: \(error)")
+            return true
+
+        case .missing:
+            break
         }
 
         // Check share extension bookmarks (legacy - should be migrated)
@@ -233,38 +264,42 @@ class FileCleanupManager: ObservableObject {
         return false
     }
 
-    private func resolveDocumentPickerBookmark(for stableId: String) async -> URL? {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let bookmarksURL = documentsURL.appendingPathComponent("ExternalFileBookmarks.plist")
-
-        guard FileManager.default.fileExists(atPath: bookmarksURL.path) else {
+    private func resolveDocumentPickerBookmark(for stableId: String) async -> BookmarkResolution {
+        guard let store = ExternalFileBookmarkStore.default else {
             print("🧹     No document picker bookmarks file found")
-            return nil
+            return .missing
+        }
+
+        let bookmarks: [String: Data]
+        switch store.load() {
+        case .loaded(let loaded):
+            bookmarks = loaded
+        case .unreadable(let error):
+            return .unknown(error)
+        }
+
+        guard let bookmarkData = bookmarks[stableId] else {
+            print("🧹     No bookmark found for stableId: \(stableId)")
+            return .missing
         }
 
         do {
-            let data = try Data(contentsOf: bookmarksURL)
-            guard let bookmarks = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Data],
-                  let bookmarkData = bookmarks[stableId] else {
-                print("🧹     No bookmark found for stableId: \(stableId)")
-                return nil
-            }
-
             var isStale = false
             let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
 
             if isStale {
                 print("🧹     Document picker bookmark is STALE for stableId: \(stableId)")
                 print("🧹     Resolved path: \(resolvedURL.path)")
-                return nil
+                // 同 D2 的“不确定不删”原则：stale = 位置信息需刷新，不是“文件没了”。
+                // 仍返回解析结果，由调用方的可访问性探测决定去留（探测不过才删）。
             }
 
             print("🧹     Document picker bookmark resolved successfully for stableId: \(stableId)")
             print("🧹     Resolved path: \(resolvedURL.path)")
-            return resolvedURL
+            return .resolved(resolvedURL)
         } catch {
             print("🧹     Failed to resolve document picker bookmark: \(error)")
-            return nil
+            return .missing
         }
     }
 

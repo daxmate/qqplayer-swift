@@ -186,31 +186,18 @@ struct LibraryView: View {
     }
 
     private func storeBookmarkData(_ bookmarkData: Data, for url: URL) async {
-        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("❌ Failed to resolve documents directory")
+        // 书签唯一入口：原子写（此前是原地截断写，被杀即整份书签不可解析，见审计 🔴-2）
+        guard let store = ExternalFileBookmarkStore.default else {
+            print("Failed to resolve documents directory")
             return
         }
-        let bookmarksURL = documentsURL.appendingPathComponent("ExternalFileBookmarks.plist")
 
         do {
-            // Load existing bookmarks or create new dictionary
-            var bookmarks: [String: Data] = [:]
-            if FileManager.default.fileExists(atPath: bookmarksURL.path) {
-                if let data = try? Data(contentsOf: bookmarksURL),
-                   let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Data] {
-                    bookmarks = plist
-                }
-            }
-
             // Generate stableId for this file
             let stableId = try libraryIndexer.generateStableId(for: url)
 
             // Store bookmark using stableId as key (survives file moves)
-            bookmarks[stableId] = bookmarkData
-
-            // Save updated bookmarks
-            let plistData = try PropertyListSerialization.data(fromPropertyList: bookmarks, format: .xml, options: 0)
-            try plistData.write(to: bookmarksURL)
+            try store.upsert(bookmarkData, forStableId: stableId)
 
             print("Stored bookmark for external file: \(url.lastPathComponent) with stableId: \(stableId)")
         } catch {
