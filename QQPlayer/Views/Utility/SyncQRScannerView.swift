@@ -79,6 +79,8 @@ struct SyncQRScannerView: View {
                     .ignoresSafeArea()
                 if controller.denied {
                     cameraDeniedOverlay
+                } else if controller.failed {
+                    cameraFailedOverlay
                 } else if !controller.isRunning {
                     ProgressView()
                         .tint(.white)
@@ -115,6 +117,27 @@ struct SyncQRScannerView: View {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
+            }
+            .buttonStyle(.bordered)
+            .tint(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.black.opacity(0.75))
+    }
+
+    /// 相机配置失败（输入/输出加不进去）：修前是静默 return，页面永远停在 ProgressView。
+    private var cameraFailedOverlay: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 36))
+                .foregroundStyle(.white.opacity(0.9))
+            Text("sync_camera_unavailable".localized)
+                .font(.callout)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            Button("sync_connect_retry".localized) {
+                controller.retry()
             }
             .buttonStyle(.bordered)
             .tint(.white)
@@ -449,6 +472,8 @@ enum SyncPairOutcome: Equatable {
 final class SyncScannerController: NSObject, ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var denied = false
+    /// 相机输入/输出配置失败（修前静默 return → 扫描页永远停在 ProgressView）
+    @Published private(set) var failed = false
 
     /// 扫到二维码文本（主线程回调）
     var onCode: (@MainActor (String) -> Void)?
@@ -486,9 +511,15 @@ final class SyncScannerController: NSObject, ObservableObject {
 
     /// 恢复扫描。
     func resume() {
-        guard !session.isRunning, !denied else { return }
+        guard !session.isRunning, !denied, !failed else { return }
         session.startRunning()
         isRunning = session.isRunning
+    }
+
+    /// 配置失败后重试（相机可能被其它 App 占用后释放，或输出类型暂时不可用）。
+    func retry() {
+        failed = false
+        configureAndRun()
     }
 
     func stop() {
@@ -507,11 +538,19 @@ final class SyncScannerController: NSObject, ObservableObject {
             denied = true
             return
         }
-        guard session.canAddInput(input) else { return }
+        guard session.canAddInput(input) else {
+            // 修前静默 return → 页面无任何反馈（扫不下去也退不出）
+            failed = true
+            return
+        }
         session.addInput(input)
 
         let output = AVCaptureMetadataOutput()
-        guard session.canAddOutput(output) else { return }
+        guard session.canAddOutput(output) else {
+            session.removeInput(input)
+            failed = true
+            return
+        }
         session.addOutput(output)
         output.setMetadataObjectsDelegate(self, queue: metadataQueue)
         if output.availableMetadataObjectTypes.contains(.qr) {

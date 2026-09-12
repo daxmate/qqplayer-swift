@@ -5,6 +5,8 @@ struct AlbumsScreen: View {
     let allTracks: [Track]
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var albums: [Album] = []
+    /// albumId → 曲目索引：卡片渲染不再对全库做线性 filter（修前每张卡片每次重绘一次 O(n) 扫描）
+    @State private var tracksByAlbumId: [Int64: [Track]] = [:]
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
@@ -28,7 +30,7 @@ struct AlbumsScreen: View {
                                     AlbumDetailScreen(album: album, allTracks: allTracks)
                                 } label: {
                                     AlbumCardView(album: album,
-                                                  tracks: getAlbumTracks(album))
+                                                  tracks: albumTracks(album))
                                         .frame(maxWidth: .infinity, alignment: .topLeading)
                                 }
                                 .buttonStyle(.plain)
@@ -51,8 +53,16 @@ struct AlbumsScreen: View {
         }
     }
 
-    private func getAlbumTracks(_ album: Album) -> [Track] {
-        allTracks.filter { $0.albumId == album.id }
+    /// 预取索引：一次遍历建好 albumId → tracks（替代每张卡片的 allTracks.filter）
+    private func rebuildAlbumTrackIndex() {
+        tracksByAlbumId = Dictionary(grouping: allTracks.compactMap { track in
+            track.albumId.map { ($0, track) }
+        }, by: { $0.0 }).mapValues { $0.map(\.1) }
+    }
+
+    private func albumTracks(_ album: Album) -> [Track] {
+        guard let albumId = album.id else { return [] }
+        return tracksByAlbumId[albumId] ?? []
     }
 
     private func loadAlbums() {
@@ -61,6 +71,7 @@ struct AlbumsScreen: View {
         } catch {
             print("Failed to load albums: \(error)")
         }
+        rebuildAlbumTrackIndex()
     }
 }
 
@@ -294,7 +305,7 @@ struct AlbumDetailScreen: View {
                                 // Disc header (only show if multiple discs)
                                 if hasMultipleDiscs {
                                     HStack {
-                                        Text("Disc \(disc.discNumber)")
+                                        Text("disc_number".localized(with: disc.discNumber))
                                             .font(.headline)
                                             .foregroundColor(.secondary)
                                         Spacer()
@@ -571,10 +582,10 @@ struct AlbumTrackRowView: View {
                 .accentColor(deleteSettings.backgroundColorChoice.color)
         }
         .alert(Localized.deleteFile, isPresented: $showDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
+            Button(Localized.delete, role: .destructive) {
                 deleteFile()
             }
-            Button("Cancel", role: .cancel) { }
+            Button(Localized.cancel, role: .cancel) { }
         } message: {
             Text(Localized.deleteFileConfirmation(track.title))
         }

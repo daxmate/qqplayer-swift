@@ -17,10 +17,10 @@ struct ArtistsScreen: View {
                             .font(.system(size: 40))
                             .foregroundColor(.secondary)
 
-                        Text("No artists found")
+                        Text(Localized.noArtistsFound)
                             .font(.headline)
 
-                        Text("Artists will appear here once you add music to your library")
+                        Text(Localized.artistsWillAppear)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)

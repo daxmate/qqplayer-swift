@@ -142,10 +142,10 @@ final class IntentPlaybackService {
     }
 
     /// Idempotent like/unlike — only toggles when the state actually changes.
+    /// The behaviour本身 lives on AppCoordinator.setFavorite so views and intents
+    /// share one entry point (audit B5 · 🔴-1).
     func setFavorite(trackStableId: String, isFavorite wanted: Bool) throws {
-        if try coordinator.isFavorite(trackStableId: trackStableId) != wanted {
-            try coordinator.toggleFavorite(trackStableId: trackStableId)
-        }
+        try coordinator.setFavorite(trackStableId: trackStableId, isFavorite: wanted)
     }
 
     /// Returns false when the track was already in the playlist.

@@ -21,6 +21,8 @@
 "playlist" = "Playlist";
 "songs_count_singular" = "%d musique";
 "songs_count_plural" = "%d musiques";
+"albums_count_singular" = "%d album";
+"albums_count_plural" = "%d albums";
 "created_date" = "Créée le %@";
 "no_songs_found" = "Aucune musique trouvée";
 "your_music_will_appear_here" = "Pour ajouter vos musiques :\n\n1. Ouvrez l\'app Fichiers (ou appuyez sur \'Ouvrir Fichiers\')\n2. Allez dans \'Sur mon iPhone\' → QQPlayer\n3. Copiez vos musiques dans ce dossier";
@@ -55,11 +57,13 @@
 /* Artist/Album/Track Info */
 "no_artists_found" = "Aucun artiste trouvé";
 "artists_will_appear" = "Les artistes apparaîtront ici une fois que vous ajouterez de la musique à votre bibliothèque";
+"fetching_artist_info" = "Récupération des informations de l'artiste...";
 "no_albums_found" = "Aucun album trouvé";
 "albums_will_appear" = "Les albums apparaîtront ici une fois que vous ajouterez de la musique à votre bibliothèque";
 "artist" = "Artiste";
 "album" = "Album";
 "track_number" = "%d";
+"disc_number" = "Disque %d";
 "play" = "Lecture";
 "shuffle" = "Aléatoire";
 "wrong_artist" = "Mauvais artiste ?";
@@ -326,6 +330,7 @@
 "failed_to_create" = "Échec de la création : %@";
 "failed_to_export" = "Échec de l'exportation du préréglage";
 "failed_to_delete" = "Échec de la suppression du préréglage";
+"failed_to_save" = "Échec de l'enregistrement des modifications";
 
 /* EQ Band Information */
 "band_count_info" = "%d bandes (réduites de %d)";
@@ -541,6 +546,38 @@
 "lyrics_loading" = "Chargement des paroles…";
 "instrumental_no_lyrics" = "Instrumental, sans paroles";
 "no_lyrics" = "Pas de paroles";
+
+/* Karaoké, mini-paroles et recherche de paroles (B5 : ajouté au fr) */
+"karaoke_play" = "Lecture";
+"karaoke_pause" = "Pause";
+"karaoke_previous_line" = "Ligne précédente";
+"karaoke_next_line" = "Ligne suivante";
+"karaoke_single_line_loop" = "Boucle sur une ligne";
+"karaoke_ab_loop" = "Boucle AB";
+"karaoke_ab_loop_hint" = "Touchez pour définir la ligne courante comme début, touchez une ligne de paroles pour la fin ; touchez à nouveau pour quitter";
+"karaoke_ab_end_hint" = "Touchez les paroles pour définir la fin AB";
+"karaoke_speed_label" = "Vitesse %.1f";
+"lyrics_mini_loading" = "Chargement des paroles…";
+"lyrics_mini_none" = "Pas de paroles";
+"lyrics_search_title" = "Recherche de paroles";
+"lyrics_search_close" = "Fermer la recherche de paroles";
+"lyrics_search_song_title" = "Titre de la chanson";
+"lyrics_search_artist" = "Artiste (facultatif)";
+"lyrics_search_button" = "Rechercher";
+"lyrics_search_manual_active" = "Paroles définies manuellement";
+"lyrics_search_restore_auto" = "Rétablir l'automatique";
+"lyrics_search_searching" = "Recherche…";
+"lyrics_search_no_results" = "Aucune parole trouvée. Essayez un autre titre ou artiste.";
+"lyrics_search_translation_badge" = "T";
+"lyrics_search_has_translation" = "Contient une traduction en chinois";
+"lyrics_search_enter_title" = "Saisissez un titre de chanson";
+"lyrics_search_apply_failed" = "Échec de l'application. Réessayez.";
+"lyrics_empty_loading_title" = "Chargement des paroles";
+"lyrics_empty_loading_subtitle" = "Recherche dans les métadonnées et les sources en ligne";
+"lyrics_empty_instrumental_title" = "Instrumental";
+"lyrics_empty_instrumental_subtitle" = "Ce morceau n'a pas de paroles";
+"lyrics_empty_not_found_title" = "Aucune parole disponible";
+"lyrics_empty_not_found_subtitle" = "Paroles introuvables pour ce morceau";
 "track_count" = "%d pistes";
 "search_placeholder" = "Rechercher dans votre bibliothèque";
 "search_clear" = "Effacer la recherche";
@@ -568,6 +605,11 @@
 "playlist_manage_rename" = "Renommer";
 "playlist_manage_remove_from_playlist" = "Retirer de la playlist";
 "playlist_manage_empty" = "Cette playlist est vide";
+
+/* Pochette de playlist (B5 : ajouté au fr) */
+"playlist_cover" = "Pochette de la playlist";
+"change_cover_image" = "Changer l'image de pochette";
+"remove_custom_cover" = "Supprimer la pochette personnalisée";
 "play_order_sequential" = "Lecture séquentielle";
 "play_order_shuffle" = "Lecture aléatoire";
 "play_order_repeat_all" = "Répéter tout";
@@ -606,11 +648,28 @@
 "quark_login_success" = "Connecté en tant que %@";
 "quark_login_retrying" = "Nouvelle tentative de téléchargement…";
 
+/* Historique de recherche en ligne (B5 : ajouté au fr) */
+"online_search_history_title" = "Recherches récentes";
+"online_search_clear_history" = "Effacer";
+"online_search_history_delete_help" = "Supprimer cette entrée";
+
 
 /* C-group: search anything + settings download */
 "settings_category_download" = "Téléchargement";
 "settings_download_quality" = "Qualité de téléchargement";
 "settings_download_hint" = "Qualité par défaut des téléchargements en ligne. Les fichiers sont enregistrés dans votre dossier musical (par défaut ~/Music/QQPlayer) et apparaissent automatiquement dans la bibliothèque.";
+
+/* Réglages de téléchargement (B5 : ajouté au fr) */
+"settings_download_quark_quality" = "Qualité SongSea";
+"settings_download_engine" = "Moteur de téléchargement";
+"settings_download_engine_builtin" = "Intégré";
+"settings_download_engine_aria2" = "aria2";
+"settings_download_engine_hint" = "Intégré = téléchargement direct ; aria2 = confié à aria2";
+"settings_download_aria2_rpc" = "Adresse RPC aria2";
+"settings_download_aria2_secret" = "Secret aria2";
+"settings_download_aria2_secret_placeholder" = "Saisissez le secret RPC (facultatif)";
+"settings_download_max_speed" = "Limite de vitesse (Mo/s)";
+"settings_download_max_speed_hint" = "0 = illimité";
 "settings_quality_standard" = "128 kbit/s";
 "settings_quality_exhigh" = "320 kbit/s";
 "settings_quality_lossless" = "Sans perte";
@@ -747,6 +806,7 @@
 "sync_scan_hint" = "Visez le code QR affiché dans Synchronisation sur votre Mac.";
 "sync_scan_subhint" = "Le code contient le nom du Mac et son empreinte de sécurité. Rien n'est envoyé avant votre confirmation.";
 "sync_camera_denied" = "L'accès à la caméra est nécessaire pour scanner les codes d'appairage. Autorisez-le dans Réglages.";
+"sync_camera_unavailable" = "Appareil photo indisponible";
 "sync_open_settings" = "Ouvrir les réglages";
 "sync_confirm_pair_title" = "Confirmer l'appairage";
 "sync_confirm_pair_caption" = "Vous appairez avec cet appareil";

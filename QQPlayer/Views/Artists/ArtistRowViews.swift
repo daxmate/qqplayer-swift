@@ -9,7 +9,6 @@ struct ArtistTrackRowView: View {
     @State private var showDeleteConfirmation = false
     @State private var deleteSettings = DeleteSettings.load()
     @State private var artworkImage: UIImage?
-    @State private var isPressed = false
     @State private var isMenuInteracting = false
 
     var body: some View {
@@ -110,16 +109,9 @@ struct ArtistTrackRowView: View {
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
         .onTapGesture {
+            // isPressed 已于 2026-09-12 审计 B5 删除：它只写不读，按下反馈从未生效（死状态）
             if !isMenuInteracting {
-                withAnimation(.easeOut(duration: 0.1)) {
-                    isPressed = true
-                }
                 onTap()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
-                    withAnimation(.easeOut(duration: 0.08)) {
-                        isPressed = false
-                    }
-                }
             }
         }
         .onAppear {

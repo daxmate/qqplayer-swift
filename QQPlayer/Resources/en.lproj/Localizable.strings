@@ -21,6 +21,8 @@
 "playlist" = "Playlist";
 "songs_count_singular" = "%d song";
 "songs_count_plural" = "%d songs";
+"albums_count_singular" = "%d album";
+"albums_count_plural" = "%d albums";
 "created_date" = "Created %@";
 "no_songs_found" = "No songs found";
 "your_music_will_appear_here" = "To add your music:\n\n1. Open the Files app (or tap \'Add Songs\')\n2. Go to \'On My iPhone\' → QQPlayer\n3. Copy your music files into that folder";
@@ -67,11 +69,13 @@
 /* Artist/Album/Track Info */
 "no_artists_found" = "No artists found";
 "artists_will_appear" = "Artists will appear here once you add music to your library";
+"fetching_artist_info" = "Fetching artist info...";
 "no_albums_found" = "No albums found";
 "albums_will_appear" = "Albums will appear here once you add music to your library";
 "artist" = "Artist";
 "album" = "Album";
 "track_number" = "%d";
+"disc_number" = "Disc %d";
 "play" = "Play";
 "shuffle" = "Shuffle";
 "wrong_artist" = "Wrong artist?";
@@ -338,6 +342,7 @@
 "failed_to_create" = "Failed to create: %@";
 "failed_to_export" = "Failed to export preset";
 "failed_to_delete" = "Failed to delete preset";
+"failed_to_save" = "Failed to save changes";
 
 /* EQ Band Information */
 "band_count_info" = "%d bands (reduced from %d)";
@@ -559,6 +564,38 @@
 "lyrics_loading" = "Loading lyrics…";
 "instrumental_no_lyrics" = "Instrumental, no lyrics";
 "no_lyrics" = "No lyrics";
+
+/* Karaoke, mini lyrics & lyrics search (B5: added to en) */
+"karaoke_play" = "Play";
+"karaoke_pause" = "Pause";
+"karaoke_previous_line" = "Previous line";
+"karaoke_next_line" = "Next line";
+"karaoke_single_line_loop" = "Single-line loop";
+"karaoke_ab_loop" = "AB Loop";
+"karaoke_ab_loop_hint" = "Tap to set the current line as the start, tap a lyric line for the end; tap again to exit";
+"karaoke_ab_end_hint" = "Tap lyrics to set the AB end";
+"karaoke_speed_label" = "Speed %.1f";
+"lyrics_mini_loading" = "Loading lyrics…";
+"lyrics_mini_none" = "No lyrics";
+"lyrics_search_title" = "Lyrics Search";
+"lyrics_search_close" = "Close lyrics search";
+"lyrics_search_song_title" = "Song title";
+"lyrics_search_artist" = "Artist (optional)";
+"lyrics_search_button" = "Search";
+"lyrics_search_manual_active" = "Lyrics set manually";
+"lyrics_search_restore_auto" = "Restore automatic";
+"lyrics_search_searching" = "Searching…";
+"lyrics_search_no_results" = "No lyrics found. Try a different title or artist.";
+"lyrics_search_translation_badge" = "T";
+"lyrics_search_has_translation" = "Includes Chinese translation";
+"lyrics_search_enter_title" = "Enter a song title";
+"lyrics_search_apply_failed" = "Failed to apply. Please try again.";
+"lyrics_empty_loading_title" = "Loading Lyrics";
+"lyrics_empty_loading_subtitle" = "Fetching from metadata and online sources";
+"lyrics_empty_instrumental_title" = "Instrumental";
+"lyrics_empty_instrumental_subtitle" = "This track has no lyrics";
+"lyrics_empty_not_found_title" = "No Lyrics Available";
+"lyrics_empty_not_found_subtitle" = "Lyrics not found for this track";
 "track_count" = "%d tracks";
 "search_placeholder" = "Search your library";
 "search_clear" = "Clear search";
@@ -574,6 +611,11 @@
 "playlist_manage_rename" = "Rename";
 "playlist_manage_remove_from_playlist" = "Remove from Playlist";
 "playlist_manage_empty" = "This playlist is empty";
+
+/* Playlist cover (B5: added to en) */
+"playlist_cover" = "Playlist Cover";
+"change_cover_image" = "Change Cover Image";
+"remove_custom_cover" = "Remove Custom Cover";
 
 // MARK: - Move to Trash (macOS)
 "move_to_trash" = "Move to Trash";
@@ -608,11 +650,28 @@
 "quark_login_success" = "Signed in as %@";
 "quark_login_retrying" = "Retrying download…";
 
+/* Online search history (B5: added to en) */
+"online_search_history_title" = "Recent Searches";
+"online_search_clear_history" = "Clear";
+"online_search_history_delete_help" = "Delete this entry";
+
 
 /* C-group: search anything + settings download (web SearchAnything/settings parity) */
 "settings_category_download" = "Download";
 "settings_download_quality" = "Download Quality";
 "settings_download_hint" = "Default quality for online downloads. Files are saved to your music folder (default ~/Music/QQPlayer) and appear in the library automatically.";
+
+/* Download settings (B5: added to en) */
+"settings_download_quark_quality" = "SongSea quality";
+"settings_download_engine" = "Download engine";
+"settings_download_engine_builtin" = "Built-in";
+"settings_download_engine_aria2" = "aria2";
+"settings_download_engine_hint" = "Built-in = download directly; aria2 = hand off to aria2";
+"settings_download_aria2_rpc" = "aria2 RPC address";
+"settings_download_aria2_secret" = "aria2 secret";
+"settings_download_aria2_secret_placeholder" = "Enter the RPC secret (optional)";
+"settings_download_max_speed" = "Speed limit (MB/s)";
+"settings_download_max_speed_hint" = "0 = unlimited";
 "settings_quality_standard" = "128 kbps";
 "settings_quality_exhigh" = "320 kbps";
 "settings_quality_lossless" = "Lossless";
@@ -749,6 +808,7 @@
 "sync_scan_hint" = "Point the camera at the QR code shown in Sync on your Mac.";
 "sync_scan_subhint" = "The code carries the Mac's name and security fingerprint. Nothing is sent until you confirm.";
 "sync_camera_denied" = "Camera access is needed to scan pairing codes. Allow it in Settings to continue.";
+"sync_camera_unavailable" = "Camera unavailable";
 "sync_open_settings" = "Open Settings";
 "sync_confirm_pair_title" = "Confirm Pairing";
 "sync_confirm_pair_caption" = "You are pairing with this device";

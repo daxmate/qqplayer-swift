@@ -40,8 +40,10 @@ struct SearchResultsView: View {
     let results: SearchResults
     let selectedCategory: SearchCategory
     let allTracks: [Track]
-    /// 关闭搜索 sheet 后（等待完全收起）再导航/播放；0.5s 固定延时 hack 的替代
-    let onDismiss: () async -> Void
+    /// 关闭搜索 sheet（同步发起，不等收起动画）：`dismiss()` 本身不提供"已收起"回调，
+    /// 修前声明成 `() async -> Void` + `await` 是假等待（await 立即返回）。
+    /// 需要"真等待"的地方不要在视图层猜，改用状态驱动的导航（本仓既有做法）。
+    let onDismiss: () -> Void
     let onNavigateToArtist: (Artist, [Track]) -> Void
     let onNavigateToAlbum: (Album, [Track]) -> Void
     let onNavigateToPlaylist: (Playlist) -> Void
@@ -214,7 +216,7 @@ struct SearchSongRowView: View {
     let track: Track
     let allTracks: [Track]
     let artistName: String?
-    let onDismiss: () async -> Void
+    let onDismiss: () -> Void
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @StateObject private var playerEngine = PlayerEngine.shared
     @State private var settings = DeleteSettings.load()
@@ -366,8 +368,8 @@ struct SearchSongRowView: View {
             )
             .contentShape(Rectangle())
             .onTapGesture {
+                onDismiss()
                 Task {
-                    await onDismiss()
                     // Only queue the selected song from search
                     await appCoordinator.playTrack(track, queue: [track])
                 }
@@ -487,7 +489,7 @@ struct SearchSongRowView: View {
 
 struct SearchArtistRowView: View {
     let artist: Artist
-    let onDismiss: () async -> Void
+    let onDismiss: () -> Void
     let onNavigate: (Artist, [Track]) -> Void
 
     var body: some View {
@@ -498,10 +500,8 @@ struct SearchArtistRowView: View {
             } else {
                 artistTracks = []
             }
-            Task {
-                await onDismiss()
-                onNavigate(artist, artistTracks)
-            }
+            onDismiss()
+            onNavigate(artist, artistTracks)
         }) {
             HStack(spacing: 12) {
                 Image(systemName: "person.circle.fill")
@@ -538,7 +538,7 @@ struct SearchArtistRowView: View {
 
 struct SearchArtistAlbumsRow: View {
     let artist: Artist
-    let onDismiss: () async -> Void
+    let onDismiss: () -> Void
     let onNavigateToAlbum: (Album, [Track]) -> Void
     @State private var artistAlbums: [Album] = []
     @State private var artistTracks: [Track] = []
@@ -551,10 +551,8 @@ struct SearchArtistAlbumsRow: View {
                         ForEach(artistAlbums, id: \.id) { album in
                             let albumTracks = artistTracks.filter { $0.albumId == album.id }
                             Button {
-                                Task {
-                                    await onDismiss()
-                                    onNavigateToAlbum(album, albumTracks)
-                                }
+                                onDismiss()
+                                onNavigateToAlbum(album, albumTracks)
                             } label: {
                                 SearchArtistAlbumCard(album: album, tracks: artistTracks)
                             }
@@ -631,7 +629,7 @@ struct SearchArtistAlbumsRow: View {
 struct SearchAlbumRowView: View {
     let album: Album
     let albumArtistName: String?
-    let onDismiss: () async -> Void
+    let onDismiss: () -> Void
     let onNavigate: (Album, [Track]) -> Void
     @State private var settings = DeleteSettings.load()
     @State private var artworkImage: UIImage?
@@ -639,10 +637,8 @@ struct SearchAlbumRowView: View {
 
     var body: some View {
         Button(action: {
-            Task {
-                await onDismiss()
-                onNavigate(album, albumTracks)
-            }
+            onDismiss()
+            onNavigate(album, albumTracks)
         }) {
             HStack(spacing: 12) {
                 // Album artwork
@@ -721,16 +717,14 @@ struct SearchAlbumRowView: View {
 
 struct SearchPlaylistRowView: View {
     let playlist: Playlist
-    let onDismiss: () async -> Void
+    let onDismiss: () -> Void
     let onNavigate: (Playlist) -> Void
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
         Button(action: {
-            Task {
-                await onDismiss()
-                onNavigate(playlist)
-            }
+            onDismiss()
+            onNavigate(playlist)
         }) {
             HStack(spacing: 12) {
                 Image(systemName: "music.note.list")

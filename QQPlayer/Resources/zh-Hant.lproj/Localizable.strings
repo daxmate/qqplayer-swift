@@ -42,6 +42,8 @@
 "songs_count_singular" = "%d 首歌曲";
 
 "songs_count_plural" = "%d 首歌曲";
+"albums_count_singular" = "%d 張專輯";
+"albums_count_plural" = "%d 張專輯";
 
 "created_date" = "建立於 %@";
 
@@ -122,6 +124,7 @@
 "no_artists_found" = "未找到藝術家";
 
 "artists_will_appear" = "添加音樂後，藝術家資訊將顯示在這裡";
+"fetching_artist_info" = "正在取得歌手資訊...";
 
 "no_albums_found" = "未找到專輯";
 
@@ -132,6 +135,7 @@
 "album" = "專輯";
 
 "track_number" = "音軌 %d";
+"disc_number" = "碟 %d";
 
 "play" = "播放";
 
@@ -511,6 +515,7 @@
 "failed_to_export" = "預設匯出失敗";
 
 "failed_to_delete" = "預設刪除失敗";
+"failed_to_save" = "儲存失敗";
 
 /* EQ Band Information */
 "band_count_info" = "%d 段 (已從 %d 段壓縮)";
@@ -938,6 +943,14 @@
 "lyrics_loading" = "歌詞載入中…";
 "instrumental_no_lyrics" = "純音樂，無歌詞";
 "no_lyrics" = "暫無歌詞";
+
+/* B5：歌詞空態/載入態 */
+"lyrics_empty_loading_title" = "正在載入歌詞";
+"lyrics_empty_loading_subtitle" = "從中繼資料與線上來源取得";
+"lyrics_empty_instrumental_title" = "純音樂";
+"lyrics_empty_instrumental_subtitle" = "本曲沒有歌詞";
+"lyrics_empty_not_found_title" = "暫無可用的歌詞";
+"lyrics_empty_not_found_subtitle" = "找不到本曲的歌詞";
 "track_count" = "%d 首";
 "search_placeholder" = "搜尋音樂庫";
 "search_clear" = "清除搜尋";
@@ -1144,6 +1157,7 @@
 "sync_scan_hint" = "將相機對準 Mac「同步」中顯示的二維碼。";
 "sync_scan_subhint" = "二維碼包含 Mac 的名稱與安全指紋；在您確認前不會傳送任何內容。";
 "sync_camera_denied" = "掃描配對碼需要相機權限。請在設定中允許後繼續。";
+"sync_camera_unavailable" = "相機無法使用";
 "sync_open_settings" = "開啟設定";
 "sync_confirm_pair_title" = "確認配對";
 "sync_confirm_pair_caption" = "您正在與此裝置配對";

@@ -62,7 +62,7 @@ struct QueueManagementView: View {
                                     index: index,
                                     isCurrentTrack: index == playerEngine.currentIndex,
                                     isDragging: draggedTrack?.stableId == track.stableId,
-                                    artistName: (try? DatabaseManager.shared.getArtistDisplayName(forTrackStableId: track.stableId, fallbackArtistId: track.artistId)) ?? track.artistId.flatMap { artistNameCache[$0] },
+                                    artistName: artistName(for: track),
                                     onTap: {
                                         jumpToTrack(at: index)
                                     }
@@ -98,6 +98,19 @@ struct QueueManagementView: View {
         } catch {
             print("Failed to load queue artist cache: \(error)")
         }
+    }
+
+    /// 歌手名：缓存优先、DB 兜底（与 TrackListView 的取用顺序一致）。
+    /// 修前是"先查库、查不到才用缓存"，onAppear 预载的缓存形同虚设，
+    /// 于是队列每行每次重绘都做一次同步 GRDB 读。
+    private func artistName(for track: Track) -> String? {
+        if let artistId = track.artistId, let cached = artistNameCache[artistId] {
+            return cached
+        }
+        return try? DatabaseManager.shared.getArtistDisplayName(
+            forTrackStableId: track.stableId,
+            fallbackArtistId: track.artistId
+        )
     }
 
     private func moveItems(from source: IndexSet, to destination: Int) {
@@ -244,12 +257,9 @@ struct QueueTrackRow: View {
             onTap()
         }
         .onAppear {
-            loadArtwork()
-        }
-        .task {
-            if artworkImage == nil {
-                loadArtwork()
-            }
+            // 单一加载点（与 TrackRowView / PlaylistTrackRowView 一致）：
+            // 修前同时挂 .onAppear 与 .task，首帧会重复发起两次缩略图请求
+            if artworkImage == nil { loadArtwork() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
             settings = DeleteSettings.load()

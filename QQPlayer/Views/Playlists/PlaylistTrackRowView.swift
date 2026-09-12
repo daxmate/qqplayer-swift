@@ -155,10 +155,10 @@ struct PlaylistTrackRowView: View {
                 .accentColor(deleteSettings.backgroundColorChoice.color)
         }
         .alert(Localized.deleteFile, isPresented: $showDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
+            Button(Localized.delete, role: .destructive) {
                 deleteFile()
             }
-            Button("Cancel", role: .cancel) { }
+            Button(Localized.cancel, role: .cancel) { }
         } message: {
             Text(Localized.deleteFileConfirmation(track.title))
         }

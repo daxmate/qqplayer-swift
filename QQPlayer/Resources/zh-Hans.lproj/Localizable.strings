@@ -21,6 +21,8 @@
 "playlist" = "播放列表";
 "songs_count_singular" = "%d 首歌曲";
 "songs_count_plural" = "%d 首歌曲";
+"albums_count_singular" = "%d 张专辑";
+"albums_count_plural" = "%d 张专辑";
 "created_date" = "创建于 %@";
 "no_songs_found" = "未找到歌曲";
 "your_music_will_appear_here" = "如何添加你的无损音乐：\n\n1. 打开 iOS 自带的「文件」App（或点击下方“打开文件”按钮）\n2. 进入「我的 iPhone」→「QQPlayer」\n3. 将你的音乐文件移动或拷贝到该文件夹中即可";
@@ -67,11 +69,13 @@
 /* Artist/Album/Track Info */
 "no_artists_found" = "未找到艺术家";
 "artists_will_appear" = "添加音乐后，艺术家信息将显示在这里";
+"fetching_artist_info" = "正在获取歌手信息...";
 "no_albums_found" = "未找到专辑";
 "albums_will_appear" = "添加音乐后，专辑信息将显示在这里";
 "artist" = "艺术家";
 "album" = "专辑";
 "track_number" = "音轨 %d";
+"disc_number" = "碟 %d";
 "play" = "播放";
 "shuffle" = "随机播放";
 "wrong_artist" = "艺术家信息有误？";
@@ -332,6 +336,7 @@
 "failed_to_create" = "创建失败: %@";
 "failed_to_export" = "预设导出失败";
 "failed_to_delete" = "预设删除失败";
+"failed_to_save" = "保存失败";
 
 /* EQ Band Information */
 "band_count_info" = "%d 段 (已从 %d 段压缩)";
@@ -595,6 +600,14 @@
 "lyrics_loading" = "歌词加载中…";
 "instrumental_no_lyrics" = "纯音乐，无歌词";
 "no_lyrics" = "暂无歌词";
+
+/* B5：歌词空态/加载态（原硬编码英文） */
+"lyrics_empty_loading_title" = "正在加载歌词";
+"lyrics_empty_loading_subtitle" = "从元数据与在线来源获取";
+"lyrics_empty_instrumental_title" = "纯音乐";
+"lyrics_empty_instrumental_subtitle" = "本曲没有歌词";
+"lyrics_empty_not_found_title" = "暂无可用的歌词";
+"lyrics_empty_not_found_subtitle" = "未找到本曲的歌词";
 "track_count" = "%d 首";
 "search_placeholder" = "搜索音乐库";
 "search_clear" = "清空搜索";
@@ -800,6 +813,7 @@
 "sync_scan_hint" = "将相机对准 Mac「同步」中显示的二维码。";
 "sync_scan_subhint" = "二维码包含 Mac 的名称与安全指纹；在您确认前不会发送任何内容。";
 "sync_camera_denied" = "扫描配对码需要相机权限。请在设置中允许后继续。";
+"sync_camera_unavailable" = "相机不可用";
 "sync_open_settings" = "打开设置";
 "sync_confirm_pair_title" = "确认配对";
 "sync_confirm_pair_caption" = "您正在与此设备配对";

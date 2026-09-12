@@ -44,7 +44,7 @@ struct TrackBulkActionsModifier: ViewModifier {
                                 Label(Localized.selectAll, systemImage: "checkmark.circle")
                             }
                             Divider()
-                            Button(action: { bulkToggleLiked() }) {
+                            Button(action: { bulkSetLiked() }) {
                                 Label(
                                     isLikedContext ? Localized.removeFromLiked : Localized.addToLiked,
                                     systemImage: "heart.fill"
@@ -100,27 +100,30 @@ struct TrackBulkActionsModifier: ViewModifier {
         selectedTracks = Set(tracks.map { $0.stableId })
     }
 
-    private func bulkToggleLiked() {
-        for trackId in selectedTracks {
-            if let track = tracks.first(where: { $0.stableId == trackId }) {
-                try? appCoordinator.toggleFavorite(trackStableId: track.stableId)
-            }
-        }
+    /// 批量收藏：文案即目标状态（「加入喜欢」= 全部设为已喜欢），幂等，不是逐曲取反。
+    private func bulkSetLiked() {
+        let selected = orderedSelection()
+        let desired = FavoriteBatchLogic.desiredState(isLikedContext: isLikedContext)
+        _ = try? appCoordinator.setFavorites(trackStableIds: selected.map(\.stableId), isFavorite: desired)
         exitBulkMode()
+    }
+
+    /// 选中曲目（按列表顺序，保持稳定；顺带避免逐个 O(n) first(where:)）
+    private func orderedSelection() -> [Track] {
+        let tracksByStableId = Dictionary(tracks.map { ($0.stableId, $0) }, uniquingKeysWith: { first, _ in first })
+        return selectedTracks.compactMap { tracksByStableId[$0] }
     }
 
     private func bulkDelete() {
         Task {
             let deleteSettings = DeleteSettings.load()
-            for trackId in selectedTracks {
-                if let track = tracks.first(where: { $0.stableId == trackId }) {
-                    if deleteSettings.deleteFromLibraryOnly {
-                        DeleteSettings.addExcludedTrack(track.stableId)
-                    } else {
-                        try? FileManager.default.removeItem(at: URL(fileURLWithPath: track.path))
-                    }
-                    try? DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
+            for track in orderedSelection() {
+                if deleteSettings.deleteFromLibraryOnly {
+                    DeleteSettings.addExcludedTrack(track.stableId)
+                } else {
+                    try? FileManager.default.removeItem(at: URL(fileURLWithPath: track.path))
                 }
+                try? DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
             }
             NotificationCenter.default.post(
                 name: NSNotification.Name("LibraryNeedsRefresh"),

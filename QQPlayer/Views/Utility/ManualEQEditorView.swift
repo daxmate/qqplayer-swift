@@ -17,9 +17,9 @@ struct CreateManualEQView: View {
                     TextField(Localized.enterPresetName, text: $presetName)
                 }
 
-                Section("Bands") {
+                Section(Localized.eqBands) {
                     Stepper(value: $bandCount, in: 0 ... 16) {
-                        Text("\(bandCount) / 16")
+                        Text(Localized.eqBandsCount(bandCount, 16))
                     }
                 }
 
@@ -33,17 +33,17 @@ struct CreateManualEQView: View {
 
                 Section(Localized.presetInfo) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Create a parametric EQ preset with up to 16 fully editable bands.")
+                        Text(Localized.eqCreateManualDescription)
                             .font(.caption)
                             .foregroundColor(.secondary)
 
-                        Text("You can edit frequency, gain, and Q for every band after creation.")
+                        Text(Localized.eqEditBandsHint)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
             }
-            .navigationTitle("Create Manual EQ")
+            .navigationTitle(Localized.eqCreateManual)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -120,13 +120,13 @@ struct ManualEQEditorView: View {
                             Text(preset.name)
                                 .font(.headline)
                             Spacer()
-                            Text("\(editableBandCount) / \(maxBands) bands")
+                            Text(Localized.eqBandsCount(editableBandCount, maxBands))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
 
-                    Section("Parametric Editor") {
+                    Section(Localized.eqParametricEditor) {
                         ParametricEQGraphView(
                             frequencies: $bandFrequencies,
                             gains: $bandGains,
@@ -139,13 +139,13 @@ struct ManualEQEditorView: View {
                         .frame(height: 260)
 
                         HStack {
-                            Button("Add Band") {
+                            Button(Localized.eqAddBand) {
                                 addBand()
                             }
                             .disabled(editableBandCount >= maxBands)
                             .buttonStyle(.bordered)
 
-                            Button("Remove Band") {
+                            Button(Localized.eqRemoveBand) {
                                 removeSelectedBand()
                             }
                             .disabled(editableBandCount == 0)
@@ -154,12 +154,12 @@ struct ManualEQEditorView: View {
                     }
 
                     if let selectedBandIndex, selectedBandIndex < editableBandCount {
-                        Section("Selected Band") {
-                            Text("Band \(selectedBandIndex + 1)")
+                        Section(Localized.eqSelectedBand) {
+                            Text(Localized.eqBandNumber(selectedBandIndex + 1))
                                 .font(.headline)
 
                             HStack {
-                                Text("Frequency")
+                                Text(Localized.eqFrequency)
                                 Spacer()
                                 Text(formatFrequency(bandFrequencies[selectedBandIndex]))
                                     .foregroundColor(.secondary)
@@ -174,7 +174,7 @@ struct ManualEQEditorView: View {
                             .tint(.orange)
 
                             HStack {
-                                Text("Gain")
+                                Text(Localized.eqGain)
                                 Spacer()
                                 Text("\(bandGains[selectedBandIndex], specifier: "%.1f") dB")
                                     .foregroundColor(.secondary)
@@ -183,7 +183,7 @@ struct ManualEQEditorView: View {
                                 .tint(.blue)
 
                             HStack {
-                                Text("Q")
+                                Text(Localized.eqQ)
                                 Spacer()
                                 Text("\(qFactor(fromBandwidth: bandBandwidths[selectedBandIndex]), specifier: "%.2f")")
                                     .foregroundColor(.secondary)
@@ -243,25 +243,20 @@ struct ManualEQEditorView: View {
             do {
                 let bands = try await eqManager.databaseManager.getBands(for: preset)
                 let sortedBands = bands.sorted { $0.bandIndex < $1.bandIndex }
-                let targetBandCount = sortedBands.count
 
                 await MainActor.run {
                     bandFrequencies = []
                     bandGains = []
                     bandBandwidths = []
 
-                    for index in 0 ..< targetBandCount {
-                        let defaultFrequency = defaultFrequencies(for: targetBandCount)[index]
-
-                        if index < sortedBands.count {
-                            bandFrequencies.append(max(minFrequency, min(maxFrequency, sortedBands[index].frequency)))
-                            bandGains.append(sortedBands[index].gain)
-                            bandBandwidths.append(max(0.05, min(5.0, sortedBands[index].bandwidth)))
-                        } else {
-                            bandFrequencies.append(defaultFrequency)
-                            bandGains.append(0.0)
-                            bandBandwidths.append(1.0)
-                        }
+                    // 跨层契约收口（审计 B5 · 🟡-11）：循环只按 sortedBands 自身下标取值。
+                    // 修前用 `defaultFrequencies(for: targetBandCount)[index]` 填默认值，
+                    // 而 Services 侧 EQManager.defaultParametricFrequencies 内部 clamp 到 16
+                    // （maxBands）→ DB 里 band 数 > 16 时下标 16 越界崩溃。
+                    for index in sortedBands.indices {
+                        bandFrequencies.append(max(minFrequency, min(maxFrequency, sortedBands[index].frequency)))
+                        bandGains.append(sortedBands[index].gain)
+                        bandBandwidths.append(max(0.05, min(5.0, sortedBands[index].bandwidth)))
                     }
 
                     selectedBandIndex = editableBandCount > 0 ? 0 : nil
@@ -350,8 +345,12 @@ struct ManualEQEditorView: View {
 
     private func resetToFlat() {
         let defaults = defaultFrequencies(for: editableBandCount)
+        // 防御：默认频率表长度由 Services 侧 clamp 决定，可能短于当前 band 数
+        // （审计 B5 · 🟡-11）——不越界，频率保留旧值、增益/Q 照常重置。
         for index in 0 ..< editableBandCount {
-            bandFrequencies[index] = defaults[index]
+            if index < defaults.count {
+                bandFrequencies[index] = defaults[index]
+            }
             bandGains[index] = 0.0
             bandBandwidths[index] = 1.0
         }
