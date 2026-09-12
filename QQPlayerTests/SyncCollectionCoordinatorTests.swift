@@ -71,8 +71,10 @@ private final class CoordinatorSinkSpy: SyncLibrarySyncSink, @unchecked Sendable
 
 @MainActor
 struct SyncCollectionCoordinatorTests {
-    /// 注入的极小超时（默认值 20s；用例只需「有界」）。
-    private static let tinyTimeout: TimeInterval = 0.5
+    /// 注入的「小」超时（默认值 20s；用例只需**有界**，不是性能断言）。
+    /// 取值 2s：要显著大于 CI 偶发线程饥饿量级（本仓库有秒级饥饿先例，0.5s 级
+    /// 注入会把「请求刚发出仍在计划态」这条即时读取变成耗时断言 → 假红）。
+    private static let tinyTimeout: TimeInterval = 2.0
     /// 轮询上限（宽松；不是耗时断言）。
     private static let waitLimit: TimeInterval = 10
 
@@ -189,7 +191,8 @@ struct SyncCollectionCoordinatorTests {
 
     // MARK: 等待 / 状态助手
 
-    /// 有界轮询到条件成立（宽松上限 10s）。**不是耗时断言**：条件本身才是契约。
+    /// 有界轮询到条件成立（宽松上限 10s，须大于 `tinyTimeout`）。**不是耗时断言**：
+    /// 条件本身才是契约。
     @discardableResult
     private func waitUntil(_ condition: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(Self.waitLimit)
@@ -281,8 +284,10 @@ struct SyncCollectionCoordinatorTests {
         // 账目完整：对端缺这条 → 推送且成功
         #expect(coordinator.report.pushed == [relativePath])
 
-        // 越过超时点之后复核（4 倍超时值）：到点检查必须被「仍在计划态」守卫挡住
-        Thread.sleep(forTimeInterval: Self.tinyTimeout * 4)
+        // 越过超时点之后复核：到点检查必须被「仍在计划态」守卫挡住。
+        // 只需跨过超时点即可（不再乘倍数，省 CI 时间）；这仍是「越过之后」的复核，
+        // 不是耗时断言 —— 断言的是越过之后的状态契约。
+        Thread.sleep(forTimeInterval: Self.tinyTimeout + 1.0)
         #expect(coordinator.state == .done)
         #expect(failureReason(coordinator.state) == nil)
         #expect(coordinator.report.pushed == [relativePath])
