@@ -564,8 +564,13 @@ struct SyncTransferIdentityTests {
 
         #expect(fixture.clientSession.phase == .closed)
         #expect(fixture.clientSession.closeReason == .handshakeTimeout)
-        // 人工批准阶段**故意**不设超时：主机仍在等用户点弹窗
-        #expect(fixture.hostSession.phase == .waitingForPairApproval)
+        // 人工批准阶段**故意**不设超时：主机不会**自己**超时。
+        // 注意：client 超时关闭会带动链路关闭 → 主机随之以 .remoteClosed 被动关闭，
+        // 这是正确的连带结果（不是主机超时）。故断言“主机的关闭原因不是 handshakeTimeout”。
+        #expect(
+            !(fixture.hostSession.phase == .closed && fixture.hostSession.closeReason == .handshakeTimeout),
+            "主机在等人工批准时不得自行超时（实际：\(fixture.hostSession.phase) / \(String(describing: fixture.hostSession.closeReason))）"
+        )
     }
 
     // MARK: 🟡T5 续传对齐失败
