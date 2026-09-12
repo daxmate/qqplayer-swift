@@ -119,6 +119,22 @@ private func settle(_ rounds: Int = 50) async {
     }
 }
 
+/// 轮询等待条件成立（超时即返回末次结果）。
+/// CI 慢机上「固定轮次 yield」不足以保证异步补齐已落库 → 用超时轮询替代，
+/// 语义仍是「等到补齐完成」，不引入 sleep 猜测。
+@MainActor
+private func waitUntil(
+    timeout: TimeInterval = 5,
+    _ condition: () -> Bool
+) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if condition() { return true }
+        await Task.yield()
+    }
+    return condition()
+}
+
 @MainActor
 struct MacLibraryFactsStoreTests {
     @Test("缓存未命中：body 侧读回默认值且不阻塞，补齐后读到真值")
@@ -127,11 +143,13 @@ struct MacLibraryFactsStoreTests {
         fake.setArtistCount(42, for: 7)
         let store = MacLibraryFactsStore(loader: fake.loader())
 
-        // 首次读：同步返回默认 0（修复前这里是同步 DB 查询），并调度异步补齐
+        // 首次读：同步返回默认 0（修复前这里是同步 DB 查询），不阻塞主线程
         #expect(store.artistTrackCount(forArtistId: 7) == 0)
-        #expect(fake.artistCalls == [7])
 
-        await settle()
+        // 补齐跑在后续的 Task 上（同 actor 的同步断言点必然还没执行取数，
+        // 修复前这里断言「立即已取数」是错的——CI 上必然失败）→ 等补齐完成再断言
+        let filled = await waitUntil { fake.artistCalls == [7] }
+        #expect(filled)
         #expect(store.artistTrackCount(forArtistId: 7) == 42)
         // 二次读命中缓存：不再取数
         #expect(fake.artistCalls == [7])
@@ -146,10 +164,11 @@ struct MacLibraryFactsStoreTests {
         for _ in 0 ..< 5 {
             _ = store.artistTrackCount(forArtistId: 3)
         }
-        #expect(fake.artistCalls == [3])
 
-        await settle()
+        #expect(await waitUntil { fake.artistCalls == [3] })
         #expect(store.artistTrackCount(forArtistId: 3) == 9)
+        // 5 次读只调度一次取数（inFlight 去重）
+        #expect(fake.artistCalls == [3])
     }
 
     @Test("专辑事实：标题/曲目数同次取数填充")
@@ -209,8 +228,7 @@ struct MacLibraryFactsStoreTests {
         let store = MacLibraryFactsStore(loader: fake.loader())
 
         _ = store.albumFacts(forAlbumId: 5) // 命中未缓存 → 调度（取数挂在门上）
-        await settle(5)
-        #expect(fake.albumCalls == [5]) // 已进入取数并在门上挂起
+        #expect(await waitUntil { fake.albumCalls == [5] }) // 已进入取数并在门上挂起
 
         store.invalidate() // 期间曲库已变
         fake.openGate() // 放行过期取数

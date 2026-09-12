@@ -93,6 +93,11 @@ struct MacSpectrumDSPTests {
         DispatchQueue.concurrentPerform(iterations: 8) { _ in
             _ = dsp.process(buffer: makeBuffer(amplitude: 0.3))
         }
-        #expect(dsp.process(buffer: makeBuffer()) != nil)
+        // 并发本身不崩即达标；随后要断言「还能正常出帧」必须避开发布节流——
+        // 并发帧可能刚发布过（间隔 < 1/30s 会返回 nil，与锁无关，CI 上必现）→
+        // 先 reset()（清空节流时间戳），再断言本帧必发布
+        dsp.reset()
+        let levels = dsp.process(buffer: makeBuffer())
+        #expect(levels?.count == MacSpectrumDSP.binCount)
     }
 }
