@@ -32,9 +32,9 @@ struct FavoriteBatchLogicTests {
     // MARK: - 幂等规划
 
     @Test("加入喜欢：混合选择时，已喜欢的曲目不得进入变更集合（修复前会被取反取消）")
-    func mixedSelectionKeepsAlreadyLiked() throws {
+    func mixedSelectionKeepsAlreadyLiked() {
         let liked = ["a", "c"]
-        let toChange = try FavoriteBatchLogic.stableIdsNeedingChange(
+        let toChange = FavoriteBatchLogic.stableIdsNeedingChange(
             ["a", "b", "c"],
             desired: true,
             isFavorite: { liked.contains($0) }
@@ -43,8 +43,8 @@ struct FavoriteBatchLogicTests {
     }
 
     @Test("加入喜欢：全部已喜欢 → 无需写库（幂等，无副作用）")
-    func allAlreadyLikedIsNoOp() throws {
-        let toChange = try FavoriteBatchLogic.stableIdsNeedingChange(
+    func allAlreadyLikedIsNoOp() {
+        let toChange = FavoriteBatchLogic.stableIdsNeedingChange(
             ["a", "b"],
             desired: true,
             isFavorite: { _ in true }
@@ -53,9 +53,9 @@ struct FavoriteBatchLogicTests {
     }
 
     @Test("移出喜欢：只变更当前已喜欢的曲目")
-    func unlikedRemovalTargetsOnlyLiked() throws {
+    func unlikedRemovalTargetsOnlyLiked() {
         let liked = ["b"]
-        let toChange = try FavoriteBatchLogic.stableIdsNeedingChange(
+        let toChange = FavoriteBatchLogic.stableIdsNeedingChange(
             ["a", "b", "c"],
             desired: false,
             isFavorite: { liked.contains($0) }
@@ -64,8 +64,8 @@ struct FavoriteBatchLogicTests {
     }
 
     @Test("空选择 → 空变更集合")
-    func emptySelection() throws {
-        let toChange = try FavoriteBatchLogic.stableIdsNeedingChange(
+    func emptySelection() {
+        let toChange = FavoriteBatchLogic.stableIdsNeedingChange(
             [],
             desired: true,
             isFavorite: { _ in false }
@@ -74,8 +74,8 @@ struct FavoriteBatchLogicTests {
     }
 
     @Test("重复 id 去重，且保持传入顺序")
-    func deduplicatesAndKeepsOrder() throws {
-        let toChange = try FavoriteBatchLogic.stableIdsNeedingChange(
+    func deduplicatesAndKeepsOrder() {
+        let toChange = FavoriteBatchLogic.stableIdsNeedingChange(
             ["b", "a", "b", "a", "c"],
             desired: true,
             isFavorite: { _ in false }
@@ -96,9 +96,9 @@ struct FavoriteBatchLogicTests {
     }
 
     @Test("查询次数 = 去重后的选择数（每个 id 只查一次）")
-    func queriesEachIdOnce() throws {
+    func queriesEachIdOnce() {
         var callCount = 0
-        _ = try FavoriteBatchLogic.stableIdsNeedingChange(
+        _ = FavoriteBatchLogic.stableIdsNeedingChange(
             ["a", "a", "b", "c", "c", "c"],
             desired: true,
             isFavorite: { _ in
