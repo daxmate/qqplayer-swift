@@ -502,7 +502,10 @@ struct SyncTransferIdentityTests {
         try sender.send(fileURL: sourceURL, fileID: "t4-timeout", name: "src.bin")
         #expect(sender.isActive) // 已发 meta，等 ack（对端无接收端 → 永远等不到）
 
-        try await Task.sleep(nanoseconds: 700_000_000)
+        // 等超时回调落地：轮询而非固定 sleep——CI runner 线程饥饿时，注入的 0.15s 定时器
+        // 可能远晚于标称时间才被调度，固定 sleep 会假失败（2026-09-12 CI 实测）。
+        let timedOut = await waitUntil { outcome.value != nil }
+        #expect(timedOut, "等待 file_ack 超时未在 10s 内落地")
 
         guard case let .failed(error)? = outcome.value else {
             Issue.record("期望超时失败，实际 \(String(describing: outcome.value))")
@@ -515,6 +518,24 @@ struct SyncTransferIdentityTests {
             Issue.record("期望 protocolError，实际 \(error)")
         }
         #expect(!sender.isActive) // 状态已清 → 可重试
+    }
+
+    /// CI 线程饥饿下的等待：轮询到条件成立（默认 10s 上限）。
+    ///
+    /// 为什么不用固定 `Task.sleep`：注入超时（0.15s/0.2s）虽短，但 CI runner 上定时器
+    /// 可能远晚于标称时间才被调度 → 固定 sleep 会假失败（2026-09-12 CI 实测）。
+    /// 条件始终不成立时返回 false，由调用方的 #expect 给出可读失败信息（真缺陷不被掩盖）。
+    @discardableResult
+    private func waitUntil(
+        timeout: TimeInterval = 10,
+        _ condition: () -> Bool
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        return condition()
     }
 
     @Test("🟡T4 等主机答复阶段有超时 → client 不再永久卡在「配对中」")
@@ -537,7 +558,9 @@ struct SyncTransferIdentityTests {
         #expect(fixture.clientSession.phase == .waitingForPairResponse)
         #expect(fixture.hostSession.phase == .waitingForPairApproval)
 
-        try await Task.sleep(nanoseconds: 800_000_000)
+        // 同上：轮询到 client 因握手超时关闭（CI 定时器调度可能远晚于标称 0.2s）
+        let closed = await waitUntil { fixture.clientSession.phase == .closed }
+        #expect(closed, "握手超时未在 10s 内关闭 client 会话")
 
         #expect(fixture.clientSession.phase == .closed)
         #expect(fixture.clientSession.closeReason == .handshakeTimeout)
