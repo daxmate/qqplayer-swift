@@ -1,0 +1,11 @@
+/*
+  InfoPlist.strings (繁體中文)
+  QQPlayer
+
+  Info.plist 權限提示文案在地化（QQPlayer/Info.plist）；
+  key 必須與 Info.plist 完全一致。
+  本檔由 zh-Hans 語意改寫，台灣用詞：裝置／區域網路／資料庫。
+*/
+
+"NSCameraUsageDescription" = "掃描 QR Code 以與您自己的 QQPlayer 裝置配對並同步（僅限您授權的配對操作）。";
+"NSLocalNetworkUsageDescription" = "用於發掘並連接同一區域網路內的 QQPlayer 裝置（Mac/Windows/NAS），以配對並同步音樂資料庫。";

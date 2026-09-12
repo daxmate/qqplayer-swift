@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  QQPlayerMac-Info.plist — macOS target 的 Info.plist 补充片段。
+
+  为什么需要这个文件（审计 2026-09-12 🟡-4）：
+  macOS target 用 GENERATE_INFOPLIST_FILE = YES 由构建设置生成 Info.plist。
+  但 `INFOPLIST_KEY_NSBonjourServices` **不是** Xcode 支持的 INFOPLIST_KEY_* 名字
+  （数组型键不在其允许清单内）——实测：加上该 build setting 后构建成功，
+  产物 QQPlayerMac.app/Contents/Info.plist 里依旧没有 NSBonjourServices
+  （同一批加上的字符串键 NSLocalNetworkUsageDescription 则正常出现）。
+  所以这里用显式 plist 文件承载数组键，再通过 INFOPLIST_FILE 与生成的键合并
+  （Xcode 13+：GENERATE_INFOPLIST_FILE=YES 且设置 INFOPLIST_FILE 时，生成的键
+  会合并进该文件；文件内同名键优先）。
+
+  值必须与 iOS 侧 QQPlayer/Info.plist 的 NSBonjourServices 保持一致，
+  且与 SyncListener.serviceType / SyncBrowser.serviceType 相同：
+    QQPlayer/Sync/SyncListener.swift:128  static let serviceType = "_qqplayer-sync._tcp"
+    QQPlayer/Sync/SyncBrowser.swift:28    static let serviceType = "_qqplayer-sync._tcp"
+  改了服务类型请同步改这三处。
+-->
+<plist version="1.0">
+<dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_qqplayer-sync._tcp</string>
+	</array>
+</dict>
+</plist>

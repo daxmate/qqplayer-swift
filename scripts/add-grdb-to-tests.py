@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """add-grdb-to-tests.py — 把 GRDB 框架链接进 QQPlayerTests target（一次性工具）。
 
+⚠️ 已废弃（审计 2026-09-12 ⚰️ 死代码）：目的已达成，无再执行场景。
+   QQPlayerTests 已具备 GRDB 依赖：
+     - project.pbxproj:1008  QQPlayerTests packageProductDependencies 含 23C312EB… /* GRDB */
+     - QQPlayerTests Frameworks phase 同样已加好
+   对本仓库再跑一次是幂等空操作（若重复执行可能产生重复条目，请勿执行）。
+   按子代理守则 §6（不得删文件）本批次**只登记不删除**，等待 maintainer 清理。
+   清理前请先确认全仓无引用：
+     grep -rn "add-grdb-to-tests" . --exclude-dir=.git --exclude-dir=build
+   （README 的 scripts/ 清单已标注本文件为遗留工具；如删除本文件请一并删该行。）
+
 QQPlayerTests 需要直接 `import GRDB`（内存库跑聚合查询测试），
 但该 target 没有 package 依赖。本脚本做 3 处最小修改：
   1. PBXBuildFile 新增 GRDB in Frameworks 条目（复用 SiriIntentsExtension 的 product 23C312EB）

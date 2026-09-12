@@ -1,0 +1,22 @@
+/*
+  AppShortcuts.strings (简体中文)
+  QQPlayer
+
+  QQPlayerAppShortcuts.swift 中 App Shortcuts 的 Siri 调用短语。
+  key 必须与英文短语完全一致（${applicationName} 为 App 名占位符），
+  仅 value 为本地化短语——与 en/fr/ru 三语同款做法。
+*/
+
+"Resume playback in ${applicationName}" = "在 ${applicationName} 中继续播放";
+"Resume my music in ${applicationName}" = "在 ${applicationName} 中继续播放我的音乐";
+"Continue playing in ${applicationName}" = "在 ${applicationName} 中继续收听";
+
+"Like this song in ${applicationName}" = "在 ${applicationName} 中收藏这首歌";
+"Add this song to favorites in ${applicationName}" = "在 ${applicationName} 中把这首歌添加到收藏";
+"Add this song to my favorites in ${applicationName}" = "在 ${applicationName} 中把这首歌添加到我的收藏";
+"Add this song to Liked Songs in ${applicationName}" = "在 ${applicationName} 中把这首歌添加到我喜欢";
+"Add the current song to favorites in ${applicationName}" = "在 ${applicationName} 中收藏当前歌曲";
+
+"Make me a mix in ${applicationName}" = "在 ${applicationName} 中给我做一个混音";
+"Generate a mix in ${applicationName}" = "在 ${applicationName} 中生成混音";
+"Play me something new in ${applicationName}" = "在 ${applicationName} 中播放点新歌";

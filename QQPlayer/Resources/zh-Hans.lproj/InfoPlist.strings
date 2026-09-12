@@ -1,0 +1,10 @@
+/*
+  InfoPlist.strings (简体中文)
+  QQPlayer
+
+  Info.plist 权限弹窗文案本地化（QQPlayer/Info.plist）；
+  key 必须与 Info.plist 完全一致。
+*/
+
+"NSCameraUsageDescription" = "扫描二维码以与您自己的 QQPlayer 设备配对并同步（仅限您授权的配对操作）。";
+"NSLocalNetworkUsageDescription" = "用于发现并连接同一局域网内的 QQPlayer 设备（Mac/Windows/NAS），以配对并同步音乐库。";

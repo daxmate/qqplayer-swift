@@ -1,0 +1,11 @@
+/*
+  InfoPlist.strings (English)
+  QQPlayer
+
+  Localizes Info.plist permission prompts (QQPlayer/Info.plist).
+  Keys must match the Info.plist keys exactly; changing a key here without
+  changing Info.plist (or vice versa) silently falls back to the base string.
+*/
+
+"NSCameraUsageDescription" = "Scan a QR code to pair with your own QQPlayer devices and sync (only for pairing you authorize).";
+"NSLocalNetworkUsageDescription" = "Used to discover and connect QQPlayer devices (Mac/Windows/NAS) on the same local network, so you can pair and sync your music library.";

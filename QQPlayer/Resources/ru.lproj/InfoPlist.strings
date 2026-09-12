@@ -1,0 +1,9 @@
+/*
+  InfoPlist.strings (Русский)
+  QQPlayer
+
+  Локализация запросов разрешений из Info.plist (QQPlayer/Info.plist).
+*/
+
+"NSCameraUsageDescription" = "Отсканируйте QR-код, чтобы сопрячь и синхронизировать свои устройства QQPlayer (только для сопряжений, которые вы разрешите).";
+"NSLocalNetworkUsageDescription" = "Используется для поиска и подключения устройств QQPlayer (Mac/Windows/NAS) в той же локальной сети: сопряжение и синхронизация музыкальной библиотеки.";

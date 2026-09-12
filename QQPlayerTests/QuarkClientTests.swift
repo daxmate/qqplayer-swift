@@ -91,7 +91,8 @@ struct QuarkClientTests {
     private static func makeClient(cookieFile: URL) -> QuarkClient {
         QuarkClient(
             sleep: { _ in },
-            cookieFileURL: cookieFile,
+            cookieStore: QuarkFileCookieStore(fileURL: cookieFile),
+            legacyCookieFileURL: nil,
             protocolClasses: [QuarkMockURLProtocol.self]
         )
     }
