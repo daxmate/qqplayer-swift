@@ -2690,6 +2690,43 @@ do {
     check(false, "㊶ 抛错：\(error)")
 }
 
+// MARK: - ㊷ 到点检查不得覆盖已完成/进行中的编排
+
+section("㊷ 到点检查不得覆盖已完成/进行中的编排")
+do {
+    let data = silentData(0xC8, count: 8_000)
+    let hash = try sha256Hex(of: data)
+    // 极小超时 + 对端**正常应答**（attachDeviceHost 默认 true → 编排在 start() 内跑完）。
+    // 到点时只能看到「已应答 / 已收尾」，绝不允许把编排打成失败。
+    var configuration = SyncCollectionSyncConfiguration()
+    configuration.peerManifestTimeout = 0.3
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        direction: .upload,
+        macFiles: [("Album/race.flac", data)],
+        playlists: [
+            "p1": [
+                SyncCollectionTrackFact(
+                    stableId: "s-race",
+                    relativePath: "Album/race.flac",
+                    contentHash: hash
+                ),
+            ],
+        ],
+        configuration: configuration
+    )
+
+    checkEqual(scenario.coordinator.state, .done, "对端应答 → 编排跑完（.done）")
+    // 等过超时点（0.3s）再复核：到点检查必须被「仍在计划态」守卫挡住
+    Thread.sleep(forTimeInterval: 1.0)
+    checkEqual(scenario.coordinator.state, .done, "到点检查不得把已完成编排打成失败")
+    checkEqual(failureReason(scenario.coordinator.state), nil, "无失败原因（无超时误报）")
+    checkEqual(scenario.coordinator.report.pushed, ["Album/race.flac"], "推送账目完整（收尾未被覆盖）")
+    scenario.deviceHost.detach()
+} catch {
+    check(false, "㊷ 抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")
