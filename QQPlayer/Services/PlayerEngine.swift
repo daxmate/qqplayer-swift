@@ -49,6 +49,11 @@ class PlayerEngine: NSObject, ObservableObject {
     var lastKnownPlaybackPositionUpdatedAt = Date()
     @Published var duration: TimeInterval = 0
     @Published var playbackState: PlaybackState = .stopped
+    /// 播放失败的用户可见文案（2026-09-12 审计 P8）。
+    /// 背景：载入失败（如 DSD 不被任何引擎支持）以前只 print，playTrack 拿到 false
+    /// 直接 return → 用户侧表现是"点了不播"、无任何提示。载入开始/成功时清空，
+    /// 失败时设置并在几秒后自动消失（不堵界面）。
+    @Published private(set) var playbackErrorMessage: String?
     @Published var playbackQueue: [Track] = []
     @Published var currentIndex = 0
     @Published var isRepeating = false
@@ -69,7 +74,6 @@ class PlayerEngine: NSObject, ObservableObject {
     /// 倍速音频节点（跟唱模式变速不变调：rate 档位，pitch 保持 0）
     lazy var timePitchNode = AVAudioUnitTimePitch()
     var audioFile: AVAudioFile?
-    private var playbackStrategy: PlaybackRouter.PlaybackStrategy?
     var playbackTimer: Timer?
 
     // Gapless playback support
@@ -96,6 +100,8 @@ class PlayerEngine: NSObject, ObservableObject {
 
     var isLoadingTrack = false
     var currentLoadTask: Task<Bool, Never>?
+    /// 失败提示的自动清除任务（重复上报时取消上一个，见 reportPlaybackFailure）
+    private var playbackErrorClearTask: Task<Void, Never>?
     var loadGeneration: UInt64 = 0
     var hasRestoredState = false
     var hasSetupAudioEngine = false
@@ -143,6 +149,24 @@ class PlayerEngine: NSObject, ObservableObject {
         case playing
         case paused
         case loading
+    }
+
+    /// 上报一次播放失败（自动清除任务同源：重复上报会取消上一个清除任务）。
+    func reportPlaybackFailure(_ message: String) {
+        playbackErrorMessage = message
+        playbackErrorClearTask?.cancel()
+        playbackErrorClearTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.playbackErrorMessage = nil
+        }
+    }
+
+    /// 清空播放失败提示（载入开始/成功时调用）。
+    func clearPlaybackFailure() {
+        playbackErrorClearTask?.cancel()
+        playbackErrorClearTask = nil
+        playbackErrorMessage = nil
     }
 
     private override init() {
@@ -399,106 +423,9 @@ class PlayerEngine: NSObject, ObservableObject {
         }
     }
 
-    func restorePlayerState() async {
-        guard let playerStateDict = UserDefaults.standard.dictionary(forKey: "QQPlayerState") else {
-            print("📭 No saved player state found in UserDefaults")
-            return
-        }
-
-        guard let lastSavedAt = playerStateDict["lastSavedAt"] as? Date else {
-            print("🚫 Invalid saved state format")
-            return
-        }
-
-        print("🔄 Restoring player state from \(lastSavedAt)")
-
-        // Don't restore if the saved state is too old (more than 7 days)
-        let daysSinceLastSave = Date().timeIntervalSince(lastSavedAt) / (24 * 60 * 60)
-        if daysSinceLastSave > 7 {
-            print("⏰ Saved state is too old (\(Int(daysSinceLastSave)) days), skipping restore")
-            return
-        }
-
-        // Find the current track by stable ID
-        guard let currentTrackStableId = playerStateDict["currentTrackStableId"] as? String else {
-            print("🚫 No current track in saved state")
-            return
-        }
-
-        do {
-            let track = try DatabaseManager.shared.read { db in
-                try Track.filter(Column("stable_id") == currentTrackStableId).fetchOne(db)
-            }
-
-            guard let restoredTrack = track else {
-                print("🚫 Could not find saved track with ID: \(currentTrackStableId)")
-                return
-            }
-
-            // Restore queue by finding tracks with stable IDs
-            let queueTrackIds = playerStateDict["queueTrackIds"] as? [String] ?? []
-            let originalQueueTrackIds = playerStateDict["originalQueueTrackIds"] as? [String] ?? []
-
-            let queueTracks = try DatabaseManager.shared.getTracksByStableIdsPreservingOrder(queueTrackIds)
-            let originalQueueTracks = try DatabaseManager.shared.getTracksByStableIdsPreservingOrder(originalQueueTrackIds)
-
-            // Restore player state
-            await MainActor.run {
-                self.playbackQueue = queueTracks.isEmpty ? [restoredTrack] : queueTracks
-                self.originalQueue = originalQueueTracks.isEmpty ? [restoredTrack.stableId] : originalQueueTracks.map { $0.stableId }
-
-                let savedIndex = playerStateDict["currentIndex"] as? Int ?? 0
-                self.currentIndex = max(0, min(savedIndex, self.playbackQueue.count - 1))
-
-                self.isRepeating = playerStateDict["isRepeating"] as? Bool ?? false
-                self.isShuffled = playerStateDict["isShuffled"] as? Bool ?? false
-                self.isLoopingSong = playerStateDict["isLoopingSong"] as? Bool ?? false
-                self.currentTrack = restoredTrack
-
-                print("✅ Restored state: queue=\(self.playbackQueue.count) tracks, index=\(self.currentIndex), loop=\(self.isLoopingSong)")
-
-                // Additional validation for shuffle state
-                if !self.isShuffled {
-                    // When not shuffled, ensure currentIndex points to the actual currentTrack
-                    if let currentTrack = self.currentTrack,
-                       self.currentIndex < self.playbackQueue.count,
-                       self.playbackQueue[self.currentIndex].stableId != currentTrack.stableId {
-                        // Find the correct index for the current track
-                        if let correctIndex = self.playbackQueue.firstIndex(where: { $0.stableId == currentTrack.stableId }) {
-                            print("⚠️ Fixed currentIndex from \(self.currentIndex) to \(correctIndex) for non-shuffled queue")
-                            self.currentIndex = correctIndex
-                        } else {
-                            print("⚠️ Current track not found in queue, resetting to index 0")
-                            self.currentIndex = 0
-                        }
-                    }
-                }
-            }
-
-            await MainActor.run { self.normalizeIndexAndTrack() }
-
-            await MainActor.run {
-                // Set saved position before loading track
-                let savedTime = playerStateDict["playbackTime"] as? TimeInterval ?? 0
-                self.playbackTime = savedTime
-            }
-
-            // Load the track and preserve the saved position
-            await loadTrack(restoredTrack, preservePlaybackTime: true)
-
-            // Seek to the saved position after loading
-            let savedTime = playerStateDict["playbackTime"] as? TimeInterval ?? 0
-            if savedTime > 0 {
-                await seek(to: savedTime)
-                print("🔄 Seeked to restored position: \(savedTime)s")
-            }
-
-            print("✅ Player state restored from UserDefaults - track: \(restoredTrack.title), position: \(savedTime)s")
-
-        } catch {
-            print("❌ Failed to restore player state: \(error)")
-        }
-    }
+    // restorePlayerState() 已删除（2026-09-12 审计死代码 ⚰️-1）：全仓 grep 仅命中定义处、零调用方，
+    // 且与 restoreUIStateOnly()（唯一在用的恢复入口，只恢复 UI 不载音频）功能重叠；
+    // 需要时从 git 历史取回。
 
     private func setupPeriodicStateSaving() {
         // Save state every 30 seconds while playing, and on important events

@@ -60,6 +60,8 @@
             print("📀 loadTrack called for: \(track.title) (format: \(formatInfo.format))")
 
             isLoadingTrack = true
+            // 新一轮载入开始：清掉上一个失败提示（2026-09-12 审计 P8）
+            clearPlaybackFailure()
             print("🔄 Starting load process for: \(track.title)")
 
             // 切歌：清 AB 行号（保留跟唱模式/速度/单句循环）
@@ -170,26 +172,13 @@
                         print("✅ Delegated to SFBAudioEngine: \(url.lastPathComponent)")
                     } catch {
                         print("❌ SFBAudioEngine delegation failed: \(error)")
-
-                        // Check if this is a DSD sample rate issue - if so, try native fallback
-                        if let nsError = error as NSError?,
-                           (nsError.domain == "SFBAudioEngineManager" && nsError.code == 1001) ||
-                           (nsError.domain == "org.sbooth.AudioEngine.DSDDecoder" && nsError.code == 2),
-                           url.pathExtension.lowercased() == "dff" || url.pathExtension.lowercased() == "dsf" {
-                            print("💡 Attempting native playback fallback for DSD file with unsupported sample rate")
-
-                            // Force native playback for this DSD file
-                            usingSFBEngine = false
-
-                            let loadedAudioFile = try await openNativeAudioFile(at: url, qos: .background)
-                            guard isCurrentLoad(generation) else { return false }
-                            audioFile = loadedAudioFile
-                            print("✅ DSD file loaded successfully with native AVAudioFile fallback")
-                        } else {
-                            // For other SFBAudioEngine errors (like AudioPlayer init failure), rethrow
-                            print("❌ SFBAudioEngine failed and no fallback available for this file type")
-                            throw error
-                        }
+                        // DSD 的 "native fallback" 分支已删除（2026-09-12 审计 P8）：
+                        // openNativeAudioFile 对 dsf/dff 无条件抛 3001，该分支**构造上必失败**
+                        // （\(error) 只留下一条误导日志：“Attempting native playback fallback”），
+                        // 删除是行为等价的：统一由这里 rethrow，交 performLoadTrack 的 catch
+                        // 给出用户可见错误（不再静默）。
+                        usingSFBEngine = false
+                        throw error
                     }
                 } else {
                     // Use your existing native implementation for FLAC, MP3, WAV, AAC
@@ -290,6 +279,11 @@
                     playbackState = .stopped
                     isLoadingTrack = false
                     audioFile = nil
+                    // 用户可见错误（2026-09-12 审计 P8）：原来只 print，playTrack 拿到 false
+                    // 直接 return → 用户侧只有“点了不播”。
+                    reportPlaybackFailure(
+                        PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                    )
                 }
                 return false
             }
@@ -903,6 +897,10 @@
                 print("❌ macOS loadTrack: file not found \(url.path)")
                 playbackState = .stopped
                 isLoadingTrack = false
+                // 用户可见错误（2026-09-12 审计 P8）：macOS 失败同样不再静默
+                reportPlaybackFailure(
+                    PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                )
                 return false
             }
 
@@ -930,6 +928,11 @@
                         usingSFBEngine = false
                         playbackState = .stopped
                         isLoadingTrack = false
+                        // 用户可见错误（2026-09-12 审计 P8）：Opus/DSD 失败以前只 print，
+                        // 用户侧表现是“点了完全无反应”（macOS 没有 iOS 那样的 native 回退）。
+                        reportPlaybackFailure(
+                            PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                        )
                     }
                     return false
                 }
@@ -952,6 +955,9 @@
                     playbackState = .stopped
                     isLoadingTrack = false
                     audioFile = nil
+                    reportPlaybackFailure(
+                        PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                    )
                 }
                 return false
             }
@@ -1034,12 +1040,41 @@
                 }
             }
 
-            let startFrame = AVAudioFramePosition(playbackTime * audioFile.processingFormat.sampleRate)
+            let requestedFrame = AVAudioFramePosition(playbackTime * audioFile.processingFormat.sampleRate)
+            // 起始位置决策上收（MacPlaybackGate.playStartPlan，有单测锁定）：末尾/越界位置
+            // 直接送进 scheduleSegment 会被 segmentPlan 拒绝 → 无调度、无 completion、永不自愈，
+            // 但 isPlaying 仍被置 true（界面在播、实际无声；2026-09-12 审计 P1）。回零重播，
+            // 并把位置状态一起归零（playbackTime / seekTimeOffset / lastKnown / 时间轴同源）。
+            let startFrame: AVAudioFramePosition
+            let requestedSeconds = playbackTime
+            switch MacPlaybackGate.playStartPlan(requestedFrame: requestedFrame, fileLength: audioFile.length) {
+            case let .resume(frame):
+                startFrame = frame
+            case .restartFromStart:
+                startFrame = 0
+                seekTimeOffset = 0
+                playbackTime = 0
+                nodeTimelineStartSampleTime = 0
+                lastKnownPlaybackPosition = 0
+                lastKnownPlaybackPositionUpdatedAt = Date()
+                print("↩️ macOS play: 位置 \(requestedSeconds)s（帧 \(requestedFrame)/\(audioFile.length)）已在末尾或越界，从 0 重播")
+            }
+
             // 对齐 iOS play（暂停恢复路径）：cancel + stop 再重新 schedule，避免队列残留旧 segment
             // 与旧 completion 误触发 handleTrackEnd（与 seek 同根因，2026-09-01）
             cancelPendingCompletions()
             playerNode.stop()
-            scheduleSegment(from: startFrame, file: audioFile, track: currentTrack, trackIndex: currentIndex)
+            guard scheduleSegment(from: startFrame, file: audioFile, track: currentTrack, trackIndex: currentIndex) else {
+                // 调度失败（引擎未运行 / 帧范围非法）：绝不进入「显示在播但无声」——
+                // 那条路径没有自愈机制（无调度 → 无 completion → 不会走到 handleTrackEnd），
+                // 只能靠用户拖进度条解除（2026-09-12 审计 P1）。保持停止态，UI 与真实一致。
+                isPlaying = false
+                playbackState = .stopped
+                stopPlaybackTimer()
+                updateNowPlayingInfoEnhanced()
+                print("❌ macOS play: scheduleSegment 失败（startFrame=\(startFrame)），保持停止态不置 isPlaying")
+                return
+            }
 
             playerNode.play()
             isPlaying = true

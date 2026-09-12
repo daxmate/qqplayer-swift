@@ -78,6 +78,24 @@ struct PlayerView: View {
             .allowsHitTesting(false)
             mainContent
 
+            // 播放失败提示（2026-09-12 审计 P8）：载入失败不再静默（"点了不播"）。
+            // 文案由引擎统一上报（playbackErrorMessage），5 秒后自动消失。
+            if let message = playerEngine.playbackErrorMessage {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color.red.opacity(0.9)))
+                    .padding(.horizontal, 24)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 8)
+                    .allowsHitTesting(false)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(30)
+            }
+
             // 全屏歌词页：满屏覆盖（右滑入/右滑出），与播放页同一 ZStack，随下拉一起跟手
             if showLyricsSheet {
                 LiveLyricsSheet(
@@ -130,6 +148,7 @@ struct PlayerView: View {
         // 事务变更后 withTransaction(.continuous) 不再可靠禁用），导致下拉抖动；
         // 歌词页/搜索页的过渡动画改在赋值处显式 withAnimation（与歌词页右滑同款实现）
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .animation(.easeInOut(duration: 0.25), value: playerEngine.playbackErrorMessage)
     }
 
     private var mainContent: some View {

@@ -163,6 +163,59 @@ struct MacPlaybackGateSegmentFinishedTests {
     }
 }
 
+struct MacPlaybackGatePlayStartTests {
+    // play() 起始位置决策（2026-09-12 审计 P1）：macOS 曲终 / seek 到末尾后 playbackTime
+    // 停在 ≈ duration，旧 play() 直接用它算 startFrame 并被 segmentPlan 拒绝，但仍置
+    // isPlaying = true（界面在播、实际无声、无自愈路径）。决策上收后此处锁定语义：
+    // 位置不在 [1, fileLength) 内一律回零重播。
+
+    @Test("暂停在文件中间：从该帧继续（暂停恢复不受影响）")
+    func resumeFromMiddle() {
+        #expect(MacPlaybackGate.playStartPlan(requestedFrame: 400, fileLength: 1000) == .resume(frame: 400))
+        #expect(MacPlaybackGate.playStartPlan(requestedFrame: 1, fileLength: 1000) == .resume(frame: 1))
+    }
+
+    @Test("位置为 0：回零重播（等价从头，不产生无效调度）")
+    func zeroRestarts() {
+        #expect(MacPlaybackGate.playStartPlan(requestedFrame: 0, fileLength: 1000) == .restartFromStart)
+    }
+
+    @Test("位置正好等于末尾（曲终 / seek 到末尾后残留）：回零重播")
+    func atEndRestarts() {
+        #expect(MacPlaybackGate.playStartPlan(requestedFrame: 1000, fileLength: 1000) == .restartFromStart)
+    }
+
+    @Test("位置越过末尾（异常索引 / 时长漂移）：回零重播")
+    func beyondEndRestarts() {
+        #expect(MacPlaybackGate.playStartPlan(requestedFrame: 1200, fileLength: 1000) == .restartFromStart)
+    }
+
+    @Test("位置为负（异常）：回零重播")
+    func negativeRestarts() {
+        #expect(MacPlaybackGate.playStartPlan(requestedFrame: -1, fileLength: 1000) == .restartFromStart)
+    }
+
+    @Test("不变量：playStartPlan 的输出帧永远能通过 segmentPlan（不再产生 invalidStartFrame）")
+    func planAlwaysSchedulable() {
+        // 修复前 play() 把 playbackTime 直接当 startFrame 且丢弃 scheduleSegment 返回值，
+        // 末尾位置会命中 .invalidStartFrame → 假播放。此不变量锁死两个纯函数的组合语义。
+        for requested in [Int64(-5), 0, 1, 999, 1000, 1001, 10_000] {
+            let frame: Int64
+            switch MacPlaybackGate.playStartPlan(requestedFrame: requested, fileLength: 1000) {
+            case let .resume(resumeFrame): frame = resumeFrame
+            case .restartFromStart: frame = 0
+            }
+            switch MacPlaybackGate.segmentPlan(
+                engineIsRunning: true, startFrame: frame, fileLength: 1000, maxFrameCount: 1_000_000
+            ) {
+            case .success: break
+            case let .failure(reason):
+                Issue.record("requested=\(requested) 得到 startFrame=\(frame)，被 segmentPlan 拒绝：\(reason)")
+            }
+        }
+    }
+}
+
 struct MacPlaybackGateKaraokeLayoutTests {
     // 歌词大画面布局决策：播放区隐藏/歌词撑满（2026-09-01 跟唱 / 2026-09-06
     // 双击纯放大拆分为独立 isLyricsExpanded 维度——两者任一成立都进大画面）。

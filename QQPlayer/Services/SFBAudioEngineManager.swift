@@ -30,11 +30,6 @@ class SFBAudioEngineManager: NSObject, ObservableObject, AudioPlayer.Delegate {
     var updateTimer: Timer?
     private var eqAttachmentFailed = false
 
-    // Gapless playback support
-    var nextTrackURL: URL?
-    var onTrackNearingEnd: (() -> Void)?
-    private var hasTriggeredNearEnd = false
-
     nonisolated private func configureDefaultSFBBands(for equalizer: AVAudioUnitEQ) {
         let numberOfBands = equalizer.bands.count
         let minFreq = 20.0
@@ -497,46 +492,8 @@ class SFBAudioEngineManager: NSObject, ObservableObject, AudioPlayer.Delegate {
     }
 
     // MARK: - Background/Foreground Optimization
-
-    func optimizeForBackground() async {
-        print("🔒 Optimizing SFBAudioEngine for background/lock screen")
-
-        #if os(iOS)
-            // Increase buffer size significantly for background stability
-            do {
-                let session = AVAudioSession.sharedInstance()
-                try session.setPreferredIOBufferDuration(0.100) // 100ms buffer for lock screen
-                print("✅ Increased buffer to 100ms for lock screen stability")
-            } catch {
-                print("⚠️ Failed to increase buffer for background: \(error)")
-            }
-        #endif
-
-        // Reduce processing load by temporarily disabling EQ if possible
-        if let equalizer = sfbEqualizer {
-            equalizer.bypass = true
-            print("✅ Temporarily bypassed EQ for background stability")
-        }
-    }
-
-    func optimizeForForeground() async {
-        print("🔓 Restoring SFBAudioEngine for foreground")
-
-        #if os(iOS)
-            // Restore normal buffer size
-            do {
-                let session = AVAudioSession.sharedInstance()
-                try session.setPreferredIOBufferDuration(0.040) // Back to 40ms
-                print("✅ Restored buffer to 40ms for foreground")
-            } catch {
-                print("⚠️ Failed to restore buffer for foreground: \(error)")
-            }
-        #endif
-
-        // Re-enable EQ based on current settings
-        if let equalizer = sfbEqualizer {
-            equalizer.bypass = !eqManager.isEnabled
-            print("✅ Restored EQ bypass state for foreground")
-        }
-    }
+    //
+    // optimizeForBackground() / optimizeForForeground() 已删除（2026-09-12 审计死代码 ⚰️-6）：
+    // 全仓 grep 仅命中定义处、零调用方（它们会改 IO buffer 并 bypass EQ，无法验证的旧方案）。
+    // 需要时从 git 历史取回。
 }

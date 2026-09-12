@@ -41,6 +41,15 @@ enum QueueReorderMath {
             removed < acc ? acc - 1 : acc
         }
     }
+
+    /// 移除前的下标筛选（单一入口，removeQueueItems / removeQueueItem(stableId:) 共用）：
+    /// - 越界下标丢弃：offsets 常来自**渲染期**枚举下标，而 playbackQueue 可被引擎侧异步
+    ///   整体替换（restoreOriginalQueue / jumpToQueueIndex），陈旧下标直达 Array.remove(at:)
+    ///   是 fatalError（不可捕获崩溃），2026-09-12 审计 P2。
+    /// - 当前播放项不可移除（保持旧语义：UI 已过滤，引擎侧再兜一层）。
+    static func validRemovalIndices(_ offsets: IndexSet, queueCount: Int, currentIndex: Int) -> [Int] {
+        offsets.filter { $0 >= 0 && $0 < queueCount && $0 != currentIndex }
+    }
 }
 
 extension PlayerEngine {
@@ -209,15 +218,37 @@ extension PlayerEngine {
     /// 从队列移除若干项（当前播放项不可移除——UI 已过滤，这里再兜底）。
     /// 移除后立即持久化。
     func removeQueueItems(at offsets: IndexSet) {
-        let removable = offsets.filter { $0 != currentIndex }
+        let removable = QueueReorderMath.validRemovalIndices(
+            offsets,
+            queueCount: playbackQueue.count,
+            currentIndex: currentIndex
+        )
         guard !removable.isEmpty else { return }
+        applyQueueRemoval(removable)
+    }
 
+    /// 按 stableId 移除队列项（UI 调用入口，2026-09-12 审计 P2）：
+    /// macOS 队列面板此前把 ForEach 的渲染期下标直接传回引擎（MacPlayerView），
+    /// 渲染快照与引擎数组不一致时下标可能越界/错位；stableId 定位把不确定性消在入口。
+    func removeQueueItem(stableId: String) {
+        guard let index = playbackQueue.firstIndex(where: { $0.stableId == stableId }) else { return }
+        let removable = QueueReorderMath.validRemovalIndices(
+            IndexSet(integer: index),
+            queueCount: playbackQueue.count,
+            currentIndex: currentIndex
+        )
+        guard !removable.isEmpty else { return }
+        applyQueueRemoval(removable)
+    }
+
+    /// 移除的单一实现（下标已过校验，见 QueueReorderMath.validRemovalIndices）。
+    private func applyQueueRemoval(_ removable: [Int]) {
         var newQueue = playbackQueue
-        for index in removable.sorted().reversed() {
+        for index in removable.sorted().reversed() where newQueue.indices.contains(index) {
             newQueue.remove(at: index)
         }
         currentIndex = QueueReorderMath.adjustedCurrentIndexAfterRemoval(
-            removedIndices: Array(removable),
+            removedIndices: removable,
             currentIndex: currentIndex
         )
         currentIndex = max(0, min(currentIndex, newQueue.count - 1))

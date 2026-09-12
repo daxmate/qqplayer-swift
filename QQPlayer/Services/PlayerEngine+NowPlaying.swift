@@ -104,6 +104,7 @@
                 WidgetDataManager.shared.clearCurrentTrack()
                 return
             }
+            let trackId = track.stableId
 
             Task {
                 // Get artwork
@@ -136,6 +137,13 @@
                 // Get theme color
                 let settings = DeleteSettings.load()
                 let colorHex = settings.backgroundColorChoice.color.toHex()
+
+                // 同曲校验（2026-09-12 审计 P5）：上面两次 await（封面 / 后台编码）期间可能已切歌，
+                // 旧曲写进去会一直留在小组件（saveCurrentTrack 同步写盘 + reloadAllTimelines）。
+                guard PlaybackTrackGate.isStillCurrent(trackId: trackId, currentTrackId: currentTrack?.stableId) else {
+                    print("↩️ widget 更新丢弃：\(track.title) 已不是当前曲目")
+                    return
+                }
 
                 let widgetData = WidgetTrackData(
                     trackId: track.stableId,

@@ -118,18 +118,9 @@ class EQManager: ObservableObject {
         }
     }
 
-    func insertEQIntoAudioGraph(between inputNode: AVAudioNode, and outputNode: AVAudioNode, format: AVAudioFormat?) {
-        guard let audioEngine = audioEngine, let eqNode = eqNode else { return }
-
-        // Disconnect existing connection
-        audioEngine.disconnectNodeInput(outputNode)
-
-        // Connect: input -> EQ -> output
-        audioEngine.connect(inputNode, to: eqNode, format: format)
-        audioEngine.connect(eqNode, to: outputNode, format: format)
-
-        print("✅ EQ node inserted between \(inputNode) and \(outputNode)")
-    }
+    // insertEQIntoAudioGraph(between:and:format:) 已删除（2026-09-12 审计死代码 ⚰️-7）：
+    // 全仓 grep 仅命中定义处、零调用方——真实接线在 PlayerEngine.connectPlaybackChain /
+    // ensureMacAudioEngineSetup。
 
     // Expose this for PlayerEngine to use when reconfiguring
     var currentEQNode: AVAudioUnitEQ? {
@@ -234,6 +225,16 @@ class EQManager: ObservableObject {
             do {
                 let bands = try await loadBands(for: preset)
                 let sortedBands = bands.sorted { $0.bandIndex < $1.bandIndex }
+
+                // 同源校验（2026-09-12 审计 P4，与 updatePresetBands 同一入口）：await 期间
+                // 用户可能已切到别的预设/关闭 EQ，后完成的旧任务不得覆盖新选择。
+                guard EQPresetApplyGate.shouldApply(
+                    requestedPresetId: preset.id,
+                    currentPresetId: currentPreset?.id
+                ) else {
+                    print("↩️ EQ 预设加载结果已过期（\(preset.name)），丢弃不落地")
+                    return
+                }
 
                 await MainActor.run {
                     let newFrequencies = sortedBands.map { $0.frequency }
@@ -378,7 +379,7 @@ class EQManager: ObservableObject {
 
         // If this is the current preset, apply changes immediately
         await MainActor.run {
-            if self.currentPreset?.id == preset.id {
+            if EQPresetApplyGate.shouldApply(requestedPresetId: preset.id, currentPresetId: self.currentPreset?.id) {
                 self.applyEQSettings()
             }
         }

@@ -153,6 +153,8 @@
 "queue_remove_from_queue" = "從佇列移除";
 
 "no_track_selected" = "未選擇曲目";
+"playback_error_generic" = "無法播放這首歌曲，檔案可能已遺失或格式不受支援。";
+"playback_error_dsd_unsupported" = "無法播放此 DSD 檔案，請嘗試較低碼率（DSD64）或轉換為 FLAC。";
 
 /* Search */
 "search_your_music_library" = "搜尋你的媒體庫";

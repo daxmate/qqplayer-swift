@@ -75,4 +75,43 @@ struct QueueReorderMathTests {
     func emptyRemovalKeeps() {
         #expect(QueueReorderMath.adjustedCurrentIndexAfterRemoval(removedIndices: [], currentIndex: 2) == 2)
     }
+
+    // MARK: - validRemovalIndices（2026-09-12 审计 P2）
+
+    @Test("越界下标被丢弃（渲染快照落后于引擎数组时不崩溃）")
+    func outOfRangeDropped() {
+        // 修复前 `offsets.filter { $0 != currentIndex }` 直接进 Array.remove(at:)：
+        // index 3/99 在 count=3 的队列上是 fatalError（不可捕获崩溃）。
+        let offsets = IndexSet([0, 3, 99])
+        #expect(QueueReorderMath.validRemovalIndices(offsets, queueCount: 3, currentIndex: -1) == [0])
+    }
+
+    @Test("当前播放项被排除：不移除")
+    func currentIndexExcluded() {
+        let offsets = IndexSet([0, 1, 2])
+        #expect(QueueReorderMath.validRemovalIndices(offsets, queueCount: 3, currentIndex: 1) == [0, 2])
+    }
+
+    @Test("合法多选：全部保留（升序，尾部先删）")
+    func validMultiSelectionKept() {
+        let offsets = IndexSet([1, 3])
+        #expect(QueueReorderMath.validRemovalIndices(offsets, queueCount: 5, currentIndex: 0) == [1, 3])
+    }
+
+    @Test("空队列 / 全越界：无可移除项")
+    func nothingRemovable() {
+        #expect(QueueReorderMath.validRemovalIndices(IndexSet(), queueCount: 0, currentIndex: 0).isEmpty)
+        #expect(QueueReorderMath.validRemovalIndices(IndexSet([5]), queueCount: 0, currentIndex: -1).isEmpty)
+    }
+
+    @Test("越界筛选是 remove 前唯一防线：筛选结果全部落在 [0, queueCount)")
+    func filteredIndicesAlwaysSafe() {
+        // 不变量：筛选后的下标直接用于 Array.remove(at:)（尾部先删）不可能越界。
+        for count in 0 ... 4 {
+            let offsets = IndexSet([-1, 0, 1, 2, 3, 9])
+            let safe = QueueReorderMath.validRemovalIndices(offsets, queueCount: count, currentIndex: -1)
+            #expect(safe.allSatisfy { $0 >= 0 && $0 < count })
+            #expect(safe == safe.sorted())
+        }
+    }
 }

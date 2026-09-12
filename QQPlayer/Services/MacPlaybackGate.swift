@@ -78,6 +78,25 @@ enum MacPlaybackGate {
         return true
     }
 
+    /// play() 的起始位置决策：把「曲终 / seek 到末尾后残留的位置」规整为可播放起点。
+    ///
+    /// 背景（2026-09-12 审计 P1）：macOS 曲终后 playbackTime 停在 ≈ duration，seek 也允许
+    /// 停在 duration；再点播放时 startFrame == file.length 被 segmentPlan 拒绝
+    /// （.invalidStartFrame, MacPlaybackGate.swift 的帧计划）→ 没有调度也就没有 completion
+    /// → 永远不会自愈，但 isPlaying 仍被置 true = 界面在播、实际无声。
+    /// 决策上收为纯函数：位置不在 [1, fileLength) 内（末尾 / 越界 / 负值 / 0）一律回零重播。
+    static func playStartPlan(requestedFrame: Int64, fileLength: Int64) -> PlayStartPlan {
+        guard requestedFrame > 0, requestedFrame < fileLength else { return .restartFromStart }
+        return .resume(frame: requestedFrame)
+    }
+
+    enum PlayStartPlan: Equatable {
+        /// 暂停恢复：从该帧继续
+        case resume(frame: Int64)
+        /// 位置无效（末尾 / 越界 / 0 / 负值）：从头重播
+        case restartFromStart
+    }
+
     // MARK: - 歌词大画面布局决策（2026-09-01 跟唱撑满 / 2026-09-06 双击纯放大拆分）
 
     /// 播放区是否隐藏（跟唱开启 或 双击放大歌词 时把空间让给歌词区）

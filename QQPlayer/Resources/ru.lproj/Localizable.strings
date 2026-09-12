@@ -73,6 +73,8 @@
 "queue_shuffle_disabled_hint" = "Изменение порядка отключено в режиме перемешивания";
 "queue_remove_from_queue" = "Убрать из очереди";
 "no_track_selected" = "Трек не выбран";
+"playback_error_generic" = "Не удалось воспроизвести этот трек. Возможно, файл отсутствует или формат не поддерживается.";
+"playback_error_dsd_unsupported" = "Не удалось воспроизвести этот файл DSD. Попробуйте более низкий поток DSD (DSD64) или конвертируйте его в FLAC.";
 
 /* Search */
 "search_your_music_library" = "Поиск по медиатеке";
