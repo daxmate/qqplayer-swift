@@ -238,9 +238,10 @@ extension DatabaseManager {
 
     func searchPlaylists(query: String, limit: Int = 15) throws -> [Playlist] {
         return try read { db in
-            let pattern = "%\(query)%"
+            // D8：与其他搜索共用同一转义入口
+            let pattern = self.likePattern(for: query)
             return try Playlist
-                .filter(Column("title").like(pattern))
+                .filter(Column("title").like(pattern, escape: "\\"))
                 .order(Column("title"))
                 .limit(limit)
                 .fetchAll(db)

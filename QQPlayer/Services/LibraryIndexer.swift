@@ -148,11 +148,7 @@ class LibraryIndexer: NSObject, ObservableObject {
         }
 
         print("🔁 Track already exists by path with old stable ID: \(existing.stableId)")
-        try databaseManager.migrateTrackStableIdAndPath(
-            oldStableId: existing.stableId,
-            newStableId: stableId,
-            newPath: path
-        )
+        try databaseManager.migrateTrackForMovedFile(oldStableId: existing.stableId, newPath: path)
         existing.stableId = stableId
         existing.path = path
         return existing
@@ -1081,28 +1077,19 @@ class LibraryIndexer: NSObject, ObservableObject {
     }
 
     private func storeBookmarkPermanently(_ bookmarkData: Data, for url: URL) async {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let bookmarksURL = documentsURL.appendingPathComponent("ExternalFileBookmarks.plist")
+        guard let store = ExternalFileBookmarkStore.default else {
+            print("❌ Failed to resolve documents directory for bookmarks")
+            return
+        }
 
         do {
-            // Load existing bookmarks or create new dictionary
-            var bookmarks: [String: Data] = [:]
-            if FileManager.default.fileExists(atPath: bookmarksURL.path) {
-                let data = try Data(contentsOf: bookmarksURL)
-                if let existingBookmarks = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Data] {
-                    bookmarks = existingBookmarks
-                }
-            }
-
             // Generate stableId for this file
             let stableId = try generateStableId(for: url)
 
-            // Store bookmark data using stableId as key (survives file moves)
-            bookmarks[stableId] = bookmarkData
-
-            // Save updated bookmarks
-            let plistData = try PropertyListSerialization.data(fromPropertyList: bookmarks, format: .xml, options: 0)
-            try plistData.write(to: bookmarksURL)
+            // Store bookmark data using stableId as key (survives file moves)。
+            // 经书签唯一入口写入：**原子写** —— 此前该写入是原地截断，进程被杀即
+            // 整份书签 plist 不可解析 → 全部外部文件不再导入（审计 🔴-2）。
+            try store.upsert(bookmarkData, forStableId: stableId)
 
             print("💾 Stored permanent bookmark for shared file: \(url.lastPathComponent) with stableId: \(stableId)")
         } catch {
@@ -1111,129 +1098,131 @@ class LibraryIndexer: NSObject, ObservableObject {
     }
 
     private func processStoredExternalBookmarks() async {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let bookmarksURL = documentsURL.appendingPathComponent("ExternalFileBookmarks.plist")
-
-        guard FileManager.default.fileExists(atPath: bookmarksURL.path) else {
+        guard let store = ExternalFileBookmarkStore.default else {
             print("📁 No stored external bookmarks found")
             return
         }
 
-        do {
-            let data = try Data(contentsOf: bookmarksURL)
-            guard var bookmarks = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Data] else {
-                print("❌ Invalid external bookmarks format")
-                return
-            }
-            var bookmarksChanged = false
+        let bookmarks: [String: Data]
+        switch store.load() {
+        case .loaded(let loaded) where !loaded.isEmpty:
+            bookmarks = loaded
+        case .loaded:
+            print("📁 No stored external bookmarks found")
+            return
+        case .unreadable(let error):
+            // 读失败 ≠ 无书签：不拿空字典覆盖（还能救的书签会被抹掉），本轮跳过
+            print("❌ Invalid external bookmarks format: \(error)")
+            return
+        }
 
-            print("📁 Found \(bookmarks.count) stored external file bookmarks")
+        // 键改名先收集、结束时经唯一入口一次原子落盘
+        var bookmarkKeyRemapping: [String: String] = [:]
 
-            for (stableId, bookmarkData) in Array(bookmarks) {
-                do {
-                    // Resolve bookmark to get current file location
-                    var isStale = false
-                    let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
+        print("📁 Found \(bookmarks.count) stored external file bookmarks")
 
-                    if isStale {
-                        print("⚠️ Bookmark is stale for stableId: \(stableId)")
-                        continue
-                    }
+        for (stableId, bookmarkData) in Array(bookmarks) {
+            do {
+                // Resolve bookmark to get current file location
+                var isStale = false
+                let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
 
-                    // Reject network URLs
-                    if let scheme = resolvedURL.scheme?.lowercased(), ["http", "https", "ftp", "sftp"].contains(scheme) {
-                        print("❌ Rejected network URL: \(resolvedURL.absoluteString)")
-                        continue
-                    }
-
-                    let resolvedStableId = try generateStableId(for: resolvedURL)
-
-                    // Check if this file is in the database. Existing files
-                    // still flow through processExternalFile below so a
-                    // changed modification date can refresh their metadata.
-                    var trackAlreadyExists = false
-                    if let existingTrack = try databaseManager.getTrack(byStableId: stableId) {
-                        trackAlreadyExists = true
-                        // File exists in DB - check if path has changed
-                        if existingTrack.path != resolvedURL.path {
-                            print("📍 File moved detected! Old: \(existingTrack.path)")
-                            print("📍 File moved detected! New: \(resolvedURL.path)")
-
-                            try databaseManager.migrateTrackStableIdAndPath(
-                                oldStableId: stableId,
-                                newStableId: resolvedStableId,
-                                newPath: resolvedURL.path
-                            )
-                            bookmarks.removeValue(forKey: stableId)
-                            bookmarks[resolvedStableId] = bookmarkData
-                            bookmarksChanged = true
-                            print("✅ Updated database path for: \(resolvedURL.lastPathComponent)")
-                        } else {
-                            print("📍 External file path unchanged: \(resolvedURL.lastPathComponent)")
-                        }
-                    } else if try databaseManager.getTrack(byStableId: resolvedStableId) != nil {
-                        trackAlreadyExists = true
-                        bookmarks.removeValue(forKey: stableId)
-                        bookmarks[resolvedStableId] = bookmarkData
-                        bookmarksChanged = true
-                        print("🔁 Updated stale bookmark key for existing track: \(resolvedURL.lastPathComponent)")
-                    }
-
-                    // Check if track was excluded (removed from library only)
-                    if !trackAlreadyExists &&
-                        (DeleteSettings.isTrackExcluded(stableId) || DeleteSettings.isTrackExcluded(resolvedStableId)) {
-                        print("⏭️ Track excluded from library: \(resolvedURL.lastPathComponent)")
-                        continue
-                    }
-
-                    // File not in database yet - process it
-                    // Start accessing security-scoped resource
-                    guard resolvedURL.startAccessingSecurityScopedResource() else {
-                        print("❌ Failed to access security-scoped resource for: \(resolvedURL.lastPathComponent)")
-                        continue
-                    }
-
-                    defer {
-                        resolvedURL.stopAccessingSecurityScopedResource()
-                    }
-
-                    // Import a new file or refresh an existing file whose
-                    // fingerprint changed.
-                    await processExternalFile(resolvedURL)
-                    print("✅ Processed stored external file: \(resolvedURL.lastPathComponent)")
-
-                } catch {
-                    print("❌ Failed to resolve bookmark for stableId \(stableId): \(error)")
+                if isStale {
+                    print("⚠️ Bookmark is stale for stableId: \(stableId)")
+                    continue
                 }
-            }
 
-            if bookmarksChanged {
-                let plistData = try PropertyListSerialization.data(fromPropertyList: bookmarks, format: .xml, options: 0)
-                try plistData.write(to: bookmarksURL, options: .atomic)
-                print("✅ Updated external bookmark keys after stable ID migration")
-            }
+                // Reject network URLs
+                if let scheme = resolvedURL.scheme?.lowercased(), ["http", "https", "ftp", "sftp"].contains(scheme) {
+                    print("❌ Rejected network URL: \(resolvedURL.absoluteString)")
+                    continue
+                }
 
-        } catch {
-            print("❌ Failed to process stored external bookmarks: \(error)")
+                let resolvedStableId = try generateStableId(for: resolvedURL)
+
+                // Check if this file is in the database. Existing files
+                // still flow through processExternalFile below so a
+                // changed modification date can refresh their metadata.
+                var trackAlreadyExists = false
+                if let existingTrack = try databaseManager.getTrack(byStableId: stableId) {
+                    trackAlreadyExists = true
+                    // File exists in DB - check if path has changed
+                    if existingTrack.path != resolvedURL.path {
+                        print("📍 File moved detected! Old: \(existingTrack.path)")
+                        print("📍 File moved detected! New: \(resolvedURL.path)")
+
+                        try databaseManager.migrateTrackStableIdAndPath(
+                            oldStableId: stableId,
+                            newStableId: resolvedStableId,
+                            newPath: resolvedURL.path
+                        )
+                        // 书签键改名由迁移唯一入口（TrackIdentityMigration）一并完成
+                        print("✅ Updated database path for: \(resolvedURL.lastPathComponent)")
+                    } else {
+                        print("📍 External file path unchanged: \(resolvedURL.lastPathComponent)")
+                    }
+                } else if try databaseManager.getTrack(byStableId: resolvedStableId) != nil {
+                    trackAlreadyExists = true
+                    bookmarkKeyRemapping[stableId] = resolvedStableId
+                    print("🔁 Updated stale bookmark key for existing track: \(resolvedURL.lastPathComponent)")
+                }
+
+                // Check if track was excluded (removed from library only)
+                if !trackAlreadyExists &&
+                    (DeleteSettings.isTrackExcluded(stableId) || DeleteSettings.isTrackExcluded(resolvedStableId)) {
+                    print("⏭️ Track excluded from library: \(resolvedURL.lastPathComponent)")
+                    continue
+                }
+
+                // File not in database yet - process it
+                // Start accessing security-scoped resource
+                guard resolvedURL.startAccessingSecurityScopedResource() else {
+                    print("❌ Failed to access security-scoped resource for: \(resolvedURL.lastPathComponent)")
+                    continue
+                }
+
+                defer {
+                    resolvedURL.stopAccessingSecurityScopedResource()
+                }
+
+                // Import a new file or refresh an existing file whose
+                // fingerprint changed.
+                await processExternalFile(resolvedURL)
+                print("✅ Processed stored external file: \(resolvedURL.lastPathComponent)")
+
+            } catch {
+                print("❌ Failed to resolve bookmark for stableId \(stableId): \(error)")
+            }
+        }
+
+        if !bookmarkKeyRemapping.isEmpty {
+            do {
+                let renamed = try store.renameKeys(bookmarkKeyRemapping)
+                print("✅ Updated \(renamed) external bookmark key(s) after stable ID migration")
+            } catch {
+                print("❌ Failed to update external bookmark keys: \(error)")
+            }
         }
     }
 
     /// Resolve bookmark for a specific track and update database path if file moved
     func resolveBookmarkForTrack(_ track: Track) async -> URL? {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let bookmarksURL = documentsURL.appendingPathComponent("ExternalFileBookmarks.plist")
+        guard let store = ExternalFileBookmarkStore.default else { return nil }
 
-        guard FileManager.default.fileExists(atPath: bookmarksURL.path) else {
+        let bookmarks: [String: Data]
+        switch store.load() {
+        case .loaded(let loaded):
+            bookmarks = loaded
+        case .unreadable(let error):
+            print("⚠️ External bookmarks unreadable (treated as no bookmark): \(error)")
             return nil
         }
 
-        do {
-            let data = try Data(contentsOf: bookmarksURL)
-            guard let bookmarks = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Data],
-                  let bookmarkData = bookmarks[track.stableId] else {
-                return nil // No bookmark for this track
-            }
+        guard let bookmarkData = bookmarks[track.stableId] else {
+            return nil // No bookmark for this track
+        }
 
+        do {
             // Resolve bookmark to get current file location
             var isStale = false
             let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
@@ -1243,17 +1232,19 @@ class LibraryIndexer: NSObject, ObservableObject {
                 return nil
             }
 
-            // Update database path if file moved
+            // D5：文件移动 = stableId 变更（不变量 `stable_id == SHA256(标准化 path)`）。
+            // 此前只改 path 不改 stable_id → 行内身份与实际路径错位，改名迁移/去重/
+            // 内容指纹对账全部基于旧 id 追踪。改走完整迁移入口：stable_id + 四表引用
+            // + 文件侧引用（书签键/歌词/封面）一次搬完。
             if track.path != resolvedURL.path {
                 print("📍 Playback: File moved detected! Old: \(track.path)")
                 print("📍 Playback: File moved detected! New: \(resolvedURL.path)")
 
-                try databaseManager.write { db in
-                    var updatedTrack = track
-                    updatedTrack.path = resolvedURL.path
-                    try updatedTrack.update(db)
-                }
-                print("✅ Updated database path for playback: \(resolvedURL.lastPathComponent)")
+                let migratedStableId = try databaseManager.migrateTrackForMovedFile(
+                    oldStableId: track.stableId,
+                    newPath: resolvedURL.path
+                )
+                print("✅ Updated database path for playback: \(resolvedURL.lastPathComponent) (stableId \(track.stableId) → \(migratedStableId ?? "no-op"))")
             }
 
             return resolvedURL
