@@ -38,6 +38,7 @@ struct LyricsSearchView: View {
         self.accentColor = accentColor
         self.onClose = onClose
         self.onApply = onApply
+        // 显示值≠查询值：这里是发给网易云/lrclib 的查询串（按 UI 语言转字形会降低命中率），保持原文
         _searchTitle = State(initialValue: track.title)
         // 歌手名预填原本在 init 内同步 DB 读（阻塞初始化），改到 onAppear 的 Task 里
         _searchArtist = State(initialValue: "")
@@ -303,12 +304,13 @@ struct LyricsSearchView: View {
                     .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: 6))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(candidate.title)
+                    // 候选行是渲染出来的歌曲文本（转字形只影响显示；id/source 等取歌词用字段不动）
+                    Text(DisplayScriptNormalizer.display(candidate.title))
                         .font(.subheadline.weight(.medium))
                         .foregroundColor(.primary)
                         .lineLimit(1)
                     if !candidate.artist.isEmpty {
-                        Text(candidate.artist)
+                        Text(DisplayScriptNormalizer.display(candidate.artist))
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
