@@ -37,6 +37,188 @@ private enum MacLyricsEmptyKind {
     }
 }
 
+// MARK: - 切句过渡（emphasis 逐帧插值）
+
+/// 分段线性插值：节点按 emphasis 降序给出，超出两端取端值。
+/// 每个节点值 = 改前（3ff6474）该档位的静态渲染值，故静态效果不变，只有节点之间才插值。
+private func lyricLerp(_ value: Double, _ nodes: [(Double, Double)]) -> Double {
+    guard let first = nodes.first, let last = nodes.last else { return value }
+    if value >= first.0 { return first.1 }
+    if value <= last.0 { return last.1 }
+    for index in 0 ..< (nodes.count - 1) {
+        let (highEmphasis, highValue) = nodes[index]
+        let (lowEmphasis, lowValue) = nodes[index + 1]
+        guard value <= highEmphasis, value >= lowEmphasis else { continue }
+        let ratio = (value - lowEmphasis) / (highEmphasis - lowEmphasis)
+        return lowValue + (highValue - lowValue) * ratio
+    }
+    return last.1
+}
+
+/// 0.66 → 1.0 的归一化进度：只有这一段跨色相（语义色 → accent），低段只动 alpha。
+private func lyricEmphasisProgress(_ emphasis: Double) -> CGFloat {
+    CGFloat(min(max((emphasis - 0.66) / 0.34, 0), 1))
+}
+
+/// 语义色 → accent 的跨档位混色（fraction 0 = 语义色，1 = accent）。
+/// macOS 13 兼容：NSColor.blended(withFraction:of:)；Color.mix 是 macOS 15+ API，部署目标 13.0 不可用。
+private func blendSemantic(
+    _ base: NSColor,
+    alpha: CGFloat,
+    with accent: Color,
+    fraction: CGFloat
+) -> Color {
+    let clamped = min(max(fraction, 0), 1)
+    guard let from = base.withAlphaComponent(alpha).usingColorSpace(.sRGB),
+          let to = NSColor(accent).usingColorSpace(.sRGB),
+          let mixed = from.blended(withFraction: clamped, of: to)
+    else { return accent }
+    return Color(nsColor: mixed)
+}
+
+/// 行强调度（0…1，1 = 当前行）：Animatable —— 字号/颜色/阴影随过渡值逐帧插值，
+/// 替代「字号瞬间跳变（SwiftUI 不插值 Font）+ 两条曲线不同步」的急促观感（2026-09-13 用户反馈）。
+/// 字重不可插值 → 按 emphasis 阈值切换（切换点前后字号/透明度正在连续变化，视觉上被掩盖）。
+/// 透明度/缩放/行距作用于整行（含译文行）→ 由下面的 static 方法供行容器调用。
+private struct LyricLineEmphasis: ViewModifier, Animatable {
+    /// 0…1
+    var emphasis: Double
+    let accent: Color
+    let fontScale: CGFloat
+    let karaoke: Bool
+
+    /// 关键：让 emphasis 可插值 → body 逐帧重算 → 字号连续变化
+    var animatableData: Double {
+        get { emphasis }
+        set { emphasis = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: mainSize, weight: mainWeight))
+            .foregroundColor(mainColor)
+            .shadow(color: shadowColor, radius: shadowRadius)
+    }
+
+    // MARK: 行级度量（透明度/缩放/行距作用于整行，含译文行）
+
+    /// 整行透明度（节点值 = 改前的 mainOpacity；跟唱 1.0 / 0.8）
+    static func lineOpacity(_ emphasis: Double, karaoke: Bool) -> Double {
+        if karaoke {
+            return lyricLerp(emphasis, [(1.0, 1.0), (0.66, 0.8)])
+        }
+        return lyricLerp(
+            emphasis,
+            [(1.0, 1.0), (0.66, 0.9), (0.40, 0.6), (0.20, 0.3), (0.08, 0.15)]
+        )
+    }
+
+    /// 整行缩放（节点值 = 改前的 lineScale；跟唱不缩放）
+    static func lineScale(_ emphasis: Double, karaoke: Bool) -> CGFloat {
+        guard !karaoke else { return 1.0 }
+        return CGFloat(lyricLerp(emphasis, [(1.0, 1.02), (0.66, 0.97), (0.40, 0.94)]))
+    }
+
+    /// 整行垂直内边距（改前 当前行 24 / 其余 16；跟唱固定 18）
+    static func linePadding(_ emphasis: Double, karaoke: Bool) -> CGFloat {
+        guard !karaoke else { return 18 }
+        return CGFloat(lyricLerp(emphasis, [(1.0, 24), (0.66, 16)]))
+    }
+
+    // MARK: 主行样式
+
+    /// 字号（×fontScale）：1.0 → 26、0.66 → 19、0.40 及更远 → 16（跟唱 22 / 19）
+    private var mainSize: CGFloat {
+        let size = karaoke
+            ? lyricLerp(emphasis, [(1.0, 22), (0.66, 19)])
+            : lyricLerp(emphasis, [(1.0, 26), (0.66, 19), (0.40, 16)])
+        return CGFloat(size) * fontScale
+    }
+
+    private var mainWeight: Font.Weight {
+        if karaoke { return emphasis > 0.85 ? .bold : .regular }
+        if emphasis > 0.85 { return .bold }
+        if emphasis > 0.45 { return .semibold }
+        return .medium
+    }
+
+    /// 颜色：≤0.66 只插值 primary 的 alpha（0.75 / 0.40 / 0.18），>0.66 才由 primary 混向 accent
+    private var mainColor: Color {
+        let fraction = lyricEmphasisProgress(emphasis)
+        if karaoke {
+            guard fraction > 0 else { return .primary.opacity(0.8) }
+            return blendSemantic(.labelColor, alpha: 0.8, with: accent, fraction: fraction)
+        }
+        guard fraction > 0 else {
+            let alpha = lyricLerp(emphasis, [(0.66, 0.75), (0.40, 0.4), (0.20, 0.18), (0.08, 0.18)])
+            return .primary.opacity(alpha)
+        }
+        return blendSemantic(.labelColor, alpha: 0.75, with: accent, fraction: fraction)
+    }
+
+    /// 阴影：只有 0.66 → 1.0 段出现（1.0 → 半径 20 / accent 0.5，节点之下 → 0 / clear）
+    private var shadowRadius: CGFloat {
+        guard !karaoke else { return 0 }
+        return CGFloat(lyricLerp(emphasis, [(1.0, 20), (0.66, 0)]))
+    }
+
+    private var shadowColor: Color {
+        guard !karaoke else { return .clear }
+        return accent.opacity(0.5 * Double(lyricEmphasisProgress(emphasis)))
+    }
+}
+
+/// 译文行强调：与主行同一套路（节点值照旧：当前 16 / 距离 1 14 / 更远 13；
+/// 跟唱 当前 16 / 其余 14），字号与颜色都按 emphasis 插值、字号 ×fontScale。
+/// 整行透明度/缩放仍由行容器统一施加。
+private struct LyricTranslationEmphasis: ViewModifier, Animatable {
+    var emphasis: Double
+    let accent: Color
+    let fontScale: CGFloat
+    let karaoke: Bool
+
+    var animatableData: Double {
+        get { emphasis }
+        set { emphasis = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: size * fontScale))
+            .foregroundColor(color)
+    }
+
+    private var size: CGFloat {
+        let value = karaoke
+            ? lyricLerp(emphasis, [(1.0, 16), (0.66, 14)])
+            : lyricLerp(emphasis, [(1.0, 16), (0.66, 14), (0.20, 13)])
+        return CGFloat(value)
+    }
+
+    private var color: Color {
+        let fraction = lyricEmphasisProgress(emphasis)
+        if karaoke {
+            guard fraction > 0 else { return .secondary.opacity(0.7) }
+            return blendSemantic(
+                .secondaryLabelColor,
+                alpha: 0.7,
+                with: accent.opacity(0.95),
+                fraction: fraction
+            )
+        }
+        guard fraction > 0 else {
+            let alpha = lyricLerp(emphasis, [(0.66, 0.85), (0.40, 0.5), (0.20, 0.25)])
+            return .secondary.opacity(alpha)
+        }
+        return blendSemantic(
+            .secondaryLabelColor,
+            alpha: 0.85,
+            with: accent.opacity(0.95),
+            fraction: fraction
+        )
+    }
+}
+
 struct MacLyricsView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
@@ -64,6 +246,11 @@ struct MacLyricsView: View {
     private var baseColor: Color { Color(nsColor: .windowBackgroundColor) }
     /// 字号整体缩放系数（对齐 iOS LyricsView 的固定字号体系）
     private var fontScale: CGFloat { CGFloat(fontSize / 15.0) }
+
+    /// 切句过渡动画：行强调与滚屏共用同一条曲线。
+    /// 改前是两条响应不同的 spring（行 ≈0.31s / 滚屏 ≈0.48s）→ 文字先变完、屏才开始滚，
+    /// 观感是二次突变；统一成一条 0.55s / 阻尼 0.92 的柔和曲线（2026-09-13 用户反馈）。
+    private static let lyricAnimation = Animation.spring(response: 0.55, dampingFraction: 0.92)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -373,14 +560,7 @@ struct MacLyricsView: View {
                     // 等选 AB 终点（b == nil）时暂停自动滚动：让用户手动滚动找 B 句
                     // （对齐 iOS updateActiveLineAndScroll，用户拍板 2026-08-29）
                     if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
-                    withAnimation(
-                        .interpolatingSpring(
-                            mass: 1.0,
-                            stiffness: 170,
-                            damping: 25,
-                            initialVelocity: 0
-                        )
-                    ) {
+                    withAnimation(Self.lyricAnimation) {
                         proxy.scrollTo(newIndex, anchor: .center)
                     }
                 }
@@ -403,43 +583,59 @@ struct MacLyricsView: View {
         return top ? stops : stops.reversed()
     }
 
+    /// 行强调度（0…1）：非跟唱按与当前行的距离取档（档位值 = 改前的静态值），跟唱统一 1.0 / 0.66。
+    private func emphasisValue(isActive: Bool, distance: Int) -> Double {
+        if karaoke.isKaraokeOn { return isActive ? 1.0 : 0.66 }
+        if isActive { return 1.0 }
+        switch distance {
+        case 1: return 0.66
+        case 2: return 0.40
+        case 3: return 0.20
+        default: return 0.08
+        }
+    }
+
     private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
-        VStack(spacing: 4) {
+        let emphasis = emphasisValue(isActive: isActive, distance: distance)
+        let isKaraoke = karaoke.isKaraokeOn
+        return VStack(spacing: 4) {
             Text(line.displayText)
-                .font(mainFont(isActive: isActive, distance: distance))
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
-                .foregroundColor(mainColor(isActive: isActive, distance: distance))
                 .multilineTextAlignment(.center)
-                .shadow(
-                    color: isActive ? appAccentColor.opacity(0.5) : .clear,
-                    radius: isActive ? 20 : 0
+                .modifier(
+                    LyricLineEmphasis(
+                        emphasis: emphasis,
+                        accent: appAccentColor,
+                        fontScale: fontScale,
+                        karaoke: isKaraoke
+                    )
                 )
 
             if showTranslation, let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)
-                    .font(translationFont(isActive: isActive, distance: distance))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .foregroundColor(translationColor(isActive: isActive, distance: distance))
                     .multilineTextAlignment(.center)
+                    .modifier(
+                        LyricTranslationEmphasis(
+                            emphasis: emphasis,
+                            accent: appAccentColor,
+                            fontScale: fontScale,
+                            karaoke: isKaraoke
+                        )
+                    )
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 32)
-        .padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))
+        .padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))
         .id(index)
-        .scaleEffect(lineScale(isActive: isActive, distance: distance), anchor: .center)
-        .opacity(mainOpacity(isActive: isActive, distance: distance))
-        .animation(
-            .interpolatingSpring(
-                mass: 0.5,
-                stiffness: 200,
-                damping: 20,
-                initialVelocity: 0
-            ),
-            value: isActive
-        )
+        .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke), anchor: .center)
+        .opacity(LyricLineEmphasis.lineOpacity(emphasis, karaoke: isKaraoke))
+        // 行强调由播放 tick 驱动的 body 重算得出（不是用户事件）→ 靠 .animation(value:) 触发，
+        // 与滚屏共用同一条曲线（不要再套 withAnimation）
+        .animation(Self.lyricAnimation, value: emphasis)
         .contentShape(Rectangle())
         // 对齐 iOS LyricsView：仅跟唱模式响应，决策统一走 clickLine
         // （无 AB → 播放该句；等选终点 → 设 B；区间内 → 跳到该句播放）
@@ -458,88 +654,6 @@ struct MacLyricsView: View {
                     .frame(width: 7, height: 7)
                     .padding(.trailing, 26)
             }
-        }
-    }
-
-    /// 主行字号（×k）：跟唱整屏等大可见；非跟唱按与当前行的距离分级
-    private func mainFont(isActive: Bool, distance: Int) -> Font {
-        if karaoke.isKaraokeOn {
-            return .system(size: (isActive ? 22 : 19) * fontScale, weight: isActive ? .bold : .regular)
-        }
-        if isActive {
-            return .system(size: 26 * fontScale, weight: .bold)
-        } else if distance <= 1 {
-            return .system(size: 19 * fontScale, weight: .semibold)
-        } else {
-            return .system(size: 16 * fontScale, weight: .medium)
-        }
-    }
-
-    private func mainColor(isActive: Bool, distance: Int) -> Color {
-        if karaoke.isKaraokeOn {
-            return isActive ? appAccentColor : .primary.opacity(0.8)
-        }
-        if isActive {
-            return appAccentColor
-        } else if distance <= 1 {
-            return .primary.opacity(0.75)
-        } else if distance <= 2 {
-            return .primary.opacity(0.4)
-        } else {
-            return .primary.opacity(0.18)
-        }
-    }
-
-    private func mainOpacity(isActive: Bool, distance: Int) -> Double {
-        if karaoke.isKaraokeOn {
-            return isActive ? 1.0 : 0.8
-        }
-        if isActive {
-            return 1.0
-        } else if distance <= 1 {
-            return 0.9
-        } else if distance <= 2 {
-            return 0.6
-        } else if distance <= 3 {
-            return 0.3
-        } else {
-            return 0.15
-        }
-    }
-
-    private func lineScale(isActive: Bool, distance: Int) -> CGFloat {
-        if karaoke.isKaraokeOn { return 1.0 }
-        if isActive { return 1.02 }
-        return distance <= 1 ? 0.97 : 0.94
-    }
-
-    /// 译文行字号（×k）
-    private func translationFont(isActive: Bool, distance: Int) -> Font {
-        let size: CGFloat
-        if karaoke.isKaraokeOn {
-            size = isActive ? 16 : 14
-        } else if isActive {
-            size = 16
-        } else if distance <= 1 {
-            size = 14
-        } else {
-            size = 13
-        }
-        return .system(size: size * fontScale)
-    }
-
-    private func translationColor(isActive: Bool, distance: Int) -> Color {
-        if karaoke.isKaraokeOn {
-            return isActive ? appAccentColor.opacity(0.95) : .secondary.opacity(0.7)
-        }
-        if isActive {
-            return appAccentColor.opacity(0.95)
-        } else if distance <= 1 {
-            return .secondary.opacity(0.85)
-        } else if distance <= 2 {
-            return .secondary.opacity(0.5)
-        } else {
-            return .secondary.opacity(0.25)
         }
     }
 
