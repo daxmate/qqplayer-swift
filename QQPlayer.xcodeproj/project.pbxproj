@@ -148,6 +148,7 @@
 		077EEB1C6A6F4468893454B3 /* DisplayScriptContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D96D2271B3C4C909F926881 /* DisplayScriptContractTests.swift */; };
 		101DC833D5334782AE72320D /* DisplayScriptLanguageOverrideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */; };
 		4D5400DE37BD4A17986438FF /* SyncDataSyncCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E96B5114D5BB4B1D88E89AF2 /* SyncDataSyncCoreTests.swift */; };
+		687FCF0AA8A94705ABB8EAFB /* SyncWiringContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -345,6 +346,7 @@
 		4D96D2271B3C4C909F926881 /* DisplayScriptContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DisplayScriptContractTests.swift; sourceTree = "<group>"; };
 		E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DisplayScriptLanguageOverrideTests.swift; sourceTree = "<group>"; };
 		E96B5114D5BB4B1D88E89AF2 /* SyncDataSyncCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDataSyncCoreTests.swift; sourceTree = "<group>"; };
+		BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncWiringContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -949,6 +951,7 @@
 				4D96D2271B3C4C909F926881 /* DisplayScriptContractTests.swift */,
 				E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */,
 				E96B5114D5BB4B1D88E89AF2 /* SyncDataSyncCoreTests.swift */,
+				BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1395,6 +1398,7 @@
 				077EEB1C6A6F4468893454B3 /* DisplayScriptContractTests.swift in Sources */,
 				101DC833D5334782AE72320D /* DisplayScriptLanguageOverrideTests.swift in Sources */,
 				4D5400DE37BD4A17986438FF /* SyncDataSyncCoreTests.swift in Sources */,
+				687FCF0AA8A94705ABB8EAFB /* SyncWiringContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
