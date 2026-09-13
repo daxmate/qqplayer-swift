@@ -40,15 +40,28 @@ struct DatabaseSyncPeerLibraryFacts {
     let libraryRoot: URL
     /// 「收藏」伪歌单显示名（默认走既有本地化键；测试可注入固定串）。
     let favoritesName: String
+    /// 自动歌单（`@smart:*`）显示名（默认走本地化键；测试可注入固定串）。
+    let smartNames: [SyncBrowseSmartKind: String]
+
+    /// 自动歌单缺省显示名（本端语言；与播放列表页**同一份**本地化键，不另起文案）。
+    static var defaultSmartNames: [SyncBrowseSmartKind: String] {
+        [
+            .recentAdded: Localized.smartPlaylistTitle(.recentAdded),
+            .recentPlayed: Localized.smartPlaylistTitle(.recentPlayed),
+            .topPlayed: Localized.smartPlaylistTitle(.topPlayed),
+        ]
+    }
 
     init(
         database: DatabaseManager = .shared,
         libraryRoot: URL,
-        favoritesName: String? = nil
+        favoritesName: String? = nil,
+        smartNames: [SyncBrowseSmartKind: String]? = nil
     ) {
         self.database = database
         self.libraryRoot = libraryRoot
         self.favoritesName = favoritesName ?? "sync_run_favorites".localized
+        self.smartNames = smartNames ?? Self.defaultSmartNames
     }
 
     /// 应答路径用的惰性 provider（供被动端装配注入）。
@@ -58,12 +71,14 @@ struct DatabaseSyncPeerLibraryFacts {
     static func catalogProvider(
         database: DatabaseManager = .shared,
         libraryRoot: URL,
-        favoritesName: String? = nil
+        favoritesName: String? = nil,
+        smartNames: [SyncBrowseSmartKind: String]? = nil
     ) -> () -> SyncPeerLibraryCatalog {
         let facts = DatabaseSyncPeerLibraryFacts(
             database: database,
             libraryRoot: libraryRoot,
-            favoritesName: favoritesName
+            favoritesName: favoritesName,
+            smartNames: smartNames
         )
         return { facts.catalog() }
     }
@@ -124,6 +139,24 @@ struct DatabaseSyncPeerLibraryFacts {
                 // 同 slug 撞名（历史数据）→ 并集：多算条目是安全侧（多列几首），漏算是危险侧
                 memberPathsByPlaylist[slug, default: []].formUnion(paths)
             }
+        }
+
+        // 自动歌单（最近添加 / 最近播放 / 常听排行）：与播放列表页同一数据层，
+        // 成员相对路径口径 = `SmartPlaylistSourceResolver`（本端单曲来源同一份实现，
+        // 两端同口径）。trackCount = 成员集 ∩ 曲目清单，保证「按该 id 筛 tracks」条数一致。
+        let resolver = SmartPlaylistSourceResolver(database: database, libraryRoot: libraryRoot)
+        var smartMemberPaths: [SyncBrowseSmartKind: Set<String>] = [:]
+        for kind in SyncBrowseSmartKind.allCases {
+            smartMemberPaths[kind] = resolver.pathSet(for: SyncBrowseSourceRef.smart(kind))
+        }
+        let smartEntries = SyncPeerLibraryCatalog.smartPlaylistEntries(
+            names: smartNames,
+            memberPaths: smartMemberPaths,
+            catalogPaths: Set(trackItems.map(\.relativePath))
+        )
+        playlists.append(contentsOf: smartEntries.playlists)
+        for (playlistID, paths) in smartEntries.members {
+            memberPathsByPlaylist[playlistID] = paths
         }
 
         return SyncPeerLibraryCatalog(

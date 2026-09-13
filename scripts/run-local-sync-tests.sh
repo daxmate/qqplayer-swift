@@ -43,6 +43,9 @@ SOURCES=(
   # T9「对端内容清单」（帧 15/16）：载荷 + 纯逻辑清单/分页 + 应答端 + 客户端（Mac）
   QQPlayer/Sync/SyncPeerLibraryModels.swift
   QQPlayer/Sync/SyncPeerLibraryCatalog.swift
+  # 同步内容来源标识命名空间（纯逻辑，零依赖；`SyncPeerLibraryCatalog` 的 `@smart:*`
+  # 条目装配依赖它，故必须一起编入 harness）
+  QQPlayer/Sync/SyncBrowseSource.swift
   QQPlayer/Sync/SyncPeerLibraryResponder.swift
   QQPlayer/Sync/SyncPeerLibraryClient.swift
   QQPlayer/Sync/SyncCollection.swift

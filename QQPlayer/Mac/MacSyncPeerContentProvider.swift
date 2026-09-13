@@ -141,10 +141,16 @@ final class MacSyncPeerContentProvider {
     }
 
     /// 对端曲目一页（`query` 空 = 全库；**搜索在对端执行**，本端不做过滤）。
-    func loadTrackPage(query: String, offset: Int) async throws -> SyncUIPeerTrackPage {
+    /// `source` 决定对端的收窄范围：全部曲库 → `playlistID = nil`（既有语义）；
+    /// 其余来源（收藏 / `@smart:*` / 真实歌单）→ 带该标识让对端先按歌单收口。
+    func loadTrackPage(
+        source: SyncBrowseSourceRef,
+        query: String,
+        offset: Int
+    ) async throws -> SyncUIPeerTrackPage {
         let normalized = SyncUISearchGate.normalize(query)
         let response = try await client.fetchTracks(
-            playlistID: nil,
+            playlistID: source.peerPlaylistID,
             query: normalized.isEmpty ? nil : normalized,
             offset: max(0, offset),
             limit: Self.pageSize

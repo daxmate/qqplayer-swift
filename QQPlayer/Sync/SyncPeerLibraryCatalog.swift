@@ -186,3 +186,40 @@ struct SyncPeerLibraryCatalog: Equatable, Sendable {
         "\(item.title ?? "")\u{1F}\(item.artistName ?? "")\u{1F}\(item.sizeBytes)\u{1F}\(item.contentHash ?? "")"
     }
 }
+
+// MARK: - 自动歌单条目（`@smart:*`，2026-09-13）
+
+extension SyncPeerLibraryCatalog {
+    /// 自动歌单（`@smart:*`）条目装配（**纯函数**，确定性）。
+    ///
+    /// 为什么在这里：`@smart:*` 是 playlist 命名空间的保留标识，条目形态必须与其它
+    /// 歌单条目完全一致（同一个 `SyncPeerPlaylistItem`），而「`trackCount` 必须等于按
+    /// 该 id 筛 tracks 的条数」这条纪律由本函数收口——成员集先与曲目清单求交，
+    /// 否则顶部摘要的数字会与筛选结果对不上（既有 favorites 同款纪律）。
+    ///
+    /// - 顺序 = `SyncBrowseSmartKind.allCases`（固定序，与同步页展示序一致）；
+    /// - 成员集与 `catalogPaths` 求交（不在清单里的成员不计入，口径同真实歌单）；
+    /// - 名称为空 → 回落标识本身（不产生空行）。
+    static func smartPlaylistEntries(
+        names: [SyncBrowseSmartKind: String],
+        memberPaths: [SyncBrowseSmartKind: Set<String>],
+        catalogPaths: Set<String>
+    ) -> (playlists: [SyncPeerPlaylistItem], members: [String: Set<String>]) {
+        var playlists: [SyncPeerPlaylistItem] = []
+        var members: [String: Set<String>] = [:]
+        for kind in SyncBrowseSmartKind.allCases {
+            let ref = SyncBrowseSourceRef.smart(kind)
+            let paths = (memberPaths[kind] ?? []).intersection(catalogPaths)
+            let name = (names[kind] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            playlists.append(
+                SyncPeerPlaylistItem(
+                    id: ref.id,
+                    name: name.isEmpty ? ref.id : name,
+                    trackCount: paths.count
+                )
+            )
+            members[ref.id] = paths
+        }
+        return (playlists, members)
+    }
+}

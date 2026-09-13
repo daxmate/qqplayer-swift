@@ -83,21 +83,99 @@ struct MacSyncLocalContentProvider {
 
     // MARK: - 曲目
 
-    /// 单曲级一页（`query` 非空 = 搜索，返回的 `hasMore` 恒 false：搜索结果不分页）。
-    func trackPage(query: String, offset: Int) -> (options: [SyncUITrackOption], hasMore: Bool) {
+    /// 单曲级一页（**来源内 + 搜索词内**分页）。
+    /// - `source.isLibraryWide`（全部曲库）：沿用既有 DB 分页 / DB 搜索（不在内存里展开全库）；
+    /// - 其余来源（收藏 / 自动歌单 / 真实歌单）：取成员全集 → 搜索词收窄 → 内存分页。
+    ///
+    /// `hasMore` = 后面还有页（全库分页语义不变；其余来源 = 内存切片后是否还有剩余）。
+    func trackPage(
+        source: SyncBrowseSourceRef,
+        query: String,
+        offset: Int
+    ) -> (options: [SyncUITrackOption], hasMore: Bool) {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let rows: [Track]
-        if normalized.isEmpty {
-            rows = (try? database.getTracksPaginated(
-                limit: Self.trackPageSize,
-                offset: max(0, offset)
-            )) ?? []
-        } else {
+        if source.isLibraryWide {
+            let rows: [Track]
+            if normalized.isEmpty {
+                rows = (try? database.getTracksPaginated(
+                    limit: Self.trackPageSize,
+                    offset: max(0, offset)
+                )) ?? []
+                artistNames.loadIfNeeded(for: rows, database: database)
+                return (rows.compactMap(trackOption(for:)), rows.count == Self.trackPageSize)
+            }
             rows = (try? database.searchTracks(query: normalized, limit: Self.trackSearchLimit)) ?? []
+            artistNames.loadIfNeeded(for: rows, database: database)
+            // 搜索结果不分页（既有语义）
+            return (rows.compactMap(trackOption(for:)), false)
         }
-        artistNames.loadIfNeeded(for: rows, database: database)
-        let options = rows.compactMap(trackOption(for:))
-        return (options, normalized.isEmpty && rows.count == Self.trackPageSize)
+
+        let members = SmartPlaylistSourceResolver(database: database, libraryRoot: libraryRoot)
+            .tracks(for: source)
+        artistNames.loadIfNeeded(for: members, database: database)
+        let allOptions = members.compactMap(trackOption(for:))
+        let filtered = normalized.isEmpty ? allOptions : allOptions.filter {
+            SyncBrowseSourceSearch.matches(
+                title: $0.title,
+                artistName: $0.artistName,
+                relativePath: $0.relativePath,
+                query: normalized
+            )
+        }
+        let page = SyncBrowseSourcePager.slice(filtered, offset: offset, pageSize: Self.trackPageSize)
+        return (page.items, page.hasMore)
+    }
+
+    // MARK: - 来源（browse sources）
+
+    /// 内容来源清单（单曲 tab 的来源下拉 / 歌单 tab 的下钻入口）。
+    ///
+    /// 顺序由 `SyncBrowseSourceCatalog.ordered` 收口（全部曲库 → 收藏 → 3 个自动歌单
+    /// → 真实歌单 slug 升序），每项带曲目数与大小合计（大小未知的曲目按 0 计入）。
+    func browseSources() -> [SyncBrowseSourceOption] {
+        let titles = MacSyncBrowseTitles.current
+        let resolver = SmartPlaylistSourceResolver(database: database, libraryRoot: libraryRoot)
+        var options: [SyncBrowseSourceOption] = []
+
+        // 全部曲库（本端合成项；规模走既有全库事实）
+        let library = libraryFacts()
+        options.append(
+            SyncBrowseSourceOption(
+                ref: .library,
+                title: titles.title(for: .library) ?? "",
+                trackCount: library.trackCount,
+                totalBytes: library.totalBytes
+            )
+        )
+
+        // 收藏 + 真实歌单（复用既有选项目径：一次全库索引 + 每歌单成员查询）
+        for option in playlistOptions() {
+            guard let ref = SyncBrowseSourceRef.parse(id: option.id) else { continue }
+            options.append(
+                SyncBrowseSourceOption(
+                    ref: ref,
+                    title: titles.title(for: ref) ?? option.title,
+                    trackCount: option.trackCount,
+                    totalBytes: option.totalBytes
+                )
+            )
+        }
+
+        // 自动歌单（与播放列表页同一数据层，同一条数上限）
+        for kind in SyncBrowseSmartKind.allCases {
+            let ref = SyncBrowseSourceRef.smart(kind)
+            let members = resolver.tracks(for: ref)
+            options.append(
+                SyncBrowseSourceOption(
+                    ref: ref,
+                    title: titles.title(for: ref) ?? ref.id,
+                    trackCount: members.count,
+                    totalBytes: totalBytes(of: members)
+                )
+            )
+        }
+
+        return SyncBrowseSourceCatalog.ordered(options)
     }
 
     // MARK: - 全库规模
@@ -156,4 +234,25 @@ final class ArtistNameCache {
     }
 
     func name(forStableId stableId: String) -> String? { names[stableId] }
+}
+
+// MARK: - 保留标识的本地化标题（Mac 侧唯一装配点）
+
+/// `SyncBrowseSourceTitles`（纯值）的**本地化装配点**：可本地化文案只在这里产生，
+/// 纯逻辑文件（`Sync/SyncBrowseSource.swift`）不碰文案。
+///
+/// 全部复用既有键，不新增本地化条目：「全部曲库」= 同步页选择模式键；
+/// 「收藏」= `sync_run_favorites`；自动歌单 = 播放列表页同一份键（`Localized.smartPlaylistTitle`）。
+enum MacSyncBrowseTitles {
+    static var current: SyncBrowseSourceTitles {
+        SyncBrowseSourceTitles(
+            library: "sync_run_mode_library".localized,
+            favorites: "sync_run_favorites".localized,
+            smart: [
+                .recentAdded: Localized.smartPlaylistTitle(.recentAdded),
+                .recentPlayed: Localized.smartPlaylistTitle(.recentPlayed),
+                .topPlayed: Localized.smartPlaylistTitle(.topPlayed),
+            ]
+        )
+    }
 }

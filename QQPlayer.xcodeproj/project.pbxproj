@@ -142,6 +142,8 @@
 		CB708B9FA3B14F34A538F955 /* CloudCopyArchiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBB68FA07FD4BA8AA31CF0E /* CloudCopyArchiverTests.swift */; };
 		0EFEED25D00648BAA2541460 /* LibraryIndexerCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5118775D895341ED854DBA44 /* LibraryIndexerCancellationTests.swift */; };
 		93777CE702E14711BC025088 /* ArtworkCacheEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5949C69E938E437AAADAD641 /* ArtworkCacheEncodingTests.swift */; };
+		CC2F6D86CF6C4C78BC47D883 /* SyncBrowseSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4389FDA16154BE8A8B1DFE4 /* SyncBrowseSourceTests.swift */; };
+		091092B377F4402EBE1EC58B /* SmartPlaylistSourceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E957BA80E0243FBB0D86999 /* SmartPlaylistSourceResolverTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -333,6 +335,8 @@
 		8EBB68FA07FD4BA8AA31CF0E /* CloudCopyArchiverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudCopyArchiverTests.swift; sourceTree = "<group>"; };
 		5118775D895341ED854DBA44 /* LibraryIndexerCancellationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryIndexerCancellationTests.swift; sourceTree = "<group>"; };
 		5949C69E938E437AAADAD641 /* ArtworkCacheEncodingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkCacheEncodingTests.swift; sourceTree = "<group>"; };
+		A4389FDA16154BE8A8B1DFE4 /* SyncBrowseSourceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncBrowseSourceTests.swift; sourceTree = "<group>"; };
+		5E957BA80E0243FBB0D86999 /* SmartPlaylistSourceResolverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartPlaylistSourceResolverTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -563,6 +567,7 @@
 				"Services/SFBAudioEngineManager+Playback.swift",
 				"Services/SFBAudioEngineManager+Queue.swift",
 				Services/SimplifiedTraditionalMap.swift,
+				Services/SmartPlaylistSourceResolver.swift,
 				Services/SmartPlaylistStore.swift,
 				Services/SpotifyAPI.swift,
 				Services/StateManager.swift,
@@ -581,6 +586,7 @@
 				Sync/PairingModels.swift,
 				Sync/PairingStateMachine.swift,
 				Sync/SyncAlignedLyrics.swift,
+				Sync/SyncBrowseSource.swift,
 				Sync/SyncChangeLogDeletionPolicy.swift,
 				Sync/SyncChangeLogMapping.swift,
 				Sync/SyncChangeLogPendingStore.swift,
@@ -911,6 +917,8 @@
 				8EBB68FA07FD4BA8AA31CF0E /* CloudCopyArchiverTests.swift */,
 				5118775D895341ED854DBA44 /* LibraryIndexerCancellationTests.swift */,
 				5949C69E938E437AAADAD641 /* ArtworkCacheEncodingTests.swift */,
+				A4389FDA16154BE8A8B1DFE4 /* SyncBrowseSourceTests.swift */,
+				5E957BA80E0243FBB0D86999 /* SmartPlaylistSourceResolverTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1351,6 +1359,8 @@
 				CB708B9FA3B14F34A538F955 /* CloudCopyArchiverTests.swift in Sources */,
 				0EFEED25D00648BAA2541460 /* LibraryIndexerCancellationTests.swift in Sources */,
 				93777CE702E14711BC025088 /* ArtworkCacheEncodingTests.swift in Sources */,
+				CC2F6D86CF6C4C78BC47D883 /* SyncBrowseSourceTests.swift in Sources */,
+				091092B377F4402EBE1EC58B /* SmartPlaylistSourceResolverTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

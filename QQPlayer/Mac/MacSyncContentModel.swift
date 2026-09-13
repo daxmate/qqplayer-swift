@@ -57,6 +57,12 @@ final class MacSyncContentModel: ObservableObject {
     /// 单曲级搜索词（View 绑定；去抖到期后调用 `applySearch()`）。
     @Published var trackQuery = ""
 
+    /// 内容来源清单（全部曲库 / 收藏 / 自动歌单 / 真实歌单；顺序由
+    /// `SyncBrowseSourceCatalog.ordered` 收口，View 不再自己排序）。
+    @Published private(set) var browseSources: [SyncBrowseSourceOption] = []
+    /// 当前内容来源（默认全部曲库；切方向 / 断开重置）。
+    @Published private(set) var browseSource: SyncBrowseSourceRef = .library
+
     /// 歌单清单加载态（对端清单才有异步态；本端为 `.loaded`）。
     @Published private(set) var playlistState: SyncUIContentLoadState = .idle
     /// 单曲列表加载态（同上）。
@@ -207,6 +213,69 @@ final class MacSyncContentModel: ObservableObject {
     /// 清空选择（不推不拉）。
     func clearSelection() { clearSelection(persist: true) }
 
+    // MARK: - 来源（View 调用）
+
+    /// 切换内容来源：**必须在当前 `browseSources` 内**（否则忽略）→ 重置分页 + 重载曲目。
+    ///
+    /// ⚠️ **绝不清空选择集**：跨来源累加是本期核心语义（用户在「最近添加」勾几首、
+    /// 再切到某个歌单继续勾，已勾选的单曲全部保留）。
+    func selectBrowseSource(_ ref: SyncBrowseSourceRef) {
+        guard browseSources.contains(where: { $0.ref == ref }) else { return }
+        guard browseSource != ref else { return }
+        browseSource = ref
+        reloadTracks(reset: true)
+    }
+
+    /// 歌单 tab 下钻入口：切到单曲级 + 选该来源（同样不清空已选）。
+    func pickTracks(in ref: SyncBrowseSourceRef) {
+        selectBrowseSource(ref)
+        setMode(.tracks)
+    }
+
+    /// 重算来源清单（本端 = 同步 DB 读；对端 = 由已加载的清单/摘要合成）。
+    private func rebuildBrowseSources() {
+        switch source {
+        case .none:
+            browseSources = []
+        case .local:
+            browseSources = local.browseSources()
+        case .peer:
+            browseSources = makePeerBrowseSources()
+        }
+        // 来源清单变了但当前来源没了（如对端删了该歌单）→ 回到全部曲库（不静默指向未知来源）。
+        if !browseSources.contains(where: { $0.ref == browseSource }), let first = browseSources.first {
+            browseSource = first.ref
+        }
+    }
+
+    /// 对端（iPhone）来源清单：全部曲库（摘要数字）+ 对端清单里的收藏 / `@smart:*` /
+    /// 真实歌单。保留标识一律用**本端语言**显示（与收藏伪歌单同款纪律：对端回传的
+    /// 名字是它自己语言的）；大小未知 → nil（不编造 0 B）。
+    private func makePeerBrowseSources() -> [SyncBrowseSourceOption] {
+        let titles = MacSyncBrowseTitles.current
+        let library = libraryFacts
+        var options: [SyncBrowseSourceOption] = [
+            SyncBrowseSourceOption(
+                ref: .library,
+                title: titles.title(for: .library) ?? "",
+                trackCount: library.trackCount,
+                totalBytes: library.totalBytes
+            ),
+        ]
+        for option in playlistOptions {
+            guard let ref = SyncBrowseSourceRef.parse(id: option.id) else { continue }
+            options.append(
+                SyncBrowseSourceOption(
+                    ref: ref,
+                    title: titles.title(for: ref) ?? option.title,
+                    trackCount: option.trackCount,
+                    totalBytes: option.totalBytes > 0 ? option.totalBytes : nil
+                )
+            )
+        }
+        return SyncBrowseSourceCatalog.ordered(options)
+    }
+
     /// 全曲库选择的规模预览（二次确认文案；下载方向用**对端**的数字）。
     func libraryWidePreview() -> SyncUISelectionSummary {
         SyncUISelectionSummarizer.make(
@@ -263,6 +332,7 @@ final class MacSyncContentModel: ObservableObject {
         case .local:
             playlistOptions = local.playlistOptions()
             playlistState = .loaded
+            rebuildBrowseSources()
             estimateSelection()
         case .peer:
             reloadPeerPlaylists()
@@ -309,6 +379,8 @@ final class MacSyncContentModel: ObservableObject {
         searchGate.reset()
         peerFacts = nil
         localFacts = .empty
+        browseSources = []
+        browseSource = .library
         playlistState = .idle
         tracksState = .idle
         summaryState = .idle
@@ -363,7 +435,11 @@ final class MacSyncContentModel: ObservableObject {
 
     private func reloadLocalTracks(reset: Bool) {
         if reset { trackOffset = 0 }
-        let page = local.trackPage(query: searchGate.appliedQuery, offset: trackOffset)
+        let page = local.trackPage(
+            source: browseSource,
+            query: searchGate.appliedQuery,
+            offset: trackOffset
+        )
         trackOptions = SyncUIContentPager.merge(existing: trackOptions, page: page.options, reset: reset)
         trackOffset = SyncUIContentPager.nextOffset(loadedCount: trackOptions.count)
         hasMoreTracks = page.hasMore
@@ -389,6 +465,8 @@ final class MacSyncContentModel: ObservableObject {
                 guard let self, self.generation == generation else { return }
                 self.playlistOptions = options
                 self.playlistState = .loaded
+                // 来源清单依赖对端清单（收藏 / `@smart:*` / 真实歌单）→ 一并重建
+                self.rebuildBrowseSources()
                 self.estimateSelection()
             } catch {
                 guard let self, self.generation == generation else { return }
@@ -408,6 +486,8 @@ final class MacSyncContentModel: ObservableObject {
                 guard let self, self.generation == generation else { return }
                 self.peerFacts = facts
                 self.summaryState = .loaded
+                // 摘要只影响「全部曲库」行的数字 → 重建来源清单（数量/大小同步刷新）
+                self.rebuildBrowseSources()
                 self.estimateSelection()
             } catch {
                 guard let self, self.generation == generation else { return }
@@ -426,12 +506,18 @@ final class MacSyncContentModel: ObservableObject {
         let generation = self.generation
         let query = searchGate.appliedQuery
         let offset = trackOffset
+        // 来源在任务外取定（任务闭包内 `self` 是弱引用；来源与 query/offset 属同一快照）
+        let source = browseSource
         loadTask?.cancel()
         tracksState = .loading
         isLoadingTracks = true
         loadTask = Task { @MainActor [weak self] in
             do {
-                let page = try await peer.loadTrackPage(query: query, offset: offset)
+                let page = try await peer.loadTrackPage(
+                    source: source,
+                    query: query,
+                    offset: offset
+                )
                 guard let self, self.generation == generation else { return }
                 self.trackOptions = SyncUIContentPager.merge(
                     existing: self.trackOptions,
