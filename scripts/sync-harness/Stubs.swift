@@ -127,3 +127,25 @@ final class LibraryIndexer: @unchecked Sendable {
         return true
     }
 }
+
+// MARK: - SmartPlaylistKind（生产定义在 Services/SmartPlaylistStore.swift）
+//
+// 为什么是桩：`SyncBrowseSource.swift`（T11「来源挑歌」，2026-09-13）的
+// `var smartPlaylistKind: SmartPlaylistKind` 需要这个类型，而它的生产宿主
+// `Services/SmartPlaylistStore.swift` 是 **GRDB-SQL 重依赖**（`Database` / `Row.fetchAll`
+// / `Track.fetchAll(db, sql:arguments:)` / `DatabaseManager.read`）——要在命令行编它，
+// 桩里就得实现真 SQL 查询语义，等于再造一个数据库，不可行。
+//
+// 故按本文件既有模式（`Track` / `DatabaseManager` / `DeleteSettings` 等都是这么做的）
+// 给出**与生产逐字同形**的替身：case 名、case 顺序、rawValue、协议一致性全部一致。
+//
+// ⚠️ 漂移防线（两道）：
+// ① 编译期：`SyncBrowseSource.swift` 里按 case 的 switch 是穷尽式的，
+//    桩少一个 case / 改名 → harness 直接编译失败。
+// ② 运行期：`run-local-sync-tests.sh` 在编译前比对本声明与生产声明，不一致即报错退出
+//    （防「生产新增 case 但桩没跟」这类编译期看不见的漂移）。
+
+enum SmartPlaylistKind: String, CaseIterable, Identifiable {
+    case recentAdded, recentPlayed, topPlayed, decades
+    var id: String { rawValue }
+}

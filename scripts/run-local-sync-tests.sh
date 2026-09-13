@@ -13,6 +13,10 @@
 # 覆盖不到的（由 CI 的 xcodebuild test 兜底）：Swift Testing 套件本体、iOS/Mac
 # target 的特有代码路径（LibraryIndexer 真实现、MacSyncLibraryHost 装配）。
 #
+# T12（2026-09-14）：`SyncBrowseSource.swift` 依赖的 `SmartPlaylistKind` 走 harness 同形桩
+# （生产宿主 SmartPlaylistStore 是 GRDB-SQL 重依赖，无法命令行直编）——编译前先跑桩/生产
+# 声明一致性守卫，防「生产新增 case」这类编译期看不见的漂移。
+#
 # 用法：scripts/run-local-sync-tests.sh [--verbose]
 set -uo pipefail
 
@@ -74,6 +78,32 @@ SOURCES=(
   scripts/sync-harness/HarnessSupport.swift
   scripts/sync-harness/main.swift
 )
+
+# ── 漂移守卫：SmartPlaylistKind（生产 vs harness 桩）──────────────────────────
+# `SyncBrowseSource.swift`（T11「来源挑歌」）依赖 `SmartPlaylistKind`，而它的生产宿主
+# `Services/SmartPlaylistStore.swift` 是 GRDB-SQL 重依赖、无法命令行直编，故本 harness
+# 用同形桩（scripts/sync-harness/Stubs.swift）替代。桩与生产必须逐字同形，否则
+# 「生产新增 case」这类漂移编译期看不见。守卫失败即退出，不静默降级。
+extract_smart_playlist_kind() {
+  awk '/^enum SmartPlaylistKind: /{ found = 1; print; next }
+       found && /^    case /{ print; exit }' "$1"
+}
+prod_kind="$(extract_smart_playlist_kind QQPlayer/Services/SmartPlaylistStore.swift)"
+stub_kind="$(extract_smart_playlist_kind scripts/sync-harness/Stubs.swift)"
+if [ -z "$prod_kind" ] || [ -z "$stub_kind" ]; then
+  echo "❌ 漂移守卫无法定位 SmartPlaylistKind 声明（生产或桩被改写了？）"
+  echo "   生产：QQPlayer/Services/SmartPlaylistStore.swift → '$prod_kind'"
+  echo "   桩  ：scripts/sync-harness/Stubs.swift → '$stub_kind'"
+  exit 1
+fi
+if [ "$prod_kind" != "$stub_kind" ]; then
+  echo "❌ SmartPlaylistKind 桩已漂移（桩 = scripts/sync-harness/Stubs.swift）"
+  echo "   生产：$prod_kind"
+  echo "   桩  ：$stub_kind"
+  echo "   → 把桩改成与生产逐字同形（case 名 / 顺序 / rawValue / 协议）再重跑。"
+  exit 1
+fi
+echo "✅ 漂移守卫通过：SmartPlaylistKind 桩与生产声明一致"
 
 echo "▶︎ 编译 GRDB 模块桩（生产源码 PairingModels 仅用到两个 Record 协议）"
 swiftc -swift-version 5 -emit-module -emit-library -module-name GRDB \
