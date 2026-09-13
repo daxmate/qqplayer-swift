@@ -952,6 +952,26 @@
 "sync_run_result_empty_selection" = "Nothing was selected, so nothing was transferred.";
 "sync_run_result_no_deletion" = "Syncing never deletes songs on either device.";
 
+// S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+"sync_run_data_section" = "Playback Data";
+"sync_run_data_description" = "Syncs favorites, play history and playlists on their own — no songs are transferred.";
+"sync_run_data_button" = "Sync Data";
+"sync_run_data_help" = "Merge favorites, play history and playlists with your iPhone";
+"sync_run_data_cancel" = "Cancel";
+"sync_run_data_phase_pushing" = "Sending your changes…";
+"sync_run_data_phase_pulling" = "Receiving changes…";
+"sync_run_data_result_sent" = "Sent";
+"sync_run_data_result_applied" = "Applied";
+"sync_run_data_result_pending" = "Pending";
+"sync_run_data_result_skipped" = "Deletions skipped";
+"sync_run_data_pending_hint" = "%d entries are waiting for songs this Mac doesn't have yet.";
+"sync_run_data_result_none" = "No data sync has run yet.";
+"sync_run_data_cancelled" = "Data sync cancelled.";
+"sync_run_data_disconnected" = "The device disconnected, so the data sync stopped.";
+"sync_run_data_reason_not_connected" = "Connect your iPhone first (Settings → Sync).";
+"sync_run_data_reason_already_running" = "A data sync is already running.";
+"sync_run_data_footer" = "Merging never deletes favorites, play history or playlists on either device.";
+
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "Sync Direction";
 "sync_run_direction_upload" = "Upload to iPhone";

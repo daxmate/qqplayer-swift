@@ -957,6 +957,26 @@
 "sync_run_result_empty_selection" = "没有选择任何内容，因此没有传输。";
 "sync_run_result_no_deletion" = "同步不会删除任何一端的歌曲。";
 
+// S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+"sync_run_data_section" = "播放数据";
+"sync_run_data_description" = "独立于文件传输，只同步收藏 / 播放历史 / 歌单，不传歌曲。";
+"sync_run_data_button" = "同步数据";
+"sync_run_data_help" = "把收藏、播放历史、歌单与 iPhone 合并";
+"sync_run_data_cancel" = "取消";
+"sync_run_data_phase_pushing" = "正在发送本机的改动…";
+"sync_run_data_phase_pulling" = "正在接收对端的改动…";
+"sync_run_data_result_sent" = "发送";
+"sync_run_data_result_applied" = "应用";
+"sync_run_data_result_pending" = "挂起";
+"sync_run_data_result_skipped" = "忽略删除";
+"sync_run_data_pending_hint" = "有 %d 条改动在等本机缺失的歌曲，歌到位后会自动生效。";
+"sync_run_data_result_none" = "还没有同步过播放数据。";
+"sync_run_data_cancelled" = "数据同步已取消。";
+"sync_run_data_disconnected" = "设备已断开，数据同步已停止。";
+"sync_run_data_reason_not_connected" = "请先连接 iPhone（设置 → 同步）。";
+"sync_run_data_reason_already_running" = "正在同步数据，请稍候。";
+"sync_run_data_footer" = "合并不删除任何一端的收藏、播放历史或歌单。";
+
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "同步方向";
 "sync_run_direction_upload" = "从本地上传到 iPhone";

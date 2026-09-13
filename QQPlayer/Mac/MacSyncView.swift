@@ -5,7 +5,11 @@
 //  M6（T3，2026-09-11；T10 2026-09-12 方向优先改造）macOS「同步」页 —— **同步操作区**
 //  （QQPlayerMac target only）：
 //  A 连接状态区 / B 方向区（T10 新增，面板第一屏）/ C 内容选择区（随方向切数据源）/
-//  D 执行区 / E 结果区（最近一次）。
+//  D 执行区 / E 结果区（最近一次）/ F 数据同步区（S2-T12，2026-09-13）。
+//
+//  F 数据同步区（S2-T12）：**播放数据**（收藏 / 播放历史 / 歌单结构）的独立动作入口
+//  ——与文件传输无关（不选方向、不选歌），一次 = 推本端增量 + 拉对端增量；
+//  驱动与账目全在 `MacSyncDataViewModel` + `SyncDataSyncCoordinator`（共享 Core）。
 //
 //  T10 的用户反馈（2026-09-12）：「我明明是从 iPhone 上下载，但是显示的内容是本地的
 //  曲库」→ 本文件把**方向**提到内容之前：未选方向时内容区只显示引导，选定后内容
@@ -32,6 +36,8 @@ struct MacSyncRunSection: View {
     @StateObject private var model: MacSyncRunViewModel
     /// 内容侧（方向 / 内容源 / 选项 / 选择集）。
     @StateObject private var content: MacSyncContentModel
+    /// 数据同步侧（S2-T12：收藏 / 播放历史 / 歌单结构）。
+    @StateObject private var dataModel: MacSyncDataViewModel
 
     /// 全曲库二次确认（Q4 决策：全库必须确认）。
     @State private var showLibraryWideConfirm = false
@@ -52,6 +58,7 @@ struct MacSyncRunSection: View {
         _hostCenter = ObservedObject(wrappedValue: center)
         _content = StateObject(wrappedValue: contentModel)
         _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center, content: contentModel))
+        _dataModel = StateObject(wrappedValue: MacSyncDataViewModel(hostCenter: center))
     }
 
     var body: some View {
@@ -61,12 +68,14 @@ struct MacSyncRunSection: View {
             selectionSection
             runSection
             resultSection
+            dataSection
         }
         .onAppear { model.onAppear() }
         .onDisappear {
             searchTask?.cancel()
             content.onDisappear()
             model.onDisappear()
+            dataModel.onDisappear()
         }
         .confirmationDialog(
             "sync_run_library_confirm_title".localized,
@@ -864,6 +873,105 @@ struct MacSyncRunSection: View {
                     .font(.callout)
             }
         )
+    }
+
+    // MARK: - F 数据同步区（S2-T12：与文件传输解耦的「同步数据」）
+
+    /// 播放数据（收藏 / 播放历史 / 歌单结构）的独立动作区：不选方向、不选歌，
+    /// 一次动作 = 推本端增量 + 拉对端增量（阶段 / 账目全来自 `MacSyncDataViewModel`）。
+    @ViewBuilder
+    private var dataSection: some View {
+        Section {
+            Text("sync_run_data_description".localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 12) {
+                if dataModel.isRunning {
+                    Button("sync_run_data_cancel".localized, role: .destructive) {
+                        dataModel.cancel()
+                    }
+                } else {
+                    Button("sync_run_data_button".localized) {
+                        dataModel.start()
+                    }
+                    .disabled(!dataModel.canStart)
+                    .help("sync_run_data_help".localized)
+                }
+
+                if let phaseText = dataPhaseText {
+                    Text(phaseText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            if dataModel.isRunning {
+                ProgressView()
+                    .progressViewStyle(.linear)
+            }
+
+            if let failure = dataModel.errorMessage {
+                Text(failure)
+                    .font(.callout)
+                    .foregroundStyle(dataModel.isInterrupted ? Color.secondary : Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !dataModel.isRunning, let reason = dataModel.unavailableReason {
+                // 禁用按钮永远有解释（与执行区同一纪律）。
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            dataResult
+        } header: {
+            Text("sync_run_data_section".localized)
+        } footer: {
+            Text("sync_run_data_footer".localized)
+        }
+    }
+
+    /// 运行中阶段文案（非运行中 = nil；终态只说结果，不再报阶段）。
+    private var dataPhaseText: String? {
+        switch dataModel.phase {
+        case .pushing: return "sync_run_data_phase_pushing".localized
+        case .pulling: return "sync_run_data_phase_pulling".localized
+        case .idle, .finished: return nil
+        }
+    }
+
+    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 忽略删除 + 挂起解释。
+    @ViewBuilder
+    private var dataResult: some View {
+        let report = dataModel.report
+        if dataModel.phase == .finished {
+            HStack(alignment: .top, spacing: 24) {
+                metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
+                metric("sync_run_data_result_applied".localized, report.appliedEntries, .primary)
+                metric(
+                    "sync_run_data_result_pending".localized,
+                    report.suspendedEntries,
+                    report.suspendedEntries > 0 ? .orange : .secondary
+                )
+                metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
+                Spacer()
+            }
+            .padding(.vertical, 2)
+
+            if report.suspendedEntries > 0 {
+                Text("sync_run_data_pending_hint".localized(with: report.suspendedEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else if !dataModel.isRunning {
+            Text("sync_run_data_result_none".localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

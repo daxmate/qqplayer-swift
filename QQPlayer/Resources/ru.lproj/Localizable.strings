@@ -947,6 +947,26 @@
 "sync_run_result_empty_selection" = "Ничего не выбрано, передача не выполнялась.";
 "sync_run_result_no_deletion" = "Синхронизация никогда не удаляет песни ни на одном устройстве.";
 
+// S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+"sync_run_data_section" = "Данные воспроизведения";
+"sync_run_data_description" = "Синхронизирует избранное, историю и плейлисты отдельно от файлов — песни не передаются.";
+"sync_run_data_button" = "Синхронизировать данные";
+"sync_run_data_help" = "Объединить избранное, историю и плейлисты с iPhone";
+"sync_run_data_cancel" = "Отмена";
+"sync_run_data_phase_pushing" = "Отправка ваших изменений…";
+"sync_run_data_phase_pulling" = "Получение изменений…";
+"sync_run_data_result_sent" = "Отправлено";
+"sync_run_data_result_applied" = "Применено";
+"sync_run_data_result_pending" = "В ожидании";
+"sync_run_data_result_skipped" = "Удаления пропущены";
+"sync_run_data_pending_hint" = "%d изменений ждут песен, которых нет на этом Mac.";
+"sync_run_data_result_none" = "Синхронизация данных ещё не выполнялась.";
+"sync_run_data_cancelled" = "Синхронизация данных отменена.";
+"sync_run_data_disconnected" = "Устройство отключилось, синхронизация данных остановлена.";
+"sync_run_data_reason_not_connected" = "Сначала подключите iPhone (Настройки → Синхронизация).";
+"sync_run_data_reason_already_running" = "Синхронизация данных уже выполняется.";
+"sync_run_data_footer" = "Объединение никогда не удаляет избранное, историю или плейлисты ни на одном из устройств.";
+
 // T10（2026-09-12）направление сначала · источник содержимого зависит от направления
 "sync_run_direction_section" = "Направление синхронизации";
 "sync_run_direction_upload" = "Загрузить на iPhone";

@@ -1,0 +1,192 @@
+//
+//  MacSyncDataViewModel.swift
+//  QQPlayer
+//
+//  S2-T12（2026-09-13）macOS 同步页**数据同步区**视图模型（QQPlayerMac target only）。
+//
+//  职责：把一个 ready 会话驱动成一次「同步数据」（收藏 / 播放历史 / 歌单结构的
+//  changeLog 增量），并把阶段 + 账目发布给 UI。
+//  - 编排：`SyncDataSyncCoordinator`（共享 Core）——一次 = 推本端增量 + 拉对端增量，
+//    与文件传输**完全解耦**（不碰 file_* / manifest / 选择集，两端都能独立发起）
+//  - 判定：本文件只做 IO 与线程搬运，**不新造状态机**（阶段 / 账目一律来自协调器）
+//
+//  与 `MacSyncRunViewModel` 的分工：那个类型跑**文件**同步（方向 / 选择集 / 传输进度），
+//  本类型跑**播放数据**同步（无方向、无选择集、无文件进度）。两者各自持有自己的
+//  协调器实例、互不影响（帧 8/9 与 file_* 是不同帧），可同时跑。
+//
+//  线程（硬要求）：协调器回调在**会话线程**触发（阶段 emit / 超时队列 / 迟到帧回填）
+//  → 一律 `Task { @MainActor in }` 回到主线程再改 `@Published`（同 `MacSyncRunViewModel`）。
+//
+//  账目实时读 + 终态兜底重读：`coordinator.report` 是**实时值**，收尾后仍可能被
+//  迟到帧回填（见 `SyncDataSyncCoordinator` 文件头）→ 终态时先立刻读一次，
+//  再延迟读一次覆盖（只在本视图模型仍持有该协调器、且它仍在终态时生效）。
+//
+//  为什么不做单测：本文件属 `QQPlayer/Mac/`（iOS 单测 target 看不到它，仓库也没有
+//  macOS 单测 target）→ 靠编译 + 代码审查覆盖；其中可测的判定全在共享 Core
+//  （`SyncDataSyncCoordinator` / `SyncChangeLogStore` 等，`QQPlayerTests` 真跑）。
+//
+
+import Combine
+import Foundation
+
+@MainActor
+final class MacSyncDataViewModel: ObservableObject {
+    /// 协调器 `cancel()` 的固定失败串（`SyncDataSyncCoordinator.cancel`）。
+    private static let cancelledReason = "cancelled"
+
+    // MARK: 依赖
+
+    private let hostCenter: SyncHostCenter
+    private let makeCoordinator: (SyncPeerSession) -> SyncDataSyncCoordinator
+
+    // MARK: 发布状态
+
+    /// 当前阶段（idle / pushing / pulling / finished）。
+    @Published private(set) var phase: SyncDataSyncPhase = .idle
+    /// 最近一次「同步数据」的账目（实时值；没跑过 = 全 0）。
+    @Published private(set) var report = SyncDataSyncReport()
+    /// 面向 UI 的失败 / 中断文案（nil = 无失败）：`cancelled` 走本地化，
+    /// 其余协调器内部诊断文案原样展示（比 "unknown" 有信息量，同 `MacSyncRunViewModel`）。
+    @Published private(set) var errorMessage: String?
+    /// 运行中会话断开（文案优先于 `cancelled`）。
+    @Published private(set) var didDisconnectWhileRunning = false
+
+    // MARK: 内部状态
+
+    private var coordinator: SyncDataSyncCoordinator?
+    private var cancellables = Set<AnyCancellable>()
+    private var reportRefreshTask: Task<Void, Never>?
+
+    init(
+        hostCenter: SyncHostCenter? = nil,
+        makeCoordinator: @escaping (SyncPeerSession) -> SyncDataSyncCoordinator = {
+            SyncDataSyncCoordinator(session: $0)
+        }
+    ) {
+        // 默认值是 `nil` 而不是 `.shared`：默认实参在**非隔离**上下文求值，
+        // 直接写 `= .shared` 会报「main actor-isolated property 跨隔离引用」
+        // （Swift 6 语言模式下是错误）→ 在 init 体内（MainActor）解析。
+        let center = hostCenter ?? .shared
+        self.hostCenter = center
+        self.makeCoordinator = makeCoordinator
+        // 监听中心变化（连接 / 断开）→ 主线程刷新可用性与运行态。
+        // objectWillChange 是**变更前**通知 → 用 Task 排到主线程队列尾，读到的就是新值。
+        center.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.hostDidChange() }
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - 派生（View 只读）
+
+    /// 是否已连接。
+    var isConnected: Bool { hostCenter.connectedPeer != nil }
+
+    /// 是否正在跑（按钮切「取消」）。
+    var isRunning: Bool {
+        switch phase {
+        case .pushing, .pulling: return true
+        case .idle, .finished: return false
+        }
+    }
+
+    /// 「同步数据」可用性：已连接 + 有会话 + 未在跑。
+    var canStart: Bool {
+        isConnected && hostCenter.activeSession != nil && !isRunning
+    }
+
+    /// 不能开始的原因（可开始 / 运行中 = nil）。
+    var unavailableReason: String? {
+        if isRunning { return "sync_run_data_reason_already_running".localized }
+        if !isConnected || hostCenter.activeSession == nil {
+            return "sync_run_data_reason_not_connected".localized
+        }
+        return nil
+    }
+
+    /// 只是用户取消 / 掉线中断（UI 用次要色，不当错误红字）。
+    var isInterrupted: Bool {
+        didDisconnectWhileRunning || report.failureMessage == Self.cancelledReason
+    }
+
+    // MARK: - 生命周期
+
+    /// 页面消失：停掉延迟任务（协调器**不**取消——同步应在后台继续跑完）。
+    func onDisappear() {
+        stopReportRefresh()
+    }
+
+    // MARK: - 同步执行
+
+    /// 跑一次「同步数据」（未连接 / 已在跑 = no-op）。
+    func start() {
+        guard canStart, let session = hostCenter.activeSession else { return }
+        stopReportRefresh()
+        didDisconnectWhileRunning = false
+        report = SyncDataSyncReport()
+        errorMessage = nil
+
+        let coordinator = makeCoordinator(session)
+        coordinator.onStateChange = { [weak self] _ in
+            Task { @MainActor in self?.refreshFromCoordinator(coordinator) }
+        }
+        self.coordinator = coordinator
+        coordinator.start()
+        // 内存回环下 `start()` 可能已在本调用内跑到终态 → 补一次状态同步（幂等）。
+        refreshFromCoordinator(coordinator)
+    }
+
+    /// 取消进行中的「同步数据」。
+    func cancel() {
+        guard let coordinator else { return }
+        coordinator.cancel()
+        refreshFromCoordinator(coordinator)
+    }
+
+    // MARK: - 内部
+
+    /// 协调器状态 / 账目 → 发布值。
+    private func refreshFromCoordinator(_ source: SyncDataSyncCoordinator) {
+        guard coordinator === source else { return }
+        report = source.report
+        phase = source.phase
+        errorMessage = failureText(for: source.report)
+        if source.phase == .finished {
+            scheduleReportRefresh(for: source)
+        }
+    }
+
+    private func failureText(for report: SyncDataSyncReport) -> String? {
+        guard let message = report.failureMessage else { return nil }
+        if didDisconnectWhileRunning { return "sync_run_data_disconnected".localized }
+        if message == Self.cancelledReason { return "sync_run_data_cancelled".localized }
+        return message
+    }
+
+    /// 终态后再延迟读一次账目：迟到帧可能晚于 `.finished` 回调（见文件头）。
+    private func scheduleReportRefresh(for source: SyncDataSyncCoordinator) {
+        stopReportRefresh()
+        reportRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !Task.isCancelled, let self else { return }
+            guard self.coordinator === source, source.phase == .finished else { return }
+            self.report = source.report
+            self.errorMessage = self.failureText(for: source.report)
+        }
+    }
+
+    private func stopReportRefresh() {
+        reportRefreshTask?.cancel()
+        reportRefreshTask = nil
+    }
+
+    /// 监听中心状态变化：断开时立刻中止进行中的一次——协调器本身要等 20s 超时
+    /// 才会报「对端无应答」，对用户来说「设备已断开」更准确也更及时。
+    private func hostDidChange() {
+        guard !isConnected, let coordinator, !coordinator.report.isFinished else { return }
+        didDisconnectWhileRunning = true
+        coordinator.cancel()
+        refreshFromCoordinator(coordinator)
+    }
+}

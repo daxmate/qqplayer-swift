@@ -950,6 +950,26 @@
 "sync_run_result_empty_selection" = "Aucune sélection : rien n'a été transféré.";
 "sync_run_result_no_deletion" = "La synchronisation ne supprime jamais de morceaux, sur aucun appareil.";
 
+// S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+"sync_run_data_section" = "Données de lecture";
+"sync_run_data_description" = "Synchronise les favoris, l'historique et les playlists indépendamment des fichiers — aucune chanson n'est transférée.";
+"sync_run_data_button" = "Synchroniser les données";
+"sync_run_data_help" = "Fusionner les favoris, l'historique et les playlists avec votre iPhone";
+"sync_run_data_cancel" = "Annuler";
+"sync_run_data_phase_pushing" = "Envoi de vos modifications…";
+"sync_run_data_phase_pulling" = "Réception des modifications…";
+"sync_run_data_result_sent" = "Envoyées";
+"sync_run_data_result_applied" = "Appliquées";
+"sync_run_data_result_pending" = "En attente";
+"sync_run_data_result_skipped" = "Suppressions ignorées";
+"sync_run_data_pending_hint" = "%d modifications attendent des chansons absentes de ce Mac.";
+"sync_run_data_result_none" = "Aucune synchronisation de données effectuée pour l'instant.";
+"sync_run_data_cancelled" = "Synchronisation des données annulée.";
+"sync_run_data_disconnected" = "L'appareil s'est déconnecté, la synchronisation des données s'est arrêtée.";
+"sync_run_data_reason_not_connected" = "Connectez d'abord votre iPhone (Réglages → Synchronisation).";
+"sync_run_data_reason_already_running" = "Une synchronisation des données est déjà en cours.";
+"sync_run_data_footer" = "La fusion ne supprime jamais de favoris, d'historique ni de playlists sur l'un ou l'autre appareil.";
+
 // T10 (2026-09-12) sens d'abord · la source de contenu suit le sens
 "sync_run_direction_section" = "Sens de synchronisation";
 "sync_run_direction_upload" = "Envoyer vers l'iPhone";
