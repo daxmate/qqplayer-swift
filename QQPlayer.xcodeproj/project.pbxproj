@@ -414,6 +414,15 @@
 			);
 			target = 23AF81342E71E15D0005527C /* Share */;
 		};
+		5C0DE00000000000000000A1 /* Exceptions for "QQPlayer" folder in "SiriIntentsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Services/ArtistNameNormalizer.swift,
+				Services/DisplayScriptNormalizer.swift,
+				Services/SimplifiedTraditionalMap.swift,
+			);
+			target = 23C312D92E78015500342F7C /* SiriIntentsExtension */;
+		};
 		23C312E82E78015500342F7C /* Exceptions for "SiriIntentsExtension" folder in "SiriIntentsExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -652,6 +661,7 @@
 				2312D6502E6090E2007F756D /* Exceptions for "QQPlayer" folder in "QQPlayer" target */,
 				B1A00000000000000000000B /* Exceptions for "QQPlayer" folder in "QQPlayerMac" target */,
 				239B24A22EE5F806009F83F1 /* Exceptions for "QQPlayer" folder in "PlayerWidgetExtension" target */,
+				5C0DE00000000000000000A1 /* Exceptions for "QQPlayer" folder in "SiriIntentsExtension" target */,
 			);
 			path = QQPlayer;
 			sourceTree = "<group>";

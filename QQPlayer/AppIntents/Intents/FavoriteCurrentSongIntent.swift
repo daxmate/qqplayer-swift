@@ -29,13 +29,13 @@ struct FavoriteCurrentSongIntent: AppIntent {
 
         if try playback.isFavorite(trackStableId: track.stableId) {
             return .result(dialog: IntentDialog(
-                "\(track.title) is already in your Liked Songs."
+                "\(DisplayScriptNormalizer.display(track.title)) is already in your Liked Songs."
             ))
         }
 
         try playback.setFavorite(trackStableId: track.stableId, isFavorite: true)
         return .result(dialog: IntentDialog(
-            "Added \(track.title) to your Liked Songs."
+            "Added \(DisplayScriptNormalizer.display(track.title)) to your Liked Songs."
         ))
     }
 }

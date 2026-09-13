@@ -12,6 +12,27 @@ import Intents
     import FoundationModels
 #endif
 
+// MARK: - 显示层简繁归一（只作用于 Siri 消歧/确认卡片里的曲名・歌手名・专辑名）
+
+/// 归一方向。扩展进程里 `Bundle.main` 是扩展包（无本地化资源 → preferredLocalizations
+/// 恒为 ["en"]），读不到 App 的 UI 语言；改用系统语言列表（App 无应用内语言设置，
+/// UI 语言 == 系统语言）。方向规则仍走 DisplayScriptNormalizer / ArtistNameNormalizer
+/// 的纯函数入口，与 App 侧同一套语义（含日文假名豁免）。
+private let displayScriptDirection = DisplayScriptNormalizer.direction(for: Locale.preferredLanguages)
+private let displayArtistDirection = ArtistNameNormalizer.direction(for: Locale.preferredLanguages)
+
+/// 展示字段（曲名/专辑名等）的显示字形。命名与 App 侧入口一致，便于契约测试与全仓检索：
+/// 这里只是补上扩展进程自己拿到的方向，转换规则仍只在 DisplayScriptNormalizer 里。
+/// **只包展示值**：`INMediaItem.identifier` 与一切参与匹配/排序/查询的原始字段保持原文。
+private func display(_ text: String) -> String {
+    DisplayScriptNormalizer.display(text, direction: displayScriptDirection)
+}
+
+/// 歌手名的显示字形（人名语境的姓氏保护在 ArtistNameNormalizer 内）
+private func displayArtist(_ name: String) -> String {
+    ArtistNameNormalizer.displayName(name, direction: displayArtistDirection)
+}
+
 // String similarity extension for fuzzy matching
 extension String {
     var siriSearchNormalized: String {
@@ -474,7 +495,7 @@ class IntentHandler: INExtension, INPlayMediaIntentHandling, INAddMediaIntentHan
             if let track = tracks.first {
                 completion([INAddMediaMediaItemResolutionResult.success(with: INMediaItem(
                     identifier: track.stableId,
-                    title: track.title,
+                    title: display(track.title),
                     type: .song,
                     artwork: nil,
                     artist: nil
@@ -593,7 +614,7 @@ class IntentHandler: INExtension, INPlayMediaIntentHandling, INAddMediaIntentHan
                     return tracks.map { track in
                         INMediaItem(
                             identifier: track.stableId,
-                            title: track.title,
+                            title: display(track.title),
                             type: .song,
                             artwork: nil,
                             artist: nil
@@ -649,10 +670,10 @@ class IntentHandler: INExtension, INPlayMediaIntentHandling, INAddMediaIntentHan
                 return tracks.map { track in
                     INMediaItem(
                         identifier: track.stableId,
-                        title: track.title,
+                        title: display(track.title),
                         type: .song,
                         artwork: nil,
-                        artist: track.artistName
+                        artist: track.artistName.map(displayArtist)
                     )
                 }
             } else if mediaSearch.reference == .my {
@@ -673,7 +694,7 @@ class IntentHandler: INExtension, INPlayMediaIntentHandling, INAddMediaIntentHan
                 // The app database knows albums; resolve there.
                 return [INMediaItem(
                     identifier: "search_album_\(albumName)",
-                    title: albumName,
+                    title: display(albumName),
                     type: .album,
                     artwork: nil
                 )]
@@ -690,7 +711,7 @@ class IntentHandler: INExtension, INPlayMediaIntentHandling, INAddMediaIntentHan
                 // The app database knows artists; resolve there.
                 return [INMediaItem(
                     identifier: "search_artist_\(artistName)",
-                    title: artistName,
+                    title: displayArtist(artistName),
                     type: .artist,
                     artwork: nil
                 )]
@@ -800,10 +821,10 @@ class IntentHandler: INExtension, INPlayMediaIntentHandling, INAddMediaIntentHan
                     return tracks.map { track in
                         INMediaItem(
                             identifier: track.stableId,
-                            title: track.title,
+                            title: display(track.title),
                             type: .song,
                             artwork: nil,
-                            artist: track.artistName
+                            artist: track.artistName.map(displayArtist)
                         )
                     }
                 }

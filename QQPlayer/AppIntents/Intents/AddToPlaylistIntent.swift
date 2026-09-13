@@ -43,7 +43,7 @@
 
             let dialog = IntentDialog(
                 full: LocalizedStringResource(
-                    "Added \(song.title) to \(playlist.title).",
+                    "Added \(DisplayScriptNormalizer.display(song.title)) to \(playlist.title).",
                     comment: "Spoken confirmation when a song is added to a playlist. Argument 1 is the song title, argument 2 the playlist title."
                 ),
                 supporting: LocalizedStringResource(

@@ -38,14 +38,14 @@
             case .like:
                 dialog = IntentDialog(
                     LocalizedStringResource(
-                        "Added \(song.title) to your favorites.",
+                        "Added \(DisplayScriptNormalizer.display(song.title)) to your favorites.",
                         comment: "Spoken confirmation when the person likes a song. Argument 1 is the song title."
                     )
                 )
             case .dislike, .unset:
                 dialog = IntentDialog(
                     LocalizedStringResource(
-                        "Removed \(song.title) from your favorites.",
+                        "Removed \(DisplayScriptNormalizer.display(song.title)) from your favorites.",
                         comment: "Spoken confirmation when the person unlikes a song. Argument 1 is the song title."
                     )
                 )

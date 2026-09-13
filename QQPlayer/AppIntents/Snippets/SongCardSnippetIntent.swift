@@ -42,8 +42,9 @@
 
             return .result(view: SongCardSnippetView(
                 trackStableId: track.stableId,
-                title: song.title,
-                artistName: song.artistName,
+                // 展示字形（实体属性保持原文供 Spotlight 索引/匹配，只在渲染前归一）
+                title: DisplayScriptNormalizer.display(song.title),
+                artistName: ArtistNameNormalizer.displayName(song.artistName),
                 isLiked: isLiked,
                 artwork: artwork
             ))

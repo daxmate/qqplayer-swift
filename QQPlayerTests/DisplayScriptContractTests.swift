@@ -14,9 +14,12 @@
 //    **不碰文件系统** → 测试里能用合成源码自证「能抓到违规」（防止契约本身空转）。
 //  - 白名单 fail-closed：没列出的裸用一律算违规。每条 = 文件路径尾段 + 行内容片段 + 理由，
 //    并有单独测试断言「每条白名单都还在真实源码里命中」，防止白名单腐烂（代码改了条目没删）。
-//  - 扫描范围只有渲染路径两个目录：QQPlayer/Views/** 与 QQPlayer/Mac/**。
-//    Share / PlayerWidget / SiriIntentsExtension / QQPlayer/AppIntents 是独立 target 或系统入口，
-//    本包未纳入（只读盘点见本次任务报告）。
+//  - 扫描范围 = 渲染路径 + Siri 入口（2026-09-13 扩展）：
+//    QQPlayer/Views/**、QQPlayer/Mac/**、QQPlayer/AppIntents/**、SiriIntentsExtension/**。
+//    Siri 消歧卡片（INMediaItem）、AppIntents 卡片与对话、实体 → 展示字段走显示字形；
+//    而 **实体 schema 属性 / Spotlight 索引 / 匹配 / 查询 / SQL / 诊断日志** 一律保持原文
+//    （保住跨字形可搜性），这些位置逐条进白名单并写明理由。
+//    Share / PlayerWidget 仍未纳入（无歌名显示 / 写入点已归一）。
 //
 
 import Foundation
@@ -69,6 +72,23 @@ enum DisplayScriptContract {
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacTrackListView.swift", lineSnippet: "self.title = track.title", reason: "Table 排序列值（单元格渲染走 row.track.displayTitle）"),
         // 传输载荷：跨端同步的字段，属于数据不是显示
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacSyncLocalContentProvider.swift", lineSnippet: "title: track.title,", reason: "同步载荷字段（跨端传输数据，非显示）"),
+
+        // ── 2026-09-13 新增扫描范围（QQPlayer/AppIntents + SiriIntentsExtension）：显示层之外的例外 ──
+        // 判据：出现在渲染/对话里才是显示；索引、匹配、查询、排序、落库、诊断日志一律保持原文。
+        WhitelistEntry(fileSuffix: "QQPlayer/AppIntents/Entities/SongEntity.swift", lineSnippet: "            title = track.title", reason: "实体 schema 属性：indexAppEntities 索引进 Spotlight，Siri 按名解析/跨字形可搜，保持原文"),
+        WhitelistEntry(fileSuffix: "QQPlayer/AppIntents/Entities/AlbumEntity.swift", lineSnippet: "            title = album.title", reason: "同上：专辑实体 schema 属性（Spotlight 索引 + 实体解析），保持原文"),
+        WhitelistEntry(fileSuffix: "QQPlayer/AppIntents/Entities/AudioEntity.swift", lineSnippet: "                album.title", reason: "union value 的标题聚合（与实体属性同源，供实体解析语境）；本包内无显示消费点，保持原文"),
+        WhitelistEntry(fileSuffix: "QQPlayer/AppIntents/FoundationModels/MixGenerator.swift", lineSnippet: "                try database.getAllAlbums().compactMap { album in album.id.map { ($0, album.title) } },", reason: "LLM 提示词/候选集构建（语义匹配输入，非显示）"),
+        WhitelistEntry(fileSuffix: "QQPlayer/AppIntents/FoundationModels/MixGenerator.swift", lineSnippet: "            var parts = [track.title]", reason: "同上：describe() 拼匹配用 haystack（lowercased 后参与匹配）"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                       track.title,", reason: "SQL 投影列：SELECT 读原文供打分/排序，不是显示值"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                       album.title AS album_title", reason: "同上：SQL 投影列（album.title AS album_title）"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                ORDER BY track.title", reason: "SQL ORDER BY：列表排序键"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                    let metadata = [track.title, track.artistName, track.albumTitle]", reason: "打分用元数据拼接（匹配输入）"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                        query.siriSearchScore(against: track.title),", reason: "siriSearchScore 打分（匹配）"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                    return $0.track.title.localizedCaseInsensitiveCompare($1.track.title) == .orderedAscending", reason: "同分时的字母序 tie-break（排序）"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                return \"\\(index): title=\\(track.title) | artist=\\(track.artistName ?? \"unknown\") | album=\\(track.albumTitle ?? \"unknown\")\"", reason: "LLM 候选清单文本（语义匹配输入）"),
+        WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "            SiriDiag.log(\"EXT LLM matched query=\\(query) index=\\(index) title=\\(shortlist[index].track.title)\")", reason: "SiriDiag 诊断日志（匹配透明度用，不是界面文案）"),
+
     ]
 
     /// 一次扫描的结果
@@ -140,7 +160,7 @@ enum DisplayScriptContract {
 extension DisplayScriptContract {
     /// 渲染路径下的所有 .swift（递归；文件系统访问只在这个辅助函数里，核心扫描保持纯净）
     static func renderPathSwiftFiles(repoRoot: URL) -> [URL] {
-        let roots = ["QQPlayer/Views", "QQPlayer/Mac"]
+        let roots = ["QQPlayer/Views", "QQPlayer/Mac", "QQPlayer/AppIntents", "SiriIntentsExtension"]
         var result: [URL] = []
         let fileManager = FileManager.default
         for root in roots {
