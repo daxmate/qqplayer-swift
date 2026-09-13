@@ -195,6 +195,7 @@ struct AlignedLyricsSyncTests {
             case "s1": return "s1.json"
             case "escape": return "escape.json"
             case "outside": return "../\(outsideRoot.lastPathComponent)/secret.json"
+            case "absolute": return outsideFile.path
             default: return nil
             }
         }
@@ -202,7 +203,7 @@ struct AlignedLyricsSyncTests {
         let plan = SyncLibraryFetchResponder.makePlan(
             relativePaths: [
                 "@lyrics/s1.json", "@lyrics/s1.json", "@lyrics/escape.json",
-                "@lyrics/outside.json", "@lyrics/missing.json",
+                "@lyrics/outside.json", "@lyrics/absolute.json", "@lyrics/missing.json",
                 "@lyrics/../etc/passwd", "@lyrics/a/b.json",
             ],
             roots: roots,
@@ -213,6 +214,8 @@ struct AlignedLyricsSyncTests {
         let reasons = Dictionary(plan.failures.map { ($0.relativePath, $0.reason) }, uniquingKeysWith: { first, _ in first })
         #expect(reasons["@lyrics/escape.json"] == SyncFetchFailureReason.outOfRoot)
         #expect(reasons["@lyrics/outside.json"] == SyncFetchFailureReason.notFound)
+        // 注入映射给出绝对路径 → 拒（只接受单段文件名，绝不用它拼出根外路径）
+        #expect(reasons["@lyrics/absolute.json"] == SyncFetchFailureReason.notFound)
         #expect(reasons["@lyrics/missing.json"] == SyncFetchFailureReason.notFound)
         #expect(reasons["@lyrics/../etc/passwd"] == SyncFetchFailureReason.invalidPath)
         #expect(reasons["@lyrics/a/b.json"] == SyncFetchFailureReason.invalidPath)
@@ -224,6 +227,8 @@ struct AlignedLyricsSyncTests {
         )
         #expect(noLyrics.failures.map(\.reason) == [SyncFetchFailureReason.notFound])
         #expect(noLyrics.files.isEmpty)
+        // 未接线歌词根时不得落回曲库根：曲库根内不会冒出歌词命名空间副本
+        #expect(!FileManager.default.fileExists(atPath: roots.libraryRoot.appendingPathComponent("@lyrics/s1.json").path))
     }
 
     @Test("生产映射：复用 M4-2a SyncContentHashResolver（双向 + 无此歌 = nil）")

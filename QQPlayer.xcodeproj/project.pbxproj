@@ -136,6 +136,7 @@
 		FA75A213C9F140FE84BC8E3A /* MacSyncClientPoolPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */; };
 		FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */; };
 		BF033716D78646F7A2CF1FAB /* IndexingGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */; };
+		426E0B171BA145F0A982343A /* SyncLibraryPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD72A7C36194032A5887F28 /* SyncLibraryPlanTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -321,6 +322,7 @@
 		580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSyncClientPoolPolicyTests.swift; sourceTree = "<group>"; };
 		1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavoriteBatchLogicTests.swift; sourceTree = "<group>"; };
 		38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IndexingGateTests.swift; sourceTree = "<group>"; };
+		3DD72A7C36194032A5887F28 /* SyncLibraryPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLibraryPlanTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -893,6 +895,7 @@
 				580229652C3F490AADFFECEA /* MacSyncClientPoolPolicyTests.swift */,
 				1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */,
 				38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */,
+				3DD72A7C36194032A5887F28 /* SyncLibraryPlanTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1327,6 +1330,7 @@
 				FA75A213C9F140FE84BC8E3A /* MacSyncClientPoolPolicyTests.swift in Sources */,
 				FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */,
 				BF033716D78646F7A2CF1FAB /* IndexingGateTests.swift in Sources */,
+				426E0B171BA145F0A982343A /* SyncLibraryPlanTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
