@@ -162,4 +162,29 @@ struct DisplayScriptLanguageOverrideTests {
             stored: stored, systemLanguages: ["zh-Hans"])
         #expect(direction == .toTraditional)
     }
+
+    /// 白名单必须与 App 的本地化集合同步：将来给 App 加第 6 种本地化时忘了同步
+    /// `supportedLanguages`，App 写入的值会被判非法 → 扩展回退系统语言 →
+    /// Siri 卡片与 App 字形再次不一致（静默退化，行为用例抓不到）。
+    /// 反向也查：白名单写了 App 并未打包的语言（拼错 / 语言已删）同样是漂移。
+    @Test func supportedLanguagesMatchAppLocalizations() {
+        let bundled = Set(
+            Bundle.main.localizations
+                .map { $0.lowercased() }
+                .filter { $0 != "base" }
+        )
+        #expect(!bundled.isEmpty, "宿主 App 里 Bundle.main.localizations 为空 → 本守护测试失效，需改用别的取法")
+
+        let missing = bundled.subtracting(DisplayScriptLanguageOverride.supportedLanguages)
+        #expect(
+            missing.isEmpty,
+            "App 打包了这些本地化但 supportedLanguages 未列（加语言时请同步）：\(missing.sorted())"
+        )
+
+        let extra = DisplayScriptLanguageOverride.supportedLanguages.subtracting(bundled)
+        #expect(
+            extra.isEmpty,
+            "supportedLanguages 列了 App 未打包的语言（拼错或语言已删？）：\(extra.sorted())"
+        )
+    }
 }
