@@ -67,14 +67,17 @@ if [ "${QQPLAYER_NO_LOCK:-0}" != "1" ]; then
     sleep 5
     waited=$((waited + 5))
   done
-  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true; exit 130' INT TERM
 fi
 
 echo "▶︎ 共享 SPM 缓存：$SHARED_SPM"
 echo "▶︎ DerivedData：$DERIVED_DATA"
 echo "▶︎ 命令：xcodebuild $*"
 
-exec xcodebuild \
+# ⚠️ 不能用 exec：exec 会替换 shell 进程 → EXIT trap 不执行 → 锁永不释放
+# （2026-09-13 实测：冒烟测试后 /tmp/qqplayer-xcbuild.lock 残留）。
+xcodebuild \
   -clonedSourcePackagesDirPath "$SHARED_SPM" \
   -derivedDataPath "$DERIVED_DATA" \
   "$@"
