@@ -3,7 +3,7 @@
 //  QQPlayerTests
 //
 //  歌手名简繁归一纯逻辑测试：
-//  - 方向判断（zh-Hans/zh-Hant/其他 → toSimplified/toTraditional/identity）
+//  - 方向判断（zh-Hant/zh-HK/zh-TW/zh-MO → toTraditional；其余含 zh-Hans/en/fr/ru/空 → toSimplified）
 //  - normalizedKey / displayName 的字形转换（繁体归并、日文假名不受影响、
 //    日文汉字转简体、ASCII 不变、台→台 特例）
 //  - displayName(for:) 组内显示名选择逻辑
@@ -37,12 +37,24 @@ struct ArtistNameNormalizerTests {
         #expect(ArtistNameNormalizer.direction(for: ["zh-TW"]) == .toTraditional)
     }
 
-    @Test("其他语言/空列表 → identity")
-    func directionIdentity() {
-        #expect(ArtistNameNormalizer.direction(for: ["en"]) == .identity)
-        #expect(ArtistNameNormalizer.direction(for: ["ru"]) == .identity)
-        #expect(ArtistNameNormalizer.direction(for: ["fr", "zh-Hans"]) == .identity) // 只看首位
-        #expect(ArtistNameNormalizer.direction(for: []) == .identity)
+    @Test("其他语言/空列表 → toSimplified（2026-09-13 语义变更：英文界面也显示简体）")
+    func directionOtherLanguages() {
+        #expect(ArtistNameNormalizer.direction(for: ["en"]) == .toSimplified)
+        #expect(ArtistNameNormalizer.direction(for: ["ru"]) == .toSimplified)
+        #expect(ArtistNameNormalizer.direction(for: ["fr", "zh-Hans"]) == .toSimplified) // 只看首位
+        #expect(ArtistNameNormalizer.direction(for: []) == .toSimplified)
+    }
+
+    @Test("方向委托 DisplayScriptNormalizer（两处判定永远一致）")
+    func directionDelegatesToDisplayScriptNormalizer() {
+        for locales in [["zh-Hant"], ["zh-HK"], ["zh-Hans"], ["en"], ["ru"], ["fr"], []] {
+            let artistDirection = ArtistNameNormalizer.direction(for: locales)
+            switch DisplayScriptNormalizer.direction(for: locales) {
+            case .toSimplified: #expect(artistDirection == .toSimplified, "\(locales)")
+            case .toTraditional: #expect(artistDirection == .toTraditional, "\(locales)")
+            case .identity: #expect(artistDirection == .identity, "\(locales)")
+            }
+        }
     }
 
     // MARK: - normalizedKey

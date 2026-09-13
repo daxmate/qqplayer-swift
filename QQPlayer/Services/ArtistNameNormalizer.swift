@@ -6,10 +6,12 @@
 //
 //  背景：artist 表里同一歌手可能同时有繁体名（周杰倫）和简体名（周杰伦）两行，
 //  被当作两个歌手。按当前 UI 语言归一字形：
-//  - 简体 UI（zh-Hans）→ 只显示简体名（繁体名归并）
-//  - 繁体 UI（zh-Hant）→ 对称
-//  - 其他语言（en/ru/fr）→ 不归一（原样）
-//  方向由系统语言决定（App 无应用内语言设置）：Bundle.main.preferredLocalizations 首位。
+//  - 繁体中文 UI（zh-Hant/zh-HK/zh-TW/zh-MO）→ 显示繁体名（简体名归并）
+//  - 其余全部（zh-Hans/en/fr/ru/空/未知）→ 显示简体名（繁体名归并）
+//  方向由系统语言决定（App 无应用内语言设置）：Bundle.main.preferredLocalizations 首位；
+//  方向判定委托 DisplayScriptNormalizer（显示层字形归一的唯一入口），
+//  保证歌手名与曲名/专辑名/歌词的字形方向完全一致。
+//  （2026-09-13 语义变更：en/ru/fr 由 identity 改为 toSimplified——英文界面也显示简体字形。）
 //
 //  日文假名不受影响（映射表无假名字符）；日文汉字名在简体 UI 显示简体字形
 //  （主流播放器一致做法）。
@@ -28,7 +30,7 @@ enum ArtistNameNormalizer {
         case toSimplified
         /// 繁体 UI：简体名归并为繁体
         case toTraditional
-        /// 其他语言：不归一
+        /// 不转换（仅显式传入时使用；方向判定不再产出此值）
         case identity
     }
 
@@ -39,18 +41,15 @@ enum ArtistNameNormalizer {
         direction(for: Bundle.main.preferredLocalizations)
     }
 
-    /// 纯函数：由 preferredLocalizations 首位决定方向，便于测试。
-    /// zh-Hans* → toSimplified；zh-Hant*/zh-HK/zh-TW/zh-MO → toTraditional；其他 → identity。
+    /// 纯函数：由 preferredLocalizations 首位决定方向，便于测试（不依赖宿主语言）。
+    /// 委托 DisplayScriptNormalizer，与之保持同一语义：
+    /// zh-Hant*/zh-HK/zh-TW/zh-MO → toTraditional；其余（zh-Hans/en/fr/ru/空/未知）→ toSimplified。
     static func direction(for preferredLocalizations: [String]) -> Direction {
-        guard let first = preferredLocalizations.first?.lowercased() else { return .identity }
-        if first.hasPrefix("zh-hans") { return .toSimplified }
-        if first.hasPrefix("zh-hant")
-            || first.hasPrefix("zh-hk")
-            || first.hasPrefix("zh-tw")
-            || first.hasPrefix("zh-mo") {
-            return .toTraditional
+        switch DisplayScriptNormalizer.direction(for: preferredLocalizations) {
+        case .toSimplified: return .toSimplified
+        case .toTraditional: return .toTraditional
+        case .identity: return .identity
         }
-        return .identity
     }
 
     // MARK: - 映射
