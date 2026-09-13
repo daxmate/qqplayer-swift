@@ -32,7 +32,7 @@ struct ArtistTrackRowView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(track.title)
+                Text(track.displayTitle)
                     .font(.title3)
                     .fontWeight(.medium)
                     .lineLimit(1)
@@ -128,7 +128,7 @@ struct ArtistTrackRowView: View {
             }
             Button(Localized.cancel, role: .cancel) { }
         } message: {
-            Text(Localized.deleteFileConfirmation(track.title))
+            Text(Localized.deleteFileConfirmation(track.displayTitle))
         }
     }
 
@@ -203,7 +203,7 @@ struct ArtistAlbumCardView: View {
                     }
                 }
 
-            Text(album.title)
+            Text(album.displayTitle)
                 .font(.caption)
                 .fontWeight(.medium)
                 .lineLimit(2)

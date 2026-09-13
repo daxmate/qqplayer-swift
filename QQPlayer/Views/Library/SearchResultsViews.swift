@@ -295,7 +295,7 @@ struct SearchSongRowView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .font(.body)
                         .fontWeight(.medium)
                         .foregroundColor(isCurrentlyPlaying ? settings.backgroundColorChoice.color : .primary)
@@ -438,7 +438,7 @@ struct SearchSongRowView: View {
             }
             Button(Localized.cancel, role: .cancel) { }
         } message: {
-            Text(Localized.deleteFileConfirmation(track.title))
+            Text(Localized.deleteFileConfirmation(track.displayTitle))
         }
     }
 
@@ -603,7 +603,7 @@ struct SearchArtistAlbumsRow: View {
                     }
                 }
 
-                Text(album.title)
+                Text(album.displayTitle)
                     .font(.caption2)
                     .fontWeight(.medium)
                     .lineLimit(2)
@@ -657,7 +657,7 @@ struct SearchAlbumRowView: View {
                 .background(Color(.systemGray5))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(album.title)
+                    Text(album.displayTitle)
                         .font(.body)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)

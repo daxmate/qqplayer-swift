@@ -161,7 +161,7 @@ struct LyricsSearchView: View {
                 Text(NSLocalizedString("lyrics_search_title", value: "Lyrics Search", comment: ""))
                     .font(.headline)
                     .foregroundColor(.primary)
-                Text(track.title)
+                Text(track.displayTitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)

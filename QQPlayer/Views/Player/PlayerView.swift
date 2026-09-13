@@ -630,7 +630,7 @@ struct PlayerView: View {
                     let userInfo = ["album": album, "allTracks": allTracks] as [String: Any]
                     NotificationCenter.default.post(name: NSNotification.Name("NavigateToAlbumFromPlayer"), object: nil, userInfo: userInfo)
                 }) {
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
                         .fontWeight(.semibold)
                         .lineLimit(2)
@@ -640,7 +640,7 @@ struct PlayerView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             } else {
-                Text(track.title)
+                Text(track.displayTitle)
                     .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
                     .fontWeight(.semibold)
                     .lineLimit(2)

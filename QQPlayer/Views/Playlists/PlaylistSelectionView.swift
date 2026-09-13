@@ -44,7 +44,7 @@ struct PlaylistSelectionView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

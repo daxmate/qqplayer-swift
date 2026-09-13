@@ -120,7 +120,7 @@ private struct AlbumCardView: View {
             .aspectRatio(1, contentMode: .fit)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(album.title)
+                Text(album.displayTitle)
                     .font(.headline)
                     .lineLimit(2)
 
@@ -222,7 +222,7 @@ struct AlbumDetailScreen: View {
                             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
 
                         VStack(spacing: 8) {
-                            Text(album.title)
+                            Text(album.displayTitle)
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .multilineTextAlignment(.center)
@@ -467,7 +467,7 @@ struct AlbumTrackRowView: View {
 
             // Track info
             VStack(alignment: .leading, spacing: 4) {
-                Text(track.title)
+                Text(track.displayTitle)
                     .font(.body)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
@@ -587,7 +587,7 @@ struct AlbumTrackRowView: View {
             }
             Button(Localized.cancel, role: .cancel) { }
         } message: {
-            Text(Localized.deleteFileConfirmation(track.title))
+            Text(Localized.deleteFileConfirmation(track.displayTitle))
         }
     }
 

@@ -29,15 +29,15 @@ struct LyricMiniSection: View {
             } else if let lines = lyrics?.syncedLyrics, !lines.isEmpty {
                 let idx = activeIndex ?? 0
                 VStack(spacing: 6) {
-                    miniLine(line(idx - 1, in: lines)?.text, isActive: false)
-                    miniLine(line(idx, in: lines)?.text, isActive: true)
-                    miniLine(line(idx + 1, in: lines)?.text, isActive: false)
+                    miniLine(line(idx - 1, in: lines)?.displayText, isActive: false)
+                    miniLine(line(idx, in: lines)?.displayText, isActive: true)
+                    miniLine(line(idx + 1, in: lines)?.displayText, isActive: false)
                 }
                 .frame(maxWidth: .infinity)
             } else if let lyrics = lyrics,
                       let firstLine = lyrics.plainLyrics.split(separator: "\n").first {
                 // 无时间轴歌词：显示第一行
-                Text(String(firstLine))
+                Text(DisplayScriptNormalizer.display(String(firstLine)))
                     .font(.callout.weight(.medium))
                     .foregroundColor(.primary)
                     .lineLimit(1)
@@ -116,7 +116,7 @@ struct MiniPlayerView: View {
 
                         // Track info
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(playerEngine.currentTrack?.title ?? "")
+                            Text(playerEngine.currentTrack?.displayTitle ?? "")
                                 .font(.headline)
                                 .foregroundColor(.primary)
                                 .lineLimit(1)

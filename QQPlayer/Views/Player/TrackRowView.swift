@@ -76,7 +76,7 @@ struct TrackRowView: View, @MainActor Equatable {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .font(.title3)
                         .fontWeight(.medium)
                         .foregroundColor(isCurrentlyPlaying ? deleteSettings.backgroundColorChoice.color : .primary)
@@ -185,7 +185,7 @@ struct TrackRowView: View, @MainActor Equatable {
             Button(Localized.delete, role: .destructive) { deleteFile() }
             Button(Localized.cancel, role: .cancel) { }
         } message: {
-            Text(Localized.deleteFileConfirmation(track.title))
+            Text(Localized.deleteFileConfirmation(track.displayTitle))
         }
         .onAppear {
             isFavorite = (try? appCoordinator.isFavorite(trackStableId: track.stableId)) ?? false

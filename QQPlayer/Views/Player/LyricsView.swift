@@ -40,7 +40,7 @@ struct LyricsView: View {
                     } else if !lyrics.syncedLyrics.isEmpty {
                         syncedLyricsView(lyrics.syncedLyrics)
                     } else if !lyrics.plainLyrics.isEmpty {
-                        plainLyricsView(lyrics.plainLyrics)
+                        plainLyricsView(DisplayScriptNormalizer.display(lyrics.plainLyrics))
                     } else {
                         noLyricsView
                     }
@@ -203,7 +203,7 @@ struct LyricsView: View {
 
     private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
         VStack(spacing: 4) {
-            Text(line.text)
+            Text(line.displayText)
                 .font(fontForLine(isActive: isActive, distance: distance))
                 .fontWeight(isActive ? .bold : .semibold)
                 .lineLimit(3)
@@ -217,7 +217,7 @@ struct LyricsView: View {
                     y: 0
                 )
 
-            if let translation = line.translation, !translation.isEmpty {
+            if let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)
                     .font(.system(size: translationFontSize(isActive: isActive, distance: distance), weight: .regular))
                     .lineLimit(2)

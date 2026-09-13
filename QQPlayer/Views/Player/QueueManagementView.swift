@@ -215,7 +215,7 @@ struct QueueTrackRow: View {
             // Track info
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .font(.headline)
                         .fontWeight(isCurrentTrack ? .bold : .medium)
                         .foregroundColor(isCurrentTrack ? settings.backgroundColorChoice.color : .primary)
