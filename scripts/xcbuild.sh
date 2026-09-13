@@ -14,8 +14,16 @@
 #   scripts/xcbuild.sh test -scheme QQPlayer -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 #
 # 环境变量：
-#   QQPLAYER_DD  覆盖 DerivedData 路径（默认 /tmp/dd-<worktree 目录名>，按工作区隔离防互踩）
+#   QQPLAYER_DD       覆盖 DerivedData 路径（默认 /tmp/dd-<worktree 目录名>，按工作区隔离防互踩）
+#   QQPLAYER_NO_LOCK  置 1 跳过构建锁（仅在确知无并发构建时用）
 #
+# 构建锁（2026-09-13 立，血的教训）：
+#   两个 worktree 同时构建时，SPM 会对**同一份共享 clone 缓存**做并发解析——
+#   实测会把 repositories/<pkg> 镜像清空并重新 `git clone --mirror`（日志特征
+#   `skipping cache due to an error: ... already exists unexpectedly`），慢网络下
+#   克隆挂死、构建 CPU 归零、缓存处于半残状态（当日两次踩坑，含子代理构建）。
+#   DerivedData 会话名隔离挡不住这个（踩的是共享 clone 缓存）→ 这里用目录锁把**所有**
+#   走本入口的构建全局串行化；后到者排队等待，超时/陈旧锁自动清理。
 set -euo pipefail
 
 SHARED_SPM_DEFAULT="/Users/dax/codes/qqplayer-swift/build/SourcePackagesShared"
@@ -35,6 +43,32 @@ else
 fi
 DERIVED_DATA="${QQPLAYER_DD:-/tmp/dd-$WORKSPACE_NAME}"
 mkdir -p "$DERIVED_DATA"
+
+# ---- 构建锁（全局串行；mkdir 原子性做锁，macOS 无 flock）----
+LOCK_DIR="/tmp/qqplayer-xcbuild.lock"
+if [ "${QQPLAYER_NO_LOCK:-0}" != "1" ]; then
+  waited=0
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    lock_age=0
+    if [ -d "$LOCK_DIR" ]; then
+      lock_mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null || echo 0)"
+      lock_age=$(( $(date +%s) - lock_mtime ))
+    fi
+    if [ "$lock_age" -gt 1800 ]; then
+      echo "⚠️  构建锁超过 30 分钟未释放（疑似中断残留），强制清理：$LOCK_DIR"
+      rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"
+      continue
+    fi
+    if [ "$waited" -ge 2400 ]; then
+      echo "❌ 等待构建锁超时（40 分钟）：$LOCK_DIR（如确无并发构建，用 QQPLAYER_NO_LOCK=1 绕过）" >&2
+      exit 3
+    fi
+    [ $(( waited % 60 )) -eq 0 ] && echo "⏳ 其他构建进行中，排队等待（已等 ${waited}s）…"
+    sleep 5
+    waited=$((waited + 5))
+  done
+  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+fi
 
 echo "▶︎ 共享 SPM 缓存：$SHARED_SPM"
 echo "▶︎ DerivedData：$DERIVED_DATA"
