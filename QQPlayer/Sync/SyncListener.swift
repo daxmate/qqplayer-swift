@@ -149,7 +149,11 @@ final class SyncListener: @unchecked Sendable {
     private let lock = NSLock()
     private var listener: NWListener?
     private var channels: [UUID: NWPeerChannel] = [:]
-    private let nonceRegistry = SyncPairingNonceRegistry()
+    /// 配对 nonce 池：**不设过期**（2026-09-13 恢复）。
+    /// 之前「注册新码作废旧码 + 300s TTL」会让仍在展示的二维码静默失效（扫码 → 验签
+    /// 无源 → 静默拒绝，桌面不弹批准卡；同页面板同时打开时更必现）。旧码的作废时机
+    /// 回到「配对完成 / 停止监听」，见 `SyncHostCenter.discardQRNonce()`。
+    private let nonceRegistry = SyncPairingNonceRegistry(nonceTTL: .infinity)
 
     init(localIdentity: SyncIdentity, trustStore: any SyncTrustStore, deviceName: String) {
         self.localIdentity = localIdentity

@@ -6,7 +6,8 @@
 //    🔴T1 认领绑定传输级身份（同名不同目录 + 前一条失败被跳过 → 不错位）
 //    🟡T2 每条 announced 条目都有终态；finishBatch 恰一次且幂等（含暂存歌词收尾）
 //    🟡T3 落位原子替换；失败保留本端原文件
-//    🟡T4 file_meta 解码失败回 protocolError；发送端 ack 超时；等主机答复阶段超时
+//    🟡T4 file_meta 解码失败回 protocolError；发送端 ack 超时（等人工批准**不**设超时，
+//       2026-09-13 恢复：该阶段是人工节奏，超时会让慢一点批准就静默失败）
 //    🟡T5 续传对齐 truncate 失败走明确失败路径（不静默继续）
 //
 //  fixture 复用 SyncPeerSessionTestSupport.swift（SessionFixture 双 ready 回环）。
@@ -540,8 +541,14 @@ struct SyncTransferIdentityTests {
         return condition()
     }
 
-    @Test("🟡T4 等主机答复阶段有超时 → client 不再永久卡在「配对中」")
-    func clientPairResponseTimesOut() async throws {
+    /// 2026-09-13 恢复：等人工批准不做超时。
+    ///
+    /// 此前 🟡T4 把 `waitingForPairResponse` 纳入握手超时（缺省 10s）——主机侧
+    /// `.waitingForPairApproval` 明确「等用户点弹窗不受超时约束」，客户端却在 10s 后
+    /// 自行放弃 → 用户扫码后稍慢一点批准就静默失败（与“配对功能坏了”同症状）。
+    /// 恢复为两端同一口径：人工决定阶段无超时。
+    @Test("等人工批准不受握手超时约束 → client 不自行超时关闭")
+    func clientWaitsForHumanApprovalWithoutTimeout() async throws {
         let fixture = SessionFixture.make(config: SyncSessionConfiguration(handshakeTimeout: 0.2))
         let nonce = Data((0 ..< 16).map { UInt8($0) })
         fixture.hostSession.pairingNonces?.register(nonce)
@@ -560,19 +567,17 @@ struct SyncTransferIdentityTests {
         #expect(fixture.clientSession.phase == .waitingForPairResponse)
         #expect(fixture.hostSession.phase == .waitingForPairApproval)
 
-        // 同上：轮询到 client 因握手超时关闭（CI 定时器节流下可能需 10s+）
-        let closed = await waitUntil { fixture.clientSession.phase == .closed }
-        #expect(closed, "握手超时未在 60s 内关闭 client 会话")
+        // 断言“超时**没有**发生”只能按时间推进：等 5 倍注入超时（0.2s）。
+        // CI 定时器被节流只会让（本该没有的）超时更晚触发 → 不会造成假红。
+        try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        #expect(fixture.clientSession.phase == .closed)
-        #expect(fixture.clientSession.closeReason == .handshakeTimeout)
-        // 人工批准阶段**故意**不设超时：主机不会**自己**超时。
-        // 注意：client 超时关闭会带动链路关闭 → 主机随之以 .remoteClosed 被动关闭，
-        // 这是正确的连带结果（不是主机超时）。故断言“主机的关闭原因不是 handshakeTimeout”。
-        #expect(
-            !(fixture.hostSession.phase == .closed && fixture.hostSession.closeReason == .handshakeTimeout),
-            "主机在等人工批准时不得自行超时（实际：\(fixture.hostSession.phase) / \(String(describing: fixture.hostSession.closeReason))）"
-        )
+        #expect(fixture.clientSession.phase == .waitingForPairResponse, "客户端在等人工批准时不得自行超时")
+        #expect(fixture.hostSession.phase == .waitingForPairApproval)
+
+        // 用户点「批准」→ 链路照常走到双方 ready（恢复后配对链路完整）
+        fixture.hostSession.approvePairing(displayName: "iPhone")
+        #expect(fixture.clientSession.phase == .ready)
+        #expect(fixture.hostSession.phase == .ready)
     }
 
     // MARK: 🟡T5 续传对齐失败

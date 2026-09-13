@@ -342,12 +342,14 @@ final class SyncPeerSession: @unchecked Sendable {
 
     /// 进入 `ready` 之前的等待阶段（需要超时兜底的）：
     /// - `waitingForPeerHello` / `waitingForPairRequest`：等对端 hello / pair_request
-    /// - `waitingForPairResponse`：client 已发 pair_request，等主机答复（2026-09-12 审计
-    ///   🟡T4：之前该阶段无超时，主机不回就永远卡在“配对中”）
+    /// - `waitingForPairResponse` **故意不含**（2026-09-13 恢复）：该阶段等的是
+    ///   **主机侧用户在批准卡上做决定**（人工节奏），不是对端技术故障——给它加
+    ///   握手超时会让人慢一点批准就静默失败（与主机侧 `.waitingForPairApproval`
+    ///   同一口径：人工决定不受超时约束）。
     /// - `waitingForPairApproval` **故意不含**：等用户在弹窗上决定，不受超时约束
     static func phaseNeedsHandshakeDeadline(_ phase: SyncSessionPhase) -> Bool {
         switch phase {
-        case .waitingForPeerHello, .waitingForPairRequest, .waitingForPairResponse:
+        case .waitingForPeerHello, .waitingForPairRequest:
             return true
         default:
             return false
