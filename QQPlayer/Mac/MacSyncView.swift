@@ -359,27 +359,96 @@ struct MacSyncRunSection: View {
         case let .failed(error):
             failureRow(error)
         case .loaded:
-            if content.playlistOptions.isEmpty {
+            if content.playlistOptions.isEmpty, smartSources.isEmpty {
                 Text("sync_run_playlists_empty".localized)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(content.playlistOptions) { option in
+                VStack(alignment: .leading, spacing: 8) {
+                    smartSourceGroup
+                    playlistGroup
+                }
+            }
+        }
+    }
+
+    /// 自动歌单来源（最近添加 / 最近播放 / 常听排行）。
+    ///
+    /// 这里**不给整单勾选**：自动歌单是动态集合，而「整单同步」的展开口径本期只覆盖
+    /// 收藏 / 真实歌单（`@smart:*` 不在展开器的识别范围内）——与其放一个勾了不同步的
+    /// 复选框，不如只提供明确可用的「挑选歌曲」入口。
+    private var smartSources: [SyncBrowseSourceOption] {
+        content.browseSources.filter(\.isSmart)
+    }
+
+    @ViewBuilder
+    private var smartSourceGroup: some View {
+        let sources = smartSources
+        if !sources.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("sync_source_smart_group".localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(sources) { option in
+                    HStack(spacing: 8) {
+                        Image(systemName: smartIconName(option))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 16)
+                        Text(option.title)
+                        Spacer(minLength: 0)
+                        Text("smart_songs_count".localized(with: option.trackCount))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        pickTracksButton(option.ref)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var playlistGroup: some View {
+        if !content.playlistOptions.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                if !smartSources.isEmpty {
+                    Text("sync_run_mode_playlists".localized)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(content.playlistOptions) { option in
+                    HStack(spacing: 8) {
                         Toggle(isOn: playlistBinding(option.id)) {
                             HStack(spacing: 8) {
                                 Text(option.title)
-                                Spacer()
                                 Text("sync_run_songs_count".localized(with: option.trackCount))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .toggleStyle(.checkbox)
+                        Spacer(minLength: 0)
+                        if let ref = SyncBrowseSourceRef.parse(id: option.id) {
+                            pickTracksButton(ref)
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// 自动歌单行的图标（复用播放列表页卡片同一套决策）。
+    private func smartIconName(_ option: SyncBrowseSourceOption) -> String {
+        guard let kind = option.ref.smartKind else { return "music.note.list" }
+        return MacSmartPlaylistUILogic.iconName(for: kind.smartPlaylistKind)
+    }
+
+    /// 下钻入口：切到单曲级 + 把该来源设为当前来源（已勾选的歌全部保留）。
+    private func pickTracksButton(_ ref: SyncBrowseSourceRef) -> some View {
+        Button("sync_run_pick_tracks".localized) {
+            content.pickTracks(in: ref)
+        }
+        .buttonStyle(.link)
+        .font(.caption)
     }
 
     private func playlistBinding(_ id: String) -> Binding<Bool> {
@@ -392,9 +461,44 @@ struct MacSyncRunSection: View {
         )
     }
 
+    /// 单曲级「来源」选择（全部曲库 / 收藏 / 自动歌单 / 真实歌单）——用户 2026-09-13
+    /// 反馈「要一首一首搜索」的正面解法：先选来源，再在来源内搜索 / 翻页挑歌。
+    /// 只做展示：选项、当前值、切换动作全部来自 `MacSyncContentModel`。
+    @ViewBuilder
+    private var sourcePicker: some View {
+        if content.browseSources.count > 1 {
+            HStack(spacing: 8) {
+                Text("sync_source_label".localized)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: sourceBinding) {
+                    ForEach(content.browseSources) { option in
+                        Text(sourceOptionTitle(option)).tag(option.ref)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var sourceBinding: Binding<SyncBrowseSourceRef> {
+        Binding(
+            get: { content.browseSource },
+            set: { content.selectBrowseSource($0) }
+        )
+    }
+
+    /// 下拉项文案：来源名 + 曲目数（与歌单行同一口径的「%d 首」）。
+    private func sourceOptionTitle(_ option: SyncBrowseSourceOption) -> String {
+        "\(option.title) · " + "smart_songs_count".localized(with: option.trackCount)
+    }
+
     @ViewBuilder
     private var trackList: some View {
         VStack(alignment: .leading, spacing: 6) {
+            sourcePicker
             TextField("sync_run_track_search_placeholder".localized, text: $content.trackQuery)
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: content.trackQuery) { _ in

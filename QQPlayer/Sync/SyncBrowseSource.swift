@@ -271,3 +271,18 @@ enum SyncBrowseSourcePager {
         return (page, end < items.count)
     }
 }
+
+// MARK: - 与播放列表页的展示种类对齐（图标复用）
+
+extension SyncBrowseSmartKind {
+    /// 播放列表页卡片同款的展示种类：同步页的自动歌单行与播放列表页用**同一套**
+    /// 图标决策（`MacSmartPlaylistUILogic.iconName(for:)` / iOS 同名逻辑），
+    /// 避免同一个「最近添加」在两处长得不一样。
+    var smartPlaylistKind: SmartPlaylistKind {
+        switch self {
+        case .recentAdded: return .recentAdded
+        case .recentPlayed: return .recentPlayed
+        case .topPlayed: return .topPlayed
+        }
+    }
+}
