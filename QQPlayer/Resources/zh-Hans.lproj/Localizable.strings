@@ -899,6 +899,10 @@
 "sync_run_mode_library" = "全曲库";
 "sync_run_mode_playlists" = "歌单";
 "sync_run_mode_tracks" = "单曲";
+"sync_source_label" = "来源";
+"sync_source_all_library" = "全部曲库";
+"sync_source_smart_group" = "自动歌单";
+"sync_run_pick_tracks" = "挑选歌曲";
 "sync_run_library_row_title" = "整个曲库";
 "sync_run_library_row_hint" = "曲库里的全部歌曲，选中前会先让你确认。";
 "sync_run_library_row_detail" = "%d 首 · 约 %@";

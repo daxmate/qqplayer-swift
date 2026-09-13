@@ -889,6 +889,10 @@
 "sync_run_mode_library" = "Вся медиатека";
 "sync_run_mode_playlists" = "Плейлисты";
 "sync_run_mode_tracks" = "Песни";
+"sync_source_label" = "Источник";
+"sync_source_all_library" = "Вся медиатека";
+"sync_source_smart_group" = "Умные плейлисты";
+"sync_run_pick_tracks" = "Выбрать песни";
 "sync_run_library_row_title" = "Вся медиатека";
 "sync_run_library_row_hint" = "Все песни медиатеки. Перед выбором потребуется подтверждение.";
 "sync_run_library_row_detail" = "%d песен · около %@";

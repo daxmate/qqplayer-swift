@@ -894,6 +894,10 @@
 "sync_run_mode_library" = "Entire Library";
 "sync_run_mode_playlists" = "Playlists";
 "sync_run_mode_tracks" = "Songs";
+"sync_source_label" = "Source";
+"sync_source_all_library" = "Entire Library";
+"sync_source_smart_group" = "Smart Playlists";
+"sync_run_pick_tracks" = "Select Songs";
 "sync_run_library_row_title" = "Entire library";
 "sync_run_library_row_hint" = "Every song in your library. You'll be asked to confirm first.";
 "sync_run_library_row_detail" = "%d songs · about %@";
