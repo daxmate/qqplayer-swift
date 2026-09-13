@@ -137,6 +137,11 @@
 		FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */; };
 		BF033716D78646F7A2CF1FAB /* IndexingGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */; };
 		426E0B171BA145F0A982343A /* SyncLibraryPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD72A7C36194032A5887F28 /* SyncLibraryPlanTests.swift */; };
+		CDD3A3DC422B4D67A35306F7 /* LyricsManagerCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E5633C65BE849FD80976DE3 /* LyricsManagerCacheTests.swift */; };
+		C9587157C41540E4BFB5F841 /* PlaylistReorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38769BFE17E34699B79F61DC /* PlaylistReorderTests.swift */; };
+		CB708B9FA3B14F34A538F955 /* CloudCopyArchiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBB68FA07FD4BA8AA31CF0E /* CloudCopyArchiverTests.swift */; };
+		0EFEED25D00648BAA2541460 /* LibraryIndexerCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5118775D895341ED854DBA44 /* LibraryIndexerCancellationTests.swift */; };
+		93777CE702E14711BC025088 /* ArtworkCacheEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5949C69E938E437AAADAD641 /* ArtworkCacheEncodingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -323,6 +328,11 @@
 		1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavoriteBatchLogicTests.swift; sourceTree = "<group>"; };
 		38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IndexingGateTests.swift; sourceTree = "<group>"; };
 		3DD72A7C36194032A5887F28 /* SyncLibraryPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLibraryPlanTests.swift; sourceTree = "<group>"; };
+		6E5633C65BE849FD80976DE3 /* LyricsManagerCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsManagerCacheTests.swift; sourceTree = "<group>"; };
+		38769BFE17E34699B79F61DC /* PlaylistReorderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaylistReorderTests.swift; sourceTree = "<group>"; };
+		8EBB68FA07FD4BA8AA31CF0E /* CloudCopyArchiverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudCopyArchiverTests.swift; sourceTree = "<group>"; };
+		5118775D895341ED854DBA44 /* LibraryIndexerCancellationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryIndexerCancellationTests.swift; sourceTree = "<group>"; };
+		5949C69E938E437AAADAD641 /* ArtworkCacheEncodingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkCacheEncodingTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -896,6 +906,11 @@
 				1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */,
 				38AD583ADBF84EC8A526B54F /* IndexingGateTests.swift */,
 				3DD72A7C36194032A5887F28 /* SyncLibraryPlanTests.swift */,
+				6E5633C65BE849FD80976DE3 /* LyricsManagerCacheTests.swift */,
+				38769BFE17E34699B79F61DC /* PlaylistReorderTests.swift */,
+				8EBB68FA07FD4BA8AA31CF0E /* CloudCopyArchiverTests.swift */,
+				5118775D895341ED854DBA44 /* LibraryIndexerCancellationTests.swift */,
+				5949C69E938E437AAADAD641 /* ArtworkCacheEncodingTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1331,6 +1346,11 @@
 				FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */,
 				BF033716D78646F7A2CF1FAB /* IndexingGateTests.swift in Sources */,
 				426E0B171BA145F0A982343A /* SyncLibraryPlanTests.swift in Sources */,
+				CDD3A3DC422B4D67A35306F7 /* LyricsManagerCacheTests.swift in Sources */,
+				C9587157C41540E4BFB5F841 /* PlaylistReorderTests.swift in Sources */,
+				CB708B9FA3B14F34A538F955 /* CloudCopyArchiverTests.swift in Sources */,
+				0EFEED25D00648BAA2541460 /* LibraryIndexerCancellationTests.swift in Sources */,
+				93777CE702E14711BC025088 /* ArtworkCacheEncodingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

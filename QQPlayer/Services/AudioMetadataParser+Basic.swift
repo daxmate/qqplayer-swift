@@ -2,74 +2,12 @@
 //  AudioMetadataParser+Basic.swift
 //  QQPlayer
 //
-//  基础解析域：SFBAudioEngine 元数据提取（Opus/Vorbis 等）、内嵌封面检测、
-//  文件名基础解析（避免 SFB 解析挂起）。
+//  基础解析域：内嵌封面检测、文件名基础解析（避免 SFB 解析挂起）。
 //
 
 import Foundation
-import SFBAudioEngine
 
 extension AudioMetadataParser {
-    // Parse using SFBAudioEngine for Opus, Vorbis, etc.
-    private static func parseSFBAudioFile(_ url: URL) async throws -> AudioMetadata {
-        print("📖 Reading SFBAudioEngine metadata for: \(url.lastPathComponent)")
-
-        do {
-            // Create SFBAudioFile for metadata extraction
-            let audioFile = try SFBAudioEngine.AudioFile(readingPropertiesAndMetadataFrom: url)
-
-            // Extract basic properties
-            let properties = audioFile.properties
-            let metadata = audioFile.metadata
-
-            let durationSeconds = properties.duration ?? 0
-            let sampleRate = Int(properties.sampleRate ?? 0)
-            let channels = Int(properties.channelCount ?? 0)
-            let bitDepth = 0  // BitDepth not directly available from AudioProperties
-
-            // Extract metadata
-            let title = metadata.title
-            let artist = metadata.artist
-            let album = metadata.albumTitle
-            let albumArtist = metadata.albumArtist
-            let genre = Self.normalizedGenre(metadata.genre)
-            let trackNumber = metadata.trackNumber
-            let discNumber = metadata.discNumber
-            let year = metadata.releaseDate?.components(separatedBy: "-").first.flatMap { Int($0) }
-
-            print("🎵 SFBAudioEngine metadata for \(url.lastPathComponent):")
-            print("   Title: \(title ?? "nil")")
-            print("   Artist: \(artist ?? "nil")")
-            print("   Sample Rate: \(sampleRate) Hz")
-            print("   Channels: \(channels)")
-            print("   Duration: \(durationSeconds) seconds")
-
-            return AudioMetadata(
-                title: title,
-                artist: artist,
-                album: album,
-                albumArtist: albumArtist,
-                genre: genre,
-                trackNumber: trackNumber,
-                discNumber: discNumber,
-                year: year,
-                durationMs: Int(durationSeconds * 1000),
-                sampleRate: sampleRate,
-                bitDepth: bitDepth > 0 ? bitDepth : nil,
-                channels: channels,
-                replaygainTrackGain: metadata.replayGainTrackGain,
-                replaygainAlbumGain: metadata.replayGainAlbumGain,
-                replaygainTrackPeak: metadata.replayGainTrackPeak,
-                replaygainAlbumPeak: metadata.replayGainAlbumPeak,
-                hasEmbeddedArt: await checkForEmbeddedArtwork(url: url)  // Check for embedded artwork in SFBAudioEngine files
-            )
-
-        } catch {
-            print("❌ SFBAudioEngine parsing failed: \(error)")
-            throw AudioParseError.invalidFile
-        }
-    }
-
     // Simple artwork detection for supported formats
     static func checkForEmbeddedArtwork(url: URL) async -> Bool {
         do {

@@ -41,6 +41,9 @@ class LibraryIndexer: NSObject, ObservableObject {
     /// Bumped by stop(), so work deferred by an in-flight start() can tell that
     /// it belongs to a run that has since been cancelled.
     private var indexingGeneration = 0
+    /// 在途扫描任务（start/startOfflineMode 注册，stop 取消）：generation 只让闭包
+    /// 提前 return，任务组仍会等已入队文件跑完；cancel 才能让取消传播（审计 🔵-9）。
+    private(set) var activeScanTask: Task<Void, Never>?
 
     private let databaseManager = DatabaseManager.shared
     private let stateManager = StateManager.shared
@@ -62,7 +65,13 @@ class LibraryIndexer: NSObject, ObservableObject {
 
             let generation = indexingGeneration
 
-            Task {
+            activeScanTask = Task {
+                // 取消检查：stop() 已取消本轮 → 不再复制共享容器文件、不再起扫
+                guard !Task.isCancelled else {
+                    print("🛑 iOS scan cancelled - indexing was stopped")
+                    return
+                }
+
                 // Copy any new files from share extension first
                 await copyFilesFromSharedContainer()
 
@@ -87,7 +96,7 @@ class LibraryIndexer: NSObject, ObservableObject {
         tracksFound = 0
 
         let generation = indexingGeneration
-        Task {
+        activeScanTask = Task {
             await scanLocalDocuments(generation: generation)
         }
     }
@@ -95,6 +104,11 @@ class LibraryIndexer: NSObject, ObservableObject {
     func stop() {
         indexingGeneration &+= 1
         isIndexing = false
+        // 取消在途扫描：generation 只让任务组内的 guard 提前 return，任务组仍会
+        // 等已入队文件跑完（审计 🔵-9）；cancel 让取消向子任务传播，配合扫描内
+        // 的 Task.isCancelled 检查快速退出。
+        activeScanTask?.cancel()
+        activeScanTask = nil
     }
 
     func switchToOfflineMode() {
@@ -425,7 +439,10 @@ class LibraryIndexer: NSObject, ObservableObject {
                 while await group.next() != nil {
                     processedFiles += 1
 
-                    guard generation == indexingGeneration else { return }
+                    guard generation == indexingGeneration, !Task.isCancelled else {
+                        group.cancelAll()
+                        return
+                    }
 
                     if processedFiles % 10 == 0 || processedFiles == totalFiles {
                         indexingProgress = Double(processedFiles) / Double(totalFiles)
@@ -475,7 +492,7 @@ class LibraryIndexer: NSObject, ObservableObject {
             tracksFound = 0
 
             let generation = indexingGeneration
-            Task {
+            activeScanTask = Task {
                 await scanMusicFolder(generation: generation)
             }
         }
@@ -567,7 +584,10 @@ class LibraryIndexer: NSObject, ObservableObject {
                     while await group.next() != nil {
                         completedCount += 1
 
-                        guard generation == indexingGeneration else { return }
+                        guard generation == indexingGeneration, !Task.isCancelled else {
+                            group.cancelAll()
+                            return
+                        }
 
                         if completedCount % 20 == 0 || completedCount == processTotal {
                             currentlyProcessing = allFileNames[min(completedCount, processTotal - 1)]
@@ -648,6 +668,9 @@ class LibraryIndexer: NSObject, ObservableObject {
     }
 
     nonisolated private func processLocalFile(_ fileURL: URL) async {
+        // 取消检查：stop() 取消在途扫描后，已入队的文件不再继续处理（审计 🔵-9）。
+        // 子任务继承父任务取消状态，此处早退即可（不写库、不做 IO）。
+        guard !Task.isCancelled else { return }
         do {
             print("🎵 Starting to process file: \(fileURL.lastPathComponent)")
 

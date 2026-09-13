@@ -46,12 +46,13 @@ enum MP4EmptyCovrStripper {
         var i = ilstBody.lowerBound
         var emptyCovrOffset: Int?
         while i + 8 <= ilstBody.upperBound {
-            let size = Int(readUInt32(data, at: i))
-            guard size >= 8, i + size <= ilstBody.upperBound else { break }
+            guard let size = resolvedSize(data, at: i, limit: ilstBody.upperBound) else { break }
+            guard i + size <= ilstBody.upperBound else { break }
             let type = String(data: data.subdata(in: i + 4 ..< i + 8), encoding: .ascii)
             if type == "covr" {
-                // covr item 内应有 data 子 atom；空壳 = size 恰好 8（或子区域不足一个 data 头）
-                if size == 8 || i + size - (i + 8) < 8 {
+                // covr item 内应有 data 子 atom；空壳 = 子区域不足一个 data 头
+                let payload = i + size - (i + headerSize(data, at: i))
+                if payload < 8 {
                     emptyCovrOffset = i
                 }
                 break
@@ -63,10 +64,15 @@ enum MP4EmptyCovrStripper {
         // 删除 covr item（8 字节），并修正 ilst/meta/udta/moov 的 size（各 -8）
         var fixed = data
         let delta = 8
+        let containerEnds = [
+            (offset: ilst.offset, end: ilst.offset + ilst.size),
+            (offset: meta.offset, end: meta.offset + meta.size),
+            (offset: udta.offset, end: udta.offset + udta.size),
+            (offset: moov.offset, end: moov.offset + moov.size),
+        ]
         fixed.removeSubrange(covrOffset ..< covrOffset + delta)
-        for containerOffset in [ilst.offset, meta.offset, udta.offset, moov.offset] {
-            let old = readUInt32(fixed, at: containerOffset)
-            writeUInt32(old - UInt32(delta), to: &fixed, at: containerOffset)
+        for container in containerEnds {
+            shrinkAtomSize(&fixed, at: container.offset, end: container.end, delta: delta)
         }
         try fixed.write(to: url, options: .atomic)
     }
@@ -77,8 +83,8 @@ enum MP4EmptyCovrStripper {
     private static func findAtom(in data: Data, type: String, range: Range<Int>) -> (offset: Int, size: Int)? {
         var i = range.lowerBound
         while i + 8 <= range.upperBound {
-            let size = Int(readUInt32(data, at: i))
-            guard size >= 8, i + size <= range.upperBound else { break }
+            guard let size = resolvedSize(data, at: i, limit: range.upperBound) else { break }
+            guard i + size <= range.upperBound else { break }
             let atomType = String(data: data.subdata(in: i + 4 ..< i + 8), encoding: .ascii)
             if atomType == type {
                 return (i, size)
@@ -86,6 +92,42 @@ enum MP4EmptyCovrStripper {
             i += size
         }
         return nil
+    }
+
+    /// atom 实际长度（按 MP4 语义）：
+    /// - size == 0：延伸到容器末尾（此前循环直接 break，导致此布局下漏删空壳 covr，审计 🔵-8）
+    /// - size == 1：64 位扩展，长度在 header 后 8 字节（headerSize 已按 16 字节算，此处补上解析）
+    /// - 其它 size < 8（含 2/3/4/5/6/7）为非法值 → nil（停止扫描）
+    private static func resolvedSize(_ data: Data, at offset: Int, limit: Int) -> Int? {
+        let raw = readUInt32(data, at: offset)
+        if raw == 0 { return limit - offset }
+        if raw == 1 {
+            guard offset + 16 <= data.count else { return nil }
+            let high = UInt64(readUInt32(data, at: offset + 8))
+            let low = UInt64(readUInt32(data, at: offset + 12))
+            let large = (high << 32) | low
+            guard large >= 16, large <= UInt64(limit - offset) else { return nil }
+            return Int(large)
+        }
+        guard raw >= 8 else { return nil }
+        return Int(raw)
+    }
+
+    /// atom 的 size 字段减去 delta，兼容三种写法：32 位 / 64 位扩展 / size==0（延伸到末尾，
+    /// 删除后写成等价显式长度）
+    private static func shrinkAtomSize(_ data: inout Data, at offset: Int, end: Int, delta: Int) {
+        let raw = readUInt32(data, at: offset)
+        if raw == 1 {
+            let high = UInt64(readUInt32(data, at: offset + 8))
+            let low = UInt64(readUInt32(data, at: offset + 12))
+            let newSize = ((high << 32) | low) - UInt64(delta)
+            writeUInt32(UInt32(newSize >> 32), to: &data, at: offset + 8)
+            writeUInt32(UInt32(newSize & 0xFFFF_FFFF), to: &data, at: offset + 12)
+        } else if raw == 0 {
+            writeUInt32(UInt32(max(0, end - offset - delta)), to: &data, at: offset)
+        } else {
+            writeUInt32(raw - UInt32(delta), to: &data, at: offset)
+        }
     }
 
     /// atom header 长度（支持 64 位扩展 size==1）

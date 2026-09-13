@@ -398,17 +398,8 @@ class DatabaseManager: @unchecked Sendable {
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_eq_band_preset ON eq_band(preset_id)")
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_eq_band_index ON eq_band(band_index)")
 
-            // Play history (automatic playlists data source: recent/top played)
-            try db.execute(sql: """
-                CREATE TABLE IF NOT EXISTS play_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    track_stable_id TEXT NOT NULL,
-                    played_at INTEGER NOT NULL,
-                    play_duration_ms INTEGER DEFAULT 0
-                )
-            """)
-            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_stable_id)")
-            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at)")
+            // 注：play_history 建表/索引在本函数上方（约 :315）已定义一次，此处原先
+            // 逐字重复的同样 DDL 已删除（第二遍恒为空操作，审计 ⚰️-6）。
 
             // 局域网同步配对记录（S2, M1；docs/lan-sync-design.md §7）。
             // 新表对旧库亦生效：createTables 每次启动都跑（CREATE TABLE IF

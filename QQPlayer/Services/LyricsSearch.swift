@@ -343,7 +343,7 @@ extension LyricsManager {
             for item in recent {
                 let trackId = item.url.deletingPathExtension().lastPathComponent
                 if let lyrics = await loadLyricsFromDisk(trackId: trackId) {
-                    cache[trackId] = lyrics
+                    cacheLyrics(lyrics, for: trackId)
                     loadedCount += 1
                 }
             }

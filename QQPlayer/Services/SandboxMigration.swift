@@ -10,7 +10,8 @@
 //    DB 路径切换候选。防"双位置重复"判据 = 同 content_hash 判同（§8.5）。
 //  - SandboxMusicMigrator：执行器（iOS only）——最小 ubiquity 读取能力（列容器 +
 //    dataless 实体化等待，不依赖 CloudDownloadManager 的 NSMetadataQuery 监控），
-//    按 planner 决策分批复制、校验、切 DB 路径、清 iCloud 副本。幂等可断点：
+//    按 planner 决策分批复制、校验、切 DB 路径、归档 iCloud 副本（移到
+//    _migrated-backup/，不删除，审计 🔵-10 后改为可恢复）。幂等可断点：
 //    "沙盒目标已存在且 content_hash 一致" = 已完成，重跑自动跳过（不重复不丢）。
 //
 //  迁移属一次性前置逻辑，真机行为无法在 CI 验证：纯逻辑部分（planner）有单测，
@@ -137,6 +138,46 @@ enum SandboxMigrationPlanner {
     }
 }
 
+// MARK: - iCloud 副本归档（平台无关，可单测）
+
+/// 迁移完成后对 iCloud 原件的处理：**移到备份目录**而不是删除（审计 🔵-10：
+/// 原先直接 removeItem，判据仅「云端与沙盒 content_hash 相等」，无备份不可逆）。
+/// 备份目录在同一个 iCloud 容器内（同卷 rename，不产生双份本地占用），用户可随时找回。
+enum CloudCopyArchiver {
+    /// 备份目录名（在 iCloud 容器根下，带下划线前缀避免与歌曲目录混淆）
+    static let backupDirectoryName = "_migrated-backup"
+
+    static func backupRoot(for cloudRoot: URL) -> URL {
+        cloudRoot.appendingPathComponent(backupDirectoryName, isDirectory: true)
+    }
+
+    /// 把 cloudRoot 下的 relativePath 归档到备份目录的同名相对路径。
+    /// - 返回归档目标 URL；目标已存在（此前已归档过）返回 nil 且**不动原件**（不覆盖不删）。
+    /// - 同卷移动用 moveItem（rename）；失败会抛错，调用方保留原件、只打日志。
+    @discardableResult
+    static func archive(
+        relativePath: String,
+        cloudRoot: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL? {
+        let source = SandboxMigrationPlanner.url(relativePath: relativePath, under: cloudRoot)
+        guard fileManager.fileExists(atPath: source.path) else { return nil }
+
+        let destination = SandboxMigrationPlanner.url(
+            relativePath: relativePath,
+            under: backupRoot(for: cloudRoot)
+        )
+        if fileManager.fileExists(atPath: destination.path) { return nil }
+
+        try fileManager.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try fileManager.moveItem(at: source, to: destination)
+        return destination
+    }
+}
+
 // MARK: - 执行器（iOS only；最小 ubiquity 读取，真机验收留 M6）
 
 #if os(iOS)
@@ -215,7 +256,8 @@ enum SandboxMigrationPlanner {
                 switchTrackDBPath(pathSwitch, sandboxRoot: sandboxRoot)
             }
 
-            // 7) 校验 + 清 iCloud 副本：仅删"已确认切到沙盒且沙盒文件存在"的云文件
+            // 7) 校验 + 归档 iCloud 副本：仅处理「已确认切到沙盒且沙盒文件存在」的云文件
+            //    （归档 = 移到备份目录，可恢复；审计 🔵-10 前是直接删除）
             cleanupCloudCopies(plan: finalPlan, cloudRoot: cloudRoot, sandboxRoot: sandboxRoot)
 
             print("📦 SandboxMigration: migration completed")
@@ -340,8 +382,7 @@ enum SandboxMigrationPlanner {
             cloudRoot: URL,
             sandboxRoot: URL
         ) {
-            let fm = FileManager.default
-            // 删除条件：该 iCloud 文件已在沙盒存在同 content_hash 的副本（判同），
+            // 归档条件：该 iCloud 文件已在沙盒存在同 content_hash 的副本（判同），
             // 即复制成功或本来就已存在。不满足（nameConflict/未复制成功）则保留云端文件。
             for item in plan.items {
                 guard item.action != .nameConflict else { continue }
@@ -352,10 +393,15 @@ enum SandboxMigrationPlanner {
                 let sandboxHash = DatabaseManager.contentHashIfFilePresent(atPath: sandboxURL.path)
                 guard cloudHash != nil, cloudHash == sandboxHash else { continue }
                 do {
-                    try fm.removeItem(at: cloudURL)
-                    print("📦 SandboxMigration: cleaned iCloud copy \(rel)")
+                    // 审计 🔵-10：原先直接 removeItem 删原件（不可逆）；改为移到
+                    // cloudRoot/_migrated-backup/<rel>，可人工恢复。
+                    if let archived = try CloudCopyArchiver.archive(relativePath: rel, cloudRoot: cloudRoot) {
+                        print("📦 SandboxMigration: archived iCloud copy → \(archived.path)")
+                    } else {
+                        print("📦 SandboxMigration: cloud copy already archived, kept original \(rel)")
+                    }
                 } catch {
-                    print("📦 SandboxMigration: cloud cleanup failed \(rel): \(error)")
+                    print("📦 SandboxMigration: cloud archive failed \(rel): \(error)")
                 }
             }
         }

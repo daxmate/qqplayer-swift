@@ -252,14 +252,8 @@ class FileCleanupManager: ObservableObject {
             break
         }
 
-        // Check share extension bookmarks (legacy - should be migrated)
-        if let resolvedURL = await resolveShareExtensionBookmark(for: stableId) {
-            if resolvedURL.path != fileURL.path {
-                print("🧹     File has been moved from \(fileURL.path) to \(resolvedURL.path) - bookmark is tracking it ✅")
-            }
-            return await testFileAccessibility(resolvedURL)
-        }
-
+        // 注：share extension 书签此前有一个恒返回 nil 的 stub 分支，已删除（零行为
+        // 变化：该分支从未命中，控制流原样落到下面的「无有效书签」返回 false）。
         print("🧹     No valid bookmark found for external file")
         return false
     }
@@ -301,13 +295,6 @@ class FileCleanupManager: ObservableObject {
             print("🧹     Failed to resolve document picker bookmark: \(error)")
             return .missing
         }
-    }
-
-    private func resolveShareExtensionBookmark(for stableId: String) async -> URL? {
-        // Share extension bookmarks are now migrated to the main bookmark storage
-        // This function is kept for backward compatibility but should not be needed
-        print("🧹     Share extension bookmarks have been migrated to main storage")
-        return nil
     }
 
     private func testFileAccessibility(_ fileURL: URL) async -> Bool {
