@@ -26,6 +26,8 @@
 //    逐键与本地 outbox 对账（SyncLWWReconcile：同键 updated_at 大者胜，
 //    平局 delete 压 upsert）→ 胜出的远端行交 SyncChangeLogApplier 落本地业务表
 //    → 把 lastOutboxID 记为本端对该 peer 的游标（sync_cursor）。
+//    本端**主动**推增量（S2-T12 `sendIncrement`）也发同一帧：起点 = sync_push_cursor
+//    （本端已推给该 peer 的位置，与 sync_cursor 方向相反，见 SyncDataSyncModels）。
 //  - 会话断连/关闭：清空进行中的拉取上下文（v1 拉取为一次性请求-应答，
 //    无跨帧状态；仅需转发 onClosed 给调用方感知）。
 //
@@ -67,6 +69,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPushIgnoredDeletes: ((Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
+    /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
+    var onIncrementSent: ((Int) -> Void)?
 
     // 会话槽位链式挂接
     private var priorAppHandler: ((SyncFrame) -> Void)?
@@ -98,6 +102,57 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         let request = SyncChangeLogPullRequest(cursor: cursor)
         let payload = try JSONEncoder().encode(request)
         try session.sendApplicationFrame(type: .changeLogPull, payload: payload)
+    }
+
+    /// 把本端 outbox 中「id > 本端已推给该 peer 的位置」的增量分批推给对端（帧 9）。
+    ///
+    /// 语义（与 `handlePull` 应答**逐字同口径**，不另立第二套）：
+    /// - 每批取批与「本批末行 id」在**同一读事务**内取值（`SyncChangeLogStore.page`），
+    ///   每批 `lastOutboxID` = **该批实际末行 id**（不是 outbox 全局末尾——S1 审计口径）。
+    /// - 过滤 delete 复用单一事实源 `SyncChangeLogDeletionPolicy.transmittableIndexes`
+    ///   （含「同键在本批末行是 delete 时其更早 upsert 也不上线」）；contentHash 复用
+    ///   `mapper.wireEntries`。**不新写判定、不新造载荷**。
+    /// - **空增量**（本端 outbox 无行）：不发帧、不动游标、返回 0。
+    /// - 批内有行但全被过滤（例如整批 delete）：**照发该批**（与 `handlePull` 应答一致）——
+    ///   帧内 `entries` 为空但 `lastOutboxID` = 本批末行，对端游标因此能越过这些永不上线的
+    ///   行；若跳过不发，本端 pushCursor 永远推不动，每轮都会重读同一批（死循环式重推）。
+    /// - **全部批次发送成功后才推进 pushCursor**：任一批 throw → 整体 throw 且游标不动
+    ///   （重推幂等由对端 LWW 保证）。
+    ///
+    /// 返回值 / `onIncrementSent` 计数 = 本端 outbox 增量**行数**（含被过滤的 delete），
+    /// 与 `handlePull` 的 `onPullHandled` 计数语义一致，**不等于** wire 条目数。
+    @discardableResult
+    func sendIncrement(maxPerBatch: Int = 500) throws -> Int {
+        // 上限兜底：limit <= 0 会让 page 永远取空批——静默不干活比抛错更难查，故夹到 1。
+        let batchSize = max(1, maxPerBatch)
+        var cursor = try store.pushCursor(forPeer: peerID)
+        var consumed = 0
+        var lastSentCursor: Int64?
+        while true {
+            let page = try store.page(after: cursor, limit: batchSize)
+            guard !page.rows.isEmpty else { break }
+            let transmittable = SyncChangeLogDeletionPolicy
+                .transmittableIndexes(rows: page.rows.map {
+                    SyncChangeLogPolicyRow(entity: $0.entity, rowKey: $0.rowKey, op: $0.op)
+                })
+                .map { page.rows[$0] }
+            // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
+            let wireEntries = try mapper.wireEntries(transmittable)
+            let payload = SyncChangeLogPushPayload(
+                entries: wireEntries,
+                lastOutboxID: page.lastOutboxID
+            )
+            try session.sendApplicationFrame(type: .changeLogPush, payload: try JSONEncoder().encode(payload))
+            consumed += page.rows.count
+            cursor = page.lastOutboxID
+            lastSentCursor = cursor
+            if page.rows.count < batchSize { break }
+        }
+        // 全部批次成功 → 才推进推送游标（失败已在上面 throw 出去，游标保持原值）。
+        guard let finalCursor = lastSentCursor else { return 0 } // 空增量：不发帧、不动游标
+        try store.setPushCursor(forPeer: peerID, lastOutboxID: finalCursor)
+        onIncrementSent?(consumed)
+        return consumed
     }
 
     // MARK: 帧入口（会话 onApplicationFrame 转发）

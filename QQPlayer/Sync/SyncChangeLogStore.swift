@@ -104,6 +104,33 @@ final class SyncChangeLogStore: @unchecked Sendable {
         try SyncPeerCursor(peerID: peerID, lastOutboxID: lastOutboxID).upsert(db)
     }
 
+    // MARK: - 推送游标（sync_push_cursor）
+
+    /// 本端**已推给该 peer** 的本端 outbox 最大 id（无记录 = 0）。
+    ///
+    /// ⚠️ 与 `cursor(forPeer:)` **方向相反**：那个是「本端已消费的**对端** outbox」
+    /// （拉取游标），这个是「本端**已推给对端**的本端 outbox」（推送游标）。
+    /// 推送增量（`SyncChangeLogPeer.sendIncrement`）从这里起算。
+    func pushCursor(forPeer peerID: String) throws -> Int64 {
+        try database.read { db in
+            try SyncPeerPushCursor
+                .filter(Column("peer_id") == peerID)
+                .fetchOne(db)?.lastOutboxID ?? 0
+        }
+    }
+
+    /// 记录本端已推给该 peer 的本端 outbox id（幂等 upsert）。
+    /// 只在**全部批次发送成功**后推进（失败不推进，重推幂等靠 LWW）。
+    func setPushCursor(forPeer peerID: String, lastOutboxID: Int64) throws {
+        try database.write { db in
+            try self.setPushCursor(db, forPeer: peerID, lastOutboxID: lastOutboxID)
+        }
+    }
+
+    func setPushCursor(_ db: Database, forPeer peerID: String, lastOutboxID: Int64) throws {
+        try SyncPeerPushCursor(peerID: peerID, lastOutboxID: lastOutboxID).upsert(db)
+    }
+
     // MARK: - 增量拉取
 
     /// 取本端 outbox 中 id > cursor 的增量（升序，limit 分页上限）。

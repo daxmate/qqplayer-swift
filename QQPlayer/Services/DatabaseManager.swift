@@ -425,8 +425,12 @@ class DatabaseManager: @unchecked Sendable {
             // 模型见 Sync/SyncDataSyncModels.swift；存储/对账见 SyncChangeLogStore.swift。
             // - sync_outbox：本地变更日志（每端一份），LWW 键 = (entity, row_key)，
             //   updated_at 毫秒；payload_json = 该行完整数据快照（对端胜出可直接应用）。
-            // - sync_cursor：per-peer 游标（peer_id = DeviceID，last_outbox_id = 对端已消费的
-            //   本端 outbox 最大 id）。拉取增量与推送应答共用。
+            // - sync_cursor：per-peer **拉取**游标（peer_id = DeviceID，last_outbox_id = 本端
+            //   已消费的对端 outbox 最大 id）。拉取应答（pull 请求携带）与收推送后推进共用。
+            // - sync_push_cursor：per-peer **推送**游标（last_outbox_id = 本端**已推给对端**的
+            //   本端 outbox 最大 id）。⚠️ 与 sync_cursor **方向相反**（一个描述对方 outbox，
+            //   一个描述本端 outbox），键同为 peer_id 却语义相反，故刻意分表——合表必被写错。
+            //   模型见 SyncDataSyncModels.swift 的 SyncPeerPushCursor。
             try db.execute(sql: """
                 CREATE TABLE IF NOT EXISTS sync_outbox (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,6 +446,15 @@ class DatabaseManager: @unchecked Sendable {
 
             try db.execute(sql: """
                 CREATE TABLE IF NOT EXISTS sync_cursor (
+                    peer_id TEXT PRIMARY KEY,
+                    last_outbox_id INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+
+            // 推送游标（S2-T12，2026-09-13）：本端 outbox 已推给某 peer 的位置。
+            // 与 sync_cursor 并列但**方向相反**（见上）；同样幂等建表，旧库启动自动补表。
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_push_cursor (
                     peer_id TEXT PRIMARY KEY,
                     last_outbox_id INTEGER NOT NULL DEFAULT 0
                 )

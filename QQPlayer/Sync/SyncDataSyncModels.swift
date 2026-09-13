@@ -102,6 +102,30 @@ struct SyncPeerCursor: Codable, FetchableRecord, PersistableRecord, Equatable, S
     }
 }
 
+// MARK: - per-peer 推送游标（sync_push_cursor）
+
+/// sync_push_cursor 一行：**本端已推给某 peer 的本端 outbox 位置**（推送游标）。
+///
+/// ⚠️ 与 `SyncPeerCursor`（sync_cursor）**方向相反，绝不可复用同一张表**：
+/// - `SyncPeerCursor` = 本端**已消费的对端** outbox 位置（拉取游标）：
+///   `SyncChangeLogPeer.handlePush` 写入、`sendPull` 读取。
+/// - `SyncPeerPushCursor` = 本端**已推给对端**的本端 outbox 位置（推送游标）：
+///   `SyncChangeLogPeer.sendIncrement` 写入并读取（增量推送的起点）。
+///
+/// 两表键同为 peer_id 却指向两条完全不同的变更流，合表 = 推/拉互相把对方的
+/// 位置当自己的起点（重复推或漏推）。
+struct SyncPeerPushCursor: Codable, FetchableRecord, PersistableRecord, Equatable, Sendable {
+    var peerID: String
+    var lastOutboxID: Int64
+
+    static let databaseTableName = "sync_push_cursor"
+
+    enum CodingKeys: String, CodingKey {
+        case peerID = "peer_id"
+        case lastOutboxID = "last_outbox_id"
+    }
+}
+
 // MARK: - 线载荷（changeLogPull / changeLogPush）
 
 /// changeLogPull 请求：对端带自己已消费的本端 outbox id（cursor）来拉增量。
