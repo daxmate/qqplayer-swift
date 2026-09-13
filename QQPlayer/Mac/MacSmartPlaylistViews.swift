@@ -2,7 +2,7 @@
 //  MacSmartPlaylistViews.swift
 //  QQPlayer
 //
-//  macOS automatic playlists (自动歌单): a pinned card strip at the top of
+//  macOS automatic playlists (自动歌单): a pinned card grid at the top of
 //  the playlist page plus a detail sheet (track list for recentAdded /
 //  recentPlayed / topPlayed; decade bucket list that pushes into a per-decade
 //  track list inside the same sheet). QQPlayerMac target only.
@@ -44,56 +44,145 @@ enum MacSmartPlaylistUILogic {
             return songsFormat(count)
         }
     }
+
+    /// 卡片条列数：先算「卡宽不低于 minCardWidth」时能放几列，再在这个上限内挑
+    /// 一个能把最后一行也填满的列数（4 张卡 → 4 或 2 列，避免 3+1 这种半空行）。
+    /// availableWidth <= 0 表示本帧还没量到宽度，先按一行排，量到后立即重排。
+    static func stripColumnCount(
+        cardCount: Int,
+        availableWidth: CGFloat,
+        minCardWidth: CGFloat,
+        spacing: CGFloat
+    ) -> Int {
+        guard cardCount > 0 else { return 1 }
+        guard availableWidth > 0 else { return cardCount }
+        let fitting = Int((availableWidth + spacing) / (minCardWidth + spacing))
+        let bounded = max(1, min(cardCount, fitting))
+        guard bounded > 1 else { return 1 }
+        for candidate in stride(from: bounded, through: 2, by: -1) where cardCount % candidate == 0 {
+            return candidate
+        }
+        return bounded
+    }
+
+    /// 卡片宽度：行内均分可用宽度，夹在 [minCardWidth, maxCardWidth] 之间。
+    static func stripCardWidth(
+        columns: Int,
+        availableWidth: CGFloat,
+        minCardWidth: CGFloat,
+        maxCardWidth: CGFloat,
+        spacing: CGFloat
+    ) -> CGFloat {
+        guard columns > 0, availableWidth > 0 else { return minCardWidth }
+        let evenly = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+        return min(max(evenly, minCardWidth), maxCardWidth)
+    }
 }
 
-/// Horizontal pinned-card strip (4 cards) at the top of the playlist page.
-/// Each card renders a 2x2 cover collage of its representative tracks
-/// (MacArtworkCollage) with the SF Symbol icon as placeholder fallback.
+/// 置顶自动歌单卡片网格（4 张，铺在播放列表页顶部）。
+///
+/// 2026-09-13 用户反馈：以前是固定 116pt 卡宽的横向 `ScrollView`（4 卡共 532pt），
+/// 而歌单列宽只有 320–600pt —— 列一窄就必须左右滚动才能看到「常听排行 / 年代」。
+/// 改成按可用宽度算列数/卡宽的网格后：窄列 2×2、宽列一行 4 张，封面拼贴随列宽
+/// 缩放，永远不需要横向滚动。列数/卡宽的计算在 `MacSmartPlaylistUILogic` 里
+/// （纯函数，便于以后 macOS 有测试 target 时单测）。
 struct MacSmartPlaylistCardStrip: View {
     let cards: [SmartPlaylistCardInfo]
     let coverTracks: [SmartPlaylistKind: [Track]]
     let onSelect: (SmartPlaylistKind) -> Void
 
-    private let cardWidth: CGFloat = 116
+    /// 卡宽区间：下限保证封面拼贴与标题可读，上限避免宽列下单卡过大。
+    private static let minCardWidth: CGFloat = 104
+    private static let maxCardWidth: CGFloat = 168
+    /// 卡间距 / 条带左右内边距（列数与卡宽计算共用）。
+    private static let spacing: CGFloat = 12
+    private static let horizontalPadding: CGFloat = 16
+
+    /// 条带可用宽度（含左右内边距；0 = 本帧还没量到）→ 决定列数与卡宽。
+    @State private var stripWidth: CGFloat = 0
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(cards, id: \.kind) { info in
-                    Button {
-                        onSelect(info.kind)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            MacArtworkCollage(
-                                tracks: coverTracks[info.kind] ?? [],
-                                size: cardWidth,
-                                cornerRadius: 8,
-                                placeholderIcon: MacSmartPlaylistUILogic.iconName(for: info.kind)
-                            )
-                            Text(Localized.smartPlaylistTitle(info.kind))
-                                .font(.callout)
-                                .fontWeight(.medium)
-                                .lineLimit(1)
-                            Text(MacSmartPlaylistUILogic.cardSubtitle(
-                                kind: info.kind,
-                                count: info.count,
-                                songsFormat: Localized.smartSongsCount,
-                                decadesFormat: Localized.smartDecadeCount
-                            ))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                        }
-                        .frame(width: cardWidth, alignment: .leading)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(Localized.smartPlaylistTitle(info.kind))
+        LazyVGrid(columns: columns, alignment: .leading, spacing: Self.spacing) {
+            ForEach(cards, id: \.kind) { info in
+                Button {
+                    onSelect(info.kind)
+                } label: {
+                    card(info)
                 }
+                .buttonStyle(.plain)
+                .help(Localized.smartPlaylistTitle(info.kind))
             }
-            .padding(.horizontal, 16)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Self.horizontalPadding)
         .padding(.vertical, 12)
+        .background(GeometryReader { geometry in
+            Color.clear.preference(key: MacSmartCardStripWidthKey.self, value: geometry.size.width)
+        })
+        .onPreferenceChange(MacSmartCardStripWidthKey.self) { width in
+            stripWidth = width
+        }
+    }
+
+    // MARK: 卡片
+
+    /// 单卡：封面拼贴（跟随列宽）+ 标题 + 计数。
+    private func card(_ info: SmartPlaylistCardInfo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MacArtworkCollageFill(
+                tracks: coverTracks[info.kind] ?? [],
+                cornerRadius: 8,
+                placeholderIcon: MacSmartPlaylistUILogic.iconName(for: info.kind)
+            )
+            Text(Localized.smartPlaylistTitle(info.kind))
+                .font(.callout)
+                .fontWeight(.medium)
+                .lineLimit(1)
+            Text(MacSmartPlaylistUILogic.cardSubtitle(
+                kind: info.kind,
+                count: info.count,
+                songsFormat: Localized.smartSongsCount,
+                decadesFormat: Localized.smartDecadeCount
+            ))
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: 布局
+
+    private var columns: [GridItem] {
+        let usable = stripWidth - Self.horizontalPadding * 2
+        let columnCount = MacSmartPlaylistUILogic.stripColumnCount(
+            cardCount: cards.count,
+            availableWidth: usable,
+            minCardWidth: Self.minCardWidth,
+            spacing: Self.spacing
+        )
+        let cardWidth = MacSmartPlaylistUILogic.stripCardWidth(
+            columns: columnCount,
+            availableWidth: usable,
+            minCardWidth: Self.minCardWidth,
+            maxCardWidth: Self.maxCardWidth,
+            spacing: Self.spacing
+        )
+        return Array(
+            repeating: GridItem(.fixed(cardWidth), spacing: Self.spacing, alignment: .topLeading),
+            count: columnCount
+        )
+    }
+}
+
+/// 卡片条宽度回传（宽度 → 列数/卡宽）。容器被 `frame(maxWidth:)` 钉住宽度，
+/// 网格内容不会反过来影响它，因此不存在布局反馈回路。
+private struct MacSmartCardStripWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat { 0 }
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

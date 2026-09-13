@@ -166,3 +166,24 @@ struct MacArtworkCollage: View {
         return result
     }
 }
+
+/// 宽度自适应正方形封面拼贴（自适应卡片网格用）：撑满父容器宽度。
+/// `MacArtworkCollage` 需要固定边长，列宽由布局决定时用这个包装（与
+/// `MacArtworkThumbnailFill` 同一套 GeometryReader + aspectRatio 写法）。
+struct MacArtworkCollageFill: View {
+    let tracks: [Track]
+    var cornerRadius: CGFloat = 8
+    var placeholderIcon: String = "music.note"
+
+    var body: some View {
+        GeometryReader { geo in
+            MacArtworkCollage(
+                tracks: tracks,
+                size: geo.size.width,
+                cornerRadius: cornerRadius,
+                placeholderIcon: placeholderIcon
+            )
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+}
