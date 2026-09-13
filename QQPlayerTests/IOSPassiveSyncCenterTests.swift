@@ -7,9 +7,12 @@
 //    （名称匹配优先 / 落单 endpoint 兜底 / 空输入）
 //  - IOSPassiveReconnectPolicy：指数退避 + 封顶 + 次数上限（上限用尽 = 手动兜底）
 //  - IOSPassiveSyncPresenter：状态与失败 → 文案 key + 账目数字 + 重连按钮可用性
+//  - S2-T12（2026-09-13）数据同步端装配：`IOSPassiveDataSyncLogic` 游标键决策 +
+//    ready 装配 / 无对端 hello 不装 / 拆除摘下（真会话夹具 + 内存库，无网络）
 //
 
 import Foundation
+import GRDB
 import Network
 import Testing
 
@@ -34,6 +37,30 @@ struct IOSPassiveSyncCenterTests {
             pairedAt: 0,
             lastSeenAt: 0,
             notes: nil
+        )
+    }
+
+    // MARK: - 夹具（数据同步端装配用：真会话 + 内存库 + 临时曲库根）
+
+    private func makeManager() throws -> DatabaseManager {
+        let manager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try manager.createTables()
+        return manager
+    }
+
+    private func makeTempRoot(_ tag: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("qqp-ios-passive-\(tag)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @MainActor
+    private func makeCenter(_ manager: DatabaseManager, root: URL) -> IOSPassiveSyncCenter {
+        IOSPassiveSyncCenter(
+            deviceStore: DeviceStore(database: manager),
+            libraryRoot: { root },
+            database: manager
         )
     }
 
@@ -247,6 +274,59 @@ struct IOSPassiveSyncCenterTests {
         #expect(value.lastBatchEntries == 3)
         #expect(value.failures == [failure])
     }
+
+    // MARK: - 数据同步端装配（S2-T12）
+
+    @Test("数据同步端决策：对端 Device ID 非空才用（空串 = 不装配，不写脏游标键）")
+    func dataSyncPeerIDDecision() {
+        #expect(IOSPassiveDataSyncLogic.dataSyncPeerID(peerDeviceID: "PEER-A") == "PEER-A")
+        #expect(IOSPassiveDataSyncLogic.dataSyncPeerID(peerDeviceID: nil) == nil)
+        #expect(IOSPassiveDataSyncLogic.dataSyncPeerID(peerDeviceID: "") == nil)
+    }
+
+    @MainActor
+    @Test("会话 ready 装配：被动端 + 数据同步端同时挂上，游标键 = 对端 Device ID")
+    func dataSyncAttachedOnReady() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("ready"))
+        #expect(center.isDataSyncAttached == false)
+
+        center.attachPassiveHost(to: fixture.clientSession)
+
+        #expect(center.isDataSyncAttached)
+        #expect(center.dataSyncPeerID == fixture.hostIdentity.deviceID)
+    }
+
+    @MainActor
+    @Test("无对端 hello（未握手）→ 只挂被动端，不挂数据同步端")
+    func dataSyncNotAttachedWithoutPeerHello() throws {
+        let fixture = SessionFixture.make()
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("nohello"))
+
+        center.attachPassiveHost(to: fixture.clientSession)
+
+        #expect(center.isDataSyncAttached == false)
+        #expect(center.dataSyncPeerID == nil)
+    }
+
+    @MainActor
+    @Test("会话拆除 → 数据同步端随之摘下")
+    func dataSyncDetachedOnTeardown() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("teardown"))
+        center.attachPassiveHost(to: fixture.clientSession)
+        #expect(center.isDataSyncAttached)
+
+        center.stop()
+
+        #expect(center.isDataSyncAttached == false)
+        #expect(center.dataSyncPeerID == nil)
+    }
+
+    // MARK: - 展示映射
 
     @Test("失败原因码 → 文案 key 映射（含兜底）")
     func failureReasonKeyMapping() {

@@ -17,6 +17,21 @@
 //       用尽后交设置页「重连」按钮手动兜底（`reconnectNow()`）。
 //    ④ 进度：`SyncLibraryPassiveHost.onFileLanded` / `onBatchCompleted` → `summary`
 //       （**不加新协议帧**；v1 文件级进度）。
+//    ⑤ **数据同步端**（S2-T12，2026-09-13）：会话 ready 时同时挂 `SyncChangeLogPeer`
+//       ——它是帧 8/9（`change_log_pull` / `change_log_push`）的**唯一**处理器，此前
+//       只在 Mac 侧装配（`MacSyncCoordinatorFactory`）→ iPhone 收到 Mac 推来的帧 9 被
+//       静默丢弃、Mac 发来的帧 8 无人应答 → 收藏/播放记录/歌单等播放数据永不落机。
+//       本中心把这条链路补上（`dataSyncPeerID` = 对端 hello 的 Device ID = 游标键）。
+//
+//  ⚠️ 会话回调单槽 + 挂接顺序（帧 8/9 与帧 15 都能到达的原因）：
+//  `SyncPeerSession.onApplicationFrame` 是**单槽闭包**、后挂者为链头，链头**必须**把帧转发
+//  给 prior，否则更早挂的处理器再也收不到帧。本中心 ready 时的挂接顺序为：
+//    ① `SyncLibraryPassiveHost.attach`（内部再挂 SyncFileReceiver / SyncPeerLibraryResponder，
+//       最后挂它自己 → 链序 … → responder → passiveHost）
+//    ② `SyncChangeLogPeer.init`（后挂 = 链头，自身只挑 changeLogPull/Push，其余原样转发 prior）
+//  于是链为「SyncChangeLogPeer → SyncLibraryPassiveHost → SyncPeerLibraryResponder → …」：
+//  帧 8/9 在链头被数据端处理，`library_push_announce`（帧 15）沿 prior 到达被动端
+//  —— 两种帧都能到达，互不遮挡。`onClosed` 同理（数据端处理为空 + 转发被动端收尾）。
 //
 //  复用而非重写（行为单一事实源）：
 //    - 浏览/连接：`SyncBrowser`
@@ -242,6 +257,23 @@
         }
     }
 
+    // MARK: - 纯逻辑：数据同步端装配决策（可单测）
+
+    /// 会话 ready 时数据同步端（帧 8/9 = `SyncChangeLogPeer`）的装配决策。
+    ///
+    /// 抽成纯函数是为了让 iOS 测试 target 能直接锁死这条决策：装配路径本身依赖网络
+    /// 发现（浏览 → 连接 → ready），无法直接单测。
+    enum IOSPassiveDataSyncLogic {
+        /// 对端 hello 里的 Device ID → 数据同步端游标键；nil / 空串 → 不装配。
+        ///
+        /// 口径与 `MacSyncCoordinatorFactory` 一致：peerID 是 `sync_cursor.peer_id`
+        /// 的键，空串会写出一条谁也匹配不到的脏游标行 → **宁可不接，不写脏数据**。
+        static func dataSyncPeerID(peerDeviceID: String?) -> String? {
+            guard let peerDeviceID, !peerDeviceID.isEmpty else { return nil }
+            return peerDeviceID
+        }
+    }
+
     // MARK: - 中心（App 级单例）
 
     /// iOS App 级被动同步中心（契约 C3）：一个实例至多一个活动会话，只应答 + 接收。
@@ -260,6 +292,8 @@
         private let deviceStore: DeviceStore
         private let libraryRoot: () -> URL
         private let clientName: () -> String?
+        /// 同步库（生产 = `.shared`；测试注入内存库，避免碰真实 DB）
+        private let database: DatabaseManager
 
         /// 默认本机名来源（握手 hello / 配对请求携带的展示名）：
         /// 用户命名（`LocalDeviceNameStore`）优先，未命名回落系统设备名。
@@ -272,6 +306,15 @@
         private var browser: SyncBrowser?
         private var session: SyncPeerSession?
         private var passiveHost: SyncLibraryPassiveHost?
+        /// 数据同步端（帧 8/9 处理器）= `SyncChangeLogPeer`；nil = 未装配
+        private var dataSyncPeer: SyncChangeLogPeer?
+        /// 数据同步端的对端游标键（`sync_cursor.peer_id`）；nil = 未装配
+        private(set) var dataSyncPeerID: String?
+
+        /// 数据同步端是否已装配（可达性诊断 / 测试断言）。
+        var isDataSyncAttached: Bool {
+            dataSyncPeer != nil
+        }
         private var pairedHosts: [PeerDevice] = []
         private var currentTarget: IOSPassiveSyncTarget?
         /// 本轮已尝试过的目标（`peerID|hostName`），避免浏览回调反复重连同一目标
@@ -289,12 +332,14 @@
             identityStore: SyncIdentityStore = SyncIdentityStore(),
             deviceStore: DeviceStore = DeviceStore(),
             libraryRoot: @escaping () -> URL = { MusicFolderResolver.iosDocumentsDirectoryURL() },
-            clientName: @escaping () -> String? = { IOSPassiveSyncCenter.defaultClientName() }
+            clientName: @escaping () -> String? = { IOSPassiveSyncCenter.defaultClientName() },
+            database: DatabaseManager = .shared
         ) {
             self.identityStore = identityStore
             self.deviceStore = deviceStore
             self.libraryRoot = libraryRoot
             self.clientName = clientName
+            self.database = database
             reloadPairedHosts()
         }
 
@@ -436,10 +481,13 @@
             state = .connected(hostName: target.hostName, peerID: target.peerID)
         }
 
-        /// 会话 ready → 装配被动端（曲库根与既有扫描同源）。
-        private func attachPassiveHost(to session: SyncPeerSession) {
+        /// 会话 ready → 装配被动端（曲库根与既有扫描同源）**+ 数据同步端**（帧 8/9）。
+        ///
+        /// internal（非 private）仅供 iOS 测试 target 驱动装配路径（`@testable`）；
+        /// 生产只由 `handlePhase` 调用。
+        func attachPassiveHost(to session: SyncPeerSession) {
             let token = attemptToken
-            let host = SyncLibraryPassiveHost(libraryRoot: libraryRoot())
+            let host = SyncLibraryPassiveHost(libraryRoot: libraryRoot(), database: database)
             host.onFileLanded = { [weak self] _ in
                 Task { @MainActor in
                     guard let self, self.attemptToken == token, let host = self.passiveHost else { return }
@@ -460,12 +508,59 @@
                 return
             }
             summary = host.summary
+            // 被动端接好后挂数据同步端：帧 8/9 与帧 15 的链序见文件头注释。
+            attachDataSync(to: session)
+        }
+
+        /// 会话 ready → 装配数据同步端（帧 8/9 = `SyncChangeLogPeer`，全仓帧 8/9 唯一处理器）。
+        ///
+        /// 装配顺序：本方法在 `SyncLibraryPassiveHost.attach` **之后**调用——
+        /// `SyncChangeLogPeer.init` 会把 handler 挂成链头并转发 prior，于是帧 8/9 由它处理、
+        /// 帧 15 继续到达被动端（见文件头「会话回调单槽 + 挂接顺序」）。
+        private func attachDataSync(to session: SyncPeerSession) {
+            guard dataSyncPeer == nil else { return }
+            guard let peerID = IOSPassiveDataSyncLogic.dataSyncPeerID(
+                peerDeviceID: session.peerHelloValue?.deviceID
+            ) else {
+                // 空游标键会往 sync_cursor 写脏行（与 MacSyncCoordinatorFactory 同口径）
+                print("⚠️ IOSPassiveSyncCenter: 会话无对端 Device ID，不装配数据同步端（避免空游标键写脏数据）")
+                return
+            }
+            let peer = SyncChangeLogPeer(
+                session: session,
+                store: SyncChangeLogStore(database: database),
+                applier: SyncChangeLogApplier(database: database),
+                peerID: peerID
+            )
+            // 诊断打点：只记计数 / 错误类别，不打印曲目内容（隐私）。
+            peer.onPullHandled = { _, count in
+                print("ℹ️ SyncChangeLogPeer: 已应答远端拉取（本批 outbox 行数=\(count)）")
+            }
+            peer.onPushApplied = { count in
+                print("ℹ️ SyncChangeLogPeer: 已应用远端播放数据（行数=\(count)）")
+            }
+            peer.onPushSuspended = { count in
+                guard count > 0 else { return }
+                print("ℹ️ SyncChangeLogPeer: 本地缺歌挂起（行数=\(count)，待歌到位重放）")
+            }
+            peer.onPushIgnoredDeletes = { count in
+                guard count > 0 else { return }
+                print("ℹ️ SyncChangeLogPeer: 忽略远端删除（行数=\(count)，删除不跨端传播）")
+            }
+            peer.onDecodeFailure = { error in
+                print("⚠️ SyncChangeLogPeer: 载荷解码失败 \(error)")
+            }
+            dataSyncPeer = peer
+            dataSyncPeerID = peerID
+            print("ℹ️ IOSPassiveSyncCenter: 数据同步端已装配（帧 8/9）")
         }
 
         private func handleClosed(_ reason: SyncSessionCloseReason) {
             guard !isTearingDown else { return }
             session = nil
             passiveHost = nil
+            dataSyncPeer = nil
+            dataSyncPeerID = nil
             currentTarget = nil
             guard isRunning else { return }
             if let failure = SyncConnectLogic.failure(fromCloseReason: reason) {
@@ -543,6 +638,8 @@
             isTearingDown = true
             passiveHost?.detach()
             passiveHost = nil
+            dataSyncPeer = nil
+            dataSyncPeerID = nil
             session?.cancel(reason: .userCancelled)
             session = nil
             isTearingDown = false
