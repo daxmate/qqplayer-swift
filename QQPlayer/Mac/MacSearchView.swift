@@ -203,7 +203,7 @@ private struct MacSearchSongRow: View {
                 }
                 .frame(width: 16)
 
-                Text(track.title)
+                Text(track.displayTitle)
                     .lineLimit(1)
                     .fontWeight(isActive ? .semibold : .regular)
 
@@ -247,7 +247,7 @@ private struct MacSearchAlbumRow: View {
                     placeholderIcon: "square.stack"
                 )
 
-                Text(album.title)
+                Text(album.displayTitle)
                     .lineLimit(1)
 
                 Spacer()

@@ -210,7 +210,7 @@ struct MacSearchAnythingLayer: View {
                 Image(systemName: "music.note")
                     .foregroundColor(.secondary)
                     .frame(width: 14)
-                Text(track.title).lineLimit(1)
+                Text(track.displayTitle).lineLimit(1)
                 if let artist = artistNameResolver(track) {
                     Text(artist)
                         .foregroundColor(.secondary)
@@ -257,7 +257,7 @@ struct MacSearchAnythingLayer: View {
                 Image(systemName: "square.stack")
                     .foregroundColor(.secondary)
                     .frame(width: 14)
-                Text(album.title).lineLimit(1)
+                Text(album.displayTitle).lineLimit(1)
                 if let artist = album.albumArtist, !artist.isEmpty {
                     Text(ArtistNameNormalizer.displayName(artist))
                         .foregroundColor(.secondary)
@@ -294,8 +294,8 @@ struct MacSearchAnythingLayer: View {
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(song.title).lineLimit(1)
-                    Text(onlineSubtitle(song))
+                    Text(DisplayScriptNormalizer.display(song.title)).lineLimit(1)
+                    Text(DisplayScriptNormalizer.display(onlineSubtitle(song)))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -453,7 +453,7 @@ struct MacSearchAnythingLayer: View {
             } catch {
                 failedIDs.insert(song.id)
                 downloadedIDs.remove(song.id)
-                statusMessage = "online_download_failed_prefix".localized(with: song.title)
+                statusMessage = "online_download_failed_prefix".localized(with: DisplayScriptNormalizer.display(song.title))
             }
             downloadingIDs.remove(song.id)
             downloadProgress.removeValue(forKey: song.id) // 下载结束清进度（B2）

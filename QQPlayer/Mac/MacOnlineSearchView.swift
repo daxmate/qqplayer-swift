@@ -477,7 +477,7 @@ struct MacOnlineSearchView: View {
                 // 便于区分直链服务不可用 / HTTP 拒绝 / 落盘失败等不同环节。
                 print("❌ [在线下载] 失败《\(song.title)》id=\(song.id): \(error)")
                 // errorMessage 是 String?：先拼好非可选字符串再整体赋值（不能 +=）。
-                var message = "online_download_failed_prefix".localized(with: song.title)
+                var message = "online_download_failed_prefix".localized(with: DisplayScriptNormalizer.display(song.title))
                 // noPlayURL 高频原因：VIP/版权受限歌曲 → 直链代理(200 空响应)与
                 // cenguigui 兜底都取不到 URL。给用户可理解的提示而非裸错误码。
                 if let ne = error as? NeteaseOnlineError, case .noPlayURL = ne {
@@ -552,7 +552,7 @@ struct MacOnlineSearchView: View {
                     print("❌ [歌曲海下载] 失败《\(song.title)》id=\(song.id): \(error)")
                     // 错误文案 = web 路由 error 原文（GequhaiDownloadError.errorDescription），
                     // 真实原因红字展示（无分享/分享失效/无音频/夸克侧失败等）
-                    var message = "online_download_failed_prefix".localized(with: song.title)
+                    var message = "online_download_failed_prefix".localized(with: DisplayScriptNormalizer.display(song.title))
                     let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                     if !reason.isEmpty {
                         message += "（\(reason)）"
@@ -672,9 +672,9 @@ private struct MacOnlineResultRow: View {
             cover
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
+                Text(DisplayScriptNormalizer.display(item.title))
                     .lineLimit(1)
-                Text(item.subtitle)
+                Text(DisplayScriptNormalizer.display(item.subtitle))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)

@@ -125,7 +125,7 @@ struct MacLyricsSearchView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("lyrics_search_title".localized)
                     .font(.headline)
-                Text(track.title)
+                Text(track.displayTitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -252,12 +252,12 @@ struct MacLyricsSearchView: View {
                     .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: 6))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(candidate.title)
+                    Text(DisplayScriptNormalizer.display(candidate.title))
                         .font(.subheadline.weight(.medium))
                         .foregroundColor(.primary)
                         .lineLimit(1)
                     if !candidate.artist.isEmpty {
-                        Text(candidate.artist)
+                        Text(DisplayScriptNormalizer.display(candidate.artist))
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)

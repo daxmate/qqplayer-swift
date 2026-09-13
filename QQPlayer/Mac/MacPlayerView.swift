@@ -253,7 +253,7 @@ struct MacPlayerView: View {
 
             // Track info
             VStack(spacing: 4) {
-                Text(track?.title ?? "not_playing".localized)
+                Text(track?.displayTitle ?? "not_playing".localized)
                     .font(.title3)
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -584,7 +584,7 @@ private struct MacQueuePanelView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(track.title)
+                Text(track.displayTitle)
                     .fontWeight(isCurrent ? .semibold : .regular)
                     .lineLimit(1)
                 if let artist = try? DatabaseManager.shared.getArtistDisplayName(

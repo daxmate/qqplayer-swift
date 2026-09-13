@@ -132,7 +132,8 @@ struct MacLyricsView: View {
             } else if !lyrics.syncedLyrics.isEmpty {
                 syncedView(lyrics.syncedLyrics)
             } else if !lyrics.plainLyrics.isEmpty {
-                plainView(lyrics.plainLyrics)
+                // 无时间轴歌词同样是「渲染出来的歌词文本」→ 按 UI 语言归一字形
+                plainView(DisplayScriptNormalizer.display(lyrics.plainLyrics))
             } else {
                 emptyState("no_lyrics".localized)
             }
@@ -163,13 +164,13 @@ struct MacLyricsView: View {
                 LazyVStack(spacing: 10) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                         VStack(spacing: 2) {
-                            Text(line.text)
+                            Text(line.displayText)
                                 .font(.system(size: fontSize))
                                 .foregroundColor(index == activeIndex ? .white : .secondary)
                                 .fontWeight(index == activeIndex ? .semibold : .regular)
                                 .multilineTextAlignment(.center)
                                 .id(index)
-                            if showTranslation, let translation = line.translation, !translation.isEmpty {
+                            if showTranslation, let translation = line.displayTranslation, !translation.isEmpty {
                                 Text(translation)
                                     .font(.system(size: max(fontSize - 3, 9)))
                                     .foregroundColor(index == activeIndex ? .white.opacity(0.85) : Color.secondary.opacity(0.7))

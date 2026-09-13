@@ -17,7 +17,7 @@ struct MacTagEditorCandidateRow: View {
         HStack(spacing: 10) {
             cover
             VStack(alignment: .leading, spacing: 2) {
-                Text(candidate.title ?? "")
+                Text(candidate.title.map(DisplayScriptNormalizer.display) ?? "")
                     .font(.callout)
                     .fontWeight(.medium)
                     .lineLimit(1)
@@ -66,12 +66,14 @@ struct MacTagEditorCandidateRow: View {
     }
 
     /// 歌手 · 专辑 · 年份 · 流派 · 时长（web cand-sub 结构，缺失段跳过）
+    /// 文本段按 UI 语言归一字形（刮削候选是“非模型字符串”，只影响显示；
+    /// 选中后写入表单/DB 的仍是服务返回原文，见 MacTagEditorView）
     private var subtitle: String {
         var parts: [String] = []
-        if let artist = candidate.artist, !artist.isEmpty { parts.append(artist) }
-        if let album = candidate.album, !album.isEmpty { parts.append(album) }
+        if let artist = candidate.artist, !artist.isEmpty { parts.append(DisplayScriptNormalizer.display(artist)) }
+        if let album = candidate.album, !album.isEmpty { parts.append(DisplayScriptNormalizer.display(album)) }
         if let year = candidate.year { parts.append(String(year)) }
-        if let genre = candidate.genre, !genre.isEmpty { parts.append(genre) }
+        if let genre = candidate.genre, !genre.isEmpty { parts.append(DisplayScriptNormalizer.display(genre)) }
         if let durationMs = candidate.durationMs, durationMs > 0 {
             parts.append(Self.formatDuration(durationMs))
         }

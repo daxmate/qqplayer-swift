@@ -41,11 +41,11 @@ struct MacAlbumGridView: View {
                                 cornerRadius: 8,
                                 placeholderIcon: "square.stack"
                             )
-                            Text(album.title)
+                            Text(album.displayTitle)
                                 .font(.callout)
                                 .fontWeight(.medium)
                                 .lineLimit(1)
-                            Text(album.albumArtist ?? String(format: "track_count".localized, albumFacts.trackCount))
+                            Text(album.albumArtist.map(ArtistNameNormalizer.displayName) ?? String(format: "track_count".localized, albumFacts.trackCount))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -113,7 +113,7 @@ struct MacAlbumDetailSheet: View {
                     placeholderIcon: "square.stack"
                 )
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(album.title)
+                    Text(album.displayTitle)
                         .font(.title2)
                         .fontWeight(.bold)
                     if let albumArtist = album.albumArtist, !albumArtist.isEmpty {
@@ -131,7 +131,7 @@ struct MacAlbumDetailSheet: View {
 
             List(tracks, id: \.stableId) { track in
                 HStack {
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .lineLimit(1)
                     Spacer()
                     Text(artistNameResolver(track) ?? "")
@@ -177,7 +177,7 @@ struct MacArtistListView: View {
                 HStack {
                     Image(systemName: "music.mic")
                         .foregroundColor(.secondary)
-                    Text(artist.name)
+                    Text(ArtistNameNormalizer.displayName(artist.name))
                         .lineLimit(1)
                     Spacer()
                     Text(String(format: "track_count".localized, facts.artistTrackCount(for: artist)))
@@ -238,7 +238,7 @@ struct MacArtistDetailSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(artist.name)
+                Text(ArtistNameNormalizer.displayName(artist.name))
                     .font(.title2)
                     .fontWeight(.bold)
                 Spacer()
@@ -251,7 +251,7 @@ struct MacArtistDetailSheet: View {
 
             List(tracks, id: \.stableId) { track in
                 HStack {
-                    Text(track.title)
+                    Text(track.displayTitle)
                         .lineLimit(1)
                     Spacer()
                     Text(albumTitle(for: track))
@@ -274,7 +274,7 @@ struct MacArtistDetailSheet: View {
               }) else {
             return ""
         }
-        return album.title
+        return album.displayTitle
     }
 
     private func duration(for track: Track) -> TimeInterval {

@@ -213,7 +213,7 @@ struct MacTrackListView: View {
             .width(40)
 
             TableColumn("title".localized, value: \.title) { row in
-                Text(row.track.title)
+                Text(row.track.displayTitle)
                     .fontWeight(row.track.stableId == activeTrackId ? .semibold : .regular)
                     .lineLimit(1)
             }
@@ -401,7 +401,7 @@ struct MacTrackListView: View {
     // MARK: - Move to Trash（web 版「移到废纸篓」对齐：send2trash 语义 = 系统废纸篓可恢复）
 
     private var trashConfirmMessage: String {
-        if pendingTrashTracks.count == 1, let title = pendingTrashTracks.first?.title {
+        if pendingTrashTracks.count == 1, let title = pendingTrashTracks.first?.displayTitle {
             return Localized.moveToTrashConfirm(title)
         }
         return Localized.moveToTrashConfirm(count: pendingTrashTracks.count)
@@ -552,7 +552,8 @@ struct MacTrackListView: View {
 
     private func albumTitle(for track: Track) -> String {
         // 审计 M2：以前每个可见行每帧一次 `Album.fetchOne` → 读缓存（预取已就位）
-        facts.albumTitle(forTrack: track)
+        // 专辑列是显示文本 → 按 UI 语言归一字形（facts 内部仍是原始值，排序/匹配不受影响）
+        DisplayScriptNormalizer.display(facts.albumTitle(forTrack: track))
     }
 
     // MARK: - Context-menu modal 延迟呈现（macOS SwiftUI 已知 bug workaround）

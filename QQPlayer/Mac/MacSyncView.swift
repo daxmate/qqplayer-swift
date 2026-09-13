@@ -553,9 +553,11 @@ struct MacSyncRunSection: View {
         Toggle(isOn: trackBinding(option.relativePath)) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(option.title)
+                    // 曲目行是「渲染出来的歌曲文本」（含对端曲库）→ 按 UI 语言归一字形；
+                    // 勾选/传输仍用 relativePath（原始字段，不受显示层影响）
+                    Text(DisplayScriptNormalizer.display(option.title))
                     if let artist = option.artistName, !artist.isEmpty {
-                        Text(artist)
+                        Text(DisplayScriptNormalizer.display(artist))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
