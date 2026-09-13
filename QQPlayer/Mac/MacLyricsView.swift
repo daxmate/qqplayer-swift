@@ -6,8 +6,8 @@
 //  page (distance-graded typography, accent active line + glow, vertical
 //  centering, edge fades, glass empty-state card, spring scrolling).
 //  Karaoke mode keeps speed / single-line loop / AB loop controls
-//  (KaraokeControlBar). QQPlayerMac target only — kept out of the iOS
-//  target via pbxproj membership exceptions.
+//  (MacKaraokeControlBar, macOS 单行样式). QQPlayerMac target only — kept
+//  out of the iOS target via pbxproj membership exceptions.
 //
 
 import AppKit
@@ -260,15 +260,8 @@ struct MacLyricsView: View {
             // 对齐 iOS LyricsView：跟唱控制条常驻底部，无论歌词状态（加载中/纯文本/无歌词）都显示
             if karaoke.isKaraokeOn {
                 Divider()
-                KaraokeControlBar(accentColor: appAccentColor)
+                MacKaraokeControlBar(accentColor: appAccentColor)
                     .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(
-                            colors: [.clear, Color.black.opacity(0.35)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
             }
         }
         .background(panelBackground)
