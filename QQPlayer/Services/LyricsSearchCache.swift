@@ -21,6 +21,10 @@ struct LyricsSearchCache: Sendable {
     /// 缓存有效期（秒）：7 天
     private static let ttl: TimeInterval = 7 * 24 * 3600
 
+    /// 目录文件数上限：TTL 之内的文件过多（高频搜索）时按 mtime 淘汰最久未写的。
+    /// 与 LyricsManager.diskCacheFileLimit 同为 200（两侧不对称会在长会话下堆文件）。
+    static let fileLimit = 200
+
     private struct Entry: Codable {
         let timestamp: Date
         let candidates: [LyricsSearchCandidate]
@@ -53,7 +57,9 @@ struct LyricsSearchCache: Sendable {
         return entry.candidates
     }
 
-    /// 写入缓存（原子写，mtime 即写入时刻，作为定期清理依据）
+    /// 写入缓存（原子写，mtime 即写入时刻，作为定期清理依据）；
+    /// 写完顺带清理一次（TTL + 条数上限）——此前清理只在 load 内触发，
+    /// 用户停止搜索后 <sha256>.json 会长期驻留（审计 🔵-6）。
     func save(_ candidates: [LyricsSearchCandidate], title: String, artist: String) {
         let fm = FileManager.default
         try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -61,10 +67,11 @@ struct LyricsSearchCache: Sendable {
         let entry = Entry(timestamp: Date(), candidates: candidates)
         guard let data = try? JSONEncoder().encode(entry) else { return }
         try? data.write(to: fileURL(title: title, artist: artist), options: .atomic)
+        cleanupExpired()
     }
 
-    /// 定期清理：删除目录中超过 TTL 的旧缓存文件（读写时顺带执行一次，
-    /// 目录文件数极少，开销可忽略）。
+    /// 清理：删除目录中超过 TTL 的旧缓存文件，并对 TTL 内文件执行条数上限
+    /// （读写时顺带执行一次，目录文件数极少，开销可忽略）。
     func cleanupExpired() {
         let fm = FileManager.default
         let cutoff = Date().addingTimeInterval(-Self.ttl)
@@ -74,12 +81,26 @@ struct LyricsSearchCache: Sendable {
             options: [.skipsHiddenFiles]
         ) else { return }
 
+        var survivors: [(url: URL, mtime: Date)] = []
         for file in files {
             guard file.pathExtension == "json" else { continue }
-            let mtime = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-            if let mtime, mtime < cutoff {
-                try? fm.removeItem(at: file)
+            guard let mtime = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                // mtime 读不到：保守保留且不参与淘汰（不可能判定为旧）
+                survivors.append((file, .distantFuture))
+                continue
             }
+            if mtime < cutoff {
+                try? fm.removeItem(at: file)
+            } else {
+                survivors.append((file, mtime))
+            }
+        }
+
+        // 条数上限：TTL 内文件仍过多时，按 mtime 淘汰最久未写的
+        guard survivors.count > Self.fileLimit else { return }
+        let excess = survivors.count - Self.fileLimit
+        for survivor in survivors.sorted(by: { $0.mtime < $1.mtime }).prefix(excess) {
+            try? fm.removeItem(at: survivor.url)
         }
     }
 

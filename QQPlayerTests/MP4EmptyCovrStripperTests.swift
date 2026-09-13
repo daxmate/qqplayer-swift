@@ -43,6 +43,31 @@ private func fullAtom(_ type: String, versionFlags: UInt32, payload: Data) -> Da
     return data
 }
 
+/// 大端 UInt64 写入
+private func appendUInt64(_ value: UInt64, to data: inout Data) {
+    var v = value.bigEndian
+    withUnsafeBytes(of: &v) { data.append(contentsOf: $0) }
+}
+
+/// size 字段写 0 的 atom（MP4 语义 = 延伸到容器/文件末尾）
+private func zeroSizedAtom(_ type: String, payload: Data) -> Data {
+    var data = Data()
+    appendUInt32(0, to: &data)
+    data.append(contentsOf: type.utf8)
+    data.append(payload)
+    return data
+}
+
+/// 64 位扩展 size（size 字段 = 1，header 后 8 字节 largesize）
+private func largeSizedAtom(_ type: String, payload: Data) -> Data {
+    var data = Data()
+    appendUInt32(1, to: &data)
+    data.append(contentsOf: type.utf8)
+    appendUInt64(UInt64(payload.count + 16), to: &data)
+    data.append(payload)
+    return data
+}
+
 /// 正常带 data 子 atom 的 covr item
 private func normalCovrItem() -> Data {
     let dataPayload = Data([0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4]) // version/flags + locale + 数据
@@ -59,12 +84,29 @@ private func makeMP4(ilstItems: [Data]) -> Data {
     return ftyp + moov
 }
 
-// 测试内镜像解析 helper（与生产 findAtom 同构，仅用于断言结果结构）
+// 测试内镜像解析 helper（与生产 findAtom 同构，仅用于断言结果结构）：
+// 同样按 MP4 语义解析 size（0 = 延伸到容器末尾、1 = 64 位扩展），否则
+// size==0/64 位布局的用例无法定位 moov 做断言。
+private func resolvedSize(_ data: Data, _ offset: Int, _ limit: Int) -> Int? {
+    let raw = readUInt32(data, offset)
+    if raw == 0 { return limit - offset }
+    if raw == 1 {
+        guard offset + 16 <= data.count else { return nil }
+        let large = (UInt64(readUInt32(data, offset + 8)) << 32) | UInt64(readUInt32(data, offset + 12))
+        guard large >= 16, large <= UInt64(limit - offset) else { return nil }
+        return Int(large)
+    }
+    return raw >= 8 ? Int(raw) : nil
+}
+
+private func atomHeaderSize(_ data: Data, _ offset: Int) -> Int {
+    readUInt32(data, offset) == 1 ? 16 : 8
+}
+
 private func findAtom(_ data: Data, _ type: String, in range: Range<Int>) -> (offset: Int, size: Int)? {
     var i = range.lowerBound
     while i + 8 <= range.upperBound {
-        let size = Int(readUInt32(data, i))
-        guard size >= 8, i + size <= range.upperBound else { break }
+        guard let size = resolvedSize(data, i, range.upperBound), i + size <= range.upperBound else { break }
         let t = String(data: data.subdata(in: i + 4 ..< i + 8), encoding: .ascii)
         if t == type { return (i, size) }
         i += size
@@ -78,18 +120,17 @@ private func readUInt32(_ data: Data, _ offset: Int) -> UInt32 {
 
 private func ilstCovrCount(_ data: Data) -> Int {
     guard let moov = findAtom(data, "moov", in: 0 ..< data.count) else { return 0 }
-    let moovBody = moov.offset + 8 ..< moov.offset + moov.size
+    let moovBody = moov.offset + atomHeaderSize(data, moov.offset) ..< moov.offset + moov.size
     guard let udta = findAtom(data, "udta", in: moovBody) else { return 0 }
-    let udtaBody = udta.offset + 8 ..< udta.offset + udta.size
+    let udtaBody = udta.offset + atomHeaderSize(data, udta.offset) ..< udta.offset + udta.size
     guard let meta = findAtom(data, "meta", in: udtaBody) else { return 0 }
-    let metaBody = meta.offset + 12 ..< meta.offset + meta.size // header 8 + version/flags 4
+    let metaBody = meta.offset + atomHeaderSize(data, meta.offset) + 4 ..< meta.offset + meta.size
     guard let ilst = findAtom(data, "ilst", in: metaBody) else { return 0 }
-    let ilstBody = ilst.offset + 8 ..< ilst.offset + ilst.size
+    let ilstBody = ilst.offset + atomHeaderSize(data, ilst.offset) ..< ilst.offset + ilst.size
     var count = 0
     var i = ilstBody.lowerBound
     while i + 8 <= ilstBody.upperBound {
-        let size = Int(readUInt32(data, i))
-        guard size >= 8, i + size <= ilstBody.upperBound else { break }
+        guard let size = resolvedSize(data, i, ilstBody.upperBound), i + size <= ilstBody.upperBound else { break }
         let t = String(data: data.subdata(in: i + 4 ..< i + 8), encoding: .ascii)
         if t == "covr" { count += 1 }
         i += size
@@ -173,6 +214,46 @@ struct MP4EmptyCovrStripperTests {
         let original = makeMP4(ilstItems: [nam])
         let result = try strip(original)
         #expect(result == original)
+    }
+
+    @Test("moov 的 size 字段为 0（延伸到文件末尾）→ 仍能定位并删除空 covr（修复前遍历遇 size==0 直接 break）")
+    func handlesZeroSizedContainerAtom() throws {
+        let emptyCovr = atom("covr", payload: Data())
+        let ilst = atom("ilst", payload: emptyCovr)
+        let meta = fullAtom("meta", versionFlags: 0, payload: ilst)
+        let udta = atom("udta", payload: meta)
+        let moov = zeroSizedAtom("moov", payload: udta)
+        let ftyp = atom("ftyp", payload: Data("isom".utf8))
+        let original = ftyp + moov
+        #expect(ilstCovrCount(original) == 1)
+
+        let result = try strip(original)
+
+        #expect(ilstCovrCount(result) == 0)
+        #expect(result.count == original.count - 8)
+        // size==0 的容器删除后写成等价显式长度（= 结果文件长度 − ftyp）
+        let moovAfter = findAtom(result, "moov", in: 0 ..< result.count)!
+        #expect(moovAfter.size == result.count - ftyp.count)
+    }
+
+    @Test("moov 用 64 位扩展 size（size==1）→ 仍能定位并删除空 covr，且 64 位 largesize 正确减 8")
+    func handlesLargeSizeContainerAtom() throws {
+        let emptyCovr = atom("covr", payload: Data())
+        let ilst = atom("ilst", payload: emptyCovr)
+        let meta = fullAtom("meta", versionFlags: 0, payload: ilst)
+        let udta = atom("udta", payload: meta)
+        let moov = largeSizedAtom("moov", payload: udta)
+        let ftyp = atom("ftyp", payload: Data("isom".utf8))
+        let original = ftyp + moov
+        #expect(ilstCovrCount(original) == 1)
+
+        let moovBefore = findAtom(original, "moov", in: 0 ..< original.count)!
+        let result = try strip(original)
+
+        #expect(ilstCovrCount(result) == 0)
+        #expect(result.count == original.count - 8)
+        let moovAfter = findAtom(result, "moov", in: 0 ..< result.count)!
+        #expect(moovAfter.size == moovBefore.size - 8)
     }
 
     @Test("非 MP4（无 moov atom）→ 静默跳过，原样不动")

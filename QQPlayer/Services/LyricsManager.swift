@@ -9,11 +9,16 @@
 //
 
 import Foundation
+#if os(iOS)
+    import UIKit
+#endif
 
 actor LyricsManager {
     static let shared = LyricsManager()
 
     var cache: [String: Lyrics] = [:]
+    /// 内存缓存 LRU 顺序（最近使用在后）；由 cacheLyrics/markCacheAccess 单点维护
+    private var cacheRecency: [String] = []
     /// 用户手动指定歌词（搜索页选择）：stableId → Lyrics；优先级高于自动链路
     private var manualOverrides: [String: Lyrics] = [:]
     /// 手动歌词磁盘是否已恢复（init 异步预载与首次 getLyrics 的竞态窗口防护）
@@ -33,6 +38,9 @@ actor LyricsManager {
 
     /// 启动预加载上限：只把最近 N 条缓存载入内存，其余磁盘缓存命中时懒加载
     static let startupCacheLoadLimit = 50
+    /// 内存缓存条数上限：超出淘汰最久未使用的（磁盘缓存仍在，命中后懒加载）。
+    /// 此前内存缓存无上限，长会话（播放越多）只增不减（审计 🔵-5）。
+    static let memoryCacheLimit = 100
     /// 磁盘缓存文件数上限（LRU 淘汰：超出删除最久未使用的；正/负面缓存都算）
     static let diskCacheFileLimit = 200
     /// 负面缓存有效期：确认无歌词的曲目在此期限内跳过全链路（与搜索缓存 TTL 一致）
@@ -43,10 +51,55 @@ actor LyricsManager {
 
     private init() {
         Task {
+            #if os(iOS)
+                await registerMemoryPressureObservers()
+            #endif
             await loadCacheFromDisk()
             await loadManualOverridesFromDisk()
             await markManualOverridesLoaded()
         }
+    }
+
+    #if os(iOS)
+        /// 内存警告 / 进后台 → 丢弃内存歌词缓存（磁盘缓存与手动歌词仍在，命中后懒加载）。
+        /// 上限之外的第二道内存保险（审计 🔵-5：此前 clearCache 全仓无调用者）。
+        /// 单例观察者随进程存活，故意不注销。
+        private func registerMemoryPressureObservers() {
+            let center = NotificationCenter.default
+            for name in [UIApplication.didReceiveMemoryWarningNotification,
+                         UIApplication.didEnterBackgroundNotification] {
+                center.addObserver(forName: name, object: nil, queue: nil) { _ in
+                    Task { await LyricsManager.shared.clearMemoryCache() }
+                }
+            }
+        }
+    #endif
+
+    /// 内存缓存唯一写入入口：写入 + LRU 上限维护。手动指定歌词不淘汰
+    /// （manualOverrides 是强引用来源且 UI 依赖即时命中）。
+    func cacheLyrics(_ lyrics: Lyrics, for trackId: String) {
+        cache[trackId] = lyrics
+        cacheRecency.removeAll { $0 == trackId }
+        cacheRecency.append(trackId)
+        while cache.count > Self.memoryCacheLimit, let oldest = cacheRecency.first {
+            cacheRecency.removeFirst()
+            guard manualOverrides[oldest] == nil else { continue }
+            cache[oldest] = nil
+        }
+    }
+
+    /// 命中内存缓存时刷新 LRU 位置（读 = 写入场景的一次）
+    private func markCacheAccess(_ trackId: String) {
+        guard cache[trackId] != nil else { return }
+        cacheRecency.removeAll { $0 == trackId }
+        cacheRecency.append(trackId)
+    }
+
+    /// 丢弃内存缓存（磁盘缓存不动；下次命中磁盘后懒加载）
+    func clearMemoryCache() {
+        cache.removeAll()
+        cacheRecency.removeAll()
+        print("🗑️ Lyrics memory cache cleared")
     }
 
     /// 手动歌词磁盘已恢复标记（actor 方法：init 的 Task 是 nonisolated，不能直写属性）
@@ -73,6 +126,7 @@ actor LyricsManager {
 
         // Check memory cache first
         if let cached = cache[track.stableId] {
+            markCacheAccess(track.stableId)
             print("📝 Using cached lyrics for: \(track.title)")
             return cached
         }
@@ -80,7 +134,7 @@ actor LyricsManager {
         // Check disk cache
         if let diskCached = await loadLyricsFromDisk(trackId: track.stableId) {
             print("📝 Loaded lyrics from disk for: \(track.title)")
-            cache[track.stableId] = diskCached
+            cacheLyrics(diskCached, for: track.stableId)
             return diskCached
         }
 
@@ -94,7 +148,7 @@ actor LyricsManager {
         // Try embedded lyrics first
         if let embedded = await getEmbeddedLyrics(for: track) {
             print("📝 Found embedded lyrics for: \(track.title)")
-            cache[track.stableId] = embedded
+            cacheLyrics(embedded, for: track.stableId)
             await saveLyricsToDisk(lyrics: embedded, trackId: track.stableId)
             return embedded
         }
@@ -107,7 +161,7 @@ actor LyricsManager {
                 print("⚠️ Netease returned header-only lyrics, skipping: \(track.title)")
             } else {
                 print("📝 Fetched lyrics from Netease for: \(track.title)")
-                cache[track.stableId] = fetched
+                cacheLyrics(fetched, for: track.stableId)
                 await saveLyricsToDisk(lyrics: fetched, trackId: track.stableId)
                 return fetched
             }
@@ -121,7 +175,7 @@ actor LyricsManager {
                 return nil
             }
             print("📝 Fetched lyrics from lrclib.net for: \(track.title)")
-            cache[track.stableId] = fetched
+            cacheLyrics(fetched, for: track.stableId)
             await saveLyricsToDisk(lyrics: fetched, trackId: track.stableId)
             return fetched
         }
@@ -133,7 +187,7 @@ actor LyricsManager {
     }
 
     func clearCache() {
-        cache.removeAll()
+        clearMemoryCache()
 
         // Clear disk cache
         Task {
@@ -175,7 +229,7 @@ actor LyricsManager {
     /// 手动指定歌词（内存 + 磁盘持久化；同时写入内存缓存，getLyrics 直接命中）
     func setManualLyrics(_ lyrics: Lyrics, for track: Track) {
         manualOverrides[track.stableId] = lyrics
-        cache[track.stableId] = lyrics
+        cacheLyrics(lyrics, for: track.stableId)
         Task {
             await saveManualLyricsToDisk(lyrics: lyrics, trackId: track.stableId)
             await clearNegativeCache(trackId: track.stableId) // 已有歌词：清除负面标记
@@ -187,6 +241,7 @@ actor LyricsManager {
     func clearManualLyrics(for track: Track) {
         manualOverrides[track.stableId] = nil
         cache[track.stableId] = nil
+        cacheRecency.removeAll { $0 == track.stableId }
         Task {
             await removeManualLyricsFromDisk(trackId: track.stableId)
             await clearNegativeCache(trackId: track.stableId) // 恢复自动：重走全链路，不残留旧负面标记
@@ -245,7 +300,7 @@ actor LyricsManager {
                 continue
             }
             manualOverrides[trackId] = lyrics
-            cache[trackId] = lyrics
+            cacheLyrics(lyrics, for: trackId)
         }
     }
 

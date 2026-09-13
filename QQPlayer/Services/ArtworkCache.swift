@@ -124,9 +124,41 @@ extension ArtworkManager {
                 image.draw(in: CGRect(origin: .zero, size: targetSize))
             }
         #else
-            // macOS resize (NSImage/ImageIO) lands with the macOS UI batch; return
-            // the image unchanged for the skeleton.
-            return image
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                return image
+            }
+            let largestSide = max(cgImage.width, cgImage.height)
+            guard CGFloat(largestSide) > maxPixelSize else { return image }
+
+            let ratio = maxPixelSize / CGFloat(largestSide)
+            let width = max(1, Int((CGFloat(cgImage.width) * ratio).rounded()))
+            let height = max(1, Int((CGFloat(cgImage.height) * ratio).rounded()))
+            guard let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return image }
+            context.interpolationQuality = .high
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            guard let scaled = context.makeImage() else { return image }
+            return NSImage(cgImage: scaled, size: NSSize(width: width, height: height))
+        #endif
+    }
+
+    /// JPEG 编码（iOS = UIImage.jpegData；macOS = NSBitmapImageRep，落盘缓存共用）
+    nonisolated static func jpegData(_ image: ArtworkImage, compressionQuality: CGFloat) -> Data? {
+        #if os(iOS)
+            return image.jpegData(compressionQuality: compressionQuality)
+        #else
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                return nil
+            }
+            return NSBitmapImageRep(cgImage: cgImage)
+                .representation(using: .jpeg, properties: [.compressionFactor: compressionQuality])
         #endif
     }
 
@@ -158,42 +190,38 @@ extension ArtworkManager {
     }
 
     nonisolated func saveToDiskCache(image: ArtworkImage, stableId: String) async {
-        #if os(iOS)
-            // Cap stored size; anything larger only costs decode time and memory
-            let cappedImage = Self.downsampled(image, maxPixelSize: Self.maxFullArtworkPixelSize)
-            // Compress to JPEG at 85% quality for faster loading and smaller size
-            guard let imageData = cappedImage.jpegData(compressionQuality: 0.85) else {
-                print("❌ Failed to compress artwork to JPEG")
-                return
-            }
+        // 落盘缓存两端同构（macOS 复用同一条路径；此前 macOS 是 no-op，封面每次冷启动
+        // 都要重新解包内嵌封面，审计 🔵-2）。
+        // Cap stored size; anything larger only costs decode time and memory
+        let cappedImage = Self.downsampled(image, maxPixelSize: Self.maxFullArtworkPixelSize)
+        // Compress to JPEG at 85% quality for faster loading and smaller size
+        guard let imageData = Self.jpegData(cappedImage, compressionQuality: 0.85) else {
+            print("❌ Failed to compress artwork to JPEG")
+            return
+        }
 
-            // Compute hash of artwork data to deduplicate
-            let artworkHash = SHA256.hash(data: imageData)
-            let hashString = artworkHash.compactMap { String(format: "%02x", $0) }.joined()
+        // Compute hash of artwork data to deduplicate
+        let artworkHash = SHA256.hash(data: imageData)
+        let hashString = artworkHash.compactMap { String(format: "%02x", $0) }.joined()
 
-            let diskFile = diskCacheURL.appendingPathComponent("\(hashString).jpg")
+        let diskFile = diskCacheURL.appendingPathComponent("\(hashString).jpg")
 
-            // Check if artwork already exists
-            if FileManager.default.fileExists(atPath: diskFile.path) {
-                // Artwork already cached, just update mapping
-                await updateMapping(stableId: stableId, artworkHash: hashString)
-                print("♻️ Reused existing artwork: \(hashString).jpg for track \(stableId)")
-                return
-            }
+        // Check if artwork already exists
+        if FileManager.default.fileExists(atPath: diskFile.path) {
+            // Artwork already cached, just update mapping
+            await updateMapping(stableId: stableId, artworkHash: hashString)
+            print("♻️ Reused existing artwork: \(hashString).jpg for track \(stableId)")
+            return
+        }
 
-            // Save new artwork file
-            do {
-                try imageData.write(to: diskFile, options: .atomic)
-                await updateMapping(stableId: stableId, artworkHash: hashString)
-                print("💾 Saved artwork to disk cache: \(hashString).jpg (\(imageData.count / 1024) KB)")
-            } catch {
-                print("❌ Failed to save artwork to disk: \(error)")
-            }
-        #else
-            // macOS artwork persistence (NSBitmapImageRep JPEG encoding) lands with
-            // the macOS UI batch; disk cache stays read-only for the skeleton.
-            print("ℹ️ saveToDiskCache: not implemented on macOS yet")
-        #endif
+        // Save new artwork file
+        do {
+            try imageData.write(to: diskFile, options: .atomic)
+            await updateMapping(stableId: stableId, artworkHash: hashString)
+            print("💾 Saved artwork to disk cache: \(hashString).jpg (\(imageData.count / 1024) KB)")
+        } catch {
+            print("❌ Failed to save artwork to disk: \(error)")
+        }
     }
 
     private func updateMapping(stableId: String, artworkHash: String) async {

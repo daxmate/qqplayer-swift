@@ -347,22 +347,27 @@ extension DatabaseManager {
             // Insert at the destination position
             mutableItems.insert(movedItem, at: destinationIndex)
 
-            // Two-phase update to avoid UNIQUE constraint violations:
-            // Phase 1: Shift all positions by +10000 (temporary offset)
+            // Two-phase update to avoid UNIQUE constraint violations.
+            // 按**旧 position** 定位行（playlist_item 主键 = (playlist_id, position)）；
+            // 此前按 track_stable_id 匹配：同一曲目在歌单里出现两次时两行会被写成
+            // 同一 position → 撞主键 → 整个重排事务回滚（审计 🔵-7）。
+            // 阶段 1 的目标位置带 +10000 偏移，与阶段 2 的目标集不相交，两阶段
+            // 内部目标位置各自唯一 ⇒ 不会互相撞键。
             print("🔄 Phase 1: Shifting positions to avoid conflicts")
             for (index, item) in mutableItems.enumerated() {
                 _ = try PlaylistItem
                     .filter(Column("playlist_id") == playlistId &&
-                        Column("track_stable_id") == item.trackStableId)
+                        Column("position") == item.position)
                     .updateAll(db, Column("position").set(to: index + 10000))
             }
 
             // Phase 2: Set final positions
             print("🔄 Phase 2: Setting final positions")
-            for (index, item) in mutableItems.enumerated() {
+            // 阶段 2 只按「阶段 1 写入的临时 position」定位行，不读 item → 用 indices
+            for index in mutableItems.indices {
                 _ = try PlaylistItem
                     .filter(Column("playlist_id") == playlistId &&
-                        Column("track_stable_id") == item.trackStableId)
+                        Column("position") == index + 10000)
                     .updateAll(db, Column("position").set(to: index))
             }
 

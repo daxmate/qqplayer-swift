@@ -3,11 +3,9 @@
 //  QQPlayer
 //
 //  DSD 解析域：DSF 头/ID3v2 标签解析、文本帧解码、little-endian 读取辅助
-//  （parseDSDMetadata 已废弃但保留）。
 //
 
 import Foundation
-import SFBAudioEngine
 
 extension AudioMetadataParser {
     // Parse DSD metadata with proper ID3v2 tag extraction from DSF files
@@ -344,61 +342,5 @@ extension AudioMetadataParser {
         let byte3 = UInt32(data[offset + 3]) << 24
 
         return byte0 | byte1 | byte2 | byte3
-    }
-
-    // Parse DSD metadata with SFBAudioEngine (DEPRECATED - causes hangs)
-    private static func parseDSDMetadata(_ url: URL) async throws -> AudioMetadata {
-        print("📖 Reading DSD metadata for: \(url.lastPathComponent)")
-
-        do {
-            // Create DSD decoder
-            let decoder = try SFBAudioEngine.AudioDecoder(url: url)
-
-            // Extract properties
-            let sourceFormat = decoder.sourceFormat
-            _ = decoder.processingFormat
-
-            let sampleRate = Int(sourceFormat.sampleRate)
-            let channels = Int(sourceFormat.channelCount)
-            // Duration calculation for DSD - using properties if available
-            let durationSeconds = 0.0  // Duration not directly available from AudioDecoder
-
-            // DSD is 1-bit, but we report the effective resolution
-            let bitDepth = 1
-
-            print("🎵 DSD metadata for \(url.lastPathComponent):")
-            print("   Sample Rate: \(sampleRate) Hz (DSD)")
-            print("   Channels: \(channels)")
-            print("   Duration: \(durationSeconds) seconds")
-            print("   Format: DSD (1-bit)")
-
-            // For DSD files, metadata is limited, so use filename parsing
-            let filename = url.deletingPathExtension().lastPathComponent
-            let title = filename
-
-            return AudioMetadata(
-                title: title,
-                artist: nil,
-                album: nil,
-                albumArtist: nil,
-                genre: nil,
-                trackNumber: nil,
-                discNumber: nil,
-                year: nil,
-                durationMs: Int(durationSeconds * 1000),
-                sampleRate: sampleRate,
-                bitDepth: bitDepth,
-                channels: channels,
-                replaygainTrackGain: nil,
-                replaygainAlbumGain: nil,
-                replaygainTrackPeak: nil,
-                replaygainAlbumPeak: nil,
-                hasEmbeddedArt: false
-            )
-
-        } catch {
-            print("❌ DSD parsing failed: \(error)")
-            throw AudioParseError.invalidFile
-        }
     }
 }

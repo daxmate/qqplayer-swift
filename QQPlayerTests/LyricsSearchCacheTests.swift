@@ -155,6 +155,31 @@ struct LyricsSearchCacheTests {
         #expect(FileManager.default.fileExists(atPath: trackFile.path))
     }
 
+    @Test("写入即清理：save 后即调用 cleanupExpired（修复前只在 load 内触发，停止搜索后文件长期驻留）")
+    func saveTriggersCleanup() throws {
+        LyricsSearchCache.shared.save([neteaseCandidate()], title: "写时清理", artist: "")
+        let files = cacheFiles
+        #expect(files.count == 1)
+
+        // 把已写文件 mtime 改到 TTL 之前；下一次 save 应顺手清掉它（无需任何 load）
+        let oldMtime = Date().addingTimeInterval(-8 * 24 * 3600)
+        try FileManager.default.setAttributes([.modificationDate: oldMtime], ofItemAtPath: files[0].path)
+
+        LyricsSearchCache.shared.save([lrclibCandidate()], title: "另一个词", artist: "")
+
+        #expect(cacheFiles.count == 1) // 只剩刚写入的新文件
+    }
+
+    @Test("条数上限：TTL 内文件过多时按 mtime 淘汰，目录不无限增长")
+    func enforcesFileLimit() {
+        let limit = LyricsSearchCache.fileLimit
+        for index in 0 ..< (limit + 1) {
+            LyricsSearchCache.shared.save([neteaseCandidate()], title: "上限歌\(index)", artist: "")
+        }
+
+        #expect(cacheFiles.count <= limit)
+    }
+
     @Test("定期清理：删除超过 TTL 的旧缓存文件")
     func cleanupRemovesOldFiles() throws {
         // 两个搜索词，各写一个缓存
