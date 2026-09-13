@@ -129,7 +129,7 @@
                    let artist = try? DatabaseManager.shared.read({ db in
                        try Artist.fetchOne(db, key: artistId)
                    }) {
-                    artistName = artist.name
+                    artistName = ArtistNameNormalizer.displayName(artist.name)
                 } else {
                     artistName = Localized.unknownArtist
                 }
@@ -147,7 +147,7 @@
 
                 let widgetData = WidgetTrackData(
                     trackId: track.stableId,
-                    title: track.title,
+                    title: track.displayTitle,
                     artist: artistName,
                     isPlaying: isPlaying,
                     backgroundColorHex: colorHex
@@ -179,8 +179,10 @@
             let currentTime = nowPlayingElapsedTime()
 
             // Create comprehensive Now Playing info
+            // 展示字段一律走显示层字形（锁屏/控制中心/CarPlay 与 App 内一致）：
+            // 数据库里 track.title 原文不动，只改写出的显示值。
             var info: [String: Any] = [
-                MPMediaItemPropertyTitle: track.title,
+                MPMediaItemPropertyTitle: track.displayTitle,
                 MPMediaItemPropertyPlaybackDuration: duration,
                 MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
                 MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
@@ -1024,7 +1026,7 @@
             }
 
             var info: [String: Any] = [
-                MPMediaItemPropertyTitle: currentTrack.title,
+                MPMediaItemPropertyTitle: currentTrack.displayTitle,
                 MPMediaItemPropertyPlaybackDuration: duration,
                 MPNowPlayingInfoPropertyElapsedPlaybackTime: playbackTime,
                 MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,

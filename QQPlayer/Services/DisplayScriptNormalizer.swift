@@ -135,4 +135,30 @@ enum DisplayScriptNormalizer {
     static func display(_ text: String) -> String {
         display(text, direction: current)
     }
+
+    // MARK: - 搜索变体
+
+    /// 搜索变体：query 本身 + 双向字形转换（去重），供 SQL LIKE OR 匹配。
+    /// 库里 tag 原文一个字都不动，同一首曲子可能以简体或繁体字形入库；
+    /// 单一字形模式会漏召回（简体 UI 下用户输"周杰伦"搜不到库里的"周傑倫"，反之对称）。
+    ///
+    /// - 首元素恒为 query 本身：用户输入原样优先匹配，行为与加变体前一致。
+    /// - identity 方向只返回 `[query]`。
+    /// - 不做日文假名豁免：假名不在映射表内，两个方向的转换结果都与 query 相同 → 天然去重
+    ///   （假名文本只可能因词级修正产生变体，属无害的超集匹配）。
+    /// - 歌手名变体不走这里：`ArtistNameNormalizer.searchVariants` 的人名语境需要姓氏保护
+    ///   （于文文 → 於文文 是误伤），曲名/专辑名按本文件语义不做姓氏保护（如「干杯」）。
+    static func searchVariants(of query: String, direction: Direction) -> [String] {
+        guard direction != .identity else { return [query] }
+        var variants = [query]
+        for variant in [toSimplified(query), toTraditional(query)] where !variants.contains(variant) {
+            variants.append(variant)
+        }
+        return variants
+    }
+
+    /// 当前 UI 语言方向下的搜索变体
+    static func searchVariants(of query: String) -> [String] {
+        searchVariants(of: query, direction: current)
+    }
 }
