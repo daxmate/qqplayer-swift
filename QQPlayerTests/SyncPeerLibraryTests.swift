@@ -508,3 +508,90 @@ struct SyncPeerLibraryTests {
         host.detach()
     }
 }
+
+// MARK: - ⑧ 来源顺序（2026-09-13 统一：按歌单筛选后按「来源自身顺序」返回）
+
+extension SyncPeerLibraryTests {
+    @Test("真 DB：按歌单筛选后按成员顺序返回（不按路径升序），trackCount 与结果一致")
+    func playlistFilterPreservesMemberOrder() throws {
+        let fixture = try makeDatabaseFixture()
+        let playlist = try fixture.manager.createPlaylist(title: "Newest")
+        let playlistID = try #require(playlist.id)
+        // 有意与路径升序相反：先加 Rock/c.flac（t3），再加 Jazz/a.flac（t1）
+        try fixture.manager.addToPlaylist(playlistId: playlistID, trackStableId: "t3")
+        try fixture.manager.addToPlaylist(playlistId: playlistID, trackStableId: "t1")
+
+        let catalog = DatabaseSyncPeerLibraryFacts(
+            database: fixture.manager,
+            libraryRoot: fixture.libraryRoot,
+            favoritesName: "收藏"
+        ).catalog()
+
+        let response = catalog.response(for: SyncPeerLibraryRequestPayload(
+            scope: SyncPeerLibraryScope.tracks.rawValue,
+            playlistID: playlist.slug,
+            offset: 0,
+            limit: 50,
+            requestID: 1
+        ))
+        #expect(
+            response.trackItems.map(\.relativePath) == ["Rock/c.flac", "Jazz/a.flac"],
+            "成员顺序 = 来源自身顺序（不重排成路径升序）"
+        )
+        let item = try #require(catalog.playlists.first { $0.id == playlist.slug })
+        #expect(item.trackCount == response.total, "trackCount 必须等于按该 id 筛 tracks 的条数")
+    }
+}
+
+/// 纯逻辑：来源顺序语义（成员列表顺序 = 来源自身顺序；全库仍升序；未知 = 空）
+struct SyncPeerLibrarySourceOrderTests {
+    private func makeCatalog() -> SyncPeerLibraryCatalog {
+        SyncPeerLibraryCatalog(
+            tracks: [
+                SyncPeerTrackItem(relativePath: "Jazz/01 a.flac", title: "A", sizeBytes: 1),
+                SyncPeerTrackItem(relativePath: "Jazz/02 b.flac", title: "B", sizeBytes: 1),
+                SyncPeerTrackItem(relativePath: "Jazz/03 c.flac", title: "C", sizeBytes: 1),
+            ],
+            trackPathsByPlaylist: [
+                "recent": ["Jazz/03 c.flac", "Jazz/01 a.flac"],
+                "@favorites": ["Jazz/02 b.flac"],
+                "empty": [],
+            ]
+        )
+    }
+
+    private func paths(playlistID: String?, query: String? = nil) -> [String] {
+        makeCatalog().matchedTracks(for: SyncPeerLibraryRequestPayload(
+            scope: SyncPeerLibraryScope.tracks.rawValue,
+            playlistID: playlistID,
+            query: query,
+            offset: 0,
+            limit: 50,
+            requestID: 1
+        )).map(\.relativePath)
+    }
+
+    @Test("带 playlistID → 按来源自身顺序（不是路径升序）")
+    func filteredFollowsSourceOrder() {
+        #expect(paths(playlistID: "recent") == ["Jazz/03 c.flac", "Jazz/01 a.flac"])
+        #expect(paths(playlistID: "@favorites") == ["Jazz/02 b.flac"])
+    }
+
+    @Test("不带 playlistID（全库）→ 仍按 relativePath 升序（既有契约不变）")
+    func libraryStaysAscending() {
+        #expect(paths(playlistID: nil) == ["Jazz/01 a.flac", "Jazz/02 b.flac", "Jazz/03 c.flac"])
+    }
+
+    @Test("未知/非法/空歌单 → 空结果（绝不回落全库）")
+    func unknownIsEmpty() {
+        #expect(paths(playlistID: "nope").isEmpty)
+        #expect(paths(playlistID: "a/b").isEmpty)
+        #expect(paths(playlistID: "empty").isEmpty)
+    }
+
+    @Test("来源内搜索不重排（仍是来源顺序）")
+    func searchKeepsSourceOrder() {
+        #expect(paths(playlistID: "recent", query: "flac") == ["Jazz/03 c.flac", "Jazz/01 a.flac"])
+        #expect(paths(playlistID: nil, query: "03") == ["Jazz/03 c.flac"])
+    }
+}

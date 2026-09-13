@@ -75,10 +75,26 @@ struct SmartPlaylistSourceResolver {
         }
     }
 
+    /// 来源的成员相对路径（**保持来源自身顺序**：自动歌单的语义序（最近添加 = 最新在前）、
+    /// 收藏与真实歌单的成员序；去重保序，拿不到相对路径的曲目跳过）。
+    ///
+    /// 展示序用它（本端单曲列表 / 对端清单的 `trackPathsByPlaylist`）；两侧同一份实现
+    /// → 同一个来源在两端给出同样的顺序（2026-09-13 统一：此前对端按路径升序返回，
+    /// 与上传方向不一致）。
+    func orderedRelativePaths(for ref: SyncBrowseSourceRef) -> [String] {
+        var seen: Set<String> = []
+        var paths: [String] = []
+        for track in tracks(for: ref) {
+            guard let path = relativePath(of: track), seen.insert(path).inserted else { continue }
+            paths.append(path)
+        }
+        return paths
+    }
+
     /// 来源的成员相对路径（升序、去重；拿不到相对路径的曲目跳过）。
     ///
-    /// 升序是为了**确定性 + 跨方向一致**：对端清单（`SyncPeerLibraryCatalog`）本来
-    /// 就按 relativePath 升序返回，两端对同一来源给出同样的顺序。
+    /// 只用于**集合/确定性**用途（如比较、集合相等）；展示序请用
+    /// `orderedRelativePaths(for:)`。
     func relativePaths(for ref: SyncBrowseSourceRef) -> [String] {
         var seen: Set<String> = []
         var paths: [String] = []
@@ -89,9 +105,9 @@ struct SmartPlaylistSourceResolver {
         return paths.sorted()
     }
 
-    /// 来源成员相对路径集合（对端清单的 `trackPathsByPlaylist` 口径）。
+    /// 来源成员相对路径集合（集合口径；展示序见 `orderedRelativePaths(for:)`）。
     func pathSet(for ref: SyncBrowseSourceRef) -> Set<String> {
-        Set(relativePaths(for: ref))
+        Set(orderedRelativePaths(for: ref))
     }
 
     // MARK: - 内部

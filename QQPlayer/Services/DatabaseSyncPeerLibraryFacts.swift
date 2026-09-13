@@ -108,11 +108,11 @@ struct DatabaseSyncPeerLibraryFacts {
         }
 
         var playlists: [SyncPeerPlaylistItem] = []
-        var memberPathsByPlaylist: [String: Set<String>] = [:]
+        var memberPathsByPlaylist: [String: [String]] = [:]
 
         // 决策 9：收藏视为特殊歌单（保留标识 `@favorites`）。
         if let favorites = try? database.getFavoriteTracks() {
-            let paths = Set(favorites.compactMap { pathByStableId[$0.stableId] })
+            let paths = orderedUniquePaths(favorites.compactMap { pathByStableId[$0.stableId] })
             playlists.append(
                 SyncPeerPlaylistItem(
                     id: SyncCollectionSelection.favoritesPlaylistID,
@@ -132,22 +132,24 @@ struct DatabaseSyncPeerLibraryFacts {
                 else {
                     continue // 单条不成只跳过该歌单，不炸整批
                 }
-                let paths = Set(items.compactMap { pathByStableId[$0.trackStableId] })
+                let paths = orderedUniquePaths(items.compactMap { pathByStableId[$0.trackStableId] })
+                // 同 slug 撞名（历史数据）→ 追加未见过的成员：多算条目是安全侧（多列几首），漏算是危险侧
+                let merged = appendingUnseen(paths, to: memberPathsByPlaylist[slug] ?? [])
                 playlists.append(
-                    SyncPeerPlaylistItem(id: slug, name: playlist.title, trackCount: paths.count)
+                    SyncPeerPlaylistItem(id: slug, name: playlist.title, trackCount: merged.count)
                 )
-                // 同 slug 撞名（历史数据）→ 并集：多算条目是安全侧（多列几首），漏算是危险侧
-                memberPathsByPlaylist[slug, default: []].formUnion(paths)
+                memberPathsByPlaylist[slug] = merged
             }
         }
 
         // 自动歌单（最近添加 / 最近播放 / 常听排行）：与播放列表页同一数据层，
         // 成员相对路径口径 = `SmartPlaylistSourceResolver`（本端单曲来源同一份实现，
-        // 两端同口径）。trackCount = 成员集 ∩ 曲目清单，保证「按该 id 筛 tracks」条数一致。
+        // 两端同口径；**保持来源自身顺序**——自动歌单的排序语义就是它的语义）。
+        // trackCount = 成员 ∩ 曲目清单，保证「按该 id 筛 tracks」条数一致。
         let resolver = SmartPlaylistSourceResolver(database: database, libraryRoot: libraryRoot)
-        var smartMemberPaths: [SyncBrowseSmartKind: Set<String>] = [:]
+        var smartMemberPaths: [SyncBrowseSmartKind: [String]] = [:]
         for kind in SyncBrowseSmartKind.allCases {
-            smartMemberPaths[kind] = resolver.pathSet(for: SyncBrowseSourceRef.smart(kind))
+            smartMemberPaths[kind] = resolver.orderedRelativePaths(for: SyncBrowseSourceRef.smart(kind))
         }
         let smartEntries = SyncPeerLibraryCatalog.smartPlaylistEntries(
             names: smartNames,
@@ -168,6 +170,22 @@ struct DatabaseSyncPeerLibraryFacts {
     }
 
     // MARK: - 内部
+
+    /// 去重保序（同一路径重复时留首个：成员表里同一首歌出现两次只算一次）。
+    private func orderedUniquePaths(_ raw: [String]) -> [String] {
+        var seen: Set<String> = []
+        return raw.filter { seen.insert($0).inserted }
+    }
+
+    /// 把 `extra` 追加到 `base` 末尾（只追加未见过的，保持 base 的既有顺序）。
+    private func appendingUnseen(_ extra: [String], to base: [String]) -> [String] {
+        var seen = Set(base)
+        var out = base
+        for path in extra where seen.insert(path).inserted {
+            out.append(path)
+        }
+        return out
+    }
 
     /// 一条 track 行 → 曲库内相对路径（不在根内 / 路径非法 → nil = 跳过该条）。
     private func relativePath(of track: Track) -> String? {

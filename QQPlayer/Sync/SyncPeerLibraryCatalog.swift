@@ -28,8 +28,11 @@ struct SyncPeerLibraryCatalog: Equatable, Sendable {
     var playlists: [SyncPeerPlaylistItem]
     /// 曲目清单（构造时按 relativePath 升序、按 relativePath 去重）
     var tracks: [SyncPeerTrackItem]
-    /// 歌单标识 → 成员曲目 relativePath 集合（**本端事实，不上线**；tracks 按歌单筛选用）
-    var trackPathsByPlaylist: [String: Set<String>]
+    /// 歌单标识 → 成员曲目 relativePath（**来源自身顺序**；本端事实，不上线；tracks 按歌单筛选用）
+    ///
+    /// 顺序是语义的一部分（自动歌单 = 最新添加在前 / 收藏与歌单 = 成员序；2026-09-13 统一），
+    /// 去重由装配方保证（同一路径重复出现时取首个）。
+    var trackPathsByPlaylist: [String: [String]]
     /// 装配时因上限截断（诊断；透传到响应）
     var truncated: Bool
 
@@ -41,7 +44,7 @@ struct SyncPeerLibraryCatalog: Equatable, Sendable {
     init(
         playlists: [SyncPeerPlaylistItem] = [],
         tracks: [SyncPeerTrackItem] = [],
-        trackPathsByPlaylist: [String: Set<String>] = [:],
+        trackPathsByPlaylist: [String: [String]] = [:],
         truncated: Bool = false
     ) {
         self.playlists = Self.normalizedPlaylists(playlists)
@@ -80,11 +83,23 @@ struct SyncPeerLibraryCatalog: Equatable, Sendable {
         }
     }
 
-    /// 按 playlistID / query 收窄的曲目（保持 relativePath 升序）。
+    /// 按 playlistID / query 收窄的曲目。
+    ///
+    /// 顺序语义（2026-09-13 统一为「来源自身顺序」）：
+    /// - 未指定 playlistID（全库）→ 既有契约：relativePath 升序（构造时已归一）；
+    /// - 指定 playlistID 且命中 → **按该来源自己的成员顺序**（自动歌单 = 最新在前 /
+    ///   收藏与歌单 = 成员序），与发起端（Mac）本端列表同一顺序；
+    /// - 指定但未知/非法 → 空结果（不回落全库）。
     func matchedTracks(for request: SyncPeerLibraryRequestPayload) -> [SyncPeerTrackItem] {
         var matched = tracks
-        if let members = memberPaths(forPlaylistID: request.normalizedPlaylistID) {
-            matched = matched.filter { members.contains($0.relativePath) }
+        if let members = orderedMemberPaths(forPlaylistID: request.normalizedPlaylistID) {
+            let rankByPath = Dictionary(
+                members.enumerated().map { ($0.element, $0.offset) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            matched = matched
+                .filter { rankByPath[$0.relativePath] != nil }
+                .sorted { (rankByPath[$0.relativePath] ?? 0) < (rankByPath[$1.relativePath] ?? 0) }
         }
         if let query = request.normalizedQuery {
             matched = matched.filter { Self.matches($0, query: query) }
@@ -92,14 +107,19 @@ struct SyncPeerLibraryCatalog: Equatable, Sendable {
         return matched
     }
 
-    /// 指定歌单的成员相对路径：
+    /// 指定歌单的成员相对路径（**来源顺序**）：
     /// - nil（未指定）→ nil = 不过滤
-    /// - 未知/非法标识 → 空集（与 `SyncCollection.selectedStableIds` 同语义：
+    /// - 未知/非法标识 → 空数组（与 `SyncCollection.selectedStableIds` 同语义：
     ///   「选不出内容」比「误给全库」安全）
-    func memberPaths(forPlaylistID playlistID: String?) -> Set<String>? {
+    func orderedMemberPaths(forPlaylistID playlistID: String?) -> [String]? {
         guard let playlistID else { return nil }
         guard SyncCollectionSelection.isValidPlaylistID(playlistID) else { return [] }
         return trackPathsByPlaylist[playlistID] ?? []
+    }
+
+    /// 成员集合口径（既有调用方/测试用）：`orderedMemberPaths` 的集合形式（顺序丢失）。
+    func memberPaths(forPlaylistID playlistID: String?) -> Set<String>? {
+        orderedMemberPaths(forPlaylistID: playlistID).map(Set.init)
     }
 
     /// 搜索词命中（contains，大小写不敏感；标题/歌手/相对路径三者任一命中）。
@@ -198,18 +218,18 @@ extension SyncPeerLibraryCatalog {
     /// 否则顶部摘要的数字会与筛选结果对不上（既有 favorites 同款纪律）。
     ///
     /// - 顺序 = `SyncBrowseSmartKind.allCases`（固定序，与同步页展示序一致）；
-    /// - 成员集与 `catalogPaths` 求交（不在清单里的成员不计入，口径同真实歌单）；
+    /// - 成员**保持来源自身顺序**并与 `catalogPaths` 求交（不在清单里的成员不计入，口径同真实歌单）；
     /// - 名称为空 → 回落标识本身（不产生空行）。
     static func smartPlaylistEntries(
         names: [SyncBrowseSmartKind: String],
-        memberPaths: [SyncBrowseSmartKind: Set<String>],
+        memberPaths: [SyncBrowseSmartKind: [String]],
         catalogPaths: Set<String>
-    ) -> (playlists: [SyncPeerPlaylistItem], members: [String: Set<String>]) {
+    ) -> (playlists: [SyncPeerPlaylistItem], members: [String: [String]]) {
         var playlists: [SyncPeerPlaylistItem] = []
-        var members: [String: Set<String>] = [:]
+        var members: [String: [String]] = [:]
         for kind in SyncBrowseSmartKind.allCases {
             let ref = SyncBrowseSourceRef.smart(kind)
-            let paths = (memberPaths[kind] ?? []).intersection(catalogPaths)
+            let paths = (memberPaths[kind] ?? []).filter { catalogPaths.contains($0) }
             let name = (names[kind] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             playlists.append(
                 SyncPeerPlaylistItem(
