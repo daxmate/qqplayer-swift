@@ -146,6 +146,7 @@
 		091092B377F4402EBE1EC58B /* SmartPlaylistSourceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E957BA80E0243FBB0D86999 /* SmartPlaylistSourceResolverTests.swift */; };
 		C407DA63E13F448E8DA29607 /* DisplayScriptNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764BC43D7EA94619A91E150E /* DisplayScriptNormalizerTests.swift */; };
 		077EEB1C6A6F4468893454B3 /* DisplayScriptContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D96D2271B3C4C909F926881 /* DisplayScriptContractTests.swift */; };
+		101DC833D5334782AE72320D /* DisplayScriptLanguageOverrideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -341,6 +342,7 @@
 		5E957BA80E0243FBB0D86999 /* SmartPlaylistSourceResolverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartPlaylistSourceResolverTests.swift; sourceTree = "<group>"; };
 		764BC43D7EA94619A91E150E /* DisplayScriptNormalizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DisplayScriptNormalizerTests.swift; sourceTree = "<group>"; };
 		4D96D2271B3C4C909F926881 /* DisplayScriptContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DisplayScriptContractTests.swift; sourceTree = "<group>"; };
+		E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DisplayScriptLanguageOverrideTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -418,6 +420,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Services/ArtistNameNormalizer.swift,
+				Services/DisplayScriptLanguageOverride.swift,
 				Services/DisplayScriptNormalizer.swift,
 				Services/SimplifiedTraditionalMap.swift,
 			);
@@ -937,6 +940,7 @@
 				5E957BA80E0243FBB0D86999 /* SmartPlaylistSourceResolverTests.swift */,
 				764BC43D7EA94619A91E150E /* DisplayScriptNormalizerTests.swift */,
 				4D96D2271B3C4C909F926881 /* DisplayScriptContractTests.swift */,
+				E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1381,6 +1385,7 @@
 				091092B377F4402EBE1EC58B /* SmartPlaylistSourceResolverTests.swift in Sources */,
 				C407DA63E13F448E8DA29607 /* DisplayScriptNormalizerTests.swift in Sources */,
 				077EEB1C6A6F4468893454B3 /* DisplayScriptContractTests.swift in Sources */,
+				101DC833D5334782AE72320D /* DisplayScriptLanguageOverrideTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

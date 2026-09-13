@@ -25,9 +25,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // 先把本 App 解析出的 UI 语言写进 App Group（Siri 扩展的读点见
+        // DisplayScriptLanguageOverride），再建 Siri 词表/上下文。
+        recordResolvedDisplayLanguage()
         // Set up Siri vocabulary and media context
         setupSiriIntegration()
         return true
+    }
+
+    /// 记录 App 已解析的 UI 语言到 App Group，供 Siri 扩展与 App 用同一门语言
+    /// 判定显示字形（扩展包无本地化资源，读不到 per-app 语言）。
+    /// **每次启动覆盖写**：per-app 语言变化会重启 App，启动时读到的即最新值。
+    private func recordResolvedDisplayLanguage() {
+        guard let defaults = DisplayScriptLanguageOverride.sharedDefaults else { return }
+        // App 有 5 语本地化，preferredLocalizations 非空；万一为空则写空串 →
+        // 扩展侧视为非法值，回退系统语言。
+        let resolved = Bundle.main.preferredLocalizations.first ?? ""
+        DisplayScriptLanguageOverride.write(resolvedLanguage: resolved, to: defaults)
     }
 
     private func setupSiriIntegration() {

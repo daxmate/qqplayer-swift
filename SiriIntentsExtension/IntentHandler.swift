@@ -14,12 +14,17 @@ import Intents
 
 // MARK: - 显示层简繁归一（只作用于 Siri 消歧/确认卡片里的曲名・歌手名・专辑名）
 
-/// 归一方向。扩展进程里 `Bundle.main` 是扩展包（无本地化资源 → preferredLocalizations
-/// 恒为 ["en"]），读不到 App 的 UI 语言；改用系统语言列表（App 无应用内语言设置，
-/// UI 语言 == 系统语言）。方向规则仍走 DisplayScriptNormalizer / ArtistNameNormalizer
-/// 的纯函数入口，与 App 侧同一套语义（含日文假名豁免）。
-private let displayScriptDirection = DisplayScriptNormalizer.direction(for: Locale.preferredLanguages)
-private let displayArtistDirection = ArtistNameNormalizer.direction(for: Locale.preferredLanguages)
+/// 归一方向用的有效语言列表。扩展进程里 `Bundle.main` 是扩展包（无本地化资源 →
+/// preferredLocalizations 恒为 ["en"]），读不到 App 的 UI 语言；App 启动时会把
+/// **自己解析出的 UI 语言**写进 App Group（DisplayScriptLanguageOverride），
+/// 这里优先读它，读不到（App 从未启动过 / 值非法）才回退系统语言列表。
+/// 方向规则仍走 DisplayScriptNormalizer / ArtistNameNormalizer 的纯函数入口，
+/// 与 App 侧同一套语义（含日文假名豁免）——这里只决定「用哪门语言」。
+private let displayLanguages = DisplayScriptLanguageOverride.effectiveLanguages(
+    stored: DisplayScriptLanguageOverride.storedLanguageFromAppGroup(),
+    systemLanguages: Locale.preferredLanguages)
+private let displayScriptDirection = DisplayScriptNormalizer.direction(for: displayLanguages)
+private let displayArtistDirection = ArtistNameNormalizer.direction(for: displayLanguages)
 
 /// 展示字段（曲名/专辑名等）的显示字形。命名与 App 侧入口一致，便于契约测试与全仓检索：
 /// 这里只是补上扩展进程自己拿到的方向，转换规则仍只在 DisplayScriptNormalizer 里。
