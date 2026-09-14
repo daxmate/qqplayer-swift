@@ -69,6 +69,21 @@ struct SyncSettingsView: View {
                 Text("sync_passive_footer".localized)
             }
 
+            // MARK: 同步数据（帧 8/9）账目 —— 手机侧也能看见「同步了什么 / 丢了多少」（2026-09-15）
+            Section {
+                if passiveSync.dataSummary.hasSessionData {
+                    dataSyncSummaryRows
+                } else {
+                    Text("sync_run_data_result_none".localized)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("sync_run_data_section".localized)
+            } footer: {
+                Text("sync_run_data_description".localized)
+            }
+
             // MARK: 本机
             Section {
                 // 本机名称（用户可改；改的是握手 hello 携带的展示名 → Mac 设备列表显示名）
@@ -169,6 +184,41 @@ struct SyncSettingsView: View {
             deviceName = LocalDeviceNameStore.shared.name
             // 幂等：进页时确保被动端在跑（配对完成后也由此重新检查主机）
             passiveSync.start()
+        }
+    }
+
+    // MARK: - 数据同步账目（帧 8/9）
+
+    /// 手机侧的同步数据账目：正常计数行 + 缺口行（纯逻辑在 `IOSPassiveDataSyncPresenter`，可单测）。
+    /// 复用 Mac 面板已有的 key，不新增文案。
+    @ViewBuilder
+    private var dataSyncSummaryRows: some View {
+        let summary = passiveSync.dataSummary
+        ForEach(
+            Array(IOSPassiveDataSyncPresenter.countRows(summary).enumerated()),
+            id: \.offset
+        ) { _, row in
+            LabeledContent(row.labelKey.localized) {
+                Text("\(row.count)")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        ForEach(
+            Array(IOSPassiveDataSyncPresenter.gapRows(summary).enumerated()),
+            id: \.offset
+        ) { _, row in
+            VStack(alignment: .leading, spacing: 4) {
+                LabeledContent(row.labelKey.localized) {
+                    Text("\(row.count)")
+                        .foregroundStyle(.orange)
+                }
+                if let hintKey = row.hintKey {
+                    Text(hintKey.localized(with: row.count))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
     }
 

@@ -230,6 +230,15 @@
   - 用例：`SyncDataSyncCoreTests`（`applyPlaylistItemCountsMissingPlaylistParent` / `applyFavoriteCountsMissingTrack`）。
 - **建议**：以后任何新增的 `return false` 分支都要配一个计数字段；「没落库就不许算已应用，也不许无声无息」。
 
+### INV-29　账目必须在**两端都可见**（不能只有一端有面板、另一端只 `print`）
+
+- **现有守护：✅ 已收（2026-09-15）**
+  - Mac：`MacSyncView` 同步数据区（计数行 + 缺口行 + hint，5 语）。
+  - iOS：`IOSPassiveSyncCenter.dataSummary`（帧 8/9 回调累加，主线程）+ `IOSPassiveDataSyncPresenter`
+    （`countRows` / `gapRows` 纯逻辑）+ `SyncSettingsView` 的「播放数据」账目区；未同步过 = 空态。
+  - 用例：`SyncDataSyncCoreTests.passiveDataSyncPresenterRowsArePure`。
+- **建议**：新增任何跨端能力时，**两端的账目面都要有落点**（只 `print` 不算披露）。
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：

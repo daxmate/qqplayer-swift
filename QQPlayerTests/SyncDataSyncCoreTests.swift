@@ -765,6 +765,47 @@ struct SyncDataSyncCoreTests {
         #expect(missingParent.value == 1)
     }
 
+    // MARK: - iPhone 账目面板（纯逻辑，2026-09-15）
+
+    @Test("手机侧账目：缺口行只列 >0 的项且按严重度排序；计数行齐全；未同步过 = 空态")
+    func passiveDataSyncPresenterRowsArePure() throws {
+        var summary = IOSPassiveDataSyncSummary()
+        #expect(summary.hasSessionData == false, "没同步过 = 空态（面板显示「还没有同步过播放数据」）")
+        #expect(IOSPassiveDataSyncPresenter.gapRows(summary).isEmpty)
+        #expect(IOSPassiveDataSyncPresenter.countRows(summary).count == 4)
+
+        summary.hasSessionData = true
+        summary.appliedEntries = 3
+        summary.answeredPullEntries = 5
+        summary.suspendedEntries = 1
+        summary.unresolvedEntries = 2
+        summary.skippedMissingParentEntries = 1
+        summary.missingIdentityEntries = 4
+        summary.unsupportedEntries = 0
+        summary.ignoredDeletes = 7
+
+        let gaps = IOSPassiveDataSyncPresenter.gapRows(summary)
+        #expect(
+            gaps.map(\.labelKey) == [
+                "sync_run_data_result_unresolved",
+                "sync_run_data_skipped_parent",
+                "sync_run_data_result_missing_identity",
+            ],
+            "缺口顺序 = 严重度；未支持为 0 时不出现"
+        )
+        #expect(gaps.map(\.count) == [2, 1, 4])
+        #expect(gaps.allSatisfy { $0.hintKey != nil }, "每条缺口都要有说明文案")
+
+        let counts = IOSPassiveDataSyncPresenter.countRows(summary)
+        #expect(counts.map(\.labelKey) == [
+            "sync_run_data_result_applied",
+            "sync_run_data_result_pending",
+            "sync_run_data_result_sent",
+            "sync_run_data_result_skipped",
+        ])
+        #expect(counts.map(\.count) == [3, 1, 5, 7])
+    }
+
     // MARK: - 连接后自动触发（2026-09-15）
 
     @Test("连接后自动触发（纯逻辑）：已连接 + 有会话 + 不忙 + 本次未跑过 才自动跑")

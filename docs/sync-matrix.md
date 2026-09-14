@@ -206,7 +206,7 @@ i18n 键确认只有两个缺口口径：`sync_run_data_result_unresolved` = 未
 | --- | --- | --- | --- |
 | 9 | **⑥ 披露不区分实体** | `MacSyncView.swift:983-1026` 全是总数 | 用户只能看到「有 110 条没定位」，无法判断该修哪条通道 |
 | 10 | **F⑥ 歌词丢弃计了数没上屏** | `SyncUIState.swift:449-500` 无 `discardedLyrics`/`orphanLyricsSkipped` | 歌词没到，用户不知道为什么 |
-| 11 | **iOS 端零 UI 披露** | `IOSPassiveSyncCenter.swift:549-578` 全 print | 被动端的静默失效用户在设备上完全看不见 |
+| 11 | ~~**iOS 端零 UI 披露**~~ **已收（2026-09-15）** | 修法：`IOSPassiveSyncCenter.dataSummary`（帧 8/9 回调累加，主线程）+ `IOSPassiveDataSyncPresenter`（`countRows`/`gapRows` 纯逻辑）+ iOS「设置 → 同步」新增「播放数据」账目区（计数行 + 缺口行 + 说明，>0 橙色；**复用 Mac 既有 key，无新增文案**）；未同步过 = 空态 | 手机侧也能看见「同步了什么 / 丢了多少」 |
 | 12 | **E⑦ 无 applier 用例** | `grep "Applier playback" QQPlayerTests/` 无 | 上述 5 号的误导行为不会被 CI 抓到 |
 
 ---
