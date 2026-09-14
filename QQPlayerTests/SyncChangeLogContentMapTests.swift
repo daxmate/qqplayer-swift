@@ -759,6 +759,138 @@ struct SyncChangeLogContentMapTests {
         let after = try Self.businessSnapshot(queue)
         #expect(after == before)
     }
+
+    // MARK: - T15b-2 本地真值 → outbox 对账补发
+
+    /// 造一个歌单（返回 id）；`folderSynced` = true 模拟 folder-synced 歌单。
+    private static func insertPlaylist(
+        _ db: Database,
+        slug: String,
+        folderSynced: Bool = false
+    ) throws -> Int64 {
+        try Playlist(
+            id: nil,
+            slug: slug,
+            title: slug.uppercased(),
+            createdAt: 1,
+            updatedAt: 1,
+            lastPlayedAt: 0,
+            folderPath: folderSynced ? "/local/folder" : nil,
+            isFolderSynced: folderSynced,
+            lastFolderSync: nil,
+            customCoverImagePath: nil
+        ).insert(db)
+        return try Playlist.filter(Column("slug") == slug).fetchOne(db)?.id ?? 0
+    }
+
+    /// outbox 的「实体|行键」列表（按 id 升序）。
+    private static func outboxKeys(_ queue: DatabaseQueue) throws -> [String] {
+        try queue.read { db in
+            try SyncChangeLogRow.order(Column("id")).fetchAll(db).map { "\($0.entity)|\($0.rowKey)" }
+        }
+    }
+
+    @Test("T15b-2 补发：业务表现有收藏/歌单成员/播放历史而 outbox 缺行 → 补进 outbox 且不再缺身份键")
+    func reconcileEmitsLocalTruthIntoOutbox() throws {
+        let (manager, queue) = try Self.makeManager()
+        let playedAt: Int64 = 1_700_000_100_000
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-live", contentHash: "hash-live")
+            try Favorite(trackStableId: "s-live").insert(db)
+            let playlistID = try Self.insertPlaylist(db, slug: "pl")
+            try PlaylistItem(playlistId: playlistID, position: 0, trackStableId: "s-live").insert(db)
+            try PlayHistoryEntry(trackStableId: "s-live", playedAt: playedAt, playDurationMs: 900).insert(db)
+        }
+
+        let report = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(report.emitted == 3)
+        #expect(report.emittedWithoutIdentity == 0)
+        #expect(report.skippedLocalDangling == 0)
+        #expect(
+            try Self.outboxKeys(queue).sorted()
+                == ["favorite|s-live", "play_history|s-live|\(playedAt)", "playlist_item|pl|s-live"].sorted()
+        )
+
+        // 真的能同步出去：补发的三条都不缺身份键（否则对端会按「未定位」丢弃）
+        let rows = try queue.read { db in try SyncChangeLogRow.order(Column("id")).fetchAll(db) }
+        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        #expect(batch.missingIdentity.isEmpty)
+        #expect(batch.entries.map(\.contentHash) == ["hash-live", "hash-live", "hash-live"])
+    }
+
+    @Test("T15b-2 补发：幂等——再跑一遍零改动、零计数，outbox 逐字不变")
+    func reconcileIsIdempotent() throws {
+        let (manager, queue) = try Self.makeManager()
+        let playedAt: Int64 = 1_700_000_100_001
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-live", contentHash: "hash-live")
+            try Favorite(trackStableId: "s-live").insert(db)
+            try PlayHistoryEntry(trackStableId: "s-live", playedAt: playedAt, playDurationMs: 900).insert(db)
+        }
+
+        let repair = SyncChangeLogDanglingRepair(database: manager)
+        let first = try repair.run()
+        #expect(first.emitted == 2)
+        let afterFirst = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+
+        let second = try repair.run()
+        #expect(second == SyncChangeLogDanglingRepair.Report())
+        #expect(second.didChange == false)
+        let afterSecond = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(afterSecond == afterFirst)
+    }
+
+    @Test("T15b-2 补发：本地悬空不补（只计数）；缺指纹照补并计数（对端应披露为未定位）")
+    func reconcileSkipsLocalDanglingAndCountsMissingIdentity() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            // 有 track 行但指纹为空 = 缺指纹（T13/T14 口径：照发，对端未定位）
+            try Self.insertTrack(db, stableId: "s-nohash", contentHash: nil)
+            try Favorite(trackStableId: "s-nohash").insert(db)
+            // 本地悬空：收藏指向的歌在 track 表查无
+            try Favorite(trackStableId: "s-ghost").insert(db)
+        }
+
+        let report = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(report.emitted == 1)
+        #expect(report.emittedWithoutIdentity == 1)
+        #expect(report.skippedLocalDangling == 1)
+        #expect(try Self.outboxKeys(queue) == ["favorite|s-nohash"])
+    }
+
+    @Test("T15b-2 补发：悬空行被清掉后按业务表补回（「清完就永远同步不出去」的修复）")
+    func reconcileReemitsAfterDanglingCleanup() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-live", contentHash: "hash-live")
+            try Favorite(trackStableId: "s-live").insert(db)
+            // 引用已失效的旧 stableId（容器路径变化前的键）——T15b 只清不补，这里验证 T15b-2 会补回
+            try SyncChangeLogStore.record(
+                db, entity: .favorite, rowKey: "s-dead", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "s-dead")),
+                updatedAtMs: 5000
+            )
+        }
+
+        let report = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(report.cleaned == 1)
+        #expect(report.emitted == 1)
+        #expect(try Self.outboxKeys(queue) == ["favorite|s-live"])
+    }
+
+    @Test("T15b-2 补发：folder-synced 歌单成员不入跨端同步（与写入侧同一口径）")
+    func reconcileSkipsFolderSyncedPlaylistItems() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-live", contentHash: "hash-live")
+            let folderPlaylistID = try Self.insertPlaylist(db, slug: "folder-pl", folderSynced: true)
+            try PlaylistItem(playlistId: folderPlaylistID, position: 0, trackStableId: "s-live").insert(db)
+        }
+
+        let report = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(report.emitted == 0)
+        #expect(try Self.outboxKeys(queue).isEmpty)
+    }
 }
 
 // MARK: - 测试辅助

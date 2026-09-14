@@ -534,10 +534,7 @@
             do {
                 let repair = try SyncChangeLogDanglingRepair(database: database).run()
                 if repair.didChange {
-                    print(
-                        "ℹ️ IOSPassiveSyncCenter: 出站悬空引用对账完成"
-                            + "（修复=\(repair.repaired) 清理=\(repair.cleaned) 跳过=\(repair.skipped)）"
-                    )
+                    print("ℹ️ IOSPassiveSyncCenter: 出站悬空引用修复 + 本地真值补发完成" + repair.logText)
                 }
             } catch {
                 print("⚠️ IOSPassiveSyncCenter: 出站悬空引用对账失败 \(error)")

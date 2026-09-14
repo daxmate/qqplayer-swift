@@ -40,6 +40,13 @@
 //  改写引用），且新开文件需改 pbxproj 目标成员名单（本包禁止）——修复入口与它所镜像的
 //  「接收侧本地化」放在一起，行为对照最直观。
 //
+//  T15b-2（2026-09-14 真机事故：收藏「从来没同步过」）：`run()` = 两步——
+//  ① `repairDanglingRows`（修/清悬空引用，见上）；② `reconcileLocalTruth`（把业务表里
+//  **现有**的收藏 / 歌单成员 / 播放历史补进 outbox：outbox 没有对应 upsert 就补一条）。
+//  没有第二步时，favorite / playlist_item 的废止 outbox 行被清掉后**不会重新产生**——
+//  业务行还在（用户看得见）、同步层永远看不到它，且零报错。判定口径与发送侧同一事实源
+//  （悬空不补、缺指纹照补并计数）。
+//
 //  本文件只做只读查询 + 纯变换，无写副作用；挂起/重放见
 //  SyncChangeLogPendingStore.swift。
 //
@@ -426,7 +433,7 @@ struct SyncChangeLogMapper {
 /// 为什么清理而不是留着重试：这些行的引用键永久失效（重拉重推都拿不到指纹），
 /// 留着只消耗每轮批次数与面板噪音；业务表里的同名孤儿由用户决定，不在本入口范围。
 struct SyncChangeLogDanglingRepair {
-    /// 三态计数（修复 / 清理 / 跳过）。
+    /// 计数（修复 / 清理 / 跳过 / 补发）。
     struct Report: Equatable, Sendable {
         /// 悬空引用被**改写**为当前可用 stableId 的行数（play_history 按 played_at 命中）。
         var repaired = 0
@@ -434,8 +441,22 @@ struct SyncChangeLogDanglingRepair {
         var cleaned = 0
         /// 悬空引用但本次**未动**的行数（引用键解析不出 → 无法判断，宁可不碰）。
         var skipped = 0
+        /// 本地真值**补发**进 outbox 的行数（业务表有、outbox 没有对应 upsert）。
+        var emitted = 0
+        /// 补发时本地拿不到身份键的行数（track 行在、`content_hash` 空 = 缺指纹）：
+        /// 行照样补发（它是本地真值），对端会按「未定位」披露。
+        var emittedWithoutIdentity = 0
+        /// 本地业务行引用的歌在 `track` 表查无（本地悬空）→ **不补发**、只计数。
+        var skippedLocalDangling = 0
 
-        var didChange: Bool { repaired > 0 || cleaned > 0 }
+        var didChange: Bool { repaired > 0 || cleaned > 0 || emitted > 0 }
+
+        /// 一行诊断文案（Mac / iOS 两个调用点共用，避免两份文案漂移）。
+        var logText: String {
+            "（修复=\(repaired) 清理=\(cleaned) 跳过=\(skipped)"
+                + " 补发=\(emitted) 缺指纹=\(emittedWithoutIdentity)"
+                + " 本地悬空=\(skippedLocalDangling)）"
+        }
     }
 
     /// 参与修复的实体：引用歌曲、且对端靠稳定身份键定位的那几类。
@@ -453,9 +474,22 @@ struct SyncChangeLogDanglingRepair {
         try database.write { db in try Self.run(db) }
     }
 
-    /// 事务内版本（测试可直接在内存库事务里调用）。
+    /// 事务内版本（测试可直接在内存库事务里调用）：**先修悬空引用，再补发本地真值**。
+    /// 两步顺序有讲究——先清/改掉废行，补发阶段再判「outbox 里有没有这一条」，
+    /// 否则刚被清掉的键会被误判成「已存在」。两步都在同一写事务内，幂等可重入。
     @discardableResult
     static func run(_ db: Database) throws -> Report {
+        var report = try repairDanglingRows(db)
+        let reconcile = try reconcileLocalTruth(db)
+        report.emitted = reconcile.emitted
+        report.emittedWithoutIdentity = reconcile.emittedWithoutIdentity
+        report.skippedLocalDangling = reconcile.skippedLocalDangling
+        return report
+    }
+
+    /// 第一步：出站**悬空引用**修复（只动 `sync_outbox`）。
+    @discardableResult
+    static func repairDanglingRows(_ db: Database) throws -> Report {
         var report = Report()
         let entityValues = repairableEntities.map(\.rawValue)
         let rows = try SyncChangeLogRow
@@ -528,5 +562,149 @@ struct SyncChangeLogDanglingRepair {
             if try !isDangling(db, stableId: candidate) { return candidate }
         }
         return nil
+    }
+
+    // MARK: - 第二步：本地真值 → outbox 对账补发（T15b-2，2026-09-14）
+
+    /// 参与补发的实体：本地载体是 DB 行、且对端按歌曲身份键定位的那几类。
+    /// （`playlist` 结构行不引用歌曲；`playback_position` 本地载体不是 DB 行。）
+    static let reconcilableEntities: [SyncChangeEntity] = [.favorite, .playHistory, .playlistItem]
+
+    /// 把本端业务表里**现有**的真值，补进 `sync_outbox`（缺对应 upsert 行时才补）。
+    ///
+    /// 为什么需要它（2026-09-14 真机事故）：收藏 / 歌单成员 / 播放历史的 outbox 行可能
+    /// **根本不存在**——① 在 outbox 机制建立之前产生的业务行；② 引用失效后被
+    /// `repairDanglingRows` 清理掉的行（favorite / playlist_item 没有可靠对账键，只能清）。
+    /// 两种情况下业务行都还在（用户看得见），同步层却永远看不到它 ⇒ 收藏「从来没同步过」
+    /// 且零报错（面板不报、日志不报）。补发把本地现状重新变成一条可发送的变更。
+    ///
+    /// 判定口径（与发送侧同一事实源、与写入侧同一行键形态）：
+    /// - 已有同实体同键的 `upsert` 行 → 不动。**delete 行不算**：v2 删除不上线、只做
+    ///   批次抑制，所以「有 delete」不等于「这个事实已经进过 outbox」。
+    /// - 引用歌在 `track` 表查无（本地悬空）→ **不补发**、计数 `skippedLocalDangling`
+    ///   （补了也拿不到身份键，只会给对端添「未定位」噪音）。
+    /// - 引用歌在表里但 `content_hash` 空（缺指纹）→ 照发，计数 `emittedWithoutIdentity`
+    ///   （对端面板按「未定位」披露，不静默）。
+    static func reconcileLocalTruth(_ db: Database) throws -> Report {
+        var report = Report()
+        var existing: [String: Set<String>] = [:]
+        for entity in reconcilableEntities {
+            let keys = try String.fetchAll(
+                db,
+                sql: "SELECT row_key FROM sync_outbox WHERE entity = ? AND op = ?",
+                arguments: [entity.rawValue, SyncChangeOp.upsert.rawValue]
+            )
+            existing[entity.rawValue] = Set(keys)
+        }
+        var seen = Set<String>()
+
+        /// 三类实体的统一收口：去重 → 「已有 upsert 就跳过」→ 身份判定 → 补发 + 计数。
+        /// 收在一处，避免三条分支各写一份判定而漂移。
+        func emit(entity: SyncChangeEntity, stableId: String, payloadJSON: String) throws {
+            guard let key = Self.rowKey(entity: entity, stableId: stableId, payloadJSON: payloadJSON),
+                  !key.isEmpty else { return }
+            let dedupe = "\(entity.rawValue)|\(key)"
+            guard seen.insert(dedupe).inserted else { return }
+            guard existing[entity.rawValue]?.contains(key) != true else { return }
+            let identity = try SyncContentHashResolver.trackIdentity(db, forTrackStableId: stableId)
+            if case .noTrackRow = identity {
+                report.skippedLocalDangling += 1
+                return
+            }
+            try SyncChangeLogStore.record(
+                db,
+                entity: entity,
+                rowKey: key,
+                op: .upsert,
+                payloadJSON: payloadJSON
+            )
+            report.emitted += 1
+            if case .emptyContentHash = identity { report.emittedWithoutIdentity += 1 }
+        }
+
+        // 收藏（row_key = track_stable_id）
+        let favoriteIds = try String.fetchAll(
+            db,
+            sql: "SELECT track_stable_id FROM favorite ORDER BY track_stable_id"
+        )
+        for stableId in favoriteIds where !stableId.isEmpty {
+            let snapshot = SyncFavoriteSnapshot(trackStableId: stableId)
+            try emit(
+                entity: .favorite,
+                stableId: stableId,
+                payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+            )
+        }
+
+        // 歌单成员（row_key = slug|track_stable_id）。folder-synced 歌单内容由本地扫描
+        // 派生（folder_path 是设备本地路径），不入跨端同步——与写入侧同一口径。
+        let items = try Row.fetchAll(db, sql: """
+        SELECT p.slug AS slug, pi.position AS position, pi.track_stable_id AS stable_id
+        FROM playlist_item pi
+        JOIN playlist p ON p.id = pi.playlist_id
+        WHERE p.is_folder_synced = 0
+        ORDER BY p.slug, pi.position
+        """)
+        for item in items {
+            let slug: String = item["slug"]
+            let stableId: String = item["stable_id"]
+            let position: Int = item["position"]
+            guard !slug.isEmpty, !stableId.isEmpty else { continue }
+            let snapshot = SyncPlaylistItemSnapshot(
+                playlistSlug: slug,
+                position: position,
+                trackStableId: stableId
+            )
+            try emit(
+                entity: .playlistItem,
+                stableId: stableId,
+                payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+            )
+        }
+
+        // 播放历史（row_key = stableId|played_at）
+        let history = try Row.fetchAll(db, sql: """
+        SELECT track_stable_id AS stable_id, played_at AS played_at, play_duration_ms AS duration
+        FROM play_history ORDER BY id
+        """)
+        for entry in history {
+            let stableId: String = entry["stable_id"]
+            guard !stableId.isEmpty else { continue }
+            let playedAt: Int64 = entry["played_at"]
+            let duration: Int64 = (entry["duration"] as Int64?) ?? 0
+            let snapshot = SyncPlayHistorySnapshot(
+                trackStableId: stableId,
+                playedAt: playedAt,
+                playDurationMs: duration
+            )
+            try emit(
+                entity: .playHistory,
+                stableId: stableId,
+                payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+            )
+        }
+        return report
+    }
+
+    /// 补发行键：与写入侧 `SyncChangeLogStore.record` 的形态逐字对齐
+    /// （favorite = stableId；play_history = stableId|playedAt；playlist_item = slug|stableId）。
+    /// 从 payload 快照派生，避免三条分支各拼一次字符串。
+    private static func rowKey(entity: SyncChangeEntity, stableId: String, payloadJSON: String) -> String? {
+        switch entity {
+        case .favorite:
+            return SyncFavoriteSnapshot(trackStableId: stableId).rowKey
+        case .playHistory:
+            guard let snapshot = try? SyncSnapshotCodec.decode(SyncPlayHistorySnapshot.self, from: payloadJSON) else {
+                return nil
+            }
+            return snapshot.rowKey
+        case .playlistItem:
+            guard let snapshot = try? SyncSnapshotCodec.decode(SyncPlaylistItemSnapshot.self, from: payloadJSON) else {
+                return nil
+            }
+            return snapshot.rowKey
+        case .playlist, .playbackPosition:
+            return nil
+        }
     }
 }

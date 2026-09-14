@@ -146,6 +146,19 @@ final class MacSyncDataViewModel: ObservableObject {
         report = SyncDataSyncReport()
         errorMessage = nil
 
+        // T15b-2（2026-09-14）：发送前先把「本地真值」对账进 outbox（业务表有、outbox
+        // 没有 upsert 的收藏 / 歌单成员 / 播放历史）。收藏在补发通道之前是**只出不进**：
+        // 引用失效的 outbox 行被清掉后业务行还在（用户看得见），同步层却永远看不到它
+        // ⇒「收藏从来没同步过」且零报错。失败只打日志，**不阻断**本轮同步。
+        do {
+            let reconcile = try repairDangling()
+            if reconcile.didChange {
+                print("ℹ️ MacSyncDataViewModel: 同步前对账本地真值" + reconcile.logText)
+            }
+        } catch {
+            print("⚠️ MacSyncDataViewModel: 同步前对账失败 \(error)")
+        }
+
         let coordinator = makeCoordinator(session)
         coordinator.onStateChange = { [weak self] _ in
             Task { @MainActor in self?.refreshFromCoordinator(coordinator) }
@@ -186,10 +199,7 @@ final class MacSyncDataViewModel: ObservableObject {
             do {
                 let repair = try repairDangling()
                 if repair.didChange {
-                    print(
-                        "ℹ️ MacSyncDataViewModel: 重置前对账出站悬空引用"
-                            + "（修复=\(repair.repaired) 清理=\(repair.cleaned) 跳过=\(repair.skipped)）"
-                    )
+                    print("ℹ️ MacSyncDataViewModel: 重置前对账出站悬空引用与本地真值" + repair.logText)
                 }
             } catch {
                 print("⚠️ MacSyncDataViewModel: 出站悬空引用对账失败 \(error)")
