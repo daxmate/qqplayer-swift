@@ -543,6 +543,20 @@
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 本地缺歌挂起（行数=\(count)，待歌到位重放）")
             }
+            // 身份缺口披露（2026-09-14）：引用歌曲但拿不到指纹的行两端都跳/标，
+            // 只记计数（不打印曲目内容）。
+            peer.onPushUnresolved = { count in
+                guard count > 0 else { return }
+                print("⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(count)，缺身份键）")
+            }
+            peer.onPullMissingIdentity = { count in
+                guard count > 0 else { return }
+                print("⚠️ SyncChangeLogPeer: 应答拉取时有 \(count) 行缺身份键（对端定位不了）")
+            }
+            peer.onIncrementMissingIdentity = { count in
+                guard count > 0 else { return }
+                print("⚠️ SyncChangeLogPeer: 推送增量时有 \(count) 行缺身份键（对端定位不了）")
+            }
             peer.onPushIgnoredDeletes = { count in
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 忽略远端删除（行数=\(count)，删除不跨端传播）")

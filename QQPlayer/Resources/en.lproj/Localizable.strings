@@ -964,13 +964,25 @@
 "sync_run_data_result_applied" = "Applied";
 "sync_run_data_result_pending" = "Pending";
 "sync_run_data_result_skipped" = "Deletions skipped";
+"sync_run_data_result_unresolved" = "Unresolved";
+"sync_run_data_result_missing_identity" = "Missing fingerprint";
 "sync_run_data_pending_hint" = "%d entries are waiting for songs this Mac doesn't have yet.";
+"sync_run_data_unresolved_hint" = "%d entries couldn't be matched to a song on this Mac, so they were not applied.";
+"sync_run_data_missing_identity_hint" = "%d entries were sent without a song fingerprint, so the other device can't match them.";
 "sync_run_data_result_none" = "No data sync has run yet.";
 "sync_run_data_cancelled" = "Data sync cancelled.";
 "sync_run_data_disconnected" = "The device disconnected, so the data sync stopped.";
 "sync_run_data_reason_not_connected" = "Connect your iPhone first (Settings → Sync).";
 "sync_run_data_reason_already_running" = "A data sync is already running.";
+"sync_run_data_reset_button" = "Re-sync from scratch (reset cursors)";
+"sync_run_data_reset_help" = "Reset how far playback data has synced with this device, so the next run starts over";
+"sync_run_data_reset_confirm_title" = "Re-sync from scratch?";
+"sync_run_data_reset_confirm_message" = "Resets the sync position with this device. The next Sync Data will fetch all playback data again.";
+"sync_run_data_reset_confirm_action" = "Reset and re-sync";
+"sync_run_data_reset_done" = "Sync position reset. Run Sync Data again to fetch everything.";
+"sync_run_data_reset_failed" = "Couldn't reset the sync position. Please try again.";
 "sync_run_data_footer" = "Merging never deletes favorites, play history or playlists on either device.";
+"sync_run_data_identity_footer" = "If the two devices fingerprint songs differently, songs can't be matched and those entries aren't applied. Make sure both devices run the latest version; if they still don't match, use Re-sync from scratch.";
 
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "Sync Direction";

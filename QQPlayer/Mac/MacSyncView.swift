@@ -41,6 +41,8 @@ struct MacSyncRunSection: View {
 
     /// 全曲库二次确认（Q4 决策：全库必须确认）。
     @State private var showLibraryWideConfirm = false
+    /// 「重新对账」二次确认（身份缺口包：重置两端游标 = 重新拉一遍，不可无声执行）。
+    @State private var showResetCursorsConfirm = false
     /// 二次确认文案里的规模（弹框时现算）。
     @State private var libraryWidePreview: SyncUISelectionSummary = .empty
     /// 失败清单展开态。
@@ -93,6 +95,18 @@ struct MacSyncRunSection: View {
                     libraryWidePreview.trackCount
                 )
             )
+        }
+        .confirmationDialog(
+            "sync_run_data_reset_confirm_title".localized,
+            isPresented: $showResetCursorsConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("sync_run_data_reset_confirm_action".localized) {
+                dataModel.resetCursorsForPeer()
+            }
+            Button(Localized.cancel, role: .cancel) {}
+        } message: {
+            Text("sync_run_data_reset_confirm_message".localized)
         }
         .alert(
             "sync_load_failed_title".localized,
@@ -898,6 +912,14 @@ struct MacSyncRunSection: View {
                     }
                     .disabled(!dataModel.canStart)
                     .help("sync_run_data_help".localized)
+
+                    // 次要动作：重置与该对端的推/拉游标（身份修复后必须能重拉，否则已被
+                    // 游标越过的行永不重来）。二次确认后执行，与主按钮同步进行态无关。
+                    Button("sync_run_data_reset_button".localized) {
+                        showResetCursorsConfirm = true
+                    }
+                    .disabled(!dataModel.canResetCursors)
+                    .help("sync_run_data_reset_help".localized)
                 }
 
                 if let phaseText = dataPhaseText {
@@ -927,10 +949,20 @@ struct MacSyncRunSection: View {
             }
 
             dataResult
+
+            if let resetMessage = dataModel.resetResultMessage {
+                Text(resetMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } header: {
             Text("sync_run_data_section".localized)
         } footer: {
-            Text("sync_run_data_footer".localized)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("sync_run_data_footer".localized)
+                Text("sync_run_data_identity_footer".localized)
+            }
         }
     }
 
@@ -943,18 +975,29 @@ struct MacSyncRunSection: View {
         }
     }
 
-    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 忽略删除 + 挂起解释。
+    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 缺指纹（本端发出）/ 忽略删除
+    /// + 各自解释。
     @ViewBuilder
     private var dataResult: some View {
         let report = dataModel.report
         if dataModel.phase == .finished {
-            HStack(alignment: .top, spacing: 24) {
+            HStack(alignment: .top, spacing: 20) {
                 metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
                 metric("sync_run_data_result_applied".localized, report.appliedEntries, .primary)
                 metric(
                     "sync_run_data_result_pending".localized,
                     report.suspendedEntries,
                     report.suspendedEntries > 0 ? .orange : .secondary
+                )
+                metric(
+                    "sync_run_data_result_unresolved".localized,
+                    report.unresolvedEntries,
+                    report.unresolvedEntries > 0 ? .orange : .secondary
+                )
+                metric(
+                    "sync_run_data_result_missing_identity".localized,
+                    report.pushedMissingIdentityEntries,
+                    report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
                 )
                 metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
                 Spacer()
@@ -966,6 +1009,23 @@ struct MacSyncRunSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.unresolvedEntries > 0 {
+                Text("sync_run_data_unresolved_hint".localized(with: report.unresolvedEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.pushedMissingIdentityEntries > 0 {
+                Text(
+                    "sync_run_data_missing_identity_hint"
+                        .localized(with: report.pushedMissingIdentityEntries)
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         } else if !dataModel.isRunning {
             Text("sync_run_data_result_none".localized)

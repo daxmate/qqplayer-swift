@@ -131,6 +131,21 @@ final class SyncChangeLogStore: @unchecked Sendable {
         try SyncPeerPushCursor(peerID: peerID, lastOutboxID: lastOutboxID).upsert(db)
     }
 
+    // MARK: - 重置游标（「重新对账」）
+
+    /// 把该 peer 的**两个**游标都清零：拉取游标（sync_cursor）+ 推送游标（sync_push_cursor）。
+    ///
+    /// 为什么需要：游标一旦越过某行就永不回头（见 `page` 的口径）——身份键修复后，
+    /// 之前因缺指纹被跳过的行不会自己重来，必须能把位置退回去重拉 / 重推。
+    /// 两个方向一起清：只退一边会得到「本端重发了一遍但对方不会再回推」的半途状态。
+    /// 幂等（无记录 = 0）；不动任何业务行 / outbox 行。
+    func resetCursors(forPeer peerID: String) throws {
+        try database.write { db in
+            try self.setCursor(db, forPeer: peerID, lastOutboxID: 0)
+            try self.setPushCursor(db, forPeer: peerID, lastOutboxID: 0)
+        }
+    }
+
     // MARK: - 增量拉取
 
     /// 取本端 outbox 中 id > cursor 的增量（升序，limit 分页上限）。

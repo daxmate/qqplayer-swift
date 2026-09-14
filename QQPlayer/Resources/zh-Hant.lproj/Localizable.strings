@@ -1313,13 +1313,25 @@
 "sync_run_data_result_applied" = "套用";
 "sync_run_data_result_pending" = "等待中";
 "sync_run_data_result_skipped" = "略過刪除";
+"sync_run_data_result_unresolved" = "未定位";
+"sync_run_data_result_missing_identity" = "缺指紋";
 "sync_run_data_pending_hint" = "有 %d 筆變更在等本機缺少的歌曲，歌曲到位後會自動生效。";
+"sync_run_data_unresolved_hint" = "有 %d 筆變更在本機找不到對應歌曲，沒有套用。";
+"sync_run_data_missing_identity_hint" = "有 %d 筆變更沒有帶歌曲指紋，對端無法定位。";
 "sync_run_data_result_none" = "還沒有同步過播放資料。";
 "sync_run_data_cancelled" = "資料同步已取消。";
 "sync_run_data_disconnected" = "裝置已中斷連線，資料同步已停止。";
 "sync_run_data_reason_not_connected" = "請先連接 iPhone（設定 → 同步）。";
 "sync_run_data_reason_already_running" = "正在同步資料，請稍候。";
+"sync_run_data_reset_button" = "重新對帳（重置游標）";
+"sync_run_data_reset_help" = "重置與本機的同步進度，下次「同步資料」從頭重新對齊";
+"sync_run_data_reset_confirm_title" = "確定要重新對帳？";
+"sync_run_data_reset_confirm_message" = "將重置與這台裝置的同步進度，下次「同步資料」會重新拉取全部播放資料。";
+"sync_run_data_reset_confirm_action" = "重置並重新對帳";
+"sync_run_data_reset_done" = "同步進度已重置，請再點一次「同步資料」。";
+"sync_run_data_reset_failed" = "重置同步進度失敗，請重試。";
 "sync_run_data_footer" = "合併不會刪除任何一端的收藏、播放紀錄或播放列表。";
+"sync_run_data_identity_footer" = "兩端歌曲指紋不一致時無法定位歌曲，這些變更不會套用。請確認兩端都是最新版本；若仍有問題，可點「重新對帳」。";
 
 // T10（2026-09-12）方向優先 · 內容來源隨方向切換
 "sync_run_direction_section" = "同步方向";

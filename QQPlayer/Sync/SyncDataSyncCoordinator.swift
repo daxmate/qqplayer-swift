@@ -28,9 +28,14 @@
 //       超时未收到应答 → finished + `failureMessage`（不静默挂死）。
 //
 //  ⚠️ 拉取方向的应收数 = 帧 9 到达（本端 peer 的 onPushApplied / onPushSuspended /
-//  onPushIgnoredDeletes 三者**累加**回填账目）。三个回调**任一**到达即视为「对端已应答」——
-//  `handlePush` 内三者总是同步顺序触发，不在其中挑一个「最后一个」当判据（那会把
-//  正确性押在别人代码的调用顺序上）；账目后续帧继续累加，收尾后仍可能被迟到帧回填。
+//  onPushIgnoredDeletes / onPushUnresolved 四者**累加**回填账目）。四个回调**任一**到达即视为
+//  「对端已应答」——`handlePush` 内四者总是同步顺序触发，不在其中挑一个「最后一个」当判据
+//  （那会把正确性押在别人代码的调用顺序上）；账目后续帧继续累加，收尾后仍可能被迟到帧回填。
+//
+//  ⚠️ 两个**本端发送侧**回调（onIncrementMissingIdentity / onPullMissingIdentity）只累加
+//  账目（pushedMissingIdentityEntries），**绝不触发收尾**：前者在 `start()` 的推送阶段同步
+//  触发（此时还没发帧 8，收尾会把拉取路径切断）；后者由**入站**帧 8 触发，与「对端应答了
+//  本端的拉取」无关。
 //
 //  ⚠️ 必须先持有 peer 再发帧：`SyncChangeLogPeer` 以 `[weak self]` 挂接会话回调，
 //  不持有则永不应答（同 `SyncPlaybackCarryPeer` 的既有教训）；同时它的回调必须在
@@ -63,6 +68,12 @@ struct SyncDataSyncReport: Equatable, Sendable {
     var appliedEntries: Int = 0
     /// 对端推来的行里因本地缺歌而挂起的行数（歌到位后重放，不丢数据）
     var suspendedEntries: Int = 0
+    /// 拉取方向：对端推来的行里因**缺身份键**（contentHash nil/空）而**未落库**的行数
+    /// （无法定位到本地歌曲 → 落库也永远不可见；见 `SyncEntryLocalization.unresolved`）
+    var unresolvedEntries: Int = 0
+    /// 推送方向：本端发出去的行里缺身份键的条数（对端定位不了它们；含主动推增量
+    /// 与应答对方拉取两个方向）
+    var pushedMissingIdentityEntries: Int = 0
     /// 对端推来的行里被忽略的 delete 行数（删除不跨端传播）
     var ignoredDeletes: Int = 0
     /// 失败原因（nil = 未失败；「缺 peerID / 推失败 / 发拉取失败 / 对端无应答」/ cancelled）
@@ -169,7 +180,12 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         // 先装回调再发帧：内存回环下应答会在 sendPull 内同步回来。
         peer.onPushApplied = { [weak self] count in self?.recordApplied(count) }
         peer.onPushSuspended = { [weak self] count in self?.recordSuspended(count) }
+        peer.onPushUnresolved = { [weak self] count in self?.recordUnresolved(count) }
         peer.onPushIgnoredDeletes = { [weak self] count in self?.recordIgnoredDeletes(count) }
+        // 发送侧缺身份键：只累加账目，**不收尾**（见文件头：推送阶段触发 / 入站帧触发，
+        // 两者都不是「对端应答了本端拉取」）。
+        peer.onIncrementMissingIdentity = { [weak self] count in self?.recordPushedMissingIdentity(count) }
+        peer.onPullMissingIdentity = { [weak self] count in self?.recordPushedMissingIdentity(count) }
         stage = .pushing
         peerValue = peer
         lock.unlock()
@@ -224,6 +240,21 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         reportValue.suspendedEntries += count
         lock.unlock()
         finish(failure: nil)
+    }
+
+    /// 拉取方向：对端推来的行里因缺身份键未落库的行数（与其它三个「应答已到」回调用同一收尾语义）。
+    private func recordUnresolved(_ count: Int) {
+        lock.lock()
+        reportValue.unresolvedEntries += count
+        lock.unlock()
+        finish(failure: nil)
+    }
+
+    /// 发送方向：本端发出去但缺身份键的行数。**只累加，不收尾**——这不是「对端应答」。
+    private func recordPushedMissingIdentity(_ count: Int) {
+        lock.lock()
+        reportValue.pushedMissingIdentityEntries += count
+        lock.unlock()
     }
 
     private func recordIgnoredDeletes(_ count: Int) {

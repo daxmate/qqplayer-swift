@@ -21,6 +21,11 @@
 //  迟到帧回填（见 `SyncDataSyncCoordinator` 文件头）→ 终态时先立刻读一次，
 //  再延迟读一次覆盖（只在本视图模型仍持有该协调器、且它仍在终态时生效）。
 //
+//  「重新对账」（2026-09-14 身份缺口包）：把与该对端的推/拉游标清零 → 下次「同步
+//  数据」重新全量对齐。游标一旦越过某行就永不回头，所以身份键修复后必须能把位置
+//  退回去，否则那些行永远不再同步（参见 `SyncChangeLogStore.resetCursors`）。
+//  本类只做 IO + 二次确认后的调用，按钮/弹框在 `MacSyncView`。
+//
 //  为什么不做单测：本文件属 `QQPlayer/Mac/`（iOS 单测 target 看不到它，仓库也没有
 //  macOS 单测 target）→ 靠编译 + 代码审查覆盖；其中可测的判定全在共享 Core
 //  （`SyncDataSyncCoordinator` / `SyncChangeLogStore` 等，`QQPlayerTests` 真跑）。
@@ -38,6 +43,8 @@ final class MacSyncDataViewModel: ObservableObject {
 
     private let hostCenter: SyncHostCenter
     private let makeCoordinator: (SyncPeerSession) -> SyncDataSyncCoordinator
+    /// 「重新对账」的落点（默认 = 生产 store，走 `.shared`；测试/预览可注入）。
+    private let resetCursors: (String) throws -> Void
 
     // MARK: 发布状态
 
@@ -50,6 +57,8 @@ final class MacSyncDataViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     /// 运行中会话断开（文案优先于 `cancelled`）。
     @Published private(set) var didDisconnectWhileRunning = false
+    /// 「重新对账」结果提示（nil = 本次没有可说的；成功 / 失败 / 未连接）。
+    @Published private(set) var resetResultMessage: String?
 
     // MARK: 内部状态
 
@@ -61,7 +70,8 @@ final class MacSyncDataViewModel: ObservableObject {
         hostCenter: SyncHostCenter? = nil,
         makeCoordinator: @escaping (SyncPeerSession) -> SyncDataSyncCoordinator = {
             SyncDataSyncCoordinator(session: $0)
-        }
+        },
+        resetCursors: ((String) throws -> Void)? = nil
     ) {
         // 默认值是 `nil` 而不是 `.shared`：默认实参在**非隔离**上下文求值，
         // 直接写 `= .shared` 会报「main actor-isolated property 跨隔离引用」
@@ -69,6 +79,9 @@ final class MacSyncDataViewModel: ObservableObject {
         let center = hostCenter ?? .shared
         self.hostCenter = center
         self.makeCoordinator = makeCoordinator
+        self.resetCursors = resetCursors ?? { peerID in
+            try SyncChangeLogStore().resetCursors(forPeer: peerID)
+        }
         // 监听中心变化（连接 / 断开）→ 主线程刷新可用性与运行态。
         // objectWillChange 是**变更前**通知 → 用 Task 排到主线程队列尾，读到的就是新值。
         center.objectWillChange
@@ -116,7 +129,6 @@ final class MacSyncDataViewModel: ObservableObject {
     func onDisappear() {
         stopReportRefresh()
     }
-
     // MARK: - 同步执行
 
     /// 跑一次「同步数据」（未连接 / 已在跑 = no-op）。
@@ -142,6 +154,32 @@ final class MacSyncDataViewModel: ObservableObject {
         guard let coordinator else { return }
         coordinator.cancel()
         refreshFromCoordinator(coordinator)
+    }
+
+    // MARK: - 重新对账（重置游标）
+
+    /// 是否可用「重新对账」（已连接且拿得到对端 Device ID 才谈得上重置谁）。
+    var canResetCursors: Bool {
+        guard let peerID = hostCenter.connectedPeer?.peerID else { return false }
+        return !peerID.isEmpty
+    }
+
+    /// 把与该对端的推/拉游标清零（UI 二次确认后调用）：身份修复后必须能重拉，
+    /// 否则已被游标越过的行永不重来。同步进行中也可以重置（下一轮生效）。
+    func resetCursorsForPeer() {
+        guard let peerID = hostCenter.connectedPeer?.peerID, !peerID.isEmpty else {
+            // 复用「未连接」既有 key（不造重复 key）
+            resetResultMessage = "sync_run_data_reason_not_connected".localized
+            return
+        }
+        do {
+            try resetCursors(peerID)
+            resetResultMessage = "sync_run_data_reset_done".localized
+            print("ℹ️ MacSyncDataViewModel: 已重置与对端的同步游标（peerID 已脱敏）")
+        } catch {
+            print("❌ MacSyncDataViewModel: 重置同步游标失败 \(error)")
+            resetResultMessage = "sync_run_data_reset_failed".localized
+        }
     }
 
     // MARK: - 内部
