@@ -45,6 +45,9 @@ final class MacSyncDataViewModel: ObservableObject {
     private let makeCoordinator: (SyncPeerSession) -> SyncDataSyncCoordinator
     /// 「重新对账」的落点（默认 = 生产 store，走 `.shared`；测试/预览可注入）。
     private let resetCursors: (String) throws -> Void
+    /// 出站悬空引用对账（T15b）：重置游标**之前**先跑一次（默认 = 生产 `SyncChangeLogDanglingRepair`；
+    /// 测试/预览可注入）。
+    private let repairDangling: () throws -> SyncChangeLogDanglingRepair.Report
 
     // MARK: 发布状态
 
@@ -71,7 +74,8 @@ final class MacSyncDataViewModel: ObservableObject {
         makeCoordinator: @escaping (SyncPeerSession) -> SyncDataSyncCoordinator = {
             SyncDataSyncCoordinator(session: $0)
         },
-        resetCursors: ((String) throws -> Void)? = nil
+        resetCursors: ((String) throws -> Void)? = nil,
+        repairDangling: (() throws -> SyncChangeLogDanglingRepair.Report)? = nil
     ) {
         // 默认值是 `nil` 而不是 `.shared`：默认实参在**非隔离**上下文求值，
         // 直接写 `= .shared` 会报「main actor-isolated property 跨隔离引用」
@@ -81,6 +85,9 @@ final class MacSyncDataViewModel: ObservableObject {
         self.makeCoordinator = makeCoordinator
         self.resetCursors = resetCursors ?? { peerID in
             try SyncChangeLogStore().resetCursors(forPeer: peerID)
+        }
+        self.repairDangling = repairDangling ?? {
+            try SyncChangeLogDanglingRepair().run()
         }
         // 监听中心变化（连接 / 断开）→ 主线程刷新可用性与运行态。
         // objectWillChange 是**变更前**通知 → 用 Task 排到主线程队列尾，读到的就是新值。
@@ -173,6 +180,20 @@ final class MacSyncDataViewModel: ObservableObject {
             return
         }
         do {
+            // T15b（2026-09-14）：先对账 outbox 的出站悬空引用（引用 stableId 在 track 表查无行）。
+            // 不先修的话「重新对账」只是把同一批废行再推一遍——那些行永远拿不到指纹，
+            // 对端仍全部「未定位」。修复失败只打日志，**不阻断**游标重置（两件事互不依赖）。
+            do {
+                let repair = try repairDangling()
+                if repair.didChange {
+                    print(
+                        "ℹ️ MacSyncDataViewModel: 重置前对账出站悬空引用"
+                            + "（修复=\(repair.repaired) 清理=\(repair.cleaned) 跳过=\(repair.skipped)）"
+                    )
+                }
+            } catch {
+                print("⚠️ MacSyncDataViewModel: 出站悬空引用对账失败 \(error)")
+            }
             try resetCursors(peerID)
             resetResultMessage = "sync_run_data_reset_done".localized
             print("ℹ️ MacSyncDataViewModel: 已重置与对端的同步游标（peerID 已脱敏）")

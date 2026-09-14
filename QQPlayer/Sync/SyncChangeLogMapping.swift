@@ -34,6 +34,12 @@
 //    「缺身份键」明细，区分「本地没有该 track 行」与「有行但指纹为空」两种成因，
 //    供会话层面板披露（见 SyncChangeLogPeer 的回调 / SyncDataSyncReport）。
 //
+//  T15b（2026-09-14）：本文件末尾新增 `SyncChangeLogDanglingRepair`（本端 outbox
+//  **出站悬空引用**的对账修复）。为什么放本文件：它的两个关键判定都直接复用本文件的单一
+//  事实源（`SyncContentHashResolver.trackIdentity` 判悬空、`SyncChangeLogMapper.rewrite`
+//  改写引用），且新开文件需改 pbxproj 目标成员名单（本包禁止）——修复入口与它所镜像的
+//  「接收侧本地化」放在一起，行为对照最直观。
+//
 //  本文件只做只读查询 + 纯变换，无写副作用；挂起/重放见
 //  SyncChangeLogPendingStore.swift。
 //
@@ -395,5 +401,132 @@ struct SyncChangeLogMapper {
         }
         snapshot.trackStableId = localStableId
         return (try? SyncSnapshotCodec.encode(snapshot)) ?? payloadJSON
+    }
+}
+
+// MARK: - T15b 出站悬空引用对账修复
+
+/// 本端 `sync_outbox` **出站悬空引用**的对账修复入口。
+///
+/// 事故：本端 outbox 里的行引用的 `stable_id` 在本端 `track` 表查无此歌——容器路径
+/// 变化后旧 stableId 失效，业务表被 `TrackIdentityMigration` 迁移过、**outbox 没有**。
+/// 每轮同步这些行都拿不到 `contentHash` → 对端全部判「未定位」跳过
+/// （`SyncEntryLocalization.unresolved`），一次都落不了库：白跑一批 + 面板永远橙。
+///
+/// 三态处理（**只动 `sync_outbox`**，绝不删/改任何业务行）：
+/// - `play_history`：按 **`played_at` 对账**（本地 `play_history` 表里找「同 `played_at`
+///   且 `track_stable_id` 在 track 表存在」的行）→ 命中就把 row_key 与 payload 的歌曲
+///   引用改写为**当前** stableId（复用 `SyncChangeLogMapper.rewrite`，与接收侧本地化
+///   同一变换）。这条路径能救回历史播放。
+/// - `favorite` / `playlist_item`（没有可靠对账键）与对不上账的 play_history →
+///   **不可修复**，从 `sync_outbox` 清理（否则每轮同步白跑、面板永远橙）。
+/// - 引用键解析不出的行 → 计数跳过（判断不了，宁可不碰）。
+///
+/// 幂等 + 可重入：整趟在**一个写事务**内完成（中途崩溃不留半成品）；跑第二遍零改动。
+/// 为什么清理而不是留着重试：这些行的引用键永久失效（重拉重推都拿不到指纹），
+/// 留着只消耗每轮批次数与面板噪音；业务表里的同名孤儿由用户决定，不在本入口范围。
+struct SyncChangeLogDanglingRepair {
+    /// 三态计数（修复 / 清理 / 跳过）。
+    struct Report: Equatable, Sendable {
+        /// 悬空引用被**改写**为当前可用 stableId 的行数（play_history 按 played_at 命中）。
+        var repaired = 0
+        /// 悬空引用**无法修复**、已从 `sync_outbox` 清理的行数。
+        var cleaned = 0
+        /// 悬空引用但本次**未动**的行数（引用键解析不出 → 无法判断，宁可不碰）。
+        var skipped = 0
+
+        var didChange: Bool { repaired > 0 || cleaned > 0 }
+    }
+
+    /// 参与修复的实体：引用歌曲、且对端靠稳定身份键定位的那几类。
+    /// （`playlist` 不引用歌曲；`playback_position` 的本地载体不是 DB 行，都不在范围。）
+    static let repairableEntities: [SyncChangeEntity] = [.favorite, .playHistory, .playlistItem]
+
+    let database: DatabaseManager
+
+    init(database: DatabaseManager = .shared) {
+        self.database = database
+    }
+
+    @discardableResult
+    func run() throws -> Report {
+        try database.write { db in try Self.run(db) }
+    }
+
+    /// 事务内版本（测试可直接在内存库事务里调用）。
+    @discardableResult
+    static func run(_ db: Database) throws -> Report {
+        var report = Report()
+        let entityValues = repairableEntities.map(\.rawValue)
+        let rows = try SyncChangeLogRow
+            .filter(entityValues.contains(Column("entity")))
+            .order(Column("id"))
+            .fetchAll(db)
+        for row in rows {
+            guard let entity = row.entityValue, repairableEntities.contains(entity) else { continue }
+            // 引用键解析不出（如 playlist_item 的 row_key 形态不符且 payload 缺失）→
+            // 判断不了是否悬空，宁可不碰。
+            guard let stableId = SyncTrackReference.trackStableId(
+                entity: entity,
+                rowKey: row.rowKey,
+                payloadJSON: row.payloadJSON
+            ), !stableId.isEmpty else {
+                report.skipped += 1
+                continue
+            }
+            // 引用在 track 表里有行（哪怕指纹为空 = 缺指纹，归 T13/T14）→ 不是悬空，不动。
+            guard try isDangling(db, stableId: stableId) else { continue }
+
+            if entity == .playHistory, let currentStableId = try currentPlayHistoryTrackStableId(db, row: row) {
+                let rewritten = SyncChangeLogMapper.rewrite(row, entity: .playHistory, localStableId: currentStableId)
+                guard rewritten != row else {
+                    // 改写后逐字没变（理论不可达：旧键无 track 行、新键有）→ 当不可修复处理，
+                    // 避免「计数说修了、实际没变」的假账。
+                    try row.delete(db)
+                    report.cleaned += 1
+                    continue
+                }
+                try rewritten.update(db)
+                report.repaired += 1
+            } else {
+                try row.delete(db)
+                report.cleaned += 1
+            }
+        }
+        return report
+    }
+
+    // MARK: - 判定
+
+    /// 该 stableId 是否**悬空**（本端 track 表查无此歌）。
+    /// 复用发送侧同一事实源：`.noTrackRow` = 悬空；`.emptyContentHash`（有行、指纹未回填）
+    /// 只是「缺指纹」，不在本入口范围（T13/T14 口径）。
+    private static func isDangling(_ db: Database, stableId: String) throws -> Bool {
+        if case .noTrackRow = try SyncContentHashResolver.trackIdentity(db, forTrackStableId: stableId) {
+            return true
+        }
+        return false
+    }
+
+    /// 按 `played_at` 对账：本地 `play_history` 表里「同 played_at 且 track_stable_id 在
+    /// track 表存在」的首行（id 升序 → 同一输入确定性）→ 当前 stableId；对不上 = nil。
+    ///
+    /// 为什么 played_at 能当对账键：播放历史是**事件**，容器路径变化后 stableId 会重新
+    /// 派生（TrackIdentityMigration），但事件的发生时间不变 → 用它把旧引用接回当前曲目。
+    private static func currentPlayHistoryTrackStableId(_ db: Database, row: SyncChangeLogRow) throws -> String? {
+        var playedAt = SyncChangeLogApplier.parseCompositeRowKey(row.rowKey)?.1
+        if playedAt == nil {
+            playedAt = (try? SyncSnapshotCodec.decode(SyncPlayHistorySnapshot.self, from: row.payloadJSON))?.playedAt
+        }
+        guard let playedAt else { return nil }
+        let candidates = try String.fetchAll(
+            db,
+            sql: "SELECT track_stable_id FROM play_history WHERE played_at = ? ORDER BY id",
+            arguments: [playedAt]
+        )
+        for candidate in candidates where !candidate.isEmpty {
+            if try !isDangling(db, stableId: candidate) { return candidate }
+        }
+        return nil
     }
 }

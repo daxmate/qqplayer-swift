@@ -570,6 +570,195 @@ struct SyncChangeLogContentMapTests {
         let stored = try queue.read { db in try SyncPendingChangeRow.fetchCount(db) }
         #expect(stored == 1)
     }
+
+    // MARK: - T15b 出站悬空引用对账修复
+
+    /// 修复前后业务表的逐字快照（「不误伤」断言用）：只比内容，不比自增 id。
+    private static func businessSnapshot(_ queue: DatabaseQueue) throws -> [String] {
+        try queue.read { db in
+            var out: [String] = []
+            for row in try PlayHistoryEntry.fetchAll(db) {
+                out.append("ph|\(row.trackStableId)|\(row.playedAt)|\(row.playDurationMs)")
+            }
+            for row in try Favorite.fetchAll(db) {
+                out.append("fav|\(row.trackStableId)")
+            }
+            for row in try PlaylistItem.fetchAll(db) {
+                out.append("pi|\(row.playlistId)|\(row.position)|\(row.trackStableId)")
+            }
+            return out.sorted()
+        }
+    }
+
+    @Test("T15b 悬空对账：play_history 按 played_at 命中 → outbox 引用改写，wire 不再缺身份键")
+    func danglingRepairRewritesPlayHistoryByPlayedAt() throws {
+        let (manager, queue) = try Self.makeManager()
+        let playedAt: Int64 = 1_700_000_000_000
+        try queue.write { db in
+            // 当前曲目（容器路径变化后重新派生的 stableId，有行有指纹）
+            try Self.insertTrack(db, stableId: "s-new", contentHash: "hash-new")
+            // 业务播放历史：事件时间不变、指向当前 stableId
+            try PlayHistoryEntry(trackStableId: "s-new", playedAt: playedAt, playDurationMs: 1000).insert(db)
+            // outbox 悬空行：引用已失效的旧 stableId（track 表查无此歌）
+            try SyncChangeLogStore.record(
+                db,
+                entity: .playHistory,
+                rowKey: "s-old|\(playedAt)",
+                op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlayHistorySnapshot(trackStableId: "s-old", playedAt: playedAt, playDurationMs: 1000)
+                ),
+                updatedAtMs: 2000
+            )
+        }
+
+        let repair = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(repair.repaired == 1)
+        #expect(repair.cleaned == 0)
+        #expect(repair.skipped == 0)
+
+        let rows = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(rows.count == 1)
+        #expect(rows[0].rowKey == "s-new|\(playedAt)")
+        let payload = try SyncSnapshotCodec.decode(SyncPlayHistorySnapshot.self, from: rows[0].payloadJSON)
+        #expect(payload.trackStableId == "s-new")
+
+        // 真的能被同步出去：修好后 wire 取数不再缺身份键（对端因此能定位并落库）
+        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        #expect(batch.missingIdentity.isEmpty)
+        #expect(batch.entries.map(\.contentHash) == ["hash-new"])
+    }
+
+    @Test("T15b 悬空对账：不可修复的悬空行（favorite / playlist_item / 对不上账的 play_history）→ 清理 + 计数")
+    func danglingRepairCleansUnrepairableRows() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-live", contentHash: "hash-live")
+            // 悬空 favorite：没有可靠对账键
+            try SyncChangeLogStore.record(
+                db, entity: .favorite, rowKey: "s-gone", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "s-gone")),
+                updatedAtMs: 1000
+            )
+            // 悬空 playlist_item：没有可靠对账键
+            try SyncChangeLogStore.record(
+                db, entity: .playlistItem, rowKey: "pl|s-gone", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlaylistItemSnapshot(playlistSlug: "pl", position: 0, trackStableId: "s-gone")
+                ),
+                updatedAtMs: 1000
+            )
+            // 悬空 play_history：本端 play_history 表里没有同 played_at 的行 → 对不上账
+            try SyncChangeLogStore.record(
+                db, entity: .playHistory, rowKey: "s-gone|123", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlayHistorySnapshot(trackStableId: "s-gone", playedAt: 123, playDurationMs: 0)
+                ),
+                updatedAtMs: 1000
+            )
+            // 引用有效的行（非悬空）：不参与修复，必须原样保留
+            try SyncChangeLogStore.record(
+                db, entity: .favorite, rowKey: "s-live", op: .upsert, payloadJSON: nil, updatedAtMs: 1000
+            )
+        }
+
+        let repair = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(repair.repaired == 0)
+        #expect(repair.cleaned == 3)
+        #expect(repair.skipped == 0)
+
+        let remaining = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(remaining.map(\.rowKey) == ["s-live"])
+    }
+
+    @Test("T15b 悬空对账：幂等——再跑一遍零改动、零计数，outbox 逐字不变")
+    func danglingRepairIsIdempotent() throws {
+        let (manager, queue) = try Self.makeManager()
+        let playedAt: Int64 = 1_700_000_000_001
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-cur", contentHash: "hash-cur")
+            try PlayHistoryEntry(trackStableId: "s-cur", playedAt: playedAt, playDurationMs: 500).insert(db)
+            try SyncChangeLogStore.record(
+                db, entity: .playHistory, rowKey: "s-dead|\(playedAt)", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlayHistorySnapshot(trackStableId: "s-dead", playedAt: playedAt, playDurationMs: 500)
+                ),
+                updatedAtMs: 3000
+            )
+            try SyncChangeLogStore.record(
+                db, entity: .favorite, rowKey: "s-dead", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "s-dead")),
+                updatedAtMs: 3000
+            )
+        }
+        let repair = SyncChangeLogDanglingRepair(database: manager)
+        let first = try repair.run()
+        #expect(first.repaired == 1)
+        #expect(first.cleaned == 1)
+        let afterFirst = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+
+        let second = try repair.run()
+        #expect(second == SyncChangeLogDanglingRepair.Report())
+        #expect(second.didChange == false)
+        let afterSecond = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(afterSecond == afterFirst)
+    }
+
+    @Test("T15b 悬空对账：不误伤——业务行（play_history / favorite / playlist_item）行数与内容逐字不变")
+    func danglingRepairLeavesBusinessRowsUntouched() throws {
+        let (manager, queue) = try Self.makeManager()
+        let playedAt: Int64 = 1_700_000_000_002
+        try queue.write { db in
+            try Self.insertTrack(db, stableId: "s-keep", contentHash: "hash-keep")
+            // 业务行：全部指向有效曲目（修复只该动 outbox，不碰这些）
+            try PlayHistoryEntry(trackStableId: "s-keep", playedAt: playedAt, playDurationMs: 700).insert(db)
+            try Favorite(trackStableId: "s-keep").insert(db)
+            try Playlist(
+                id: nil,
+                slug: "pl",
+                title: "PL",
+                createdAt: 1,
+                updatedAt: 1,
+                lastPlayedAt: 0,
+                folderPath: nil,
+                isFolderSynced: false,
+                lastFolderSync: nil,
+                customCoverImagePath: nil
+            ).insert(db)
+            let playlistID = try Playlist.filter(Column("slug") == "pl").fetchOne(db)?.id ?? 0
+            try PlaylistItem(playlistId: playlistID, position: 0, trackStableId: "s-keep").insert(db)
+            // 悬空 outbox 行（各实体一份）：只该清/改 outbox 侧
+            try SyncChangeLogStore.record(
+                db, entity: .favorite, rowKey: "s-dead", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "s-dead")),
+                updatedAtMs: 4000
+            )
+            try SyncChangeLogStore.record(
+                db, entity: .playlistItem, rowKey: "pl|s-dead", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlaylistItemSnapshot(playlistSlug: "pl", position: 1, trackStableId: "s-dead")
+                ),
+                updatedAtMs: 4000
+            )
+            try SyncChangeLogStore.record(
+                db, entity: .playHistory, rowKey: "s-dead|\(playedAt)", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlayHistorySnapshot(trackStableId: "s-dead", playedAt: playedAt, playDurationMs: 700)
+                ),
+                updatedAtMs: 4000
+            )
+        }
+        let before = try Self.businessSnapshot(queue)
+        #expect(before.count == 3)
+
+        let repair = try SyncChangeLogDanglingRepair(database: manager).run()
+        // 悬空 play_history 被 played_at 命中（与业务行同 played_at）→ 修复；另两条清理
+        #expect(repair.repaired == 1)
+        #expect(repair.cleaned == 2)
+
+        let after = try Self.businessSnapshot(queue)
+        #expect(after == before)
+    }
 }
 
 // MARK: - 测试辅助

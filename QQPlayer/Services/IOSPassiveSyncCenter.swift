@@ -526,6 +526,22 @@
                 print("⚠️ IOSPassiveSyncCenter: 会话无对端 Device ID，不装配数据同步端（避免空游标键写脏数据）")
                 return
             }
+            // T15b（2026-09-14）：装配数据同步端**之前**先对账本端 outbox 的出站悬空引用
+            // （引用 stableId 在 track 表查无行的行——容器路径变化后旧 id 失效，业务表被
+            // TrackIdentityMigration 迁移过、outbox 没有 → 每轮推送这些行都拿不到指纹，
+            // 对端全部判「未定位」跳过）。本方法一次会话只走一次（dataSyncPeer == nil 守卫），
+            // 正好在首次推送之前把 outbox 修好/清干净。失败只打日志，不影响装配主流程。
+            do {
+                let repair = try SyncChangeLogDanglingRepair(database: database).run()
+                if repair.didChange {
+                    print(
+                        "ℹ️ IOSPassiveSyncCenter: 出站悬空引用对账完成"
+                            + "（修复=\(repair.repaired) 清理=\(repair.cleaned) 跳过=\(repair.skipped)）"
+                    )
+                }
+            } catch {
+                print("⚠️ IOSPassiveSyncCenter: 出站悬空引用对账失败 \(error)")
+            }
             let peer = SyncChangeLogPeer(
                 session: session,
                 store: SyncChangeLogStore(database: database),

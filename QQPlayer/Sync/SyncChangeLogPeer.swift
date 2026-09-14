@@ -254,7 +254,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             var remoteRows: [SyncChangeLogRow] = []
             var suspended = 0
             var ignoredDeletes = 0
-            var unresolved = 0
+            var unresolved: [UnresolvedDetail] = []
             for entry in payload.entries {
                 // v2（§12b-7）：删除不传播——收到 delete 一律忽略，且必须在 localize
                 // 之前拦截（见文件头注释：否则会被误判为"本地缺歌"挂起）。
@@ -272,14 +272,16 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 case .unresolved(let reason, let remoteRow):
                     // 引用歌曲但没有可用身份键 → 定位不到本地歌曲：不落库（否则写出
                     // JOIN track 永不匹配的孤儿业务行）也不挂起（缺 content_hash 当键），
-                    // 只计数（面板据此披露「未定位」）。
-                    unresolved += 1
-                    print(
-                        "⚠️ SyncChangeLogPeer: 跳过未定位的远端行（\(reason.rawValue)：缺身份键）"
-                            + " entity=\(remoteRow.entity) rowKey=\(remoteRow.rowKey)"
-                    )
+                    // 只计数（面板据此披露「未定位」）+ 收明细供**按批**汇总日志。
+                    unresolved.append(UnresolvedDetail(
+                        entity: remoteRow.entity,
+                        rowKey: remoteRow.rowKey,
+                        reason: reason
+                    ))
                 }
             }
+            // 未定位按批汇总一行（T15b 降噪：原先逐行 print，一盘 110 行刷屏）。
+            Self.logUnresolved(unresolved)
             // 本地批：按 (entity, row_key) **一次取齐**本端该键最新行（对账代表本端事实）。
             // S4（2026-09-12 审计）：原先逐行调 `latestRow` 是 N+1（每行一次查询）；
             // 改为按 entity 分组的批量查询，键集合 = 远端批本地化后的键集合，口径不变。
@@ -305,7 +307,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
             onPushSuspended?(suspended)
-            onPushUnresolved?(unresolved)
+            onPushUnresolved?(unresolved.count)
             onPushIgnoredDeletes?(ignoredDeletes)
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
@@ -313,6 +315,35 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     }
 
     // MARK: 缺身份键诊断
+
+    /// 「未定位」明细一行（只用于按批汇总日志；隐私：只记实体/键，不打印曲目内容）。
+    private struct UnresolvedDetail {
+        var entity: String
+        var rowKey: String
+        var reason: SyncEntryUnresolvedReason
+    }
+
+    /// 「未定位」按**批**汇总一行：原因 + 实体 + 条数 + 最多 2 条样例 rowKey 前缀。
+    /// 原先逐行 print（一盘 110 行刷屏）——诊断价值保留（能看出是哪类实体/什么键），
+    /// 但一轮同步只占一行日志。
+    private static func logUnresolved(_ items: [UnresolvedDetail]) {
+        guard !items.isEmpty else { return }
+        let byReason = Dictionary(grouping: items, by: \.reason)
+            .map { "\($0.key.rawValue)=\($0.value.count)" }
+            .sorted()
+            .joined(separator: " ")
+        let byEntity = Dictionary(grouping: items, by: \.entity)
+            .map { "\($0.key)=\($0.value.count)" }
+            .sorted()
+            .joined(separator: " ")
+        let samples = items.prefix(2)
+            .map { "\($0.entity):\(String($0.rowKey.prefix(24)))" }
+            .joined(separator: " | ")
+        print(
+            "⚠️ SyncChangeLogPeer: 跳过未定位的远端行 共 \(items.count) 条"
+                + "（原因 \(byReason)；实体 \(byEntity)；样例 \(samples)）"
+        )
+    }
 
     /// 本批上线行里缺身份键的成因分解（只记实体无关的成因/条数，不打印曲目内容）。
     private static func logMissingIdentity(_ items: [SyncWireMissingIdentity]) {
