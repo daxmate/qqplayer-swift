@@ -1001,9 +1001,73 @@ struct SyncChangeLogContentMapTests {
         #expect(report == SyncChangeLogDanglingRepair.Report())
         #expect(try Self.outboxKeys(queue).isEmpty)
     }
-}
 
-// MARK: - 测试辅助
+    // MARK: - 矩阵守护（静态契约 + 行为，2026-09-15）
+    //
+    // 目的：把 `docs/sync-matrix.md` 的「实体 × 能力」矩阵变成**CI 能守的断言**——
+    // 新增实体 / 新消费点漏一层（没分类 / 没补发 / 没计数）时这里直接红，
+    // 而不是等真机“测到哪发现修到哪”。
+
+    @Test("矩阵契约：每个 `SyncChangeEntity` 都必须被显式分类（新增 case 必须做决定）")
+    func matrixContractEveryEntityIsClassified() throws {
+        // 声明表 = 本仓库当前事实（与 `v1Synced`、docs/sync-matrix.md §0 一致；改实体清单就要改这里）
+        let synced: Set<SyncChangeEntity> = [.favorite, .playHistory, .playlist, .playlistItem]
+        let gatedSynced: [SyncChangeEntity: String] = [
+            .playbackPosition: "跳端续播：默认关闭的独立开关门控（捕获/落点见 PlaybackPositionCapture 一套）",
+        ]
+
+        #expect(
+            Set(SyncChangeEntity.v1Synced) == synced,
+            "v1Synced 与矩阵声明表不一致：改实体清单要同时更新声明表与 docs/sync-matrix.md"
+        )
+        for entity in SyncChangeEntity.allCases {
+            let classified = synced.contains(entity) || gatedSynced[entity] != nil
+            #expect(
+                classified,
+                "\(entity.rawValue) 未分类：新实体必须显式声明「参与同步 / 开关门控同步 / 不同步+理由」"
+            )
+        }
+        #expect(
+            synced.union(gatedSynced.keys) == Set(SyncChangeEntity.allCases),
+            "分类必须覆盖全部 case（新增 case 漏分类时这里红）"
+        )
+    }
+
+    @Test("矩阵契约：补发要覆盖所有「本地载体是业务表」的同步实体")
+    func matrixContractReconcileCoversTableBackedEntities() throws {
+        // 事实：favorite / play_history / playlist / playlist_item 的本地载体都是 DB 行 →
+        // 必须能从业务表重建 outbox 行（否则 outbox 机制之前产生的行永不同步：2026-09-14 收藏事故）
+        let tableBacked: Set<SyncChangeEntity> = [.favorite, .playHistory, .playlist, .playlistItem]
+        #expect(
+            Set(SyncChangeLogDanglingRepair.reconcilableEntities) == tableBacked,
+            "补发清单与「表载体同步实体」不一致：新增表载体实体必须同时接进 reconcileLocalTruth"
+        )
+        // 载体不是 DB 行的实体不得进补发表（playback_position = UserDefaults 载体）
+        #expect(
+            SyncChangeLogDanglingRepair.reconcilableEntities.contains(.playbackPosition) == false,
+            "载体不是业务表的实体没有「从表重建」语义，不能挂在补发入口上"
+        )
+    }
+
+    @Test("矩阵契约：引用歌曲的同步实体缺身份键时逐条记账（不得静默丢）")
+    func matrixContractMissingIdentityIsCountedForEveryTrackScopedEntity() throws {
+        let (manager, _) = try Self.makeManager()
+        // 本端没有这些歌 → 发送侧必须逐条记「缺身份键」（对端会按「未定位」披露）
+        let rows: [SyncChangeLogRow] = [
+            SyncChangeLogRow(entity: .favorite, rowKey: "ghost", op: .upsert, updatedAtMs: 1),
+            SyncChangeLogRow(entity: .playHistory, rowKey: "ghost|1000", op: .upsert, updatedAtMs: 1),
+            SyncChangeLogRow(entity: .playlistItem, rowKey: "pl|ghost", op: .upsert, updatedAtMs: 1),
+        ]
+
+        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+
+        #expect(
+            batch.missingIdentity.count == rows.count,
+            "引用歌曲的实体缺身份键时必须逐条记账（静默丢 = 对端只能默默丢掉）"
+        )
+        #expect(batch.entries.allSatisfy { $0.contentHash == nil })
+    }
+}
 
 /// 闭包捕获用的小盒子（避免在 @MainActor 测试里捕获可变局部变量）。
 private final class IntBox: @unchecked Sendable {
