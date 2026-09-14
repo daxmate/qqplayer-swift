@@ -45,14 +45,134 @@ class DatabaseManager: @unchecked Sendable {
     private let contentHashBackfillEnqueueLock = NSLock()
     private var contentHashBackfillEnqueued = false
 
+    /// 端内歌曲身份的**基准根**：iOS = 沙盒 Documents，macOS = nil（绝对路径）。
+    ///
+    /// 为什么分平台（2026-09-14 同步事故修复）：iOS 数据容器 UUID 会变（重装 / 迁移），
+    /// 用绝对路径派生身份 → **整库 stable_id 全变** → 业务表引用（靠
+    /// `TrackIdentityMigration` 迁移）看着还行，但 `sync_outbox` 里的行键/载荷仍是旧 id
+    /// → 发送端查不到 track 行 → 整批变更拿不到身份键、对端全部判「未定位」。
+    /// macOS 曲库路径稳定且支持多根，改相对只会在无收益的情况下打乱既有身份，故不动。
+    /// 跨端身份恒为 `content_hash`，stableId 只是端内身份，两端各自演进没有兼容问题。
+    static var defaultStableIdRoot: URL? {
+        #if os(iOS)
+            return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        #else
+            return nil
+        #endif
+    }
+
+    /// stableId 的唯一输入：标准化路径在基准根之下时改写成**相对路径**（跨容器前缀
+    /// 变化稳定）；不在根下 / 无基准根 → 回落绝对路径（保守，不误改）。
+    /// 纯函数（基准根可注入），迁移与测试共用同一事实源，避免两处派生漂移。
+    static func identityPath(forPath path: String, relativeRoot: URL?) -> String {
+        let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
+        guard let rootPath = relativeRoot?.standardizedFileURL.path, !rootPath.isEmpty else {
+            return normalized
+        }
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard normalized.hasPrefix(prefix) else { return normalized }
+        return String(normalized.dropFirst(prefix.count))
+    }
+
     static func generatePathStableId(forPath path: String) -> String {
-        let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
-        let digest = SHA256.hash(data: normalizedPath.data(using: .utf8) ?? Data())
+        generatePathStableId(forPath: path, relativeRoot: defaultStableIdRoot)
+    }
+
+    /// 可注入基准根的版本（迁移 / 测试用）。
+    static func generatePathStableId(forPath path: String, relativeRoot: URL?) -> String {
+        let identityPath = identityPath(forPath: path, relativeRoot: relativeRoot)
+        let digest = SHA256.hash(data: identityPath.data(using: .utf8) ?? Data())
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
 
     static func standardizedPath(_ path: String) -> String {
         URL(fileURLWithPath: path).standardizedFileURL.path
+    }
+
+    // MARK: - stableId 相对化迁移（iOS 一次性；含 sync_outbox）
+
+    /// 迁移完成门（UserDefaults）：成功才置位，失败下次启动重试（迁移幂等）。
+    static let relativeStableIdMigrationKey = "database.relativeStableIdMigrationCompleted.v1"
+
+    /// `createTables` 事务内产出的 old→new 映射，事务外消费做文件侧引用迁移
+    /// （文件 IO 不进写事务）。
+    private var pendingStableIdFileRemapping: [String: String] = [:]
+
+    /// 把既有 stableId（绝对路径派生）迁到「曲库根相对路径」派生（iOS）。
+    ///
+    /// **必须连 `sync_outbox` 一起迁**：身份变更牵动的引用有七处——业务四表、外部文件
+    /// 书签、三个歌词目录、封面映射（前六处由 `TrackIdentityMigration` 负责），以及
+    /// **同步层 `sync_outbox` 的行键/载荷**（本函数负责）。漏掉 outbox 的后果就是
+    /// 2026-09-14 的事故：业务表看着正常、同步整批发不出去。
+    ///
+    /// - Returns: old→new 映射（供事务外文件侧迁移与日志）。
+    @discardableResult
+    static func migrateStableIdsToIdentityPaths(
+        _ db: Database,
+        relativeRoot: URL?
+    ) throws -> [String: String] {
+        guard relativeRoot != nil else { return [:] }
+        var remapping: [String: String] = [:]
+        var skippedOccupied = 0
+        for track in try Track.fetchAll(db) {
+            let newStableId = generatePathStableId(forPath: track.path, relativeRoot: relativeRoot)
+            guard track.stableId != newStableId else { continue }
+            // 目标 id 已被别的行占用（理论上不可达：同一容器内相对路径唯一）→ 保守跳过，
+            // 不做会撞唯一索引的改写（撞了会回滚整个迁移事务）。
+            let occupied = try Track
+                .filter(Column("stable_id") == newStableId && Column("id") != track.id)
+                .fetchCount(db)
+            guard occupied == 0 else {
+                skippedOccupied += 1
+                continue
+            }
+            try db.execute(
+                sql: "UPDATE track SET stable_id = ? WHERE id = ?",
+                arguments: [newStableId, track.id]
+            )
+            // 业务四表引用跟随（唯一入口；OR IGNORE + 清残留，幂等）
+            try TrackIdentityMigration.migrateDatabaseReferences(db, from: track.stableId, to: newStableId)
+            remapping[track.stableId] = newStableId
+        }
+        guard !remapping.isEmpty else { return [:] }
+        let outboxRows = try rewriteSyncOutboxReferences(db, remapping: remapping)
+        print("✅ Database: stableId 相对化迁移 \(remapping.count) 首（sync_outbox 改写 \(outboxRows) 行，跳过占用 \(skippedOccupied)）")
+        return remapping
+    }
+
+    /// `sync_outbox` 行的歌曲引用改写：`row_key` 与 `payload_json` 里的稳定 id 子串
+    /// 替换（stableId 是 64 位十六进制，无歧义）。只 UPDATE 已有行，**不新增、不删除**。
+    /// 引用歌曲的实体（favorite / play_history / playlist_item / playback_position）的
+    /// 行键与载荷都承载 stableId；歌单（playlist）不承载，替换自然不命中。
+    @discardableResult
+    static func rewriteSyncOutboxReferences(
+        _ db: Database,
+        remapping: [String: String]
+    ) throws -> Int {
+        guard !remapping.isEmpty else { return 0 }
+        var updated = 0
+        for row in try SyncChangeLogRow.fetchAll(db) {
+            var rowKey = row.rowKey
+            var payload = row.payloadJSON
+            var changed = false
+            for (oldId, newId) in remapping {
+                if rowKey.contains(oldId) {
+                    rowKey = rowKey.replacingOccurrences(of: oldId, with: newId)
+                    changed = true
+                }
+                if let current = payload, current.contains(oldId) {
+                    payload = current.replacingOccurrences(of: oldId, with: newId)
+                    changed = true
+                }
+            }
+            guard changed, let rowId = row.id else { continue }
+            try db.execute(
+                sql: "UPDATE sync_outbox SET row_key = ?, payload_json = ? WHERE id = ?",
+                arguments: [rowKey, payload, rowId]
+            )
+            updated += 1
+        }
+        return updated
     }
 
     private init() {
@@ -142,6 +262,13 @@ class DatabaseManager: @unchecked Sendable {
 
         dbWriter = try DatabasePool(path: databaseURL.path, configuration: configuration)
         try createTables()
+        // stableId 相对化迁移的**文件侧**引用（书签 / 三个歌词目录 / 封面映射）在事务外做：
+        // 文件 IO 不进写事务；失败只记日志（DB 侧已提交，下次入库/对账再走）。
+        if !pendingStableIdFileRemapping.isEmpty {
+            let report = TrackIdentityMigration.migrateFileReferences(remapping: pendingStableIdFileRemapping)
+            print("✅ Database: stableId 迁移文件侧引用（书签 \(report.bookmarksRenamed) / 歌词 \(report.lyricsFilesRenamed) / 封面 \(report.artworkKeysRenamed)）")
+            pendingStableIdFileRemapping = [:]
+        }
         try migrateDatabaseIfNeeded()
 
         // M3-1: content_hash 存量惰性回填已**移出启动主线程**——dataless（云端未下载）
@@ -762,6 +889,25 @@ class DatabaseManager: @unchecked Sendable {
             } catch {
                 print("⚠️ Database migration: Failed to create UNIQUE index on stable_id: \(error)")
             }
+
+            // 2026-09-14（同步事故修复）：iOS 把既有 stableId 从「绝对路径派生」迁到
+            // 「沙盒 Documents 相对路径派生」。本事务内完成 DB 侧（track + 业务四表 +
+            // sync_outbox），文件侧引用的事务外迁移由调用方按 pendingStableIdFileRemapping
+            // 消费。成功才置门（失败下次启动重试；迁移幂等）。
+            #if os(iOS)
+                do {
+                    let key = Self.relativeStableIdMigrationKey
+                    if !UserDefaults.standard.bool(forKey: key) {
+                        self.pendingStableIdFileRemapping = try Self.migrateStableIdsToIdentityPaths(
+                            db,
+                            relativeRoot: Self.defaultStableIdRoot
+                        )
+                        UserDefaults.standard.set(true, forKey: key)
+                    }
+                } catch {
+                    print("⚠️ Database migration: stableId 相对化迁移失败（下次启动重试）：\(error)")
+                }
+            #endif
 
             // M3-1: content_hash 索引（manifest 对账按内容指纹查同歌，设计 §7）。
             // 幂等：CREATE INDEX IF NOT EXISTS；列刚由上方 ALTER 补上，必存在。

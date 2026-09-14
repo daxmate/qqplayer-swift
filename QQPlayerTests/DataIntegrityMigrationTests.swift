@@ -478,4 +478,126 @@ struct SearchEscapingTests {
         #expect(wildcardOnlyPlaylists == ["100% Pure"])
         #expect(plainPlaylists == ["Plain"])
     }
+    // MARK: - 2026-09-14 同步事故修复：stableId 相对曲库根（iOS）+ 迁移
+
+    @Test("身份路径：同一条相对路径在容器前缀变化前后派生同一 stableId（事故根因断言）")
+    func identityPathIsStableAcrossContainerPrefixChange() throws {
+        let rootA = URL(fileURLWithPath: "/var/mobile/Containers/Data/Application/AAA/Documents")
+        let rootB = URL(fileURLWithPath: "/var/mobile/Containers/Data/Application/BBB/Documents")
+        let name = "A-Lin - 有一種悲傷.mp3"
+
+        let idA = DatabaseManager.generatePathStableId(
+            forPath: rootA.appendingPathComponent(name).path,
+            relativeRoot: rootA
+        )
+        let idB = DatabaseManager.generatePathStableId(
+            forPath: rootB.appendingPathComponent(name).path,
+            relativeRoot: rootB
+        )
+        // ★ 重装 / 容器 UUID 变化后身份必须不变（修前这里必然不等 → 整库引用变孤儿）
+        #expect(idA == idB)
+
+        // 与「绝对路径派生」明确不同：否则这次迁移等于没做
+        let absoluteId = DatabaseManager.generatePathStableId(
+            forPath: rootA.appendingPathComponent(name).path,
+            relativeRoot: nil
+        )
+        #expect(idA != absoluteId)
+
+        // 根外文件回落绝对路径（保守，不误改）
+        let outsideWithRoot = DatabaseManager.generatePathStableId(
+            forPath: "/tmp/other.mp3",
+            relativeRoot: rootA
+        )
+        let outsideAbsolute = DatabaseManager.generatePathStableId(
+            forPath: "/tmp/other.mp3",
+            relativeRoot: nil
+        )
+        #expect(outsideWithRoot == outsideAbsolute)
+
+        // macOS 语义：无基准根 → 保持绝对路径派生（既有身份不动）
+        #expect(DatabaseManager.identityPath(forPath: "/Users/x/Music/a.mp3", relativeRoot: nil) == "/Users/x/Music/a.mp3")
+    }
+
+    @Test("stableId 相对化迁移：track + 业务引用 + sync_outbox 一起搬，业务行不丢、幂等")
+    func relativeStableIdMigrationRewritesReferencesAndOutbox() throws {
+        let (manager, dbQueue) = try DataIntegrityFixture.makeManager()
+        let root = URL(fileURLWithPath: "/var/mobile/Containers/Data/Application/TEST/Documents")
+        let filePath = root.appendingPathComponent("song.mp3").path
+        let oldId = DatabaseManager.generatePathStableId(forPath: filePath, relativeRoot: nil)
+        let newId = DatabaseManager.generatePathStableId(forPath: filePath, relativeRoot: root)
+        #expect(oldId != newId)
+
+        let favoritePayload = try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: oldId))
+        let historyPayload = try SyncSnapshotCodec.encode(
+            SyncPlayHistorySnapshot(trackStableId: oldId, playedAt: 1000, playDurationMs: 5000)
+        )
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, 'T', ?, 'h1')",
+                arguments: [oldId, filePath]
+            )
+            try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES (?)", arguments: [oldId])
+            try db.execute(
+                sql: "INSERT INTO play_history (track_stable_id, played_at, play_duration_ms) VALUES (?, 1000, 5000)",
+                arguments: [oldId]
+            )
+            try db.execute(
+                sql: """
+                INSERT INTO sync_outbox (entity, row_key, op, updated_at, payload_json)
+                VALUES ('favorite', ?, 'upsert', 1, ?)
+                """,
+                arguments: [oldId, favoritePayload]
+            )
+            try db.execute(
+                sql: """
+                INSERT INTO sync_outbox (entity, row_key, op, updated_at, payload_json)
+                VALUES ('play_history', ?, 'upsert', 2, ?)
+                """,
+                arguments: ["\(oldId)|1000", historyPayload]
+            )
+        }
+
+        let remapping = try dbQueue.write { db in
+            try DatabaseManager.migrateStableIdsToIdentityPaths(db, relativeRoot: root)
+        }
+        #expect(remapping == [oldId: newId])
+
+        try dbQueue.read { db in
+            let trackId: String? = try String.fetchOne(
+                db, sql: "SELECT stable_id FROM track WHERE path = ?", arguments: [filePath]
+            )
+            #expect(trackId == newId)
+            let favorites: [String] = try String.fetchAll(db, sql: "SELECT track_stable_id FROM favorite")
+            #expect(favorites == [newId])
+            let history: [String] = try String.fetchAll(db, sql: "SELECT track_stable_id FROM play_history")
+            #expect(history == [newId])
+
+            // outbox：行键与载荷都跟着搬（漏了它 = 业务表正常但同步整批发不出去）
+            let outbox = try SyncChangeLogRow.fetchAll(db)
+            #expect(outbox.count == 2)
+            #expect(outbox.allSatisfy { $0.rowKey.contains(newId) && !$0.rowKey.contains(oldId) })
+            #expect(outbox.allSatisfy { ($0.payloadJSON ?? "").contains(newId) })
+            #expect(outbox.allSatisfy { !($0.payloadJSON ?? "").contains(oldId) })
+
+            // 业务行数未变（迁移只改引用，不删行）
+            let favoriteCount = try Favorite.fetchCount(db)
+            let historyCount = try PlayHistoryEntry.fetchCount(db)
+            #expect(favoriteCount == 1)
+            #expect(historyCount == 1)
+        }
+
+        // 幂等：再跑一遍零改动
+        let secondRun = try dbQueue.write { db in
+            try DatabaseManager.migrateStableIdsToIdentityPaths(db, relativeRoot: root)
+        }
+        #expect(secondRun.isEmpty)
+
+        // 无基准根（macOS 语义）→ 不动
+        let thirdRun = try dbQueue.write { db in
+            try DatabaseManager.migrateStableIdsToIdentityPaths(db, relativeRoot: nil)
+        }
+        #expect(thirdRun.isEmpty)
+        _ = manager
+    }
 }
