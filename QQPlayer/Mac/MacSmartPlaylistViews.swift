@@ -130,15 +130,17 @@ struct MacSmartPlaylistCardStrip: View {
             minCardWidth: Self.minCardWidth,
             spacing: Self.spacing
         )
-        let cardWidth = SmartPlaylistGridLayout.stripCardWidth(
-            columns: columnCount,
-            availableWidth: usable,
-            minCardWidth: Self.minCardWidth,
-            maxCardWidth: Self.maxCardWidth,
-            spacing: Self.spacing
-        )
+        // ⚠️ 一律用**弹性**列，绝不用 `.fixed`：固定宽会把「列数 × 卡宽 + 间距」变成内容的
+        // **硬最小宽**（2×176 + 12 + 内边距 32 ≈ 396pt），比一级视图声明的
+        // `navigationSplitViewColumnWidth(min: 320)` 还大 → 歌单列**缩不下去**
+        // （2026-09-14 用户实测）。弹性列最小宽为 0：列宽由容器分配、列数仍由可用宽度决定，
+        // 于是「容器变窄 → 列数降档 → 继续变窄」这条链才成立；单卡上限仍由 maximum 兜住。
         return Array(
-            repeating: GridItem(.fixed(cardWidth), spacing: Self.spacing, alignment: .topLeading),
+            repeating: GridItem(
+                .flexible(minimum: 0, maximum: Self.maxCardWidth),
+                spacing: Self.spacing,
+                alignment: .topLeading
+            ),
             count: columnCount
         )
     }

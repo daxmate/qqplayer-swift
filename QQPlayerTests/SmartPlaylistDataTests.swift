@@ -286,21 +286,25 @@ struct SmartPlaylistDataTests {
         #expect(sixCards == 3)
     }
 
-    @Test("卡片宽度：夹在 [176, 300]，两列时均分可用宽")
-    func cardStripWidthStaysWithinBounds() {
-        let twoColumns = SmartPlaylistGridLayout.stripCardWidth(columns: 2, availableWidth: 520)
-        #expect(twoColumns == 244)
+    @Test("卡片网格参数自洽：下限 < 上限（下限只用于列数判定，上限用于单卡封顶）")
+    func cardStripBoundsAreSane() {
+        #expect(SmartPlaylistGridLayout.minCardWidth < SmartPlaylistGridLayout.maxCardWidth)
+        #expect(SmartPlaylistGridLayout.spacing > 0)
+        #expect(SmartPlaylistGridLayout.horizontalPadding > 0)
+    }
 
-        // 单列且很宽 → 撞上限（不至于一张卡铺满整列）
-        let singleWide = SmartPlaylistGridLayout.stripCardWidth(columns: 1, availableWidth: 900)
-        #expect(singleWide == SmartPlaylistGridLayout.maxCardWidth)
-
-        // 四列窄列 → 撞下限（不再压到不可读）
-        let fourNarrow = SmartPlaylistGridLayout.stripCardWidth(columns: 4, availableWidth: 700)
-        #expect(fourNarrow == SmartPlaylistGridLayout.minCardWidth)
-
-        // 宽度未量到 → 返回下限（先给个安全值，量到后重排）
-        let unmeasured = SmartPlaylistGridLayout.stripCardWidth(columns: 2, availableWidth: 0)
-        #expect(unmeasured == SmartPlaylistGridLayout.minCardWidth)
+    @Test("契约：置顶卡片条必须用弹性列——固定宽会顶住一级视图的收窄（2026-09-14 回归）")
+    func cardStripMustUseFlexibleColumns() throws {
+        // 直接扫源码：这是 SwiftUI 布局属性（内容硬最小宽），纯函数测不出来；
+        // 用静态契约把「不许再改回 .fixed」钉住。
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repoRoot.appendingPathComponent("QQPlayer/Mac/MacSmartPlaylistViews.swift"),
+            encoding: .utf8
+        )
+        #expect(source.contains(".flexible(minimum: 0, maximum:"))
+        #expect(!source.contains("GridItem(.fixed(cardWidth)"))
     }
 }

@@ -279,6 +279,10 @@ enum SmartPlaylistGridLayout {
     /// 卡片条列数：先算「卡宽不低于 minCardWidth」时能放几列，再在这个上限内挑一个
     /// 能把最后一行也填满的列数（4 张卡 → 4 或 2 列，避免 3+1 这种半空行）。
     /// availableWidth <= 0 表示本帧还没量到宽度，先按一行排，量到后立即重排。
+    ///
+    /// ⚠️ `minCardWidth` **只参与列数判定**，绝不能拿它当布局硬下限（`GridItem(.fixed())`
+    /// 那种）：那会让内容的最小宽 = 列数 × minCardWidth，顶住一级视图的 `min: 320` 声明、
+    /// 歌单列缩不下去（2026-09-14 实测）。列宽由弹性列按容器分配，单卡上限用 `maxCardWidth`。
     static func stripColumnCount(
         cardCount: Int,
         availableWidth: CGFloat,
@@ -294,18 +298,5 @@ enum SmartPlaylistGridLayout {
             return candidate
         }
         return bounded
-    }
-
-    /// 卡片宽度：行内均分可用宽度，夹在 [minCardWidth, maxCardWidth] 之间。
-    static func stripCardWidth(
-        columns: Int,
-        availableWidth: CGFloat,
-        minCardWidth: CGFloat = minCardWidth,
-        maxCardWidth: CGFloat = maxCardWidth,
-        spacing: CGFloat = spacing
-    ) -> CGFloat {
-        guard columns > 0, availableWidth > 0 else { return minCardWidth }
-        let evenly = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
-        return min(max(evenly, minCardWidth), maxCardWidth)
     }
 }
