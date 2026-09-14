@@ -281,6 +281,47 @@ struct SyncDataSyncCoreTests {
         _ = responder
     }
 
+    @Test("coordinator：缺身份键账目——拉取侧未定位 + 推送侧缺指纹各自计数，且不提前收尾")
+    func coordinatorCountsMissingIdentity() throws {
+        let pair = try makePair()
+        let responder = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)
+        _ = responder
+
+        // 本端（host）：歌在本地但**指纹为空** → 推出去的行缺身份键（对端定位不了）
+        try Self.insertTrack(pair.hostQueue, stableId: "host-nohash", contentHash: nil)
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-nohash", updatedAtMs: 1000)
+        // 对端（client）：同样指纹为空 → 它推来的行本端也定位不到（未落库）
+        try Self.insertTrack(pair.clientQueue, stableId: "client-nohash", contentHash: nil)
+        try Self.recordFavorite(pair.clientQueue, rowKey: "client-nohash", updatedAtMs: 2000)
+
+        let phases = PhaseListBox()
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID
+        )
+        coordinator.onStateChange = { phases.append($0) }
+        coordinator.start()
+
+        #expect(coordinator.phase == .finished)
+        let report = coordinator.report
+        #expect(report.pushedEntries == 1)
+        #expect(report.pushedMissingIdentityEntries == 1, "本端发出去的那行缺身份键")
+        #expect(report.unresolvedEntries == 1, "对端推来的那行缺身份键 → 未落库（未定位）")
+        #expect(report.appliedEntries == 0)
+        #expect(report.suspendedEntries == 0, "缺身份键不挂起（挂起键 = content_hash）")
+        #expect(report.ignoredDeletes == 0)
+        #expect(report.failureMessage == nil)
+        // 推送侧计数回调不得把编排提前收尾：仍要走完 推 → 拉 → 收尾
+        #expect(phases.values == [.pushing, .pulling, .finished], "实际：\(phases.values)")
+        // 两端业务表都不得出现引用不存在歌曲的孤儿行
+        #expect(try Self.favoriteIDs(pair.hostQueue).isEmpty)
+        #expect(try Self.favoriteIDs(pair.clientQueue).isEmpty)
+        // 游标照常推进（不因缺身份键而重发死循环）
+        #expect(try pair.hostStore.pushCursor(forPeer: pair.clientID) == 1)
+        #expect(try pair.hostStore.cursor(forPeer: pair.clientID) == 1)
+    }
+
     @Test("coordinator：空增量不发帧；peerID 缺省取握手得到的对端 Device ID")
     func coordinatorEmptyIncrementSendsNoFrame() throws {
         let pair = try makePair()

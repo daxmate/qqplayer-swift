@@ -8,7 +8,9 @@
 //    upsert vs upsert 本端胜、delete vs delete 不应用；本端更新则不应用
 //  - SyncChangeLogApplier：favorite/play_history/playlist/playlist_item 的
 //    upsert 落本地业务表（含幂等：重复应用不炸）；v2（2026-09-10 §12b-7）删除不跨端
-//    传播 → delete 在应用层入口被丢弃（不删本地行），断言方向相应改为"被忽略"
+//    传播 → delete 在应用层入口被丢弃（不删本地行），断言方向相应改为"被忽略"；
+//    引用歌曲的实体落库前先查本地 `track` 行（2026-09-14 身份缺口包）：不存在 → 跳过，
+//    不写出 JOIN track 永不匹配的孤儿业务行
 //
 //  fixture 走 DatabaseManager.init(dbWriter:) + createTables()（内存库真实路径）。
 //
@@ -127,6 +129,14 @@ struct SyncLWWReconcileTests {
         #expect(result.applyRemote[0].id == 31)
     }
 
+    /// 本地 `track` 表插一行（引用歌曲的业务行只有能 JOIN 上它才会被应用）。
+    private static func insertTrack(_ db: Database, stableId: String) throws {
+        try db.execute(
+            sql: "INSERT INTO track (stable_id, title, path) VALUES (?, ?, ?)",
+            arguments: [stableId, "T-\(stableId)", "/m/\(stableId).flac"]
+        )
+    }
+
     // MARK: - Applier（favorite）
 
     @Test("Applier favorite：upsert 落行可重复应用；delete 被忽略（不删本地行）")
@@ -135,6 +145,8 @@ struct SyncLWWReconcileTests {
         let manager = DatabaseManager(dbWriter: dbQueue)
         try manager.createTables()
         let applier = SyncChangeLogApplier(database: manager)
+        // 本端有这首歌（收藏只有能 JOIN 上 track 才会在列表里出现）
+        try dbQueue.write { db in try Self.insertTrack(db, stableId: "t1") }
 
         let upsert = SyncChangeLogRow(
             entity: .favorite, rowKey: "t1", op: .upsert, updatedAtMs: 100,
@@ -168,6 +180,7 @@ struct SyncLWWReconcileTests {
         let manager = DatabaseManager(dbWriter: dbQueue)
         try manager.createTables()
         let applier = SyncChangeLogApplier(database: manager)
+        try dbQueue.write { db in try Self.insertTrack(db, stableId: "hist-1") }
 
         func snapshot(_ duration: Int64, playedAt: Int64 = 1000) throws -> SyncChangeLogRow {
             SyncChangeLogRow(
@@ -214,6 +227,7 @@ struct SyncLWWReconcileTests {
         let manager = DatabaseManager(dbWriter: dbQueue)
         try manager.createTables()
         let applier = SyncChangeLogApplier(database: manager)
+        try dbQueue.write { db in try Self.insertTrack(db, stableId: "t1") }
 
         let now: Int64 = 1000
         let snapshot = SyncPlaylistSnapshot(
@@ -255,5 +269,71 @@ struct SyncLWWReconcileTests {
         let itemCount = try dbQueue.read { db in try PlaylistItem.fetchCount(db) }
         #expect(playlistCount == 1)
         #expect(itemCount == 1)
+    }
+
+    // MARK: - Applier 身份兜底（2026-09-14 身份缺口包）
+
+    @Test("Applier 身份兜底：引用不存在曲目的 favorite / play_history / playlist_item 一律跳过，歌入库后可落")
+    func applierSkipsRowsWithoutLocalTrack() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+        let applier = SyncChangeLogApplier(database: manager)
+
+        let favorite = SyncChangeLogRow(
+            entity: .favorite, rowKey: "ghost", op: .upsert, updatedAtMs: 1,
+            payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "ghost"))
+        )
+        let history = SyncChangeLogRow(
+            entity: .playHistory, rowKey: "ghost|1000", op: .upsert, updatedAtMs: 1,
+            payloadJSON: try SyncSnapshotCodec.encode(SyncPlayHistorySnapshot(
+                trackStableId: "ghost", playedAt: 1000, playDurationMs: 5000
+            ))
+        )
+        let playlist = SyncChangeLogRow(
+            entity: .playlist, rowKey: "mix", op: .upsert, updatedAtMs: 1,
+            payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
+                slug: "mix", title: "Mix", createdAt: 1, updatedAt: 1, lastPlayedAt: 0,
+                folderPath: nil, isFolderSynced: false, lastFolderSync: nil, customCoverImagePath: nil
+            ))
+        )
+        let item = SyncChangeLogRow(
+            entity: .playlistItem, rowKey: "mix|ghost", op: .upsert, updatedAtMs: 1,
+            payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistItemSnapshot(
+                playlistSlug: "mix", position: 1, trackStableId: "ghost"
+            ))
+        )
+
+        // 本地没有这首歌 → 三条引用歌曲的行都跳过（每行独立事务，互不影响）
+        #expect(try applier.apply([favorite, history, item]) == 0)
+        // 歌单（不引用歌曲）照常落库，不受影响
+        #expect(try applier.apply([playlist]) == 1)
+        // 闭包内不写 #expect(try …)（Swift Testing 宏限制）；先取值再断言
+        let (favoriteCount, historyCount, itemCount, playlistCount) = try dbQueue.read { db in
+            (
+                try Favorite.fetchCount(db),
+                try PlayHistoryEntry.fetchCount(db),
+                try PlaylistItem.fetchCount(db),
+                try Playlist.fetchCount(db)
+            )
+        }
+        #expect(favoriteCount == 0, "不得写出孤儿收藏行")
+        #expect(historyCount == 0, "不得写出孤儿播放历史行")
+        #expect(itemCount == 0, "不得写出孤儿歌单项行")
+        #expect(playlistCount == 1, "歌单结构无歌曲引用，照常同步")
+
+        // 歌入库（指纹回填 / 同步到位）→ 同一条行可落（不永久丢数据）
+        try dbQueue.write { db in try Self.insertTrack(db, stableId: "ghost") }
+        #expect(try applier.apply([favorite, history, item]) == 3)
+        let (favoriteAfter, historyAfter, itemAfter) = try dbQueue.read { db in
+            (
+                try Favorite.fetchCount(db),
+                try PlayHistoryEntry.fetchCount(db),
+                try PlaylistItem.fetchCount(db)
+            )
+        }
+        #expect(favoriteAfter == 1)
+        #expect(historyAfter == 1)
+        #expect(itemAfter == 1)
     }
 }

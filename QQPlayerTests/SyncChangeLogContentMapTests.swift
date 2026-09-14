@@ -7,7 +7,8 @@
 //  - 发送侧：outbox 行 → wire entry 填 contentHash（引用歌曲的实体填；歌单/未知歌/
 //    无指纹 = nil；线上 row_key 保持发送端本地键）
 //  - 接收侧本地化：命中映射 → row_key 与 payload 歌曲引用改写成**本地 stableId**；
-//    无 contentHash（老 peer）/ 歌单行 → 降级透传；本地无此歌 → 挂起
+//    歌单行（不引用歌曲）→ 降级透传；本地无此歌 → 挂起；**引用歌曲但没有可用身份
+//    键（contentHash nil/空）→ 未定位（不落库、不挂起）**（2026-09-14 身份缺口包）
 //  - 跨端 roundtrip：A 的 stableId → wire contentHash → B 映射回本地 stableId 落地
 //  - 挂起 + 歌到达后重放（upsertTrack 钩子）/ 重放幂等 / 本端更新时本端胜
 //  - sync_pending_change 新表迁移幂等
@@ -147,6 +148,11 @@ struct SyncChangeLogContentMapTests {
         try queue.read { db in
             try Favorite.filter(Column("track_stable_id") == stableId).fetchCount(db)
         }
+    }
+
+    /// play_history 行数。
+    private static func playHistoryCount(_ queue: DatabaseQueue) throws -> Int {
+        try queue.read { db in try PlayHistoryEntry.fetchCount(db) }
     }
 
     // MARK: - 迁移
@@ -329,8 +335,8 @@ struct SyncChangeLogContentMapTests {
         #expect(deleteRow.payloadJSON == nil)
     }
 
-    @Test("接收侧：本地无此歌 → 挂起（保留远端行）；无 contentHash / 歌单行 → 降级透传")
-    func localizeSuspendsAndDegrades() throws {
+    @Test("接收侧：本地无此歌 → 挂起（保留远端行）；引用歌曲无身份键 → 未定位；歌单行 → 透传")
+    func localizeSuspendsDegradesAndMarksUnresolved() throws {
         let (manager, _) = try Self.makeManager()
         let mapper = SyncChangeLogMapper(database: manager)
 
@@ -349,17 +355,21 @@ struct SyncChangeLogContentMapTests {
         #expect(remoteRow.rowKey == "host-1") // 挂起行保持远端键
         #expect(remoteRow.id == 21)
 
-        // 无 contentHash（M4-1 老 peer / 无指纹）→ 降级透传（按远端键应用）
+        // 引用歌曲但没有可用身份键（contentHash nil）→ 未定位：不落库也不挂起
+        // （落库会写出 JOIN track 永不匹配的孤儿业务行；挂起又缺 content_hash 当键）
         let legacyEntry = SyncChangeLogWireEntry(
             id: 22, entity: SyncChangeEntity.favorite.rawValue, rowKey: "host-legacy",
             op: SyncChangeOp.upsert.rawValue, updatedAtMs: 21,
             contentHash: nil, payloadJSON: nil
         )
-        guard case .passThrough(let legacyRow) = try mapper.localize(legacyEntry) else {
-            Issue.record("无 contentHash 应降级透传")
+        guard case .unresolved(let reason, let unresolvedRow) = try mapper.localize(legacyEntry) else {
+            Issue.record("引用歌曲但无身份键应判未定位")
             return
         }
-        #expect(legacyRow.rowKey == "host-legacy")
+        #expect(reason == .missingIdentityKey)
+        #expect(unresolvedRow.rowKey == "host-legacy") // 未定位分支保留远端行（诊断用），不改写
+        #expect(unresolvedRow.id == 22)
+        #expect(unresolvedRow.entity == SyncChangeEntity.favorite.rawValue) // 行模型未被改写（顺序无关）
 
         // 歌单行（不引用歌曲）→ 透传，即便对端误带 contentHash 也不改写
         let playlistEntry = SyncChangeLogWireEntry(
@@ -372,6 +382,63 @@ struct SyncChangeLogContentMapTests {
             return
         }
         #expect(playlistRow.rowKey == "mix")
+        #expect(playlistRow.entity == SyncChangeEntity.playlist.rawValue)
+
+        // 歌单没有身份键（nil/空）照样透传：无歌曲引用就无需跨端身份
+        for hash in [String?.none, ""] {
+            let entry = SyncChangeLogWireEntry(
+                id: 24, entity: SyncChangeEntity.playlist.rawValue, rowKey: "mix2",
+                op: SyncChangeOp.upsert.rawValue, updatedAtMs: 23,
+                contentHash: hash, payloadJSON: nil
+            )
+            guard case .passThrough = try mapper.localize(entry) else {
+                Issue.record("歌单行（contentHash=\(hash ?? "nil")）应透传")
+                return
+            }
+        }
+
+        // 未知实体（未来版本加的新实体）：无歌曲引用概念 → 仍透传（不因未知识别就丢数据）
+        let unknownEntry = SyncChangeLogWireEntry(
+            id: 25, entity: "future_entity", rowKey: "x",
+            op: SyncChangeOp.upsert.rawValue, updatedAtMs: 24,
+            contentHash: nil, payloadJSON: nil
+        )
+        guard case .passThrough = try mapper.localize(unknownEntry) else {
+            Issue.record("未知实体应透传")
+            return
+        }
+    }
+
+    @Test("handlePush：缺身份键的 play_history 行 → 不落库（也不挂起），未定位计数回调收到 1")
+    func handlePushSkipsUnresolvedRows() throws {
+        let harness = try makeHarness()
+        let unresolvedBox = IntBox()
+        let appliedBox = IntBox()
+        harness.clientPeer.onPushUnresolved = { unresolvedBox.value = $0 }
+        harness.clientPeer.onPushApplied = { appliedBox.value = $0 }
+
+        // host：歌在本地但**指纹为空** → wire entry 拿不到 contentHash（发送侧欠账）
+        try harness.hostQueue.write { db in
+            try Self.insertTrack(db, stableId: "host-track", contentHash: nil)
+        }
+        let history = SyncPlayHistorySnapshot(trackStableId: "host-track", playedAt: 1700, playDurationMs: 3000)
+        try harness.hostQueue.write { db in
+            try SyncChangeLogStore.record(
+                db, entity: .playHistory, rowKey: history.rowKey, op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(history), updatedAtMs: 1000
+            )
+        }
+
+        try harness.clientPeer.sendPull()
+
+        #expect(try Self.playHistoryCount(harness.clientQueue) == 0, "缺身份键的行不落库（否则是不可见的孤儿行）")
+        #expect(unresolvedBox.value == 1, "未定位计数可观测（面板据此披露）")
+        #expect(appliedBox.value == 0, "未落库 → 应用计数 0")
+        #expect(
+            try SyncChangeLogPendingStore(database: harness.clientManager).pendingCount() == 0,
+            "不挂起（挂起键 = content_hash，这里没有）"
+        )
+        #expect(try harness.clientStore.cursor(forPeer: harness.clientPeer.peerID) == 1, "游标照常推进：不留重发死循环")
     }
 
     // MARK: - 跨端 roundtrip
@@ -513,12 +580,12 @@ private final class IntBox: @unchecked Sendable {
 }
 
 private extension SyncEntryLocalization {
-    /// 非挂起分支的行（挂起分支返回 nil，便于 #require 断言）。
+    /// 非挂起 / 非未定位分支的行（两者返回 nil，便于 #require 断言）。
     var mappedRow: SyncChangeLogRow? {
         switch self {
         case .mapped(let row), .passThrough(let row):
             return row
-        case .suspended:
+        case .suspended, .unresolved:
             return nil
         }
     }

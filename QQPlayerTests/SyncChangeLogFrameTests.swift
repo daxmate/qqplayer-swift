@@ -136,6 +136,14 @@ struct SyncChangeLogFrameTests {
     func sessionRoundtripFavorite() throws {
         let harness = try makeHarness()
 
+        // client 本地有这首歌（引用歌曲的业务行只有能 JOIN 上 track 才可见：
+        // 2026-09-14 身份缺口包起，引用不存在的歌的行不落库）
+        try harness.clientQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path) VALUES ('sync-fav', 'T', '/m/sync-fav.flac')"
+            )
+        }
+
         // host 业务写入（模拟 addToFavorites 的 outbox 形态：favorite upsert）
         try harness.hostQueue.write { db in
             try SyncChangeLogStore.record(
@@ -210,6 +218,13 @@ struct SyncChangeLogFrameTests {
     func inboundDeleteIgnored() throws {
         let harness = try makeHarness()
 
+        // client 本地有这首歌（引用歌曲的行只有能 JOIN 上 track 才落库）
+        try harness.clientQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path) VALUES ('legacy-fav', 'T', '/m/legacy-fav.flac')"
+            )
+        }
+
         // client 本地先落一条收藏：host 推 upsert（无 contentHash → 降级透传，不依赖本地有该歌）
         try harness.hostQueue.write { db in
             try SyncChangeLogStore.record(
@@ -252,6 +267,11 @@ struct SyncChangeLogFrameTests {
     @Test("会话往返：host 建歌单+加歌 → client pull → 本地出现歌单与 item（结构同步）")
     func sessionRoundtripPlaylist() throws {
         let harness = try makeHarness()
+
+        // client 本地有这首歌（歌单项引用歌曲，引用不存在歌的行不落库）
+        try harness.clientQueue.write { db in
+            try db.execute(sql: "INSERT INTO track (stable_id, title, path) VALUES ('t1', 'T', '/m/t1.flac')")
+        }
 
         let now: Int64 = 1000
         let playlistSnap = SyncPlaylistSnapshot(

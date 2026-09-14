@@ -295,6 +295,42 @@ struct SyncChangeLogStoreTests {
         #expect(try store.cursor(forPeer: peer) == 3)
     }
 
+    // MARK: - 重新对账（重置游标）
+
+    @Test("重新对账：resetCursors 同时清零该 peer 的两个方向游标，不碰其它 peer，可重复调用")
+    func resetCursorsClearsBothDirections() throws {
+        let (manager, _) = try Self.makeManager()
+        let store = SyncChangeLogStore(database: manager)
+        let peer = "peer-a"
+
+        try manager.addToFavorites(trackStableIds: ["r1", "r2"])
+        #expect(try store.maxOutboxID() == 2)
+        try store.setCursor(forPeer: peer, lastOutboxID: 2)
+        try store.setPushCursor(forPeer: peer, lastOutboxID: 2)
+        try store.setCursor(forPeer: "peer-b", lastOutboxID: 1)
+        try store.setPushCursor(forPeer: "peer-b", lastOutboxID: 2)
+
+        try store.resetCursors(forPeer: peer)
+
+        #expect(try store.cursor(forPeer: peer) == 0, "拉取游标清零")
+        #expect(try store.pushCursor(forPeer: peer) == 0, "推送游标清零")
+        #expect(try store.cursor(forPeer: "peer-b") == 1, "其它 peer 的拉取游标不受影响")
+        #expect(try store.pushCursor(forPeer: "peer-b") == 2, "其它 peer 的推送游标不受影响")
+        // 语义：清零后两个方向都从头再来（已被游标越过的行重新可见）
+        #expect(try store.page(after: try store.cursor(forPeer: peer)).rows.map(\.rowKey) == ["r1", "r2"])
+        #expect(try store.maxOutboxID() == 2, "重置不动 outbox 本身")
+
+        // 幂等：再重置一次不报错、结果不变
+        try store.resetCursors(forPeer: peer)
+        #expect(try store.cursor(forPeer: peer) == 0)
+        #expect(try store.pushCursor(forPeer: peer) == 0)
+
+        // 从未有记录的 peer：重置也不报错（无记录 = 0）
+        try store.resetCursors(forPeer: "peer-new")
+        #expect(try store.cursor(forPeer: "peer-new") == 0)
+        #expect(try store.pushCursor(forPeer: "peer-new") == 0)
+    }
+
     // MARK: - S1：分页游标（取批 + 本批末行 id）
 
     @Test("S1 契约：page 的 lastOutboxID = 本批末行；批外行不被越过；空批/越末尾不动游标")
