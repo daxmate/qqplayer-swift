@@ -105,13 +105,13 @@
 
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
-| ① | **✗ 空格** | 生产 **0 个写点**：`grep -rn "entity: \.playbackPosition" QQPlayer/` → 无输出。`SyncChangeEntity.v1Synced` `QQPlayer/Sync/SyncDataSyncModels.swift:38` 不含它；`SyncPlaybackCarryDatabaseFacts.trackScopedEntities` `QQPlayer/Sync/SyncPlaybackCarryPeer.swift:55`（= v1Synced 去 playlist）也不含。**缺什么**：捕获挂点（谁在播到哪一秒时记一条 outbox）。`QQPlayer/Sync/SyncDataSnapshots.swift:107-110` 自己写着「捕获挂点留待 M4-2 定本地存储后接入」——**这句话至今仍是全部实现** |
-| ② | **✗ 空格** | 无行可发。映射分支 `SyncChangeLogMapping.swift:160` 存在（`case .favorite, .playbackPosition: return rowKey`）但**永远拿不到输入** |
-| ③ | 部分 | `SyncChangeLogApplier.applyPlaybackPosition(payloadJSON:)` `SyncChangeLogApplier.swift:247-255` 有分支；但 `playbackPositionSink`（定义 `:52`）**生产恒为 nil**——全仓仅测试注入（`grep -rn "playbackPositionSink" .` → 定义 1 处 + 使用 2 处 + 注释）。走 `:252` 打印「丢弃」后 **`return true`**（`:254`）⇒ **被计入 `appliedEntries`** |
-| ④ | **✗ 空格** | 无数据可挂起；`SyncChangeLogReplay` / `SyncChangeLogPendingStore` 里无 playbackPosition 相关分支 |
-| ⑤ | **✗ 空格** | 不在 `reconcilableEntities` `SyncChangeLogMapping.swift:571`；`rowKey` `:706` 对 `.playbackPosition` **显式 `return nil`**；本地真值载体是 `UserDefaults` `QQPlayerState`（非 DB 行，见 `SyncDataSnapshots.swift:107-110`）⇒ **无「本地真值 → outbox」通道** |
-| ⑥ | **✗ 空格** | 无实体计数。更糟：因 ③ 返回 true，**接收端的静默丢弃被记进面板「已应用 N」**——面板数字与用户可见事实相反 |
-| ⑦ | **✗ 空格** | 无落库语义用例（`grep "Applier playback" QQPlayerTests/` → 无结果）。仅协议/映射层出现：`SyncChangeLogContentMapTests.swift:223`、`:311-314` |
+| ① | **✅ 有**（2026-09-15，开关门控） | 捕获挂点 = `PlayerEngine.savePlayerState()` 末尾 → `PlaybackPositionCapture.recordIfEnabled`（换歌必记 / 同曲 60s 节流；**开关关 = 直接 return：零 DB 访问**）。rowKey = `stableId`，载荷 = `SyncPlaybackPositionSnapshot` |
+| ② | **✅ 有** | 有行可发：映射分支 `SyncChangeLogMapping.swift:160`（`case .favorite, .playbackPosition: return rowKey`）现拿到真实输入 |
+| ③ | **✅ 有**（开关开 + 同曲才落地） | `SyncChangeLogApplier.applyPlaybackPosition` **不再虚报**：关 / 无落点 / 落点未接受（不同曲 / 远端更旧 / 位置差 < 3s）一律 `return false` + `onPlaybackPositionUnsupported` → `unsupportedEntries`；开关开 + 同曲 + 远端更新 → `PlaybackPositionResumeSink.apply` 只改写本机 `QQPlayerState.playbackTime`（LWW；绝不改 isPlaying） |
+| ④ | 不适用 | 播放位置没有「本地缺歌」概念（业务载体不是 DB 行）；开关关 = 不接受、不挂起 |
+| ⑤ | 不适用 | 本地载体 = `UserDefaults QQPlayerState`（非 DB 行），不进 `reconcilableEntities`（那套是「业务表 → outbox」补发） |
+| ⑥ | **✅ 有** | `SyncDataSyncReport.unsupportedEntries` → `MacSyncView` 「未支持」账目行（>0 橙）+ hint（5 语） |
+| ⑦ | **✅ 有** | `SyncDataSyncCoreTests`：开关关 / 开但无落点 / 落点未接受 → 不计「已应用」；`PlaybackPositionResumeSink.shouldApply` 与 `PlaybackPositionCapture.shouldRecord` 纯逻辑用例 |
 
 ### F. aligned 歌词（不在枚举）
 
@@ -190,7 +190,7 @@ i18n 键确认只有两个缺口口径：`sync_run_data_result_unresolved` = 未
 
 | # | 空格 | 证据 | 用户可见后果 |
 | --- | --- | --- | --- |
-| 5 | **E③ 静默丢弃被计入「已应用」** | `SyncChangeLogApplier.swift:247-255`（sink nil → print → `return true`） | 面板报「已应用 N 条」而**本地什么都没变**——正是 2026-09-14 那个事故的同一类误导，只是换了实体 |
+| 5 | ~~**E③ 静默丢弃被计入「已应用」**~~ **已收（2026-09-15）** | 修法：`applyPlaybackPosition` 三条未落地路径（开关关 / 无落点 / 落点未接受）一律 `return false` + `onPlaybackPositionUnsupported` → `unsupportedEntries` → 面板「未支持」行 | 面板不再报「已应用 N」而本地零变化（INV-20 有守护） |
 | 6 | **C⑥ 歌单结构缺口无计数** | `Report`（`SyncChangeLogMapping.swift:437-460`）无 playlist 字段 | 一级第 1 条的静默失效**没有任何可观测信号** |
 
 ### 三级：同不同步看运气（依赖用户手动触发）

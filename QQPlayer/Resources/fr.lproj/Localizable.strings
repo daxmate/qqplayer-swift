@@ -955,7 +955,7 @@
 "sync_run_data_description" = "Synchronise les favoris, l'historique et les playlists indépendamment des fichiers — aucune chanson n'est transférée.";
 // Interrupteur de reprise entre appareils (2026-09-14) : désactivé par défaut
 "sync_run_playback_position_toggle" = "Reprise entre appareils (position de lecture)";
-"sync_run_playback_position_help" = "Désactivé par défaut : ce Mac ne signale ni n'accepte de position de lecture. Activé, les deux appareils peuvent échanger leur position de lecture (l'envoi et l'application sur ce Mac arriveront dans une version ultérieure).";
+"sync_run_playback_position_help" = "Désactivé par défaut : cet appareil ne signale ni n'accepte de position de lecture. Activé, les deux appareils échangent leur position — cet appareil signale la sienne et accepte celle de l'autre, pour reprendre le même morceau là où vous l'avez laissé.";
 "sync_run_data_button" = "Synchroniser les données";
 "sync_run_data_help" = "Fusionner les favoris, l'historique et les playlists avec votre iPhone";
 "sync_run_data_cancel" = "Annuler";
@@ -970,7 +970,7 @@
 "sync_run_data_unsupported" = "Non pris en charge";
 "sync_run_data_pending_hint" = "%d modifications attendent des chansons absentes de ce Mac.";
 "sync_run_data_unresolved_hint" = "%d modifications n'ont pas pu être associées à un morceau sur ce Mac et n'ont pas été appliquées.";
-"sync_run_data_unsupported_hint" = "%d modifications de position de lecture n'ont pas été appliquées (reprise entre appareils désactivée, ou envoi et application pas encore disponibles sur ce Mac).";
+"sync_run_data_unsupported_hint" = "%d modifications de position de lecture n'ont pas été appliquées (reprise entre appareils désactivée, ou position reçue pour un autre morceau).";
 "sync_run_data_missing_identity_hint" = "%d modifications ont été envoyées sans empreinte de morceau : l'autre appareil ne peut pas les associer.";
 "sync_run_data_result_none" = "Aucune synchronisation de données effectuée pour l'instant.";
 "sync_run_data_cancelled" = "Synchronisation des données annulée.";

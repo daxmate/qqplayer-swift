@@ -145,10 +145,10 @@
 
 ### INV-20　「已应用 N」必须真的是落库行数（静默丢弃不算应用）
 
-- **现有守护**：`✗ 无守护`（**违反中**）
-  - `SyncChangeLogApplier.applyPlaybackPosition` `QQPlayer/SyncChangeLogApplier.swift:247-255`：sink 为 nil 时打印「丢弃」后 **`return true`** ⇒ 计入 `appliedEntries`。
-  - 无 applier 用例（`grep "Applier playback" QQPlayerTests/` 无结果）。
-- **建议**：**行为用例** + **面板披露**：为 `applyPlaybackPosition` 补用例断言「sink 为 nil 时返回 false / 或单独计数 `unsupportedEntries`」，并把该计数上屏。
+- **现有守护：✅ 已收（2026-09-15）**
+  - `SyncChangeLogApplier.applyPlaybackPosition`：开关关 / 无落点 / 落点未接受（不同曲 / 远端更旧 / 位置差 < 3s）——三条路径一律 `return false`，并触发 `onPlaybackPositionUnsupported` → `SyncChangeLogPeer.onPushUnsupported` → `SyncDataSyncReport.unsupportedEntries` → 面板「未支持」行。
+  - 用例：`SyncDataSyncCoreTests`（开关关 → 不计「已应用」+ 计未支持；开但无落点 → 同；落点未接受 → 同）。
+- **建议**：已落；后续任何新增 `apply*` 分支都必须守「没落库就不 return true」。
 
 ---
 
@@ -199,6 +199,15 @@
 | INV-18 缺口必须计数并上屏 | `MacSyncView.swift:978` 注释 | **面板披露**（按实体分桶）+ 静态契约 |
 | INV-20 「已应用」= 真的落库 | `SyncChangeLogApplier.swift:223-255` 注释自承「v1 不落库」 | **行为用例**（sink nil ⇒ 不算 applied）+ 面板披露 |
 | INV-23 封面路径不可跨端引用 | **无处声明** | 静态契约或面板披露（见上） |
+
+### INV-26　跳端续播（`playback_position`）必须由**同一个开关**门控，且**默认关**（关 = 零出站零入站）
+
+- **现有守护：✅ 已收（2026-09-15）**
+  - 设置：`DeleteSettings.syncPlaybackPositionEnabled` 默认 **false**（`decodeIfPresent ?? false` 兜底旧设置）；
+  - 出站：`PlaybackPositionCapture.recordIfEnabled` 开关关 → **直接 return（零 DB 访问）**；开 → 换歌必记 / 同曲 60s 节流；
+  - 入站：`SyncChangeLogApplier.playbackPositionSyncEnabled` 关 → 不落点 + 计 `unsupportedEntries`；开且同曲才落（`PlaybackPositionResumeSink`，LWW，**绝不改 isPlaying**）；
+  - 用例：`SyncDataSyncCoreTests`（旧设置无 key → false；开关关 → 不落点不计「已应用」；开但无落点 / 落点未接受 → 同）。
+- **建议**：两端门控读**同一设置项**这条事实源不要漂移（捕获/落点/装配三处）；补静态契约前先保持。
 
 ## 9. 判断标准（新增能力时怎么自检）
 

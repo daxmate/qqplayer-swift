@@ -520,7 +520,9 @@ struct SyncDataSyncCoreTests {
         var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: false)
         let sinkCalls = CounterBox()
         let unsupported = CounterBox()
-        applier.playbackPositionSink = { _ in sinkCalls.increment() }
+        applier.playbackPositionSink = { _ in sinkCalls.increment()
+            return false
+        }
         applier.onPlaybackPositionUnsupported = { unsupported.increment() }
 
         let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
@@ -536,7 +538,9 @@ struct SyncDataSyncCoreTests {
         var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: true)
         let sinkCalls = CounterBox()
         let unsupported = CounterBox()
-        applier.playbackPositionSink = { _ in sinkCalls.increment() }
+        applier.playbackPositionSink = { _ in sinkCalls.increment()
+            return true
+        }
         applier.onPlaybackPositionUnsupported = { unsupported.increment() }
 
         let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])

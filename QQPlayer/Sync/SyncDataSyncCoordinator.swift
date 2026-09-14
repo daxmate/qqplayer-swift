@@ -128,7 +128,12 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         self.session = session
         self.database = database
         self.store = SyncChangeLogStore(database: database)
-        self.applier = SyncChangeLogApplier(database: database)
+        var applier = SyncChangeLogApplier(database: database)
+        // 跨端续播（默认关）：开关开且落点可用才注入落点；关 = 本端不接受播放位置（INV-26）。
+        if applier.playbackPositionSyncEnabled {
+            applier.playbackPositionSink = { PlaybackPositionResumeSink.apply($0) }
+        }
+        self.applier = applier
         // peerID 缺省 = 会话握手得到的对端 Device ID（与 SyncChangeLogPeer.peerID 同语义）；
         // 显式传入但为空串（含全空白）= 调用方给错 → 不回落，直接留空让 start() 立即失败
         // （静默回落会把「参数错了」伪装成「同步成功」，比显式失败更难查）。

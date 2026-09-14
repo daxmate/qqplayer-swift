@@ -512,6 +512,16 @@
             attachDataSync(to: session)
         }
 
+        /// 被动端数据同步端的 applier：开关开（跳端续播）才注入落点；
+        /// 关 = 本端不接受播放位置（关着时行不落地也不计「已应用」，见 INV-20/INV-26）。
+        private static func makePassiveApplier(database: DatabaseManager) -> SyncChangeLogApplier {
+            var applier = SyncChangeLogApplier(database: database)
+            if applier.playbackPositionSyncEnabled {
+                applier.playbackPositionSink = { PlaybackPositionResumeSink.apply($0) }
+            }
+            return applier
+        }
+
         /// 会话 ready → 装配数据同步端（帧 8/9 = `SyncChangeLogPeer`，全仓帧 8/9 唯一处理器）。
         ///
         /// 装配顺序：本方法在 `SyncLibraryPassiveHost.attach` **之后**调用——
@@ -542,7 +552,7 @@
             let peer = SyncChangeLogPeer(
                 session: session,
                 store: SyncChangeLogStore(database: database),
-                applier: SyncChangeLogApplier(database: database),
+                applier: Self.makePassiveApplier(database: database),
                 peerID: peerID
             )
             // 诊断打点：只记计数 / 错误类别，不打印曲目内容（隐私）。

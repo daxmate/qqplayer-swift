@@ -52,9 +52,9 @@ struct SyncChangeLogApplier {
     /// internal（M4-2a）：会话层用它构造跨端映射器/挂起存储（同一库连接）。
     let database: DatabaseManager
 
-    /// playback_position 落点（v1 可选注入；nil = 无落点实现，见 `playbackPositionSyncEnabled`）。
-    /// 生产接线（写 UserDefaults QQPlayerState / 未来 DB 行）留 M4-2。
-    var playbackPositionSink: ((SyncPlaybackPositionSnapshot) -> Void)?
+    /// playback_position 落点（nil = 无落点实现）。**返回 true 仅当这条真的落到了本地位置**
+    /// ——静态丢弃（不同曲 / 远端更旧 / 位置差过小）一律 false，账目按「未支持」披露。
+    var playbackPositionSink: ((SyncPlaybackPositionSnapshot) -> Bool)?
 
     /// 跨端续播开关（关 = 本端不接受 playback_position）。
     /// 注入 nil = 读真实设置（`DeleteSettings.syncPlaybackPositionEnabled`，默认关）；
@@ -276,11 +276,17 @@ struct SyncChangeLogApplier {
             return false
         }
         guard let playbackPositionSink else {
-            print("ℹ️ SyncChangeLogApplier: 跨端续播已开启但落点未接（M4-2 定本地存储），跳过 \(snapshot.trackStableId)")
+            print("ℹ️ SyncChangeLogApplier: 跨端续播已开启但落点未接，跳过 \(snapshot.trackStableId)")
             onPlaybackPositionUnsupported?()
             return false
         }
-        playbackPositionSink(snapshot)
+        guard playbackPositionSink(snapshot) else {
+            // 落点存在但**未接受**（不同曲 / 远端更旧 / 位置差过小）：仍然没落地，
+            // 不能计「已应用」（INV-20 的口径对这两条路一视同仁）。
+            print("ℹ️ SyncChangeLogApplier: 跨端续播落点未接受这条位置，跳过 \(snapshot.trackStableId)")
+            onPlaybackPositionUnsupported?()
+            return false
+        }
         return true
     }
 }

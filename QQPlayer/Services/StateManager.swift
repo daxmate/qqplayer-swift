@@ -303,3 +303,134 @@ extension StateManager {
         }
     }
 }
+
+// MARK: - 跨端续播（播放位置）：落点 + 捕获（2026-09-15）
+
+/// 跨端续播**落点**：把对端播放位置写进本机 `QQPlayerState`（**只改 playbackTime 一个键**）。
+///
+/// 语义（用户 2026-09-14 拍板：功能默认关，开关在同步面板）：
+/// - **同一首歌续播**：远端位置必须指向本机当前曲目（`currentTrackStableId` 相同）；
+///   不是同一首 → 不动本地状态（返回 false → 账目按「未支持」披露，绝不虚报已应用）；
+/// - LWW：远端 `updatedAtMs` 必须比本机 `lastSavedAt` 新；
+/// - 位置差 < `minDeltaMs` 视为无意义 → 不写（避免抖动）；
+/// - **绝不改 isPlaying**（保存态恒为 false = 启动不自动播放，既有不变量）。
+enum PlaybackPositionResumeSink {
+    /// 位置差小于该值视为无意义（毫秒）。
+    static let minDeltaMs: Int64 = 3_000
+    /// 播放状态在 UserDefaults 里的键（`PlayerEngine.savePlayerState` 写入）。
+    static let playerStateKey = "QQPlayerState"
+
+    /// 纯判定（可单测）：远端这条是否应落到本机状态。
+    static func shouldApply(
+        snapshot: SyncPlaybackPositionSnapshot,
+        localTrackStableId: String?,
+        localPositionMs: Int64,
+        localSavedAtMs: Int64
+    ) -> Bool {
+        guard let localTrackStableId, localTrackStableId == snapshot.trackStableId else { return false }
+        guard snapshot.updatedAtMs > localSavedAtMs else { return false }
+        return abs(snapshot.positionMs - localPositionMs) >= minDeltaMs
+    }
+
+    /// 生产落点：读-改-写**单个键**（不重建整个字典，免得弄丢队列等其余字段）。
+    @discardableResult
+    static func apply(
+        _ snapshot: SyncPlaybackPositionSnapshot,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard var state = defaults.dictionary(forKey: playerStateKey) else { return false }
+        let localPositionMs = Int64(((state["playbackTime"] as? Double) ?? 0) * 1000)
+        let localSavedAtMs = Int64(((state["lastSavedAt"] as? Date)?.timeIntervalSince1970 ?? 0) * 1000)
+        guard shouldApply(
+            snapshot: snapshot,
+            localTrackStableId: state["currentTrackStableId"] as? String,
+            localPositionMs: localPositionMs,
+            localSavedAtMs: localSavedAtMs
+        ) else { return false }
+        state["playbackTime"] = Double(snapshot.positionMs) / 1000
+        defaults.set(state, forKey: playerStateKey)
+        print("ℹ️ 跨端续播：已接受对端播放位置（同曲续播）")
+        return true
+    }
+}
+
+/// 跨端续播**捕获**：开关开时把本机播放位置**节流**记入 `sync_outbox`。
+/// 开关关 = 零 DB 访问（`recordIfEnabled` 直接返回），关着时完全无副作用。
+enum PlaybackPositionCapture {
+    /// 同曲内的最小上报间隔（换歌一定上报）。
+    static let minIntervalMs: Int64 = 60_000
+
+    struct Sample: Equatable, Sendable {
+        var trackStableId: String
+        var positionMs: Int64
+        var updatedAtMs: Int64
+    }
+
+    /// 纯判定（可单测）：这一次「保存播放状态」该不该记一条 outbox。
+    /// - 换歌 → 记（续播最需要的就是“换到哪首”）
+    /// - 同曲：距上次上报 ≥ `minIntervalMs` → 记；否则不记（定时器每 30s 一次，
+    ///   不节流会写出大量同键行）
+    static func shouldRecord(previous: Sample?, current: Sample) -> Bool {
+        guard let previous else { return true }
+        guard previous.trackStableId == current.trackStableId else { return true }
+        return current.updatedAtMs - previous.updatedAtMs >= minIntervalMs
+    }
+
+    /// 节流状态（锁保护）。`static let` 只共享**不可变引用**，可变状态在类内用锁串行化
+    /// （Swift 6 并发检查不允许裸的 nonisolated 可变全局状态）。
+    private final class ThrottleState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lastSample: Sample?
+
+        /// 判定并**就地**更新状态（同一把锁内完成，调用方不会看到中间态）。
+        func shouldRecord(_ current: Sample) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            let decision = PlaybackPositionCapture.shouldRecord(previous: lastSample, current: current)
+            if decision { lastSample = current }
+            return decision
+        }
+
+        func reset() {
+            lock.lock()
+            lastSample = nil
+            lock.unlock()
+        }
+    }
+
+    private static let throttle = ThrottleState()
+
+    /// 测试用：清掉节流状态（避免用例间相互影响）。
+    static func resetThrottleForTesting() {
+        throttle.reset()
+    }
+
+    /// 生产入口（`PlayerEngine.savePlayerState` 末尾调用）。
+    static func recordIfEnabled(trackStableId: String, positionMs: Int64, enabled: Bool) {
+        guard enabled, !trackStableId.isEmpty else { return }
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        let sample = Sample(trackStableId: trackStableId, positionMs: positionMs, updatedAtMs: nowMs)
+        guard throttle.shouldRecord(sample) else { return }
+
+        let snapshot = SyncPlaybackPositionSnapshot(
+            trackStableId: trackStableId,
+            positionMs: positionMs,
+            updatedAtMs: nowMs
+        )
+        // DB 写在后台队列：本方法在播放/定时器上下文（主线程）里调用，不在这里同步写盘。
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                let payloadJSON = try SyncSnapshotCodec.encode(snapshot)
+                try SyncChangeLogStore(database: .shared).record(
+                    entity: .playbackPosition,
+                    rowKey: trackStableId,
+                    op: .upsert,
+                    payloadJSON: payloadJSON,
+                    updatedAtMs: nowMs
+                )
+            } catch {
+                print("⚠️ 跨端续播：播放位置上报失败 \(error)")
+            }
+        }
+    }
+}

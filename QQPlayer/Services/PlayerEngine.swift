@@ -279,6 +279,14 @@ class PlayerEngine: NSObject, ObservableObject {
         UserDefaults.standard.set(playerState, forKey: "QQPlayerState")
         UserDefaults.standard.synchronize()
         print("✅ Player state saved to UserDefaults (offline, per-device)")
+
+        // S2-T12+（2026-09-15）：跨端续播（同步面板开关，默认关）。
+        // 关 = `recordIfEnabled` 直接 return：不读设置外的任何东西、不碰 DB、不写 outbox。
+        PlaybackPositionCapture.recordIfEnabled(
+            trackStableId: currentTrack.stableId,
+            positionMs: Int64(positionToPersist * 1000),
+            enabled: DeleteSettings.load().syncPlaybackPositionEnabled
+        )
     }
 
     private func cappedTrackIdsForPersistence(_ trackIds: [String], currentIndex: Int) -> ([String], Int) {
