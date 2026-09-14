@@ -103,6 +103,27 @@ struct SyncSettingsView: View {
                 Text("sync_client_identity_footer".localized)
             }
 
+            // MARK: 跳端续播（播放位置）——与 Mac 同步面板**同一个设置项**（默认关）
+            //
+            // 2026-09-15：开关只有面板入口时，手机端读到的永远是默认值（关）——
+            // 于是「开一台 = 单向」成为默认事实。这里补上 iOS 入口，两端都开才真正双向。
+            // 绑定直接读写 `DeleteSettings`（无本地 @State），避免双源不同步。
+            Section {
+                Toggle(
+                    "sync_run_playback_position_toggle".localized,
+                    isOn: Binding(
+                        get: { DeleteSettings.load().syncPlaybackPositionEnabled },
+                        set: { newValue in
+                            var settings = DeleteSettings.load()
+                            settings.syncPlaybackPositionEnabled = newValue
+                            settings.save()
+                        }
+                    )
+                )
+            } footer: {
+                Text("sync_run_playback_position_help".localized)
+            }
+
             // MARK: 已配对主机
             Section {
                 if hosts.isEmpty {
