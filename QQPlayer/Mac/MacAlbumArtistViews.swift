@@ -333,56 +333,61 @@ struct MacPlaylistListView: View {
     // MARK: 主页（自动歌单卡片 + 普通歌单列表）
 
     private var home: some View {
-        VStack(spacing: 0) {
-            // Pinned automatic playlists — always visible, never user-editable.
-            MacSmartPlaylistCardStrip(cards: smartCards, coverTracks: smartCoverTracks) { kind in
-                detailTarget = .smart(kind)
-            }
-            Divider()
-
-            List {
-                Section {
-                    Button {
-                        newPlaylistName = ""
-                        showNewPlaylistAlert = true
-                    } label: {
-                        Label("create_new_playlist".localized, systemImage: "plus")
-                    }
+        // 2026-09-14 用户反馈：「垂直方向超出屏幕，要可以上下滚动」——原先卡片条钉在
+        // List **上方**（VStack{条; Divider; List}）：卡片不参与滚动，2 行卡片（≈450pt）
+        // 一占位，下面歌单只剩一小条，窗口一矮整页也滚不动。改为把卡片条搬进 List
+        // 当第一段 → 整页（卡片 + 歌单）同一滚动容器，与 iOS `PlaylistsScreen`
+        // （卡片与歌单同处一个 ScrollView）同一做法。
+        List {
+            Section {
+                MacSmartPlaylistCardStrip(cards: smartCards, coverTracks: smartCoverTracks) { kind in
+                    detailTarget = .smart(kind)
                 }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+            Section {
+                Button {
+                    newPlaylistName = ""
+                    showNewPlaylistAlert = true
+                } label: {
+                    Label("create_new_playlist".localized, systemImage: "plus")
+                }
+            }
 
-                Section {
-                    ForEach(playlists, id: \.id) { playlist in
-                        let playlistFacts = facts.playlistFacts(for: playlist)
-                        Button {
-                            detailTarget = .manual(playlist)
-                        } label: {
-                            HStack(spacing: 10) {
-                                MacArtworkThumbnail(
-                                    track: playlistFacts.representativeTrack,
-                                    size: 36,
-                                    cornerRadius: 6,
-                                    placeholderIcon: "list.bullet.rectangle"
-                                )
-                                Text(playlist.title)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text(String(format: "track_count".localized, playlistFacts.itemCount))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .contentShape(Rectangle())
+            Section {
+                ForEach(playlists, id: \.id) { playlist in
+                    let playlistFacts = facts.playlistFacts(for: playlist)
+                    Button {
+                        detailTarget = .manual(playlist)
+                    } label: {
+                        HStack(spacing: 10) {
+                            MacArtworkThumbnail(
+                                track: playlistFacts.representativeTrack,
+                                size: 36,
+                                cornerRadius: 6,
+                                placeholderIcon: "list.bullet.rectangle"
+                            )
+                            Text(playlist.title)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(String(format: "track_count".localized, playlistFacts.itemCount))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        // 文件拖到歌单行 → 导入并加入该歌单（web 侧栏 drop 的
-                        // 等价物；B 组，2026-09-03）。行级 drop 优先于窗口级。
-                        .onDrop(
-                            of: [UTType.fileURL],
-                            isTargeted: nil
-                        ) { providers in
-                            guard let playlistId = playlist.id else { return false }
-                            handleDrop(on: providers, playlistId: playlistId)
-                            return true
-                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    // 文件拖到歌单行 → 导入并加入该歌单（web 侧栏 drop 的
+                    // 等价物；B 组，2026-09-03）。行级 drop 优先于窗口级。
+                    .onDrop(
+                        of: [UTType.fileURL],
+                        isTargeted: nil
+                    ) { providers in
+                        guard let playlistId = playlist.id else { return false }
+                        handleDrop(on: providers, playlistId: playlistId)
+                        return true
                     }
                 }
             }
