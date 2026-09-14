@@ -1304,6 +1304,9 @@
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
 "sync_run_data_section" = "播放資料";
 "sync_run_data_description" = "獨立於檔案傳輸，只同步收藏 / 播放紀錄 / 播放列表，不傳歌曲。";
+// 跨端續播開關（2026-09-14）：預設關；本步開啟也只允許兩端交換，上報/落點見下個版本
+"sync_run_playback_position_toggle" = "跨端續播（播放位置）";
+"sync_run_playback_position_help" = "預設關閉：本機不上報也不接受播放位置。開啟後允許兩端交換播放位置（本機上報與落點見下個版本接入）。";
 "sync_run_data_button" = "同步資料";
 "sync_run_data_help" = "把收藏、播放紀錄、播放列表與 iPhone 合併";
 "sync_run_data_cancel" = "取消";
@@ -1315,8 +1318,10 @@
 "sync_run_data_result_skipped" = "略過刪除";
 "sync_run_data_result_unresolved" = "未定位";
 "sync_run_data_result_missing_identity" = "缺指紋";
+"sync_run_data_unsupported" = "未支援";
 "sync_run_data_pending_hint" = "有 %d 筆變更在等本機缺少的歌曲，歌曲到位後會自動生效。";
 "sync_run_data_unresolved_hint" = "有 %d 筆變更在本機找不到對應歌曲，沒有套用。";
+"sync_run_data_unsupported_hint" = "有 %d 筆播放位置變更沒有套用（跨端續播關閉，或本機上報與落點尚未接入）。";
 "sync_run_data_missing_identity_hint" = "有 %d 筆變更沒有帶歌曲指紋，對端無法定位。";
 "sync_run_data_result_none" = "還沒有同步過播放資料。";
 "sync_run_data_cancelled" = "資料同步已取消。";

@@ -28,8 +28,8 @@
 //       超时未收到应答 → finished + `failureMessage`（不静默挂死）。
 //
 //  ⚠️ 拉取方向的应收数 = 帧 9 到达（本端 peer 的 onPushApplied / onPushSuspended /
-//  onPushIgnoredDeletes / onPushUnresolved 四者**累加**回填账目）。四个回调**任一**到达即视为
-//  「对端已应答」——`handlePush` 内四者总是同步顺序触发，不在其中挑一个「最后一个」当判据
+//  onPushIgnoredDeletes / onPushUnresolved / onPushUnsupported 五者**累加**回填账目）。五个回调**任一**到达即视为
+//  「对端已应答」——`handlePush` 内五者总是同步顺序触发，不在其中挑一个「最后一个」当判据
 //  （那会把正确性押在别人代码的调用顺序上）；账目后续帧继续累加，收尾后仍可能被迟到帧回填。
 //
 //  ⚠️ 两个**本端发送侧**回调（onIncrementMissingIdentity / onPullMissingIdentity）只累加
@@ -71,6 +71,10 @@ struct SyncDataSyncReport: Equatable, Sendable {
     /// 拉取方向：对端推来的行里因**缺身份键**（contentHash nil/空）而**未落库**的行数
     /// （无法定位到本地歌曲 → 落库也永远不可见；见 `SyncEntryLocalization.unresolved`）
     var unresolvedEntries: Int = 0
+    /// 拉取方向：对端推来的 `playback_position` 行里**没有落到本地位置**的行数
+    /// （跨端续播开关关 = 默认，或开关开但本端落点未接；见 `SyncChangeLogApplier`）。
+    /// ⚠️ 这些行**不计入 `appliedEntries`**——「已应用」= 真的落了本地（INV-20）。
+    var unsupportedEntries: Int = 0
     /// 推送方向：本端发出去的行里缺身份键的条数（对端定位不了它们；含主动推增量
     /// 与应答对方拉取两个方向）
     var pushedMissingIdentityEntries: Int = 0
@@ -181,6 +185,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         peer.onPushApplied = { [weak self] count in self?.recordApplied(count) }
         peer.onPushSuspended = { [weak self] count in self?.recordSuspended(count) }
         peer.onPushUnresolved = { [weak self] count in self?.recordUnresolved(count) }
+        peer.onPushUnsupported = { [weak self] count in self?.recordUnsupported(count) }
         peer.onPushIgnoredDeletes = { [weak self] count in self?.recordIgnoredDeletes(count) }
         // 发送侧缺身份键：只累加账目，**不收尾**（见文件头：推送阶段触发 / 入站帧触发，
         // 两者都不是「对端应答了本端拉取」）。
@@ -246,6 +251,15 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private func recordUnresolved(_ count: Int) {
         lock.lock()
         reportValue.unresolvedEntries += count
+        lock.unlock()
+        finish(failure: nil)
+    }
+
+    /// 拉取方向：对端推来的播放位置行**没落地**（跨端续播关 = 默认 / 落点未接）。
+    /// 与其它四个「应答已到」回调用同一收尾语义；applier 侧已保证这些行不计 applied。
+    private func recordUnsupported(_ count: Int) {
+        lock.lock()
+        reportValue.unsupportedEntries += count
         lock.unlock()
         finish(failure: nil)
     }

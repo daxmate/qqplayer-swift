@@ -442,6 +442,154 @@ struct SyncDataSyncCoreTests {
         #expect(coordinator.report.failureMessage != nil, "超时必须有可读原因，不静默挂死")
         #expect(coordinator.report.isFinished)
     }
+
+    // MARK: - 跨端续播开关（2026-09-14：默认关；关 = 不上报也不接受播放位置）
+
+    /// 单端内存库（applier 用例不需要双端会话）。
+    private func makeManager() throws -> DatabaseManager {
+        let queue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: queue)
+        try manager.createTables()
+        return manager
+    }
+
+    /// 一条 playback_position 远端胜出行（row_key = 歌键；payload = 快照）。
+    private static func playbackPositionRow(rowKey: String) throws -> SyncChangeLogRow {
+        SyncChangeLogRow(
+            entity: .playbackPosition,
+            rowKey: rowKey,
+            op: .upsert,
+            updatedAtMs: 1000,
+            payloadJSON: try SyncSnapshotCodec.encode(
+                SyncPlaybackPositionSnapshot(trackStableId: rowKey, positionMs: 500, updatedAtMs: 1000)
+            )
+        )
+    }
+
+    /// 本端 outbox 记一条播放位置（发送方向，用于端到端账目用例）。
+    private static func recordPlaybackPosition(
+        _ queue: DatabaseQueue,
+        rowKey: String,
+        updatedAtMs: Int64
+    ) throws {
+        try queue.write { db in
+            try SyncChangeLogStore.record(
+                db,
+                entity: .playbackPosition,
+                rowKey: rowKey,
+                op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlaybackPositionSnapshot(trackStableId: rowKey, positionMs: 500, updatedAtMs: updatedAtMs)
+                ),
+                updatedAtMs: updatedAtMs
+            )
+        }
+    }
+
+    /// 真 UserDefaults 用例的保存/恢复（键名与 `DeleteSettings.load()` 内部一致）。
+    private func withSettingsBackup(_ body: () throws -> Void) rethrows {
+        let backup = UserDefaults.standard.data(forKey: "DeleteSettings")
+        defer {
+            if let backup {
+                UserDefaults.standard.set(backup, forKey: "DeleteSettings")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "DeleteSettings")
+            }
+        }
+        try body()
+    }
+
+    @Test("开关：旧数据（无 syncPlaybackPositionEnabled）→ false；save/load 往返 true")
+    func playbackPositionSwitchDefaultsOffAndRoundTrips() throws {
+        // 1) 旧设置文件（JSON 里没有这个 key）必须解出「关」，且不得解码失败
+        let legacy = try JSONDecoder().decode(DeleteSettings.self, from: Data("{}".utf8))
+        #expect(legacy.syncPlaybackPositionEnabled == false)
+
+        // 2) 写 true → load 回来 true（真 UserDefaults；测后恢复原值，不污染其它用例）
+        try withSettingsBackup {
+            var settings = DeleteSettings.load()
+            settings.syncPlaybackPositionEnabled = true
+            settings.save()
+            #expect(DeleteSettings.load().syncPlaybackPositionEnabled, "写 true 后 load 回来必须是 true")
+        }
+    }
+
+    @Test("applier：开关关 → 不落点、不计「已应用」，未支持回调收到 1")
+    func applierSkipsPlaybackPositionWhenSwitchOff() throws {
+        let manager = try makeManager()
+        var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: false)
+        let sinkCalls = CounterBox()
+        let unsupported = CounterBox()
+        applier.playbackPositionSink = { _ in sinkCalls.increment() }
+        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+
+        let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
+
+        #expect(applied == 0, "关：这条没落到任何本地位置，不得计入「已应用」（INV-20）")
+        #expect(unsupported.value == 1, "必须计数上屏（面板披露）")
+        #expect(sinkCalls.value == 0, "关 = 不落点，sink 不得被调")
+    }
+
+    @Test("applier：开关开 + 注入落点 → 调 sink、计「已应用」、不报未支持")
+    func applierAppliesPlaybackPositionWithSink() throws {
+        let manager = try makeManager()
+        var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: true)
+        let sinkCalls = CounterBox()
+        let unsupported = CounterBox()
+        applier.playbackPositionSink = { _ in sinkCalls.increment() }
+        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+
+        let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
+
+        #expect(applied == 1)
+        #expect(sinkCalls.value == 1)
+        #expect(unsupported.value == 0)
+    }
+
+    @Test("applier：开关开但落点未接 → 计未支持、不计「已应用」")
+    func applierSkipsPlaybackPositionWithoutSink() throws {
+        let manager = try makeManager()
+        var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: true)
+        let unsupported = CounterBox()
+        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+
+        let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
+
+        #expect(applied == 0, "无落点实现 = 这条没落地，不得计入「已应用」")
+        #expect(unsupported.value == 1)
+    }
+
+    @Test("端到端：开关关（默认）→ 对端推来的播放位置不计「应用」，计入未支持")
+    func coordinatorCountsUnsupportedPlaybackPosition() throws {
+        let pair = try makePair()
+        let responder = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)
+        _ = responder
+
+        // 两端同一首歌（contentHash 一致 → 能本地化）；对端 outbox 有该歌的播放位置
+        try Self.insertTrack(pair.hostQueue, stableId: "host-1", contentHash: "H-1")
+        try Self.insertTrack(pair.clientQueue, stableId: "client-1", contentHash: "H-1")
+        try Self.recordPlaybackPosition(pair.clientQueue, rowKey: "client-1", updatedAtMs: 1000)
+
+        // 显式置「关」（= 默认值）并在结束后恢复原值：不依赖本机设置、也不污染它
+        try withSettingsBackup {
+            var settings = DeleteSettings.load()
+            settings.syncPlaybackPositionEnabled = false
+            settings.save()
+
+            let coordinator = SyncDataSyncCoordinator(
+                session: pair.fixture.hostSession,
+                database: pair.hostManager,
+                peerID: pair.clientID
+            )
+            coordinator.start()
+
+            #expect(coordinator.phase == .finished)
+            let report = coordinator.report
+            #expect(report.appliedEntries == 0, "播放位置没落地 → 不得虚报「已应用」（INV-20）")
+            #expect(report.unsupportedEntries == 1, "未落地的播放位置行必须计数上屏")
+            #expect(report.failureMessage == nil)
+        }
+    }
 }
 
 // MARK: - 测试辅助（闭包捕获盒子；避免在 @MainActor 测试里捕获可变局部变量）

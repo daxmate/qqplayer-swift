@@ -955,6 +955,9 @@
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
 "sync_run_data_section" = "Playback Data";
 "sync_run_data_description" = "Syncs favorites, play history and playlists on their own — no songs are transferred.";
+// Cross-device resume switch (2026-09-14): off by default; turning it on only allows exchange for now
+"sync_run_playback_position_toggle" = "Cross-device resume (playback position)";
+"sync_run_playback_position_help" = "Off by default: this Mac neither reports nor accepts playback positions. When on, the two devices may exchange playback positions (reporting and applying on this side arrive in a later version).";
 "sync_run_data_button" = "Sync Data";
 "sync_run_data_help" = "Merge favorites, play history and playlists with your iPhone";
 "sync_run_data_cancel" = "Cancel";
@@ -966,8 +969,10 @@
 "sync_run_data_result_skipped" = "Deletions skipped";
 "sync_run_data_result_unresolved" = "Unresolved";
 "sync_run_data_result_missing_identity" = "Missing fingerprint";
+"sync_run_data_unsupported" = "Unsupported";
 "sync_run_data_pending_hint" = "%d entries are waiting for songs this Mac doesn't have yet.";
 "sync_run_data_unresolved_hint" = "%d entries couldn't be matched to a song on this Mac, so they were not applied.";
+"sync_run_data_unsupported_hint" = "%d playback-position changes were not applied (cross-device resume is off, or this Mac doesn't report or apply yet).";
 "sync_run_data_missing_identity_hint" = "%d entries were sent without a song fingerprint, so the other device can't match them.";
 "sync_run_data_result_none" = "No data sync has run yet.";
 "sync_run_data_cancelled" = "Data sync cancelled.";

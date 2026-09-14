@@ -240,6 +240,11 @@ struct DeleteSettings: Codable {
     /// 批量刮削开关（web scraping.batch_enabled；默认关，关时批量入口隐藏+服务拒接）
     var scrapingBatchEnabled: Bool = false
 
+    // MARK: - 跨端续播（播放位置）
+
+    /// 跨端续播（播放位置）开关；默认关（2026-09-14 用户拍板）。关 = 本端既不上报也不接受 playback_position
+    var syncPlaybackPositionEnabled: Bool = false
+
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
 
@@ -289,6 +294,10 @@ struct DeleteSettings: Codable {
         scrapingSourceOrder = try container.decodeIfPresent([String].self, forKey: .scrapingSourceOrder)
             ?? ["netease", "musicbrainz"]
         scrapingBatchEnabled = try container.decodeIfPresent(Bool.self, forKey: .scrapingBatchEnabled) ?? false
+        // 跨端续播开关：旧设置文件（无此 key）必须是「关」——decodeIfPresent 兜底，绝不解码失败。
+        syncPlaybackPositionEnabled = try container.decodeIfPresent(
+            Bool.self, forKey: .syncPlaybackPositionEnabled
+        ) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

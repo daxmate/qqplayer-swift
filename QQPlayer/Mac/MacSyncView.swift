@@ -47,6 +47,8 @@ struct MacSyncRunSection: View {
     @State private var libraryWidePreview: SyncUISelectionSummary = .empty
     /// 失败清单展开态。
     @State private var showFailures = false
+    /// 本页设置读写（跨端续播开关；与 MacSettingsView 同做法：load → 改 → save）。
+    @State private var deleteSettings = DeleteSettings.load()
     /// 单曲搜索防抖任务。
     @State private var searchTask: Task<Void, Never>?
 
@@ -72,7 +74,10 @@ struct MacSyncRunSection: View {
             resultSection
             dataSection
         }
-        .onAppear { model.onAppear() }
+        .onAppear {
+            model.onAppear()
+            deleteSettings = DeleteSettings.load()
+        }
         .onDisappear {
             searchTask?.cancel()
             content.onDisappear()
@@ -901,6 +906,14 @@ struct MacSyncRunSection: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            // 跨端续播开关（默认关；关 = 本端既不上报也不接受播放位置）。
+            // 文案必须与真实行为逐字一致：本步开也只允许交换，上报/落点见下一版本。
+            Toggle("sync_run_playback_position_toggle".localized, isOn: $deleteSettings.syncPlaybackPositionEnabled)
+                .onChange(of: deleteSettings.syncPlaybackPositionEnabled) { _ in
+                    deleteSettings.save()
+                }
+                .help("sync_run_playback_position_help".localized)
+
             HStack(spacing: 12) {
                 if dataModel.isRunning {
                     Button("sync_run_data_cancel".localized, role: .destructive) {
@@ -975,8 +988,8 @@ struct MacSyncRunSection: View {
         }
     }
 
-    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 缺指纹（本端发出）/ 忽略删除
-    /// + 各自解释。
+    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 未支持（播放位置未落地）
+    /// / 缺指纹（本端发出）/ 忽略删除 + 各自解释。
     @ViewBuilder
     private var dataResult: some View {
         let report = dataModel.report
@@ -993,6 +1006,11 @@ struct MacSyncRunSection: View {
                     "sync_run_data_result_unresolved".localized,
                     report.unresolvedEntries,
                     report.unresolvedEntries > 0 ? .orange : .secondary
+                )
+                metric(
+                    "sync_run_data_unsupported".localized,
+                    report.unsupportedEntries,
+                    report.unsupportedEntries > 0 ? .orange : .secondary
                 )
                 metric(
                     "sync_run_data_result_missing_identity".localized,
@@ -1013,6 +1031,13 @@ struct MacSyncRunSection: View {
 
             if report.unresolvedEntries > 0 {
                 Text("sync_run_data_unresolved_hint".localized(with: report.unresolvedEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.unsupportedEntries > 0 {
+                Text("sync_run_data_unsupported_hint".localized(with: report.unsupportedEntries))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

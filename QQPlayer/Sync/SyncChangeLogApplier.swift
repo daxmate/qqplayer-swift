@@ -36,6 +36,11 @@
 //    v1 不落库：通过 playbackPositionSink 注入回调（测试用内存捕获）；生产
 //    接线（写 UserDefaults QQPlayerState / 未来 DB 行）留 M4-2 定本地载体。
 //    entity 枚举/行模型/LWW/协议层已支持，payload 见 SyncPlaybackPositionSnapshot。
+//    ⚠️ 跨端续播开关（2026-09-14）：`playbackPositionSyncEnabled` 关（默认）/ 开但
+//    sink 未接时，该行**不落任何本地位置**——因此**不算「已应用」**（不返回 true），
+//    只触发 `onPlaybackPositionUnsupported`（面板据此披露「未支持」）。
+//    修复 INV-20：先前 sink == nil 时 print「丢弃」却 return true
+//    ⇒ 面板报「已应用 N」而本地零变化。
 //
 //  线程：应用走 DatabaseManager.write（同步）；调用方负责串行（会话层锁外）。
 //
@@ -47,12 +52,25 @@ struct SyncChangeLogApplier {
     /// internal（M4-2a）：会话层用它构造跨端映射器/挂起存储（同一库连接）。
     let database: DatabaseManager
 
-    /// playback_position 落点（v1 可选注入；nil = 丢弃并打印调试日志）。
+    /// playback_position 落点（v1 可选注入；nil = 无落点实现，见 `playbackPositionSyncEnabled`）。
     /// 生产接线（写 UserDefaults QQPlayerState / 未来 DB 行）留 M4-2。
     var playbackPositionSink: ((SyncPlaybackPositionSnapshot) -> Void)?
 
-    init(database: DatabaseManager) {
+    /// 跨端续播开关（关 = 本端不接受 playback_position）。
+    /// 注入 nil = 读真实设置（`DeleteSettings.syncPlaybackPositionEnabled`，默认关）；
+    /// 测试注入明确的 true/false，不依赖真实 UserDefaults。
+    let playbackPositionSyncEnabled: Bool
+
+    /// 一条 playback_position 行**没有落到任何本地位置**时逐条触发。
+    /// 两种成因合并成一个回调（面板口径都是「这条没应用」，本步不区分）：
+    /// ① 开关关（默认，本端不接受）；② 开关开但落点未接（sink 由下一版本接入）。
+    /// 调用方（SyncChangeLogPeer）据此计数 → 账目 → 面板披露。
+    var onPlaybackPositionUnsupported: (() -> Void)?
+
+    init(database: DatabaseManager, playbackPositionSyncEnabled: Bool? = nil) {
         self.database = database
+        self.playbackPositionSyncEnabled = playbackPositionSyncEnabled
+            ?? DeleteSettings.load().syncPlaybackPositionEnabled
     }
 
     /// 应用一批远端胜出行（顺序无关；每行独立事务，单行失败不影响其余行）。
@@ -244,13 +262,25 @@ struct SyncChangeLogApplier {
     }
 
     /// v2：delete 已在 applyOne 入口丢弃（删除不传播），这里只处理 upsert。
+    ///
+    /// 返回 true **仅当**这一条真的落到了本地位置（调用了 sink）——「已应用」= 真的落库，
+    /// 静默丢弃一律返回 false（INV-20）。两种未落地情形：
+    /// - 开关关（默认）：本端不接受播放位置，不调 sink；
+    /// - 开关开但 sink 未接（落点实现由下一版本接入）：同样不调 sink。
+    /// 两者都触发 `onPlaybackPositionUnsupported`（本步在账目/面板上不区分）。
     private func applyPlaybackPosition(payloadJSON: String?) throws -> Bool {
         let snapshot = try SyncSnapshotCodec.decode(SyncPlaybackPositionSnapshot.self, from: payloadJSON)
-        if let playbackPositionSink {
-            playbackPositionSink(snapshot)
-        } else {
-            print("ℹ️ SyncChangeLogApplier: playback_position 落点未接（M4-2 定本地存储），丢弃 \(snapshot.trackStableId)")
+        guard playbackPositionSyncEnabled else {
+            print("ℹ️ SyncChangeLogApplier: 跨端续播已关闭，不接受播放位置，跳过 \(snapshot.trackStableId)")
+            onPlaybackPositionUnsupported?()
+            return false
         }
+        guard let playbackPositionSink else {
+            print("ℹ️ SyncChangeLogApplier: 跨端续播已开启但落点未接（M4-2 定本地存储），跳过 \(snapshot.trackStableId)")
+            onPlaybackPositionUnsupported?()
+            return false
+        }
+        playbackPositionSink(snapshot)
         return true
     }
 }

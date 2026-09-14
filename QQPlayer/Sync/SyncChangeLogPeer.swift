@@ -44,7 +44,10 @@
 //  applier（都注入 DatabaseManager，测试用内存库）。
 //
 //  v1 范围：播放位置上下文（playback_position）本地载体非 DB 行，应用走
-//  applier 的 playbackPositionSink（nil = 丢弃，M4-2 接本地存储）。端到端
+//  applier 的 playbackPositionSink（nil = 不落任何位置，M4-2 接本地存储）。
+//  ⚠️ 跨端续播开关（2026-09-14）：开关关（默认）或开关开但落点未接时，这些行
+//  既不算「已应用」（applier 返回 false）也不静默丢——按批计数经 `onPushUnsupported`
+//  上报（面板披露「未支持」）。端到端
 //  "自动同步调度"（何时发起 pull）归 M4-2/UI，本类只做收到帧后的处理与
 //  应答，可单测级验证。
 //
@@ -59,7 +62,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
 
     private let session: SyncPeerSession
     private let store: SyncChangeLogStore
-    private let applier: SyncChangeLogApplier
+    /// ⚠️ var（非 let）：init 里要把「未支持」回调装到自己的这份 applier 上（见下）。
+    private var applier: SyncChangeLogApplier
     /// 跨端歌曲引用映射（发送侧填 contentHash / 接收侧本地化，M4-2a）。
     private let mapper: SyncChangeLogMapper
     /// 本地还没有该歌时挂起远端变更，歌到后由 SyncChangeLogReplay 重放。
@@ -78,6 +82,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPushUnresolved: ((Int) -> Void)?
     /// push 中被忽略的 delete 行数（v2 删除不传播；锁外触发；0 = 无忽略）。
     var onPushIgnoredDeletes: ((Int) -> Void)?
+    /// push 中**没落到本地位置**的 playback_position 行数（跨端续播开关关 = 默认，
+    /// 或开关开但落点未接；这些行不计入 `onPushApplied`）。锁外触发；0 = 不上报。
+    var onPushUnsupported: ((Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
@@ -87,6 +94,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onIncrementMissingIdentity: ((Int) -> Void)?
     /// 应答远端拉取时，本批上线行里缺身份键的行数（锁外触发；0 条不触发）。
     var onPullMissingIdentity: ((Int) -> Void)?
+
+    /// 本批 applier 报「未支持」的次数（handlePush 内单线程累加，应用后读值并清零）。
+    private var unsupportedPlaybackPositionCount = 0
 
     // 会话槽位链式挂接
     private var priorAppHandler: ((SyncFrame) -> Void)?
@@ -105,6 +115,11 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         self.mapper = SyncChangeLogMapper(database: applier.database)
         self.pendingStore = SyncChangeLogPendingStore(database: applier.database)
         self.peerID = peerID
+        // 「未支持」计数的唯一入口：applier 每报一条没落地的播放位置，本批计数 +1。
+        // ⚠️ 装在自己的这份 applier 上（struct 值类型，不影响调用方持有的那份）。
+        self.applier.onPlaybackPositionUnsupported = { [weak self] in
+            self?.unsupportedPlaybackPositionCount += 1
+        }
         attachHandlers()
     }
 
@@ -302,13 +317,17 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             }
             // LWW 合并 → 应用远端胜出行
             let mergeResult = SyncLWWReconcile.merge(localRows: localRows, remoteRows: remoteRows)
+            // 播放位置未落地（跨端续播关 / 落点未接）逐条回调 → 本批累加（应用前清零）。
+            unsupportedPlaybackPositionCount = 0
             let applied = try applier.apply(mergeResult.applyRemote)
+            let unsupported = unsupportedPlaybackPositionCount
             // 推进本端对该 peer 的游标（挂起行已持久化，游标可安全推进：数据不丢）
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
             onPushSuspended?(suspended)
             onPushUnresolved?(unresolved.count)
             onPushIgnoredDeletes?(ignoredDeletes)
+            if unsupported > 0 { onPushUnsupported?(unsupported) }
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
         }

@@ -562,6 +562,11 @@
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(count)，缺身份键）")
             }
+            // 跨端续播关（默认）/ 落点未接：播放位置行不落地、也不计入「已应用」。
+            peer.onPushUnsupported = { count in
+                guard count > 0 else { return }
+                print("ℹ️ SyncChangeLogPeer: 跳过未落地的播放位置行（行数=\(count)，跨端续播关或落点未接）")
+            }
             peer.onPullMissingIdentity = { count in
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 应答拉取时有 \(count) 行缺身份键（对端定位不了）")
