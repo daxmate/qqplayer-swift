@@ -2,7 +2,7 @@
 
 ## 项目来源声明
 
-**QQPlayer (iOS)** 是基于 **QQPlayer** 的衍生作品（fork），遵循 **GNU General Public License v3.0**。
+**QQPlayer (iOS)** 是基于 **Cosmos Music Player** 的衍生作品（fork），遵循 **GNU General Public License v3.0**。
 
 - **原作者**: Raphael Boullay Le Fur（GitHub: [clquwu](https://github.com/clquwu)）
 - **原项目**: [Cosmos Music Player](https://github.com/clquwu/Cosmos-Music-Player)
@@ -23,5 +23,14 @@
 - 保留本 NOTICE 与 LICENSE 文件
 - 提供完整源代码（本仓库即源代码）
 - 保持 GPL-3.0 许可不变
+
+## 上游附加许可（GPLv3 §7 — Apple App Store 分发）
+
+本仓库通过 Apple App Store 分发 iOS 版本。为此，上游版权人 **Raphael Boullay Le Fur**（Cosmos Music Player 作者）已就本项目的 GPLv3 **§7 additional permission** 请求作出书面同意（2026-09-14）：允许 QQPlayer 及其衍生作品通过 Apple App Store 分发，不受与 GPL-3.0 冲突的平台条款限制。
+
+- 凭据原文、当事人与范围： [`docs/compliance/upstream-permission.md`](docs/compliance/upstream-permission.md)
+- 该附加许可**不改变**本仓库的整体 GPL-3.0 许可，也不免除源码公开义务
+
+## 独立项目
 
 桌面端 QQPlayer（FastAPI 后端 + Web 前端）为独立项目，与本仓库无代码衍生关系，其许可不受本仓库影响。
