@@ -254,3 +254,58 @@ enum SmartPlaylistStore {
         return "a.year IS NULL OR a.year < 1000 OR a.year > 9999"
     }
 }
+
+// MARK: - 置顶自动歌单卡片的网格布局（纯函数 + 单一事实源）
+
+/// 自动歌单卡片网格的列数 / 卡宽计算。**唯一事实源**：macOS 的置顶卡片条
+/// （`MacSmartPlaylistCardStrip`）与测试都读这里——此前这两个函数与阈值常量写在
+/// `QQPlayer/Mac/`（iOS 单测 target 编不到），于是"4 张卡挤成一行、折不下来"这类
+/// 参数问题没有任何兜底（2026-09-14 用户反馈）。
+///
+/// 阈值语义（macOS 歌单列宽典型 400–700pt）：
+/// - `minCardWidth = 176`（与 iOS 两列卡宽同量级）→ 2 列需要可用宽 ≥ 2×176+12 = 364pt，
+///   即列宽 ≥ ~396pt：**典型窗口就是 2×2 两行**；4 张一行需要可用宽 ≥ 740pt（列宽 ≥ ~772pt），
+///   只有很宽的窗口才会出现。
+/// - `maxCardWidth = 300`：宽列下卡不至于过大。
+enum SmartPlaylistGridLayout {
+    /// 卡宽下限（低于此值封面拼贴与标题不可读）。
+    static let minCardWidth: CGFloat = 176
+    /// 卡宽上限（宽列下单卡不过大）。
+    static let maxCardWidth: CGFloat = 300
+    /// 卡间距 / 条带左右内边距（列数与卡宽计算共用）。
+    static let spacing: CGFloat = 12
+    static let horizontalPadding: CGFloat = 16
+
+    /// 卡片条列数：先算「卡宽不低于 minCardWidth」时能放几列，再在这个上限内挑一个
+    /// 能把最后一行也填满的列数（4 张卡 → 4 或 2 列，避免 3+1 这种半空行）。
+    /// availableWidth <= 0 表示本帧还没量到宽度，先按一行排，量到后立即重排。
+    static func stripColumnCount(
+        cardCount: Int,
+        availableWidth: CGFloat,
+        minCardWidth: CGFloat = minCardWidth,
+        spacing: CGFloat = spacing
+    ) -> Int {
+        guard cardCount > 0 else { return 1 }
+        guard availableWidth > 0 else { return cardCount }
+        let fitting = Int((availableWidth + spacing) / (minCardWidth + spacing))
+        let bounded = max(1, min(cardCount, fitting))
+        guard bounded > 1 else { return 1 }
+        for candidate in stride(from: bounded, through: 2, by: -1) where cardCount % candidate == 0 {
+            return candidate
+        }
+        return bounded
+    }
+
+    /// 卡片宽度：行内均分可用宽度，夹在 [minCardWidth, maxCardWidth] 之间。
+    static func stripCardWidth(
+        columns: Int,
+        availableWidth: CGFloat,
+        minCardWidth: CGFloat = minCardWidth,
+        maxCardWidth: CGFloat = maxCardWidth,
+        spacing: CGFloat = spacing
+    ) -> CGFloat {
+        guard columns > 0, availableWidth > 0 else { return minCardWidth }
+        let evenly = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+        return min(max(evenly, minCardWidth), maxCardWidth)
+    }
+}

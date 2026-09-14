@@ -236,4 +236,71 @@ struct SmartPlaylistDataTests {
             #expect(Self.stableIds(decades) == ["t1", "t7", "t6", "t3"])
         }
     }
+    // MARK: - 置顶卡片网格布局（2026-09-14：阈值与算法上收共享层 + 补兜底）
+
+    /// 条带内边距换算：视图传入的是「列宽」，布局算的是「列宽 − 左右内边距」。
+    private static func usableWidth(columnWidth: CGFloat) -> CGFloat {
+        columnWidth - SmartPlaylistGridLayout.horizontalPadding * 2
+    }
+
+    @Test("卡片网格：典型歌单列宽 → 2 列（2×2 两行），不再挤成一行 4 张")
+    func cardStripUsesTwoRowsAtTypicalColumnWidth() {
+        // 552pt 是 macOS 歌单列的常见宽度（用户 2026-09-14 反馈时的场景）
+        let twoColumns = SmartPlaylistGridLayout.stripColumnCount(
+            cardCount: 4,
+            availableWidth: Self.usableWidth(columnWidth: 552)
+        )
+        #expect(twoColumns == 2)
+    }
+
+    @Test("卡片网格：窄列单列、很宽才一行 4 张、宽度未量到先按一行排")
+    func cardStripAdaptsToAvailableWidth() {
+        let narrow = SmartPlaylistGridLayout.stripColumnCount(
+            cardCount: 4,
+            availableWidth: Self.usableWidth(columnWidth: 360)
+        )
+        #expect(narrow == 1)
+
+        let wide = SmartPlaylistGridLayout.stripColumnCount(
+            cardCount: 4,
+            availableWidth: Self.usableWidth(columnWidth: 860)
+        )
+        #expect(wide == 4)
+
+        // 本帧还没量到宽度（0）→ 按一行排，量到后立即重排
+        let unmeasured = SmartPlaylistGridLayout.stripColumnCount(cardCount: 4, availableWidth: 0)
+        #expect(unmeasured == 4)
+
+        // 没有卡片 → 1（不返回 0，避免 GridItem 空数组）
+        #expect(SmartPlaylistGridLayout.stripColumnCount(cardCount: 0, availableWidth: 500) == 1)
+    }
+
+    @Test("卡片网格：绝不出现 3+1 半空行（列数必须是卡片数的约数）")
+    func cardStripNeverLeavesHalfEmptyRow() {
+        // 可用宽刚好只够 3 张 → 退到 2 列（4 的约数），而不是 3 列 + 1 张落单
+        let threeFitting = SmartPlaylistGridLayout.stripColumnCount(cardCount: 4, availableWidth: 620)
+        #expect(threeFitting == 2)
+
+        // 六张卡（万一以后扩到 6 类）：只允许 6 / 3 / 2 / 1 列
+        let sixCards = SmartPlaylistGridLayout.stripColumnCount(cardCount: 6, availableWidth: 620)
+        #expect(sixCards == 3)
+    }
+
+    @Test("卡片宽度：夹在 [176, 300]，两列时均分可用宽")
+    func cardStripWidthStaysWithinBounds() {
+        let twoColumns = SmartPlaylistGridLayout.stripCardWidth(columns: 2, availableWidth: 520)
+        #expect(twoColumns == 244)
+
+        // 单列且很宽 → 撞上限（不至于一张卡铺满整列）
+        let singleWide = SmartPlaylistGridLayout.stripCardWidth(columns: 1, availableWidth: 900)
+        #expect(singleWide == SmartPlaylistGridLayout.maxCardWidth)
+
+        // 四列窄列 → 撞下限（不再压到不可读）
+        let fourNarrow = SmartPlaylistGridLayout.stripCardWidth(columns: 4, availableWidth: 700)
+        #expect(fourNarrow == SmartPlaylistGridLayout.minCardWidth)
+
+        // 宽度未量到 → 返回下限（先给个安全值，量到后重排）
+        let unmeasured = SmartPlaylistGridLayout.stripCardWidth(columns: 2, availableWidth: 0)
+        #expect(unmeasured == SmartPlaylistGridLayout.minCardWidth)
+    }
 }

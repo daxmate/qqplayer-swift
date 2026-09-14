@@ -45,58 +45,26 @@ enum MacSmartPlaylistUILogic {
         }
     }
 
-    /// 卡片条列数：先算「卡宽不低于 minCardWidth」时能放几列，再在这个上限内挑
-    /// 一个能把最后一行也填满的列数（4 张卡 → 4 或 2 列，避免 3+1 这种半空行）。
-    /// availableWidth <= 0 表示本帧还没量到宽度，先按一行排，量到后立即重排。
-    static func stripColumnCount(
-        cardCount: Int,
-        availableWidth: CGFloat,
-        minCardWidth: CGFloat,
-        spacing: CGFloat
-    ) -> Int {
-        guard cardCount > 0 else { return 1 }
-        guard availableWidth > 0 else { return cardCount }
-        let fitting = Int((availableWidth + spacing) / (minCardWidth + spacing))
-        let bounded = max(1, min(cardCount, fitting))
-        guard bounded > 1 else { return 1 }
-        for candidate in stride(from: bounded, through: 2, by: -1) where cardCount % candidate == 0 {
-            return candidate
-        }
-        return bounded
-    }
-
-    /// 卡片宽度：行内均分可用宽度，夹在 [minCardWidth, maxCardWidth] 之间。
-    static func stripCardWidth(
-        columns: Int,
-        availableWidth: CGFloat,
-        minCardWidth: CGFloat,
-        maxCardWidth: CGFloat,
-        spacing: CGFloat
-    ) -> CGFloat {
-        guard columns > 0, availableWidth > 0 else { return minCardWidth }
-        let evenly = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
-        return min(max(evenly, minCardWidth), maxCardWidth)
-    }
 }
 
 /// 置顶自动歌单卡片网格（4 张，铺在播放列表页顶部）。
 ///
 /// 2026-09-13 用户反馈：以前是固定 116pt 卡宽的横向 `ScrollView`（4 卡共 532pt），
 /// 而歌单列宽只有 320–600pt —— 列一窄就必须左右滚动才能看到「常听排行 / 年代」。
-/// 改成按可用宽度算列数/卡宽的网格后：窄列 2×2、宽列一行 4 张，封面拼贴随列宽
-/// 缩放，永远不需要横向滚动。列数/卡宽的计算在 `MacSmartPlaylistUILogic` 里
-/// （纯函数，便于以后 macOS 有测试 target 时单测）。
+/// 改成按可用宽度算列数/卡宽的网格后：典型列宽 2×2 两行、很宽才一行 4 张、窄列单列，
+/// 封面拼贴随列宽缩放，永远不需要横向滚动。列数/卡宽的计算与阈值在共享层
+/// `SmartPlaylistGridLayout`（纯函数 + 单测覆盖，2026-09-14 上收）。
 struct MacSmartPlaylistCardStrip: View {
     let cards: [SmartPlaylistCardInfo]
     let coverTracks: [SmartPlaylistKind: [Track]]
     let onSelect: (SmartPlaylistKind) -> Void
 
-    /// 卡宽区间：下限保证封面拼贴与标题可读，上限避免宽列下单卡过大。
-    private static let minCardWidth: CGFloat = 104
-    private static let maxCardWidth: CGFloat = 168
-    /// 卡间距 / 条带左右内边距（列数与卡宽计算共用）。
-    private static let spacing: CGFloat = 12
-    private static let horizontalPadding: CGFloat = 16
+    /// 卡宽区间 / 间距 / 内边距：单一事实源在共享层 `SmartPlaylistGridLayout`
+    /// （阈值与算法放那里，iOS 单测才够得着；2026-09-14 起）。
+    private static var minCardWidth: CGFloat { SmartPlaylistGridLayout.minCardWidth }
+    private static var maxCardWidth: CGFloat { SmartPlaylistGridLayout.maxCardWidth }
+    private static var spacing: CGFloat { SmartPlaylistGridLayout.spacing }
+    private static var horizontalPadding: CGFloat { SmartPlaylistGridLayout.horizontalPadding }
 
     /// 条带可用宽度（含左右内边距；0 = 本帧还没量到）→ 决定列数与卡宽。
     @State private var stripWidth: CGFloat = 0
@@ -156,13 +124,13 @@ struct MacSmartPlaylistCardStrip: View {
 
     private var columns: [GridItem] {
         let usable = stripWidth - Self.horizontalPadding * 2
-        let columnCount = MacSmartPlaylistUILogic.stripColumnCount(
+        let columnCount = SmartPlaylistGridLayout.stripColumnCount(
             cardCount: cards.count,
             availableWidth: usable,
             minCardWidth: Self.minCardWidth,
             spacing: Self.spacing
         )
-        let cardWidth = MacSmartPlaylistUILogic.stripCardWidth(
+        let cardWidth = SmartPlaylistGridLayout.stripCardWidth(
             columns: columnCount,
             availableWidth: usable,
             minCardWidth: Self.minCardWidth,
