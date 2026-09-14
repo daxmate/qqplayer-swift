@@ -8,6 +8,13 @@
 //  （DatabaseSuspensionCoordinator）。拆分见
 //  DatabaseManager+Tracks/Library/Playlists.swift。
 //
+//  身份键自愈（M3-1 后续，2026-09-14）：track.content_hash 是跨端歌曲身份键，缺它
+//  接收侧只能把对端 stableId 原样落库 → 孤儿行。回填**不再**走一次性完成门（旧 key
+//  database.contentHashBackfillCompleted.v1 已退役并在启动时清理）——取舍：一次性门省下
+//  的只是「零 NULL 行时的一次索引查询」，代价却是「入库时没算到指纹」的行永久 NULL
+//  （哪怕文件一直在本地），跨端身份随之永久对不上；故改为每次启动在后台队列自愈跑一遍，
+//  保留 dataless（云端未下载）跳过语义，补齐后顺手重放该指纹下的挂起变更。
+//
 
 import Combine
 import CryptoKit
@@ -86,7 +93,8 @@ class DatabaseManager: @unchecked Sendable {
     }
 
     /// 把 content_hash 回填丢到专用后台串行队列（启动路径**不阻塞主线程**）。
-    /// 失败只打印不抛：UserDefaults 门未置位 → 下次启动自动重试。
+    /// 失败只打印不抛：回填幂等，下次启动自动重试。
+    /// 回填跑完后再打一行身份缺失普查（只读统计）——放在回填之后，报的是补齐后的余量。
     private func scheduleContentHashBackfillInBackground() {
         contentHashBackfillEnqueueLock.lock()
         if contentHashBackfillEnqueued {
@@ -103,6 +111,16 @@ class DatabaseManager: @unchecked Sendable {
             } catch {
                 print("⚠️ Database: content_hash backfill failed (will retry next launch): \(error)")
             }
+            manager.logIdentityCensus()
+        }
+    }
+
+    /// 身份缺失普查汇总一行（只读诊断；失败只打印，绝不影响启动）。
+    private func logIdentityCensus() {
+        do {
+            print(try identityCensus().summaryLine)
+        } catch {
+            print("⚠️ Database: identity census failed (diagnostic only): \(error)")
         }
     }
 
@@ -800,40 +818,81 @@ class DatabaseManager: @unchecked Sendable {
         return try? SyncFileChecksum.sha256Hex(ofFile: url)
     }
 
-    /// content_hash 存量惰性回填（带一次性 UserDefaults 门）。独立 key，仿
-    /// legacyMigrationKey 模式：失败不置位 → 下次启动重试。
+    /// content_hash 存量自愈回填（**无一次性门**，每次启动在后台队列跑一遍）。
+    ///
+    /// 取舍：旧实现用一次性完成门 database.contentHashBackfillCompleted.v1 挡重复扫描，
+    /// 省下的只是「零 NULL 行时的一次索引查询」；代价是只要门被置位（含「文件当时不存在」
+    /// 这类非云端跳过），NULL 指纹就**永不重试** → 身份键永久缺失，跨端同步永久对不上。
+    /// 改成「上次运行标记」后：每次启动都尝试，零 NULL 行时仅一次索引查询即返回；
+    /// dataless/文件未就绪只是本次跳过，下次启动自然重试。
+    ///
+    /// 补齐后对本次新填的每个 content_hash 调用 SyncChangeLogReplay.replay
+    /// ——「因缺身份键而长期挂起的对端播放数据」借此落库。重放失败只打日志。
     ///
     /// ⚠️ 不再在启动主线程调用——见 scheduleContentHashBackfillInBackground()
     /// （dataless iCloud 文件会阻塞主线程）。
-    func backfillTrackContentHashesIfNeeded() throws {
-        let key = "database.contentHashBackfillCompleted.v1"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        let skippedCloudOnly = try backfillMissingContentHashes()
-        // 有因云端未下载跳过的曲目 → 不置门，下次启动（文件可能已下载完）重试。
-        // 文件真不存在的旧行为不变：不算跳过，照常置门（已处理）。
-        guard skippedCloudOnly == 0 else {
-            print("⏭️ Database: content_hash backfill skipped \(skippedCloudOnly) cloud-only track(s); will retry next launch")
-            return
+    /// - Parameters:
+    ///   - defaults: 运行标记所用 UserDefaults（测试注入独立 suite）。
+    ///   - isLocallyAvailable: 本地可读性判定（避免读取 dataless 文件触发云端下载）。
+    /// - Returns: 本次回填结果（新填指纹列表 + 跳过/候选计数）。
+    @discardableResult
+    func backfillTrackContentHashesIfNeeded(
+        defaults: UserDefaults = .standard,
+        isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
+    ) throws -> ContentHashBackfillOutcome {
+        if ContentHashBackfillMarker.removeRetiredCompletionGate(defaults: defaults) {
+            print("ℹ️ Database: 退役一次性 content_hash 回填门（改为每次启动自愈回填）")
         }
-        UserDefaults.standard.set(true, forKey: key)
+
+        let outcome = try backfillMissingContentHashesDetailed(isLocallyAvailable: isLocallyAvailable)
+        ContentHashBackfillMarker.markRun(defaults: defaults)
+
+        // 身份键补齐 → 重放之前因「本地查不到该 content_hash」而挂起的对端变更。
+        for hash in outcome.filledHashes {
+            do {
+                let replayed = try SyncChangeLogReplay.replay(contentHash: hash, database: self)
+                if replayed > 0 {
+                    print("🔁 Sync: 回填指纹后重放挂起变更 \(replayed) 条（hash=\(hash.prefix(12))…）")
+                }
+            } catch {
+                print("⚠️ Sync: 回填后挂起变更重放失败（下次回填/入库再试）：\(error)")
+            }
+        }
+
+        if outcome.skippedCloudOnly > 0 {
+            print("⏭️ Database: content_hash backfill skipped \(outcome.skippedCloudOnly) cloud-only track(s); will retry next launch")
+        }
+        return outcome
     }
 
-    /// 回填核心（internal 供测试直调，绕开 UserDefaults 门）：扫 content_hash IS NULL
-    /// 行 → 文件存在且本地已实体化则算 SHA-256 → 批量 UPDATE。幂等：再跑一遍无 NULL
-    /// 行可补，不崩。
+    /// 回填核心（internal 供测试直调）：扫 content_hash IS NULL 行 → 文件存在且本地已
+    /// 实体化则算 SHA-256 → 批量 UPDATE。幂等：再跑一遍无 NULL 行可补，不崩。
     /// - Returns: 因 iCloud 云端未下载被跳过的曲目数（文件不存在的旧行为不计入）。
     @discardableResult
     func backfillMissingContentHashes(
         isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
     ) throws -> Int {
+        try backfillMissingContentHashesDetailed(isLocallyAvailable: isLocallyAvailable).skippedCloudOnly
+    }
+
+    /// 回填核心（详版）：与 backfillMissingContentHashes 同一套语义，另外交出本次新填的
+    /// content_hash 列表（启动路径据此重放挂起变更）。
+    @discardableResult
+    func backfillMissingContentHashesDetailed(
+        isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
+    ) throws -> ContentHashBackfillOutcome {
         struct PendingFill {
             let id: Int64
             let hash: String
         }
 
-        // Phase 1: 只读事务取候选（无文件 IO）。
+        // Phase 1: 只读事务取候选（无文件 IO）。走 idx_track_content_hash 索引。
         let candidates = try read { db in
             try Track.filter(sql: "content_hash IS NULL").fetchAll(db)
+        }
+        guard !candidates.isEmpty else {
+            // 零 NULL 行：到此为止（一次索引查询），不写库、不触发重放。
+            return ContentHashBackfillOutcome(filledHashes: [], skippedCloudOnly: 0, candidateCount: 0)
         }
 
         // Phase 2: 事务外逐文件哈希（syscalls 不碰 GRDB writer）。
@@ -841,7 +900,7 @@ class DatabaseManager: @unchecked Sendable {
         var skippedCloudOnly = 0
         for track in candidates {
             guard let id = track.id else { continue }
-            // 文件真不存在：旧行为（按已处理跳过，不计入云端跳过数）。
+            // 文件真不存在：本次跳过（不计入云端跳过数），下次启动再试。
             guard FileManager.default.fileExists(atPath: track.path) else { continue }
             // 云端未下载：不读内容（会阻塞），计入跳过数，下次重试。
             guard isLocallyAvailable(URL(fileURLWithPath: track.path)) else {
@@ -854,7 +913,13 @@ class DatabaseManager: @unchecked Sendable {
             ) else { continue }
             pending.append(PendingFill(id: id, hash: hash))
         }
-        guard !pending.isEmpty else { return skippedCloudOnly }
+        guard !pending.isEmpty else {
+            return ContentHashBackfillOutcome(
+                filledHashes: [],
+                skippedCloudOnly: skippedCloudOnly,
+                candidateCount: candidates.count
+            )
+        }
 
         // Phase 3: 短写事务批量落库。
         try write { db in
@@ -866,7 +931,43 @@ class DatabaseManager: @unchecked Sendable {
             }
         }
         print("✅ Database: Backfilled content_hash for \(pending.count) track(s)")
-        return skippedCloudOnly
+        return ContentHashBackfillOutcome(
+            filledHashes: pending.map(\.hash),
+            skippedCloudOnly: skippedCloudOnly,
+            candidateCount: candidates.count
+        )
+    }
+
+    // MARK: - 身份缺失普查（诊断，只读）
+
+    /// 身份缺失普查（**只读**：绝不删除/修改任何行，孤儿行清理由 maintainer 单独执行）。
+    /// 供启动时打印汇总与测试直调。
+    func identityCensus() throws -> IdentityCensus {
+        try read { db in try Self.identityCensus(db) }
+    }
+
+    /// 事务内版本（纯读；调用方须自行保证所在事务不接受写操作）。
+    static func identityCensus(_ db: Database) throws -> IdentityCensus {
+        func count(_ sql: String) throws -> Int {
+            try Int.fetchOne(db, sql: sql) ?? 0
+        }
+        return IdentityCensus(
+            nullHash: try count(
+                "SELECT COUNT(*) FROM track WHERE content_hash IS NULL OR content_hash = ''"
+            ),
+            danglingHistory: try count("""
+            SELECT COUNT(*) FROM play_history h
+            WHERE NOT EXISTS (SELECT 1 FROM track t WHERE t.stable_id = h.track_stable_id)
+            """),
+            danglingFavorite: try count("""
+            SELECT COUNT(*) FROM favorite f
+            WHERE NOT EXISTS (SELECT 1 FROM track t WHERE t.stable_id = f.track_stable_id)
+            """),
+            danglingItem: try count("""
+            SELECT COUNT(*) FROM playlist_item i
+            WHERE NOT EXISTS (SELECT 1 FROM track t WHERE t.stable_id = i.track_stable_id)
+            """)
+        )
     }
 
     // SwiftUI rows call getArtistDisplayName on every render - cache the
@@ -1038,5 +1139,73 @@ enum LegacyTrackMigrationGate {
 
     static func markCompleted(defaults: UserDefaults = .standard) {
         defaults.set(true, forKey: completionKey)
+    }
+}
+
+// MARK: - content_hash 回填运行标记（替代已退役的一次性完成门）
+
+/// content_hash 回填的**运行标记**（非完成门）：只记录「上次跑过的时间」，
+/// **不参与跳过判定** —— 回填每次启动都跑（零 NULL 行时只是一次索引查询）。
+///
+/// 为何退役一次性门：该门一旦置位，NULL 指纹永不重试；而指纹缺失的成因不止
+/// 「存量老库」（还有入库时文件尚未就绪、云端未下载等），这些行即使文件一直在
+/// 本地也永远拿不到身份键 → 跨端同步永久把对端 stableId 落成孤儿行。省下的却是
+/// 可忽略的一次索引查询。故改为「每次都试 + 只跳过读不了的文件」。
+/// 保留标记键仅为诊断（排查「回填上次何时跑、跑没跑」）。
+/// 旧 key `database.contentHashBackfillCompleted.v1` 已退役，启动时由
+/// `removeRetiredCompletionGate` 清理，避免历史遗留的 true 误导排查。
+enum ContentHashBackfillMarker {
+    /// 上次回填时间（Unix 秒；0/缺失 = 本机从未跑过）。
+    static let lastRunKey = "database.contentHashBackfillLastRun.v1"
+    /// 已退役的一次性完成门（仅用于启动清理，任何路径都不得再回读它做判定）。
+    static let retiredCompletionKey = "database.contentHashBackfillCompleted.v1"
+
+    static func lastRunDate(defaults: UserDefaults = .standard) -> Date? {
+        let seconds = defaults.double(forKey: lastRunKey)
+        return seconds > 0 ? Date(timeIntervalSince1970: seconds) : nil
+    }
+
+    static func markRun(defaults: UserDefaults = .standard, at date: Date = Date()) {
+        defaults.set(date.timeIntervalSince1970, forKey: lastRunKey)
+    }
+
+    /// 清理旧一次性门。
+    /// - Returns: 是否真的清了（旧库升级后第一次启动为 true，仅打印用）。
+    @discardableResult
+    static func removeRetiredCompletionGate(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: retiredCompletionKey) != nil else { return false }
+        defaults.removeObject(forKey: retiredCompletionKey)
+        return true
+    }
+}
+
+// MARK: - content_hash 回填结果
+
+/// 一次 content_hash 回填的结果。
+struct ContentHashBackfillOutcome: Equatable, Sendable {
+    /// 本次新填入的 content_hash（顺序 = 扫描顺序）。启动路径据此重放挂起变更。
+    let filledHashes: [String]
+    /// 因 iCloud 云端未下载跳过的曲目数（下次启动重试，不置任何永久门）。
+    let skippedCloudOnly: Int
+    /// 本次扫到的 NULL 指纹候选行数（诊断用；0 = 零 NULL 行，只花了一次索引查询）。
+    let candidateCount: Int
+}
+
+// MARK: - 身份缺失普查
+
+/// 身份缺失普查结果（只读诊断）：身份键缺口的三个面。
+struct IdentityCensus: Equatable, Sendable {
+    /// ① track.content_hash 为 NULL/空 的行数。
+    var nullHash: Int
+    /// ② play_history.track_stable_id 在 track 表找不到的行数（孤儿）。
+    var danglingHistory: Int
+    /// ③ favorite.track_stable_id 悬空行数。
+    var danglingFavorite: Int
+    /// ③ playlist_item.track_stable_id 悬空行数。
+    var danglingItem: Int
+
+    var summaryLine: String {
+        "🔎 Identity census: nullHash=\(nullHash) danglingHistory=\(danglingHistory) "
+            + "danglingFavorite=\(danglingFavorite) danglingItem=\(danglingItem)"
     }
 }
