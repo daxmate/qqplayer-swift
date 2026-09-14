@@ -763,24 +763,41 @@ struct SyncChangeLogContentMapTests {
     // MARK: - T15b-2 本地真值 → outbox 对账补发
 
     /// 造一个歌单（返回 id）；`folderSynced` = true 模拟 folder-synced 歌单。
+    /// 其余字段可显式指定（“载荷与业务行逐字一致”断言用）。
     private static func insertPlaylist(
         _ db: Database,
         slug: String,
-        folderSynced: Bool = false
+        folderSynced: Bool = false,
+        title: String? = nil,
+        createdAt: Int64 = 1,
+        updatedAt: Int64 = 1,
+        lastPlayedAt: Int64 = 0,
+        customCoverImagePath: String? = nil
     ) throws -> Int64 {
         try Playlist(
             id: nil,
             slug: slug,
-            title: slug.uppercased(),
-            createdAt: 1,
-            updatedAt: 1,
-            lastPlayedAt: 0,
+            title: title ?? slug.uppercased(),
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            lastPlayedAt: lastPlayedAt,
             folderPath: folderSynced ? "/local/folder" : nil,
             isFolderSynced: folderSynced,
             lastFolderSync: nil,
-            customCoverImagePath: nil
+            customCoverImagePath: customCoverImagePath
         ).insert(db)
         return try Playlist.filter(Column("slug") == slug).fetchOne(db)?.id ?? 0
+    }
+
+    /// 歌单业务行的逐字快照（“只动 outbox、不碰业务行”断言用；Playlist 不是 Equatable）。
+    private static func playlistSnapshot(_ queue: DatabaseQueue) throws -> [String] {
+        try queue.read { db in
+            try Playlist.order(Column("slug")).fetchAll(db).map {
+                "\($0.slug)|\($0.title)|\($0.createdAt)|\($0.updatedAt)|\($0.lastPlayedAt)"
+                    + "|\($0.folderPath ?? "-")|\($0.isFolderSynced)|\($0.lastFolderSync ?? -1)"
+                    + "|\($0.customCoverImagePath ?? "-")"
+            }
+        }
     }
 
     /// outbox 的「实体|行键」列表（按 id 升序）。
@@ -803,19 +820,25 @@ struct SyncChangeLogContentMapTests {
         }
 
         let report = try SyncChangeLogDanglingRepair(database: manager).run()
-        #expect(report.emitted == 3)
+        #expect(report.emitted == 4)
         #expect(report.emittedWithoutIdentity == 0)
         #expect(report.skippedLocalDangling == 0)
         #expect(
             try Self.outboxKeys(queue).sorted()
-                == ["favorite|s-live", "play_history|s-live|\(playedAt)", "playlist_item|pl|s-live"].sorted()
+                == [
+                    "favorite|s-live",
+                    "play_history|s-live|\(playedAt)",
+                    "playlist|pl",
+                    "playlist_item|pl|s-live",
+                ].sorted()
         )
 
-        // 真的能同步出去：补发的三条都不缺身份键（否则对端会按「未定位」丢弃）
+        // 真的能同步出去：补发的四条都不缺身份键（否则对端会按「未定位」丢弃）
         let rows = try queue.read { db in try SyncChangeLogRow.order(Column("id")).fetchAll(db) }
         let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
         #expect(batch.missingIdentity.isEmpty)
-        #expect(batch.entries.map(\.contentHash) == ["hash-live", "hash-live", "hash-live"])
+        // 歌单结构行不引用歌曲 → 线上 contentHash = nil（对端按「不引用歌曲」透传，不是缺口）
+        #expect(batch.entries.map(\.contentHash) == [nil, "hash-live", "hash-live", "hash-live"])
     }
 
     @Test("T15b-2 补发：幂等——再跑一遍零改动、零计数，outbox 逐字不变")
@@ -889,6 +912,93 @@ struct SyncChangeLogContentMapTests {
 
         let report = try SyncChangeLogDanglingRepair(database: manager).run()
         #expect(report.emitted == 0)
+        #expect(try Self.outboxKeys(queue).isEmpty)
+    }
+
+    @Test("T15b-2 补发：手动歌单结构行补进 outbox——行键 = slug、载荷可解码且与业务行逐字一致")
+    func reconcileEmitsPlaylistStructure() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            // 注意：**不插任何 track 行**——歌单结构不引用歌曲，补发不依赖曲库。
+            _ = try Self.insertPlaylist(
+                db,
+                slug: "my-pl",
+                title: "My Playlist",
+                createdAt: 111,
+                updatedAt: 222,
+                lastPlayedAt: 333,
+                customCoverImagePath: "/covers/x.png"
+            )
+        }
+
+        let report = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(report.emitted == 1)
+        // 结构行不做身份判定：两个身份类计数必须保持为 0
+        #expect(report.emittedWithoutIdentity == 0)
+        #expect(report.skippedLocalDangling == 0)
+
+        let rows = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(rows.count == 1)
+        let row = try #require(rows.first)
+        #expect(row.entity == SyncChangeEntity.playlist.rawValue)
+        #expect(row.op == SyncChangeOp.upsert.rawValue)
+        #expect(row.rowKey == "my-pl")
+
+        // 载荷可解码，且与业务行逐字一致
+        let payload = try SyncSnapshotCodec.decode(SyncPlaylistSnapshot.self, from: row.payloadJSON)
+        #expect(payload.rowKey == row.rowKey)
+        let business = try #require(
+            try queue.read { db in try Playlist.filter(Column("slug") == "my-pl").fetchOne(db) }
+        )
+        #expect(payload.slug == business.slug)
+        #expect(payload.title == business.title)
+        #expect(payload.createdAt == business.createdAt)
+        #expect(payload.updatedAt == business.updatedAt)
+        #expect(payload.lastPlayedAt == business.lastPlayedAt)
+        #expect(payload.folderPath == business.folderPath)
+        #expect(payload.isFolderSynced == business.isFolderSynced)
+        #expect(payload.lastFolderSync == business.lastFolderSync)
+        #expect(payload.customCoverImagePath == business.customCoverImagePath)
+
+        // 线上不发身份键噪音（歌单行不引用歌曲 → contentHash nil，但不是「缺身份键」）
+        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        #expect(batch.missingIdentity.isEmpty)
+        #expect(batch.entries.map(\.contentHash) == [nil])
+    }
+
+    @Test("T15b-2 补发：歌单补发幂等——再跑一遍零改动零计数，outbox 与业务行逐字不变")
+    func reconcilePlaylistIsIdempotent() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            _ = try Self.insertPlaylist(db, slug: "my-pl", title: "My Playlist", updatedAt: 222)
+            _ = try Self.insertPlaylist(db, slug: "other-pl", title: "Other")
+        }
+
+        let repair = SyncChangeLogDanglingRepair(database: manager)
+        let first = try repair.run()
+        #expect(first.emitted == 2)
+        let afterFirst = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        let businessBefore = try Self.playlistSnapshot(queue)
+
+        let second = try repair.run()
+        #expect(second == SyncChangeLogDanglingRepair.Report())
+        #expect(second.didChange == false)
+        let afterSecond = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(afterSecond == afterFirst)
+        // 只动 sync_outbox：业务行零改动
+        #expect(try Self.playlistSnapshot(queue) == businessBefore)
+    }
+
+    @Test("T15b-2 补发：folder-synced 歌单结构行不入跨端同步（与写入侧同一口径）")
+    func reconcileSkipsFolderSyncedPlaylists() throws {
+        let (manager, queue) = try Self.makeManager()
+        try queue.write { db in
+            _ = try Self.insertPlaylist(db, slug: "folder-pl", folderSynced: true)
+        }
+
+        let report = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(report.emitted == 0)
+        #expect(report == SyncChangeLogDanglingRepair.Report())
         #expect(try Self.outboxKeys(queue).isEmpty)
     }
 }

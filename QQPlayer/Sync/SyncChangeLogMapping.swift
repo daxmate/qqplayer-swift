@@ -566,9 +566,10 @@ struct SyncChangeLogDanglingRepair {
 
     // MARK: - 第二步：本地真值 → outbox 对账补发（T15b-2，2026-09-14）
 
-    /// 参与补发的实体：本地载体是 DB 行、且对端按歌曲身份键定位的那几类。
-    /// （`playlist` 结构行不引用歌曲；`playback_position` 本地载体不是 DB 行。）
-    static let reconcilableEntities: [SyncChangeEntity] = [.favorite, .playHistory, .playlistItem]
+    /// 参与补发的实体：本地载体是 DB 行的那几类。
+    /// （`playlist` 结构行**不引用歌曲**，补发时不做身份判定；`playback_position`
+    /// 本地载体不是 DB 行，不在范围。）
+    static let reconcilableEntities: [SyncChangeEntity] = [.favorite, .playHistory, .playlist, .playlistItem]
 
     /// 把本端业务表里**现有**的真值，补进 `sync_outbox`（缺对应 upsert 行时才补）。
     ///
@@ -585,6 +586,10 @@ struct SyncChangeLogDanglingRepair {
     ///   （补了也拿不到身份键，只会给对端添「未定位」噪音）。
     /// - 引用歌在表里但 `content_hash` 空（缺指纹）→ 照发，计数 `emittedWithoutIdentity`
     ///   （对端面板按「未定位」披露，不静默）。
+    /// - `playlist` 是**结构行、不引用歌曲**：没有 track 身份键可判，跳过身份判定直
+    ///   接补发，补发计数只计 `emitted`（不碰 `emittedWithoutIdentity` /
+    ///   `skippedLocalDangling`）；folder-synced 歌单由本地扫描派生，与写入侧同一
+    ///   口径不补。
     static func reconcileLocalTruth(_ db: Database) throws -> Report {
         var report = Report()
         var existing: [String: Set<String>] = [:]
@@ -598,18 +603,29 @@ struct SyncChangeLogDanglingRepair {
         }
         var seen = Set<String>()
 
-        /// 三类实体的统一收口：去重 → 「已有 upsert 就跳过」→ 身份判定 → 补发 + 计数。
-        /// 收在一处，避免三条分支各写一份判定而漂移。
-        func emit(entity: SyncChangeEntity, stableId: String, payloadJSON: String) throws {
+        /// 各实体的统一收口：去重 → 「已有 upsert 就跳过」→ 身份判定 → 补发 + 计数。
+        /// 收在一处，避免每个分支各写一份判定而漂移。
+        /// `requiresTrackIdentity = false`：不引用歌曲的结构实体（`playlist`）——没有
+        /// 身份键可判，跳过身份判定，补发计数只计 `emitted`。
+        func emit(
+            entity: SyncChangeEntity,
+            stableId: String,
+            payloadJSON: String,
+            requiresTrackIdentity: Bool = true
+        ) throws {
             guard let key = Self.rowKey(entity: entity, stableId: stableId, payloadJSON: payloadJSON),
                   !key.isEmpty else { return }
             let dedupe = "\(entity.rawValue)|\(key)"
             guard seen.insert(dedupe).inserted else { return }
             guard existing[entity.rawValue]?.contains(key) != true else { return }
-            let identity = try SyncContentHashResolver.trackIdentity(db, forTrackStableId: stableId)
-            if case .noTrackRow = identity {
-                report.skippedLocalDangling += 1
-                return
+            var missingIdentity = false
+            if requiresTrackIdentity {
+                let identity = try SyncContentHashResolver.trackIdentity(db, forTrackStableId: stableId)
+                if case .noTrackRow = identity {
+                    report.skippedLocalDangling += 1
+                    return
+                }
+                if case .emptyContentHash = identity { missingIdentity = true }
             }
             try SyncChangeLogStore.record(
                 db,
@@ -619,7 +635,35 @@ struct SyncChangeLogDanglingRepair {
                 payloadJSON: payloadJSON
             )
             report.emitted += 1
-            if case .emptyContentHash = identity { report.emittedWithoutIdentity += 1 }
+            if missingIdentity { report.emittedWithoutIdentity += 1 }
+        }
+
+        // 歌单结构（row_key = slug）。**不引用歌曲** → 不做身份判定（见 emit 的
+        // `requiresTrackIdentity`），载荷与写入侧 `createPlaylist` 逐字同形。
+        // folder-synced 歌单内容由本地扫描派生（folder_path 是设备本地路径），
+        // 不入跨端同步——与写入侧同一口径。
+        let playlists = try Playlist
+            .filter(Column("is_folder_synced") == false)
+            .order(Column("slug"))
+            .fetchAll(db)
+        for playlist in playlists where !playlist.slug.isEmpty {
+            let snapshot = SyncPlaylistSnapshot(
+                slug: playlist.slug,
+                title: playlist.title,
+                createdAt: playlist.createdAt,
+                updatedAt: playlist.updatedAt,
+                lastPlayedAt: playlist.lastPlayedAt,
+                folderPath: playlist.folderPath,
+                isFolderSynced: playlist.isFolderSynced,
+                lastFolderSync: playlist.lastFolderSync,
+                customCoverImagePath: playlist.customCoverImagePath
+            )
+            try emit(
+                entity: .playlist,
+                stableId: playlist.slug,
+                payloadJSON: try SyncSnapshotCodec.encode(snapshot),
+                requiresTrackIdentity: false
+            )
         }
 
         // 收藏（row_key = track_stable_id）
@@ -687,8 +731,8 @@ struct SyncChangeLogDanglingRepair {
     }
 
     /// 补发行键：与写入侧 `SyncChangeLogStore.record` 的形态逐字对齐
-    /// （favorite = stableId；play_history = stableId|playedAt；playlist_item = slug|stableId）。
-    /// 从 payload 快照派生，避免三条分支各拼一次字符串。
+    /// （favorite = stableId；play_history = stableId|playedAt；playlist = slug；
+    /// playlist_item = slug|stableId）。从 payload 快照派生，避免每个分支各拼一次字符串。
     private static func rowKey(entity: SyncChangeEntity, stableId: String, payloadJSON: String) -> String? {
         switch entity {
         case .favorite:
@@ -703,7 +747,12 @@ struct SyncChangeLogDanglingRepair {
                 return nil
             }
             return snapshot.rowKey
-        case .playlist, .playbackPosition:
+        case .playlist:
+            guard let snapshot = try? SyncSnapshotCodec.decode(SyncPlaylistSnapshot.self, from: payloadJSON) else {
+                return nil
+            }
+            return snapshot.rowKey
+        case .playbackPosition:
             return nil
         }
     }
