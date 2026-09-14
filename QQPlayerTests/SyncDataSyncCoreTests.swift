@@ -486,8 +486,57 @@ struct SyncDataSyncCoreTests {
         }
     }
 
+    @Test("applier：开关开 + 落点未接受（返回 false）→ 计「未支持」、不计「已应用」")
+    func applierCountsUnsupportedWhenSinkRejects() throws {
+        let manager = try makeManager()
+        var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: true)
+        let unsupported = CounterBox()
+        applier.playbackPositionSink = { _ in false }
+        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+
+        let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
+
+        #expect(applied == 0, "落点未接受 = 没落地，不得计入「已应用」（INV-20）")
+        #expect(unsupported.value == 1)
+    }
+
+    @Test("续播落点判定（纯逻辑）：同曲 + 远端最新 + 位置差 ≥3s 才落")
+    func resumeSinkShouldApplyIsPureAndConservative() throws {
+        let snapshot = SyncPlaybackPositionSnapshot(trackStableId: "t-1", positionMs: 30_000, updatedAtMs: 5_000)
+        func shouldApply(localTrack: String?, localPositionMs: Int64, localSavedAtMs: Int64) -> Bool {
+            PlaybackPositionResumeSink.shouldApply(
+                snapshot: snapshot,
+                localTrackStableId: localTrack,
+                localPositionMs: localPositionMs,
+                localSavedAtMs: localSavedAtMs
+            )
+        }
+
+        #expect(shouldApply(localTrack: "t-1", localPositionMs: 0, localSavedAtMs: 9_000) == false, "远端更旧 → 不落（LWW）")
+        #expect(shouldApply(localTrack: "t-2", localPositionMs: 0, localSavedAtMs: 1_000) == false, "不同曲 → 不落（不擅自改本端状态）")
+        #expect(shouldApply(localTrack: nil, localPositionMs: 0, localSavedAtMs: 1_000) == false, "本端无当前曲目 → 不落")
+        #expect(shouldApply(localTrack: "t-1", localPositionMs: 29_000, localSavedAtMs: 1_000) == false, "位置差 < 3s → 不落（避抖动）")
+        #expect(shouldApply(localTrack: "t-1", localPositionMs: 0, localSavedAtMs: 1_000), "同曲 + 更新 + 差 30s → 落")
+    }
+
+    @Test("续播捕获节流（纯逻辑）：换歌必记；同曲 60s 内不记、到 60s 记")
+    func captureThrottleIsPure() throws {
+        let base = PlaybackPositionCapture.Sample(trackStableId: "t-1", positionMs: 0, updatedAtMs: 1_000_000)
+        func shouldRecord(track: String, positionMs: Int64, updatedAtMs: Int64) -> Bool {
+            PlaybackPositionCapture.shouldRecord(
+                previous: base,
+                current: .init(trackStableId: track, positionMs: positionMs, updatedAtMs: updatedAtMs)
+            )
+        }
+
+        #expect(PlaybackPositionCapture.shouldRecord(previous: nil, current: base), "首次必记")
+        #expect(shouldRecord(track: "t-1", positionMs: 30_000, updatedAtMs: 1_030_000) == false, "同曲 30s 内不记（节流）")
+        #expect(shouldRecord(track: "t-1", positionMs: 60_000, updatedAtMs: 1_060_000), "同曲到 60s → 记")
+        #expect(shouldRecord(track: "t-2", positionMs: 0, updatedAtMs: 1_001_000), "换歌必记")
+    }
+
     /// 真 UserDefaults 用例的保存/恢复（键名与 `DeleteSettings.load()` 内部一致）。
-    private func withSettingsBackup(_ body: () throws -> Void) rethrows {
+    private func withSettingsBackup(_ body: () -> Void) {
         let backup = UserDefaults.standard.data(forKey: "DeleteSettings")
         defer {
             if let backup {
@@ -496,7 +545,7 @@ struct SyncDataSyncCoreTests {
                 UserDefaults.standard.removeObject(forKey: "DeleteSettings")
             }
         }
-        try body()
+        body()
     }
 
     @Test("开关：旧数据（无 syncPlaybackPositionEnabled）→ false；save/load 往返 true")
@@ -506,7 +555,7 @@ struct SyncDataSyncCoreTests {
         #expect(legacy.syncPlaybackPositionEnabled == false)
 
         // 2) 写 true → load 回来 true（真 UserDefaults；测后恢复原值，不污染其它用例）
-        try withSettingsBackup {
+        withSettingsBackup {
             var settings = DeleteSettings.load()
             settings.syncPlaybackPositionEnabled = true
             settings.save()
@@ -575,7 +624,7 @@ struct SyncDataSyncCoreTests {
         try Self.recordPlaybackPosition(pair.clientQueue, rowKey: "client-1", updatedAtMs: 1000)
 
         // 显式置「关」（= 默认值）并在结束后恢复原值：不依赖本机设置、也不污染它
-        try withSettingsBackup {
+        withSettingsBackup {
             var settings = DeleteSettings.load()
             settings.syncPlaybackPositionEnabled = false
             settings.save()
