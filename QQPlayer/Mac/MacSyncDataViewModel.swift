@@ -141,6 +141,12 @@ final class MacSyncDataViewModel: ObservableObject {
     /// 跑一次「同步数据」（未连接 / 已在跑 = no-op）。
     func start() {
         guard canStart, let session = hostCenter.activeSession else { return }
+        // 与「连接后自动」共用同一个在飞门：同一会话只允许一轮（手动 / 自动互斥），
+        // 取不到门 = 直接放弃本轮（不排队）。
+        guard SyncDataRunGate.shared.acquire() else {
+            print("ℹ️ MacSyncDataViewModel: 已有一轮同步数据在跑（自动或手动），本轮跳过")
+            return
+        }
         stopReportRefresh()
         didDisconnectWhileRunning = false
         report = SyncDataSyncReport()
@@ -222,6 +228,8 @@ final class MacSyncDataViewModel: ObservableObject {
         phase = source.phase
         errorMessage = failureText(for: source.report)
         if source.phase == .finished {
+            // 收尾 → 释放在飞门（自动轮与手动轮共用；重复释放是幂等的）。
+            SyncDataRunGate.shared.release()
             scheduleReportRefresh(for: source)
         }
     }

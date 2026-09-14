@@ -643,6 +643,45 @@ struct SyncDataSyncCoreTests {
             #expect(report.failureMessage == nil)
         }
     }
+
+    // MARK: - 连接后自动触发（2026-09-15）
+
+    @Test("连接后自动触发（纯逻辑）：已连接 + 有会话 + 不忙 + 本次未跑过 才自动跑")
+    func autoRunDecisionIsPure() throws {
+        func shouldStart(
+            connected: Bool = true,
+            session: Bool = true,
+            busy: Bool = false,
+            ranThisConnection: Bool = false
+        ) -> Bool {
+            SyncDataAutoRunDecision.shouldStart(
+                isConnected: connected,
+                hasActiveSession: session,
+                isBusy: busy,
+                didAutoRunForCurrentConnection: ranThisConnection
+            )
+        }
+
+        #expect(shouldStart(), "正常路径：连接就绪且本次没跑过 → 自动跑")
+        #expect(shouldStart(connected: false) == false, "没连上不跑")
+        #expect(shouldStart(session: false) == false, "没会话不跑")
+        #expect(shouldStart(busy: true) == false, "已有一轮在跑不抢")
+        #expect(shouldStart(ranThisConnection: true) == false, "一次连接只自动跑一次")
+    }
+
+    @Test("在飞门：同一会话只允许一轮（取不到 = 放弃本轮，不排队）")
+    func runGateIsExclusive() throws {
+        let gate = SyncDataRunGate.shared
+        gate.resetForTesting()
+
+        #expect(gate.isHeld == false)
+        #expect(gate.acquire(), "空门：第一次取到")
+        #expect(gate.isHeld)
+        #expect(gate.acquire() == false, "占用中：第二次取不到（手动 / 自动互斥）")
+        gate.release()
+        #expect(gate.acquire(), "释放后可再取")
+        gate.release()
+    }
 }
 
 // MARK: - 测试辅助（闭包捕获盒子；避免在 @MainActor 测试里捕获可变局部变量）

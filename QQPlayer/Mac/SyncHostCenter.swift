@@ -226,6 +226,9 @@ final class SyncHostCenter: ObservableObject {
             guard host.attach(to: session) else { return }
             libraryHost = host
             activeSession = session
+            // 连接就绪 → 后台自动跑一次「同步数据」（用户 2026-09-15 拍板：触发时机 = 连接后自动）。
+            // 放在这里而不是面板 view model 里：面板没打开时也要跑（否则又变成“点过的才同步”）。
+            MacDataSyncAutoRunner.shared.sessionDidBecomeReady(session)
         case .closed:
             clearConnection(ifMatching: session)
             libraryHost?.detach()
@@ -241,6 +244,8 @@ final class SyncHostCenter: ObservableObject {
         connectedSession = nil
         connectedPeer = nil
         activeSession = nil
+        // 会话下线：让自动触发的「一次连接一次」标记归位（下次连上再自动跑一轮）。
+        MacDataSyncAutoRunner.shared.sessionDidClose()
     }
 
     /// 对端 hello 携带展示名且与信任表现有 display_name 不同 → 刷新 display_name
@@ -339,5 +344,95 @@ final class SyncHostCenter: ObservableObject {
         let isReplacement = ((try? trustStore.byPeerID(pending.request.clientDeviceID)) ?? nil) != nil
         pendingSession = session
         pendingCard = pending.makeApprovalCard(isReplacement: isReplacement)
+    }
+}
+
+// MARK: - 连接后自动跑一轮「同步数据」（2026-09-15）
+
+/// 连接就绪 → 后台自动跑一轮「同步数据」（用户 2026-09-15 拍板：触发时机 = 连接后自动）。
+///
+/// 为什么是 App 级而不是面板 view model：面板（`MacSyncView`）没打开时 view model 根本
+/// 不存在，自动触发就会退化成“打开面板才同步”——正是矩阵三级空格
+/// 「点过的设备同步了、没点的没有」。
+///
+/// 一轮 = ① 本地真值对账（补发，与手动路径同一入口）② 推本端增量 + 拉对端增量。
+/// 与手动触发共用一个在飞门（`SyncDataRunGate`）：同一会话只允许一轮，取不到门就放弃本轮。
+/// 一次连接只自动跑一次（会话下线时清标记，重连再跑）。
+@MainActor
+final class MacDataSyncAutoRunner {
+    static let shared = MacDataSyncAutoRunner()
+    private var coordinator: SyncDataSyncCoordinator?
+    private var didAutoRunForCurrentConnection = false
+    /// 本 runner 是否持有在飞门（释放只释放自己那份，不误伤手动轮）。
+    private var holdsGate = false
+
+    private init() {}
+
+    func sessionDidBecomeReady(_ session: SyncPeerSession) {
+        guard SyncDataAutoRunDecision.shouldStart(
+            isConnected: true,
+            hasActiveSession: true,
+            isBusy: SyncDataRunGate.shared.isHeld,
+            didAutoRunForCurrentConnection: didAutoRunForCurrentConnection
+        ) else { return }
+        guard SyncDataRunGate.shared.acquire() else { return }
+        holdsGate = true
+        didAutoRunForCurrentConnection = true
+
+        // 同手动路径：发送前先把「本地真值」对账进 outbox（补发）。失败只打日志、不阻断。
+        do {
+            let reconcile = try SyncChangeLogDanglingRepair().run()
+            if reconcile.didChange {
+                print("ℹ️ MacDataSyncAutoRunner: 连接后自动对账本地真值" + reconcile.logText)
+            }
+        } catch {
+            print("⚠️ MacDataSyncAutoRunner: 自动对账失败 \(error)")
+        }
+
+        // peerID 取对端 hello 的 Device ID（与手动路径同一口径）；空着就不跑，
+        // 避免拿空串当游标键写脏数据。
+        guard let peerID = session.peerHelloValue?.deviceID,
+              !peerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("⚠️ MacDataSyncAutoRunner: 会话无对端 Device ID，跳过自动同步")
+            finish()
+            return
+        }
+
+        let coordinator = SyncDataSyncCoordinator(session: session, database: .shared, peerID: peerID)
+        self.coordinator = coordinator
+        coordinator.onStateChange = { [weak self] phase in
+            Task { @MainActor in
+                guard let self, phase == .finished else { return }
+                let report = coordinator.report
+                print(
+                    "ℹ️ MacDataSyncAutoRunner: 自动同步收尾"
+                        + "（发送=\(report.pushedEntries) 应用=\(report.appliedEntries)"
+                        + " 挂起=\(report.suspendedEntries) 未定位=\(report.unresolvedEntries)"
+                        + " 未支持=\(report.unsupportedEntries) 忽略删除=\(report.ignoredDeletes)"
+                        + " 失败=\(report.failureMessage ?? "无")）"
+                )
+                self.finish()
+            }
+        }
+        print("ℹ️ MacDataSyncAutoRunner: 连接就绪 → 自动跑一轮同步数据")
+        coordinator.start()
+    }
+
+    /// 会话下线：标记归位（下次连上再自动跑一轮）+ 取消未收尾的自动轮并释放门。
+    func sessionDidClose() {
+        didAutoRunForCurrentConnection = false
+        if let coordinator {
+            coordinator.cancel()
+            self.coordinator = nil
+        }
+        if holdsGate { finish() }
+    }
+
+    private func finish() {
+        coordinator = nil
+        if holdsGate {
+            holdsGate = false
+            SyncDataRunGate.shared.release()
+        }
     }
 }

@@ -117,7 +117,7 @@
 
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
-| ① | 不适用 | 不走 outbox，走**文件帧**：`SyncCollectionSyncCoordinator.swift:540` `descriptor.lyricsEntries()`；命名空间 `SyncLyricsNamespace` `QQPlayer/Sync/SyncAlignedLyrics.swift:35-79` |
+| ① | 不适用 | 不走 outbox，走**文件帧**：`SyncCollectionSyncCoordinator.swift:540` `descriptor.lyricsEntries()`；命名空间 `SyncLyricsNamespace` `QQPlayer/Sync/SyncAlignedLyrics.swift:35-79`。**方向决策（2026-09-15 用户拍板）**：对齐歌词**单向（桌面 → 移动）**——AI 对齐只在桌面端做，移动端不生成；功能本身尚未实现，所以「移动端没有补发通道」**不是待补空格，而是设计边界**（实现时按单向接，不做双向补发） |
 | ② | 有 | `SyncLyricsNamespace.wirePath(songContentHash:)` `SyncAlignedLyrics.swift:48`（`@lyrics/{歌曲 content_hash}.json`）；生产映射 `SyncLyricsContentMapping.live(database:)` `SyncChangeLogMapping.swift:134`（复用 M4-2a resolver，不新写 SQL） |
 | ③ | 有 | `SyncLyricsReceiver`（install / pending / discarded / failed 四态）；测试 `QQPlayerTests/AlignedLyricsSyncTests.swift:348` |
 | ④ | 部分 | **无挂起表**，只有**会话内暂存**：`SyncLyricsReceiver.swift:96-111`（收尾再试一次映射，仍不行 → 丢弃 + 记账）；自愈靠「下次同步从对端 manifest 重新拉」（`:13`） |
@@ -197,7 +197,7 @@ i18n 键确认只有两个缺口口径：`sync_run_data_result_unresolved` = 未
 
 | # | 空格 | 证据 | 用户可见后果 |
 | --- | --- | --- | --- |
-| 7 | **补发通道的三个触发点都是「用户动作」** | `MacSyncDataViewModel.swift:154`（点「同步数据」前）、`:200`（点「重新对账」）、`IOSPassiveSyncCenter.swift:535`（会话装配一次） | 不点就不补。同一份数据，「点过的设备同步了、没点的没有」 |
+| 7 | ~~**补发通道的三个触发点都是「用户动作」**~~ **已收（2026-09-15）** | 修法：Mac 侧**会话 ready 自动跑一轮**（`SyncHostCenter.handleSessionPhase(.ready)` → `MacDataSyncAutoRunner.sessionDidBecomeReady`，含「本地真值对账补发」）；手动（面板按钮）与自动共用 `SyncDataRunGate`（同一会话只允许一轮，取不到=放弃本轮）；iOS 仍在会话装配时跑一次 | 不点也会补（用户 2026-09-15 拍板「触发时机 = 连接后自动」）；不再出现「点过的设备同步了、没点的没有」 |
 | 8 | **D 链式依赖无守护**：playlist_item 要求 playlist 结构先行落地 | `SyncChangeLogApplier.swift:195-198`（歌单未到 → 静默跳过，`return false` 不计失败也不计数） | 歌单结构没同步成功时，其成员的落地**静默失败**，面板 `appliedEntries` 不含它们 |
 
 ### 四级：只影响诊断

@@ -156,3 +156,57 @@ struct SyncChangeLogWireEntry: Codable, Equatable, Sendable {
     var contentHash: String?
     var payloadJSON: String?
 }
+
+// MARK: - 连接后自动跑一次「同步数据」（2026-09-15 用户拍板：触发时机 = 连接后自动）
+
+/// 自动触发的纯判定（可单测；调用方只负责把四个事实递进来）。
+///
+/// 为什么要把「什么时候自动跑」收成纯函数：跨端同步原本只在用户点「同步数据」时才跑
+/// （矩阵三级空格：「点过的设备同步了、没点的没有」）；自动触发的条件一旦散在会话回调里，
+/// 就会变成“有时跑有时不跑”。
+enum SyncDataAutoRunDecision {
+    /// 已连接 + 有会话 + 没有一轮在跑 + 本次连接还没自动跑过 → 才自动跑。
+    /// 一次连接只自动一次：重连（断后重连）会由调用方清标记，再跑一次。
+    static func shouldStart(
+        isConnected: Bool,
+        hasActiveSession: Bool,
+        isBusy: Bool,
+        didAutoRunForCurrentConnection: Bool
+    ) -> Bool {
+        guard isConnected, hasActiveSession, !isBusy, !didAutoRunForCurrentConnection else { return false }
+        return true
+    }
+}
+
+/// 「同步数据」在飞门：**手动（面板按钮）与自动（连接就绪）共用一个门**。
+///
+/// 为什么必须有：同一会话上两个协调器并发 = 同一 outbox 两个推送者
+/// （游标/账目双写、批次互相越过）。取不到门 = 直接放弃本轮，**不排队**
+/// （排队会积压出“点了没反应、过一会儿才跑”的怪行为）。
+/// `@MainActor` 隔离：调用点都在主线程（面板按钮 / 会话回调）。
+@MainActor
+final class SyncDataRunGate {
+    static let shared = SyncDataRunGate()
+    private var isBusy = false
+
+    private init() {}
+
+    /// 取门；已被占用 = false。
+    func acquire() -> Bool {
+        guard !isBusy else { return false }
+        isBusy = true
+        return true
+    }
+
+    func release() {
+        isBusy = false
+    }
+
+    /// 当前是否有一轮在跑（诊断/测试读）。
+    var isHeld: Bool { isBusy }
+
+    /// 测试用：清掉（避免用例之间相互影响）。
+    func resetForTesting() {
+        isBusy = false
+    }
+}

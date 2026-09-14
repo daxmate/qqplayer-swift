@@ -209,6 +209,17 @@
   - 用例：`SyncDataSyncCoreTests`（旧设置无 key → false；开关关 → 不落点不计「已应用」；开但无落点 / 落点未接受 → 同）。
 - **建议**：两端门控读**同一设置项**这条事实源不要漂移（捕获/落点/装配三处）；补静态契约前先保持。
 
+### INV-27　连接就绪后必须**自动**跑一轮「同步数据」（补发不得依赖用户动作）
+
+- **现有守护：✅ 已收（2026-09-15）**
+  - 触发：`SyncHostCenter.handleSessionPhase(.ready)` → `MacDataSyncAutoRunner.sessionDidBecomeReady`
+    （App 级：面板没打开也跑）；会话关闭 → `sessionDidClose()` 清「一次连接一次」标记。
+  - 互斥：手动（面板按钮）与自动**共用一个在飞门** `SyncDataRunGate`（同一会话只允许一轮；
+    取不到 = 放弃本轮，不排队）。
+  - 判定纯逻辑：`SyncDataAutoRunDecision.shouldStart(isConnected:hasActiveSession:isBusy:didAutoRunForCurrentConnection:)`。
+  - 用例：`SyncDataSyncCoreTests`（`autoRunDecisionIsPure` / `runGateIsExclusive`）。
+- **建议**：保持；以后任何新增的「自动触发」都走同一个门，别再写第二个 busy 标记。
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：
