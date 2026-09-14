@@ -233,4 +233,229 @@ struct TrackContentHashTests {
         let expected = try SyncFileChecksum.sha256Hex(ofFile: url)
         #expect(filled?.contentHash == expected)
     }
+
+    // MARK: - 自愈回填（去一次性门）+ 挂起重放 + 身份缺失普查（2026-09-14）
+
+    /// 独立 UserDefaults suite：避免污染真实门状态、也让「上一轮启动」可复现。
+    private func makeIsolatedDefaults() -> UserDefaults {
+        let suiteName = "TrackContentHashTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
+    /// 插入一行带显式 content_hash 的曲目（"" 用于验证普查把空串计入缺失）。
+    private func insertTrackWithHash(
+        _ dbQueue: DatabaseQueue,
+        stableId: String,
+        path: String,
+        contentHash: String
+    ) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, ?, ?, ?)",
+                arguments: [stableId, stableId, path, contentHash]
+            )
+        }
+    }
+
+    private func contentHash(_ dbQueue: DatabaseQueue, stableId: String) throws -> String? {
+        try dbQueue.read { db in
+            try Track.filter(Column("stable_id") == stableId).fetchOne(db)?.contentHash
+        }
+    }
+
+    @Test("自愈回填：连跑两遍幂等；filledHashes 只报告本次新填的指纹")
+    func backfillIsIdempotentAndReportsOnlyNewlyFilledHashes() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+
+        let url = try writeTempFile(named: "idem-present.bin", byte: 0x77)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let expected = try SyncFileChecksum.sha256Hex(ofFile: url)
+        let existing = String(repeating: "a", count: 64)
+
+        try insertNullHashTrack(dbQueue, stableId: "idem-null", path: url.path)
+        try insertTrackWithHash(dbQueue, stableId: "idem-hashed", path: url.path, contentHash: existing)
+
+        let first = try manager.backfillMissingContentHashesDetailed()
+        #expect(first.filledHashes == [expected])
+        #expect(first.candidateCount == 1)
+        #expect(first.skippedCloudOnly == 0)
+
+        // 第二遍：无 NULL 行 → 零查询结果、零填充、不崩（幂等）
+        let second = try manager.backfillMissingContentHashesDetailed()
+        #expect(second.filledHashes.isEmpty)
+        #expect(second.candidateCount == 0)
+
+        // 已有指纹不被重算
+        #expect(try contentHash(dbQueue, stableId: "idem-hashed") == existing)
+        #expect(try contentHash(dbQueue, stableId: "idem-null") == expected)
+    }
+
+    @Test("自愈回填：文件缺失只推迟、不落永久门——下一轮启动仍重试，文件出现后自动补齐")
+    func backfillRetriesMissingFilesOnNextLaunch() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+        let defaults = makeIsolatedDefaults()
+
+        let presentURL = try writeTempFile(named: "heal-present.bin", byte: 0x88)
+        defer { try? FileManager.default.removeItem(at: presentURL.deletingLastPathComponent()) }
+        let missingURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TrackContentHashTests-heal-missing-\(UUID().uuidString).bin")
+
+        try insertNullHashTrack(dbQueue, stableId: "heal-present", path: presentURL.path)
+        try insertNullHashTrack(dbQueue, stableId: "heal-missing", path: missingURL.path)
+
+        // 第一轮启动：存在的文件补齐，缺失的保持 NULL
+        let first = try manager.backfillTrackContentHashesIfNeeded(defaults: defaults)
+        #expect(first.filledHashes == [try SyncFileChecksum.sha256Hex(ofFile: presentURL)])
+        #expect(try contentHash(dbQueue, stableId: "heal-missing") == nil)
+        // 只留运行标记（诊断），不得留下任何「已完成」语义的门
+        #expect(ContentHashBackfillMarker.lastRunDate(defaults: defaults) != nil)
+        #expect(!defaults.bool(forKey: ContentHashBackfillMarker.retiredCompletionKey))
+
+        // 第二轮启动：仍会重试（旧一次性门在这一步就永久跳过了）
+        let second = try manager.backfillTrackContentHashesIfNeeded(defaults: defaults)
+        #expect(second.candidateCount == 1)
+        #expect(second.filledHashes.isEmpty)
+
+        // 文件后来出现了 → 第三轮自愈补齐
+        try Data(repeating: 0x99, count: 1024).write(to: missingURL)
+        defer { try? FileManager.default.removeItem(at: missingURL) }
+        let third = try manager.backfillTrackContentHashesIfNeeded(defaults: defaults)
+        #expect(third.filledHashes == [try SyncFileChecksum.sha256Hex(ofFile: missingURL)])
+        #expect(try contentHash(dbQueue, stableId: "heal-missing") == third.filledHashes.first)
+    }
+
+    @Test("自愈回填：云端未下载 → 跳过且不置永久门；下载完成后下一轮补齐")
+    func backfillSkipsDatalessWithoutPermanentGate() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+        let defaults = makeIsolatedDefaults()
+
+        let url = try writeTempFile(named: "heal-dataless.bin", byte: 0xAA)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try insertNullHashTrack(dbQueue, stableId: "heal-dataless", path: url.path)
+
+        // 第一轮：云端未下载（不读内容）→ 跳过
+        let first = try manager.backfillTrackContentHashesIfNeeded(
+            defaults: defaults, isLocallyAvailable: { _ in false }
+        )
+        #expect(first.filledHashes.isEmpty)
+        #expect(first.skippedCloudOnly == 1)
+        #expect(try contentHash(dbQueue, stableId: "heal-dataless") == nil)
+        #expect(!defaults.bool(forKey: ContentHashBackfillMarker.retiredCompletionKey))
+
+        // 第二轮（文件已实体化）：仍会重试并补齐
+        let second = try manager.backfillTrackContentHashesIfNeeded(
+            defaults: defaults, isLocallyAvailable: { _ in true }
+        )
+        #expect(second.filledHashes == [try SyncFileChecksum.sha256Hex(ofFile: url)])
+        #expect(second.skippedCloudOnly == 0)
+        #expect(try contentHash(dbQueue, stableId: "heal-dataless") == second.filledHashes.first)
+    }
+
+    @Test("身份缺失普查：NULL/空指纹 + 三类悬空引用计数正确，且只读不改任何行")
+    func identityCensusCountsMissingIdentity() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+
+        let url = try writeTempFile(named: "census-present.bin", byte: 0xBB)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let missingPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TrackContentHashTests-census-missing-\(UUID().uuidString).bin").path
+
+        // 健康行：指纹完整 + 三类引用均指向它（不应计入任何悬空数）
+        try insertTrackWithHash(dbQueue, stableId: "cen-ok", path: url.path, contentHash: String(repeating: "b", count: 64))
+        // 缺失身份：NULL 指纹行 + 空串指纹行
+        try insertNullHashTrack(dbQueue, stableId: "cen-null", path: missingPath)
+        try insertTrackWithHash(dbQueue, stableId: "cen-empty", path: missingPath, contentHash: "")
+
+        try dbQueue.write { db in
+            try db.execute(sql: "INSERT INTO play_history (track_stable_id, played_at) VALUES (?, ?)", arguments: ["cen-ok", 10])
+            try db.execute(sql: "INSERT INTO play_history (track_stable_id, played_at) VALUES (?, ?)", arguments: ["ghost-history", 20])
+            try db.execute(sql: "INSERT INTO play_history (track_stable_id, played_at) VALUES (?, ?)", arguments: ["ghost-history", 30])
+            try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES (?)", arguments: ["cen-ok"])
+            try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES (?)", arguments: ["ghost-favorite"])
+            try db.execute(
+                sql: "INSERT INTO playlist (id, slug, title, created_at, updated_at) VALUES (1, 'census-p', 'Census P', 0, 0)"
+            )
+            try db.execute(
+                sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 0, 'cen-ok')"
+            )
+            try db.execute(
+                sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 1, 'ghost-item')"
+            )
+        }
+
+        let census = try manager.identityCensus()
+        #expect(census.nullHash == 2)
+        #expect(census.danglingHistory == 2)
+        #expect(census.danglingFavorite == 1)
+        #expect(census.danglingItem == 1)
+        #expect(
+            census.summaryLine
+                == "🔎 Identity census: nullHash=2 danglingHistory=2 danglingFavorite=1 danglingItem=1"
+        )
+
+        // 只读：普查后行数与悬空行原样保留（孤儿行不由本入口清理）。
+        // 注：throwing 闭包内不能写 `#expect(try …)`——宏展开报 "errors thrown from
+        // here are not handled"（报错指向 @__swiftmacro_* 展开文件）。先取值再断言。
+        let remaining = try dbQueue.read { db in
+            (
+                tracks: try Track.fetchCount(db),
+                history: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM play_history") ?? -1,
+                favorites: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM favorite") ?? -1,
+                items: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM playlist_item") ?? -1
+            )
+        }
+        #expect(remaining.tracks == 3)
+        #expect(remaining.history == 3)
+        #expect(remaining.favorites == 2)
+        #expect(remaining.items == 2)
+    }
+
+    @Test("自愈回填补齐指纹后 → 重放该指纹的挂起变更（对端收藏落到本地 stableId）")
+    func backfillReplaysPendingChanges() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+        let defaults = makeIsolatedDefaults()
+
+        let url = try writeTempFile(named: "replay-local.bin", byte: 0xCC)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let expectedHash = try SyncFileChecksum.sha256Hex(ofFile: url)
+        try insertNullHashTrack(dbQueue, stableId: "replay-local", path: url.path)
+
+        // 对端播放数据先到、本地还没有该指纹 → 挂起
+        let pendingStore = SyncChangeLogPendingStore(database: manager)
+        try pendingStore.suspend(
+            SyncChangeLogRow(
+                entity: .favorite,
+                rowKey: "peer-track",
+                op: .upsert,
+                updatedAtMs: 1000,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "peer-track"))
+            ),
+            contentHash: expectedHash
+        )
+        #expect(try pendingStore.pendingCount() == 1)
+
+        let outcome = try manager.backfillTrackContentHashesIfNeeded(
+            defaults: defaults, isLocallyAvailable: { _ in true }
+        )
+        #expect(outcome.filledHashes == [expectedHash])
+
+        // 指纹补齐 → 挂起变更本地化落库，挂起行被消费
+        let favoriteIDs = try dbQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT track_stable_id FROM favorite")
+        }
+        #expect(favoriteIDs == ["replay-local"])
+        #expect(try pendingStore.pendingCount() == 0)
+    }
 }
