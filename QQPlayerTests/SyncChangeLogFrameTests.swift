@@ -136,22 +136,32 @@ struct SyncChangeLogFrameTests {
     func sessionRoundtripFavorite() throws {
         let harness = try makeHarness()
 
-        // client 本地有这首歌（引用歌曲的业务行只有能 JOIN 上 track 才可见：
-        // 2026-09-14 身份缺口包起，引用不存在的歌的行不落库）
+        // 跨端身份（2026-09-14 身份缺口包）：两端各有这首歌，指纹相同、stableId 不同。
+        // 只在 client 建 track 行不够——host 侧没有指纹时 wire entry 拿不到 contentHash，
+        // 接收侧判「未定位」不落库（见 SyncChangeLogMapping.swift 文件头），所以指纹
+        // 必须两端齐：host 侧有指纹 = 线上带身份键，client 侧有指纹 = 能映射回本端 stableId。
+        let favHash = "h-sync-fav"
+        try harness.hostQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, 'T', ?, ?)",
+                arguments: ["host-sync-fav", "/m/host-sync-fav.flac", favHash]
+            )
+        }
         try harness.clientQueue.write { db in
             try db.execute(
-                sql: "INSERT INTO track (stable_id, title, path) VALUES ('sync-fav', 'T', '/m/sync-fav.flac')"
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, 'T', ?, ?)",
+                arguments: ["sync-fav", "/m/sync-fav.flac", favHash]
             )
         }
 
-        // host 业务写入（模拟 addToFavorites 的 outbox 形态：favorite upsert）
+        // host 业务写入（模拟 addToFavorites 的 outbox 形态：favorite upsert，键 = 本端 stableId）
         try harness.hostQueue.write { db in
             try SyncChangeLogStore.record(
                 db,
                 entity: .favorite,
-                rowKey: "sync-fav",
+                rowKey: "host-sync-fav",
                 op: .upsert,
-                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "sync-fav")),
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "host-sync-fav")),
                 updatedAtMs: 1000
             )
         }
@@ -163,7 +173,9 @@ struct SyncChangeLogFrameTests {
 
         try harness.clientQueue.read { db in
             let count = try Favorite.filter(Column("track_stable_id") == "sync-fav").fetchCount(db)
-            #expect(count == 1)
+            #expect(count == 1) // 已本地化为本端 stableId
+            let orphan = try Favorite.filter(Column("track_stable_id") == "host-sync-fav").fetchCount(db)
+            #expect(orphan == 0) // 绝不落对端 stableId 的孤儿行
         }
         // client 游标推进到 host outbox 末尾；host 侧游标未被污染（host 只应答不消费）
         #expect(try harness.clientStore.cursor(forPeer: harness.clientPeer.peerID) == 1)
@@ -218,22 +230,15 @@ struct SyncChangeLogFrameTests {
     func inboundDeleteIgnored() throws {
         let harness = try makeHarness()
 
-        // client 本地有这首歌（引用歌曲的行只有能 JOIN 上 track 才落库）
+        // client 本地已有这条收藏（旧 peer 的无身份键 upsert 现在判「未定位」不落库，
+        // 那条路径由 SyncChangeLogContentMapTests 覆盖）——本例要验的是「远端 delete
+        // 不删本地行」，所以本端状态直接落库，不依赖透传路径。
         try harness.clientQueue.write { db in
             try db.execute(
                 sql: "INSERT INTO track (stable_id, title, path) VALUES ('legacy-fav', 'T', '/m/legacy-fav.flac')"
             )
+            try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES ('legacy-fav')")
         }
-
-        // client 本地先落一条收藏：host 推 upsert（无 contentHash → 降级透传，不依赖本地有该歌）
-        try harness.hostQueue.write { db in
-            try SyncChangeLogStore.record(
-                db, entity: .favorite, rowKey: "legacy-fav", op: .upsert,
-                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "legacy-fav")),
-                updatedAtMs: 1000
-            )
-        }
-        try harness.clientPeer.sendPull()
         try harness.clientQueue.read { db in
             let count = try Favorite.filter(Column("track_stable_id") == "legacy-fav").fetchCount(db)
             #expect(count == 1)
@@ -268,9 +273,19 @@ struct SyncChangeLogFrameTests {
     func sessionRoundtripPlaylist() throws {
         let harness = try makeHarness()
 
-        // client 本地有这首歌（歌单项引用歌曲，引用不存在歌的行不落库）
+        // 歌单项引用歌曲 → 两端身份齐（指纹相同、stableId 不同）才能本地化落库
+        let itemHash = "h-t1"
+        try harness.hostQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, 'T', ?, ?)",
+                arguments: ["host-t1", "/m/host-t1.flac", itemHash]
+            )
+        }
         try harness.clientQueue.write { db in
-            try db.execute(sql: "INSERT INTO track (stable_id, title, path) VALUES ('t1', 'T', '/m/t1.flac')")
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, 'T', ?, ?)",
+                arguments: ["client-t1", "/m/client-t1.flac", itemHash]
+            )
         }
 
         let now: Int64 = 1000
@@ -278,7 +293,7 @@ struct SyncChangeLogFrameTests {
             slug: "mix", title: "Mix", createdAt: now, updatedAt: now, lastPlayedAt: 0,
             folderPath: nil, isFolderSynced: false, lastFolderSync: nil, customCoverImagePath: nil
         )
-        let itemSnap = SyncPlaylistItemSnapshot(playlistSlug: "mix", position: 1, trackStableId: "t1")
+        let itemSnap = SyncPlaylistItemSnapshot(playlistSlug: "mix", position: 1, trackStableId: "host-t1")
         try harness.hostQueue.write { db in
             try SyncChangeLogStore.record(
                 db, entity: .playlist, rowKey: "mix", op: .upsert,
@@ -298,6 +313,8 @@ struct SyncChangeLogFrameTests {
             #expect(playlist?.title == "Mix")
             let itemCount = try PlaylistItem.fetchCount(db)
             #expect(itemCount == 1)
+            let item = try PlaylistItem.fetchOne(db)
+            #expect(item?.trackStableId == "client-t1") // 已本地化为本端 stableId
         }
         #expect(try harness.clientStore.cursor(forPeer: harness.clientPeer.peerID) == 2)
     }
