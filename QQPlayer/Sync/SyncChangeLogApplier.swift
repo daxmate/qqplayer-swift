@@ -173,6 +173,11 @@ struct SyncChangeLogApplier {
 
     /// 落远端歌单快照：按 slug 查本地，存在则更新字段（保留本地 id 与 FK 完整性），
     /// 不存在则插入（自增 id）。
+    ///
+    /// ⚠️ INV-23（2026-09-15）：`customCoverImagePath` **不跳端引用**——载荷里带的是
+    /// 发送端的**设备本地相对路径**，在本端必然解析不到（面板会静默回落默认封面，谁也看不见）。
+    /// 所以：更新既有歌单时**保留本端自己的封面**；新建时封面为空。
+    /// 跳端封面若要真支持，必须另做按 `content_hash` 寻址的文件通道（matrix H 段，未做）。
     private func applyPlaylist(payloadJSON: String?) throws -> Bool {
         return try database.write { db in
             let snapshot = try SyncSnapshotCodec.decode(SyncPlaylistSnapshot.self, from: payloadJSON)
@@ -181,7 +186,7 @@ struct SyncChangeLogApplier {
                 updated.title = snapshot.title
                 updated.updatedAt = snapshot.updatedAt
                 updated.lastPlayedAt = snapshot.lastPlayedAt
-                updated.customCoverImagePath = snapshot.customCoverImagePath
+                // 封面：保持本端值（不写对端设备路径，见上方 INV-23）
                 try updated.update(db)
             } else {
                 try Playlist(
@@ -194,7 +199,7 @@ struct SyncChangeLogApplier {
                     folderPath: snapshot.folderPath,
                     isFolderSynced: snapshot.isFolderSynced,
                     lastFolderSync: snapshot.lastFolderSync,
-                    customCoverImagePath: snapshot.customCoverImagePath
+                    customCoverImagePath: nil
                 ).insert(db)
             }
             return true

@@ -644,6 +644,73 @@ struct SyncDataSyncCoreTests {
         }
     }
 
+    // MARK: - 歌单封面跨端（INV-23，2026-09-15）
+
+    @Test("歌单封面（INV-23）：对端来的设备本地封面路径不写本端")
+    func applyPlaylistDoesNotImportPeerCoverPath() throws {
+        let manager = try makeManager()
+        let applier = SyncChangeLogApplier(database: manager)
+
+        // 1) 本地已有同名歌单且有自己的封面 → 对端路径不得覆盖
+        try manager.write { db in
+            try Playlist(
+                id: nil,
+                slug: "pl",
+                title: "PL",
+                createdAt: 1,
+                updatedAt: 1,
+                lastPlayedAt: 0,
+                folderPath: nil,
+                isFolderSynced: false,
+                lastFolderSync: nil,
+                customCoverImagePath: "/local/mine.jpg"
+            ).insert(db)
+        }
+        var remote = SyncPlaylistSnapshot(
+            slug: "pl",
+            title: "PL-remote",
+            createdAt: 1,
+            updatedAt: 9,
+            lastPlayedAt: 0,
+            folderPath: nil,
+            isFolderSynced: false,
+            lastFolderSync: nil,
+            customCoverImagePath: "/peer/device/cover.jpg"
+        )
+        let applied = try applier.apply([
+            SyncChangeLogRow(
+                entity: .playlist,
+                rowKey: "pl",
+                op: .upsert,
+                updatedAtMs: 9,
+                payloadJSON: try SyncSnapshotCodec.encode(remote)
+            ),
+        ])
+        #expect(applied == 1)
+
+        let local = try manager.read { db in
+            try Playlist.filter(Column("slug") == "pl").fetchOne(db)
+        }
+        #expect(local?.title == "PL-remote", "标题照常同步")
+        #expect(local?.customCoverImagePath == "/local/mine.jpg", "本端封面不被对端设备路径覆盖（INV-23）")
+
+        // 2) 新歌单：封面留空（不引入对端设备路径）
+        remote.slug = "pl2"
+        _ = try applier.apply([
+            SyncChangeLogRow(
+                entity: .playlist,
+                rowKey: "pl2",
+                op: .upsert,
+                updatedAtMs: 10,
+                payloadJSON: try SyncSnapshotCodec.encode(remote)
+            ),
+        ])
+        let inserted = try manager.read { db in
+            try Playlist.filter(Column("slug") == "pl2").fetchOne(db)
+        }
+        #expect(inserted?.customCoverImagePath == nil, "新建歌单不得写入对端设备路径")
+    }
+
     // MARK: - 连接后自动触发（2026-09-15）
 
     @Test("连接后自动触发（纯逻辑）：已连接 + 有会话 + 不忙 + 本次未跑过 才自动跑")
