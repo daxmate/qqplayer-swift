@@ -573,6 +573,11 @@
                 print("⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(count)，缺身份键）")
             }
             // 跨端续播关（默认）/ 落点未接：播放位置行不落地、也不计入「已应用」。
+            // 父行 / 被引用行不存在而跳过（矩阵三级 #8）：以前静默失败，现在计数可见。
+            peer.onPushSkippedMissingParent = { count in
+                guard count > 0 else { return }
+                print("ℹ️ SyncChangeLogPeer: 跳过依赖尚未到达的远端行（行数=\(count)，歌单结构未到或歌无本机行）")
+            }
             peer.onPushUnsupported = { count in
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 跳过未落地的播放位置行（行数=\(count)，跨端续播关或落点未接）")

@@ -711,6 +711,60 @@ struct SyncDataSyncCoreTests {
         #expect(inserted?.customCoverImagePath == nil, "新建歌单不得写入对端设备路径")
     }
 
+    // MARK: - 父行 / 被引用行不存在 → 必须计数（矩阵三级 #8，2026-09-15）
+
+    @Test("applier：歌单结构未到本地 → 歌单项不落库、不计「已应用」、计入缺依赖")
+    func applyPlaylistItemCountsMissingPlaylistParent() throws {
+        let manager = try makeManager()
+        // 本地有歌（t-1），但没有歌单 pl（父行缺失）
+        try manager.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, ?, ?, ?)",
+                arguments: ["t-1", "T", "/m/t-1.flac", "H-1"]
+            )
+        }
+
+        var applier = SyncChangeLogApplier(database: manager)
+        let missingParent = CounterBox()
+        applier.onSkippedMissingParent = { missingParent.increment() }
+
+        let applied = try applier.apply([
+            SyncChangeLogRow(
+                entity: .playlistItem,
+                rowKey: "pl|t-1",
+                op: .upsert,
+                updatedAtMs: 1,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlaylistItemSnapshot(playlistSlug: "pl", position: 0, trackStableId: "t-1")
+                )
+            ),
+        ])
+
+        #expect(applied == 0, "父行不在 → 没落库，不得计入「已应用」")
+        #expect(missingParent.value == 1, "静默失败必须计数上屏（矩阵三级 #8）")
+    }
+
+    @Test("applier：引用歌本地查无 → 收藏不落库、计入缺依赖")
+    func applyFavoriteCountsMissingTrack() throws {
+        let manager = try makeManager()
+        var applier = SyncChangeLogApplier(database: manager)
+        let missingParent = CounterBox()
+        applier.onSkippedMissingParent = { missingParent.increment() }
+
+        let applied = try applier.apply([
+            SyncChangeLogRow(
+                entity: .favorite,
+                rowKey: "t-ghost",
+                op: .upsert,
+                updatedAtMs: 1,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "t-ghost"))
+            ),
+        ])
+
+        #expect(applied == 0)
+        #expect(missingParent.value == 1)
+    }
+
     // MARK: - 连接后自动触发（2026-09-15）
 
     @Test("连接后自动触发（纯逻辑）：已连接 + 有会话 + 不忙 + 本次未跑过 才自动跑")

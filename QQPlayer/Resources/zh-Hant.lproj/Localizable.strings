@@ -1322,6 +1322,8 @@
 "sync_run_data_pending_hint" = "有 %d 筆變更在等本機缺少的歌曲，歌曲到位後會自動生效。";
 "sync_run_data_unresolved_hint" = "有 %d 筆變更在本機找不到對應歌曲，沒有套用。";
 "sync_run_data_unsupported_hint" = "有 %d 筆播放位置變更沒有套用（跨端續播關閉，或對端位置與本機目前曲目不同）。";
+"sync_run_data_skipped_parent" = "缺依賴";
+"sync_run_data_skipped_parent_hint" = "有 %d 筆變更因為依賴的對象還沒到本機而跳過（歌單結構未同步到，或引用的歌沒有本機記錄）。";
 "sync_run_data_missing_identity_hint" = "有 %d 筆變更沒有帶歌曲指紋，對端無法定位。";
 "sync_run_data_result_none" = "還沒有同步過播放資料。";
 "sync_run_data_cancelled" = "資料同步已取消。";

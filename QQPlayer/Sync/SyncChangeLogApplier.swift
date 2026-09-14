@@ -67,6 +67,13 @@ struct SyncChangeLogApplier {
     /// 调用方（SyncChangeLogPeer）据此计数 → 账目 → 面板披露。
     var onPlaybackPositionUnsupported: (() -> Void)?
 
+    /// 一行引用**父行/被引用行不存在**而被跳过时逐条触发（2026-09-15，矩阵三级 #8）。
+    /// 三种成因（都返回 false、都不落库）：
+    /// - `playlist_item` 的歌单结构还没落本地（父行不存在）；
+    /// - 收藏 / 播放历史 / 歌单项引用的歌在本地 `track` 表查无。
+    /// 以前这三种**只打印**、既不计失败也不计数 ⇒ 面板看不到“到底丢了多少”。
+    var onSkippedMissingParent: (() -> Void)?
+
     init(database: DatabaseManager, playbackPositionSyncEnabled: Bool? = nil) {
         self.database = database
         self.playbackPositionSyncEnabled = playbackPositionSyncEnabled
@@ -133,6 +140,7 @@ struct SyncChangeLogApplier {
         try database.write { db in
             guard try Self.trackRowExists(db, stableId: rowKey) else {
                 Self.logOrphanSkip(entity: .favorite, stableId: rowKey)
+                onSkippedMissingParent?()
                 return false
             }
             try Favorite(trackStableId: rowKey).insert(db, onConflict: .replace)
@@ -149,6 +157,7 @@ struct SyncChangeLogApplier {
             let snapshot = try SyncSnapshotCodec.decode(SyncPlayHistorySnapshot.self, from: payloadJSON)
             guard try Self.trackRowExists(db, stableId: snapshot.trackStableId) else {
                 Self.logOrphanSkip(entity: .playHistory, stableId: snapshot.trackStableId)
+                onSkippedMissingParent?()
                 return false
             }
             let existing = try PlayHistoryEntry
@@ -217,10 +226,13 @@ struct SyncChangeLogApplier {
         return try database.write { db in
             guard let playlist = try Playlist.filter(Column("slug") == snapshot.playlistSlug).fetchOne(db),
                   let playlistId = playlist.id else {
-                return false // 歌单未同步到本地，结构收敛由 playlist upsert 先行保证
+                // 歌单结构还没到本地（父行不存在）：不落库、**计数**（矩阵三级 #8：静默失败必须可见）
+                onSkippedMissingParent?()
+                return false
             }
             guard try Self.trackRowExists(db, stableId: snapshot.trackStableId) else {
                 Self.logOrphanSkip(entity: .playlistItem, stableId: snapshot.trackStableId)
+                onSkippedMissingParent?()
                 return false
             }
             let itemExists = try PlaylistItem

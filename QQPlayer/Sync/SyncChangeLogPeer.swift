@@ -85,6 +85,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     /// push 中**没落到本地位置**的 playback_position 行数（跨端续播开关关 = 默认，
     /// 或开关开但落点未接；这些行不计入 `onPushApplied`）。锁外触发；0 = 不上报。
     var onPushUnsupported: ((Int) -> Void)?
+    /// push 中因**父行/被引用行不存在**而跳过的行数（歌单结构未到 / 引用歌本地查无；
+    /// 逐条累计，0 = 无。矩阵三级 #8：静默失败必须计数上屏）。
+    var onPushSkippedMissingParent: ((Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
@@ -97,6 +100,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
 
     /// 本批 applier 报「未支持」的次数（handlePush 内单线程累加，应用后读值并清零）。
     private var unsupportedPlaybackPositionCount = 0
+    /// 本批因父行 / 被引用行不存在而跳过的行数（应用前清零、应用后上报）。
+    private var skippedMissingParentCount = 0
 
     // 会话槽位链式挂接
     private var priorAppHandler: ((SyncFrame) -> Void)?
@@ -119,6 +124,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         // ⚠️ 装在自己的这份 applier 上（struct 值类型，不影响调用方持有的那份）。
         self.applier.onPlaybackPositionUnsupported = { [weak self] in
             self?.unsupportedPlaybackPositionCount += 1
+        }
+        self.applier.onSkippedMissingParent = { [weak self] in
+            self?.skippedMissingParentCount += 1
         }
         attachHandlers()
     }
@@ -319,8 +327,10 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             let mergeResult = SyncLWWReconcile.merge(localRows: localRows, remoteRows: remoteRows)
             // 播放位置未落地（跨端续播关 / 落点未接）逐条回调 → 本批累加（应用前清零）。
             unsupportedPlaybackPositionCount = 0
+            skippedMissingParentCount = 0
             let applied = try applier.apply(mergeResult.applyRemote)
             let unsupported = unsupportedPlaybackPositionCount
+            let skippedMissingParent = skippedMissingParentCount
             // 推进本端对该 peer 的游标（挂起行已持久化，游标可安全推进：数据不丢）
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
@@ -328,6 +338,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             onPushUnresolved?(unresolved.count)
             onPushIgnoredDeletes?(ignoredDeletes)
             if unsupported > 0 { onPushUnsupported?(unsupported) }
+            if skippedMissingParent > 0 { onPushSkippedMissingParent?(skippedMissingParent) }
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
         }

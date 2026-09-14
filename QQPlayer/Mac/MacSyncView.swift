@@ -1013,6 +1013,11 @@ struct MacSyncRunSection: View {
                     report.unsupportedEntries > 0 ? .orange : .secondary
                 )
                 metric(
+                    "sync_run_data_skipped_parent".localized,
+                    report.skippedMissingParentEntries,
+                    report.skippedMissingParentEntries > 0 ? .orange : .secondary
+                )
+                metric(
                     "sync_run_data_result_missing_identity".localized,
                     report.pushedMissingIdentityEntries,
                     report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
@@ -1038,6 +1043,13 @@ struct MacSyncRunSection: View {
 
             if report.unsupportedEntries > 0 {
                 Text("sync_run_data_unsupported_hint".localized(with: report.unsupportedEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.skippedMissingParentEntries > 0 {
+                Text("sync_run_data_skipped_parent_hint".localized(with: report.skippedMissingParentEntries))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

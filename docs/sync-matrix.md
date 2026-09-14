@@ -198,7 +198,7 @@ i18n 键确认只有两个缺口口径：`sync_run_data_result_unresolved` = 未
 | # | 空格 | 证据 | 用户可见后果 |
 | --- | --- | --- | --- |
 | 7 | ~~**补发通道的三个触发点都是「用户动作」**~~ **已收（2026-09-15）** | 修法：Mac 侧**会话 ready 自动跑一轮**（`SyncHostCenter.handleSessionPhase(.ready)` → `MacDataSyncAutoRunner.sessionDidBecomeReady`，含「本地真值对账补发」）；手动（面板按钮）与自动共用 `SyncDataRunGate`（同一会话只允许一轮，取不到=放弃本轮）；iOS 仍在会话装配时跑一次 | 不点也会补（用户 2026-09-15 拍板「触发时机 = 连接后自动」）；不再出现「点过的设备同步了、没点的没有」 |
-| 8 | **D 链式依赖无守护**：playlist_item 要求 playlist 结构先行落地 | `SyncChangeLogApplier.swift:195-198`（歌单未到 → 静默跳过，`return false` 不计失败也不计数） | 歌单结构没同步成功时，其成员的落地**静默失败**，面板 `appliedEntries` 不含它们 |
+| 8 | ~~**D 链式依赖无守护**：playlist_item 要求 playlist 结构先行落地~~ **已收（2026-09-15）** | 修法：applier 新增 `onSkippedMissingParent`，三种“父行/被引用行不存在”路径（歌单结构未到 / 收藏·播放历史·歌单项引用的歌本地查无）全部返回 false + **计数**；peer 累加 → `SyncDataSyncReport.skippedMissingParentEntries` → Mac 面板「缺依赖」行（>0 橙）+ hint（5 语） | 以前这三种静默失败（面板不计、「已应用」也不含），现在可见；不会再出现“同步完了但什么都没发生、没人报警” |
 
 ### 四级：只影响诊断
 

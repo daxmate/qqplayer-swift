@@ -75,6 +75,9 @@ struct SyncDataSyncReport: Equatable, Sendable {
     /// （跨端续播开关关 = 默认，或开关开但本端落点未接；见 `SyncChangeLogApplier`）。
     /// ⚠️ 这些行**不计入 `appliedEntries`**——「已应用」= 真的落了本地（INV-20）。
     var unsupportedEntries: Int = 0
+    /// 拉取方向：对端推来的行里因**父行/被引用行不存在**而跳过的行数
+    /// （歌单结构未到 / 引用歌本地查无；矩阵三级 #8：以前静默失败，现在必须可见）
+    var skippedMissingParentEntries: Int = 0
     /// 推送方向：本端发出去的行里缺身份键的条数（对端定位不了它们；含主动推增量
     /// 与应答对方拉取两个方向）
     var pushedMissingIdentityEntries: Int = 0
@@ -190,6 +193,9 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         peer.onPushApplied = { [weak self] count in self?.recordApplied(count) }
         peer.onPushSuspended = { [weak self] count in self?.recordSuspended(count) }
         peer.onPushUnresolved = { [weak self] count in self?.recordUnresolved(count) }
+        peer.onPushSkippedMissingParent = { [weak self] count in
+            self?.recordSkippedMissingParent(count)
+        }
         peer.onPushUnsupported = { [weak self] count in self?.recordUnsupported(count) }
         peer.onPushIgnoredDeletes = { [weak self] count in self?.recordIgnoredDeletes(count) }
         // 发送侧缺身份键：只累加账目，**不收尾**（见文件头：推送阶段触发 / 入站帧触发，
@@ -265,6 +271,15 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private func recordUnsupported(_ count: Int) {
         lock.lock()
         reportValue.unsupportedEntries += count
+        lock.unlock()
+        finish(failure: nil)
+    }
+
+    /// 拉取方向：对端推来的行里因**父行 / 被引用行不存在**而跳过的行数（矩阵三级 #8：
+    /// 以前静默失败，现在必须计数上屏）。与其它「应答已到」回调用同一收尾语义。
+    private func recordSkippedMissingParent(_ count: Int) {
+        lock.lock()
+        reportValue.skippedMissingParentEntries += count
         lock.unlock()
         finish(failure: nil)
     }

@@ -978,6 +978,8 @@
 "sync_run_data_pending_hint" = "有 %d 条改动在等本机缺失的歌曲，歌到位后会自动生效。";
 "sync_run_data_unresolved_hint" = "有 %d 条改动在本机找不到对应歌曲，没有应用。";
 "sync_run_data_unsupported_hint" = "有 %d 条播放位置改动没有应用（跨端续播关闭，或对端位置与本机当前曲目不同）。";
+"sync_run_data_skipped_parent" = "缺依赖";
+"sync_run_data_skipped_parent_hint" = "有 %d 条改动因为依赖的对象还没到本机而跳过（歌单结构未同步到，或引用的歌没有本地记录）。";
 "sync_run_data_missing_identity_hint" = "有 %d 条改动没有携带歌曲指纹，对端无法定位。";
 "sync_run_data_result_none" = "还没有同步过播放数据。";
 "sync_run_data_cancelled" = "数据同步已取消。";

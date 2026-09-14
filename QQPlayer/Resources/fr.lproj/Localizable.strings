@@ -971,6 +971,8 @@
 "sync_run_data_pending_hint" = "%d modifications attendent des chansons absentes de ce Mac.";
 "sync_run_data_unresolved_hint" = "%d modifications n'ont pas pu être associées à un morceau sur ce Mac et n'ont pas été appliquées.";
 "sync_run_data_unsupported_hint" = "%d modifications de position de lecture n'ont pas été appliquées (reprise entre appareils désactivée, ou position reçue pour un autre morceau).";
+"sync_run_data_skipped_parent" = "Dépendance manquante";
+"sync_run_data_skipped_parent_hint" = "%d modifications ignorées : la dépendance n'est pas encore sur cet appareil (structure de playlist non synchronisée, ou morceau référencé sans entrée locale).";
 "sync_run_data_missing_identity_hint" = "%d modifications ont été envoyées sans empreinte de morceau : l'autre appareil ne peut pas les associer.";
 "sync_run_data_result_none" = "Aucune synchronisation de données effectuée pour l'instant.";
 "sync_run_data_cancelled" = "Synchronisation des données annulée.";

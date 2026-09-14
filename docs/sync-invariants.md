@@ -220,6 +220,16 @@
   - 用例：`SyncDataSyncCoreTests`（`autoRunDecisionIsPure` / `runGateIsExclusive`）。
 - **建议**：保持；以后任何新增的「自动触发」都走同一个门，别再写第二个 busy 标记。
 
+### INV-28　父行 / 被引用行不存在时：不落库、**必须计数上屏**（静默失败不允许）
+
+- **现有守护：✅ 已收（2026-09-15）**
+  - applier 侧：`SyncChangeLogApplier.onSkippedMissingParent`（三种成因：`playlist_item` 的歌单结构未到、
+    收藏 / 播放历史 / 歌单项引用的歌在本地 `track` 查无）——一律 `return false`（**不计「已应用」**）+ 计数；
+  - peer → `SyncChangeLogPeer.onPushSkippedMissingParent`（按批累加）→ `SyncDataSyncReport.skippedMissingParentEntries`
+    → Mac 面板「缺依赖」行 + hint（5 语）。
+  - 用例：`SyncDataSyncCoreTests`（`applyPlaylistItemCountsMissingPlaylistParent` / `applyFavoriteCountsMissingTrack`）。
+- **建议**：以后任何新增的 `return false` 分支都要配一个计数字段；「没落库就不许算已应用，也不许无声无息」。
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：
