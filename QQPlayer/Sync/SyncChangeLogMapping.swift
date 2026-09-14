@@ -22,8 +22,17 @@
 //    (entity, row_key)，同一个收藏/播放历史在两端 stableId 不同，不先本地化就
 //    对不上键（各记一条、永不收敛）。本地还没有这首歌 → 挂起（见
 //    SyncChangeLogPendingStore.swift），歌到位后重放，不丢数据。
-//  - 降级：contentHash 为 nil（对端是 M4-1 老版本，或该行无歌曲引用）→ 不做映射，
-//    按 M4-1 原样透传应用，保证与老 peer 互通。
+//  - 透传：contentHash 为 nil 但该行**不引用歌曲**（歌单）/ 未知实体 → 无需跨端
+//    身份键，按 M4-1 原样透传应用。
+//  - 未定位（`.unresolved`，2026-09-14 身份缺口包）：**引用歌曲**却没有可用身份键
+//    （contentHash nil/空）→ 无法定位到本地歌曲：既不落库也不挂起（挂起键 =
+//    content_hash，这里没有），由调用方计数 + 面板披露。此前这类行被当「老 peer」
+//    透传应用，写出 `track_stable_id` 是**对端** stableId 的孤儿业务行——最近播放 /
+//    常听排行是 `JOIN track ON t.stable_id = h.track_stable_id`，永远匹配不上，
+//    界面毫无变化而面板显示「应用 N 条」（2026-09-14 maintainer 实锤）。
+//  - 发送侧欠账披露：`wireEntriesDetailed`（本文件）在填 contentHash 的同时记下
+//    「缺身份键」明细，区分「本地没有该 track 行」与「有行但指纹为空」两种成因，
+//    供会话层面板披露（见 SyncChangeLogPeer 的回调 / SyncDataSyncReport）。
 //
 //  本文件只做只读查询 + 纯变换，无写副作用；挂起/重放见
 //  SyncChangeLogPendingStore.swift。
@@ -71,6 +80,34 @@ struct SyncContentHashResolver {
             sql: "SELECT stable_id FROM track WHERE content_hash = ? ORDER BY id LIMIT 1",
             arguments: [contentHash]
         )
+    }
+
+    // MARK: 发送侧诊断用的三态查询
+
+    /// 本地 stableId 的身份键三态：区分「没有 track 行」与「有行但指纹为空」。
+    /// 两者都让 wire entry 的 contentHash 变 nil，但成因与修复手段不同
+    /// （缺行 = 该键本地没这首歌；空指纹 = 等指纹回填），面板要分开报。
+    enum TrackIdentity: Equatable {
+        /// 本地 track 表没有该 stableId 的行。
+        case noTrackRow
+        /// 有行，但 content_hash 为空（指纹未回填）。
+        case emptyContentHash
+        /// 有行且指纹可用。
+        case resolved(String)
+    }
+
+    static func trackIdentity(_ db: Database, forTrackStableId stableId: String) throws -> TrackIdentity {
+        guard !stableId.isEmpty else { return .noTrackRow }
+        guard let row = try Row.fetchOne(
+            db,
+            sql: "SELECT content_hash FROM track WHERE stable_id = ? LIMIT 1",
+            arguments: [stableId]
+        ) else {
+            return .noTrackRow
+        }
+        let hash: String? = row["content_hash"]
+        guard let hash, !hash.isEmpty else { return .emptyContentHash }
+        return .resolved(hash)
     }
 }
 
@@ -125,22 +162,57 @@ enum SyncTrackReference {
 
 // MARK: - 本地化结果
 
+/// 接收侧「未定位」的成因（面板/诊断用，单一事实源）。
+enum SyncEntryUnresolvedReason: String, Equatable, Sendable {
+    /// 该行引用歌曲，但线上 entry 没有可用身份键（contentHash nil/空）——无法定位
+    /// 到本地歌曲（发送侧拿不到本地指纹，或对端是老 peer）。
+    case missingIdentityKey = "missing_identity_key"
+}
+
 /// 接收侧一条线上 entry 的本地化结果。
 enum SyncEntryLocalization: Equatable {
     /// 命中 content_hash 映射：row_key 与 payload 歌曲引用已改写为**本地 stableId**。
     case mapped(SyncChangeLogRow)
-    /// 无需映射：该行不引用歌曲（歌单），或 entry.contentHash 为空（降级 = M4-1 原样）。
+    /// 无需映射：该行不引用歌曲（歌单）/ 未知实体 → M4-1 原样透传应用。
     case passThrough(SyncChangeLogRow)
     /// 本地还没有这首歌（content_hash 映射不到本地 stableId）→ 挂起，歌到后重放。
     case suspended(contentHash: String, remoteRow: SyncChangeLogRow)
+    /// 引用歌曲但没有可用身份键（contentHash nil/空）→ **不落库、不挂起**，只计数：
+    /// 落库会写出 JOIN track 永不匹配的孤儿业务行（界面毫无变化却显示「应用 N 条」），
+    /// 挂起又缺 content_hash 当键。
+    case unresolved(reason: SyncEntryUnresolvedReason, remoteRow: SyncChangeLogRow)
 
-    /// 本地化后的行（挂起分支 = 未改写的远端行，供挂起存储使用）。
+    /// 本地化后的行（挂起/未定位分支 = 未改写的远端行，供挂起存储 / 诊断使用）。
     var row: SyncChangeLogRow {
         switch self {
-        case .mapped(let row), .passThrough(let row), .suspended(_, let row):
+        case .mapped(let row), .passThrough(let row), .suspended(_, let row), .unresolved(_, let row):
             return row
         }
     }
+}
+
+// MARK: - 发送侧身份缺口诊断
+
+/// 发送侧一行「缺身份键」的诊断（只用于计数 / 日志，不上线）。
+struct SyncWireMissingIdentity: Equatable, Sendable {
+    /// 缺键成因（必须可区分，面板与修复手段都不同）。
+    enum Reason: String, Equatable, Sendable {
+        /// ① 行引用的 stableId 在本地 `track` 表里**没有行**。
+        case unknownTrack = "unknown_track"
+        /// ② 有行但 `content_hash` 为空（指纹未回填）。
+        case emptyContentHash = "empty_content_hash"
+    }
+
+    var entity: String
+    var rowKey: String
+    var trackStableId: String
+    var reason: Reason
+}
+
+/// 发送侧取数结果：wire 条目 + 缺身份键明细（`wireEntries` 签名不变，这是带诊断的入口）。
+struct SyncWireEntryBatch: Equatable, Sendable {
+    var entries: [SyncChangeLogWireEntry] = []
+    var missingIdentity: [SyncWireMissingIdentity] = []
 }
 
 // MARK: - 收发两侧的映射变换
@@ -159,9 +231,21 @@ struct SyncChangeLogMapper {
 
     /// outbox 行批 → wire entry 批（逐行按歌曲引用查 track 取 content_hash）。
     /// 一个读事务内完成，避免逐行开关事务。
+    ///
+    /// ⚠️ 签名保持（两端调用点都在用）；需要「哪些行缺身份键」时用
+    /// `wireEntriesDetailed`（本方法就是它的 `.entries`，同一事实源）。
     func wireEntries(_ rows: [SyncChangeLogRow]) throws -> [SyncChangeLogWireEntry] {
+        try wireEntriesDetailed(rows).entries
+    }
+
+    /// 带诊断的发送侧取数：wire 条目 + **缺身份键明细**（区分「本地没有该 track 行」
+    /// 与「有行但指纹为空」）。原实现静默填 nil、零计数，调用方（handlePull /
+    /// sendIncrement）完全看不见缺口——这正是「同步成功但界面毫无变化」的发送侧成因。
+    func wireEntriesDetailed(_ rows: [SyncChangeLogRow]) throws -> SyncWireEntryBatch {
         try database.read { db in
-            try rows.map { row in
+            var batch = SyncWireEntryBatch()
+            batch.entries.reserveCapacity(rows.count)
+            for row in rows {
                 var contentHash: String?
                 if let entity = row.entityValue,
                    let trackStableId = SyncTrackReference.trackStableId(
@@ -169,10 +253,28 @@ struct SyncChangeLogMapper {
                        rowKey: row.rowKey,
                        payloadJSON: row.payloadJSON
                    ) {
-                    contentHash = try SyncContentHashResolver.contentHash(db, forTrackStableId: trackStableId)
+                    switch try SyncContentHashResolver.trackIdentity(db, forTrackStableId: trackStableId) {
+                    case .resolved(let hash):
+                        contentHash = hash
+                    case .noTrackRow:
+                        batch.missingIdentity.append(SyncWireMissingIdentity(
+                            entity: row.entity,
+                            rowKey: row.rowKey,
+                            trackStableId: trackStableId,
+                            reason: .unknownTrack
+                        ))
+                    case .emptyContentHash:
+                        batch.missingIdentity.append(SyncWireMissingIdentity(
+                            entity: row.entity,
+                            rowKey: row.rowKey,
+                            trackStableId: trackStableId,
+                            reason: .emptyContentHash
+                        ))
+                    }
                 }
-                return Self.wireEntry(row, contentHash: contentHash)
+                batch.entries.append(Self.wireEntry(row, contentHash: contentHash))
             }
+            return batch
         }
     }
 
@@ -197,10 +299,14 @@ struct SyncChangeLogMapper {
         guard let entity = SyncChangeEntity(rawValue: entry.entity) else {
             return .passThrough(remoteRow) // 未知实体：交对账/应用层按未知忽略
         }
-        // 不引用歌曲（歌单）或没有跨端歌曲键（老 peer / 指纹缺失）→ 降级透传
-        guard SyncTrackReference.referencesTrack(entity),
-              let contentHash = entry.contentHash, !contentHash.isEmpty else {
+        // 不引用歌曲（歌单）→ 没有跨端身份键也无所谓，原样透传
+        guard SyncTrackReference.referencesTrack(entity) else {
             return .passThrough(remoteRow)
+        }
+        // 引用歌曲但没有可用身份键 → 未定位：不落库（否则写出 JOIN 永不匹配的孤儿行）、
+        // 不挂起（缺 content_hash 当挂起键），只计数。
+        guard let contentHash = entry.contentHash, !contentHash.isEmpty else {
+            return .unresolved(reason: .missingIdentityKey, remoteRow: remoteRow)
         }
         guard let localStableId = try resolver.trackStableId(forContentHash: contentHash) else {
             return .suspended(contentHash: contentHash, remoteRow: remoteRow)

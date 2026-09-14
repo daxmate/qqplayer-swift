@@ -14,6 +14,14 @@
 //     歌到位 → 垃圾数据 + 语义错乱），不进 localize / pendingStore / LWW，也不删本地行。
 //  删除判定集中在 SyncChangeLogDeletionPolicy.swift（纯逻辑单一事实源）。
 //
+//  ⚠️ 身份缺口披露（2026-09-14）：引用歌曲却**没有可用身份键**（wire contentHash
+//  nil/空）的入站行，localize 返回 `.unresolved` → 本类**不落库、不挂起**（挂起
+//  需要 content_hash 当键），只计数并通过 `onPushUnresolved` 上报（面板据此披露
+//  「未定位」）；发送侧用 `wireEntriesDetailed` 的缺身份键明细，经
+//  `onIncrementMissingIdentity` / `onPullMissingIdentity` 上报（面板据此披露
+//  「缺指纹」）。以前发送侧静默填 nil、接收侧拿对端 stableId 透传落库 → 写出
+//  `JOIN track` 永不匹配的孤儿行：界面毫无变化而面板显示「应用 59 条」。
+//
 //  协议语义（docs/lan-sync-design.md §6.2；v1 单 Host-单 Client）：
 //  - change_log_pull(cursor)：对端请求本端 outbox 中 id > cursor 的增量。
 //    应答 = change_log_push(entries, lastOutboxID)。处理 = 本端从 store 取
@@ -65,12 +73,20 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPushApplied: ((Int) -> Void)?
     /// push 中因本地缺歌而挂起的行数（锁外触发；0 = 无挂起）。
     var onPushSuspended: ((Int) -> Void)?
+    /// push 中因缺身份键而未落库的行数（引用歌曲但 contentHash nil/空 → 不落库、
+    /// 不挂起；锁外触发；0 = 无未定位行）。
+    var onPushUnresolved: ((Int) -> Void)?
     /// push 中被忽略的 delete 行数（v2 删除不传播；锁外触发；0 = 无忽略）。
     var onPushIgnoredDeletes: ((Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
     var onIncrementSent: ((Int) -> Void)?
+    /// 主动推送增量中缺身份键的行数（contentHash 拿不到，对端定位不了；
+    /// 锁外触发；0 条不触发）。
+    var onIncrementMissingIdentity: ((Int) -> Void)?
+    /// 应答远端拉取时，本批上线行里缺身份键的行数（锁外触发；0 条不触发）。
+    var onPullMissingIdentity: ((Int) -> Void)?
 
     // 会话槽位链式挂接
     private var priorAppHandler: ((SyncFrame) -> Void)?
@@ -127,6 +143,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         let batchSize = max(1, maxPerBatch)
         var cursor = try store.pushCursor(forPeer: peerID)
         var consumed = 0
+        var missingIdentity = 0
         var lastSentCursor: Int64?
         while true {
             let page = try store.page(after: cursor, limit: batchSize)
@@ -137,9 +154,14 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 })
                 .map { page.rows[$0] }
             // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
-            let wireEntries = try mapper.wireEntries(transmittable)
+            // 2026-09-14：同时收缺身份键明细 → 对端定位不了的量要看得见（面板披露）。
+            let batch = try mapper.wireEntriesDetailed(transmittable)
+            missingIdentity += batch.missingIdentity.count
+            if !batch.missingIdentity.isEmpty {
+                Self.logMissingIdentity(batch.missingIdentity)
+            }
             let payload = SyncChangeLogPushPayload(
-                entries: wireEntries,
+                entries: batch.entries,
                 lastOutboxID: page.lastOutboxID
             )
             try session.sendApplicationFrame(type: .changeLogPush, payload: try JSONEncoder().encode(payload))
@@ -151,6 +173,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         // 全部批次成功 → 才推进推送游标（失败已在上面 throw 出去，游标保持原值）。
         guard let finalCursor = lastSentCursor else { return 0 } // 空增量：不发帧、不动游标
         try store.setPushCursor(forPeer: peerID, lastOutboxID: finalCursor)
+        if missingIdentity > 0 { onIncrementMissingIdentity?(missingIdentity) }
         onIncrementSent?(consumed)
         return consumed
     }
@@ -195,13 +218,18 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 })
                 .map { entries[$0] }
             // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
-            let wireEntries = try mapper.wireEntries(transmittable)
+            // 2026-09-14：缺身份键明细单独计数上报（对端会因「未定位」跳过这些行）。
+            let batch = try mapper.wireEntriesDetailed(transmittable)
             // 游标 = **本批实际末行 id**（含被本批过滤的 delete 行）：被过滤的行永不重发、
             // 允许被越过；批外的行（任何 upsert）一律不被越过（下一轮继续发）。
-            let response = SyncChangeLogPushPayload(entries: wireEntries, lastOutboxID: page.lastOutboxID)
+            let response = SyncChangeLogPushPayload(entries: batch.entries, lastOutboxID: page.lastOutboxID)
             try session.sendApplicationFrame(type: .changeLogPush, payload: JSONEncoder().encode(response))
             // 计数语义保持不变 = "本端 outbox 增量行数"（含被过滤的 delete），与 wire 条目数无关。
             onPullHandled?(request, entries.count)
+            if !batch.missingIdentity.isEmpty {
+                Self.logMissingIdentity(batch.missingIdentity)
+                onPullMissingIdentity?(batch.missingIdentity.count)
+            }
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_pull 应答失败：\(error)"))
         }
@@ -226,6 +254,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             var remoteRows: [SyncChangeLogRow] = []
             var suspended = 0
             var ignoredDeletes = 0
+            var unresolved = 0
             for entry in payload.entries {
                 // v2（§12b-7）：删除不传播——收到 delete 一律忽略，且必须在 localize
                 // 之前拦截（见文件头注释：否则会被误判为"本地缺歌"挂起）。
@@ -240,6 +269,15 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 case .suspended(let contentHash, let remoteRow):
                     try pendingStore.suspend(remoteRow, contentHash: contentHash)
                     suspended += 1
+                case .unresolved(let reason, let remoteRow):
+                    // 引用歌曲但没有可用身份键 → 定位不到本地歌曲：不落库（否则写出
+                    // JOIN track 永不匹配的孤儿业务行）也不挂起（缺 content_hash 当键），
+                    // 只计数（面板据此披露「未定位」）。
+                    unresolved += 1
+                    print(
+                        "⚠️ SyncChangeLogPeer: 跳过未定位的远端行（\(reason.rawValue)：缺身份键）"
+                            + " entity=\(remoteRow.entity) rowKey=\(remoteRow.rowKey)"
+                    )
                 }
             }
             // 本地批：按 (entity, row_key) **一次取齐**本端该键最新行（对账代表本端事实）。
@@ -267,10 +305,22 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
             onPushSuspended?(suspended)
+            onPushUnresolved?(unresolved)
             onPushIgnoredDeletes?(ignoredDeletes)
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
         }
+    }
+
+    // MARK: 缺身份键诊断
+
+    /// 本批上线行里缺身份键的成因分解（只记实体无关的成因/条数，不打印曲目内容）。
+    private static func logMissingIdentity(_ items: [SyncWireMissingIdentity]) {
+        let byReason = Dictionary(grouping: items, by: \.reason)
+            .map { "\($0.key.rawValue)=\($0.value.count)" }
+            .sorted()
+            .joined(separator: " ")
+        print("⚠️ SyncChangeLogPeer: 本批 \(items.count) 行缺身份键（\(byReason)）→ 对端定位不了，不会落库")
     }
 
     // MARK: 会话断连

@@ -179,6 +179,8 @@ enum SyncChangeLogReplay {
                 localizable.append((id, row))
             case .suspended:
                 continue // 仍映射不到（异常情形）：保留挂起行，下次再试
+            case .unresolved:
+                continue // 不可能：这里 contentHash 非空（挂起键即指纹）；到达即视为仍不可用
             }
         }
         guard !localizable.isEmpty else { return 0 }

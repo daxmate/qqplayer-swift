@@ -11,6 +11,13 @@
 //  delete 行，**绝不删本地业务行**（正常情况下 delete 已在 SyncChangeLogPeer
 //  handlePush 的 localize 之前被拦掉；见该文件）。
 //
+//  ⚠️ 身份兜底（2026-09-14 身份缺口包）：引用歌曲的实体（favorite / play_history /
+//  playlist_item）落库前先查本地 `track` 表**行是否存在**，不存在 → 跳过（返回 false）
+//  + 一行诊断。理由：最近播放 / 常听排行是 `JOIN track ON t.stable_id = h.track_stable_id`
+//  （见 SmartPlaylistStore），引用不存在歌曲的业务行**永远不可见**——先前的
+//  passThrough 透传路径会拿对端 stableId 写出这类孤儿行，界面毫无变化而面板显示
+//  「应用 N 条」。任何路径（含挂起重放 SyncChangeLogReplay）都不该写出它。
+//
 //  各实体应用语义（与捕获侧 SyncDataSnapshots 对称；v2 起只应用 upsert）：
 //  - favorite：row_key = track_stable_id。upsert = INSERT OR REPLACE。
 //  - play_history：row_key = "\(trackStableId)|\(playedAt)"。upsert = 本地按
@@ -81,11 +88,35 @@ struct SyncChangeLogApplier {
         }
     }
 
+    // MARK: 身份兜底（引用歌曲的实体：本地必须有该 track 行）
+
+    /// 本地 `track` 表是否存在该 stable_id 的行。
+    /// 引用歌曲的业务行（收藏 / 播放历史 / 歌单项）只有能 JOIN 上 track 才在界面可见
+    /// （最近播放 / 常听排行都走 JOIN），所以不存在该行时一律不写。
+    private static func trackRowExists(_ db: Database, stableId: String) throws -> Bool {
+        guard !stableId.isEmpty else { return false }
+        return try Int.fetchOne(
+            db,
+            sql: "SELECT 1 FROM track WHERE stable_id = ? LIMIT 1",
+            arguments: [stableId]
+        ) != nil
+    }
+
+    /// 一行诊断（隐私：只打实体/键，不打曲目内容）。
+    private static func logOrphanSkip(entity: SyncChangeEntity, stableId: String) {
+        print("⚠️ SyncChangeLogApplier: 跳过引用不存在歌曲的 \(entity.rawValue) 行（本地无 stable_id=\(stableId) 的 track）")
+    }
+
     // MARK: favorite
 
-    /// row_key = track_stable_id。落 upsert 收藏行（replace 幂等）。
+    /// row_key = track_stable_id。本地必须有该歌（否则该收藏永不进入列表）→
+    /// 落 upsert 收藏行（replace 幂等）。
     private func applyFavorite(rowKey: String) throws -> Bool {
         try database.write { db in
+            guard try Self.trackRowExists(db, stableId: rowKey) else {
+                Self.logOrphanSkip(entity: .favorite, stableId: rowKey)
+                return false
+            }
             try Favorite(trackStableId: rowKey).insert(db, onConflict: .replace)
             return true
         }
@@ -98,6 +129,10 @@ struct SyncChangeLogApplier {
     private func applyPlayHistory(payloadJSON: String?) throws -> Bool {
         return try database.write { db in
             let snapshot = try SyncSnapshotCodec.decode(SyncPlayHistorySnapshot.self, from: payloadJSON)
+            guard try Self.trackRowExists(db, stableId: snapshot.trackStableId) else {
+                Self.logOrphanSkip(entity: .playHistory, stableId: snapshot.trackStableId)
+                return false
+            }
             let existing = try PlayHistoryEntry
                 .filter(Column("track_stable_id") == snapshot.trackStableId
                     && Column("played_at") == snapshot.playedAt)
@@ -151,13 +186,19 @@ struct SyncChangeLogApplier {
     // MARK: playlist_item
 
     /// 落远端歌单项快照：按 slug 找本地歌单（未同步到则跳过，结构收敛由 playlist
-    /// upsert 先行保证）；存在则更新 position，不存在则插入。
+    /// upsert 先行保证）；本地无该歌（item 引用的 track 行不存在）也跳过——歌单项
+    /// 只有能 JOIN 上 track 才可见，否则是永远不可见的孤儿行。存在则更新 position，
+    /// 不存在则插入。
     private func applyPlaylistItem(payloadJSON: String?) throws -> Bool {
         let snapshot = try SyncSnapshotCodec.decode(SyncPlaylistItemSnapshot.self, from: payloadJSON)
         return try database.write { db in
             guard let playlist = try Playlist.filter(Column("slug") == snapshot.playlistSlug).fetchOne(db),
                   let playlistId = playlist.id else {
                 return false // 歌单未同步到本地，结构收敛由 playlist upsert 先行保证
+            }
+            guard try Self.trackRowExists(db, stableId: snapshot.trackStableId) else {
+                Self.logOrphanSkip(entity: .playlistItem, stableId: snapshot.trackStableId)
+                return false
             }
             let itemExists = try PlaylistItem
                 .filter(Column("playlist_id") == playlistId
