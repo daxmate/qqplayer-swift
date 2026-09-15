@@ -8,8 +8,10 @@
 //
 
 import AVFoundation
+import Combine
 import CryptoKit
 import Foundation
+import GRDB
 import SFBAudioEngine
 
 enum LibraryIndexerError: Error {
@@ -44,6 +46,38 @@ class LibraryIndexer: NSObject, ObservableObject {
     /// 在途扫描任务（start/startOfflineMode 注册，stop 取消）：generation 只让闭包
     /// 提前 return，任务组仍会等已入队文件跑完；cancel 才能让取消传播（审计 🔵-9）。
     private(set) var activeScanTask: Task<Void, Never>?
+
+    // MARK: - 曲库索引终态（changeLog 同步前置门的事实位）
+
+    /// **本启动**内一次完整主扫（含空库）是否已跑完。
+    @Published private(set) var hasCompletedScanThisLaunch = false
+
+    /// 曲库索引是否已到达终态（= 曲库行已由一次完整主扫建立）。
+    ///
+    /// 两个来源：① 本启动跑完过主扫（`hasCompletedScanThisLaunch`）；② `track` 表已有行
+    /// （上次启动/上次安装的主扫确实落过库）。
+    /// **fail-closed**：两个来源都不成立 → false。安装后第一次冷启动时 `track` 表还是空的
+    /// （业务表仍在），此刻放行同步就会：把 outbox 行当悬空清掉、应答拉取的行全缺身份键。
+    /// 注意不能只看 `isIndexing`：`.task` 里 `AppCoordinator.initialize()` 才起扫，
+    /// 而同步可能**更早**（scenePhase → .active）就已经连上对端——那一瞬 `isIndexing` 仍是 false。
+    var hasReachedIndexingTerminalState: Bool {
+        if hasCompletedScanThisLaunch { return true }
+        return libraryHasIndexedRows()
+    }
+
+    /// 终态事实**变化**信号（不携带值）：订阅方收到后重新走 `IndexingGate` 的唯一判定
+    /// （本文件不复述判定，只报“变了”）。
+    var indexingTerminalStatePublisher: AnyPublisher<Void, Never> {
+        $hasCompletedScanThisLaunch.map { _ in () }.eraseToAnyPublisher()
+    }
+
+    /// `track` 表是否已有行。读失败按 false（fail-closed，宁可不放行）。
+    private func libraryHasIndexedRows() -> Bool {
+        let rows: Int? = try? databaseManager.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM track") ?? 0
+        }
+        return (rows ?? 0) > 0
+    }
 
     private let databaseManager = DatabaseManager.shared
     private let stateManager = StateManager.shared
@@ -463,6 +497,8 @@ class LibraryIndexer: NSObject, ObservableObject {
 
             await MainActor.run {
                 isIndexing = false
+                // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
+                hasCompletedScanThisLaunch = true
                 print("✅ iOS library scan completed. Found \(tracksFound) tracks.")
             }
 
@@ -613,6 +649,8 @@ class LibraryIndexer: NSObject, ObservableObject {
                 postPendingLibraryRefresh()
 
                 isIndexing = false
+                // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
+                hasCompletedScanThisLaunch = true
                 print("✅ macOS scan completed. Found \(tracksFound) tracks.")
                 MacScanLogger.log("scan completed, tracksFound: \(tracksFound), skippedDataless: \(skippedDataless)")
 

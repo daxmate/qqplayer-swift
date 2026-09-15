@@ -429,6 +429,9 @@
         private let clientName: () -> String?
         /// 同步库（生产 = `.shared`；测试注入内存库，避免碰真实 DB）
         private let database: DatabaseManager
+        /// 曲库索引状态源（= changeLog 同步前置门的事实来源，`IndexingGate` 唯一判定；
+        /// 生产 = `LibraryIndexer.shared`，测试注入假源）。
+        private let indexingState: IndexingStateProviding
 
         /// 默认本机名来源（握手 hello / 配对请求携带的展示名）：
         /// 用户命名（`LocalDeviceNameStore`）优先，未命名回落系统设备名。
@@ -445,6 +448,10 @@
         private var dataSyncPeer: SyncChangeLogPeer?
         /// 数据同步端的对端游标键（`sync_cursor.peer_id`）；nil = 未装配
         private(set) var dataSyncPeerID: String?
+        /// 待装配数据同步端的会话（前置门挡住时留着，索引终态后补装；拆除时清）
+        private var dataSyncSession: SyncPeerSession?
+        /// 索引终态事实的订阅（start 挂、stop 摘）
+        private var indexingTerminalStateCancellable: AnyCancellable?
 
         /// 数据同步端是否已装配（可达性诊断 / 测试断言 / **运行时装配自检事实**）。
         var isDataSyncAttached: Bool {
@@ -471,13 +478,15 @@
             deviceStore: DeviceStore = DeviceStore(),
             libraryRoot: @escaping () -> URL = { MusicFolderResolver.iosDocumentsDirectoryURL() },
             clientName: @escaping () -> String? = { IOSPassiveSyncCenter.defaultClientName() },
-            database: DatabaseManager = .shared
+            database: DatabaseManager = .shared,
+            indexingState: IndexingStateProviding = LibraryIndexer.shared
         ) {
             self.identityStore = identityStore
             self.deviceStore = deviceStore
             self.libraryRoot = libraryRoot
             self.clientName = clientName
             self.database = database
+            self.indexingState = indexingState
             reloadPairedHosts()
         }
 
@@ -486,6 +495,7 @@
         /// App 进入前台 / 设置页出现：开始（幂等）。
         /// 已在跑但此前因「无已配对主机」闲置时，本调用会重新检查主机并立即开始。
         func start() {
+            observeIndexingTerminalState()
             if isRunning {
                 reloadPairedHosts()
                 guard !state.isConnected, !state.isConnecting, !isWaitingBackoff, !pairedHosts.isEmpty else { return }
@@ -497,9 +507,31 @@
             beginAttempt()
         }
 
+        /// 订阅「曲库索引终态」事实：终态一到，把此前被前置门挡住的数据同步端补上
+        /// （会话仍在时才动；判定只有一处 = `IndexingGate.isReadyForChangeLogSync`）。
+        private func observeIndexingTerminalState() {
+            guard indexingTerminalStateCancellable == nil else { return }
+            indexingTerminalStateCancellable = indexingState.indexingTerminalStatePublisher
+                .sink { [weak self] in
+                    Task { @MainActor in self?.refreshDataSyncAttachment() }
+                }
+        }
+
+        /// 索引终态事实变化 → 若会话已就绪，补装数据同步端（幂等：已装配就什么都不做）。
+        ///
+        /// internal（非 private）仅供 iOS 测试 target 驱动这条路径（与 `attachPassiveHost` 同口径）；
+        /// 生产只由 `observeIndexingTerminalState` 的订阅回调触发。
+        func refreshDataSyncAttachment() {
+            guard let session = dataSyncSession, session.isReady else { return }
+            attachDataSync(to: session)
+        }
+
         /// App 退到后台：拆接线 + 关会话 + 停浏览（幂等）。
         func stop() {
             isRunning = false
+            indexingTerminalStateCancellable?.cancel()
+            indexingTerminalStateCancellable = nil
+            dataSyncSession = nil
             automaticAttempts = 0
             isWaitingBackoff = false
             cancelDiscovery()
@@ -647,6 +679,9 @@
                 return
             }
             summary = host.summary
+            // 记下待装配数据同步端的会话：前置门若未开，索引终态后由
+            // `refreshDataSyncAttachment()` 用这个会话补装。
+            dataSyncSession = session
             // 被动端接好后挂数据同步端：帧 8/9 与帧 15 的链序见文件头注释。
             attachDataSync(to: session)
             // 装配完成 → 申报事实（会话 ready 的自检时点；缺口在面板上可见，见 SyncWiringSelfCheck）。
@@ -660,7 +695,10 @@
         private func recordWiringFacts() {
             let store = SyncWiringFactsStore.shared
             store.record(.libraryPassiveHost, attached: passiveHost != nil)
-            store.record(.changeLogPeer, attached: isDataSyncAttached)
+            // 前置门未开（索引未到终态）= 本端**有意**未装配，不是接线缺口 → 记「不适用」（nil），
+            // 与「门控关 = 不适用」同口径；门开着却没装配才是缺口（false）。
+            let gated = !IndexingGate.isReadyForChangeLogSync(indexingState)
+            store.record(.changeLogPeer, attached: isDataSyncAttached ? true : (gated ? nil : false))
             store.record(.playbackPositionSink, attached: playbackPositionSinkAttached)
         }
 
@@ -685,11 +723,19 @@
 
         /// 会话 ready → 装配数据同步端（帧 8/9 = `SyncChangeLogPeer`，全仓帧 8/9 唯一处理器）。
         ///
+        /// **前置门**（唯一判定 = `IndexingGate.isReadyForChangeLogSync`）：曲库索引未到终态时
+        /// 本端**整体不接**——不装配 peer（不发起、不应答帧 8/9）、不跑补发对账，等终态后
+        /// 由 `refreshDataSyncAttachment()` 补装。理由见 `IndexingGate` 内的取证注释。
+        ///
         /// 装配顺序：本方法在 `SyncLibraryPassiveHost.attach` **之后**调用——
         /// `SyncChangeLogPeer.init` 会把 handler 挂成链头并转发 prior，于是帧 8/9 由它处理、
         /// 帧 15 继续到达被动端（见文件头「会话回调单槽 + 挂接顺序」）。
         private func attachDataSync(to session: SyncPeerSession) {
             guard dataSyncPeer == nil else { return }
+            guard IndexingGate.isReadyForChangeLogSync(indexingState) else {
+                print("⏸️ IOSPassiveSyncCenter: 曲库索引未到终态，不装配数据同步端（不发起/不应答/不补发对账，待终态后补装）")
+                return
+            }
             guard let peerID = IOSPassiveDataSyncLogic.dataSyncPeerID(
                 peerDeviceID: session.peerHelloValue?.deviceID
             ) else {
@@ -791,6 +837,7 @@
             passiveHost = nil
             dataSyncPeer = nil
             dataSyncPeerID = nil
+            dataSyncSession = nil
             playbackPositionSinkAttached = nil
             SyncWiringFactsStore.shared.clear()
             currentTarget = nil
@@ -872,6 +919,7 @@
             passiveHost = nil
             dataSyncPeer = nil
             dataSyncPeerID = nil
+            dataSyncSession = nil
             playbackPositionSinkAttached = nil
             // 会话拆除：自检事实归零（不是缺口——没有会话就谈不上装配）。
             SyncWiringFactsStore.shared.clear()

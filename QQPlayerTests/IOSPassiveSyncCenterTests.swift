@@ -11,12 +11,33 @@
 //    ready 装配 / 无对端 hello 不装 / 拆除摘下（真会话夹具 + 内存库，无网络）
 //
 
+import Combine
 import Foundation
 import GRDB
 import Network
 import Testing
 
 @testable import QQPlayer
+
+/// 假索引状态源（前置门事实源）：不碰 DatabaseManager / LibraryIndexer 单例。
+@MainActor
+private final class FakeIndexingState: IndexingStateProviding {
+    @Published var isIndexing: Bool
+    @Published var hasReachedIndexingTerminalState: Bool
+
+    init(isIndexing: Bool = false, hasReachedIndexingTerminalState: Bool = true) {
+        self.isIndexing = isIndexing
+        self.hasReachedIndexingTerminalState = hasReachedIndexingTerminalState
+    }
+
+    var isIndexingPublisher: AnyPublisher<Bool, Never> {
+        $isIndexing.eraseToAnyPublisher()
+    }
+
+    var indexingTerminalStatePublisher: AnyPublisher<Void, Never> {
+        $hasReachedIndexingTerminalState.map { _ in () }.eraseToAnyPublisher()
+    }
+}
 
 struct IOSPassiveSyncCenterTests {
     // MARK: - 夹具
@@ -56,11 +77,16 @@ struct IOSPassiveSyncCenterTests {
     }
 
     @MainActor
-    private func makeCenter(_ manager: DatabaseManager, root: URL) -> IOSPassiveSyncCenter {
+    private func makeCenter(
+        _ manager: DatabaseManager,
+        root: URL,
+        indexingState: IndexingStateProviding = FakeIndexingState()
+    ) -> IOSPassiveSyncCenter {
         IOSPassiveSyncCenter(
             deviceStore: DeviceStore(database: manager),
             libraryRoot: { root },
-            database: manager
+            database: manager,
+            indexingState: indexingState
         )
     }
 
@@ -324,6 +350,60 @@ struct IOSPassiveSyncCenterTests {
 
         #expect(center.isDataSyncAttached == false)
         #expect(center.dataSyncPeerID == nil)
+    }
+
+    // MARK: - 数据同步端前置门（2026-09-15：索引未到终态不得发起/应答 changeLog 同步）
+
+    @MainActor
+    @Test("前置门：曲库索引未到终态 → 不装配数据同步端，且补发对账没跑（outbox 逐字不变）")
+    func dataSyncGatedUntilIndexingTerminal() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let manager = try makeManager()
+        // 安装后第一次冷启动的形状：业务行 / outbox 行在、track 表还是空的。
+        // 这条 outbox 行引用的歌在 track 表查无（`s-gone`）——补发对账一旦跑，
+        // 就会把它当「本地悬空」清掉，而那正是真机上 outbox 491 → 0 的形状。
+        try manager.write { db in
+            try SyncChangeLogStore.record(
+                db,
+                entity: .favorite,
+                rowKey: "s-gone",
+                op: .upsert,
+                payloadJSON: nil,
+                updatedAtMs: 1000
+            )
+        }
+        let source = FakeIndexingState(isIndexing: false, hasReachedIndexingTerminalState: false)
+        let center = makeCenter(manager, root: try makeTempRoot("gated"), indexingState: source)
+
+        center.attachPassiveHost(to: fixture.clientSession)
+
+        #expect(center.isDataSyncAttached == false, "索引未终态就不该装配帧 8/9 处理器")
+        #expect(center.dataSyncPeerID == nil)
+        let remaining = try manager.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(
+            remaining.map(\.rowKey) == ["s-gone"],
+            "前置门没把补发对账挡住：outbox 行被当悬空清掉了（真机 outbox 491 → 0 的形状）"
+        )
+    }
+
+    @MainActor
+    @Test("前置门：索引终态到达 → 同一会话补装数据同步端（门只挡到终态为止）")
+    func dataSyncAttachedWhenTerminalStateArrives() async throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let manager = try makeManager()
+        let source = FakeIndexingState(isIndexing: false, hasReachedIndexingTerminalState: false)
+        let center = makeCenter(manager, root: try makeTempRoot("terminal"), indexingState: source)
+        // 无已配对主机 → start() 只挂「终态事实」订阅，不建连接（不碰 Keychain / 网络）
+        center.start()
+        center.attachPassiveHost(to: fixture.clientSession)
+        #expect(center.isDataSyncAttached == false)
+
+        // 主扫跑完 → 终态事实翻转 → 订阅回调补装
+        source.hasReachedIndexingTerminalState = true
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        #expect(center.isDataSyncAttached, "终态到了却没补装 → 本次会话的播放数据同步永远不通")
+        #expect(center.dataSyncPeerID == fixture.hostIdentity.deviceID)
     }
 
     // MARK: - 展示映射

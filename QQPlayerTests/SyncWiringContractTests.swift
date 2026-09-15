@@ -1607,3 +1607,179 @@ struct SyncEntityRegistryContractTests {
         )
     }
 }
+
+// MARK: - changeLog 同步前置门形状契约（2026-09-15）
+
+/// 「曲库索引未到终态 → 不得发起 / 应答 changeLog 同步」唯一实现的**形状契约**。
+///
+/// 为什么单独一层：装配可达性只问「能力接上了没有」，问不出「这一刻该不该接」。
+/// 2026-09-15 真机取证：安装后第一次冷启动，曲库行还没由主扫重建（`track` 表空、
+/// 业务表仍在）而同步已经跑起来 —— 补发对账把 outbox 行当**本地悬空**清掉（真值
+/// 静默从同步层消失），应答拉取的行全部拿不到身份键（对端整批判「未定位」）。
+///
+/// 判据（同 `SyncIdentityContract` 风格）：①该判定只有**一处实现**（白名单 = 门文件），
+/// ②那段索引事实只有门在读（别处再读一遍 = 第二处判断，本包要防的正是这个形状），
+/// ③iOS 装配点真的在**调用**这个门（白名单空转 → 必须失败），④合成源码自证能抓到违例。
+enum SyncIndexingPreconditionContract {
+    /// 唯一允许定义该判定的生产文件（`IndexingGate` = 索引门的唯一实现处，
+    /// 「等索引结束」与「能不能同步」同一家族同一文件）。
+    static let gateDefinitionPath = "QQPlayer/Services/IndexingGate.swift"
+
+    /// 判定入口的调用形态（定义处 = `static func isReadyForChangeLogSync(`，
+    /// 调用处 = `IndexingGate.isReadyForChangeLogSync(`）。
+    static let gateName = "isReadyForChangeLogSync"
+
+    /// 门所依赖的**索引事实**名（生产只在事实生产处与门内出现）。
+    static let terminalStateFactName = "hasReachedIndexingTerminalState"
+
+    /// 唯一允许生产该事实的文件（= `LibraryIndexer`，`IndexingStateProviding` 的生产实现）。
+    static let factProducerPaths = ["QQPlayer/Services/LibraryIndexer.swift"]
+
+    /// 唯一必须在装配前调用门的文件（iOS 数据同步端唯一装配点）。
+    static let iosAssemblyPath = "QQPlayer/Services/IOSPassiveSyncCenter.swift"
+
+    /// 生产码扫描根（测试 / harness 是 seam，允许假事实源，不在扫描范围）。
+    static let productionRoot = "QQPlayer"
+
+    /// 纯函数：一份生产源码里违禁的标记（空 = 该文件合规）。
+    static func violations(inSource source: String, relativePath: String) -> [String] {
+        var result: [String] = []
+        // ① 判定的第二处定义（同名函数出现在门文件之外）
+        if relativePath != gateDefinitionPath,
+           source.contains("func \(gateName)(") {
+            result += ["第二处「能不能同步」判定：`func \(gateName)(`"]
+        }
+        // ② 索引终态事实的第二处读取（绕过门直接看事实 = 两套口径，改一处漏一处）
+        if relativePath != gateDefinitionPath,
+           !factProducerPaths.contains(relativePath),
+           source.contains(terminalStateFactName) {
+            result += ["绕过前置门直接判定索引终态：`\(terminalStateFactName)`（只允许门与事实生产处出现）"]
+        }
+        return result
+    }
+}
+
+extension SyncIndexingPreconditionContract {
+    struct ScanResult {
+        var scannedFiles: Int = 0
+        /// 违禁明细（`相对路径 → 标记`）
+        var violations: [String] = []
+        /// 门文件自身是否真的持有判定实现（false = 白名单空转，必须失败）
+        var gateDefinesDecision = false
+        /// iOS 装配点是否真的在装配前调用门（false = 门没人用，等于没修）
+        var iosAssemblyCallsGate = false
+    }
+
+    /// 生产码全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
+    static func scan(repoRoot: URL) -> ScanResult {
+        var result = ScanResult()
+        for url in SyncWiringContract.swiftSources(repoRoot: repoRoot, at: productionRoot) {
+            let relativePath = url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            result.scannedFiles += 1
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                result.violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
+                continue
+            }
+            if relativePath == gateDefinitionPath {
+                result.gateDefinesDecision = source.contains("func \(gateName)(")
+                    && source.contains(terminalStateFactName)
+            }
+            if relativePath == iosAssemblyPath {
+                result.iosAssemblyCallsGate = source.contains("IndexingGate.\(gateName)(")
+            }
+            result.violations += violations(inSource: source, relativePath: relativePath)
+                .map { "\(relativePath) → \($0)" }
+        }
+        return result
+    }
+}
+
+// MARK: - 前置门形状测试
+
+struct SyncIndexingPreconditionContractTests {
+    static let repoRoot = SyncWiringContractTests.repoRoot
+
+    @Test("changeLog 同步前置门：生产码里只有一处实现，且 iOS 装配点真的在调用")
+    func productionHasSinglePreconditionGate() {
+        let result = SyncIndexingPreconditionContract.scan(repoRoot: Self.repoRoot)
+        #expect(
+            result.scannedFiles > 50,
+            "生产码一个 .swift 都没扫到 = 契约空转：扫到 \(result.scannedFiles)"
+        )
+        #expect(
+            result.gateDefinesDecision,
+            """
+            白名单文件 \(SyncIndexingPreconditionContract.gateDefinitionPath) 里找不到前置门实现
+            （`\(SyncIndexingPreconditionContract.gateName)` + `\(SyncIndexingPreconditionContract.terminalStateFactName)`）
+            ——契约的空转保护失效（判定搬走了 / 改名了）。
+            """
+        )
+        #expect(
+            result.iosAssemblyCallsGate,
+            """
+            \(SyncIndexingPreconditionContract.iosAssemblyPath) 装配数据同步端前**没有**调用前置门
+            `IndexingGate.\(SyncIndexingPreconditionContract.gateName)(`：曲库行还没建立时同步照样会跑
+            （补发对账清 outbox、对端整批判「未定位」），等于没修。
+            """
+        )
+        #expect(
+            result.violations.isEmpty,
+            """
+            生产码里出现了第二处「曲库索引未到终态 → 不同步」判定（唯一实现 = \
+            \(SyncIndexingPreconditionContract.gateDefinitionPath) 的 \
+            IndexingGate.\(SyncIndexingPreconditionContract.gateName)）：
+            \(result.violations.joined(separator: "\n"))
+
+            修法：删掉第二处判定，改为在装配/发起前调用唯一入口——判定所需的索引事实
+            经 `IndexingStateProviding` 注入（生产实现 = LibraryIndexer），别处不得直接读
+            `\(SyncIndexingPreconditionContract.terminalStateFactName)` 再自己下结论。
+            """
+        )
+    }
+
+    @Test("合成「第二处判定」必须被抓到（契约自证有效，fail-closed）")
+    func syntheticSecondDecisionIsCaught() {
+        let bypass = """
+        func attachDataSync(to session: SyncPeerSession) {
+            guard !indexing.hasReachedIndexingTerminalState else { return }
+            let peer = SyncChangeLogPeer(session: session)
+        }
+        """
+        #expect(
+            SyncIndexingPreconditionContract.violations(
+                inSource: bypass,
+                relativePath: "QQPlayer/Sync/SomeOtherAssembly.swift"
+            ).count == 1,
+            "绕过前置门直接读索引终态事实必须被抓到"
+        )
+        #expect(
+            SyncIndexingPreconditionContract.violations(
+                inSource: bypass,
+                relativePath: SyncIndexingPreconditionContract.factProducerPaths[0]
+            ).isEmpty,
+            "事实生产处（LibraryIndexer）自身必须放行，否则契约不可用"
+        )
+
+        let secondDefinition = """
+        enum SomeOtherGate {
+            static func isReadyForChangeLogSync(_ source: IndexingStateProviding) -> Bool {
+                !source.isIndexing
+            }
+        }
+        """
+        #expect(
+            SyncIndexingPreconditionContract.violations(
+                inSource: secondDefinition,
+                relativePath: "QQPlayer/Sync/SomeOtherGate.swift"
+            ).count == 1,
+            "同名判定的第二处定义必须被抓到"
+        )
+        #expect(
+            SyncIndexingPreconditionContract.violations(
+                inSource: secondDefinition,
+                relativePath: SyncIndexingPreconditionContract.gateDefinitionPath
+            ).isEmpty,
+            "门文件自身（定义处）必须放行"
+        )
+    }
+}

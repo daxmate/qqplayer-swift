@@ -720,6 +720,40 @@ struct SyncChangeLogContentMapTests {
         #expect(afterSecond == afterFirst)
     }
 
+    @Test("窗口取证（2026-09-15 真机）：曲库行还没建立时跑补发对账 → outbox 行被当悬空清掉、真值也补不回来")
+    func reconcileDuringEmptyTrackWindowDestroysOutbox() throws {
+        // 安装后第一次冷启动的形状（真机读数 track=0 / play_history=492 / outbox=491）：
+        // 业务四表在、track 表待主扫重建、outbox 里已经有行。
+        let (manager, queue) = try Self.makeManager()
+        let playedAt: Int64 = 1_700_000_000_003
+        try queue.write { db in
+            try PlayHistoryEntry(trackStableId: "s-1", playedAt: playedAt, playDurationMs: 1000).insert(db)
+            try Favorite(trackStableId: "s-1").insert(db)
+            try SyncChangeLogStore.record(
+                db, entity: .playHistory, rowKey: "s-1|\(playedAt)", op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlayHistorySnapshot(trackStableId: "s-1", playedAt: playedAt, playDurationMs: 1000)
+                ),
+                updatedAtMs: 2000
+            )
+        }
+
+        // 同步在窗口里跑起来（修复前的行为）：对账这一刻 track 表还是空的
+        let duringWindow = try SyncChangeLogDanglingRepair(database: manager).run()
+
+        #expect(duringWindow.cleaned == 1, "track 表空 → 既有 outbox 行被当本地悬空清掉（真机 491 → 0）")
+        #expect(duringWindow.emitted == 0, "同一时刻补发也补不了：引用歌「本地悬空」→ 不补发")
+        #expect(duringWindow.skippedLocalDangling == 2, "业务真值（play_history + favorite）全部补不出去")
+        let duringWindowRows = try queue.read { db in try SyncChangeLogRow.fetchAll(db) }
+        #expect(duringWindowRows.isEmpty, "窗口里 outbox 被清成空的（真机读数 outbox=0）")
+
+        // 主扫跑完（track 表有了）后，只有**下一次装配**才会重新补发——
+        // 也就是说窗口里那一轮是白跑的：既丢了行、又把「没身份键」的行推给对端。
+        try queue.write { db in try Self.insertTrack(db, stableId: "s-1", contentHash: "hash-1") }
+        let afterScan = try SyncChangeLogDanglingRepair(database: manager).run()
+        #expect(afterScan.emitted == 2, "曲库行到位后补发对账才能把真值重新变成可发送变更")
+    }
+
     @Test("T15b 悬空对账：不误伤——业务行（play_history / favorite / playlist_item）行数与内容逐字不变")
     func danglingRepairLeavesBusinessRowsUntouched() throws {
         let (manager, queue) = try Self.makeManager()

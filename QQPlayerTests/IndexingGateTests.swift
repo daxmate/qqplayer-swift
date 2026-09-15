@@ -21,13 +21,20 @@ import Testing
 @MainActor
 private final class FakeIndexingSource: IndexingStateProviding {
     @Published var isIndexing: Bool
+    /// 曲库索引终态事实（默认 false = 与生产同一 fail-closed 口径）
+    @Published var hasReachedIndexingTerminalState: Bool
 
-    init(isIndexing: Bool) {
+    init(isIndexing: Bool, hasReachedIndexingTerminalState: Bool = false) {
         self.isIndexing = isIndexing
+        self.hasReachedIndexingTerminalState = hasReachedIndexingTerminalState
     }
 
     var isIndexingPublisher: AnyPublisher<Bool, Never> {
         $isIndexing.eraseToAnyPublisher()
+    }
+
+    var indexingTerminalStatePublisher: AnyPublisher<Void, Never> {
+        $hasReachedIndexingTerminalState.map { _ in () }.eraseToAnyPublisher()
     }
 }
 
@@ -54,6 +61,26 @@ struct IndexingGateTests {
         #expect(IndexingWaitPolicy(timeout: 1.5).timeoutNanoseconds == 1_500_000_000)
         #expect(IndexingWaitPolicy(timeout: 0).timeoutNanoseconds == 0)
         #expect(IndexingWaitPolicy(timeout: -5).timeoutNanoseconds == 0)
+    }
+
+    // MARK: - changeLog 同步前置门（唯一判定）
+
+    @Test("前置门：曲库索引未到终态 → 不放行（安装后第一次冷启动，track 表还空着）")
+    func gateBlocksWithoutTerminalState() {
+        let source = FakeIndexingSource(isIndexing: false, hasReachedIndexingTerminalState: false)
+        #expect(IndexingGate.isReadyForChangeLogSync(source) == false)
+    }
+
+    @Test("前置门：索引在跑 → 不放行（哪怕终态事实已成立，重扫中途也不放）")
+    func gateBlocksWhileIndexing() {
+        let source = FakeIndexingSource(isIndexing: true, hasReachedIndexingTerminalState: true)
+        #expect(IndexingGate.isReadyForChangeLogSync(source) == false)
+    }
+
+    @Test("前置门：终态成立且不在跑 → 放行")
+    func gateOpensWhenTerminalAndIdle() {
+        let source = FakeIndexingSource(isIndexing: false, hasReachedIndexingTerminalState: true)
+        #expect(IndexingGate.isReadyForChangeLogSync(source) == true)
     }
 
     // MARK: - 等待
