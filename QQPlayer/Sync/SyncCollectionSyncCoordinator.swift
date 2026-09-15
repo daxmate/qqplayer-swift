@@ -322,7 +322,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration(),
         sink: SyncLibrarySyncSink = LibraryIndexerSyncSink(),
         lyricsStore: AlignedLyricsStore = .shared,
-        lyricsMapping: SyncLyricsContentMapping? = nil,
+        lyricsMapping: SyncLyricsContentMapping,
         playbackCarry: (any SyncPlaybackCarryDriving)? = nil,
         fileManager: FileManager = .default
     ) {
@@ -334,7 +334,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         self.configuration = configuration
         self.sink = sink
         self.lyricsStore = lyricsStore
-        self.lyricsMapping = lyricsMapping ?? .unresolved
+        self.lyricsMapping = lyricsMapping
         self.playbackCarry = playbackCarry
         self.fileManager = fileManager
     }

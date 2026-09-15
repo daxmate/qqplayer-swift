@@ -26,8 +26,37 @@
 //
 //  本文件只做字符串/纯值变换；盘上事实（文件哈希、DB 查询）由调用方注入闭包。
 //
+//  身份入口包（2026-09-15）：本文件同时声明**跨端歌曲身份解析的唯一入口**
+//  `SyncIdentityResolving`（下节）。协议声明是纯类型（无 IO / 无 DB），所以放在本
+//  文件不破坏「可无模拟器直编」；它的**唯一生产实现**是 `SyncContentHashResolver`
+//  （`SyncChangeLogMapping.swift`，SQL 只在那里）。
+//
 
 import Foundation
+
+// MARK: - 歌曲身份解析唯一入口（2026-09-15 形状收口）
+
+/// 跨端歌曲身份的**唯一解析入口**：本地 `stable_id` ↔ 跨端 `content_hash` 双向。
+///
+/// 为什么要有这个协议：在此之前「歌曲身份解析」在生产码里有 5 处并行表达
+/// （真实现 `SyncContentHashResolver` / 歌词映射闭包 / 请求应答器闭包 /
+/// 曲库描述符闭包 / 曲库事实里再包一层同名 func），每处都可选、都可用「返回 nil」
+/// 的缺省表达——**漏接线一处就静默失效**（先例：iOS 忘装 peer，播放数据永不通）。
+/// 现在：所有生产调用点依赖本入口；闭包只允许留在**测试 seam** 一侧。
+///
+/// 语义（全仓库唯一口径）：
+/// - 无此歌 / 指纹未回填 / 入参为空 → `nil`（绝不抛给调用方，实现内部查库失败按 nil）
+/// - 同 `content_hash` 多行 → 取 id 最小 = 最早入库（两端确定性一致）
+///
+/// 实现约束：**生产实现只允许一个**（`QQPlayer/Sync/SyncChangeLogMapping.swift` 的
+/// `SyncContentHashResolver`；契约测试 `SyncIdentityContractTests` 静态扫描禁止第二处）。
+protocol SyncIdentityResolving: Sendable {
+    /// 本地 stableId → content_hash（无此歌 / 指纹未回填 = nil）。
+    func contentHash(forTrackStableId stableId: String) throws -> String?
+
+    /// content_hash → 本地 stableId（无此歌 = nil）。
+    func trackStableId(forContentHash contentHash: String) throws -> String?
+}
 
 // MARK: - 线上命名空间
 
@@ -78,15 +107,30 @@ enum SyncLyricsNamespace {
     }
 }
 
-// MARK: - content_hash 映射（调用方注入）
+// MARK: - content_hash 映射
 
-/// 本地 stableId ↔ 歌曲 content_hash 双向映射（纯值 + 闭包）。
-/// 生产实现走 M4-2a 的 `SyncContentHashResolver`（见 `SyncLyricsContentMapping.live(database:)`），
-/// 测试/harness 注入内存查表——本文件因此不依赖 GRDB，可无模拟器直编。
+/// 本地 stableId ↔ 歌曲 content_hash 双向映射（纯值），把 `SyncIdentityResolving`
+/// 的值语义化成两个闭包，供**纯逻辑**的歌词链路消费——本文件因此不依赖 GRDB，
+/// 可无模拟器直编。
+///
+/// 生产构造只有一条路：`init(identity:)` / `.live(database:)`（唯一入口，见上）。
+/// 闭包式 `init(contentHashForStableId:stableIdForContentHash:)` 是**测试 seam**
+/// （内存查表），生产初始化不得用它。
 struct SyncLyricsContentMapping: Sendable {
-    var contentHashForStableId: @Sendable (String) -> String?
-    var stableIdForContentHash: @Sendable (String) -> String?
+    let contentHashForStableId: @Sendable (String) -> String?
+    let stableIdForContentHash: @Sendable (String) -> String?
 
+    /// 生产构造：包住唯一身份入口（查库失败按 nil，与入口语义一致）。
+    init(identity: any SyncIdentityResolving) {
+        self.contentHashForStableId = { stableId in
+            (try? identity.contentHash(forTrackStableId: stableId)) ?? nil
+        }
+        self.stableIdForContentHash = { contentHash in
+            (try? identity.trackStableId(forContentHash: contentHash)) ?? nil
+        }
+    }
+
+    /// ⚠️ **测试 seam**（harness / 单测注入内存查表）：生产码不得走这个初始化。
     init(
         contentHashForStableId: @escaping @Sendable (String) -> String?,
         stableIdForContentHash: @escaping @Sendable (String) -> String?
@@ -96,6 +140,7 @@ struct SyncLyricsContentMapping: Sendable {
     }
 
     /// 无映射（歌词同步关闭）：两端都解析不出结果 → manifest 不含歌词、收到也不落库。
+    /// ⚠️ **测试 seam**：生产初始化**不得**用它当缺省（那是「漏接线即静默失效」的形状）。
     static let unresolved = SyncLyricsContentMapping(
         contentHashForStableId: { _ in nil },
         stableIdForContentHash: { _ in nil }

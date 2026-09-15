@@ -57,6 +57,10 @@ import Foundation
 // MARK: - 双向解析
 
 /// 本地 stable_id ↔ content_hash 双向解析（只读查询）。
+///
+/// **本类型是全仓「歌曲身份解析」的唯一生产实现**（`SyncIdentityResolving`，见
+/// `SyncAlignedLyrics.swift`）——全仓只有本文件允许出现 `track` 身份 SQL
+/// （`stable_id ↔ content_hash` 两条查询）。新增消费点请依赖入口，别再写第二套。
 struct SyncContentHashResolver {
     let database: DatabaseManager
 
@@ -126,21 +130,17 @@ struct SyncContentHashResolver {
 
 // MARK: - 歌词同步映射的生产实现（M4-2b）
 
+/// 身份入口的生产唯一实现（协议声明在 `SyncAlignedLyrics.swift`）。
+/// 两条方法的 SQL 就在本类型里（下面），所以生产码不需要、也不允许第二处实现。
+extension SyncContentHashResolver: SyncIdentityResolving {}
+
 /// aligned 歌词随歌同步的 content_hash 映射：复用本文件上面的
 /// `SyncContentHashResolver`（M4-2a），不新写 SQL。
 extension SyncLyricsContentMapping {
-    /// 生产实现：本地 stableId ↔ 歌曲 content_hash（查不到 / 指纹未回填 = nil，
+    /// 生产实现：把唯一身份入口包成歌词链路的映射（查不到 / 指纹未回填 = nil，
     /// 与 M4-2a 同一语义）。
     static func live(database: DatabaseManager) -> SyncLyricsContentMapping {
-        let resolver = SyncContentHashResolver(database: database)
-        return SyncLyricsContentMapping(
-            contentHashForStableId: { stableId in
-                (try? resolver.contentHash(forTrackStableId: stableId)) ?? nil
-            },
-            stableIdForContentHash: { contentHash in
-                (try? resolver.trackStableId(forContentHash: contentHash)) ?? nil
-            }
-        )
+        SyncLyricsContentMapping(identity: SyncContentHashResolver(database: database))
     }
 }
 

@@ -81,9 +81,13 @@ struct SyncLocalLibraryDescriptor {
     var sourceFiles: () -> [SyncManifestSourceFile]
     /// aligned 歌词命名空间条目（未过滤；无歌词同步 = 空）
     var lyricsEntries: () -> [ManifestEntry]
-    /// 曲库内相对路径 → content_hash（发送 fileID 用；缺失可回落现算）
+    /// 曲库内相对路径 → content_hash（发送 fileID 用）。**必传**（无缺省）：它的内容
+    /// 指纹事实源是唯一身份入口（`.live` 注入 `SyncIdentityResolving`），给了缺省
+    /// `{ _ in nil }` 就等于「漏接线也能编译，只是 fileID 口径静默换掉」。
+    /// 确实无指纹来源时传 `{ _ in nil }`——显式写出来，不靠缺省。
     var contentHash: (String) -> String?
-    /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）
+    /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）。
+    /// **必传**（同上）：它由身份入口的 content_hash → stableId 方向推得。
     var lyricsFileName: (String) -> String?
     /// 歌单标识 → 成员 stableId 集合（T7b）：应答 `.playlists` manifest 时按需求值。
     /// 缺省空表 = 「歌单过滤不出内容」（接 DB 的装配方负责注入真实表，见
@@ -96,8 +100,8 @@ struct SyncLocalLibraryDescriptor {
         lyricsRoot: URL? = nil,
         sourceFiles: @escaping () -> [SyncManifestSourceFile],
         lyricsEntries: @escaping () -> [ManifestEntry] = { [] },
-        contentHash: @escaping (String) -> String? = { _ in nil },
-        lyricsFileName: @escaping (String) -> String? = { _ in nil },
+        contentHash: @escaping (String) -> String?,
+        lyricsFileName: @escaping (String) -> String?,
         members: (() -> SyncCollectionMembers)? = nil
     ) {
         self.libraryRoot = libraryRoot
@@ -129,6 +133,8 @@ extension SyncLocalLibraryDescriptor {
         members: (() -> SyncCollectionMembers)? = nil
     ) -> SyncLocalLibraryDescriptor {
         let mapping = lyricsMapping ?? .live(database: database)
+        // 唯一身份入口的生产实例（本装配点建一次，描述符内部所有身份解析都走它）。
+        let identity = SyncContentHashResolver(database: database)
         return SyncLocalLibraryDescriptor(
             libraryRoot: libraryRoot,
             rootName: rootName ?? libraryRoot.lastPathComponent,
@@ -145,7 +151,11 @@ extension SyncLocalLibraryDescriptor {
             },
             contentHash: { [libraryRoot] relativePath in
                 let url = libraryRoot.appendingPathComponent(relativePath)
-                if let stored = try? database.getTrack(byPath: url.path)?.contentHash, !stored.isEmpty {
+                // 内容指纹解析走唯一身份入口（先按路径定位曲目行，再取跨端身份键）；
+                // 无此歌 / 指纹为空 → 回落「文件在盘上现算」（既有语义不变）。
+                if let track = (try? database.getTrack(byPath: url.path)) ?? nil,
+                   let stored = (try? identity.contentHash(forTrackStableId: track.stableId)) ?? nil,
+                   !stored.isEmpty {
                     return stored
                 }
                 return DatabaseManager.contentHashIfFilePresent(atPath: url.path)

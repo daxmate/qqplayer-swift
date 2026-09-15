@@ -52,11 +52,18 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     private let session: SyncPeerSession
     private let roots: SyncFetchRoots
     private let fileManager: FileManager
-    /// 相对路径 → content_hash（本端事实；缺失时回落到现算 SHA-256，用于 fileID）
-    private let contentHashProvider: ((String) -> String?)?
-    /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）
+    /// 本端内容指纹来源：相对路径 → content_hash（**必传**，见 init 注释）。
+    /// 缺失时 fileID 回落现算 SHA-256——那是另一种口径，不是「没指纹也一样」。
+    private let contentHashProvider: (String) -> String?
+    /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）。
+    /// `nil` = 本端不服务歌词命名空间（语义明确，非静默失效）。
     private let lyricsFileNameProvider: ((String) -> String?)?
     private let lock = NSLock()
+
+    /// 「无 DB 指纹来源」的**显式 seam**（单根初始化 + 测试/harness 用）：
+    /// fileID 一律现算 SHA-256。命名出来是为了让「谁没有指纹来源」在代码里看得见——
+    /// 之前它是一个裸 `nil` 缺省值，漏接线的那一侧 fileID 口径静默换掉。
+    static let computedChecksumProvider: @Sendable (String) -> String? = { _ in nil }
 
     /// 一次拉取的结论已发出（含全失败/空请求的场景）。
     var onResultSent: ((SyncFetchResult) -> Void)?
@@ -83,26 +90,31 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
 
     // MARK: init
 
-    /// 单根初始化（M4-2b 之前的调用点/测试保持不变：歌词命名空间不服务）。
+    /// 单根初始化（**测试/harness seam**：不服务歌词命名空间，且无 DB 指纹来源 →
+    /// fileID 一律现算 SHA-256）。生产装配必须走下面带根表的 init 并显式传指纹来源
+    /// （`SyncLocalLibraryProvider.attach` 就是这么接的）。
     convenience init(
         session: SyncPeerSession,
         libraryRoot: URL,
-        fileManager: FileManager = .default,
-        contentHashProvider: ((String) -> String?)? = nil
+        fileManager: FileManager = .default
     ) {
         self.init(
             session: session,
             roots: .libraryOnly(libraryRoot),
             fileManager: fileManager,
-            contentHashProvider: contentHashProvider
+            contentHashProvider: SyncLibraryFetchResponder.computedChecksumProvider
         )
     }
 
+    /// - Parameter contentHashProvider: 本端内容指纹来源（相对路径 → content_hash）。
+    ///   **必传**：生产装配由 `SyncLocalLibraryProvider` 从曲库描述符注入（描述符的内容
+    ///   指纹事实源 = 唯一身份入口 `SyncIdentityResolving`）；确实无指纹来源时传
+    ///   `SyncLibraryFetchResponder.computedChecksumProvider`（显式命名，不靠 `nil` 缺省）。
     init(
         session: SyncPeerSession,
         roots: SyncFetchRoots,
         fileManager: FileManager = .default,
-        contentHashProvider: ((String) -> String?)? = nil,
+        contentHashProvider: @escaping (String) -> String?,
         lyricsFileNameProvider: ((String) -> String?)? = nil
     ) {
         self.session = session
@@ -308,7 +320,7 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
         let fileID: String?
         if SyncLyricsNamespace.isLyricsPath(file.relativePath) {
             fileID = try? SyncFileChecksum.sha256Hex(ofFile: file.url)
-        } else if let provided = contentHashProvider?(file.relativePath), !provided.isEmpty {
+        } else if let provided = contentHashProvider(file.relativePath), !provided.isEmpty {
             fileID = provided
         } else {
             fileID = try? SyncFileChecksum.sha256Hex(ofFile: file.url)

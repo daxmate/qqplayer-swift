@@ -201,6 +201,8 @@ struct SyncPlaylistMembersTests {
                     ),
                 ]
             },
+            contentHash: { _ in nil },
+            lyricsFileName: { _ in nil },
             members: {
                 counter.increment()
                 return members
@@ -240,6 +242,8 @@ struct SyncPlaylistMembersTests {
                     ),
                 ]
             },
+            contentHash: { _ in nil },
+            lyricsFileName: { _ in nil },
             members: { members }
         )
         let provider = SyncLocalLibraryProvider(descriptor: descriptor)

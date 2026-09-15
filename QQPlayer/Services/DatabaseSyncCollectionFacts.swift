@@ -18,6 +18,8 @@
 //    `SyncLocalLibraryScanner`（manifest 侧唯一入口）**同一口径**，不自己拼字符串。
 //  - 内容指纹：M4-2a `SyncContentHashResolver`（stable_id → content_hash），
 //    不新写 SQL；未指纹 = nil（展开器计入 `not_fingerprinted` 跳过）。
+//    2026-09-15（身份入口包）：本类型内的指纹解析一律走唯一入口
+//    `SyncIdentityResolving`（不再自包一层同名 func）。
 //  - 歌词：与 `MacSyncLibraryHost` / `SyncLocalLibraryDescriptor.live` 同一套路
 //    （`AlignedLyricsStore.shared` 同根 + `@lyrics/{歌曲 content_hash}.json` 命名空间
 //    + `SyncLyricsContentMapping.live(database:)` 映射）。
@@ -41,6 +43,9 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
     let libraryRoot: URL
     let lyricsStore: AlignedLyricsStore
     let lyricsMapping: SyncLyricsContentMapping
+
+    /// 内容指纹解析的唯一入口（生产实例：`SyncContentHashResolver`，SQL 只在那里）。
+    private var identity: any SyncIdentityResolving { SyncContentHashResolver(database: database) }
 
     /// 缺省曲库根：macOS = `~/Music/QQPlayer`（与 `MacSyncLibraryHost` 同源）；
     /// iOS = 沙盒 Documents（M3-2 起 iOS 唯一音乐位置）。
@@ -141,10 +146,9 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
     }
 
     /// M4-2a 单一事实源：stable_id → content_hash（无此歌 / 未指纹 = nil）。
+    /// 走唯一身份入口，不再自写查询（查询实现 = `SyncContentHashResolver`）。
     private func contentHash(forTrackStableId stableId: String) -> String? {
-        guard !stableId.isEmpty else { return nil }
-        let resolver = SyncContentHashResolver(database: database)
-        return (try? resolver.contentHash(forTrackStableId: stableId)) ?? nil
+        (try? identity.contentHash(forTrackStableId: stableId)) ?? nil
     }
 }
 

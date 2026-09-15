@@ -2891,12 +2891,14 @@ do {
             DatabaseManager.contentHashIfFilePresent(
                 atPath: pullTargetRoot.appendingPathComponent(relativePath).path
             )
-        }
+        },
+        lyricsFileName: { _ in nil }
     )
     let pullController = SyncLibraryPullController(
         session: pullFixture.hostSession,
         descriptor: pullDescriptor,
-        sink: pullSink
+        sink: pullSink,
+        lyricsMapping: .unresolved
     )
     try pullController.start()
     let pullLandedB = pullTargetRoot.appendingPathComponent("B/01 Song.flac")

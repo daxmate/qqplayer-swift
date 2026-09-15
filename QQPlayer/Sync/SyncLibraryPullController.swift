@@ -194,7 +194,7 @@ final class SyncLibraryPullController: @unchecked Sendable {
         sink: SyncLibrarySyncSink = LibraryIndexerSyncSink(),
         configuration: SyncLibraryPullConfiguration = SyncLibraryPullConfiguration(),
         lyricsStore: AlignedLyricsStore = .shared,
-        lyricsMapping: SyncLyricsContentMapping? = nil,
+        lyricsMapping: SyncLyricsContentMapping,
         fileManager: FileManager = .default
     ) {
         self.session = session
@@ -203,7 +203,7 @@ final class SyncLibraryPullController: @unchecked Sendable {
         self.configuration = configuration
         self.fileManager = fileManager
         self.lyricsStore = lyricsStore
-        let mapping = lyricsMapping ?? .unresolved
+        let mapping = lyricsMapping
         self.lyricsMapping = mapping
         self.lyricsReceiver = SyncLyricsReceiver(
             lyricsStore: lyricsStore,

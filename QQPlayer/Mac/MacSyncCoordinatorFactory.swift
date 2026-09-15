@@ -80,9 +80,9 @@ enum MacSyncCoordinatorFactory {
             facts: facts,
             sink: LibraryIndexerSyncSink(),
             lyricsStore: .shared,
-            // ⚠️ 必须显式传映射：coordinator 缺省是 `.unresolved`（两端都解析不出），
-            // 会让拉取侧 `SyncLyricsReceiver.install` 把对端发来的歌词全判为 orphan
-            // → iPhone 的歌同步到 Mac 时歌词永远不落库。
+            // 映射必须显式传（2026-09-15 起 coordinator 的该参数**必传**，不再有
+            // `.unresolved` 缺省）：缺了会让拉取侧 `SyncLyricsReceiver.install` 把对端发来的
+            // 歌词全判为 orphan → iPhone 的歌同步到 Mac 时歌词永远不落库。
             lyricsMapping: lyricsMapping,
             playbackCarry: peerID.isEmpty
                 ? nil

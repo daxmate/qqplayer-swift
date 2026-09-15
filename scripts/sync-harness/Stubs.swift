@@ -83,6 +83,22 @@ extension SyncLyricsContentMapping {
     static func live(database: DatabaseManager) -> SyncLyricsContentMapping { .unresolved }
 }
 
+// MARK: - SyncContentHashResolver（生产在 SyncChangeLogMapping.swift，未被 harness 编入）
+//
+// 「歌曲身份解析」的唯一生产实现走 GRDB 的 track 表；harness 的 DatabaseManager 是内存
+// 桩、没有 content_hash 查询，故这里给等价签名的空解析器（两向恒 nil）。harness 里需要
+// 身份的断言一律显式注入夹具映射（main.swift 的 `mapping(of:)`）。
+// 注意：本桩只被 `SyncLocalLibraryDescriptor.live` 引用，而 harness 从不调用它（自建
+// 描述符），所以空实现不会影响任何断言。
+
+struct SyncContentHashResolver: SyncIdentityResolving {
+    let database: DatabaseManager
+
+    func contentHash(forTrackStableId stableId: String) throws -> String? { nil }
+
+    func trackStableId(forContentHash contentHash: String) throws -> String? { nil }
+}
+
 // MARK: - DatabaseSyncCollectionFacts.liveMembersProvider（生产在 Services/，未被 harness 编入）
 //
 // T7b（2026-09-11）起 `SyncLibraryPassiveHost` / `SyncLocalLibraryProvider` 的默认歌单
