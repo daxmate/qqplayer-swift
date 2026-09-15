@@ -267,8 +267,9 @@ struct SyncWiringContractTests {
 
 // MARK: - 身份解析「禁止第二实现」契约（2026-09-15 身份入口包）
 
-/// 「歌曲身份解析」（stable_id ↔ content_hash）唯一入口的**形状契约**：扫生产码，断言两件事
-/// 各自只有一处实现——① 身份 SQL（两个方向）；② 用闭包构造身份映射。
+/// 「歌曲身份解析」（stable_id ↔ content_hash，以及曲库路径 → 身份）唯一入口的
+/// **形状契约**：扫生产码，断言两件事各自只有一处实现——① 身份 SQL（三个方向）；
+/// ② 用闭包构造身份映射。
 ///
 /// 为什么单独一层：装配可达性只能发现「没接线」，发现不了「同一件事被第二处实现」。
 /// 身份解析此前在生产码里有 5 处并行表达（真实现 / 歌词映射闭包 / 请求应答器闭包 / 曲库
@@ -287,10 +288,14 @@ enum SyncIdentityContract {
     /// 生产码扫描根（测试 / harness 是 seam，允许内存查表实现，不在扫描范围）。
     static let productionRoot = "QQPlayer"
 
-    /// 身份解析 SQL 的形态（stableId → content_hash / content_hash → stableId）。
+    /// 身份解析 SQL 的形态（stableId → content_hash / content_hash → stableId /
+    /// 路径 → 身份）。
     static let identitySQLMarkers = [
         "content_hash FROM track WHERE stable_id",
         "stable_id FROM track WHERE content_hash",
+        // B1b（2026-09-15）：路径键形态（曲库路径 → (stableId, content_hash)）。
+        // 它同样只允许出现在入口实现文件——否则「同一个身份事实」又被第二处解析。
+        "FROM track WHERE path",
     ]
 
     /// 闭包式构造身份映射的标记（`SyncLyricsContentMapping(contentHashForStableId:…)`）。
@@ -377,8 +382,10 @@ struct SyncIdentityContractTests {
             \(result.violations.joined(separator: "\n"))
 
             修法：删掉第二处实现，改为依赖入口——① 需要 stableId ↔ content_hash 就注入/持有
-            `any SyncIdentityResolving`；② 需要身份映射就走 `SyncLyricsContentMapping(identity:)` /
-            `.live(database:)`（闭包构造只允许留在测试 seam 一侧）。
+            `any SyncIdentityResolving`；② 需要「曲库路径 → 身份」就走
+            `trackIdentity(atAbsolutePath:)`（同步线程取数也不得改走全表回落的 `getTrack(byPath:)`）；
+            ③ 需要身份映射就走 `SyncLyricsContentMapping(identity:)` / `.live(database:)`
+            （闭包构造只允许留在测试 seam 一侧）。
             """
         )
     }
@@ -395,8 +402,31 @@ struct SyncIdentityContractTests {
             "非白名单文件里的身份 SQL 必须被抓到"
         )
         #expect(
-            SyncIdentityContract.violations(inSource: sql, relativePath: SyncIdentityContract.entryImplementationPath).isEmpty,
+            SyncIdentityContract.violations(
+                inSource: sql,
+                relativePath: SyncIdentityContract.entryImplementationPath
+            ).isEmpty,
             "入口文件自身必须放行（否则契约不可用）"
+        )
+
+        // B1b：路径键形态的身份 SQL 同样不得出现在白名单之外
+        let pathSQL = """
+        let row = try Row.fetchOne(
+            db,
+            sql: "SELECT stable_id, content_hash FROM track WHERE path = ? LIMIT 1",
+            arguments: [path]
+        )
+        """
+        #expect(
+            SyncIdentityContract.violations(inSource: pathSQL, relativePath: "QQPlayer/Sync/Somewhere.swift").count == 1,
+            "非白名单文件里的路径键身份 SQL 必须被抓到（B1b）"
+        )
+        #expect(
+            SyncIdentityContract.violations(
+                inSource: pathSQL,
+                relativePath: SyncIdentityContract.entryImplementationPath
+            ).isEmpty,
+            "入口文件自身必须放行（路径键）"
         )
 
         let closureWiring = """
