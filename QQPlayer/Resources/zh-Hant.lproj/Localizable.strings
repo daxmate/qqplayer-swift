@@ -1340,6 +1340,16 @@
 "sync_run_data_footer" = "合併不會刪除任何一端的收藏、播放紀錄或播放列表。";
 "sync_run_data_identity_footer" = "兩端歌曲指紋不一致時無法定位歌曲，這些變更不會套用。請確認兩端都是最新版本；若仍有問題，可點「重新對帳」。";
 
+// L5 裝配自檢（2026-09-15）：本機宣告的能力真的裝配上了嗎
+// 有缺口才出現；缺口 = 0 時不顯示任何列（空狀態）。
+"sync_wiring_gap_label" = "裝配自檢：有 %d 項能力沒裝配上去";
+"sync_wiring_gap_hint" = "本機已宣告這些能力但沒裝配上去：%@。相關方向的資料不會同步（詳見日誌）。";
+"sync_wiring_probe_change_log_peer" = "資料同步端（訊框 8/9）";
+"sync_wiring_probe_library_passive_host" = "檔案接收端";
+"sync_wiring_probe_playback_position_sink" = "跨端續播落點";
+"sync_wiring_probe_playback_carry" = "跟歌走攜帶";
+"sync_wiring_probe_data_sync_entry" = "同步資料入口";
+
 // T10（2026-09-12）方向優先 · 內容來源隨方向切換
 "sync_run_direction_section" = "同步方向";
 "sync_run_direction_upload" = "從本機上傳到 iPhone";

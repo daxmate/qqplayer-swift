@@ -991,6 +991,16 @@
 "sync_run_data_footer" = "Merging never deletes favorites, play history or playlists on either device.";
 "sync_run_data_identity_footer" = "If the two devices fingerprint songs differently, songs can't be matched and those entries aren't applied. Make sure both devices run the latest version; if they still don't match, use Re-sync from scratch.";
 
+// L5 wiring self-check (2026-09-15): are the capabilities this device declares actually attached?
+// Shown only when there is at least one gap (no gaps = nothing displayed).
+"sync_wiring_gap_label" = "Wiring check: %d declared capabilities aren't attached";
+"sync_wiring_gap_hint" = "This device declares these capabilities but they aren't attached: %@. Data in those directions won't sync (details in the log).";
+"sync_wiring_probe_change_log_peer" = "Playback-data endpoint (frames 8/9)";
+"sync_wiring_probe_library_passive_host" = "File receiver";
+"sync_wiring_probe_playback_position_sink" = "Resume-position sink";
+"sync_wiring_probe_playback_carry" = "Playback position carried with songs";
+"sync_wiring_probe_data_sync_entry" = "Sync Data entry";
+
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "Sync Direction";
 "sync_run_direction_upload" = "Upload to iPhone";

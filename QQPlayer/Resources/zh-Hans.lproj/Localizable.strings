@@ -996,6 +996,16 @@
 "sync_run_data_footer" = "合并不删除任何一端的收藏、播放历史或歌单。";
 "sync_run_data_identity_footer" = "两端歌曲指纹不一致时无法定位歌曲，这些改动不会应用。请确认两端都是最新版本；若仍有问题，可点「重新对账」。";
 
+// L5 装配自检（2026-09-15）：本端声明的能力真的装配上了吗
+// 有缺口才出现；缺口 = 0 时不显示任何行（空态）。
+"sync_wiring_gap_label" = "装配自检：有 %d 项能力没装配上";
+"sync_wiring_gap_hint" = "本端已声明这些能力但没装配上：%@。相关方向的数据不会同步（详见日志）。";
+"sync_wiring_probe_change_log_peer" = "数据同步端（帧 8/9）";
+"sync_wiring_probe_library_passive_host" = "文件接收端";
+"sync_wiring_probe_playback_position_sink" = "跨端续播落点";
+"sync_wiring_probe_playback_carry" = "跟歌走携带";
+"sync_wiring_probe_data_sync_entry" = "同步数据入口";
+
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "同步方向";
 "sync_run_direction_upload" = "从本地上传到 iPhone";

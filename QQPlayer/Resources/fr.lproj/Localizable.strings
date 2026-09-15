@@ -987,7 +987,17 @@
 "sync_run_data_reset_done" = "Progression réinitialisée. Relancez la synchronisation des données.";
 "sync_run_data_reset_failed" = "Impossible de réinitialiser la progression. Veuillez réessayer.";
 "sync_run_data_footer" = "La fusion ne supprime jamais de favoris, d'historique ni de playlists sur l'un ou l'autre appareil.";
-"sync_run_data_identity_footer" = "Si les deux appareils calculent des empreintes différentes, les morceaux ne peuvent pas être associés et ces modifications ne sont pas appliquées. Vérifiez que les deux appareils sont à jour ; sinon, utilisez la resynchronisation complète.";
+"sync_run_data_identity_footer" = "Si les deux appareils calculent des empreintes différentes, les morceaux ne peuvent pas être associés et ces modifications ne sont pas appliquées. Vérifiez que les deux appareils sont à jour ; sinon, utilisez « Re-synchroniser ».";
+
+// Contrôle d'assemblage L5 (2026-09-15) : les capacités déclarées sont-elles réellement assemblées ?
+// Affiché uniquement s'il y a au moins un manque (aucun manque = rien affiché).
+"sync_wiring_gap_label" = "Contrôle d'assemblage : %d capacités déclarées ne sont pas assemblées";
+"sync_wiring_gap_hint" = "Cet appareil déclare ces capacités mais elles ne sont pas assemblées : %@. Les données concernées ne seront pas synchronisées (détails dans le journal).";
+"sync_wiring_probe_change_log_peer" = "Point de synchronisation des données (trames 8/9)";
+"sync_wiring_probe_library_passive_host" = "Réception de fichiers";
+"sync_wiring_probe_playback_position_sink" = "Reprise de lecture";
+"sync_wiring_probe_playback_carry" = "Position de lecture transportée avec les morceaux";
+"sync_wiring_probe_data_sync_entry" = "Entrée « Synchroniser les données »";
 
 // T10 (2026-09-12) sens d'abord · la source de contenu suit le sens
 "sync_run_direction_section" = "Sens de synchronisation";
