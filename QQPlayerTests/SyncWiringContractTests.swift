@@ -455,3 +455,225 @@ struct SyncIdentityContractTests {
         )
     }
 }
+
+// MARK: - 结果账目「单一实现」契约（L6，2026-09-15）
+
+/// 「一次「同步数据」的结果计数」唯一实现的**形状契约**：扫生产码，断言①结果计数只在
+/// `SyncOutcomeTally` 一处声明 / 改写；②两端账目（Mac / iOS）都持有它。
+///
+/// 为什么单独一层：行为用例只能发现「算错了」，发现不了「同一份账目被第二处维护」。
+/// 收口前同一批结果有两套结构（`SyncDataSyncReport` 四个手写 `+=` /
+/// `IOSPassiveDataSyncSummary` 另一套），每类要「产生 → 累加 → 映射 → 上屏」四处手工
+/// 对齐，漏一处即静默（矩阵四级 #18/#19）。
+///
+/// 判据（同 `SyncIdentityContract` 风格）：纯函数判定 + 合成源码自证 + fail-closed。
+enum SyncOutcomeContract {
+    /// 唯一允许声明 / 改写结果计数的生产文件。
+    static let tallyDefinitionPath = "QQPlayer/Sync/SyncOutcomeTally.swift"
+
+    /// 生产码扫描根（测试是 seam，不在扫描范围）。
+    static let productionRoot = "QQPlayer"
+
+    /// 结果计数的**槽位名**：新口径 + 收口前的旧字段名（旧名再出现即「第二处账目」）。
+    static let slotNames = [
+        "appliedEntries",
+        "suspendedEntries",
+        "outboundEntries",
+        "unresolvedEntries",
+        "skippedMissingParentEntries",
+        "unsupportedEntries",
+        "missingIdentityEntries",
+        "ignoredDeletes",
+        // 收口前的旧字段名（Mac / iOS 各一套，不得再出现）
+        "pushedEntries",
+        "pushedMissingIdentityEntries",
+        "answeredPullEntries",
+    ]
+
+    /// 两端账目文件：必须**持有** tally（写死路径是刻意的：搬走 = 契约失效，得显式改这里）。
+    static let ledgerPaths = [
+        "QQPlayer/Sync/SyncDataSyncCoordinator.swift",
+        "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+    ]
+
+    /// 纯函数：一份生产源码里违禁的计数写法（空 = 该文件合规）。
+    static func violations(inSource source: String, relativePath: String) -> [String] {
+        guard relativePath != tallyDefinitionPath else { return [] }
+        return mutationViolations(inSource: source)
+    }
+
+    /// 去空白后的「槽位名 + 操作符」扫描：`x.appliedEntries += 1` /
+    /// `$0.answeredPullEntries = count` / `var appliedEntries = 0` 都是「第二处账目」；
+    /// 只读（`report.appliedEntries > 0`、`report.pushedEntries,`）与比较（`== 0`）不是；
+    /// 计算属性（`var appliedEntries: Int { tally.… }`）是**读数投影**，放行。
+    static func mutationViolations(inSource source: String) -> [String] {
+        let compact = source.filter { !$0.isWhitespace }
+        var hits: [String] = []
+        for name in slotNames {
+            var searchStart = compact.startIndex
+            while let found = compact.range(of: name, range: searchStart ..< compact.endIndex) {
+                searchStart = found.upperBound
+                let prefix = compact[..<found.lowerBound]
+                let suffix = compact[found.upperBound...]
+                if suffix.hasPrefix("+=") {
+                    hits.append("分类累加：`\(name) +=`")
+                } else if suffix.hasPrefix("="), !suffix.hasPrefix("==") {
+                    hits.append("分类赋值：`\(name) =`（结果计数只能由 SyncOutcomeTally 持有）")
+                }
+                if prefix.hasSuffix("var"), suffix.hasPrefix(":Int"), !suffix.dropFirst(":Int".count).hasPrefix("{") {
+                    hits.append("第二处计数字段：`var \(name): Int`")
+                }
+            }
+        }
+        return hits
+    }
+}
+
+extension SyncOutcomeContract {
+    struct ScanResult {
+        var scannedFiles = 0
+        /// 违禁明细（`相对路径 → 明细`）
+        var violations: [String] = []
+        /// 白名单文件是否真的在定义账目（false = 白名单空转，必须失败）
+        var tallyDefinesSlots = false
+        /// 两端账目里真的持有 tally 的文件（数量不足 = 收口没接上）
+        var ledgersHoldingTally: [String] = []
+    }
+
+    /// 生产码全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
+    static func scan(repoRoot: URL) -> ScanResult {
+        var result = ScanResult()
+        for url in SyncWiringContract.swiftSources(repoRoot: repoRoot, at: productionRoot) {
+            let relativePath = url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            result.scannedFiles += 1
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                result.violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
+                continue
+            }
+            if relativePath == tallyDefinitionPath {
+                result.tallyDefinesSlots = source.contains("enum SyncRowOutcome")
+                    && source.contains("struct SyncOutcomeTally")
+                    && slotNames.prefix(8).allSatisfy { source.contains("var \($0): Int") }
+            }
+            if ledgerPaths.contains(relativePath), ledgerHoldsTally(source) {
+                result.ledgersHoldingTally.append(relativePath)
+            }
+            result.violations += violations(inSource: source, relativePath: relativePath)
+                .map { "\(relativePath) → \($0)" }
+        }
+        return result
+    }
+
+    /// 一份账目源码是否真的「持有 tally + 往它写」（两条都在才算）：只有读数、没有
+    /// `tally` 字段的旧写法会漏这一条。
+    static func ledgerHoldsTally(_ source: String) -> Bool {
+        source.contains("var tally = SyncOutcomeTally()") && source.contains(".tally.")
+    }
+}
+
+// MARK: - 结果账目形状测试
+
+struct SyncOutcomeContractTests {
+    static let repoRoot = SyncWiringContractTests.repoRoot
+
+    @Test("结果账目：生产码里只有一处计数定义（白名单 = tally 文件；别处不得分类 += / =）")
+    func productionHasSingleOutcomeTally() {
+        let result = SyncOutcomeContract.scan(repoRoot: Self.repoRoot)
+        #expect(result.scannedFiles > 50, "生产码一个 .swift 都没扫到 = 契约空转：扫到 \(result.scannedFiles)")
+        #expect(
+            result.tallyDefinesSlots,
+            """
+            白名单文件 \(SyncOutcomeContract.tallyDefinitionPath) 里找不到账目定义——
+            说明契约的空转保护失效（tally 被改名 / 搬走 / 槽位名改了）。
+            """
+        )
+        #expect(
+            result.ledgersHoldingTally.count == SyncOutcomeContract.ledgerPaths.count,
+            """
+            两端账目没有都持有 tally（L6 收口断了）：
+            缺 \(SyncOutcomeContract.ledgerPaths.filter { !result.ledgersHoldingTally.contains($0) })
+            """
+        )
+        #expect(
+            result.violations.isEmpty,
+            """
+            生产码里出现了第二处「同步数据结果计数」（唯一账目 = SyncOutcomeTally，
+            \(SyncOutcomeContract.tallyDefinitionPath)；Mac 账目 = SyncDataSyncReport.tally、
+            iOS 账目 = IOSPassiveDataSyncSummary.tally）：
+            \(result.violations.joined(separator: "\n"))
+
+            修法：删掉别处的分类计数，改为——① 写就用 `tally.accumulate(…)`（累加）/
+            `tally.overwrite(…, with:)`（最近一批口径）；② 读就用 tally 的访问器或旧字段名
+            （`report.appliedEntries` 这类只读投影允许保留）；③ 新增类别先改 `SyncRowOutcome`
+            （tally 的 switch 无 default，会强制你给出槽位）。
+            """
+        )
+    }
+
+    @Test("合成「第二处账目」必须被抓到（契约自证有效）")
+    func syntheticSecondLedgerIsCaught() {
+        let coordinatorStyle = """
+            private func recordApplied(_ count: Int) {
+                reportValue.appliedEntries += count
+            }
+        """
+        #expect(
+            SyncOutcomeContract.violations(
+                inSource: coordinatorStyle,
+                relativePath: "QQPlayer/Sync/SyncDataSyncCoordinator.swift"
+            ).count == 1,
+            "coordinator 里的分类 `+=` 必须被抓到"
+        )
+
+        let iosStyle = """
+            peer.onPullHandled = { [weak self] _, count in
+                Task { @MainActor in self?.recordDataSync { $0.answeredPullEntries = count } }
+            }
+        """
+        #expect(
+            SyncOutcomeContract.violations(
+                inSource: iosStyle,
+                relativePath: "QQPlayer/Services/IOSPassiveSyncCenter.swift"
+            ).count == 1,
+            "iOS 侧的分类 `=`（旧写法）必须被抓到"
+        )
+
+        let secondDefinition = """
+            struct IOSPassiveDataSyncSummary: Equatable, Sendable {
+                var appliedEntries = 0
+            }
+        """
+        #expect(
+            SyncOutcomeContract.violations(
+                inSource: secondDefinition,
+                relativePath: "QQPlayer/Services/IOSPassiveSyncCenter.swift"
+            ).count == 1,
+            "第二套账目字段必须被抓到"
+        )
+
+        // 只读 / 比较 / 计算属性投影不得误报（Mac 面板与两端读数就是这样写的）
+        let readOnly = """
+            var appliedEntries: Int { tally.appliedEntries }
+            let report = dataModel.report
+            metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
+            if report.suspendedEntries > 0 { }
+            if report.unresolvedEntries == 0 { }
+        """
+        #expect(
+            SyncOutcomeContract.violations(
+                inSource: readOnly,
+                relativePath: "QQPlayer/Mac/MacSyncView.swift"
+            ).isEmpty,
+            "读 / 比较 / 计算属性不是第二处账目，不得误报"
+        )
+
+        // 白名单文件自身必须放行（否则契约不可用）
+        #expect(
+            SyncOutcomeContract.violations(
+                inSource: coordinatorStyle + secondDefinition,
+                relativePath: SyncOutcomeContract.tallyDefinitionPath
+            ).isEmpty,
+            "账目定义文件自身必须放行"
+        )
+    }
+}

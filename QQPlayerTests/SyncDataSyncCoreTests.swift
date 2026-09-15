@@ -775,14 +775,16 @@ struct SyncDataSyncCoreTests {
         #expect(IOSPassiveDataSyncPresenter.countRows(summary).count == 4)
 
         summary.hasSessionData = true
-        summary.appliedEntries = 3
-        summary.answeredPullEntries = 5
-        summary.suspendedEntries = 1
-        summary.unresolvedEntries = 2
-        summary.skippedMissingParentEntries = 1
-        summary.missingIdentityEntries = 4
-        summary.unsupportedEntries = 0
-        summary.ignoredDeletes = 7
+        // L6：计数从**唯一**账目（`SyncRowOutcome` → `SyncOutcomeTally`）派生，不再是各端自建字段；
+        // 下面写的还是同一个口径（断言一字未改）。
+        summary.tally.accumulate(.applied, count: 3)
+        summary.tally.overwrite(.outbound, with: 5)
+        summary.tally.accumulate(.suspended, count: 1)
+        summary.tally.accumulate(.unresolved, count: 2)
+        summary.tally.accumulate(.skippedMissingParent, count: 1)
+        summary.tally.accumulate(.missingIdentity, count: 4)
+        summary.tally.accumulate(.unsupported, count: 0)
+        summary.tally.accumulate(.ignoredDelete, count: 7)
 
         let gaps = IOSPassiveDataSyncPresenter.gapRows(summary)
         #expect(
@@ -879,6 +881,87 @@ private final class IntListBox: @unchecked Sendable {
         lock.lock()
         storage.append(value)
         lock.unlock()
+    }
+
+    // MARK: - L6 结果账目（穷尽枚举 + 单一 tally，2026-09-15）
+
+    @Test("结果枚举：每个类别一个槽位（allCases 1:1，累加互不串台）")
+    func outcomeTallySlotsAreOneToOne() {
+        #expect(
+            SyncRowOutcome.allCases.count == 8,
+            "类别数变了：新增/删除结果类别必须同步改这里与 SyncOutcomeContractTests 的形状断言"
+        )
+        for outcome in SyncRowOutcome.allCases {
+            var tally = SyncOutcomeTally()
+            tally.accumulate(outcome, count: 3)
+            #expect(tally.count(for: outcome) == 3, "\(outcome) 的槽位没被写到")
+            for other in SyncRowOutcome.allCases where other != outcome {
+                #expect(tally.count(for: other) == 0, "\(outcome) 串到 \(other) 的槽位")
+            }
+        }
+    }
+
+    @Test("结果账目：accumulate 累加 / overwrite 覆盖（「最近一批」口径不累加）")
+    func tallyAccumulateAndOverwriteSemantics() {
+        var tally = SyncOutcomeTally()
+        tally.accumulate(.applied)
+        tally.accumulate(.applied, count: 2)
+        #expect(tally.appliedEntries == 3, "累加语义：1 + 2")
+        tally.overwrite(.outbound, with: 5)
+        tally.overwrite(.outbound, with: 2)
+        #expect(tally.outboundEntries == 2, "覆盖语义：只看最近一批（与收口前 `= pushed` 同口径）")
+        #expect(tally.appliedEntries == 3, "覆盖一个槽位不得影响别的槽位")
+    }
+
+    @Test("两套账目 = 同一份 tally：Mac report 与 iOS summary 读数同源（L6 收口）")
+    func bothLedgersShareOneTally() {
+        var report = SyncDataSyncReport()
+        report.tally.accumulate(.applied, count: 3)
+        report.tally.accumulate(.unresolved, count: 2)
+
+        var summary = IOSPassiveDataSyncSummary()
+        summary.tally.accumulate(.applied, count: 3)
+        summary.tally.accumulate(.unresolved, count: 2)
+
+        // 两端账目**持有同一个类型**（不是各自一套账）：下面两行是编译期举证。
+        let reportTally: SyncOutcomeTally = report.tally
+        let summaryTally: SyncOutcomeTally = summary.tally
+        #expect(reportTally == summaryTally, "同样写入 → 同一份账目（同类型、同口径）")
+        #expect(report.appliedEntries == summary.appliedEntries)
+        #expect(report.unresolvedEntries == summary.unresolvedEntries)
+        // 欠一面板/纯逻辑读的旧名仍是旧口径（UI 零改动的依据）
+        #expect(report.pushedEntries == report.tally.outboundEntries)
+        #expect(report.pushedMissingIdentityEntries == report.tally.missingIdentityEntries)
+        #expect(summary.answeredPullEntries == summary.tally.outboundEntries)
+        #expect(summary.ignoredDeletes == report.tally.ignoredDeletes)
+    }
+
+    @Test("结果类别展示归属：gapOrder + countOrder 恰好覆盖全部类别（新增类别必须给归宿）")
+    func presenterPlacementCoversAllOutcomes() {
+        let gapOrder = IOSPassiveDataSyncPresenter.gapOrder
+        let countOrder = IOSPassiveDataSyncPresenter.countOrder
+        #expect(
+            Set(gapOrder + countOrder) == Set(SyncRowOutcome.allCases),
+            "有类别没有展示归宿（或重复出现）：新增 SyncRowOutcome 必须同时进 gapOrder / countOrder"
+        )
+        #expect(
+            (gapOrder + countOrder).count == SyncRowOutcome.allCases.count,
+            "同一类别不得同时出现在缺口行与计数行"
+        )
+        #expect(
+            gapOrder.allSatisfy { outcome in
+                if case .gap = IOSPassiveDataSyncPresenter.placement(of: outcome) { return true }
+                return false
+            },
+            "gapOrder 里的类别必须都是缺口归属（否则 gapRows 静默漏行）"
+        )
+        #expect(
+            countOrder.allSatisfy { outcome in
+                if case .count = IOSPassiveDataSyncPresenter.placement(of: outcome) { return true }
+                return false
+            },
+            "countOrder 里的类别必须都是计数行归属（否则 countRows 静默漏行）"
+        )
     }
 }
 
