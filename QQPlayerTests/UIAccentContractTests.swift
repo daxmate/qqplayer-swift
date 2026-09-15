@@ -3,6 +3,8 @@
 //  QQPlayerTests
 //
 //  强调色「防裸用」形状契约（2026-09-15 UI 设计令牌 B1，见 docs/ui-design-tokens.md §5）。
+//  同文件后续章节：B2a 圆角 / 字号防裸值（`UIGeometryContract`），
+//  B2c-a 间距防裸值（`UISpacingContract`）——三章共用同一套扫描纯函数，不另起测试文件。
 //
 //  背景：强调色的**名单**一直是唯一的（macOS `MacAppearance.accentPresets` / iOS
 //  `BackgroundColor`），坏的是**传递机制**——2026-09-05 把 22 处 `Color.accentColor`
@@ -217,7 +219,8 @@ enum UIGeometryContract {
                   parts[3] == "CGFloat", parts[4] == "=", parts[2].hasSuffix(":")
             else { continue }
             let name = String(parts[2].dropLast())
-            guard name.hasPrefix("radius") || name.hasPrefix("font") else { continue }
+            // 三类令牌同住 `enum DesignTokens`：B2a 圆角 / 字号 + B2c-a 间距
+            guard name.hasPrefix("radius") || name.hasPrefix("font") || name.hasPrefix("space") else { continue }
             result.append(Token(name: name, value: String(parts[5])))
         }
         return result
@@ -229,6 +232,90 @@ enum UIGeometryContract {
             .filter { $0.valueEncodedInName != $0.value }
             .map { "\($0.name) = \($0.value)（名字编码的是 \($0.valueEncodedInName)）" }
     }
+}
+
+// MARK: - 间距「防裸值」规则（B2c-a 2026-09-16）
+
+/// 间距令牌（C11）的形状契约。扫描机制与 `UIAccentContract` / `UIGeometryContract` 共用同一套纯函数。
+///
+/// 背景：间距从来没有令牌。B2c-a 迁移前实测 **829 处 / 33 种取值**——`.padding(<数>)` 33 处、
+/// `.padding(.<边>, <数>)` 343 处、容器 `spacing:` / `GridItem(spacing:)` 434 处、
+/// `Spacer(minLength:)` 19 处（`docs/ui-design-tokens.md` §3 M4 旧记录写 376 + 416 + 21，是漏项版）。
+/// 「这一屏留白到底几 pt」只能靠 grep 盘点 ⇒ B2c-a 收成 `DesignTokens.space*`
+/// （**同值令牌化，零视觉变化**：每个令牌的值 = 迁移前那处裸字面量，逐字相同），本条契约保证它不散回去。
+///
+/// 与 B2a 同款 fail-closed 难点：这条规则的目标状态就是 **0 命中** ⇒ 不能用「命中数 > 0」证明非空转，
+/// 改用 ① 合成源码正反例（裸值恰好被抓、令牌/变量/表达式/注释不误报）；② 令牌引用条数下限 + 定义↔引用一一对应。
+///
+/// 刻意**不抓**的形态（本阶段边界，「不迁移清单」见 `docs/ui-design-tokens.md` §3 M4）：
+/// - `.padding()` 空参（= 系统默认 16）、`.padding(.horizontal)` 仅边参数——没有数值可令牌化；
+/// - 变量 / 表达式：`spacing: someVar`、`spacing: Self.spacing`、`.padding(compact ? 20 : 44)`、
+///   `spacing: … ? 12 : 16`、`.padding(.horizontal, max(16, …))`（这些是 B2c-b 归一的输入）；
+/// - 声明而非调用点：`let spacing: CGFloat = 2`、`static let spacing: CGFloat = 12`、`spacing: CGFloat = spacing`。
+///
+/// 已知边界（line-based 扫描的固有局限，与 B1/B2a 同款）：只认同一行内的写法；
+/// `spacing:` 与数字分行的写法抓不到（当前代码 0 处，实测）。
+///
+/// 阈值纪律：本轮每条令牌定义行都会自匹配吗？不会——`static let space8: CGFloat = 8` 里没有
+/// `padding(` / `spacing:` / `SpaceSpacer(minLength:` 这些调用点形态，实测命中 0 次 ⇒ **白名单为空是正常的**，
+/// 不是漏配（B2a 同款结论）。
+///
+/// 未来若新增 `QQPlayer/**` 之外的 SwiftUI 代码（`Share/` / `PlayerWidget/`），属另一 target 的归属问题，
+/// 记「范围外」而不是硬迁。
+enum UISpacingContract {
+    /// 规则 1：`.padding(<字面量>)`。
+    /// 正则要求「数字后紧跟 `)`」⇒ `.padding()` / `.padding(.horizontal)` / `.padding(DesignTokens.space8)` /
+    /// `.padding(compact ? 20 : 44)` / `.padding(max(16, …))` 都不命中（它们是别的形态，不是要迁移的裸值）。
+    static let nakedPaddingRule = UIAccentContract.Rule(
+        name: "内边距走 DesignTokens.space*，不得写 .padding(<字面量>)",
+        pattern: #"\.padding\(\s*-?\d+(?:\.\d+)?\s*\)"#,
+        whitelist: []
+    )
+
+    /// 规则 2：`.padding(.<边>, <字面量>)`。**边参数与数值是两个维度**，只有数值该令牌化；
+    /// 仅边参数（`.padding(.horizontal)`）与令牌实参都不命中。
+    static let nakedPaddingEdgeRule = UIAccentContract.Rule(
+        name: "内边距走 DesignTokens.space*，不得写 .padding(.<边>, <字面量>)",
+        pattern: #"\.padding\(\s*\.(?:horizontal|vertical|top|leading|trailing|bottom)\s*,\s*-?\d+(?:\.\d+)?\s*\)"#,
+        whitelist: []
+    )
+
+    /// 规则 3：容器间距 —— `VStack/HStack/LazyVStack/LazyVGrid(spacing:)` 与 `GridItem(spacing:)`
+    /// （`Grid(horizontalSpacing:verticalSpacing:)` 同形，当前仓库 0 处，预防性覆盖）。
+    /// 要求「数字后紧跟 `,` / `)` / 行尾」⇒ `spacing: someVar` / `spacing: 12 * scale` /
+    /// `spacing: … ? 12 : 16` / `let spacing: CGFloat = 2` 全不命中。
+    static let nakedSpacingRule = UIAccentContract.Rule(
+        name: "容器间距走 DesignTokens.space*，不得写 spacing: <字面量>",
+        pattern: #"(?:horizontalSpacing|verticalSpacing|spacing):\s*-?\d+(?:\.\d+)?\s*(?:[,)]|$)"#,
+        whitelist: []
+    )
+
+    /// 规则 4：`Spacer(minLength: <字面量>)`。
+    static let nakedSpacerMinLengthRule = UIAccentContract.Rule(
+        name: "Spacer(minLength:) 走 DesignTokens.space*，不得写字面量",
+        pattern: #"Spacer\(\s*minLength:\s*-?\d+(?:\.\d+)?\s*[,)]"#,
+        whitelist: []
+    )
+
+    /// 规则 5：**字面量参与运算**（`.padding(8 * scale)` / `spacing: 12 * scale` / `Spacer(minLength: 8 * scale)`）。
+    /// 值来源仍是字面量，属同一缺口。正则锚在「实参**开头就是数字**后紧跟算术运算符」⇒ 结构化排除误伤：
+    /// 变量左操作数（`.padding(size * 0.5)`）、令牌参与运算（`.padding(DesignTokens.space8 * scale)`）、
+    /// 自定义函数实参（`.padding(.vertical, LyricLineEmphasis.linePadding(…))`）都不命中。
+    /// **刻意不做「实参任意位置出现数字」的宽匹配**（B2a 同款理由）：`size * 0.5` 里的比例常数不是间距，
+    /// 宽匹配会逼出 `DesignTokens.space0_5` 这种语义错的令牌。实测当前 0 处（预防性，与 B2a 的圆角同形规则一致）。
+    static let nakedSpacingArithmeticRule = UIAccentContract.Rule(
+        name: "间距实参开头的字面量参与运算（padding(8 * scale)）也要令牌化",
+        pattern: #"(?:\.padding\(\s*(?:\.(?:horizontal|vertical|top|leading|trailing|bottom)\s*,\s*)?|(?:horizontalSpacing|verticalSpacing|spacing):\s*|Spacer\(\s*minLength:\s*)-?\d+(?:\.\d+)?\s*[*/+\-]"#,
+        whitelist: []
+    )
+
+    /// 全部规则（扫描真实源码用）：新增规则必须登记到这里，否则它只服务合成用例、守卫空转
+    static let allRules = [
+        nakedPaddingRule, nakedPaddingEdgeRule, nakedSpacingRule, nakedSpacerMinLengthRule, nakedSpacingArithmeticRule,
+    ]
+
+    /// 令牌引用条数下限（非空兜底：正则写坏时前面的断言会假绿）
+    static let minimumReferenceCount = 700
 }
 
 // SCAN-END
@@ -500,8 +587,10 @@ struct UIGeometryContractTests {
         let tokens = UIGeometryContract.parseTokens(source: source)
         let radiusTokens = tokens.filter { $0.name.hasPrefix("radius") }
         let fontTokens = tokens.filter { $0.name.hasPrefix("font") }
+        let spaceTokens = tokens.filter { $0.name.hasPrefix("space") }
         #expect(radiusTokens.count >= 15, "圆角令牌数异常（B2a 实测 15 种）：\(radiusTokens.count)")
         #expect(fontTokens.count >= 26, "字号令牌数异常（B2a 实测 26 种）：\(fontTokens.count)")
+        #expect(spaceTokens.count >= 33, "间距令牌数异常（B2c-a 实测 33 种）：\(spaceTokens.count)")
 
         let inconsistent = UIGeometryContract.selfInconsistent(tokens)
         #expect(inconsistent.isEmpty, "令牌名与值不自洽（拼错名 = 值静默变成另一个数）：\n\(inconsistent.joined(separator: "\n"))")
@@ -590,5 +679,134 @@ struct UIGeometryContractTests {
             result.violations.isEmpty,
             "出现裸几何 / 字号字面量（改用 DesignTokens.radius* / font*；确属合法的补白名单并写明理由）：\n\(result.violations.joined(separator: "\n"))"
         )
+    }
+}
+
+// MARK: - 间距令牌测试（B2c-a 2026-09-16）
+
+struct UISpacingContractTests {
+    static let repoRoot = UIAccentContractTests.repoRoot
+
+    static var tokenFileURL: URL {
+        repoRoot.appendingPathComponent("QQPlayer/Models/AppearanceTheme.swift")
+    }
+
+    /// 源码里出现的所有 `DesignTokens.space*`（注释行不计；令牌定义行本身不含 `DesignTokens.` 前缀）
+    static func spaceTokenNames(in urls: [URL]) -> [String] {
+        UIGeometryContractTests.tokenNames(in: urls).filter { $0.hasPrefix("space") }
+    }
+
+    @Test("合成源码：裸间距字面量必被抓到，令牌 / 空参 / 仅边 / 变量 / 表达式 / 声明 / 注释不误报")
+    func syntheticNakedSpacingLiteralsAreCaughtAndLegalFormsAreNot() {
+        var lines = ["import SwiftUI", "struct Tmp: View {", "    var body: some View {"]
+        /// 行号 -> 该行应被抓到的处数（行号自动记录，避免手写行号漂移）
+        /// 扫描器粒度 = **每行每条规则最多一条违规**（与强调色/几何契约同一套 `scan`），
+        /// 故同一行里同规则的多处命中只计 1。
+        var expected: [Int: Int] = [:]
+        func add(_ line: String, violating: Int = 0) {
+            lines.append(line)
+            if violating > 0 { expected[lines.count] = violating }
+        }
+        // 该抓：裸字面量（B2c-a 迁移前全仓实测 33 种取值里的代表形态）
+        add("        Text(\"a\").padding(8)", violating: 1)
+        add("        Text(\"b\").padding(1.5)", violating: 1)
+        add("        Text(\"c\").padding(.horizontal, 16)", violating: 1)
+        add("        Text(\"d\").padding(.top, 4)", violating: 1)
+        add("        VStack(spacing: 8) { Text(\"e\") }", violating: 1)
+        add("        VStack(alignment: .leading, spacing: 12) {", violating: 1)
+        add("        HStack(alignment: .center, spacing: 16, content: { Text(\"f\") })", violating: 1)
+        add("        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {", violating: 1)
+        add("        let cells = [GridItem(.flexible(), spacing: 20)]", violating: 1)
+        add("        Grid(horizontalSpacing: 8, verticalSpacing: 12) {", violating: 1)   // 扫描粒度=每行每规则一条，故记 1
+        add("        Spacer(minLength: 0)", violating: 1)
+        add("        Spacer(minLength: 24),", violating: 1)
+        // 该抓：多行写法——值单独一行（`spacing:` 后紧跟数字）
+        add("        LazyVGrid(")
+        add("            spacing: 16,", violating: 1)
+        add("            content: { Text(\"g\") }")
+        add("        )")
+        // 该抓：实参开头的字面量参与运算（规则 5）
+        add("        Text(\"h\").padding(8 * scale)", violating: 1)
+        add("        VStack(spacing: 12 * scale) { Text(\"i\") }", violating: 1)
+        add("        Spacer(minLength: 8 * scale)", violating: 1)
+        // 不该抓：令牌 / 空参 / 仅边 / 变量 / 表达式 / 声明 / 比例常数 / 注释
+        add("        Text(\"j\").padding()")
+        add("        Text(\"k\").padding(.horizontal)")
+        add("        Text(\"l\").padding(DesignTokens.space8)")
+        add("        Text(\"m\").padding(.horizontal, DesignTokens.space16)")
+        add("        VStack(spacing: DesignTokens.space8) { Text(\"n\") }")
+        add("        VStack(spacing: spacing) { Text(\"o\") }")
+        add("        VStack(spacing: Self.spacing) { Text(\"p\") }")
+        add("        let gridSpacing = SmartPlaylistGridLayout.spacing")
+        add("        Text(\"q\").padding(size * 0.5)")
+        add("        Text(\"r\").padding(DesignTokens.space8 * scale)")
+        add("        Text(\"s\").padding(compact ? 20 : 44)")
+        add("        Text(\"t\").padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))")
+        add("        Text(\"u\").padding(.horizontal, max(16, min(20, UIScreen.main.bounds.width * 0.05)))")
+        add("        Text(\"v\").padding(.horizontal, Self.horizontalPadding)")
+        add("        Text(\"w\").padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))")
+        add("        VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 12 : 16) {")
+        add("        Spacer(minLength: UIScreen.main.scale < UIScreen.main.nativeScale ? 16 : 20)")
+        add("        Spacer(minLength: other)")
+        add("        let spacing: CGFloat = 2")
+        add("        private static let spacing: CGFloat = 12")
+        add("        private static var spacing: CGFloat { SmartPlaylistGridLayout.spacing }")
+        add("        func f(spacing: CGFloat = spacing) {}")
+        add("        // 反例说明：不要写 .padding(8) / VStack(spacing: 8)")
+        add("        /// 反例说明：不要写 Spacer(minLength: 0)")
+        add("    }")
+        add("}")
+
+        let report = UIAccentContract.scan(
+            source: lines.joined(separator: "\n"),
+            filePath: "QQPlayer/Views/Tmp.swift",
+            rules: UISpacingContract.allRules
+        )
+        let expectedTotal = expected.values.reduce(0, +)
+        #expect(
+            report.violations.count == expectedTotal,
+            "应恰好抓到 \(expectedTotal) 处，实际 \(report.violations.count)：\n\(report.violations.joined(separator: "\n"))"
+        )
+        for (line, count) in expected {
+            let hits = report.violations.filter { $0.hasPrefix("QQPlayer/Views/Tmp.swift:\(line):") }
+            #expect(hits.count == count, "第 \(line) 行应抓到 \(count) 处，实际 \(hits.count)：\(report.violations)")
+        }
+    }
+
+    @Test("真实源码无裸间距字面量（白名单为空，fail-closed）")
+    func appSourcesHaveNoNakedSpacingLiterals() {
+        let files = UIAccentContract.appSourceFiles(repoRoot: Self.repoRoot)
+        #expect(files.count >= 250, "扫描范围异常（B2a 实测 QQPlayer/** 301 个 .swift）：\(files.count)")
+        #expect(files.contains(Self.tokenFileURL), "令牌定义文件不在扫描范围内：\(Self.tokenFileURL.path)")
+
+        // 非空转佐证：迁移后全仓应有 ≈829 条 DesignTokens.space* 引用（B2c-a 实测 829 处）
+        let references = Self.spaceTokenNames(in: files)
+        #expect(
+            references.count >= UISpacingContract.minimumReferenceCount,
+            "源码里的间距令牌引用过少（\(references.count) 条）= 迁移被整体回退或扫描范围写错"
+        )
+
+        let result = UIAccentContractTests.scanFiles(files, rules: UISpacingContract.allRules)
+        #expect(
+            result.violations.isEmpty,
+            "出现裸间距字面量（改用 DesignTokens.space*；确属合法的补白名单并写明理由）：\n\(result.violations.joined(separator: "\n"))"
+        )
+    }
+
+    @Test("间距令牌名 ↔ 值自洽，且每条都被引用（防拼错名静默改值 / 防死令牌）")
+    func spacingTokenTableIsSelfConsistentAndFullyReferenced() throws {
+        let source = try String(contentsOf: Self.tokenFileURL, encoding: .utf8)
+        let tokens = UIGeometryContract.parseTokens(source: source).filter { $0.name.hasPrefix("space") }
+        #expect(tokens.count >= 33, "间距令牌数异常（B2c-a 实测 33 种）：\(tokens.count)")
+
+        let inconsistent = UIGeometryContract.selfInconsistent(tokens)
+        #expect(
+            inconsistent.isEmpty,
+            "间距令牌名与值不自洽（拼错名 = 值静默变成另一个间距，编译器与截图都发现不了）：\n\(inconsistent.joined(separator: "\n"))"
+        )
+
+        let referenced = Set(Self.spaceTokenNames(in: UIAccentContract.appSourceFiles(repoRoot: Self.repoRoot)))
+        let dead = tokens.map(\.name).filter { !referenced.contains($0) }
+        #expect(dead.isEmpty, "只定义没引用的间距令牌（死令牌，或某处迁移漏做）：\(dead.sorted())")
     }
 }
