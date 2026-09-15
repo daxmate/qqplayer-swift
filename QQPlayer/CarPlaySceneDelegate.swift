@@ -11,6 +11,8 @@ import UIKit
 
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     var interfaceController: CPInterfaceController?
+    /// 歌词页（当前句 + 后续句列表）：didConnect 建立、didDisconnect 停订阅
+    private(set) var lyricsController: CarPlayLyricsController?
     private var allSongsTemplate: CPListTemplate?
     var allSongsTracks: [Track] = []
     private var artistNameCache: [Int64: String] = [:]
@@ -27,6 +29,10 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
                                   didConnect interfaceController: CPInterfaceController) {
         self.interfaceController = interfaceController
 
+        // 重连时先停掉上一份歌词页（订阅 + 时钟），防同场景重复 didConnect 时旧控制器残活
+        lyricsController?.stop()
+        lyricsController = nil
+
         loadInitialCarPlayData()
 
         // Update SFBAudioEngine CarPlay status
@@ -35,11 +41,35 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         let allSongsTemplate = createAllSongsTab()
         self.allSongsTemplate = allSongsTemplate
 
+        // 歌词页紧挨「全部歌曲」（在车里最常用的一页）
+        let lyricsController = CarPlayLyricsController()
+        let lyricsTemplate = lyricsController.template
+        addNowPlayingButton(to: lyricsTemplate)
+
         let favoritesTemplate = createFavoritesTab()
         let playlistsTemplate = createPlaylistsTab()
         let browseTemplate = createBrowseTab()
 
-        let tabBarTemplate = CPTabBarTemplate(templates: [allSongsTemplate, favoritesTemplate, playlistsTemplate, browseTemplate])
+        // TabBar 能显示几个 tab 由 entitlement 决定（Apple 文档：maximumTabCount 是运行时取值，
+        // 本项目 entitlement 下为 5）。超限时保住既有 4 个 tab、歌词页让位并打日志——
+        // 绝不因新页把老入口挤掉，也不赌系统自己丢弃多余 tab。
+        var tabTemplates: [CPTemplate] = [
+            allSongsTemplate,
+            lyricsTemplate,
+            favoritesTemplate,
+            playlistsTemplate,
+            browseTemplate,
+        ]
+        let maxTabs = max(CPTabBarTemplate.maximumTabCount, 1)
+        if tabTemplates.count > maxTabs {
+            tabTemplates.remove(at: 1)
+            lyricsController.stop()
+            print("⚠️ CarPlay TabBar 上限 \(maxTabs)：歌词页未挂载（既有入口优先）")
+        } else {
+            self.lyricsController = lyricsController
+        }
+
+        let tabBarTemplate = CPTabBarTemplate(templates: tabTemplates)
         interfaceController.setRootTemplate(tabBarTemplate, animated: true, completion: nil)
 
         // 曾在此 setupPlayerStateObserver()（监听 "PlayerStateChanged" 只 print 一行）：
@@ -60,6 +90,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
                                   didDisconnectInterfaceController interfaceController: CPInterfaceController) {
         self.interfaceController = nil
+        // 歌词页订阅（播放进度/当前曲目）随场景断开解除，下次连接重新建立
+        lyricsController?.stop()
+        lyricsController = nil
 
         print("🚗 CarPlay disconnected")
         // 通知主场景刷新布局：iOS 26 在 CarPlay 场景断开后可能不刷新主窗口

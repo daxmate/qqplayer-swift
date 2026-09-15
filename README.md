@@ -77,6 +77,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 **🚗 CarPlay**
 - 原生 CarPlay 支持（entitlement 已启用）：标签页导航、正在播放界面、专辑封面、手机与车机播放状态实时同步、界面完整本地化
+- 歌词页：当前句在首行（播放指示器标注）+ 后续 5 句逐句刷新（CarPlay 模板集无歌词控件，见 `CarPlay+Lyrics.swift` 头部说明）
 
 **🎧 均衡器与音频**
 - 10 段常用预设 + 自定义滑杆编辑器（新增）
@@ -371,7 +372,7 @@ QQPlayer.xcodeproj            # 工程（QQPlayer iOS / QQPlayerMac 双 target �
 QQPlayer/
 ├── QQPlayerApp.swift         # iOS 入口
 ├── QQPlayerMacApp.swift      # macOS 入口（Settings scene）
-├── CarPlaySceneDelegate.swift / CarPlay+Playback.swift
+├── CarPlaySceneDelegate.swift / CarPlay+Playback.swift / CarPlay+Lyrics.swift
 ├── ContentView.swift
 ├── Mac/                      # macOS UI（三栏、播放页、迷你模式、在线搜索、刮削编辑器、同步中心等 41 文件）
 ├── Services/                 # 共享 Core：播放引擎 / 歌词 / 跟唱 / EQ / 索引 / 在线客户端 / 刮削 / aria2 等 80 文件
