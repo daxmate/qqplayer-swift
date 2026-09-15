@@ -99,7 +99,7 @@ struct MacSmartPlaylistCardStrip: View {
         VStack(alignment: .leading, spacing: 6) {
             MacArtworkCollageFill(
                 tracks: coverTracks[info.kind] ?? [],
-                cornerRadius: 8,
+                cornerRadius: DesignTokens.radius8,
                 placeholderIcon: MacSmartPlaylistUILogic.iconName(for: info.kind)
             )
             Text(Localized.smartPlaylistTitle(info.kind))
@@ -431,7 +431,7 @@ struct MacSmartPlaylistEmptyView: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 40))
+                .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)
             Text(message)
                 .font(.callout)

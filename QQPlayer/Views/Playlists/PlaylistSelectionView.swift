@@ -1,6 +1,8 @@
 import GRDB
 import SwiftUI
 struct PlaylistSelectionView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let track: Track
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appCoordinator: AppCoordinator
@@ -52,7 +54,7 @@ struct PlaylistSelectionView: View {
                 if playlists.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "music.note.list")
-                            .font(.system(size: 40))
+                            .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)
 
                         Text(Localized.noPlaylistsYet)
@@ -72,7 +74,7 @@ struct PlaylistSelectionView: View {
                                 // Main clickable area for add/remove
                                 HStack {
                                     Image(systemName: "music.note.list")
-                                        .foregroundColor(settings.backgroundColorChoice.color)
+                                        .foregroundColor(accentColor)
 
                                     Text(playlist.title)
                                         .foregroundColor(.primary)
@@ -85,7 +87,7 @@ struct PlaylistSelectionView: View {
                                             .foregroundColor(.green)
                                     } else {
                                         Image(systemName: "plus.circle")
-                                            .foregroundColor(settings.backgroundColorChoice.color)
+                                            .foregroundColor(accentColor)
                                     }
                                 }
                                 .contentShape(Rectangle())
@@ -110,7 +112,7 @@ struct PlaylistSelectionView: View {
                                         .foregroundColor(.red)
                                         .frame(width: 32, height: 32)
                                         .background(Color.red.opacity(0.1))
-                                        .cornerRadius(8)
+                                        .cornerRadius(DesignTokens.radius8)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }

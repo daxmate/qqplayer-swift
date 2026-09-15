@@ -232,7 +232,7 @@ struct MacPlayerView: View {
 
             // Artwork
             ZStack {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignTokens.radius16)
                     .fill(Color.gray.opacity(0.15))
                     .frame(width: 240, height: 240)
                     .shadow(radius: 8, y: 4)
@@ -242,10 +242,10 @@ struct MacPlayerView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width: 240, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius16))
                 } else {
                     Image(systemName: "music.note")
-                        .font(.system(size: 60))
+                        .font(.system(size: DesignTokens.font60))
                         .foregroundColor(.secondary)
                 }
             }
@@ -296,21 +296,21 @@ struct MacPlayerView: View {
             HStack(spacing: 24) {
                 Button(action: onPrevious) {
                     Image(systemName: "backward.fill")
-                        .font(.system(size: 22))
+                        .font(.system(size: DesignTokens.font22))
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
 
                 Button(action: onPlayPause) {
                     Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 44))
+                        .font(.system(size: DesignTokens.font44))
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
 
                 Button(action: onNext) {
                     Image(systemName: "forward.fill")
-                        .font(.system(size: 22))
+                        .font(.system(size: DesignTokens.font22))
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
@@ -323,7 +323,7 @@ struct MacPlayerView: View {
                     player.cyclePlaybackOrderMode()
                 } label: {
                     Image(systemName: playOrderIcon)
-                        .font(.system(size: 16))
+                        .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(isPlayOrderActive ? appAccentColor : .secondary)
@@ -335,7 +335,7 @@ struct MacPlayerView: View {
                     try? AppCoordinator.shared.toggleFavorite(trackStableId: track.stableId)
                 } label: {
                     Image(systemName: currentTrackIsFavorite ? "heart.fill" : "heart")
-                        .font(.system(size: 16))
+                        .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(currentTrackIsFavorite ? .pink : .secondary)
@@ -357,7 +357,7 @@ struct MacPlayerView: View {
                         }
                     } label: {
                         Image(systemName: sleepTimerEndDate == nil ? "timer" : "timer.circle.fill")
-                            .font(.system(size: 16))
+                            .font(.system(size: DesignTokens.font16))
                     }
                     .menuStyle(.borderlessButton)
                     .foregroundColor(sleepTimerEndDate == nil ? .secondary : appAccentColor)
@@ -373,7 +373,7 @@ struct MacPlayerView: View {
                     showQueuePanel = true
                 } label: {
                     Image(systemName: "list.number")
-                        .font(.system(size: 16))
+                        .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
@@ -385,7 +385,7 @@ struct MacPlayerView: View {
                     karaoke.toggleKaraokeMode()
                 } label: {
                     Image(systemName: karaoke.isKaraokeOn ? "mic.fill" : "mic")
-                        .font(.system(size: 16))
+                        .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : .secondary)
@@ -534,7 +534,7 @@ private struct MacQueuePanelView: View {
         if player.playbackQueue.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "music.note.list")
-                    .font(.system(size: 40))
+                    .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
                 Text(Localized.noSongsInQueue)
                     .foregroundColor(.secondary)

@@ -122,9 +122,9 @@ struct MacQuarkLoginView: View {
             }
         }
         .frame(width: 190, height: 190)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.radius12)
                 .stroke(Color.gray.opacity(0.25), lineWidth: 1)
         }
     }
@@ -132,7 +132,7 @@ struct MacQuarkLoginView: View {
     private func statusIcon(_ systemName: String, tint: Color) -> some View {
         VStack(spacing: 8) {
             Image(systemName: systemName)
-                .font(.system(size: 30))
+                .font(.system(size: DesignTokens.font30))
                 .foregroundColor(tint)
         }
     }

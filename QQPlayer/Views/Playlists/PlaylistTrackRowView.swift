@@ -1,6 +1,8 @@
 import GRDB
 import SwiftUI
 struct PlaylistTrackRowView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let track: Track
     let playlist: Playlist?
     let isEditMode: Bool
@@ -26,7 +28,7 @@ struct PlaylistTrackRowView: View {
             HStack(spacing: 12) {
                 // Album artwork thumbnail (matching TrackRowView exactly)
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius8)
                         .fill(Color.gray.opacity(0.2))
                         .frame(width: 60, height: 60)
 
@@ -34,7 +36,7 @@ struct PlaylistTrackRowView: View {
                         Image(uiImage: image)
                             .resizable().scaledToFill()
                             .frame(width: 60, height: 60)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8))
                     } else {
                         Image(systemName: "music.note")
                             .font(.title2)
@@ -43,8 +45,8 @@ struct PlaylistTrackRowView: View {
 
                     // Stroke when playing (matching TrackRowView)
                     if isCurrentlyPlaying {
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(deleteSettings.backgroundColorChoice.color, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: DesignTokens.radius8)
+                            .stroke(accentColor, lineWidth: 2)
                             .frame(width: 60, height: 60)
                     }
                 }
@@ -54,13 +56,13 @@ struct PlaylistTrackRowView: View {
                     Text(track.displayTitle)
                         .font(.title3)
                         .fontWeight(.medium)
-                        .foregroundColor(isCurrentlyPlaying ? deleteSettings.backgroundColorChoice.color : .primary)
+                        .foregroundColor(isCurrentlyPlaying ? accentColor : .primary)
                         .lineLimit(1)
 
                     if let artistName, !artistName.isEmpty {
                         Text(artistName)
                             .font(.body)
-                            .foregroundColor(isCurrentlyPlaying ? deleteSettings.backgroundColorChoice.color.opacity(0.8) : .secondary)
+                            .foregroundColor(isCurrentlyPlaying ? accentColor.opacity(0.8) : .secondary)
                             .lineLimit(1)
                     }
                 }
@@ -70,7 +72,7 @@ struct PlaylistTrackRowView: View {
                 // Equalizer animation when playing (matching TrackRowView)
                 if isCurrentlyPlaying {
                     EqualizerBarsExact(
-                        color: deleteSettings.backgroundColorChoice.color,
+                        color: accentColor,
                         isActive: playerEngine.isPlaying && isCurrentlyPlaying,
                         isLarge: true,
                         trackId: playerEngine.currentTrack?.stableId
@@ -152,7 +154,7 @@ struct PlaylistTrackRowView: View {
         .padding(.horizontal, 12)
         .sheet(isPresented: $showPlaylistDialog) {
             PlaylistSelectionView(track: track)
-                .accentColor(deleteSettings.backgroundColorChoice.color)
+                .accentColor(accentColor)
         }
         .alert(Localized.deleteFile, isPresented: $showDeleteConfirmation) {
             Button(Localized.delete, role: .destructive) {

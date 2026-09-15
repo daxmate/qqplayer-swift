@@ -29,7 +29,7 @@ struct MacPairApprovalCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: "macbook.and.iphone")
-                    .font(.system(size: 22))
+                    .font(.system(size: DesignTokens.font22))
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(SyncDeviceList.displayName(candidate))
@@ -68,7 +68,7 @@ struct MacPairApprovalCardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
     }
 }
 

@@ -141,7 +141,7 @@ private struct GraphicEQ10BandGraphView: View {
             }
 
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color(.secondarySystemBackground))
 
                 // 水平网格线（0dB 中线高亮）

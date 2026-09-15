@@ -4,6 +4,8 @@ import SwiftUI
     import FoundationModels
 #endif
 struct PlaylistsScreen: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var playlists: [Playlist] = []
     /// 歌单 id → 曲目（loadPlaylists 时批量加载一次，替代网格每卡片每次 body 求值查库）
@@ -80,7 +82,7 @@ struct PlaylistsScreen: View {
                     if playlists.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "music.note.list")
-                                .font(.system(size: 40))
+                                .font(.system(size: DesignTokens.font40))
                                 .foregroundColor(.secondary)
 
                             Text(Localized.noPlaylistsYet)
@@ -165,7 +167,7 @@ struct PlaylistsScreen: View {
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                     .frame(width: 56, height: 56)
-                                    .background(Circle().fill(Color.accentColor))
+                                    .background(Circle().fill(accentColor))
                                     .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
                             }
                             .accessibilityLabel(Localized.aiPlaylistButton)
@@ -396,21 +398,21 @@ struct NewPlaylistCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color.gray.opacity(0.2))
                     .aspectRatio(1, contentMode: .fit)
 
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6]))
                     .foregroundColor(.secondary.opacity(0.5))
                     .aspectRatio(1, contentMode: .fit)
 
                 Image(systemName: "plus")
-                    .font(.system(size: 40, weight: .light))
+                    .font(.system(size: DesignTokens.font40, weight: .light))
                     .foregroundColor(.secondary)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(Localized.createPlaylist)

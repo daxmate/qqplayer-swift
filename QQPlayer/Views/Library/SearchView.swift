@@ -5,6 +5,8 @@ import SwiftUI
 // MARK: - Search View
 
 struct SearchView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let allTracks: [Track]
     let onNavigateToArtist: (Artist, [Track]) -> Void
     let onNavigateToAlbum: (Album, [Track]) -> Void
@@ -115,7 +117,7 @@ struct SearchView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color(.systemGray6))
-                        .cornerRadius(10)
+                        .cornerRadius(DesignTokens.radius10)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -134,7 +136,7 @@ struct SearchView: View {
                                         .padding(.vertical, 8)
                                         .background(
                                             selectedCategory == category ?
-                                                settings.backgroundColorChoice.color :
+                                                accentColor :
                                                 Color(.systemGray6)
                                         )
                                         .foregroundColor(
@@ -142,7 +144,7 @@ struct SearchView: View {
                                                 .white :
                                                 .primary
                                         )
-                                        .cornerRadius(20)
+                                        .cornerRadius(DesignTokens.radius20)
                                 }
                             }
                         }
@@ -154,7 +156,7 @@ struct SearchView: View {
                     if debouncedSearchText.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 40))
+                                .font(.system(size: DesignTokens.font40))
                                 .foregroundColor(.secondary)
 
                             Text(Localized.searchYourMusicLibrary)
@@ -170,7 +172,7 @@ struct SearchView: View {
                         VStack(spacing: 16) {
                             ProgressView()
                                 .scaleEffect(1.2)
-                                .progressViewStyle(CircularProgressViewStyle(tint: settings.backgroundColorChoice.color))
+                                .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
 
                             Text("search_any_loading".localized)
                                 .font(.subheadline)
@@ -197,7 +199,7 @@ struct SearchView: View {
                         Button(Localized.done) {
                             dismiss()
                         }
-                        .foregroundColor(settings.backgroundColorChoice.color)
+                        .foregroundColor(accentColor)
                     }
                 }
             }

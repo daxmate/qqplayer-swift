@@ -44,7 +44,7 @@ struct QueueManagementView: View {
                     if playerEngine.playbackQueue.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "music.note.list")
-                                .font(.system(size: 60))
+                                .font(.system(size: DesignTokens.font60))
                                 .foregroundColor(.secondary)
 
                             Text(Localized.noSongsInQueue)
@@ -182,6 +182,8 @@ struct QueueManagementView: View {
 }
 
 struct QueueTrackRow: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let track: Track
     let index: Int
     let isCurrentTrack: Bool
@@ -196,7 +198,7 @@ struct QueueTrackRow: View {
         HStack(spacing: 12) {
             // Album artwork
             ZStack {
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: DesignTokens.radius6)
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: 50, height: 50)
 
@@ -204,7 +206,7 @@ struct QueueTrackRow: View {
                     Image(uiImage: image)
                         .resizable().scaledToFill()
                         .frame(width: 50, height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius6))
                 } else {
                     Image(systemName: "music.note")
                         .font(.title3)
@@ -218,13 +220,13 @@ struct QueueTrackRow: View {
                     Text(track.displayTitle)
                         .font(.headline)
                         .fontWeight(isCurrentTrack ? .bold : .medium)
-                        .foregroundColor(isCurrentTrack ? settings.backgroundColorChoice.color : .primary)
+                        .foregroundColor(isCurrentTrack ? accentColor : .primary)
                         .lineLimit(1)
 
                     if isCurrentTrack {
                         Image(systemName: "speaker.wave.2.fill")
                             .font(.caption)
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .foregroundColor(accentColor)
                     }
                 }
 
@@ -246,8 +248,8 @@ struct QueueTrackRow: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isCurrentTrack ? settings.backgroundColorChoice.color.opacity(0.15) : Color.clear)
+            RoundedRectangle(cornerRadius: DesignTokens.radius10)
+                .fill(isCurrentTrack ? accentColor.opacity(0.15) : Color.clear)
         )
         .opacity(isDragging ? 0.8 : 1.0)
         .scaleEffect(isDragging ? 1.05 : 1.0)

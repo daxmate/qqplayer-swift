@@ -1,6 +1,8 @@
 import GRDB
 import SwiftUI
 struct ArtistDetailScreen: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     /// 归一后的一组歌手（同名简繁两行归并后传入）；primaryArtist 用于专辑/网络信息
     let artists: [Artist]
     let allTracks: [Track]
@@ -172,7 +174,7 @@ struct ArtistDetailScreen: View {
                                 .clipped()
                         } else {
                             Image(systemName: "person.circle")
-                                .font(.system(size: 60))
+                                .font(.system(size: DesignTokens.font60))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -289,7 +291,7 @@ struct ArtistDetailScreen: View {
                                     }
                                 }
                                 .font(.caption)
-                                .foregroundColor(settings.backgroundColorChoice.color)
+                                .foregroundColor(accentColor)
                             }
                         }
 
@@ -357,8 +359,8 @@ struct ArtistDetailScreen: View {
                     .padding(.horizontal, 8)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(settings.backgroundColorChoice.color)
-                    .cornerRadius(25)
+                    .background(accentColor)
+                    .cornerRadius(DesignTokens.radius25)
             }
             Button {
                 let shuffled = artistTracks.shuffled()
@@ -367,12 +369,12 @@ struct ArtistDetailScreen: View {
             } label: {
                 HStack { Image(systemName: "shuffle"); Text(Localized.shuffle).lineLimit(1).minimumScaleFactor(0.6) }
                     .font(.title3).fontWeight(.semibold)
-                    .foregroundColor(settings.backgroundColorChoice.color)
+                    .foregroundColor(accentColor)
                     .padding(.horizontal, 8)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(settings.backgroundColorChoice.color.opacity(0.1))
-                    .cornerRadius(25)
+                    .background(accentColor.opacity(0.1))
+                    .cornerRadius(DesignTokens.radius25)
             }
         }
     }
@@ -394,7 +396,6 @@ struct ArtistDetailScreen: View {
                         if isBulkMode {
                             TrackSelectionIndicator(
                                 isSelected: selectedTracks.contains(track.stableId),
-                                accentColor: settings.backgroundColorChoice.color,
                                 onTap: { toggleSelection(track) }
                             )
                             .padding(.leading)

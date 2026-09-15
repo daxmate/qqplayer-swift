@@ -450,7 +450,7 @@ private struct MacParametricEQGraphView: View {
                 .sorted { $0.point.x < $1.point.x }
 
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color(nsColor: .controlBackgroundColor))
 
                 Path { path in

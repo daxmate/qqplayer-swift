@@ -27,7 +27,7 @@ struct HintCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: DesignTokens.font15, weight: .semibold))
                     .foregroundColor(accentColor)
 
                 Text(title)
@@ -38,7 +38,7 @@ struct HintCardView: View {
 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: DesignTokens.font12, weight: .semibold))
                         .foregroundColor(.secondary)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
@@ -58,15 +58,15 @@ struct HintCardView: View {
         // 卡片最大宽度封顶：overlay 中不会撑满全屏，卡片外区域自然不拦截手势
         .frame(maxWidth: 360)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignTokens.radius16)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignTokens.radius16)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius16))
         .onTapGesture(perform: onDismiss)
         .onAppear {
             autoDismissTask = Task { @MainActor in

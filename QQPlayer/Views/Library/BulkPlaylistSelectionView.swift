@@ -4,6 +4,8 @@ import SwiftUI
 // MARK: - Bulk Selection Components
 
 struct BulkPlaylistSelectionView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let trackIds: [String]
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -29,7 +31,7 @@ struct BulkPlaylistSelectionView: View {
                 if playlists.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "music.note.list")
-                            .font(.system(size: 40))
+                            .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)
 
                         Text(Localized.noPlaylistsYet)
@@ -48,7 +50,7 @@ struct BulkPlaylistSelectionView: View {
                             }) {
                                 HStack {
                                     Image(systemName: "music.note.list")
-                                        .foregroundColor(settings.backgroundColorChoice.color)
+                                        .foregroundColor(accentColor)
 
                                     Text(playlist.title)
                                         .foregroundColor(.primary)
@@ -56,7 +58,7 @@ struct BulkPlaylistSelectionView: View {
                                     Spacer()
 
                                     Image(systemName: "plus.circle")
-                                        .foregroundColor(settings.backgroundColorChoice.color)
+                                        .foregroundColor(accentColor)
                                 }
                             }
                             .buttonStyle(PlainButtonStyle())

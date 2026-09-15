@@ -205,7 +205,7 @@ struct SmartPlaylistEmptyView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "music.note")
-                .font(.system(size: 40))
+                .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)
 
             Text(message)
@@ -225,7 +225,7 @@ struct SmartPlaylistErrorView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
+                .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)
 
             Text(message)

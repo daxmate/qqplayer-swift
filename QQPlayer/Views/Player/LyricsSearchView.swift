@@ -11,7 +11,8 @@ import SwiftUI
 
 struct LyricsSearchView: View {
     let track: Track
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
     let onClose: () -> Void
     /// 应用搜索结果（选中候选）或恢复自动（nil）；由外层负责刷新歌词显示
     let onApply: (Lyrics?) -> Void
@@ -30,12 +31,10 @@ struct LyricsSearchView: View {
 
     init(
         track: Track,
-        accentColor: Color,
         onClose: @escaping () -> Void,
         onApply: @escaping (Lyrics?) -> Void
     ) {
         self.track = track
-        self.accentColor = accentColor
         self.onClose = onClose
         self.onApply = onApply
         // 显示值≠查询值：这里是发给网易云/lrclib 的查询串（按 UI 语言转字形会降低命中率），保持原文
@@ -151,7 +150,7 @@ struct LyricsSearchView: View {
         HStack(spacing: 12) {
             Button(action: onClose) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: DesignTokens.font17, weight: .semibold))
                     .foregroundColor(accentColor)
                     .frame(width: 32, height: 32)
             }
@@ -189,7 +188,7 @@ struct LyricsSearchView: View {
                     .font(.subheadline)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                     .submitLabel(.search)
                     .onSubmit { doSearch() }
 
@@ -198,16 +197,16 @@ struct LyricsSearchView: View {
                     .font(.subheadline)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                     .submitLabel(.search)
                     .onSubmit { doSearch() }
 
                 Button(action: doSearch) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: DesignTokens.font15, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 34, height: 34)
-                        .background(accentColor, in: RoundedRectangle(cornerRadius: 10))
+                        .background(accentColor, in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(searching)
@@ -222,7 +221,7 @@ struct LyricsSearchView: View {
     private var manualStatusRow: some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14))
+                .font(.system(size: DesignTokens.font14))
                 .foregroundColor(accentColor)
 
             Text(NSLocalizedString("lyrics_search_manual_active", value: "Manual lyrics assigned", comment: ""))
@@ -246,7 +245,7 @@ struct LyricsSearchView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
     }
 
     // MARK: - Content
@@ -266,7 +265,7 @@ struct LyricsSearchView: View {
             VStack(spacing: 12) {
                 Spacer()
                 Image(systemName: "text.badge.xmark")
-                    .font(.system(size: 36))
+                    .font(.system(size: DesignTokens.font36))
                     .foregroundColor(.secondary)
                 Text(NSLocalizedString("lyrics_search_no_results", value: "No lyrics found. Try changing the title or artist", comment: ""))
                     .font(.subheadline)
@@ -301,7 +300,7 @@ struct LyricsSearchView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: 6))
+                    .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
 
                 VStack(alignment: .leading, spacing: 3) {
                     // 候选行是渲染出来的歌曲文本（转字形只影响显示；id/source 等取歌词用字段不动）
@@ -326,7 +325,7 @@ struct LyricsSearchView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .stroke(accentColor.opacity(0.6), lineWidth: 1)
                         )
                         .accessibilityLabel(NSLocalizedString("lyrics_search_has_translation", value: "Contains translation", comment: ""))
@@ -343,7 +342,7 @@ struct LyricsSearchView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(applyingIndex != nil)
@@ -412,8 +411,8 @@ struct LyricsSearchView: View {
             title: "花海",
             path: "/tmp/preview.flac"
         ),
-        accentColor: .red,
         onClose: {},
         onApply: { _ in }
     )
+    .environment(\.appAccentColor, .red)
 }

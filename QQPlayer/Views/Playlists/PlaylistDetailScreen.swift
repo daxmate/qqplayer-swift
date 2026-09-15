@@ -4,6 +4,8 @@ import SwiftUI
 import WidgetKit
 
 struct PlaylistDetailScreen: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let playlist: Playlist
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var tracks: [Track] = []
@@ -113,7 +115,7 @@ struct PlaylistDetailScreen: View {
                     VStack(spacing: 16) {
                         // Four-song grid artwork
                         ZStack {
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                 .fill(Color.gray.opacity(0.2))
                                 .frame(width: 250, height: 250)
 
@@ -122,7 +124,7 @@ struct PlaylistDetailScreen: View {
                                 Image(uiImage: customCover)
                                     .resizable().scaledToFill()
                                     .frame(width: 250, height: 250)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
                             } else if tracks.count >= 4 {
                                 // 2x2 mashup for 4+ songs
                                 VStack(spacing: 2) {
@@ -136,14 +138,14 @@ struct PlaylistDetailScreen: View {
                                     }
                                 }
                                 .frame(width: 250, height: 250)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
                             } else if !tracks.isEmpty {
                                 // Single artwork for 1-3 songs
                                 artworkView(at: 0, size: 250)
                             } else {
                                 // Default icon for empty playlist
                                 Image(systemName: "music.note.list")
-                                    .font(.system(size: 50))
+                                    .font(.system(size: DesignTokens.font50))
                                     .foregroundColor(.secondary)
                             }
 
@@ -157,7 +159,7 @@ struct PlaylistDetailScreen: View {
                                             showCoverOptions = true
                                         }) {
                                             Image(systemName: "photo")
-                                                .font(.system(size: 40, weight: .light))
+                                                .font(.system(size: DesignTokens.font40, weight: .light))
                                                 .foregroundColor(.white)
                                                 .frame(width: 80, height: 80)
                                                 .background(Color.black.opacity(0.6))
@@ -207,8 +209,8 @@ struct PlaylistDetailScreen: View {
                                 .padding(.horizontal, 8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
-                                .background(settings.backgroundColorChoice.color)
-                                .cornerRadius(28)
+                                .background(accentColor)
+                                .cornerRadius(DesignTokens.radius28)
                             }
                             .disabled(tracks.isEmpty)
 
@@ -226,12 +228,12 @@ struct PlaylistDetailScreen: View {
                                         .minimumScaleFactor(0.6)
                                 }
                                 .font(.title3.weight(.semibold))
-                                .foregroundColor(settings.backgroundColorChoice.color)
+                                .foregroundColor(accentColor)
                                 .padding(.horizontal, 8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
-                                .background(settings.backgroundColorChoice.color.opacity(0.1))
-                                .cornerRadius(28)
+                                .background(accentColor.opacity(0.1))
+                                .cornerRadius(DesignTokens.radius28)
                             }
                             .disabled(tracks.isEmpty)
                         }
@@ -276,7 +278,7 @@ struct PlaylistDetailScreen: View {
                                     } label: {
                                         Label(Localized.playNext, systemImage: "text.line.first.and.arrowtriangle.forward")
                                     }
-                                    .tint(settings.backgroundColorChoice.color)
+                                    .tint(accentColor)
                                 }
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -337,7 +339,7 @@ struct PlaylistDetailScreen: View {
                                 }
                             } label: {
                                 Image(systemName: "arrow.up.arrow.down")
-                                    .foregroundColor(settings.backgroundColorChoice.color)
+                                    .foregroundColor(accentColor)
                             }
                         }
                         .textCase(nil)
@@ -347,7 +349,7 @@ struct PlaylistDetailScreen: View {
                     Section {
                         VStack(spacing: 16) {
                             Image(systemName: "music.note")
-                                .font(.system(size: 40))
+                                .font(.system(size: DesignTokens.font40))
                                 .foregroundColor(.secondary)
 
                             Text(Localized.noSongsFound)
@@ -435,7 +437,7 @@ struct PlaylistDetailScreen: View {
                 .frame(width: size, height: size)
                 .clipped()
         } else if index < tracks.count {
-            RoundedRectangle(cornerRadius: 0)
+            RoundedRectangle(cornerRadius: DesignTokens.radius0)
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: size, height: size)
                 .overlay(

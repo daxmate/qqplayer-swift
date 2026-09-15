@@ -219,7 +219,7 @@ struct MacEQSettingsView: View {
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(Color.gray.opacity(0.15))
-                    .cornerRadius(4)
+                    .cornerRadius(DesignTokens.radius4)
 
                 Text(Localized.frequencyGainPairDescription)
                     .font(.caption)
@@ -245,7 +245,7 @@ struct MacEQSettingsView: View {
                 .padding(.vertical, 8)
                 .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
                 .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(8)
+                .cornerRadius(DesignTokens.radius8)
         }
         .buttonStyle(.plain)
     }
@@ -277,7 +277,7 @@ struct MacEQSettingsView: View {
                     if eqManager.currentPreset?.id == preset.id {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.blue)
-                            .font(.system(size: 18))
+                            .font(.system(size: DesignTokens.font18))
                     }
                 }
                 .contentShape(Rectangle())
@@ -288,7 +288,7 @@ struct MacEQSettingsView: View {
                 exportPreset(preset)
             } label: {
                 Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 13))
+                    .font(.system(size: DesignTokens.font13))
             }
             .buttonStyle(.borderless)
             .help(Localized.eqExport)
@@ -297,7 +297,7 @@ struct MacEQSettingsView: View {
                 presetPendingDelete = preset
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 13))
+                    .font(.system(size: DesignTokens.font13))
             }
             .buttonStyle(.borderless)
             .help(Localized.eqDelete)

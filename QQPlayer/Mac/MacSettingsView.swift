@@ -137,7 +137,7 @@ private struct MacPlaybackSettingsView: View {
                     HStack {
                         Image(systemName: "slider.horizontal.3")
                             .foregroundColor(.blue)
-                            .font(.system(size: 16))
+                            .font(.system(size: DesignTokens.font16))
                         Text(Localized.graphicEqualizer)
                             .foregroundColor(.primary)
                         Spacer()
@@ -309,7 +309,7 @@ private struct MacAppearanceSettingsView: View {
                     )
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: DesignTokens.font12, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
@@ -406,11 +406,11 @@ private struct MacLibrarySettingsView: View {
                         .padding(.vertical, 5)
                         .frame(maxWidth: .infinity)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .fill(isOn ? appAccentColor.opacity(0.18) : Color.gray.opacity(0.1))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .strokeBorder(isOn ? appAccentColor : Color.gray.opacity(0.25), lineWidth: 1)
                         )
                         .foregroundColor(isOn ? appAccentColor : .primary)
@@ -505,7 +505,7 @@ private struct MacAboutSettingsView: View {
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)
-                            .font(.system(size: 14))
+                            .font(.system(size: DesignTokens.font14))
                     }
                     .contentShape(Rectangle())
                 }

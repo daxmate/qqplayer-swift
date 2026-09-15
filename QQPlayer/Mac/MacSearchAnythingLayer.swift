@@ -74,10 +74,10 @@ struct MacSearchAnythingLayer: View {
         }
         .frame(width: 600)
         .frame(maxHeight: 560)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.gray.opacity(0.25), lineWidth: 1))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
+        .overlay(RoundedRectangle(cornerRadius: DesignTokens.radius12).strokeBorder(Color.gray.opacity(0.25), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
         .onExitCommand { state.isOpen = false }
     }
 
@@ -131,7 +131,7 @@ struct MacSearchAnythingLayer: View {
         } else if hasNoResults {
             VStack(spacing: 8) {
                 Image(systemName: "magnifyingglass.circle")
-                    .font(.system(size: 40))
+                    .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
                 Text("search_any_no_results".localized)
                     .foregroundColor(.secondary)
@@ -291,7 +291,7 @@ struct MacSearchAnythingLayer: View {
                     }
                 }
                 .frame(width: 28, height: 28)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius4))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(DisplayScriptNormalizer.display(song.title)).lineLimit(1)
@@ -327,7 +327,7 @@ struct MacSearchAnythingLayer: View {
     }
 
     private var placeholderCover: some View {
-        RoundedRectangle(cornerRadius: 4)
+        RoundedRectangle(cornerRadius: DesignTokens.radius4)
             .fill(Color.gray.opacity(0.18))
             .overlay {
                 Image(systemName: "music.note")
@@ -362,7 +362,7 @@ struct MacSearchAnythingLayer: View {
     private var emptyHint: some View {
         VStack(spacing: 8) {
             Image(systemName: "sparkle.magnifyingglass")
-                .font(.system(size: 36))
+                .font(.system(size: DesignTokens.font36))
                 .foregroundColor(.secondary)
             Text("search_any_empty_hint".localized)
                 .font(.callout)

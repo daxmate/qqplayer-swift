@@ -64,7 +64,7 @@ struct EQSettingsView: View {
                             if eqManager.currentPreset?.id == preset.id {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.blue)
-                                    .font(.system(size: 20))
+                                    .font(.system(size: DesignTokens.font20))
                             }
                         }
                         .contentShape(Rectangle())
@@ -130,7 +130,7 @@ struct EQSettingsView: View {
                             if eqManager.currentPreset?.id == preset.id {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.blue)
-                                    .font(.system(size: 20))
+                                    .font(.system(size: DesignTokens.font20))
                             }
                         }
                         .contentShape(Rectangle())
@@ -204,7 +204,7 @@ struct EQSettingsView: View {
                         .padding(.vertical, 4)
                         .padding(.horizontal, 8)
                         .background(Color(.systemGray6))
-                        .cornerRadius(4)
+                        .cornerRadius(DesignTokens.radius4)
 
                     Text(Localized.frequencyGainPairDescription)
                         .font(.caption)
@@ -255,7 +255,7 @@ struct EQSettingsView: View {
                 .padding(.vertical, 8)
                 .background(isSelected ? Color.blue : Color(.systemGray6))
                 .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(8)
+                .cornerRadius(DesignTokens.radius8)
         }
         .buttonStyle(.plain)
     }

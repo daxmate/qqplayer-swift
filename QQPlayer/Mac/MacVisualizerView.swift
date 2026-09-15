@@ -10,8 +10,10 @@
 import SwiftUI
 
 /// 播放页频谱条（数据源 MacSpectrumAnalyzer.shared；无数据/未激活时不绘制）。
-/// 颜色跟随设置强调色（web 版强调色语义）：Color.accentColor 在 macOS 上跟随
-/// 系统强调色而非 App tint，故直接读 MacAppearance.accentColor(forKey:)（2026-09-05）。
+/// 颜色跟随设置强调色（web 版强调色语义）：`Color.accentColor` 在 macOS 上跟随
+/// 系统强调色而非 App tint，故读 `MacAppearance.currentAccentColor`（唯一读取入口；
+/// 2026-09-05 改为直读 MacAppearance，2026-09-15 M2 收口为 currentAccentColor，
+/// 不再自读 `DeleteSettings.accentColorName`）。
 ///
 /// ⚠️ 重绘驱动（2026-09-12 修「播放中频谱条恒为最低高度、贴成一条虚线」）：
 /// 2026-09-08 曾把数据订阅换成「直读 levels + TimelineView(.animation) 驱动」，
@@ -26,10 +28,9 @@ struct MacVisualizerView: View {
     @State private var isActive = false
     /// 当前频谱数据（~30fps 发布；作为绘制输入，数据驱动重绘）
     @State private var levels: [Float] = []
-    /// 当前强调色（设置页改动经 qqplayerSettingsDidChange 刷新）
-    @State private var accentColor: Color = MacAppearance.accentColor(
-        forKey: DeleteSettings.load().accentColorName
-    )
+    /// 当前强调色（唯一读取入口 MacAppearance.currentAccentColor；设置页改动经
+    /// qqplayerSettingsDidChange 刷新）
+    @State private var accentColor: Color = MacAppearance.currentAccentColor
 
     var body: some View {
         Group {
@@ -46,7 +47,7 @@ struct MacVisualizerView: View {
             levels = MacSpectrumAnalyzer.shared.levels
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
-            accentColor = MacAppearance.accentColor(forKey: DeleteSettings.load().accentColorName)
+            accentColor = MacAppearance.currentAccentColor
         }
     }
 

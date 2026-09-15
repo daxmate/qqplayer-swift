@@ -223,7 +223,7 @@ struct MacTagEditorView: View {
         Group {
             switch coverState {
             case .keep:
-                MacArtworkThumbnail(track: track, size: 132, cornerRadius: 10)
+                MacArtworkThumbnail(track: track, size: 132, cornerRadius: DesignTokens.radius10)
             case .replace(let data):
                 if let image = NSImage(data: data) {
                     Image(nsImage: image)
@@ -237,19 +237,19 @@ struct MacTagEditorView: View {
             }
         }
         .frame(width: 132, height: 132)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius10))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: DesignTokens.radius10)
                 .strokeBorder(Color.gray.opacity(0.25), lineWidth: 1)
         )
     }
 
     private var placeholderCover: some View {
-        RoundedRectangle(cornerRadius: 10)
+        RoundedRectangle(cornerRadius: DesignTokens.radius10)
             .fill(Color.gray.opacity(0.15))
             .overlay {
                 Image(systemName: "music.note")
-                    .font(.system(size: 40))
+                    .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
             }
     }
@@ -351,7 +351,7 @@ struct MacTagEditorView: View {
             if neteaseCandidates.isEmpty && musicbrainzCandidates.isEmpty {
                 VStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 22))
+                        .font(.system(size: DesignTokens.font22))
                         .foregroundColor(.secondary)
                     Text("tag_editor_no_candidates".localized)
                         .font(.callout)

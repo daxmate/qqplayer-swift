@@ -50,7 +50,7 @@ struct GraphicEQImportView: View {
                             .foregroundColor(.secondary)
                             .padding(8)
                             .background(Color(.systemGray6))
-                            .cornerRadius(4)
+                            .cornerRadius(DesignTokens.radius4)
 
                         Text(Localized.frequencyGainPair)
                             .font(.caption)

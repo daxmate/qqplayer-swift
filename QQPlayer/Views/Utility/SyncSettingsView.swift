@@ -270,7 +270,7 @@ struct SyncSettingsView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Image(systemName: presentation.symbol)
-                    .font(.system(size: 20))
+                    .font(.system(size: DesignTokens.font20))
                     .foregroundStyle(passiveSync.state.isConnected ? Color.green : Color.secondary)
                     .frame(width: 26)
 
@@ -342,7 +342,7 @@ struct SyncSettingsView: View {
     private func hostRow(_ device: PeerDevice) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "macpro.gen3")
-                .font(.system(size: 20))
+                .font(.system(size: DesignTokens.font20))
                 .foregroundStyle(.secondary)
                 .frame(width: 26)
 

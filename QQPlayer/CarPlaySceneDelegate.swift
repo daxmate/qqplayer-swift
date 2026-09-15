@@ -443,7 +443,7 @@ private func resizeImageForCarPlay(_ image: UIImage, rounded: Bool = false) -> U
     let renderer = UIGraphicsImageRenderer(size: targetSize)
     return renderer.image { _ in
         if rounded {
-            let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: targetSize), cornerRadius: 8)
+            let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: targetSize), cornerRadius: DesignTokens.radius8)
             path.addClip()
         }
 
@@ -494,7 +494,7 @@ private func createPlaylistCollageImage(from artworks: [UIImage]) -> UIImage? {
 
     let renderer = UIGraphicsImageRenderer(size: targetSize)
     return renderer.image { _ in
-        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: targetSize), cornerRadius: 8)
+        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: targetSize), cornerRadius: DesignTokens.radius8)
         path.addClip()
 
         UIColor.systemGray5.setFill()
@@ -517,7 +517,7 @@ private func createPlaceholderImage(systemName: String = "music.note") -> UIImag
     let renderer = UIGraphicsImageRenderer(size: size)
 
     return renderer.image { _ in
-        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8)
+        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: DesignTokens.radius8)
         UIColor.systemGray5.setFill()
         path.fill()
 

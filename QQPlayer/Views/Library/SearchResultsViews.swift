@@ -37,6 +37,8 @@ struct SearchResults {
 }
 
 struct SearchResultsView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let results: SearchResults
     let selectedCategory: SearchCategory
     let allTracks: [Track]
@@ -72,7 +74,7 @@ struct SearchResultsView: View {
         if results.isEmpty {
             VStack(spacing: 16) {
                 Image(systemName: "magnifyingglass.circle")
-                    .font(.system(size: 40))
+                    .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
 
                 Text(Localized.noResultsFound)
@@ -101,7 +103,7 @@ struct SearchResultsView: View {
                                     artistName: artistDisplayNameCache[track.stableId] ?? track.artistId.flatMap { artistNameCache[$0] },
                                     onDismiss: onDismiss
                                 )
-                                .shadow(color: settings.backgroundColorChoice.color.opacity(0.15), radius: 4, x: 0, y: 2)
+                                .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
                                 .padding(.horizontal, 16)
                             }
                         }
@@ -123,11 +125,11 @@ struct SearchResultsView: View {
                                     onNavigate: onNavigateToAlbum
                                 )
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                         .fill(.ultraThinMaterial)
                                         .opacity(0.7)
                                 )
-                                .shadow(color: settings.backgroundColorChoice.color.opacity(0.15), radius: 4, x: 0, y: 2)
+                                .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
                                 .padding(.horizontal, 16)
                             }
                         }
@@ -149,11 +151,11 @@ struct SearchResultsView: View {
                                         onNavigate: onNavigateToArtist
                                     )
                                     .background(
-                                        RoundedRectangle(cornerRadius: 12)
+                                        RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                             .fill(.ultraThinMaterial)
                                             .opacity(0.7)
                                     )
-                                    .shadow(color: settings.backgroundColorChoice.color.opacity(0.15), radius: 4, x: 0, y: 2)
+                                    .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
                                     .padding(.horizontal, 16)
 
                                     // Show this artist's albums below
@@ -183,11 +185,11 @@ struct SearchResultsView: View {
                                     onNavigate: onNavigateToPlaylist
                                 )
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                         .fill(.ultraThinMaterial)
                                         .opacity(0.7)
                                 )
-                                .shadow(color: settings.backgroundColorChoice.color.opacity(0.15), radius: 4, x: 0, y: 2)
+                                .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
                                 .padding(.horizontal, 16)
                             }
                         }
@@ -213,6 +215,8 @@ struct SearchResultsView: View {
 }
 
 struct SearchSongRowView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let track: Track
     let allTracks: [Track]
     let artistName: String?
@@ -243,10 +247,10 @@ struct SearchSongRowView: View {
                 // Left side - Play Next bubble (appears on right swipe)
                 if swipeOffset > 0 {
                     Image(systemName: "text.line.first.and.arrowtriangle.forward")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: DesignTokens.font14, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 36, height: 36)
-                        .background(settings.backgroundColorChoice.color)
+                        .background(accentColor)
                         .clipShape(Circle())
                         .opacity(min(Double(swipeOffset) / swipeThreshold, 1.0))
                         .scaleEffect(min(Double(swipeOffset) / swipeThreshold, 1.0))
@@ -258,7 +262,7 @@ struct SearchSongRowView: View {
                 // Right side - Add to Queue bubble (appears on left swipe)
                 if swipeOffset < 0 {
                     Image(systemName: "text.append")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: DesignTokens.font14, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 36, height: 36)
                         .background(.blue)
@@ -279,17 +283,17 @@ struct SearchSongRowView: View {
                                 .resizable().scaledToFill()
                         } else {
                             Image(systemName: "music.note")
-                                .font(.system(size: 16))
-                                .foregroundColor(settings.backgroundColorChoice.color)
+                                .font(.system(size: DesignTokens.font16))
+                                .foregroundColor(accentColor)
                         }
                     }
                     .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius6))
                     .background(Color(.systemGray5))
 
                     if isCurrentlyPlaying {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(settings.backgroundColorChoice.color, lineWidth: 1.5)
+                        RoundedRectangle(cornerRadius: DesignTokens.radius6)
+                            .stroke(accentColor, lineWidth: 1.5)
                             .frame(width: 40, height: 40)
                     }
                 }
@@ -298,7 +302,7 @@ struct SearchSongRowView: View {
                     Text(track.displayTitle)
                         .font(.body)
                         .fontWeight(.medium)
-                        .foregroundColor(isCurrentlyPlaying ? settings.backgroundColorChoice.color : .primary)
+                        .foregroundColor(isCurrentlyPlaying ? accentColor : .primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .multilineTextAlignment(.leading)
@@ -306,7 +310,7 @@ struct SearchSongRowView: View {
                     if let artistName, !artistName.isEmpty {
                         Text(artistName)
                             .font(.caption)
-                            .foregroundColor(isCurrentlyPlaying ? settings.backgroundColorChoice.color.opacity(0.8) : .secondary)
+                            .foregroundColor(isCurrentlyPlaying ? accentColor.opacity(0.8) : .secondary)
                     }
                 }
 
@@ -317,7 +321,7 @@ struct SearchSongRowView: View {
                     let eqKey = "\(playerEngine.isPlaying && isCurrentlyPlaying)-\(playerEngine.currentTrack?.stableId ?? "")"
 
                     EqualizerBarsExact(
-                        color: settings.backgroundColorChoice.color,
+                        color: accentColor,
                         isActive: playerEngine.isPlaying && isCurrentlyPlaying,
                         isLarge: false,
                         trackId: playerEngine.currentTrack?.stableId
@@ -334,7 +338,7 @@ struct SearchSongRowView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(.ultraThinMaterial)
                     .opacity(0.7)
             )
@@ -430,7 +434,7 @@ struct SearchSongRowView: View {
         }
         .sheet(isPresented: $showPlaylistDialog) {
             PlaylistSelectionView(track: track)
-                .accentColor(settings.backgroundColorChoice.color)
+                .accentColor(accentColor)
         }
         .alert(Localized.deleteFile, isPresented: $showDeleteConfirmation) {
             Button(Localized.delete, role: .destructive) {
@@ -587,7 +591,7 @@ struct SearchArtistAlbumsRow: View {
         var body: some View {
             VStack(spacing: 4) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius6)
                         .fill(Color(.systemGray5))
                         .frame(width: 80, height: 80)
 
@@ -595,7 +599,7 @@ struct SearchArtistAlbumsRow: View {
                         Image(uiImage: image)
                             .resizable().scaledToFill()
                             .frame(width: 80, height: 80)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius6))
                     } else {
                         Image(systemName: "opticaldisc.fill")
                             .font(.title3)
@@ -648,12 +652,12 @@ struct SearchAlbumRowView: View {
                             .resizable().scaledToFill()
                     } else {
                         Image(systemName: "opticaldisc.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: DesignTokens.font20))
                             .foregroundColor(.orange)
                     }
                 }
                 .frame(width: 40, height: 40)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius6))
                 .background(Color(.systemGray5))
 
                 VStack(alignment: .leading, spacing: 4) {

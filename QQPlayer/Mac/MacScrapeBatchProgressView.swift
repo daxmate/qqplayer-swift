@@ -66,7 +66,7 @@ struct MacScrapeBatchProgressView: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: libraryMode ? "books.vertical" : "tag")
-                .font(.system(size: 15))
+                .font(.system(size: DesignTokens.font15))
                 .foregroundColor(appAccentColor)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 3) {
@@ -119,7 +119,7 @@ struct MacScrapeBatchProgressView: View {
     private func hintPane(icon: String, text: String, color: Color) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 26))
+                .font(.system(size: DesignTokens.font26))
                 .foregroundColor(color)
             Text(text)
                 .font(.callout)
@@ -147,7 +147,7 @@ struct MacScrapeBatchProgressView: View {
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 8)
-        .background(Color.gray.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+        .background(Color.gray.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
     }
 
     private func statusIcon(_ status: String) -> some View {
@@ -166,7 +166,7 @@ struct MacScrapeBatchProgressView: View {
         }
         return Image(systemName: icon)
             .foregroundColor(color)
-            .font(.system(size: 13))
+            .font(.system(size: DesignTokens.font13))
             .padding(.top, 1)
     }
 

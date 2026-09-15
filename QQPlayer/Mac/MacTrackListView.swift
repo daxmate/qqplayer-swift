@@ -98,7 +98,7 @@ struct MacTrackListView: View {
         if tracks.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "music.note.list")
-                    .font(.system(size: 44))
+                    .font(.system(size: DesignTokens.font44))
                     .foregroundColor(.secondary)
                 Text("library_empty".localized)
                     .font(.title3)

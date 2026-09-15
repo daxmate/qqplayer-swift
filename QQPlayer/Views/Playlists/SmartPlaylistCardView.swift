@@ -69,14 +69,14 @@ struct SmartPlaylistCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Artwork area, matching PlaylistCardView's square artwork geometry.
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color.gray.opacity(0.2))
                     .aspectRatio(1, contentMode: .fit)
 
                 switch SmartPlaylistUILogic.coverLayout(artworkCount: artworks.count) {
                 case .icon:
                     Image(systemName: SmartPlaylistUILogic.iconName(for: info.kind))
-                        .font(.system(size: 40))
+                        .font(.system(size: DesignTokens.font40))
                         .foregroundColor(.secondary)
                 case .single:
                     GeometryReader { geometry in
@@ -98,8 +98,8 @@ struct SmartPlaylistCardView: View {
                     }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
 
             // Text info
             VStack(alignment: .leading, spacing: 2) {

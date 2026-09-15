@@ -53,7 +53,7 @@
         var body: some View {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous)
                         .fill(.regularMaterial)
                     Image(systemName: "music.note.list")
                         .font(.title3)

@@ -46,7 +46,7 @@ struct MacMiniPlayerView: View {
             Button {
                 DesktopWindowsManager.shared.showMainWindow()
             } label: {
-                MacArtworkThumbnail(track: player.currentTrack, size: 76, cornerRadius: 8)
+                MacArtworkThumbnail(track: player.currentTrack, size: 76, cornerRadius: DesignTokens.radius8)
             }
             .buttonStyle(.plain)
             .onHover { hovering in
@@ -60,12 +60,12 @@ struct MacMiniPlayerView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(player.currentTrack?.displayTitle ?? "mini_window_no_track".localized)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: DesignTokens.font13, weight: .semibold))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Text(artistName)
-                            .font(.system(size: 11))
+                            .font(.system(size: DesignTokens.font11))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
@@ -128,9 +128,9 @@ struct MacMiniPlayerView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
         .task(id: player.currentTrack?.stableId) {

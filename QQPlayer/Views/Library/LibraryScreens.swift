@@ -3,6 +3,8 @@ import GRDB
 import SwiftUI
 
 struct AllSongsScreen: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let tracks: [Track]
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var settings = DeleteSettings.load()
@@ -18,7 +20,7 @@ struct AllSongsScreen: View {
                         shuffleAllSongs()
                     } label: {
                         Image(systemName: "shuffle")
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .foregroundColor(accentColor)
                     }
                     .disabled(tracks.isEmpty)
                 }
@@ -38,6 +40,8 @@ struct AllSongsScreen: View {
 }
 
 struct LikedSongsScreen: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let allTracks: [Track]
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var likedTracks: [Track] = []
@@ -54,7 +58,7 @@ struct LikedSongsScreen: View {
                         shuffleLikedSongs()
                     } label: {
                         Image(systemName: "shuffle")
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .foregroundColor(accentColor)
                     }
                     .disabled(likedTracks.isEmpty)
                 }

@@ -17,6 +17,8 @@ import SwiftUI
 /// Supplies the selection toolbar, the "add to playlist" sheet and the delete
 /// confirmation for a list that supports multi-select.
 struct TrackBulkActionsModifier: ViewModifier {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     /// Candidates for "Select All" - the tracks currently shown by the list.
     let tracks: [Track]
     @Binding var isBulkMode: Bool
@@ -35,7 +37,7 @@ struct TrackBulkActionsModifier: ViewModifier {
                 if isBulkMode {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(Localized.cancel) { exitBulkMode() }
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .foregroundColor(accentColor)
                     }
 
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -64,7 +66,7 @@ struct TrackBulkActionsModifier: ViewModifier {
                         } label: {
                             Image(systemName: "ellipsis.circle")
                                 .font(.title3)
-                                .foregroundColor(settings.backgroundColorChoice.color)
+                                .foregroundColor(accentColor)
                                 .padding(4)
                                 .contentShape(Rectangle())
                         }
@@ -78,7 +80,7 @@ struct TrackBulkActionsModifier: ViewModifier {
                     trackIds: Array(selectedTracks),
                     onComplete: { exitBulkMode() }
                 )
-                .accentColor(settings.backgroundColorChoice.color)
+                .accentColor(accentColor)
             }
             .alert(Localized.deleteFilesConfirmation, isPresented: $showDeleteConfirmation) {
                 Button(Localized.delete, role: .destructive) { bulkDelete() }
@@ -158,7 +160,8 @@ extension View {
 /// including a full-size tap target on the checkmark itself.
 struct TrackSelectionIndicator: View {
     let isSelected: Bool
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
     var onTap: (() -> Void)?
 
     var body: some View {

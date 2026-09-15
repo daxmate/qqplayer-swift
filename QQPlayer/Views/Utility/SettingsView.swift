@@ -79,7 +79,7 @@ struct SettingsView: View {
 
                                         if deleteSettings.backgroundColorChoice == color {
                                             Image(systemName: "checkmark")
-                                                .font(.system(size: 16, weight: .bold))
+                                                .font(.system(size: DesignTokens.font16, weight: .bold))
                                                 .foregroundColor(.white)
                                         }
                                     }
@@ -99,7 +99,7 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "slider.horizontal.3")
                                 .foregroundColor(.blue)
-                                .font(.system(size: 20))
+                                .font(.system(size: DesignTokens.font20))
                             Text(Localized.graphicEqualizer)
                         }
                     }
@@ -193,7 +193,7 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "arrow.triangle.2.circlepath")
                                 .foregroundColor(.blue)
-                                .font(.system(size: 20))
+                                .font(.system(size: DesignTokens.font20))
                             Text("sync_settings_entry".localized)
                         }
                     }
@@ -263,7 +263,7 @@ struct SettingsView: View {
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .foregroundColor(.secondary)
-                                .font(.system(size: 16))
+                                .font(.system(size: DesignTokens.font16))
                         }
                         .contentShape(Rectangle()) // Make entire area tappable
                     }

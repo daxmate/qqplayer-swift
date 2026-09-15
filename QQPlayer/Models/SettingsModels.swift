@@ -89,13 +89,8 @@ enum BackgroundColor: String, CaseIterable, Codable {
     }
 
     var color: Color {
-        #if os(iOS)
-            return Color(hex: self.rawValue)
-        #else
-            // Color(hex:) lives in an iOS Views file; macOS UI batch will bring
-            // its own hex color helper. Fall back to a plain SwiftUI Color.
-            return Color(red: 0.5, green: 0.5, blue: 0.5)
-        #endif
+        // hex 解析走全仓唯一入口 Color(hex:)（Models/AppearanceTheme.swift，2026-09-15 M3 收口）
+        Color(hex: rawValue)
     }
 }
 

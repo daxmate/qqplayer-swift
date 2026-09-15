@@ -13,7 +13,7 @@ struct PlaylistManagementView: View {
                 if playlists.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "music.note.list")
-                            .font(.system(size: 40))
+                            .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)
 
                         Text(Localized.noPlaylistsYet)

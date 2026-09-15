@@ -20,6 +20,8 @@ extension View {
 }
 
 struct LibraryView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let tracks: [Track]
     @Binding var showTutorial: Bool
     @Binding var showPlaylistManagement: Bool
@@ -214,7 +216,7 @@ struct LibraryView: View {
                     title: Localized.allSongs,
                     subtitle: Localized.songsCountOnly(tracks.count),
                     icon: "music.note",
-                    color: settings.backgroundColorChoice.color
+                    color: accentColor
                 )
             }
             .buttonStyle(PlainButtonStyle())
@@ -301,14 +303,14 @@ struct LibraryView: View {
 
                             Text("\(Localized.processing): \(libraryIndexer.currentlyProcessing)")
                                 .font(.caption2)
-                                .foregroundColor(settings.backgroundColorChoice.color)
+                                .foregroundColor(accentColor)
                                 .lineLimit(1)
 
                             Spacer()
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
-                        .background(settings.backgroundColorChoice.color.opacity(0.05))
+                        .background(accentColor.opacity(0.05))
                     }
 
                     // Large section rows
@@ -321,7 +323,7 @@ struct LibraryView: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(width: 32, height: 32)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8))
 
                                     Text(Localized.library)
                                         .responsiveLibraryTitleFont()
@@ -352,11 +354,11 @@ struct LibraryView: View {
                                                 if isRefreshing {
                                                     ProgressView()
                                                         .scaleEffect(0.8)
-                                                        .progressViewStyle(CircularProgressViewStyle(tint: settings.backgroundColorChoice.color))
+                                                        .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
                                                 } else {
                                                     Image(systemName: "arrow.clockwise")
-                                                        .font(.system(size: 26, weight: .medium))
-                                                        .foregroundColor(settings.backgroundColorChoice.color)
+                                                        .font(.system(size: DesignTokens.font26, weight: .medium))
+                                                        .foregroundColor(accentColor)
                                                 }
                                             }
                                             .padding(.bottom, 4)
@@ -371,8 +373,8 @@ struct LibraryView: View {
                                         showSearch = true
                                     }) {
                                         Image(systemName: "magnifyingglass")
-                                            .font(.system(size: 26, weight: .medium))
-                                            .foregroundColor(settings.backgroundColorChoice.color)
+                                            .font(.system(size: DesignTokens.font26, weight: .medium))
+                                            .foregroundColor(accentColor)
                                     }
 
                                     // Settings button
@@ -380,8 +382,8 @@ struct LibraryView: View {
                                         showSettings = true
                                     }) {
                                         Image(systemName: "gearshape")
-                                            .font(.system(size: 26, weight: .medium))
-                                            .foregroundColor(settings.backgroundColorChoice.color)
+                                            .font(.system(size: DesignTokens.font26, weight: .medium))
+                                            .foregroundColor(accentColor)
                                     }
                                 }
                             }
@@ -508,15 +510,15 @@ struct LibraryView: View {
                         HStack {
                             Image(systemName: syncToastIcon)
                                 .foregroundColor(syncToastColor)
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: DesignTokens.font16, weight: .medium))
                             Text(syncToastMessage)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: DesignTokens.font14, weight: .medium))
                                 .foregroundColor(.primary)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                 .fill(.regularMaterial)
                                 .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 6)
                         )
@@ -543,7 +545,7 @@ struct LibraryView: View {
                     searchPlaylistToNavigate = playlist
                 }
             )
-            .accentColor(settings.backgroundColorChoice.color)
+            .accentColor(accentColor)
         }
         .sheet(isPresented: $showMusicPicker) {
             MusicFilePicker { urls in
@@ -577,6 +579,8 @@ struct LibraryView: View {
 }
 
 struct LibrarySectionRowView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let title: String
     let subtitle: String
     let icon: String
@@ -588,17 +592,17 @@ struct LibrarySectionRowView: View {
             // Icon
             if settings.minimalistIcons {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .medium))
+                    .font(.system(size: DesignTokens.font24, weight: .medium))
                     .foregroundColor(.primary)
                     .frame(width: 60, height: 60)
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius12)
                         .fill(color.opacity(0.2))
                         .frame(width: 60, height: 60)
 
                     Image(systemName: icon)
-                        .font(.system(size: 24, weight: .medium))
+                        .font(.system(size: DesignTokens.font24, weight: .medium))
                         .foregroundColor(color)
                 }
             }
@@ -625,12 +629,12 @@ struct LibrarySectionRowView: View {
         .padding(.vertical, 16)
         .background(
             // Glassy background that reflects gradient
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.radius12)
                 .fill(.ultraThinMaterial)
                 .opacity(0.8)
         )
-        .cornerRadius(12)
-        .shadow(color: settings.backgroundColorChoice.color.opacity(0.15), radius: 4, x: 0, y: 2)
+        .cornerRadius(DesignTokens.radius12)
+        .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
         }

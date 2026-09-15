@@ -59,6 +59,8 @@ struct ScreenSpecificBackgroundView: View {
 }
 
 struct BackgroundTextureView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let design: BackgroundDesign
     @State private var settings = DeleteSettings.load()
 
@@ -129,7 +131,7 @@ struct BackgroundTextureView: View {
                     path.addLine(to: CGPoint(x: extendedStart.x - perpX, y: extendedStart.y - perpY))
                     path.closeSubpath()
                 }
-                .fill(settings.backgroundColorChoice.color.opacity(0.6))
+                .fill(accentColor.opacity(0.6))
                 .blur(radius: 60)
                 .opacity(0.5)
             }
@@ -175,7 +177,7 @@ struct BackgroundTextureView: View {
                     path.addLine(to: CGPoint(x: extendedStart.x - perpX, y: extendedStart.y - perpY))
                     path.closeSubpath()
                 }
-                .fill(settings.backgroundColorChoice.color.opacity(0.6))
+                .fill(accentColor.opacity(0.6))
                 .blur(radius: 60)
                 .opacity(0.5)
             }
@@ -221,7 +223,7 @@ struct BackgroundTextureView: View {
                     path.addLine(to: CGPoint(x: extendedStart.x - perpX, y: extendedStart.y - perpY))
                     path.closeSubpath()
                 }
-                .fill(settings.backgroundColorChoice.color.opacity(0.6))
+                .fill(accentColor.opacity(0.6))
                 .blur(radius: 60)
                 .opacity(0.5)
             }
@@ -267,7 +269,7 @@ struct BackgroundTextureView: View {
                     path.addLine(to: CGPoint(x: extendedStart.x - perpX, y: extendedStart.y - perpY))
                     path.closeSubpath()
                 }
-                .fill(settings.backgroundColorChoice.color.opacity(0.6))
+                .fill(accentColor.opacity(0.6))
                 .blur(radius: 60)
                 .opacity(0.5)
             }
@@ -304,9 +306,9 @@ struct BackgroundTextureView: View {
                     LinearGradient(
                         colors: [
                             Color.clear,
-                            settings.backgroundColorChoice.color.opacity(0.15),
-                            settings.backgroundColorChoice.color.opacity(0.25),
-                            settings.backgroundColorChoice.color.opacity(0.15),
+                            accentColor.opacity(0.15),
+                            accentColor.opacity(0.25),
+                            accentColor.opacity(0.15),
                             Color.clear,
                         ],
                         startPoint: .leading,
@@ -318,8 +320,8 @@ struct BackgroundTextureView: View {
                 // Complementary radial accent - top right
                 RadialGradient(
                     gradient: Gradient(stops: [
-                        .init(color: settings.backgroundColorChoice.color.opacity(0.2), location: 0.0),
-                        .init(color: settings.backgroundColorChoice.color.opacity(0.08), location: 0.5),
+                        .init(color: accentColor.opacity(0.2), location: 0.0),
+                        .init(color: accentColor.opacity(0.08), location: 0.5),
                         .init(color: Color.clear, location: 1.0),
                     ]),
                     center: UnitPoint(x: 0.85, y: 0.15),
@@ -332,7 +334,7 @@ struct BackgroundTextureView: View {
                     gradient: Gradient(stops: [
                         .init(color: Color.clear, location: 0.0),
                         .init(color: Color.clear, location: 0.8),
-                        .init(color: settings.backgroundColorChoice.color.opacity(0.08), location: 1.0),
+                        .init(color: accentColor.opacity(0.08), location: 1.0),
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
@@ -349,7 +351,7 @@ struct BackgroundTextureView: View {
                 // Soft mesh-like gradient pattern
                 EllipticalGradient(
                     gradient: Gradient(colors: [
-                        settings.backgroundColorChoice.color.opacity(0.06),
+                        accentColor.opacity(0.06),
                         Color.clear,
                     ]),
                     center: UnitPoint(x: 0.2, y: 0.2),
@@ -359,7 +361,7 @@ struct BackgroundTextureView: View {
 
                 EllipticalGradient(
                     gradient: Gradient(colors: [
-                        settings.backgroundColorChoice.color.opacity(0.04),
+                        accentColor.opacity(0.04),
                         Color.clear,
                     ]),
                     center: UnitPoint(x: 0.8, y: 0.7),
@@ -377,13 +379,13 @@ struct BackgroundTextureView: View {
             ZStack {
                 // Single soft color wash
                 Rectangle()
-                    .fill(settings.backgroundColorChoice.color.opacity(0.03))
+                    .fill(accentColor.opacity(0.03))
                     .blur(radius: 100)
 
                 // Subtle top highlight
                 LinearGradient(
                     gradient: Gradient(stops: [
-                        .init(color: settings.backgroundColorChoice.color.opacity(0.08), location: 0.0),
+                        .init(color: accentColor.opacity(0.08), location: 0.0),
                         .init(color: Color.clear, location: 0.3),
                     ]),
                     startPoint: .top,

@@ -424,7 +424,7 @@ private struct ParametricEQGraphView: View {
                 .sorted { $0.point.x < $1.point.x }
 
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color(.secondarySystemBackground))
 
                 Path { path in

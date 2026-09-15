@@ -7,7 +7,8 @@ struct LyricMiniSection: View {
     @ObservedObject private var progress = PlayerEngine.shared.progress
     let lyrics: Lyrics?
     let isLoading: Bool
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
 
     /// 当前句 index（syncedLyrics 中）；还没到第一句时返回 0
     private var activeIndex: Int? {
@@ -83,6 +84,8 @@ struct LiveLyricsSheet: View {
 }
 
 struct MiniPlayerView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     @StateObject private var playerEngine = PlayerEngine.shared
     @StateObject private var artworkManager = ArtworkManager.shared
     @State private var isExpanded = false
@@ -98,7 +101,7 @@ struct MiniPlayerView: View {
                     HStack(spacing: 12) {
                         // Album artwork
                         ZStack {
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius8)
                                 .fill(Color.gray.opacity(0.2))
                                 .frame(width: 60, height: 60)
 
@@ -106,7 +109,7 @@ struct MiniPlayerView: View {
                                 Image(uiImage: artwork)
                                     .resizable().scaledToFill()
                                     .frame(width: 60, height: 60)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8))
                             } else {
                                 Image(systemName: "music.note")
                                     .font(.title2)
@@ -182,7 +185,7 @@ struct MiniPlayerView: View {
                     .padding(.vertical, 12)
                     .background(
                         // Very strong glassy background
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: DesignTokens.radius16)
                             .fill(.regularMaterial)
                             .opacity(0.98)
                     )
@@ -192,13 +195,12 @@ struct MiniPlayerView: View {
                             Spacer()
 
                             MiniPlayerProgressBar(
-                                duration: playerEngine.duration,
-                                accentColor: settings.backgroundColorChoice.color
+                                duration: playerEngine.duration
                             )
                         }
                     )
-                    .cornerRadius(16)
-                    .shadow(color: settings.backgroundColorChoice.color.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .cornerRadius(DesignTokens.radius16)
+                    .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
                     .padding(.horizontal, 12)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -208,7 +210,7 @@ struct MiniPlayerView: View {
                 .fullScreenCover(isPresented: $isExpanded) {
                     // 全屏播放页（2026-08-29：sheet 弹窗改全屏覆盖，无圆角/拖动条/背景露出）
                     PlayerView()
-                        .accentColor(settings.backgroundColorChoice.color)
+                        .accentColor(accentColor)
                 }
                 .task(id: playerEngine.currentTrack?.stableId) {
                     if let track = playerEngine.currentTrack {
@@ -249,7 +251,8 @@ struct MiniPlayerView: View {
 private struct MiniPlayerProgressBar: View {
     @ObservedObject private var progress = PlayerEngine.shared.progress
     let duration: TimeInterval
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
 
     private var fraction: CGFloat {
         guard duration > 0 else { return 0 }

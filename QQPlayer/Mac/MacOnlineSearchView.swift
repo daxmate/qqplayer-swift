@@ -201,7 +201,7 @@ struct MacOnlineSearchView: View {
         case .failed:
             VStack(spacing: 8) {
                 Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 30))
+                    .font(.system(size: DesignTokens.font30))
                     .foregroundColor(.secondary)
                 Text(errorMessage ?? "online_search_failed".localized)
                     .font(.callout)
@@ -214,7 +214,7 @@ struct MacOnlineSearchView: View {
             if results.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "music.note.list")
-                        .font(.system(size: 30))
+                        .font(.system(size: DesignTokens.font30))
                         .foregroundColor(.secondary)
                     Text("online_search_no_results".localized)
                         .foregroundColor(.secondary)
@@ -228,7 +228,7 @@ struct MacOnlineSearchView: View {
     private var idleView: some View {
         VStack(spacing: 10) {
             Image(systemName: "icloud.and.arrow.down")
-                .font(.system(size: 36))
+                .font(.system(size: DesignTokens.font36))
                 .foregroundColor(.secondary)
             Text("online_search_idle_hint".localized)
                 .font(.callout)
@@ -717,11 +717,11 @@ private struct MacOnlineResultRow: View {
             }
         }
         .frame(width: 34, height: 34)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius5))
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: 5)
+        RoundedRectangle(cornerRadius: DesignTokens.radius5)
             .fill(Color.gray.opacity(0.18))
             .overlay {
                 Image(systemName: "music.note")

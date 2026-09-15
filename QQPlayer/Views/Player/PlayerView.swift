@@ -15,6 +15,8 @@ private enum ArtworkSwipeDirection: Equatable {
 }
 
 struct PlayerView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     @StateObject private var playerEngine = PlayerEngine.shared
     @StateObject private var artworkManager = ArtworkManager.shared
     @EnvironmentObject private var appCoordinator: AppCoordinator
@@ -118,7 +120,6 @@ struct PlayerView: View {
             if showLyricsSearch, let currentTrack = playerEngine.currentTrack {
                 LyricsSearchView(
                     track: currentTrack,
-                    accentColor: settings.backgroundColorChoice.color,
                     onClose: {
                         withAnimation(.easeOut(duration: 0.26)) {
                             showLyricsSearch = false
@@ -243,7 +244,7 @@ struct PlayerView: View {
                                 Localized.hintPlaybackLine2,
                                 Localized.hintPlaybackLine3,
                             ],
-                            accentColor: settings.backgroundColorChoice.color,
+                            accentColor: accentColor,
                             onDismiss: {
                                 withAnimation(.easeOut(duration: 0.3)) {
                                     showHint = false
@@ -258,7 +259,6 @@ struct PlayerView: View {
 
                 CollapsiblePlayerControls(
                     duration: playerEngine.duration,
-                    accentColor: settings.backgroundColorChoice.color,
                     onSeek: { newTime in
                         Task {
                             await playerEngine.seek(to: newTime)
@@ -300,14 +300,14 @@ struct PlayerView: View {
         Group {
             if let currentTrack = playerEngine.currentTrack {
                 PlaylistSelectionView(track: currentTrack)
-                    .accentColor(settings.backgroundColorChoice.color)
+                    .accentColor(accentColor)
             }
         }
     }
 
     private var queueSheet: some View {
         QueueManagementView()
-            .accentColor(settings.backgroundColorChoice.color)
+            .accentColor(accentColor)
     }
 
     // MARK: - Artwork Section
@@ -374,7 +374,7 @@ struct PlayerView: View {
 
     private func currentArtworkView(size: CGFloat) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.radius12)
                 .fill(Color.gray.opacity(0.1))
                 .frame(width: size, height: size)
 
@@ -382,7 +382,7 @@ struct PlayerView: View {
                 Image(uiImage: artwork)
                     .resizable().scaledToFill()
                     .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
             } else {
                 Image(systemName: "music.note")
                     .font(.system(size: min(80, size * 0.2)))
@@ -393,7 +393,7 @@ struct PlayerView: View {
 
     private func adjacentArtworkView(artwork: UIImage?, size: CGFloat) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.radius12)
                 .fill(Color.gray.opacity(0.1))
                 .frame(width: size, height: size)
 
@@ -401,7 +401,7 @@ struct PlayerView: View {
                 Image(uiImage: artwork)
                     .resizable().scaledToFill()
                     .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
             } else {
                 Image(systemName: "music.note")
                     .font(.system(size: min(80, size * 0.2)))
@@ -725,8 +725,7 @@ struct PlayerView: View {
     private var lyricMiniSection: some View {
         LyricMiniSection(
             lyrics: currentLyrics,
-            isLoading: isLoadingLyrics,
-            accentColor: settings.backgroundColorChoice.color
+            isLoading: isLoadingLyrics
         )
         .padding(.horizontal, 8)
         // 点击进全屏歌词页（普通视图 + onTapGesture：与 DragGesture 仲裁标准，
@@ -792,7 +791,7 @@ struct PlayerView: View {
     private var emptyStateView: some View {
         VStack {
             Image(systemName: "music.note")
-                .font(.system(size: 60))
+                .font(.system(size: DesignTokens.font60))
                 .foregroundColor(.secondary)
 
             Text(Localized.noTrackSelected)

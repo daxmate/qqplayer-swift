@@ -25,11 +25,9 @@ struct FeatureGuideSection: Identifiable {
 }
 
 struct FeatureGuideView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     @State private var settings = DeleteSettings.load()
-
-    private var accentColor: Color {
-        settings.backgroundColorChoice.color
-    }
 
     private var sections: [FeatureGuideSection] {
         [
@@ -138,10 +136,10 @@ struct FeatureGuideView: View {
                     ForEach(section.items) { item in
                         HStack(alignment: .top, spacing: 14) {
                             Image(systemName: item.icon)
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.system(size: DesignTokens.font18, weight: .medium))
                                 .foregroundColor(accentColor)
                                 .frame(width: 28, height: 28)
-                                .background(accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                                .background(accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.title)

@@ -27,7 +27,7 @@ struct PlaylistCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Artwork area
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color.gray.opacity(0.2))
                     .aspectRatio(1, contentMode: .fit)
 
@@ -72,7 +72,7 @@ struct PlaylistCardView: View {
                         // Centered photo icon for changing cover
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                             Image(systemName: "photo")
-                                .font(.system(size: 32, weight: .light))
+                                .font(.system(size: DesignTokens.font32, weight: .light))
                                 .foregroundColor(.white)
                                 .frame(width: 64, height: 64)
                                 .background(Color.black.opacity(0.6))
@@ -117,12 +117,12 @@ struct PlaylistCardView: View {
                 } else {
                     // Default icon for empty playlist
                     Image(systemName: "music.note.list")
-                        .font(.system(size: 40))
+                        .font(.system(size: DesignTokens.font40))
                         .foregroundColor(.secondary)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
 
             // Text info
             VStack(alignment: .leading, spacing: 2) {

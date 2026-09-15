@@ -38,6 +38,9 @@ extension Notification.Name {
 
 /// macOS 同步中心（设置页「同步」分类 + 工具栏同步面板共用）。
 struct MacSyncCenterView: View {
+    /// App 强调色（读环境值，与主窗同源；macOS 上 `Color.accentColor` 跟随系统强调色而非
+    /// App tint——2026-09-05 已统一，本文件 2026-09-12 新增时复发，见 M1）
+    @Environment(\.appAccentColor) private var accentColor
     @State private var identity: SyncIdentity?
     @State private var identityError: String?
     @State private var qrPayload: PairQRPayload?
@@ -179,7 +182,7 @@ struct MacSyncCenterView: View {
         let selected = targetDeviceID == row.peerID
         return HStack(alignment: .top, spacing: 10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                .foregroundStyle(selected ? accentColor : Color.secondary)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -189,7 +192,7 @@ struct MacSyncCenterView: View {
                     if selected {
                         Text("sync_devices_target_badge".localized)
                             .font(.caption2)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(accentColor)
                     }
                 }
                 Text(row.shortCode)
@@ -207,8 +210,8 @@ struct MacSyncCenterView: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(selected ? Color.accentColor.opacity(0.12) : Color.clear)
+            RoundedRectangle(cornerRadius: DesignTokens.radius6)
+                .fill(selected ? accentColor.opacity(0.12) : Color.clear)
         )
         .contentShape(Rectangle())
         .onTapGesture { targetDeviceID = row.peerID }
@@ -251,12 +254,12 @@ struct MacSyncCenterView: View {
                             .resizable()
                             .frame(width: 168, height: 168)
                     } else {
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: DesignTokens.radius8)
                             .fill(.quaternary)
                             .frame(width: 168, height: 168)
                             .overlay(
                                 Image(systemName: "qrcode")
-                                    .font(.system(size: 40))
+                                    .font(.system(size: DesignTokens.font40))
                                     .foregroundStyle(.secondary)
                             )
                     }
@@ -307,7 +310,7 @@ struct MacSyncCenterView: View {
     private func deviceRow(_ device: PeerDevice) -> some View {
         HStack(spacing: 10) {
             Image(systemName: device.role == .host ? "macpro.gen3" : "iphone")
-                .font(.system(size: 18))
+                .font(.system(size: DesignTokens.font18))
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
 

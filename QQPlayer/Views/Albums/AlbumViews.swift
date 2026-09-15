@@ -79,7 +79,7 @@ private struct EmptyAlbumsView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "opticaldisc")
-                .font(.system(size: 40))
+                .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)
             Text(Localized.noAlbumsFound).font(.headline)
             Text(Localized.albumsWillAppear)
@@ -102,17 +102,17 @@ private struct AlbumCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Album artwork area with fixed aspect ratio
             GeometryReader { geometry in
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color.gray.opacity(0.15))
                     .overlay {
                         if let image = artworkImage {
                             Image(uiImage: image)
                                 .resizable().scaledToFill()
                                 .frame(width: geometry.size.width, height: geometry.size.width)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
                         } else {
                             Image(systemName: "music.note")
-                                .font(.system(size: 36))
+                                .font(.system(size: DesignTokens.font36))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -146,6 +146,8 @@ private struct AlbumCardView: View {
 
 // Album detail view reconstructed
 struct AlbumDetailScreen: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let album: Album
     let allTracks: [Track]
     @EnvironmentObject private var appCoordinator: AppCoordinator
@@ -204,7 +206,7 @@ struct AlbumDetailScreen: View {
                 VStack(spacing: 24) {
                     // Artwork + info
                     VStack(spacing: 16) {
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: DesignTokens.radius12)
                             .fill(Color.gray.opacity(0.2))
                             .frame(width: 250, height: 250)
                             .overlay {
@@ -212,10 +214,10 @@ struct AlbumDetailScreen: View {
                                     Image(uiImage: image)
                                         .resizable().scaledToFill()
                                         .frame(width: 250, height: 250)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
                                 } else {
                                     Image(systemName: "music.note")
-                                        .font(.system(size: 50))
+                                        .font(.system(size: DesignTokens.font50))
                                         .foregroundColor(.secondary)
                                 }
                             }
@@ -257,8 +259,8 @@ struct AlbumDetailScreen: View {
                                 .padding(.horizontal, 8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
-                                .background(settings.backgroundColorChoice.color)
-                                .cornerRadius(28)
+                                .background(accentColor)
+                                .cornerRadius(DesignTokens.radius28)
                             }
 
                             Button {
@@ -275,12 +277,12 @@ struct AlbumDetailScreen: View {
                                         .minimumScaleFactor(0.6)
                                 }
                                 .font(.title3.weight(.semibold))
-                                .foregroundColor(settings.backgroundColorChoice.color)
+                                .foregroundColor(accentColor)
                                 .padding(.horizontal, 8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
-                                .background(settings.backgroundColorChoice.color.opacity(0.1))
-                                .cornerRadius(28)
+                                .background(accentColor.opacity(0.1))
+                                .cornerRadius(DesignTokens.radius28)
                             }
                         }
                         .padding(.horizontal, 8)
@@ -321,7 +323,6 @@ struct AlbumDetailScreen: View {
                                         if isBulkMode {
                                             TrackSelectionIndicator(
                                                 isSelected: selectedTracks.contains(track.stableId),
-                                                accentColor: settings.backgroundColorChoice.color,
                                                 onTap: { toggleSelection(track) }
                                             )
                                             .padding(.leading)
@@ -441,6 +442,8 @@ struct AlbumDetailScreen: View {
 }
 
 struct AlbumTrackRowView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let track: Track
     let trackNumber: Int
     let artistName: String?
@@ -579,7 +582,7 @@ struct AlbumTrackRowView: View {
         }
         .sheet(isPresented: $showPlaylistDialog) {
             PlaylistSelectionView(track: track)
-                .accentColor(deleteSettings.backgroundColorChoice.color)
+                .accentColor(accentColor)
         }
         .alert(Localized.deleteFile, isPresented: $showDeleteConfirmation) {
             Button(Localized.delete, role: .destructive) {

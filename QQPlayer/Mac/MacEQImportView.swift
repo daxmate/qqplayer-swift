@@ -50,7 +50,7 @@ struct MacEQImportView: View {
                             .foregroundColor(.secondary)
                             .padding(8)
                             .background(Color.gray.opacity(0.15))
-                            .cornerRadius(4)
+                            .cornerRadius(DesignTokens.radius4)
 
                         Text(Localized.frequencyGainPair)
                             .font(.caption)

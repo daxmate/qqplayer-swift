@@ -18,7 +18,7 @@ struct EqualizerBarsExact: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 1) {
             ForEach(0 ..< 4, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 0.5)
+                RoundedRectangle(cornerRadius: DesignTokens.radius0_5)
                     .fill(color)
                     .frame(width: isLarge ? 2 : 1.5)
                     .frame(height: isActive && kick ? targetH[i] : minH)
@@ -46,39 +46,15 @@ struct EqualizerBarsExact: View {
     }
 }
 
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
+// hex→Color 解析已收口到 Models/AppearanceTheme.swift 的 `Color(hex:)`（全仓唯一实现，2026-09-15 M3）
 
 /// Owns the fast-changing progress observation so the complete PlayerView
 /// (artwork, sheets and controls) is not recomputed four times per second.
 struct PlayerProgressSection: View {
     @ObservedObject private var progress = PlayerEngine.shared.progress
     let duration: TimeInterval
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
     let onSeek: (TimeInterval) -> Void
 
     private var fraction: Double {
@@ -92,8 +68,7 @@ struct PlayerProgressSection: View {
         VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 12 : 16) {
             InteractiveProgressBar(
                 progress: fraction,
-                onSeek: { onSeek($0 * duration) },
-                accentColor: accentColor
+                onSeek: { onSeek($0 * duration) }
             )
             .frame(height: 1)
 
@@ -123,7 +98,8 @@ struct PlayerProgressSection: View {
 struct InteractiveProgressBar: View {
     let progress: Double
     let onSeek: (Double) -> Void
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
 
     @State private var isDragging = false
     @State private var dragProgress: Double = 0
@@ -136,12 +112,12 @@ struct InteractiveProgressBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background track
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: DesignTokens.radius2)
                     .fill(Color.gray.opacity(0.3))
                     .frame(height: 4)
 
                 // Progress fill
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: DesignTokens.radius2)
                     .fill(accentColor)
                     .frame(width: geometry.size.width * displayProgress, height: 4)
 

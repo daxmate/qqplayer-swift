@@ -28,6 +28,8 @@ struct TutorialView: View {
 }
 
 struct MusicFilesStepView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     @ObservedObject var viewModel: TutorialViewModel
     @Environment(\.dismiss) private var dismiss
     var onComplete: (() -> Void)?
@@ -39,8 +41,8 @@ struct MusicFilesStepView: View {
                 Spacer(minLength: 20)
 
                 Image(systemName: "music.note")
-                    .font(.system(size: 70))
-                    .foregroundColor(settings.backgroundColorChoice.color)
+                    .font(.system(size: DesignTokens.font70))
+                    .foregroundColor(accentColor)
 
                 VStack(spacing: 12) {
                     Text(Localized.addYourMusic)
@@ -116,6 +118,8 @@ struct MusicFilesStepView: View {
 }
 
 struct InstructionRow: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let step: String
     let title: String
     let description: String
@@ -128,7 +132,7 @@ struct InstructionRow: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(settings.backgroundColorChoice.color))
+                .background(Circle().fill(accentColor))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)

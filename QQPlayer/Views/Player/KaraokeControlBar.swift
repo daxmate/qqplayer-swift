@@ -18,7 +18,8 @@ struct KaraokeControlBar: View {
     @ObservedObject private var karaoke = KaraokeController.shared
     @ObservedObject private var progress = PlayerEngine.shared.progress
     @ObservedObject private var playerEngine = PlayerEngine.shared
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
 
     /// 当前句 index（AB 单击取 A 点）；还没到第一句时为 nil
     private var currentLineIndex: Int? {
@@ -69,7 +70,7 @@ struct KaraokeControlBar: View {
             KaraokeController.shared.stepLine(delta: -1, currentTime: progress.playbackTime)
         } label: {
             Image(systemName: "chevron.up")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: DesignTokens.font17, weight: .semibold))
                 .foregroundColor(.primary.opacity(0.85))
                 .frame(width: 42, height: 42)
                 .background(Circle().fill(.ultraThinMaterial))
@@ -87,7 +88,7 @@ struct KaraokeControlBar: View {
             }
         } label: {
             Image(systemName: playerEngine.isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: DesignTokens.font22, weight: .semibold))
                 .foregroundColor(accentColor)
                 .frame(width: 54, height: 54)
                 .background(Circle().fill(.ultraThinMaterial))
@@ -103,7 +104,7 @@ struct KaraokeControlBar: View {
             KaraokeController.shared.stepLine(delta: 1, currentTime: progress.playbackTime)
         } label: {
             Image(systemName: "chevron.down")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: DesignTokens.font17, weight: .semibold))
                 .foregroundColor(.primary.opacity(0.85))
                 .frame(width: 42, height: 42)
                 .background(Circle().fill(.ultraThinMaterial))
@@ -196,6 +197,7 @@ struct KaraokeControlBar: View {
 // MARK: - Preview
 
 #Preview {
-    KaraokeControlBar(accentColor: .blue)
+    KaraokeControlBar()
+        .environment(\.appAccentColor, .blue)
         .padding()
 }

@@ -14,7 +14,7 @@ struct ArtistsScreen: View {
                 if artists.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "person.2")
-                            .font(.system(size: 40))
+                            .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)
 
                         Text(Localized.noArtistsFound)
@@ -58,7 +58,7 @@ struct ArtistsScreen: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .background(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                     .fill(.ultraThinMaterial)
                                     .opacity(0.7)
                             )

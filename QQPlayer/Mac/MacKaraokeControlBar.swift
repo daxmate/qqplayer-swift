@@ -84,7 +84,7 @@ struct MacKaraokeControlBar: View {
             }
         ) {
             Image(systemName: "chevron.up")
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: DesignTokens.font12_5, weight: .semibold))
                 .foregroundColor(.primary.opacity(0.85))
         }
         .accessibilityLabel(NSLocalizedString("karaoke_previous_line", value: "Previous line", comment: ""))
@@ -105,7 +105,7 @@ struct MacKaraokeControlBar: View {
             }
         ) {
             Image(systemName: playerEngine.isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: DesignTokens.font15, weight: .bold))
                 .foregroundColor(.white)
         }
         .shadow(color: accentColor.opacity(0.35), radius: 6, y: 2)
@@ -127,7 +127,7 @@ struct MacKaraokeControlBar: View {
             }
         ) {
             Image(systemName: "chevron.down")
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: DesignTokens.font12_5, weight: .semibold))
                 .foregroundColor(.primary.opacity(0.85))
         }
         .accessibilityLabel(NSLocalizedString("karaoke_next_line", value: "Next line", comment: ""))
@@ -151,7 +151,7 @@ struct MacKaraokeControlBar: View {
                 HStack(spacing: 3) {
                     Text(String(format: "%.1fx", karaoke.speed))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: DesignTokens.font8, weight: .bold))
                 }
             }
         }
@@ -203,7 +203,7 @@ struct MacKaraokeControlBar: View {
 
     private var abEndHint: some View {
         Text(NSLocalizedString("karaoke_ab_end_hint", value: "Tap a lyric line to set the AB end point", comment: ""))
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: DesignTokens.font11, weight: .medium))
             .foregroundColor(accentColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
@@ -284,7 +284,7 @@ private struct KaraokePill<Content: View>: View {
 
     var body: some View {
         content
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: DesignTokens.font12, weight: .semibold))
             .foregroundColor(isHighlighted ? accentColor : Color.primary.opacity(0.85))
             .padding(.horizontal, 12)
             .padding(.vertical, 6)

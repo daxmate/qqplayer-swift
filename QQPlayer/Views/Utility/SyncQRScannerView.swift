@@ -106,7 +106,7 @@ struct SyncQRScannerView: View {
     private var cameraDeniedOverlay: some View {
         VStack(spacing: 10) {
             Image(systemName: "camera.fill")
-                .font(.system(size: 36))
+                .font(.system(size: DesignTokens.font36))
                 .foregroundStyle(.white.opacity(0.9))
             Text("sync_camera_denied".localized)
                 .font(.callout)
@@ -129,7 +129,7 @@ struct SyncQRScannerView: View {
     private var cameraFailedOverlay: some View {
         VStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 36))
+                .font(.system(size: DesignTokens.font36))
                 .foregroundStyle(.white.opacity(0.9))
             Text("sync_camera_unavailable".localized)
                 .font(.callout)
@@ -207,7 +207,7 @@ struct SyncQRScannerView: View {
         let outcome = SyncPairOutcome(connectFailure: failure, hostName: nil)
         return VStack(spacing: 14) {
             Image(systemName: outcome.symbol)
-                .font(.system(size: 52))
+                .font(.system(size: DesignTokens.font52))
                 .foregroundStyle(outcome.symbolColor)
             Text(outcome.title)
                 .font(.title3)

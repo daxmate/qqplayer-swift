@@ -1,6 +1,8 @@
 import GRDB
 import SwiftUI
 struct ArtistTrackRowView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let track: Track
     let onTap: () -> Void
     @EnvironmentObject private var appCoordinator: AppCoordinator
@@ -15,7 +17,7 @@ struct ArtistTrackRowView: View {
         HStack {
             // Album artwork thumbnail
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignTokens.radius8)
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: 60, height: 60)
 
@@ -23,7 +25,7 @@ struct ArtistTrackRowView: View {
                     Image(uiImage: image)
                         .resizable().scaledToFill()
                         .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8))
                 } else {
                     Image(systemName: "music.note")
                         .font(.title2)
@@ -120,7 +122,7 @@ struct ArtistTrackRowView: View {
         }
         .sheet(isPresented: $showPlaylistDialog) {
             PlaylistSelectionView(track: track)
-                .accentColor(deleteSettings.backgroundColorChoice.color)
+                .accentColor(accentColor)
         }
         .alert(Localized.deleteFile, isPresented: $showDeleteConfirmation) {
             Button(Localized.delete, role: .destructive) {
@@ -187,7 +189,7 @@ struct ArtistAlbumCardView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: DesignTokens.radius8)
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 120, height: 120)
                 .overlay {
@@ -195,7 +197,7 @@ struct ArtistAlbumCardView: View {
                         Image(uiImage: image)
                             .resizable().scaledToFill()
                             .frame(width: 120, height: 120)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8))
                     } else {
                         Image(systemName: "music.note")
                             .font(.title2)

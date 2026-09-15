@@ -38,7 +38,7 @@ struct MacAlbumGridView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             MacArtworkThumbnailFill(
                                 track: albumFacts.representativeTrack,
-                                cornerRadius: 8,
+                                cornerRadius: DesignTokens.radius8,
                                 placeholderIcon: "square.stack"
                             )
                             Text(album.displayTitle)
@@ -109,7 +109,7 @@ struct MacAlbumDetailSheet: View {
                 MacArtworkThumbnail(
                     track: MacArtworkResolver.representativeTrack(forAlbum: album),
                     size: 120,
-                    cornerRadius: 10,
+                    cornerRadius: DesignTokens.radius10,
                     placeholderIcon: "square.stack"
                 )
                 VStack(alignment: .leading, spacing: 4) {
@@ -366,7 +366,7 @@ struct MacPlaylistListView: View {
                             MacArtworkThumbnail(
                                 track: playlistFacts.representativeTrack,
                                 size: 36,
-                                cornerRadius: 6,
+                                cornerRadius: DesignTokens.radius6,
                                 placeholderIcon: "list.bullet.rectangle"
                             )
                             Text(playlist.title)

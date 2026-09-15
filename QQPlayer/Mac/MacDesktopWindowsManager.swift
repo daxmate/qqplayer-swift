@@ -76,7 +76,7 @@ final class DesktopWindowsManager: ObservableObject {
     func start() {
         guard !didStart else { return }
         didStart = true
-        lastInjectedAccentName = DeleteSettings.load().accentColorName
+        lastInjectedAccentName = MacAppearance.currentAccentKey
         settingsObserver = NotificationCenter.default.addObserver(
             forName: .qqplayerSettingsDidChange,
             object: nil,
@@ -142,7 +142,7 @@ final class DesktopWindowsManager: ObservableObject {
     /// 与实现不符——其余设置项由浮窗内部自订阅 .qqplayerSettingsDidChange 刷新，
     /// 不需要重建整个 rootView；这里只负责强调色。
     private func refreshPanelRootViews() {
-        let accentName = DeleteSettings.load().accentColorName
+        let accentName = MacAppearance.currentAccentKey
         guard accentName != lastInjectedAccentName else { return }
         lastInjectedAccentName = accentName
         for (kind, host) in panelHosts {
@@ -197,7 +197,8 @@ final class DesktopWindowsManager: ObservableObject {
         case .mini:
             // 迷你窗控件（播放键/歌词点亮态）跟随 App 强调色：NSPanel 内容不继承
             // App 场景注入，accent 在此显式注入（设置改动经 refreshPanelRootViews 重建）
-            let accent = MacAppearance.accentColor(forKey: DeleteSettings.load().accentColorName)
+            // ——值取 MacAppearance.currentAccentColor（与主窗同一读取入口，M2）。
+            let accent = MacAppearance.currentAccentColor
             MacMiniPlayerView()
                 .environment(\.appAccentColor, accent)
                 .tint(accent)

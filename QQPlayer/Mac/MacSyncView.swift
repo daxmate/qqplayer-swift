@@ -32,6 +32,9 @@ import SwiftUI
 /// 同步操作区（在 `MacSyncSettingsView` 的 `Form` 内渲染）。
 struct MacSyncRunSection: View {
     @ObservedObject var hostCenter: SyncHostCenter
+    /// App 强调色（读环境值，与主窗同源；macOS 上 `Color.accentColor` 跟随系统强调色而非
+    /// App tint——2026-09-05 已统一，本文件 2026-09-11 新增时复发，见 M1）
+    @Environment(\.appAccentColor) private var accentColor
     /// 执行侧（阶段 / 进度 / 结果）。
     @StateObject private var model: MacSyncRunViewModel
     /// 内容侧（方向 / 内容源 / 选项 / 选择集）。
@@ -157,7 +160,7 @@ struct MacSyncRunSection: View {
     private func connectedRow(_ peer: SyncConnectedPeer) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "iphone")
-                .font(.system(size: 18))
+                .font(.system(size: DesignTokens.font18))
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
 
@@ -224,7 +227,7 @@ struct MacSyncRunSection: View {
         let selected = model.direction == direction
         return HStack(alignment: .top, spacing: 10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                .foregroundStyle(selected ? accentColor : Color.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .fontWeight(selected ? .medium : .regular)
@@ -237,8 +240,8 @@ struct MacSyncRunSection: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(selected ? Color.accentColor.opacity(0.12) : Color.clear)
+            RoundedRectangle(cornerRadius: DesignTokens.radius6)
+                .fill(selected ? accentColor.opacity(0.12) : Color.clear)
         )
         .contentShape(Rectangle())
         .onTapGesture { model.selectDirection(direction) }
@@ -353,7 +356,7 @@ struct MacSyncRunSection: View {
         let summary = content.selectionSummary
         return HStack(spacing: 10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                .foregroundStyle(selected ? accentColor : Color.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(libraryRowTitle)
                 Text(

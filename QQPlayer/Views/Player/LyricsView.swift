@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct LyricsView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let lyrics: Lyrics?
     let currentTime: TimeInterval
     let isLoading: Bool
@@ -54,7 +56,7 @@ struct LyricsView: View {
             if karaoke.isKaraokeOn {
                 VStack(spacing: 0) {
                     Spacer()
-                    KaraokeControlBar(accentColor: settings.backgroundColorChoice.color)
+                    KaraokeControlBar()
                         .padding(.bottom, 12)
                 }
                 .transition(.opacity)
@@ -103,7 +105,7 @@ struct LyricsView: View {
                         Localized.hintFullLyricsLine1,
                         Localized.hintFullLyricsLine2,
                     ],
-                    accentColor: settings.backgroundColorChoice.color,
+                    accentColor: accentColor,
                     onDismiss: {
                         withAnimation(.easeOut(duration: 0.3)) {
                             showHint = false
@@ -211,7 +213,7 @@ struct LyricsView: View {
                 .foregroundColor(lineColor(distance: distance, isActive: isActive))
                 .multilineTextAlignment(.center)
                 .shadow(
-                    color: isActive ? settings.backgroundColorChoice.color.opacity(0.5) : .clear,
+                    color: isActive ? accentColor.opacity(0.5) : .clear,
                     radius: isActive ? 20 : 0,
                     x: 0,
                     y: 0
@@ -263,7 +265,7 @@ struct LyricsView: View {
             if let ab = karaoke.abLoop, karaoke.isKaraokeOn,
                index == ab.a || index == ab.b {
                 Circle()
-                    .fill(settings.backgroundColorChoice.color)
+                    .fill(accentColor)
                     .frame(width: 7, height: 7)
                     .padding(.trailing, 26)
             }
@@ -285,10 +287,10 @@ struct LyricsView: View {
 
     private func translationColor(distance: Int, isActive: Bool) -> Color {
         if karaoke.isKaraokeOn {
-            return isActive ? settings.backgroundColorChoice.color.opacity(0.95) : .secondary.opacity(0.7)
+            return isActive ? accentColor.opacity(0.95) : .secondary.opacity(0.7)
         }
         if isActive {
-            return settings.backgroundColorChoice.color.opacity(0.95)
+            return accentColor.opacity(0.95)
         } else if distance <= 1 {
             return .secondary.opacity(0.85)
         } else if distance <= 2 {
@@ -314,22 +316,22 @@ struct LyricsView: View {
             return .system(size: isActive ? 22 : 19, weight: isActive ? .bold : .regular)
         }
         if isActive {
-            return .system(size: 26, weight: .bold)
+            return .system(size: DesignTokens.font26, weight: .bold)
         } else if distance <= 1 {
-            return .system(size: 19, weight: .semibold)
+            return .system(size: DesignTokens.font19, weight: .semibold)
         } else {
-            return .system(size: 16, weight: .medium)
+            return .system(size: DesignTokens.font16, weight: .medium)
         }
     }
 
     private func lineColor(distance: Int, isActive: Bool) -> Color {
         if karaoke.isKaraokeOn {
             // 跟唱：当前句主题色，其余正常可见
-            return isActive ? settings.backgroundColorChoice.color : .primary.opacity(0.8)
+            return isActive ? accentColor : .primary.opacity(0.8)
         }
         if isActive {
             // 当前句用设置中的主题色
-            return settings.backgroundColorChoice.color
+            return accentColor
         } else if distance <= 1 {
             return .primary.opacity(0.75)
         } else if distance <= 2 {
@@ -368,7 +370,7 @@ struct LyricsView: View {
                         .frame(height: geometry.safeAreaInsets.top + 24)
 
                     Text(text)
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: DesignTokens.font17, weight: .medium))
                         .foregroundColor(.primary.opacity(0.9))
                         .lineSpacing(10)
                         .multilineTextAlignment(.leading)
@@ -399,9 +401,9 @@ struct LyricsView: View {
                         .fill(
                             RadialGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.4),
-                                    settings.backgroundColorChoice.color.opacity(0.2),
-                                    settings.backgroundColorChoice.color.opacity(0.05),
+                                    accentColor.opacity(0.4),
+                                    accentColor.opacity(0.2),
+                                    accentColor.opacity(0.05),
                                     Color.clear,
                                 ]),
                                 center: .center,
@@ -420,9 +422,9 @@ struct LyricsView: View {
                                 .stroke(
                                     LinearGradient(
                                         gradient: Gradient(colors: [
-                                            settings.backgroundColorChoice.color.opacity(0.6),
-                                            settings.backgroundColorChoice.color.opacity(0.3),
-                                            settings.backgroundColorChoice.color.opacity(0.1),
+                                            accentColor.opacity(0.6),
+                                            accentColor.opacity(0.3),
+                                            accentColor.opacity(0.1),
                                         ]),
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
@@ -432,16 +434,16 @@ struct LyricsView: View {
                         )
                         .frame(width: 120, height: 120)
                         .shadow(
-                            color: settings.backgroundColorChoice.color.opacity(0.3),
+                            color: accentColor.opacity(0.3),
                             radius: 25,
                             x: 0,
                             y: 10
                         )
 
                     Image(systemName: "music.note")
-                        .font(.system(size: 50, weight: .medium))
+                        .font(.system(size: DesignTokens.font50, weight: .medium))
                         .foregroundColor(.primary)
-                        .shadow(color: settings.backgroundColorChoice.color.opacity(0.6), radius: 15)
+                        .shadow(color: accentColor.opacity(0.6), radius: 15)
                 }
 
                 VStack(spacing: 12) {
@@ -458,16 +460,16 @@ struct LyricsView: View {
             .padding(44)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .fill(.ultraThinMaterial)
 
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .stroke(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.3),
+                                    accentColor.opacity(0.3),
                                     Color.primary.opacity(0.15),
-                                    settings.backgroundColorChoice.color.opacity(0.2),
+                                    accentColor.opacity(0.2),
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -475,20 +477,20 @@ struct LyricsView: View {
                             lineWidth: 1
                         )
 
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.05),
+                                    accentColor.opacity(0.05),
                                     Color.clear,
-                                    settings.backgroundColorChoice.color.opacity(0.08),
+                                    accentColor.opacity(0.08),
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 }
-                .shadow(color: settings.backgroundColorChoice.color.opacity(0.2), radius: 35, x: 0, y: 15)
+                .shadow(color: accentColor.opacity(0.2), radius: 35, x: 0, y: 15)
             )
             .padding(.horizontal, 40)
 
@@ -508,9 +510,9 @@ struct LyricsView: View {
                         .fill(
                             RadialGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.4),
-                                    settings.backgroundColorChoice.color.opacity(0.2),
-                                    settings.backgroundColorChoice.color.opacity(0.05),
+                                    accentColor.opacity(0.4),
+                                    accentColor.opacity(0.2),
+                                    accentColor.opacity(0.05),
                                     Color.clear,
                                 ]),
                                 center: .center,
@@ -529,9 +531,9 @@ struct LyricsView: View {
                                 .stroke(
                                     LinearGradient(
                                         gradient: Gradient(colors: [
-                                            settings.backgroundColorChoice.color.opacity(0.6),
-                                            settings.backgroundColorChoice.color.opacity(0.3),
-                                            settings.backgroundColorChoice.color.opacity(0.1),
+                                            accentColor.opacity(0.6),
+                                            accentColor.opacity(0.3),
+                                            accentColor.opacity(0.1),
                                         ]),
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
@@ -541,16 +543,16 @@ struct LyricsView: View {
                         )
                         .frame(width: 120, height: 120)
                         .shadow(
-                            color: settings.backgroundColorChoice.color.opacity(0.3),
+                            color: accentColor.opacity(0.3),
                             radius: 25,
                             x: 0,
                             y: 10
                         )
 
                     Image(systemName: "text.badge.xmark")
-                        .font(.system(size: 50, weight: .medium))
+                        .font(.system(size: DesignTokens.font50, weight: .medium))
                         .foregroundColor(.primary)
-                        .shadow(color: settings.backgroundColorChoice.color.opacity(0.6), radius: 15)
+                        .shadow(color: accentColor.opacity(0.6), radius: 15)
                 }
 
                 VStack(spacing: 12) {
@@ -567,16 +569,16 @@ struct LyricsView: View {
             .padding(44)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .fill(.ultraThinMaterial)
 
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .stroke(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.3),
+                                    accentColor.opacity(0.3),
                                     Color.primary.opacity(0.15),
-                                    settings.backgroundColorChoice.color.opacity(0.2),
+                                    accentColor.opacity(0.2),
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -584,20 +586,20 @@ struct LyricsView: View {
                             lineWidth: 1
                         )
 
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.05),
+                                    accentColor.opacity(0.05),
                                     Color.clear,
-                                    settings.backgroundColorChoice.color.opacity(0.08),
+                                    accentColor.opacity(0.08),
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 }
-                .shadow(color: settings.backgroundColorChoice.color.opacity(0.2), radius: 35, x: 0, y: 15)
+                .shadow(color: accentColor.opacity(0.2), radius: 35, x: 0, y: 15)
             )
             .padding(.horizontal, 40)
 
@@ -617,9 +619,9 @@ struct LyricsView: View {
                         .fill(
                             RadialGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.4),
-                                    settings.backgroundColorChoice.color.opacity(0.2),
-                                    settings.backgroundColorChoice.color.opacity(0.05),
+                                    accentColor.opacity(0.4),
+                                    accentColor.opacity(0.2),
+                                    accentColor.opacity(0.05),
                                     Color.clear,
                                 ]),
                                 center: .center,
@@ -638,9 +640,9 @@ struct LyricsView: View {
                                 .stroke(
                                     LinearGradient(
                                         gradient: Gradient(colors: [
-                                            settings.backgroundColorChoice.color.opacity(0.6),
-                                            settings.backgroundColorChoice.color.opacity(0.3),
-                                            settings.backgroundColorChoice.color.opacity(0.1),
+                                            accentColor.opacity(0.6),
+                                            accentColor.opacity(0.3),
+                                            accentColor.opacity(0.1),
                                         ]),
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
@@ -650,7 +652,7 @@ struct LyricsView: View {
                         )
                         .frame(width: 120, height: 120)
                         .shadow(
-                            color: settings.backgroundColorChoice.color.opacity(0.3),
+                            color: accentColor.opacity(0.3),
                             radius: 25,
                             x: 0,
                             y: 10
@@ -676,16 +678,16 @@ struct LyricsView: View {
             .padding(44)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .fill(.ultraThinMaterial)
 
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .stroke(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.3),
+                                    accentColor.opacity(0.3),
                                     Color.primary.opacity(0.15),
-                                    settings.backgroundColorChoice.color.opacity(0.2),
+                                    accentColor.opacity(0.2),
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -693,20 +695,20 @@ struct LyricsView: View {
                             lineWidth: 1
                         )
 
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius28)
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    settings.backgroundColorChoice.color.opacity(0.05),
+                                    accentColor.opacity(0.05),
                                     Color.clear,
-                                    settings.backgroundColorChoice.color.opacity(0.08),
+                                    accentColor.opacity(0.08),
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 }
-                .shadow(color: settings.backgroundColorChoice.color.opacity(0.2), radius: 35, x: 0, y: 15)
+                .shadow(color: accentColor.opacity(0.2), radius: 35, x: 0, y: 15)
             )
             .padding(.horizontal, 40)
 

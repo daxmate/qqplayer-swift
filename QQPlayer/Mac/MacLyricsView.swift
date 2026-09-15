@@ -334,7 +334,7 @@ struct MacLyricsView: View {
                     karaoke.toggleKaraokeMode()
                 } label: {
                     Image(systemName: karaoke.isKaraokeOn ? "mic.fill" : "mic")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: DesignTokens.font14, weight: .semibold))
                         .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : .secondary)
                 }
                 .buttonStyle(.plain)
@@ -342,7 +342,7 @@ struct MacLyricsView: View {
             }
             Button(action: onLyricsSearch) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: DesignTokens.font14, weight: .semibold))
             }
             .buttonStyle(.plain)
             .foregroundColor(.secondary)
@@ -469,7 +469,7 @@ struct MacLyricsView: View {
 
     /// 毛玻璃卡：ultraThinMaterial + 主题色渐变描边 + 内层高光 + 主题色投影
     private var cardBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: 28)
+        let shape = RoundedRectangle(cornerRadius: DesignTokens.radius28)
         return shape
             .fill(.ultraThinMaterial)
             .overlay(
@@ -685,7 +685,7 @@ struct MacLyricsView: View {
     private func plainView(_ text: String) -> some View {
         ScrollView(showsIndicators: false) {
             Text(text)
-                .font(.system(size: 17 * fontScale, weight: .medium))
+                .font(.system(size: DesignTokens.font17 * fontScale, weight: .medium))
                 .foregroundColor(.primary.opacity(0.9))
                 .lineSpacing(10)
                 .multilineTextAlignment(.leading)

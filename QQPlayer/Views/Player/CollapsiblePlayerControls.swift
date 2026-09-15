@@ -8,7 +8,8 @@ struct CollapsiblePlayerControls: View {
     @State private var isExpanded = false
 
     let duration: TimeInterval
-    let accentColor: Color
+    /// App 强调色（读环境值；根注入见 ContentView）
+    @Environment(\.appAccentColor) private var accentColor
     let onSeek: (TimeInterval) -> Void
     let showSleepTimerButton: Bool
     let isLoadingLyrics: Bool
@@ -23,7 +24,6 @@ struct CollapsiblePlayerControls: View {
         VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 12 : 16) {
             PlayerProgressSection(
                 duration: duration,
-                accentColor: accentColor,
                 onSeek: onSeek
             )
 

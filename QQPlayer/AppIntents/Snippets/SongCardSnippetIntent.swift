@@ -63,7 +63,7 @@
             HStack(spacing: 12) {
                 artworkView
                     .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -119,7 +119,7 @@
                     .scaledToFill()
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous)
                         .fill(.regularMaterial)
                     Image(systemName: "music.note")
                         .font(.title3)

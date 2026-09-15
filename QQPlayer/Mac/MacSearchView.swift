@@ -49,7 +49,7 @@ struct MacSearchField: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.gray.opacity(0.15)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.radius7).fill(Color.gray.opacity(0.15)))
         .padding(.horizontal, 8)
         .padding(.top, 8)
     }
@@ -146,7 +146,7 @@ struct MacSearchResultsView: View {
     private var emptyView: some View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass.circle")
-                .font(.system(size: 44))
+                .font(.system(size: DesignTokens.font44))
                 .foregroundColor(.secondary)
             Text("search_no_results".localized)
                 .font(.title3)
@@ -243,7 +243,7 @@ private struct MacSearchAlbumRow: View {
                 MacArtworkThumbnail(
                     track: facts.albumFacts(for: album).representativeTrack,
                     size: 28,
-                    cornerRadius: 4,
+                    cornerRadius: DesignTokens.radius4,
                     placeholderIcon: "square.stack"
                 )
 
@@ -307,7 +307,7 @@ private struct MacSearchPlaylistRow: View {
                 MacArtworkThumbnail(
                     track: playlistFacts.representativeTrack,
                     size: 28,
-                    cornerRadius: 4,
+                    cornerRadius: DesignTokens.radius4,
                     placeholderIcon: "list.bullet.rectangle"
                 )
 

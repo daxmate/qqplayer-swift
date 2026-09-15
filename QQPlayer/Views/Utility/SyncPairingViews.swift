@@ -26,7 +26,7 @@ struct SyncPairConfirmCardView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 Image(systemName: "iphone.and.arrow.forward")
-                    .font(.system(size: 26))
+                    .font(.system(size: DesignTokens.font26))
                     .foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(SyncDeviceList.displayName(candidate))
@@ -48,7 +48,7 @@ struct SyncPairConfirmCardView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
 
             HStack(spacing: 8) {
                 switch candidate.source {
@@ -84,7 +84,7 @@ struct SyncPairConfirmCardView: View {
             .controlSize(.large)
         }
         .padding(16)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
     }
 }
 
@@ -102,7 +102,7 @@ struct SyncPairOutcomeView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: symbol)
-                .font(.system(size: 52))
+                .font(.system(size: DesignTokens.font52))
                 .foregroundStyle(symbolColor)
             Text(title)
                 .font(.title3)

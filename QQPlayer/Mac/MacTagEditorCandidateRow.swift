@@ -32,7 +32,7 @@ struct MacTagEditorCandidateRow: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(Color.gray.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.gray.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
         .contentShape(Rectangle())
     }
 
@@ -52,15 +52,15 @@ struct MacTagEditorCandidateRow: View {
             }
         }
         .frame(width: 36, height: 36)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius6))
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: 6)
+        RoundedRectangle(cornerRadius: DesignTokens.radius6)
             .fill(Color.gray.opacity(0.15))
             .overlay {
                 Image(systemName: "music.note")
-                    .font(.system(size: 13))
+                    .font(.system(size: DesignTokens.font13))
                     .foregroundColor(.secondary)
             }
     }
@@ -84,7 +84,7 @@ struct MacTagEditorCandidateRow: View {
     /// 尽力值已在 subtitle 的 genre 段体现；badge 只标来源）
     private var sourceBadge: some View {
         Text(candidate.source == "netease" ? "source_netease".localized : "source_musicbrainz".localized)
-            .font(.system(size: 9))
+            .font(.system(size: DesignTokens.font9))
             .foregroundColor(.secondary)
             .padding(.horizontal, 5)
             .padding(.vertical, 1.5)

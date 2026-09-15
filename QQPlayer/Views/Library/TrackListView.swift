@@ -2,6 +2,8 @@ import GRDB
 import SwiftUI
 
 struct TrackListView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let tracks: [Track]
     let playlist: Playlist?
     let isEditMode: Bool
@@ -169,7 +171,7 @@ struct TrackListView: View {
             if isBulkMode {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(Localized.cancel) { exitBulkMode() }
-                        .foregroundColor(settings.backgroundColorChoice.color)
+                        .foregroundColor(accentColor)
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -195,7 +197,7 @@ struct TrackListView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .font(.title3)
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .foregroundColor(accentColor)
                             // Increase hit area
                             .padding(4)
                             .contentShape(Rectangle())
@@ -220,7 +222,7 @@ struct TrackListView: View {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down.circle")
                             .font(.title3)
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .foregroundColor(accentColor)
                             .padding(4)
                             .contentShape(Rectangle())
                     }
@@ -229,7 +231,7 @@ struct TrackListView: View {
         }
         .sheet(isPresented: $showBulkPlaylistDialog) {
             BulkPlaylistSelectionView(trackIds: Array(selectedTracks), onComplete: { exitBulkMode() })
-                .accentColor(settings.backgroundColorChoice.color)
+                .accentColor(accentColor)
         }
         .alert(Localized.deleteFilesConfirmation, isPresented: $showBulkDeleteConfirmation) {
             Button(Localized.delete, role: .destructive) { bulkDelete() }
@@ -253,6 +255,8 @@ struct TrackListView: View {
 }
 
 struct TrackListContentView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let tracks: [Track]
     let playlist: Playlist?
     let isEditMode: Bool
@@ -348,7 +352,7 @@ struct TrackListContentView: View {
     var body: some View {
         if tracks.isEmpty {
             VStack(spacing: 16) {
-                Image(systemName: "music.note").font(.system(size: 40)).foregroundColor(.secondary)
+                Image(systemName: "music.note").font(.system(size: DesignTokens.font40)).foregroundColor(.secondary)
                 Text(Localized.noSongsFound).font(.headline)
                 Text(Localized.yourMusicWillAppearHere).font(.subheadline).foregroundColor(.secondary)
             }
@@ -361,7 +365,7 @@ struct TrackListContentView: View {
                             if isBulkMode {
                                 Image(systemName: selectedTracks.contains(track.stableId) ? "checkmark.circle.fill" : "circle")
                                     .font(.title2)
-                                    .foregroundColor(selectedTracks.contains(track.stableId) ? settings.backgroundColorChoice.color : .secondary)
+                                    .foregroundColor(selectedTracks.contains(track.stableId) ? accentColor : .secondary)
                                     .frame(width: 44, height: 44)
                                     .contentShape(Rectangle())
                                     .onTapGesture { toggleSelection(for: track) }
@@ -401,7 +405,7 @@ struct TrackListContentView: View {
                                 playerEngine.insertNext(track)
                                 markAsActed(track.stableId)
                             } label: { Label(Localized.playNext, systemImage: "text.line.first.and.arrowtriangle.forward") }
-                                .tint(settings.backgroundColorChoice.color)
+                                .tint(accentColor)
                         }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -413,7 +417,7 @@ struct TrackListContentView: View {
                                 .tint(.blue)
                         }
                     }
-                    .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial).opacity(0.7))
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.radius12).fill(.ultraThinMaterial).opacity(0.7))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .listRowSeparator(.hidden).listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)

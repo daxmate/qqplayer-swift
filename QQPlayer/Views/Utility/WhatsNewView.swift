@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct WhatsNewView: View {
+    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
+    @Environment(\.appAccentColor) private var accentColor
     let onClose: () -> Void
     @State private var settings = DeleteSettings.load()
 
@@ -19,8 +21,8 @@ struct WhatsNewView: View {
                         Spacer(minLength: 24)
 
                         Image(systemName: "sparkles")
-                            .font(.system(size: 64, weight: .medium))
-                            .foregroundColor(settings.backgroundColorChoice.color)
+                            .font(.system(size: DesignTokens.font64, weight: .medium))
+                            .foregroundColor(accentColor)
 
                         VStack(spacing: 8) {
                             Text(Localized.whatsNewTitle)
@@ -36,8 +38,8 @@ struct WhatsNewView: View {
                             ForEach(WhatsNewContent.all.first?.items ?? [], id: \.self) { item in
                                 HStack(alignment: .top, spacing: 12) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(settings.backgroundColorChoice.color)
+                                        .font(.system(size: DesignTokens.font18))
+                                        .foregroundColor(accentColor)
 
                                     Text(item)
                                         .font(.body)
@@ -49,7 +51,7 @@ struct WhatsNewView: View {
                         .padding(.horizontal, 32)
                         .padding(.vertical, 20)
                         .background(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius16)
                                 .fill(Color.primary.opacity(0.05))
                         )
                         .padding(.horizontal, 24)

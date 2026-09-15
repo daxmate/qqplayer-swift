@@ -154,7 +154,7 @@ private struct MacGraphicEQ10BandGraphView: View {
             }
 
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color(nsColor: .controlBackgroundColor))
 
                 // 水平网格线（0dB 中线高亮）

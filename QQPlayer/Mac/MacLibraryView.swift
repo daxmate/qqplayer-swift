@@ -367,7 +367,7 @@ struct MacLibraryView: View {
 
     /// 拖拽悬停提示（web 版遮罩语义的轻量版）。
     private var dropTargetHint: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: DesignTokens.radius12)
             .strokeBorder(appAccentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .padding(12)
             .overlay {
@@ -376,7 +376,7 @@ struct MacLibraryView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
             }
             .allowsHitTesting(false)
     }

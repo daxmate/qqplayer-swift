@@ -156,7 +156,7 @@ struct MacLyricsSearchView: View {
 
             Button(action: doSearch) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: DesignTokens.font14, weight: .semibold))
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.borderedProminent)
@@ -171,7 +171,7 @@ struct MacLyricsSearchView: View {
     private var manualStatusRow: some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14))
+                .font(.system(size: DesignTokens.font14))
                 .foregroundColor(appAccentColor)
 
             Text("lyrics_search_manual_active".localized)
@@ -194,7 +194,7 @@ struct MacLyricsSearchView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
     }
 
     // MARK: - Content
@@ -214,7 +214,7 @@ struct MacLyricsSearchView: View {
             VStack(spacing: 12) {
                 Spacer()
                 Image(systemName: "text.badge.xmark")
-                    .font(.system(size: 36))
+                    .font(.system(size: DesignTokens.font36))
                     .foregroundColor(.secondary)
                 Text("lyrics_search_no_results".localized)
                     .font(.subheadline)
@@ -249,7 +249,7 @@ struct MacLyricsSearchView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: 6))
+                    .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(DisplayScriptNormalizer.display(candidate.title))
@@ -273,7 +273,7 @@ struct MacLyricsSearchView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .stroke(appAccentColor.opacity(0.6), lineWidth: 1)
                         )
                         .help("lyrics_search_has_translation".localized)
@@ -290,7 +290,7 @@ struct MacLyricsSearchView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

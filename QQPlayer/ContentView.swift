@@ -17,6 +17,9 @@ struct ContentView: View {
         mainContent
             .background(.clear)
             .accentColor(settings.backgroundColorChoice.color)
+            // App 强调色环境值（iOS 唯一注入点，2026-09-15 I1）：值来自 8 色 iOS 名单
+            // `BackgroundColor`，视图统一读 @Environment(\.appAccentColor)，不再直读 settings。
+            .environment(\.appAccentColor, settings.backgroundColorChoice.color)
             .onAppear {
                 AppearanceResolver.apply(forceDark: settings.forceDarkMode)
             }
