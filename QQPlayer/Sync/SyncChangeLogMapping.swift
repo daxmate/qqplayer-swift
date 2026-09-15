@@ -63,6 +63,10 @@ import Foundation
 /// （`stable_id ↔ content_hash` 两条查询）。新增消费点请依赖入口，别再写第二套。
 struct SyncContentHashResolver {
     let database: DatabaseManager
+    /// 曲库根（**必传**，2026-09-18 身份兜底包）：相对路径第一/第二身份的换算基准。
+    /// 为什么做成必传而不是可选：可选 = 忘了传就编译得过、相对路径身份静默失效
+    /// （「没有曲库根就构造不出解析器」应是编译期硬约束）；注入根也是测试隔离的手段。
+    let libraryRoot: URL
 
     /// 本地 stableId → content_hash（无此歌 / 指纹未回填 = nil）。
     func contentHash(forTrackStableId stableId: String) throws -> String? {
@@ -135,6 +139,104 @@ struct SyncContentHashResolver {
         return (stableId: stableId, contentHash: contentHash)
     }
 
+    // MARK: 第二身份（曲库相对路径，2026-09-18 身份兜底包）
+
+    /// 远端身份键组 → 本端落点判定（解析顺序的唯一口径，详见协议注释）。
+    func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome {
+        // ① content_hash 存在 → **只用内容身份**（今天语义逐字不变；绝不再看相对路径）。
+        if let contentHash = identity.contentHash, !contentHash.isEmpty {
+            if let stableId = try trackStableId(forContentHash: contentHash) {
+                return .resolved(stableId: stableId, key: .contentHash)
+            }
+            return .suspended(pendingKey: SyncPendingKey.contentHash(contentHash))
+        }
+        // ② 第一身份缺失 → 相对路径兜底（非法路径 = 视为无此键）。
+        guard let raw = identity.relativePath, !raw.isEmpty,
+              let normalized = SyncManifestGenerator.normalizeRelativePath(raw) else {
+            return .unresolved
+        }
+        let absolutePath = libraryRoot.appendingPathComponent(normalized).path
+        let candidates = try distinctStableIds(atAbsolutePath: absolutePath)
+        switch candidates.count {
+        case 0:
+            return .suspended(pendingKey: SyncPendingKey.relativePath(normalized))
+        case 1:
+            return .resolved(stableId: candidates[0], key: .relativePath)
+        default:
+            // 多首本地曲目同路径（历史重导入残留）：选哪首都是猜 → 不落库、不挂起，只计数。
+            return .ambiguous(key: .relativePath, candidateCount: candidates.count)
+        }
+    }
+
+    /// 按绝对路径取**去重后**的本地 stableId（最多 2 条——只需要判「唯一 or 歧义」）。
+    /// 同步线程（NW 队列）约束：不许全表扫描，所以仍走 `track.path` 上的精确匹配 +
+    /// 标准形态回落（与 `trackIdentity(atAbsolutePath:)` 同一形态，不新开口径）。
+    func distinctStableIds(atAbsolutePath path: String) throws -> [String] {
+        try database.read { db in
+            try Self.distinctStableIds(db, atAbsolutePath: path)
+        }
+    }
+
+    static func distinctStableIds(_ db: Database, atAbsolutePath path: String) throws -> [String] {
+        if let ids = try distinctStableIdsRow(db, atAbsolutePath: path), !ids.isEmpty { return ids }
+        let standardized = DatabaseManager.standardizedPath(path)
+        if standardized != path, let ids = try distinctStableIdsRow(db, atAbsolutePath: standardized) {
+            return ids
+        }
+        return []
+    }
+
+    private static func distinctStableIdsRow(_ db: Database, atAbsolutePath path: String) throws -> [String]? {
+        try String.fetchAll(
+            db,
+            sql: "SELECT DISTINCT stable_id FROM track WHERE path = ? ORDER BY stable_id LIMIT 2",
+            arguments: [path]
+        )
+    }
+
+    /// 本地 stableId → 身份键组（发送侧取数；详见协议注释）。
+    /// `nil` = 本地 `track` 表没该行；非 nil 但 `isEmpty` = 有行但两把键都拿不到。
+    func remoteTrackIdentity(forTrackStableId stableId: String) throws -> SyncRemoteTrackIdentity? {
+        try database.read { db in
+            try Self.remoteTrackIdentity(db, forTrackStableId: stableId, libraryRoot: libraryRoot)
+        }
+    }
+
+    /// 事务内版本（发送侧一批行共用一个读事务时用）。
+    static func remoteTrackIdentity(
+        _ db: Database,
+        forTrackStableId stableId: String,
+        libraryRoot: URL
+    ) throws -> SyncRemoteTrackIdentity? {
+        guard !stableId.isEmpty else { return nil }
+        guard let row = try Row.fetchOne(
+            db,
+            sql: "SELECT path, content_hash FROM track WHERE stable_id = ? LIMIT 1",
+            arguments: [stableId]
+        ) else {
+            return nil
+        }
+        let path: String = row["path"]
+        let storedHash: String? = row["content_hash"]
+        let contentHash = (storedHash?.isEmpty == false) ? storedHash : nil
+        // 第一身份可用 → **不带**第二身份（省字节、防误用；与 wire 填键口径一致）。
+        if contentHash != nil { return SyncRemoteTrackIdentity(contentHash: contentHash) }
+        return SyncRemoteTrackIdentity(
+            contentHash: nil,
+            relativePath: relativePath(ofAbsoluteTrackPath: path, libraryRoot: libraryRoot)
+        )
+    }
+
+    /// 盘上绝对路径 → 曲库相对路径。换算一律走 `SyncManifestGenerator`（路径换算的
+    /// 单一事实源）——本文件不得手写路径切片。
+    static func relativePath(ofAbsoluteTrackPath path: String, libraryRoot: URL) -> String? {
+        guard !path.isEmpty else { return nil }
+        return SyncManifestGenerator.relativePath(
+            of: URL(fileURLWithPath: path),
+            baseDirectory: libraryRoot
+        )
+    }
+
     // MARK: 发送侧诊断用的三态查询
 
     /// 本地 stableId 的身份键三态：区分「没有 track 行」与「有行但指纹为空」。
@@ -175,8 +277,9 @@ extension SyncContentHashResolver: SyncIdentityResolving {}
 extension SyncLyricsContentMapping {
     /// 生产实现：把唯一身份入口包成歌词链路的映射（查不到 / 指纹未回填 = nil，
     /// 与 M4-2a 同一语义）。
-    static func live(database: DatabaseManager) -> SyncLyricsContentMapping {
-        SyncLyricsContentMapping(identity: SyncContentHashResolver(database: database))
+    /// `libraryRoot` = 曲库根（身份入口的必传输入，见 `SyncContentHashResolver`）。
+    static func live(database: DatabaseManager, libraryRoot: URL) -> SyncLyricsContentMapping {
+        SyncLyricsContentMapping(identity: SyncContentHashResolver(database: database, libraryRoot: libraryRoot))
     }
 }
 
@@ -223,21 +326,26 @@ enum SyncEntryUnresolvedReason: String, Equatable, Sendable {
 
 /// 接收侧一条线上 entry 的本地化结果。
 enum SyncEntryLocalization: Equatable {
-    /// 命中 content_hash 映射：row_key 与 payload 歌曲引用已改写为**本地 stableId**。
+    /// 命中身份键（内容指纹或曲库相对路径）：row_key 与 payload 歌曲引用已改写为
+    /// **本地 stableId**。
     case mapped(SyncChangeLogRow)
     /// 无需映射：该行不引用歌曲（歌单）/ 未知实体 → M4-1 原样透传应用。
     case passThrough(SyncChangeLogRow)
-    /// 本地还没有这首歌（content_hash 映射不到本地 stableId）→ 挂起，歌到后重放。
-    case suspended(contentHash: String, remoteRow: SyncChangeLogRow)
-    /// 引用歌曲但没有可用身份键（contentHash nil/空）→ **不落库、不挂起**，只计数：
-    /// 落库会写出 JOIN track 永不匹配的孤儿业务行（界面毫无变化却显示「应用 N 条」），
-    /// 挂起又缺 content_hash 当键。
+    /// 本地还没有这首歌（两把键都定位不到本地 stableId）→ 挂起，歌到后重放。
+    /// `pendingKey` = 挂起表行键（命名空间见 `SyncPendingKey`；内容指纹 / `rel:{路径}`）。
+    case suspended(pendingKey: String, remoteRow: SyncChangeLogRow)
+    /// 第二身份（相对路径）命中**多行**（歧义）→ **不落库、不挂起**，只计数披露：
+    /// 两首本地曲目同路径，选哪首都是猜；挂起也没意义（歌已在，再等也不会变唯一）。
+    case ambiguous(key: SyncRemoteKey, candidateCount: Int, remoteRow: SyncChangeLogRow)
+    /// 两把键都拿不到 → **不落库、不挂起**，只计数：落库会写出 JOIN track 永不匹配的
+    /// 孤儿业务行（界面毫无变化却显示「应用 N 条」），挂起又无键可挂。
     case unresolved(reason: SyncEntryUnresolvedReason, remoteRow: SyncChangeLogRow)
 
-    /// 本地化后的行（挂起/未定位分支 = 未改写的远端行，供挂起存储 / 诊断使用）。
+    /// 本地化后的行（挂起/歧义/未定位分支 = 未改写的远端行，供挂起存储 / 诊断使用）。
     var row: SyncChangeLogRow {
         switch self {
-        case .mapped(let row), .passThrough(let row), .suspended(_, let row), .unresolved(_, let row):
+        case .mapped(let row), .passThrough(let row), .suspended(_, let row),
+             .ambiguous(_, _, let row), .unresolved(_, let row):
             return row
         }
     }
@@ -246,12 +354,17 @@ enum SyncEntryLocalization: Equatable {
 // MARK: - 发送侧身份缺口诊断
 
 /// 发送侧一行「缺身份键」的诊断（只用于计数 / 日志，不上线）。
+///
+/// ⚠️ 口径（2026-09-18 身份兜底包）：**缺身份键 = 两把键都拿不到**。
+/// 「有 track 行、指纹为空但相对路径算得出」**不再算缺键**——那时 wire entry 会带上
+/// `relativePath`，对端靠第二身份照样能落库。
 struct SyncWireMissingIdentity: Equatable, Sendable {
     /// 缺键成因（必须可区分，面板与修复手段都不同）。
     enum Reason: String, Equatable, Sendable {
-        /// ① 行引用的 stableId 在本地 `track` 表里**没有行**。
+        /// ① 行引用的 stableId 在本地 `track` 表里**没有行**（两把键都无从谈起）。
         case unknownTrack = "unknown_track"
-        /// ② 有行但 `content_hash` 为空（指纹未回填）。
+        /// ② 有行，但指纹为空**且**相对路径也算不出（`track.path` 不在曲库根内 / 为空）。
+        /// 修复手段 = 等指纹回填（或把文件放回曲库根），故与 ① 分开报。
         case emptyContentHash = "empty_content_hash"
     }
 
@@ -269,15 +382,20 @@ struct SyncWireEntryBatch: Equatable, Sendable {
 
 // MARK: - 收发两侧的映射变换
 
-/// changeLog 帧的跨端映射变换（发送侧填 contentHash / 接收侧本地化）。
+/// changeLog 帧的跨端映射变换（发送侧填身份键 / 接收侧本地化）。
 struct SyncChangeLogMapper {
     let database: DatabaseManager
+    /// 曲库根（**必传**）：相对路径第二身份的换算基准（传给唯一身份入口）。
+    let libraryRoot: URL
 
-    init(database: DatabaseManager) {
+    init(database: DatabaseManager, libraryRoot: URL) {
         self.database = database
+        self.libraryRoot = libraryRoot
     }
 
-    private var resolver: SyncContentHashResolver { SyncContentHashResolver(database: database) }
+    private var resolver: SyncContentHashResolver {
+        SyncContentHashResolver(database: database, libraryRoot: libraryRoot)
+    }
 
     // MARK: 发送侧
 
@@ -291,47 +409,64 @@ struct SyncChangeLogMapper {
     }
 
     /// 带诊断的发送侧取数：wire 条目 + **缺身份键明细**（区分「本地没有该 track 行」
-    /// 与「有行但指纹为空」）。原实现静默填 nil、零计数，调用方（handlePull /
+    /// 与「有行但指纹空且相对路径算不出」）。原实现静默填 nil、零计数，调用方（handlePull /
     /// sendIncrement）完全看不见缺口——这正是「同步成功但界面毫无变化」的发送侧成因。
+    ///
+    /// 取键一律走唯一身份入口 `remoteTrackIdentity`（不在此另写 track SQL）：
+    /// - 入口返 nil（无 track 行） → 缺键（`.unknownTrack`）
+    /// - 指纹可用 → 只填 `contentHash`（与今天逐字一致）
+    /// - 指纹空但相对路径可用 → 只填 `relativePath`（**不算缺键**）
+    /// - 两把键都无 → 缺键（`.emptyContentHash`）
     func wireEntriesDetailed(_ rows: [SyncChangeLogRow]) throws -> SyncWireEntryBatch {
         try database.read { db in
             var batch = SyncWireEntryBatch()
             batch.entries.reserveCapacity(rows.count)
             for row in rows {
-                var contentHash: String?
+                var identity: SyncRemoteTrackIdentity?
                 if let entity = row.entityValue,
                    let trackStableId = SyncTrackReference.trackStableId(
                        entity: entity,
                        rowKey: row.rowKey,
                        payloadJSON: row.payloadJSON
                    ) {
-                    switch try SyncContentHashResolver.trackIdentity(db, forTrackStableId: trackStableId) {
-                    case .resolved(let hash):
-                        contentHash = hash
-                    case .noTrackRow:
-                        batch.missingIdentity.append(SyncWireMissingIdentity(
-                            entity: row.entity,
-                            rowKey: row.rowKey,
-                            trackStableId: trackStableId,
-                            reason: .unknownTrack
-                        ))
-                    case .emptyContentHash:
+                    identity = try SyncContentHashResolver.remoteTrackIdentity(
+                        db,
+                        forTrackStableId: trackStableId,
+                        libraryRoot: libraryRoot
+                    )
+                    if let identity, identity.isEmpty {
                         batch.missingIdentity.append(SyncWireMissingIdentity(
                             entity: row.entity,
                             rowKey: row.rowKey,
                             trackStableId: trackStableId,
                             reason: .emptyContentHash
                         ))
+                    } else if identity == nil {
+                        batch.missingIdentity.append(SyncWireMissingIdentity(
+                            entity: row.entity,
+                            rowKey: row.rowKey,
+                            trackStableId: trackStableId,
+                            reason: .unknownTrack
+                        ))
                     }
                 }
-                batch.entries.append(Self.wireEntry(row, contentHash: contentHash))
+                batch.entries.append(Self.wireEntry(
+                    row,
+                    contentHash: identity?.contentHash,
+                    relativePath: identity?.relativePath
+                ))
             }
             return batch
         }
     }
 
     /// 纯变换（无 IO；发送侧与测试共用）。
-    static func wireEntry(_ row: SyncChangeLogRow, contentHash: String?) -> SyncChangeLogWireEntry {
+    /// `relativePath` 只在**第一身份缺失**时传入（调用方已按此收口；入口也不会同时给两把）。
+    static func wireEntry(
+        _ row: SyncChangeLogRow,
+        contentHash: String?,
+        relativePath: String? = nil
+    ) -> SyncChangeLogWireEntry {
         SyncChangeLogWireEntry(
             id: row.id ?? 0,
             entity: row.entity,
@@ -339,6 +474,7 @@ struct SyncChangeLogMapper {
             op: row.op,
             updatedAtMs: row.updatedAtMs,
             contentHash: contentHash,
+            relativePath: contentHash == nil ? relativePath : nil,
             payloadJSON: row.payloadJSON
         )
     }
@@ -346,6 +482,9 @@ struct SyncChangeLogMapper {
     // MARK: 接收侧
 
     /// 线上 entry → 本地化结果（见 SyncEntryLocalization）。
+    ///
+    /// 判定**全部**发生在唯一身份入口内部（`SyncIdentityResolving.localizeRemoteTrack`），
+    /// 这里只把 (contentHash, relativePath) 打包交给入口、把 verdict 映射成落库动作。
     func localize(_ entry: SyncChangeLogWireEntry) throws -> SyncEntryLocalization {
         let remoteRow = Self.remoteRow(entry)
         guard let entity = SyncChangeEntity(rawValue: entry.entity) else {
@@ -355,15 +494,21 @@ struct SyncChangeLogMapper {
         guard SyncTrackReference.referencesTrack(entity) else {
             return .passThrough(remoteRow)
         }
-        // 引用歌曲但没有可用身份键 → 未定位：不落库（否则写出 JOIN 永不匹配的孤儿行）、
-        // 不挂起（缺 content_hash 当挂起键），只计数。
-        guard let contentHash = entry.contentHash, !contentHash.isEmpty else {
+        let identity = SyncRemoteTrackIdentity(
+            contentHash: entry.contentHash,
+            relativePath: entry.relativePath
+        )
+        switch try resolver.localizeRemoteTrack(identity) {
+        case let .resolved(stableId, _):
+            // 两把键命中都走同一改写（相对路径命中也必须改写 row_key/payload）。
+            return .mapped(Self.rewrite(remoteRow, entity: entity, localStableId: stableId))
+        case let .suspended(pendingKey):
+            return .suspended(pendingKey: pendingKey, remoteRow: remoteRow)
+        case let .ambiguous(key, candidateCount):
+            return .ambiguous(key: key, candidateCount: candidateCount, remoteRow: remoteRow)
+        case .unresolved:
             return .unresolved(reason: .missingIdentityKey, remoteRow: remoteRow)
         }
-        guard let localStableId = try resolver.trackStableId(forContentHash: contentHash) else {
-            return .suspended(contentHash: contentHash, remoteRow: remoteRow)
-        }
-        return .mapped(Self.rewrite(remoteRow, entity: entity, localStableId: localStableId))
     }
 
     /// wire entry → 远端 outbox 行（保留远端 id：merge 排序键 (updated_at, id) 需要它）。

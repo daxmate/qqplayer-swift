@@ -64,6 +64,113 @@ protocol SyncIdentityResolving: Sendable {
     /// 语义：**精确命中即返回**，再退标准形态；不做 `getTrack(byPath:)` 式全表回落——
     /// 同步线程（NW 队列）上不容忍 O(库) 扫描（这是既有生产约束，不得放宽）。
     func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)?
+
+    /// 本地 stableId → **跨端身份键组**（2026-09-18 身份兜底包）：本地曲目行拿得到的
+    /// 两把键——内容指纹 + 曲库相对路径。
+    ///
+    /// 语义：
+    /// - 本地 `track` 表**没有该行** → `nil`（该行连身份都无从谈起）。
+    /// - 有行 → 非 nil；指纹为空时 `contentHash` = nil、`relativePath` 尽量给出
+    ///   （`track.path` 换算到曲库根；算出可用的相对路径时**不再算「缺身份键」**）。
+    /// - 两把键都为 nil/空 → `isEmpty == true`（真·缺身份键，发送侧要计数披露）。
+    ///
+    /// ⚠️ 相对路径的换算**必须**走 `SyncManifestGenerator.relativePath(of:baseDirectory:)`
+    /// （路径换算的单一事实源），不得在此手写路径切片。
+    func remoteTrackIdentity(forTrackStableId stableId: String) throws -> SyncRemoteTrackIdentity?
+
+    /// 远端身份键组 → **本端落点判定**（接收侧唯一判定点，2026-09-18 身份兜底包）。
+    ///
+    /// **解析顺序 = 全仓唯一口径**（任何调用方都不得另立一套）：
+    /// 1. `contentHash` 非空 → **只用 content_hash**（内容身份优先）：
+    ///    命中 → `.resolved(key: .contentHash)`；本地无此歌 → `.suspended`（键 = 指纹）。
+    ///    ⚠️ **content_hash 存在时绝不使用相对路径**——既保持今天语义逐字不变，
+    ///    也避免「同一内容两把键给出不同落点」。
+    /// 2. 否则 `relativePath` 非空且**合法**（`normalizeRelativePath` 拒绝空/绝对/`..`）
+    ///    → 按曲库根换算成绝对路径定位本地曲目：
+    ///    - 去重后**唯一命中** → `.resolved(key: .relativePath)`
+    ///    - 去重后候选 > 1 → `.ambiguous`（**不落库、不挂起**：两首同路径的本地曲目，
+    ///      选哪首都是猜）
+    ///    - 0 候选 → `.suspended`（键 = `rel:{relativePath}`，歌到位后重放）
+    /// 3. 两把键都无（含相对路径非法） → `.unresolved`。
+    func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome
+}
+
+// MARK: - 跨端身份键组（2026-09-18 身份兜底包）
+
+/// 远端一行带来的**身份键组**：内容指纹（第一身份）+ 曲库相对路径（第二身份）。
+///
+/// 为什么需要第二身份：发送侧某行拿不到 `content_hash`（指纹未回填 / 本地无该 track 行）
+/// 时，wire entry 的 `contentHash` 只能留 nil → 接收侧判「未定位」，不落库也不挂起 →
+/// 用户的收藏 / 播放历史**永远过不了端**，面板只显示「未定位 N」。相对路径是两端统一的
+/// 跨端键（Mac 推送文件时就是按相对路径落到 iOS 曲库），可以当第二身份。
+struct SyncRemoteTrackIdentity: Equatable, Sendable {
+    /// 第一身份：歌曲内容指纹（跨端同名）。
+    var contentHash: String?
+    /// 第二身份：曲库相对路径（跨端同名；仅第一身份缺失时才带上线）。
+    var relativePath: String?
+
+    /// 两把键都拿不到（真·缺身份键）。
+    var isEmpty: Bool {
+        (contentHash ?? "").isEmpty && (relativePath ?? "").isEmpty
+    }
+
+    init(contentHash: String? = nil, relativePath: String? = nil) {
+        self.contentHash = contentHash
+        self.relativePath = relativePath
+    }
+}
+
+/// 跨端身份键的种类（面板披露与诊断要区分「靠哪把键落库的」）。
+enum SyncRemoteKey: String, Equatable, Sendable {
+    case contentHash = "content_hash"
+    case relativePath = "relative_path"
+}
+
+/// 一条远端行在本端的落点判定（`SyncIdentityResolving.localizeRemoteTrack` 的返回值）。
+enum SyncLocalTrackOutcome: Equatable, Sendable {
+    /// 定位到本地曲目（`key` = 靠哪把键命中的，供诊断与测试断言）。
+    case resolved(stableId: String, key: SyncRemoteKey)
+    /// 本地还没有这首歌 → 挂起（`pendingKey` = 挂起表行键，命名空间见 `SyncPendingKey`）。
+    case suspended(pendingKey: String)
+    /// 第二身份命中**多行**（歧义）→ 不落库、不挂起，只计数披露。
+    case ambiguous(key: SyncRemoteKey, candidateCount: Int)
+    /// 两把键都拿不到 → 未定位（不落库、不挂起）。
+    case unresolved
+}
+
+// MARK: - 挂起键命名空间（身份入口一侧，唯一构造/解析处）
+
+/// `sync_pending_change.row_key` 的**命名空间**：挂起键的构造与解析只准出现在这里
+/// （pendig store / replay / coordinator 都不许各拼一遍字符串）。
+///
+/// 表结构不变（`row_key` 是 TEXT，天然容纳）：
+/// - 内容指纹命名空间：键 = 指纹本身（**今天形态，历史库里的行原样可读**）。
+/// - 相对路径命名空间：键 = `rel:{相对路径}`。**两个命名空间不可能撞名**：指纹字形受
+///   `SyncLyricsNamespace.isValidContentHash` 约束（字母/数字/`-`/`_`/`.`，**不含 `:`**），
+///   所以带冒号的 `rel:` 前缀只可能是相对路径键。
+enum SyncPendingKey {
+    /// 相对路径命名空间前缀。
+    static let relativePathPrefix = "rel:"
+
+    /// 内容指纹键（今天形态）。
+    static func contentHash(_ contentHash: String) -> String { contentHash }
+
+    /// 相对路径键。
+    static func relativePath(_ normalizedRelativePath: String) -> String {
+        relativePathPrefix + normalizedRelativePath
+    }
+
+    /// 挂起键 → 身份键组（重放时重建；非法键 = nil → 调用方丢弃并计数）。
+    /// 解析顺序与写入侧一致：先判相对路径前缀，其余按内容指纹。
+    static func identity(fromPendingKey key: String) -> SyncRemoteTrackIdentity? {
+        guard !key.isEmpty else { return nil }
+        if key.hasPrefix(relativePathPrefix) {
+            let raw = String(key.dropFirst(relativePathPrefix.count))
+            guard let normalized = SyncManifestGenerator.normalizeRelativePath(raw) else { return nil }
+            return SyncRemoteTrackIdentity(relativePath: normalized)
+        }
+        return SyncRemoteTrackIdentity(contentHash: key)
+    }
 }
 
 // MARK: - 线上命名空间

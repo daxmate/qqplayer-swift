@@ -23,6 +23,22 @@ enum MusicFolderResolver {
             .appendingPathComponent("QQPlayer", isDirectory: true)
     }
 
+    /// **同步子系统的曲库根（缺省值）**：与各装配点注入的根同源。
+    ///
+    /// 为什么要有这个访问器：同步装配点（Mac 工厂 / iOS 被动中心 / 曲库 host）都在
+    /// 构造时显式注入根（测试可注入）；但**入库路径**（`DatabaseManager.upsertTrack`）
+    /// 的挂起重放触发点拿不到装配点上下文，需要一个**同一事实源**的根来换算
+    /// `rel:` 命名空间的挂起键——不能在那里另写一套平台判断。
+    /// 平台分叉与 `DatabaseSyncCollectionFacts.defaultLibraryRoot` 同口径（生产装配点
+    /// 用的就是这两个值）。
+    static var syncLibraryRoot: URL {
+        #if os(macOS)
+            macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+        #else
+            iosDocumentsDirectoryURL()
+        #endif
+    }
+
     /// macOS 曲库扫描根列表：默认 ~/Music/QQPlayer 恒在列，加上设置页「音乐库」
     /// 添加的外部文件夹（多根共存，与默认目录同路径者去重）。行为与旧
     /// StateManager.getMusicFolderURLs() 完全一致（A0 仅上收实现位置）。
