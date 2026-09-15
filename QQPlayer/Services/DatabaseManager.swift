@@ -192,6 +192,7 @@ class DatabaseManager: @unchecked Sendable {
         for attempt in 1 ... maxRetries {
             do {
                 try setupDatabase()
+                dbDiagStats()
                 print("✅ Database initialized successfully on attempt \(attempt)")
                 return
             } catch {
@@ -324,6 +325,7 @@ class DatabaseManager: @unchecked Sendable {
 
             // Try to create a fresh database
             try setupDatabase()
+            dbDiagStats()
             dbDiag("✅ recovery OK (fresh database created)")
             print("✅ Database recovery successful - created fresh database")
         } catch {
@@ -401,6 +403,40 @@ class DatabaseManager: @unchecked Sendable {
                 try line.write(to: url, atomically: true, encoding: .utf8)
             } catch {
                 // 诊断日志失败不影响启动
+            }
+        #endif
+    }
+
+    /// 打开后记录：**App 实际使用的 App Group 容器路径与根目录条目** + 库内关键计数。
+    /// 为什么需要：devicectl 列出的 group 容器可能不是 App 实际用的那个（实测两者不一致），
+    /// 只有 App 自己报出的路径与内容才可信。
+    private func dbDiagStats() {
+        #if os(iOS)
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios") {
+                let entries = (try? FileManager.default.contentsOfDirectory(atPath: container.path))?
+                    .sorted().joined(separator: ",") ?? "?"
+                dbDiag("📁 groupContainer=\(container.path) entries=[\(entries)]")
+            } else {
+                dbDiag("📁 groupContainer=nil（退回 Documents 或降级）")
+            }
+            guard let writer = dbWriter else {
+                dbDiag("📊 stats skipped（dbWriter=nil = 降级）")
+                return
+            }
+            do {
+                let stats = try writer.read { db -> String in
+                    func count(_ table: String) -> Int {
+                        (try? Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)")) ?? -1
+                    }
+                    return "track=\(count("track")) play_history=\(count("play_history")) "
+                        + "favorite=\(count("favorite")) playlist=\(count("playlist")) "
+                        + "playlist_item=\(count("playlist_item")) outbox=\(count("sync_outbox")) "
+                        + "pending=\(count("sync_pending_change"))"
+                }
+                dbDiag("📊 \(stats)")
+            } catch {
+                dbDiag("📊 stats failed error=\(error)")
             }
         #endif
     }
