@@ -1783,3 +1783,203 @@ struct SyncIndexingPreconditionContractTests {
         )
     }
 }
+
+// MARK: - 「按实体披露」单一投影契约（INV-18 后半句 / INV-19，2026-09-15）
+
+/// 「按实体披露」唯一实现的**形状契约**：扫生产码 + 扫文案库，断言三件事——
+/// ① 界面层**不得自算数字 / 自行枚举实体**（明细行只能来自 `SyncEntityOutcomeDisclosure`）；
+/// ② 披露维度**完整**：每个结果类别有披露归属、每条实体有五语文案（新增即红）；
+/// ③ 合成「界面层自算数字」必须被抓到（fail-closed，证明断言不空转）。
+///
+/// 为什么单独一层：行为用例只能发现「算错了 / 少一行」，发现不了「界面层又自己算了一遍」
+/// ——那正是「同一语义多处手工维护」的形状（先例：封面解析 5 处并行实现）。
+///
+/// 判据（同 `SyncIdentityContract` / `SyncOutcomeContract` 风格）：纯函数判定 + 合成源码自证 + fail-closed。
+enum SyncEntityDisclosureContract {
+    /// 唯一投影（明细行的唯一来源）。
+    static let disclosurePath = "QQPlayer/Sync/SyncEntityOutcomeDisclosure.swift"
+    /// 界面层目录：这里出现的自算写法一律红。
+    static let uiRoots = ["QQPlayer/Mac", "QQPlayer/Views"]
+    /// 界面层**禁止**出现的写法（每条 = 一种「界面层自己算 / 自己枚举」的形状）。
+    static let forbiddenMarkers: [(marker: String, message: String)] = [
+        (".count(for:", "界面层直接读结果计数槽位 —— 数字必须由投影给出（INV-19）"),
+        ("entityGroups(for:", "界面层自行做实体分桶 —— 分组只有一处（tally.entityGroups）"),
+        ("SyncEntityRegistry", "界面层自行枚举实体名单 —— 分桶维度 = 注册表（INV-18）"),
+        ("SyncChangeEntity", "界面层自行枚举实体 —— 明细行由投影给出"),
+        ("sync_run_data_entity_", "界面层自行拼实体文案 key —— 行文案由投影给出"),
+    ]
+
+    /// 五语文案目录（key 齐全性检查用）。
+    static let languages = ["en", "fr", "ru", "zh-Hans", "zh-Hant"]
+
+    /// 纯函数：一份界面层源码里的违禁写法（空 = 合规）。
+    static func violations(inSource source: String) -> [String] {
+        forbiddenMarkers.compactMap { marker, message in
+            source.contains(marker) ? "`\(marker)` \(message)" : nil
+        }
+    }
+
+    /// 纯函数：各语言文案源码里**缺失**的 key（合成自证就喂它一份「少一个 key」的输入）。
+    static func missingKeys(_ keys: [String], sources: [String: String]) -> [String] {
+        var missing: [String] = []
+        for (language, source) in sources.sorted(by: { $0.key < $1.key }) {
+            for key in keys where !source.contains("\"\(key)\" = ") {
+                missing.append("\(language) 缺 `\(key)`")
+            }
+        }
+        return missing
+    }
+
+    /// 明细行需要五语齐全的 key：区标题 + 行格式 + 每条实体的名字 + 每个类别的名字与说明。
+    static var disclosureKeys: [String] {
+        var keys = [
+            SyncEntityOutcomeDisclosure.breakdownTitleKey,
+            SyncEntityOutcomeDisclosure.rowFormatKey,
+        ]
+        keys += SyncChangeEntity.allCases.map { SyncEntityOutcomeDisclosure.entityLabelKey($0) }
+        keys += SyncRowOutcome.allCases.map { SyncEntityOutcomeDisclosure.outcomeLabelKey($0) }
+        keys += SyncRowOutcome.allCases.compactMap { SyncEntityOutcomeDisclosure.outcomeHintKey($0) }
+        return keys
+    }
+
+    struct UITreeScan {
+        var scannedFiles = 0
+        var violations: [String] = []
+    }
+
+    /// 界面层全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
+    static func scanUITree(repoRoot: URL) -> UITreeScan {
+        var result = UITreeScan()
+        for root in uiRoots {
+            for url in SyncWiringContract.swiftSources(repoRoot: repoRoot, at: root) {
+                result.scannedFiles += 1
+                let relativePath = url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+                guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                    result.violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
+                    continue
+                }
+                result.violations += violations(inSource: source).map { "\(relativePath) → \($0)" }
+            }
+        }
+        return result
+    }
+}
+
+// MARK: - 按实体披露形状测试
+
+struct SyncEntityDisclosureContractTests {
+    static let repoRoot = SyncWiringContractTests.repoRoot
+
+    @Test("按实体披露：界面层不得自算数字 / 自行枚举实体（明细行只能来自唯一投影）")
+    func uiConsumesDisclosureOnly() {
+        let scan = SyncEntityDisclosureContract.scanUITree(repoRoot: Self.repoRoot)
+        #expect(
+            scan.scannedFiles > 50,
+            "界面层一个 .swift 都没扫到 = 契约空转：扫到 \(scan.scannedFiles)"
+        )
+        #expect(
+            scan.violations.isEmpty,
+            """
+            界面层出现了「自己算数字 / 自己枚举实体」的写法（明细行必须来自
+            \(SyncEntityDisclosureContract.disclosurePath) 的 `SyncEntityOutcomeDisclosure.rows(_:)`）：
+            \(scan.violations.joined(separator: "\n"))
+
+            修法：Mac 面板取 `SyncEntityOutcomeDisclosure.rows(report.tally)`、iOS 设置页取
+            `SyncEntityOutcomeDisclosure.rows(summary.tally)`，行文案用 `rowLabel(_:)`。
+            """
+        )
+        // 白名单文件必须在场，且真的是明细行的入口（防「投影被删/改名，扫描变空转」）
+        let url = Self.repoRoot.appendingPathComponent(SyncEntityDisclosureContract.disclosurePath)
+        let source = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        #expect(!source.isEmpty, "读不到投影源码 = 契约空转（fail-closed）")
+        #expect(source.contains("static func rows("), "投影必须提供唯一入口 rows(_:)")
+        #expect(source.contains("static func disclosesByEntity("), "投影必须对每个类别表态是否按实体披露")
+    }
+
+    @Test("合成「界面层自算数字」必须被抓到（契约自证有效）")
+    func syntheticUISelfComputationIsCaught() {
+        let selfComputed = """
+            let rows = report.tally.entityGroups(for: .unresolved)
+            let label = "sync_run_data_entity_" + entity.rawValue
+            if SyncEntityRegistry.entityOrder.isEmpty { }
+        """
+        #expect(
+            SyncEntityDisclosureContract.violations(inSource: selfComputed).count == 3,
+            "界面层自算分桶 / 自拼文案 key / 自枚举注册表都必须被抓到"
+        )
+
+        let clean = """
+            let rows = SyncEntityOutcomeDisclosure.rows(report.tally)
+            Text(SyncEntityOutcomeDisclosure.breakdownTitleKey.localized)
+            Text(SyncEntityOutcomeDisclosure.rowLabel(row))
+        """
+        #expect(
+            SyncEntityDisclosureContract.violations(inSource: clean).isEmpty,
+            "正规写法（消费投影）不得误报"
+        )
+    }
+
+    @Test("披露维度完整：类别有归属、实体有位置、五语文案齐全（新增实体/类别即红）")
+    func disclosureCoversEveryCaseAndLanguage() throws {
+        // ① 结果类别：`disclosesByEntity` 的集合必须与披露顺序逐项一致（漏表态 / 重复表态即红）
+        let disclosed = SyncRowOutcome.allCases.filter(SyncEntityOutcomeDisclosure.disclosesByEntity)
+        #expect(
+            Set(disclosed) == Set(SyncEntityOutcomeDisclosure.entityDisclosureOrder),
+            """
+            按实体披露的类别集合与顺序表不一致（新增 SyncRowOutcome 必须两边同时表态）：
+            开关给出 \(disclosed.map { $0 }) / 顺序表 \(SyncEntityOutcomeDisclosure.entityDisclosureOrder.map { $0 })
+            """
+        )
+        #expect(
+            SyncEntityOutcomeDisclosure.entityDisclosureOrder.count == disclosed.count,
+            "同一个类别不得在披露顺序里重复出现"
+        )
+        // ② 缺口行 + 计数行 = 全部类别（新增类别漏归宿即红）
+        #expect(
+            Set(SyncEntityOutcomeDisclosure.gapOrder + SyncEntityOutcomeDisclosure.countOrder)
+                == Set(SyncRowOutcome.allCases),
+            "有类别没有展示归宿（新增 SyncRowOutcome 必须同时进 gapOrder / countOrder）"
+        )
+        // ③ 实体：注册表顺序必须覆盖全部实体（新增实体漏登记即红）
+        #expect(
+            Set(SyncEntityRegistry.entityOrder) == Set(SyncChangeEntity.allCases),
+            "注册表实体顺序没覆盖全部实体：\(SyncEntityRegistry.entityOrder.map(\.rawValue))"
+        )
+
+        // ④ 文案：明细行相关 key 五语齐全（新增实体 = 新增 key，缺一个就红）
+        var sources: [String: String] = [:]
+        for language in SyncEntityDisclosureContract.languages {
+            let url = Self.repoRoot
+                .appendingPathComponent("QQPlayer/Resources/\(language).lproj/Localizable.strings")
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                Issue.record("读不到 \(language) 文案（fail-closed，不跳过）：\(url.path)")
+                continue
+            }
+            sources[language] = source
+        }
+        #expect(
+            sources.count == SyncEntityDisclosureContract.languages.count,
+            "五语文案没读全：\(sources.keys.sorted())"
+        )
+        let missing = SyncEntityDisclosureContract.missingKeys(
+            SyncEntityDisclosureContract.disclosureKeys,
+            sources: sources
+        )
+        #expect(missing.isEmpty, "缺文案 → 界面直接显示 key 原文：\(missing)")
+
+        // 合成自证：把一份文案里的一个 key 改掉 → 必须被判定为缺失（检查不空转）
+        var synthetic = sources
+        let english = try #require(sources["en"], "en 文案必须在场")
+        synthetic["en"] = english.replacingOccurrences(
+            of: "\"sync_run_data_entity_playlist_item\" = ",
+            with: "\"not_this_key\" = "
+        )
+        #expect(
+            SyncEntityDisclosureContract.missingKeys(
+                SyncEntityDisclosureContract.disclosureKeys,
+                sources: synthetic
+            ).contains("en 缺 `sync_run_data_entity_playlist_item`"),
+            "文案检查不得空转（合成缺 key 必须报出来）"
+        )
+    }
+}

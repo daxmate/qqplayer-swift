@@ -422,7 +422,9 @@ struct SyncChangeLogContentMapTests {
         let harness = try makeHarness()
         let unresolvedBox = IntBox()
         let appliedBox = IntBox()
-        harness.clientPeer.onPushUnresolved = { unresolvedBox.value = $0 }
+        harness.clientPeer.onPushUnresolved = { groups in
+            unresolvedBox.value = groups.reduce(0) { $0 + $1.count }
+        }
         harness.clientPeer.onPushApplied = { appliedBox.value = $0 }
 
         // host：歌在本地但**指纹为空** → wire entry 拿不到 contentHash（发送侧欠账）
@@ -480,7 +482,9 @@ struct SyncChangeLogContentMapTests {
     func suspendThenReplayOnTrackArrival() throws {
         let harness = try makeHarness()
         let suspendedBox = IntBox()
-        harness.clientPeer.onPushSuspended = { suspendedBox.value = $0 }
+        harness.clientPeer.onPushSuspended = { groups in
+            suspendedBox.value = groups.reduce(0) { $0 + $1.count }
+        }
 
         try harness.hostQueue.write { db in
             try Self.insertTrack(db, stableId: "host-track", contentHash: "H2")

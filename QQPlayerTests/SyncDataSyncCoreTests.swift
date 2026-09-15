@@ -106,6 +106,31 @@ struct SyncDataSyncCoreTests {
         }
     }
 
+    /// 记一条歌单项 outbox 变更（模拟业务写点；row_key = "歌单 slug|歌 stableId"）。
+    private static func recordPlaylistItem(
+        _ queue: DatabaseQueue,
+        playlistSlug: String,
+        trackStableId: String,
+        updatedAtMs: Int64
+    ) throws {
+        try queue.write { db in
+            try SyncChangeLogStore.record(
+                db,
+                entity: .playlistItem,
+                rowKey: "\(playlistSlug)|\(trackStableId)",
+                op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(
+                    SyncPlaylistItemSnapshot(
+                        playlistSlug: playlistSlug,
+                        position: 0,
+                        trackStableId: trackStableId
+                    )
+                ),
+                updatedAtMs: updatedAtMs
+            )
+        }
+    }
+
     private static func favoriteIDs(_ queue: DatabaseQueue) throws -> [String] {
         try queue.read { db in
             try String.fetchAll(db, sql: "SELECT track_stable_id FROM favorite ORDER BY track_stable_id")
@@ -510,7 +535,7 @@ struct SyncDataSyncCoreTests {
         var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: true)
         let unsupported = CounterBox()
         applier.playbackPositionSink = { _ in false }
-        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+        applier.onPlaybackPositionUnsupported = { _ in unsupported.increment() }
 
         let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
 
@@ -590,7 +615,7 @@ struct SyncDataSyncCoreTests {
         applier.playbackPositionSink = { _ in sinkCalls.increment()
             return false
         }
-        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+        applier.onPlaybackPositionUnsupported = { _ in unsupported.increment() }
 
         let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
 
@@ -608,7 +633,7 @@ struct SyncDataSyncCoreTests {
         applier.playbackPositionSink = { _ in sinkCalls.increment()
             return true
         }
-        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+        applier.onPlaybackPositionUnsupported = { _ in unsupported.increment() }
 
         let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
 
@@ -622,7 +647,7 @@ struct SyncDataSyncCoreTests {
         let manager = try makeManager()
         var applier = SyncChangeLogApplier(database: manager, playbackPositionSyncEnabled: true)
         let unsupported = CounterBox()
-        applier.onPlaybackPositionUnsupported = { unsupported.increment() }
+        applier.onPlaybackPositionUnsupported = { _ in unsupported.increment() }
 
         let applied = try applier.apply([try Self.playbackPositionRow(rowKey: "t-1")])
 
@@ -745,7 +770,7 @@ struct SyncDataSyncCoreTests {
 
         var applier = SyncChangeLogApplier(database: manager)
         let missingParent = CounterBox()
-        applier.onSkippedMissingParent = { missingParent.increment() }
+        applier.onSkippedMissingParent = { _ in missingParent.increment() }
 
         let applied = try applier.apply([
             SyncChangeLogRow(
@@ -768,7 +793,7 @@ struct SyncDataSyncCoreTests {
         let manager = try makeManager()
         var applier = SyncChangeLogApplier(database: manager)
         let missingParent = CounterBox()
-        applier.onSkippedMissingParent = { missingParent.increment() }
+        applier.onSkippedMissingParent = { _ in missingParent.increment() }
 
         let applied = try applier.apply([
             SyncChangeLogRow(
@@ -865,6 +890,205 @@ struct SyncDataSyncCoreTests {
         #expect(gate.acquire(), "释放后可再取")
         gate.release()
     }
+
+    // MARK: - (实体, 结果) 二维账目 + 按实体披露（INV-18 后半句，2026-09-15）
+
+    @Test("结果账目（二维）：总数 = 未归属 + 各实体桶之和；分桶不串台；覆盖写按桶")
+    func tallyBucketsAreTwoDimensional() {
+        var tally = SyncOutcomeTally()
+        tally.accumulate(.unresolved, entity: .favorite, count: 2)
+        tally.accumulate(.unresolved, entity: .playlistItem, count: 3)
+        tally.accumulate(.unresolved, count: 1) // 未申报实体 → 未归属桶
+
+        #expect(tally.count(for: .unresolved) == 6, "总数 = 派生值（2 + 3 + 1），不是另存的一份")
+        #expect(tally.count(for: .unresolved, entity: .favorite) == 2)
+        #expect(tally.count(for: .unresolved, entity: .playlistItem) == 3)
+        #expect(tally.count(for: .unresolved, entity: nil) == 1, "未归属桶单列")
+        #expect(tally.count(for: .unresolved, entity: .playlist) == 0, "没写过的实体桶为 0")
+        #expect(tally.count(for: .applied) == 0, "别的结果类别不受影响（不串台）")
+
+        #expect(
+            tally.entityGroups(for: .unresolved).map(\.entity) == [.favorite, .playlistItem],
+            "分组只出 > 0 的桶，顺序 = 注册表声明顺序（A favorite → D playlistItem）"
+        )
+        #expect(
+            SyncOutcomeTally().entityGroups(for: .unresolved).isEmpty,
+            "全 0 = 无分组（会话层据此判定「本批无该类结果」）"
+        )
+
+        // 覆盖写（「最近一批」口径）按**桶**生效，且不影响别的类别
+        tally.overwrite(.outbound, with: 5)
+        tally.overwrite(.outbound, with: 2)
+        #expect(tally.count(for: .outbound) == 2)
+        #expect(tally.count(for: .outbound, entity: nil) == 2, "批次事实落在未归属桶")
+        #expect(tally.count(for: .unresolved) == 6, "覆盖一个槽位不影响别的类别")
+    }
+
+    @Test("按实体披露（纯逻辑）：只出 >0 的 (结果, 实体) 行；顺序 = 严重度 × 注册表")
+    func entityDisclosureRowsComeFromTallyOnly() {
+        var tally = SyncOutcomeTally()
+        #expect(SyncEntityOutcomeDisclosure.rows(tally).isEmpty, "全 0 = 空表（正常实体不占行，不做恒零噪音表）")
+
+        tally.accumulate(.unresolved, entity: .favorite, count: 2)
+        tally.accumulate(.skippedMissingParent, entity: .playlistItem, count: 1)
+        tally.accumulate(.suspended, entity: .favorite, count: 3)
+        tally.accumulate(.applied, entity: .favorite, count: 9) // 已应用：不按实体披露
+        tally.accumulate(.ignoredDelete, entity: .favorite, count: 4) // 忽略删除：设计行为，不上明细
+
+        let rows = SyncEntityOutcomeDisclosure.rows(tally)
+        #expect(
+            rows.map { "\($0.outcome)/\($0.entity.rawValue)/\($0.count)" } == [
+                "unresolved/favorite/2",
+                "skippedMissingParent/playlist_item/1",
+                "suspended/favorite/3",
+            ],
+            "顺序 = 结果严重度（未定位 → 缺依赖 → 挂起）× 实体（注册表顺序）；只出 > 0 的行"
+        )
+        #expect(
+            rows.allSatisfy { SyncEntityOutcomeDisclosure.disclosesByEntity($0.outcome) },
+            "不按实体披露的类别（已应用 / 发出 / 忽略删除）不得出现在明细行里"
+        )
+        #expect(
+            rows.allSatisfy {
+                SyncEntityOutcomeDisclosure.entityLabelKey($0.entity).hasPrefix("sync_run_data_entity_")
+                    && !SyncEntityOutcomeDisclosure.outcomeLabelKey($0.outcome).isEmpty
+            },
+            "每条明细行都要有实体名与结果名的文案 key"
+        )
+        // 同一份账目 → 同一个投影（两端面板不会各算一套）
+        #expect(SyncEntityOutcomeDisclosure.rows(tally) == rows)
+    }
+
+    @Test("coordinator：缺口按实体分桶——收藏与歌单项的未定位各自成行（INV-18 后半句）")
+    func coordinatorBucketsGapsByEntity() throws {
+        let pair = try makePair()
+        let responder = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)
+        _ = responder
+
+        // 对端（client）：一条收藏 + 一条歌单项，两首歌都**没有指纹**（两把键都拿不到）
+        // → 本端未定位；实体不同（favorite / playlistItem）必须各自成行。
+        try Self.insertTrack(pair.clientQueue, stableId: "client-fav", contentHash: nil)
+        try Self.insertTrack(pair.clientQueue, stableId: "client-item", contentHash: nil)
+        try Self.recordFavorite(pair.clientQueue, rowKey: "client-fav", updatedAtMs: 1000)
+        try Self.recordPlaylistItem(
+            pair.clientQueue,
+            playlistSlug: "pl-1",
+            trackStableId: "client-item",
+            updatedAtMs: 2000
+        )
+
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start()
+
+        let report = coordinator.report
+        #expect(report.unresolvedEntries == 2, "总数口径不变（两条都未定位）")
+        #expect(report.tally.count(for: .unresolved, entity: .favorite) == 1, "收藏那条例成一行")
+        #expect(report.tally.count(for: .unresolved, entity: .playlistItem) == 1, "歌单项那条另成一行")
+        #expect(
+            SyncEntityOutcomeDisclosure.rows(report.tally).map { "\($0.outcome)/\($0.entity.rawValue)/\($0.count)" }
+                == ["unresolved/favorite/1", "unresolved/playlist_item/1"],
+            "面板明细行：按实体分开披露（同一类别、不同实体）"
+        )
+        // 明细行的和 = 汇总行的数（同一份账目派生，两个数字对得上）
+        let detailTotal = SyncEntityOutcomeDisclosure.rows(report.tally)
+            .filter { $0.outcome == .unresolved }
+            .reduce(0) { $0 + $1.count }
+        #expect(detailTotal == report.unresolvedEntries, "明细之和必须等于汇总数（派生自同一份账目）")
+    }
+
+    @Test("coordinator：歌单行应用失败 → 按实体（playlist）计数上屏（L0 契约 C 的失败披露）")
+    func coordinatorCountsPlaylistApplyFailure() throws {
+        let pair = try makePair()
+        // 会话侧处理器（⚠️ 必须强持有：它以 [weak self] 挂接会话回调）；缺了它帧 8 无人应答
+        let responder = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)
+        _ = responder
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start()
+        #expect(coordinator.report.isFinished)
+
+        // 模拟对端推来一条**载荷缺失**的歌单行（真实成因：载荷非法 / 落库抛错）——
+        // 以前这条只进日志（面板零信号），歌单级失败因此不可见。
+        let payload = SyncChangeLogPushPayload(
+            entries: [
+                SyncChangeLogWireEntry(
+                    id: 1, entity: SyncChangeEntity.playlist.rawValue, rowKey: "pl-broken",
+                    op: SyncChangeOp.upsert.rawValue, updatedAtMs: 1,
+                    contentHash: nil, payloadJSON: nil
+                ),
+            ],
+            lastOutboxID: 1
+        )
+        try pair.fixture.clientSession.sendApplicationFrame(
+            type: .changeLogPush,
+            payload: try JSONEncoder().encode(payload)
+        )
+
+        let report = coordinator.report
+        #expect(report.applyFailedEntries == 1, "歌单级失败必须计数（以前只进日志）")
+        #expect(report.appliedEntries == 0, "没落库就不许算「已应用」（INV-20）")
+        #expect(report.tally.count(for: .applyFailed, entity: .playlist) == 1, "失败归属到歌单实体")
+        #expect(
+            SyncEntityOutcomeDisclosure.rows(report.tally) == [
+                SyncEntityOutcomeDisclosure.Row(outcome: .applyFailed, entity: .playlist, count: 1),
+            ],
+            "面板明细行：歌单结构 · 应用失败 1"
+        )
+        #expect(try Self.countRows(pair.hostQueue, table: "playlist") == 0, "坏行不得写出歌单")
+    }
+
+    @Test("coordinator：应用失败后同一批的后续行不再应用（批次中断语义不变）+ 坏行不推进游标")
+    func applyFailureKeepsBatchInterruptionSemantics() throws {
+        let pair = try makePair()
+        let responder = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)
+        _ = responder
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start()
+
+        try Self.insertTrack(pair.hostQueue, stableId: "host-1", contentHash: "H-1")
+        let payload = SyncChangeLogPushPayload(
+            entries: [
+                SyncChangeLogWireEntry(
+                    id: 1, entity: SyncChangeEntity.playlist.rawValue, rowKey: "pl-broken",
+                    op: SyncChangeOp.upsert.rawValue, updatedAtMs: 1,
+                    contentHash: nil, payloadJSON: nil
+                ),
+                SyncChangeLogWireEntry(
+                    id: 2, entity: SyncChangeEntity.favorite.rawValue, rowKey: "host-1",
+                    op: SyncChangeOp.upsert.rawValue, updatedAtMs: 2,
+                    contentHash: "H-1",
+                    payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "H-1"))
+                ),
+            ],
+            lastOutboxID: 2
+        )
+        try pair.fixture.clientSession.sendApplicationFrame(
+            type: .changeLogPush,
+            payload: try JSONEncoder().encode(payload)
+        )
+
+        #expect(coordinator.report.applyFailedEntries == 1)
+        #expect(coordinator.report.appliedEntries == 0, "坏行之后的同批行不应用（与收口前一致）")
+        #expect(try Self.favoriteIDs(pair.hostQueue).isEmpty)
+        #expect(
+            try pair.hostStore.cursor(forPeer: pair.clientID) == 0,
+            "应用失败不推进游标（与收口前一致：下一轮重试）"
+        )
+    }
 }
 
 // MARK: - 测试辅助（闭包捕获盒子；避免在 @MainActor 测试里捕获可变局部变量）
@@ -907,7 +1131,7 @@ private final class IntListBox: @unchecked Sendable {
     @Test("结果枚举：每个类别一个槽位（allCases 1:1，累加互不串台）")
     func outcomeTallySlotsAreOneToOne() {
         #expect(
-            SyncRowOutcome.allCases.count == 8,
+            SyncRowOutcome.allCases.count == 10,
             "类别数变了：新增/删除结果类别必须同步改这里与 SyncOutcomeContractTests 的形状断言"
         )
         for outcome in SyncRowOutcome.allCases {
@@ -982,6 +1206,7 @@ private final class IntListBox: @unchecked Sendable {
             "countOrder 里的类别必须都是计数行归属（否则 countRows 静默漏行）"
         )
     }
+
 }
 
 private final class PhaseListBox: @unchecked Sendable {
