@@ -131,25 +131,33 @@
 
 ### INV-18　缺口必须**计数并上屏**，且**区分实体**
 
-- **现有守护**：`△` 计数有、上屏不全、实体维度**完全没有**。
-  - 计数：`SyncDataSyncReport`（`QQPlayer/Sync/SyncDataSyncCoordinator.swift:64-83`），行为用例 `SyncDataSyncCoreTests.swift:284`。
-  - 上屏（Mac only）：`MacSyncView.swift:983-1026`（6 个总数）。
-  - `✗` iOS 无面板（`IOSPassiveSyncCenter.swift:549-578` 全 print）。
-  - `✗` 歌词丢弃计了数没进 `SyncUIReportSummary`（`QQPlayer/Services/SyncUIState.swift:449-500` 无该字段）。
+- **现有守护**：`△` 计数有、上屏有（两端）、实体维度**仍然没有**。
+  - 计数：`SyncDataSyncReport`（`QQPlayer/Sync/SyncDataSyncCoordinator.swift:68`）——L6 起账目 = `SyncOutcomeTally`（`QQPlayer/Sync/SyncOutcomeTally.swift`）。
+  - 上屏：Mac `QQPlayer/Mac/MacSyncView.swift`（8 个总数）、iOS `IOSPassiveDataSyncPresenter`（4 缺口行 + 4 计数行，`QQPlayer/Services/IOSPassiveSyncCenter.swift`）。
+  - `✗` 歌词丢弃计了数没进 `SyncUIReportSummary`（`QQPlayer/Services/SyncUIState.swift` 无该字段）。
+- **L6 守护（2026-09-15 立，可执行名字）**：
+  - `QQPlayerTests/SyncDataSyncCoreTests.swift` → `outcomeTallySlotsAreOneToOne`（`SyncRowOutcome.allCases` 每类恰一个槽位、互不串台；类别数变了先红）
+  - `QQPlayerTests/SyncWiringContractTests.swift` → `productionHasSingleOutcomeTally`（静态：结果计数**只准**声明/改写于 `QQPlayer/Sync/SyncOutcomeTally.swift`，别处分类 `+=` / `=` 即红）
+  - `QQPlayerTests/SyncWiringContractTests.swift` → `syntheticSecondLedgerIsCaught`（合成「第二处账目」必须被抓到——契约定自证不空转，fail-closed）
+  - `QQPlayerTests/SyncDataSyncCoreTests.swift` → `presenterPlacementCoversAllOutcomes`（新增类别不给展示归宿就红）+ `passiveDataSyncPresenterRowsArePure`（缺口行只列 >0、顺序 = 严重度、每条都有 hint）
 - **建议**：**面板披露** + **静态契约**
-  - 面板：`SyncDataSyncReport` 按实体分桶（`[SyncChangeEntity: Int]`）→ 面板分实体展示；歌词 `discardedLyrics` / `orphanLyricsSkipped` 进 `SyncUIReportSummary`。
-  - 静态：断言「`Report` 里的每个计数字段都有 UI 消费点」（防止再次出现「计了数没上屏」）。
+  - 面板：`SyncDataSyncReport` 按实体分桶（`[SyncChangeEntity: Int]`）→ 面板分实体展示（**仍未做**）；歌词 `discardedLyrics` / `orphanLyricsSkipped` 进 `SyncUIReportSummary`（**仍未做**）。
+  - 静态：✅ 已落（见上 `productionHasSingleOutcomeTally`）。
 
 ### INV-19　面板数字必须来自**协调器账目单一数据源**（不在 UI 层补算）
 
 - **现有守护**：**行为用例**：`SyncUIStateTests.swift`（`SyncUIReportSummary.make` 唯一映射）；注释纪律 `SyncUIState.swift:478`「唯一数据源；不在这里补算任何数字」。
-- **建议**：保持；补**静态契约**：禁止 `MacSync*View` 里出现 `report.` 之外的算术（可 grep 白名单）。
+- **L6 守护（2026-09-15 立）**：两端账目**持有同一个** `SyncOutcomeTally`（Mac `SyncDataSyncReport.tally` / iOS `IOSPassiveDataSyncSummary.tally`），面板/纯逻辑读的是它的投影——L6 之前 iOS 那套是**自己声明**的一份计数（同一账目两个结构）。
+  - 行为用例：`QQPlayerTests/SyncDataSyncCoreTests.swift` → `bothLedgersShareOneTally`（同样写入 → 同一份账目；旧读数名 = 槽位口径）+ `tallyAccumulateAndOverwriteSemantics`（累加 / 「最近一批」覆盖写）
+  - 静态：`QQPlayerTests/SyncWiringContractTests.swift` → `productionHasSingleOutcomeTally`（别处不得分类 `+=` / `=`；**只读投影与比较放行**——Mac 面板 / iOS 纯逻辑就是只读）
+- **建议**：保持；若要更严，可再补「`MacSync*View` 里 `report.` 之外的算术」白名单（本轮未做）。
 
 ### INV-20　「已应用 N」必须真的是落库行数（静默丢弃不算应用）
 
 - **现有守护：✅ 已收（2026-09-15）**
   - `SyncChangeLogApplier.applyPlaybackPosition`：开关关 / 无落点 / 落点未接受（不同曲 / 远端更旧 / 位置差 < 3s）——三条路径一律 `return false`，并触发 `onPlaybackPositionUnsupported` → `SyncChangeLogPeer.onPushUnsupported` → `SyncDataSyncReport.unsupportedEntries` → 面板「未支持」行。
   - 用例：`SyncDataSyncCoreTests`（开关关 → 不计「已应用」+ 计未支持；开但无落点 → 同；落点未接受 → 同）。
+- **L6 守护（2026-09-15 立）**：`.applied` 与 `.unsupported` / `.unresolved` / `.skippedMissingParent` / `.ignoredDelete` 是**互不相干的槽位**（`QQPlayerTests/SyncDataSyncCoreTests.swift` → `outcomeTallySlotsAreOneToOne`）——「没落库的不许算进已应用」在枚举层就是形状，不再靠「每处对账」。
 - **建议**：已落；后续任何新增 `apply*` 分支都必须守「没落库就不 return true」。
 
 ---
