@@ -84,7 +84,7 @@ struct MacKaraokeControlBar: View {
             }
         ) {
             Image(systemName: "chevron.up")
-                .font(.system(size: DesignTokens.font12_5, weight: .semibold))
+                .font(.system(size: DesignTokens.font12, weight: .semibold))
                 .foregroundColor(.primary.opacity(0.85))
         }
         .accessibilityLabel(NSLocalizedString("karaoke_previous_line", value: "Previous line", comment: ""))
@@ -127,7 +127,7 @@ struct MacKaraokeControlBar: View {
             }
         ) {
             Image(systemName: "chevron.down")
-                .font(.system(size: DesignTokens.font12_5, weight: .semibold))
+                .font(.system(size: DesignTokens.font12, weight: .semibold))
                 .foregroundColor(.primary.opacity(0.85))
         }
         .accessibilityLabel(NSLocalizedString("karaoke_next_line", value: "Next line", comment: ""))
@@ -203,7 +203,7 @@ struct MacKaraokeControlBar: View {
 
     private var abEndHint: some View {
         Text(NSLocalizedString("karaoke_ab_end_hint", value: "Tap a lyric line to set the AB end point", comment: ""))
-            .font(.system(size: DesignTokens.font11, weight: .medium))
+            .font(.system(size: DesignTokens.font12, weight: .medium))
             .foregroundColor(accentColor)
             .padding(.horizontal, DesignTokens.space10)
             .padding(.vertical, DesignTokens.space4)

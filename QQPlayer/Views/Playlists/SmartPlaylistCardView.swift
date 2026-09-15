@@ -133,9 +133,9 @@ struct SmartPlaylistCardView: View {
                 .scaledToFill()
                 .frame(width: size, height: size)
                 .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: artworks.count >= 4 ? 6 : 12))
+                .clipShape(RoundedRectangle(cornerRadius: artworks.count >= 4 ? DesignTokens.radius6 : DesignTokens.radius12))
         } else {
-            RoundedRectangle(cornerRadius: artworks.count >= 4 ? 6 : 12)
+            RoundedRectangle(cornerRadius: artworks.count >= 4 ? DesignTokens.radius6 : DesignTokens.radius12)
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: size, height: size)
                 .overlay(

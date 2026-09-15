@@ -156,15 +156,15 @@ struct PlaylistCardView: View {
                 .resizable().scaledToFill()
                 .frame(width: size, height: size)
                 .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: index < 4 && allTracks.count >= 4 ? 6 : 12))
+                .clipShape(RoundedRectangle(cornerRadius: index < 4 && allTracks.count >= 4 ? DesignTokens.radius6 : DesignTokens.radius12))
         } else if index < allTracks.count {
-            RoundedRectangle(cornerRadius: index < 4 && allTracks.count >= 4 ? 6 : 12)
+            RoundedRectangle(cornerRadius: index < 4 && allTracks.count >= 4 ? DesignTokens.radius6 : DesignTokens.radius12)
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: size, height: size)
                 .overlay(
                     Image(systemName: "music.note")
                         .foregroundColor(.secondary)
-                        .font(.system(size: size != nil ? size! / 4 : 40))
+                        .font(.system(size: size != nil ? size! / 4 : DesignTokens.font40))
                 )
         }
     }

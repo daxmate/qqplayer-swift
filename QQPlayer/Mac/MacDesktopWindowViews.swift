@@ -65,7 +65,7 @@ struct MacMiniPlayerView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Text(artistName)
-                            .font(.system(size: DesignTokens.font11))
+                            .font(.system(size: DesignTokens.font12))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }

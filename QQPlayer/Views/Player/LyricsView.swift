@@ -313,7 +313,7 @@ struct LyricsView: View {
     private func fontForLine(isActive: Bool, distance: Int) -> Font {
         if karaoke.isKaraokeOn {
             // 跟唱：整屏歌词等大可见（当前句略大加粗），不聚焦淡出
-            return .system(size: isActive ? 22 : 19, weight: isActive ? .bold : .regular)
+            return .system(size: isActive ? DesignTokens.font22 : DesignTokens.font19, weight: isActive ? .bold : .regular)
         }
         if isActive {
             return .system(size: DesignTokens.font26, weight: .bold)

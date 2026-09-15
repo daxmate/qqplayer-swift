@@ -49,7 +49,7 @@ struct MacSearchField: View {
         }
         .padding(.horizontal, DesignTokens.space8)
         .padding(.vertical, DesignTokens.space6)
-        .background(RoundedRectangle(cornerRadius: DesignTokens.radius7).fill(Color.gray.opacity(0.15)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.radius6).fill(Color.gray.opacity(0.15)))
         .padding(.horizontal, DesignTokens.space8)
         .padding(.top, DesignTokens.space8)
     }

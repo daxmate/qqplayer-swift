@@ -717,11 +717,11 @@ private struct MacOnlineResultRow: View {
             }
         }
         .frame(width: 34, height: 34)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius5))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius4))
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: DesignTokens.radius5)
+        RoundedRectangle(cornerRadius: DesignTokens.radius4)
             .fill(Color.gray.opacity(0.18))
             .overlay {
                 Image(systemName: "music.note")

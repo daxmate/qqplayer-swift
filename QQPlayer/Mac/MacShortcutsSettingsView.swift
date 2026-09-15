@@ -71,7 +71,7 @@ struct MacShortcutsSettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal, DesignTokens.space8)
                         .padding(.vertical, DesignTokens.space3)
-                        .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius5))
+                        .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius4))
                 }
                 Button(recordingID == def.id ? "shortcuts_cancel".localized : "shortcuts_record".localized) {
                     toggleRecording(def.id)

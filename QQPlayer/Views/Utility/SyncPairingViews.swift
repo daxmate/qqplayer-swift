@@ -84,7 +84,7 @@ struct SyncPairConfirmCardView: View {
             .controlSize(.large)
         }
         .padding(DesignTokens.space16)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
     }
 }
 

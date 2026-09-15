@@ -83,10 +83,11 @@ extension EnvironmentValues {
 
 /// 圆角 / 字号刻度的**唯一列举处**（`docs/ui-design-tokens.md` §2 C10/C12）。
 ///
-/// 本轮（B2a）只做「同值令牌化」：每个令牌的值 = 迁移前那处裸字面量，**逐字相同、零视觉变化**；
-/// 不做归一（把 5/7/9/11/14 这类零散值并档是 B2b，待用户拍板）。令牌的作用是把「现在到底有多少种取值」
-/// 从「只能靠 grep 盘点」变成一处可列——改前实测圆角 15 种 / **152 处**、字号 26 种 / **115 处**
-/// （文档最初记的 12 种 / 25 种是漏项版，且漏了 `.cornerRadius(12)` 这种不带冒号的写法）。
+/// **B2a（同值令牌化，零视觉变化）**：每个令牌的值 = 迁移前那处裸字面量（实测圆角 15 种 / 152 处、
+/// 字号 26 种 / 115 处）。**B2b（归一，有视觉变化，用户 2026-09-16 拍板）**：把零散档并到刻度上——
+/// 圆角 `0.5→0 / 5→4 / 7→6 / 14→12 / 25→24`，字号 `11→12 / 12.5→12`；
+/// 并档口径 = 就近取整，两侧等距取较小整数（`docs/ui-design-tokens.md` §B2b）。
+/// 归一后：**圆角 11 种 / 152 处，字号 24 种 / 116 处**。
 ///
 /// 命名规则：**按值命名**，小数点写成 `_`（Swift 标识符不允许 `.`）：`radius12_5 = 12.5`。
 /// 名字与值必须自洽——`UIAccentContractTests` 里有断言逐条比对「名字解出来的数 == 值」：
@@ -96,51 +97,41 @@ extension EnvironmentValues {
 /// `.system(size: <数字>`（本轮迁移 152 + 115 处 → 裸值 0 处，见 `UIAccentContractTests`）。
 /// 令牌定义本身不匹配上述调用点模式 ⇒ 该规则的白名单为空（不是漏配）。
 enum DesignTokens {
-    // MARK: 圆角（C10：15 种 / 152 处，值 = 迁移前裸字面量）
+    // MARK: 圆角（C10：归一后 11 种 / 152 处，B2b 2026-09-16）
 
-    /// `0` —— 改前 1 处。
+    /// 直角（语义：无圆角）。
+    /// 改前 1 处；B2b 并由 `0.5`（+1 处，小数档就近取整 → 等距取较小整数）。
     static let radius0: CGFloat = 0
-    /// `0.5` —— 改前 1 处。
-    static let radius0_5: CGFloat = 0.5
-    /// `2` —— 改前 2 处。
+    /// 改前 2 处。
     static let radius2: CGFloat = 2
-    /// `4` —— 改前 8 处。
+    /// 改前 8 处；B2b 并由 `5`（+3 处，4|6 等距 → 取较小）。
     static let radius4: CGFloat = 4
-    /// `5` —— 改前 3 处。
-    static let radius5: CGFloat = 5
-    /// `6` —— 改前 19 处。
+    /// 改前 19 处；B2b 并由 `7`（+2 处，6|8 等距 → 取较小）。
     static let radius6: CGFloat = 6
-    /// `7` —— 改前 2 处。
-    static let radius7: CGFloat = 7
-    /// `8` —— 改前 32 处。
+    /// 改前 32 处。
     static let radius8: CGFloat = 8
-    /// `10` —— 改前 11 处。
+    /// 改前 11 处。
     static let radius10: CGFloat = 10
-    /// `12` —— 改前 43 处。
+    /// 改前 43 处；B2b 并由 `14`（+3 处，12|16 等距 → 取较小）。
     static let radius12: CGFloat = 12
-    /// `14` —— 改前 3 处。
-    static let radius14: CGFloat = 14
-    /// `16` —— 改前 10 处。
+    /// 改前 10 处。
     static let radius16: CGFloat = 16
-    /// `20` —— 改前 1 处。
+    /// 改前 1 处。
     static let radius20: CGFloat = 20
-    /// `25` —— 改前 2 处。
-    static let radius25: CGFloat = 25
-    /// `28` —— 改前 14 处。
+    /// B2b 新增档位（改前 0 处）；由 `25` 就近取整而来（+2 处）。
+    static let radius24: CGFloat = 24
+    /// 改前 14 处（大卡面 / 歌词卡片）。
     static let radius28: CGFloat = 28
 
-    // MARK: 字号（C12：26 种 / 115 处，值 = 迁移前裸字面量）
+    // MARK: 字号（C12：归一后 24 种 / 116 处，B2b 2026-09-16）
 
-    /// `8` —— 改前 1 处。
+    /// 改前 1 处。
     static let font8: CGFloat = 8
-    /// `9` —— 改前 1 处。
+    /// 改前 1 处。
     static let font9: CGFloat = 9
-    /// `11` —— 改前 2 处。
-    static let font11: CGFloat = 11
-    /// `12` —— 改前 3 处。
+    /// 小字档唯一刻度（语义：辅助说明 / 桌面歌词角标）。
+    /// 改前 3 处；B2b 并由 `11`（+2 处）与 `12.5`（+2 处，小数档就近取整）。
     static let font12: CGFloat = 12
-    /// `12.5` —— 改前 2 处。
-    static let font12_5: CGFloat = 12.5
     /// `13` —— 改前 5 处。
     static let font13: CGFloat = 13
     /// `14` —— 改前 9 处。

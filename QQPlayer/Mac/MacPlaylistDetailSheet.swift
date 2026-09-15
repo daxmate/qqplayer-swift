@@ -80,7 +80,7 @@ struct MacManualPlaylistDetailView: View {
             MacArtworkThumbnail(
                 track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
                 size: 48,
-                cornerRadius: DesignTokens.radius7,
+                cornerRadius: DesignTokens.radius6,
                 placeholderIcon: "list.bullet.rectangle"
             )
             VStack(alignment: .leading, spacing: DesignTokens.space2) {

@@ -360,7 +360,7 @@ struct ArtistDetailScreen: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(accentColor)
-                    .cornerRadius(DesignTokens.radius25)
+                    .cornerRadius(DesignTokens.radius24)
             }
             Button {
                 let shuffled = artistTracks.shuffled()
@@ -374,7 +374,7 @@ struct ArtistDetailScreen: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(accentColor.opacity(0.1))
-                    .cornerRadius(DesignTokens.radius25)
+                    .cornerRadius(DesignTokens.radius24)
             }
         }
     }

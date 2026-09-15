@@ -179,8 +179,9 @@ enum UIGeometryContract {
     /// 都不命中。
     /// **刻意不做「实参任意位置出现数字」的宽匹配**：`fontSize * 0.45`、`max(size * 0.3, 10)` 里的
     /// 0.45 / 0.3 是**比例常数**（不是字号），宽匹配会把它们误判成裸值、逼着写成 `DesignTokens.font45`
-    /// 这种语义错的令牌。残余（实参非开头处的尺寸字面量：三元分支 `? 22 : 19`、`min(80, …)` 的 80 等）
-    /// 列在 docs/ui-design-tokens.md §3 M4，归 B2b。
+    /// 这种语义错的令牌。残余（实参非开头处、且是该实参的**夹取边界**：`min(80, …)` 的 80、
+    /// `max(size * 0.3, 10)` 的 10）列在 docs/ui-design-tokens.md §B2b 作为**刻意保留的例外**。
+    /// （「纯档位三元」`? 22 : 19`、`? 6 : 12` 已在 B2b 2026-09-16 令牌化，值与归一档位一致、零视觉变化。）
     static let nakedFontSizeArithmeticRule = UIAccentContract.Rule(
         name: "字号实参开头的字面量参与运算（size: 17 * fontScale）也要令牌化",
         pattern: #"\.system\(size:\s*-?\d+(?:\.\d+)?\s*[*/+\-]"#,
@@ -588,8 +589,8 @@ struct UIGeometryContractTests {
         let radiusTokens = tokens.filter { $0.name.hasPrefix("radius") }
         let fontTokens = tokens.filter { $0.name.hasPrefix("font") }
         let spaceTokens = tokens.filter { $0.name.hasPrefix("space") }
-        #expect(radiusTokens.count >= 15, "圆角令牌数异常（B2a 实测 15 种）：\(radiusTokens.count)")
-        #expect(fontTokens.count >= 26, "字号令牌数异常（B2a 实测 26 种）：\(fontTokens.count)")
+        #expect(radiusTokens.count >= 11, "圆角令牌数异常（B2b 归一后 11 种）：\(radiusTokens.count)")
+        #expect(fontTokens.count >= 24, "字号令牌数异常（B2b 归一后 24 种）：\(fontTokens.count)")
         #expect(spaceTokens.count >= 33, "间距令牌数异常（B2c-a 实测 33 种）：\(spaceTokens.count)")
 
         let inconsistent = UIGeometryContract.selfInconsistent(tokens)
@@ -603,6 +604,45 @@ struct UIGeometryContractTests {
             定义与引用不一致。
             只定义没引用（死令牌 / 解析漏了）：\(defined.subtracting(referenced).sorted())
             引用了没定义（拼错名）：\(referenced.subtracting(defined).sorted())
+            """
+        )
+    }
+
+    /// B2b 2026-09-16 归一后的**目标刻度集合**（归一验收物：刻度只能少、不能再长出零散值）。
+    /// 圆角：15 种 → 11 种（`0.5→0`、`5→4`、`7→6`、`14→12`、`25→24`）。
+    /// 字号：26 种 → 24 种（`11→12`、`12.5→12`，用户拍板方案 B）。
+    /// 改动刻度必须同时改本断言——这是「归一没被新零散值静默回退」的唯一兜底。
+    static let expectedRadiusNames: Set<String> = [
+        "radius0", "radius2", "radius4", "radius6", "radius8", "radius10",
+        "radius12", "radius16", "radius20", "radius24", "radius28",
+    ]
+    static let expectedFontNames: Set<String> = [
+        "font8", "font9", "font12", "font13", "font14", "font15", "font16", "font17",
+        "font18", "font19", "font20", "font22", "font24", "font26", "font30", "font32",
+        "font36", "font40", "font44", "font50", "font52", "font60", "font64", "font70",
+    ]
+
+    @Test("归一后刻度集合 == 预期集合（圆角 11 种 / 字号 24 种，B2b 验收物）")
+    func normalizedScaleMatchesExpectedSet() throws {
+        let source = try String(contentsOf: Self.tokenFileURL, encoding: .utf8)
+        let tokens = UIGeometryContract.parseTokens(source: source)
+        let radius = Set(tokens.map(\.name).filter { $0.hasPrefix("radius") })
+        let font = Set(tokens.map(\.name).filter { $0.hasPrefix("font") })
+
+        #expect(
+            radius == Self.expectedRadiusNames,
+            """
+            圆角刻度与归一验收物不一致。
+            多出（又长回零散值 / 忘了删旧令牌）：\(radius.subtracting(Self.expectedRadiusNames).sorted())
+            缺失（被误删）：\(Self.expectedRadiusNames.subtracting(radius).sorted())
+            """
+        )
+        #expect(
+            font == Self.expectedFontNames,
+            """
+            字号刻度与归一验收物不一致。
+            多出（又长回零散值 / 忘了删旧令牌）：\(font.subtracting(Self.expectedFontNames).sorted())
+            缺失（被误删）：\(Self.expectedFontNames.subtracting(font).sorted())
             """
         )
     }

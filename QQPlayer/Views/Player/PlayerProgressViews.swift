@@ -18,7 +18,7 @@ struct EqualizerBarsExact: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: DesignTokens.space1) {
             ForEach(0 ..< 4, id: \.self) { i in
-                RoundedRectangle(cornerRadius: DesignTokens.radius0_5)
+                RoundedRectangle(cornerRadius: DesignTokens.radius0)
                     .fill(color)
                     .frame(width: isLarge ? 2 : 1.5)
                     .frame(height: isActive && kick ? targetH[i] : minH)

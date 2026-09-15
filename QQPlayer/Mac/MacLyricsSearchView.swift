@@ -290,7 +290,7 @@ struct MacLyricsSearchView: View {
             }
             .padding(.horizontal, DesignTokens.space14)
             .padding(.vertical, DesignTokens.space12)
-            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
