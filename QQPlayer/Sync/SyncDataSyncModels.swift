@@ -150,6 +150,11 @@ struct SyncChangeLogPushPayload: Codable, Equatable, Sendable {
 /// 线上 outbox 行（changeLogPush 的 entry）。
 /// contentHash：跨端歌曲引用键（M4-2a 已收口：发送侧填本地 track 指纹，接收侧
 /// 映射回本地 stableId，缺歌挂起重放，见 SyncChangeLogMapping）。
+/// relativePath：**第二身份**（2026-09-18 身份兜底包）：发送侧拿不到指纹（`content_hash`
+/// 未回填 / 本地无 track 行）时，改填该歌的曲库相对路径（跨端同名）——接收侧靠它落库，
+/// 不再白丢用户的收藏 / 播放历史。
+/// 兼容性：**加性可选字段**（L7 加性演进）——老 peer 解码忽略未知键、新 peer 解老载荷
+/// 得 nil → 双方行为与今天一致。第一身份可用时**不填**（省字节、防误用）。
 struct SyncChangeLogWireEntry: Codable, Equatable, Sendable {
     var id: Int64
     var entity: String
@@ -157,6 +162,10 @@ struct SyncChangeLogWireEntry: Codable, Equatable, Sendable {
     var op: String
     var updatedAtMs: Int64
     var contentHash: String?
+    // swiftlint:disable implicit_optional_initialization
+    /// 第二身份：曲库相对路径（仅第一身份缺失时非 nil；解码缺键 = nil = 今天行为）。
+    var relativePath: String? = nil
+    // swiftlint:enable implicit_optional_initialization
     var payloadJSON: String?
 }
 
