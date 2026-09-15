@@ -1998,8 +1998,11 @@ struct SyncEntityDisclosureContractTests {
 ///    写进本端业务行）；
 /// ③ 合成「把对端封面写进本端」必须被抓到（fail-closed，证明断言不空转）。
 ///
-/// 白名单（三条，均为**现状事实**，不是理想态）：
-/// - `SyncDataSnapshots.swift`：wire 字段声明处（`custom_cover_image_path` 只在这一次声明）；
+/// 白名单（四条，均为**现状事实**，不是理想态）：
+/// - `SyncDataSnapshots.swift`：wire 字段声明处（`custom_cover_image_path` 的 snake_case 键）；
+/// - `SyncEntityRegistry.swift`：**实体登记处**——H（歌单封面）条目的 `carrierNote` 以散文
+///   引用该 wire 键（说明「随 C 的载荷搭车但无独立通道」），是**登记/文档**而非消费点
+///   （维护者复核时抓到：漏了这条白名单，本用例自己就是红的）；
 /// - `SyncChangeLogMapping.swift`：**捕获侧**——本端路径随 C 的载荷搭车发出（对端不消费；
 ///   真要跨端封面得另做 `@cover/{content_hash}` 式的文件通道，属未做的功能，不在本包范围）；
 /// - `SyncChangeLogApplier.swift`：**接收侧规则本身**（本包守护的对象）。
@@ -2012,18 +2015,23 @@ enum SyncCoverValueContract {
     static let applierPath = "QQPlayer/Sync/SyncChangeLogApplier.swift"
     /// wire 字段声明处（snake_case 键只准在这里出现）。
     static let payloadDeclarationPath = "QQPlayer/Sync/SyncDataSnapshots.swift"
+    /// 实体登记处（H 条目以散文引用 wire 键；登记 ≠ 消费）。
+    static let registryPath = "QQPlayer/Sync/SyncEntityRegistry.swift"
     /// 捕获侧（现状：本端路径搭车发出，无独立通道）。
     static let capturePath = "QQPlayer/Sync/SyncChangeLogMapping.swift"
 
     /// 允许提到封面路径的文件（白名单之外的任何一处 = 新的跨端消费点）。
-    static var whitelist: [String] { [applierPath, payloadDeclarationPath, capturePath] }
+    static var whitelist: [String] { [applierPath, payloadDeclarationPath, capturePath, registryPath] }
 
     /// 纯函数：一份 `Sync/` 源码里的违禁写法（空 = 该文件合规）。
     static func violations(inSource source: String, relativePath: String) -> [String] {
         var hits: [String] = []
-        // ① wire 键只准在声明处出现
-        if relativePath != payloadDeclarationPath, source.contains("custom_cover_image_path") {
-            hits.append("出现了 wire 键 `custom_cover_image_path`（只准在声明处 \(payloadDeclarationPath)）")
+        // ① wire 键只准在声明处 / 登记处出现（登记处是散文引用，不是消费点）
+        if relativePath != payloadDeclarationPath, relativePath != registryPath,
+           source.contains("custom_cover_image_path") {
+            hits.append(
+                "出现了 wire 键 `custom_cover_image_path`（只准在声明处 \(payloadDeclarationPath) / 登记处 \(registryPath)）"
+            )
         }
         // ② 属性名的出现只准在白名单文件里
         guard source.contains("customCoverImagePath") else { return hits }
