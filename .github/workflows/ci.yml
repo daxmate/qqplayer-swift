@@ -103,6 +103,13 @@ jobs:
       - name: Format (swiftformat --lint)
         run: swiftformat --lint .
 
+      - name: Target membership (guard)
+        run: |
+          python3 scripts/check-target-membership.py
+          if git rev-parse --verify -q HEAD~1 >/dev/null; then
+            python3 scripts/check-target-membership.py --base HEAD~1
+          fi
+
       # SPM 依赖（SFBAudioEngine 等）首次拉取+编译 30-40 分钟，必须缓存：
       #   - ~/Library/Caches/org.swift.swiftpm（包源码/解析结果）
       #   - build/DerivedData（编译产物，命中后 xcodebuild 增量秒级）

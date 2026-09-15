@@ -19,6 +19,18 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 
 fail=0
 
+# ---- target 成员归属（新文件必须显式表态；纯 python，无编译，毫秒级）----
+# 背景（2026-09-15 事故）：新增共享文件忘记登记 Mac 白名单 → 只有干净全量编译才暴露，
+# 增量编译与 Xcode 缓存都测不出来。守卫把「这个文件编不编 Mac」摆在提交时决定。
+if [ "${SKIP_MEMBERSHIP_CHECK:-0}" = "1" ]; then
+  echo "⚠️  SKIP_MEMBERSHIP_CHECK=1——跳过 target 成员归属检查（CI 仍兜底）"
+elif [ -f scripts/check-target-membership.py ] && command -v python3 >/dev/null 2>&1; then
+  echo "→ target 成员归属检查"
+  python3 scripts/check-target-membership.py --staged || fail=1
+else
+  echo "⚠️  scripts/check-target-membership.py 不可用，跳过（CI 会兜底）"
+fi
+
 swift_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift' 2>/dev/null)
 if [ -n "$swift_files" ]; then
   if ! command -v swiftformat >/dev/null 2>&1; then
