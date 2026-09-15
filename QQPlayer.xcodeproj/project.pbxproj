@@ -149,6 +149,7 @@
 		101DC833D5334782AE72320D /* DisplayScriptLanguageOverrideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */; };
 		4D5400DE37BD4A17986438FF /* SyncDataSyncCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E96B5114D5BB4B1D88E89AF2 /* SyncDataSyncCoreTests.swift */; };
 		687FCF0AA8A94705ABB8EAFB /* SyncWiringContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */; };
+		4C324948263C46A985D468D6 /* SyncWiringSelfCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DF05DCE984D479AADBDA23A /* SyncWiringSelfCheckTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -347,6 +348,7 @@
 		E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DisplayScriptLanguageOverrideTests.swift; sourceTree = "<group>"; };
 		E96B5114D5BB4B1D88E89AF2 /* SyncDataSyncCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDataSyncCoreTests.swift; sourceTree = "<group>"; };
 		BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncWiringContractTests.swift; sourceTree = "<group>"; };
+		9DF05DCE984D479AADBDA23A /* SyncWiringSelfCheckTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncWiringSelfCheckTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -659,6 +661,7 @@
 				Sync/SyncManifestGenerator.swift,
 				Sync/SyncManifestPeer.swift,
 				Sync/SyncManifestReconciler.swift,
+				Sync/SyncWiringSelfCheck.swift,
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/PlayerGestureLogic.swift,
 				Views/Utility/HintCardView.swift,
@@ -954,6 +957,7 @@
 				E5C4680397FB4C5A84F48789 /* DisplayScriptLanguageOverrideTests.swift */,
 				E96B5114D5BB4B1D88E89AF2 /* SyncDataSyncCoreTests.swift */,
 				BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */,
+				9DF05DCE984D479AADBDA23A /* SyncWiringSelfCheckTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1401,6 +1405,7 @@
 				101DC833D5334782AE72320D /* DisplayScriptLanguageOverrideTests.swift in Sources */,
 				4D5400DE37BD4A17986438FF /* SyncDataSyncCoreTests.swift in Sources */,
 				687FCF0AA8A94705ABB8EAFB /* SyncWiringContractTests.swift in Sources */,
+				4C324948263C46A985D468D6 /* SyncWiringSelfCheckTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
