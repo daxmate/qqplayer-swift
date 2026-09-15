@@ -280,23 +280,27 @@
     ///
     /// 为什么需要：Mac 是发起方、有完整的账目面板；手机侧以前这些数字**只进 print**，
     /// 用户在手机上完全看不出“这次同步了什么 / 丢了多少”（矩阵四级空格）。
+    /// ⚠️ 计数**不在这里维护**：唯一存储 = `tally`（`SyncOutcomeTally`，与 Mac 面板**同一类型**
+    /// ——L6 起两端不再各建一套账目），下面是它的投影；面板/纯逻辑读的名字不变。
     struct IOSPassiveDataSyncSummary: Equatable, Sendable {
+        /// **唯一**结果账目（见 `SyncRowOutcome` / `SyncOutcomeTally`）。
+        var tally = SyncOutcomeTally()
         /// 本机应答对端拉取时发出的 outbox 增量行数（最近一批）
-        var answeredPullEntries = 0
+        var answeredPullEntries: Int { tally.outboundEntries }
         /// 对端推来并落到本地业务表的行数
-        var appliedEntries = 0
+        var appliedEntries: Int { tally.appliedEntries }
         /// 因本地缺歌而挂起的行数（歌到位后重放）
-        var suspendedEntries = 0
+        var suspendedEntries: Int { tally.suspendedEntries }
         /// 因缺身份键（未定位）未落库的行数
-        var unresolvedEntries = 0
+        var unresolvedEntries: Int { tally.unresolvedEntries }
         /// 播放位置未落地（跨端续播关 / 落点未接受）
-        var unsupportedEntries = 0
+        var unsupportedEntries: Int { tally.unsupportedEntries }
         /// 父行 / 被引用行不存在而跳过（歌单结构未到 / 引用歌本地查无）
-        var skippedMissingParentEntries = 0
+        var skippedMissingParentEntries: Int { tally.skippedMissingParentEntries }
         /// 忽略的 delete 行数（删除不跳端传播）
-        var ignoredDeletes = 0
+        var ignoredDeletes: Int { tally.ignoredDeletes }
         /// 本机应答拉取 / 推送增量时缺身份键的行数
-        var missingIdentityEntries = 0
+        var missingIdentityEntries: Int { tally.missingIdentityEntries }
         /// 是否已有账目（false = 还没同步过 → 面板显示空态）
         var hasSessionData = false
         /// 最近一次更新时间
@@ -313,57 +317,87 @@
             var hintKey: String?
         }
 
-        /// 缺口行（顺序 = 严重度：未定位 → 缺依赖 → 未支持 → 缺指纹）。
-        /// 复用 Mac 面板已有的 key（不再新增文案）。
+        /// 一条结果的**展示归属**（穷尽映射：新增 `SyncRowOutcome` 类别时这里编译不过
+        /// ——不会出现「新类别静默不上屏」）。
+        enum Placement: Equatable {
+            /// 缺口行（计数 > 0 才出现）
+            case gap(labelKey: String, hintKey: String)
+            /// 正常计数行（恒出现）
+            case count(labelKey: String)
+        }
+
+        /// 结果类别 → 展示归属（`switch` **无 `default`**；key 复用 Mac 面板已有文案，不新增）。
+        static func placement(of outcome: SyncRowOutcome) -> Placement {
+            switch outcome {
+            case .unresolved:
+                return .gap(
+                    labelKey: "sync_run_data_result_unresolved",
+                    hintKey: "sync_run_data_unresolved_hint"
+                )
+            case .skippedMissingParent:
+                return .gap(
+                    labelKey: "sync_run_data_skipped_parent",
+                    hintKey: "sync_run_data_skipped_parent_hint"
+                )
+            case .unsupported:
+                return .gap(
+                    labelKey: "sync_run_data_unsupported",
+                    hintKey: "sync_run_data_unsupported_hint"
+                )
+            case .missingIdentity:
+                return .gap(
+                    labelKey: "sync_run_data_result_missing_identity",
+                    hintKey: "sync_run_data_missing_identity_hint"
+                )
+            case .applied:
+                return .count(labelKey: "sync_run_data_result_applied")
+            case .suspended:
+                return .count(labelKey: "sync_run_data_result_pending")
+            case .outbound:
+                return .count(labelKey: "sync_run_data_result_sent")
+            case .ignoredDelete:
+                return .count(labelKey: "sync_run_data_result_skipped")
+            }
+        }
+
+        /// 缺口行展示顺序（严重度：未定位 → 缺依赖 → 未支持 → 缺指纹）。
+        /// ⚠️ 与 `countOrder` 合起来必须**恰好覆盖** `SyncRowOutcome.allCases`（有用例钉住）。
+        static let gapOrder: [SyncRowOutcome] = [
+            .unresolved,
+            .skippedMissingParent,
+            .unsupported,
+            .missingIdentity,
+        ]
+
+        /// 正常计数行展示顺序（已应用 / 挂起 / 发送 / 忽略删除）。
+        static let countOrder: [SyncRowOutcome] = [
+            .applied,
+            .suspended,
+            .outbound,
+            .ignoredDelete,
+        ]
+
+        /// 缺口行（计数 > 0 才出现；顺序 = 严重度）。
+        /// 读数一律走 `summary.tally`（不在 UI 层补算任何数字，INV-19）。
         static func gapRows(_ summary: IOSPassiveDataSyncSummary) -> [GapRow] {
             var rows: [GapRow] = []
-            if summary.unresolvedEntries > 0 {
-                rows.append(
-                    GapRow(
-                        labelKey: "sync_run_data_result_unresolved",
-                        count: summary.unresolvedEntries,
-                        hintKey: "sync_run_data_unresolved_hint"
-                    )
-                )
-            }
-            if summary.skippedMissingParentEntries > 0 {
-                rows.append(
-                    GapRow(
-                        labelKey: "sync_run_data_skipped_parent",
-                        count: summary.skippedMissingParentEntries,
-                        hintKey: "sync_run_data_skipped_parent_hint"
-                    )
-                )
-            }
-            if summary.unsupportedEntries > 0 {
-                rows.append(
-                    GapRow(
-                        labelKey: "sync_run_data_unsupported",
-                        count: summary.unsupportedEntries,
-                        hintKey: "sync_run_data_unsupported_hint"
-                    )
-                )
-            }
-            if summary.missingIdentityEntries > 0 {
-                rows.append(
-                    GapRow(
-                        labelKey: "sync_run_data_result_missing_identity",
-                        count: summary.missingIdentityEntries,
-                        hintKey: "sync_run_data_missing_identity_hint"
-                    )
-                )
+            for outcome in gapOrder {
+                guard case let .gap(labelKey, hintKey) = placement(of: outcome) else { continue }
+                let count = summary.tally.count(for: outcome)
+                guard count > 0 else { continue }
+                rows.append(GapRow(labelKey: labelKey, count: count, hintKey: hintKey))
             }
             return rows
         }
 
-        /// 正常计数行（已应用 / 挂起 / 发送 / 忽略删除）。
+        /// 正常计数行（恒出现；顺序固定）。
         static func countRows(_ summary: IOSPassiveDataSyncSummary) -> [(labelKey: String, count: Int)] {
-            [
-                ("sync_run_data_result_applied", summary.appliedEntries),
-                ("sync_run_data_result_pending", summary.suspendedEntries),
-                ("sync_run_data_result_sent", summary.answeredPullEntries),
-                ("sync_run_data_result_skipped", summary.ignoredDeletes),
-            ]
+            var rows: [(labelKey: String, count: Int)] = []
+            for outcome in countOrder {
+                guard case let .count(labelKey) = placement(of: outcome) else { continue }
+                rows.append((labelKey: labelKey, count: summary.tally.count(for: outcome)))
+            }
+            return rows
         }
     }
 
@@ -664,47 +698,47 @@
             // 会话回调不在主线程 → 统一 Task 跳主线程累加。
             peer.onPullHandled = { [weak self] _, count in
                 print("ℹ️ SyncChangeLogPeer: 已应答远端拉取（本批 outbox 行数=\(count)）")
-                Task { @MainActor in self?.recordDataSync { $0.answeredPullEntries = count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.overwrite(.outbound, with: count) } }
             }
             peer.onPushApplied = { [weak self] count in
                 print("ℹ️ SyncChangeLogPeer: 已应用远端播放数据（行数=\(count)）")
-                Task { @MainActor in self?.recordDataSync { $0.appliedEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.applied, count: count) } }
             }
             peer.onPushSuspended = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.suspendedEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.suspended, count: count) } }
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 本地缺歌挂起（行数=\(count)，待歌到位重放）")
             }
             // 身份缺口披露（2026-09-14）：引用歌曲但拿不到指纹的行两端都跳/标。
             peer.onPushUnresolved = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.unresolvedEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.unresolved, count: count) } }
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(count)，缺身份键）")
             }
             // 父行 / 被引用行不存在而跳过（矩阵三级 #8）：以前静默失败，现在计数可见。
             peer.onPushSkippedMissingParent = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.skippedMissingParentEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.skippedMissingParent, count: count) } }
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 跳过依赖尚未到达的远端行（行数=\(count)，歌单结构未到或歌无本机行）")
             }
             // 跨端续播关（默认）/ 落点未接：播放位置行不落地、也不计入「已应用」。
             peer.onPushUnsupported = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.unsupportedEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.unsupported, count: count) } }
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 跳过未落地的播放位置行（行数=\(count)，跨端续播关或落点未接）")
             }
             peer.onPullMissingIdentity = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.missingIdentityEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.missingIdentity, count: count) } }
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 应答拉取时有 \(count) 行缺身份键（对端定位不了）")
             }
             peer.onIncrementMissingIdentity = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.missingIdentityEntries += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.missingIdentity, count: count) } }
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 推送增量时有 \(count) 行缺身份键（对端定位不了）")
             }
             peer.onPushIgnoredDeletes = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.ignoredDeletes += count } }
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.ignoredDelete, count: count) } }
                 guard count > 0 else { return }
                 print("ℹ️ SyncChangeLogPeer: 忽略远端删除（行数=\(count)，删除不跨端传播）")
             }
