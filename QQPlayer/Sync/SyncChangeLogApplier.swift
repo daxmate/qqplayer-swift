@@ -61,18 +61,28 @@ struct SyncChangeLogApplier {
     /// 测试注入明确的 true/false，不依赖真实 UserDefaults。
     let playbackPositionSyncEnabled: Bool
 
-    /// 一条 playback_position 行**没有落到任何本地位置**时逐条触发。
+    /// 一条 playback_position 行**没有落到任何本地位置**时逐条触发（**带实体**：
+    /// 计数要按实体分桶披露，实体恒为 `.playbackPosition`）。
     /// 两种成因合并成一个回调（面板口径都是「这条没应用」，本步不区分）：
     /// ① 开关关（默认，本端不接受）；② 开关开但落点未接（sink 由下一版本接入）。
     /// 调用方（SyncChangeLogPeer）据此计数 → 账目 → 面板披露。
-    var onPlaybackPositionUnsupported: (() -> Void)?
+    var onPlaybackPositionUnsupported: ((SyncChangeEntity) -> Void)?
 
     /// 一行引用**父行/被引用行不存在**而被跳过时逐条触发（2026-09-15，矩阵三级 #8）。
     /// 三种成因（都返回 false、都不落库）：
     /// - `playlist_item` 的歌单结构还没落本地（父行不存在）；
     /// - 收藏 / 播放历史 / 歌单项引用的歌在本地 `track` 表查无。
     /// 以前这三种**只打印**、既不计失败也不计数 ⇒ 面板看不到“到底丢了多少”。
-    var onSkippedMissingParent: (() -> Void)?
+    /// ⚠️ 带实体：计数按实体分桶（面板按实体披露「哪类实体缺依赖」）。
+    var onSkippedMissingParent: ((SyncChangeEntity) -> Void)?
+
+    /// 一行**应用失败**（载荷解不开 / 落库抛错）时逐条触发（带实体）。
+    ///
+    /// 与 `onSkippedMissingParent` 的区别：那是「明知不适用 → 跳过」（不算失败），
+    /// 这是「本该能落却失败了」。以前这类失败只进日志（面板零信号）；歌单结构尤其如此
+    /// ——L0 契约 C 行要求「歌单级失败必须单独计数上屏」。
+    /// 触发后错误**照原样抛**（批次中断语义不变，调用方的游标推进判据不变）。
+    var onRowApplyFailed: ((SyncChangeEntity) -> Void)?
 
     init(database: DatabaseManager, playbackPositionSyncEnabled: Bool? = nil) {
         self.database = database
@@ -86,8 +96,17 @@ struct SyncChangeLogApplier {
     @discardableResult
     func apply(_ rows: [SyncChangeLogRow]) throws -> Int {
         var applied = 0
-        for row in rows where try applyOne(row) {
-            applied += 1
+        for row in rows {
+            do {
+                if try applyOne(row) { applied += 1 }
+            } catch {
+                // 失败行**按实体**计数（INV-18：歌单级失败等必须单独可见），随后**原样抛出**
+                // ——批次中断 / 游标不推进的既有语义逐字不变（本步只加可观测性）。
+                if let entity = row.entityValue {
+                    onRowApplyFailed?(entity)
+                }
+                throw error
+            }
         }
         return applied
     }
@@ -140,7 +159,7 @@ struct SyncChangeLogApplier {
         try database.write { db in
             guard try Self.trackRowExists(db, stableId: rowKey) else {
                 Self.logOrphanSkip(entity: .favorite, stableId: rowKey)
-                onSkippedMissingParent?()
+                onSkippedMissingParent?(.favorite)
                 return false
             }
             try Favorite(trackStableId: rowKey).insert(db, onConflict: .replace)
@@ -157,7 +176,7 @@ struct SyncChangeLogApplier {
             let snapshot = try SyncSnapshotCodec.decode(SyncPlayHistorySnapshot.self, from: payloadJSON)
             guard try Self.trackRowExists(db, stableId: snapshot.trackStableId) else {
                 Self.logOrphanSkip(entity: .playHistory, stableId: snapshot.trackStableId)
-                onSkippedMissingParent?()
+                onSkippedMissingParent?(.playHistory)
                 return false
             }
             let existing = try PlayHistoryEntry
@@ -227,12 +246,12 @@ struct SyncChangeLogApplier {
             guard let playlist = try Playlist.filter(Column("slug") == snapshot.playlistSlug).fetchOne(db),
                   let playlistId = playlist.id else {
                 // 歌单结构还没到本地（父行不存在）：不落库、**计数**（矩阵三级 #8：静默失败必须可见）
-                onSkippedMissingParent?()
+                onSkippedMissingParent?(.playlistItem)
                 return false
             }
             guard try Self.trackRowExists(db, stableId: snapshot.trackStableId) else {
                 Self.logOrphanSkip(entity: .playlistItem, stableId: snapshot.trackStableId)
-                onSkippedMissingParent?()
+                onSkippedMissingParent?(.playlistItem)
                 return false
             }
             let itemExists = try PlaylistItem
@@ -289,19 +308,19 @@ struct SyncChangeLogApplier {
         let snapshot = try SyncSnapshotCodec.decode(SyncPlaybackPositionSnapshot.self, from: payloadJSON)
         guard playbackPositionSyncEnabled else {
             print("ℹ️ SyncChangeLogApplier: 跨端续播已关闭，不接受播放位置，跳过 \(snapshot.trackStableId)")
-            onPlaybackPositionUnsupported?()
+            onPlaybackPositionUnsupported?(.playbackPosition)
             return false
         }
         guard let playbackPositionSink else {
             print("ℹ️ SyncChangeLogApplier: 跨端续播已开启但落点未接，跳过 \(snapshot.trackStableId)")
-            onPlaybackPositionUnsupported?()
+            onPlaybackPositionUnsupported?(.playbackPosition)
             return false
         }
         guard playbackPositionSink(snapshot) else {
             // 落点存在但**未接受**（不同曲 / 远端更旧 / 位置差过小）：仍然没落地，
             // 不能计「已应用」（INV-20 的口径对这两条路一视同仁）。
             print("ℹ️ SyncChangeLogApplier: 跨端续播落点未接受这条位置，跳过 \(snapshot.trackStableId)")
-            onPlaybackPositionUnsupported?()
+            onPlaybackPositionUnsupported?(.playbackPosition)
             return false
         }
         return true

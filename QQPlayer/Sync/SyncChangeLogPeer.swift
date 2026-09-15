@@ -75,31 +75,38 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPullHandled: ((SyncChangeLogPullRequest, Int) -> Void)?
     /// push 应用完成（applied 行数；锁外触发）。
     var onPushApplied: ((Int) -> Void)?
-    /// push 中因本地缺歌而挂起的行数（锁外触发；0 = 无挂起）。
-    var onPushSuspended: ((Int) -> Void)?
-    /// push 中因缺身份键而未落库的行数（引用歌曲但 contentHash nil/空 → 不落库、
-    /// 不挂起；锁外触发；0 = 无未定位行）。
-    var onPushUnresolved: ((Int) -> Void)?
+    /// push 中因本地缺歌而挂起的行数（**按实体分组**；锁外触发）。
+    /// ⚠️ 本回调**恒触发**（无挂起 = 空数组）：调用方据「任一应答类回调到达」判定
+    /// 「对端已应答」（见 `SyncDataSyncCoordinator` 的收尾语义），分组不得改掉这条语义。
+    var onPushSuspended: (([SyncEntityOutcomeCount]) -> Void)?
+    /// push 中因缺身份键而未落库的行数（引用歌曲但两把身份键都拿不到 → 不落库、
+    /// 不挂起；**按实体分组**；锁外触发）。**恒触发**（空数组 = 本批无未定位行）。
+    var onPushUnresolved: (([SyncEntityOutcomeCount]) -> Void)?
     /// push 中被忽略的 delete 行数（v2 删除不传播；锁外触发；0 = 无忽略）。
     var onPushIgnoredDeletes: ((Int) -> Void)?
     /// push 中因**身份歧义**（第二身份相对路径命中多首本地曲目）而未落库的行数
-    /// （不落库、不挂起；锁外触发；0 = 无歧义）。
-    var onPushAmbiguous: ((Int) -> Void)?
+    /// （不落库、不挂起；**按实体分组**；锁外触发；空 = 无歧义、不触发）。
+    var onPushAmbiguous: (([SyncEntityOutcomeCount]) -> Void)?
     /// push 中**没落到本地位置**的 playback_position 行数（跨端续播开关关 = 默认，
-    /// 或开关开但落点未接；这些行不计入 `onPushApplied`）。锁外触发；0 = 不上报。
-    var onPushUnsupported: ((Int) -> Void)?
-    /// push 中因**父行/被引用行不存在**而跳过的行数（歌单结构未到 / 引用歌本地查无；
-    /// 逐条累计，0 = 无。矩阵三级 #8：静默失败必须计数上屏）。
-    var onPushSkippedMissingParent: ((Int) -> Void)?
+    /// 或开关开但落点未接；这些行不计入 `onPushApplied`）。**按实体分组**；
+    /// 锁外触发；空 = 无、不触发。
+    var onPushUnsupported: (([SyncEntityOutcomeCount]) -> Void)?
+    /// push 中因**父行/被引用行不存在**而跳过的行数（歌单结构未到 / 引用歌本地查无）。
+    /// **按实体分组**；锁外触发；空 = 无、不触发（矩阵三级 #8：静默失败必须计数上屏）。
+    var onPushSkippedMissingParent: (([SyncEntityOutcomeCount]) -> Void)?
+    /// push 中**应用失败**的行数（载荷解不开 / 落库抛错），**按实体分组**；锁外触发；
+    /// 空 = 无、不触发。以前这类失败只进日志（面板零信号）——L0 契约 C 行要求
+    /// 「歌单级失败必须单独计数上屏」，这条就是它的落点（歌单行失败 → 实体 = playlist）。
+    var onPushApplyFailed: (([SyncEntityOutcomeCount]) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: ((DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
     var onIncrementSent: ((Int) -> Void)?
-    /// 主动推送增量中缺身份键的行数（contentHash 拿不到，对端定位不了；
-    /// 锁外触发；0 条不触发）。
-    var onIncrementMissingIdentity: ((Int) -> Void)?
-    /// 应答远端拉取时，本批上线行里缺身份键的行数（锁外触发；0 条不触发）。
-    var onPullMissingIdentity: ((Int) -> Void)?
+    /// 主动推送增量中缺身份键的行数（两把身份键都拿不到，对端定位不了）。
+    /// **按实体分组**（明细行自带实体）；锁外触发；空 = 无、不触发。
+    var onIncrementMissingIdentity: (([SyncEntityOutcomeCount]) -> Void)?
+    /// 应答远端拉取时，本批上线行里缺身份键的行数（**按实体分组**；锁外触发；空 = 不触发）。
+    var onPullMissingIdentity: (([SyncEntityOutcomeCount]) -> Void)?
 
     /// 本批 applier 报回的类别计数（`handlePush` 内单线程读写：`applier.apply` 之前清零、
     /// 之后读数上报）。⚠️ 计数只进 `SyncOutcomeTally`，本类不再自建分类计数器（L6 形状契约）。
@@ -126,11 +133,14 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         self.peerID = peerID
         // 计数只进 tally（单一存储）：applier 每报一条，就往对应的结果类别里加一条。
         // ⚠️ 装在自己的这份 applier 上（struct 值类型，不影响调用方持有的那份）。
-        self.applier.onPlaybackPositionUnsupported = { [weak self] in
-            self?.applierBatchTally.accumulate(.unsupported)
+        self.applier.onPlaybackPositionUnsupported = { [weak self] entity in
+            self?.applierBatchTally.accumulate(.unsupported, entity: entity)
         }
-        self.applier.onSkippedMissingParent = { [weak self] in
-            self?.applierBatchTally.accumulate(.skippedMissingParent)
+        self.applier.onSkippedMissingParent = { [weak self] entity in
+            self?.applierBatchTally.accumulate(.skippedMissingParent, entity: entity)
+        }
+        self.applier.onRowApplyFailed = { [weak self] entity in
+            self?.applierBatchTally.accumulate(.applyFailed, entity: entity)
         }
         attachHandlers()
     }
@@ -170,7 +180,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         let batchSize = max(1, maxPerBatch)
         var cursor = try store.pushCursor(forPeer: peerID)
         var consumed = 0
-        var missingIdentity = 0
+        // 缺身份键计数跨批次累计（按实体分组，见 `entityGroups(ofMissingIdentity:)`）。
+        var missingIdentityTally = SyncOutcomeTally()
         var lastSentCursor: Int64?
         while true {
             let page = try store.page(after: cursor, limit: batchSize)
@@ -183,7 +194,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // M4-2a: 逐行按歌曲引用查 track 取 content_hash 填进 wire（查不到 = nil）。
             // 2026-09-14：同时收缺身份键明细 → 对端定位不了的量要看得见（面板披露）。
             let batch = try mapper.wireEntriesDetailed(transmittable)
-            missingIdentity += batch.missingIdentity.count
+            for item in batch.missingIdentity {
+                missingIdentityTally.accumulate(.missingIdentity, entity: SyncChangeEntity(rawValue: item.entity))
+            }
             if !batch.missingIdentity.isEmpty {
                 Self.logMissingIdentity(batch.missingIdentity)
             }
@@ -200,7 +213,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         // 全部批次成功 → 才推进推送游标（失败已在上面 throw 出去，游标保持原值）。
         guard let finalCursor = lastSentCursor else { return 0 } // 空增量：不发帧、不动游标
         try store.setPushCursor(forPeer: peerID, lastOutboxID: finalCursor)
-        if missingIdentity > 0 { onIncrementMissingIdentity?(missingIdentity) }
+        let missingIdentityGroups = missingIdentityTally.entityGroups(for: .missingIdentity)
+        if !missingIdentityGroups.isEmpty { onIncrementMissingIdentity?(missingIdentityGroups) }
         onIncrementSent?(consumed)
         return consumed
     }
@@ -255,7 +269,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             onPullHandled?(request, entries.count)
             if !batch.missingIdentity.isEmpty {
                 Self.logMissingIdentity(batch.missingIdentity)
-                onPullMissingIdentity?(batch.missingIdentity.count)
+                onPullMissingIdentity?(Self.entityGroups(ofMissingIdentity: batch.missingIdentity))
             }
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_pull 应答失败：\(error)"))
@@ -297,7 +311,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 case .suspended(let pendingKey, let remoteRow):
                     // 挂起键由身份入口给出（指纹 / `rel:{相对路径}`），本层不自拼。
                     try pendingStore.suspend(remoteRow, pendingKey: pendingKey)
-                    batchTally.accumulate(.suspended)
+                    batchTally.accumulate(.suspended, entity: remoteRow.entityValue)
                 case .ambiguous(let key, let candidateCount, let remoteRow):
                     // 第二身份命中多首本地曲目 → 选哪首都是猜：不落库、不挂起，只计数
                     // （落库会挂到错歌上，用户看到的是「收藏跑到别的歌」）。
@@ -307,6 +321,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                         key: key,
                         candidateCount: candidateCount
                     ))
+                    batchTally.accumulate(.ambiguousIdentity, entity: remoteRow.entityValue)
                 case .unresolved(let reason, let remoteRow):
                     // 引用歌曲但没有可用身份键 → 定位不到本地歌曲：不落库（否则写出
                     // JOIN track 永不匹配的孤儿业务行）也不挂起（缺 content_hash 当键），
@@ -316,13 +331,13 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                         rowKey: remoteRow.rowKey,
                         reason: reason
                     ))
+                    batchTally.accumulate(.unresolved, entity: remoteRow.entityValue)
                 }
             }
             // 未定位按批汇总一行（T15b 降噪：原先逐行 print，一盘 110 行刷屏）。
             Self.logUnresolved(unresolved)
-            // 身份歧义同样按批汇总一行，并计入结果账目（不落库、不挂起）。
+            // 身份歧义同样按批汇总一行（账目已在上面按实体逐条累加；不落库、不挂起）。
             Self.logAmbiguous(ambiguous)
-            batchTally.accumulate(.ambiguousIdentity, count: ambiguous.count)
             // 本地批：按 (entity, row_key) **一次取齐**本端该键最新行（对账代表本端事实）。
             // S4（2026-09-12 审计）：原先逐行调 `latestRow` 是 N+1（每行一次查询）；
             // 改为按 entity 分组的批量查询，键集合 = 远端批本地化后的键集合，口径不变。
@@ -346,20 +361,33 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // 播放位置未落地（跨端续播关 / 落点未接）逐条回调 → 本批累加（应用前清零）。
             applierBatchTally = SyncOutcomeTally()
             let applied = try applier.apply(mergeResult.applyRemote)
-            let unsupported = applierBatchTally.count(for: .unsupported)
-            let skippedMissingParent = applierBatchTally.count(for: .skippedMissingParent)
             // 推进本端对该 peer 的游标（挂起行已持久化，游标可安全推进：数据不丢）
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
-            onPushSuspended?(batchTally.count(for: .suspended))
-            onPushUnresolved?(unresolved.count)
+            // 挂起 / 未定位**恒上报**（空组 = 空数组）：调用方据「应答类回调到达」收尾。
+            onPushSuspended?(batchTally.entityGroups(for: .suspended))
+            onPushUnresolved?(batchTally.entityGroups(for: .unresolved))
             onPushIgnoredDeletes?(batchTally.count(for: .ignoredDelete))
-            if !ambiguous.isEmpty { onPushAmbiguous?(ambiguous.count) }
-            if unsupported > 0 { onPushUnsupported?(unsupported) }
-            if skippedMissingParent > 0 { onPushSkippedMissingParent?(skippedMissingParent) }
+            let ambiguousGroups = batchTally.entityGroups(for: .ambiguousIdentity)
+            if !ambiguousGroups.isEmpty { onPushAmbiguous?(ambiguousGroups) }
+            reportApplierGroups()
         } catch {
+            // 应用中途失败：先把**已经发生**的失败行按实体上报（面板可见，INV-18），
+            // 再报失败本身。批次中断 / 游标不推进的语义逐字不变。
+            reportApplierGroups()
             onDecodeFailure?(.invalidPayload("change_log_push 应用失败：\(error)"))
         }
+    }
+
+    /// 本批 **applier 侧**结果（未支持 / 缺依赖 / 应用失败）按实体分组上报。
+    /// 成功路径与「应用中途抛错」路径**共用**（失败也要可见）。
+    private func reportApplierGroups() {
+        let unsupported = applierBatchTally.entityGroups(for: .unsupported)
+        if !unsupported.isEmpty { onPushUnsupported?(unsupported) }
+        let skippedMissingParent = applierBatchTally.entityGroups(for: .skippedMissingParent)
+        if !skippedMissingParent.isEmpty { onPushSkippedMissingParent?(skippedMissingParent) }
+        let applyFailed = applierBatchTally.entityGroups(for: .applyFailed)
+        if !applyFailed.isEmpty { onPushApplyFailed?(applyFailed) }
     }
 
     // MARK: 缺身份键诊断
@@ -369,6 +397,18 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         var entity: String
         var rowKey: String
         var reason: SyncEntryUnresolvedReason
+    }
+
+    /// 缺身份键明细 → **按实体分组**（发送侧两个方向共用：主动推增量 / 应答拉取）。
+    /// 走 `SyncOutcomeTally` 同一套分桶与顺序（不另造一份分组逻辑）。
+    private static func entityGroups(
+        ofMissingIdentity items: [SyncWireMissingIdentity]
+    ) -> [SyncEntityOutcomeCount] {
+        var tally = SyncOutcomeTally()
+        for item in items {
+            tally.accumulate(.missingIdentity, entity: SyncChangeEntity(rawValue: item.entity))
+        }
+        return tally.entityGroups(for: .missingIdentity)
     }
 
     /// 「未定位」按**批**汇总一行：原因 + 实体 + 条数 + 最多 2 条样例 rowKey 前缀。

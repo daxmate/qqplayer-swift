@@ -973,6 +973,15 @@
 "sync_run_data_skipped_parent" = "Нет зависимости";
 "sync_run_data_skipped_parent_hint" = "%d изменений пропущено: зависимости ещё нет на этом устройстве (структура плейлиста не синхронизирована или трек отсутствует в локальной базе).";
 "sync_run_data_missing_identity_hint" = "%d изменений отправлены без отпечатка песни, другое устройство не может их сопоставить.";
+"sync_run_data_apply_failed" = "Не удалось применить";
+"sync_run_data_apply_failed_hint" = "%d изменений не удалось применить (данные не читаются или не удалось записать на это устройство).";
+"sync_run_data_entity_breakdown" = "По категориям";
+"sync_run_data_entity_row" = "%1$@ · %2$@";
+"sync_run_data_entity_favorite" = "Избранное";
+"sync_run_data_entity_play_history" = "История прослушивания";
+"sync_run_data_entity_playlist" = "Плейлисты";
+"sync_run_data_entity_playlist_item" = "Треки плейлистов";
+"sync_run_data_entity_playback_position" = "Позиция возобновления";
 "sync_run_data_result_none" = "Синхронизация данных ещё не выполнялась.";
 "sync_run_data_cancelled" = "Синхронизация данных отменена.";
 "sync_run_data_disconnected" = "Устройство отключилось, синхронизация данных остановлена.";

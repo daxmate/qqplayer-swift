@@ -983,6 +983,15 @@
 "sync_run_data_skipped_parent" = "缺依赖";
 "sync_run_data_skipped_parent_hint" = "有 %d 条改动因为依赖的对象还没到本机而跳过（歌单结构未同步到，或引用的歌没有本地记录）。";
 "sync_run_data_missing_identity_hint" = "有 %d 条改动没有携带歌曲指纹，对端无法定位。";
+"sync_run_data_apply_failed" = "应用失败";
+"sync_run_data_apply_failed_hint" = "有 %d 条改动没能应用（数据读不出，或写入本机失败）。";
+"sync_run_data_entity_breakdown" = "按类别明细";
+"sync_run_data_entity_row" = "%1$@ · %2$@";
+"sync_run_data_entity_favorite" = "收藏";
+"sync_run_data_entity_play_history" = "播放历史";
+"sync_run_data_entity_playlist" = "歌单结构";
+"sync_run_data_entity_playlist_item" = "歌单成员";
+"sync_run_data_entity_playback_position" = "续播位置";
 "sync_run_data_result_none" = "还没有同步过播放数据。";
 "sync_run_data_cancelled" = "数据同步已取消。";
 "sync_run_data_disconnected" = "设备已断开，数据同步已停止。";

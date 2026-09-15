@@ -27,6 +27,10 @@
 //    ③ finished：账目（pushed/applied/suspended/ignoredDeletes）见 `report`；
 //       超时未收到应答 → finished + `failureMessage`（不静默挂死）。
 //
+//  ⚠️ 结果账目（2026-09-15 起）= **(实体, 结果) 二维**：回调按**实体分组**上报
+//  （`[SyncEntityOutcomeCount]`），本类只往唯一存储 `reportValue.tally` 里累加；
+//  面板的「按实体披露」明细行由 `SyncEntityOutcomeDisclosure` 从同一份账目派生。
+//
 //  ⚠️ 拉取方向的应收数 = 帧 9 到达（本端 peer 的 onPushApplied / onPushSuspended /
 //  onPushIgnoredDeletes / onPushUnresolved / onPushUnsupported 五者**累加**回填账目）。五个回调**任一**到达即视为
 //  「对端已应答」——`handlePush` 内五者总是同步顺序触发，不在其中挑一个「最后一个」当判据
@@ -92,6 +96,8 @@ struct SyncDataSyncReport: Equatable, Sendable {
     var pushedMissingIdentityEntries: Int { tally.missingIdentityEntries }
     /// 对端推来的行里被忽略的 delete 行数（删除不跨端传播）
     var ignoredDeletes: Int { tally.ignoredDeletes }
+    /// 对端推来的行里**应用失败**的行数（载荷解不开 / 落库抛错；不落库、计入缺口）
+    var applyFailedEntries: Int { tally.applyFailedEntries }
     /// 失败原因（nil = 未失败；「缺 peerID / 推失败 / 发拉取失败 / 对端无应答」/ cancelled）
     var failureMessage: String?
     /// 是否已收尾（与 `phase == .finished` 同义；冗余存一份便于调用方只读 report）
@@ -205,18 +211,30 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         )
         // 先装回调再发帧：内存回环下应答会在 sendPull 内同步回来。
         peer.onPushApplied = { [weak self] count in self?.recordApplied(count) }
-        peer.onPushSuspended = { [weak self] count in self?.recordSuspended(count) }
-        peer.onPushUnresolved = { [weak self] count in self?.recordUnresolved(count) }
-        peer.onPushAmbiguous = { [weak self] count in self?.recordAmbiguousIdentity(count) }
-        peer.onPushSkippedMissingParent = { [weak self] count in
-            self?.recordSkippedMissingParent(count)
+        peer.onPushSuspended = { [weak self] groups in self?.recordAnswered(.suspended, groups: groups) }
+        peer.onPushUnresolved = { [weak self] groups in self?.recordAnswered(.unresolved, groups: groups) }
+        peer.onPushAmbiguous = { [weak self] groups in
+            self?.recordAnswered(.ambiguousIdentity, groups: groups)
         }
-        peer.onPushUnsupported = { [weak self] count in self?.recordUnsupported(count) }
+        peer.onPushSkippedMissingParent = { [weak self] groups in
+            self?.recordAnswered(.skippedMissingParent, groups: groups)
+        }
+        peer.onPushUnsupported = { [weak self] groups in
+            self?.recordAnswered(.unsupported, groups: groups)
+        }
+        // 应用失败（歌单级失败等）：同样算「对端已应答」——批次已中断，不必再等超时。
+        peer.onPushApplyFailed = { [weak self] groups in
+            self?.recordAnswered(.applyFailed, groups: groups)
+        }
         peer.onPushIgnoredDeletes = { [weak self] count in self?.recordIgnoredDeletes(count) }
         // 发送侧缺身份键：只累加账目，**不收尾**（见文件头：推送阶段触发 / 入站帧触发，
         // 两者都不是「对端应答了本端拉取」）。
-        peer.onIncrementMissingIdentity = { [weak self] count in self?.recordPushedMissingIdentity(count) }
-        peer.onPullMissingIdentity = { [weak self] count in self?.recordPushedMissingIdentity(count) }
+        peer.onIncrementMissingIdentity = { [weak self] groups in
+            self?.recordPushedMissingIdentity(groups)
+        }
+        peer.onPullMissingIdentity = { [weak self] groups in
+            self?.recordPushedMissingIdentity(groups)
+        }
         stage = .pushing
         peerValue = peer
         lock.unlock()
@@ -267,52 +285,26 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         finish(failure: nil)
     }
 
-    private func recordSuspended(_ count: Int) {
+    /// 拉取方向：把一类结果的**按实体分组**累加进账目并收尾。
+    ///
+    /// 收尾语义与收口前逐字一致：这些回调**任一到达**即视为「对端已应答」
+    /// （挂起 / 未定位即使空数组也上报 → 空数组 = 累加零条 + 照常收尾）。
+    private func recordAnswered(_ outcome: SyncRowOutcome, groups: [SyncEntityOutcomeCount]) {
         lock.lock()
-        reportValue.tally.accumulate(.suspended, count: count)
+        for group in groups {
+            reportValue.tally.accumulate(outcome, entity: group.entity, count: group.count)
+        }
         lock.unlock()
         finish(failure: nil)
     }
 
-    /// 拉取方向：对端推来的行里因缺身份键未落库的行数（与其它三个「应答已到」回调用同一收尾语义）。
-    private func recordUnresolved(_ count: Int) {
+    /// 发送方向：本端发出去但缺身份键的行数（按实体分组）。**只累加，不收尾**——这不是
+    /// 「对端应答」。
+    private func recordPushedMissingIdentity(_ groups: [SyncEntityOutcomeCount]) {
         lock.lock()
-        reportValue.tally.accumulate(.unresolved, count: count)
-        lock.unlock()
-        finish(failure: nil)
-    }
-
-    /// 拉取方向：对端推来的行里因**身份歧义**未落库的行数（第二身份相对路径命中多首
-    /// 本地曲目；不落库、不挂起）。与其它「应答已到」回调用同一收尾语义。
-    private func recordAmbiguousIdentity(_ count: Int) {
-        lock.lock()
-        reportValue.tally.accumulate(.ambiguousIdentity, count: count)
-        lock.unlock()
-        finish(failure: nil)
-    }
-
-    /// 拉取方向：对端推来的播放位置行**没落地**（跨端续播关 = 默认 / 落点未接）。
-    /// 与其它四个「应答已到」回调用同一收尾语义；applier 侧已保证这些行不计 applied。
-    private func recordUnsupported(_ count: Int) {
-        lock.lock()
-        reportValue.tally.accumulate(.unsupported, count: count)
-        lock.unlock()
-        finish(failure: nil)
-    }
-
-    /// 拉取方向：对端推来的行里因**父行 / 被引用行不存在**而跳过的行数（矩阵三级 #8：
-    /// 以前静默失败，现在必须计数上屏）。与其它「应答已到」回调用同一收尾语义。
-    private func recordSkippedMissingParent(_ count: Int) {
-        lock.lock()
-        reportValue.tally.accumulate(.skippedMissingParent, count: count)
-        lock.unlock()
-        finish(failure: nil)
-    }
-
-    /// 发送方向：本端发出去但缺身份键的行数。**只累加，不收尾**——这不是「对端应答」。
-    private func recordPushedMissingIdentity(_ count: Int) {
-        lock.lock()
-        reportValue.tally.accumulate(.missingIdentity, count: count)
+        for group in groups {
+            reportValue.tally.accumulate(.missingIdentity, entity: group.entity, count: group.count)
+        }
         lock.unlock()
     }
 

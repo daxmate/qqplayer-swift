@@ -1327,6 +1327,15 @@
 "sync_run_data_skipped_parent" = "缺依賴";
 "sync_run_data_skipped_parent_hint" = "有 %d 筆變更因為依賴的對象還沒到本機而跳過（歌單結構未同步到，或引用的歌沒有本機記錄）。";
 "sync_run_data_missing_identity_hint" = "有 %d 筆變更沒有帶歌曲指紋，對端無法定位。";
+"sync_run_data_apply_failed" = "套用失敗";
+"sync_run_data_apply_failed_hint" = "有 %d 筆變更無法套用（資料讀不出，或寫入本機失敗）。";
+"sync_run_data_entity_breakdown" = "依類別明細";
+"sync_run_data_entity_row" = "%1$@ · %2$@";
+"sync_run_data_entity_favorite" = "收藏";
+"sync_run_data_entity_play_history" = "播放紀錄";
+"sync_run_data_entity_playlist" = "歌單結構";
+"sync_run_data_entity_playlist_item" = "歌單成員";
+"sync_run_data_entity_playback_position" = "續播位置";
 "sync_run_data_result_none" = "還沒有同步過播放資料。";
 "sync_run_data_cancelled" = "資料同步已取消。";
 "sync_run_data_disconnected" = "裝置已中斷連線，資料同步已停止。";

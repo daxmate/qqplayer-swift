@@ -1100,6 +1100,29 @@ struct MacSyncRunSection: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
+
+            // 按实体披露（INV-18 后半句）：只出计数 > 0 的 (结果, 实体) 行——正常实体不占行。
+            // 数字与顺序全部来自唯一投影 `SyncEntityOutcomeDisclosure`（UI 不自算、不枚举实体）。
+            let entityRows = SyncEntityOutcomeDisclosure.rows(report.tally)
+            if !entityRows.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(SyncEntityOutcomeDisclosure.breakdownTitleKey.localized)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(Array(entityRows.enumerated()), id: \.offset) { _, row in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(SyncEntityOutcomeDisclosure.rowLabel(row))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("\(row.count)")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
         } else if !dataModel.isRunning {
             Text("sync_run_data_result_none".localized)
                 .font(.callout)

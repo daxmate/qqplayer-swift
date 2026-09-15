@@ -978,6 +978,15 @@
 "sync_run_data_skipped_parent" = "Missing dependency";
 "sync_run_data_skipped_parent_hint" = "%d changes were skipped because their dependency isn't on this device yet (playlist structure not synced, or the referenced song has no local record).";
 "sync_run_data_missing_identity_hint" = "%d entries were sent without a song fingerprint, so the other device can't match them.";
+"sync_run_data_apply_failed" = "Apply failed";
+"sync_run_data_apply_failed_hint" = "%d changes couldn't be applied (the data was unreadable or couldn't be written on this device).";
+"sync_run_data_entity_breakdown" = "Broken down by entity";
+"sync_run_data_entity_row" = "%1$@ · %2$@";
+"sync_run_data_entity_favorite" = "Favorites";
+"sync_run_data_entity_play_history" = "Play history";
+"sync_run_data_entity_playlist" = "Playlists";
+"sync_run_data_entity_playlist_item" = "Playlist tracks";
+"sync_run_data_entity_playback_position" = "Resume position";
 "sync_run_data_result_none" = "No data sync has run yet.";
 "sync_run_data_cancelled" = "Data sync cancelled.";
 "sync_run_data_disconnected" = "The device disconnected, so the data sync stopped.";

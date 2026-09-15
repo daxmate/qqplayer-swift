@@ -976,6 +976,15 @@
 "sync_run_data_skipped_parent" = "Dépendance manquante";
 "sync_run_data_skipped_parent_hint" = "%d modifications ignorées : la dépendance n'est pas encore sur cet appareil (structure de playlist non synchronisée, ou morceau référencé sans entrée locale).";
 "sync_run_data_missing_identity_hint" = "%d modifications ont été envoyées sans empreinte de morceau : l'autre appareil ne peut pas les associer.";
+"sync_run_data_apply_failed" = "Échec d’application";
+"sync_run_data_apply_failed_hint" = "%d modifications n’ont pas pu être appliquées (données illisibles ou écriture impossible sur cet appareil).";
+"sync_run_data_entity_breakdown" = "Détail par catégorie";
+"sync_run_data_entity_row" = "%1$@ · %2$@";
+"sync_run_data_entity_favorite" = "Favoris";
+"sync_run_data_entity_play_history" = "Historique d’écoute";
+"sync_run_data_entity_playlist" = "Playlists";
+"sync_run_data_entity_playlist_item" = "Titres des playlists";
+"sync_run_data_entity_playback_position" = "Position de reprise";
 "sync_run_data_result_none" = "Aucune synchronisation de données effectuée pour l'instant.";
 "sync_run_data_cancelled" = "Synchronisation des données annulée.";
 "sync_run_data_disconnected" = "L'appareil s'est déconnecté, la synchronisation des données s'est arrêtée.";

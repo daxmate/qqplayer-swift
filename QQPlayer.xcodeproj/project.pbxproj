@@ -624,6 +624,7 @@
 				Sync/SyncCollectionSyncCoordinator.swift,
 				Sync/SyncCrypto.swift,
 				Sync/SyncDataSyncCoordinator.swift,
+				Sync/SyncEntityOutcomeDisclosure.swift,
 				Sync/SyncEntityRegistry.swift,
 				Sync/SyncFileChecksum.swift,
 				Sync/SyncFileReceiver.swift,

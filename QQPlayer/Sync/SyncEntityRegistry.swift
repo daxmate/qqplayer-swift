@@ -605,6 +605,14 @@ enum SyncEntityRegistry {
         allAssemblyPoints.filter { $0.platform == platform }
     }
 
+    /// **实体词表的顺序**（= 注册表声明顺序；只取有 `SyncChangeEntity` 的登记，A–E）。
+    ///
+    /// 用途 = 结果计数的**分桶维度 + 展示顺序**（按实体披露的明细行）都从这里派生，
+    /// 面板/计数层不得手写第二份实体名单。
+    static var entityOrder: [SyncChangeEntity] {
+        entries.compactMap(\.entity)
+    }
+
     /// 某实体的登记（未登记 = nil）。
     static func entry(for entity: SyncChangeEntity) -> SyncEntityRegistryEntry? {
         entries.first { $0.entity == entity }
