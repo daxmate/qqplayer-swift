@@ -185,8 +185,11 @@ extension SyncLyricsContentMapping {
 /// 从被同步实体行里提取"它引用的歌曲本地 stableId"；不引用歌曲的实体（歌单）返回 nil。
 enum SyncTrackReference {
     /// 该实体是否引用歌曲（playlist 只是结构，不含歌曲键）。
+    /// **派生自唯一声明处 `SyncEntityRegistry`**（每个实体的身份键要求登记在注册表里，
+    /// 不再在这里手写判定表达式——INV-6 的风险点正是「新增实体忘表态 → 默认 true 被
+    /// 判未定位」，现在漏登记会被 CI 的 `everyEntityCaseIsRegistered` 抓住）。
     static func referencesTrack(_ entity: SyncChangeEntity) -> Bool {
-        entity != .playlist
+        SyncEntityRegistry.referencesTrack(entity)
     }
 
     /// 行内歌曲引用：优先取 row_key（跨端行键即承载引用），row_key 形态不符时回落
@@ -497,7 +500,8 @@ struct SyncChangeLogDanglingRepair {
 
     /// 参与修复的实体：引用歌曲、且对端靠稳定身份键定位的那几类。
     /// （`playlist` 不引用歌曲；`playback_position` 的本地载体不是 DB 行，都不在范围。）
-    static let repairableEntities: [SyncChangeEntity] = [.favorite, .playHistory, .playlistItem]
+    /// **派生自唯一声明处 `SyncEntityRegistry`**（见 `repairsDanglingReferences`）。
+    static var repairableEntities: [SyncChangeEntity] { SyncEntityRegistry.danglingRepairableEntities }
 
     let database: DatabaseManager
 
@@ -605,7 +609,8 @@ struct SyncChangeLogDanglingRepair {
     /// 参与补发的实体：本地载体是 DB 行的那几类。
     /// （`playlist` 结构行**不引用歌曲**，补发时不做身份判定；`playback_position`
     /// 本地载体不是 DB 行，不在范围。）
-    static let reconcilableEntities: [SyncChangeEntity] = [.favorite, .playHistory, .playlist, .playlistItem]
+    /// **派生自唯一声明处 `SyncEntityRegistry`**（见 `reconcilesLocalTruth`）。
+    static var reconcilableEntities: [SyncChangeEntity] { SyncEntityRegistry.reconcilableEntities }
 
     /// 把本端业务表里**现有**的真值，补进 `sync_outbox`（缺对应 upsert 行时才补）。
     ///

@@ -32,10 +32,13 @@ enum SyncChangeEntity: String, Codable, CaseIterable, Sendable {
     case playlistItem = "playlist_item"
     case playbackPosition = "playback_position"
 
-    // v1 参与同步的实体清单（设置白名单 v1 不做，待产品定后接入）。
+    // v1 参与同步的实体清单。**派生自唯一声明处 `SyncEntityRegistry`**（不要再在这里
+    // 手写清单：同一件事多处维护、漏一处即静默，2026-09-14 事故的形状）。
+    // 口径 = 注册表里 `syncMode == .synced`（无条件承诺）的实体；门控实体
+    // （`playbackPosition`，默认关）不在其中。
     // swiftlint:disable:next todo
     // TODO: 设置白名单同步（M4-2，产品定白名单字段后实现）
-    static let v1Synced: [SyncChangeEntity] = [.favorite, .playHistory, .playlist, .playlistItem]
+    static var v1Synced: [SyncChangeEntity] { SyncEntityRegistry.v1SyncedEntities }
 }
 
 /// outbox 操作类型（sync_outbox.op 列）。

@@ -54,8 +54,9 @@ struct SyncPlaybackCarryDatabaseFacts: SyncPlaybackCarryFactsProviding {
     /// 身份解析的唯一入口（B1b）：路径键取数走它，本类型不再自带 SQL。
     private var identity: any SyncIdentityResolving { SyncContentHashResolver(database: database) }
 
-    /// 参与携带的歌维度实体（与 `SyncChangeEntity.v1Synced` 一致，去掉非歌维度的 playlist）。
-    static let trackScopedEntities: [SyncChangeEntity] = SyncChangeEntity.v1Synced.filter { $0 != .playlist }
+    /// 参与携带的歌维度实体（= 无条件同步 ∩ 引用歌曲；playlist 不是歌维度）。
+    /// **派生自唯一声明处 `SyncEntityRegistry`**，不再在这里手写过滤条件。
+    static var trackScopedEntities: [SyncChangeEntity] { SyncEntityRegistry.trackScopedSyncedEntities }
 
     func trackFact(atRelativePath relativePath: String) -> SyncCollectionTrackFact? {
         guard let normalized = SyncManifestGenerator.normalizeRelativePath(relativePath) else { return nil }
