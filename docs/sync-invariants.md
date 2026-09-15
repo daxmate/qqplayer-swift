@@ -217,14 +217,33 @@
 
 ### INV-22　依附内容在目标端定位不到时不得写孤儿（歌词丢弃 + 记账；封面同理）
 
-- **现有守护**：歌词：`AlignedLyricsSyncTests.swift:374`（无对应歌曲 → 丢弃不落库）、`:394`（删除不传播）。封面：`✗ 无守护`（`SyncChangeLogApplier.swift:166/179` 原样写入对端本地路径）。
-- **建议**：**行为用例**：封面路径来自对端时必须被清空或改写；**面板披露**：封面加载失败计数。
+- **现有守护：✅ 已收（2026-09-15，H 封面防回归守护包）**
+  - 歌词：`AlignedLyricsSyncTests.swift:374`（无对应歌曲 → 丢弃不落库）、`:394`（删除不传播）。
+  - 封面（行为）：`QQPlayerTests/SyncLWWReconcileTests.swift` → `playlistCoverNeverComesFromPeer`
+    （喂一条带对端 `custom_cover_image_path` 的 playlist 载荷：新建 → 本端为 nil；更新 → 保留本端值，
+    且**其它字段照常跟随对端**——证明是封面这一项的规则，不是整行不更新）。
+  - 封面（静态）：`QQPlayerTests/SyncWiringContractTests.swift` → `productionHasSingleCoverRule`
+    （`Sync/` 生产码里只有接收侧一条规则；白名单外出现该属性即红；`custom_cover_image_path` 键只准在
+    `SyncDataSnapshots.swift` 声明；applier 里每处只准是注释或 `customCoverImagePath: nil`）
+    + `syntheticPeerCoverWriteIsCaught`（合成「把对端封面写进本端」必须被抓到，fail-closed）。
+  - 实现：`QQPlayer/Sync/SyncChangeLogApplier.swift` 的 `applyPlaylist`（更新保留本端封面 / 新建置 nil；`ed59f24`）。
+- **建议**：**面板披露**（封面加载失败计数）**仍未做**——消费点在 View 层静默回落（`try? Data(contentsOf:)`），
+  「封面加载失败」不是同步账目里的条目，本轮未纳入。
 
 ### INV-23　歌单自定义封面**不是**可跨端直接引用的值（`custom_cover_image_path` 是设备本地相对路径）
 
-- **现有守护**：`✗ 无守护`（**只活在「文件传输不含封面」这一事实里，没有任何地方声明它**）
-  - 证据：`SyncDataSnapshots.swift:69/79`；`grep -rn "cover" QQPlayer/Sync/` 无传输点。
-- **建议**：**静态契约** + **面板披露**：明确二选一——① 封面文件走文件通道（仿 `@lyrics/{content_hash}` 做 `@cover/{content_hash}`）；② 声明「封面不同步」并在 `applyPlaylist` 落库时把对端来源的 `customCoverImagePath` 置 nil。断言「`applyPlaylist` 不会写入非本端路径」。
+- **现有守护：✅ 已收（2026-09-15，H 封面防回归守护包）**。去向已定为契约 §2 H 的**「不承诺跨端」**：
+  封面是歌单内歌曲封面的派生数据，两端各自合成，无可同步之物。
+  - 行为：`QQPlayerTests/SyncLWWReconcileTests.swift` → `playlistCoverNeverComesFromPeer`；
+    实现 = `applyPlaylist`（更新保留本端值 / 新建置 nil）。
+  - 静态契约：`QQPlayerTests/SyncWiringContractTests.swift` → `SyncCoverValueContract`
+    （`productionHasSingleCoverRule` / `syntheticPeerCoverWriteIsCaught`）：`Sync/` 生产码里除
+    三条白名单（wire 字段声明 `SyncDataSnapshots.swift` / 捕获侧搭车 `SyncChangeLogMapping.swift` /
+    接收侧规则本身 `SyncChangeLogApplier.swift`）外，不得读写该属性；applier 里每一处只准是注释或
+    `customCoverImagePath: nil`（既不许读对端快照的值，也不许把对端值写进本端业务行）。
+  - 现状说明（**本轮未改行为**）：捕获侧仍把本端路径**随 C 的载荷搭车**发出（对端不消费、
+    本端落库时也不采用）；「封面文件走文件通道（`@cover/{content_hash}`）」属**未做的功能**，
+    不在守护范围内——真要做得按那份设计另开包。
 
 ---
 
@@ -254,7 +273,7 @@
 | INV-17 同一会话只装一个 changeLog 处理器 | `IOSPassiveSyncCenter.swift:21-32` 注释 | 静态契约（构造点计数上限） |
 | ~~INV-18 缺口必须计数并上屏~~ **已收（2026-09-15）** | — | 已落：二维分桶 + `SyncEntityOutcomeDisclosure` 唯一投影 + 界面层自算静态契约 |
 | INV-20 「已应用」= 真的落库 | `SyncChangeLogApplier.swift:223-255` 注释自承「v1 不落库」 | **行为用例**（sink nil ⇒ 不算 applied）+ 面板披露 |
-| INV-23 封面路径不可跨端引用 | **无处声明** | 静态契约或面板披露（见上） |
+| ~~INV-23 封面路径不可跨端引用~~ **已收（2026-09-15）** | — | 已落：`playlistCoverNeverComesFromPeer` + `SyncCoverValueContract`（静态 + 合成自证） |
 
 ### INV-26　跨端续播（`playback_position`）必须由**同一个开关**门控，且**默认关**（关 = 零出站零入站）
 
