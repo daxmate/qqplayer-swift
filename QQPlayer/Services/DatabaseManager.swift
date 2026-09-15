@@ -196,6 +196,7 @@ class DatabaseManager: @unchecked Sendable {
                 return
             } catch {
                 lastError = error
+                dbDiag("⚠️ setup failed attempt \(attempt)/\(maxRetries) error=\(error)")
                 print("⚠️ Database setup failed on attempt \(attempt)/\(maxRetries): \(error)")
 
                 if attempt < maxRetries {
@@ -260,7 +261,13 @@ class DatabaseManager: @unchecked Sendable {
             try db.execute(sql: "PRAGMA foreign_keys = ON")
         }
 
-        dbWriter = try DatabasePool(path: databaseURL.path, configuration: configuration)
+        do {
+            dbWriter = try DatabasePool(path: databaseURL.path, configuration: configuration)
+        } catch {
+            dbDiag("❌ open failed path=\(databaseURL.path) error=\(error)")
+            throw error
+        }
+        dbDiag("✅ open OK path=\(databaseURL.path)")
         try createTables()
         // stableId 相对化迁移的**文件侧**引用（书签 / 三个歌词目录 / 封面映射）在事务外做：
         // 文件 IO 不进写事务；失败只记日志（DB 侧已提交，下次入库/对账再走）。
@@ -301,6 +308,7 @@ class DatabaseManager: @unchecked Sendable {
     }
 
     private func attemptDatabaseRecovery(error: Error) {
+        dbDiag("🔧 recovery start originalError=\(error)")
         print("🔧 Attempting database recovery...")
 
         do {
@@ -316,12 +324,14 @@ class DatabaseManager: @unchecked Sendable {
 
             // Try to create a fresh database
             try setupDatabase()
+            dbDiag("✅ recovery OK (fresh database created)")
             print("✅ Database recovery successful - created fresh database")
         } catch {
             // The database file is corrupted beyond repair. Fall back to an
             // in-memory database so the app keeps running (degraded, empty
             // library) instead of force-exiting at launch. Migrations are
             // intentionally skipped: an in-memory database has no old data.
+            dbDiag("⚠️ recovery failed → in-memory fallback reason=\(error)")
             print("❌ Database recovery failed: \(error)")
             print("⚠️ Database corrupted, running with in-memory fallback")
             setupInMemoryFallback()
@@ -344,15 +354,55 @@ class DatabaseManager: @unchecked Sendable {
             // safe on a brand-new schema).
             dbWriter = try DatabaseQueue(configuration: configuration)
             try createTables()
+            dbDiag("✅ in-memory created (DEGRADED: library starts empty)")
             print("✅ In-memory database created successfully (degraded mode: library starts empty)")
         } catch {
             // Absolute last resort - keep the app alive instead of crashing.
+            dbDiag("❌ in-memory creation failed error=\(error)")
             print("❌ Failed to create in-memory fallback database: \(error)")
             print("⚠️ Continuing without a usable database (degraded mode)")
             if dbWriter == nil {
                 dbWriter = try? DatabaseQueue()
             }
         }
+    }
+
+    // MARK: - DB 打开诊断（2026-09-15）
+
+    /// 把「选了哪条路径 → 拿到没拿到 App Group 容器 → 打开结果 → 降级原因」追加写入
+    /// 容器内 `Documents/db-debug.log`（环形：超 256KB 留尾部 64KB）。
+    ///
+    /// 为什么落盘：iOS 的 `print` 只进 stdout，真机拿不到（`devicectl process launch
+    /// --console` 实测报 CoreDeviceError 10002）。而「静默降级成一局空库」我们已经栽过两次
+    /// —— 这条日志让降级原因可离线取证（拉容器文件即可读）。
+    /// 只在启动期决策点写（每次启动 ≤ 6 行），不进任何热路径；诊断自身失败绝不影响启动。
+    private func dbDiag(_ message: String) {
+        #if os(iOS)
+            guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+                .first?.appendingPathComponent("db-debug.log") else { return }
+            let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+            do {
+                if FileManager.default.fileExists(atPath: url.path),
+                   let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+                   size > 256_000 {
+                    if let handle = try? FileHandle(forReadingFrom: url) {
+                        defer { _ = try? handle.close() }
+                        try? handle.seek(toOffset: UInt64(max(0, size - 64_000)))
+                        let tail = handle.readDataToEndOfFile()
+                        _ = try? tail.write(to: url, options: .atomic)
+                    }
+                }
+                if let handle = try? FileHandle(forWritingTo: url) {
+                    defer { _ = try? handle.close() }
+                    _ = try? handle.seekToEnd()
+                    _ = try? handle.write(contentsOf: Data(line.utf8))
+                    return
+                }
+                try line.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                // 诊断日志失败不影响启动
+            }
+        #endif
     }
 
     private func getDatabaseURL() throws -> URL {
@@ -376,9 +426,13 @@ class DatabaseManager: @unchecked Sendable {
                 forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios")
             let documentsPath = FileManager.default.urls(for: .documentDirectory,
                                                          in: .userDomainMask).first!
-            return DatabasePathResolver.iosDatabaseURL(
+            let resolved = DatabasePathResolver.iosDatabaseURL(
                 appGroupContainer: containerURL,
                 documentsDirectory: documentsPath)
+            dbDiag("🔎 resolve appGroup=\(containerURL == nil ? "nil" : containerURL!.path) "
+                + "documents=\(documentsPath.path) → chosen=\(resolved.path) "
+                + "exists=\(FileManager.default.fileExists(atPath: resolved.path))")
+            return resolved
         #endif
     }
 
