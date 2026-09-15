@@ -24,6 +24,8 @@ struct SyncSettingsView: View {
     @State private var pendingUnpair: PeerDevice?
     /// App 级被动同步中心（Mac 推送接收状态；T4/T5）
     @ObservedObject private var passiveSync = IOSPassiveSyncCenter.shared
+    /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）
+    @ObservedObject private var wiringFacts = SyncWiringFactsStore.shared
 
     private let deviceStore = DeviceStore()
 
@@ -71,6 +73,10 @@ struct SyncSettingsView: View {
 
             // MARK: 同步数据（帧 8/9）账目 —— 手机侧也能看见「同步了什么 / 丢了多少」（2026-09-15）
             Section {
+                // 装配自检（L5）：缺口 > 0 才显示一行；缺口 = 0 = 空态（判定全在纯逻辑里）。
+                if let wiringRow = SyncWiringSelfCheckPresenter.gapRow(wiringFacts.gaps) {
+                    wiringSelfCheckRow(wiringRow)
+                }
                 if passiveSync.dataSummary.hasSessionData {
                     dataSyncSummaryRows
                 } else {
@@ -184,6 +190,22 @@ struct SyncSettingsView: View {
             deviceName = LocalDeviceNameStore.shared.name
             // 幂等：进页时确保被动端在跑（配对完成后也由此重新检查主机）
             passiveSync.start()
+        }
+    }
+
+    // MARK: - 装配自检（L5）
+
+    /// 装配自检行：一行说明「缺了什么 / 影响什么」（缺失能力名列表来自探针本地化文案）。
+    /// View 不做任何判断——行要不要出现、缺几项，全部来自 `SyncWiringSelfCheckPresenter`。
+    private func wiringSelfCheckRow(_ row: SyncWiringSelfCheckPresenter.GapRow) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(row.labelKey.localized(with: row.count))
+                .font(.callout)
+                .foregroundStyle(.orange)
+            Text(row.hintKey.localized(with: row.probeLabelKeys.map { $0.localized }.joined(separator: ", ")))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

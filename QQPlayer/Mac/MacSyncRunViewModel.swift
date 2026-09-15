@@ -45,7 +45,7 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 内容侧（方向 / 内容源 / 选择集）。
     private let content: MacSyncContentModel
     private let deviceStore: DeviceStore
-    private let makeCoordinator: (SyncPeerSession, SyncCollectionSelection) -> SyncCollectionSyncCoordinator
+    private let makeCoordinator: (SyncPeerSession, SyncCollectionSelection) -> MacSyncCoordinatorAssembly
 
     // MARK: 发布状态
 
@@ -79,7 +79,7 @@ final class MacSyncRunViewModel: ObservableObject {
         hostCenter: SyncHostCenter? = nil,
         content: MacSyncContentModel,
         deviceStore: DeviceStore = DeviceStore(),
-        makeCoordinator: @escaping (SyncPeerSession, SyncCollectionSelection) -> SyncCollectionSyncCoordinator = {
+        makeCoordinator: @escaping (SyncPeerSession, SyncCollectionSelection) -> MacSyncCoordinatorAssembly = {
             MacSyncCoordinatorFactory.make(session: $0, selection: $1)
         }
     ) {
@@ -202,7 +202,10 @@ final class MacSyncRunViewModel: ObservableObject {
         reportSummary = nil
         errorMessage = nil
 
-        let coordinator = makeCoordinator(session, content.selection)
+        let assembly = makeCoordinator(session, content.selection)
+        let coordinator = assembly.coordinator
+        // 装配事实 → 运行时自检（INV-16 后半句）：跟歌走携带没装上要看得见，不能只留在注释里。
+        SyncWiringFactsStore.shared.record(.playbackCarry, attached: assembly.playbackCarryAttached)
         coordinator.onStateChange = { [weak self] state in
             Task { @MainActor in self?.handleState(state, from: coordinator) }
         }

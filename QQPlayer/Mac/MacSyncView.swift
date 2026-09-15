@@ -38,6 +38,8 @@ struct MacSyncRunSection: View {
     @StateObject private var content: MacSyncContentModel
     /// 数据同步侧（S2-T12：收藏 / 播放历史 / 歌单结构）。
     @StateObject private var dataModel: MacSyncDataViewModel
+    /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）。
+    @ObservedObject private var wiringFacts: SyncWiringFactsStore
 
     /// 全曲库二次确认（Q4 决策：全库必须确认）。
     @State private var showLibraryWideConfirm = false
@@ -63,6 +65,7 @@ struct MacSyncRunSection: View {
         _content = StateObject(wrappedValue: contentModel)
         _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center, content: contentModel))
         _dataModel = StateObject(wrappedValue: MacSyncDataViewModel(hostCenter: center))
+        _wiringFacts = ObservedObject(wrappedValue: .shared)
     }
 
     var body: some View {
@@ -959,6 +962,24 @@ struct MacSyncRunSection: View {
                 Text(reason)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            // 装配自检（L5，INV-16 后半句）：缺口 > 0 才显示一行；缺口 = 0 = 空态。
+            // 判定全在 `SyncWiringSelfCheckPresenter`（纯逻辑），View 不写判断。
+            if let wiringRow = SyncWiringSelfCheckPresenter.gapRow(wiringFacts.gaps) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(wiringRow.labelKey.localized(with: wiringRow.count))
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                    Text(
+                        wiringRow.hintKey.localized(
+                            with: wiringRow.probeLabelKeys.map { $0.localized }.joined(separator: ", ")
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             dataResult

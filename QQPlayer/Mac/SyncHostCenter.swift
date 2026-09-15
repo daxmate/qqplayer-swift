@@ -246,6 +246,8 @@ final class SyncHostCenter: ObservableObject {
         activeSession = nil
         // 会话下线：让自动触发的「一次连接一次」标记归位（下次连上再自动跑一轮）。
         MacDataSyncAutoRunner.shared.sessionDidClose()
+        // 装配自检事实同步归零（不是缺口——没有会话就谈不上装配）。
+        SyncWiringFactsStore.shared.clear()
     }
 
     /// 对端 hello 携带展示名且与信任表现有 display_name 不同 → 刷新 display_name
@@ -394,9 +396,12 @@ final class MacDataSyncAutoRunner {
         guard let peerID = session.peerHelloValue?.deviceID,
               !peerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             print("⚠️ MacDataSyncAutoRunner: 会话无对端 Device ID，跳过自动同步")
+            // 装配自检事实：声明了「同步数据入口」却装配不了（会话没有可用游标键）→ 面板可见。
+            SyncWiringFactsStore.shared.record(.dataSyncEntry, attached: false)
             finish()
             return
         }
+        SyncWiringFactsStore.shared.record(.dataSyncEntry, attached: true)
 
         let coordinator = SyncDataSyncCoordinator(session: session, database: .shared, peerID: peerID)
         self.coordinator = coordinator

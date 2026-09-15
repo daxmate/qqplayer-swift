@@ -440,10 +440,13 @@
         /// 数据同步端的对端游标键（`sync_cursor.peer_id`）；nil = 未装配
         private(set) var dataSyncPeerID: String?
 
-        /// 数据同步端是否已装配（可达性诊断 / 测试断言）。
+        /// 数据同步端是否已装配（可达性诊断 / 测试断言 / **运行时装配自检事实**）。
         var isDataSyncAttached: Bool {
             dataSyncPeer != nil
         }
+
+        /// 播放位置落点是否已注入（装配自检事实；**门控关 = nil = 不适用**，不计缺口，见 INV-26）。
+        private var playbackPositionSinkAttached: Bool?
         private var pairedHosts: [PeerDevice] = []
         private var currentTarget: IOSPassiveSyncTarget?
         /// 本轮已尝试过的目标（`peerID|hostName`），避免浏览回调反复重连同一目标
@@ -633,12 +636,26 @@
             guard host.attach(to: session) else {
                 // 曲库根不存在 / 接线失败：拆掉并让会话关闭走统一失败路径
                 passiveHost = nil
+                recordWiringFacts()
                 session.cancel(reason: .storageError("passive host attach failed"))
                 return
             }
             summary = host.summary
             // 被动端接好后挂数据同步端：帧 8/9 与帧 15 的链序见文件头注释。
             attachDataSync(to: session)
+            // 装配完成 → 申报事实（会话 ready 的自检时点；缺口在面板上可见，见 SyncWiringSelfCheck）。
+            recordWiringFacts()
+        }
+
+        /// 装配结果 → 运行时自检事实（INV-16 后半句：**本端声明的能力这一刻真的装上没有**）。
+        ///
+        /// 只申报事实，不做判定（判定 = `SyncWiringSelfCheck.gaps(items:)` 纯函数，
+        /// 展示 = `SyncWiringSelfCheckPresenter`）；探针清单来自注册表，不在这里写死。
+        private func recordWiringFacts() {
+            let store = SyncWiringFactsStore.shared
+            store.record(.libraryPassiveHost, attached: passiveHost != nil)
+            store.record(.changeLogPeer, attached: isDataSyncAttached)
+            store.record(.playbackPositionSink, attached: playbackPositionSinkAttached)
         }
 
         /// 被动端数据同步端的 applier：开关开（跳端续播）才注入落点；
@@ -687,10 +704,15 @@
             } catch {
                 print("⚠️ IOSPassiveSyncCenter: 出站悬空引用对账失败 \(error)")
             }
+            let applier = Self.makePassiveApplier(database: database)
+            // 自检事实：门控开 = 「落点真的注入了吗」，门控关 = 不适用（不报缺口，INV-26）。
+            playbackPositionSinkAttached = applier.playbackPositionSyncEnabled
+                ? (applier.playbackPositionSink != nil)
+                : nil
             let peer = SyncChangeLogPeer(
                 session: session,
                 store: SyncChangeLogStore(database: database),
-                applier: Self.makePassiveApplier(database: database),
+                applier: applier,
                 peerID: peerID
             )
             // 诊断打点：只记计数 / 错误类别，不打印曲目内容（隐私）。
@@ -756,6 +778,8 @@
             passiveHost = nil
             dataSyncPeer = nil
             dataSyncPeerID = nil
+            playbackPositionSinkAttached = nil
+            SyncWiringFactsStore.shared.clear()
             currentTarget = nil
             guard isRunning else { return }
             if let failure = SyncConnectLogic.failure(fromCloseReason: reason) {
@@ -835,6 +859,9 @@
             passiveHost = nil
             dataSyncPeer = nil
             dataSyncPeerID = nil
+            playbackPositionSinkAttached = nil
+            // 会话拆除：自检事实归零（不是缺口——没有会话就谈不上装配）。
+            SyncWiringFactsStore.shared.clear()
             session?.cancel(reason: .userCancelled)
             session = nil
             isTearingDown = false

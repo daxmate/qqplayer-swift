@@ -34,13 +34,25 @@
 
 import Foundation
 
+/// 一次装配的产物：协调器 + **装配事实**。
+///
+/// 为什么要连事实一起返回（2026-09-15，L5 运行时自检）：对端 Device ID 为空时
+/// `playbackCarry` 传 nil —— 协调器照跑、歌曲照传，但 R3b「跟歌走」**静默失效**
+/// （播放数据不跟着走了，用户只看到「同步了但播放记录没过来」）。以前这件事只体现在
+/// 一段注释里；现在它作为事实回报给调用方 → `SyncWiringFactsStore` → 面板上的自检行。
+struct MacSyncCoordinatorAssembly {
+    let coordinator: SyncCollectionSyncCoordinator
+    /// 跟歌走携带（`SyncPlaybackCarryPeer`）是否真的装上了。
+    let playbackCarryAttached: Bool
+}
+
 /// Mac 同步编排装配工厂。
 enum MacSyncCoordinatorFactory {
     /// 生产入口：曲库根 = macOS 默认曲库（与 `MacSyncLibraryHost` 同源）。
     static func make(
         session: SyncPeerSession,
         selection: SyncCollectionSelection
-    ) -> SyncCollectionSyncCoordinator {
+    ) -> MacSyncCoordinatorAssembly {
         make(
             session: session,
             selection: selection,
@@ -55,7 +67,7 @@ enum MacSyncCoordinatorFactory {
         session: SyncPeerSession,
         selection: SyncCollectionSelection,
         libraryRoot: URL
-    ) -> SyncCollectionSyncCoordinator {
+    ) -> MacSyncCoordinatorAssembly {
         let database = DatabaseManager.shared
         // 歌词跨端映射：**一处创建、三处共用**（descriptor 的 manifest 侧 / facts 的
         // 「本端有无该歌词」判定 / 拉取侧 SyncLyricsReceiver 的落库映射），
@@ -72,8 +84,11 @@ enum MacSyncCoordinatorFactory {
             lyricsMapping: lyricsMapping
         )
         let peerID = session.peerHelloValue?.deviceID ?? ""
+        let playbackCarry = peerID.isEmpty
+            ? nil
+            : SyncPlaybackCarryPeer(session: session, libraryRoot: libraryRoot, peerID: peerID)
 
-        return SyncCollectionSyncCoordinator(
+        let coordinator = SyncCollectionSyncCoordinator(
             session: session,
             descriptor: descriptor,
             selection: selection,
@@ -84,9 +99,8 @@ enum MacSyncCoordinatorFactory {
             // `.unresolved` 缺省）：缺了会让拉取侧 `SyncLyricsReceiver.install` 把对端发来的
             // 歌词全判为 orphan → iPhone 的歌同步到 Mac 时歌词永远不落库。
             lyricsMapping: lyricsMapping,
-            playbackCarry: peerID.isEmpty
-                ? nil
-                : SyncPlaybackCarryPeer(session: session, libraryRoot: libraryRoot, peerID: peerID)
+            playbackCarry: playbackCarry
         )
+        return MacSyncCoordinatorAssembly(coordinator: coordinator, playbackCarryAttached: playbackCarry != nil)
     }
 }
