@@ -98,6 +98,22 @@ enum SyncWiringContract {
             请把 SyncFrame.FrameType 的 changeLogPull 恢复到 = 8、changeLogPush 恢复到 = 9（新增帧只能用未占用的号段）。
             """
         ),
+        Requirement(
+            id: "identity-entry-implemented-and-wired",
+            path: "QQPlayer/Sync/SyncChangeLogMapping.swift",
+            requiredMarkers: [
+                "extension SyncContentHashResolver: SyncIdentityResolving",
+                "SyncLyricsContentMapping(identity:",
+            ],
+            alternativeMarkers: [],
+            guidance: """
+            歌曲身份解析的入口实现断了：`SyncContentHashResolver` 不再声明遵守 `SyncIdentityResolving`，
+            或歌词映射不再从入口构造（`SyncLyricsContentMapping(identity:)`）——两条都是「入口空转」的形状：
+            编译能过（协议可选遵守）、下游各自拿闭包，漏接线一处就静默。
+            请检查 QQPlayer/Sync/SyncChangeLogMapping.swift：`SyncContentHashResolver` 必须有 `: SyncIdentityResolving` 遵守声明，
+            `.live(database:)` 必须走 `SyncLyricsContentMapping(identity: SyncContentHashResolver(database:))`。
+            """
+        ),
     ]
 
     /// 纯函数：一份源码对某条断言的**缺失标记**列表（空 = 满足）。
@@ -246,5 +262,166 @@ struct SyncWiringContractTests {
         }
         #expect(source.contains("enum SyncChangeLogPeer") || source.contains("final class SyncChangeLogPeer"),
                 "SyncChangeLogPeer 类型声明不见了（帧 8/9 唯一处理器）")
+    }
+}
+
+// MARK: - 身份解析「禁止第二实现」契约（2026-09-15 身份入口包）
+
+/// 「歌曲身份解析」（stable_id ↔ content_hash）唯一入口的**形状契约**：扫生产码，断言两件事
+/// 各自只有一处实现——① 身份 SQL（两个方向）；② 用闭包构造身份映射。
+///
+/// 为什么单独一层：装配可达性只能发现「没接线」，发现不了「同一件事被第二处实现」。
+/// 身份解析此前在生产码里有 5 处并行表达（真实现 / 歌词映射闭包 / 请求应答器闭包 / 曲库
+/// 描述符闭包 / 曲库事实里再包一层同名 func），每处都可选、都能「返回 nil」，漏修一处即静默。
+///
+/// 判据（同 `SyncWiringContract` 风格）：纯函数判定 + 合成源码自证 + fail-closed。
+enum SyncIdentityContract {
+    /// 唯一允许解析 `stable_id ↔ content_hash` 的生产文件
+    /// （`SyncContentHashResolver` = `SyncIdentityResolving` 的生产实现）。
+    static let entryImplementationPath = "QQPlayer/Sync/SyncChangeLogMapping.swift"
+
+    /// 唯一允许用闭包构造 `SyncLyricsContentMapping` 的生产文件（类型声明 + `.unresolved`
+    /// 测试 seam 都在此）；其它生产文件只能走入口（`(identity:)` / `.live(database:)`）。
+    static let mappingDefinitionPath = "QQPlayer/Sync/SyncAlignedLyrics.swift"
+
+    /// 生产码扫描根（测试 / harness 是 seam，允许内存查表实现，不在扫描范围）。
+    static let productionRoot = "QQPlayer"
+
+    /// 身份解析 SQL 的形态（stableId → content_hash / content_hash → stableId）。
+    static let identitySQLMarkers = [
+        "content_hash FROM track WHERE stable_id",
+        "stable_id FROM track WHERE content_hash",
+    ]
+
+    /// 闭包式构造身份映射的标记（`SyncLyricsContentMapping(contentHashForStableId:…)`）。
+    /// 注意带冒号：`mapping.stableIdForContentHash(x)` 这类**读**调用不匹配。
+    static let closureWiringMarkers = [
+        "contentHashForStableId:",
+        "stableIdForContentHash:",
+    ]
+
+    /// 纯函数：一份生产源码里违禁的标记（空 = 该文件合规）。
+    static func violations(inSource source: String, relativePath: String) -> [String] {
+        var result: [String] = []
+        if relativePath != entryImplementationPath {
+            result += identitySQLMarkers.filter { source.contains($0) }
+                .map { "身份 SQL：`\($0)`" }
+        }
+        if relativePath != mappingDefinitionPath {
+            result += closureWiringMarkers.filter { source.contains($0) }
+                .map { "闭包构造身份映射：`\($0)`" }
+        }
+        return result
+    }
+}
+
+extension SyncIdentityContract {
+    struct ScanResult {
+        var scannedFiles: Int = 0
+        /// 违禁明细（`相对路径 → 标记`）
+        var violations: [String] = []
+        /// 入口文件自身是否真的在做两个方向的解析（false = 白名单空转，必须失败）
+        var entryResolvesIdentity = false
+        /// 映射定义文件是否真的持有闭包（false = 白名单空转，必须失败）
+        var definitionHoldsClosures = false
+    }
+
+    /// 生产码全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
+    static func scan(repoRoot: URL) -> ScanResult {
+        var result = ScanResult()
+        for url in SyncWiringContract.swiftSources(repoRoot: repoRoot, at: productionRoot) {
+            let relativePath = url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            result.scannedFiles += 1
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                result.violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
+                continue
+            }
+            if relativePath == entryImplementationPath {
+                result.entryResolvesIdentity = identitySQLMarkers.allSatisfy { source.contains($0) }
+            }
+            if relativePath == mappingDefinitionPath {
+                result.definitionHoldsClosures = closureWiringMarkers.allSatisfy { source.contains($0) }
+            }
+            result.violations += violations(inSource: source, relativePath: relativePath)
+                .map { "\(relativePath) → \($0)" }
+        }
+        return result
+    }
+}
+
+// MARK: - 身份入口形状测试
+
+struct SyncIdentityContractTests {
+    static let repoRoot = SyncWiringContractTests.repoRoot
+
+    @Test("身份解析：生产码里只有一处实现（白名单 = 入口文件；映射只能从入口构造）")
+    func productionHasSingleIdentityImplementation() {
+        let result = SyncIdentityContract.scan(repoRoot: Self.repoRoot)
+        #expect(result.scannedFiles > 50, "生产码一个 .swift 都没扫到 = 契约空转：扫到 \(result.scannedFiles)")
+        #expect(
+            result.entryResolvesIdentity,
+            """
+            白名单文件 \(SyncIdentityContract.entryImplementationPath) 里找不到两个方向的身份 SQL——
+            说明契约的空转保护失效（要么身份实现搬走了，要么 SQL 改形态了）。
+            """
+        )
+        #expect(
+            result.definitionHoldsClosures,
+            "\(SyncIdentityContract.mappingDefinitionPath) 里找不到闭包字段/闭包 init——白名单空转保护失效。"
+        )
+        #expect(
+            result.violations.isEmpty,
+            """
+            生产码里出现了第二处「歌曲身份解析」（唯一入口 = SyncIdentityResolving，\
+            生产实现 = QQPlayer/Sync/SyncChangeLogMapping.swift 的 SyncContentHashResolver）：
+            \(result.violations.joined(separator: "\n"))
+
+            修法：删掉第二处实现，改为依赖入口——① 需要 stableId ↔ content_hash 就注入/持有
+            `any SyncIdentityResolving`；② 需要身份映射就走 `SyncLyricsContentMapping(identity:)` /
+            `.live(database:)`（闭包构造只允许留在测试 seam 一侧）。
+            """
+        )
+    }
+
+    @Test("合成「第二处实现」必须被抓到（契约自证有效）")
+    func syntheticSecondImplementationIsCaught() {
+        let sql = """
+        func contentHash(forTrackStableId stableId: String) throws -> String? {
+            try String.fetchOne(db, sql: "SELECT content_hash FROM track WHERE stable_id = ? LIMIT 1")
+        }
+        """
+        #expect(
+            SyncIdentityContract.violations(inSource: sql, relativePath: "QQPlayer/Sync/Somewhere.swift").count == 1,
+            "非白名单文件里的身份 SQL 必须被抓到"
+        )
+        #expect(
+            SyncIdentityContract.violations(inSource: sql, relativePath: SyncIdentityContract.entryImplementationPath).isEmpty,
+            "入口文件自身必须放行（否则契约不可用）"
+        )
+
+        let closureWiring = """
+        let mapping = SyncLyricsContentMapping(
+            contentHashForStableId: { _ in nil },
+            stableIdForContentHash: { _ in nil }
+        )
+        """
+        #expect(
+            SyncIdentityContract.violations(inSource: closureWiring, relativePath: "QQPlayer/Mac/Somewhere.swift").count == 2,
+            "生产码里用闭包构造身份映射必须被抓到（闭包只允许留在测试 seam）"
+        )
+        #expect(
+            SyncIdentityContract.violations(
+                inSource: closureWiring,
+                relativePath: SyncIdentityContract.mappingDefinitionPath
+            ).isEmpty,
+            "映射定义文件自身必须放行"
+        )
+
+        // 读调用（`mapping.stableIdForContentHash(x)`）不带冒号，不得被误报
+        let readCall = "let sid = lyricsMapping.stableIdForContentHash(songHash)"
+        #expect(
+            SyncIdentityContract.violations(inSource: readCall, relativePath: "QQPlayer/Sync/Somewhere.swift").isEmpty,
+            "读调用不是第二处实现，不得误报"
+        )
     }
 }
