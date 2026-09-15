@@ -61,28 +61,34 @@ enum SyncDataSyncPhase: Equatable, Sendable {
 }
 
 /// 一次「同步数据」的账目（调用方只消费，不参与决策）。
+///
+/// ⚠️ 计数**不在这里维护**：唯一存储 = `tally`（`SyncOutcomeTally`，与 iOS 面板**同一类型**），
+/// 下面这些读数是它的投影——面板读的名字不变（UI 零改动），但「谁来加这个数」全仓只剩
+/// `tally.accumulate(…)` 一处（L6：失败/结果枚举化 + 两套账目收口）。
 struct SyncDataSyncReport: Equatable, Sendable {
+    /// **唯一**结果账目（见 `SyncRowOutcome` / `SyncOutcomeTally`）。
+    var tally = SyncOutcomeTally()
     /// 本端 outbox 增量行数（含被过滤的 delete，口径同 `handlePull` 的计数）；空增量 = 0
-    var pushedEntries: Int = 0
+    var pushedEntries: Int { tally.outboundEntries }
     /// 对端推来的帧 9 中实际落到本地业务表的行数
-    var appliedEntries: Int = 0
+    var appliedEntries: Int { tally.appliedEntries }
     /// 对端推来的行里因本地缺歌而挂起的行数（歌到位后重放，不丢数据）
-    var suspendedEntries: Int = 0
+    var suspendedEntries: Int { tally.suspendedEntries }
     /// 拉取方向：对端推来的行里因**缺身份键**（contentHash nil/空）而**未落库**的行数
     /// （无法定位到本地歌曲 → 落库也永远不可见；见 `SyncEntryLocalization.unresolved`）
-    var unresolvedEntries: Int = 0
+    var unresolvedEntries: Int { tally.unresolvedEntries }
     /// 拉取方向：对端推来的 `playback_position` 行里**没有落到本地位置**的行数
     /// （跨端续播开关关 = 默认，或开关开但本端落点未接；见 `SyncChangeLogApplier`）。
     /// ⚠️ 这些行**不计入 `appliedEntries`**——「已应用」= 真的落了本地（INV-20）。
-    var unsupportedEntries: Int = 0
+    var unsupportedEntries: Int { tally.unsupportedEntries }
     /// 拉取方向：对端推来的行里因**父行/被引用行不存在**而跳过的行数
     /// （歌单结构未到 / 引用歌本地查无；矩阵三级 #8：以前静默失败，现在必须可见）
-    var skippedMissingParentEntries: Int = 0
+    var skippedMissingParentEntries: Int { tally.skippedMissingParentEntries }
     /// 推送方向：本端发出去的行里缺身份键的条数（对端定位不了它们；含主动推增量
     /// 与应答对方拉取两个方向）
-    var pushedMissingIdentityEntries: Int = 0
+    var pushedMissingIdentityEntries: Int { tally.missingIdentityEntries }
     /// 对端推来的行里被忽略的 delete 行数（删除不跨端传播）
-    var ignoredDeletes: Int = 0
+    var ignoredDeletes: Int { tally.ignoredDeletes }
     /// 失败原因（nil = 未失败；「缺 peerID / 推失败 / 发拉取失败 / 对端无应答」/ cancelled）
     var failureMessage: String?
     /// 是否已收尾（与 `phase == .finished` 同义；冗余存一份便于调用方只读 report）
@@ -211,7 +217,8 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         do {
             let pushed = try peer.sendIncrement()
             lock.lock()
-            reportValue.pushedEntries = pushed
+            // 批次事实（「最近一批发出行数」）→ 覆盖写，不累加（与收口前 `= pushed` 同口径）。
+            reportValue.tally.overwrite(.outbound, with: pushed)
             lock.unlock()
         } catch {
             finish(failure: "推送增量失败：\(error)")
@@ -246,14 +253,14 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
 
     private func recordApplied(_ count: Int) {
         lock.lock()
-        reportValue.appliedEntries += count
+        reportValue.tally.accumulate(.applied, count: count)
         lock.unlock()
         finish(failure: nil)
     }
 
     private func recordSuspended(_ count: Int) {
         lock.lock()
-        reportValue.suspendedEntries += count
+        reportValue.tally.accumulate(.suspended, count: count)
         lock.unlock()
         finish(failure: nil)
     }
@@ -261,7 +268,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     /// 拉取方向：对端推来的行里因缺身份键未落库的行数（与其它三个「应答已到」回调用同一收尾语义）。
     private func recordUnresolved(_ count: Int) {
         lock.lock()
-        reportValue.unresolvedEntries += count
+        reportValue.tally.accumulate(.unresolved, count: count)
         lock.unlock()
         finish(failure: nil)
     }
@@ -270,7 +277,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     /// 与其它四个「应答已到」回调用同一收尾语义；applier 侧已保证这些行不计 applied。
     private func recordUnsupported(_ count: Int) {
         lock.lock()
-        reportValue.unsupportedEntries += count
+        reportValue.tally.accumulate(.unsupported, count: count)
         lock.unlock()
         finish(failure: nil)
     }
@@ -279,7 +286,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     /// 以前静默失败，现在必须计数上屏）。与其它「应答已到」回调用同一收尾语义。
     private func recordSkippedMissingParent(_ count: Int) {
         lock.lock()
-        reportValue.skippedMissingParentEntries += count
+        reportValue.tally.accumulate(.skippedMissingParent, count: count)
         lock.unlock()
         finish(failure: nil)
     }
@@ -287,13 +294,13 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     /// 发送方向：本端发出去但缺身份键的行数。**只累加，不收尾**——这不是「对端应答」。
     private func recordPushedMissingIdentity(_ count: Int) {
         lock.lock()
-        reportValue.pushedMissingIdentityEntries += count
+        reportValue.tally.accumulate(.missingIdentity, count: count)
         lock.unlock()
     }
 
     private func recordIgnoredDeletes(_ count: Int) {
         lock.lock()
-        reportValue.ignoredDeletes += count
+        reportValue.tally.accumulate(.ignoredDelete, count: count)
         lock.unlock()
         finish(failure: nil)
     }
