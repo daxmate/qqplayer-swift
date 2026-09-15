@@ -290,12 +290,48 @@
   - 用例：`SyncDataSyncCoreTests.passiveDataSyncPresenterRowsArePure`。
 - **建议**：新增任何跨端能力时，**两端的账目面都要有落点**（只 `print` 不算披露）。
 
+### INV-30　第二身份（曲库相对路径）兑底必须**唯一命中**才落库；歧义不落库、不挂起，且必须计数上屏
+
+- **风险**：相对路径不像 `content_hash` 那样天然唯一（历史重导入残留可让两行 `track.path` 相同）。
+  选错一首 = 把对端的收藏 / 播放历史挂到**另一首歌**上（用户看到“收藏跑到别的歌”）——比不落库更坏。
+- **现有守护：✅ 已收（2026-09-18）**
+  - 入口：`SyncContentHashResolver.localizeRemoteTrack` 按 `SELECT DISTINCT stable_id FROM track WHERE path = ? LIMIT 2` 计数：
+    1 = resolved、>1 = `.ambiguous`、0 = suspended（`QQPlayer/Sync/SyncChangeLogMapping.swift`）。
+  - 账目：`SyncRowOutcome.ambiguousIdentity` → 两端面板「身份歧义」行（>0 才显示）+ 5 语 hint。
+  - 解析顺序：`content_hash` 存在时**绝不看相对路径**（保持今天语义逐字不变）。
+- **用例**：`SyncRelativePathIdentityTests.ambiguousRelativePathWritesNothing`（真查表：业务表零新行）、
+  `replayAmbiguousWritesNoBusinessRow`、`ambiguousIdentityIsNotApplied`（INV-20）。
+
+### INV-31　身份键的构造/解析**单入口**，接收侧判定不得散在 applier
+
+- **风险**：旧形状是“给帧加字段 + 在 applier 加 fallback 分支”——判定散落后，
+  「修一处漏一处」必然重演（先例：封面解析 5 处并行实现）。
+- **现有守护：✅ 已收（2026-09-18）**
+  - 唯一入口：`SyncIdentityResolving`（协议）+ `SyncContentHashResolver`（唯一生产实现）；
+    新方法 `remoteTrackIdentity(forTrackStableId:)` / `localizeRemoteTrack(_:)`。
+  - 静态契约：`SyncIdentityContract` 扫生产码——身份 SQL 只准在入口文件；
+    **`SyncChangeLogApplier` 不得出现 `relativePath` / `SyncRemoteTrackIdentity` / `SyncLocalTrackOutcome`**；
+    入口文件必含第二身份标记（退化为「只认 content_hash」会报红）。
+- **用例**：`SyncIdentityContractTests.secondIdentityFallbackMustBeImplemented`（含合成退化源码自证）、
+  `pendingKeyNamespaceAndApplierShape`。
+
+### INV-32　挂起键命名空间单入口（指纹 / `rel:{相对路径}`）
+
+- **风险**：挂起键是「歌到位后能不能重放」的唯一线索。前缀在 pending store / replay / coordinator
+  各拼一遍 ⇒ 改前缀漏一处就静默对不上（行永远重放不了）。
+- **现有守护：✅ 已收（2026-09-18）**
+  - 构造/解析只在 `SyncPendingKey`（`QQPlayer/Sync/SyncAlignedLyrics.swift`）；表结构不变
+    （`row_key` 是 TEXT，历史库里的指纹键原样可读）。
+  - 静态契约：`"rel:"` 字面量只准出现在命名空间声明文件。
+- **用例**：`SyncRelativePathIdentityTests.pendingKeyNamespacesDoNotCollide`（含非法键 = nil）、
+  `replayByRelativePathKeyAppliesAndClears`（rel: 挂起行歌到位后重放并清行）。
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：
 
 1. 本地哪个写点记 outbox？与业务行同一事务吗？（INV-1 / INV-2）
-2. 它引用歌曲吗？引用则身份键从哪来、拿不到时怎么办？（INV-4 / INV-5 / INV-6）
+2. 它引用歌曲吗？引用则身份键从哪来、拿不到时怎么办？（INV-4 / INV-5 / INV-6 / INV-30 / INV-31 / INV-32）
 3. 接收侧有本地化 + 应用分支吗？（INV-7）
 4. 本地缺依赖（歌 / 歌单结构）时挂起还是丢弃？重放触发点在哪？（INV-8）
 5. 游标越过后还能回来吗？（INV-9 / INV-10 / INV-11 / INV-12）

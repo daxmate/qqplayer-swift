@@ -57,7 +57,7 @@
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
 | ① | 有 | `DatabaseManager.addToFavorites(trackStableId:)` `QQPlayer/Services/DatabaseManager+Tracks.swift:393`（record `:399`）；`addToFavorites(trackStableIds:)` `:413`（`:419`）；`removeFromFavorites` `:431`（delete `:437`）；`deleteTrack(byStableId:)` `:466`（级联 delete `:516`） |
-| ② | 有 | `SyncChangeLogMapper.wireEntriesDetailed` `QQPlayer/Sync/SyncChangeLogMapping.swift:257`；行内引用 `SyncTrackReference.trackStableId` `:160`（favorite 的引用 = rowKey 本身）；指纹解析 `.resolved` 分支 `:270-272` |
+| ② | 有 | `SyncChangeLogMapper.wireEntriesDetailed` `QQPlayer/Sync/SyncChangeLogMapping.swift`（行内引用 `SyncTrackReference.trackStableId`；**两把身份键**：指纹可用只填 `contentHash`，指纹缺失则填 `relativePath`（曲库相对路径，第二身份））；入口 `SyncIdentityResolving.remoteTrackIdentity(forTrackStableId:)` |
 | ③ | 有 | `SyncChangeLogApplier.applyFavorite(rowKey:)` `QQPlayer/Sync/SyncChangeLogApplier.swift:114-123`；本地化改写 `SyncChangeLogMapper.rewrite` `SyncChangeLogMapping.swift:355-357` |
 | ④ | 有 | `SyncChangeLogPendingStore.suspend` `QQPlayer/Sync/SyncChangeLogPendingStore.swift:73`；`SyncChangeLogReplay.replay` `:142`（触发点 `QQPlayer/Services/DatabaseManager+Tracks.swift:87`、`QQPlayer/Services/DatabaseManager.swift:999`） |
 | ⑤ | 有 | `SyncChangeLogDanglingRepair.reconcileLocalTruth` `SyncChangeLogMapping.swift:588`，favorite 分支 `:626-637`；`reconcilableEntities` `:571` 含 `.favorite` |
@@ -69,7 +69,7 @@
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
 | ① | 有 | `PlayHistoryRecorder.playbackBegan` `QQPlayer/Services/PlayHistoryRecorder.swift:62`（record `:96`，初始态时长 0）；`settleSession(endingAt:)` `:166`（record `:183`，最终态含累计时长）；`deleteTrack` 级联 delete `QQPlayer/Services/DatabaseManager+Tracks.swift:466`（`:539`） |
-| ② | 有 | `SyncChangeLogMapping.swift:162-165`（row_key = `stableId\|playedAt`，复合键解析失败回落 payload 快照） |
+| ② | 有 | `SyncChangeLogMapping.swift`（row_key = `stableId\|playedAt`，复合键解析失败回落 payload 快照）；身份键同 A②（指纹优先 → 相对路径兑底），入口 `localizeRemoteTrack(_:)` |
 | ③ | 有 | `SyncChangeLogApplier.applyPlayHistory(payloadJSON:)` `SyncChangeLogApplier.swift:129-152`（按 `(track_stable_id, played_at)` 匹配，存在更新时长 / 不存在插入） |
 | ④ | 有 | 同 A ④ |
 | ⑤ | 有 | `reconcileLocalTruth` 播放历史分支 `SyncChangeLogMapping.swift:665-685`；**且**悬空修复有专属对账键：`currentPlayHistoryTrackStableId` `:550`（按 `played_at` 把旧引用接回当前曲目） |
@@ -94,7 +94,7 @@
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
 | ① | 有 | `DatabaseManager+Playlists.swift:257` `addToPlaylist`（record `:284`）；`:304` `removeFromPlaylist`（delete `:313`）；`:328` `reorderPlaylistItems`（逐项 upsert `:388`）；`deleteTrack` 级联 delete `DatabaseManager+Tracks.swift:466`（`:526`） |
-| ② | 有 | `SyncChangeLogMapping.swift:166-169`（row_key = `playlistSlug\|trackStableId`） |
+| ② | 有 | `SyncChangeLogMapping.swift`（row_key = `playlistSlug\|trackStableId`）；身份键同 A② |
 | ③ | 有 | `SyncChangeLogApplier.applyPlaylistItem(payloadJSON:)` `SyncChangeLogApplier.swift:192-221`；两条跳过：歌单未同步到本地 `:195-198`、歌不存在 `:199-202` |
 | ④ | 有 | 同 A ④ |
 | ⑤ | 有 | `reconcileLocalTruth` 歌单成员分支 `SyncChangeLogMapping.swift:639-663`（`JOIN playlist WHERE p.is_folder_synced = 0`，与写入侧同口径） |
@@ -163,8 +163,14 @@
 
 ⇒ **全部是总数，没有任何实体维度**。用户看到「未定位 110」不可能知道是收藏、歌单项、
 还是播放历史出的问题；也无法据此判断该修哪条通道。
-i18n 键确认只有两个缺口口径：`sync_run_data_result_unresolved` = 未定位、
-`sync_run_data_result_missing_identity` = 缺指纹（`QQPlayer/Resources/zh-Hans.lproj/Localizable.strings:972-973`）。
+
+**2026-09-18 身份兑底包起**：两端面板多了「身份歧义 N 条」（仅 N > 0 显示，5 语）；
+「缺指纹」口径也变了——**有曲库相对路径可用的行不再算缺键**（`SyncWireMissingIdentity.Reason` 只区分
+「无 track 行」与「有行但两把键都算不出」）。
+
+i18n 键确认三个缺口口径：`sync_run_data_result_unresolved` = 未定位、
+`sync_run_data_result_missing_identity` = 缺指纹、`sync_run_data_ambiguous_identity` = 身份歧义
+（`QQPlayer/Resources/zh-Hans.lproj/Localizable.strings`）。
 
 **iOS 端**：**没有面板**。全部披露是 `print`（`QQPlayer/Services/IOSPassiveSyncCenter.swift:549-578`）：
 `onPushUnresolved` → `print("⚠️ ... 跳过未定位的远端行")`、`onIncrementMissingIdentity` /
@@ -217,8 +223,8 @@ i18n 键确认只有两个缺口口径：`sync_run_data_result_unresolved` = 未
 # ① outbox 写点总表
 grep -rn "SyncChangeLogStore.record" --include="*.swift" QQPlayer/ | grep -v SyncChangeLogStore.swift
 
-# ② 身份键填充（发送侧）
-sed -n '257,292p' QQPlayer/Sync/SyncChangeLogMapping.swift
+# ② 身份键填充（发送侧）：两把键（指纹优先 → 相对路径兑底）
+grep -n "remoteTrackIdentity\|relativePath" QQPlayer/Sync/SyncChangeLogMapping.swift
 
 # ⑤ 补发覆盖的实体（关键空格证据）
 grep -n "reconcilableEntities\|repairableEntities" QQPlayer/Sync/SyncChangeLogMapping.swift
