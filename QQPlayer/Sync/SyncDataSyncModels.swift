@@ -150,7 +150,7 @@ struct SyncChangeLogPushPayload: Codable, Equatable, Sendable {
 /// 线上 outbox 行（changeLogPush 的 entry）。
 /// contentHash：跨端歌曲引用键（M4-2a 已收口：发送侧填本地 track 指纹，接收侧
 /// 映射回本地 stableId，缺歌挂起重放，见 SyncChangeLogMapping）。
-/// relativePath：**第二身份**（2026-09-18 身份兜底包）：发送侧拿不到指纹（`content_hash`
+/// relativePath：**第二身份**（2026-09-15 身份兜底包）：发送侧拿不到指纹（`content_hash`
 /// 未回填 / 本地无 track 行）时，改填该歌的曲库相对路径（跨端同名）——接收侧靠它落库，
 /// 不再白丢用户的收藏 / 播放历史。
 /// 兼容性：**加性可选字段**（L7 加性演进）——老 peer 解码忽略未知键、新 peer 解老载荷

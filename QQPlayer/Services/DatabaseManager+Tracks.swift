@@ -79,7 +79,7 @@ extension DatabaseManager {
         if let savedTrack {
             try cleanupStaleUnplayableDuplicates(matching: savedTrack)
 
-            // 身份重放（2026-09-18 身份兜底包）：两个命名空间的挂起键都算出来——
+            // 身份重放（2026-09-15 身份兜底包）：两个命名空间的挂起键都算出来——
             // ① 新到位的指纹（content_hash 命名空间）；② 该歌的曲库相对路径（rel: 命名空间，
             // 对端那行拿不到指纹时用的第二身份）。只重放其一会让另一半挂起行永远等人。
             // 放在写事务外（重放自走读写事务），失败不影响入库本身（下次入库/

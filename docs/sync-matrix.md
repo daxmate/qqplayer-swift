@@ -69,7 +69,7 @@
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
 | ① | 有 | `PlayHistoryRecorder.playbackBegan` `QQPlayer/Services/PlayHistoryRecorder.swift:62`（record `:96`，初始态时长 0）；`settleSession(endingAt:)` `:166`（record `:183`，最终态含累计时长）；`deleteTrack` 级联 delete `QQPlayer/Services/DatabaseManager+Tracks.swift:466`（`:539`） |
-| ② | 有 | `SyncChangeLogMapping.swift`（row_key = `stableId\|playedAt`，复合键解析失败回落 payload 快照）；身份键同 A②（指纹优先 → 相对路径兑底），入口 `localizeRemoteTrack(_:)` |
+| ② | 有 | `SyncChangeLogMapping.swift`（row_key = `stableId\|playedAt`，复合键解析失败回落 payload 快照）；身份键同 A②（指纹优先 → 相对路径兜底），入口 `localizeRemoteTrack(_:)` |
 | ③ | 有 | `SyncChangeLogApplier.applyPlayHistory(payloadJSON:)` `SyncChangeLogApplier.swift:129-152`（按 `(track_stable_id, played_at)` 匹配，存在更新时长 / 不存在插入） |
 | ④ | 有 | 同 A ④ |
 | ⑤ | 有 | `reconcileLocalTruth` 播放历史分支 `SyncChangeLogMapping.swift:665-685`；**且**悬空修复有专属对账键：`currentPlayHistoryTrackStableId` `:550`（按 `played_at` 把旧引用接回当前曲目） |
@@ -164,7 +164,7 @@
 ⇒ **全部是总数，没有任何实体维度**。用户看到「未定位 110」不可能知道是收藏、歌单项、
 还是播放历史出的问题；也无法据此判断该修哪条通道。
 
-**2026-09-18 身份兑底包起**：两端面板多了「身份歧义 N 条」（仅 N > 0 显示，5 语）；
+**2026-09-15 身份兜底包起**：两端面板多了「身份歧义 N 条」（仅 N > 0 显示，5 语）；
 「缺指纹」口径也变了——**有曲库相对路径可用的行不再算缺键**（`SyncWireMissingIdentity.Reason` 只区分
 「无 track 行」与「有行但两把键都算不出」）。
 
@@ -223,7 +223,7 @@ i18n 键确认三个缺口口径：`sync_run_data_result_unresolved` = 未定位
 # ① outbox 写点总表
 grep -rn "SyncChangeLogStore.record" --include="*.swift" QQPlayer/ | grep -v SyncChangeLogStore.swift
 
-# ② 身份键填充（发送侧）：两把键（指纹优先 → 相对路径兑底）
+# ② 身份键填充（发送侧）：两把键（指纹优先 → 相对路径兜底）
 grep -n "remoteTrackIdentity\|relativePath" QQPlayer/Sync/SyncChangeLogMapping.swift
 
 # ⑤ 补发覆盖的实体（关键空格证据）

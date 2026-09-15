@@ -643,14 +643,20 @@ struct SyncIdentityContractTests {
 
     @Test("身份入口：第二身份兜底必须真接在入口里（合成退化源码必报红）")
     func secondIdentityFallbackMustBeImplemented() {
-        // 合成退化入口：只认 content_hash（正是本包要防的形状）
+        // 合成退化入口：只认 content_hash（正是本包要防的形状）。
+        // ⚠️ 退化形态 = 回到收口前「mapper 里直接查指纹」的写法——**连 `localizeRemoteTrack`
+        // 都不存在**。如果这里留着 `func localizeRemoteTrack(` 签名，那条标记就永远"不缺失"，
+        // 本用例会变成半条空断言（维护者复核时抓到过一次）。
         let degraded = """
-        func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome {
-            guard let contentHash = identity.contentHash, !contentHash.isEmpty else { return .unresolved }
-            if let stableId = try trackStableId(forContentHash: contentHash) {
-                return .resolved(stableId: stableId, key: .contentHash)
+        func localize(_ entry: SyncChangeLogWireEntry) throws -> SyncEntryLocalization {
+            let remoteRow = Self.remoteRow(entry)
+            guard let contentHash = entry.contentHash, !contentHash.isEmpty else {
+                return .unresolved(reason: .missingIdentityKey, remoteRow: remoteRow)
             }
-            return .suspended(pendingKey: contentHash)
+            if let stableId = try resolver.trackStableId(forContentHash: contentHash) {
+                return .mapped(Self.rewrite(remoteRow, entity: entity, localStableId: stableId))
+            }
+            return .suspended(contentHash: contentHash, remoteRow: remoteRow)
         }
         """
         #expect(

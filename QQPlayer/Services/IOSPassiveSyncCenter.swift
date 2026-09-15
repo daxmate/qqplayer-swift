@@ -297,7 +297,7 @@
         var unsupportedEntries: Int { tally.unsupportedEntries }
         /// 父行 / 被引用行不存在而跳过（歌单结构未到 / 引用歌本地查无）
         var skippedMissingParentEntries: Int { tally.skippedMissingParentEntries }
-        /// 忽略的 delete 行数（删除不跳端传播）
+        /// 忽略的 delete 行数（删除不跨端传播）
         var ignoredDeletes: Int { tally.ignoredDeletes }
         /// 本机应答拉取 / 推送增量时缺身份键的行数
         var missingIdentityEntries: Int { tally.missingIdentityEntries }
@@ -664,7 +664,7 @@
             store.record(.playbackPositionSink, attached: playbackPositionSinkAttached)
         }
 
-        /// 被动端数据同步端的 applier：开关开（跳端续播）才注入落点；
+        /// 被动端数据同步端的 applier：开关开（跨端续播）才注入落点；
         /// 关 = 本端不接受播放位置（关着时行不落地也不计「已应用」，见 INV-20/INV-26）。
         private static func makePassiveApplier(database: DatabaseManager) -> SyncChangeLogApplier {
             var applier = SyncChangeLogApplier(database: database)
@@ -744,7 +744,7 @@
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(count)，缺身份键）")
             }
-            // 身份歧义（2026-09-18）：第二身份相对路径命中多首本地曲目 → 不落库。
+            // 身份歧义（2026-09-15）：第二身份相对路径命中多首本地曲目 → 不落库。
             peer.onPushAmbiguous = { [weak self] count in
                 Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.ambiguousIdentity, count: count) } }
                 guard count > 0 else { return }

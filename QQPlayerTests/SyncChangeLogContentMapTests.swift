@@ -1029,7 +1029,7 @@ struct SyncChangeLogContentMapTests {
         // 声明表 = 本仓库当前事实（与 `v1Synced`、docs/sync-matrix.md §0 一致；改实体清单就要改这里）
         let synced: Set<SyncChangeEntity> = [.favorite, .playHistory, .playlist, .playlistItem]
         let gatedSynced: [SyncChangeEntity: String] = [
-            .playbackPosition: "跳端续播：默认关闭的独立开关门控（捕获/落点见 PlaybackPositionCapture 一套）",
+            .playbackPosition: "跨端续播：默认关闭的独立开关门控（捕获/落点见 PlaybackPositionCapture 一套）",
         ]
 
         #expect(

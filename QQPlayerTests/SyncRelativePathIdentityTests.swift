@@ -2,7 +2,7 @@
 //  SyncRelativePathIdentityTests.swift
 //  QQPlayerTests
 //
-//  跨端身份兜底（2026-09-18）：**曲库相对路径当第二身份**。
+//  跨端身份兜底（2026-09-15）：**曲库相对路径当第二身份**。
 //
 //  背景：跨端身份键原先只有 `content_hash`。发送侧某行拿不到指纹（指纹未回填 / 本地无
 //  track 行）时 wire entry 的 contentHash = nil → 接收侧判「未定位」（不落库、不挂起、

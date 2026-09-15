@@ -65,7 +65,7 @@ protocol SyncIdentityResolving: Sendable {
     /// 同步线程（NW 队列）上不容忍 O(库) 扫描（这是既有生产约束，不得放宽）。
     func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)?
 
-    /// 本地 stableId → **跨端身份键组**（2026-09-18 身份兜底包）：本地曲目行拿得到的
+    /// 本地 stableId → **跨端身份键组**（2026-09-15 身份兜底包）：本地曲目行拿得到的
     /// 两把键——内容指纹 + 曲库相对路径。
     ///
     /// 语义：
@@ -78,7 +78,7 @@ protocol SyncIdentityResolving: Sendable {
     /// （路径换算的单一事实源），不得在此手写路径切片。
     func remoteTrackIdentity(forTrackStableId stableId: String) throws -> SyncRemoteTrackIdentity?
 
-    /// 远端身份键组 → **本端落点判定**（接收侧唯一判定点，2026-09-18 身份兜底包）。
+    /// 远端身份键组 → **本端落点判定**（接收侧唯一判定点，2026-09-15 身份兜底包）。
     ///
     /// **解析顺序 = 全仓唯一口径**（任何调用方都不得另立一套）：
     /// 1. `contentHash` 非空 → **只用 content_hash**（内容身份优先）：
@@ -95,7 +95,7 @@ protocol SyncIdentityResolving: Sendable {
     func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome
 }
 
-// MARK: - 跨端身份键组（2026-09-18 身份兜底包）
+// MARK: - 跨端身份键组（2026-09-15 身份兜底包）
 
 /// 远端一行带来的**身份键组**：内容指纹（第一身份）+ 曲库相对路径（第二身份）。
 ///

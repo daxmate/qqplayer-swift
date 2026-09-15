@@ -63,7 +63,7 @@ import Foundation
 /// （`stable_id ↔ content_hash` 两条查询）。新增消费点请依赖入口，别再写第二套。
 struct SyncContentHashResolver {
     let database: DatabaseManager
-    /// 曲库根（**必传**，2026-09-18 身份兜底包）：相对路径第一/第二身份的换算基准。
+    /// 曲库根（**必传**，2026-09-15 身份兜底包）：相对路径第一/第二身份的换算基准。
     /// 为什么做成必传而不是可选：可选 = 忘了传就编译得过、相对路径身份静默失效
     /// （「没有曲库根就构造不出解析器」应是编译期硬约束）；注入根也是测试隔离的手段。
     let libraryRoot: URL
@@ -139,7 +139,7 @@ struct SyncContentHashResolver {
         return (stableId: stableId, contentHash: contentHash)
     }
 
-    // MARK: 第二身份（曲库相对路径，2026-09-18 身份兜底包）
+    // MARK: 第二身份（曲库相对路径，2026-09-15 身份兜底包）
 
     /// 远端身份键组 → 本端落点判定（解析顺序的唯一口径，详见协议注释）。
     func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome {
@@ -355,7 +355,7 @@ enum SyncEntryLocalization: Equatable {
 
 /// 发送侧一行「缺身份键」的诊断（只用于计数 / 日志，不上线）。
 ///
-/// ⚠️ 口径（2026-09-18 身份兜底包）：**缺身份键 = 两把键都拿不到**。
+/// ⚠️ 口径（2026-09-15 身份兜底包）：**缺身份键 = 两把键都拿不到**。
 /// 「有 track 行、指纹为空但相对路径算得出」**不再算缺键**——那时 wire entry 会带上
 /// `relativePath`，对端靠第二身份照样能落库。
 struct SyncWireMissingIdentity: Equatable, Sendable {

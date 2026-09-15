@@ -251,7 +251,7 @@
 | INV-20 「已应用」= 真的落库 | `SyncChangeLogApplier.swift:223-255` 注释自承「v1 不落库」 | **行为用例**（sink nil ⇒ 不算 applied）+ 面板披露 |
 | INV-23 封面路径不可跨端引用 | **无处声明** | 静态契约或面板披露（见上） |
 
-### INV-26　跳端续播（`playback_position`）必须由**同一个开关**门控，且**默认关**（关 = 零出站零入站）
+### INV-26　跨端续播（`playback_position`）必须由**同一个开关**门控，且**默认关**（关 = 零出站零入站）
 
 - **现有守护：✅ 已收（2026-09-15）**
   - 设置：`DeleteSettings.syncPlaybackPositionEnabled` 默认 **false**（`decodeIfPresent ?? false` 兜底旧设置）；
@@ -290,11 +290,11 @@
   - 用例：`SyncDataSyncCoreTests.passiveDataSyncPresenterRowsArePure`。
 - **建议**：新增任何跨端能力时，**两端的账目面都要有落点**（只 `print` 不算披露）。
 
-### INV-30　第二身份（曲库相对路径）兑底必须**唯一命中**才落库；歧义不落库、不挂起，且必须计数上屏
+### INV-30　第二身份（曲库相对路径）兜底必须**唯一命中**才落库；歧义不落库、不挂起，且必须计数上屏
 
 - **风险**：相对路径不像 `content_hash` 那样天然唯一（历史重导入残留可让两行 `track.path` 相同）。
   选错一首 = 把对端的收藏 / 播放历史挂到**另一首歌**上（用户看到“收藏跑到别的歌”）——比不落库更坏。
-- **现有守护：✅ 已收（2026-09-18）**
+- **现有守护：✅ 已收（2026-09-15）**
   - 入口：`SyncContentHashResolver.localizeRemoteTrack` 按 `SELECT DISTINCT stable_id FROM track WHERE path = ? LIMIT 2` 计数：
     1 = resolved、>1 = `.ambiguous`、0 = suspended（`QQPlayer/Sync/SyncChangeLogMapping.swift`）。
   - 账目：`SyncRowOutcome.ambiguousIdentity` → 两端面板「身份歧义」行（>0 才显示）+ 5 语 hint。
@@ -306,7 +306,7 @@
 
 - **风险**：旧形状是“给帧加字段 + 在 applier 加 fallback 分支”——判定散落后，
   「修一处漏一处」必然重演（先例：封面解析 5 处并行实现）。
-- **现有守护：✅ 已收（2026-09-18）**
+- **现有守护：✅ 已收（2026-09-15）**
   - 唯一入口：`SyncIdentityResolving`（协议）+ `SyncContentHashResolver`（唯一生产实现）；
     新方法 `remoteTrackIdentity(forTrackStableId:)` / `localizeRemoteTrack(_:)`。
   - 静态契约：`SyncIdentityContract` 扫生产码——身份 SQL 只准在入口文件；
@@ -319,7 +319,7 @@
 
 - **风险**：挂起键是「歌到位后能不能重放」的唯一线索。前缀在 pending store / replay / coordinator
   各拼一遍 ⇒ 改前缀漏一处就静默对不上（行永远重放不了）。
-- **现有守护：✅ 已收（2026-09-18）**
+- **现有守护：✅ 已收（2026-09-15）**
   - 构造/解析只在 `SyncPendingKey`（`QQPlayer/Sync/SyncAlignedLyrics.swift`）；表结构不变
     （`row_key` 是 TEXT，历史库里的指纹键原样可读）。
   - 静态契约：`"rel:"` 字面量只准出现在命名空间声明文件。

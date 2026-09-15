@@ -1043,7 +1043,7 @@ struct MacSyncRunSection: View {
                     report.pushedMissingIdentityEntries,
                     report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
                 )
-                // 身份歧义（2026-09-18）：**仅当 N > 0 才显示**（无歧义时不留一个恒 0 的噪音格）。
+                // 身份歧义（2026-09-15）：**仅当 N > 0 才显示**（无歧义时不留一个恒 0 的噪音格）。
                 if report.ambiguousIdentityEntries > 0 {
                     metric(
                         "sync_run_data_ambiguous_identity".localized,
