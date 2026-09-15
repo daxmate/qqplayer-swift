@@ -38,13 +38,13 @@
 ### INV-4　引用歌曲的实体行，**没有可用身份键就不许落库**（落库会写出 `JOIN track` 永不匹配的孤儿行：界面无变化而面板显示「已应用 N」）
 
 - **现有守护**：**行为用例**：`SyncChangeLogContentMapTests.swift:412`（缺身份键的 play_history 不落库、计数回调收到 1）；`SyncLWWReconcileTests.swift:276`（applier 身份兜底：favorite / play_history / playlist_item 一律跳过）；实现 `SyncChangeLogApplier.trackRowExists` `SyncChangeLogApplier.swift:96`。
-- **形状守护（2026-09-15 身份入口包）**：`SyncIdentityContractTests.productionHasSingleIdentityImplementation`（静态扫描：生产码里 `stable_id ↔ content_hash` 只有**一处**实现，白名单只留 `QQPlayer/Sync/SyncChangeLogMapping.swift`；并且生产码里不得再用闭包构造身份映射）+ `SyncWiringContractTests` 的 `identity-entry-implemented-and-wired`（入口遵守声明与映射构造点存在）——防止「新增消费点各自写一套解析」，那正是「不落库也看不出来」的上游。
+- **形状守护（2026-09-15 身份入口包，B1b 扩到三方向）**：`SyncIdentityContractTests.productionHasSingleIdentityImplementation`（静态扫描：生产码里 `stable_id ↔ content_hash` 与「曲库路径 → 身份」都**只有一处**实现，白名单只留 `QQPlayer/Sync/SyncChangeLogMapping.swift`；并且生产码里不得再用闭包构造身份映射）+ `SyncWiringContractTests` 的 `identity-entry-implemented-and-wired`（入口遵守声明与映射构造点存在）——防止「新增消费点各自写一套解析」，那正是「不落库也看不出来」的上游。
 - **建议**：保持；**静态契约**补一条：`SyncChangeLogApplier` 的五个 `apply*` 分支中，凡 `SyncTrackReference.referencesTrack(entity) == true` 的必须在写业务行前调用 `trackRowExists`（防止新增实体漏查）。
 
 ### INV-5　引用歌曲的行上不了线时**必须被计数并披露**，不得静默填 nil
 
 - **现有守护**：**行为用例**：`SyncDataSyncCoreTests.swift:284`（拉取侧未定位 + 推送侧缺指纹各自计数，且不提前收尾）；实现 `SyncWireMissingIdentity` `SyncChangeLogMapping.swift:210`、`wireEntriesDetailed` `:257`。
-- **形状守护（2026-09-15 身份入口包）**：`SyncIdentityContractTests.productionHasSingleIdentityImplementation` + `SyncWiringContractTests` 的 `identity-entry-implemented-and-wired`——身份解析收口到唯一入口 `SyncIdentityResolving`（生产实现 `SyncContentHashResolver`）；「拿不到身份键」只可能发生在**一个**解析点上，不再有「某一路径忘了接线、于是静默返回 nil」的第二种成因。
+- **形状守护（2026-09-15 身份入口包，B1b 扩到三方向）**：`SyncIdentityContractTests.productionHasSingleIdentityImplementation` + `SyncWiringContractTests` 的 `identity-entry-implemented-and-wired`——身份解析收口到唯一入口 `SyncIdentityResolving`（生产实现 `SyncContentHashResolver`；三方向 = stableId → content_hash / content_hash → stableId / 曲库路径 → 身份）；「拿不到身份键」只可能发生在**一个**解析点上，不再有「某一路径忘了接线、于是静默返回 nil」的第二种成因。
 - **建议**：保持；补**面板披露**强约束（见 INV-12）。
 
 ### INV-6　不引用歌曲的实体（`playlist`）不得被要求提供身份键（必须走 passThrough，不许被判「未定位」）
