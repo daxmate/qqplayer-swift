@@ -18,9 +18,15 @@
 
 import Foundation
 import GRDB
+
 import Testing
 
 @testable import QQPlayer
+
+/// 测试曲库根（身份入口 `SyncContentHashResolver` 的必传输入）。
+/// 与用例里 track.path 的形态（`/m/...`）不同根 ⇒ 相对路径算不出 ⇒ 这些用例
+/// 覆盖的仍是「content_hash 优先」的既有语义（第二身份由 SyncRelativePathIdentityTests 覆盖）。
+private let testLibraryRoot = URL(fileURLWithPath: "/library")
 
 @MainActor
 struct SyncChangeLogContentMapTests {
@@ -99,13 +105,15 @@ struct SyncChangeLogContentMapTests {
             session: fixture.hostSession,
             store: hostStore,
             applier: SyncChangeLogApplier(database: hostManager),
-            peerID: fixture.clientIdentity.deviceID
+            peerID: fixture.clientIdentity.deviceID,
+            libraryRoot: testLibraryRoot
         )
         let clientPeer = SyncChangeLogPeer(
             session: fixture.clientSession,
             store: clientStore,
             applier: SyncChangeLogApplier(database: clientManager),
-            peerID: fixture.hostIdentity.deviceID
+            peerID: fixture.hostIdentity.deviceID,
+            libraryRoot: testLibraryRoot
         )
         return PeerHarness(
             fixture: fixture,
@@ -179,7 +187,7 @@ struct SyncChangeLogContentMapTests {
             try Self.insertTrack(db, stableId: "s-hash", contentHash: "hash-A")
             try Self.insertTrack(db, stableId: "s-nohash", contentHash: nil)
         }
-        let resolver = SyncContentHashResolver(database: manager)
+        let resolver = SyncContentHashResolver(database: manager, libraryRoot: testLibraryRoot)
 
         #expect(try resolver.contentHash(forTrackStableId: "s-hash") == "hash-A")
         #expect(try resolver.contentHash(forTrackStableId: "s-nohash") == nil)
@@ -199,7 +207,7 @@ struct SyncChangeLogContentMapTests {
             try Self.insertTrack(db, stableId: "dup-first", contentHash: "hash-dup")
             try Self.insertTrack(db, stableId: "dup-second", contentHash: "hash-dup")
         }
-        let resolver = SyncContentHashResolver(database: manager)
+        let resolver = SyncContentHashResolver(database: manager, libraryRoot: testLibraryRoot)
         #expect(try resolver.trackStableId(forContentHash: "hash-dup") == "dup-first")
     }
 
@@ -212,7 +220,7 @@ struct SyncChangeLogContentMapTests {
             try Self.insertTrack(db, stableId: "host-1", contentHash: "hash-1")
             try Self.insertTrack(db, stableId: "host-nohash", contentHash: nil)
         }
-        let mapper = SyncChangeLogMapper(database: manager)
+        let mapper = SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot)
         let rows = [
             SyncChangeLogRow(entity: .favorite, rowKey: "host-1", op: .upsert, updatedAtMs: 1),
             SyncChangeLogRow(entity: .favorite, rowKey: "host-nohash", op: .upsert, updatedAtMs: 2),
@@ -245,7 +253,7 @@ struct SyncChangeLogContentMapTests {
         try queue.write { db in
             try Self.insertTrack(db, stableId: "host-2", contentHash: "hash-2")
         }
-        let mapper = SyncChangeLogMapper(database: manager)
+        let mapper = SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot)
         let history = SyncPlayHistorySnapshot(trackStableId: "host-2", playedAt: 42, playDurationMs: 1000)
         let rows = [
             // 播放历史 row_key 少了时间戳段（异常形态）→ 回落 payload
@@ -269,7 +277,7 @@ struct SyncChangeLogContentMapTests {
         try queue.write { db in
             try Self.insertTrack(db, stableId: "local-1", contentHash: "hash-1")
         }
-        let mapper = SyncChangeLogMapper(database: manager)
+        let mapper = SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot)
 
         // favorite（无载荷）
         let favoriteEntry = SyncChangeLogWireEntry(
@@ -338,7 +346,7 @@ struct SyncChangeLogContentMapTests {
     @Test("接收侧：本地无此歌 → 挂起（保留远端行）；引用歌曲无身份键 → 未定位；歌单行 → 透传")
     func localizeSuspendsDegradesAndMarksUnresolved() throws {
         let (manager, _) = try Self.makeManager()
-        let mapper = SyncChangeLogMapper(database: manager)
+        let mapper = SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot)
 
         // 本地库空空：hash 映射不到 → 挂起
         let suspendedEntry = SyncChangeLogWireEntry(
@@ -347,11 +355,11 @@ struct SyncChangeLogContentMapTests {
             contentHash: "hash-unknown", payloadJSON: nil
         )
         let suspended = try mapper.localize(suspendedEntry)
-        guard case .suspended(let hash, let remoteRow) = suspended else {
+        guard case .suspended(let pendingKey, let remoteRow) = suspended else {
             Issue.record("本地无此歌应挂起，实际 \(suspended)")
             return
         }
-        #expect(hash == "hash-unknown")
+        #expect(pendingKey == "hash-unknown")
         #expect(remoteRow.rowKey == "host-1") // 挂起行保持远端键
         #expect(remoteRow.id == 21)
 
@@ -485,7 +493,7 @@ struct SyncChangeLogContentMapTests {
         let pendingStore = SyncChangeLogPendingStore(database: harness.clientManager)
         #expect(try Self.favoriteCount(harness.clientQueue) == 0)
         #expect(try pendingStore.pendingCount() == 1)
-        let pending = try #require(try pendingStore.rows(forContentHash: "H2").first)
+        let pending = try #require(try pendingStore.rows(forPendingKey: SyncPendingKey.contentHash("H2")).first)
         #expect(pending.entity == SyncChangeEntity.favorite.rawValue)
         #expect(pending.rowKey == "H2") // 挂起键 = content_hash
         #expect(pending.remoteRowKey == "host-track")
@@ -513,7 +521,11 @@ struct SyncChangeLogContentMapTests {
 
         try harness.clientManager.upsertTrack(Self.makeTrack(stableId: "client-track", contentHash: "H4"))
         // 第二次重放：无挂起行可处理
-        let replayed = try SyncChangeLogReplay.replay(contentHash: "H4", database: harness.clientManager)
+        let replayed = try SyncChangeLogReplay.replay(
+            pendingKey: SyncPendingKey.contentHash("H4"),
+            database: harness.clientManager,
+            libraryRoot: testLibraryRoot
+        )
         #expect(replayed == 0)
         #expect(try Self.favoriteCount(harness.clientQueue) == 1)
         #expect(try SyncChangeLogPendingStore(database: harness.clientManager).pendingCount() == 0)
@@ -538,7 +550,11 @@ struct SyncChangeLogContentMapTests {
                 updatedAtMs: 9000
             )
         }
-        let replayed = try SyncChangeLogReplay.replay(contentHash: "H5", database: harness.clientManager)
+        let replayed = try SyncChangeLogReplay.replay(
+            pendingKey: SyncPendingKey.contentHash("H5"),
+            database: harness.clientManager,
+            libraryRoot: testLibraryRoot
+        )
         #expect(replayed == 0) // 本端胜：无远端行应用
         // 已消费的挂起行清理（本端事实会向对端收敛）
         #expect(try SyncChangeLogPendingStore(database: harness.clientManager).pendingCount() == 0)
@@ -553,16 +569,16 @@ struct SyncChangeLogContentMapTests {
         let row = SyncChangeLogRow(
             entity: .favorite, rowKey: "host-track", op: .upsert, updatedAtMs: 1000, payloadJSON: nil
         )
-        try pendingStore.suspend(row, contentHash: "H6")
-        try pendingStore.suspend(row, contentHash: "H6")
+        try pendingStore.suspend(row, pendingKey: "H6")
+        try pendingStore.suspend(row, pendingKey: "H6")
         #expect(try pendingStore.pendingCount() == 1)
 
         // 更旧的远端事实不应覆盖较新的挂起行
         let older = SyncChangeLogRow(
             entity: .favorite, rowKey: "host-track", op: .delete, updatedAtMs: 900, payloadJSON: nil
         )
-        try pendingStore.suspend(older, contentHash: "H6")
-        let rows = try pendingStore.rows(forContentHash: "H6")
+        try pendingStore.suspend(older, pendingKey: "H6")
+        let rows = try pendingStore.rows(forPendingKey: "H6")
         #expect(rows.count == 1)
         #expect(rows[0].op == SyncChangeOp.upsert.rawValue)
         #expect(rows[0].updatedAtMs == 1000)
@@ -624,7 +640,7 @@ struct SyncChangeLogContentMapTests {
         #expect(payload.trackStableId == "s-new")
 
         // 真的能被同步出去：修好后 wire 取数不再缺身份键（对端因此能定位并落库）
-        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        let batch = try SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot).wireEntriesDetailed(rows)
         #expect(batch.missingIdentity.isEmpty)
         #expect(batch.entries.map(\.contentHash) == ["hash-new"])
     }
@@ -835,7 +851,7 @@ struct SyncChangeLogContentMapTests {
 
         // 真的能同步出去：补发的四条都不缺身份键（否则对端会按「未定位」丢弃）
         let rows = try queue.read { db in try SyncChangeLogRow.order(Column("id")).fetchAll(db) }
-        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        let batch = try SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot).wireEntriesDetailed(rows)
         #expect(batch.missingIdentity.isEmpty)
         // 歌单结构行不引用歌曲 → 线上 contentHash = nil（对端按「不引用歌曲」透传，不是缺口）
         #expect(batch.entries.map(\.contentHash) == [nil, "hash-live", "hash-live", "hash-live"])
@@ -961,7 +977,7 @@ struct SyncChangeLogContentMapTests {
         #expect(payload.customCoverImagePath == business.customCoverImagePath)
 
         // 线上不发身份键噪音（歌单行不引用歌曲 → contentHash nil，但不是「缺身份键」）
-        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        let batch = try SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot).wireEntriesDetailed(rows)
         #expect(batch.missingIdentity.isEmpty)
         #expect(batch.entries.map(\.contentHash) == [nil])
     }
@@ -1059,7 +1075,7 @@ struct SyncChangeLogContentMapTests {
             SyncChangeLogRow(entity: .playlistItem, rowKey: "pl|ghost", op: .upsert, updatedAtMs: 1),
         ]
 
-        let batch = try SyncChangeLogMapper(database: manager).wireEntriesDetailed(rows)
+        let batch = try SyncChangeLogMapper(database: manager, libraryRoot: testLibraryRoot).wireEntriesDetailed(rows)
 
         #expect(
             batch.missingIdentity.count == rows.count,
@@ -1080,7 +1096,7 @@ private extension SyncEntryLocalization {
         switch self {
         case .mapped(let row), .passThrough(let row):
             return row
-        case .suspended, .unresolved:
+        case .suspended, .ambiguous, .unresolved:
             return nil
         }
     }

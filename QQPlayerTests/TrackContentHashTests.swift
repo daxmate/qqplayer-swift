@@ -442,7 +442,7 @@ struct TrackContentHashTests {
                 updatedAtMs: 1000,
                 payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "peer-track"))
             ),
-            contentHash: expectedHash
+            pendingKey: expectedHash
         )
         #expect(try pendingStore.pendingCount() == 1)
 

@@ -16,9 +16,13 @@
 
 import Foundation
 import GRDB
+
 import Testing
 
 @testable import QQPlayer
+
+/// 测试曲库根（身份入口的必传输入；本文件不建真实曲库文件，故只用于构造）。
+private let testLibraryRoot = URL(fileURLWithPath: "/library")
 
 struct DatabaseSyncCollectionFactsTests {
     // MARK: - 夹具
@@ -47,7 +51,7 @@ struct DatabaseSyncCollectionFactsTests {
             libraryRoot: libraryRoot,
             lyricsStore: lyricsStore,
             // 生产映射（M4-2a）——顺带覆盖 stableId ↔ content_hash 真实接线
-            lyricsMapping: .live(database: manager)
+            lyricsMapping: .live(database: manager, libraryRoot: testLibraryRoot)
         )
         return Fixture(
             manager: manager,

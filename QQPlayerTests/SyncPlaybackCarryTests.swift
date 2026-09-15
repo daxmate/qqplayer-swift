@@ -59,7 +59,8 @@ struct SyncPlaybackCarryTests {
             session: fixture.clientSession,
             store: deviceStore,
             applier: SyncChangeLogApplier(database: deviceManager),
-            peerID: fixture.hostIdentity.deviceID
+            peerID: fixture.hostIdentity.deviceID,
+            libraryRoot: deviceRoot
         )
         let macCarry = SyncPlaybackCarryPeer(
             session: fixture.hostSession,
@@ -237,7 +238,11 @@ struct SyncPlaybackCarryTests {
             harness.deviceManager, stableId: "d-a", contentHash: "h-a",
             root: harness.deviceRoot, relative: "Album/a.flac"
         )
-        let applied = try SyncChangeLogReplay.replay(contentHash: "h-a", database: harness.deviceManager)
+        let applied = try SyncChangeLogReplay.replay(
+            pendingKey: SyncPendingKey.contentHash("h-a"),
+            database: harness.deviceManager,
+            libraryRoot: harness.deviceRoot
+        )
         let pendingAfterReplay = try pendingStore.pendingCount()
         #expect(applied == 1)
         #expect(pendingAfterReplay == 0, "重放后挂起清空")

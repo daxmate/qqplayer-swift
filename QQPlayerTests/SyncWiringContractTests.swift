@@ -443,6 +443,36 @@ enum SyncIdentityContract {
         "stableIdForContentHash:",
     ]
 
+    /// 挂起键命名空间前缀的**字面量**只允许出现在入口侧声明（`SyncPendingKey` 所在文件）。
+    /// 别处各拼一遍 `"rel:"` = 命名空间多处手工维护（改前缀漏一处就静默对不上）。
+    static let pendingKeyNamespacePath = "QQPlayer/Sync/SyncAlignedLyrics.swift"
+    static let pendingKeyPrefixLiteral = "\"rel:\""
+
+    /// 接收侧**不得**出现身份兜底分支：判定全部在唯一身份入口内部
+    /// （用户 2026-09-15 拍板的形状——不是「给帧加字段 + 在 applier 加 fallback 分支」）。
+    static let applierPath = "QQPlayer/Sync/SyncChangeLogApplier.swift"
+    static let applierForbiddenMarkers = [
+        "relativePath",
+        "SyncRemoteTrackIdentity",
+        "SyncLocalTrackOutcome",
+    ]
+
+    /// 第二身份（相对路径兜底）在**入口实现**里的必备标记：缺任一 = 入口退化成
+    /// 「只认 content_hash」——wire 带了第二键但接收侧没人看它，相对路径身份静默失效
+    /// （本包要防的正是这个形状，故用标记把它钉死）。
+    static let secondIdentityMarkers = [
+        "func localizeRemoteTrack(",
+        "SyncPendingKey.relativePath(",
+        "SyncManifestGenerator.normalizeRelativePath(",
+        "DISTINCT stable_id FROM track WHERE path",
+    ]
+
+    /// 纯函数：一份入口源码里**缺的第二身份标记**（空 = 兜底真的接在入口里）。
+    /// 合成退化源码（只认 content_hash）必须全部报红——契约自证的入口。
+    static func missingSecondIdentityMarkers(inSource source: String) -> [String] {
+        secondIdentityMarkers.filter { !source.contains($0) }
+    }
+
     /// 纯函数：一份生产源码里违禁的标记（空 = 该文件合规）。
     static func violations(inSource source: String, relativePath: String) -> [String] {
         var result: [String] = []
@@ -453,6 +483,13 @@ enum SyncIdentityContract {
         if relativePath != mappingDefinitionPath {
             result += closureWiringMarkers.filter { source.contains($0) }
                 .map { "闭包构造身份映射：`\($0)`" }
+        }
+        if relativePath != pendingKeyNamespacePath, source.contains(pendingKeyPrefixLiteral) {
+            result += ["挂起键命名空间字面量：`\(pendingKeyPrefixLiteral)`（只准出现在 SyncPendingKey 一处）"]
+        }
+        if relativePath == applierPath {
+            result += applierForbiddenMarkers.filter { source.contains($0) }
+                .map { "applier 里的身份兜底分支：`\($0)`（判定必须全在身份入口内部）" }
         }
         return result
     }
@@ -465,6 +502,8 @@ extension SyncIdentityContract {
         var violations: [String] = []
         /// 入口文件自身是否真的在做两个方向的解析（false = 白名单空转，必须失败）
         var entryResolvesIdentity = false
+        /// 入口文件是否真的接了**第二身份兜底**（false = 退化回「只认 content_hash」）
+        var entryImplementsRelativePathFallback = false
         /// 映射定义文件是否真的持有闭包（false = 白名单空转，必须失败）
         var definitionHoldsClosures = false
     }
@@ -481,6 +520,7 @@ extension SyncIdentityContract {
             }
             if relativePath == entryImplementationPath {
                 result.entryResolvesIdentity = identitySQLMarkers.allSatisfy { source.contains($0) }
+                result.entryImplementsRelativePathFallback = missingSecondIdentityMarkers(inSource: source).isEmpty
             }
             if relativePath == mappingDefinitionPath {
                 result.definitionHoldsClosures = closureWiringMarkers.allSatisfy { source.contains($0) }
@@ -511,6 +551,14 @@ struct SyncIdentityContractTests {
         #expect(
             result.definitionHoldsClosures,
             "\(SyncIdentityContract.mappingDefinitionPath) 里找不到闭包字段/闭包 init——白名单空转保护失效。"
+        )
+        #expect(
+            result.entryImplementsRelativePathFallback,
+            """
+            身份入口退化了：\(SyncIdentityContract.entryImplementationPath) 里缺第二身份（相对路径兜底）标记
+            \(SyncIdentityContract.secondIdentityMarkers)；wire 会带 relativePath
+            但接收侧没人看它，相对路径身份静默失效（对端行的收藏 / 播放历史永远过不了端）。
+            """
         )
         #expect(
             result.violations.isEmpty,
@@ -590,6 +638,72 @@ struct SyncIdentityContractTests {
         #expect(
             SyncIdentityContract.violations(inSource: readCall, relativePath: "QQPlayer/Sync/Somewhere.swift").isEmpty,
             "读调用不是第二处实现，不得误报"
+        )
+    }
+
+    @Test("身份入口：第二身份兜底必须真接在入口里（合成退化源码必报红）")
+    func secondIdentityFallbackMustBeImplemented() {
+        // 合成退化入口：只认 content_hash（正是本包要防的形状）
+        let degraded = """
+        func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome {
+            guard let contentHash = identity.contentHash, !contentHash.isEmpty else { return .unresolved }
+            if let stableId = try trackStableId(forContentHash: contentHash) {
+                return .resolved(stableId: stableId, key: .contentHash)
+            }
+            return .suspended(pendingKey: contentHash)
+        }
+        """
+        #expect(
+            SyncIdentityContract.missingSecondIdentityMarkers(inSource: degraded).count
+                == SyncIdentityContract.secondIdentityMarkers.count,
+            "退化成「只认 content_hash」的入口必须全标记报红（契约自证失效 = 这是条空断言）"
+        )
+        // 真入口（读盘）必须不报红
+        let entryURL = Self.repoRoot.appendingPathComponent(SyncIdentityContract.entryImplementationPath)
+        let source = (try? String(contentsOf: entryURL, encoding: .utf8)) ?? ""
+        #expect(!source.isEmpty, "读不到入口源码 = 契约空转（fail-closed）")
+        #expect(
+            SyncIdentityContract.missingSecondIdentityMarkers(inSource: source).isEmpty,
+            "入口实现缺第二身份标记：\(SyncIdentityContract.missingSecondIdentityMarkers(inSource: source))"
+        )
+    }
+
+    @Test("身份入口：挂起键命名空间单入口（字面量只准一处）+ applier 不得有身份兜底分支")
+    func pendingKeyNamespaceAndApplierShape() {
+        let namespaceFile = "QQPlayer/Sync/SyncAlignedLyrics.swift"
+        let leak = "let key = \"rel:\" + relativePath"
+        #expect(
+            SyncIdentityContract.violations(inSource: leak, relativePath: "QQPlayer/Sync/SyncChangeLogPeer.swift")
+                .count == 1,
+            "别处手拼挂起键前缀必须被抓到（命名空间多处维护 = 改前缀漏一处就静默）"
+        )
+        #expect(
+            SyncIdentityContract.violations(inSource: leak, relativePath: namespaceFile).isEmpty,
+            "命名空间声明处自身必须放行"
+        )
+
+        // applier 不得出现任何身份兜底：判定全在身份入口内部
+        let fallbackInApplier = """
+        if let side = SyncRemoteTrackIdentity(contentHash: nil, relativePath: entry.relativePath) {
+            return try resolver.localizeRemoteTrack(side)
+        }
+        """
+        #expect(
+            SyncIdentityContract.violations(
+                inSource: fallbackInApplier,
+                relativePath: SyncIdentityContract.applierPath
+            ).count == 2,
+            "applier 里的身份兜底分支必须被抓到（形状要求：判定全在入口内部）"
+        )
+        let applierURL = Self.repoRoot.appendingPathComponent(SyncIdentityContract.applierPath)
+        let source = (try? String(contentsOf: applierURL, encoding: .utf8)) ?? ""
+        #expect(!source.isEmpty, "读不到 applier 源码 = 契约空转（fail-closed）")
+        #expect(
+            SyncIdentityContract.violations(
+                inSource: source,
+                relativePath: SyncIdentityContract.applierPath
+            ).isEmpty,
+            "applier 里出现了身份兜底分支——判定必须全部发生在身份入口内部"
         )
     }
 }

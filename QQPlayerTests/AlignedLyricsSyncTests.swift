@@ -15,9 +15,13 @@
 
 import Foundation
 import GRDB
+
 import Testing
 
 @testable import QQPlayer
+
+/// 测试曲库根（身份入口的必传输入；本文件不建真实曲库文件，故只用于构造）。
+private let testLibraryRoot = URL(fileURLWithPath: "/library")
 
 // MARK: - 落盘 spy
 
@@ -241,7 +245,7 @@ struct AlignedLyricsSyncTests {
                 arguments: ["sid-a", "T", "/m/a.flac", "hash-a"]
             )
         }
-        let live = SyncLyricsContentMapping.live(database: manager)
+        let live = SyncLyricsContentMapping.live(database: manager, libraryRoot: testLibraryRoot)
         #expect(live.contentHashForStableId("sid-a") == "hash-a")
         #expect(live.stableIdForContentHash("hash-a") == "sid-a")
         #expect(live.contentHashForStableId("nope") == nil)

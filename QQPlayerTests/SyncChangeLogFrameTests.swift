@@ -16,9 +16,15 @@
 
 import Foundation
 import GRDB
+
 import Testing
 
 @testable import QQPlayer
+
+/// 测试曲库根（身份入口 `SyncContentHashResolver` 的必传输入）。
+/// 与用例里 track.path 的形态（`/m/...`）不同根 ⇒ 相对路径算不出 ⇒ 这些用例
+/// 覆盖的仍是「content_hash 优先」的既有语义（第二身份由 SyncRelativePathIdentityTests 覆盖）。
+private let testLibraryRoot = URL(fileURLWithPath: "/library")
 
 @MainActor
 struct SyncChangeLogFrameTests {
@@ -116,13 +122,15 @@ struct SyncChangeLogFrameTests {
             session: fixture.hostSession,
             store: hostStore,
             applier: SyncChangeLogApplier(database: hostManager),
-            peerID: fixture.clientIdentity.deviceID
+            peerID: fixture.clientIdentity.deviceID,
+            libraryRoot: testLibraryRoot
         )
         let clientPeer = SyncChangeLogPeer(
             session: fixture.clientSession,
             store: clientStore,
             applier: SyncChangeLogApplier(database: clientManager),
-            peerID: fixture.hostIdentity.deviceID
+            peerID: fixture.hostIdentity.deviceID,
+            libraryRoot: testLibraryRoot
         )
         return PeerHarness(
             fixture: fixture, hostQueue: hostQueue, clientQueue: clientQueue,

@@ -17,9 +17,13 @@
 
 import Foundation
 import GRDB
+
 import Testing
 
 @testable import QQPlayer
+
+/// 测试曲库根（身份入口的必传输入；本文件不建真实曲库文件，故只用于构造）。
+private let testLibraryRoot = URL(fileURLWithPath: "/library")
 
 @MainActor
 struct SyncDataSyncCoreTests {
@@ -63,7 +67,8 @@ struct SyncDataSyncCoreTests {
             session: session,
             store: SyncChangeLogStore(database: manager),
             applier: SyncChangeLogApplier(database: manager),
-            peerID: peerID
+            peerID: peerID,
+            libraryRoot: testLibraryRoot
         )
     }
 
@@ -257,7 +262,8 @@ struct SyncDataSyncCoreTests {
         let coordinator = SyncDataSyncCoordinator(
             session: pair.fixture.hostSession,
             database: pair.hostManager,
-            peerID: pair.clientID
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
         )
         coordinator.onStateChange = { phases.append($0) }
         coordinator.start()
@@ -298,7 +304,8 @@ struct SyncDataSyncCoreTests {
         let coordinator = SyncDataSyncCoordinator(
             session: pair.fixture.hostSession,
             database: pair.hostManager,
-            peerID: pair.clientID
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
         )
         coordinator.onStateChange = { phases.append($0) }
         coordinator.start()
@@ -330,7 +337,11 @@ struct SyncDataSyncCoreTests {
         responder.onPushApplied = { _ in pushFrames.increment() }
 
         // peerID 缺省：取 session.peerHelloValue.deviceID（= 对端 client ID）
-        let coordinator = SyncDataSyncCoordinator(session: pair.fixture.hostSession, database: pair.hostManager)
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            libraryRoot: testLibraryRoot
+        )
         coordinator.start()
 
         #expect(coordinator.phase == .finished)
@@ -349,7 +360,8 @@ struct SyncDataSyncCoreTests {
         let coordinator = SyncDataSyncCoordinator(
             session: pair.fixture.hostSession,
             database: pair.hostManager,
-            peerID: pair.clientID
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
         )
         coordinator.start()
         #expect(coordinator.report.isFinished)
@@ -400,7 +412,8 @@ struct SyncDataSyncCoreTests {
         let blank = SyncDataSyncCoordinator(
             session: pair.fixture.hostSession,
             database: pair.hostManager,
-            peerID: "   "
+            peerID: "   ",
+            libraryRoot: testLibraryRoot
         )
         blank.start()
         #expect(blank.phase == .finished)
@@ -410,7 +423,11 @@ struct SyncDataSyncCoreTests {
 
         // 未握手会话（peerHelloValue = nil）→ 同样立即失败
         let naked = SessionFixture.make()
-        let unresolved = SyncDataSyncCoordinator(session: naked.hostSession, database: pair.hostManager)
+        let unresolved = SyncDataSyncCoordinator(
+            session: naked.hostSession,
+            database: pair.hostManager,
+            libraryRoot: testLibraryRoot
+        )
         unresolved.start()
         #expect(unresolved.phase == .finished)
         #expect(unresolved.report.failureMessage != nil)
@@ -427,7 +444,8 @@ struct SyncDataSyncCoreTests {
         let coordinator = SyncDataSyncCoordinator(
             session: pair.fixture.hostSession,
             database: pair.hostManager,
-            peerID: pair.clientID
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
         )
         coordinator.start(timeout: 0.2)
 
@@ -632,7 +650,8 @@ struct SyncDataSyncCoreTests {
             let coordinator = SyncDataSyncCoordinator(
                 session: pair.fixture.hostSession,
                 database: pair.hostManager,
-                peerID: pair.clientID
+                peerID: pair.clientID,
+                libraryRoot: testLibraryRoot
             )
             coordinator.start()
 
