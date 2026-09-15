@@ -98,10 +98,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     /// 应答远端拉取时，本批上线行里缺身份键的行数（锁外触发；0 条不触发）。
     var onPullMissingIdentity: ((Int) -> Void)?
 
-    /// 本批 applier 报「未支持」的次数（handlePush 内单线程累加，应用后读值并清零）。
-    private var unsupportedPlaybackPositionCount = 0
-    /// 本批因父行 / 被引用行不存在而跳过的行数（应用前清零、应用后上报）。
-    private var skippedMissingParentCount = 0
+    /// 本批 applier 报回的类别计数（`handlePush` 内单线程读写：`applier.apply` 之前清零、
+    /// 之后读数上报）。⚠️ 计数只进 `SyncOutcomeTally`，本类不再自建分类计数器（L6 形状契约）。
+    private var applierBatchTally = SyncOutcomeTally()
 
     // 会话槽位链式挂接
     private var priorAppHandler: ((SyncFrame) -> Void)?
@@ -120,13 +119,13 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         self.mapper = SyncChangeLogMapper(database: applier.database)
         self.pendingStore = SyncChangeLogPendingStore(database: applier.database)
         self.peerID = peerID
-        // 「未支持」计数的唯一入口：applier 每报一条没落地的播放位置，本批计数 +1。
+        // 计数只进 tally（单一存储）：applier 每报一条，就往对应的结果类别里加一条。
         // ⚠️ 装在自己的这份 applier 上（struct 值类型，不影响调用方持有的那份）。
         self.applier.onPlaybackPositionUnsupported = { [weak self] in
-            self?.unsupportedPlaybackPositionCount += 1
+            self?.applierBatchTally.accumulate(.unsupported)
         }
         self.applier.onSkippedMissingParent = { [weak self] in
-            self?.skippedMissingParentCount += 1
+            self?.applierBatchTally.accumulate(.skippedMissingParent)
         }
         attachHandlers()
     }
@@ -275,14 +274,14 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // 本端 stableId）再对账——LWW 键 = (entity, row_key)，两端 stableId
             // 不同，不本地化就对不上键；本地还没这首歌的行挂起，不丢。
             var remoteRows: [SyncChangeLogRow] = []
-            var suspended = 0
-            var ignoredDeletes = 0
+            // 本批（方法局部）结果计数：只进 tally，本类不再自建分类计数器（L6 形状契约）。
+            var batchTally = SyncOutcomeTally()
             var unresolved: [UnresolvedDetail] = []
             for entry in payload.entries {
                 // v2（§12b-7）：删除不传播——收到 delete 一律忽略，且必须在 localize
                 // 之前拦截（见文件头注释：否则会被误判为"本地缺歌"挂起）。
                 if SyncChangeLogDeletionPolicy.shouldIgnore(op: entry.op) {
-                    ignoredDeletes += 1
+                    batchTally.accumulate(.ignoredDelete)
                     print("ℹ️ SyncChangeLogPeer: 忽略远端删除（删除不跨端传播）entity=\(entry.entity) rowKey=\(entry.rowKey)")
                     continue
                 }
@@ -291,7 +290,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                     remoteRows.append(row)
                 case .suspended(let contentHash, let remoteRow):
                     try pendingStore.suspend(remoteRow, contentHash: contentHash)
-                    suspended += 1
+                    batchTally.accumulate(.suspended)
                 case .unresolved(let reason, let remoteRow):
                     // 引用歌曲但没有可用身份键 → 定位不到本地歌曲：不落库（否则写出
                     // JOIN track 永不匹配的孤儿业务行）也不挂起（缺 content_hash 当键），
@@ -326,17 +325,16 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // LWW 合并 → 应用远端胜出行
             let mergeResult = SyncLWWReconcile.merge(localRows: localRows, remoteRows: remoteRows)
             // 播放位置未落地（跨端续播关 / 落点未接）逐条回调 → 本批累加（应用前清零）。
-            unsupportedPlaybackPositionCount = 0
-            skippedMissingParentCount = 0
+            applierBatchTally = SyncOutcomeTally()
             let applied = try applier.apply(mergeResult.applyRemote)
-            let unsupported = unsupportedPlaybackPositionCount
-            let skippedMissingParent = skippedMissingParentCount
+            let unsupported = applierBatchTally.count(for: .unsupported)
+            let skippedMissingParent = applierBatchTally.count(for: .skippedMissingParent)
             // 推进本端对该 peer 的游标（挂起行已持久化，游标可安全推进：数据不丢）
             try store.setCursor(forPeer: peerID, lastOutboxID: payload.lastOutboxID)
             onPushApplied?(applied)
-            onPushSuspended?(suspended)
+            onPushSuspended?(batchTally.count(for: .suspended))
             onPushUnresolved?(unresolved.count)
-            onPushIgnoredDeletes?(ignoredDeletes)
+            onPushIgnoredDeletes?(batchTally.count(for: .ignoredDelete))
             if unsupported > 0 { onPushUnsupported?(unsupported) }
             if skippedMissingParent > 0 { onPushSkippedMissingParent?(skippedMissingParent) }
         } catch {
