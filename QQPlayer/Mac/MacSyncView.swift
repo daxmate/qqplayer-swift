@@ -1051,6 +1051,14 @@ struct MacSyncRunSection: View {
                         .orange
                     )
                 }
+                // 应用失败（2026-09-15）：同样仅 N > 0 才显示；口径与 iOS 面板的缺口行一致（INV-29）。
+                if report.applyFailedEntries > 0 {
+                    metric(
+                        "sync_run_data_apply_failed".localized,
+                        report.applyFailedEntries,
+                        .orange
+                    )
+                }
                 metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
                 Spacer()
             }
@@ -1086,6 +1094,13 @@ struct MacSyncRunSection: View {
 
             if report.skippedMissingParentEntries > 0 {
                 Text("sync_run_data_skipped_parent_hint".localized(with: report.skippedMissingParentEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.applyFailedEntries > 0 {
+                Text("sync_run_data_apply_failed_hint".localized(with: report.applyFailedEntries))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
