@@ -132,9 +132,9 @@ extension SyncLocalLibraryDescriptor {
         lyricsMapping: SyncLyricsContentMapping? = nil,
         members: (() -> SyncCollectionMembers)? = nil
     ) -> SyncLocalLibraryDescriptor {
-        let mapping = lyricsMapping ?? .live(database: database)
+        let mapping = lyricsMapping ?? SyncLyricsContentMapping.live(database: database, libraryRoot: libraryRoot)
         // 唯一身份入口的生产实例（本装配点建一次，描述符内部所有身份解析都走它）。
-        let identity = SyncContentHashResolver(database: database)
+        let identity = SyncContentHashResolver(database: database, libraryRoot: libraryRoot)
         return SyncLocalLibraryDescriptor(
             libraryRoot: libraryRoot,
             rootName: rootName ?? libraryRoot.lastPathComponent,

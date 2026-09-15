@@ -52,7 +52,9 @@ struct SyncPlaybackCarryDatabaseFacts: SyncPlaybackCarryFactsProviding {
     let libraryRoot: URL
 
     /// 身份解析的唯一入口（B1b）：路径键取数走它，本类型不再自带 SQL。
-    private var identity: any SyncIdentityResolving { SyncContentHashResolver(database: database) }
+    private var identity: any SyncIdentityResolving {
+        SyncContentHashResolver(database: database, libraryRoot: libraryRoot)
+    }
 
     /// 参与携带的歌维度实体（= 无条件同步 ∩ 引用歌曲；playlist 不是歌维度）。
     /// **派生自唯一声明处 `SyncEntityRegistry`**，不再在这里手写过滤条件。
@@ -136,7 +138,8 @@ final class SyncPlaybackCarryPeer: SyncPlaybackCarryDriving, @unchecked Sendable
             session: session,
             store: store,
             applier: SyncChangeLogApplier(database: database),
-            peerID: peerID
+            peerID: peerID,
+            libraryRoot: libraryRoot
         )
     }
 

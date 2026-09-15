@@ -72,7 +72,7 @@ final class MacSyncDataViewModel: ObservableObject {
     init(
         hostCenter: SyncHostCenter? = nil,
         makeCoordinator: @escaping (SyncPeerSession) -> SyncDataSyncCoordinator = {
-            SyncDataSyncCoordinator(session: $0)
+            SyncDataSyncCoordinator(session: $0, libraryRoot: MusicFolderResolver.syncLibraryRoot)
         },
         resetCursors: ((String) throws -> Void)? = nil,
         repairDangling: (() throws -> SyncChangeLogDanglingRepair.Report)? = nil

@@ -562,7 +562,7 @@ enum SyncEntityRegistry {
                 或歌词映射不再从入口构造（`SyncLyricsContentMapping(identity:)`）——两条都是「入口空转」的形状：
                 编译能过（协议可选遵守）、下游各自拿闭包，漏接线一处就静默。
                 请检查 QQPlayer/Sync/SyncChangeLogMapping.swift：`SyncContentHashResolver` 必须有 `: SyncIdentityResolving` 遵守声明，
-                `.live(database:)` 必须走 `SyncLyricsContentMapping(identity: SyncContentHashResolver(database:))`。
+                `.live(database:libraryRoot:)` 必须走 `SyncLyricsContentMapping(identity: SyncContentHashResolver(database:libraryRoot:))`。
                 """
             ),
             probe: nil

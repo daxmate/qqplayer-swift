@@ -129,7 +129,7 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         membersProvider: (() -> SyncCollectionMembers)? = nil,
         peerLibraryProvider: (() -> SyncPeerLibraryCatalog)? = nil
     ) {
-        let mapping = lyricsMapping ?? .live(database: database)
+        let mapping = lyricsMapping ?? SyncLyricsContentMapping.live(database: database, libraryRoot: libraryRoot)
         self.libraryRoot = libraryRoot
         self.rootName = rootName ?? libraryRoot.lastPathComponent
         self.sink = sink

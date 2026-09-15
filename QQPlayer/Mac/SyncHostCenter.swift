@@ -228,7 +228,7 @@ final class SyncHostCenter: ObservableObject {
             activeSession = session
             // 连接就绪 → 后台自动跑一次「同步数据」（用户 2026-09-15 拍板：触发时机 = 连接后自动）。
             // 放在这里而不是面板 view model 里：面板没打开时也要跑（否则又变成“点过的才同步”）。
-            MacDataSyncAutoRunner.shared.sessionDidBecomeReady(session)
+            MacDataSyncAutoRunner.shared.sessionDidBecomeReady(session, libraryRoot: libraryRootProvider())
         case .closed:
             clearConnection(ifMatching: session)
             libraryHost?.detach()
@@ -370,7 +370,7 @@ final class MacDataSyncAutoRunner {
 
     private init() {}
 
-    func sessionDidBecomeReady(_ session: SyncPeerSession) {
+    func sessionDidBecomeReady(_ session: SyncPeerSession, libraryRoot: URL) {
         guard SyncDataAutoRunDecision.shouldStart(
             isConnected: true,
             hasActiveSession: true,
@@ -403,7 +403,12 @@ final class MacDataSyncAutoRunner {
         }
         SyncWiringFactsStore.shared.record(.dataSyncEntry, attached: true)
 
-        let coordinator = SyncDataSyncCoordinator(session: session, database: .shared, peerID: peerID)
+        let coordinator = SyncDataSyncCoordinator(
+            session: session,
+            database: .shared,
+            peerID: peerID,
+            libraryRoot: libraryRoot
+        )
         self.coordinator = coordinator
         coordinator.onStateChange = { [weak self] phase in
             Task { @MainActor in

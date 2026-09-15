@@ -45,7 +45,9 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
     let lyricsMapping: SyncLyricsContentMapping
 
     /// 内容指纹解析的唯一入口（生产实例：`SyncContentHashResolver`，SQL 只在那里）。
-    private var identity: any SyncIdentityResolving { SyncContentHashResolver(database: database) }
+    private var identity: any SyncIdentityResolving {
+        SyncContentHashResolver(database: database, libraryRoot: libraryRoot)
+    }
 
     /// 缺省曲库根：macOS = `~/Music/QQPlayer`（与 `MacSyncLibraryHost` 同源）；
     /// iOS = 沙盒 Documents（M3-2 起 iOS 唯一音乐位置）。
@@ -72,7 +74,8 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
         self.lyricsStore = lyricsStore
         // 默认与 SyncLocalLibraryDescriptor.live 同实现（M4-2a 映射），
         // 不另起一套 stableId ↔ content_hash 查询。
-        self.lyricsMapping = lyricsMapping ?? .live(database: database)
+        self.lyricsMapping = lyricsMapping
+            ?? SyncLyricsContentMapping.live(database: database, libraryRoot: libraryRoot)
     }
 
     // MARK: - SyncCollectionFactsProviding

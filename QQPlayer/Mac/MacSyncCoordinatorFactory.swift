@@ -72,7 +72,7 @@ enum MacSyncCoordinatorFactory {
         // 歌词跨端映射：**一处创建、三处共用**（descriptor 的 manifest 侧 / facts 的
         // 「本端有无该歌词」判定 / 拉取侧 SyncLyricsReceiver 的落库映射），
         // 避免三处各建一套而口径漂移。
-        let lyricsMapping = SyncLyricsContentMapping.live(database: database)
+        let lyricsMapping = SyncLyricsContentMapping.live(database: database, libraryRoot: libraryRoot)
         let descriptor = SyncLocalLibraryDescriptor.live(
             libraryRoot: libraryRoot,
             database: database,

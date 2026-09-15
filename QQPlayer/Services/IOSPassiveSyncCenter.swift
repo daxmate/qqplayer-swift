@@ -334,6 +334,11 @@
                     labelKey: "sync_run_data_result_unresolved",
                     hintKey: "sync_run_data_unresolved_hint"
                 )
+            case .ambiguousIdentity:
+                return .gap(
+                    labelKey: "sync_run_data_ambiguous_identity",
+                    hintKey: "sync_run_data_ambiguous_identity_hint"
+                )
             case .skippedMissingParent:
                 return .gap(
                     labelKey: "sync_run_data_skipped_parent",
@@ -360,10 +365,11 @@
             }
         }
 
-        /// 缺口行展示顺序（严重度：未定位 → 缺依赖 → 未支持 → 缺指纹）。
+        /// 缺口行展示顺序（严重度：未定位 → 身份歧义 → 缺依赖 → 未支持 → 缺指纹）。
         /// ⚠️ 与 `countOrder` 合起来必须**恰好覆盖** `SyncRowOutcome.allCases`（有用例钉住）。
         static let gapOrder: [SyncRowOutcome] = [
             .unresolved,
+            .ambiguousIdentity,
             .skippedMissingParent,
             .unsupported,
             .missingIdentity,
@@ -713,7 +719,8 @@
                 session: session,
                 store: SyncChangeLogStore(database: database),
                 applier: applier,
-                peerID: peerID
+                peerID: peerID,
+                libraryRoot: libraryRoot()
             )
             // 诊断打点：只记计数 / 错误类别，不打印曲目内容（隐私）。
             // 同一批数字同时交给 `dataSummary`（手机侧的账目面板，2026-09-15）——
@@ -736,6 +743,12 @@
                 Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.unresolved, count: count) } }
                 guard count > 0 else { return }
                 print("⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(count)，缺身份键）")
+            }
+            // 身份歧义（2026-09-18）：第二身份相对路径命中多首本地曲目 → 不落库。
+            peer.onPushAmbiguous = { [weak self] count in
+                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.ambiguousIdentity, count: count) } }
+                guard count > 0 else { return }
+                print("⚠️ SyncChangeLogPeer: 跳过身份歧义的远端行（行数=\(count)，相对路径命中多首本地曲目）")
             }
             // 父行 / 被引用行不存在而跳过（矩阵三级 #8）：以前静默失败，现在计数可见。
             peer.onPushSkippedMissingParent = { [weak self] count in

@@ -80,7 +80,7 @@ enum LibraryAudioFormats {
 // （main.swift 的 mapping(of:)），不走本默认值。
 
 extension SyncLyricsContentMapping {
-    static func live(database: DatabaseManager) -> SyncLyricsContentMapping { .unresolved }
+    static func live(database: DatabaseManager, libraryRoot: URL) -> SyncLyricsContentMapping { .unresolved }
 }
 
 // MARK: - SyncContentHashResolver（生产在 SyncChangeLogMapping.swift，未被 harness 编入）
@@ -93,12 +93,19 @@ extension SyncLyricsContentMapping {
 
 struct SyncContentHashResolver: SyncIdentityResolving {
     let database: DatabaseManager
+    let libraryRoot: URL
 
     func contentHash(forTrackStableId stableId: String) throws -> String? { nil }
 
     func trackStableId(forContentHash contentHash: String) throws -> String? { nil }
 
     func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)? { nil }
+
+    func remoteTrackIdentity(forTrackStableId stableId: String) throws -> SyncRemoteTrackIdentity? { nil }
+
+    func localizeRemoteTrack(_ identity: SyncRemoteTrackIdentity) throws -> SyncLocalTrackOutcome {
+        .unresolved
+    }
 }
 
 // MARK: - DatabaseSyncCollectionFacts.liveMembersProvider（生产在 Services/，未被 harness 编入）
