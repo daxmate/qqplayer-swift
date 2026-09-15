@@ -40,7 +40,7 @@ struct MacManualPlaylistDetailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: DesignTokens.space0) {
             header
             Divider()
             content
@@ -70,7 +70,7 @@ struct MacManualPlaylistDetailView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Button(action: onExit) {
                 Label(Localized.back, systemImage: "chevron.left")
             }
@@ -83,7 +83,7 @@ struct MacManualPlaylistDetailView: View {
                 cornerRadius: DesignTokens.radius7,
                 placeholderIcon: "list.bullet.rectangle"
             )
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(currentTitle)
                     .font(.title3)
                     .fontWeight(.bold)
@@ -102,8 +102,8 @@ struct MacManualPlaylistDetailView: View {
                 showDeleteConfirm = true
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     // MARK: - Content

@@ -134,14 +134,14 @@ struct FeatureGuideView: View {
             ForEach(sections) { section in
                 Section(section.title) {
                     ForEach(section.items) { item in
-                        HStack(alignment: .top, spacing: 14) {
+                        HStack(alignment: .top, spacing: DesignTokens.space14) {
                             Image(systemName: item.icon)
                                 .font(.system(size: DesignTokens.font18, weight: .medium))
                                 .foregroundColor(accentColor)
                                 .frame(width: 28, height: 28)
                                 .background(accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
 
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: DesignTokens.space3) {
                                 Text(item.title)
                                     .font(.subheadline.weight(.medium))
                                     .foregroundColor(.primary)
@@ -152,7 +152,7 @@ struct FeatureGuideView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
-                        .padding(.vertical, 2)
+                        .padding(.vertical, DesignTokens.space2)
                     }
                 }
             }

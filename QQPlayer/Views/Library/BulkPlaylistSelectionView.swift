@@ -17,8 +17,8 @@ struct BulkPlaylistSelectionView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                VStack(spacing: 8) {
+            VStack(spacing: DesignTokens.space20) {
+                VStack(spacing: DesignTokens.space8) {
                     Text(Localized.addToPlaylist)
                         .font(.title2)
                         .fontWeight(.semibold)
@@ -29,7 +29,7 @@ struct BulkPlaylistSelectionView: View {
                 }
 
                 if playlists.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: DesignTokens.space16) {
                         Image(systemName: "music.note.list")
                             .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)

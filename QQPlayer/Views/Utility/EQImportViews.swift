@@ -40,7 +40,7 @@ struct GraphicEQImportView: View {
                 }
 
                 Section(Localized.formatInfo) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.expectedGraphicEQFormat)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -48,7 +48,7 @@ struct GraphicEQImportView: View {
                         Text("GraphicEQ: 20 -7.9; 21 -7.9; 22 -8.0; 23 -8.0; ...")
                             .font(.caption2.monospaced())
                             .foregroundColor(.secondary)
-                            .padding(8)
+                            .padding(DesignTokens.space8)
                             .background(Color(.systemGray6))
                             .cornerRadius(DesignTokens.radius4)
 

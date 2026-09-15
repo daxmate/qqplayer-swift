@@ -33,7 +33,7 @@ struct ArtistTrackRowView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text(track.displayTitle)
                     .font(.title3)
                     .fontWeight(.medium)
@@ -108,7 +108,7 @@ struct ArtistTrackRowView: View {
             )
         }
         .frame(height: 80)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DesignTokens.space12)
         .contentShape(Rectangle())
         .onTapGesture {
             // isPressed 已于 2026-09-12 审计 B5 删除：它只写不读，按下反馈从未生效（死状态）
@@ -188,7 +188,7 @@ struct ArtistAlbumCardView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignTokens.space8) {
             RoundedRectangle(cornerRadius: DesignTokens.radius8)
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 120, height: 120)

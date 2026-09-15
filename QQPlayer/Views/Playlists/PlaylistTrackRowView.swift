@@ -23,9 +23,9 @@ struct PlaylistTrackRowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: DesignTokens.space0) {
             // MARK: - Tappable Content Area
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 // Album artwork thumbnail (matching TrackRowView exactly)
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius8)
@@ -52,7 +52,7 @@ struct PlaylistTrackRowView: View {
                 }
 
                 // Track info (matching TrackRowView exactly)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(track.displayTitle)
                         .font(.title3)
                         .fontWeight(.medium)
@@ -78,7 +78,7 @@ struct PlaylistTrackRowView: View {
                         trackId: playerEngine.currentTrack?.stableId
                     )
                     .id("\(playerEngine.isPlaying && isCurrentlyPlaying)-\(playerEngine.currentTrack?.stableId ?? "")")
-                    .padding(.trailing, 8)
+                    .padding(.trailing, DesignTokens.space8)
                 }
             }
             .contentShape(Rectangle())
@@ -102,7 +102,7 @@ struct PlaylistTrackRowView: View {
                         .overlay(Circle().stroke(.red.opacity(0.3), lineWidth: 1))
                 }
                 .buttonStyle(PlainButtonStyle())
-                .padding(.leading, 8)
+                .padding(.leading, DesignTokens.space8)
             } else {
                 Menu {
                     Button(action: {
@@ -151,7 +151,7 @@ struct PlaylistTrackRowView: View {
             }
         }
         .frame(height: 80)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DesignTokens.space12)
         .sheet(isPresented: $showPlaylistDialog) {
             PlaylistSelectionView(track: track)
                 .accentColor(accentColor)

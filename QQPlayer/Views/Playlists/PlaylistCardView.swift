@@ -24,7 +24,7 @@ struct PlaylistCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
             // Artwork area
             ZStack {
                 RoundedRectangle(cornerRadius: DesignTokens.radius12)
@@ -82,7 +82,7 @@ struct PlaylistCardView: View {
 
                         Spacer()
                     }
-                    .padding(8)
+                    .padding(DesignTokens.space8)
                     .zIndex(1000)
                 }
 
@@ -98,12 +98,12 @@ struct PlaylistCardView: View {
                     // 2x2 mashup for 4+ songs
                     GeometryReader { geometry in
                         let size = (geometry.size.width - 2) / 2
-                        VStack(spacing: 2) {
-                            HStack(spacing: 2) {
+                        VStack(spacing: DesignTokens.space2) {
+                            HStack(spacing: DesignTokens.space2) {
                                 artworkView(at: 0, size: size)
                                 artworkView(at: 1, size: size)
                             }
-                            HStack(spacing: 2) {
+                            HStack(spacing: DesignTokens.space2) {
                                 artworkView(at: 2, size: size)
                                 artworkView(at: 3, size: size)
                             }
@@ -125,7 +125,7 @@ struct PlaylistCardView: View {
             .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
 
             // Text info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(playlist.title)
                     .font(.headline)
                     .lineLimit(1)

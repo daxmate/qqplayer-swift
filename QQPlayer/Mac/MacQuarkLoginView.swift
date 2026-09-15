@@ -50,10 +50,10 @@ struct MacQuarkLoginView: View {
     private static let pollInterval: TimeInterval = 2   // web POLL_MS = 2000
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
 
-            VStack(spacing: 10) {
+            VStack(spacing: DesignTokens.space10) {
                 qrArea
                 Text("quark_login_scan_hint".localized)
                     .font(.callout)
@@ -61,8 +61,8 @@ struct MacQuarkLoginView: View {
                     .multilineTextAlignment(.center)
                 statusArea
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 18)
+            .padding(.horizontal, DesignTokens.space22)
+            .padding(.vertical, DesignTokens.space18)
         }
         .frame(width: 320)
         .onAppear {
@@ -76,7 +76,7 @@ struct MacQuarkLoginView: View {
     // MARK: - 头部
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             Image(systemName: "qrcode")
                 .foregroundColor(appAccentColor)
             Text("quark_login_title".localized)
@@ -93,8 +93,8 @@ struct MacQuarkLoginView: View {
             .keyboardShortcut(.cancelAction)
             .help("close".localized)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.top, DesignTokens.space16)
     }
 
     // MARK: - 二维码区
@@ -130,7 +130,7 @@ struct MacQuarkLoginView: View {
     }
 
     private func statusIcon(_ systemName: String, tint: Color) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignTokens.space8) {
             Image(systemName: systemName)
                 .font(.system(size: DesignTokens.font30))
                 .foregroundColor(tint)
@@ -149,7 +149,7 @@ struct MacQuarkLoginView: View {
                 .foregroundColor(secondsLeft <= 30 ? .orange : Color.secondary)
                 .monospacedDigit()
         case .expired:
-            VStack(spacing: 8) {
+            VStack(spacing: DesignTokens.space8) {
                 Text("quark_login_expired".localized)
                     .font(.callout)
                     .foregroundColor(.secondary)
@@ -158,7 +158,7 @@ struct MacQuarkLoginView: View {
                 }
             }
         case .failed:
-            VStack(spacing: 8) {
+            VStack(spacing: DesignTokens.space8) {
                 Text("quark_login_error".localized)
                     .font(.callout)
                     .foregroundColor(.secondary)

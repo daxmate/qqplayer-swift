@@ -20,7 +20,7 @@ struct MacAlbumGridView: View {
     /// 详情 sheet 开关（父视图持有，支持「右键 → 进专辑」外部触发）
     @Binding var showAlbumSheet: Bool
 
-    private let gridColumns = [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)]
+    private let gridColumns = [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: DesignTokens.space16)]
 
     /// 专辑卡事实缓存（审计 M2：以前每张卡每帧 2 次整表查询）
     @ObservedObject private var facts = MacLibraryFactsStore.shared
@@ -29,13 +29,13 @@ struct MacAlbumGridView: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: gridColumns, spacing: 16) {
+            LazyVGrid(columns: gridColumns, spacing: DesignTokens.space16) {
                 ForEach(albums, id: \.id) { album in
                     let albumFacts = facts.albumFacts(for: album)
                     Button {
                         openAlbum(album)
                     } label: {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space6) {
                             MacArtworkThumbnailFill(
                                 track: albumFacts.representativeTrack,
                                 cornerRadius: DesignTokens.radius8,
@@ -54,7 +54,7 @@ struct MacAlbumGridView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(16)
+            .padding(DesignTokens.space16)
         }
         .alert("error".localized, isPresented: openErrorBinding) {
             Button(Localized.ok, role: .cancel) { openError = nil }
@@ -104,15 +104,15 @@ struct MacAlbumDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.space12) {
+            HStack(spacing: DesignTokens.space12) {
                 MacArtworkThumbnail(
                     track: MacArtworkResolver.representativeTrack(forAlbum: album),
                     size: 120,
                     cornerRadius: DesignTokens.radius10,
                     placeholderIcon: "square.stack"
                 )
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(album.displayTitle)
                         .font(.title2)
                         .fontWeight(.bold)
@@ -236,7 +236,7 @@ struct MacArtistDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.space12) {
             HStack {
                 Text(ArtistNameNormalizer.displayName(artist.name))
                     .font(.title2)
@@ -362,7 +362,7 @@ struct MacPlaylistListView: View {
                     Button {
                         detailTarget = .manual(playlist)
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: DesignTokens.space10) {
                             MacArtworkThumbnail(
                                 track: playlistFacts.representativeTrack,
                                 size: 36,

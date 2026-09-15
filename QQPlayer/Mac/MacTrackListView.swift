@@ -96,7 +96,7 @@ struct MacTrackListView: View {
 
     var body: some View {
         if tracks.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Image(systemName: "music.note.list")
                     .font(.system(size: DesignTokens.font44))
                     .foregroundColor(.secondary)
@@ -108,7 +108,7 @@ struct MacTrackListView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 toolbarRow
                 Divider()
                 table
@@ -178,7 +178,7 @@ struct MacTrackListView: View {
             // 批量删除进度 + 取消（审计 H1：修复前磁盘/DB 逐首同步跑在主线程、
             // 窗口卡死且无法取消——现在执行在后台，主线程只显示进度并允许取消）
             if let trashProgress {
-                HStack(spacing: 8) {
+                HStack(spacing: DesignTokens.space8) {
                     ProgressView()
                         .controlSize(.small)
                     Text("\(trashProgress.done)/\(trashProgress.total)")
@@ -192,8 +192,8 @@ struct MacTrackListView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DesignTokens.space12)
+        .padding(.vertical, DesignTokens.space4)
     }
 
     // MARK: - Table

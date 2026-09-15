@@ -293,10 +293,10 @@ struct LibraryView: View {
             ZStack {
                 ScreenSpecificBackgroundView(screen: .library)
 
-                VStack(spacing: 0) {
+                VStack(spacing: DesignTokens.space0) {
                     // Compact processing status at the top of library
                     if libraryIndexer.isIndexing && !libraryIndexer.currentlyProcessing.isEmpty {
-                        HStack(spacing: 8) {
+                        HStack(spacing: DesignTokens.space8) {
                             ProgressView()
                                 .scaleEffect(0.6)
                                 .frame(width: 12, height: 12)
@@ -308,17 +308,17 @@ struct LibraryView: View {
 
                             Spacer()
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, DesignTokens.space16)
+                        .padding(.vertical, DesignTokens.space6)
                         .background(accentColor.opacity(0.05))
                     }
 
                     // Large section rows
                     ScrollView {
-                        VStack(spacing: 16) {
+                        VStack(spacing: DesignTokens.space16) {
                             // Library title with icons that scrolls with content
                             HStack(alignment: .center) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: DesignTokens.space10) {
                                     Image("AppLogo")
                                         .resizable()
                                         .scaledToFit()
@@ -332,7 +332,7 @@ struct LibraryView: View {
 
                                 Spacer()
 
-                                HStack(spacing: 20) {
+                                HStack(spacing: DesignTokens.space20) {
                                     // Sync button (if available)
                                     if onManualSync != nil {
                                         Button(action: {
@@ -361,7 +361,7 @@ struct LibraryView: View {
                                                         .foregroundColor(accentColor)
                                                 }
                                             }
-                                            .padding(.bottom, 4)
+                                            .padding(.bottom, DesignTokens.space4)
                                             .scaleEffect(isRefreshing ? 0.9 : 1.0)
                                             .animation(.easeInOut(duration: 0.2), value: isRefreshing)
                                         }
@@ -387,14 +387,14 @@ struct LibraryView: View {
                                     }
                                 }
                             }
-                            .padding(.leading, 4)
-                            .padding(.trailing, 4)
+                            .padding(.leading, DesignTokens.space4)
+                            .padding(.trailing, DesignTokens.space4)
                             ForEach(settings.homeSections.filter(\.isVisible)) { section in
                                 homeSectionView(for: section.id)
                             }
                         }
-                        .padding(16)
-                        .padding(.bottom, 100) // Add padding for mini player
+                        .padding(DesignTokens.space16)
+                        .padding(.bottom, DesignTokens.space100) // Add padding for mini player
                     }
                 }
                 .navigationTitle("")
@@ -515,15 +515,15 @@ struct LibraryView: View {
                                 .font(.system(size: DesignTokens.font14, weight: .medium))
                                 .foregroundColor(.primary)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, DesignTokens.space16)
+                        .padding(.vertical, DesignTokens.space12)
                         .background(
                             RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                 .fill(.regularMaterial)
                                 .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 6)
                         )
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 120) // Space above mini player
+                        .padding(.horizontal, DesignTokens.space20)
+                        .padding(.bottom, DesignTokens.space120) // Space above mini player
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
@@ -588,7 +588,7 @@ struct LibrarySectionRowView: View {
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: DesignTokens.space16) {
             // Icon
             if settings.minimalistIcons {
                 Image(systemName: icon)
@@ -608,7 +608,7 @@ struct LibrarySectionRowView: View {
             }
 
             // Text content
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text(title)
                     .responsiveSectionTitleFont()
                     .foregroundColor(.primary)
@@ -625,8 +625,8 @@ struct LibrarySectionRowView: View {
                 .font(.body)
                 .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, DesignTokens.space20)
+        .padding(.vertical, DesignTokens.space16)
         .background(
             // Glassy background that reflects gradient
             RoundedRectangle(cornerRadius: DesignTokens.radius12)

@@ -65,7 +65,7 @@ struct MacSettingsView: View {
 
     var body: some View {
         // 左侧分类导航 + 右侧内容区（web 版布局；分类多了比顶部 tab 更合理）
-        HStack(spacing: 0) {
+        HStack(spacing: DesignTokens.space0) {
             List(SettingsCategory.allCases, id: \.self, selection: $selectedCategory) { category in
                 Label(category.title, systemImage: category.icon)
                     .tag(category)
@@ -175,7 +175,7 @@ private struct MacLyricsSettingsView: View {
     var body: some View {
         Form {
             Section(Localized.lyricsDisplay) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     HStack {
                         Text(Localized.lyricsFontSize)
                         Spacer()
@@ -199,7 +199,7 @@ private struct MacLyricsSettingsView: View {
             }
 
             Section {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     HStack {
                         Text(Localized.lyricsOffset)
                         Spacer()
@@ -261,12 +261,12 @@ private struct MacAppearanceSettingsView: View {
             }
 
             Section(Localized.accentColor) {
-                HStack(spacing: 14) {
+                HStack(spacing: DesignTokens.space14) {
                     ForEach(MacAppearance.accentPresets, id: \.key) { preset in
                         accentSwatch(preset)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, DesignTokens.space4)
             }
         }
         .formStyle(.grouped)
@@ -389,9 +389,9 @@ private struct MacLibrarySettingsView: View {
     private var fileTypeChips: some View {
         let enabled = Set(deleteSettings.audioExtensions)
         return LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 84), spacing: 8)],
+            columns: [GridItem(.adaptive(minimum: 84), spacing: DesignTokens.space8)],
             alignment: .leading,
-            spacing: 8
+            spacing: DesignTokens.space8
         ) {
             ForEach(LibraryAudioFormats.allSupported, id: \.self) { ext in
                 let isOn = enabled.contains(ext)
@@ -402,8 +402,8 @@ private struct MacLibrarySettingsView: View {
                 } label: {
                     Text("." + ext)
                         .font(.system(.callout, design: .monospaced))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, DesignTokens.space10)
+                        .padding(.vertical, DesignTokens.space5)
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: DesignTokens.radius6)
@@ -420,7 +420,7 @@ private struct MacLibrarySettingsView: View {
                 .help(isLastEnabled ? Localized.libraryFileTypesFooter : "")
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     private func toggleExtension(_ ext: String, currentlyEnabled: Set<String>) {

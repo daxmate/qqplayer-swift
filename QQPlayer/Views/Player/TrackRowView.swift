@@ -50,9 +50,9 @@ struct TrackRowView: View, @MainActor Equatable {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: DesignTokens.space0) {
             // MARK: - Tappable Content Area
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 // Album artwork thumbnail
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius8)
@@ -77,7 +77,7 @@ struct TrackRowView: View, @MainActor Equatable {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(track.displayTitle)
                         .font(.title3)
                         .fontWeight(.medium)
@@ -105,7 +105,7 @@ struct TrackRowView: View, @MainActor Equatable {
                         trackId: activeTrackId
                     )
                     .id(eqKey)
-                    .padding(.trailing, 8)
+                    .padding(.trailing, DesignTokens.space8)
                 }
             }
             .contentShape(Rectangle())
@@ -126,7 +126,7 @@ struct TrackRowView: View, @MainActor Equatable {
                         .overlay(Circle().stroke(.red.opacity(0.3), lineWidth: 1))
                 }
                 .buttonStyle(PlainButtonStyle())
-                .padding(.leading, 8)
+                .padding(.leading, DesignTokens.space8)
             } else {
                 Menu {
                     if let onEnterBulkMode = onEnterBulkMode {
@@ -174,7 +174,7 @@ struct TrackRowView: View, @MainActor Equatable {
             }
         }
         .frame(height: 80)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DesignTokens.space12)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.radius8)
                 .fill(accentColor.opacity(0.12))

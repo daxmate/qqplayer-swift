@@ -16,7 +16,7 @@ struct EqualizerBarsExact: View {
     private var restartKey: String { "\(isActive)-\(trackId ?? "")" }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 1) {
+        HStack(alignment: .bottom, spacing: DesignTokens.space1) {
             ForEach(0 ..< 4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: DesignTokens.radius0_5)
                     .fill(color)
@@ -84,7 +84,7 @@ struct PlayerProgressSection: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, DesignTokens.space8)
     }
 
     private func formatTime(_ time: TimeInterval) -> String {

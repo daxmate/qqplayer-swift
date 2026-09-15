@@ -60,12 +60,12 @@
         let artwork: UIImage?
 
         var body: some View {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 artworkView
                     .frame(width: 56, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(title)
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -76,9 +76,9 @@
                         .lineLimit(1)
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: DesignTokens.space0)
 
-                HStack(spacing: 14) {
+                HStack(spacing: DesignTokens.space14) {
                     Button(intent: EnqueueTrackIntent(trackStableId: trackStableId, playNext: true)) {
                         Image(systemName: "text.line.first.and.arrowtriangle.forward")
                             .font(.body)

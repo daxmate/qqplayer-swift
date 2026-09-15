@@ -12,7 +12,7 @@ struct ArtistsScreen: View {
 
             VStack {
                 if artists.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: DesignTokens.space16) {
                         Image(systemName: "person.2")
                             .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)
@@ -40,7 +40,7 @@ struct ArtistsScreen: View {
                                     .foregroundColor(.purple)
                                     .frame(width: 24, height: 24)
 
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                                     Text(item.displayName)
                                         .font(.headline)
 
@@ -55,8 +55,8 @@ struct ArtistsScreen: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
+                            .padding(.horizontal, DesignTokens.space16)
+                            .padding(.vertical, DesignTokens.space12)
                             .background(
                                 RoundedRectangle(cornerRadius: DesignTokens.radius12)
                                     .fill(.ultraThinMaterial)
@@ -69,7 +69,7 @@ struct ArtistsScreen: View {
                     }
                     .listStyle(PlainListStyle())
                     .scrollContentBackground(.hidden)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, DesignTokens.space8)
                     .safeAreaInset(edge: .bottom) {
                         Color.clear.frame(height: 100) // Space for mini player
                     }

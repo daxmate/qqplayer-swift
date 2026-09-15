@@ -53,28 +53,28 @@ struct LyricsSearchView: View {
             ScreenSpecificBackgroundView(screen: .library)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 header
                 searchBar
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.top, DesignTokens.space8)
 
                 if manualActive {
                     manualStatusRow
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
+                        .padding(.horizontal, DesignTokens.space20)
+                        .padding(.top, DesignTokens.space12)
                 }
 
                 if !searchError.isEmpty {
                     Text(searchError)
                         .font(.footnote)
                         .foregroundColor(.red)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
+                        .padding(.horizontal, DesignTokens.space20)
+                        .padding(.top, DesignTokens.space10)
                 }
 
                 content
-                    .padding(.top, 12)
+                    .padding(.top, DesignTokens.space12)
             }
         }
         .onAppear {
@@ -119,8 +119,8 @@ struct LyricsSearchView: View {
                         }
                     }
                 )
-                .padding(.top, 64)
-                .padding(.horizontal, 20)
+                .padding(.top, DesignTokens.space64)
+                .padding(.horizontal, DesignTokens.space20)
             }
         }
         .simultaneousGesture(
@@ -147,7 +147,7 @@ struct LyricsSearchView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Button(action: onClose) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: DesignTokens.font17, weight: .semibold))
@@ -157,7 +157,7 @@ struct LyricsSearchView: View {
             .buttonStyle(PlainButtonStyle())
             .accessibilityLabel(NSLocalizedString("lyrics_search_close", value: "Close lyrics search", comment: ""))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(NSLocalizedString("lyrics_search_title", value: "Lyrics Search", comment: ""))
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -174,20 +174,20 @@ struct LyricsSearchView: View {
                     .scaleEffect(0.8)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .padding(.horizontal, DesignTokens.space20)
+        .padding(.top, DesignTokens.space8)
     }
 
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(spacing: DesignTokens.space10) {
+            HStack(spacing: DesignTokens.space10) {
                 TextField(NSLocalizedString("lyrics_search_song_title", value: "Song title", comment: ""), text: $searchTitle)
                     .textFieldStyle(.plain)
                     .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, DesignTokens.space12)
+                    .padding(.vertical, DesignTokens.space9)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                     .submitLabel(.search)
                     .onSubmit { doSearch() }
@@ -195,8 +195,8 @@ struct LyricsSearchView: View {
                 TextField(NSLocalizedString("lyrics_search_artist", value: "Artist (optional)", comment: ""), text: $searchArtist)
                     .textFieldStyle(.plain)
                     .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, DesignTokens.space12)
+                    .padding(.vertical, DesignTokens.space9)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                     .submitLabel(.search)
                     .onSubmit { doSearch() }
@@ -219,7 +219,7 @@ struct LyricsSearchView: View {
     // MARK: - Manual Status
 
     private var manualStatusRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: DesignTokens.font14))
                 .foregroundColor(accentColor)
@@ -243,8 +243,8 @@ struct LyricsSearchView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DesignTokens.space12)
+        .padding(.vertical, DesignTokens.space10)
         .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
     }
 
@@ -253,7 +253,7 @@ struct LyricsSearchView: View {
     @ViewBuilder
     private var content: some View {
         if searching && results.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Spacer()
                 ProgressView()
                 Text(NSLocalizedString("lyrics_search_searching", value: "Searching…", comment: ""))
@@ -262,7 +262,7 @@ struct LyricsSearchView: View {
                 Spacer()
             }
         } else if searched && results.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Spacer()
                 Image(systemName: "text.badge.xmark")
                     .font(.system(size: DesignTokens.font36))
@@ -279,13 +279,13 @@ struct LyricsSearchView: View {
 
     private var resultList: some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: DesignTokens.space10) {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, candidate in
                     resultRow(candidate, at: index)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.horizontal, DesignTokens.space20)
+            .padding(.bottom, DesignTokens.space24)
         }
     }
 
@@ -293,16 +293,16 @@ struct LyricsSearchView: View {
         Button {
             apply(candidate, at: index)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 // 来源标签
                 Text(candidate.source.displayName)
                     .font(.caption2.weight(.semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, DesignTokens.space8)
+                    .padding(.vertical, DesignTokens.space4)
                     .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: DesignTokens.space3) {
                     // 候选行是渲染出来的歌曲文本（转字形只影响显示；id/source 等取歌词用字段不动）
                     Text(DisplayScriptNormalizer.display(candidate.title))
                         .font(.subheadline.weight(.medium))
@@ -322,8 +322,8 @@ struct LyricsSearchView: View {
                     Text(NSLocalizedString("lyrics_search_translation_badge", value: "TR", comment: ""))
                         .font(.caption2.weight(.bold))
                         .foregroundColor(accentColor)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, DesignTokens.space6)
+                        .padding(.vertical, DesignTokens.space3)
                         .overlay(
                             RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .stroke(accentColor.opacity(0.6), lineWidth: 1)
@@ -340,8 +340,8 @@ struct LyricsSearchView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space12)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
         }
         .buttonStyle(PlainButtonStyle())

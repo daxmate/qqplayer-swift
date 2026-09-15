@@ -64,7 +64,7 @@ struct MacPlayerView: View {
 
     var body: some View {
         GeometryReader { geo in
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 if !MacPlaybackGate.shouldHidePlayerSection(
                     isKaraokeOn: karaoke.isKaraokeOn,
                     isLyricsExpanded: lyricsExpanded
@@ -113,10 +113,10 @@ struct MacPlayerView: View {
                 Text(message)
                     .font(.footnote)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, DesignTokens.space14)
+                    .padding(.vertical, DesignTokens.space7)
                     .background(Capsule().fill(Color.red.opacity(0.9)))
-                    .padding(.top, 10)
+                    .padding(.top, DesignTokens.space10)
                     .allowsHitTesting(false)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -227,7 +227,7 @@ struct MacPlayerView: View {
     // MARK: - Player section
 
     private var playerSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.space16) {
             Spacer()
 
             // Artwork
@@ -252,7 +252,7 @@ struct MacPlayerView: View {
             .frame(width: 240, height: 240)
 
             // Track info
-            VStack(spacing: 4) {
+            VStack(spacing: DesignTokens.space4) {
                 Text(track?.displayTitle ?? "not_playing".localized)
                     .font(.title3)
                     .fontWeight(.semibold)
@@ -264,7 +264,7 @@ struct MacPlayerView: View {
             }
 
             // Progress bar
-            VStack(spacing: 4) {
+            VStack(spacing: DesignTokens.space4) {
                 Slider(
                     value: Binding(
                         get: { isDragging ? (dragTime ?? playbackTime) : playbackTime },
@@ -293,7 +293,7 @@ struct MacPlayerView: View {
             .frame(maxWidth: 420)
 
             // Controls
-            HStack(spacing: 24) {
+            HStack(spacing: DesignTokens.space24) {
                 Button(action: onPrevious) {
                     Image(systemName: "backward.fill")
                         .font(.system(size: DesignTokens.font22))
@@ -399,13 +399,13 @@ struct MacPlayerView: View {
             if visualizerEnabled {
                 MacVisualizerView()
                     .frame(width: 420, height: 44)
-                    .padding(.top, 2)
+                    .padding(.top, DesignTokens.space2)
             }
 
             Spacer()
         }
-        .padding(.top, 24)
-        .padding(.horizontal, 32)
+        .padding(.top, DesignTokens.space24)
+        .padding(.horizontal, DesignTokens.space32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: player.isPlaying) { _ in
             updateSpectrumTap()
@@ -510,7 +510,7 @@ private struct MacQueuePanelView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Divider()
             content
@@ -526,13 +526,13 @@ private struct MacQueuePanelView: View {
             Button("close".localized) { dismiss() }
                 .keyboardShortcut(.cancelAction)
         }
-        .padding(12)
+        .padding(DesignTokens.space12)
     }
 
     @ViewBuilder
     private var content: some View {
         if player.playbackQueue.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Image(systemName: "music.note.list")
                     .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
@@ -541,14 +541,14 @@ private struct MacQueuePanelView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 if !player.isQueueReorderable {
                     Text(Localized.queueShuffleDisabledHint)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, DesignTokens.space12)
+                        .padding(.vertical, DesignTokens.space6)
                 }
                 List {
                     ForEach(Array(player.playbackQueue.enumerated()), id: \.element.stableId) { index, track in
@@ -564,7 +564,7 @@ private struct MacQueuePanelView: View {
 
     private func row(for track: Track, at index: Int) -> some View {
         let isCurrent = index == player.currentIndex
-        return HStack(spacing: 10) {
+        return HStack(spacing: DesignTokens.space10) {
             Text("\(index + 1)")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -583,7 +583,7 @@ private struct MacQueuePanelView: View {
                     .frame(width: 14)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(track.displayTitle)
                     .fontWeight(isCurrent ? .semibold : .regular)
                     .lineLimit(1)

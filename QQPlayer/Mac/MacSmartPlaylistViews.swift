@@ -83,7 +83,7 @@ struct MacSmartPlaylistCardStrip: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Self.horizontalPadding)
-        .padding(.vertical, 12)
+        .padding(.vertical, DesignTokens.space12)
         .background(GeometryReader { geometry in
             Color.clear.preference(key: MacSmartCardStripWidthKey.self, value: geometry.size.width)
         })
@@ -96,7 +96,7 @@ struct MacSmartPlaylistCardStrip: View {
 
     /// 单卡：封面拼贴（跟随列宽）+ 标题 + 计数。
     private func card(_ info: SmartPlaylistCardInfo) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DesignTokens.space6) {
             MacArtworkCollageFill(
                 tracks: coverTracks[info.kind] ?? [],
                 cornerRadius: DesignTokens.radius8,
@@ -179,7 +179,7 @@ struct MacSmartPlaylistDetailView: View {
     @State private var loadTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: DesignTokens.space0) {
             header
             Divider()
             content
@@ -199,7 +199,7 @@ struct MacSmartPlaylistDetailView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             Button {
                 if selectedBucket != nil {
                     selectedBucket = nil
@@ -217,8 +217,8 @@ struct MacSmartPlaylistDetailView: View {
                 .lineLimit(1)
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     private var title: String {
@@ -429,7 +429,7 @@ struct MacSmartPlaylistEmptyView: View {
     let retry: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignTokens.space12) {
             Image(systemName: systemImage)
                 .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)

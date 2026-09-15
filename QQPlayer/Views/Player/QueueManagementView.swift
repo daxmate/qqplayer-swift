@@ -14,7 +14,7 @@ struct QueueManagementView: View {
             ZStack {
                 ScreenSpecificBackgroundView(screen: .player)
 
-                VStack(spacing: 20) {
+                VStack(spacing: DesignTokens.space20) {
                     // Header
                     HStack {
                         Button(Localized.done) {
@@ -38,11 +38,11 @@ struct QueueManagementView: View {
                         .opacity(0)
                         .disabled(true)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.top, DesignTokens.space10)
 
                     if playerEngine.playbackQueue.isEmpty {
-                        VStack(spacing: 16) {
+                        VStack(spacing: DesignTokens.space16) {
                             Image(systemName: "music.note.list")
                                 .font(.system(size: DesignTokens.font60))
                                 .foregroundColor(.secondary)
@@ -76,7 +76,7 @@ struct QueueManagementView: View {
                         }
                         .listStyle(PlainListStyle())
                         .scrollContentBackground(.hidden)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignTokens.space16)
                     }
                 }
             }
@@ -195,7 +195,7 @@ struct QueueTrackRow: View {
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             // Album artwork
             ZStack {
                 RoundedRectangle(cornerRadius: DesignTokens.radius6)
@@ -215,7 +215,7 @@ struct QueueTrackRow: View {
             }
 
             // Track info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 HStack {
                     Text(track.displayTitle)
                         .font(.headline)
@@ -245,8 +245,8 @@ struct QueueTrackRow: View {
                 .font(.caption)
                 .foregroundColor(.secondary.opacity(0.6))
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, DesignTokens.space8)
+        .padding(.horizontal, DesignTokens.space12)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.radius10)
                 .fill(isCurrentTrack ? accentColor.opacity(0.15) : Color.clear)

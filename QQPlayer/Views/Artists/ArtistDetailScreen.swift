@@ -127,14 +127,14 @@ struct ArtistDetailScreen: View {
     private func richArtistView(_ unifiedArtist: UnifiedArtist) -> some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: DesignTokens.space0) {
                     headerSection(geometry: geometry)
-                    VStack(spacing: 20) {
+                    VStack(spacing: DesignTokens.space20) {
                         if !artistAlbums.isEmpty { albumsSection }
                         if !artistTracks.isEmpty { songsSection }
                     }
-                    .padding(.top, 20)
-                    .padding(.bottom, 100) // Add padding for mini player
+                    .padding(.top, DesignTokens.space20)
+                    .padding(.bottom, DesignTokens.space100) // Add padding for mini player
                 }
             }
         }
@@ -144,12 +144,12 @@ struct ArtistDetailScreen: View {
     @ViewBuilder
     private var simpleView: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: DesignTokens.space20) {
                 simpleHeader
                 if !artistAlbums.isEmpty { albumsSection }
                 if !artistTracks.isEmpty { songsSection }
             }
-            .padding(.bottom, 100) // Add padding for mini player
+            .padding(.bottom, DesignTokens.space100) // Add padding for mini player
         }
     }
 
@@ -160,7 +160,7 @@ struct ArtistDetailScreen: View {
         let safeAreaTop = geometry.safeAreaInsets.top
         let imageHeight: CGFloat = 300 + safeAreaTop
 
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.space16) {
             ZStack {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
@@ -197,8 +197,8 @@ struct ArtistDetailScreen: View {
                             Image("SpotifyWhite")
                                 .resizable().scaledToFit()
                                 .frame(width: 21, height: 21)
-                                .padding(.top, 16)
-                                .padding(.trailing, 20)
+                                .padding(.top, DesignTokens.space16)
+                                .padding(.trailing, DesignTokens.space20)
                         }
                     }
                     Spacer()
@@ -208,8 +208,8 @@ struct ArtistDetailScreen: View {
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-                            .padding(.leading, 20)
-                            .padding(.bottom, 20)
+                            .padding(.leading, DesignTokens.space20)
+                            .padding(.bottom, DesignTokens.space20)
                         Spacer()
                     }
                 }
@@ -232,7 +232,7 @@ struct ArtistDetailScreen: View {
             )
             .frame(maxWidth: .infinity)
 
-            VStack(spacing: 16) {
+            VStack(spacing: DesignTokens.space16) {
                 if let unifiedArtist = unifiedArtist, !unifiedArtist.profile.isEmpty {
                     profileSection(unifiedArtist)
                 }
@@ -245,7 +245,7 @@ struct ArtistDetailScreen: View {
 
     @ViewBuilder
     private var simpleHeader: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.space16) {
             Text(displayName)
                 .font(.largeTitle)
                 .fontWeight(.bold)
@@ -261,7 +261,7 @@ struct ArtistDetailScreen: View {
 
     @ViewBuilder
     private func profileSection(_ unifiedArtist: UnifiedArtist) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
             if unifiedArtist.source == .spotify {
                 // Spotify content with attribution
                 Text(unifiedArtist.profile)
@@ -273,8 +273,8 @@ struct ArtistDetailScreen: View {
                     }
 
                 if showFullProfile {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
+                        HStack(spacing: DesignTokens.space4) {
                             Text(Localized.dataProvidedBy("Spotify"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -301,7 +301,7 @@ struct ArtistDetailScreen: View {
                                 await searchAlternativeArtistAutomatically()
                             }
                         }) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: DesignTokens.space6) {
                                 Image(systemName: "questionmark.circle")
                                 Text(Localized.wrongArtist)
                             }
@@ -309,7 +309,7 @@ struct ArtistDetailScreen: View {
                             .foregroundColor(.orange)
                         }
                     }
-                    .padding(.top, 4)
+                    .padding(.top, DesignTokens.space4)
                 }
             } else {
                 // Discogs or other source content
@@ -322,7 +322,7 @@ struct ArtistDetailScreen: View {
                     }
 
                 if showFullProfile {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.dataProvidedBy(unifiedArtist.source.rawValue.capitalized))
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -333,7 +333,7 @@ struct ArtistDetailScreen: View {
                                 await searchAlternativeArtistAutomatically()
                             }
                         }) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: DesignTokens.space6) {
                                 Image(systemName: "questionmark.circle")
                                 Text(Localized.wrongArtist)
                             }
@@ -341,14 +341,14 @@ struct ArtistDetailScreen: View {
                             .foregroundColor(.orange)
                         }
                     }
-                    .padding(.top, 4)
+                    .padding(.top, DesignTokens.space4)
                 }
             }
         }
     }
 
     private var playButtons: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: DesignTokens.space20) {
             Button {
                 guard let first = artistTracks.first else { return }
                 Task { await playerEngine.playTrack(first, queue: artistTracks) }
@@ -356,7 +356,7 @@ struct ArtistDetailScreen: View {
                 HStack { Image(systemName: "play.fill"); Text(Localized.play).lineLimit(1).minimumScaleFactor(0.6) }
                     .font(.title3).fontWeight(.semibold)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, DesignTokens.space8)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(accentColor)
@@ -370,7 +370,7 @@ struct ArtistDetailScreen: View {
                 HStack { Image(systemName: "shuffle"); Text(Localized.shuffle).lineLimit(1).minimumScaleFactor(0.6) }
                     .font(.title3).fontWeight(.semibold)
                     .foregroundColor(accentColor)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, DesignTokens.space8)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(accentColor.opacity(0.1))
@@ -380,7 +380,7 @@ struct ArtistDetailScreen: View {
     }
 
     private var songsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: DesignTokens.space0) {
             HStack {
                 Text(Localized.songs).font(.title3).fontWeight(.bold)
                 Spacer()
@@ -388,11 +388,11 @@ struct ArtistDetailScreen: View {
                     .font(.body).foregroundColor(.secondary)
             }
             .padding(.horizontal)
-            .padding(.bottom, 12)
-            LazyVStack(spacing: 0) {
+            .padding(.bottom, DesignTokens.space12)
+            LazyVStack(spacing: DesignTokens.space0) {
                 ForEach(artistTracks.indices, id: \.self) { index in
                     let track = artistTracks[index]
-                    HStack(spacing: 12) {
+                    HStack(spacing: DesignTokens.space12) {
                         if isBulkMode {
                             TrackSelectionIndicator(
                                 isSelected: selectedTracks.contains(track.stableId),
@@ -418,7 +418,7 @@ struct ArtistDetailScreen: View {
                     }
 
                     if index < artistTracks.count - 1 {
-                        Divider().padding(.leading, 20)
+                        Divider().padding(.leading, DesignTokens.space20)
                     }
                 }
             }
@@ -426,7 +426,7 @@ struct ArtistDetailScreen: View {
     }
 
     private var albumsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.space12) {
             HStack {
                 Text(Localized.albums).font(.title3).fontWeight(.bold)
                 Spacer()
@@ -435,7 +435,7 @@ struct ArtistDetailScreen: View {
             }
             .padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(spacing: DesignTokens.space12) {
                     ForEach(artistAlbums, id: \.id) { album in
                         NavigationLink {
                             AlbumDetailScreen(album: album, allTracks: allTracks)

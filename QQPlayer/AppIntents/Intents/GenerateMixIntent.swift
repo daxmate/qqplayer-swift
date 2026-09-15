@@ -111,7 +111,7 @@
         let isSaved: Bool
 
         var body: some View {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous)
                         .fill(.regularMaterial)
@@ -121,7 +121,7 @@
                 }
                 .frame(width: 56, height: 56)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(title)
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -131,7 +131,7 @@
                         .foregroundStyle(.secondary)
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: DesignTokens.space0)
 
                 if isSaved {
                     Label {

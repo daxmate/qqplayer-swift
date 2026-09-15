@@ -64,15 +64,15 @@ struct CollapsiblePlayerControls: View {
 
     /// 三键行：三个按钮用 Spacer 均匀分布，容器与进度条同宽（同 .padding(.horizontal, 8)），底色透明
     private var threeButtonRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: DesignTokens.space0) {
             previousButton
             Spacer()
             playPauseButton
             Spacer()
             nextButton
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignTokens.space8)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     private var previousButton: some View {
@@ -128,37 +128,37 @@ struct CollapsiblePlayerControls: View {
     // MARK: - 展开区
 
     private var expandedSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignTokens.space12) {
             mainToolRow
             accessoryRow
         }
-        .padding(.top, 2)
+        .padding(.top, DesignTokens.space2)
     }
 
     /// 主工具行：播放顺序 / 歌单 / 输出源 三键同一容器，摆放方式及底色同三键行（Spacer 均分 + 透明 + 与进度条同宽）
     private var mainToolRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: DesignTokens.space0) {
             playOrderButton
             Spacer()
             queueButton
             Spacer()
             airPlayButton
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignTokens.space8)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     /// 辅助行：定时（可开关）/ 歌词（歌词第一重要，恒显示）
     private var accessoryRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: DesignTokens.space0) {
             if showSleepTimerButton {
                 sleepTimerButton
                 Spacer()
             }
             lyricsButton
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignTokens.space8)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     // 播放顺序四态轮换按钮：顺序播放 → 随机播放 → 循环列表 → 单曲循环（仅图标，无文字）

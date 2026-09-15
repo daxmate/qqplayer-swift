@@ -369,13 +369,13 @@ struct MacLibraryView: View {
     private var dropTargetHint: some View {
         RoundedRectangle(cornerRadius: DesignTokens.radius12)
             .strokeBorder(appAccentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
-            .padding(12)
+            .padding(DesignTokens.space12)
             .overlay {
                 Text(Localized.dragImportHint)
                     .font(.title3)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, DesignTokens.space16)
+                    .padding(.vertical, DesignTokens.space10)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
             }
             .allowsHitTesting(false)
@@ -384,11 +384,11 @@ struct MacLibraryView: View {
     private func importToastLabel(_ message: String) -> some View {
         Text(message)
             .font(.callout)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space8)
             .background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Color.gray.opacity(0.3), lineWidth: 1))
-            .padding(.bottom, 40)
+            .padding(.bottom, DesignTokens.space40)
             .frame(maxHeight: .infinity, alignment: .bottom)
             .allowsHitTesting(false)
             .transition(.opacity)
@@ -407,7 +407,7 @@ struct MacLibraryView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             MacSearchField(text: $searchText)
             List(MacLibrarySection.allCases, selection: $section) { item in
                 Label(item.title, systemImage: item.icon)
@@ -416,7 +416,7 @@ struct MacLibraryView: View {
             .listStyle(.sidebar)
         }
         .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignTokens.space6) {
                 if indexer.isIndexing {
                     ProgressView(value: indexer.indexingProgress)
                         .progressViewStyle(.linear)
@@ -447,7 +447,7 @@ struct MacLibraryView: View {
                     .font(.caption)
                 }
             }
-            .padding(8)
+            .padding(DesignTokens.space8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -796,7 +796,7 @@ private struct MacSyncPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
 
             Form {
@@ -811,7 +811,7 @@ private struct MacSyncPanel: View {
     /// 原先只有 `navigationTitle`——用户从工具栏打开面板后**没有任何关闭途径**
     /// （macOS 的 sheet 不会自动给关闭按钮，也没有默认 Esc 取消）。
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Text("sync_run_panel_title".localized)
                 .font(.title2)
                 .fontWeight(.bold)

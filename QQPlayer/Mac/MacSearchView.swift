@@ -31,7 +31,7 @@ struct MacSearchField: View {
     @Binding var text: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: DesignTokens.space6) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             TextField("search_placeholder".localized, text: $text)
@@ -47,11 +47,11 @@ struct MacSearchField: View {
                 .help("search_clear".localized)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, DesignTokens.space8)
+        .padding(.vertical, DesignTokens.space6)
         .background(RoundedRectangle(cornerRadius: DesignTokens.radius7).fill(Color.gray.opacity(0.15)))
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
+        .padding(.horizontal, DesignTokens.space8)
+        .padding(.top, DesignTokens.space8)
     }
 }
 
@@ -144,7 +144,7 @@ struct MacSearchResultsView: View {
     }
 
     private var emptyView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignTokens.space12) {
             Image(systemName: "magnifyingglass.circle")
                 .font(.system(size: DesignTokens.font44))
                 .foregroundColor(.secondary)
@@ -191,7 +191,7 @@ private struct MacSearchSongRow: View {
 
     var body: some View {
         Button(action: onPlay) {
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 Group {
                     if isActive {
                         Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
@@ -239,7 +239,7 @@ private struct MacSearchAlbumRow: View {
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 MacArtworkThumbnail(
                     track: facts.albumFacts(for: album).representativeTrack,
                     size: 28,
@@ -273,7 +273,7 @@ private struct MacSearchArtistRow: View {
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 Image(systemName: "music.mic")
                     .foregroundColor(.secondary)
                     .frame(width: 16)
@@ -303,7 +303,7 @@ private struct MacSearchPlaylistRow: View {
     var body: some View {
         let playlistFacts = facts.playlistFacts(for: playlist)
         Button(action: onOpen) {
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 MacArtworkThumbnail(
                     track: playlistFacts.representativeTrack,
                     size: 28,

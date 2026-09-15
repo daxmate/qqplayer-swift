@@ -28,9 +28,9 @@ struct PlaylistsScreen: View {
             VStack {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                    ], spacing: 16) {
+                        GridItem(.flexible(), spacing: DesignTokens.space8),
+                        GridItem(.flexible(), spacing: DesignTokens.space8),
+                    ], spacing: DesignTokens.space16) {
                         // Pinned automatic playlists — always visible (even with
                         // an empty library), never editable.
                         ForEach(smartCardInfos, id: \.kind) { info in
@@ -75,12 +75,12 @@ struct PlaylistsScreen: View {
                             }
                         }
                     }
-                    .padding(16)
-                    .padding(.bottom, 100) // Add padding for mini player
+                    .padding(DesignTokens.space16)
+                    .padding(.bottom, DesignTokens.space100) // Add padding for mini player
 
                     // Empty-library hint below the pinned smart cards.
                     if playlists.isEmpty {
-                        VStack(spacing: 16) {
+                        VStack(spacing: DesignTokens.space16) {
                             Image(systemName: "music.note.list")
                                 .font(.system(size: DesignTokens.font40))
                                 .foregroundColor(.secondary)
@@ -95,8 +95,8 @@ struct PlaylistsScreen: View {
                                 .padding(.horizontal)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 24)
-                        .padding(.bottom, 100) // Add padding for mini player
+                        .padding(.top, DesignTokens.space24)
+                        .padding(.bottom, DesignTokens.space100) // Add padding for mini player
                     }
                 }
             }
@@ -171,8 +171,8 @@ struct PlaylistsScreen: View {
                                     .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
                             }
                             .accessibilityLabel(Localized.aiPlaylistButton)
-                            .padding(.trailing, 20)
-                            .padding(.bottom, 110) // clear the mini player
+                            .padding(.trailing, DesignTokens.space20)
+                            .padding(.bottom, DesignTokens.space110) // clear the mini player
                         }
                     }
                 }
@@ -294,7 +294,7 @@ struct PlaylistsScreen: View {
 
         var body: some View {
             NavigationStack {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: DesignTokens.space20) {
                     Text(Localized.aiPlaylistDescription)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -324,14 +324,14 @@ struct PlaylistsScreen: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, DesignTokens.space6)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(isGenerating || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     Spacer()
                 }
-                .padding(20)
+                .padding(DesignTokens.space20)
                 .navigationTitle(Localized.aiPlaylistTitle)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -396,7 +396,7 @@ struct PlaylistsScreen: View {
 /// grid rows stay aligned alongside real playlist cards.
 struct NewPlaylistCardView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
             ZStack {
                 RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(Color.gray.opacity(0.2))
@@ -414,7 +414,7 @@ struct NewPlaylistCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
             .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(Localized.createPlaylist)
                     .font(.headline)
                     .lineLimit(1)

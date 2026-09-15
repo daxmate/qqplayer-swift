@@ -33,7 +33,7 @@ struct LyricsView: View {
             ScreenSpecificBackgroundView(screen: .library)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 if isLoading {
                     loadingView
                 } else if let lyrics = lyrics {
@@ -54,10 +54,10 @@ struct LyricsView: View {
 
             // 跟唱模式：底部控制条（非跟唱隐藏）
             if karaoke.isKaraokeOn {
-                VStack(spacing: 0) {
+                VStack(spacing: DesignTokens.space0) {
                     Spacer()
                     KaraokeControlBar()
-                        .padding(.bottom, 12)
+                        .padding(.bottom, DesignTokens.space12)
                 }
                 .transition(.opacity)
             }
@@ -112,7 +112,7 @@ struct LyricsView: View {
                         }
                     }
                 )
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignTokens.space24)
             }
         }
         // 页面级双击：跟唱模式开关（挂在最外层 ZStack，全屏任意位置双击都触发）。
@@ -133,7 +133,7 @@ struct LyricsView: View {
             ScrollViewReader { proxy in
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        VStack(spacing: DesignTokens.space0) {
                             // Reduced spacer at top - use more space
                             Spacer()
                                 .frame(height: geometry.size.height / 2 - 40)
@@ -164,7 +164,7 @@ struct LyricsView: View {
                     .disabled(!karaoke.isKaraokeOn)
 
                     // Fade gradients at top and bottom（贴近系统底色，歌词边缘柔和融入背景）
-                    VStack(spacing: 0) {
+                    VStack(spacing: DesignTokens.space0) {
                         LinearGradient(
                             gradient: Gradient(colors: [
                                 Color(uiColor: .systemBackground).opacity(0.95),
@@ -204,7 +204,7 @@ struct LyricsView: View {
     }
 
     private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: DesignTokens.space4) {
             Text(line.displayText)
                 .font(fontForLine(isActive: isActive, distance: distance))
                 .fontWeight(isActive ? .bold : .semibold)
@@ -239,7 +239,7 @@ struct LyricsView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 32)
+        .padding(.horizontal, DesignTokens.space32)
         .padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))
         .id(index)
         .scaleEffect(karaoke.isKaraokeOn ? 1.0 : (isActive ? 1.02 : (distance <= 1 ? 0.97 : 0.94)), anchor: .center)
@@ -267,7 +267,7 @@ struct LyricsView: View {
                 Circle()
                     .fill(accentColor)
                     .frame(width: 7, height: 7)
-                    .padding(.trailing, 26)
+                    .padding(.trailing, DesignTokens.space26)
             }
         }
     }
@@ -364,7 +364,7 @@ struct LyricsView: View {
         // 容器已铺满全屏（ignoresSafeArea）：顶部手动补偿状态栏高度，文字不被遮挡
         GeometryReader { geometry in
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: DesignTokens.space0) {
                     // 顶部 padding（状态栏高度 + 内容间距）
                     Spacer()
                         .frame(height: geometry.safeAreaInsets.top + 24)
@@ -376,8 +376,8 @@ struct LyricsView: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 16)
+                        .padding(.horizontal, DesignTokens.space32)
+                        .padding(.vertical, DesignTokens.space16)
 
                     // Bottom padding
                     Spacer()
@@ -390,10 +390,10 @@ struct LyricsView: View {
     // MARK: - States
 
     private var instrumentalView: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             Spacer()
 
-            VStack(spacing: 32) {
+            VStack(spacing: DesignTokens.space32) {
                 // Animated icon with glass background
                 ZStack {
                     // Large outer glow
@@ -446,7 +446,7 @@ struct LyricsView: View {
                         .shadow(color: accentColor.opacity(0.6), radius: 15)
                 }
 
-                VStack(spacing: 12) {
+                VStack(spacing: DesignTokens.space12) {
                     Text("lyrics_empty_instrumental_title".localized)
                         .font(.title)
                         .fontWeight(.bold)
@@ -457,7 +457,7 @@ struct LyricsView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(44)
+            .padding(DesignTokens.space44)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius28)
@@ -492,17 +492,17 @@ struct LyricsView: View {
                 }
                 .shadow(color: accentColor.opacity(0.2), radius: 35, x: 0, y: 15)
             )
-            .padding(.horizontal, 40)
+            .padding(.horizontal, DesignTokens.space40)
 
             Spacer()
         }
     }
 
     private var noLyricsView: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             Spacer()
 
-            VStack(spacing: 32) {
+            VStack(spacing: DesignTokens.space32) {
                 // Animated icon with glass background
                 ZStack {
                     // Large outer glow
@@ -555,7 +555,7 @@ struct LyricsView: View {
                         .shadow(color: accentColor.opacity(0.6), radius: 15)
                 }
 
-                VStack(spacing: 12) {
+                VStack(spacing: DesignTokens.space12) {
                     Text("lyrics_empty_not_found_title".localized)
                         .font(.title)
                         .fontWeight(.bold)
@@ -566,7 +566,7 @@ struct LyricsView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(44)
+            .padding(DesignTokens.space44)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius28)
@@ -601,17 +601,17 @@ struct LyricsView: View {
                 }
                 .shadow(color: accentColor.opacity(0.2), radius: 35, x: 0, y: 15)
             )
-            .padding(.horizontal, 40)
+            .padding(.horizontal, DesignTokens.space40)
 
             Spacer()
         }
     }
 
     private var loadingView: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             Spacer()
 
-            VStack(spacing: 32) {
+            VStack(spacing: DesignTokens.space32) {
                 // Animated loading with glass background
                 ZStack {
                     // Large outer glow - animated
@@ -663,7 +663,7 @@ struct LyricsView: View {
                         .scaleEffect(1.5)
                 }
 
-                VStack(spacing: 12) {
+                VStack(spacing: DesignTokens.space12) {
                     Text("lyrics_empty_loading_title".localized)
                         .font(.title)
                         .fontWeight(.bold)
@@ -675,7 +675,7 @@ struct LyricsView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            .padding(44)
+            .padding(DesignTokens.space44)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius28)
@@ -710,7 +710,7 @@ struct LyricsView: View {
                 }
                 .shadow(color: accentColor.opacity(0.2), radius: 35, x: 0, y: 15)
             )
-            .padding(.horizontal, 40)
+            .padding(.horizontal, DesignTokens.space40)
 
             Spacer()
         }

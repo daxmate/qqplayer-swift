@@ -32,7 +32,7 @@ struct CreateManualEQView: View {
                 }
 
                 Section(Localized.presetInfo) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.eqCreateManualDescription)
                             .font(.caption)
                             .foregroundColor(.secondary)

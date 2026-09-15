@@ -23,12 +23,12 @@ struct SyncPairConfirmCardView: View {
     let onCancel: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.space14) {
+            HStack(spacing: DesignTokens.space12) {
                 Image(systemName: "iphone.and.arrow.forward")
                     .font(.system(size: DesignTokens.font26))
                     .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
                     Text(SyncDeviceList.displayName(candidate))
                         .font(.headline)
                     Text("sync_confirm_pair_caption".localized)
@@ -37,7 +37,7 @@ struct SyncPairConfirmCardView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignTokens.space6) {
                 Text("sync_device_id".localized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -46,11 +46,11 @@ struct SyncPairConfirmCardView: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(10)
+            .padding(DesignTokens.space10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
 
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 switch candidate.source {
                 case .qr:
                     Label("sync_source_qr".localized, systemImage: "qrcode.viewfinder")
@@ -73,7 +73,7 @@ struct SyncPairConfirmCardView: View {
                     .labelStyle(.titleAndIcon)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Button("sync_confirm_pair".localized, action: onConfirm)
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
@@ -83,7 +83,7 @@ struct SyncPairConfirmCardView: View {
             }
             .controlSize(.large)
         }
-        .padding(16)
+        .padding(DesignTokens.space16)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
     }
 }
@@ -100,7 +100,7 @@ struct SyncPairOutcomeView: View {
     var symbolColor: Color = .secondary
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: DesignTokens.space14) {
             Image(systemName: symbol)
                 .font(.system(size: DesignTokens.font52))
                 .foregroundStyle(symbolColor)
@@ -115,10 +115,10 @@ struct SyncPairOutcomeView: View {
             if let actionTitle {
                 Button(actionTitle, action: onAction)
                     .buttonStyle(.borderedProminent)
-                    .padding(.top, 4)
+                    .padding(.top, DesignTokens.space4)
             }
         }
-        .padding(24)
+        .padding(DesignTokens.space24)
         .frame(maxWidth: .infinity)
     }
 }

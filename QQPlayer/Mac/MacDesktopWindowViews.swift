@@ -40,7 +40,7 @@ struct MacMiniPlayerView: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             // 封面（点击返回主窗——v2 迷你模式与主窗互斥，封面是返回出口；
             // hover 手型提示可点击）
             Button {
@@ -53,12 +53,12 @@ struct MacMiniPlayerView: View {
                 updateCursor(hovering: hovering)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignTokens.space6) {
                 // 标题 / 歌手（点击返回主窗，hover 手型同封面）
                 Button {
                     DesktopWindowsManager.shared.showMainWindow()
                 } label: {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space2) {
                         Text(player.currentTrack?.displayTitle ?? "mini_window_no_track".localized)
                             .font(.system(size: DesignTokens.font13, weight: .semibold))
                             .foregroundColor(.primary)
@@ -94,7 +94,7 @@ struct MacMiniPlayerView: View {
                     .disabled(player.currentTrack == nil)
                 }
 
-                HStack(spacing: 14) {
+                HStack(spacing: DesignTokens.space14) {
                     controlButton("backward.fill", size: 15) {
                         Task { @MainActor in await player.previousTrack() }
                     }
@@ -123,11 +123,11 @@ struct MacMiniPlayerView: View {
                     }
                     .help("mini_lyrics_enabled".localized)
                 }
-                .padding(.top, 1)
+                .padding(.top, DesignTokens.space1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: DesignTokens.space0)
         }
-        .padding(12)
+        .padding(DesignTokens.space12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous)
@@ -199,8 +199,8 @@ struct MacDesktopLyricView: View {
             content(line: index.map { karaoke.currentLines[$0] })
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
+        .padding(.horizontal, DesignTokens.space24)
+        .padding(.vertical, DesignTokens.space14)
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             let settings = DeleteSettings.load()
             fontSize = settings.desktopLyricFontSize
@@ -212,7 +212,7 @@ struct MacDesktopLyricView: View {
 
     @ViewBuilder
     private func content(line: LyricsLine?) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: DesignTokens.space6) {
             if let line {
                 Text(line.displayText)
                     .font(.system(size: fontSize, weight: .semibold))

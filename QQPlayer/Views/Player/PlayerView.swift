@@ -87,12 +87,12 @@ struct PlayerView: View {
                     .font(.footnote)
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, DesignTokens.space14)
+                    .padding(.vertical, DesignTokens.space8)
                     .background(Capsule().fill(Color.red.opacity(0.9)))
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignTokens.space24)
                     .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 8)
+                    .padding(.top, DesignTokens.space8)
                     .allowsHitTesting(false)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .zIndex(30)
@@ -223,7 +223,7 @@ struct PlayerView: View {
     }
 
     private var contentView: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             if let currentTrack = playerEngine.currentTrack {
                 VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 20 : 25) {
                     artworkSection
@@ -235,7 +235,7 @@ struct PlayerView: View {
 
                 // 首次进入播放页的手势提示气泡：显示在小歌词窗上方（布局内插入，
                 // 不遮挡任何手势区域；卡片自带过渡动画，隐藏后布局平滑复位）
-                VStack(spacing: 10) {
+                VStack(spacing: DesignTokens.space10) {
                     if showHint {
                         HintCardView(
                             title: Localized.hintPlaybackTitle,
@@ -607,8 +607,8 @@ struct PlayerView: View {
     // MARK: - Title and Artist Section
 
     private func titleAndArtistSection(track: Track) -> some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center, spacing: DesignTokens.space16) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 titleButton(track: track)
                 artistButton(track: track)
             }
@@ -620,7 +620,7 @@ struct PlayerView: View {
                 addToPlaylistButton
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, DesignTokens.space8)
     }
 
     private func titleButton(track: Track) -> some View {
@@ -727,7 +727,7 @@ struct PlayerView: View {
             lyrics: currentLyrics,
             isLoading: isLoadingLyrics
         )
-        .padding(.horizontal, 8)
+        .padding(.horizontal, DesignTokens.space8)
         // 点击进全屏歌词页（普通视图 + onTapGesture：与 DragGesture 仲裁标准，
         // 不用 Button——Button 手势优先级高，快速右滑会误触发 tap 直接进歌词页）
         .onTapGesture {

@@ -43,13 +43,13 @@ struct MacKaraokeControlBar: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: DesignTokens.space6) {
             if isWaitingABEnd {
                 abEndHint
             }
 
-            HStack(spacing: 14) {
-                HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space14) {
+                HStack(spacing: DesignTokens.space12) {
                     prevLineButton
                     playPauseButton
                     nextLineButton
@@ -60,7 +60,7 @@ struct MacKaraokeControlBar: View {
                     .fill(Color.primary.opacity(0.12))
                     .frame(width: 1, height: 22)
 
-                HStack(spacing: 8) {
+                HStack(spacing: DesignTokens.space8) {
                     speedButton
                     singleLineLoopButton
                     abButton
@@ -68,8 +68,8 @@ struct MacKaraokeControlBar: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space10)
     }
 
     // MARK: - 播放控制（上一句 / 播放暂停 / 下一句）
@@ -148,7 +148,7 @@ struct MacKaraokeControlBar: View {
             }
         } label: {
             pill(isHighlighted: karaoke.speed != 1.0) {
-                HStack(spacing: 3) {
+                HStack(spacing: DesignTokens.space3) {
                     Text(String(format: "%.1fx", karaoke.speed))
                     Image(systemName: "chevron.down")
                         .font(.system(size: DesignTokens.font8, weight: .bold))
@@ -205,8 +205,8 @@ struct MacKaraokeControlBar: View {
         Text(NSLocalizedString("karaoke_ab_end_hint", value: "Tap a lyric line to set the AB end point", comment: ""))
             .font(.system(size: DesignTokens.font11, weight: .medium))
             .foregroundColor(accentColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.horizontal, DesignTokens.space10)
+            .padding(.vertical, DesignTokens.space4)
             .background(Capsule().fill(accentColor.opacity(0.12)))
     }
 
@@ -286,8 +286,8 @@ private struct KaraokePill<Content: View>: View {
         content
             .font(.system(size: DesignTokens.font12, weight: .semibold))
             .foregroundColor(isHighlighted ? accentColor : Color.primary.opacity(0.85))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, DesignTokens.space12)
+            .padding(.vertical, DesignTokens.space6)
             .background(Capsule().fill(backgroundColor))
             .overlay(Capsule().stroke(borderColor, lineWidth: 1))
             .contentShape(Capsule())

@@ -21,7 +21,7 @@ struct MacGraphicEQ10BandEditorView: View {
     private let gainStep = 0.5
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Form {
                 Section {
@@ -75,7 +75,7 @@ struct MacGraphicEQ10BandEditorView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Text(Localized.eqCustomTitle)
                 .font(.title2)
                 .fontWeight(.bold)

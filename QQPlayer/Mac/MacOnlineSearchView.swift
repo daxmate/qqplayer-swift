@@ -65,16 +65,16 @@ struct MacOnlineSearchView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
 
             sourcePicker
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.horizontal, DesignTokens.space16)
+                .padding(.top, DesignTokens.space8)
 
             searchField
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, DesignTokens.space16)
+                .padding(.vertical, DesignTokens.space10)
 
             Divider()
 
@@ -123,8 +123,8 @@ struct MacOnlineSearchView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.top, DesignTokens.space16)
     }
 
     // MARK: - 源切换（web OnlineSearch src-seg 对齐）
@@ -143,7 +143,7 @@ struct MacOnlineSearchView: View {
     // MARK: - 搜索框
 
     private var searchField: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: DesignTokens.space6) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             TextField("online_search_placeholder".localized, text: $query)
@@ -193,13 +193,13 @@ struct MacOnlineSearchView: View {
                 historyView
             }
         case .loading:
-            VStack(spacing: 10) {
+            VStack(spacing: DesignTokens.space10) {
                 ProgressView()
                 Text("online_search_loading".localized)
                     .foregroundColor(.secondary)
             }
         case .failed:
-            VStack(spacing: 8) {
+            VStack(spacing: DesignTokens.space8) {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: DesignTokens.font30))
                     .foregroundColor(.secondary)
@@ -212,7 +212,7 @@ struct MacOnlineSearchView: View {
             }
         case .loaded:
             if results.isEmpty {
-                VStack(spacing: 8) {
+                VStack(spacing: DesignTokens.space8) {
                     Image(systemName: "music.note.list")
                         .font(.system(size: DesignTokens.font30))
                         .foregroundColor(.secondary)
@@ -226,7 +226,7 @@ struct MacOnlineSearchView: View {
     }
 
     private var idleView: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DesignTokens.space10) {
             Image(systemName: "icloud.and.arrow.down")
                 .font(.system(size: DesignTokens.font36))
                 .foregroundColor(.secondary)
@@ -234,7 +234,7 @@ struct MacOnlineSearchView: View {
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, DesignTokens.space40)
         }
     }
 
@@ -243,8 +243,8 @@ struct MacOnlineSearchView: View {
     /// 历史列表（标题行「最近搜索」+ 清空按钮；行 = 图标 + keyword + 来源标签 +
     /// hover 删除；点击 = 填词 + 切源 + 立即搜索）
     private var historyView: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
+        VStack(spacing: DesignTokens.space0) {
+            HStack(spacing: DesignTokens.space8) {
                 Text("online_search_history_title".localized)
                     .font(.callout)
                     .foregroundColor(.secondary)
@@ -257,8 +257,8 @@ struct MacOnlineSearchView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, DesignTokens.space12)
+            .padding(.vertical, DesignTokens.space6)
 
             List {
                 ForEach(history) { entry in
@@ -270,9 +270,9 @@ struct MacOnlineSearchView: View {
     }
 
     private func historyRow(_ entry: SearchHistoryEntry) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             // 左侧内容区点击 = 应用历史（与行尾删除按钮 hit 区分离，避免误触发）
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 Image(systemName: "magnifyingglass")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -301,7 +301,7 @@ struct MacOnlineSearchView: View {
                 .help("online_search_history_delete_help".localized)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
         .contentShape(Rectangle())
         .onHover { hovering in
             hoveredHistoryID = hovering ? entry.id : nil
@@ -355,10 +355,10 @@ struct MacOnlineSearchView: View {
                     .font(.caption)
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 12)
+                    .padding(.vertical, DesignTokens.space6)
+                    .padding(.horizontal, DesignTokens.space12)
                     .background(.regularMaterial, in: Capsule())
-                    .padding(.bottom, 8)
+                    .padding(.bottom, DesignTokens.space8)
             }
         }
     }
@@ -668,10 +668,10 @@ private struct MacOnlineResultRow: View {
     let onDownload: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             cover
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(DisplayScriptNormalizer.display(item.title))
                     .lineLimit(1)
                 Text(DisplayScriptNormalizer.display(item.subtitle))
@@ -696,7 +696,7 @@ private struct MacOnlineResultRow: View {
             .disabled(isDownloading)
             .help(helpText)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
         .contentShape(Rectangle())
         .onTapGesture(perform: onDownload)
     }

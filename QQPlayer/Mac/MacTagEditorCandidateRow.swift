@@ -14,9 +14,9 @@ struct MacTagEditorCandidateRow: View {
     let candidate: ScrapeCandidate
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             cover
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(candidate.title.map(DisplayScriptNormalizer.display) ?? "")
                     .font(.callout)
                     .fontWeight(.medium)
@@ -27,11 +27,11 @@ struct MacTagEditorCandidateRow: View {
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
-            Spacer(minLength: 6)
+            Spacer(minLength: DesignTokens.space6)
             sourceBadge
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
+        .padding(.vertical, DesignTokens.space6)
+        .padding(.horizontal, DesignTokens.space8)
         .background(Color.gray.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
         .contentShape(Rectangle())
     }
@@ -86,8 +86,8 @@ struct MacTagEditorCandidateRow: View {
         Text(candidate.source == "netease" ? "source_netease".localized : "source_musicbrainz".localized)
             .font(.system(size: DesignTokens.font9))
             .foregroundColor(.secondary)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
+            .padding(.horizontal, DesignTokens.space5)
+            .padding(.vertical, DesignTokens.space1_5)
             .background(Color.gray.opacity(0.15), in: Capsule())
             .lineLimit(1)
     }

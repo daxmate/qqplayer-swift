@@ -40,8 +40,8 @@ struct PlaylistSelectionView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                VStack(spacing: 8) {
+            VStack(spacing: DesignTokens.space20) {
+                VStack(spacing: DesignTokens.space8) {
                     Text(Localized.addToPlaylist)
                         .font(.title2)
                         .fontWeight(.semibold)
@@ -52,7 +52,7 @@ struct PlaylistSelectionView: View {
                 }
 
                 if playlists.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: DesignTokens.space16) {
                         Image(systemName: "music.note.list")
                             .font(.system(size: DesignTokens.font40))
                             .foregroundColor(.secondary)
@@ -70,7 +70,7 @@ struct PlaylistSelectionView: View {
                         ForEach(sortedPlaylists, id: \.id) { playlist in
                             let isInPlaylist = playlistsContainingTrack.contains(playlist.id ?? 0)
 
-                            HStack(spacing: 8) {
+                            HStack(spacing: DesignTokens.space8) {
                                 // Main clickable area for add/remove
                                 HStack {
                                     Image(systemName: "music.note.list")
@@ -116,7 +116,7 @@ struct PlaylistSelectionView: View {
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
-                            .padding(.vertical, 4)
+                            .padding(.vertical, DesignTokens.space4)
                         }
                     }
                 }

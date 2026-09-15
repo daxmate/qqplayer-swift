@@ -99,7 +99,7 @@ struct MacTagEditorView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Divider()
             content
@@ -117,16 +117,16 @@ struct MacTagEditorView: View {
         }
         .overlay(alignment: .bottom) {
             if savedFlash {
-                HStack(spacing: 6) {
+                HStack(spacing: DesignTokens.space6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                     Text("tag_editor_saved".localized)
                         .font(.callout)
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 16)
+                .padding(.vertical, DesignTokens.space8)
+                .padding(.horizontal, DesignTokens.space16)
                 .background(.regularMaterial, in: Capsule())
-                .padding(.bottom, 50)
+                .padding(.bottom, DesignTokens.space50)
                 .transition(.opacity)
             }
         }
@@ -135,7 +135,7 @@ struct MacTagEditorView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             Image(systemName: "tag")
                 .foregroundColor(appAccentColor)
             Text("tag_editor_title".localized)
@@ -155,16 +155,16 @@ struct MacTagEditorView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.top, DesignTokens.space14)
+        .padding(.bottom, DesignTokens.space10)
     }
 
     // MARK: - Content
 
     private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: DesignTokens.space14) {
                 mainEditor
                 scrapeRow
                 candidatesSection
@@ -176,13 +176,13 @@ struct MacTagEditorView: View {
                         .textSelection(.enabled)
                 }
             }
-            .padding(16)
+            .padding(DesignTokens.space16)
         }
     }
 
     /// 封面预览 + 表单（web tag-main 布局）
     private var mainEditor: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: DesignTokens.space14) {
             coverColumn
             formColumn
         }
@@ -191,7 +191,7 @@ struct MacTagEditorView: View {
     // MARK: 封面列
 
     private var coverColumn: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignTokens.space8) {
             coverPreview
             Text("tag_editor_cover".localized)
                 .font(.caption2)
@@ -257,15 +257,15 @@ struct MacTagEditorView: View {
     // MARK: 表单列
 
     private var formColumn: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
             field("title".localized, text: $formTitle, disabled: saving)
             field("artist".localized, text: $formArtist, disabled: saving)
             field("album".localized, text: $formAlbum, disabled: saving)
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 field("tag_editor_field_year".localized, text: $formYear, disabled: saving)
                 field("tag_editor_field_genre".localized, text: $formGenre, disabled: saving)
             }
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 field("tag_editor_field_track".localized, text: $formTrack, disabled: saving)
                 field("tag_editor_field_album_artist".localized, text: $formAlbumArtist, disabled: saving)
             }
@@ -273,7 +273,7 @@ struct MacTagEditorView: View {
     }
 
     private func field(_ label: String, text: Binding<String>, disabled: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: DesignTokens.space3) {
             Text(label)
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -286,19 +286,19 @@ struct MacTagEditorView: View {
     // MARK: 刮削行
 
     private var scrapeRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             switch scrapeState {
             case .idle:
                 emptyRow
             case .searching:
-                HStack(spacing: 6) {
+                HStack(spacing: DesignTokens.space6) {
                     ProgressView()
                         .controlSize(.small)
                     Text("tag_editor_scraping".localized)
                         .foregroundColor(.secondary)
                 }
             case .done:
-                HStack(spacing: 6) {
+                HStack(spacing: DesignTokens.space6) {
                     Image(systemName: "sparkles")
                         .foregroundColor(appAccentColor)
                     if !scrapeQuery.isEmpty {
@@ -315,7 +315,7 @@ struct MacTagEditorView: View {
                     .disabled(saving)
                 }
             case .failed(let message):
-                HStack(spacing: 6) {
+                HStack(spacing: DesignTokens.space6) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.red)
                     Text(message)
@@ -332,7 +332,7 @@ struct MacTagEditorView: View {
             Spacer()
         }
         .font(.caption)
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     private var emptyRow: some View {
@@ -349,7 +349,7 @@ struct MacTagEditorView: View {
     private var candidatesSection: some View {
         if scrapeState != .idle && scrapeState != .searching {
             if neteaseCandidates.isEmpty && musicbrainzCandidates.isEmpty {
-                VStack(spacing: 6) {
+                VStack(spacing: DesignTokens.space6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: DesignTokens.font22))
                         .foregroundColor(.secondary)
@@ -358,9 +358,9 @@ struct MacTagEditorView: View {
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, DesignTokens.space18)
             } else {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: DesignTokens.space10) {
                     ForEach(orderedSources, id: \.self) { source in
                         switch source {
                         case "musicbrainz":
@@ -397,8 +397,8 @@ struct MacTagEditorView: View {
         candidates: [ScrapeCandidate],
         source: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: DesignTokens.space6) {
+            HStack(spacing: DesignTokens.space5) {
                 Image(systemName: icon)
                     .font(.caption2)
                 Text(title)
@@ -411,7 +411,7 @@ struct MacTagEditorView: View {
                 Text("tag_editor_no_candidates".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, DesignTokens.space4)
             } else {
                 ForEach(Array(candidates.enumerated()), id: \.offset) { _, candidate in
                     Button {
@@ -428,7 +428,7 @@ struct MacTagEditorView: View {
     // MARK: 重命名
 
     private var renameSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DesignTokens.space6) {
             Toggle(isOn: $renameEnabled) {
                 Text("tag_editor_rename_files".localized)
                     .font(.callout)
@@ -437,7 +437,7 @@ struct MacTagEditorView: View {
             .onChange(of: renameEnabled) { _ in
                 updateRenamePreview()
             }
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 Text("scraping_rename_preview".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -449,7 +449,7 @@ struct MacTagEditorView: View {
                     .truncationMode(.middle)
                     .textSelection(.enabled)
             }
-            .padding(.leading, 2)
+            .padding(.leading, DesignTokens.space2)
         }
         .onChange(of: formTitle) { _ in updateRenamePreview() }
         .onChange(of: formArtist) { _ in updateRenamePreview() }
@@ -471,7 +471,7 @@ struct MacTagEditorView: View {
             Button {
                 save()
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: DesignTokens.space5) {
                     if saving {
                         ProgressView()
                             .controlSize(.small)
@@ -483,8 +483,8 @@ struct MacTagEditorView: View {
             .keyboardShortcut(.defaultAction)
             .disabled(!canSave || saving)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space10)
     }
 
     /// 无可保存内容（全空 + 封面未动）→ 禁用保存（web「至少一个非空」语义的

@@ -52,7 +52,7 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space12) {
                         Text(Localized.backgroundColor)
                             .font(.headline)
 
@@ -61,7 +61,7 @@ struct SettingsView: View {
                             GridItem(.flexible()),
                             GridItem(.flexible()),
                             GridItem(.flexible()),
-                        ], spacing: 16) {
+                        ], spacing: DesignTokens.space16) {
                             ForEach(BackgroundColor.allCases, id: \.self) { color in
                                 Button(action: {
                                     deleteSettings.backgroundColorChoice = color
@@ -104,7 +104,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.dsdPlaybackMode)
                             .font(.headline)
 
@@ -129,9 +129,9 @@ struct SettingsView: View {
                         Text(deleteSettings.dsdPlaybackMode.description)
                             .font(.caption)
                             .foregroundColor(.secondary)
-                            .padding(.top, 4)
+                            .padding(.top, DesignTokens.space4)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, DesignTokens.space4)
                 }
 
                 Section(Localized.lyricsDisplay) {

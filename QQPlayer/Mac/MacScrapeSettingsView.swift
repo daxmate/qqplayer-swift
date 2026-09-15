@@ -35,7 +35,7 @@ struct MacScrapeSettingsView: View {
                 Text("scraping_rename_template_hint".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                HStack(spacing: 8) {
+                HStack(spacing: DesignTokens.space8) {
                     Text("scraping_rename_preview".localized)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -54,7 +54,7 @@ struct MacScrapeSettingsView: View {
             // 源优先级（web「源优先级」组：netease/musicbrainz 上下移）
             Section {
                 ForEach(Array(deleteSettings.scrapingSourceOrder.enumerated()), id: \.element) { index, source in
-                    HStack(spacing: 10) {
+                    HStack(spacing: DesignTokens.space10) {
                         Text(sourceDisplayName(source))
                             .font(.callout)
                         Spacer()
@@ -62,8 +62,8 @@ struct MacScrapeSettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .monospacedDigit()
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 1)
+                            .padding(.horizontal, DesignTokens.space7)
+                            .padding(.vertical, DesignTokens.space1)
                             .background(Color.gray.opacity(0.15), in: Capsule())
                         moveButton(source: source, index: index, offset: -1, systemImage: "chevron.up")
                         moveButton(source: source, index: index, offset: 1, systemImage: "chevron.down")

@@ -72,7 +72,7 @@ struct SyncQRScannerView: View {
     // MARK: - 扫描态
 
     private var scanningBody: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             ZStack {
                 Color.black
                 SyncCameraPreview(session: controller.session)
@@ -89,22 +89,22 @@ struct SyncQRScannerView: View {
             .frame(maxWidth: .infinity)
             .frame(minHeight: 340)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: DesignTokens.space10) {
                 Label("sync_scan_hint".localized, systemImage: "qrcode.viewfinder")
                     .font(.callout)
                 Text("sync_scan_subhint".localized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .padding(20)
+            .padding(DesignTokens.space20)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: DesignTokens.space0)
         }
     }
 
     private var cameraDeniedOverlay: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DesignTokens.space10) {
             Image(systemName: "camera.fill")
                 .font(.system(size: DesignTokens.font36))
                 .foregroundStyle(.white.opacity(0.9))
@@ -112,7 +112,7 @@ struct SyncQRScannerView: View {
                 .font(.callout)
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignTokens.space24)
             Button("sync_open_settings".localized) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -127,7 +127,7 @@ struct SyncQRScannerView: View {
 
     /// 相机配置失败（输入/输出加不进去）：修前是静默 return，页面永远停在 ProgressView。
     private var cameraFailedOverlay: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DesignTokens.space10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: DesignTokens.font36))
                 .foregroundStyle(.white.opacity(0.9))
@@ -135,7 +135,7 @@ struct SyncQRScannerView: View {
                 .font(.callout)
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignTokens.space24)
             Button("sync_connect_retry".localized) {
                 controller.retry()
             }
@@ -150,7 +150,7 @@ struct SyncQRScannerView: View {
 
     private func confirmBody(_ candidate: PeerCandidate) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DesignTokens.space16) {
                 Text("sync_confirm_pair_title".localized)
                     .font(.headline)
                 SyncPairConfirmCardView(
@@ -160,7 +160,7 @@ struct SyncQRScannerView: View {
                     onCancel: { cancelAndRescan() }
                 )
             }
-            .padding(16)
+            .padding(DesignTokens.space16)
         }
     }
 
@@ -205,7 +205,7 @@ struct SyncQRScannerView: View {
 
     private func failedBody(_ failure: SyncConnectFailure) -> some View {
         let outcome = SyncPairOutcome(connectFailure: failure, hostName: nil)
-        return VStack(spacing: 14) {
+        return VStack(spacing: DesignTokens.space14) {
             Image(systemName: outcome.symbol)
                 .font(.system(size: DesignTokens.font52))
                 .foregroundStyle(outcome.symbolColor)
@@ -217,7 +217,7 @@ struct SyncQRScannerView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Button("sync_connect_retry".localized) {
                     autoConnect.retry()
                 }
@@ -227,9 +227,9 @@ struct SyncQRScannerView: View {
                 }
                 .buttonStyle(.bordered)
             }
-            .padding(.top, 4)
+            .padding(.top, DesignTokens.space4)
         }
-        .padding(24)
+        .padding(DesignTokens.space24)
         .frame(maxWidth: .infinity)
     }
 
@@ -334,7 +334,7 @@ private struct SyncConnectProgressView: View {
     let text: String
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: DesignTokens.space14) {
             ProgressView()
                 .controlSize(.large)
             Label(text, systemImage: symbol)
@@ -342,7 +342,7 @@ private struct SyncConnectProgressView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(32)
+        .padding(DesignTokens.space32)
         .frame(maxWidth: .infinity)
     }
 }

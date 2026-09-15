@@ -102,7 +102,7 @@ struct SearchView: View {
             ZStack {
                 ScreenSpecificBackgroundView(screen: .library)
 
-                VStack(spacing: 0) {
+                VStack(spacing: DesignTokens.space0) {
                     // Search bar
                     HStack {
                         HStack {
@@ -114,17 +114,17 @@ struct SearchView: View {
                                 .autocorrectionDisabled()
                                 .focused($isSearchFocused)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, DesignTokens.space12)
+                        .padding(.vertical, DesignTokens.space8)
                         .background(Color(.systemGray6))
                         .cornerRadius(DesignTokens.radius10)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.horizontal, DesignTokens.space16)
+                    .padding(.top, DesignTokens.space8)
 
                     // Category filters
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
+                        HStack(spacing: DesignTokens.space12) {
                             ForEach(SearchCategory.allCases, id: \.self) { category in
                                 Button(action: {
                                     selectedCategory = category
@@ -132,8 +132,8 @@ struct SearchView: View {
                                     Text(category.localizedString)
                                         .font(.subheadline)
                                         .fontWeight(.medium)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, DesignTokens.space16)
+                                        .padding(.vertical, DesignTokens.space8)
                                         .background(
                                             selectedCategory == category ?
                                                 accentColor :
@@ -148,13 +148,13 @@ struct SearchView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignTokens.space16)
                     }
-                    .padding(.top, 12)
+                    .padding(.top, DesignTokens.space12)
 
                     // Results
                     if debouncedSearchText.isEmpty {
-                        VStack(spacing: 16) {
+                        VStack(spacing: DesignTokens.space16) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: DesignTokens.font40))
                                 .foregroundColor(.secondary)
@@ -169,7 +169,7 @@ struct SearchView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if isSearching {
-                        VStack(spacing: 16) {
+                        VStack(spacing: DesignTokens.space16) {
                             ProgressView()
                                 .scaleEffect(1.2)
                                 .progressViewStyle(CircularProgressViewStyle(tint: accentColor))

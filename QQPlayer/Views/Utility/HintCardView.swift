@@ -24,8 +24,8 @@ struct HintCardView: View {
     @State private var autoDismissTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
+            HStack(spacing: DesignTokens.space8) {
                 Image(systemName: "lightbulb.fill")
                     .font(.system(size: DesignTokens.font15, weight: .semibold))
                     .foregroundColor(accentColor)
@@ -34,7 +34,7 @@ struct HintCardView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.primary)
 
-                Spacer(minLength: 12)
+                Spacer(minLength: DesignTokens.space12)
 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
@@ -54,7 +54,7 @@ struct HintCardView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(14)
+        .padding(DesignTokens.space14)
         // 卡片最大宽度封顶：overlay 中不会撑满全屏，卡片外区域自然不拦截手势
         .frame(maxWidth: 360)
         .background(

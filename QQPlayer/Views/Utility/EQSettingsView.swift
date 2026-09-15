@@ -38,19 +38,19 @@ struct EQSettingsView: View {
 
             // Common Presets (常用预设)
             Section(Localized.presetCommon) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: DesignTokens.space8), GridItem(.flexible(), spacing: DesignTokens.space8)], spacing: DesignTokens.space8) {
                     ForEach(BuiltinEQPresets.all, id: \.key) { preset in
                         builtinPresetButton(key: preset.key, title: preset.localizedName)
                     }
                     builtinPresetButton(key: BuiltinEQPresets.customKey, title: Localized.presetCustom)
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, DesignTokens.space4)
             }
             Section(Localized.manualEQPresets) {
                 if eqManager.availablePresets.contains(where: { $0.presetType == .manual }) {
                     ForEach(eqManager.availablePresets.filter { $0.presetType == .manual }) { preset in
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                                 Text(preset.name)
                                     .font(.headline)
 
@@ -94,7 +94,7 @@ struct EQSettingsView: View {
                         }
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.noManualPresetsCreated)
                             .foregroundColor(.secondary)
                             .italic()
@@ -116,7 +116,7 @@ struct EQSettingsView: View {
                 if eqManager.availablePresets.contains(where: { $0.presetType == .imported }) {
                     ForEach(eqManager.availablePresets.filter { $0.presetType == .imported }) { preset in
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                                 Text(preset.name)
                                     .font(.headline)
 
@@ -151,7 +151,7 @@ struct EQSettingsView: View {
                         }
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.noPresetsImported)
                             .foregroundColor(.secondary)
                             .italic()
@@ -171,7 +171,7 @@ struct EQSettingsView: View {
             // Global Gain (only show when EQ is enabled)
             if eqManager.isEnabled {
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         HStack {
                             Text(Localized.globalGain)
                             Spacer()
@@ -193,7 +193,7 @@ struct EQSettingsView: View {
 
             // Info Section
             Section(Localized.aboutGraphicEQFormat) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     Text(Localized.importGraphicEQFormatDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -201,8 +201,8 @@ struct EQSettingsView: View {
                     Text("GraphicEQ: 20 -7.9; 21 -7.8; 22 -8.0; ...")
                         .font(.caption2.monospaced())
                         .foregroundColor(.secondary)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
+                        .padding(.vertical, DesignTokens.space4)
+                        .padding(.horizontal, DesignTokens.space8)
                         .background(Color(.systemGray6))
                         .cornerRadius(DesignTokens.radius4)
 
@@ -252,7 +252,7 @@ struct EQSettingsView: View {
             Text(title)
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, DesignTokens.space8)
                 .background(isSelected ? Color.blue : Color(.systemGray6))
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(DesignTokens.radius8)

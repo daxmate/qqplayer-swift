@@ -29,7 +29,7 @@ struct LyricMiniSection: View {
                     .frame(maxWidth: .infinity)
             } else if let lines = lyrics?.syncedLyrics, !lines.isEmpty {
                 let idx = activeIndex ?? 0
-                VStack(spacing: 6) {
+                VStack(spacing: DesignTokens.space6) {
                     miniLine(line(idx - 1, in: lines)?.displayText, isActive: false)
                     miniLine(line(idx, in: lines)?.displayText, isActive: true)
                     miniLine(line(idx + 1, in: lines)?.displayText, isActive: false)
@@ -50,8 +50,8 @@ struct LyricMiniSection: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
+        .padding(.vertical, DesignTokens.space12)
+        .padding(.horizontal, DesignTokens.space16)
         .contentShape(Rectangle())
         .animation(.easeInOut(duration: 0.2), value: activeIndex)
     }
@@ -96,9 +96,9 @@ struct MiniPlayerView: View {
         Group {
             if playerEngine.currentTrack != nil {
                 // Mini player that shows sheet when tapped
-                VStack(spacing: 0) {
+                VStack(spacing: DesignTokens.space0) {
                     // Mini player content
-                    HStack(spacing: 12) {
+                    HStack(spacing: DesignTokens.space12) {
                         // Album artwork
                         ZStack {
                             RoundedRectangle(cornerRadius: DesignTokens.radius8)
@@ -118,7 +118,7 @@ struct MiniPlayerView: View {
                         }
 
                         // Track info
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space4) {
                             Text(playerEngine.currentTrack?.displayTitle ?? "")
                                 .font(.headline)
                                 .foregroundColor(.primary)
@@ -143,7 +143,7 @@ struct MiniPlayerView: View {
                         // buttonStyle(.plain) and a contentShape per button stop
                         // the row's tap gesture (which expands the player) from
                         // swallowing these taps.
-                        HStack(spacing: 14) {
+                        HStack(spacing: DesignTokens.space14) {
                             Button(action: {
                                 Task { await playerEngine.previousTrack() }
                             }) {
@@ -181,8 +181,8 @@ struct MiniPlayerView: View {
                     }
                     // Trimmed from 16 to give the title and the three transport
                     // buttons a little more room on narrow phones.
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, DesignTokens.space12)
+                    .padding(.vertical, DesignTokens.space12)
                     .background(
                         // Very strong glassy background
                         RoundedRectangle(cornerRadius: DesignTokens.radius16)
@@ -191,7 +191,7 @@ struct MiniPlayerView: View {
                     )
                     .overlay(
                         // Progress bar integrated into the mini player background
-                        VStack(spacing: 0) {
+                        VStack(spacing: DesignTokens.space0) {
                             Spacer()
 
                             MiniPlayerProgressBar(
@@ -201,7 +201,7 @@ struct MiniPlayerView: View {
                     )
                     .cornerRadius(DesignTokens.radius16)
                     .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, DesignTokens.space12)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         isExpanded = true

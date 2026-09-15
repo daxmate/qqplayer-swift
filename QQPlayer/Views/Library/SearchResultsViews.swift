@@ -72,7 +72,7 @@ struct SearchResultsView: View {
 
     var body: some View {
         if results.isEmpty {
-            VStack(spacing: 16) {
+            VStack(spacing: DesignTokens.space16) {
                 Image(systemName: "magnifyingglass.circle")
                     .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
@@ -87,14 +87,14 @@ struct SearchResultsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: DesignTokens.space16) {
                     // Songs
                     if selectedCategory == .all || selectedCategory == .songs, !results.songs.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space8) {
                             Text(Localized.songs)
                                 .font(.title3)
                                 .fontWeight(.bold)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
 
                             ForEach(results.songs, id: \.stableId) { track in
                                 SearchSongRowView(
@@ -104,18 +104,18 @@ struct SearchResultsView: View {
                                     onDismiss: onDismiss
                                 )
                                 .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
                             }
                         }
                     }
 
                     // Albums (also shown when Artists category is selected, grouped by artist)
                     if selectedCategory == .all || selectedCategory == .albums, !results.albums.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space8) {
                             Text(Localized.albums)
                                 .font(.title3)
                                 .fontWeight(.bold)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
 
                             ForEach(results.albums, id: \.id) { album in
                                 SearchAlbumRowView(
@@ -130,21 +130,21 @@ struct SearchResultsView: View {
                                         .opacity(0.7)
                                 )
                                 .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
                             }
                         }
                     }
 
                     // Artists - show artist row + their albums underneath
                     if selectedCategory == .all || selectedCategory == .artists, !results.artists.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space8) {
                             Text(Localized.artists)
                                 .font(.title3)
                                 .fontWeight(.bold)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
 
                             ForEach(ArtistNameNormalizer.groupedArtists(results.artists), id: \.id) { group in
-                                VStack(alignment: .leading, spacing: 0) {
+                                VStack(alignment: .leading, spacing: DesignTokens.space0) {
                                     SearchArtistRowView(
                                         artist: group.primaryArtist,
                                         onDismiss: onDismiss,
@@ -156,7 +156,7 @@ struct SearchResultsView: View {
                                             .opacity(0.7)
                                     )
                                     .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
-                                    .padding(.horizontal, 16)
+                                    .padding(.horizontal, DesignTokens.space16)
 
                                     // Show this artist's albums below
                                     SearchArtistAlbumsRow(
@@ -165,18 +165,18 @@ struct SearchResultsView: View {
                                         onNavigateToAlbum: onNavigateToAlbum
                                     )
                                 }
-                                .padding(.bottom, 4)
+                                .padding(.bottom, DesignTokens.space4)
                             }
                         }
                     }
 
                     // Playlists
                     if selectedCategory == .all || selectedCategory == .playlists, !results.playlists.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space8) {
                             Text(Localized.playlists)
                                 .font(.title3)
                                 .fontWeight(.bold)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
 
                             ForEach(results.playlists, id: \.id) { playlist in
                                 SearchPlaylistRowView(
@@ -190,12 +190,12 @@ struct SearchResultsView: View {
                                         .opacity(0.7)
                                 )
                                 .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignTokens.space16)
                             }
                         }
                     }
                 }
-                .padding(.vertical, 16)
+                .padding(.vertical, DesignTokens.space16)
             }
             .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 100) // Space for mini player
@@ -254,7 +254,7 @@ struct SearchSongRowView: View {
                         .clipShape(Circle())
                         .opacity(min(Double(swipeOffset) / swipeThreshold, 1.0))
                         .scaleEffect(min(Double(swipeOffset) / swipeThreshold, 1.0))
-                        .padding(.leading, 8)
+                        .padding(.leading, DesignTokens.space8)
                 }
 
                 Spacer()
@@ -269,12 +269,12 @@ struct SearchSongRowView: View {
                         .clipShape(Circle())
                         .opacity(min(Double(-swipeOffset) / swipeThreshold, 1.0))
                         .scaleEffect(min(Double(-swipeOffset) / swipeThreshold, 1.0))
-                        .padding(.trailing, 8)
+                        .padding(.trailing, DesignTokens.space8)
                 }
             }
 
             // Main content
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 // Album artwork
                 ZStack {
                     Group {
@@ -298,7 +298,7 @@ struct SearchSongRowView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(track.displayTitle)
                         .font(.body)
                         .fontWeight(.medium)
@@ -335,8 +335,8 @@ struct SearchSongRowView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space12)
             .background(
                 RoundedRectangle(cornerRadius: DesignTokens.radius12)
                     .fill(.ultraThinMaterial)
@@ -507,13 +507,13 @@ struct SearchArtistRowView: View {
             onDismiss()
             onNavigate(artist, artistTracks)
         }) {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 Image(systemName: "person.circle.fill")
                     .font(.title2)
                     .foregroundColor(.purple)
                     .frame(width: 24, height: 24)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(ArtistNameNormalizer.displayName(artist.name))
                         .font(.body)
                         .fontWeight(.medium)
@@ -532,8 +532,8 @@ struct SearchArtistRowView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space12)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
@@ -551,7 +551,7 @@ struct SearchArtistAlbumsRow: View {
         Group {
             if !artistAlbums.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: DesignTokens.space10) {
                         ForEach(artistAlbums, id: \.id) { album in
                             let albumTracks = artistTracks.filter { $0.albumId == album.id }
                             Button {
@@ -563,8 +563,8 @@ struct SearchArtistAlbumsRow: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.vertical, DesignTokens.space8)
                 }
             }
         }
@@ -589,7 +589,7 @@ struct SearchArtistAlbumsRow: View {
         @State private var artworkImage: UIImage?
 
         var body: some View {
-            VStack(spacing: 4) {
+            VStack(spacing: DesignTokens.space4) {
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius6)
                         .fill(Color(.systemGray5))
@@ -644,7 +644,7 @@ struct SearchAlbumRowView: View {
             onDismiss()
             onNavigate(album, albumTracks)
         }) {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 // Album artwork
                 Group {
                     if let artworkImage = artworkImage {
@@ -660,7 +660,7 @@ struct SearchAlbumRowView: View {
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius6))
                 .background(Color(.systemGray5))
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(album.displayTitle)
                         .font(.body)
                         .fontWeight(.medium)
@@ -668,7 +668,7 @@ struct SearchAlbumRowView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
 
-                    HStack(spacing: 4) {
+                    HStack(spacing: DesignTokens.space4) {
                         if let albumArtistName, !albumArtistName.isEmpty {
                             Text(albumArtistName)
                                 .font(.caption)
@@ -691,8 +691,8 @@ struct SearchAlbumRowView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space12)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
@@ -730,13 +730,13 @@ struct SearchPlaylistRowView: View {
             onDismiss()
             onNavigate(playlist)
         }) {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 Image(systemName: "music.note.list")
                     .font(.title2)
                     .foregroundColor(.green)
                     .frame(width: 24, height: 24)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(playlist.title)
                         .font(.body)
                         .fontWeight(.medium)
@@ -755,8 +755,8 @@ struct SearchPlaylistRowView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space12)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())

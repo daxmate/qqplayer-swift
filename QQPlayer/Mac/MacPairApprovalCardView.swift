@@ -26,12 +26,12 @@ struct MacPairApprovalCardView: View {
     let onReject: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: DesignTokens.space12) {
+            HStack(spacing: DesignTokens.space10) {
                 Image(systemName: "macbook.and.iphone")
                     .font(.system(size: DesignTokens.font22))
                     .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
                     Text(SyncDeviceList.displayName(candidate))
                         .font(.headline)
                     Text(DeviceID.formatted(candidate.deviceID))
@@ -41,7 +41,7 @@ struct MacPairApprovalCardView: View {
                 }
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: DesignTokens.space6) {
                 // 来源标记（QR 扫码 / 手动输入）
                 switch candidate.source {
                 case .qr:
@@ -58,7 +58,7 @@ struct MacPairApprovalCardView: View {
             .foregroundStyle(.secondary)
             .labelStyle(.titleAndIcon)
 
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 Button("sync_approve".localized, action: onApprove)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
@@ -66,18 +66,18 @@ struct MacPairApprovalCardView: View {
                     .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(16)
+        .padding(DesignTokens.space16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
     }
 }
 
 #Preview {
-    VStack(spacing: 12) {
+    VStack(spacing: DesignTokens.space12) {
         MacPairApprovalCardView(candidate: PreviewCandidates.qr, onApprove: {}, onReject: {})
         MacPairApprovalCardView(candidate: PreviewCandidates.manualReplacement, onApprove: {}, onReject: {})
     }
-    .padding(20)
+    .padding(DesignTokens.space20)
     .frame(width: 480)
 }
 

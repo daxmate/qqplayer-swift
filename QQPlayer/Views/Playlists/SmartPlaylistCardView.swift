@@ -66,7 +66,7 @@ struct SmartPlaylistCardView: View {
     @State private var didLoadCovers = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
             // Artwork area, matching PlaylistCardView's square artwork geometry.
             ZStack {
                 RoundedRectangle(cornerRadius: DesignTokens.radius12)
@@ -85,12 +85,12 @@ struct SmartPlaylistCardView: View {
                 case .grid2x2:
                     GeometryReader { geometry in
                         let size = (geometry.size.width - 2) / 2
-                        VStack(spacing: 2) {
-                            HStack(spacing: 2) {
+                        VStack(spacing: DesignTokens.space2) {
+                            HStack(spacing: DesignTokens.space2) {
                                 artworkView(at: 0, size: size)
                                 artworkView(at: 1, size: size)
                             }
-                            HStack(spacing: 2) {
+                            HStack(spacing: DesignTokens.space2) {
                                 artworkView(at: 2, size: size)
                                 artworkView(at: 3, size: size)
                             }
@@ -102,7 +102,7 @@ struct SmartPlaylistCardView: View {
             .contentShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
 
             // Text info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(Localized.smartPlaylistTitle(info.kind))
                     .font(.headline)
                     .lineLimit(1)

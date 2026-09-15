@@ -15,16 +15,16 @@ struct WhatsNewView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 ScrollView {
-                    VStack(spacing: 28) {
-                        Spacer(minLength: 24)
+                    VStack(spacing: DesignTokens.space28) {
+                        Spacer(minLength: DesignTokens.space24)
 
                         Image(systemName: "sparkles")
                             .font(.system(size: DesignTokens.font64, weight: .medium))
                             .foregroundColor(accentColor)
 
-                        VStack(spacing: 8) {
+                        VStack(spacing: DesignTokens.space8) {
                             Text(Localized.whatsNewTitle)
                                 .font(.title2)
                                 .fontWeight(.semibold)
@@ -34,9 +34,9 @@ struct WhatsNewView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space14) {
                             ForEach(WhatsNewContent.all.first?.items ?? [], id: \.self) { item in
-                                HStack(alignment: .top, spacing: 12) {
+                                HStack(alignment: .top, spacing: DesignTokens.space12) {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: DesignTokens.font18))
                                         .foregroundColor(accentColor)
@@ -48,15 +48,15 @@ struct WhatsNewView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 20)
+                        .padding(.horizontal, DesignTokens.space32)
+                        .padding(.vertical, DesignTokens.space20)
                         .background(
                             RoundedRectangle(cornerRadius: DesignTokens.radius16)
                                 .fill(Color.primary.opacity(0.05))
                         )
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, DesignTokens.space24)
 
-                        Spacer(minLength: 24)
+                        Spacer(minLength: DesignTokens.space24)
                     }
                 }
 
@@ -67,8 +67,8 @@ struct WhatsNewView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 16)
+                .padding(.horizontal, DesignTokens.space30)
+                .padding(.vertical, DesignTokens.space16)
             }
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

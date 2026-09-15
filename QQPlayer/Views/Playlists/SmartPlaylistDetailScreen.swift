@@ -203,7 +203,7 @@ struct SmartPlaylistEmptyView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.space16) {
             Image(systemName: "music.note")
                 .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)
@@ -223,7 +223,7 @@ struct SmartPlaylistErrorView: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.space16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)

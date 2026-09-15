@@ -21,7 +21,7 @@ struct MacCreateManualEQView: View {
     @State private var createError: String?
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Form {
                 Section(Localized.presetName) {
@@ -43,7 +43,7 @@ struct MacCreateManualEQView: View {
                 }
 
                 Section(Localized.presetInfo) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.eqCreateManualDescription)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -60,7 +60,7 @@ struct MacCreateManualEQView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Text(Localized.eqCreateManual)
                 .font(.title2)
                 .fontWeight(.bold)
@@ -119,7 +119,7 @@ struct MacManualEQEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             if isLoading {
                 ProgressView()
@@ -242,7 +242,7 @@ struct MacManualEQEditorView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Text(Localized.editEqualizer)
                 .font(.title2)
                 .fontWeight(.bold)

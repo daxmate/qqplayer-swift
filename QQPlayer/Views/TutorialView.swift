@@ -15,7 +15,7 @@ struct TutorialView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 // M3-2：音乐存储已切本地沙盒 Documents（退役 iCloud）——单步引导
                 // （在 Files app 的「我的 iPhone → QQPlayer」中放入音乐）。
                 MusicFilesStepView(viewModel: viewModel, onComplete: onComplete)
@@ -37,14 +37,14 @@ struct MusicFilesStepView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 25) {
-                Spacer(minLength: 20)
+            VStack(spacing: DesignTokens.space25) {
+                Spacer(minLength: DesignTokens.space20)
 
                 Image(systemName: "music.note")
                     .font(.system(size: DesignTokens.font70))
                     .foregroundColor(accentColor)
 
-                VStack(spacing: 12) {
+                VStack(spacing: DesignTokens.space12) {
                     Text(Localized.addYourMusic)
                         .font(.title2)
                         .fontWeight(.semibold)
@@ -53,10 +53,10 @@ struct MusicFilesStepView: View {
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignTokens.space20)
                 }
 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DesignTokens.space16) {
                     InstructionRow(
                         step: "1",
                         title: Localized.openFilesApp,
@@ -81,13 +81,13 @@ struct MusicFilesStepView: View {
                         description: Localized.copyMusicFiles
                     )
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignTokens.space20)
 
-                Spacer(minLength: 20)
+                Spacer(minLength: DesignTokens.space20)
             }
         }
         .overlay(alignment: .bottom) {
-            VStack(spacing: 0) {
+            VStack(spacing: DesignTokens.space0) {
                 // Gradient overlay to separate content from buttons
                 LinearGradient(
                     colors: [Color(.systemBackground).opacity(0), Color(.systemBackground)],
@@ -109,8 +109,8 @@ struct MusicFilesStepView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                 }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 40)
+                .padding(.horizontal, DesignTokens.space30)
+                .padding(.bottom, DesignTokens.space40)
                 .background(Color(.systemBackground))
             }
         }
@@ -126,7 +126,7 @@ struct InstructionRow: View {
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: DesignTokens.space12) {
             Text(step)
                 .font(.headline)
                 .fontWeight(.semibold)
@@ -134,7 +134,7 @@ struct InstructionRow: View {
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(accentColor))
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text(title)
                     .font(.headline)
                     .fontWeight(.medium)
@@ -148,7 +148,7 @@ struct InstructionRow: View {
 
             Spacer()
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 }
 

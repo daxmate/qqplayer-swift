@@ -55,10 +55,10 @@ struct MacSearchAnythingLayer: View {
 
             VStack {
                 panel
-                    .padding(.top, 60)
+                    .padding(.top, DesignTokens.space60)
                 Spacer()
             }
-            .padding(.horizontal, 120)
+            .padding(.horizontal, DesignTokens.space120)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { focused = true }
@@ -67,7 +67,7 @@ struct MacSearchAnythingLayer: View {
     // MARK: - 面板
 
     private var panel: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             searchRow
             Divider()
             resultsView
@@ -82,7 +82,7 @@ struct MacSearchAnythingLayer: View {
     }
 
     private var searchRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             TextField("search_any_placeholder".localized, text: $query)
@@ -108,8 +108,8 @@ struct MacSearchAnythingLayer: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space12)
         .onChange(of: query) { _ in
             scheduleSearch()
         }
@@ -122,14 +122,14 @@ struct MacSearchAnythingLayer: View {
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             emptyHint
         } else if isSearching {
-            VStack(spacing: 10) {
+            VStack(spacing: DesignTokens.space10) {
                 ProgressView()
                 Text("search_any_loading".localized)
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if hasNoResults {
-            VStack(spacing: 8) {
+            VStack(spacing: DesignTokens.space8) {
                 Image(systemName: "magnifyingglass.circle")
                     .font(.system(size: DesignTokens.font40))
                     .foregroundColor(.secondary)
@@ -139,7 +139,7 @@ struct MacSearchAnythingLayer: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: DesignTokens.space0) {
                     if !localSongs.isEmpty {
                         section("search_badge_song".localized) {
                             ForEach(localSongs, id: \.stableId) { track in
@@ -170,31 +170,31 @@ struct MacSearchAnythingLayer: View {
                     }
                     settingsSection
                 }
-                .padding(.vertical, 6)
+                .padding(.vertical, DesignTokens.space6)
             }
             .overlay(alignment: .bottom) {
                 if let statusMessage {
                     Text(statusMessage)
                         .font(.caption)
                         .foregroundColor(.red)
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 10)
+                        .padding(.vertical, DesignTokens.space5)
+                        .padding(.horizontal, DesignTokens.space10)
                         .background(.regularMaterial, in: Capsule())
-                        .padding(.bottom, 6)
+                        .padding(.bottom, DesignTokens.space6)
                 }
             }
         }
     }
 
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: DesignTokens.space0) {
             Text(title.uppercased())
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 2)
+                .padding(.horizontal, DesignTokens.space14)
+                .padding(.top, DesignTokens.space8)
+                .padding(.bottom, DesignTokens.space2)
             content()
         }
     }
@@ -206,7 +206,7 @@ struct MacSearchAnythingLayer: View {
             onPlayLocal(track, localSongs)
             state.isOpen = false
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Image(systemName: "music.note")
                     .foregroundColor(.secondary)
                     .frame(width: 14)
@@ -219,8 +219,8 @@ struct MacSearchAnythingLayer: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space5)
         }
         .buttonStyle(.plain)
     }
@@ -232,7 +232,7 @@ struct MacSearchAnythingLayer: View {
             onPlayArtist(artist, tracks)
             state.isOpen = false
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Image(systemName: "music.mic")
                     .foregroundColor(.secondary)
                     .frame(width: 14)
@@ -240,8 +240,8 @@ struct MacSearchAnythingLayer: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space5)
         }
         .buttonStyle(.plain)
     }
@@ -253,7 +253,7 @@ struct MacSearchAnythingLayer: View {
             onPlayAlbum(album, tracks)
             state.isOpen = false
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Image(systemName: "square.stack")
                     .foregroundColor(.secondary)
                     .frame(width: 14)
@@ -266,8 +266,8 @@ struct MacSearchAnythingLayer: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space5)
         }
         .buttonStyle(.plain)
     }
@@ -276,7 +276,7 @@ struct MacSearchAnythingLayer: View {
         Button {
             download(song)
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Group {
                     if let coverURL = song.coverURL {
                         AsyncImage(url: coverURL) { phase in
@@ -293,7 +293,7 @@ struct MacSearchAnythingLayer: View {
                 .frame(width: 28, height: 28)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius4))
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: DesignTokens.space1) {
                     Text(DisplayScriptNormalizer.display(song.title)).lineLimit(1)
                     Text(DisplayScriptNormalizer.display(onlineSubtitle(song)))
                         .font(.caption)
@@ -304,8 +304,8 @@ struct MacSearchAnythingLayer: View {
                 downloadBadge(for: song)
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space5)
         }
         .buttonStyle(.plain)
     }
@@ -343,7 +343,7 @@ struct MacSearchAnythingLayer: View {
                     onOpenSettings(category)
                     state.isOpen = false
                 } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: DesignTokens.space10) {
                         Image(systemName: "gearshape")
                             .foregroundColor(.secondary)
                             .frame(width: 14)
@@ -351,8 +351,8 @@ struct MacSearchAnythingLayer: View {
                         Spacer()
                     }
                     .contentShape(Rectangle())
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, DesignTokens.space14)
+                    .padding(.vertical, DesignTokens.space5)
                 }
                 .buttonStyle(.plain)
             }
@@ -360,7 +360,7 @@ struct MacSearchAnythingLayer: View {
     }
 
     private var emptyHint: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignTokens.space8) {
             Image(systemName: "sparkle.magnifyingglass")
                 .font(.system(size: DesignTokens.font36))
                 .foregroundColor(.secondary)
@@ -368,7 +368,7 @@ struct MacSearchAnythingLayer: View {
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 60)
+                .padding(.horizontal, DesignTokens.space60)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

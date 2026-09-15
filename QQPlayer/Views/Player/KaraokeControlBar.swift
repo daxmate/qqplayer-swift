@@ -37,30 +37,30 @@ struct KaraokeControlBar: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DesignTokens.space10) {
             if isWaitingABEnd {
                 Text(NSLocalizedString("karaoke_ab_end_hint", value: "Tap a lyric line to set the AB end point", comment: ""))
                     .font(.caption2.weight(.medium))
                     .foregroundColor(accentColor)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, DesignTokens.space12)
+                    .padding(.vertical, DesignTokens.space5)
                     .background(Capsule().fill(.ultraThinMaterial))
             }
 
             // 播放控制三键：上一句 / 播放暂停 / 下一句（歌词行级，用户 2026-08-29 拍板）
-            HStack(spacing: 26) {
+            HStack(spacing: DesignTokens.space26) {
                 prevLineButton
                 playPauseButton
                 nextLineButton
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 speedButton
                 singleLineLoopButton
                 abButton
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, DesignTokens.space6)
     }
 
     // MARK: - 播放控制（上一句 / 播放暂停 / 下一句）
@@ -180,8 +180,8 @@ struct KaraokeControlBar: View {
         content()
             .font(.footnote.weight(.semibold))
             .foregroundColor(isHighlighted ? accentColor : .primary.opacity(0.85))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space9)
             .background(Capsule().fill(.ultraThinMaterial))
             .overlay(Capsule().fill(isHighlighted ? accentColor.opacity(0.16) : Color.clear))
             .overlay(

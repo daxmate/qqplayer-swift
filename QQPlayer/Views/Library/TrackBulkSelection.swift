@@ -67,7 +67,7 @@ struct TrackBulkActionsModifier: ViewModifier {
                             Image(systemName: "ellipsis.circle")
                                 .font(.title3)
                                 .foregroundColor(accentColor)
-                                .padding(4)
+                                .padding(DesignTokens.space4)
                                 .contentShape(Rectangle())
                         }
                         .menuStyle(.button)

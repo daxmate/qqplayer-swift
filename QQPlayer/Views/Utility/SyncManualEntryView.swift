@@ -63,8 +63,8 @@ struct SyncManualEntryView: View {
     // MARK: - 输入态
 
     private var inputBody: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space16) {
+            VStack(alignment: .leading, spacing: DesignTokens.space8) {
                 Text("sync_manual_hint".localized)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -98,16 +98,16 @@ struct SyncManualEntryView: View {
             .frame(maxWidth: .infinity)
             .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: DesignTokens.space0)
         }
-        .padding(16)
+        .padding(DesignTokens.space16)
     }
 
     // MARK: - 确认态
 
     private func confirmBody(_ candidate: PeerCandidate) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DesignTokens.space16) {
                 Text("sync_confirm_pair_title".localized)
                     .font(.headline)
                 SyncPairConfirmCardView(
@@ -117,7 +117,7 @@ struct SyncManualEntryView: View {
                     onCancel: { cancelToInput() }
                 )
             }
-            .padding(16)
+            .padding(DesignTokens.space16)
         }
     }
 

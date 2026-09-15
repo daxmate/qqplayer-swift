@@ -138,7 +138,7 @@ struct MacSyncCenterView: View {
                         reloadDevices()
                     }
                 )
-                .padding(.vertical, 4)
+                .padding(.vertical, DesignTokens.space4)
             } header: {
                 Text("sync_pairing_request_header".localized)
             }
@@ -163,7 +163,7 @@ struct MacSyncCenterView: View {
                 Label("sync_devices_empty".localized, systemImage: "iphone.slash")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, DesignTokens.space6)
             } else {
                 ForEach(rows) { row in
                     deviceTargetRow(row)
@@ -180,12 +180,12 @@ struct MacSyncCenterView: View {
     /// 离线行常显「怎么把它弄上线」提示——直接回答「为什么不能同步」。
     private func deviceTargetRow(_ row: SyncDeviceTargetRow) -> some View {
         let selected = targetDeviceID == row.peerID
-        return HStack(alignment: .top, spacing: 10) {
+        return HStack(alignment: .top, spacing: DesignTokens.space10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(selected ? accentColor : Color.secondary)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
+                HStack(spacing: DesignTokens.space6) {
                     Text(row.displayName)
                         .fontWeight(selected ? .medium : .regular)
                     statusBadge(row)
@@ -205,10 +205,10 @@ struct MacSyncCenterView: View {
                 }
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: DesignTokens.space0)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, DesignTokens.space4)
+        .padding(.horizontal, DesignTokens.space6)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.radius6)
                 .fill(selected ? accentColor.opacity(0.12) : Color.clear)
@@ -220,8 +220,8 @@ struct MacSyncCenterView: View {
     private func statusBadge(_ row: SyncDeviceTargetRow) -> some View {
         Text(row.isOnline ? "sync_device_status_online".localized : "sync_device_status_offline".localized)
             .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
+            .padding(.horizontal, DesignTokens.space6)
+            .padding(.vertical, DesignTokens.space1)
             .background(
                 (row.isOnline ? Color.green : Color.secondary).opacity(0.14),
                 in: Capsule()
@@ -233,7 +233,7 @@ struct MacSyncCenterView: View {
     @ViewBuilder
     private var identitySection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: DesignTokens.space12) {
                 LabeledContent("sync_this_device".localized) {
                     Text(hostName)
                         .fontWeight(.medium)
@@ -247,7 +247,7 @@ struct MacSyncCenterView: View {
                     }
                 }
 
-                HStack(alignment: .center, spacing: 20) {
+                HStack(alignment: .center, spacing: DesignTokens.space20) {
                     if let qrImage {
                         Image(nsImage: qrImage)
                             .interpolation(.none)
@@ -264,7 +264,7 @@ struct MacSyncCenterView: View {
                             )
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text("sync_qr_scan_hint".localized)
                             .font(.callout)
                             .foregroundStyle(.secondary)
@@ -277,9 +277,9 @@ struct MacSyncCenterView: View {
                         .disabled(identity == nil)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, DesignTokens.space4)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, DesignTokens.space4)
         } header: {
             Text("sync_identity_section".localized)
         } footer: {
@@ -296,7 +296,7 @@ struct MacSyncCenterView: View {
                 Text("sync_no_paired_devices".localized)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, DesignTokens.space6)
             } else {
                 ForEach(devices, id: \.peerID) { device in
                     deviceRow(device)
@@ -308,14 +308,14 @@ struct MacSyncCenterView: View {
     }
 
     private func deviceRow(_ device: PeerDevice) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             Image(systemName: device.role == .host ? "macpro.gen3" : "iphone")
                 .font(.system(size: DesignTokens.font18))
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
+                HStack(spacing: DesignTokens.space6) {
                     Text(SyncDeviceList.displayName(device))
                         .fontWeight(.medium)
                     roleBadge(device.role)
@@ -344,14 +344,14 @@ struct MacSyncCenterView: View {
             .menuIndicator(.hidden)
             .fixedSize()
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     private func roleBadge(_ role: PeerRole) -> some View {
         Text(role == .host ? "sync_role_host".localized : "sync_role_client".localized)
             .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
+            .padding(.horizontal, DesignTokens.space6)
+            .padding(.vertical, DesignTokens.space1)
             .background(role == .host ? Color.blue.opacity(0.14) : Color.green.opacity(0.14), in: Capsule())
     }
 

@@ -27,7 +27,7 @@ struct MacEQSettingsView: View {
     @State private var actionError: String?
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Form {
                 enableSection
@@ -85,7 +85,7 @@ struct MacEQSettingsView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Text(Localized.equalizer)
                 .font(.title2)
                 .fontWeight(.bold)
@@ -111,13 +111,13 @@ struct MacEQSettingsView: View {
 
     private var commonPresetsSection: some View {
         Section(Localized.presetCommon) {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: DesignTokens.space8), GridItem(.flexible(), spacing: DesignTokens.space8)], spacing: DesignTokens.space8) {
                 ForEach(BuiltinEQPresets.all, id: \.key) { preset in
                     builtinPresetButton(key: preset.key, title: preset.localizedName)
                 }
                 builtinPresetButton(key: BuiltinEQPresets.customKey, title: Localized.presetCustom)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, DesignTokens.space4)
         }
     }
 
@@ -135,7 +135,7 @@ struct MacEQSettingsView: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     Text(Localized.noManualPresetsCreated)
                         .foregroundColor(.secondary)
                         .italic()
@@ -166,7 +166,7 @@ struct MacEQSettingsView: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     Text(Localized.noPresetsImported)
                         .foregroundColor(.secondary)
                         .italic()
@@ -186,7 +186,7 @@ struct MacEQSettingsView: View {
 
     private var globalGainSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignTokens.space8) {
                 HStack {
                     Text(Localized.globalGain)
                     Spacer()
@@ -208,7 +208,7 @@ struct MacEQSettingsView: View {
 
     private var formatInfoSection: some View {
         Section(Localized.aboutGraphicEQFormat) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignTokens.space8) {
                 Text(Localized.importGraphicEQFormatDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -216,8 +216,8 @@ struct MacEQSettingsView: View {
                 Text("GraphicEQ: 20 -7.9; 21 -7.8; 22 -8.0; ...")
                     .font(.caption2.monospaced())
                     .foregroundColor(.secondary)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
+                    .padding(.vertical, DesignTokens.space4)
+                    .padding(.horizontal, DesignTokens.space8)
                     .background(Color.gray.opacity(0.15))
                     .cornerRadius(DesignTokens.radius4)
 
@@ -242,7 +242,7 @@ struct MacEQSettingsView: View {
             Text(title)
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, DesignTokens.space8)
                 .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(DesignTokens.radius8)
@@ -257,12 +257,12 @@ struct MacEQSettingsView: View {
         subtitleColor: Color,
         onSelect: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             Button {
                 onSelect()
             } label: {
                 HStack {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space2) {
                         Text(preset.name)
                             .font(.headline)
                             .foregroundColor(.primary)

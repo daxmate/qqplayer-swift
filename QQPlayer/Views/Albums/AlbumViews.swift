@@ -20,10 +20,10 @@ struct AlbumsScreen: View {
                     ScrollView {
                         LazyVGrid(
                             columns: [
-                                GridItem(.flexible(), spacing: 20),
+                                GridItem(.flexible(), spacing: DesignTokens.space20),
                                 GridItem(.flexible()),
                             ],
-                            spacing: 16
+                            spacing: DesignTokens.space16
                         ) {
                             ForEach(albums, id: \.id) { album in
                                 NavigationLink {
@@ -36,8 +36,8 @@ struct AlbumsScreen: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(16)
-                        .padding(.bottom, 100) // Add padding for mini player
+                        .padding(DesignTokens.space16)
+                        .padding(.bottom, DesignTokens.space100) // Add padding for mini player
                     }
                 }
             }
@@ -77,7 +77,7 @@ struct AlbumsScreen: View {
 
 private struct EmptyAlbumsView: View {
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.space16) {
             Image(systemName: "opticaldisc")
                 .font(.system(size: DesignTokens.font40))
                 .foregroundColor(.secondary)
@@ -99,7 +99,7 @@ private struct AlbumCardView: View {
     @State private var artworkImage: UIImage?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
             // Album artwork area with fixed aspect ratio
             GeometryReader { geometry in
                 RoundedRectangle(cornerRadius: DesignTokens.radius12)
@@ -119,7 +119,7 @@ private struct AlbumCardView: View {
             }
             .aspectRatio(1, contentMode: .fit)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text(album.displayTitle)
                     .font(.headline)
                     .lineLimit(2)
@@ -203,9 +203,9 @@ struct AlbumDetailScreen: View {
             ScreenSpecificBackgroundView(screen: .albumDetail)
 
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: DesignTokens.space24) {
                     // Artwork + info
-                    VStack(spacing: 16) {
+                    VStack(spacing: DesignTokens.space16) {
                         RoundedRectangle(cornerRadius: DesignTokens.radius12)
                             .fill(Color.gray.opacity(0.2))
                             .frame(width: 250, height: 250)
@@ -223,7 +223,7 @@ struct AlbumDetailScreen: View {
                             }
                             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
 
-                        VStack(spacing: 8) {
+                        VStack(spacing: DesignTokens.space8) {
                             Text(album.displayTitle)
                                 .font(.title2)
                                 .fontWeight(.bold)
@@ -240,7 +240,7 @@ struct AlbumDetailScreen: View {
                             .buttonStyle(.plain)
                         }
 
-                        HStack(spacing: 12) {
+                        HStack(spacing: DesignTokens.space12) {
                             Button {
                                 if let first = filteredAlbumTracks.first {
                                     Task {
@@ -256,7 +256,7 @@ struct AlbumDetailScreen: View {
                                 }
                                 .font(.title3.weight(.semibold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, DesignTokens.space8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
                                 .background(accentColor)
@@ -278,19 +278,19 @@ struct AlbumDetailScreen: View {
                                 }
                                 .font(.title3.weight(.semibold))
                                 .foregroundColor(accentColor)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, DesignTokens.space8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
                                 .background(accentColor.opacity(0.1))
                                 .cornerRadius(DesignTokens.radius28)
                             }
                         }
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, DesignTokens.space8)
                     }
                     .padding(.horizontal)
 
                     // Track list
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space0) {
                         HStack {
                             Text(Localized.songs)
                                 .font(.title3.weight(.bold))
@@ -300,9 +300,9 @@ struct AlbumDetailScreen: View {
                                 .foregroundColor(.secondary)
                         }
                         .padding(.horizontal)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, DesignTokens.space12)
 
-                        LazyVStack(spacing: 0) {
+                        LazyVStack(spacing: DesignTokens.space0) {
                             ForEach(groupedByDisc, id: \.discNumber) { disc in
                                 // Disc header (only show if multiple discs)
                                 if hasMultipleDiscs {
@@ -314,12 +314,12 @@ struct AlbumDetailScreen: View {
                                     }
                                     .padding(.horizontal)
                                     .padding(.top, disc.discNumber > 1 ? 16 : 0)
-                                    .padding(.bottom, 8)
+                                    .padding(.bottom, DesignTokens.space8)
                                 }
 
                                 // Tracks for this disc
                                 ForEach(Array(disc.tracks.enumerated()), id: \.element.stableId) { index, track in
-                                    HStack(spacing: 12) {
+                                    HStack(spacing: DesignTokens.space12) {
                                         if isBulkMode {
                                             TrackSelectionIndicator(
                                                 isSelected: selectedTracks.contains(track.stableId),
@@ -360,14 +360,14 @@ struct AlbumDetailScreen: View {
                                     let isLastTrackOfDisc = index == disc.tracks.count - 1
                                     let isLastDisc = disc.discNumber == groupedByDisc.last?.discNumber
                                     if !isLastTrackOfDisc || !isLastDisc {
-                                        Divider().padding(.leading, 60)
+                                        Divider().padding(.leading, DesignTokens.space60)
                                     }
                                 }
                             }
                         }
                     }
                 }
-                .padding(.bottom, 100) // Add padding for mini player
+                .padding(.bottom, DesignTokens.space100) // Add padding for mini player
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -460,7 +460,7 @@ struct AlbumTrackRowView: View {
     @State private var isMenuInteracting = false
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             // Track number
             Text("\(trackNumber)")
                 .font(.body)
@@ -469,7 +469,7 @@ struct AlbumTrackRowView: View {
                 .frame(width: 22, alignment: .leading)
 
             // Track info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text(track.displayTitle)
                     .font(.body)
                     .fontWeight(.medium)
@@ -478,7 +478,7 @@ struct AlbumTrackRowView: View {
                     .multilineTextAlignment(.leading)
 
                 // Artist name and duration with dot separator
-                HStack(spacing: 0) {
+                HStack(spacing: DesignTokens.space0) {
                     if let artistName, !artistName.isEmpty {
                         Text(artistName)
                             .font(.caption)
@@ -570,7 +570,7 @@ struct AlbumTrackRowView: View {
             )
         }
         .padding(.horizontal)
-        .padding(.vertical, 8)
+        .padding(.vertical, DesignTokens.space8)
         .contentShape(Rectangle())
         .onTapGesture {
             if !isMenuInteracting {
@@ -642,7 +642,7 @@ struct ArtistDetailScreenWrapper: View {
             if !artists.isEmpty {
                 ArtistDetailScreen(artists: artists, allTracks: allTracks)
             } else {
-                VStack(spacing: 16) {
+                VStack(spacing: DesignTokens.space16) {
                     ProgressView()
                     Text(Localized.loadingArtist)
                         .foregroundColor(.secondary)

@@ -199,7 +199,7 @@ struct TrackListView: View {
                             .font(.title3)
                             .foregroundColor(accentColor)
                             // Increase hit area
-                            .padding(4)
+                            .padding(DesignTokens.space4)
                             .contentShape(Rectangle())
                     }
                     .menuStyle(.button)
@@ -223,7 +223,7 @@ struct TrackListView: View {
                         Image(systemName: "arrow.up.arrow.down.circle")
                             .font(.title3)
                             .foregroundColor(accentColor)
-                            .padding(4)
+                            .padding(DesignTokens.space4)
                             .contentShape(Rectangle())
                     }
                 }
@@ -351,7 +351,7 @@ struct TrackListContentView: View {
 
     var body: some View {
         if tracks.isEmpty {
-            VStack(spacing: 16) {
+            VStack(spacing: DesignTokens.space16) {
                 Image(systemName: "music.note").font(.system(size: DesignTokens.font40)).foregroundColor(.secondary)
                 Text(Localized.noSongsFound).font(.headline)
                 Text(Localized.yourMusicWillAppearHere).font(.subheadline).foregroundColor(.secondary)
@@ -361,7 +361,7 @@ struct TrackListContentView: View {
             List {
                 ForEach(displayedTracks, id: \.stableId) { track in
                     ZStack(alignment: .leading) {
-                        HStack(spacing: 0) {
+                        HStack(spacing: DesignTokens.space0) {
                             if isBulkMode {
                                 Image(systemName: selectedTracks.contains(track.stableId) ? "checkmark.circle.fill" : "circle")
                                     .font(.title2)
@@ -418,7 +418,7 @@ struct TrackListContentView: View {
                         }
                     }
                     .background(RoundedRectangle(cornerRadius: DesignTokens.radius12).fill(.ultraThinMaterial).opacity(0.7))
-                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .padding(.horizontal, DesignTokens.space8).padding(.vertical, DesignTokens.space4)
                     .listRowSeparator(.hidden).listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }

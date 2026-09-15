@@ -39,7 +39,7 @@ struct MacDesktopWindowsSettingsView: View {
                     .onChange(of: deleteSettings.miniLyricsEnabled) { _ in
                         deleteSettings.save()
                     }
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     HStack {
                         Text("desktop_lyric_font_size".localized)
                         Spacer()

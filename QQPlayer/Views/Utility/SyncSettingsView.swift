@@ -198,7 +198,7 @@ struct SyncSettingsView: View {
     /// 装配自检行：一行说明「缺了什么 / 影响什么」（缺失能力名列表来自探针本地化文案）。
     /// View 不做任何判断——行要不要出现、缺几项，全部来自 `SyncWiringSelfCheckPresenter`。
     private func wiringSelfCheckRow(_ row: SyncWiringSelfCheckPresenter.GapRow) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DesignTokens.space4) {
             Text(row.labelKey.localized(with: row.count))
                 .font(.callout)
                 .foregroundStyle(.orange)
@@ -229,7 +229,7 @@ struct SyncSettingsView: View {
             Array(IOSPassiveDataSyncPresenter.gapRows(summary).enumerated()),
             id: \.offset
         ) { _, row in
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 LabeledContent(row.labelKey.localized) {
                     Text("\(row.count)")
                         .foregroundStyle(.orange)
@@ -267,14 +267,14 @@ struct SyncSettingsView: View {
             summary: passiveSync.summary,
             hasPairedHost: passiveSync.pairedHostCount > 0
         )
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
+        return VStack(alignment: .leading, spacing: DesignTokens.space8) {
+            HStack(spacing: DesignTokens.space12) {
                 Image(systemName: presentation.symbol)
                     .font(.system(size: DesignTokens.font20))
                     .foregroundStyle(passiveSync.state.isConnected ? Color.green : Color.secondary)
                     .frame(width: 26)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
                     Text(localizedTitle(presentation))
                         .fontWeight(.medium)
                     if let detail = localizedDetail(presentation) {
@@ -318,7 +318,7 @@ struct SyncSettingsView: View {
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     private func localizedTitle(_ presentation: IOSPassiveSyncPresentation) -> String {
@@ -340,13 +340,13 @@ struct SyncSettingsView: View {
     // MARK: - 行
 
     private func hostRow(_ device: PeerDevice) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Image(systemName: "macpro.gen3")
                 .font(.system(size: DesignTokens.font20))
                 .foregroundStyle(.secondary)
                 .frame(width: 26)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(SyncDeviceList.displayName(device))
                     .fontWeight(.medium)
                 Text(SyncDeviceList.shortIDText(device) ?? device.peerID)
@@ -364,7 +364,7 @@ struct SyncSettingsView: View {
             }
             .buttonStyle(.borderless)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     // MARK: - 数据

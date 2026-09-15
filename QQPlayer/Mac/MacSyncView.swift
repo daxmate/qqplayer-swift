@@ -158,16 +158,16 @@ struct MacSyncRunSection: View {
     }
 
     private func connectedRow(_ peer: SyncConnectedPeer) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             Image(systemName: "iphone")
                 .font(.system(size: DesignTokens.font18))
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(peer.displayName.isEmpty ? "sync_unknown_device".localized : peer.displayName)
                     .fontWeight(.medium)
-                HStack(spacing: 10) {
+                HStack(spacing: DesignTokens.space10) {
                     if !peer.peerID.isEmpty {
                         Text("sync_device_id_short".localized(with: DeviceID.formatted(peer.peerID)))
                             .font(.system(.caption, design: .monospaced))
@@ -186,7 +186,7 @@ struct MacSyncRunSection: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     /// 未连接提示：一台都没配对 vs 配对了但没连上，指引不同。
@@ -225,20 +225,20 @@ struct MacSyncRunSection: View {
         detail: String
     ) -> some View {
         let selected = model.direction == direction
-        return HStack(alignment: .top, spacing: 10) {
+        return HStack(alignment: .top, spacing: DesignTokens.space10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(selected ? accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(title)
                     .fontWeight(selected ? .medium : .regular)
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: DesignTokens.space0)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, DesignTokens.space4)
+        .padding(.horizontal, DesignTokens.space6)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.radius6)
                 .fill(selected ? accentColor.opacity(0.12) : Color.clear)
@@ -295,7 +295,7 @@ struct MacSyncRunSection: View {
     /// 对端曲库摘要（懒加载列表的替代：只放一行「N 首 · 约 X GB」）。
     @ViewBuilder
     private var peerSummaryRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             Image(systemName: "iphone")
                 .foregroundStyle(.secondary)
             if let facts = content.peerFacts {
@@ -311,9 +311,9 @@ struct MacSyncRunSection: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: DesignTokens.space0)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     /// 对端显示名（空则回落通用「iPhone」）。
@@ -354,10 +354,10 @@ struct MacSyncRunSection: View {
     private var libraryRow: some View {
         let selected = content.selection.isLibraryWide
         let summary = content.selectionSummary
-        return HStack(spacing: 10) {
+        return HStack(spacing: DesignTokens.space10) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(selected ? accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(libraryRowTitle)
                 Text(
                     selected
@@ -369,7 +369,7 @@ struct MacSyncRunSection: View {
             }
             Spacer()
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
         .contentShape(Rectangle())
         .onTapGesture {
             guard !selected else { return }
@@ -398,7 +398,7 @@ struct MacSyncRunSection: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     smartSourceGroup
                     playlistGroup
                 }
@@ -419,17 +419,17 @@ struct MacSyncRunSection: View {
     private var smartSourceGroup: some View {
         let sources = smartSources
         if !sources.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text("sync_source_smart_group".localized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(sources) { option in
-                    HStack(spacing: 8) {
+                    HStack(spacing: DesignTokens.space8) {
                         Image(systemName: smartIconName(option))
                             .foregroundStyle(.secondary)
                             .frame(width: 16)
                         Text(option.title)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: DesignTokens.space0)
                         Text("smart_songs_count".localized(with: option.trackCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -443,16 +443,16 @@ struct MacSyncRunSection: View {
     @ViewBuilder
     private var playlistGroup: some View {
         if !content.playlistOptions.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 if !smartSources.isEmpty {
                     Text("sync_run_mode_playlists".localized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 ForEach(content.playlistOptions) { option in
-                    HStack(spacing: 8) {
+                    HStack(spacing: DesignTokens.space8) {
                         Toggle(isOn: playlistBinding(option.id)) {
-                            HStack(spacing: 8) {
+                            HStack(spacing: DesignTokens.space8) {
                                 Text(option.title)
                                 Text("sync_run_songs_count".localized(with: option.trackCount))
                                     .font(.caption)
@@ -460,7 +460,7 @@ struct MacSyncRunSection: View {
                             }
                         }
                         .toggleStyle(.checkbox)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: DesignTokens.space0)
                         if let ref = SyncBrowseSourceRef.parse(id: option.id) {
                             pickTracksButton(ref)
                         }
@@ -501,7 +501,7 @@ struct MacSyncRunSection: View {
     @ViewBuilder
     private var sourcePicker: some View {
         if content.browseSources.count > 1 {
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.space8) {
                 Text("sync_source_label".localized)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -512,7 +512,7 @@ struct MacSyncRunSection: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
-                Spacer(minLength: 0)
+                Spacer(minLength: DesignTokens.space0)
             }
         }
     }
@@ -531,7 +531,7 @@ struct MacSyncRunSection: View {
 
     @ViewBuilder
     private var trackList: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DesignTokens.space6) {
             sourcePicker
             TextField("sync_run_track_search_placeholder".localized, text: $content.trackQuery)
                 .textFieldStyle(.roundedBorder)
@@ -554,7 +554,7 @@ struct MacSyncRunSection: View {
                 .foregroundStyle(.secondary)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
+                    LazyVStack(alignment: .leading, spacing: DesignTokens.space2) {
                         ForEach(Array(content.trackOptions.enumerated()), id: \.element.id) { index, option in
                             trackRow(option)
                                 .onAppear {
@@ -585,8 +585,8 @@ struct MacSyncRunSection: View {
 
     private func trackRow(_ option: SyncUITrackOption) -> some View {
         Toggle(isOn: trackBinding(option.relativePath)) {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: DesignTokens.space8) {
+                VStack(alignment: .leading, spacing: DesignTokens.space1) {
                     // 曲目行是「渲染出来的歌曲文本」（含对端曲库）→ 按 UI 语言归一字形；
                     // 勾选/传输仍用 relativePath（原始字段，不受显示层影响）
                     Text(DisplayScriptNormalizer.display(option.title))
@@ -619,19 +619,19 @@ struct MacSyncRunSection: View {
 
     /// 加载中一行。
     private func loadingRow(_ key: String) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             ProgressView()
                 .controlSize(.small)
             Text(key.localized)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     /// 失败一行（原因 + 重试）。
     private func failureRow(_ error: SyncUIPeerContentError) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignTokens.space8) {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
             Text(error.messageKey.localized)
@@ -642,13 +642,13 @@ struct MacSyncRunSection: View {
                 content.retryPeerContent()
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
     }
 
     @ViewBuilder
     private var selectionTotals: some View {
         let summary = content.selectionSummary
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: DesignTokens.space2) {
             if summary.isEmpty {
                 Text("sync_run_selection_empty".localized)
                     .font(.callout)
@@ -669,7 +669,7 @@ struct MacSyncRunSection: View {
                 }
             }
         }
-        .padding(.top, 2)
+        .padding(.top, DesignTokens.space2)
     }
 
     private var selectionTotalText: String {
@@ -692,7 +692,7 @@ struct MacSyncRunSection: View {
     @ViewBuilder
     private var runSection: some View {
         Section {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 if model.phase.isBusy {
                     Button("sync_run_cancel".localized, role: .destructive) {
                         model.cancelSync()
@@ -818,7 +818,7 @@ struct MacSyncRunSection: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } else {
-                    HStack(alignment: .top, spacing: 24) {
+                    HStack(alignment: .top, spacing: DesignTokens.space24) {
                         metric("sync_run_result_pushed".localized, report.pushedCount, .primary)
                         metric("sync_run_result_pulled".localized, report.pulledCount, .primary)
                         metric("sync_run_result_skipped".localized, report.skippedCount, .secondary)
@@ -829,7 +829,7 @@ struct MacSyncRunSection: View {
                         )
                         Spacer()
                     }
-                    .padding(.vertical, 2)
+                    .padding(.vertical, DesignTokens.space2)
 
                     if report.unresolvedCount > 0 {
                         Text("sync_run_result_unresolved".localized(with: report.unresolvedCount))
@@ -860,7 +860,7 @@ struct MacSyncRunSection: View {
     }
 
     private func metric(_ label: String, _ value: Int, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: DesignTokens.space2) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -875,9 +875,9 @@ struct MacSyncRunSection: View {
         DisclosureGroup(
             isExpanded: $showFailures,
             content: {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     ForEach(report.failedItems) { item in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space8) {
                             Image(systemName: item.isPush ? "arrow.up.circle" : "arrow.down.circle")
                                 .foregroundStyle(.red)
                             Text(item.relativePath.isEmpty ? item.reason : item.relativePath)
@@ -891,7 +891,7 @@ struct MacSyncRunSection: View {
                         }
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, DesignTokens.space4)
             },
             label: {
                 Text("sync_run_result_failures_header".localized(with: report.failedCount))
@@ -920,7 +920,7 @@ struct MacSyncRunSection: View {
                 }
                 .help("sync_run_playback_position_help".localized)
 
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 if dataModel.isRunning {
                     Button("sync_run_data_cancel".localized, role: .destructive) {
                         dataModel.cancel()
@@ -970,7 +970,7 @@ struct MacSyncRunSection: View {
             // 装配自检（L5，INV-16 后半句）：缺口 > 0 才显示一行；缺口 = 0 = 空态。
             // 判定全在 `SyncWiringSelfCheckPresenter`（纯逻辑），View 不写判断。
             if let wiringRow = SyncWiringSelfCheckPresenter.gapRow(wiringFacts.gaps) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(wiringRow.labelKey.localized(with: wiringRow.count))
                         .font(.callout)
                         .foregroundStyle(.orange)
@@ -996,7 +996,7 @@ struct MacSyncRunSection: View {
         } header: {
             Text("sync_run_data_section".localized)
         } footer: {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text("sync_run_data_footer".localized)
                 Text("sync_run_data_identity_footer".localized)
             }
@@ -1018,7 +1018,7 @@ struct MacSyncRunSection: View {
     private var dataResult: some View {
         let report = dataModel.report
         if dataModel.phase == .finished {
-            HStack(alignment: .top, spacing: 20) {
+            HStack(alignment: .top, spacing: DesignTokens.space20) {
                 metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
                 metric("sync_run_data_result_applied".localized, report.appliedEntries, .primary)
                 metric(
@@ -1065,7 +1065,7 @@ struct MacSyncRunSection: View {
                 metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
                 Spacer()
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, DesignTokens.space2)
 
             if report.suspendedEntries > 0 {
                 Text("sync_run_data_pending_hint".localized(with: report.suspendedEntries))
@@ -1123,12 +1123,12 @@ struct MacSyncRunSection: View {
             // 数字与顺序全部来自唯一投影 `SyncEntityOutcomeDisclosure`（UI 不自算、不枚举实体）。
             let entityRows = SyncEntityOutcomeDisclosure.rows(report.tally)
             if !entityRows.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: DesignTokens.space3) {
                     Text(SyncEntityOutcomeDisclosure.breakdownTitleKey.localized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     ForEach(Array(entityRows.enumerated()), id: \.offset) { _, row in
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space6) {
                             Text(SyncEntityOutcomeDisclosure.rowLabel(row))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -1139,7 +1139,7 @@ struct MacSyncRunSection: View {
                         }
                     }
                 }
-                .padding(.top, 2)
+                .padding(.top, DesignTokens.space2)
             }
         } else if !dataModel.isRunning {
             Text("sync_run_data_result_none".localized)

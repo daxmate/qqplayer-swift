@@ -42,28 +42,28 @@ struct MacLyricsSearchView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             searchBar
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.horizontal, DesignTokens.space20)
+                .padding(.top, DesignTokens.space8)
 
             if manualActive {
                 manualStatusRow
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.top, DesignTokens.space12)
             }
 
             if !searchError.isEmpty {
                 Text(searchError)
                     .font(.footnote)
                     .foregroundColor(.red)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.top, DesignTokens.space10)
             }
 
             content
-                .padding(.top, 12)
+                .padding(.top, DesignTokens.space12)
         }
         .frame(minWidth: 520, minHeight: 440)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -80,8 +80,8 @@ struct MacLyricsSearchView: View {
                         }
                     }
                 )
-                .padding(.top, 56)
-                .padding(.horizontal, 20)
+                .padding(.top, DesignTokens.space56)
+                .padding(.horizontal, DesignTokens.space20)
             }
         }
         .onAppear {
@@ -113,7 +113,7 @@ struct MacLyricsSearchView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
@@ -122,7 +122,7 @@ struct MacLyricsSearchView: View {
             .foregroundColor(.secondary)
             .help("lyrics_search_close".localized)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text("lyrics_search_title".localized)
                     .font(.headline)
                 Text(track.displayTitle)
@@ -138,14 +138,14 @@ struct MacLyricsSearchView: View {
                     .scaleEffect(0.8)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
+        .padding(.horizontal, DesignTokens.space20)
+        .padding(.top, DesignTokens.space14)
     }
 
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             TextField("lyrics_search_song_title".localized, text: $searchTitle)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { doSearch() }
@@ -169,7 +169,7 @@ struct MacLyricsSearchView: View {
     // MARK: - Manual Status
 
     private var manualStatusRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DesignTokens.space10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: DesignTokens.font14))
                 .foregroundColor(appAccentColor)
@@ -192,8 +192,8 @@ struct MacLyricsSearchView: View {
             }
             .buttonStyle(.link)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DesignTokens.space12)
+        .padding(.vertical, DesignTokens.space10)
         .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
     }
 
@@ -202,7 +202,7 @@ struct MacLyricsSearchView: View {
     @ViewBuilder
     private var content: some View {
         if searching && results.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Spacer()
                 ProgressView()
                 Text("lyrics_search_searching".localized)
@@ -211,7 +211,7 @@ struct MacLyricsSearchView: View {
                 Spacer()
             }
         } else if searched && results.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Spacer()
                 Image(systemName: "text.badge.xmark")
                     .font(.system(size: DesignTokens.font36))
@@ -228,13 +228,13 @@ struct MacLyricsSearchView: View {
 
     private var resultList: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: DesignTokens.space10) {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, candidate in
                     resultRow(candidate, at: index)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.horizontal, DesignTokens.space20)
+            .padding(.bottom, DesignTokens.space24)
         }
     }
 
@@ -242,16 +242,16 @@ struct MacLyricsSearchView: View {
         Button {
             apply(candidate, at: index)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 // 来源标签
                 Text(candidate.source.displayName)
                     .font(.caption2.weight(.semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, DesignTokens.space8)
+                    .padding(.vertical, DesignTokens.space4)
                     .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: DesignTokens.space3) {
                     Text(DisplayScriptNormalizer.display(candidate.title))
                         .font(.subheadline.weight(.medium))
                         .foregroundColor(.primary)
@@ -270,8 +270,8 @@ struct MacLyricsSearchView: View {
                     Text("lyrics_search_translation_badge".localized)
                         .font(.caption2.weight(.bold))
                         .foregroundColor(appAccentColor)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, DesignTokens.space6)
+                        .padding(.vertical, DesignTokens.space3)
                         .overlay(
                             RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .stroke(appAccentColor.opacity(0.6), lineWidth: 1)
@@ -288,8 +288,8 @@ struct MacLyricsSearchView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.space14)
+            .padding(.vertical, DesignTokens.space12)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius14))
             .contentShape(Rectangle())
         }

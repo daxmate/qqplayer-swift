@@ -112,7 +112,7 @@ struct PlaylistDetailScreen: View {
             List {
                 // Header section with artwork and buttons
                 Section {
-                    VStack(spacing: 16) {
+                    VStack(spacing: DesignTokens.space16) {
                         // Four-song grid artwork
                         ZStack {
                             RoundedRectangle(cornerRadius: DesignTokens.radius12)
@@ -127,12 +127,12 @@ struct PlaylistDetailScreen: View {
                                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
                             } else if tracks.count >= 4 {
                                 // 2x2 mashup for 4+ songs
-                                VStack(spacing: 2) {
-                                    HStack(spacing: 2) {
+                                VStack(spacing: DesignTokens.space2) {
+                                    HStack(spacing: DesignTokens.space2) {
                                         artworkView(at: 0, size: 124)
                                         artworkView(at: 1, size: 124)
                                     }
-                                    HStack(spacing: 2) {
+                                    HStack(spacing: DesignTokens.space2) {
                                         artworkView(at: 2, size: 124)
                                         artworkView(at: 3, size: 124)
                                     }
@@ -176,7 +176,7 @@ struct PlaylistDetailScreen: View {
                         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                         .frame(maxWidth: .infinity, alignment: .center)
 
-                        VStack(spacing: 8) {
+                        VStack(spacing: DesignTokens.space8) {
                             Text(playlist.title)
                                 .font(.title2)
                                 .fontWeight(.bold)
@@ -190,7 +190,7 @@ struct PlaylistDetailScreen: View {
                         .frame(maxWidth: .infinity)
 
                         // Play and Shuffle buttons
-                        HStack(spacing: 12) {
+                        HStack(spacing: DesignTokens.space12) {
                             Button {
                                 if let first = sortedTracks.first {
                                     Task {
@@ -206,7 +206,7 @@ struct PlaylistDetailScreen: View {
                                 }
                                 .font(.title3.weight(.semibold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, DesignTokens.space8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
                                 .background(accentColor)
@@ -229,7 +229,7 @@ struct PlaylistDetailScreen: View {
                                 }
                                 .font(.title3.weight(.semibold))
                                 .foregroundColor(accentColor)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, DesignTokens.space8)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 56)
                                 .background(accentColor.opacity(0.1))
@@ -343,11 +343,11 @@ struct PlaylistDetailScreen: View {
                             }
                         }
                         .textCase(nil)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignTokens.space16)
                     }
                 } else {
                     Section {
-                        VStack(spacing: 16) {
+                        VStack(spacing: DesignTokens.space16) {
                             Image(systemName: "music.note")
                                 .font(.system(size: DesignTokens.font40))
                                 .foregroundColor(.secondary)
@@ -361,7 +361,7 @@ struct PlaylistDetailScreen: View {
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        .padding(.vertical, DesignTokens.space40)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }

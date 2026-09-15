@@ -18,7 +18,7 @@ struct MacEQImportView: View {
     @State private var importError: String?
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Form {
                 Section(Localized.presetName) {
@@ -40,7 +40,7 @@ struct MacEQImportView: View {
                 }
 
                 Section(Localized.formatInfo) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
                         Text(Localized.expectedGraphicEQFormat)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -48,7 +48,7 @@ struct MacEQImportView: View {
                         Text("GraphicEQ: 20 -7.9; 21 -7.9; 22 -8.0; 23 -8.0; ...")
                             .font(.caption2.monospaced())
                             .foregroundColor(.secondary)
-                            .padding(8)
+                            .padding(DesignTokens.space8)
                             .background(Color.gray.opacity(0.15))
                             .cornerRadius(DesignTokens.radius4)
 
@@ -66,7 +66,7 @@ struct MacEQImportView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.space12) {
             Text(Localized.importGraphicEQ)
                 .font(.title2)
                 .fontWeight(.bold)

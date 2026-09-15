@@ -54,8 +54,8 @@ struct MacShortcutsSettingsView: View {
     // MARK: - 行
 
     private func shortcutRow(_ def: MacShortcutDef) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: DesignTokens.space3) {
+            HStack(spacing: DesignTokens.space10) {
                 Text(def.labelKey.localized)
                     .font(.callout)
                 Spacer()
@@ -69,8 +69,8 @@ struct MacShortcutsSettingsView: View {
                         .font(.callout)
                         .monospaced()
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, DesignTokens.space8)
+                        .padding(.vertical, DesignTokens.space3)
                         .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius5))
                 }
                 Button(recordingID == def.id ? "shortcuts_cancel".localized : "shortcuts_record".localized) {
@@ -93,7 +93,7 @@ struct MacShortcutsSettingsView: View {
                     .foregroundColor(.red)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.space2)
         .contentShape(Rectangle())
         // 点击整行进入录制（与按钮等效；避免再点一次按钮的困惑）
         .onTapGesture {

@@ -266,7 +266,7 @@ struct MacLyricsView: View {
     private static let lyricAnimation = Animation.spring(response: 0.55, dampingFraction: 0.92)
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Divider()
             content
@@ -274,7 +274,7 @@ struct MacLyricsView: View {
             if karaoke.isKaraokeOn {
                 Divider()
                 MacKaraokeControlBar(accentColor: appAccentColor)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, DesignTokens.space8)
             }
         }
         .background(panelBackground)
@@ -349,8 +349,8 @@ struct MacLyricsView: View {
             .help("lyrics_search_title".localized)
             // 无关闭按钮：歌词常驻显示（2026-09-02 用户拍板：歌词是本 APP 第一重要功能）
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     // MARK: - Content
@@ -383,7 +383,7 @@ struct MacLyricsView: View {
             Group {
                 if height < 200 {
                     // 极矮面板（最小 140pt）：只留图标 + 标题，不套卡片，保证不裁切
-                    VStack(spacing: 8) {
+                    VStack(spacing: DesignTokens.space8) {
                         emptyIcon(kind, size: 28)
                         Text(kind.title)
                             .font(.headline)
@@ -413,7 +413,7 @@ struct MacLyricsView: View {
                 emptyIcon(kind, size: compact ? 28 : 50)
             }
 
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.space12) {
                 Text(kind.title)
                     .font(compact ? Font.headline : Font.title)
                     .fontWeight(.bold)
@@ -431,7 +431,7 @@ struct MacLyricsView: View {
         }
         .padding(compact ? 20 : 44)
         .background(cardBackground)
-        .padding(.horizontal, 40)
+        .padding(.horizontal, DesignTokens.space40)
     }
 
     /// 外圈径向辉光（跟随主题色）
@@ -526,7 +526,7 @@ struct MacLyricsView: View {
             ScrollViewReader { proxy in
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        VStack(spacing: DesignTokens.space0) {
                             // 上下等距撑开 → 当前行恒在面板垂直中央
                             Spacer()
                                 .frame(height: max(geometry.size.height / 2 - 40, 0))
@@ -551,7 +551,7 @@ struct MacLyricsView: View {
                     // 面板内不禁用滚动：Mac 无 iOS 的手势冲突，用户可手动翻，行变化时回中心
 
                     // 上下边缘渐隐（面板可矮到 140pt → 渐隐高度随面板收缩）
-                    VStack(spacing: 0) {
+                    VStack(spacing: DesignTokens.space0) {
                         LinearGradient(colors: fadeColors(top: true), startPoint: .top, endPoint: .bottom)
                             .frame(height: min(150, geometry.size.height * 0.22))
 
@@ -605,7 +605,7 @@ struct MacLyricsView: View {
     private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
         let emphasis = emphasisValue(isActive: isActive, distance: distance)
         let isKaraoke = karaoke.isKaraokeOn
-        return VStack(spacing: 4) {
+        return VStack(spacing: DesignTokens.space4) {
             Text(line.displayText)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -651,7 +651,7 @@ struct MacLyricsView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 32)
+        .padding(.horizontal, DesignTokens.space32)
         .padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))
         .id(index)
         .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke), anchor: .center)
@@ -675,7 +675,7 @@ struct MacLyricsView: View {
                 Circle()
                     .fill(appAccentColor)
                     .frame(width: 7, height: 7)
-                    .padding(.trailing, 26)
+                    .padding(.trailing, DesignTokens.space26)
             }
         }
     }
@@ -691,8 +691,8 @@ struct MacLyricsView: View {
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 16)
+                .padding(.horizontal, DesignTokens.space32)
+                .padding(.vertical, DesignTokens.space16)
         }
     }
 }

@@ -50,7 +50,7 @@ struct MacScrapeBatchProgressView: View {
     @State private var truncated = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: DesignTokens.space0) {
             header
             Divider()
             content
@@ -64,12 +64,12 @@ struct MacScrapeBatchProgressView: View {
     // MARK: - Header（标题 + 模式说明）
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: DesignTokens.space10) {
             Image(systemName: libraryMode ? "books.vertical" : "tag")
                 .font(.system(size: DesignTokens.font15))
                 .foregroundColor(appAccentColor)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 3) {
+                .padding(.top, DesignTokens.space2)
+            VStack(alignment: .leading, spacing: DesignTokens.space3) {
                 Text(libraryMode ? "scraping_batch_run_library".localized : "context_batch_scrape".localized)
                     .font(.headline)
                 Text(libraryMode ? "batch_mode_library".localized : "batch_mode_paths".localized)
@@ -89,8 +89,8 @@ struct MacScrapeBatchProgressView: View {
                 .help("batch_cancel_help".localized)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space12)
     }
 
     // MARK: - Content（逐首结果列表 / 提示态）
@@ -105,19 +105,19 @@ struct MacScrapeBatchProgressView: View {
             )
         } else {
             ScrollView {
-                LazyVStack(spacing: 2) {
+                LazyVStack(spacing: DesignTokens.space2) {
                     ForEach(results, id: \.path) { result in
                         resultRow(result)
                     }
                 }
-                .padding(8)
+                .padding(DesignTokens.space8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
     private func hintPane(icon: String, text: String, color: Color) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignTokens.space8) {
             Image(systemName: icon)
                 .font(.system(size: DesignTokens.font26))
                 .foregroundColor(color)
@@ -127,13 +127,13 @@ struct MacScrapeBatchProgressView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
+        .padding(DesignTokens.space24)
     }
 
     private func resultRow(_ result: ScrapeBatchResult) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: DesignTokens.space8) {
             statusIcon(result.status)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(URL(fileURLWithPath: result.path).lastPathComponent)
                     .font(.callout)
                     .lineLimit(1)
@@ -143,10 +143,10 @@ struct MacScrapeBatchProgressView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: DesignTokens.space4)
         }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 8)
+        .padding(.vertical, DesignTokens.space5)
+        .padding(.horizontal, DesignTokens.space8)
         .background(Color.gray.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
     }
 
@@ -167,7 +167,7 @@ struct MacScrapeBatchProgressView: View {
         return Image(systemName: icon)
             .foregroundColor(color)
             .font(.system(size: DesignTokens.font13))
-            .padding(.top, 1)
+            .padding(.top, DesignTokens.space1)
     }
 
     /// written → 写成的字段（本地化字段名）；skipped/failed → reason（web 同文案）
@@ -196,7 +196,7 @@ struct MacScrapeBatchProgressView: View {
     private var footer: some View {
         switch phase {
         case .running:
-            HStack(spacing: 10) {
+            HStack(spacing: DesignTokens.space10) {
                 Text("batch_running".localized(with: plannedTotal))
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -213,11 +213,11 @@ struct MacScrapeBatchProgressView: View {
                 }
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space10)
         case .finished:
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: DesignTokens.space12) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     summaryLine
                     if truncated {
                         Text("batch_truncated".localized)
@@ -231,10 +231,10 @@ struct MacScrapeBatchProgressView: View {
                 }
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space10)
         case .failed(let message):
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.space12) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
                 Text(message)
@@ -247,8 +247,8 @@ struct MacScrapeBatchProgressView: View {
                 }
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space10)
         default:
             // starting / disabled：只留一个关闭按钮
             HStack {
@@ -258,8 +258,8 @@ struct MacScrapeBatchProgressView: View {
                 }
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space10)
         }
     }
 
@@ -268,7 +268,7 @@ struct MacScrapeBatchProgressView: View {
         let written = results.filter { $0.status == "written" }.count
         let skipped = results.filter { $0.status == "skipped" }.count
         let failed = results.filter { $0.status == "failed" }.count
-        return HStack(spacing: 8) {
+        return HStack(spacing: DesignTokens.space8) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.green)
             Text("batch_summary".localized(with: written, skipped, failed))
