@@ -44,28 +44,19 @@ extension LyricsManager {
         }
     }
 
-    /// LRC 文本 + 可选翻译 → Lyrics；翻译按时间戳（容差 0.6s）合并进对应行
-    func makeLyrics(fromLRC lrcText: String, tlyric: String?) -> Lyrics {
+    /// 附轨（翻译 / 罗马音）合并的时间戳容差（与桌面版 merge_translation 一致）
+    static let attachedTrackTolerance: TimeInterval = 0.6
+
+    /// LRC 文本 + 可选翻译/罗马音 → Lyrics；两条附轨各自按时间戳（容差 0.6s）合并进对应行。
+    func makeLyrics(fromLRC lrcText: String, tlyric: String?, romalrc: String? = nil) -> Lyrics {
         let base = parseLyrics(lrcText, source: .netease)
-        guard var synced = base.syncedLyrics.isEmpty ? nil : base.syncedLyrics,
-              let tlyric, !tlyric.isEmpty else {
+        guard var synced = base.syncedLyrics.isEmpty ? nil : base.syncedLyrics else {
             return base
         }
 
-        let translationLines = parseSyncedLyrics(tlyric)
-        guard !translationLines.isEmpty else { return base }
-
-        for i in synced.indices {
-            guard let ts = synced[i].timestamp else { continue }
-            // 找时间戳最接近的翻译行（容差 0.6s，与桌面版 merge_translation 一致）
-            let match = translationLines.first { tLine in
-                guard let t = tLine.timestamp else { return false }
-                return abs(t - ts) <= 0.6
-            }
-            if let match {
-                synced[i].translation = match.text
-            }
-        }
+        let mergedTranslation = mergeAttachedTrack(tlyric, into: &synced, keyPath: \.translation)
+        let mergedRoman = mergeAttachedTrack(romalrc, into: &synced, keyPath: \.roman)
+        guard mergedTranslation || mergedRoman else { return base }
 
         return Lyrics(
             plainLyrics: base.plainLyrics,
@@ -73,6 +64,31 @@ extension LyricsManager {
             isInstrumental: base.isInstrumental,
             source: .netease
         )
+    }
+
+    /// 把一条附轨（翻译 / 罗马音）按时间戳合并进主歌词行；该附轨缺失/无有效行时返回 false。
+    /// 合并只有这一处实现：翻译与罗马音都走它（keyPath 决定写哪个字段），禁止再写第二份。
+    private func mergeAttachedTrack(
+        _ text: String?,
+        into lines: inout [LyricsLine],
+        keyPath: WritableKeyPath<LyricsLine, String?>
+    ) -> Bool {
+        guard let text, !text.isEmpty else { return false }
+        let attachedLines = parseSyncedLyrics(text)
+        guard !attachedLines.isEmpty else { return false }
+
+        for i in lines.indices {
+            guard let ts = lines[i].timestamp else { continue }
+            // 找时间戳最接近的附轨行
+            let match = attachedLines.first { line in
+                guard let t = line.timestamp else { return false }
+                return abs(t - ts) <= Self.attachedTrackTolerance
+            }
+            if let match {
+                lines[i][keyPath: keyPath] = match.text
+            }
+        }
+        return true
     }
 
     // MARK: - LRCLIB API

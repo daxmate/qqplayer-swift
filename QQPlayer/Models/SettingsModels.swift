@@ -209,6 +209,8 @@ struct DeleteSettings: Codable {
     var lyricFontSize: Double = 15
     /// 歌词译文行显示（web 版 lyric showZh 对齐，默认显示）
     var lyricShowTranslation: Bool = true
+    /// 歌词罗马音行显示（web 版 lyric showRoma 对齐，默认显示；只有带罗马音的曲目会出现该行）
+    var lyricShowRoman: Bool = true
     /// 歌词整体延迟校准秒（>0 = 歌词比声音延后；web 版 lyric offset 对齐，默认 0）
     var lyricOffset: Double = 0
     /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
@@ -283,6 +285,7 @@ struct DeleteSettings: Codable {
         quarkQuality = try container.decodeIfPresent(String.self, forKey: .quarkQuality) ?? "mp3"
         lyricFontSize = try container.decodeIfPresent(Double.self, forKey: .lyricFontSize) ?? 15
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
+        lyricShowRoman = try container.decodeIfPresent(Bool.self, forKey: .lyricShowRoman) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
         visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
         showMiniWindowButton = try container.decodeIfPresent(Bool.self, forKey: .showMiniWindowButton) ?? true

@@ -177,6 +177,7 @@ struct Localized {
     static let lyricsDisplay = "lyrics_display".localized
     static let lyricsFontSize = "lyrics_font_size".localized
     static let lyricsShowTranslation = "lyrics_show_translation".localized
+    static let lyricsShowRoman = "lyrics_show_roman".localized
     static let lyricsCalibration = "lyrics_calibration".localized
     static let lyricsOffset = "lyrics_offset".localized
     static let lyricsOffsetReset = "lyrics_offset_reset".localized

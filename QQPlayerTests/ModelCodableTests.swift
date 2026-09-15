@@ -82,6 +82,25 @@ struct ModelCodableTests {
         }
     }
 
+    // MARK: - LyricsLine（歌词行：新增附轨字段不得破坏旧歌词缓存 / 手动歌词）
+
+    @Test("LyricsLine 旧 JSON（无 roman 键）解码为 nil —— 老缓存向后兼容")
+    func lyricsLineLegacyJSONDecodes() throws {
+        let json = #"{"timestamp":12.5,"text":"残酷な天使のように","translation":"就像那残酷的天使一样"}"#
+        let line = try JSONDecoder().decode(LyricsLine.self, from: Data(json.utf8))
+        #expect(line.text == "残酷な天使のように")
+        #expect(line.translation == "就像那残酷的天使一样")
+        #expect(line.roman == nil)
+    }
+
+    @Test("LyricsLine 含 roman 的 JSON round-trip 保持全部字段")
+    func lyricsLineRomanRoundTrip() throws {
+        let line = LyricsLine(timestamp: 1, text: "原文", translation: "译文", roman: "ge n bu n")
+        let decoded = try JSONDecoder().decode(LyricsLine.self, from: try JSONEncoder().encode(line))
+        #expect(decoded == line)
+        #expect(decoded.roman == "ge n bu n")
+    }
+
     // MARK: - WidgetTrackData（跨进程共享，字段改动会破坏 Widget）
 
     @Test("WidgetTrackData JSON round-trip")

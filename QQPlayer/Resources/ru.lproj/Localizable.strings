@@ -125,6 +125,7 @@
 "lyrics_display" = "Отображение";
 "lyrics_font_size" = "Размер текста";
 "lyrics_show_translation" = "Показывать перевод";
+"lyrics_show_roman" = "Показывать ромадзи";
 "lyrics_calibration" = "Калибровка";
 "lyrics_offset" = "Задержка текста";
 "lyrics_offset_reset" = "Сброс";

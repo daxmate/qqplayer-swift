@@ -192,17 +192,20 @@ struct DisplayScriptNormalizerTests {
         #expect(album.title == "專輯")
     }
 
-    @Test("LyricsLine.displayText/displayTranslation 跟随当前方向；nil 保持 nil")
+    @Test("LyricsLine.displayText/displayRoman/displayTranslation 跟随当前方向；nil 保持 nil")
     func lyricsLineDisplay() {
         let toTraditional = DisplayScriptNormalizer.current == .toTraditional
-        let line = LyricsLine(timestamp: 12.5, text: "周杰倫", translation: "專輯")
+        let line = LyricsLine(timestamp: 12.5, text: "周杰倫", translation: "專輯", roman: "zhou jie lun")
         #expect(line.displayText == (toTraditional ? "周傑倫" : "周杰伦"))
         #expect(line.displayTranslation == (toTraditional ? "專輯" : "专辑"))
+        #expect(line.displayRoman == "zhou jie lun")
         #expect(line.text == "周杰倫")
         #expect(line.translation == "專輯")
+        #expect(line.roman == "zhou jie lun")
 
-        let noTranslation = LyricsLine(timestamp: nil, text: "東京の夜", translation: nil)
-        #expect(noTranslation.displayTranslation == nil)
-        #expect(noTranslation.displayText == "東京の夜")
+        let noAttached = LyricsLine(timestamp: nil, text: "東京の夜", translation: nil)
+        #expect(noAttached.displayTranslation == nil)
+        #expect(noAttached.displayRoman == nil)
+        #expect(noAttached.displayText == "東京の夜")
     }
 }

@@ -217,6 +217,16 @@ struct LyricsView: View {
                     y: 0
                 )
 
+            // 罗马音（网易云 romalrc；仅日语等有数据的曲目非空）—— 原文下、译文上，比译文小一档
+            if settings.lyricShowRoman, let roman = line.displayRoman, !roman.isEmpty {
+                Text(roman)
+                    .font(.system(size: romanFontSize(isActive: isActive, distance: distance), weight: .regular))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundColor(romanColor(distance: distance, isActive: isActive))
+                    .multilineTextAlignment(.center)
+            }
+
             if let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)
                     .font(.system(size: translationFontSize(isActive: isActive, distance: distance), weight: .regular))
@@ -286,6 +296,16 @@ struct LyricsView: View {
         } else {
             return .secondary.opacity(0.25)
         }
+    }
+
+    /// 罗马音字号：复用译文那套阶梯（同一实现），整体小一档
+    private func romanFontSize(isActive: Bool, distance: Int) -> CGFloat {
+        max(11, translationFontSize(isActive: isActive, distance: distance) - 2)
+    }
+
+    /// 罗马音颜色：复用译文那套颜色，再淡一档
+    private func romanColor(distance: Int, isActive: Bool) -> Color {
+        translationColor(distance: distance, isActive: isActive).opacity(0.85)
     }
 
     private func fontForLine(isActive: Bool, distance: Int) -> Font {

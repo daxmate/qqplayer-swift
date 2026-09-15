@@ -187,6 +187,7 @@ struct MacDesktopLyricView: View {
     /// 字号（设置页改动经 qqplayerSettingsDidChange 刷新）
     @State private var fontSize: Double = DeleteSettings.load().desktopLyricFontSize
     @State private var showTranslation = DeleteSettings.load().lyricShowTranslation
+    @State private var showRoman = DeleteSettings.load().lyricShowRoman
     @State private var lyricOffset: Double = DeleteSettings.load().lyricOffset
 
     var body: some View {
@@ -204,6 +205,7 @@ struct MacDesktopLyricView: View {
             let settings = DeleteSettings.load()
             fontSize = settings.desktopLyricFontSize
             showTranslation = settings.lyricShowTranslation
+            showRoman = settings.lyricShowRoman
             lyricOffset = settings.lyricOffset
         }
     }
@@ -219,6 +221,15 @@ struct MacDesktopLyricView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.6)
+                if showRoman, let roman = line.displayRoman, !roman.isEmpty {
+                    Text(roman)
+                        .font(.system(size: fontSize * 0.45, weight: .regular))
+                        .foregroundColor(.white.opacity(0.72))
+                        .shadow(color: .black.opacity(0.45), radius: 2, x: 0, y: 1)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.6)
+                }
                 if showTranslation, let translation = line.displayTranslation, !translation.isEmpty {
                     Text(translation)
                         .font(.system(size: fontSize * 0.55, weight: .regular))

@@ -137,6 +137,7 @@
 "lyrics_display" = "显示";
 "lyrics_font_size" = "歌词字号";
 "lyrics_show_translation" = "显示译文";
+"lyrics_show_roman" = "显示罗马音";
 "lyrics_calibration" = "校准";
 "lyrics_offset" = "歌词延迟";
 "lyrics_offset_reset" = "归零";

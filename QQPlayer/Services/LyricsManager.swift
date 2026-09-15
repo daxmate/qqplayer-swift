@@ -218,7 +218,7 @@ actor LyricsManager {
         let lyrics: Lyrics
         switch candidate.source {
         case .netease:
-            lyrics = makeLyrics(fromLRC: candidate.text, tlyric: candidate.tlyric)
+            lyrics = makeLyrics(fromLRC: candidate.text, tlyric: candidate.tlyric, romalrc: candidate.romalrc)
         case .lrclib:
             lyrics = parseLyrics(candidate.text, source: .lrclib)
         }

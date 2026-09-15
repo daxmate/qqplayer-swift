@@ -137,6 +137,7 @@
 "lyrics_display" = "Display";
 "lyrics_font_size" = "Lyrics font size";
 "lyrics_show_translation" = "Show translation";
+"lyrics_show_roman" = "Show romanization";
 "lyrics_calibration" = "Calibration";
 "lyrics_offset" = "Lyrics delay";
 "lyrics_offset_reset" = "Reset";

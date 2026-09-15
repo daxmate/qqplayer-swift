@@ -192,6 +192,10 @@ private struct MacLyricsSettingsView: View {
                     .onChange(of: deleteSettings.lyricShowTranslation) { _ in
                         deleteSettings.save()
                     }
+                Toggle(Localized.lyricsShowRoman, isOn: $deleteSettings.lyricShowRoman)
+                    .onChange(of: deleteSettings.lyricShowRoman) { _ in
+                        deleteSettings.save()
+                    }
             }
 
             Section {

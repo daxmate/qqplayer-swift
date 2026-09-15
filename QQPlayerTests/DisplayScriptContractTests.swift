@@ -47,6 +47,7 @@ enum DisplayScriptContract {
         "track.genre",
         "line.text",
         "line.translation",
+        "line.roman",
         "candidate.title",
         "candidate.artist",
     ]

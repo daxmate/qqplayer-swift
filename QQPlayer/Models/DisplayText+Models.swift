@@ -40,4 +40,9 @@ extension LyricsLine {
     var displayTranslation: String? {
         translation.map { DisplayScriptNormalizer.display($0) }
     }
+
+    /// 歌词罗马音（可空；空值与原始字段一致为 nil）
+    var displayRoman: String? {
+        roman.map { DisplayScriptNormalizer.display($0) }
+    }
 }

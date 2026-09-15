@@ -36,6 +36,8 @@ struct LyricsSearchCandidate: Codable, Equatable, Identifiable, Sendable {
     let text: String
     /// 中文翻译 LRC（仅网易云）
     let tlyric: String?
+    /// 罗马音 LRC（仅网易云，且仅部分曲目有；旧缓存无此键 = nil）
+    let romalrc: String?
 
     init(
         id: UUID = UUID(),
@@ -44,7 +46,8 @@ struct LyricsSearchCandidate: Codable, Equatable, Identifiable, Sendable {
         artist: String,
         duration: Double?,
         text: String,
-        tlyric: String?
+        tlyric: String?,
+        romalrc: String? = nil
     ) {
         self.id = id
         self.source = source
@@ -53,6 +56,7 @@ struct LyricsSearchCandidate: Codable, Equatable, Identifiable, Sendable {
         self.duration = duration
         self.text = text
         self.tlyric = tlyric
+        self.romalrc = romalrc
     }
 }
 
@@ -113,7 +117,8 @@ struct LyricsSearchProvider: Sendable {
                             artist: song.artist,
                             duration: song.duration,
                             text: result.lrc,
-                            tlyric: result.tlyric
+                            tlyric: result.tlyric,
+                            romalrc: result.romalrc
                         )
                     )
                 }

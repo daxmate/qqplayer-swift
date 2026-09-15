@@ -172,10 +172,17 @@ private struct LyricLineEmphasis: ViewModifier, Animatable {
 /// 跟唱 当前 16 / 其余 14），字号与颜色都按 emphasis 插值、字号 ×fontScale。
 /// 整行透明度/缩放仍由行容器统一施加。
 private struct LyricTranslationEmphasis: ViewModifier, Animatable {
+    /// 次要行层级：译文（原档）/ 罗马音（同一套插值，比译文小一档）
+    enum Tier {
+        case translation
+        case roman
+    }
+
     var emphasis: Double
     let accent: Color
     let fontScale: CGFloat
     let karaoke: Bool
+    var tier: Tier = .translation
 
     var animatableData: Double {
         get { emphasis }
@@ -188,11 +195,16 @@ private struct LyricTranslationEmphasis: ViewModifier, Animatable {
             .foregroundColor(color)
     }
 
+    /// 字号阶梯：译文与罗马音共用这一张表（罗马音整体小一档）
     private var size: CGFloat {
-        let value = karaoke
-            ? lyricLerp(emphasis, [(1.0, 16), (0.66, 14)])
-            : lyricLerp(emphasis, [(1.0, 16), (0.66, 14), (0.20, 13)])
-        return CGFloat(value)
+        let table: [(Double, Double)]
+        switch (karaoke, tier) {
+        case (true, .translation): table = [(1.0, 16), (0.66, 14)]
+        case (true, .roman): table = [(1.0, 14), (0.66, 12)]
+        case (false, .translation): table = [(1.0, 16), (0.66, 14), (0.20, 13)]
+        case (false, .roman): table = [(1.0, 14), (0.66, 12), (0.20, 11)]
+        }
+        return CGFloat(lyricLerp(emphasis, table))
     }
 
     private var color: Color {
@@ -240,6 +252,7 @@ struct MacLyricsView: View {
     /// 字号（12–22pt，默认 15）语义 = 整体缩放系数：所有字号等比 ×(fontSize / 15)。
     @State private var fontSize: Double = 15
     @State private var showTranslation = true
+    @State private var showRoman = true
     @State private var lyricOffset: Double = 0
 
     /// 面板底色（对齐 iOS 的 systemBackground）
@@ -302,6 +315,7 @@ struct MacLyricsView: View {
         let settings = DeleteSettings.load()
         fontSize = settings.lyricFontSize
         showTranslation = settings.lyricShowTranslation
+        showRoman = settings.lyricShowRoman
         lyricOffset = settings.lyricOffset
         karaoke.lyricOffset = settings.lyricOffset
     }
@@ -604,6 +618,22 @@ struct MacLyricsView: View {
                         karaoke: isKaraoke
                     )
                 )
+
+            if showRoman, let roman = line.displayRoman, !roman.isEmpty {
+                Text(roman)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
+                    .modifier(
+                        LyricTranslationEmphasis(
+                            emphasis: emphasis,
+                            accent: appAccentColor,
+                            fontScale: fontScale,
+                            karaoke: isKaraoke,
+                            tier: .roman
+                        )
+                    )
+            }
 
             if showTranslation, let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)

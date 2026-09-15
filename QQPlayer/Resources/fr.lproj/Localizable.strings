@@ -125,6 +125,7 @@
 "lyrics_display" = "Affichage";
 "lyrics_font_size" = "Taille du texte";
 "lyrics_show_translation" = "Afficher la traduction";
+"lyrics_show_roman" = "Afficher la romanisation";
 "lyrics_calibration" = "Calibrage";
 "lyrics_offset" = "Décalage des paroles";
 "lyrics_offset_reset" = "Réinitialiser";

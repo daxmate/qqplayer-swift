@@ -123,6 +123,47 @@ struct NeteaseLyricsMergeTests {
         #expect(lyrics.source == .netease)
     }
 
+    @Test("罗马音按时间戳合并进对应歌词行（与翻译同一套容差）")
+    func mergeRomanByTimestamp() async {
+        let lrc = """
+        [00:01.00]残酷な天使のように
+        [00:05.00]少年よ 神話になれ
+        """
+        let romalrc = """
+        [00:01.30]za n ko ku na te n shi no yo u ni
+        [00:05.00]sho u ne n yo shi n wa ni na re
+        """
+        let manager = LyricsManager.shared
+        let lyrics = await manager.makeLyrics(fromLRC: lrc, tlyric: nil, romalrc: romalrc)
+
+        #expect(lyrics.syncedLyrics.count == 2)
+        // 0.3s 差距在 0.6s 容差内 → 合并
+        #expect(lyrics.syncedLyrics[0].roman == "za n ko ku na te n shi no yo u ni")
+        #expect(lyrics.syncedLyrics[1].roman == "sho u ne n yo shi n wa ni na re")
+        // 没有翻译轨时不影响译文占位
+        #expect(lyrics.syncedLyrics[0].translation == nil)
+    }
+
+    @Test("罗马音与翻译同时合并：两条附轨各写各的字段，互不覆盖")
+    func mergeBothAttachedTracks() async {
+        let lrc = "[00:02.46]残酷な天使のように"
+        let tlyric = "[00:02.46]就像那残酷的天使一样"
+        let romalrc = "[00:02.46]za n ko ku na te n shi no yo u ni"
+        let manager = LyricsManager.shared
+        let lyrics = await manager.makeLyrics(fromLRC: lrc, tlyric: tlyric, romalrc: romalrc)
+
+        #expect(lyrics.syncedLyrics[0].translation == "就像那残酷的天使一样")
+        #expect(lyrics.syncedLyrics[0].roman == "za n ko ku na te n shi no yo u ni")
+    }
+
+    @Test("无罗马音时不占位：roman 保持 nil，译文照常")
+    func noRomanStaysNil() async {
+        let manager = LyricsManager.shared
+        let lyrics = await manager.makeLyrics(fromLRC: "[00:01.00]海", tlyric: "[00:01.00]sea", romalrc: nil)
+        #expect(lyrics.syncedLyrics[0].roman == nil)
+        #expect(lyrics.syncedLyrics[0].translation == "sea")
+    }
+
     @Test("纯文本歌词（无时间戳）保持 plainLyrics")
     func plainLyrics() async {
         let text = "海\n棠\n花"

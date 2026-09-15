@@ -35,6 +35,8 @@ struct NeteaseSong: Codable, Equatable, Sendable {
 struct NeteaseLyricResult: Sendable {
     let lrc: String
     let tlyric: String?
+    /// 罗马音 LRC（网易云 romalrc；仅部分曲目有，没有就是 nil）
+    let romalrc: String?
 }
 
 // MARK: - 有序 JSON（eapi 报文序列化，与桌面端 json.dumps(separators=(",",":")) 字节级一致）
@@ -301,15 +303,19 @@ struct NeteaseLyricsProvider: Sendable {
             return nil
         }
         let lrc = wordJSONToLRC(lrcRaw)
-        var tlyric: String?
-        if let tDict = obj["tlyric"] as? [String: Any],
-           let tRaw = tDict["lyric"] as? String {
-            let converted = wordJSONToLRC(tRaw)
-            if !converted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                tlyric = converted
-            }
+        // 附轨（中文翻译 tlyric / 罗马音 romalrc）解析：{"lyric": ...} → LRC；空白串按 nil。
+        // 唯一实现：两条附轨共用同一份解析，别再各写一份。
+        func parseAttachedTrack(_ key: String) -> String? {
+            guard let dict = obj[key] as? [String: Any],
+                  let raw = dict["lyric"] as? String else { return nil }
+            let converted = wordJSONToLRC(raw)
+            return converted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : converted
         }
-        return NeteaseLyricResult(lrc: lrc, tlyric: tlyric)
+        return NeteaseLyricResult(
+            lrc: lrc,
+            tlyric: parseAttachedTrack("tlyric"),
+            romalrc: parseAttachedTrack("romalrc")
+        )
     }
 
     // MARK: - 内部
