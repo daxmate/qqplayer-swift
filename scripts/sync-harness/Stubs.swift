@@ -97,6 +97,8 @@ struct SyncContentHashResolver: SyncIdentityResolving {
     func contentHash(forTrackStableId stableId: String) throws -> String? { nil }
 
     func trackStableId(forContentHash contentHash: String) throws -> String? { nil }
+
+    func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)? { nil }
 }
 
 // MARK: - DatabaseSyncCollectionFacts.liveMembersProvider（生产在 Services/，未被 harness 编入）

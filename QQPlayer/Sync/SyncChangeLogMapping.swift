@@ -99,6 +99,42 @@ struct SyncContentHashResolver {
         )
     }
 
+    /// 路径 → 身份（`track.path` 键形态 = 绝对路径）：先精确匹配，再退标准形态。
+    /// **不做** `getTrack(byPath:)` 的全表回落——同步线程（NW 队列）上不容忍 O(库) 扫描；
+    /// 曲库清单里的路径与 `track.path` 同源（`SyncLocalLibraryScanner`），精确匹配即命中。
+    func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)? {
+        try database.read { db in
+            try Self.trackIdentity(db, atAbsolutePath: path)
+        }
+    }
+
+    /// 事务内版本（调用方已持有读事务时用）。
+    static func trackIdentity(
+        _ db: Database,
+        atAbsolutePath path: String
+    ) throws -> (stableId: String, contentHash: String?)? {
+        if let row = try pathIdentityRow(db, atAbsolutePath: path) { return row }
+        let standardized = DatabaseManager.standardizedPath(path)
+        if standardized != path, let row = try pathIdentityRow(db, atAbsolutePath: standardized) { return row }
+        return nil
+    }
+
+    /// 单条路径键查询（精确匹配；标准形态回落由调用方决定，见上）。
+    private static func pathIdentityRow(
+        _ db: Database,
+        atAbsolutePath path: String
+    ) throws -> (stableId: String, contentHash: String?)? {
+        let row = try Row.fetchOne(
+            db,
+            sql: "SELECT stable_id, content_hash FROM track WHERE path = ? LIMIT 1",
+            arguments: [path]
+        )
+        guard let row else { return nil }
+        let stableId: String = row["stable_id"]
+        let contentHash: String? = row["content_hash"]
+        return (stableId: stableId, contentHash: contentHash)
+    }
+
     // MARK: 发送侧诊断用的三态查询
 
     /// 本地 stableId 的身份键三态：区分「没有 track 行」与「有行但指纹为空」。

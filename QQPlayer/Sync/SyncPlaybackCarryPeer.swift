@@ -51,20 +51,21 @@ struct SyncPlaybackCarryDatabaseFacts: SyncPlaybackCarryFactsProviding {
     /// 曲库根（相对路径 → 绝对路径；track.path 存绝对路径）。
     let libraryRoot: URL
 
+    /// 身份解析的唯一入口（B1b）：路径键取数走它，本类型不再自带 SQL。
+    private var identity: any SyncIdentityResolving { SyncContentHashResolver(database: database) }
+
     /// 参与携带的歌维度实体（与 `SyncChangeEntity.v1Synced` 一致，去掉非歌维度的 playlist）。
     static let trackScopedEntities: [SyncChangeEntity] = SyncChangeEntity.v1Synced.filter { $0 != .playlist }
 
     func trackFact(atRelativePath relativePath: String) -> SyncCollectionTrackFact? {
         guard let normalized = SyncManifestGenerator.normalizeRelativePath(relativePath) else { return nil }
         let absolutePath = libraryRoot.appendingPathComponent(normalized).path
-        let row: (String, String?)? = try? database.read { db in
-            try Self.trackRow(db, atAbsolutePath: absolutePath)
-        }
-        guard let row else { return nil }
+        // 取数失败一律按「查不到」返回（协议约定不抛）。
+        guard let row = (try? identity.trackIdentity(atAbsolutePath: absolutePath)) ?? nil else { return nil }
         return SyncCollectionTrackFact(
-            stableId: row.0,
+            stableId: row.stableId,
             relativePath: normalized,
-            contentHash: row.1
+            contentHash: row.contentHash
         )
     }
 
@@ -97,26 +98,8 @@ struct SyncPlaybackCarryDatabaseFacts: SyncPlaybackCarryFactsProviding {
     }
 
     /// 按绝对路径取 (stable_id, content_hash)：先精确匹配，再退标准形态。
-    /// 不做 `getTrack(byPath:)` 的全表回落（同步线程上不能容忍 O(库) 扫描）——
-    /// 曲库清单里的路径与 track.path 同源（`SyncLocalLibraryScanner`），精确匹配即命中。
-    private static func trackRow(_ db: Database, atAbsolutePath path: String) throws -> (String, String?)? {
-        if let row = try query(db, path: path) { return row }
-        let standardized = DatabaseManager.standardizedPath(path)
-        if standardized != path, let row = try query(db, path: standardized) { return row }
-        return nil
-    }
-
-    private static func query(_ db: Database, path: String) throws -> (String, String?)? {
-        let row = try Row.fetchOne(
-            db,
-            sql: "SELECT stable_id, content_hash FROM track WHERE path = ? LIMIT 1",
-            arguments: [path]
-        )
-        guard let row else { return nil }
-        let stableId: String = row["stable_id"]
-        let contentHash: String? = row["content_hash"]
-        return (stableId, contentHash)
-    }
+    /// （B1b：本实现搬到唯一身份入口 `SyncIdentityResolving.trackIdentity(atAbsolutePath:)`，
+    /// 不再自写 SQL——同步线程约束（不扫全表）由入口一并承接。）
 }
 
 // MARK: - 会话级携带驱动（R3a 编排注入）

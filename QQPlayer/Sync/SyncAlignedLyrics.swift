@@ -56,6 +56,14 @@ protocol SyncIdentityResolving: Sendable {
 
     /// content_hash → 本地 stableId（无此歌 = nil）。
     func trackStableId(forContentHash contentHash: String) throws -> String?
+
+    /// 曲库路径 → 身份（B1b，2026-09-15）：`track.path` 的键形态（**绝对路径**）
+    /// → (stableId, content_hash)。相对路径 → 绝对路径的换算留在调用方（那是曲库根知识，
+    /// 不属于身份解析）。
+    ///
+    /// 语义：**精确命中即返回**，再退标准形态；不做 `getTrack(byPath:)` 式全表回落——
+    /// 同步线程（NW 队列）上不容忍 O(库) 扫描（这是既有生产约束，不得放宽）。
+    func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)?
 }
 
 // MARK: - 线上命名空间
