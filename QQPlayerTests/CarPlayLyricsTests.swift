@@ -88,6 +88,45 @@ struct CarPlayLyricsBuilderTests {
         #expect(rows[2].translation == nil)
     }
 
+    @Test("罗马音随行带出；showRoman=false 时不带（副行退回译文）")
+    func romanCarriedAndToggleable() {
+        var lines = makeLines(["残酷な天使のように"])
+        lines[0].translation = "就像那残酷的天使一样"
+        lines[0].roman = "za n ko ku na te n shi no yo u ni"
+
+        let on = CarPlayLyricsBuilder.content(
+            trackTitle: "T",
+            lyrics: makeLyrics(lines),
+            isLoading: false,
+            activeLineIndex: 0
+        )
+        #expect(on.rows[0].roman == "za n ko ku na te n shi no yo u ni")
+        #expect(on.rows[0].translation == "就像那残酷的天使一样")
+
+        let off = CarPlayLyricsBuilder.content(
+            trackTitle: "T",
+            lyrics: makeLyrics(lines),
+            isLoading: false,
+            activeLineIndex: 0,
+            showRoman: false
+        )
+        #expect(off.rows[0].roman == nil)
+        #expect(off.rows[0].translation == "就像那残酷的天使一样")
+    }
+
+    @Test("空串罗马音等同没有（与译文同口径）")
+    func emptyRomanTreatedAsAbsent() {
+        var lines = makeLines(["あ"])
+        lines[0].roman = ""
+        let content = CarPlayLyricsBuilder.content(
+            trackTitle: "T",
+            lyrics: makeLyrics(lines),
+            isLoading: false,
+            activeLineIndex: 0
+        )
+        #expect(content.rows[0].roman == nil)
+    }
+
     @Test("歌词文本走显示层唯一入口（本层不自造简繁规则）")
     func textGoesThroughDisplayNormalizer() {
         let raw = "繁體字與简体字"

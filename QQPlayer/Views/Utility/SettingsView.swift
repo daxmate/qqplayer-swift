@@ -134,6 +134,13 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
 
+                Section(Localized.lyricsDisplay) {
+                    Toggle(Localized.lyricsShowRoman, isOn: $deleteSettings.lyricShowRoman)
+                        .onChange(of: deleteSettings.lyricShowRoman) { _, _ in
+                            deleteSettings.save()
+                        }
+                }
+
                 Section(Localized.librarySection) {
                     Toggle(Localized.removeFromLibraryOnly, isOn: $deleteSettings.deleteFromLibraryOnly)
                         .onChange(of: deleteSettings.deleteFromLibraryOnly) { _, _ in

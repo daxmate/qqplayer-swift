@@ -32,6 +32,9 @@ struct CarPlayLyricRow: Equatable {
     let text: String
     /// 翻译（与 iOS 歌词页一致：有翻译就显示）
     let translation: String?
+    /// 罗马音（网易云 romalrc；仅部分曲目有）。列表行只有「主行 + 副行」两个文字位，
+    /// 渲染时罗马音优先占副行（乘客跟唱/跟读更需要），没有罗马音才退回译文。
+    let roman: String?
     /// 是否为当前句（映射到 CPListItem.isPlaying）
     let isPlaying: Bool
 }
@@ -81,7 +84,8 @@ enum CarPlayLyricsBuilder {
         lyrics: Lyrics?,
         isLoading: Bool,
         activeLineIndex: Int?,
-        upcoming: Int = CarPlayLyricsBuilder.upcomingLineCount
+        upcoming: Int = CarPlayLyricsBuilder.upcomingLineCount,
+        showRoman: Bool = true
     ) -> CarPlayLyricsContent {
         guard let trackTitle, !trackTitle.isEmpty else {
             return CarPlayLyricsContent(header: nil, rows: [], placeholder: .noTrack)
@@ -97,7 +101,12 @@ enum CarPlayLyricsBuilder {
         }
 
         if !lyrics.syncedLyrics.isEmpty {
-            let rows = window(lyrics.syncedLyrics, activeLineIndex: activeLineIndex, upcoming: upcoming)
+            let rows = window(
+                lyrics.syncedLyrics,
+                activeLineIndex: activeLineIndex,
+                upcoming: upcoming,
+                showRoman: showRoman
+            )
             return CarPlayLyricsContent(header: trackTitle, rows: rows, placeholder: nil)
         }
 
@@ -109,17 +118,24 @@ enum CarPlayLyricsBuilder {
     }
 
     /// 从当前句开始的窗口（当前句 + 后续 upcoming 句）
-    static func window(_ lines: [LyricsLine], activeLineIndex: Int?, upcoming: Int) -> [CarPlayLyricRow] {
+    static func window(
+        _ lines: [LyricsLine],
+        activeLineIndex: Int?,
+        upcoming: Int,
+        showRoman: Bool = true
+    ) -> [CarPlayLyricRow] {
         guard !lines.isEmpty else { return [] }
         let start = windowStart(activeLineIndex: activeLineIndex, lineCount: lines.count)
         let end = min(lines.count, start + max(upcoming, 0) + 1)
         return (start ..< end).map { index in
             let line = lines[index]
             let translation = line.displayTranslation
+            let roman = showRoman ? line.displayRoman : nil
             return CarPlayLyricRow(
                 lineIndex: index,
                 text: line.displayText,
                 translation: (translation?.isEmpty ?? true) ? nil : translation,
+                roman: (roman?.isEmpty ?? true) ? nil : roman,
                 isPlaying: index == activeLineIndex
             )
         }
@@ -144,6 +160,7 @@ enum CarPlayLyricsBuilder {
                     lineIndex: nil,
                     text: DisplayScriptNormalizer.display(String(text)),
                     translation: nil,
+                    roman: nil,
                     isPlaying: false
                 )
             }
@@ -169,6 +186,8 @@ final class CarPlayLyricsController {
     private var lyricsTrackId: String?
     /// 上一次已上屏的内容
     private var appliedContent: CarPlayLyricsContent?
+    /// 罗马音开关（iOS 设置页可改；这里缓存一份，避免每个 tick 读设置）
+    private var showRoman = DeleteSettings.load().lyricShowRoman
 
     init() {
         template = CPListTemplate(title: "lyrics".localized, sections: [])
@@ -204,6 +223,17 @@ final class CarPlayLyricsController {
         tickTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
+
+        // 设置页改动（显示罗马音开关）→ 下次 refresh 用新值重建内容
+        NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.showRoman = DeleteSettings.load().lyricShowRoman
+                    self.refresh()
+                }
+            }
+            .store(in: &cancellables)
 
         currentTrackChanged()
     }
@@ -248,7 +278,8 @@ final class CarPlayLyricsController {
             trackTitle: engine.currentTrack?.title,
             lyrics: lyrics,
             isLoading: isLoadingLyrics,
-            activeLineIndex: activeIndex
+            activeLineIndex: activeIndex,
+            showRoman: showRoman
         )
 
         guard content != appliedContent else { return }
@@ -271,7 +302,8 @@ final class CarPlayLyricsController {
         }
 
         let items = content.rows.map { row -> CPListItem in
-            let item = CPListItem(text: row.text, detailText: row.translation)
+            // 副行：有罗马音给罗马音（乘客跟唱/跟读更需要），否则退回译文（中文歌等行为不变）
+            let item = CPListItem(text: row.text, detailText: row.roman ?? row.translation)
             item.isPlaying = row.isPlaying
             item.playingIndicatorLocation = .trailing
             // 不设 handler：歌词行不可点，避免行车中误触跳播
