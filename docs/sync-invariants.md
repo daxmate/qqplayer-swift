@@ -172,18 +172,23 @@
 
 ### INV-18　缺口必须**计数并上屏**，且**区分实体**
 
-- **现有守护**：`△` 计数有、上屏有（两端）、实体维度**仍然没有**。
-  - 计数：`SyncDataSyncReport`（`QQPlayer/Sync/SyncDataSyncCoordinator.swift:68`）——L6 起账目 = `SyncOutcomeTally`（`QQPlayer/Sync/SyncOutcomeTally.swift`）。
-  - 上屏：Mac `QQPlayer/Mac/MacSyncView.swift`（8 个总数）、iOS `IOSPassiveDataSyncPresenter`（4 缺口行 + 4 计数行，`QQPlayer/Services/IOSPassiveSyncCenter.swift`）。
-  - `✗` 歌词丢弃计了数没进 `SyncUIReportSummary`（`QQPlayer/Services/SyncUIState.swift` 无该字段）。
+- **现有守护：✅ 已收（2026-09-15，INV-18 剩余项「区分实体」落地）**
+  - 计数：`SyncDataSyncReport`（`QQPlayer/Sync/SyncDataSyncCoordinator.swift`）——L6 起账目 = `SyncOutcomeTally`（`QQPlayer/Sync/SyncOutcomeTally.swift`）。
+  - **二维分桶（2026-09-15）**：账目从「一个结果一个整数」升级为 **(实体, 结果) 二维**，总数 = 派生值（未归属 + 各实体桶之和，不另存一份）；实体维度取自注册表 `SyncEntityRegistry.entityOrder`。
+  - 上屏：Mac `QQPlayer/Mac/MacSyncView.swift`（8 个汇总数 + 按实体明细行）、iOS `IOSPassiveDataSyncPresenter` + `QQPlayer/Views/Utility/SyncSettingsView.swift`（4 缺口行 + 4 计数行 + 按实体明细行）。
+  - 唯一投影：`QQPlayer/Sync/SyncEntityOutcomeDisclosure.swift`（明细行的唯一来源；界面层不得自算/自行枚举实体）。
+  - 用例：`SyncDataSyncCoreTests` → `tallyBucketsAreTwoDimensional`（总数 = 派生值、分桶不串台、覆盖写按桶）、`entityDisclosureRowsComeFromTallyOnly`（只出 >0 行、顺序 = 严重度 × 注册表）、`coordinatorBucketsGapsByEntity`（端到端按实体分桶）、`coordinatorCountsPlaylistApplyFailure`（歌单级失败按实体计数上屏）。
+  - 静态契约：`SyncWiringContractTests` → `uiConsumesDisclosureOnly`（界面层自算即红）+ `syntheticUISelfComputationIsCaught`（合成自证）+ `disclosureCoversEveryCaseAndLanguage`（新增类别 / 新增实体漏表态即红，五语文案齐全）。
+  - `△` 仍未做：歌词丢弃计了数没进 `SyncUIReportSummary`（`QQPlayer/Services/SyncUIState.swift` 无该字段）——那是内容面（F）的披露，不在本包的「实体 × 结果」账目里。
 - **L6 守护（2026-09-15 立，可执行名字）**：
   - `QQPlayerTests/SyncDataSyncCoreTests.swift` → `outcomeTallySlotsAreOneToOne`（`SyncRowOutcome.allCases` 每类恰一个槽位、互不串台；类别数变了先红）
   - `QQPlayerTests/SyncWiringContractTests.swift` → `productionHasSingleOutcomeTally`（静态：结果计数**只准**声明/改写于 `QQPlayer/Sync/SyncOutcomeTally.swift`，别处分类 `+=` / `=` 即红）
   - `QQPlayerTests/SyncWiringContractTests.swift` → `syntheticSecondLedgerIsCaught`（合成「第二处账目」必须被抓到——契约定自证不空转，fail-closed）
   - `QQPlayerTests/SyncDataSyncCoreTests.swift` → `presenterPlacementCoversAllOutcomes`（新增类别不给展示归宿就红）+ `passiveDataSyncPresenterRowsArePure`（缺口行只列 >0、顺序 = 严重度、每条都有 hint）
-- **建议**：**面板披露** + **静态契约**
-  - 面板：`SyncDataSyncReport` 按实体分桶（`[SyncChangeEntity: Int]`）→ 面板分实体展示（**仍未做**）；歌词 `discardedLyrics` / `orphanLyricsSkipped` 进 `SyncUIReportSummary`（**仍未做**）。
-  - 静态：✅ 已落（见上 `productionHasSingleOutcomeTally`）。
+- **建议**：**面板披露** + **静态契约**（两条均已落）
+  - 面板：✅ 已落（2026-09-15）——账目二维分桶（`SyncOutcomeTally`）→ 明细行走唯一投影 `SyncEntityOutcomeDisclosure.rows(_:)`；两端面板同源。
+  - 静态：✅ 已落（`productionHasSingleOutcomeTally` + `uiConsumesDisclosureOnly`）。
+  - 仍未做：歌词 `discardedLyrics` / `orphanLyricsSkipped` 进 `SyncUIReportSummary`（内容面 F 的披露）。
 
 ### INV-19　面板数字必须来自**协调器账目单一数据源**（不在 UI 层补算）
 
@@ -247,7 +252,7 @@
 | INV-9 游标越过即不回头 ⇒ 必须有重置入口 | `SyncChangeLogStore.swift:134-147` 注释 | iOS 侧入口 or 显式「不支持」断言 |
 | INV-13 删除不传播收口到单一事实源 | `SyncChangeLogDeletionPolicy.swift:13-18` 注释 | **静态契约**（delete 判定只准出现在该文件） |
 | INV-17 同一会话只装一个 changeLog 处理器 | `IOSPassiveSyncCenter.swift:21-32` 注释 | 静态契约（构造点计数上限） |
-| INV-18 缺口必须计数并上屏 | `MacSyncView.swift:978` 注释 | **面板披露**（按实体分桶）+ 静态契约 |
+| ~~INV-18 缺口必须计数并上屏~~ **已收（2026-09-15）** | — | 已落：二维分桶 + `SyncEntityOutcomeDisclosure` 唯一投影 + 界面层自算静态契约 |
 | INV-20 「已应用」= 真的落库 | `SyncChangeLogApplier.swift:223-255` 注释自承「v1 不落库」 | **行为用例**（sink nil ⇒ 不算 applied）+ 面板披露 |
 | INV-23 封面路径不可跨端引用 | **无处声明** | 静态契约或面板披露（见上） |
 
@@ -338,6 +343,10 @@
 6. 它与 delete 语义的关系是什么？（INV-13 / INV-14 / INV-15）
 7. **每个平台**都装配了吗？有断言吗？（INV-16 / INV-17）
 8. 缺口计数了吗？**上屏了吗？区分实体吗？**（INV-18 / INV-19 / INV-20）
+   - 「区分实体」= 新增一条结果类别 / 一条实体时，**必须**同时给出：`SyncRowOutcome` case、
+     `SyncEntityOutcomeDisclosure` 的披露归属与文案 key（五语）、以及按实体披露的顺序表位置
+     —— 漏任何一处都有用例报红（`disclosureCoversEveryCaseAndLanguage`）。
+   - 新增的计数一律走 `tally.accumulate(_:entity:count:)`（唯一写入口），**不得**在界面层补算。
 
 > 第 7、8 两题是今天 6 条 commit 反复在两个侧面上打转的根源：
 > 「协议支持 + 有实现」都做了，**装配与披露**没人问。
