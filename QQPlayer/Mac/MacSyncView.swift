@@ -1009,7 +1009,7 @@ struct MacSyncRunSection: View {
         }
     }
 
-    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 未支持（播放位置未落地）
+    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 身份歧义 / 未支持（播放位置未落地）
     /// / 缺指纹（本端发出）/ 忽略删除 + 各自解释。
     @ViewBuilder
     private var dataResult: some View {
@@ -1043,6 +1043,14 @@ struct MacSyncRunSection: View {
                     report.pushedMissingIdentityEntries,
                     report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
                 )
+                // 身份歧义（2026-09-18）：**仅当 N > 0 才显示**（无歧义时不留一个恒 0 的噪音格）。
+                if report.ambiguousIdentityEntries > 0 {
+                    metric(
+                        "sync_run_data_ambiguous_identity".localized,
+                        report.ambiguousIdentityEntries,
+                        .orange
+                    )
+                }
                 metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
                 Spacer()
             }
@@ -1057,6 +1065,13 @@ struct MacSyncRunSection: View {
 
             if report.unresolvedEntries > 0 {
                 Text("sync_run_data_unresolved_hint".localized(with: report.unresolvedEntries))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.ambiguousIdentityEntries > 0 {
+                Text("sync_run_data_ambiguous_identity_hint".localized(with: report.ambiguousIdentityEntries))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

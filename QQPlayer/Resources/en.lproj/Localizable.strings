@@ -968,10 +968,12 @@
 "sync_run_data_result_pending" = "Pending";
 "sync_run_data_result_skipped" = "Deletions skipped";
 "sync_run_data_result_unresolved" = "Unresolved";
+"sync_run_data_ambiguous_identity" = "Identity conflict";
 "sync_run_data_result_missing_identity" = "Missing fingerprint";
 "sync_run_data_unsupported" = "Unsupported";
 "sync_run_data_pending_hint" = "%d entries are waiting for songs this Mac doesn't have yet.";
 "sync_run_data_unresolved_hint" = "%d entries couldn't be matched to a song on this Mac, so they were not applied.";
+"sync_run_data_ambiguous_identity_hint" = "%d entries matched more than one song at the same path on this Mac, so they were not applied.";
 "sync_run_data_unsupported_hint" = "%d playback-position changes were not applied (cross-device resume is off, or the incoming position is for a different track).";
 "sync_run_data_skipped_parent" = "Missing dependency";
 "sync_run_data_skipped_parent_hint" = "%d changes were skipped because their dependency isn't on this device yet (playlist structure not synced, or the referenced song has no local record).";
