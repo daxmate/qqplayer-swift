@@ -46,73 +46,100 @@ enum SyncWiringContract {
         let guidance: String
     }
 
-    /// 全部装配可达性断言。新增「某平台专属装配点」时在这里补一条，别只写单测。
-    static let requirements: [Requirement] = [
-        Requirement(
-            id: "ios-data-sync-peer-attached",
-            path: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
-            requiredMarkers: ["SyncChangeLogPeer("],
-            alternativeMarkers: [["session.peerHelloValue?.deviceID", "IOSPassiveDataSyncLogic"]],
-            guidance: """
-            iOS 数据同步端没有装配点：Mac 推来的帧 9 被静默丢弃、Mac 的帧 8 无人应答 → 两端播放数据永不通（2026-09-13 那个上线级缺陷）。
-            请检查 IOSPassiveSyncCenter 是否在会话 ready（attachDataSync）时构造 SyncChangeLogPeer，且游标 peerID 取自对端 hello 的 Device ID（session.peerHelloValue?.deviceID，或经 IOSPassiveDataSyncLogic.dataSyncPeerID 同口径）。
-            """
+    /// 全部装配可达性断言——**从注册表装配点派生**（不再手写）。
+    ///
+    /// 收口前这份清单是手写的 6 条，与 `SyncEntityRegistry.assemblyPoints` **两处各自
+    /// 表达同一件事**：注册表删掉一条装配点，这里不会红（正是「同一语义多处手工维护」的形状）。
+    /// 现在唯一来源 = 注册表申报：新增装配点 = 申报（`assertion`）→ 自动获得断言。
+    /// 「删掉申报 = 不查了」的漏洞由 `assemblyAssertionBaselineIsPinned` 基线钉住。
+    static var requirements: [Requirement] {
+        requirements(from: SyncEntityRegistry.capabilityAssemblyPoints)
+    }
+
+    /// 纯函数：装配点申报 → 断言清单。合成自证就喂它一份「缺一条申报」的输入
+    /// （断言随之消失 → 基线比对必须报红）。
+    static func requirements(
+        from declarations: [(capabilityID: String, point: SyncEntityAssemblyPoint)]
+    ) -> [Requirement] {
+        declarations.compactMap { entry in
+            guard let assertion = entry.point.assertion else { return nil }
+            return Requirement(
+                id: assertion.id,
+                path: assertion.path,
+                requiredMarkers: assertion.requiredMarkers,
+                alternativeMarkers: assertion.alternativeMarkers,
+                guidance: guidance(for: entry)
+            )
+        }
+    }
+
+    /// 断言失败信息 = **申报出处**（能力 / 平台 / 帧 / 装配点说明）+ 注册表里的可操作指引。
+    static func guidance(for entry: (capabilityID: String, point: SyncEntityAssemblyPoint)) -> String {
+        let platform = entry.point.platform ?? "两端（通道级）"
+        let frame = entry.point.frame.map { "帧 \($0)" } ?? "无帧"
+        return """
+        [申报出处] 能力 \(entry.capabilityID) · \(platform) · \(frame)
+        \(entry.point.detail)
+        （申报在 `QQPlayer/Sync/SyncEntityRegistry.swift`；改装配点 = 改这里扫描的路径/标记）
+
+        \(entry.point.assertion?.guidance ?? "")
+        """
+    }
+
+    /// 断言 id 基线（**派生不等于不查了**）：注册表删/改一条装配点申报 → 与本基线比对即红。
+    /// 收口前的五条 + 2026-09-15 立的装配断言，逐条在此登记（新增断言必须先在这里表态）。
+    static let assertionIDBaseline: [String] = [
+        // A（收藏）：两端入口
+        "mac-data-sync-entry-attached",
+        "ios-data-sync-peer-attached",
+        // E（跨端续播）：出站捕获挂点 / 入站落点
+        "mac-playback-capture-attached",
+        "ios-playback-position-sink-attached",
+        // F2（对齐歌词）：出站随歌 / 入站接收器（后者是 INV-16 既有建议、此前一直缺）
+        "mac-lyrics-push-attached",
+        "ios-lyrics-receiver-attached",
+        // G（曲库音频文件）
+        "mac-library-push-attached",
+        "ios-file-receiver-attached",
+        // 通道级 / 共享入口级 / 平台级编排
+        "frame-8-9-handler-present",
+        "frame-8-9-numbers-frozen",
+        "identity-entry-implemented-and-wired",
+        "mac-playback-carry-attached",
+    ]
+
+    /// 纯函数：派生 id × 基线 → 差异（基线断言与合成自证共用）。
+    static func baselineDiff(derived: [String], baseline: [String]) -> (missing: [String], unexpected: [String]) {
+        let derivedSet = Set(derived)
+        let baselineSet = Set(baseline)
+        return (
+            missing: baseline.filter { !derivedSet.contains($0) }.sorted(),
+            unexpected: derived.filter { !baselineSet.contains($0) }.sorted()
+        )
+    }
+
+    /// 收口前五条断言的**语义**（路径 + 必检标记）——派生不许把它们弄丢或弄错。
+    static let originalRequirementSemantics: [(id: String, path: String, markers: [String])] = [
+        (
+            "ios-data-sync-peer-attached",
+            "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+            ["SyncChangeLogPeer("]
         ),
-        Requirement(
-            id: "mac-data-sync-entry-attached",
-            path: "QQPlayer/Mac",
-            requiredMarkers: ["SyncDataSyncCoordinator("],
-            alternativeMarkers: [],
-            guidance: """
-            Mac 侧没有「同步数据」用户入口：核心层 SyncDataSyncCoordinator 写好了但用户点不到 → 能力等于不存在。
-            请检查 MacSyncDataViewModel（或新的 Mac 视图模型）是否构造 SyncDataSyncCoordinator(session:)，并接到同步页的「同步数据」按钮上。
-            """
+        ("mac-data-sync-entry-attached", "QQPlayer/Mac", ["SyncDataSyncCoordinator("]),
+        (
+            "mac-playback-carry-attached",
+            "QQPlayer/Mac/MacSyncCoordinatorFactory.swift",
+            ["SyncPlaybackCarryPeer("]
         ),
-        Requirement(
-            id: "mac-playback-carry-attached",
-            path: "QQPlayer/Mac/MacSyncCoordinatorFactory.swift",
-            requiredMarkers: ["SyncPlaybackCarryPeer("],
-            alternativeMarkers: [],
-            guidance: """
-            跟歌走链路失去装配：推 / 拉歌时播放数据不再跟随传输 → R3b 能力静默失效（要用户重新同步数据才补回来）。
-            请检查 MacSyncCoordinatorFactory 里 SyncCollectionSyncCoordinator 的 playbackCarry 实参是否仍传 SyncPlaybackCarryPeer(session:libraryRoot:peerID:)。
-            """
+        (
+            "frame-8-9-handler-present",
+            "QQPlayer/Sync/SyncChangeLogPeer.swift",
+            ["case .changeLogPull:", "case .changeLogPush:"]
         ),
-        Requirement(
-            id: "frame-8-9-handler-present",
-            path: "QQPlayer/Sync/SyncChangeLogPeer.swift",
-            requiredMarkers: ["case .changeLogPull:", "case .changeLogPush:"],
-            alternativeMarkers: [],
-            guidance: """
-            帧 8/9 的唯一处理器没了（分支被删 / 改名）：全仓再没有地方响应播放数据同步帧 → 帧 8/9 变成死协议。
-            请检查 SyncChangeLogPeer 的帧分发表是否仍有 case .changeLogPull: / case .changeLogPush: 两个分支（类型本身存在于 QQPlayer/Sync/SyncChangeLogPeer.swift）。
-            """
-        ),
-        Requirement(
-            id: "frame-8-9-numbers-frozen",
-            path: "QQPlayer/Sync/SyncFrame.swift",
-            requiredMarkers: ["case changeLogPull = 8", "case changeLogPush = 9"],
-            alternativeMarkers: [],
-            guidance: """
-            帧号被改动了：帧 8/9 是跨端线上契约（两端版本可能不同步升级），改号 = 老版本对端解错帧、同步静默错乱。
-            请把 SyncFrame.FrameType 的 changeLogPull 恢复到 = 8、changeLogPush 恢复到 = 9（新增帧只能用未占用的号段）。
-            """
-        ),
-        Requirement(
-            id: "identity-entry-implemented-and-wired",
-            path: "QQPlayer/Sync/SyncChangeLogMapping.swift",
-            requiredMarkers: [
-                "extension SyncContentHashResolver: SyncIdentityResolving",
-                "SyncLyricsContentMapping(identity:",
-            ],
-            alternativeMarkers: [],
-            guidance: """
-            歌曲身份解析的入口实现断了：`SyncContentHashResolver` 不再声明遵守 `SyncIdentityResolving`，
-            或歌词映射不再从入口构造（`SyncLyricsContentMapping(identity:)`）——两条都是「入口空转」的形状：
-            编译能过（协议可选遵守）、下游各自拿闭包，漏接线一处就静默。
-            请检查 QQPlayer/Sync/SyncChangeLogMapping.swift：`SyncContentHashResolver` 必须有 `: SyncIdentityResolving` 遵守声明，
-            `.live(database:)` 必须走 `SyncLyricsContentMapping(identity: SyncContentHashResolver(database:))`。
-            """
+        (
+            "frame-8-9-numbers-frozen",
+            "QQPlayer/Sync/SyncFrame.swift",
+            ["case changeLogPull = 8", "case changeLogPush = 9"]
         ),
     ]
 
@@ -193,22 +220,37 @@ struct SyncWiringContractTests {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
 
+    /// 按 id 取断言（合成自证不再依赖「清单里第 0 条是谁」）。
+    static func requirement(_ id: String) -> SyncWiringContract.Requirement? {
+        SyncWiringContract.requirements.first { $0.id == id }
+    }
+
     // MARK: 地基检查
 
     @Test("仓库根与断言清单解析正确（扫描前的地基检查）")
     func scanScopeResolves() {
         let marker = Self.repoRoot.appendingPathComponent("QQPlayer/Sync/SyncChangeLogPeer.swift")
         #expect(FileManager.default.fileExists(atPath: marker.path), "仓库根解析错了：\(Self.repoRoot.path)")
-        #expect(SyncWiringContract.requirements.count >= 4, "装配断言条数异常：\(SyncWiringContract.requirements.count)")
+        #expect(
+            SyncWiringContract.requirements.count >= 11,
+            "装配断言条数异常：\(SyncWiringContract.requirements.count)（注册表申报丢了？）"
+        )
         let ids = SyncWiringContract.requirements.map(\.id)
         #expect(Set(ids).count == ids.count, "断言 id 有重复：\(ids)")
+        #expect(
+            SyncWiringContract.requirements.allSatisfy { !$0.path.isEmpty },
+            "有断言没写扫描路径（派生自注册表申报，路径必填）"
+        )
     }
 
     // MARK: 契约自证有效（合成源码 —— 防止断言空转）
 
     @Test("合成缺装配源码必须被抓到（契约自证有效的关键用例）")
     func syntheticMissingWiringIsCaught() {
-        let requirement = SyncWiringContract.requirements[0]
+        guard let requirement = Self.requirement("ios-data-sync-peer-attached") else {
+            Issue.record("断言 ios-data-sync-peer-attached 不在派生清单里——注册表申报丢了")
+            return
+        }
         let missing = SyncWiringContract.missingMarkers(
             inSource: "let peer = SyncChangeLogPeer(\n    session: session,\n    peerID: \"x\"\n)",
             requirement: requirement
@@ -228,7 +270,11 @@ struct SyncWiringContractTests {
         ) else { return }
         let peer = SyncChangeLogPeer(session: session, store: store, applier: applier, peerID: peerID)
         """
-        let missing = SyncWiringContract.missingMarkers(inSource: source, requirement: SyncWiringContract.requirements[0])
+        guard let requirement = Self.requirement("ios-data-sync-peer-attached") else {
+            Issue.record("断言 ios-data-sync-peer-attached 不在派生清单里——注册表申报丢了")
+            return
+        }
+        let missing = SyncWiringContract.missingMarkers(inSource: source, requirement: requirement)
         #expect(missing.isEmpty, "正确接线不该报缺失：\(missing)")
     }
 
@@ -262,6 +308,98 @@ struct SyncWiringContractTests {
         }
         #expect(source.contains("enum SyncChangeLogPeer") || source.contains("final class SyncChangeLogPeer"),
                 "SyncChangeLogPeer 类型声明不见了（帧 8/9 唯一处理器）")
+    }
+
+    // MARK: 派生唯一来源（2026-09-15：断言改从注册表派生）
+
+    @Test("装配断言只从注册表派生（这里再手写一条 = 契约失效）")
+    func assertionsComeFromRegistryOnly() {
+        let declared = SyncEntityRegistry.capabilityAssemblyPoints
+        let withAssertion = declared.filter { $0.point.assertion != nil }
+        #expect(
+            withAssertion.count == SyncWiringContract.requirements.count,
+            """
+            断言条数 ≠ 注册表申报条数：申报 \(withAssertion.count) / 断言 \(SyncWiringContract.requirements.count)
+            修法：断言一律从注册表装配点派生（`SyncEntityRegistry.capabilityAssemblyPoints`），
+            不要在 `SyncWiringContract.requirements` 里手写任何一条。
+            """
+        )
+        // 每条断言的 id / 路径必须逐字来自申报（派生不是「另外找一份」）。
+        for entry in withAssertion {
+            guard let assertion = entry.point.assertion else { continue }
+            guard let derived = Self.requirement(assertion.id) else {
+                Issue.record("申报的断言 \(assertion.id) 没进派生清单")
+                continue
+            }
+            #expect(derived.path == assertion.path, "\(assertion.id) 的扫描路径被改写：\(derived.path)")
+            #expect(
+                derived.requiredMarkers == assertion.requiredMarkers,
+                "\(assertion.id) 的必检标记被改写：\(derived.requiredMarkers)"
+            )
+            #expect(
+                derived.alternativeMarkers == assertion.alternativeMarkers,
+                "\(assertion.id) 的候选标记被改写"
+            )
+        }
+    }
+
+    @Test("断言 id 基线：注册表删/改一条装配点申报必须红（派生 ≠ 不查了）")
+    func assemblyAssertionBaselineIsPinned() {
+        let derived = SyncWiringContract.requirements.map(\.id)
+        let diff = SyncWiringContract.baselineDiff(derived: derived, baseline: SyncWiringContract.assertionIDBaseline)
+        #expect(
+            diff.missing.isEmpty && diff.unexpected.isEmpty,
+            """
+            派生断言清单与基线不一致：
+              丢了（注册表申报被删/被改名？）：\(diff.missing)
+              新增（是对的，但要先把基线补上并说明为什么）：\(diff.unexpected)
+            修法：装配点申报的增删必须**显式**同步到这里——基线就是「删掉申报不能静默变成不查」的那道闸。
+            """
+        )
+    }
+
+    @Test("合成：注册表缺一条装配点申报必须被抓到（契约自证有效）")
+    func syntheticDroppedAssemblyDeclarationIsCaught() {
+        let full = SyncEntityRegistry.capabilityAssemblyPoints
+        let dropped = full.filter { $0.capabilityID != "A" || $0.point.platform != SyncEntityRegistry.platformIOS }
+
+        // 派生本身会跟着变少（这是设计的：申报是唯一来源）……
+        let derivedFull = SyncWiringContract.requirements(from: full).map(\.id)
+        let derivedDropped = SyncWiringContract.requirements(from: dropped).map(\.id)
+        #expect(
+            derivedFull.contains("ios-data-sync-peer-attached") && !derivedDropped.contains("ios-data-sync-peer-attached"),
+            "派生没有真的跟着申报走（合成输入失效）"
+        )
+        // ……但**基线比对必须报红**，否则「删掉申报」就成了合法的不查。
+        let diff = SyncWiringContract.baselineDiff(
+            derived: derivedDropped,
+            baseline: SyncWiringContract.assertionIDBaseline
+        )
+        #expect(
+            diff.missing == ["ios-data-sync-peer-attached"],
+            "缺一条申报必须被基线抓到，实际：\(diff.missing)"
+        )
+        #expect(diff.unexpected.isEmpty, "不该有意外新增：\(diff.unexpected)")
+    }
+
+    @Test("原五条断言的语义（路径 + 必检标记）逐条仍在——派生不许弄丢或弄错")
+    func originalRequirementSemanticsPreserved() {
+        for semantics in SyncWiringContract.originalRequirementSemantics {
+            guard let derived = Self.requirement(semantics.id) else {
+                Issue.record("原断言 \(semantics.id) 不在派生清单里（语义丢失）")
+                continue
+            }
+            #expect(
+                derived.path == semantics.path,
+                "原断言 \(semantics.id) 的扫描路径变了：\(derived.path) ≠ \(semantics.path)"
+            )
+            for marker in semantics.markers {
+                #expect(
+                    derived.requiredMarkers.contains(marker),
+                    "原断言 \(semantics.id) 丢了必检标记 `\(marker)`：\(derived.requiredMarkers)"
+                )
+            }
+        }
     }
 }
 
@@ -814,6 +952,32 @@ enum SyncEntityRegistryContract {
         return hits
     }
 
+    /// 装配申报自洽违规（纯函数：合成申报也能自证）：
+    /// ① 声明了运行时探针却没写平台（= 谁也不会去检查它）；
+    /// ② 探针枚举里有 case 没有任何装配点引用（枚举里积压没人检查的项）；
+    /// ③ 断言 id 重复申报（同一条断言被两处认领）。
+    static func assemblyDeclarationViolations(
+        entries: [SyncEntityRegistryEntry],
+        shared: [SyncEntityAssemblyPoint]
+    ) -> [String] {
+        var hits: [String] = []
+        let points = entries.flatMap(\.assemblyPoints) + shared
+        var seenIDs: Set<String> = []
+        for point in points {
+            if point.probe != nil, point.platform == nil {
+                hits.append("装配点声明了运行时探针却没有平台（没人会检查它）：\(point.detail)")
+            }
+            if let assertion = point.assertion, !seenIDs.insert(assertion.id).inserted {
+                hits.append("断言 id 重复申报：`\(assertion.id)`")
+            }
+        }
+        let declaredProbes = Set(points.compactMap(\.probe))
+        for probe in SyncWiringProbe.allCases where !declaredProbes.contains(probe) {
+            hits.append("探针 `\(probe.rawValue)` 没有任何装配点引用（枚举里积压没人检查的项）")
+        }
+        return hits
+    }
+
     /// 登记自洽违规（纯函数：合成条目也能自证）。
     static func registrySelfConsistencyViolations(_ entries: [SyncEntityRegistryEntry]) -> [String] {
         var hits: [String] = []
@@ -1105,7 +1269,15 @@ struct SyncEntityRegistryContractTests {
             writesOutbox: true,
             reconcilesLocalTruth: true,
             repairsDanglingReferences: false,
-            assemblyPoints: [SyncEntityAssemblyPoint(platform: "iOS", frame: 8, detail: "不该有")]
+            assemblyPoints: [
+                SyncEntityAssemblyPoint(
+                    platform: SyncEntityRegistry.platformIOS,
+                    frame: 8,
+                    detail: "不该有",
+                    assertion: nil,
+                    probe: nil
+                ),
+            ]
         )
         let selfViolations = SyncEntityRegistryContract.registrySelfConsistencyViolations([badEntry])
         #expect(
@@ -1208,6 +1380,78 @@ struct SyncEntityRegistryContractTests {
         #expect(SyncEntityRegistry.entries.count == 9, "登记条目数变了（应为 9：A–E + F1/F2 + G/H）")
         let ids = SyncEntityRegistry.entries.map(\.l0ID)
         #expect(ids == ["A", "B", "C", "D", "E", "F1", "F2", "G", "H"], "登记顺序/编号变了：\(ids)")
+    }
+
+    @Test("实体注册表：装配申报自洽（探针必须有平台、不得积压、断言 id 唯一）")
+    func assemblyDeclarationsAreSelfConsistent() {
+        let violations = SyncEntityRegistryContract.assemblyDeclarationViolations(
+            entries: SyncEntityRegistry.entries,
+            shared: SyncEntityRegistry.sharedAssemblyPoints
+        )
+        #expect(
+            violations.isEmpty,
+            "装配申报自相矛盾：\n\(violations.joined(separator: "\n"))"
+        )
+    }
+
+    @Test("合成：没平台的探针 / 积压的探针必须被抓到（契约自证有效）")
+    func syntheticOrphanProbeIsCaught() {
+        let orphanProbe = SyncEntityAssemblyPoint(
+            platform: nil,
+            frame: nil,
+            detail: "声明了探针却没平台",
+            assertion: nil,
+            probe: .changeLogPeer
+        )
+        let violations = SyncEntityRegistryContract.assemblyDeclarationViolations(
+            entries: [],
+            shared: [orphanProbe]
+        )
+        // 一条「探针没平台」+ 其余探针没人引用（各一条）
+        #expect(
+            violations.contains { $0.contains("没有平台") },
+            "没平台的探针必须被抓到：\(violations)"
+        )
+        #expect(
+            violations.contains { $0.contains("没有任何装配点引用") },
+            "没人引用的探针必须被抓到：\(violations)"
+        )
+
+        // 断言 id 重复申报
+        func pointWithAssertion(_ id: String) -> SyncEntityAssemblyPoint {
+            SyncEntityAssemblyPoint(
+                platform: SyncEntityRegistry.platformIOS,
+                frame: nil,
+                detail: "重复申报",
+                assertion: SyncEntityAssemblyAssertion(
+                    id: id,
+                    path: "QQPlayer/Sync",
+                    requiredMarkers: ["x"],
+                    alternativeMarkers: [],
+                    guidance: "g"
+                ),
+                probe: nil
+            )
+        }
+        var shared: [SyncEntityAssemblyPoint] = SyncWiringProbe.allCases.map { probe in
+            SyncEntityAssemblyPoint(
+                platform: SyncEntityRegistry.platformIOS,
+                frame: nil,
+                detail: "合法引用 \(probe.rawValue)",
+                assertion: nil,
+                probe: probe
+            )
+        }
+        shared.append(pointWithAssertion("dup-id"))
+        shared.append(pointWithAssertion("dup-id"))
+        let duplicate = SyncEntityRegistryContract.assemblyDeclarationViolations(
+            entries: [],
+            shared: shared
+        )
+        #expect(
+            duplicate == ["断言 id 重复申报：`dup-id`"],
+            "重复的断言 id 必须被抓到（且合法探针引用不得误报），实际：\(duplicate)"
+        )
     }
 
     @Test("实体注册表：派生清单与收口前口径逐项相同（行为零变化）")

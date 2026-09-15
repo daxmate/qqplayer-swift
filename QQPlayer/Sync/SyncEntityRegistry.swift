@@ -78,14 +78,42 @@ struct SyncEntityLocalTruth: Equatable, Sendable {
     let carrierNote: String?
 }
 
+/// 一个装配点的**静态断言载荷**（CI 扫源码口径，回答 INV-16 的「协议支持 ≠ 有实现 ≠ 已装配」）。
+///
+/// 为什么声明在注册表里：断言此前是 `QQPlayerTests/SyncWiringContractTests.swift` 里的
+/// **手写清单**，与注册表的 `assemblyPoints` 两处各自表达同一件事（「同一语义多处手工维护」
+/// 的形状）→ 注册表删一条装配点、断言那份清单不会跟着红。收口后断言**从装配点派生**
+/// （`SyncWiringContract.requirements` 的生成源），申报装配点 = 自动获得断言。
+struct SyncEntityAssemblyAssertion: Equatable, Sendable {
+    /// 断言 id（测试名 / 失败信息用）。
+    let id: String
+    /// 仓库相对路径：`.swift` 文件（单文件断言）或目录（目录下**任一**文件满足即可）。
+    let path: String
+    /// 必须**全部**出现的标记（子串匹配）。
+    let requiredMarkers: [String]
+    /// 候选标记组：每组**至少命中一个**（空数组 = 该组不约束）。
+    let alternativeMarkers: [[String]]
+    /// 断言语义（这条在钉什么）+ 不成立时的可操作指引。
+    let guidance: String
+}
+
 /// 一个装配点（回答 INV-16：「协议支持 ≠ 有实现 ≠ 已装配」）。
+///
+/// 一份申报两处用途（同一份声明，不做第二份名单）：
+/// - `assertion`：**静态**——CI 扫源码，证明调用点存在（编译期看不见的接线不掉缝）；
+/// - `probe`：**运行时**——会话 ready 时回答「本端这次真的装上没有」（如对端 Device ID
+///   为空导致静默不装配），见 `SyncWiringSelfCheck`。
 struct SyncEntityAssemblyPoint: Equatable, Sendable {
-    /// 平台（"Mac" / "iOS"）。
-    let platform: String
+    /// 平台（`SyncEntityRegistry.platformMac` / `platformIOS`；nil = 与平台无关，如通道级）。
+    let platform: String?
     /// 帧号（不走帧 = nil）。
     let frame: Int?
-    /// 装配点说明（哪个类型在哪被构造）。
+    /// 装配点说明（哪个类型在哪被构造）——运行时缺口里「缺了什么」用的就是它。
     let detail: String
+    /// 静态断言；nil = 该装配点与同类装配点**共用**断言（登记里写明了「同 X」）。
+    let assertion: SyncEntityAssemblyAssertion?
+    /// 运行时自检探针；nil = 只做静态断言（该能力不依赖会话期运行时状态）。
+    let probe: SyncWiringProbe?
 }
 
 /// 一条实体登记。字段只增不减：新增能力时补字段 = 编译期逼所有条目表态。
@@ -116,7 +144,20 @@ struct SyncEntityRegistryEntry: Equatable, Sendable {
 /// 不要在任何其它文件里手写第二份清单（CI 静态守住）。
 enum SyncEntityRegistry {
     /// 帧 8/9（变更日志通道）的帧号——装配点里重复出现，抽成常量防写错。
+    /// 帧号冻结断言（`frame-8-9-numbers-frozen`）的标记也由它派生：改常量 = 断言自动跟改。
     static let changeLogFrameNumbers = (pull: 8, push: 9)
+
+    /// 平台标识：装配点与运行时自检共用的**唯一口径**（不得在别处手写 "Mac" / "iOS" 字面量）。
+    static let platformMac = "Mac"
+    static let platformIOS = "iOS"
+
+    /// 帧号冻结断言的标记（**派生自 `changeLogFrameNumbers`**，手写「= 8」不可能与之漂移）。
+    static var frozenFrameMarkers: [String] {
+        [
+            "case changeLogPull = \(changeLogFrameNumbers.pull)",
+            "case changeLogPush = \(changeLogFrameNumbers.push)",
+        ]
+    }
 
     static let entries: [SyncEntityRegistryEntry] = [
         SyncEntityRegistryEntry(
@@ -136,14 +177,36 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: true,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
-                    frame: 8,
-                    detail: "发起端：MacSyncDataViewModel 构造 SyncDataSyncCoordinator（面板手动入口 + 会话就绪自动一轮）"
+                    platform: SyncEntityRegistry.platformMac,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "发起端：MacSyncDataViewModel 构造 SyncDataSyncCoordinator（面板手动入口 + 会话就绪自动一轮）",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "mac-data-sync-entry-attached",
+                        path: "QQPlayer/Mac",
+                        requiredMarkers: ["SyncDataSyncCoordinator("],
+                        alternativeMarkers: [],
+                        guidance: """
+                        Mac 侧没有「同步数据」用户入口：核心层 SyncDataSyncCoordinator 写好了但用户点不到 → 能力等于不存在。
+                        请检查 MacSyncDataViewModel（或新的 Mac 视图模型）是否构造 SyncDataSyncCoordinator(session:)，并接到同步页的「同步数据」按钮上。
+                        """
+                    ),
+                    probe: .dataSyncEntry
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
-                    frame: 8,
-                    detail: "被动端：IOSPassiveSyncCenter.attachDataSync 构造 SyncChangeLogPeer"
+                    platform: SyncEntityRegistry.platformIOS,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "被动端：IOSPassiveSyncCenter.attachDataSync 构造 SyncChangeLogPeer",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "ios-data-sync-peer-attached",
+                        path: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+                        requiredMarkers: ["SyncChangeLogPeer("],
+                        alternativeMarkers: [["session.peerHelloValue?.deviceID", "IOSPassiveDataSyncLogic"]],
+                        guidance: """
+                        iOS 数据同步端没有装配点：Mac 推来的帧 9 被静默丢弃、Mac 的帧 8 无人应答 → 两端播放数据永不通（2026-09-13 那个上线级缺陷）。
+                        请检查 IOSPassiveSyncCenter 是否在会话 ready（attachDataSync）时构造 SyncChangeLogPeer，且游标 peerID 取自对端 hello 的 Device ID（session.peerHelloValue?.deviceID，或经 IOSPassiveDataSyncLogic.dataSyncPeerID 同口径）。
+                        """
+                    ),
+                    probe: .changeLogPeer
                 ),
             ]
         ),
@@ -164,14 +227,18 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: true,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
-                    frame: 8,
-                    detail: "发起端：同 A（帧 8/9 处理器在两端共享，实体维度不另装配）"
+                    platform: SyncEntityRegistry.platformMac,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "发起端：同 A（帧 8/9 处理器在两端共享，实体维度不另装配；断言与运行时自检由 A 的装配点承担）",
+                    assertion: nil,
+                    probe: nil
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
-                    frame: 8,
-                    detail: "被动端：同 A"
+                    platform: SyncEntityRegistry.platformIOS,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "被动端：同 A（同一处理器；断言与运行时自检由 A 的装配点承担）",
+                    assertion: nil,
+                    probe: nil
                 ),
             ]
         ),
@@ -193,14 +260,18 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: false,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
-                    frame: 8,
-                    detail: "发起端：同 A"
+                    platform: SyncEntityRegistry.platformMac,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "发起端：同 A（帧 8/9 处理器在两端共享，实体维度不另装配；断言与运行时自检由 A 的装配点承担）",
+                    assertion: nil,
+                    probe: nil
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
-                    frame: 8,
-                    detail: "被动端：同 A"
+                    platform: SyncEntityRegistry.platformIOS,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "被动端：同 A（同一处理器；断言与运行时自检由 A 的装配点承担）",
+                    assertion: nil,
+                    probe: nil
                 ),
             ]
         ),
@@ -221,14 +292,18 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: true,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
-                    frame: 8,
-                    detail: "发起端：同 A"
+                    platform: SyncEntityRegistry.platformMac,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "发起端：同 A（帧 8/9 处理器在两端共享，实体维度不另装配；断言与运行时自检由 A 的装配点承担）",
+                    assertion: nil,
+                    probe: nil
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
-                    frame: 8,
-                    detail: "被动端：同 A"
+                    platform: SyncEntityRegistry.platformIOS,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "被动端：同 A（同一处理器；断言与运行时自检由 A 的装配点承担）",
+                    assertion: nil,
+                    probe: nil
                 ),
             ]
         ),
@@ -253,14 +328,36 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: false,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
-                    frame: 8,
-                    detail: "发起端：同 A；捕获挂点 = PlayerEngine.savePlayerState → PlaybackPositionCapture.recordIfEnabled"
+                    platform: SyncEntityRegistry.platformMac,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "发起端：同 A；捕获挂点 = PlayerEngine.savePlayerState → PlaybackPositionCapture.recordIfEnabled",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "mac-playback-capture-attached",
+                        path: "QQPlayer/Services/PlayerEngine.swift",
+                        requiredMarkers: ["PlaybackPositionCapture.recordIfEnabled("],
+                        alternativeMarkers: [],
+                        guidance: """
+                        跨端续播的**出站捕获挂点**断了：保存播放位置时不再上报（开关开着也永远推不出东西）→ 另一端永远收不到「上次听到哪」。
+                        请检查 PlayerEngine.savePlayerState 里是否仍调用 PlaybackPositionCapture.recordIfEnabled(...)（开关关时该函数自己直接 return，挂点本身必须常驻）。
+                        """
+                    ),
+                    probe: nil
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
-                    frame: 8,
-                    detail: "被动端：同 A；落点 = PlaybackPositionResumeSink（只改 playbackTime，绝不改 isPlaying）"
+                    platform: SyncEntityRegistry.platformIOS,
+                    frame: SyncEntityRegistry.changeLogFrameNumbers.pull,
+                    detail: "被动端：同 A；落点 = PlaybackPositionResumeSink（只改 playbackTime，绝不改 isPlaying）",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "ios-playback-position-sink-attached",
+                        path: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+                        requiredMarkers: ["PlaybackPositionResumeSink.apply"],
+                        alternativeMarkers: [],
+                        guidance: """
+                        跨端续播的**入站落点**没接上：Mac 推来的播放位置行会被判「未支持」丢弃（开关开着也续不了播）。
+                        请检查 IOSPassiveSyncCenter.makePassiveApplier 是否在开关开启时注入 applier.playbackPositionSink = { PlaybackPositionResumeSink.apply($0) }。
+                        """
+                    ),
+                    probe: .playbackPositionSink
                 ),
             ]
         ),
@@ -301,14 +398,36 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: false,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
+                    platform: SyncEntityRegistry.platformMac,
                     frame: 4,
-                    detail: "发起端：SyncCollectionSyncCoordinator 产出 lyricsEntries → 文件帧 4/5/6 随歌传输"
+                    detail: "发起端：SyncCollectionSyncCoordinator 产出 lyricsEntries → 文件帧 4/5/6 随歌传输",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "mac-lyrics-push-attached",
+                        path: "QQPlayer/Sync/SyncLibraryPushController.swift",
+                        requiredMarkers: ["descriptor.lyricsEntries()"],
+                        alternativeMarkers: [],
+                        guidance: """
+                        对齐歌词的**出站装配**断了：推送清单里不再包含 lyricsEntries → 歌词永远不随歌到达另一端（歌曲文件照传，用户只看到「歌词没过来」）。
+                        请检查 SyncLibraryPushController 的清单构造是否仍调用 descriptor.lyricsEntries()。
+                        """
+                    ),
+                    probe: nil
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
+                    platform: SyncEntityRegistry.platformIOS,
                     frame: 4,
-                    detail: "被动端：SyncLibraryPassiveHost / SyncLibraryPullController 构造 SyncLyricsReceiver 接收"
+                    detail: "被动端：SyncLibraryPassiveHost / SyncLibraryPullController 构造 SyncLyricsReceiver 接收",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "ios-lyrics-receiver-attached",
+                        path: "QQPlayer/Sync/SyncLibraryPassiveHost.swift",
+                        requiredMarkers: ["SyncLyricsReceiver("],
+                        alternativeMarkers: [],
+                        guidance: """
+                        被动端没有歌词接收器（INV-16 既有建议、此前一直缺的断言）：对端推来的歌词被当普通文件丢掉或落到未映射位置 → 手机上永远没有对齐歌词。
+                        请检查 SyncLibraryPassiveHost 是否构造 SyncLyricsReceiver（映射必须走 SyncLyricsContentMapping 入口，不得自行解析身份）。
+                        """
+                    ),
+                    probe: nil
                 ),
             ]
         ),
@@ -329,14 +448,36 @@ enum SyncEntityRegistry {
             repairsDanglingReferences: false,
             assemblyPoints: [
                 SyncEntityAssemblyPoint(
-                    platform: "Mac",
+                    platform: SyncEntityRegistry.platformMac,
                     frame: 10,
-                    detail: "发起端：SyncLibraryPushController + SyncManifestGenerator（内容权威在 Mac）"
+                    detail: "发起端：SyncLibraryPushController + SyncManifestGenerator（内容权威在 Mac）",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "mac-library-push-attached",
+                        path: "QQPlayer/Sync/SyncCollectionSyncCoordinator.swift",
+                        requiredMarkers: ["SyncLibraryPushController(", "SyncManifestGenerator.generate("],
+                        alternativeMarkers: [],
+                        guidance: """
+                        Mac 侧文件推送链路没装配：勾选的歌永远推不出去（用户点了「开始同步」却什么也没发生）。
+                        请检查 SyncCollectionSyncCoordinator 是否构造 SyncLibraryPushController 并用 SyncManifestGenerator.generate(...) 生成清单。
+                        """
+                    ),
+                    probe: nil
                 ),
                 SyncEntityAssemblyPoint(
-                    platform: "iOS",
+                    platform: SyncEntityRegistry.platformIOS,
                     frame: 10,
-                    detail: "被动端：SyncLibraryPassiveHost / SyncFileReceiver（纯被动，绝不跨端删文件）"
+                    detail: "被动端：SyncLibraryPassiveHost / SyncFileReceiver（纯被动，绝不跨端删文件）",
+                    assertion: SyncEntityAssemblyAssertion(
+                        id: "ios-file-receiver-attached",
+                        path: "QQPlayer/Sync/SyncLibraryPassiveHost.swift",
+                        requiredMarkers: ["SyncFileReceiver("],
+                        alternativeMarkers: [],
+                        guidance: """
+                        被动端文件接收器没装配：Mac 推来的歌落不了盘（面板显示已连接、进度永远不动）。
+                        请检查 SyncLibraryPassiveHost 是否构造 SyncFileReceiver 并在 attach 时接上会话。
+                        """
+                    ),
+                    probe: .libraryPassiveHost
                 ),
             ]
         ),
@@ -363,7 +504,106 @@ enum SyncEntityRegistry {
         ),
     ]
 
+    // MARK: - 共享装配点（不属任何一条实体登记）
+
+    /// **跨实体的装配点**：通道级（帧 8/9 的处理器与线上帧号）与平台级编排（Mac 跟歌走携带）。
+    ///
+    /// 与实体装配点**同一类型、同一份申报**：静态断言（`assertion`）与运行时自检（`probe`）
+    /// 走同一条推导路径——此前这几条活在 `SyncWiringContractTests` 的手写清单里，正是
+    /// 「同一语义多处手工维护」的另一半。
+    static let sharedAssemblyPoints: [SyncEntityAssemblyPoint] = [
+        SyncEntityAssemblyPoint(
+            platform: nil,
+            frame: changeLogFrameNumbers.push,
+            detail: "帧 8/9 的分发处理器：SyncChangeLogPeer 的帧分发表（两端共用同一处理器）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "frame-8-9-handler-present",
+                path: "QQPlayer/Sync/SyncChangeLogPeer.swift",
+                requiredMarkers: ["case .changeLogPull:", "case .changeLogPush:"],
+                alternativeMarkers: [],
+                guidance: """
+                帧 8/9 的唯一处理器没了（分支被删 / 改名）：全仓再没有地方响应播放数据同步帧 → 帧 8/9 变成死协议。
+                请检查 SyncChangeLogPeer 的帧分发表是否仍有 case .changeLogPull: / case .changeLogPush: 两个分支（类型本身存在于 QQPlayer/Sync/SyncChangeLogPeer.swift）。
+                """
+            ),
+            probe: nil
+        ),
+        SyncEntityAssemblyPoint(
+            platform: nil,
+            frame: changeLogFrameNumbers.pull,
+            detail: "帧 8/9 的线上帧号：SyncFrame 的 changeLogPull / changeLogPush（两端版本可能不同步升级）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "frame-8-9-numbers-frozen",
+                path: "QQPlayer/Sync/SyncFrame.swift",
+                // 标记**派生自 `changeLogFrameNumbers`**：改常量 = 断言里期望的号自动跟着变。
+                requiredMarkers: frozenFrameMarkers,
+                alternativeMarkers: [],
+                guidance: """
+                帧号被改动了：帧 8/9 是跨端线上契约（两端版本可能不同步升级），改号 = 老版本对端解错帧、同步静默错乱。
+                请把 SyncFrame.FrameType 的 changeLogPull 恢复到 = 8、changeLogPush 恢复到 = 9（新增帧只能用未占用的号段）。
+                """
+            ),
+            probe: nil
+        ),
+        SyncEntityAssemblyPoint(
+            platform: nil,
+            frame: nil,
+            detail: "歌曲身份解析入口：SyncContentHashResolver 遵守 SyncIdentityResolving，歌词映射从入口构造（两端共用）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "identity-entry-implemented-and-wired",
+                path: "QQPlayer/Sync/SyncChangeLogMapping.swift",
+                requiredMarkers: [
+                    "extension SyncContentHashResolver: SyncIdentityResolving",
+                    "SyncLyricsContentMapping(identity:",
+                ],
+                alternativeMarkers: [],
+                guidance: """
+                歌曲身份解析的入口实现断了：`SyncContentHashResolver` 不再声明遵守 `SyncIdentityResolving`，
+                或歌词映射不再从入口构造（`SyncLyricsContentMapping(identity:)`）——两条都是「入口空转」的形状：
+                编译能过（协议可选遵守）、下游各自拿闭包，漏接线一处就静默。
+                请检查 QQPlayer/Sync/SyncChangeLogMapping.swift：`SyncContentHashResolver` 必须有 `: SyncIdentityResolving` 遵守声明，
+                `.live(database:)` 必须走 `SyncLyricsContentMapping(identity: SyncContentHashResolver(database:))`。
+                """
+            ),
+            probe: nil
+        ),
+        SyncEntityAssemblyPoint(
+            platform: platformMac,
+            frame: nil,
+            detail: "跟歌走携带：MacSyncCoordinatorFactory 把 SyncPlaybackCarryPeer 装配进 SyncCollectionSyncCoordinator（R3b；对端 Device ID 为空则不装）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "mac-playback-carry-attached",
+                path: "QQPlayer/Mac/MacSyncCoordinatorFactory.swift",
+                requiredMarkers: ["SyncPlaybackCarryPeer("],
+                alternativeMarkers: [],
+                guidance: """
+                跟歌走链路失去装配：推 / 拉歌时播放数据不再跟随传输 → R3b 能力静默失效（要用户重新同步数据才补回来）。
+                请检查 MacSyncCoordinatorFactory 里 SyncCollectionSyncCoordinator 的 playbackCarry 实参是否仍传 SyncPlaybackCarryPeer(session:libraryRoot:peerID:)。
+                """
+            ),
+            probe: .playbackCarry
+        ),
+    ]
+
     // MARK: - 派生访问器（散落名单只准从这里取，不得手写第二份）
+
+    /// **全部装配点**（实体维度 + 共享维度）——静态装配断言与运行时自检的唯一来源。
+    static var allAssemblyPoints: [SyncEntityAssemblyPoint] {
+        entries.flatMap(\.assemblyPoints) + sharedAssemblyPoints
+    }
+
+    /// 全部 **(能力标识, 装配点)**：实体装配点的标识 = 登记的 L0 编号；共享装配点的标识 = 断言 id。
+    /// 静态断言与运行时自检都从这里取（一处声明，两处消费）。
+    static var capabilityAssemblyPoints: [(capabilityID: String, point: SyncEntityAssemblyPoint)] {
+        entries.flatMap { entry in
+            entry.assemblyPoints.map { (entry.l0ID, $0) }
+        } + sharedAssemblyPoints.map { ($0.assertion?.id ?? "shared", $0) }
+    }
+
+    /// 某平台声明的装配点（顺序 = 注册表声明顺序；`nil` 平台 = 与平台无关，不在此列）。
+    static func assemblyPoints(platform: String) -> [SyncEntityAssemblyPoint] {
+        allAssemblyPoints.filter { $0.platform == platform }
+    }
 
     /// 某实体的登记（未登记 = nil）。
     static func entry(for entity: SyncChangeEntity) -> SyncEntityRegistryEntry? {
