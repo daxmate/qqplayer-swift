@@ -131,12 +131,32 @@
 
 ### INV-16　每个跨端能力必须有**平台装配断言**（协议支持 ≠ 有实现 ≠ 已装配；每包自测全绿也能让接线掉进缝里）
 
-- **现有守护**：**静态契约**：`QQPlayerTests/SyncWiringContractTests.swift`（5 条断言 + 合成源码自证 `:193/:207`，fail-closed `:123`）。
-- **缺口**：只覆盖帧 8/9 处理器与 Mac 入口，**粒度是「类型被构造」而不是「每个实体都被处理」**；且 `QQPlayer/Mac/*` 属 Mac target（iOS 单测 target 看不到，仓库无 macOS 单测 target）→ Mac 侧行为**只能靠编译 + 契约扫源码**（`MacSyncDataViewModel.swift:29-31` 自述）。
-- **建议**：**静态契约**扩展：
-  1. `ios-lyrics-receiver-attached`（`SyncLyricsReceiver` 在被动端被构造）
-  2. `ios-data-sync-reset-reachable`（或显式断言 iOS 不支持重置，见 INV-9）
-  3. `replay-trigger-attached`（见 INV-8）
+- **现有守护**：**静态契约**：`QQPlayerTests/SyncWiringContractTests.swift`（断言清单**从实体注册表派生** + 合成源码自证，fail-closed）。
+  - **L5 守护（2026-09-15 立，装配层包——断言从「手写清单」改为「注册表派生」）**：
+    唯一声明处 = `QQPlayer/Sync/SyncEntityRegistry.swift` 的 `assemblyPoints[].assertion`（实体维度）
+    与 `sharedAssemblyPoints[].assertion`（通道级 / 共享入口级 / 平台级编排）；`SyncWiringContract.requirements`
+    只是这份申报的投影（新增装配点 = 加一条申报 → **自动获得断言**，不再手写第二份清单）。
+    - 派生自证：`assertionsComeFromRegistryOnly`（断言条数 / id / 路径 / 标记逐字来自申报）
+    - 基线：`assemblyAssertionBaselineIsPinned`（注册表删/改一条申报即红——**派生 ≠ 删了就不查**）+
+      `syntheticDroppedAssemblyDeclarationIsCaught`（合成「缺一条申报」必须被基线抓到）
+    - 语义保持：`originalRequirementSemanticsPreserved`（收口前五条的路径 + 必检标记逐条仍在）
+    - 申报自洽：`assemblyDeclarationsAreSelfConsistent`（探针必须有平台 / 不得积压 / 断言 id 唯一）+
+      `syntheticOrphanProbeIsCaught`
+  - **运行时自检（L5 新增：静态断言证明「调用点存在」，它证明「这一次真的装上了」）**：
+    `QQPlayer/Sync/SyncWiringSelfCheck.swift`——声明来自注册表 `assemblyPoints[].probe`，事实由各装配点
+    在装配发生的那一刻写入 `SyncWiringFactsStore`，判定是纯函数 `SyncWiringSelfCheck.gaps(items:)`；
+    缺口 > 0 时两端同步面板各显示一行（缺口 = 0 = 空态），并写进既有日志。
+    用例：`QQPlayerTests/SyncWiringSelfCheckTests.swift` → `noGapsWhenEverythingAttached` /
+    `singleGapIsReported` / `multipleGapsKeepOrder` / `notApplicableIsNotAGap`（门控关不算缺口，INV-26）/
+    `itemsComeFromRegistryDeclarations` / `presenterIsEmptyWhenNoGaps` / `presenterRowCarriesCountAndNames` /
+    `factsStorePublishesGaps`（@MainActor）/ `wiringStringsCoverFiveLanguages`（7 条新文案五语齐）。
+  - **新落地的装配断言**：`ios-lyrics-receiver-attached`（← 原本就在建议清单里）、`mac-playback-capture-attached`、
+    `ios-playback-position-sink-attached`、`mac-lyrics-push-attached`、`ios-file-receiver-attached`、`mac-library-push-attached`。
+- **缺口**：粒度仍是「类型被构造」而不是「每个实体都被处理」（B/C/D 三实体共用 A 的帧 8/9 装配点，登记里写明「同 A」）；
+  且 `QQPlayer/Mac/*` 属 Mac target（iOS 单测 target 看不到，仓库无 macOS 单测 target）→ Mac 侧行为**只能靠编译 + 契约扫源码 + Mac 侧运行时自检**（`MacSyncDataViewModel.swift:29-31` 自述）。
+- **建议（仍未做）**：
+  1. `ios-data-sync-reset-reachable`（或显式断言 iOS 不支持重置，见 INV-9）
+  2. `replay-trigger-attached`（见 INV-8）
 - **L0 守护（2026-09-15 立，实体注册表包——粒度从「帧 8/9 被装配」细化到「每个实体都被表态」）**：
   - `QQPlayerTests/SyncWiringContractTests.swift` → `registryEntriesAreSelfConsistent`
     （走变更日志通道的实体必须在注册表里登记**装配点 + 帧号 8/9**；`notSynced` 实体不得有装配点；
