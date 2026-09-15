@@ -636,6 +636,7 @@
 				Sync/SyncLocalLibraryProvider.swift,
 				Sync/SyncLocalLibraryScanner.swift,
 				Sync/SyncLyricsReceiver.swift,
+				Sync/SyncOutcomeTally.swift,
 				Sync/SyncPairingApprovalModel.swift,
 				Sync/SyncPairingFlow.swift,
 				Sync/SyncPeerLibraryClient.swift,
