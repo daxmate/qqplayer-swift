@@ -19,6 +19,20 @@
 - **建议**：**静态契约**（新增）+ 行为用例（补齐）
   - 静态：断言 `SyncChangeEntity.allCases` 的每个 case 都能被回答「本地真值在哪张表 / 由谁补发」——在 `SyncWiringContract.requirements` 里加一条，或在 `QQPlayerTests` 加「实体 × 补发归属表」全覆盖用例（`#expect` 每个 `allCases` 都有归属，防止新增实体漏通道）。
   - 行为：为 `.playlist` 补 `reconcileLocalTruth` 分支 + 用例（现无，见矩阵 C⑤）。
+- **L0 守护（2026-09-15 立，实体注册表包——散名单收口到唯一声明处）**：
+  - 遍历 + 静态：`QQPlayerTests/SyncWiringContractTests.swift` → `everyEntityCaseIsRegistered`
+    （`SyncChangeEntity.allCases` 每个 case **必须**在唯一声明处 `QQPlayer/Sync/SyncEntityRegistry.swift`
+    有登记；登记字段 `localTruth`（真值表 + 行键形态）与 `reconcilesLocalTruth`（有没有「表 → outbox」
+    补发）就是对「本地真值在哪张表 / 由谁补发」的可执行回答——新增实体漏登记即红）
+  - 静态：`derivedListsComeFromRegistryOnly`（`v1Synced` / `reconcilableEntities` /
+    `repairableEntities` / `trackScopedEntities` 只准从注册表派生，生产码里不得有第二份手写清单；
+    手写身份判定 `entity != .playlist` 同样只准登记在注册表）
+  - 静态：`notSyncedEntitiesAreNotImplemented`（注册表声明「记 outbox」的实体必须与生产码实际
+    写入点逐项一致；`notSynced` 实体不得出现在任何 outbox 写入点 / 补发名单 / 上线清单）
+  - 合成自证（fail-closed，证明断言不空转）：`syntheticUnregisteredEntityIsCaught` /
+    `syntheticSecondEntityListIsCaught` / `syntheticNotSyncedImplementationIsCaught` /
+    `syntheticL0IDMismatchIsCaught`；登记自洽：`registryEntriesAreSelfConsistent`
+  - 行为用例仍为：`QQPlayerTests/SyncChangeLogContentMapTests.swift:793/:821/:843/:861/:881`
 
 ### INV-2　本地写入点必须与 outbox 记录**同一事务**（绝不先改业务行后补 outbox，或反之）
 
@@ -123,6 +137,13 @@
   1. `ios-lyrics-receiver-attached`（`SyncLyricsReceiver` 在被动端被构造）
   2. `ios-data-sync-reset-reachable`（或显式断言 iOS 不支持重置，见 INV-9）
   3. `replay-trigger-attached`（见 INV-8）
+- **L0 守护（2026-09-15 立，实体注册表包——粒度从「帧 8/9 被装配」细化到「每个实体都被表态」）**：
+  - `QQPlayerTests/SyncWiringContractTests.swift` → `registryEntriesAreSelfConsistent`
+    （走变更日志通道的实体必须在注册表里登记**装配点 + 帧号 8/9**；`notSynced` 实体不得有装配点；
+    文件帧通道的实体不得登记 outbox 出站 / 补发语义）
+  - 同文件 → `l0IDsMatchContractDoc`（每条登记的 L0 编号必须在 `docs/sync-contract.md` 里真实存在，
+    且文档里的实体编号也必须有登记——契约改了代码没跟上、或代码加了契约没拍板，两边都红）
+  - 同文件 → `derivedListsMatchPreCollapseBehavior`（派生清单与收口前逐项相同 = 行为零变化基线）
 
 ### INV-17　同一会话只装一个 changeLog 处理器（重复装配 = 帧被处理两次 / 游标错乱）
 
