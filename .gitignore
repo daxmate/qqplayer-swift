@@ -107,3 +107,6 @@ Config.plist
 
 # 本地产物（审计详报/拆分方案，不入库）
 docs/
+
+# Python 工具脚本的字节码缓存（2026-09-15：check-target-membership 等）
+__pycache__/
