@@ -1086,7 +1086,11 @@ class DatabaseManager: @unchecked Sendable {
         // 身份键补齐 → 重放之前因「本地查不到该 content_hash」而挂起的对端变更。
         for hash in outcome.filledHashes {
             do {
-                let replayed = try SyncChangeLogReplay.replay(contentHash: hash, database: self)
+                let replayed = try SyncChangeLogReplay.replay(
+                    pendingKey: SyncPendingKey.contentHash(hash),
+                    database: self,
+                    libraryRoot: MusicFolderResolver.syncLibraryRoot
+                )
                 if replayed > 0 {
                     print("🔁 Sync: 回填指纹后重放挂起变更 \(replayed) 条（hash=\(hash.prefix(12))…）")
                 }

@@ -42,8 +42,11 @@ enum SyncRowOutcome: CaseIterable, Hashable, Sendable {
     /// 这是**批次事实**（本端发了多少行），不是远端行的处置：口径 = 「最近一批」，多批
     /// **覆盖写**不累加（见 `overwrite`）。
     case outbound
-    /// 远端行因**缺身份键**（`content_hash` nil/空）未定位 → 不落库、不挂起。
+    /// 远端行因**缺身份键**（两把键都拿不到）未定位 → 不落库、不挂起。
     case unresolved
+    /// 远端行的**第二身份（曲库相对路径）命中多首本地曲目**（身份歧义）→ 不落库、
+    /// 不挂起（选哪首都是猜），只计数披露。
+    case ambiguousIdentity
     /// 远端行因**父行 / 被引用行不存在**而跳过（歌单结构未到 / 引用歌本地查无）。
     case skippedMissingParent
     /// 远端 `playback_position` 行**没落到本地位置**（跨端续播开关关 = 默认 / 落点未接受）。
@@ -63,6 +66,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
     private var suspendedCount = 0
     private var outboundCount = 0
     private var unresolvedCount = 0
+    private var ambiguousIdentityCount = 0
     private var skippedMissingParentCount = 0
     private var unsupportedCount = 0
     private var missingIdentityCount = 0
@@ -77,6 +81,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
         case .suspended: suspendedCount += count
         case .outbound: outboundCount += count
         case .unresolved: unresolvedCount += count
+        case .ambiguousIdentity: ambiguousIdentityCount += count
         case .skippedMissingParent: skippedMissingParentCount += count
         case .unsupported: unsupportedCount += count
         case .missingIdentity: missingIdentityCount += count
@@ -100,6 +105,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
         case .suspended: return suspendedCount
         case .outbound: return outboundCount
         case .unresolved: return unresolvedCount
+        case .ambiguousIdentity: return ambiguousIdentityCount
         case .skippedMissingParent: return skippedMissingParentCount
         case .unsupported: return unsupportedCount
         case .missingIdentity: return missingIdentityCount
@@ -119,6 +125,8 @@ extension SyncOutcomeTally {
     var outboundEntries: Int { count(for: .outbound) }
     /// 缺身份键 → 未定位、未落库的条数。
     var unresolvedEntries: Int { count(for: .unresolved) }
+    /// 身份键歧义（第二身份相对路径命中多行）→ 未落库、未挂起的条数。
+    var ambiguousIdentityEntries: Int { count(for: .ambiguousIdentity) }
     /// 父行 / 被引用行不存在而跳过的条数。
     var skippedMissingParentEntries: Int { count(for: .skippedMissingParent) }
     /// 播放位置行没落到本地位置的条数。

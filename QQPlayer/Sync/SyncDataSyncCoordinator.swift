@@ -74,9 +74,12 @@ struct SyncDataSyncReport: Equatable, Sendable {
     var appliedEntries: Int { tally.appliedEntries }
     /// 对端推来的行里因本地缺歌而挂起的行数（歌到位后重放，不丢数据）
     var suspendedEntries: Int { tally.suspendedEntries }
-    /// 拉取方向：对端推来的行里因**缺身份键**（contentHash nil/空）而**未落库**的行数
+    /// 拉取方向：对端推来的行里因**缺身份键**（两把键都拿不到）而**未落库**的行数
     /// （无法定位到本地歌曲 → 落库也永远不可见；见 `SyncEntryLocalization.unresolved`）
     var unresolvedEntries: Int { tally.unresolvedEntries }
+    /// 拉取方向：对端推来的行里因**身份歧义**（第二身份相对路径命中多首本地曲目）
+    /// 而未落库的行数（不落库、不挂起——选哪首都是猜）
+    var ambiguousIdentityEntries: Int { tally.ambiguousIdentityEntries }
     /// 拉取方向：对端推来的 `playback_position` 行里**没有落到本地位置**的行数
     /// （跨端续播开关关 = 默认，或开关开但本端落点未接；见 `SyncChangeLogApplier`）。
     /// ⚠️ 这些行**不计入 `appliedEntries`**——「已应用」= 真的落了本地（INV-20）。
@@ -109,6 +112,8 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
 
     private let session: SyncPeerSession
     private let database: DatabaseManager
+    /// 曲库根（**必传**）：跨端身份入口的输入，第二身份（相对路径）的换算基准。
+    private let libraryRoot: URL
     private let store: SyncChangeLogStore
     private let applier: SyncChangeLogApplier
     /// 本端视角的对端 Device ID（推/拉游标键；空 = 会话未握手，不干活）。
@@ -132,11 +137,13 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     init(
         session: SyncPeerSession,
         database: DatabaseManager = .shared,
-        peerID: String? = nil
+        peerID: String? = nil,
+        libraryRoot: URL
     ) {
         self.session = session
         self.database = database
         self.store = SyncChangeLogStore(database: database)
+        self.libraryRoot = libraryRoot
         var applier = SyncChangeLogApplier(database: database)
         // 跨端续播（默认关）：开关开且落点可用才注入落点；关 = 本端不接受播放位置（INV-26）。
         if applier.playbackPositionSyncEnabled {
@@ -193,12 +200,14 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
             session: session,
             store: store,
             applier: applier,
-            peerID: peerID
+            peerID: peerID,
+            libraryRoot: libraryRoot
         )
         // 先装回调再发帧：内存回环下应答会在 sendPull 内同步回来。
         peer.onPushApplied = { [weak self] count in self?.recordApplied(count) }
         peer.onPushSuspended = { [weak self] count in self?.recordSuspended(count) }
         peer.onPushUnresolved = { [weak self] count in self?.recordUnresolved(count) }
+        peer.onPushAmbiguous = { [weak self] count in self?.recordAmbiguousIdentity(count) }
         peer.onPushSkippedMissingParent = { [weak self] count in
             self?.recordSkippedMissingParent(count)
         }
@@ -269,6 +278,15 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private func recordUnresolved(_ count: Int) {
         lock.lock()
         reportValue.tally.accumulate(.unresolved, count: count)
+        lock.unlock()
+        finish(failure: nil)
+    }
+
+    /// 拉取方向：对端推来的行里因**身份歧义**未落库的行数（第二身份相对路径命中多首
+    /// 本地曲目；不落库、不挂起）。与其它「应答已到」回调用同一收尾语义。
+    private func recordAmbiguousIdentity(_ count: Int) {
+        lock.lock()
+        reportValue.tally.accumulate(.ambiguousIdentity, count: count)
         lock.unlock()
         finish(failure: nil)
     }

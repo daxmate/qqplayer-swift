@@ -3,9 +3,14 @@
 //  QQPlayer
 //
 //  局域网同步（S2, M4-2a）挂起变更 + 重放：远端播放数据变更引用的歌曲本地还没有
-//  （content_hash 映射不到本地 stableId）时**不丢**——原样挂起在 sync_pending_change
-//  表（行键 = content_hash），等该歌曲入库（Track 保存且带 content_hash）后由
-//  SyncChangeLogReplay 重新本地化 → LWW 对账 → 应用，成功后清理挂起行。
+//  时**不丢**——原样挂起在 sync_pending_change 表（行键 = 挂起键），等该歌曲入库
+//  （Track 保存且带 content_hash / 或落在曲库相对路径上）后由 SyncChangeLogReplay
+//  重新本地化 → LWW 对账 → 应用，成功后清理挂起行。
+//
+//  挂起键有两个命名空间（**构造/解析只在 `SyncPendingKey` 一处**）：
+//  - 内容指纹（键 = content_hash 本身；**今天形态，历史库里的行原样可读**）
+//  - 曲库相对路径（键 = `rel:{相对路径}`；第二身份，对端那行拿不到指纹时用）
+//  表结构不变（`row_key` 是 TEXT，天然容纳）。
 //
 //  ⚠️ v2 语义修订（2026-09-10，docs/lan-sync-design.md §6.2 / §12b-7）：**不再有删除
 //  传播**——挂起机制只服务"歌正在传输中、播放数据先到"的竞态兜底（只延迟应用、不删
@@ -28,10 +33,11 @@
 import Foundation
 @preconcurrency import GRDB
 
-/// sync_pending_change 一行：某个 content_hash 下挂起的一条远端变更。
+/// sync_pending_change 一行：某个**挂起键**下挂起的一条远端变更。
 struct SyncPendingChangeRow: Codable, FetchableRecord, PersistableRecord, Equatable, Sendable {
     var id: Int64?
-    /// 挂起键 = 远端 entry.contentHash（歌曲内容指纹）。
+    /// 挂起键（命名空间见 `SyncPendingKey`，构造/解析只在那里）：
+    /// 内容指纹（**今天形态**）或 `rel:{曲库相对路径}`（第二身份）。
     var rowKey: String
     /// 远端原始 row_key（重放时定位 delete / 重建复合键）。
     var remoteRowKey: String
@@ -63,15 +69,17 @@ final class SyncChangeLogPendingStore: @unchecked Sendable {
         self.database = database
     }
 
-    /// 挂起一条远端行（幂等：同 (entity, content_hash, remote_row_key) upsert）。
-    func suspend(_ row: SyncChangeLogRow, contentHash: String) throws {
+    /// 挂起一条远端行（幂等：同 (entity, 挂起键, remote_row_key) upsert）。
+    /// `pendingKey` 由身份入口给出（`SyncPendingKey` 命名空间），本层不自拼字符串。
+    func suspend(_ row: SyncChangeLogRow, pendingKey: String) throws {
         try database.write { db in
-            try Self.suspend(db, row: row, contentHash: contentHash)
+            try Self.suspend(db, row: row, pendingKey: pendingKey)
         }
     }
 
     /// 事务内版本（接收侧一批行共用一个写事务时用）。
-    static func suspend(_ db: Database, row: SyncChangeLogRow, contentHash: String) throws {
+    static func suspend(_ db: Database, row: SyncChangeLogRow, pendingKey: String) throws {
+        guard !pendingKey.isEmpty else { return }
         try db.execute(
             sql: """
             INSERT INTO sync_pending_change (entity, row_key, remote_row_key, op, updated_at, payload_json)
@@ -82,20 +90,20 @@ final class SyncChangeLogPendingStore: @unchecked Sendable {
                 payload_json = excluded.payload_json
             WHERE excluded.updated_at >= sync_pending_change.updated_at
             """,
-            arguments: [row.entity, contentHash, row.rowKey, row.op, row.updatedAtMs, row.payloadJSON]
+            arguments: [row.entity, pendingKey, row.rowKey, row.op, row.updatedAtMs, row.payloadJSON]
         )
     }
 
-    /// 某 content_hash 的全部挂起行（升序 = 挂起顺序）。
-    func rows(forContentHash contentHash: String) throws -> [SyncPendingChangeRow] {
+    /// 某挂起键的全部挂起行（升序 = 挂起顺序）。
+    func rows(forPendingKey pendingKey: String) throws -> [SyncPendingChangeRow] {
         try database.read { db in
-            try Self.rows(db, forContentHash: contentHash)
+            try Self.rows(db, forPendingKey: pendingKey)
         }
     }
 
-    static func rows(_ db: Database, forContentHash contentHash: String) throws -> [SyncPendingChangeRow] {
+    static func rows(_ db: Database, forPendingKey pendingKey: String) throws -> [SyncPendingChangeRow] {
         try SyncPendingChangeRow
-            .filter(Column("row_key") == contentHash)
+            .filter(Column("row_key") == pendingKey)
             .order(Column("id"))
             .fetchAll(db)
     }
@@ -136,16 +144,22 @@ final class SyncChangeLogPendingStore: @unchecked Sendable {
 /// v2（§12b-7）：只重放 upsert 挂起行；delete 挂起行（历史遗留）直接丢弃并清理，
 /// 保证没有任何路径会让 delete 类变更被延后应用。
 enum SyncChangeLogReplay {
-    /// 重放某 content_hash 的挂起变更。
-    /// - Returns: 实际应用的业务行数（0 = 无挂起变更 / 本端胜出）。
+    /// 重放某**挂起键**的挂起变更（两个命名空间同一入口：指纹 / `rel:{相对路径}`）。
+    ///
+    /// 挂起键 → 身份键组一律走 `SyncPendingKey.identity(fromPendingKey:)`（命名空间的
+    /// 唯一解析处），再调身份入口判定 → 本文件不自己拼/解键。
+    /// - Parameters:
+    ///   - pendingKey: 挂起表行键（`SyncPendingKey` 命名空间）。
+    ///   - libraryRoot: 曲库根（`rel:` 命名空间重放必需；身份入口的必传输入）。
+    /// - Returns: 实际应用的业务行数（0 = 无挂起变更 / 本端胜出 / 仍挂起 / 歧义）。
     @discardableResult
-    static func replay(contentHash: String, database: DatabaseManager) throws -> Int {
-        guard !contentHash.isEmpty else { return 0 }
+    static func replay(pendingKey: String, database: DatabaseManager, libraryRoot: URL) throws -> Int {
+        guard !pendingKey.isEmpty else { return 0 }
         let pendingStore = SyncChangeLogPendingStore(database: database)
-        let pending = try pendingStore.rows(forContentHash: contentHash)
+        let pending = try pendingStore.rows(forPendingKey: pendingKey)
         guard !pending.isEmpty else { return 0 }
 
-        let mapper = SyncChangeLogMapper(database: database)
+        let mapper = SyncChangeLogMapper(database: database, libraryRoot: libraryRoot)
         let logStore = SyncChangeLogStore(database: database)
 
         // 0) 防御（v2 §12b-7）：历史遗留库可能存有 delete 挂起行（旧语义下 delete 也会
@@ -161,8 +175,16 @@ enum SyncChangeLogReplay {
         let applicable = pending.filter { !SyncChangeLogDeletionPolicy.shouldIgnore(op: $0.op) }
         guard !applicable.isEmpty else { return 0 }
 
+        // 0b) 挂起键 → 身份键组（非法键 = 回不到身份，保留挂起行并跳过：不可解释的键
+        //     宁可不动，也不当成指纹硬查）。
+        guard let identity = SyncPendingKey.identity(fromPendingKey: pendingKey) else {
+            print("⚠️ SyncChangeLogReplay: 挂起键不可解释，保留不动（key 前缀 \(String(pendingKey.prefix(16)))…）")
+            return 0
+        }
+
         // 1) 重新本地化（歌曲已入库，此时应能映射到本地 stableId）
         var localizable: [(pendingID: Int64, row: SyncChangeLogRow)] = []
+        var ambiguousCount = 0
         for item in applicable {
             guard let id = item.id else { continue }
             let entry = SyncChangeLogWireEntry(
@@ -171,7 +193,8 @@ enum SyncChangeLogReplay {
                 rowKey: item.remoteRowKey,
                 op: item.op,
                 updatedAtMs: item.updatedAtMs,
-                contentHash: contentHash,
+                contentHash: identity.contentHash,
+                relativePath: identity.relativePath,
                 payloadJSON: item.payloadJSON
             )
             switch try mapper.localize(entry) {
@@ -179,11 +202,20 @@ enum SyncChangeLogReplay {
                 localizable.append((id, row))
             case .suspended:
                 continue // 仍映射不到（异常情形）：保留挂起行，下次再试
+            case let .ambiguous(key, candidateCount, _):
+                // 歧义：**不落库**（写脏行比不写更糟），也不删挂起行（不丢远端事实）——
+                // 只计数 + 一行日志，等上层修复后重试。
+                ambiguousCount += 1
+                print(
+                    "⚠️ SyncChangeLogReplay: 身份歧义（\(key.rawValue) 命中 \(candidateCount) 首本地曲目）"
+                        + "，不落库：entity=\(item.entity) rowKey=\(item.remoteRowKey)"
+                )
             case .unresolved:
-                continue // 不可能：这里 contentHash 非空（挂起键即指纹）；到达即视为仍不可用
+                continue // 键不可用（不可能：挂起键非空；到达即视为仍不可用）
             }
         }
         guard !localizable.isEmpty else { return 0 }
+        _ = ambiguousCount
 
         // 2) 与本地 outbox 同键最新行对账（同 change_log_push）
         var localRows: [SyncChangeLogRow] = []
@@ -201,6 +233,41 @@ enum SyncChangeLogReplay {
 
         // 4) 已处理的挂起行清理（无论本端/远端胜出：该远端事实已被消费）
         try pendingStore.delete(ids: localizable.map(\.pendingID))
+        return applied
+    }
+
+    /// 歌曲入库后重放（`DatabaseManager.upsertTrack` 的触发点调它）：
+    /// 把这首新到位的歌能解释的**两个命名空间**的挂起键都算出来逐个重放——
+    /// ① 内容指纹（该歌的 `content_hash`）；② 曲库相对路径（`track.path` 换算到曲库根）。
+    ///
+    /// 为什么要两个：对端那行可能带的是指纹、也可能是第二身份（指纹缺失时）；只重放其一会
+    /// 让另一半挂起行永远等人。相对路径算不出（歌不在曲库根内）= 本端也没有该键，跳过。
+    /// - Returns: 实际应用的行数（各命名空间之和）。
+    @discardableResult
+    static func replayAfterTrackSave(
+        contentHash: String?,
+        absolutePath: String,
+        database: DatabaseManager,
+        libraryRoot: URL
+    ) throws -> Int {
+        var applied = 0
+        if let contentHash, !contentHash.isEmpty {
+            applied += try replay(
+                pendingKey: SyncPendingKey.contentHash(contentHash),
+                database: database,
+                libraryRoot: libraryRoot
+            )
+        }
+        if let relativePath = SyncContentHashResolver.relativePath(
+            ofAbsoluteTrackPath: absolutePath,
+            libraryRoot: libraryRoot
+        ) {
+            applied += try replay(
+                pendingKey: SyncPendingKey.relativePath(relativePath),
+                database: database,
+                libraryRoot: libraryRoot
+            )
+        }
         return applied
     }
 }

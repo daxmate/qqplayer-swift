@@ -82,6 +82,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPushUnresolved: ((Int) -> Void)?
     /// push 中被忽略的 delete 行数（v2 删除不传播；锁外触发；0 = 无忽略）。
     var onPushIgnoredDeletes: ((Int) -> Void)?
+    /// push 中因**身份歧义**（第二身份相对路径命中多首本地曲目）而未落库的行数
+    /// （不落库、不挂起；锁外触发；0 = 无歧义）。
+    var onPushAmbiguous: ((Int) -> Void)?
     /// push 中**没落到本地位置**的 playback_position 行数（跨端续播开关关 = 默认，
     /// 或开关开但落点未接；这些行不计入 `onPushApplied`）。锁外触发；0 = 不上报。
     var onPushUnsupported: ((Int) -> Void)?
@@ -111,12 +114,14 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         session: SyncPeerSession,
         store: SyncChangeLogStore,
         applier: SyncChangeLogApplier,
-        peerID: String
+        peerID: String,
+        libraryRoot: URL
     ) {
         self.session = session
         self.store = store
         self.applier = applier
-        self.mapper = SyncChangeLogMapper(database: applier.database)
+        // 曲库根（**必传**）：第二身份（相对路径）的换算基准，传给唯一身份入口。
+        self.mapper = SyncChangeLogMapper(database: applier.database, libraryRoot: libraryRoot)
         self.pendingStore = SyncChangeLogPendingStore(database: applier.database)
         self.peerID = peerID
         // 计数只进 tally（单一存储）：applier 每报一条，就往对应的结果类别里加一条。
@@ -277,6 +282,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             // 本批（方法局部）结果计数：只进 tally，本类不再自建分类计数器（L6 形状契约）。
             var batchTally = SyncOutcomeTally()
             var unresolved: [UnresolvedDetail] = []
+            var ambiguous: [AmbiguousDetail] = []
             for entry in payload.entries {
                 // v2（§12b-7）：删除不传播——收到 delete 一律忽略，且必须在 localize
                 // 之前拦截（见文件头注释：否则会被误判为"本地缺歌"挂起）。
@@ -288,9 +294,19 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 switch try mapper.localize(entry) {
                 case .mapped(let row), .passThrough(let row):
                     remoteRows.append(row)
-                case .suspended(let contentHash, let remoteRow):
-                    try pendingStore.suspend(remoteRow, contentHash: contentHash)
+                case .suspended(let pendingKey, let remoteRow):
+                    // 挂起键由身份入口给出（指纹 / `rel:{相对路径}`），本层不自拼。
+                    try pendingStore.suspend(remoteRow, pendingKey: pendingKey)
                     batchTally.accumulate(.suspended)
+                case .ambiguous(let key, let candidateCount, let remoteRow):
+                    // 第二身份命中多首本地曲目 → 选哪首都是猜：不落库、不挂起，只计数
+                    // （落库会挂到错歌上，用户看到的是「收藏跑到别的歌」）。
+                    ambiguous.append(AmbiguousDetail(
+                        entity: remoteRow.entity,
+                        rowKey: remoteRow.rowKey,
+                        key: key,
+                        candidateCount: candidateCount
+                    ))
                 case .unresolved(let reason, let remoteRow):
                     // 引用歌曲但没有可用身份键 → 定位不到本地歌曲：不落库（否则写出
                     // JOIN track 永不匹配的孤儿业务行）也不挂起（缺 content_hash 当键），
@@ -304,6 +320,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             }
             // 未定位按批汇总一行（T15b 降噪：原先逐行 print，一盘 110 行刷屏）。
             Self.logUnresolved(unresolved)
+            // 身份歧义同样按批汇总一行，并计入结果账目（不落库、不挂起）。
+            Self.logAmbiguous(ambiguous)
+            batchTally.accumulate(.ambiguousIdentity, count: ambiguous.count)
             // 本地批：按 (entity, row_key) **一次取齐**本端该键最新行（对账代表本端事实）。
             // S4（2026-09-12 审计）：原先逐行调 `latestRow` 是 N+1（每行一次查询）；
             // 改为按 entity 分组的批量查询，键集合 = 远端批本地化后的键集合，口径不变。
@@ -335,6 +354,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             onPushSuspended?(batchTally.count(for: .suspended))
             onPushUnresolved?(unresolved.count)
             onPushIgnoredDeletes?(batchTally.count(for: .ignoredDelete))
+            if !ambiguous.isEmpty { onPushAmbiguous?(ambiguous.count) }
             if unsupported > 0 { onPushUnsupported?(unsupported) }
             if skippedMissingParent > 0 { onPushSkippedMissingParent?(skippedMissingParent) }
         } catch {
@@ -370,6 +390,31 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         print(
             "⚠️ SyncChangeLogPeer: 跳过未定位的远端行 共 \(items.count) 条"
                 + "（原因 \(byReason)；实体 \(byEntity)；样例 \(samples)）"
+        )
+    }
+
+    /// 「身份歧义」明细一行（第二身份相对路径命中了多首本地曲目；只用于按批日志，
+    /// 隐私：只记实体/键/候选数，不打印曲目内容）。
+    private struct AmbiguousDetail {
+        var entity: String
+        var rowKey: String
+        var key: SyncRemoteKey
+        var candidateCount: Int
+    }
+
+    /// 「身份歧义」按**批**汇总一行（不落库、不挂起：选哪首都是猜）。
+    private static func logAmbiguous(_ items: [AmbiguousDetail]) {
+        guard !items.isEmpty else { return }
+        let byKey = Dictionary(grouping: items, by: \.key)
+            .map { "\($0.key.rawValue)=\($0.value.count)" }
+            .sorted()
+            .joined(separator: " ")
+        let samples = items.prefix(2)
+            .map { "\($0.entity):\(String($0.rowKey.prefix(24)))#\($0.candidateCount)" }
+            .joined(separator: " | ")
+        print(
+            "⚠️ SyncChangeLogPeer: 跳过身份歧义的远端行 共 \(items.count) 条"
+                + "（键 \(byKey)；样例 \(samples)）"
         )
     }
 

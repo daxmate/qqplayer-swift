@@ -79,18 +79,23 @@ extension DatabaseManager {
         if let savedTrack {
             try cleanupStaleUnplayableDuplicates(matching: savedTrack)
 
-            // M4-2a: 歌曲入库（带 content_hash）后重放引用它的挂起同步变更。
+            // 身份重放（2026-09-18 身份兜底包）：两个命名空间的挂起键都算出来——
+            // ① 新到位的指纹（content_hash 命名空间）；② 该歌的曲库相对路径（rel: 命名空间，
+            // 对端那行拿不到指纹时用的第二身份）。只重放其一会让另一半挂起行永远等人。
             // 放在写事务外（重放自走读写事务），失败不影响入库本身（下次入库/
             // 对账再试）；无挂起行时只是一次索引读，扫描入库不受影响。
-            if let contentHash = savedTrack.contentHash {
-                do {
-                    let replayed = try SyncChangeLogReplay.replay(contentHash: contentHash, database: self)
-                    if replayed > 0 {
-                        print("🔁 Sync: 重放挂起变更 \(replayed) 条")
-                    }
-                } catch {
-                    print("⚠️ Sync: 挂起变更重放失败（下次入库重试）：\(error)")
+            do {
+                let replayed = try SyncChangeLogReplay.replayAfterTrackSave(
+                    contentHash: savedTrack.contentHash,
+                    absolutePath: savedTrack.path,
+                    database: self,
+                    libraryRoot: MusicFolderResolver.syncLibraryRoot
+                )
+                if replayed > 0 {
+                    print("🔁 Sync: 重放挂起变更 \(replayed) 条")
                 }
+            } catch {
+                print("⚠️ Sync: 挂起变更重放失败（下次入库重试）：\(error)")
             }
         }
     }
