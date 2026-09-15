@@ -677,3 +677,569 @@ struct SyncOutcomeContractTests {
         )
     }
 }
+
+// MARK: - 实体注册表契约（CI 遍历断言，L0 契约 → 代码，2026-09-15）
+
+/// 「某实体具备哪些同步能力」唯一声明处（`SyncEntityRegistry`）的**形状契约**：
+/// 扫生产码 + 读 L0 契约文档，断言四件事——
+/// ① `SyncChangeEntity.allCases` 每个 case 都有登记；
+/// ② 每条登记的 L0 编号在 `docs/sync-contract.md` 里真实存在（文档 ↔ 代码双向对齐）；
+/// ③ `notSynced` 实体（契约明写「不做」）不得出现在任何 outbox 写入点 / 补发名单 / 上线清单；
+/// ④ 派生名单只准从注册表算（生产码里不得有第二份手写清单 / 手写身份判定）。
+///
+/// 为什么单独一层：行为用例只能发现「这条通道算错了」，发现不了「同一件事被第二处手工
+/// 维护」——2026-09-14 收藏事故的根因形状就是四处名单各自维护、漏一处即静默。
+///
+/// 判据（同 `SyncIdentityContract` 风格）：纯函数判定 + 合成源码自证 + fail-closed。
+enum SyncEntityRegistryContract {
+    /// 唯一声明处（白名单：只有这个文件可以持有实体清单与「引用歌曲」判定）。
+    static let registryPath = "QQPlayer/Sync/SyncEntityRegistry.swift"
+    /// 生产码扫描根（测试是 seam，不在扫描范围）。
+    static let productionRoot = "QQPlayer"
+    /// L0 契约文档（实体编号的真相；`docs/` 在 .gitignore，本文件 `git add -f` 入库）。
+    static let contractDocPath = "docs/sync-contract.md"
+
+    /// 派生名单名：收口后只允许「计算属性 → 注册表」，字面量清单只准出现在注册表里。
+    /// （这些是**散落在别处的旧名**，它们出现在注册表里是正常的——派生访问器同名。）
+    static let forbiddenListNames = [
+        "v1Synced",
+        "reconcilableEntities",
+        "repairableEntities",
+        "trackScopedEntities",
+    ]
+
+    /// 注册表必须提供的派生访问器名（不全 = 派生没收口，白名单空转必须失败）。
+    static let derivedAccessorNames = [
+        "v1SyncedEntities",
+        "reconcilableEntities",
+        "danglingRepairableEntities",
+        "trackScopedSyncedEntities",
+    ]
+
+    /// 手写「引用歌曲」判定的形态（收口前 `entity != .playlist`；现在只能登记在注册表）。
+    static let handWrittenIdentityPredicate = "!=.playlist"
+
+    /// outbox 写入点的形态：文件里同时出现存储类型 + `record(` 调用。
+    static let outboxStoreMarker = "SyncChangeLogStore"
+    static let outboxRecordMarker = "record("
+    /// outbox 写入点上的实体实参前缀（`entity: .favorite`）。
+    static let entityArgumentMarker = "entity:."
+
+    // MARK: 纯函数（只用 Foundation 字符串 API）
+
+    /// 一份源码里被当作 outbox 写入实参的实体名（`entity: .favorite` → "favorite"）。
+    static func entityCaseNames(inSource source: String) -> Set<String> {
+        let compact = source.filter { !$0.isWhitespace }
+        var result: Set<String> = []
+        var searchStart = compact.startIndex
+        while let found = compact.range(of: entityArgumentMarker, range: searchStart ..< compact.endIndex) {
+            searchStart = found.upperBound
+            let name = compact[found.upperBound...].prefix { $0.isLetter || $0.isNumber }
+            if let first = name.first, first.isLowercase {
+                result.insert(String(name))
+            }
+        }
+        return result
+    }
+
+    /// 一份生产源码里的违禁项（空 = 该文件合规）：第二份手写清单 / 手写身份判定。
+    /// 白名单 = 注册表文件自身（它是唯一声明处）。
+    static func violations(inSource source: String, relativePath: String) -> [String] {
+        guard relativePath != registryPath else { return [] }
+        let compact = source.filter { !$0.isWhitespace }
+        var hits: [String] = []
+        for name in forbiddenListNames where compact.contains("\(name):[SyncChangeEntity]=[") {
+            hits.append("第二份手写实体清单：`\(name): [SyncChangeEntity] = [`")
+        }
+        if compact.contains(handWrittenIdentityPredicate) {
+            hits.append("手写「引用歌曲」判定：`entity != .playlist`（身份键要求只能登记在注册表）")
+        }
+        return hits
+    }
+
+    /// L0 契约文档里的实体编号标题（`### A 收藏（favorite）` → "A"；`### F1 …` → "F1"）。
+    static func l0Headings(inDoc source: String) -> Set<String> {
+        var result: Set<String> = []
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+            guard line.hasPrefix("### ") else { continue }
+            let words = line.dropFirst(4).split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard let token = words.first, token.count <= 2, let first = token.first, first.isUppercase else { continue }
+            result.insert(String(token))
+        }
+        return result
+    }
+
+    /// 未登记的实体 case（CI 遍历断言的核心判定）。
+    static func unregisteredEntityCases(allCases: [String], registered: Set<String>) -> [String] {
+        allCases.filter { !registered.contains($0) }
+    }
+
+    /// Swift case 名（扫描产物是源码里的 **case 名**，不是 rawValue：`playHistory` ≠ `play_history`）。
+    /// 写法刻意用穷举 `switch`（无 default）：新增 case 时这里编译不过，逼人表态。
+    static func caseName(of entity: SyncChangeEntity) -> String {
+        switch entity {
+        case .favorite: return "favorite"
+        case .playHistory: return "playHistory"
+        case .playlist: return "playlist"
+        case .playlistItem: return "playlistItem"
+        case .playbackPosition: return "playbackPosition"
+        }
+    }
+
+    /// 注册表编号在契约文档里查无的（代码有、文档没有 → 文档没跟上）。
+    static func l0IDsMissingFromDoc(registryIDs: Set<String>, docHeadings: Set<String>) -> [String] {
+        registryIDs.subtracting(docHeadings).sorted()
+    }
+
+    /// 契约文档里的实体编号在注册表里查无的（文档有、代码没有 → 代码没跟上）。
+    static func l0IDsMissingFromRegistry(registryIDs: Set<String>, docHeadings: Set<String>) -> [String] {
+        docHeadings.subtracting(registryIDs).sorted()
+    }
+
+    /// 「不承诺」实体出现在实现点上的违规（契约明写「不做」的，任何人不得实现它）。
+    static func notSyncedViolations(
+        notSyncedCaseNames: Set<String>,
+        outboxWrittenEntityNames: Set<String>,
+        derivedListEntityNames: [String: Set<String>]
+    ) -> [String] {
+        var hits: [String] = []
+        for name in notSyncedCaseNames.sorted() {
+            if outboxWrittenEntityNames.contains(name) {
+                hits.append("`\(name)` 标为 notSynced，却出现在 outbox 写入点上")
+            }
+            for (listName, names) in derivedListEntityNames.sorted(by: { $0.key < $1.key }) where names.contains(name) {
+                hits.append("`\(name)` 标为 notSynced，却出现在名单 `\(listName)` 里")
+            }
+        }
+        return hits
+    }
+
+    /// 登记自洽违规（纯函数：合成条目也能自证）。
+    static func registrySelfConsistencyViolations(_ entries: [SyncEntityRegistryEntry]) -> [String] {
+        var hits: [String] = []
+        var seenEntities: Set<String> = []
+        var seenIDs: Set<String> = []
+        for entry in entries {
+            if !seenIDs.insert(entry.l0ID).inserted {
+                hits.append("L0 编号 `\(entry.l0ID)` 重复登记")
+            }
+            if let entity = entry.entity, !seenEntities.insert(entity.rawValue).inserted {
+                hits.append("实体 `\(entity.rawValue)` 重复登记")
+            }
+            // 不承诺 ⇒ 零实现（通道 / 出站 / 补发 / 修复 / 装配点全为空）
+            if entry.syncMode.isNotSynced {
+                if entry.channel != .none {
+                    hits.append("notSynced 的 `\(entry.l0ID)` 不能有跨端通道：\(entry.channel)")
+                }
+                if entry.writesOutbox || entry.reconcilesLocalTruth || entry.repairsDanglingReferences {
+                    hits.append("notSynced 的 `\(entry.l0ID)` 不能有任何同步实现点（出站 / 补发 / 修复）")
+                }
+                if !entry.assemblyPoints.isEmpty {
+                    hits.append("notSynced 的 `\(entry.l0ID)` 不该有装配点")
+                }
+            }
+            // 通道与能力互不矛盾
+            if entry.writesOutbox, entry.channel != .changeLog {
+                hits.append("`\(entry.l0ID)` 记 outbox 就必须走变更日志通道")
+            }
+            if entry.channel == .fileFrames, entry.writesOutbox || entry.reconcilesLocalTruth {
+                hits.append("`\(entry.l0ID)` 走文件帧通道，不该有 outbox 出站 / 补发语义")
+            }
+            if entry.entity != nil, entry.channel != .changeLog {
+                hits.append("`\(entry.l0ID)` 有 SyncChangeEntity case 就必须走变更日志通道")
+            }
+            // 悬空修复只对引用歌曲的实体有意义
+            if entry.repairsDanglingReferences, !entry.referencesTrack {
+                hits.append("`\(entry.l0ID)` 不引用歌曲，却登记为「参与悬空引用修复」")
+            }
+            // 「表 → outbox」补发只对表载体有意义
+            if entry.reconcilesLocalTruth, entry.localTruth.table == nil {
+                hits.append("`\(entry.l0ID)` 没有业务真值表，不该登记「本地真值 → outbox 补发」")
+            }
+            // 变更日志通道的装配点必须写出帧号（帧 8/9）
+            if entry.channel == .changeLog {
+                let frames = entry.assemblyPoints.compactMap(\.frame)
+                if frames.isEmpty {
+                    hits.append("`\(entry.l0ID)` 走变更日志通道，装配点必须写出帧号")
+                }
+                for frame in frames where !(8 ... 9).contains(frame) {
+                    hits.append("`\(entry.l0ID)` 变更日志通道的装配帧号应为 8/9，实际 \(frame)")
+                }
+            }
+        }
+        return hits
+    }
+}
+
+extension SyncEntityRegistryContract {
+    struct ScanResult {
+        var scannedFiles = 0
+        /// 违禁明细（`相对路径 → 明细`）
+        var violations: [String] = []
+        /// 生产码里被当作 outbox 写入实参的实体名（应在场：注册表声明 `writesOutbox` 的那几个）
+        var outboxWrittenEntityNames: Set<String> = []
+        /// 白名单文件是否真的持有登记表（false = 白名单空转，必须失败）
+        var registryDefinesEntries = false
+        /// 白名单文件里出现的派生访问器名（不全 = 派生没收口，必须失败）
+        var registryDerivedAccessors: [String] = []
+    }
+
+    /// 生产码全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
+    static func scan(repoRoot: URL) -> ScanResult {
+        var result = ScanResult()
+        for url in SyncWiringContract.swiftSources(repoRoot: repoRoot, at: productionRoot) {
+            let relativePath = url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            result.scannedFiles += 1
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                result.violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
+                continue
+            }
+            if relativePath == registryPath {
+                result.registryDefinesEntries = source.contains("static let entries: [SyncEntityRegistryEntry] = [")
+                result.registryDerivedAccessors = derivedAccessorNames.filter { source.contains($0) }
+                continue // 注册表是声明处，不是 outbox 写入点
+            }
+            let compact = source.filter { !$0.isWhitespace }
+            if compact.contains(outboxStoreMarker), compact.contains(outboxRecordMarker) {
+                result.outboxWrittenEntityNames.formUnion(entityCaseNames(inSource: source))
+            }
+            result.violations += violations(inSource: source, relativePath: relativePath)
+                .map { "\(relativePath) → \($0)" }
+        }
+        return result
+    }
+
+    /// 注册表声明「会记 outbox」的实体名（与扫描结果逐项对齐，防声明与实现漂移）。
+    /// 用 case 名（扫描产物是源码实参 `entity: .<case>` 的名字）。
+    static var declaredOutboxEntityNames: Set<String> {
+        Set(SyncEntityRegistry.entries.filter(\.writesOutbox).compactMap { entry in
+            entry.entity.map { Self.caseName(of: $0) }
+        })
+    }
+
+    /// 各派生名单的实体名（③ 断言用）。
+    static var derivedListEntityNames: [String: Set<String>] {
+        [
+            "SyncChangeEntity.v1Synced": Set(SyncChangeEntity.v1Synced.map { Self.caseName(of: $0) }),
+            "reconcilableEntities": Set(SyncChangeLogDanglingRepair.reconcilableEntities.map { Self.caseName(of: $0) }),
+            "repairableEntities": Set(SyncChangeLogDanglingRepair.repairableEntities.map { Self.caseName(of: $0) }),
+            "trackScopedEntities": Set(SyncPlaybackCarryDatabaseFacts.trackScopedEntities.map { Self.caseName(of: $0) }),
+        ]
+    }
+}
+
+// MARK: - 实体注册表断言
+
+struct SyncEntityRegistryContractTests {
+    static let repoRoot = SyncWiringContractTests.repoRoot
+
+    // MARK: ① 每个 case 都必须登记
+
+    @Test("实体注册表：SyncChangeEntity 每个 case 都必须有登记（新增实体漏登记 = 红）")
+    func everyEntityCaseIsRegistered() {
+        let registered = Set(SyncEntityRegistry.entries.compactMap { $0.entity?.rawValue })
+        let missing = SyncEntityRegistryContract.unregisteredEntityCases(
+            allCases: SyncChangeEntity.allCases.map(\.rawValue),
+            registered: registered
+        )
+        #expect(
+            missing.isEmpty,
+            """
+            这些实体 case 没有登记（`\(SyncEntityRegistryContract.registryPath)`）：
+            \(missing)
+
+            修法：给每个 case 加一条登记，逐字段表态——L0 编号 / 真值表与行键形态 /
+            是否引用歌曲 / 是否记 outbox / 是否有「本地真值 → outbox」补发 /
+            是否参与悬空引用修复 / 同步与否（不承诺的要写理由）/ 装配点（帧号 + 平台）。
+            不要在任何别的文件里手写实体清单。
+            """
+        )
+        #expect(
+            registered.count == SyncChangeEntity.allCases.count,
+            "登记条数与 case 数不一致：登记 \(registered.count)，case \(SyncChangeEntity.allCases.count)"
+        )
+        #expect(
+            SyncEntityRegistry.entries.count >= SyncChangeEntity.allCases.count,
+            "注册表条目数少于 case 数 = 有 case 没登记"
+        )
+    }
+
+    @Test("合成：漏登记的新实体必须被抓到（契约自证有效）")
+    func syntheticUnregisteredEntityIsCaught() {
+        let missing = SyncEntityRegistryContract.unregisteredEntityCases(
+            allCases: ["favorite", "brandNewEntity"],
+            registered: ["favorite"]
+        )
+        #expect(missing == ["brandNewEntity"], "漏登记的 case 必须被抓到，实际：\(missing)")
+        #expect(
+            SyncEntityRegistryContract.unregisteredEntityCases(
+                allCases: ["favorite", "playlist"],
+                registered: ["favorite", "playlist"]
+            ).isEmpty,
+            "全登记时不得误报"
+        )
+    }
+
+    // MARK: ② L0 编号 ↔ 契约文档
+
+    @Test("实体注册表：L0 编号与 docs/sync-contract.md 双向对齐（文档改了代码没跟上也红）")
+    func l0IDsMatchContractDoc() {
+        let docURL = Self.repoRoot.appendingPathComponent(SyncEntityRegistryContract.contractDocPath)
+        guard let doc = try? String(contentsOf: docURL, encoding: .utf8) else {
+            Issue.record(
+                """
+                读不到 L0 契约文档（fail-closed，不跳过）：\(docURL.path)
+                该文件属强制入库（docs/ 在 .gitignore → 改动要 `git add -f docs/sync-contract.md`）。
+                """
+            )
+            return
+        }
+        let headings = SyncEntityRegistryContract.l0Headings(inDoc: doc)
+        #expect(headings.count >= 9, "契约文档只解析出 \(headings.count) 个实体标题 = 解析失效或文档被删")
+        let registryIDs = Set(SyncEntityRegistry.entries.map(\.l0ID))
+        let missingInDoc = SyncEntityRegistryContract.l0IDsMissingFromDoc(
+            registryIDs: registryIDs,
+            docHeadings: headings
+        )
+        #expect(
+            missingInDoc.isEmpty,
+            """
+            这些 L0 编号在 `docs/sync-contract.md` 里查无：\(missingInDoc)
+            修法：编号必须与契约文档的「### <编号> …」标题逐字一致——契约里删/改了实体，
+            代码登记要跟着改；反过来新增登记必须先在契约里拍板（契约是需求真相）。
+            """
+        )
+        let missingInRegistry = SyncEntityRegistryContract.l0IDsMissingFromRegistry(
+            registryIDs: registryIDs,
+            docHeadings: headings
+        )
+        #expect(
+            missingInRegistry.isEmpty,
+            """
+            契约文档里有这些实体编号，注册表却没有对应登记：\(missingInRegistry)
+            修法：契约新增实体 ⇒ 注册表必须补一条（否则「哪些能力该有」没人回答）。
+            """
+        )
+    }
+
+    @Test("合成：L0 编号与文档对不上必须被抓到（契约自证有效）")
+    func syntheticL0IDMismatchIsCaught() {
+        let doc = """
+        ## 1. 数据面
+        ### A 收藏（favorite）
+        ### B 播放历史（playHistory）
+        """
+        let headings = SyncEntityRegistryContract.l0Headings(inDoc: doc)
+        #expect(headings == ["A", "B"], "编号标题解析错：\(headings)")
+        #expect(
+            SyncEntityRegistryContract.l0IDsMissingFromDoc(registryIDs: ["A", "B", "F1"], docHeadings: headings)
+                == ["F1"],
+            "文档里没有的编号必须被抓到"
+        )
+        #expect(
+            SyncEntityRegistryContract.l0IDsMissingFromRegistry(registryIDs: ["A"], docHeadings: headings) == ["B"],
+            "注册表里没有的文档编号必须被抓到"
+        )
+    }
+
+    // MARK: ③ notSynced 不得被实现
+
+    @Test("实体注册表：notSynced 实体不得出现在 outbox 写入点 / 补发名单 / 上线清单")
+    func notSyncedEntitiesAreNotImplemented() {
+        let scan = SyncEntityRegistryContract.scan(repoRoot: Self.repoRoot)
+        #expect(scan.scannedFiles > 50, "生产码一个 .swift 都没扫到 = 契约空转：扫到 \(scan.scannedFiles)")
+        #expect(
+            scan.outboxWrittenEntityNames == SyncEntityRegistryContract.declaredOutboxEntityNames,
+            """
+            注册表声明「记 outbox」的实体与生产码实际写入点不一致：
+            声明 \(SyncEntityRegistryContract.declaredOutboxEntityNames.sorted())
+            实际 \(scan.outboxWrittenEntityNames.sorted())
+            修法：加/删 outbox 写入点都必须同时改注册表（`writesOutbox`），别让声明与实现漂移。
+            """
+        )
+        let notSynced = Set(
+            SyncEntityRegistry.entries.filter(\.syncMode.isNotSynced).compactMap { entry in
+                entry.entity.map { SyncEntityRegistryContract.caseName(of: $0) }
+            }
+        )
+        let violations = SyncEntityRegistryContract.notSyncedViolations(
+            notSyncedCaseNames: notSynced,
+            outboxWrittenEntityNames: scan.outboxWrittenEntityNames,
+            derivedListEntityNames: SyncEntityRegistryContract.derivedListEntityNames
+        )
+        #expect(
+            violations.isEmpty,
+            """
+            「不承诺」的实体被实现了（契约 §0.2：「不承诺」也是承诺）：
+            \(violations.joined(separator: "\n"))
+            修法：要么删掉实现，要么回契约改承诺（改契约要先经用户确认）。
+            """
+        )
+    }
+
+    @Test("合成：被偷偷实现的 notSynced 实体必须被抓到（契约自证有效）")
+    func syntheticNotSyncedImplementationIsCaught() {
+        let violations = SyncEntityRegistryContract.notSyncedViolations(
+            notSyncedCaseNames: ["lyricsOnline"],
+            outboxWrittenEntityNames: ["favorite", "lyricsOnline"],
+            derivedListEntityNames: ["v1Synced": ["lyricsOnline"], "reconcilableEntities": []]
+        )
+        #expect(violations.count == 2, "写入点 + 名单各报一条，实际：\(violations)")
+
+        let clean = SyncEntityRegistryContract.notSyncedViolations(
+            notSyncedCaseNames: ["lyricsOnline"],
+            outboxWrittenEntityNames: ["favorite"],
+            derivedListEntityNames: ["v1Synced": ["favorite"]]
+        )
+        #expect(clean.isEmpty, "真不承诺的实体不得误报：\(clean)")
+
+        // 登记自洽：notSynced 却声明了实现点（通道 / 出站 / 补发 / 装配点）→ 必须被抓到
+        let badEntry = SyncEntityRegistryEntry(
+            l0ID: "Z",
+            entity: nil,
+            title: "偷偷同步的东西",
+            syncMode: .notSynced(reason: "测试"),
+            channel: .changeLog,
+            localTruth: SyncEntityLocalTruth(table: "z_table", rowKeyShape: "id", carrierNote: nil),
+            referencesTrack: false,
+            writesOutbox: true,
+            reconcilesLocalTruth: true,
+            repairsDanglingReferences: false,
+            assemblyPoints: [SyncEntityAssemblyPoint(platform: "iOS", frame: 8, detail: "不该有")]
+        )
+        let selfViolations = SyncEntityRegistryContract.registrySelfConsistencyViolations([badEntry])
+        #expect(
+            selfViolations.count == 3,
+            "notSynced + 通道/出站(含补发)/装配点三项都要报，实际：\(selfViolations)"
+        )
+        #expect(
+            selfViolations.allSatisfy { $0.contains("`Z`") },
+            "每条都要点名是哪个编号，实际：\(selfViolations)"
+        )
+    }
+
+    // MARK: ④ 派生名单唯一来源
+
+    @Test("实体注册表：派生名单在生产码里只有注册表一处（禁止第二份手写清单）")
+    func derivedListsComeFromRegistryOnly() {
+        let scan = SyncEntityRegistryContract.scan(repoRoot: Self.repoRoot)
+        #expect(scan.scannedFiles > 50, "生产码一个 .swift 都没扫到 = 契约空转：扫到 \(scan.scannedFiles)")
+        #expect(
+            scan.registryDefinesEntries,
+            """
+            \(SyncEntityRegistryContract.registryPath) 里找不到登记表 `static let entries: [SyncEntityRegistryEntry] = [`——
+            白名单空转保护失效（登记表被改名 / 搬走 / 清空）。
+            """
+        )
+        #expect(
+            scan.registryDerivedAccessors.count == SyncEntityRegistryContract.derivedAccessorNames.count,
+            """
+            注册表里没给出全部派生访问器：
+            缺 \(SyncEntityRegistryContract.derivedAccessorNames.filter { !scan.registryDerivedAccessors.contains($0) })
+            修法：散落名单一律改成「计算属性 → SyncEntityRegistry 派生」，不在这里手写第二份。
+            """
+        )
+        #expect(
+            scan.violations.isEmpty,
+            """
+            生产码里出现了第二份「实体能力清单」（唯一声明处 = SyncEntityRegistry，
+            \(SyncEntityRegistryContract.registryPath)）：
+            \(scan.violations.joined(separator: "\n"))
+
+            修法：删掉手写清单，改成从注册表取——`SyncChangeEntity.v1Synced` /
+            `SyncChangeLogDanglingRepair.reconcilableEntities` / `repairableEntities` /
+            `SyncPlaybackCarryPeer.trackScopedEntities` / `SyncTrackReference.referencesTrack(_:)`
+            都是派生访问器（行为与收口前逐项相同）。
+            """
+        )
+    }
+
+    @Test("合成：第二份手写清单 / 手写身份判定必须被抓到（契约自证有效）")
+    func syntheticSecondEntityListIsCaught() {
+        let secondList = """
+        enum SomewhereElse {
+            static let reconcilableEntities: [SyncChangeEntity] = [.favorite, .playHistory]
+            static let v1Synced: [SyncChangeEntity] = [.favorite]
+        }
+        """
+        #expect(
+            SyncEntityRegistryContract.violations(inSource: secondList, relativePath: "QQPlayer/Sync/Somewhere.swift")
+                .count == 2,
+            "两处手写清单必须各报一条"
+        )
+        #expect(
+            SyncEntityRegistryContract.violations(
+                inSource: "return entity != .playlist",
+                relativePath: "QQPlayer/Sync/SyncChangeLogMapping.swift"
+            ).count == 1,
+            "手写「引用歌曲」判定必须被抓到"
+        )
+        // 派生访问器的正确写法（计算属性 + 注册表取数）不得误报
+        let derivedAccessor = """
+        static var reconcilableEntities: [SyncChangeEntity] { SyncEntityRegistry.reconcilableEntities }
+        static var v1Synced: [SyncChangeEntity] { SyncEntityRegistry.v1SyncedEntities }
+        """
+        #expect(
+            SyncEntityRegistryContract.violations(
+                inSource: derivedAccessor,
+                relativePath: "QQPlayer/Sync/SyncDataSyncModels.swift"
+            ).isEmpty,
+            "派生访问器不是第二份清单，不得误报"
+        )
+        // 白名单文件自身必须放行（否则契约不可用）
+        #expect(
+            SyncEntityRegistryContract.violations(
+                inSource: secondList + "return entity != .playlist",
+                relativePath: SyncEntityRegistryContract.registryPath
+            ).isEmpty,
+            "注册表自身必须放行"
+        )
+    }
+
+    // MARK: ⑤ 登记自洽 + 行为零变化
+
+    @Test("实体注册表：登记自洽（不承诺 = 零实现；通道与能力字段互不矛盾）")
+    func registryEntriesAreSelfConsistent() {
+        let violations = SyncEntityRegistryContract.registrySelfConsistencyViolations(SyncEntityRegistry.entries)
+        #expect(
+            violations.isEmpty,
+            "注册表登记自相矛盾：\n\(violations.joined(separator: "\n"))"
+        )
+        #expect(SyncEntityRegistry.entries.count == 9, "登记条目数变了（应为 9：A–E + F1/F2 + G/H）")
+        let ids = SyncEntityRegistry.entries.map(\.l0ID)
+        #expect(ids == ["A", "B", "C", "D", "E", "F1", "F2", "G", "H"], "登记顺序/编号变了：\(ids)")
+    }
+
+    @Test("实体注册表：派生清单与收口前口径逐项相同（行为零变化）")
+    func derivedListsMatchPreCollapseBehavior() {
+        // 收口前的四处手写清单（逐项抄自 45bd1fa）
+        #expect(
+            SyncChangeEntity.v1Synced == [.favorite, .playHistory, .playlist, .playlistItem],
+            "v1Synced 变了：\(SyncChangeEntity.v1Synced)"
+        )
+        #expect(
+            SyncChangeLogDanglingRepair.reconcilableEntities == [.favorite, .playHistory, .playlist, .playlistItem],
+            "补发清单变了：\(SyncChangeLogDanglingRepair.reconcilableEntities)"
+        )
+        #expect(
+            SyncChangeLogDanglingRepair.repairableEntities == [.favorite, .playHistory, .playlistItem],
+            "悬空修复清单变了：\(SyncChangeLogDanglingRepair.repairableEntities)"
+        )
+        #expect(
+            SyncPlaybackCarryDatabaseFacts.trackScopedEntities == [.favorite, .playHistory, .playlistItem],
+            "跟歌走携带清单变了：\(SyncPlaybackCarryDatabaseFacts.trackScopedEntities)"
+        )
+        // 身份键要求：收口前 = `entity != .playlist`，逐项相同
+        for entity in SyncChangeEntity.allCases {
+            #expect(
+                SyncTrackReference.referencesTrack(entity) == (entity != .playlist),
+                "\(entity.rawValue) 的引用歌曲判定变了"
+            )
+        }
+        // 门控实体（跨端续播，默认关）不在 v1 无条件清单里 —— 与收口前一致
+        #expect(
+            SyncChangeEntity.v1Synced.contains(.playbackPosition) == false,
+            "门控实体不得混进 v1 无条件同步清单"
+        )
+    }
+}
