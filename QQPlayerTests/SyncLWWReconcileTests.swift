@@ -271,6 +271,107 @@ struct SyncLWWReconcileTests {
         #expect(itemCount == 1)
     }
 
+    // MARK: - 附录内容：歌单封面（INV-22 / INV-23，2026-09-15 防回归守护）
+
+    @Test("歌单封面（INV-23）：对端载荷里的 custom_cover_image_path 绝不写进本端")
+    func playlistCoverNeverComesFromPeer() throws {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+        let applier = SyncChangeLogApplier(database: manager)
+
+        // ① 新建：本地没有该歌单 → 落库后封面为 nil（不是对端的设备本地路径）
+        let created = SyncPlaylistSnapshot(
+            slug: "peer-new",
+            title: "Peer playlist",
+            createdAt: 1,
+            updatedAt: 1,
+            lastPlayedAt: 0,
+            folderPath: nil,
+            isFolderSynced: false,
+            lastFolderSync: nil,
+            customCoverImagePath: "/peer-device/Container/Documents/cover.png"
+        )
+        #expect(try applier.apply([Self.playlistRow(created, updatedAtMs: 1)]) == 1)
+        #expect(
+            try Self.playlistCover(dbQueue, slug: "peer-new") == nil,
+            """
+            新建时不得把对端设备的封面路径写进本端：那是发送端的本地相对路径，
+            本端必然加载不出（历史事故：歌单封面永远显示默认图，且零报错）。
+            """
+        )
+
+        // ② 更新：本端已有自己的封面 → 对端路径不得覆盖（保留本端值）
+        try manager.write { db in
+            try Playlist(
+                id: nil,
+                slug: "local-cover",
+                title: "Local playlist",
+                createdAt: 1,
+                updatedAt: 1,
+                lastPlayedAt: 0,
+                folderPath: nil,
+                isFolderSynced: false,
+                lastFolderSync: nil,
+                customCoverImagePath: "local-cover.png"
+            ).insert(db)
+        }
+        let remoteUpdate = SyncPlaylistSnapshot(
+            slug: "local-cover",
+            title: "Renamed by peer",
+            createdAt: 1,
+            updatedAt: 5,
+            lastPlayedAt: 0,
+            folderPath: nil,
+            isFolderSynced: false,
+            lastFolderSync: nil,
+            customCoverImagePath: "/peer-device/Container/Documents/other.png"
+        )
+        #expect(try applier.apply([Self.playlistRow(remoteUpdate, updatedAtMs: 5)]) == 1)
+        #expect(
+            try Self.playlistCover(dbQueue, slug: "local-cover") == "local-cover.png",
+            """
+            更新时保留本端封面（INV-23）：跨端封面若要真支持，必须另做按 content_hash
+            寻址的文件通道（`@cover/{content_hash}` 式），不能直接引用对端设备路径。
+            """
+        )
+        // 贴一条对照：**其它字段照常跟随对端**（不是整行不更新，规则只针对封面）
+        #expect(try Self.playlistTitle(dbQueue, slug: "local-cover") == "Renamed by peer")
+    }
+
+    private static func playlistRow(
+        _ snapshot: SyncPlaylistSnapshot,
+        updatedAtMs: Int64
+    ) throws -> SyncChangeLogRow {
+        SyncChangeLogRow(
+            entity: .playlist,
+            rowKey: snapshot.slug,
+            op: .upsert,
+            updatedAtMs: updatedAtMs,
+            payloadJSON: try SyncSnapshotCodec.encode(snapshot)
+        )
+    }
+
+    private static func playlistCover(_ queue: DatabaseQueue, slug: String) throws -> String? {
+        try queue.read { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT custom_cover_image_path FROM playlist WHERE slug = ?",
+                arguments: [slug]
+            )
+        }
+    }
+
+    private static func playlistTitle(_ queue: DatabaseQueue, slug: String) throws -> String? {
+        try queue.read { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT title FROM playlist WHERE slug = ?",
+                arguments: [slug]
+            )
+        }
+    }
+
     // MARK: - Applier 身份兜底（2026-09-14 身份缺口包）
 
     @Test("Applier 身份兜底：引用不存在曲目的 favorite / play_history / playlist_item 一律跳过，歌入库后可落")

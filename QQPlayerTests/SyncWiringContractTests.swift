@@ -1983,3 +1983,210 @@ struct SyncEntityDisclosureContractTests {
         )
     }
 }
+
+// MARK: - 封面「不可跨端引用」契约（INV-22 / INV-23，2026-09-15 防回归守护）
+
+/// 歌单自定义封面路径**不是可跨端直接引用的值**：`playlist.custom_cover_image_path` 是
+/// **设备本地相对路径**，随 C 的载荷搭车到对端后必然加载不出（历史事故：对端歌单永远
+/// 显示默认封面，且零报错）。行为已经正确（`SyncChangeLogApplier` 更新保留本端 /
+/// 新建置 nil），但此前**只有行为、没有守护**（INV-22/23 标着「✗ 无守护」）。
+///
+/// 本契约把那句「永远不得作为跨端值」变成可执行断言：
+/// ① `Sync/` 生产码里不得出现**第二处**封面跨端消费点（白名单见下，各自口径写清）；
+/// ② 白名单里的**规则本身**必须在场且形状正确——applier 里每一处 `customCoverImagePath`
+///    只能出现在注释或 `customCoverImagePath: nil`（既不许读对端快照的值，也不许把对端值
+///    写进本端业务行）；
+/// ③ 合成「把对端封面写进本端」必须被抓到（fail-closed，证明断言不空转）。
+///
+/// 白名单（三条，均为**现状事实**，不是理想态）：
+/// - `SyncDataSnapshots.swift`：wire 字段声明处（`custom_cover_image_path` 只在这一次声明）；
+/// - `SyncChangeLogMapping.swift`：**捕获侧**——本端路径随 C 的载荷搭车发出（对端不消费；
+///   真要跨端封面得另做 `@cover/{content_hash}` 式的文件通道，属未做的功能，不在本包范围）；
+/// - `SyncChangeLogApplier.swift`：**接收侧规则本身**（本包守护的对象）。
+///
+/// 判据（同 `SyncIdentityContract` 风格）：纯函数判定 + 合成源码自证 + fail-closed。
+enum SyncCoverValueContract {
+    /// 生产码扫描根。
+    static let productionRoot = "QQPlayer/Sync"
+    /// 接收侧规则（唯一允许「提到封面」并做决策的地方）。
+    static let applierPath = "QQPlayer/Sync/SyncChangeLogApplier.swift"
+    /// wire 字段声明处（snake_case 键只准在这里出现）。
+    static let payloadDeclarationPath = "QQPlayer/Sync/SyncDataSnapshots.swift"
+    /// 捕获侧（现状：本端路径搭车发出，无独立通道）。
+    static let capturePath = "QQPlayer/Sync/SyncChangeLogMapping.swift"
+
+    /// 允许提到封面路径的文件（白名单之外的任何一处 = 新的跨端消费点）。
+    static var whitelist: [String] { [applierPath, payloadDeclarationPath, capturePath] }
+
+    /// 纯函数：一份 `Sync/` 源码里的违禁写法（空 = 该文件合规）。
+    static func violations(inSource source: String, relativePath: String) -> [String] {
+        var hits: [String] = []
+        // ① wire 键只准在声明处出现
+        if relativePath != payloadDeclarationPath, source.contains("custom_cover_image_path") {
+            hits.append("出现了 wire 键 `custom_cover_image_path`（只准在声明处 \(payloadDeclarationPath)）")
+        }
+        // ② 属性名的出现只准在白名单文件里
+        guard source.contains("customCoverImagePath") else { return hits }
+        if !whitelist.contains(relativePath) {
+            hits.append(
+                """
+                出现了 `customCoverImagePath`：封面是**设备本地路径**，不得作为跨端值读写
+                （白名单 = \(whitelist.joined(separator: " / "))）
+                """
+            )
+            return hits
+        }
+        // ③ 接收侧规则：不许读对端值、不许把对端值写进本端行（注释与「置 nil」放行）
+        guard relativePath == applierPath else { return hits }
+        for (index, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.contains("customCoverImagePath") else { continue }
+            if trimmed.hasPrefix("//") { continue }
+            if trimmed.contains("customCoverImagePath: nil") { continue }
+            hits.append("applier 第 \(index + 1) 行越界使用了封面属性：`\(trimmed)`")
+        }
+        return hits
+    }
+
+    /// 纯函数：接收侧**规则本身在场**（「新建置 nil」这条断言丢了 = 守护失效）。
+    static func ruleIsPresent(inApplierSource source: String) -> Bool {
+        source.contains("customCoverImagePath: nil")
+    }
+}
+
+struct SyncCoverValueContractTests {
+    static let repoRoot = SyncWiringContractTests.repoRoot
+
+    @Test("封面（INV-22/23）：只有接收侧一条规则，Sync/ 里没有第二处跨端封面消费点")
+    func productionHasSingleCoverRule() {
+        var scannedFiles = 0
+        var violations: [String] = []
+        var applierSource = ""
+        for url in SyncWiringContract.swiftSources(
+            repoRoot: Self.repoRoot,
+            at: SyncCoverValueContract.productionRoot
+        ) {
+            scannedFiles += 1
+            let relativePath = url.path.replacingOccurrences(of: Self.repoRoot.path + "/", with: "")
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
+                continue
+            }
+            if relativePath == SyncCoverValueContract.applierPath { applierSource = source }
+            violations += SyncCoverValueContract.violations(inSource: source, relativePath: relativePath)
+                .map { "\(relativePath) → \($0)" }
+        }
+        #expect(scannedFiles > 30, "Sync/ 一个 .swift 都没扫到 = 契约空转：扫到 \(scannedFiles)")
+        #expect(
+            violations.isEmpty,
+            """
+            封面路径出现了新的跨端消费点（或接收侧规则被改写）：
+            \(violations.joined(separator: "\n"))
+
+            修法：跨端封面若要真支持，必须另做**按内容指纹寻址的文件通道**（仿
+            `@lyrics/{content_hash}` 做 `@cover/{content_hash}`），不得直接引用对端设备路径；
+            本端新建歌单的封面一律置 nil、更新时保留本端值。
+            """
+        )
+        #expect(
+            !applierSource.isEmpty,
+            "读不到接收侧源码 = 契约空转（fail-closed）：\(SyncCoverValueContract.applierPath)"
+        )
+        #expect(
+            SyncCoverValueContract.ruleIsPresent(inApplierSource: applierSource),
+            """
+            接收侧「新建歌单置 nil」这条规则不见了（`customCoverImagePath: nil`）——
+            对端设备路径会被原样写进本端业务行（INV-23 的历史事故形状）。
+            """
+        )
+    }
+
+    @Test("合成「对端封面写进本端」必须被抓到（契约自证有效）")
+    func syntheticPeerCoverWriteIsCaught() {
+        // ① 接收侧把对端快照里的封面写进本地行 → 红
+        let applierWrite = """
+            if let existing = try Playlist.filter(Column("slug") == snapshot.slug).fetchOne(db) {
+                var updated = existing
+                updated.customCoverImagePath = snapshot.customCoverImagePath
+                try updated.update(db)
+            }
+        """
+        #expect(
+            SyncCoverValueContract.violations(
+                inSource: applierWrite,
+                relativePath: SyncCoverValueContract.applierPath
+            ).count == 1,
+            "接收侧写入对端封面路径必须被抓到"
+        )
+
+        // ② 别的 Sync 文件新增一处封面读取（第二消费点）→ 红
+        let secondConsumer = """
+            let cover = row.customCoverImagePath
+            try database.updatePlaylistCustomCover(playlistId: id, imagePath: cover)
+        """
+        #expect(
+            SyncCoverValueContract.violations(
+                inSource: secondConsumer,
+                relativePath: "QQPlayer/Sync/SyncChangeLogPeer.swift"
+            ).count == 1,
+            "白名单外的封面消费点必须被抓到"
+        )
+
+        // ③ 合成「删掉置 nil 规则」→ 规则在场检查必须报红
+        let ruleRemoved = """
+            try Playlist(
+                id: nil, slug: snapshot.slug, title: snapshot.title,
+                createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt,
+                lastPlayedAt: snapshot.lastPlayedAt, folderPath: snapshot.folderPath,
+                isFolderSynced: snapshot.isFolderSynced, lastFolderSync: snapshot.lastFolderSync,
+                customCoverImagePath: snapshot.customCoverImagePath
+            ).insert(db)
+        """
+        #expect(
+            !SyncCoverValueContract.ruleIsPresent(inApplierSource: ruleRemoved),
+            "规则被换成「照抄对端值」时必须判定为规则不在场"
+        )
+
+        // ④ 正规写法不得误报：注释 + 置 nil + 捕获侧搭车 + 声明处
+        let clean = """
+            // 封面：保持本端值（不写对端设备路径，见上方 INV-23）
+            try updated.update(db)
+            _ = Playlist(
+                id: nil, slug: snapshot.slug, title: snapshot.title,
+                createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt,
+                lastPlayedAt: snapshot.lastPlayedAt, folderPath: snapshot.folderPath,
+                isFolderSynced: snapshot.isFolderSynced, lastFolderSync: snapshot.lastFolderSync,
+                customCoverImagePath: nil
+            ).insert(db)
+        """
+        #expect(
+            SyncCoverValueContract.violations(
+                inSource: clean,
+                relativePath: SyncCoverValueContract.applierPath
+            ).isEmpty,
+            "注释 + 置 nil 是规则本身，不得误报"
+        )
+        #expect(SyncCoverValueContract.ruleIsPresent(inApplierSource: clean))
+
+        let captureSide = """
+            let snapshot = SyncPlaylistSnapshot(
+                slug: playlist.slug,
+                customCoverImagePath: playlist.customCoverImagePath
+            )
+        """
+        #expect(
+            SyncCoverValueContract.violations(
+                inSource: captureSide,
+                relativePath: SyncCoverValueContract.capturePath
+            ).isEmpty,
+            "捕获侧现状（本端路径搭车）在白名单内，不得误报"
+        )
+        #expect(
+            SyncCoverValueContract.violations(
+                inSource: captureSide,
+                relativePath: "QQPlayer/Sync/SyncDataSnapshots.swift"
+            ).isEmpty,
+            "声明处不得误报"
+        )
+    }
+}
