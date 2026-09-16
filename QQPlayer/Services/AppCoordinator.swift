@@ -113,7 +113,7 @@ class AppCoordinator: ObservableObject {
             .store(in: &cancellables)
 
         // Listen for background color changes to update widget theme
-        NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))
+        NotificationCenter.default.publisher(for: .backgroundColorChanged)
             .sink { [weak self] _ in
                 Task { @MainActor in
                     print("🎨 Background color changed - updating widget theme")
@@ -211,7 +211,7 @@ class AppCoordinator: ObservableObject {
     /// toggle 与批量路径共用，避免两套副作用。
     private func favoriteDidChange(trackStableId: String?) throws {
         // Notify observers that favorites changed
-        NotificationCenter.default.post(name: NSNotification.Name("FavoritesChanged"), object: nil)
+        NotificationCenter.default.post(name: .favoritesChanged, object: nil)
 
         // Verify the database operation worked
         if let trackStableId {

@@ -105,7 +105,7 @@ struct ArtistDetailScreen: View {
             loadArtistTracks()
             loadArtistAlbums()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             // 曲库刷新后重建曲目/专辑缓存（替代计算属性每次访问查库）
             loadArtistTracks()
             loadArtistAlbums()

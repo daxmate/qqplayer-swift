@@ -196,7 +196,7 @@ struct PlayerView: View {
                 loadLyrics()
                 loadTrackMetadata()
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
                 settings = DeleteSettings.load()
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
@@ -346,7 +346,7 @@ struct PlayerView: View {
                     // )
                     .zIndex(1)
                     .onTapGesture {
-                        NotificationCenter.default.post(name: NSNotification.Name("MinimizePlayer"), object: nil)
+                        NotificationCenter.default.post(name: .minimizePlayer, object: nil)
                     }
 
                 if canNavigate {
@@ -503,7 +503,7 @@ struct PlayerView: View {
                             },
                             completion: { _ in
                                 NotificationCenter.default.post(
-                                    name: NSNotification.Name("MinimizePlayer"),
+                                    name: .minimizePlayer,
                                     object: nil
                                 )
                             }
@@ -628,7 +628,7 @@ struct PlayerView: View {
             if let album = trackAlbum {
                 Button(action: {
                     let userInfo = ["album": album, "allTracks": allTracks] as [String: Any]
-                    NotificationCenter.default.post(name: NSNotification.Name("NavigateToAlbumFromPlayer"), object: nil, userInfo: userInfo)
+                    NotificationCenter.default.post(name: .navigateToAlbumFromPlayer, object: nil, userInfo: userInfo)
                 }) {
                     Text(track.displayTitle)
                         .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
@@ -655,7 +655,7 @@ struct PlayerView: View {
             if let artist = trackArtist {
                 Button(action: {
                     let userInfo = ["artist": artist, "allTracks": allTracks] as [String: Any]
-                    NotificationCenter.default.post(name: NSNotification.Name("NavigateToArtistFromPlayer"), object: nil, userInfo: userInfo)
+                    NotificationCenter.default.post(name: .navigateToArtistFromPlayer, object: nil, userInfo: userInfo)
                 }) {
                     Text(trackArtistDisplayName ?? ArtistNameNormalizer.displayName(artist.name))
                         .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .caption : .subheadline)

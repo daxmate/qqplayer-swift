@@ -68,7 +68,7 @@ struct LyricsView: View {
                 showHint = HintCoordinator.showIfNeeded(.fullLyricsPage)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
             settings = DeleteSettings.load()
         }
         // 右滑关闭：跟手位移，达阈值/快速回甩滑出（Apple Music 风格）。

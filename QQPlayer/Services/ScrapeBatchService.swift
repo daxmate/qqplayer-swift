@@ -232,7 +232,7 @@ enum ScrapeBatchService {
         }
 
         // 批末成功完成（未取消）→ 统一发一次刷新通知（不走逐首）
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryFolderContentChanged"), object: nil)
+        NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
         return (results, truncated)
     }
 

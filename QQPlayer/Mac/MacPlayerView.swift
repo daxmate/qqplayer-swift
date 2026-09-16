@@ -123,7 +123,7 @@ struct MacPlayerView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: player.playbackErrorMessage)
         .animation(.easeInOut(duration: 0.25), value: isLyricsFullscreen)
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .favoritesChanged)) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
             favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
         }
@@ -161,7 +161,7 @@ struct MacPlayerView: View {
         // 当前曲目标签被刮削保存（封面 forceRefreshArtwork 重写）后重拉封面
         // （stableId 不变 task(id:) 不重载；2026-09-06 播放页封面不刷新修复）
         .onReceive(NotificationCenter.default.publisher(
-            for: NSNotification.Name("QQPlayerArtworkRefreshed")
+            for: .qqplayerArtworkRefreshed
         )) { notification in
             guard let stableId = track?.stableId,
                   (notification.object as? String) == stableId else { return }

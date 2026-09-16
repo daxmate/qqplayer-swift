@@ -208,7 +208,7 @@ struct MacLibraryView: View {
             // 放在 reloadLibrary 之后保证 DB 曲目可查（restore 只认已入库 stableId）。
             await player.restoreUIStateOnly()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFolderContentChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryFolderContentChanged)) { _ in
             // FSEvents 事件（已 2s 去抖，main 线程投递）→ 与 LibraryFoldersChanged
             // 同款语义：reload 立即对齐 DB + 启动/排队重扫
             MacScanLogger.log("LibraryFolderContentChanged received, isIndexing=\(indexer.isIndexing)")
@@ -259,7 +259,7 @@ struct MacLibraryView: View {
             libraryLoadTask?.cancel()
             MacFolderMonitor.shared.stop()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.favoritesChanged)) { _ in
             // 收藏变化后刷新“我喜欢的音乐”列表（含正在展示时的实时移除）
             reloadLikedTracks()
         }
@@ -272,16 +272,16 @@ struct MacLibraryView: View {
             )
             applyMacAppearance()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.playlistsChanged)) { _ in
             // 歌单管理（新建/重命名/删除/增删曲目）后刷新歌单列表与自动歌单计数
             reloadLibrary()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryNeedsRefresh)) { _ in
             // iOS 同款标准通知：曲目删除/移动后整库重载（与 PlaylistsChanged 双通道，
             // 2026-09-02 A4 用户反馈删除后曲库不刷新——deleteTrack 后必须重拉 tracks）
             reloadLibrary()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryFoldersChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryFoldersChanged)) { _ in
             // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）。
             // 若正在扫描，start() 会被 guard 吞掉 → 标记等索引结束自动补扫。
             MacScanLogger.log("LibraryFoldersChanged received, isIndexing=\(indexer.isIndexing)")
@@ -294,7 +294,7 @@ struct MacLibraryView: View {
                 indexer.start()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .libraryScanCriteriaChanged)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryScanCriteriaChanged)) { _ in
             // 设置页「文件类型」改动后重扫曲库（取消的格式由 reconcile 收尾移除，
             // 与 LibraryFoldersChanged 同款排队语义：扫描中则标记等索引结束补扫）。
             MacScanLogger.log("libraryScanCriteriaChanged received, isIndexing=\(indexer.isIndexing)")
@@ -321,7 +321,7 @@ struct MacLibraryView: View {
                 importToastLabel(importToast)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .libraryImportFinished)) { note in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryImportFinished)) { note in
             // 导入完成 toast（web 版 toast 对齐；歌单行 drop 复用同一通知）
             let count = (note.userInfo?["count"] as? Int) ?? 0
             let skipped = (note.userInfo?["skipped"] as? Int) ?? 0
@@ -585,7 +585,7 @@ struct MacLibraryView: View {
             // 已在主线程（MacFolderMonitor 去抖后 main 投递）。经通知转发，
             // 与 LibraryFoldersChanged 共用「reload + start/排队」语义，避免
             // 此处重复实现扫描中排队逻辑。
-            NotificationCenter.default.post(name: NSNotification.Name("LibraryFolderContentChanged"), object: nil)
+            NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
         }
     }
 
@@ -648,7 +648,7 @@ struct MacLibraryView: View {
     /// search anything 设置行：打开系统设置窗口并定位到对应分类
     private func openSettingsCategory(_ category: String) {
         NotificationCenter.default.post(
-            name: NSNotification.Name("MacSettingsOpenCategory"),
+            name: .macSettingsOpenCategory,
             object: nil,
             userInfo: ["category": category]
         )

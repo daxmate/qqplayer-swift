@@ -188,10 +188,10 @@ struct MacSmartPlaylistDetailView: View {
         .onDisappear { loadTask?.cancel() }
         // 刮削保存/批量刮削/重扫后：自动歌单曲目与年代分组都要重算
         // （2026-09-06：单曲刮削后自动歌单不刷新修复；decade 详情内也重载）
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             reloadAll()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .playlistsChanged)) { _ in
             reloadAll()
         }
     }

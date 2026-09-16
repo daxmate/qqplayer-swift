@@ -256,7 +256,7 @@ struct PlaylistCardView: View {
             WidgetCenter.shared.reloadAllTimelines()
 
             // Refresh the playlist list
-            NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
+            NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
 
             print("✅ Custom cover saved and database updated")
         } catch {

@@ -475,7 +475,7 @@ struct SearchSongRowView: View {
                 }
 
                 try DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
-                NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
+                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             } catch {
                 print("❌ Failed to delete track: \(error)")
             }

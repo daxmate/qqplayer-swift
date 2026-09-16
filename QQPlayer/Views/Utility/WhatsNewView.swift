@@ -81,7 +81,7 @@ struct WhatsNewView: View {
             }
             #endif
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
             settings = DeleteSettings.load()
         }
     }

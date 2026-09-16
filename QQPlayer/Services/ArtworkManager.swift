@@ -119,7 +119,7 @@ class ArtworkManager: ObservableObject {
         // 已显示的缩略图/卡片用 .task(id: stableId) 缓存，stableId 不变不会自动重载；
         // 发通知让正在展示该曲目封面的视图重拉（2026-09-06 刮削保存封面后不刷新修复）
         NotificationCenter.default.post(
-            name: NSNotification.Name("QQPlayerArtworkRefreshed"),
+            name: .qqplayerArtworkRefreshed,
             object: track.stableId
         )
         return refreshed

@@ -62,7 +62,7 @@ struct SmartPlaylistDetailScreen: View {
         .onAppear {
             loadData()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadData()
         }
     }
@@ -177,7 +177,7 @@ struct SmartPlaylistDecadeScreen: View {
         .onAppear {
             loadTracks()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadTracks()
         }
     }

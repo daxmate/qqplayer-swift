@@ -30,12 +30,6 @@ import CoreImage.CIFilterBuiltins
 import Foundation
 import SwiftUI
 
-extension Notification.Name {
-    /// 同步中心设备列表变化（审计 M4）：SyncHostCenter 的单槽回调不再直接捕获 View 值，
-    /// 改为转发这个热点通知，由视图侧（.onReceive）自己重载。
-    static let macSyncDevicesChanged = Notification.Name("MacSyncDevicesChanged")
-}
-
 /// macOS 同步中心（设置页「同步」分类 + 工具栏同步面板共用）。
 struct MacSyncCenterView: View {
     /// App 强调色（读环境值，与主窗同源；macOS 上 `Color.accentColor` 跟随系统强调色而非

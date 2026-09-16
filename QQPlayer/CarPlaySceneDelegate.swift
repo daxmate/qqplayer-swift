@@ -67,13 +67,13 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         let tabBarTemplate = CPTabBarTemplate(templates: tabTemplates)
         interfaceController.setRootTemplate(tabBarTemplate, animated: true, completion: nil)
 
-        // 曾在此 setupPlayerStateObserver()（监听 "PlayerStateChanged" 只 print 一行）：
-        // 已删除（2026-09-12 审计 P7）——该闭包无任何状态同步副作用，而 addObserver 的
-        // token 从未保存/移除、didConnect 每次调用再注册一个 → CarPlay 反复插拔线性累积
-        // observer（每次 NowPlaying 更新都会 post 一次）。CarPlay 的 Now Playing 态由
-        // MPNowPlayingInfoCenter + MPRemoteCommandCenter 驱动（见
-        // PlayerEngine+NowPlaying.updateNowPlayingInfoEnhanced 里同步写入的 playbackState 与
-        // 已启用的 remote commands），不需要额外通知桥。
+        // 曾在此 setupPlayerStateObserver()（监听 "PlayerStateChanged"）：2026-09-12 审计 P7 删除——
+        // 该闭包无任何状态同步副作用，而 addObserver 的 token 从未保存/移除、didConnect 每次
+        // 调用再注册一个 → CarPlay 反复插拔线性累积 observer（每次 NowPlaying 更新都会 post 一次）。
+        // CarPlay 的 Now Playing 态由 MPNowPlayingInfoCenter + MPRemoteCommandCenter 驱动（见
+        // PlayerEngine+NowPlaying.updateNowPlayingInfoEnhanced 里同步写入的 playbackState 与已启用的
+        // remote commands），不需要额外通知桥。
+        // 2026-09-16 事件层收口：该事件 0 订阅方 → post 点与常量一并删除（本注释保留历史理由）。
     }
 
     // CPTemplateApplicationSceneDelegate 的正式实现（didDisconnect，无 window 变体）。
@@ -92,7 +92,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         print("🚗 CarPlay disconnected")
         // 通知主场景刷新布局：iOS 26 在 CarPlay 场景断开后可能不刷新主窗口
         // safe area，导致 safeAreaInset 内容（迷你播放条）残留在错误位置。
-        NotificationCenter.default.post(name: NSNotification.Name("CarPlaySceneDidDisconnect"), object: nil)
+        NotificationCenter.default.post(name: .carPlaySceneDidDisconnect, object: nil)
         Task { @MainActor in
             SFBAudioEngineManager.shared.updateCarPlayStatus()
         }

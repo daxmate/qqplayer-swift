@@ -149,7 +149,7 @@ struct PlaylistsScreen: View {
             .onAppear {
                 loadPlaylists()
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
                 loadPlaylists()
             }
 

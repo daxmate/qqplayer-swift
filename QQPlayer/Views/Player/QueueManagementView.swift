@@ -81,7 +81,7 @@ struct QueueManagementView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
             settings = DeleteSettings.load()
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
@@ -263,7 +263,7 @@ struct QueueTrackRow: View {
             // 修前同时挂 .onAppear 与 .task，首帧会重复发起两次缩略图请求
             if artworkImage == nil { loadArtwork() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
             settings = DeleteSettings.load()
         }
     }

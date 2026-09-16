@@ -132,7 +132,7 @@ enum MacOnlineDownloadService {
             object: nil,
             userInfo: ["count": 1]
         )
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryFolderContentChanged"), object: nil)
+        NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
 
         return path
     }

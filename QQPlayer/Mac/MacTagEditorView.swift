@@ -757,7 +757,7 @@ struct MacTagEditorView: View {
             }
             // 兜底补发（processExternalFile 提前返回/指纹未变时也保证列表刷新）
             NotificationCenter.default.post(
-                name: NSNotification.Name("LibraryNeedsRefresh"),
+                name: .libraryNeedsRefresh,
                 object: nil
             )
         }

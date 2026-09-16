@@ -53,7 +53,7 @@ struct ContentView: View {
             MiniPlayerView()
                 .background(.clear)
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             Task {
                 await refreshLibrary()
             }
@@ -151,7 +151,7 @@ struct LifecycleModifier: ViewModifier {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TrackFound"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .trackFound)) { _ in
                 if libraryIndexer.isIndexing {
                     hasPendingIndexRefresh = true
                 } else {

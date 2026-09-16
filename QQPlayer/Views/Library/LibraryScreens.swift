@@ -66,7 +66,7 @@ struct LikedSongsScreen: View {
             .onAppear {
                 loadLikedTracks()
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
                 loadLikedTracks()
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in

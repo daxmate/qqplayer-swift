@@ -219,25 +219,25 @@ struct MiniPlayerView: View {
                         currentArtwork = nil
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToArtistFromPlayer"))) { _ in
+                .onReceive(NotificationCenter.default.publisher(for: .navigateToArtistFromPlayer)) { _ in
                     // Minimize the player when artist navigation is requested
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         isExpanded = false
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToAlbumFromPlayer"))) { _ in
+                .onReceive(NotificationCenter.default.publisher(for: .navigateToAlbumFromPlayer)) { _ in
                     // Minimize the player when album navigation is requested
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         isExpanded = false
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MinimizePlayer"))) { _ in
+                .onReceive(NotificationCenter.default.publisher(for: .minimizePlayer)) { _ in
                     // Minimize the player when artwork is tapped
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         isExpanded = false
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+                .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
                     settings = DeleteSettings.load()
                 }
             }

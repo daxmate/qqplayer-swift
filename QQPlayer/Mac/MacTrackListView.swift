@@ -145,10 +145,10 @@ struct MacTrackListView: View {
                 // 必须用 onChange 传入的 newTracks（新数据）重建。
                 syncDisplayedRows(tracks: newTracks)
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FavoritesChanged"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .favoritesChanged)) { _ in
                 reloadFavorites()
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .playlistsChanged)) { _ in
                 reloadPlaylists()
             }
             // 标签编辑/刮削 sheet（单曲右键第 8 项）与批量刮削 sheet（多选右键）
@@ -338,7 +338,7 @@ struct MacTrackListView: View {
             Divider()
             Button("playlist_manage_remove_from_playlist".localized, role: .destructive) {
                 try? DatabaseManager.shared.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
-                NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             }
         }
 
@@ -347,7 +347,7 @@ struct MacTrackListView: View {
             ForEach(playlists, id: \.id) { playlist in
                 Button(playlist.title) {
                     try? DatabaseManager.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
-                    NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+                    NotificationCenter.default.post(name: .playlistsChanged, object: nil)
                 }
             }
             Divider()
@@ -470,12 +470,12 @@ struct MacTrackListView: View {
             if deletedAny {
                 // 先刷新全库（tracks/歌单），再刷新收藏列表——顺序相关：
                 // reloadLibrary 先重拉 tracks，reloadLikedTracks 才能用新数据过滤
-                NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
-                NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
-                NotificationCenter.default.post(name: NSNotification.Name("FavoritesChanged"), object: nil)
+                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
+                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
+                NotificationCenter.default.post(name: .favoritesChanged, object: nil)
             } else if failedCount > 0 {
                 // 全部失败（文件仍在）：也发一次 LibraryNeedsRefresh，让曲库列表与 DB 对齐
-                NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
+                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             }
             if failedCount > 0 {
                 trashFailureAlert = Localized.moveToTrashFailed(count: failedCount)
@@ -544,7 +544,7 @@ struct MacTrackListView: View {
         do {
             let playlist = try DatabaseManager.shared.createPlaylist(title: title)
             try DatabaseManager.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
-            NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+            NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             print("❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
         }

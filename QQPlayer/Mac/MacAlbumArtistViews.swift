@@ -318,14 +318,14 @@ struct MacPlaylistListView: View {
                 home
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .playlistsChanged)) { _ in
             // 歌单变化 → 详情内重载（MacManualPlaylistDetailView 内部也监听），
             // 主页可见时重算卡片计数/封面
             reloadSmartCards()
         }
         // 刮削保存/批量刮削/重扫后：自动歌单卡片计数与封面可能变化（如年代分组），
         // 主页可见时一并重算（2026-09-06 单曲刮削后不刷新修复）
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             reloadSmartCards()
         }
     }
@@ -452,7 +452,7 @@ struct MacPlaylistListView: View {
         guard !title.isEmpty else { return }
         do {
             _ = try DatabaseManager.shared.createPlaylist(title: title)
-            NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+            NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             // 审计 L7：不再弹窗静默关闭——用户至少知道没建成
             createError = "playlist_create_failed".localized(with: error.localizedDescription)

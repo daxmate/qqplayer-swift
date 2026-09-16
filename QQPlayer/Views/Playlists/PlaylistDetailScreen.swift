@@ -413,10 +413,10 @@ struct PlaylistDetailScreen: View {
                 artistSortCache = buildArtistCache(for: tracks)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadPlaylistTracks()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
             settings = DeleteSettings.load()
         }
         .confirmationDialog(NSLocalizedString("playlist_cover", value: "Playlist Cover", comment: ""), isPresented: $showCoverOptions) {

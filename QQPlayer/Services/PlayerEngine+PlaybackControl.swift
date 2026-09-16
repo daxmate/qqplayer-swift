@@ -750,11 +750,6 @@
                         // 真实 seek 失败（SFBAudioEngineManager code 5）：音频没动，
                         // 回滚 playbackTime（保持原位置不更新 UI），并提示（2026-08-29 审计 #4）。
                         print("❌ SFBAudioEngine seek failed: \(error) — keeping position at \(playbackTime)s")
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("PlayerSeekFailed"),
-                            object: nil,
-                            userInfo: ["targetTime": time]
-                        )
                         return
                     }
                 }

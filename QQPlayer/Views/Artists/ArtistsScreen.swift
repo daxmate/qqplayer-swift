@@ -80,7 +80,7 @@ struct ArtistsScreen: View {
             .onAppear {
                 loadArtists()
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
                 loadArtists()
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in

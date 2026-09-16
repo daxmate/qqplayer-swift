@@ -46,12 +46,12 @@ struct MacManualPlaylistDetailView: View {
             content
         }
         .onAppear { loadTracks() }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PlaylistsChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .playlistsChanged)) { _ in
             loadTracks()
         }
         // 曲目标签被编辑（刮削保存/批量刮削）后，歌单内曲目标题/歌手等来自 DB，
         // 需重拉才显示新值（2026-09-06 单曲刮削后歌单详情不刷新修复）
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadTracks()
         }
         .alert("playlist_manage_rename".localized, isPresented: $showRenameAlert) {
@@ -143,7 +143,7 @@ struct MacManualPlaylistDetailView: View {
         do {
             try DatabaseManager.shared.renamePlaylist(playlistId: playlist.id ?? 0, newTitle: title)
             currentTitle = title
-            NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+            NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             print("❌ renamePlaylist failed: \(error)")
         }
@@ -152,7 +152,7 @@ struct MacManualPlaylistDetailView: View {
     private func deletePlaylist() {
         do {
             try DatabaseManager.shared.deletePlaylist(playlistId: playlist.id ?? 0)
-            NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+            NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             onExit()
         } catch {
             print("❌ deletePlaylist failed: \(error)")

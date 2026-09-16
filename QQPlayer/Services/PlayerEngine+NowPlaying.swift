@@ -234,9 +234,6 @@
                 // Trigger CarPlay Now Playing button update
                 MPNowPlayingInfoCenter.default().playbackState = self.isPlaying ? .playing : .paused
 
-                // Notify CarPlay delegate of state change
-                NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
-
                 print("🎛️ Enhanced Control Center update - playing: \(self.isPlaying)")
                 print("🎛️ Title: \(track.title), Time: \(currentTime)")
             }

@@ -237,7 +237,7 @@ class LibraryIndexer: NSObject, ObservableObject {
                 try databaseManager.cleanupOrphanedLibraryEntries()
                 await MainActor.run {
                     NotificationCenter.default.post(
-                        name: NSNotification.Name("LibraryNeedsRefresh"),
+                        name: .libraryNeedsRefresh,
                         object: nil
                     )
                 }
@@ -257,7 +257,7 @@ class LibraryIndexer: NSObject, ObservableObject {
             await MainActor.run {
                 self.tracksFound += 1
                 NotificationCenter.default.post(
-                    name: NSNotification.Name("TrackFound"),
+                    name: .trackFound,
                     object: notificationTrack
                 )
             }
@@ -274,7 +274,7 @@ class LibraryIndexer: NSObject, ObservableObject {
             print("⚠️ Failed to clean orphaned metadata after refresh: \(error)")
         }
         NotificationCenter.default.post(
-            name: NSNotification.Name("LibraryNeedsRefresh"),
+            name: .libraryNeedsRefresh,
             object: nil
         )
     }
@@ -306,7 +306,7 @@ class LibraryIndexer: NSObject, ObservableObject {
                     print("✅ Cleared exclusion for already-present track: \(fileURL.lastPathComponent)")
                 }
                 if allowExcludedReimport {
-                    NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
+                    NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
                 }
                 return false
             }

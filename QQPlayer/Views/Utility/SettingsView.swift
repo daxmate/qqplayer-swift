@@ -68,7 +68,7 @@ struct SettingsView: View {
                                 Button(action: {
                                     deleteSettings.backgroundColorChoice = color
                                     deleteSettings.save()
-                                    NotificationCenter.default.post(name: NSNotification.Name("BackgroundColorChanged"), object: nil)
+                                    NotificationCenter.default.post(name: .backgroundColorChanged, object: nil)
                                 }) {
                                     ZStack {
                                         Circle()

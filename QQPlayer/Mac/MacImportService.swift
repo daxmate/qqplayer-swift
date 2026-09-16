@@ -98,7 +98,7 @@ enum MacImportService {
                     let stableId = DatabaseManager.generatePathStableId(forPath: path)
                     try DatabaseManager.shared.addToPlaylist(playlistId: playlistId, trackStableId: stableId)
                 }
-                NotificationCenter.default.post(name: NSNotification.Name("PlaylistsChanged"), object: nil)
+                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             } catch {
                 MacScanLogger.log("import: add to playlist failed: \(error)")
             }
@@ -113,7 +113,7 @@ enum MacImportService {
         )
 
         // 触发曲库重扫收录（若正在扫描，通知处理器会排队；FSEvents created 事件双保险）
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryFolderContentChanged"), object: nil)
+        NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
 
         return result
     }

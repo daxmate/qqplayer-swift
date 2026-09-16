@@ -4,23 +4,6 @@ import SwiftUI
     import UIKit
 #endif
 
-extension Notification.Name {
-    /// Posted only when QQPlayer UI settings change. Playback persistence also
-    /// writes to UserDefaults, so views must not observe the broad
-    /// UserDefaults.didChangeNotification or every state save rebuilds the
-    /// library hierarchy while audio is playing.
-    static let qqplayerSettingsDidChange = Notification.Name("QQPlayerSettingsDidChange")
-
-    /// 曲库扫描条件变化（文件类型设置改动等）→ 需重扫曲库。与
-    /// LibraryFoldersChanged 分开：语义不同（文件夹增删 vs 收录条件变化），
-    /// 但消费方动作相同（reload + start，扫描中则排队）。
-    static let libraryScanCriteriaChanged = Notification.Name("LibraryScanCriteriaChanged")
-
-    /// 文件拖入导入完成（B 组）：userInfo["count"] = 成功导入数。
-    /// MacLibraryView 监听后弹瞬时提示（对齐 web 版 toast 语义）。
-    static let libraryImportFinished = Notification.Name("LibraryImportFinished")
-}
-
 /// 曲库可收录的音频扩展名（单一事实源）。
 ///
 /// web 版（对齐对象）有 7 种（.mp3/.flac/.m4a/.wav/.ogg/.aac/.opus），但

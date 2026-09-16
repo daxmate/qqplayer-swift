@@ -471,7 +471,7 @@ struct LibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToArtistFromPlayer"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToArtistFromPlayer)) { notification in
             if let userInfo = notification.userInfo,
                let artist = userInfo["artist"] as? Artist,
                let allTracks = userInfo["allTracks"] as? [Track] {
@@ -479,7 +479,7 @@ struct LibraryView: View {
                 artistAllTracks = allTracks
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToAlbumFromPlayer"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToAlbumFromPlayer)) { notification in
             if let userInfo = notification.userInfo,
                let album = userInfo["album"] as? Album,
                let allTracks = userInfo["allTracks"] as? [Track] {
@@ -487,7 +487,7 @@ struct LibraryView: View {
                 albumAllTracks = allTracks
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToPlaylist"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPlaylist)) { notification in
             if let userInfo = notification.userInfo,
                let playlistId = userInfo["playlistId"] as? Int64 {
                 do {
@@ -638,7 +638,7 @@ struct LibrarySectionRowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackgroundColorChanged"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
             settings = DeleteSettings.load()
         }
     }

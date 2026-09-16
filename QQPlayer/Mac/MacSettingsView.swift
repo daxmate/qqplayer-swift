@@ -111,7 +111,7 @@ struct MacSettingsView: View {
             deleteSettings = DeleteSettings.load()
         }
         // search anything 设置行：⌘K 浮层点击设置分类 → 打开本窗口并定位
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MacSettingsOpenCategory"))) { note in
+        .onReceive(NotificationCenter.default.publisher(for: .macSettingsOpenCategory)) { note in
             if let raw = note.userInfo?["category"] as? String,
                let category = SettingsCategory(rawValue: raw) {
                 selectedCategory = category
@@ -447,7 +447,7 @@ private struct MacLibrarySettingsView: View {
         settings.save()
         deleteSettings = settings
         // 触发主窗口重扫曲库
-        NotificationCenter.default.post(name: NSNotification.Name("LibraryFoldersChanged"), object: nil)
+        NotificationCenter.default.post(name: .libraryFoldersChanged, object: nil)
     }
 
     private func pickFolders() {

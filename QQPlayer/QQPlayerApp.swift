@@ -145,7 +145,7 @@ struct QQPlayerApp: App {
                     guard notification.object is UIWindowScene else { return }
                     refreshLayoutAfterSceneChange()
                 }
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CarPlaySceneDidDisconnect"))) { _ in
+                .onReceive(NotificationCenter.default.publisher(for: .carPlaySceneDidDisconnect)) { _ in
                     // CarPlay 断开但手机场景未重新激活时（didActivate 可能不触发）的兜底
                     refreshLayoutAfterSceneChange()
                 }
@@ -333,7 +333,7 @@ struct QQPlayerApp: App {
                         if let playlist = playlists.first(where: { $0.id == playlistIdInt }) {
                             // Post notification to navigate to playlist
                             NotificationCenter.default.post(
-                                name: NSNotification.Name("NavigateToPlaylist"),
+                                name: .navigateToPlaylist,
                                 object: nil,
                                 userInfo: ["playlistId": playlistIdInt]
                             )

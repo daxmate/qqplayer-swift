@@ -134,7 +134,7 @@ struct TrackListView: View {
                     try? DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
                 }
             }
-            NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
+            NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             exitBulkMode()
         }
     }

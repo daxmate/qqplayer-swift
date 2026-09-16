@@ -128,7 +128,7 @@ struct TrackBulkActionsModifier: ViewModifier {
                 try? DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
             }
             NotificationCenter.default.post(
-                name: NSNotification.Name("LibraryNeedsRefresh"),
+                name: .libraryNeedsRefresh,
                 object: nil
             )
             exitBulkMode()

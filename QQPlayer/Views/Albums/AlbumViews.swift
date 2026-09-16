@@ -45,7 +45,7 @@ struct AlbumsScreen: View {
         .navigationTitle(Localized.albums)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: loadAlbums)
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadAlbums()
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
@@ -383,7 +383,7 @@ struct AlbumDetailScreen: View {
         }
         // albumTracks is @State loaded once, so without this a bulk delete left
         // the removed tracks on screen until the view was revisited.
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LibraryNeedsRefresh"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadAlbumTracks()
         }
         .task {
@@ -624,7 +624,7 @@ struct AlbumTrackRowView: View {
                 }
 
                 try DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
-                NotificationCenter.default.post(name: NSNotification.Name("LibraryNeedsRefresh"), object: nil)
+                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             } catch {
                 print("❌ Failed to delete track: \(error)")
             }

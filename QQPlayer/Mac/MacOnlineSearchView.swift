@@ -534,7 +534,7 @@ struct MacOnlineSearchView: View {
                 errorMessage = nil
                 // downloadDirect 不自动刷新；落盘成功 → 通知曲库重扫收录（web watchdog 语义）
                 NotificationCenter.default.post(
-                    name: NSNotification.Name("LibraryFolderContentChanged"),
+                    name: .libraryFolderContentChanged,
                     object: nil
                 )
                 print("✅ [歌曲海下载] 成功《\(song.title)》id=\(song.id)")
