@@ -41,6 +41,21 @@ enum PlayerError: Error {
     case configurationError
 }
 
+/// 播放时间文案（mm:ss）的唯一入口：新消费点用这里，别再抄一份 `%d:%02d`。
+enum PlaybackTimeFormat {
+    /// 秒 → "m:ss" / "h:mm:ss"（负数归零；用于进度、时长、歌词时间轴等所有播放时间文案）
+    static func mmss(_ seconds: TimeInterval) -> String {
+        let total = Int(max(seconds, 0).rounded(.down))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        }
+        return String(format: "%d:%02d", minutes, secs)
+    }
+}
+
 /// 异步落地前的同曲校验（纯函数，可单测）。
 ///
 /// 背景（2026-09-12 审计 P5）：updateWidgetData 在函数入口捕获 track，中间经历

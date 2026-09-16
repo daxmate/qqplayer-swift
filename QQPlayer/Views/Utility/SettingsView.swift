@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var deleteSettings = DeleteSettings.load()
+    /// 歌词延迟校准（按输出路由存；车里最常用）
+    @ObservedObject private var lyricOffsetStore = LyricOffsetStore.shared
     @State private var showDeleteFolderPlaylistsPrompt = false
 
     private func deleteExistingFolderPlaylists() {
@@ -139,6 +141,43 @@ struct SettingsView: View {
                         .onChange(of: deleteSettings.lyricShowRoman) { _, _ in
                             deleteSettings.save()
                         }
+
+                    // 歌词延迟校准：无线 CarPlay / 蓝牙下「听到的」比「看到的」晚，
+                    // 这里把偏移补回去（正值 = 歌词延后显示）。不手动校准时用系统报的输出延迟当初值。
+                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
+                        HStack {
+                            Text(Localized.lyricsOffset)
+                            Spacer()
+                            Text(String(format: "%+.2f s", lyricOffsetStore.effectiveOffset))
+                                .foregroundColor(.secondary)
+                                .monospacedDigit()
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { lyricOffsetStore.manualOffset ?? lyricOffsetStore.effectiveOffset },
+                                set: { lyricOffsetStore.setManualOffset($0) }
+                            ),
+                            in: -1.0 ... 1.0,
+                            step: 0.05
+                        )
+
+                        HStack {
+                            Text(lyricOffsetRouteDescription)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Button(Localized.lyricsOffsetReset) {
+                                lyricOffsetStore.clearManualOffset()
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(lyricOffsetStore.manualOffset == nil)
+                        }
+
+                        Text(Localized.lyricsOffsetHint)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Section(Localized.librarySection) {
@@ -283,6 +322,15 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// 设置页里「当前输出 + 偏移初值从哪来」的说明（端口名用系统给的，别再自造一份翻译）
+    private var lyricOffsetRouteDescription: String {
+        let name = lyricOffsetStore.routeName ?? lyricOffsetStore.route.rawValue
+        if lyricOffsetStore.manualOffset != nil {
+            return name
+        }
+        return "\(name) · +\(String(format: "%.2f", lyricOffsetStore.autoOffset)) s"
     }
 }
 

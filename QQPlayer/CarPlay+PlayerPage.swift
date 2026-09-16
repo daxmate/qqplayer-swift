@@ -33,6 +33,8 @@ struct CarPlayPlayerPageHeader: Equatable {
     let subtitle: String?
     let isPlaying: Bool
     let playOrderMode: PlaybackOrderMode
+    /// 进度（只用于页头渲染与重建判据；不变就不重建页头）
+    let progress: CarPlayPlayerPageProgress?
     /// 封面归属的曲目（封面异步加载；页头只记 key，图片单独上屏）
     let artworkKey: String?
 }
@@ -45,10 +47,22 @@ struct CarPlayPlayerPageTrackInfo: Equatable {
     let artist: String?
 }
 
-/// 播放页页头要跟着变的播放态（播放/暂停图标、播放顺序图标）
+/// 播放页页头要跟着变的播放态（播放/暂停图标、播放顺序图标、进度条）
 struct CarPlayPlayerPagePlaybackState: Equatable {
     let isPlaying: Bool
     let playOrderMode: PlaybackOrderMode
+    /// 已播放时长（秒）
+    let elapsed: TimeInterval
+    /// 总时长（秒）；0 = 未知（不画进度条）
+    let duration: TimeInterval
+}
+
+/// 播放页进度：跑在页头封面底部的一条自绘进度条 + 时间文案（CarPlay 列表模板没有滑块）
+struct CarPlayPlayerPageProgress: Equatable {
+    /// 0…1
+    let fraction: Double
+    let elapsedText: String
+    let totalText: String
 }
 
 /// 播放页内容：页头 + 三行歌词
@@ -64,6 +78,9 @@ struct CarPlayPlayerPageContent: Equatable {
 enum CarPlayPlayerPageBuilder {
     /// 播放页显示几行歌词（当前句 + 后续 2 句）
     static let lyricLineCount = 3
+
+    /// 进度量化步长（秒）：页头重建有成本，进度按 2s 跳而不是按 0.5s tick 跳
+    static let progressStep: TimeInterval = 2
 
     static func content(
         track: CarPlayPlayerPageTrackInfo?,
@@ -82,6 +99,7 @@ enum CarPlayPlayerPageBuilder {
             subtitle: (track.artist?.isEmpty ?? true) ? nil : track.artist,
             isPlaying: playback.isPlaying,
             playOrderMode: playback.playOrderMode,
+            progress: progress(elapsed: playback.elapsed, duration: playback.duration),
             artworkKey: track.key
         )
 
@@ -100,6 +118,18 @@ enum CarPlayPlayerPageBuilder {
             header: header,
             rows: lyricsContent.rows,
             placeholder: lyricsContent.placeholder
+        )
+    }
+
+    /// 进度：按步长量化（量化后的值同时决定进度条位置与时间文案 → 同一段内内容不变，页头不重建）
+    static func progress(elapsed: TimeInterval, duration: TimeInterval) -> CarPlayPlayerPageProgress? {
+        guard duration > 0 else { return nil }
+        let clamped = min(max(elapsed, 0), duration)
+        let stepped = min((clamped / progressStep).rounded(.down) * progressStep, duration)
+        return CarPlayPlayerPageProgress(
+            fraction: stepped / duration,
+            elapsedText: PlaybackTimeFormat.mmss(stepped),
+            totalText: PlaybackTimeFormat.mmss(duration)
         )
     }
 }
@@ -252,9 +282,11 @@ final class CarPlayPlayerPageController {
         let track = engine.currentTrack
         let lines = lyrics?.syncedLyrics ?? []
         // 位置走 nowPlayingElapsedTime（后台/锁屏可用的实时位置唯一入口），
-        // 不读后台会冻结的 progress.playbackTime
-        let currentTime = engine.nowPlayingElapsedTime()
-        let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines)
+        // 不读后台会冻结的 progress.playbackTime。
+        // 延迟补偿：减掉「听到的比引擎时钟晚」的那一段（按当前输出路由取，见 LyricOffsetStore）；
+        // 歌词行号与页头进度共用同一个时间，别各算一份
+        let heardTime = engine.nowPlayingElapsedTime() - LyricOffsetStore.shared.effectiveOffset
+        let activeIndex = LyricTiming.activeLineIndex(time: heardTime, in: lines)
 
         let content = CarPlayPlayerPageBuilder.content(
             track: track.map {
@@ -266,7 +298,9 @@ final class CarPlayPlayerPageController {
             },
             playback: CarPlayPlayerPagePlaybackState(
                 isPlaying: engine.isPlaying,
-                playOrderMode: engine.playbackOrderMode
+                playOrderMode: engine.playbackOrderMode,
+                elapsed: heardTime,
+                duration: engine.duration
             ),
             lyrics: lyrics,
             isLoading: isLoadingLyrics,
@@ -344,7 +378,7 @@ final class CarPlayPlayerPageController {
 
         let artworkSettled = (loadedArtworkKey == header.artworkKey)
         let image = artworkSettled ? artwork : nil
-        let thumbnail = CPThumbnailImage(image: image ?? Self.placeholderThumbnail())
+        let thumbnail = CPThumbnailImage(image: headerThumbnail(artwork: image, progress: header.progress))
 
         let details = CPListTemplateDetailsHeader(
             thumbnail: thumbnail,
@@ -431,26 +465,73 @@ final class CarPlayPlayerPageController {
 
     // MARK: - 封面绘制
 
-    /// 封面未就绪时的占位缩略图（页头条目要求缩略图非空）
-    private static func placeholderThumbnail() -> UIImage {
+    /// 页头缩略图：封面（或占位）+ 底部进度条与时间文案。
+    /// CarPlay 列表模板没有滑块/进度控件，进度只能自绘进封面里（只读，不可拖动）。
+    private func headerThumbnail(artwork: UIImage?, progress: CarPlayPlayerPageProgress?) -> UIImage {
         let side = playerPageThumbnailSide
         let size = CGSize(width: side, height: side)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: DesignTokens.radius8)
-            UIColor.systemGray5.setFill()
-            path.fill()
-
-            guard let note = UIImage(systemName: "music.note")?.withConfiguration(
-                UIImage.SymbolConfiguration(pointSize: side * 0.3, weight: .medium)
-            ) else { return }
-            let rect = CGRect(
-                x: (side - note.size.width) / 2,
-                y: (side - note.size.height) / 2,
-                width: note.size.width,
-                height: note.size.height
-            )
-            note.withTintColor(.systemGray3, renderingMode: .alwaysOriginal).draw(in: rect)
+            let rect = CGRect(origin: .zero, size: size)
+            if let artwork {
+                drawAspectFill(artwork, in: rect)
+            } else {
+                drawPlaceholderFill(in: rect)
+            }
+            if let progress {
+                drawProgressFooter(progress, in: rect)
+            }
         }
+    }
+
+    /// 封面未就绪时的占位填充（页头条目要求缩略图非空）
+    private func drawPlaceholderFill(in rect: CGRect) {
+        UIColor.systemGray5.setFill()
+        UIRectFill(rect)
+
+        guard let note = UIImage(systemName: "music.note")?.withConfiguration(
+            UIImage.SymbolConfiguration(pointSize: rect.width * 0.3, weight: .medium)
+        ) else { return }
+        let noteRect = CGRect(
+            x: rect.midX - note.size.width / 2,
+            y: rect.midY - note.size.height / 2,
+            width: note.size.width,
+            height: note.size.height
+        )
+        note.withTintColor(.systemGray3, renderingMode: .alwaysOriginal).draw(in: noteRect)
+    }
+
+    /// 底部压暗 + 进度条 + 「已播 / 总长」：任何封面上都读得清
+    private func drawProgressFooter(_ progress: CarPlayPlayerPageProgress, in rect: CGRect) {
+        let side = rect.width
+        let footerHeight = side * 0.22
+        let footer = CGRect(x: 0, y: rect.maxY - footerHeight, width: side, height: footerHeight)
+        UIColor.black.withAlphaComponent(0.42).setFill()
+        UIRectFill(footer)
+
+        let inset = side * 0.08
+        let barHeight = side * 0.03
+        let trackRect = CGRect(x: inset, y: footer.minY + footerHeight * 0.58, width: side - inset * 2, height: barHeight)
+        UIColor.white.withAlphaComponent(0.28).setFill()
+        UIBezierPath(roundedRect: trackRect, cornerRadius: barHeight / 2).fill()
+
+        // 跑过的部分：至少留一个圆点，起始处也看得见
+        let filledWidth = min(max(trackRect.width * CGFloat(progress.fraction), barHeight), trackRect.width)
+        UIColor.white.setFill()
+        UIBezierPath(
+            roundedRect: CGRect(x: trackRect.minX, y: trackRect.minY, width: filledWidth, height: barHeight),
+            cornerRadius: barHeight / 2
+        ).fill()
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: side * 0.08, weight: .semibold),
+            .foregroundColor: UIColor.white,
+        ]
+        let textY = footer.minY + footerHeight * 0.12
+        (progress.elapsedText as NSString).draw(at: CGPoint(x: inset, y: textY), withAttributes: attributes)
+
+        let totalText = progress.totalText as NSString
+        let totalWidth = totalText.size(withAttributes: attributes).width
+        totalText.draw(at: CGPoint(x: rect.maxX - inset - totalWidth, y: textY), withAttributes: attributes)
     }
 }
 

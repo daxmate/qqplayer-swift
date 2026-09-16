@@ -43,6 +43,8 @@ struct CarPlayPlayerPageBuilderTests {
         artist: String? = "歌手",
         isPlaying: Bool = true,
         playOrderMode: PlaybackOrderMode = .sequential,
+        elapsed: TimeInterval = 0,
+        duration: TimeInterval = 0,
         lyrics: Lyrics?,
         isLoading: Bool = false,
         activeLineIndex: Int? = 0
@@ -52,7 +54,12 @@ struct CarPlayPlayerPageBuilderTests {
         }
         return CarPlayPlayerPageBuilder.content(
             track: track,
-            playback: CarPlayPlayerPagePlaybackState(isPlaying: isPlaying, playOrderMode: playOrderMode),
+            playback: CarPlayPlayerPagePlaybackState(
+                isPlaying: isPlaying,
+                playOrderMode: playOrderMode,
+                elapsed: elapsed,
+                duration: duration
+            ),
             lyrics: lyrics,
             isLoading: isLoading,
             activeLineIndex: activeLineIndex
@@ -180,5 +187,44 @@ struct CarPlayPlayerPageBuilderTests {
         let sequential = content(playOrderMode: .sequential, lyrics: lyrics, activeLineIndex: 0)
         let shuffled = content(playOrderMode: .shuffle, lyrics: lyrics, activeLineIndex: 0)
         #expect(sequential != shuffled)
+    }
+
+    // MARK: - 进度
+
+    @Test("进度按 2s 量化：同一段内内容不变（否则页头会按 tick 重建）")
+    func progressIsQuantized() {
+        let lyrics = makeLyrics(makeLines(["一", "二", "三", "四"]))
+        let at0 = content(elapsed: 0, duration: 200, lyrics: lyrics)
+        let at19 = content(elapsed: 1.9, duration: 200, lyrics: lyrics)
+        let at2 = content(elapsed: 2, duration: 200, lyrics: lyrics)
+
+        #expect(at0 == at19)
+        #expect(at0 != at2)
+    }
+
+    @Test("进度：总时长未知不画进度条")
+    func progressHiddenWithoutDuration() {
+        #expect(content(elapsed: 30, duration: 0, lyrics: makeLyrics(makeLines(["一"]))).header?.progress == nil)
+    }
+
+    @Test("进度：越界与负值收敛到 0…1，文案带已播 / 总长")
+    func progressClampsOutOfRange() {
+        let overrun = content(elapsed: 999, duration: 100, lyrics: makeLyrics(makeLines(["一"]))).header?.progress
+        #expect(overrun?.fraction == 1)
+        #expect(overrun?.elapsedText == "1:40")
+        #expect(overrun?.totalText == "1:40")
+
+        let negative = content(elapsed: -5, duration: 100, lyrics: makeLyrics(makeLines(["一"]))).header?.progress
+        #expect(negative?.fraction == 0)
+        #expect(negative?.elapsedText == "0:00")
+    }
+
+    @Test("播放时间文案走唯一入口：mm:ss，超一小时带小时位，负值归零")
+    func timeFormatting() {
+        #expect(PlaybackTimeFormat.mmss(0) == "0:00")
+        #expect(PlaybackTimeFormat.mmss(59.9) == "0:59")
+        #expect(PlaybackTimeFormat.mmss(60) == "1:00")
+        #expect(PlaybackTimeFormat.mmss(3661) == "1:01:01")
+        #expect(PlaybackTimeFormat.mmss(-3) == "0:00")
     }
 }

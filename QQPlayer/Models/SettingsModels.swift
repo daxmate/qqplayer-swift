@@ -208,6 +208,9 @@ struct DeleteSettings: Codable {
     var lyricShowRoman: Bool = true
     /// 歌词整体延迟校准秒（>0 = 歌词比声音延后；web 版 lyric offset 对齐，默认 0）
     var lyricOffset: Double = 0
+    /// 歌词延迟校准（按输出路由分开存，key = LyricOffsetRoute.rawValue；缺省 = 未校准 → 用系统初值）。
+    /// iOS / CarPlay 用（无线车机与蓝牙量级差很多）；全局 lyricOffset 仍作 Mac/web 的总校准。
+    var lyricOffsetsByRoute: [String: Double] = [:]
     /// 播放页频谱（web 版 visualizerEnabled 对齐，默认开；仅 native 引擎曲目有数据）
     var visualizerEnabled: Bool = true
 
@@ -282,6 +285,8 @@ struct DeleteSettings: Codable {
         lyricShowTranslation = try container.decodeIfPresent(Bool.self, forKey: .lyricShowTranslation) ?? true
         lyricShowRoman = try container.decodeIfPresent(Bool.self, forKey: .lyricShowRoman) ?? true
         lyricOffset = try container.decodeIfPresent(Double.self, forKey: .lyricOffset) ?? 0
+        // 旧设置文件没有按路由的偏移表 → 空表（解码绝不解码失败）
+        lyricOffsetsByRoute = try container.decodeIfPresent([String: Double].self, forKey: .lyricOffsetsByRoute) ?? [:]
         visualizerEnabled = try container.decodeIfPresent(Bool.self, forKey: .visualizerEnabled) ?? true
         showMiniWindowButton = try container.decodeIfPresent(Bool.self, forKey: .showMiniWindowButton) ?? true
         miniLyricsEnabled = try container.decodeIfPresent(Bool.self, forKey: .miniLyricsEnabled) ?? true

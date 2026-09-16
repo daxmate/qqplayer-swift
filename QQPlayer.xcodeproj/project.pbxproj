@@ -137,6 +137,7 @@
 		D956C32FFE134089BAE458BE /* SyncLibrarySyncModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E504D7F2C1B94F6A83FF13FB /* SyncLibrarySyncModelsTests.swift */; };
 		DA214B1D04F9434D87EF6827 /* SyncLibraryFetchResponderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928958225EDF47E8AB8B5B1A /* SyncLibraryFetchResponderTests.swift */; };
 		DA6D9D12AC8D47B482852CD9 /* PlaybackAsyncGuardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */; };
+		DA7B0B053EAA4201985D0FE5 /* CarPlayPlayerPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */; };
 		DD25E8BCF490415CAF2818C0 /* InterruptionResumePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D39DE9FAECA4B4799C0FA6D /* InterruptionResumePolicyTests.swift */; };
 		DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82493F629B43819C248996 /* TagWriterTests.swift */; };
 		DFCDAB74FA28465E8CC02A66 /* SyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */; };
@@ -154,7 +155,7 @@
 		FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */; };
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
-		DA7B0B053EAA4201985D0FE5 /* CarPlayPlayerPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */; };
+		010A16423D5743D1B8AE5D85 /* LyricOffsetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74235A3C260E43DE8B44FAD5 /* LyricOffsetStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -232,6 +233,7 @@
 		21702C2548494B02886D5344 /* KaraokeControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KaraokeControllerTests.swift; sourceTree = "<group>"; };
 		2312D60C2E6090E2007F756D /* QQPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QQPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		232B84C1DF4D44DA846B68A7 /* SandboxMigrationPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SandboxMigrationPlannerTests.swift; sourceTree = "<group>"; };
+		2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarPlayPlayerPageTests.swift; sourceTree = "<group>"; };
 		239B247B2EE59BEC009F83F1 /* PlayerWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PlayerWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		239B247C2EE59BEC009F83F1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		239B247E2EE59BEC009F83F1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -358,7 +360,7 @@
 		F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingApprovalModelTests.swift; sourceTree = "<group>"; };
 		FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GraphicEQCodecTests.swift; sourceTree = "<group>"; };
 		FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StateManagerTests.swift; sourceTree = "<group>"; };
-		2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarPlayPlayerPageTests.swift; sourceTree = "<group>"; };
+		74235A3C260E43DE8B44FAD5 /* LyricOffsetStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricOffsetStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -980,6 +982,7 @@
 				199ACBBFFC5344E1ADE48676 /* UIAccentContractTests.swift */,
 				D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */,
 				2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */,
+				74235A3C260E43DE8B44FAD5 /* LyricOffsetStoreTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1433,6 +1436,7 @@
 				2924887127FF4F248C6D9FC7 /* UIAccentContractTests.swift in Sources */,
 				014347DB06B147DCBEA154D8 /* PlaylistCoverLoadTests.swift in Sources */,
 				DA7B0B053EAA4201985D0FE5 /* CarPlayPlayerPageTests.swift in Sources */,
+				010A16423D5743D1B8AE5D85 /* LyricOffsetStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
