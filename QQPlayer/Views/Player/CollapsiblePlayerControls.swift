@@ -181,12 +181,8 @@ struct CollapsiblePlayerControls: View {
     }
 
     private var playOrderIcon: String {
-        switch playOrderMode {
-        case .sequential: return "arrow.clockwise"
-        case .shuffle: return "shuffle"
-        case .repeatAll: return "repeat"
-        case .repeatOne: return "repeat.1"
-        }
+        // 图标映射走 PlaybackOrderMode.systemImageName（与 CarPlay 播放页同一入口）
+        playOrderMode.systemImageName
     }
 
     private var playOrderTitle: String {

@@ -20,9 +20,16 @@ extension CarPlaySceneDelegate {
         template.trailingNavigationBarButtons = [nowPlayingButton]
     }
 
+    /// 右上角「正在播放」按钮：推**自建的播放页**（封面 + 歌名/歌手 + 控制键 + 三行歌词）。
+    /// 系统的「正在播放」屏不接受 App 注入歌词（文字位只有 title/artist 两行），所以这里
+    /// 不再推 CPNowPlayingTemplate.shared；系统屏仍由车机自身入口/方向盘唤起，播放控制命令
+    /// 走 MPRemoteCommandCenter，不受影响。
     private func showNowPlaying() {
-        let nowPlayingTemplate = CPNowPlayingTemplate.shared
-        interfaceController?.pushTemplate(nowPlayingTemplate, animated: true, completion: nil)
+        guard let playerPage = playerPageController else {
+            interfaceController?.pushTemplate(CPNowPlayingTemplate.shared, animated: true, completion: nil)
+            return
+        }
+        interfaceController?.pushTemplate(playerPage.template, animated: true, completion: nil)
     }
 
     func queueForAllSongs(startingAt index: Int) -> [Track] {

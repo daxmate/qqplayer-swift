@@ -2,19 +2,21 @@
 //  CarPlay+Lyrics.swift
 //  QQPlayer
 //
-//  CarPlay 歌词页：「当前句 + 后续句」列表形态显示同步歌词。
+//  CarPlay 歌词内容（纯逻辑）：把播放态映射成「当前句 + 后续句」的行窗口。
 //
 //  形态由来（2026-09-15）：CarPlay 模板集里没有歌词控件——iPhoneOS26.5 SDK 的
 //  CarPlay.framework 全部头文件 grep -i lyric 无命中；Now Playing 屏由系统接管，
 //  不接受 App 注入自定义内容（CPNowPlayingTemplate 只有按钮 / Up Next / Sports 模式）。
-//  可行且不分散注意力的形态 = 一个 CPListTemplate：当前句永远在首行（isPlaying
-//  播放指示器标注）+ 后续若干句，逐句重建列表——等价于「不用滚动的自动滚屏」
-//  （CarPlay 列表模板没有 scrollTo API）。
+//  可行且不分散注意力的形态 = 列表行：当前句永远在位（isPlaying 播放指示器标注）+
+//  后续若干句，逐句重建列表——等价于「不用滚动的自动滚屏」（列表模板没有 scrollTo API）。
+//
+//  消费方（2026-09-16 起）：CarPlay+PlayerPage.swift 的播放页（页头 + 三行歌词）。
+//  本站保留「播放态 → 行窗口」的唯一实现：行数由消费方给（upcoming / plainLineLimit），
+//  占位四态、简繁归一、翻译/罗马音取舍都在这里，别在页面层再写一套。
 //
 //  歌词语义不另起一套：
 //   - 行号判定 → LyricTiming.activeLineIndex（iOS 唯一入口）
 //   - 简繁字形归一 → LyricsLine.displayText / displayTranslation（DisplayScriptNormalizer）
-//  本文件只做「播放态 → 列表内容」的映射与模板装配；构建部分是纯函数，可单测。
 //
 // target: ios-only
 //
@@ -85,7 +87,8 @@ enum CarPlayLyricsBuilder {
         isLoading: Bool,
         activeLineIndex: Int?,
         upcoming: Int = CarPlayLyricsBuilder.upcomingLineCount,
-        showRoman: Bool = true
+        showRoman: Bool = true,
+        plainLineLimit: Int = CarPlayLyricsBuilder.plainLineLimit
     ) -> CarPlayLyricsContent {
         guard let trackTitle, !trackTitle.isEmpty else {
             return CarPlayLyricsContent(header: nil, rows: [], placeholder: .noTrack)
@@ -164,152 +167,5 @@ enum CarPlayLyricsBuilder {
                     isPlaying: false
                 )
             }
-    }
-}
-
-// MARK: - 歌词页控制器
-
-/// CarPlay 歌词页：持有模板、订阅播放态、内容变化才重建列表。
-/// 生命周期由 CarPlaySceneDelegate 管（didConnect 建立 / didDisconnect 调 stop()）。
-@MainActor
-final class CarPlayLyricsController {
-    /// 歌词页模板（在 CarPlaySceneDelegate 里作为 TabBar 第 2 个 tab）
-    let template: CPListTemplate
-
-    private var cancellables = Set<AnyCancellable>()
-    /// 进度时钟（自己带一只，不复用前 UI timer——见 startObserving 注释）
-    private var tickTimer: Timer?
-    /// 当前曲目的歌词（加载完成前为 nil）
-    private var lyrics: Lyrics?
-    private var isLoadingLyrics = false
-    /// 歌词归属的曲目：切歌后旧请求的返回必须丢弃（LyricsManager 取歌词可达数秒）
-    private var lyricsTrackId: String?
-    /// 上一次已上屏的内容
-    private var appliedContent: CarPlayLyricsContent?
-    /// 罗马音开关（iOS 设置页可改；这里缓存一份，避免每个 tick 读设置）
-    private var showRoman = DeleteSettings.load().lyricShowRoman
-
-    init() {
-        template = CPListTemplate(title: "lyrics".localized, sections: [])
-        template.tabImage = UIImage(systemName: "quote.bubble")
-        template.emptyViewTitleVariants = [CarPlayLyricsPlaceholder.noTrack.title]
-        startObserving()
-    }
-
-    /// 断开 CarPlay 连接时调用：解除订阅与时钟，避免继续更新已销毁的场景
-    func stop() {
-        cancellables.removeAll()
-        tickTimer?.invalidate()
-        tickTimer = nil
-    }
-
-    // MARK: - 订阅
-
-    private func startObserving() {
-        // 只捕获 Sendable 值（stableId），播放器状态在 MainActor 回调里现读
-        // （与 AppCoordinator.setupBindings 同款写法）
-        PlayerEngine.shared.$currentTrack
-            .map { $0?.stableId }
-            .removeDuplicates()
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.currentTrackChanged() }
-            }
-            .store(in: &cancellables)
-
-        // 播放进度时钟自己带：iOS 进后台会停用 0.25s 前台 UI timer
-        // （PlayerEngine.suspendUITimersForBackground），而车里手机基本是锁屏后台态——
-        // 订阅 progress.$playbackTime 会冻结在上一句，歌词永远不往下走。
-        // 0.5s 与后台 checkIfTrackEnded 同档；内容不变时 refresh 内直接返回，不上屏。
-        tickTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
-
-        // 设置页改动（显示罗马音开关）→ 下次 refresh 用新值重建内容
-        NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)
-            .sink { [weak self] _ in
-                Task { @MainActor in
-                    guard let self else { return }
-                    self.showRoman = DeleteSettings.load().lyricShowRoman
-                    self.refresh()
-                }
-            }
-            .store(in: &cancellables)
-
-        currentTrackChanged()
-    }
-
-    // MARK: - 状态同步
-
-    private func currentTrackChanged() {
-        let track = PlayerEngine.shared.currentTrack
-        let trackId = track?.stableId
-
-        guard trackId != lyricsTrackId else {
-            refresh()
-            return
-        }
-
-        lyricsTrackId = trackId
-        lyrics = nil
-        isLoadingLyrics = track != nil
-        refresh()
-
-        guard let track else { return }
-
-        Task { @MainActor [weak self] in
-            let loaded = await LyricsManager.shared.getLyrics(for: track)
-            guard let self, self.lyricsTrackId == track.stableId else { return }
-            self.lyrics = loaded
-            self.isLoadingLyrics = false
-            self.refresh()
-        }
-    }
-
-    /// 由播放态算出内容；与上次上屏内容相同则不动模板
-    private func refresh() {
-        let engine = PlayerEngine.shared
-        let lines = lyrics?.syncedLyrics ?? []
-        // 位置走 nowPlayingElapsedTime（后台/锁屏可用的实时位置唯一入口，锁屏时间轴同源），
-        // 不读后台会冻结的 progress.playbackTime
-        let currentTime = engine.nowPlayingElapsedTime()
-        let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines)
-
-        let content = CarPlayLyricsBuilder.content(
-            trackTitle: engine.currentTrack?.title,
-            lyrics: lyrics,
-            isLoading: isLoadingLyrics,
-            activeLineIndex: activeIndex,
-            showRoman: showRoman
-        )
-
-        guard content != appliedContent else { return }
-        appliedContent = content
-        apply(content)
-    }
-
-    // MARK: - 上屏
-
-    private func apply(_ content: CarPlayLyricsContent) {
-        if let placeholder = content.placeholder {
-            template.emptyViewTitleVariants = [placeholder.title]
-            // 加载中才转菊花（iOS 18.4+ 系统自带，比自造行更省事）
-            template.showsSpinnerWhileEmpty = placeholder == .loading
-        }
-
-        guard let header = content.header, !content.rows.isEmpty else {
-            template.updateSections([])
-            return
-        }
-
-        let items = content.rows.map { row -> CPListItem in
-            // 副行：有罗马音给罗马音（乘客跟唱/跟读更需要），否则退回译文（中文歌等行为不变）
-            let item = CPListItem(text: row.text, detailText: row.roman ?? row.translation)
-            item.isPlaying = row.isPlaying
-            item.playingIndicatorLocation = .trailing
-            // 不设 handler：歌词行不可点，避免行车中误触跳播
-            return item
-        }
-
-        template.updateSections([CPListSection(items: items, header: header, sectionIndexTitle: nil)])
     }
 }

@@ -13,6 +13,17 @@ enum PlaybackOrderMode: Int, CaseIterable {
     case shuffle = 1
     case repeatAll = 2
     case repeatOne = 3
+
+    /// 播放顺序按钮图标（iOS 播放页 + CarPlay 播放页共用；Mac 端历史用
+    /// "arrow.right.to.line" 表示顺序，未统一——改动前先确认那是刻意的）。
+    var systemImageName: String {
+        switch self {
+        case .sequential: return "arrow.clockwise"
+        case .shuffle: return "shuffle"
+        case .repeatAll: return "repeat"
+        case .repeatOne: return "repeat.1"
+        }
+    }
 }
 
 /// Holds the fast-changing playback position so that only views showing the
