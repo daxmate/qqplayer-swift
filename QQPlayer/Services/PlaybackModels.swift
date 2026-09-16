@@ -14,8 +14,12 @@ enum PlaybackOrderMode: Int, CaseIterable {
     case repeatAll = 2
     case repeatOne = 3
 
-    /// 播放顺序按钮图标（iOS 播放页 + CarPlay 播放页共用；Mac 端历史用
-    /// "arrow.right.to.line" 表示顺序，未统一——改动前先确认那是刻意的）。
+    /// 播放顺序按钮图标：iOS 播放页 / CarPlay 页头 / Mac 播放条**共用唯一入口**。
+    /// 各端视图不得自建映射（形状契约：PlaybackOrderIconContractTests）。
+    ///
+    /// 2026-09-16 统一记录：Mac 端曾在顺序态用 "arrow.right.to.line"（09-01 写的那份 switch
+    /// 与 iOS 三态逐字相同、仅顺序态不同，且无注释/文档/测试记录理由）= 未记录的一次性偏差，
+    /// 不是刻意保留的平台差异；经确认统一到本入口的取值。
     var systemImageName: String {
         switch self {
         case .sequential: return "arrow.clockwise"

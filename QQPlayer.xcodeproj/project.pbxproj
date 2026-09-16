@@ -96,6 +96,7 @@
 		989932778B8244E8A40BB55C /* SyncFileReceiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04972925AB743E9A4A0156C /* SyncFileReceiverTests.swift */; };
 		9AFDA6102599474FA9895BC3 /* MacAria2ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D555434727943E692856C7E /* MacAria2ClientTests.swift */; };
 		9E3CED434D384BAE965F52AE /* SyncCollectionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC5058067B2D43CF8366428C /* SyncCollectionCoordinatorTests.swift */; };
+		9F5AE1CE0FDF439F91C09D34 /* PlaybackOrderIconContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002735D27EE746F1B4513B74 /* PlaybackOrderIconContractTests.swift */; };
 		A1D0117D952345D1B1D9D76F /* SmartPlaylistUILogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AE1DBB52BD462D8FAA704D /* SmartPlaylistUILogicTests.swift */; };
 		A1E2F3A4B5C6D7E8F9A0B1C2 /* ArtworkExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* ArtworkExtractionTests.swift */; };
 		A3F6318079D84C76832E906B /* MacImportNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4265076E7177434ABAE3F541 /* MacImportNamingTests.swift */; };
@@ -214,6 +215,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		002735D27EE746F1B4513B74 /* PlaybackOrderIconContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackOrderIconContractTests.swift; sourceTree = "<group>"; };
 		0399BDBD88CA4F6C9D2D731E /* WhatsNewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WhatsNewTests.swift; sourceTree = "<group>"; };
 		044FDC06C1734E3A92BAF42F /* SyncFrameChainTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameChainTests.swift; sourceTree = "<group>"; };
 		04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IOSPassiveSyncCenterTests.swift; sourceTree = "<group>"; };
@@ -986,6 +988,7 @@
 				D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */,
 				2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */,
 				74235A3C260E43DE8B44FAD5 /* LyricOffsetStoreTests.swift */,
+				002735D27EE746F1B4513B74 /* PlaybackOrderIconContractTests.swift */,
 				AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */,
 			);
 			path = QQPlayerTests;
@@ -1441,6 +1444,7 @@
 				014347DB06B147DCBEA154D8 /* PlaylistCoverLoadTests.swift in Sources */,
 				DA7B0B053EAA4201985D0FE5 /* CarPlayPlayerPageTests.swift in Sources */,
 				010A16423D5743D1B8AE5D85 /* LyricOffsetStoreTests.swift in Sources */,
+				9F5AE1CE0FDF439F91C09D34 /* PlaybackOrderIconContractTests.swift in Sources */,
 				2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -445,12 +445,8 @@ struct MacPlayerView: View {
     }
 
     private var playOrderIcon: String {
-        switch playOrderMode {
-        case .sequential: return "arrow.right.to.line"
-        case .shuffle: return "shuffle"
-        case .repeatAll: return "repeat"
-        case .repeatOne: return "repeat.1"
-        }
+        // 图标映射走 PlaybackOrderMode.systemImageName（与 iOS 播放页、CarPlay 页头同一入口）
+        playOrderMode.systemImageName
     }
 
     private var playOrderTitle: String {
