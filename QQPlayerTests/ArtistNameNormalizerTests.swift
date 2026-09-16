@@ -305,4 +305,13 @@ struct ArtistNameNormalizerTests {
         #expect(ArtistNameNormalizer.normalizedKey("千裏之外", direction: .toSimplified) == "千里之外")
         #expect(ArtistNameNormalizer.normalizedKey("皇後", direction: .toSimplified) == "皇后")
     }
+
+    @Test("繁→简数据完整：次选字形与多简对一繁都归并到常用简体（2026-09-16）")
+    func reverseMapCoversAlternates() {
+        // 舊实现：鍾 的反查结果随哈希顺序在 钟/锺 之间跳，為/髮 根本没有反查项
+        #expect(ArtistNameNormalizer.normalizedKey("鍾漢良", direction: .toSimplified) == "钟汉良")
+        #expect(ArtistNameNormalizer.normalizedKey("為", direction: .toSimplified) == "为")
+        #expect(ArtistNameNormalizer.normalizedKey("張學友", direction: .toSimplified) == "张学友")
+        #expect(ArtistNameNormalizer.normalizedKey("長髮", direction: .toSimplified) == "长发")
+    }
 }

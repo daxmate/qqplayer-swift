@@ -57,6 +57,50 @@ struct DisplayScriptNormalizerTests {
         #expect(DisplayScriptNormalizer.display("周杰伦", direction: .identity) == "周杰伦")
     }
 
+    // MARK: - 繁→简数据完整性（2026-09-16 事故回归）
+
+    @Test("报告回归：库里繁体 tag 在简体界面正确显示（開/為）")
+    func reportedTraditionalTagsFold() {
+        // 旧实现：開 的反查结果随哈希顺序在「开」与「𫔭」(U+2B52D 非 BMP，字体无字形 = 豆腐块 囗) 之间跳
+        #expect(DisplayScriptNormalizer.display("火力全開", direction: .toSimplified) == "火力全开")
+        #expect(DisplayScriptNormalizer.display("從開始到現在", direction: .toSimplified) == "从开始到现在")
+        // 旧实现：為 在简→繁表里没有反查项 → 简体界面原样露出繁体
+        #expect(DisplayScriptNormalizer.display("因為", direction: .toSimplified) == "因为")
+        #expect(DisplayScriptNormalizer.display("鍾漢良", direction: .toSimplified) == "钟汉良")
+        #expect(DisplayScriptNormalizer.display("張學友", direction: .toSimplified) == "张学友")
+    }
+
+    @Test("次选字形（简→繁表里丢掉的另一半）在繁→简方向可归并")
+    func alternateFormsFoldToSimplified() {
+        #expect(DisplayScriptNormalizer.display("頭髮", direction: .toSimplified) == "头发")
+        #expect(DisplayScriptNormalizer.display("臺灣", direction: .toSimplified) == "台湾")
+        #expect(DisplayScriptNormalizer.display("一隻貓", direction: .toSimplified) == "一只猫")
+        #expect(DisplayScriptNormalizer.display("乾淨", direction: .toSimplified) == "干净")
+        #expect(DisplayScriptNormalizer.display("鍾情", direction: .toSimplified) == "钟情")
+        // 覆 在简体里仍是 覆（不被当作 复 的异体归并）
+        #expect(DisplayScriptNormalizer.display("覆蓋", direction: .toSimplified) == "覆盖")
+    }
+
+    @Test("不变量：繁→简表的值域全部在 BMP 内（非 BMP 字形系统字体无字形 = 豆腐块）")
+    func reverseMapValuesAreRenderable() {
+        let nonBMP = traditionalToSimplifiedMap.filter { pair in
+            pair.value.unicodeScalars.contains { $0.value > 0xFFFF }
+        }
+        #expect(nonBMP.isEmpty, "非 BMP 输出 \(nonBMP.count) 条：\(nonBMP.prefix(5))")
+    }
+
+    @Test("多简对一繁：反查结果固定为常用简体字（旧实现会给出同表内的生僻字形）")
+    func collisionCharsPickCommonSimplified() {
+        let cases: [(String, String)] = [
+            ("開", "开"), ("線", "线"), ("鍾", "钟"), ("餘", "余"), ("麼", "么"),
+            ("買", "买"), ("戰", "战"), ("廬", "庐"), ("願", "愿"), ("蘋", "苹"),
+            ("閒", "闲"), ("賬", "账"),
+        ]
+        for (traditional, expected) in cases {
+            #expect(DisplayScriptNormalizer.display(traditional, direction: .toSimplified) == expected, "\(traditional)")
+        }
+    }
+
     // MARK: - 词级保护
 
     @Test("词级保护：里（长度单位/地名）不转裏")

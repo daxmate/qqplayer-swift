@@ -154,6 +154,34 @@ enum DisplayScriptContract {
         }
         return found
     }
+
+    // MARK: - 形状守卫：繁→简数据只有一处（2026-09-16 事故）
+
+    /// 违规：迭代简→繁表（`for … in simplifiedToTraditionalMap`）——那是「反转出繁→简表」的写法，
+    /// 结果随 Dictionary 哈希顺序变（每进程随机）。合法用法只有下标取值 `simplifiedToTraditionalMap[char]`。
+    static func reverseRebuildViolations(inSource source: String, filePath: String) -> [String] {
+        var violations: [String] = []
+        for (index, rawLine) in source.components(separatedBy: "\n").enumerated() {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*") else { continue }
+            guard let range = rawLine.range(of: "in simplifiedToTraditionalMap") else { continue }
+            guard rawLine[rawLine.startIndex ..< range.lowerBound].contains("for") else { continue }
+            violations.append("\(filePath):\(index + 1): \(trimmed)  → 禁止运行时反转简→繁表（繁→简数据用 TraditionalToSimplifiedMap.swift）")
+        }
+        return violations
+    }
+
+    /// 繁→简表声明行（全局或旧形态 `static let`）。同一语义只允许一处声明。
+    static func reverseMapDeclarations(inSource source: String, filePath: String) -> [String] {
+        var hits: [String] = []
+        for (index, rawLine) in source.components(separatedBy: "\n").enumerated() {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*") else { continue }
+            guard trimmed.contains("traditionalToSimplifiedMap: [Character: Character]") else { continue }
+            hits.append("\(filePath):\(index + 1): \(trimmed)")
+        }
+        return hits
+    }
 }
 
 // SCAN-END
@@ -167,6 +195,20 @@ extension DisplayScriptContract {
         for root in roots {
             let base = repoRoot.appendingPathComponent(root)
             guard let enumerator = fileManager.enumerator(at: base, includingPropertiesForKeys: nil) else { continue }
+            for case let url as URL in enumerator where url.pathExtension == "swift" {
+                result.append(url)
+            }
+        }
+        return result.sorted { $0.path < $1.path }
+    }
+
+    /// 全仓 Swift 源（形状守卫用：归一器与数据表都在 Services/，不只渲染路径）
+    static func allSwiftFiles(repoRoot: URL) -> [URL] {
+        let roots = ["QQPlayer", "SiriIntentsExtension"]
+        var result: [URL] = []
+        let fileManager = FileManager.default
+        for root in roots {
+            guard let enumerator = fileManager.enumerator(at: repoRoot.appendingPathComponent(root), includingPropertiesForKeys: nil) else { continue }
             for case let url as URL in enumerator where url.pathExtension == "swift" {
                 result.append(url)
             }
@@ -283,5 +325,42 @@ struct DisplayScriptContractTests {
             .filter { !hits.contains($0) }
             .map { "\($0): \(DisplayScriptContract.whitelist[$0].fileSuffix) | \(DisplayScriptContract.whitelist[$0].lineSnippet)" }
         #expect(dead.isEmpty, "白名单条目已不再命中（代码改了 → 条目要同步删/改）：\n\(dead.joined(separator: "\n"))")
+    }
+
+    // MARK: 形状守卫：繁→简数据只有一处（2026-09-16 事故）
+
+    static let allSourceFiles = DisplayScriptContract.allSwiftFiles(repoRoot: repoRoot)
+
+    @Test("形状扫描自证：合成违规被抓到，合法用法不报")
+    func shapeScanSelfCheck() {
+        let builder = "for (simplified, traditional) in simplifiedToTraditionalMap { map[traditional] = simplified }"
+        #expect(DisplayScriptContract.reverseRebuildViolations(inSource: builder, filePath: "X.swift").count == 1)
+        #expect(DisplayScriptContract.reverseRebuildViolations(inSource: "let a = simplifiedToTraditionalMap[c] ?? c", filePath: "X.swift").isEmpty)
+        #expect(DisplayScriptContract.reverseRebuildViolations(inSource: "// 反例：for (s, t) in simplifiedToTraditionalMap { map[t] = s }", filePath: "X.swift").isEmpty)
+        let decl = "    static let traditionalToSimplifiedMap: [Character: Character] = [:]"
+            + "\n"
+        #expect(DisplayScriptContract.reverseMapDeclarations(inSource: decl, filePath: "X.swift").count == 1)
+    }
+
+    @Test("形状：全仓没有「运行时反转简→繁表」的代码")
+    func noRuntimeReverseRebuild() {
+        var violations: [String] = []
+        for file in Self.allSourceFiles {
+            guard let source = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            violations.append(contentsOf: DisplayScriptContract.reverseRebuildViolations(inSource: source, filePath: Self.relativePath(file)))
+        }
+        #expect(Self.allSourceFiles.count >= 200, "扫描文件数异常：\(Self.allSourceFiles.count)")
+        #expect(violations.isEmpty, "繁→简必须用 OpenCC TSCharacters 数据（TraditionalToSimplifiedMap.swift）：\n\(violations.joined(separator: "\n"))")
+    }
+
+    @Test("形状：繁→简数据表只有一处声明")
+    func reverseMapDeclaredOnce() {
+        var hits: [String] = []
+        for file in Self.allSourceFiles {
+            guard let source = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            hits.append(contentsOf: DisplayScriptContract.reverseMapDeclarations(inSource: source, filePath: Self.relativePath(file)))
+        }
+        #expect(hits.count == 1, "繁→简表声明了 \(hits.count) 处（同一语义只允许一处）：\n\(hits.joined(separator: "\n"))")
+        #expect(hits.first?.contains("QQPlayer/Services/TraditionalToSimplifiedMap.swift") == true, "\(hits)")
     }
 }
