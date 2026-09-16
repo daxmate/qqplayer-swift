@@ -501,6 +501,7 @@
         func reconnectNow() {
             isRunning = true
             automaticAttempts = 0
+            attemptedTargets.removeAll()
             beginAttempt()
         }
 
@@ -510,7 +511,10 @@
             cancelDiscovery()
             cancelReconnect()
             isWaitingBackoff = false
-            attemptedTargets.removeAll()
+            // ⚠️ 故意**不**清 `attemptedTargets`：DNS-SD 逐条投递，若一台非同步主机
+            // （如 Mac 上的 Python web 端，广播同一服务类型）先到，不清记忆就会每轮
+            // 都先撞它、真正的桌面端永远排不到（2026-09-17 真机踩过）。用户手动
+            // 「重连」时才重置（见 `reconnectNow`）。
             currentTarget = nil
             tearDownSession()
             reloadPairedHosts()
@@ -536,6 +540,7 @@
                 }
             }
             browser.onBrowseFailure = { [weak self] _ in
+                SyncConnectDiag.log("📡 浏览失败回调（按发现超时处理）")
                 Task { @MainActor in
                     guard let self, self.attemptToken == token else { return }
                     self.handleDiscoveryTimeout()
@@ -550,18 +555,33 @@
         private func handleResults(_ hosts: [SyncDiscoveredHost]) {
             guard isRunning, session == nil, !isWaitingBackoff, !state.isConnected else { return }
             let candidates = IOSPassiveReconnectLogic.targets(discovered: hosts, pairedHosts: pairedHosts)
-            for candidate in candidates where !attemptedTargets.contains(Self.key(candidate)) {
-                attemptedTargets.insert(Self.key(candidate))
-                connect(to: candidate)
+            // 本轮候选全部试过 → 清空记忆重来（保证活性：对端换了名字/刚上线时仍能重试）
+            var unattempted = candidates.filter { !attemptedTargets.contains(Self.key($0)) }
+            if unattempted.isEmpty, !candidates.isEmpty {
+                attemptedTargets.removeAll()
+                unattempted = candidates
+            }
+            SyncConnectDiag.log(
+                "🔍 discovered=[\(hosts.map(\.name).joined(separator: " | "))] "
+                    + "candidates=[\(candidates.map(\.hostName).joined(separator: " | "))] "
+                    + "unattempted=[\(unattempted.map(\.hostName).joined(separator: " | "))]"
+            )
+            guard let candidate = unattempted.first else {
+                // 无候选：继续等 discoveryTimeout 判失败
                 return
             }
-            // 候选都试过 / 无可试：继续等 discoveryTimeout 判失败
+            attemptedTargets.insert(Self.key(candidate))
+            connect(to: candidate)
         }
 
         private func connect(to target: IOSPassiveSyncTarget) {
             guard let browser else { return }
             currentTarget = target
             state = .connecting(hostName: target.hostName)
+            SyncConnectDiag.log(
+                "🔗 connect target=\(target.hostName) peer=\(target.peerID.prefix(8)) "
+                    + "endpoint=\(SyncConnectDiag.describe(target.endpoint))"
+            )
 
             var config = SyncSessionConfiguration()
             config.clientDisplayName = clientName()
@@ -600,6 +620,7 @@
             guard !state.isConnected else { return }
             cancelDiscovery()
             automaticAttempts = 0
+            attemptedTargets.removeAll()
             attachPassiveHost(to: session)
             state = .connected(hostName: target.hostName, peerID: target.peerID)
         }
@@ -848,6 +869,7 @@
 
         private func handleClosed(_ reason: SyncSessionCloseReason) {
             guard !isTearingDown else { return }
+            SyncConnectDiag.log("🛑 session closed reason=\(reason) target=\(currentTarget?.hostName ?? "-")")
             session = nil
             passiveHost = nil
             dataSyncPeer = nil
@@ -866,6 +888,7 @@
         private func handleDiscoveryTimeout() {
             guard isRunning, !isWaitingBackoff, !state.isConnected else { return }
             guard !sessionHasPeer else { return }
+            SyncConnectDiag.log("⏳ discovery timeout target=\(currentTarget?.hostName ?? "-") paired=\(pairedHosts.count)")
             cancelDiscovery()
             state = .failed(.connect(.hostNotFound(hostName: currentTarget?.hostName ?? pairedHosts.first?.displayName)))
             scheduleReconnect()
