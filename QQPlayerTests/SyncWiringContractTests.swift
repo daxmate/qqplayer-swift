@@ -1638,6 +1638,11 @@ enum SyncIndexingPreconditionContract {
     /// 唯一必须在装配前调用门的文件（iOS 数据同步端唯一装配点）。
     static let iosAssemblyPath = "QQPlayer/Services/IOSPassiveSyncCenter.swift"
 
+    /// Mac 侧同类装配点（2026-09-16 补）：连接就绪自动跑「同步数据」的唯一入口
+    /// （`MacDataSyncAutoRunner`）。两端口径必须一致——只接一端 = 另一端照样在曲库行
+    /// 没建立时跑同步（补发对账清 outbox、对端整批判「未定位」）。
+    static let macAssemblyPath = "QQPlayer/Mac/SyncHostCenter.swift"
+
     /// 生产码扫描根（测试 / harness 是 seam，允许假事实源，不在扫描范围）。
     static let productionRoot = "QQPlayer"
 
@@ -1668,6 +1673,8 @@ extension SyncIndexingPreconditionContract {
         var gateDefinesDecision = false
         /// iOS 装配点是否真的在装配前调用门（false = 门没人用，等于没修）
         var iosAssemblyCallsGate = false
+        /// Mac 装配点是否也调用了同一入口（false = 两端口径不一致，Mac 侧仍是旧行为）
+        var macAssemblyCallsGate = false
     }
 
     /// 生产码全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
@@ -1687,6 +1694,9 @@ extension SyncIndexingPreconditionContract {
             if relativePath == iosAssemblyPath {
                 result.iosAssemblyCallsGate = source.contains("IndexingGate.\(gateName)(")
             }
+            if relativePath == macAssemblyPath {
+                result.macAssemblyCallsGate = source.contains("IndexingGate.\(gateName)(")
+            }
             result.violations += violations(inSource: source, relativePath: relativePath)
                 .map { "\(relativePath) → \($0)" }
         }
@@ -1699,7 +1709,7 @@ extension SyncIndexingPreconditionContract {
 struct SyncIndexingPreconditionContractTests {
     static let repoRoot = SyncWiringContractTests.repoRoot
 
-    @Test("changeLog 同步前置门：生产码里只有一处实现，且 iOS 装配点真的在调用")
+    @Test("changeLog 同步前置门：生产码里只有一处实现，且两端装配点真的都在调用")
     func productionHasSinglePreconditionGate() {
         let result = SyncIndexingPreconditionContract.scan(repoRoot: Self.repoRoot)
         #expect(
@@ -1720,6 +1730,15 @@ struct SyncIndexingPreconditionContractTests {
             \(SyncIndexingPreconditionContract.iosAssemblyPath) 装配数据同步端前**没有**调用前置门
             `IndexingGate.\(SyncIndexingPreconditionContract.gateName)(`：曲库行还没建立时同步照样会跑
             （补发对账清 outbox、对端整批判「未定位」），等于没修。
+            """
+        )
+        #expect(
+            result.macAssemblyCallsGate,
+            """
+            \(SyncIndexingPreconditionContract.macAssemblyPath) 的连接就绪自动同步**没有**调用前置门
+            `IndexingGate.\(SyncIndexingPreconditionContract.gateName)(`：Mac 侧冷启动（曲库行重建中）
+            仍会跑「本地真值对账」——把「暂时查不到」当本地悬空清掉 outbox 行，真值静默消失。
+            修法：与 iOS 同一入口（判定只有一处），门关时订阅索引信号、终态到达再补跑。
             """
         )
         #expect(

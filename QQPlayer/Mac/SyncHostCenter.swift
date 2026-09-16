@@ -24,6 +24,7 @@
 //  本类是 `@MainActor`。
 //
 
+import Combine
 import Foundation
 import Network
 
@@ -365,6 +366,13 @@ final class SyncHostCenter: ObservableObject {
 /// 一轮 = ① 本地真值对账（补发，与手动路径同一入口）② 推本端增量 + 拉对端增量。
 /// 与手动触发共用一个在飞门（`SyncDataRunGate`）：同一会话只允许一轮，取不到门就放弃本轮。
 /// 一次连接只自动跑一次（会话下线时清标记，重连再跑）。
+///
+/// **前置门**（2026-09-16 补上，唯一判定 = `IndexingGate.isReadyForChangeLogSync`）：
+/// 曲库索引未到终态时**不跑**——此刻 `track` 表正在重建，本端「这首歌在不在」的事实不稳定：
+/// ① 本地真值对账会把「暂时查不到」当成**本地悬空** → 把 outbox 行清掉且不补发（真值静默
+/// 从同步层消失）；② 出站行整批拿不到 `content_hash` / 相对路径 → 对端全判「未定位」。
+/// iOS 侧一直有这道门（`IOSPassiveSyncCenter.attachDataSync`），Mac 侧此前**没接**
+/// （真机取证与判定说明见 `IndexingGate` 文件头）；门关时订阅索引信号，终态一到补跑。
 @MainActor
 final class MacDataSyncAutoRunner {
     static let shared = MacDataSyncAutoRunner()
@@ -372,16 +380,38 @@ final class MacDataSyncAutoRunner {
     private var didAutoRunForCurrentConnection = false
     /// 本 runner 是否持有在飞门（释放只释放自己那份，不误伤手动轮）。
     private var holdsGate = false
+    /// 待跑的会话（前置门未开时留着，等索引可跑再补跑）
+    private var pendingSession: SyncPeerSession?
+    private var pendingLibraryRoot: URL?
+    private var indexingReadinessCancellable: AnyCancellable?
 
     private init() {}
 
     func sessionDidBecomeReady(_ session: SyncPeerSession, libraryRoot: URL) {
+        pendingSession = session
+        pendingLibraryRoot = libraryRoot
+        startIfPossible()
+    }
+
+    /// 真跑一轮（幂等：已跑过 / 无待跑会话 / 会话不再 ready / 门被占 / 前置门未开 → 什么都不做）。
+    private func startIfPossible() {
+        guard let session = pendingSession,
+              let libraryRoot = pendingLibraryRoot,
+              session.isReady
+        else { return }
         guard SyncDataAutoRunDecision.shouldStart(
             isConnected: true,
             hasActiveSession: true,
             isBusy: SyncDataRunGate.shared.isHeld,
             didAutoRunForCurrentConnection: didAutoRunForCurrentConnection
         ) else { return }
+        guard IndexingGate.isReadyForChangeLogSync(LibraryIndexer.shared) else {
+            print("⏸️ MacDataSyncAutoRunner: 曲库索引未到终态，等终态后补跑自动同步")
+            // 门控期不申报「装配缺口」（有意不跑 = 不适用，INV-26；与 iOS 侧同口径）。
+            SyncWiringFactsStore.shared.record(.dataSyncEntry, attached: nil)
+            observeIndexingReadiness()
+            return
+        }
         guard SyncDataRunGate.shared.acquire() else { return }
         holdsGate = true
         didAutoRunForCurrentConnection = true
@@ -433,9 +463,28 @@ final class MacDataSyncAutoRunner {
         coordinator.start()
     }
 
+    /// 订阅「索引可跑」信号：到达后重走**唯一判定入口**（`startIfPossible` 自己幂等）。
+    ///
+    /// 为什么要两条信号：`indexingTerminalStatePublisher` 只在**本次启动首次**主扫完成时
+    /// 翻转（`$hasCompletedScanThisLaunch` 的 map），若连接就绪时正赶上**重扫**
+    /// （`isIndexing == true`，但首次完成早已发生）它不会再发 → 补跑永远等不到；
+    /// `isIndexingPublisher` 覆盖那种情况（每次扫描起止都会通知）。
+    private func observeIndexingReadiness() {
+        guard indexingReadinessCancellable == nil else { return }
+        let indexer = LibraryIndexer.shared
+        indexingReadinessCancellable = indexer.indexingTerminalStatePublisher
+            .merge(with: indexer.isIndexingPublisher.map { _ in () })
+            .sink { [weak self] in
+                Task { @MainActor in self?.startIfPossible() }
+            }
+    }
+
     /// 会话下线：标记归位（下次连上再自动跑一轮）+ 取消未收尾的自动轮并释放门。
     func sessionDidClose() {
         didAutoRunForCurrentConnection = false
+        pendingSession = nil
+        pendingLibraryRoot = nil
+        indexingReadinessCancellable = nil
         if let coordinator {
             coordinator.cancel()
             self.coordinator = nil

@@ -33,12 +33,18 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A favorite | ✓ | ✓ | ✓ | ✓ | ✓ | ✓(按实体) | ✓ | ✓(帧8/9) |
 | B playHistory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓(按实体) | ✓ | ✓(帧8/9) |
-| C playlist | ✓ | — | ✓ | — | **✗** | ✓(按实体) | △ | ✓(帧8/9) |
+| C playlist | ✓ | — | ✓ | — | ✓ | ✓(按实体) | ✓ | ✓(帧8/9) |
 | D playlistItem | ✓ | ✓ | ✓ | ✓ | ✓ | ✓(按实体) | ✓ | ✓(帧8/9) |
-| E playbackPosition | **✗** | **✗** | △ | **✗** | **✗** | **✗** | **✗** | ✓(帧8/9) |
-| F aligned 歌词 | — | ✓ | ✓ | △ | **✗** | △ | ✓ | △ |
+| E playbackPosition | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | ✓(帧8/9) |
+| F aligned 歌词 | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | △ |
 | G 曲库文件 | — | ✓ | ✓ | ✓ | △ | ✓ | ✓ | △ |
-| H 封面 | — | **✗** | △ | **✗** | **✗** | **✗** | **✗** | ✗ |
+| H 封面 | — | — | ✓ | — | — | **✗** | ✓ | ✗ |
+
+> **表头口径与最近复核**（2026-09-16）：`—` = 该能力对本行**不适用**（设计边界，不是缺口）。
+> H 行 ②④⑤ 为「—」＝契约 §2 H 已定：歌单封面由歌单内歌曲封面自动合成（派生数据），
+> **不跨端同步**，故无身份键 / 无挂起 / 无补发通道；其 ③ 列 = 落库永不对端路径（INV-23 已收）。
+> H 行 ⑥ 仍是**真缺口**（封面加载失败无计数、无披露）。
+> 本表 2026-09-16 逐格与代码复核过一次，凡标 ✓ 的格子都能在「§2 逐格证据」里指到实现与用例。
 
 **⑧ 列说明**：全仓唯一的「装配可达性」静态守护是
 `QQPlayerTests/SyncWiringContractTests.swift`（5 条断言：`ios-data-sync-peer-attached` /
@@ -84,9 +90,9 @@
 | ② | 不适用 | `SyncTrackReference.referencesTrack` `SyncChangeLogMapping.swift:152` 对 `.playlist` 返回 **false** → `localize` `:316` 走 `.passThrough`；`wireEntriesDetailed` 也不会为其取指纹（`:264` 的 `trackStableId` 为 nil）。**这是设计正确**，不是空格 |
 | ③ | 有 | `SyncChangeLogApplier.applyPlaylist(payloadJSON:)` `SyncChangeLogApplier.swift:158-184`（按 slug 存在则更新字段、不存在则 INSERT） |
 | ④ | 不适用 | 无缺歌概念（passThrough 直达），不需要挂起 |
-| ⑤ | **✗ 空格** | `reconcilableEntities` `SyncChangeLogMapping.swift:571` = `[.favorite, .playHistory, .playlistItem]`，**不含 `.playlist`**；`repairableEntities` `:464` 同样不含；`rowKey(entity:stableId:payloadJSON:)` `:706` 对 `.playlist` **显式 `return nil`**。⇒ **在 outbox 机制建立之前创建的歌单**，其 upsert 行从来不存在，而**没有任何重建入口**（T15b 只覆盖 favorite/playHistory/playlistItem）。**缺什么**：`reconcileLocalTruth` 缺一条 `SELECT slug, title, ... FROM playlist WHERE is_folder_synced = 0` → `emit(entity: .playlist, ...)` 分支 |
-| ⑥ | **✗ 空格** | 「歌单结构没进 outbox」这件事**没有任何计数**：`SyncChangeLogDanglingRepair.Report`（`SyncChangeLogMapping.swift:437-460`）只有 repaired/cleaned/skipped/emitted/emittedWithoutIdentity/skippedLocalDangling，**没有 playlist 维度**；两个调用点（`QQPlayer/Mac/MacSyncDataViewModel.swift:156`、`QQPlayer/Services/IOSPassiveSyncCenter.swift:537`）也只打印这些字段 |
-| ⑦ | 部分 | 写入点：`SyncChangeLogStoreTests.swift:167`「createPlaylist/rename/delete → playlist upsert/delete」；applier：`SyncLWWReconcileTests.swift:224`「Applier playlist」。**缺什么**：**没有补发用例**（该通道不存在，无法测） |
+| ⑤ | **✅ 有（2026-09-16 复核）** | 补发通道已在：注册表 C 条目 `writesOutbox: true` + `reconcilesLocalTruth: true`（`SyncEntityRegistry.swift` 的 `.playlist` 登记，localTruth 表 = `playlist`、行键 = slug）；补发行键分支 `rowKey(entity:stableId:payloadJSON:)` 的 `.playlist` → `SyncPlaylistSnapshot.rowKey`（`SyncChangeLogMapping.swift`）。⚠️ 旧格子引的「`:706` 对 `.playlist` 显式 nil」是**另一处**（`SyncTrackReference.trackStableId`：playlist 不引用歌曲 → nil，语义正确），别再当缺口读。**旧文（保留）**：`reconcilableEntities` `SyncChangeLogMapping.swift:571` = `[.favorite, .playHistory, .playlistItem]`，**不含 `.playlist`**；`repairableEntities` `:464` 同样不含；`rowKey(entity:stableId:payloadJSON:)` `:706` 对 `.playlist` **显式 `return nil`**。⇒ **在 outbox 机制建立之前创建的歌单**，其 upsert 行从来不存在，而**没有任何重建入口**（T15b 只覆盖 favorite/playHistory/playlistItem）。**缺什么**：`reconcileLocalTruth` 缺一条 `SELECT slug, title, ... FROM playlist WHERE is_folder_synced = 0` → `emit(entity: .playlist, ...)` 分支 |
+| ⑥ | **△ 部分（2026-09-16 复核）** | **计数有了、上屏还是没有**：「歌单结构补进 outbox」计入 `SyncChangeLogDanglingRepair.Report.emitted`（`SyncChangeLogMapping.swift:628`），但消费点只有 `print`（`MacSyncDataViewModel.swift:208` / `IOSPassiveSyncCenter.swift:707`）——**面板没有这一行**。「歌单行应用失败/缺依赖」那一半已按实体上屏（见 §4 第 6 行）。**旧文（保留）**：「歌单结构没进 outbox」这件事**没有任何计数**：`SyncChangeLogDanglingRepair.Report`（`SyncChangeLogMapping.swift:437-460`）只有 repaired/cleaned/skipped/emitted/emittedWithoutIdentity/skippedLocalDangling，**没有 playlist 维度**；两个调用点（`QQPlayer/Mac/MacSyncDataViewModel.swift:156`、`QQPlayer/Services/IOSPassiveSyncCenter.swift:537`）也只打印这些字段 |
+| ⑦ | **✅ 有（2026-09-16 复核）** | 写入点：`SyncChangeLogStoreTests.swift:167`「createPlaylist/rename/delete → playlist upsert/delete」；applier：`SyncLWWReconcileTests.swift:224`「Applier playlist」；**补发**：`SyncChangeLogContentMapTests.swift:864`「T15b-2 补发」用例里 `playlist|pl` 就是被补发的行之一（`report.emitted == 4`）。**旧文（保留）**：写入点：`SyncChangeLogStoreTests.swift:167`「createPlaylist/rename/delete → playlist upsert/delete」；applier：`SyncLWWReconcileTests.swift:224`「Applier playlist」。**缺什么**：**没有补发用例**（该通道不存在，无法测） |
 | ⑧ | ✓(帧8/9) | `SyncWiringContractTests.swift:50-101` 的 5 条断言共享（不区分实体） |
 
 ### D. playlistItem
@@ -144,12 +150,12 @@
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
 | ① | 不适用 | 随 playlist upsert payload 走：`DatabaseManager+Playlists.swift:591` `updatePlaylistCustomCover`（record `:605`） |
-| ② | **✗ 空格** | 载荷携带的是**发送端本地相对路径**（`SyncDataSnapshots.swift:69` `customCoverImagePath`，键 `:79` `custom_cover_image_path`）——**不是跨端身份键，也没有文件传输通道**（`grep -rn "cover" QQPlayer/Sync/` 无任何传输点）。**缺什么**：封面文件本身的跨端通道（可仿歌词做 `@cover/{content_hash}`）或明确「封面不同步」并把对端来源的路径在落库时清空 |
-| ③ | 部分 | `SyncChangeLogApplier.applyPlaylist` `SyncChangeLogApplier.swift:166`（更新）/ `:179`（插入）**原样写入** ⇒ 接收端歌单行里的路径指向对端设备的文件；消费点 `QQPlayer/Views/Playlists/PlaylistCardView.swift:189-196`（拼 App Group 容器路径 `try? Data(contentsOf:)`），读不到就静默 return |
-| ④ | **✗ 空格** | 无（封面没有独立挂起概念） |
-| ⑤ | **✗ 空格** | 无 |
-| ⑥ | **✗ 空格** | 封面加载失败**无任何计数/披露**（消费点 `guard let ... else { return }` 静默） |
-| ⑦ | **✗ 空格** | 无跨端封面用例（`grep cover QQPlayerTests/Sync*` 无） |
+| ② | **— 不适用（2026-09-16 改判）** | 契约 §2 H 已定：歌单封面由**歌单内歌曲封面自动合成** = 派生数据 → **不承诺跨端**、两端各自合成，**无可同步之物**（所以这不是「等着补的空格」）。**旧文（保留，供对照）**：载荷携带的是**发送端本地相对路径**（`SyncDataSnapshots.swift:69` `customCoverImagePath`，键 `:79` `custom_cover_image_path`）——**不是跨端身份键，也没有文件传输通道**（`grep -rn "cover" QQPlayer/Sync/` 无任何传输点）。**缺什么**：封面文件本身的跨端通道（可仿歌词做 `@cover/{content_hash}`）或明确「封面不同步」并把对端来源的路径在落库时清空 |
+| ③ | **✓ 已收（2026-09-16 复核）** | INV-23（2026-09-15）：落库**不采用对端路径**——`SyncChangeLogApplier.swift:230` `customCoverImagePath: nil`；守护用例 `playlistCoverNeverComesFromPeer`（`SyncLWWReconcileTests.swift`）+ `SyncCoverValueContract`（`SyncWiringContractTests.swift`）。**旧文（保留，行为已改）**：`SyncChangeLogApplier.applyPlaylist` `SyncChangeLogApplier.swift:166`（更新）/ `:179`（插入）**原样写入** ⇒ 接收端歌单行里的路径指向对端设备的文件；消费点 `QQPlayer/Views/Playlists/PlaylistCardView.swift:189-196`（拼 App Group 容器路径 `try? Data(contentsOf:)`），读不到就静默 return |
+| ④ | — 不适用（封面没有独立挂起概念；且不跨端同步） | 无 |
+| ⑤ | — 不适用（不跨端同步 ⇒ 没有补发通道这回事） | 无 |
+| ⑥ | **✗ 空格（2026-09-16 复核仍开）** | 封面加载失败**无任何计数/披露**（消费点 `guard let ... else { return }` 静默）——本轮复核后**封面项里唯一仍开的**（队列第 ② 位） |
+| ⑦ | **△ 部分（2026-09-16 复核）** | INV-23 契约用例在场（`playlistCoverNeverComesFromPeer` / `SyncCoverValueContract`）；**没有**「封面跨端」用例——设计上不跨端，故不算缺口 |
 
 ---
 
@@ -193,9 +199,9 @@ i18n 键确认三个缺口口径：`sync_run_data_result_unresolved` = 未定位
 
 | # | 空格 | 证据 | 用户可见后果 |
 | --- | --- | --- | --- |
-| 1 | **C⑤ playlist 结构无对账补发通道** | `reconcilableEntities` `SyncChangeLogMapping.swift:571` 不含 `.playlist`；`rowKey` `:706` 显式 nil | outbox 机制之前创建的歌单（名 / 封面 / 结构）**永不同步到对端**；面板全绿、日志无异常。用户看到的是「另一台设备上就是没这个歌单」 |
-| 2 | **E① playbackPosition 生产端 0 写点** | `grep -rn "entity: \.playbackPosition" QQPlayer/` 无输出；`v1Synced` `SyncDataSyncModels.swift:38` 不含 | 「播放位置上下文」这一整类**从未同步过**（设计文档 §6.2 承诺的范围里的一项，实际不存在） |
-| 3 | **H② 封面路径当跨端值传输** | `SyncDataSnapshots.swift:69/79`；`SyncChangeLogApplier.swift:166/179` 原样落库 | 对端歌单封面**必然加载不出**（路径指向发送端设备），静默回落自动封面，零报错 |
+| 1 | ~~**C⑤ playlist 结构无对账补发通道**~~ **已收（2026-09-16 复核）** | 注册表 C 条目 `writesOutbox: true` + `reconcilesLocalTruth: true`（localTruth 表 = `playlist`、行键 = slug）+ 补发行键分支 `.playlist` → `SyncPlaylistSnapshot.rowKey`；用例 `SyncChangeLogContentMapTests.swift:864`（T15b-2，`playlist|pl` 在补发之列）。⚠️ 旧格引的 `rowKey :706 显式 nil` 是另一处（`SyncTrackReference.trackStableId`，playlist 不引用歌曲 ⇒ nil 语义正确），别再当缺口读 | outbox 之前创建的歌单现在会被「本地真值补发」补上（补进 outbox → 随帧 8/9 过去） |
+| 2 | ~~**E① playbackPosition 生产端 0 写点**~~ **已收（2026-09-15，2026-09-16 复核）** | 写点在场：`StateManager.swift:425`（捕获挂点 `PlaybackPositionCapture.recordIfEnabled`，换歌必记 / 同曲 60s 节流、**开关关 = 零 DB 访问**）+ 注册表 `writesOutbox: true`；`grep -rn "entity: \.playbackPosition"` 现有 2 处（`SyncEntityRegistry.swift` / `StateManager.swift`）。**旧格子的 grep 当时确实为空**（那一包才接上生产端） | 跨端续播（默认关）现在真能两端走通；关 = 零出站零入站 |
+| 3 | ~~**H② 封面路径当跨端值传输**~~ **改判 + 已收（2026-09-16 复核）** | 两件事分开：① **封面不跨端**是契约 §2 H 的**设计边界**（派生数据、两端各自合成）——不是待补空格；② 「对端路径当跨端值落库」已由 INV-23 收口（`SyncChangeLogApplier.swift:230` `customCoverImagePath: nil` + 两个契约用例）。**仍开的只有加载侧**：封面加载失败无计数（见 §2 H⑥ / 下表第 10 位之外的新项） | 对端封面不再显示为「必然加载不出」的坏路径；两端各自合成自动封面 |
 | 4 | ~~**F⑤ aligned 歌词无补发通道**~~ **已收（2026-09-16）** | 修法：连接就绪自动跑一轮 `@lyrics/*` 补发（`SyncLyricsResendController`，Mac 发起、不新增帧）；歌不在对端不推（避免丢弃噪音），未送达进 `pendingResend` 上屏 | 已有的对齐歌词不再要等用户手动「开始同步」 |
 
 ### 二级：数字误导（看着在干活，其实没干）
@@ -216,10 +222,10 @@ i18n 键确认三个缺口口径：`sync_run_data_result_unresolved` = 未定位
 
 | # | 空格 | 证据 | 用户可见后果 |
 | --- | --- | --- | --- |
-| 9 | **⑥ 披露不区分实体** | `MacSyncView.swift:983-1026` 全是总数 | 用户只能看到「有 110 条没定位」，无法判断该修哪条通道 |
+| 9 | ~~**⑥ 披露不区分实体**~~ **已收（2026-09-15，2026-09-16 复核）** | 唯一投影 `SyncEntityOutcomeDisclosure`（(实体 × 结果) 二维分桶 + 只出 >0 的行），两端面板都只从它取数（`MacSyncView.swift` / `SyncSettingsView.swift`）；形状契约 `SyncEntityDisclosureContract`（界面层不得自算数字/自行枚举实体）+ 五语 key 齐全性断言 | 面板现在按类别明细列出「哪条通道的哪类异常各多少条」 |
 | 10 | ~~**F⑥ 歌词丢弃计了数没上屏**~~ **已收（2026-09-16）** | 修法：`SyncUIReportSummary` 加 `lyricsDiscarded` / `lyricsKeptLocal`（编排 report 从拉取控制器 summary 合并）+ `SyncEntityOutcomeDisclosure.lyricsRows` 唯一投影 + 两端面板行（含「待补发」） | 歌词没到时，用户能看到「丢弃几条 / 待补发几条 / 保留本端几条」 |
 | 11 | ~~**iOS 端零 UI 披露**~~ **已收（2026-09-15）** | 修法：`IOSPassiveSyncCenter.dataSummary`（帧 8/9 回调累加，主线程）+ `IOSPassiveDataSyncPresenter`（`countRows`/`gapRows` 纯逻辑）+ iOS「设置 → 同步」新增「播放数据」账目区（计数行 + 缺口行 + 说明，>0 橙色；**复用 Mac 既有 key，无新增文案**）；未同步过 = 空态 | 手机侧也能看见「同步了什么 / 丢了多少」 |
-| 12 | **E⑦ 无 applier 用例** | `grep "Applier playback" QQPlayerTests/` 无 | 上述 5 号的误导行为不会被 CI 抓到 |
+| 12 | ~~**E⑦ 无 applier 用例**~~ **已收（2026-09-15，2026-09-16 复核）** | `SyncDataSyncCoreTests.swift` 五条：`:532` 落点未接受 → 未支持、`:609` 开关关 → 不落点不计已应用、`:627` 开关开 + 落点 → 已应用、`:645` 开关开但无落点 → 未支持、`:658` 端到端开关关 | 「静默丢弃被计入已应用」这类误导行为 CI 能抓到（INV-20） |
 
 ---
 
