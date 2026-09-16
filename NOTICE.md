@@ -31,6 +31,17 @@
 - 凭据原文、当事人与范围： [`docs/compliance/upstream-permission.md`](docs/compliance/upstream-permission.md)
 - 该附加许可**不改变**本仓库的整体 GPL-3.0 许可，也不免除源码公开义务
 
+## 第三方数据（非代码）
+
+简繁字形归一使用的映射表是 **OpenCC** 项目的数据文件（Apache-2.0，[BYVoid/OpenCC](https://github.com/BYVoid/OpenCC)），以 Swift 字面量形式内联在源码里，不是运行时依赖：
+
+| 文件 | 数据源 | 用途 |
+|---|---|---|
+| `QQPlayer/Services/SimplifiedTraditionalMap.swift` | `STCharacters.txt` | 简→繁（显示层繁体方向） |
+| `QQPlayer/Services/TraditionalToSimplifiedMap.swift` | `TSCharacters.txt` | 繁→简（显示层简体方向；生成脚本 `scripts/gen-traditional-to-simplified.py`） |
+
+两份表都只用于**显示层**字形归一，不改写数据库里的原始 tag。
+
 ## 独立项目
 
 桌面端 QQPlayer（FastAPI 后端 + Web 前端）为独立项目，与本仓库无代码衍生关系，其许可不受本仓库影响。

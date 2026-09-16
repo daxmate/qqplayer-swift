@@ -17,7 +17,8 @@
 //  （主流播放器一致做法）。
 //
 //  映射表：简→繁复用 SimplifiedTraditionalMap.swift 的 simplifiedToTraditionalMap
-//  （OpenCC 数据 + 台→台 特例），繁→简由它反转生成，运行时构建一次。
+//  （OpenCC STCharacters 数据 + 台→台 特例）；繁→简用 TraditionalToSimplifiedMap.swift 的
+//  traditionalToSimplifiedMap（OpenCC TSCharacters 数据，权威反查方向，不做运行时反转）。
 //
 
 import Foundation
@@ -54,29 +55,21 @@ enum ArtistNameNormalizer {
 
     // MARK: - 映射
 
-    /// 繁→简单字映射：由 simplifiedToTraditionalMap 反转生成（运行时构建一次）。
-    /// "台→台" 特例反转后仍为 台→台，无副作用；源数据为单字→单字，
-    /// 反转后一繁→一简，天然安全。
-    static let traditionalToSimplifiedMap: [Character: Character] = {
-        var map: [Character: Character] = [:]
-        map.reserveCapacity(simplifiedToTraditionalMap.count)
-        for (simplified, traditional) in simplifiedToTraditionalMap {
-            map[traditional] = simplified
-        }
-        return map
-    }()
+    // 繁→简单字映射不在本文件构造：唯一数据源是 TraditionalToSimplifiedMap.swift 的
+    // `traditionalToSimplifiedMap`。⚠️ 不要由 simplifiedToTraditionalMap 反转生成
+    // （多简对一繁 → 结果随 Dictionary 哈希顺序变化、每进程随机；详见该文件头 2026-09-16 事故记录）。
 
     // MARK: - 保护表（单字映射丢失多义项的修正）
 
     /// 单字简→繁映射为每个简字只保留一个传统字形（发→發/干→幹/后→後/里→裏/复→復/于→於…），
-    /// 反转生成繁→简后另一义项彻底丢失，导致语境错误（千里之外→千裏之外）与姓氏误转
-    /// （于文文→於文文）。这里用两层保护修正 toTraditional 方向的输出，不修改
-    /// SimplifiedTraditionalMap（3895 行 OpenCC 数据）：
+    /// 丢失另一义项就会出语境错误（千里之外→千裏之外）与姓氏误转（于文文→於文文）。
+    /// 这里用两层保护修正 toTraditional 方向的输出，不动 OpenCC 数据表
+    /// （SimplifiedTraditionalMap.swift 简→繁 / TraditionalToSimplifiedMap.swift 繁→简）：
     /// 1. 姓氏保护：名字首字命中常见多义/多音姓氏时，保留原字或替换为正确传统姓氏字形；
     /// 2. 精确词保护：转换结果整词命中时回改为正确传统字形（千裏→千里、頭發→頭髮、
     ///    皇後→皇后、相幹→相干、重復→重複…）。
-    /// 反向（toSimplified）无需保护：表中收录的传统字形（發/後/裏…）均正确归并回
-    /// 简化字；表中未收录的字形（髮/複/覆/乾 等）保持原样，属既有行为，不在本次修正范围。
+    /// 反向（toSimplified）无需保护：繁→简用的是 OpenCC 权威数据（TraditionalToSimplifiedMap.swift），
+    /// 发音/干燥/台湾 等语境在繁→简方向没有歧义（髮→发、乾→干、臺→台 数据里直接给出）。
 
     /// 姓氏保护：首字命中这些常见多义/多音姓氏时，toTraditional 不再按单字表盲转。
     /// 注：单/叶/万/宁/种/钟 等姓氏单字表转换后即正确传统字形（單/葉/萬/寧/種/鍾），

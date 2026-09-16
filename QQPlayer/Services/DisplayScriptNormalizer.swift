@@ -50,16 +50,13 @@ enum DisplayScriptNormalizer {
 
     // MARK: - 映射
 
-    /// 繁→简单字映射：由 simplifiedToTraditionalMap 反转生成（运行时构建一次，唯一副本）。
-    /// "台→台" 特例反转后仍为 台→台，无副作用；源数据为单字→单字，反转后一繁→一简，天然安全。
-    static let traditionalToSimplifiedMap: [Character: Character] = {
-        var map: [Character: Character] = [:]
-        map.reserveCapacity(simplifiedToTraditionalMap.count)
-        for (simplified, traditional) in simplifiedToTraditionalMap {
-            map[traditional] = simplified
-        }
-        return map
-    }()
+    // 繁→简单字映射不在本文件构造：唯一数据源是 TraditionalToSimplifiedMap.swift 的
+    // `traditionalToSimplifiedMap`（OpenCC TSCharacters 数据）。
+    // ⚠️ 不要在这里由 simplifiedToTraditionalMap 反转生成——多个简体字对应同一繁体字时
+    // （开/𫔭 → 開 共 27 组），反转结果取决于 Dictionary 的迭代顺序（哈希种子每进程随机），
+    // 同一首歌在不同次启动可能显示 开 或 𫔭（非 BMP，字体无字形 = 豆腐块 囗）；
+    // 且 為/髮/臺/隻 等次选字形在简→繁表里没有反查项，简体界面下会原样露出繁体。
+    // 事故与修法记录（2026-09-16）见 TraditionalToSimplifiedMap.swift 文件头。
 
     // MARK: - 词级修正（toTraditional 方向）
 
