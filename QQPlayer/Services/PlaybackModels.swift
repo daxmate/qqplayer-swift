@@ -56,6 +56,50 @@ enum PlaybackTimeFormat {
     }
 }
 
+/// 「正在播放」标题位覆盖（车载歌词，2026-09-16）。
+///
+/// 由来（用户实测 + 外部取证）：CarPlay 的「正在播放」屏由系统接管，第三方 App 没有任何歌词控件
+/// （iPhoneOS26.5 SDK 的 `CarPlay.framework` 全头文件 `grep -i lyric` 零命中）；QQ 音乐等 App 的
+/// 做法是**把当前歌词行实时写进标题位**，系统屏上「大字=当前歌词、小字=歌手」，代价是曲名被顶掉。
+///
+/// 分工：**决策在车载层**（CarPlay 播放页控制器按当前句给出覆盖值，断连时清空），
+/// **执行只有一处**——本文件的元数据构建（见 PlayerEngine+NowPlaying 的标题位写入）。
+/// 两处各写一半字段会把封面/时长冲掉，所以覆盖值只以数据形式传，不各自改 MPNowPlayingInfoCenter。
+enum NowPlayingTitleOverlay {
+    /// 加锁小盒子：静态可变状态在 Swift 6 下必须显式表态（`@unchecked Sendable` + 内部加锁）
+    private final class Box: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: String?
+
+        var title: String? {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return value
+            }
+            set {
+                lock.lock()
+                value = newValue
+                lock.unlock()
+            }
+        }
+    }
+
+    private static let box = Box()
+
+    /// 当前覆盖值（nil / 空串 = 用曲名）
+    static var title: String? {
+        get { box.title }
+        set { box.title = newValue }
+    }
+
+    /// 标题位实际展示值：有覆盖用覆盖，否则回落曲名
+    static func displayTitle(fallback: String) -> String {
+        guard let override = title, !override.isEmpty else { return fallback }
+        return override
+    }
+}
+
 /// 异步落地前的同曲校验（纯函数，可单测）。
 ///
 /// 背景（2026-09-12 审计 P5）：updateWidgetData 在函数入口捕获 track，中间经历

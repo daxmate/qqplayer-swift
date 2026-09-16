@@ -166,6 +166,8 @@ final class CarPlayPlayerPageController {
     private var appliedPlaceholder: CarPlayLyricsPlaceholder?
     /// 罗马音开关（iOS 设置页可改；缓存一份，避免每个 tick 读设置）
     private var showRoman = DeleteSettings.load().lyricShowRoman
+    /// 已写进系统「正在播放」标题位的歌词行（车载歌词；nil = 当前无覆盖）
+    private var appliedCarLyricsTitle: String?
 
     init() {
         template = CPListTemplate(title: "lyrics".localized, sections: [])
@@ -178,6 +180,7 @@ final class CarPlayPlayerPageController {
         cancellables.removeAll()
         tickTimer?.invalidate()
         tickTimer = nil
+        clearCarLyricsTitle()
     }
 
     // MARK: - 订阅
@@ -288,6 +291,10 @@ final class CarPlayPlayerPageController {
         let heardTime = engine.nowPlayingElapsedTime() - LyricOffsetStore.shared.effectiveOffset
         let activeIndex = LyricTiming.activeLineIndex(time: heardTime, in: lines)
 
+        // 车载歌词：当前句写进系统「正在播放」信息的标题位（QQ 音乐同款做法）。
+        // 系统屏由 CarPlay 接管、没有歌词控件，这是唯一能让那一页出现歌词的办法。
+        publishCarLyricsTitle(activeLineIndex: activeIndex, lines: lines)
+
         let content = CarPlayPlayerPageBuilder.content(
             track: track.map {
                 CarPlayPlayerPageTrackInfo(
@@ -309,6 +316,24 @@ final class CarPlayPlayerPageController {
         )
 
         apply(content)
+    }
+
+    /// 车载歌词：把当前句写进系统「正在播放」标题位（变化才写，避免 0.5s tick 反复改元数据）。
+    /// 写入动作仍只有一处——本层只给覆盖值，然后让播放器重建一次元数据（保留封面/时长）。
+    private func publishCarLyricsTitle(activeLineIndex: Int?, lines: [LyricsLine]) {
+        let line = CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: activeLineIndex)
+        guard line != appliedCarLyricsTitle else { return }
+        appliedCarLyricsTitle = line
+        NowPlayingTitleOverlay.title = line
+        PlayerEngine.shared.updateNowPlayingInfoEnhanced()
+    }
+
+    /// 断开连接/停止时撤掉覆盖，让锁屏与控制中心回到曲名
+    private func clearCarLyricsTitle() {
+        guard appliedCarLyricsTitle != nil else { return }
+        appliedCarLyricsTitle = nil
+        NowPlayingTitleOverlay.title = nil
+        PlayerEngine.shared.updateNowPlayingInfoEnhanced()
     }
 
     private func apply(_ content: CarPlayPlayerPageContent) {

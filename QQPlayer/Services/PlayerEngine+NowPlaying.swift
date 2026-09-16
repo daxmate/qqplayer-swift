@@ -182,7 +182,8 @@
             // 展示字段一律走显示层字形（锁屏/控制中心/CarPlay 与 App 内一致）：
             // 数据库里 track.title 原文不动，只改写出的显示值。
             var info: [String: Any] = [
-                MPMediaItemPropertyTitle: track.displayTitle,
+                // 车载歌词：CarPlay 连接期间标题位可能是当前歌词行（见 NowPlayingTitleOverlay）
+                MPMediaItemPropertyTitle: NowPlayingTitleOverlay.displayTitle(fallback: track.displayTitle),
                 MPMediaItemPropertyPlaybackDuration: duration,
                 MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
                 MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
@@ -1026,7 +1027,7 @@
             }
 
             var info: [String: Any] = [
-                MPMediaItemPropertyTitle: currentTrack.displayTitle,
+                MPMediaItemPropertyTitle: NowPlayingTitleOverlay.displayTitle(fallback: currentTrack.displayTitle),
                 MPMediaItemPropertyPlaybackDuration: duration,
                 MPNowPlayingInfoPropertyElapsedPlaybackTime: playbackTime,
                 MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,

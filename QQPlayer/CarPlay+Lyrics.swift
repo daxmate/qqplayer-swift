@@ -150,6 +150,15 @@ enum CarPlayLyricsBuilder {
         return min(max(activeLineIndex ?? 0, 0), lineCount - 1)
     }
 
+    /// 车载系统屏标题位文案：**当前歌词行**。
+    /// 系统「正在播放」屏由 CarPlay 接管，App 只能通过标题位把当前句显示出来
+    /// （QQ 音乐同款做法，见 NowPlayingTitleOverlay）；无当前句/纯音乐/空行 → nil（回落曲名）。
+    static func currentLineText(_ lines: [LyricsLine], activeLineIndex: Int?) -> String? {
+        guard let index = activeLineIndex, lines.indices.contains(index) else { return nil }
+        let text = lines[index].displayText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
     /// 无时间轴歌词兜底：静态显示开头几行（没有时间轴就没有「当前句」，故不高亮）
     static func plainRows(_ plainLyrics: String, limit: Int) -> [CarPlayLyricRow] {
         guard limit > 0 else { return [] }

@@ -255,4 +255,49 @@ struct CarPlayLyricsBuilderTests {
         #expect(content.rows.first?.text == "二")
         #expect(content.rows.first?.isPlaying == true)
     }
+
+    // MARK: - 车载系统屏标题位（当前句 → 系统「正在播放」标题位）
+
+    @Test("车载标题位取当前句；无当前句 / 越界 / 空列表 = nil（调用方回落曲名）")
+    func currentLineTextPicksActiveLine() {
+        let lines = makeLines(["第一句", "第二句", "第三句"])
+        #expect(CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: 1) == "第二句")
+        #expect(CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: nil) == nil)
+        #expect(CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: 9) == nil)
+        #expect(CarPlayLyricsBuilder.currentLineText([], activeLineIndex: 0) == nil)
+    }
+
+    @Test("车载标题位跳过空行（空行不覆盖曲名）")
+    func currentLineTextSkipsBlankLine() {
+        let lines = makeLines(["   ", "正文"])
+        #expect(CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: 0) == nil)
+        #expect(CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: 1) == "正文")
+    }
+
+    @Test("车载标题位与列表行走同一份显示层字形归一")
+    func currentLineTextUsesDisplayNormalizer() {
+        let raw = "繁體字與简体字"
+        let lines = makeLines([raw])
+        #expect(CarPlayLyricsBuilder.currentLineText(lines, activeLineIndex: 0) == DisplayScriptNormalizer.display(raw))
+    }
+}
+
+/// 「正在播放」标题位覆盖（车载歌词）：决策来自车载层，执行只在元数据构建那一处
+struct NowPlayingTitleOverlayTests {
+    @Test("无覆盖时回落曲名；有覆盖时用覆盖值")
+    func overlayFallsBackToTrackTitle() {
+        NowPlayingTitleOverlay.title = nil
+        defer { NowPlayingTitleOverlay.title = nil }
+
+        #expect(NowPlayingTitleOverlay.displayTitle(fallback: "曲名") == "曲名")
+        NowPlayingTitleOverlay.title = "当前歌词行"
+        #expect(NowPlayingTitleOverlay.displayTitle(fallback: "曲名") == "当前歌词行")
+    }
+
+    @Test("空覆盖等同没有覆盖（空行不把曲名顶掉）")
+    func emptyOverlayIsIgnored() {
+        defer { NowPlayingTitleOverlay.title = nil }
+        NowPlayingTitleOverlay.title = ""
+        #expect(NowPlayingTitleOverlay.displayTitle(fallback: "曲名") == "曲名")
+    }
 }
