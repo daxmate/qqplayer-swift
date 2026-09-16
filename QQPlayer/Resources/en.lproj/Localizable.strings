@@ -1046,3 +1046,9 @@
 "sync_lyrics_pending_resend" = "%d aligned lyrics waiting to be sent";
 "sync_lyrics_pending_resend_hint" = "These lyrics weren't confirmed as delivered this round. The next connection retries automatically.";
 "sync_lyrics_kept_local" = "Lyrics kept from this device";
+
+// INV-22 另一半（2026-09-16）：歌单自定义封面读取失败的披露文案
+"sync_cover_section" = "Playlist covers";
+"sync_cover_unavailable" = "%d playlist covers can't be read";
+"sync_cover_unavailable_hint" = "These playlists' custom cover files can't be read on this device (file deleted or path no longer valid), so an auto-composed cover is shown instead.";
+"playlist_cover_unavailable" = "Custom cover file can't be read — showing the auto-composed cover.";

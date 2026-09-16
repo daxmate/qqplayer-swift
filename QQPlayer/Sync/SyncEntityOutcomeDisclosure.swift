@@ -231,6 +231,34 @@ enum SyncEntityOutcomeDisclosure {
         lyricsKeptLocalLabelKey,
     ]
 
+    /// 区标题 key（「歌单自定义封面」）。
+    static let coverSectionTitleKey = "sync_cover_section"
+    /// 「读不到」行 key（文案自带 `%d`）。
+    static let coverUnavailableLabelKey = "sync_cover_unavailable"
+    /// 该行说明 key（自带 `%d`）。
+    static let coverUnavailableHintKey = "sync_cover_unavailable_hint"
+
+    /// 文件层（封面）需要五语齐全的 key（契约测试遍历它；新增 key 即红）。
+    static let coverKeys: [String] = [
+        coverSectionTitleKey,
+        coverUnavailableLabelKey,
+        coverUnavailableHintKey,
+    ]
+
+    /// 歌单自定义封面账目 → 披露行（**只出计数 > 0**；缺口类）。
+    ///
+    /// 数字来源 = `PlaylistCoverLoadFailuresStore.count`（按歌单去重：几个歌单的封面出问题），
+    /// 界面层不得自己数（同一纪律见 `lyricsRows`）。
+    static func coverRows(unavailable: Int) -> [FileRow] {
+        guard unavailable > 0 else { return [] }
+        return [FileRow(
+            labelKey: coverUnavailableLabelKey,
+            hintKey: coverUnavailableHintKey,
+            isGap: true,
+            count: unavailable
+        )]
+    }
+
     /// 歌词账目 → 披露行（**只出计数 > 0 的行**；顺序 = 丢弃 → 待补 → 保留本端）。
     ///
     /// 三个数字的口径（都来自账目，界面层不得补算）：

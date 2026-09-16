@@ -185,21 +185,33 @@ struct PlaylistCardView: View {
     }
 
     private func loadCustomCover() async {
-        // Check if playlist has a custom cover path
-        guard let customPath = playlist.customCoverImagePath,
-              !customPath.isEmpty else { return }
-
-        // Load image from shared container
-        guard let containerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
-        ) else { return }
-
-        let fileURL = containerURL.appendingPathComponent(customPath)
-        if let data = try? Data(contentsOf: fileURL),
-           let image = UIImage(data: data) {
+        // 路径解析只有一处入口（`PlaylistCoverResolver`）：**读不到必须申报**（INV-22 另一半）。
+        // 别再在这里自己 `guard … else { return }`——那正是「封面没了但没人说得清为什么」的形状。
+        let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
+        switch PlaylistCoverResolver.resolve(customCoverImagePath: playlist.customCoverImagePath) {
+        case .none:
+            // 没配自定义封面（正常路径）：清掉可能残留的失败登记
+            await MainActor.run { PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key) }
+        case let .unavailable(reason):
+            let path = playlist.customCoverImagePath ?? ""
             await MainActor.run {
-                customCoverImage = image
+                PlaylistCoverLoadFailuresStore.shared.record(playlistKey: key, path: path, reason: reason)
             }
+        case let .available(fileURL):
+            guard let data = try? Data(contentsOf: fileURL),
+                  let image = UIImage(data: data) else {
+                let path = playlist.customCoverImagePath ?? ""
+                await MainActor.run {
+                    PlaylistCoverLoadFailuresStore.shared.record(
+                        playlistKey: key,
+                        path: path,
+                        reason: PlaylistCoverResolver.Reason.decodeFailed
+                    )
+                }
+                return
+            }
+            await MainActor.run { PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key) }
+            await MainActor.run { customCoverImage = image }
         }
     }
 

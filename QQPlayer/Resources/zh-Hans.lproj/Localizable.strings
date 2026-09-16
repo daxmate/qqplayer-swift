@@ -1051,3 +1051,9 @@
 "sync_lyrics_pending_resend" = "%d 条对齐歌词待补发";
 "sync_lyrics_pending_resend_hint" = "本轮没有确认送达的歌词，下次连接会自动重试。";
 "sync_lyrics_kept_local" = "保留本端对齐歌词";
+
+// INV-22 另一半（2026-09-16）：歌单自定义封面读取失败的披露文案
+"sync_cover_section" = "歌单自定义封面";
+"sync_cover_unavailable" = "%d 个歌单的自定义封面读不到";
+"sync_cover_unavailable_hint" = "这些歌单的封面文件在本机读不到（文件被删除或路径失效），已回落为自动合成封面。";
+"playlist_cover_unavailable" = "自定义封面文件读不到，已显示自动合成封面。";

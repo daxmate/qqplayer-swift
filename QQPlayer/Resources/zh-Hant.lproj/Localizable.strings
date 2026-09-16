@@ -1395,3 +1395,9 @@
 "sync_lyrics_pending_resend" = "%d 條對齊歌詞待補送";
 "sync_lyrics_pending_resend_hint" = "本輪沒有確認送達的歌詞，下次連線會自動重試。";
 "sync_lyrics_kept_local" = "保留本機對齊歌詞";
+
+// INV-22 另一半（2026-09-16）：歌单自定义封面读取失败的披露文案
+"sync_cover_section" = "歌單自訂封面";
+"sync_cover_unavailable" = "%d 個歌單的自訂封面讀不到";
+"sync_cover_unavailable_hint" = "這些歌單的封面檔案在本機讀不到（檔案已刪除或路徑失效），已改回自動合成封面。";
+"playlist_cover_unavailable" = "自訂封面檔案讀不到，已顯示自動合成封面。";

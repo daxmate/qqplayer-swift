@@ -153,6 +153,7 @@
 		FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */; };
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
+		014347DB06B147DCBEA154D8 /* PlaylistCoverLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -355,6 +356,7 @@
 		F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingApprovalModelTests.swift; sourceTree = "<group>"; };
 		FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GraphicEQCodecTests.swift; sourceTree = "<group>"; };
 		FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StateManagerTests.swift; sourceTree = "<group>"; };
+		D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaylistCoverLoadTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -974,6 +976,7 @@
 				71450D4286004BD1973341D6 /* SyncRelativePathIdentityTests.swift */,
 				BC53A264188B4B6E8C47806D /* CarPlayLyricsTests.swift */,
 				199ACBBFFC5344E1ADE48676 /* UIAccentContractTests.swift */,
+				D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1425,6 +1428,7 @@
 				D518084922A0428AB1A93C6A /* SyncRelativePathIdentityTests.swift in Sources */,
 				7E05A751AD7C41659C824082 /* CarPlayLyricsTests.swift in Sources */,
 				2924887127FF4F248C6D9FC7 /* UIAccentContractTests.swift in Sources */,
+				014347DB06B147DCBEA154D8 /* PlaylistCoverLoadTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

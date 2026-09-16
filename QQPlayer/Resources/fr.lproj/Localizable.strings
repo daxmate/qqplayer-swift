@@ -1044,3 +1044,9 @@
 "sync_lyrics_pending_resend" = "%d paroles alignées en attente d’envoi";
 "sync_lyrics_pending_resend_hint" = "L’envoi de ces paroles n’a pas été confirmé. La prochaine connexion réessaiera automatiquement.";
 "sync_lyrics_kept_local" = "Paroles conservées sur cet appareil";
+
+// INV-22 另一半（2026-09-16）：歌单自定义封面读取失败的披露文案
+"sync_cover_section" = "Pochettes de playlist";
+"sync_cover_unavailable" = "%d pochettes personnalisées illisibles";
+"sync_cover_unavailable_hint" = "Les fichiers de pochette personnalisée de ces playlists sont illisibles sur cet appareil (fichier supprimé ou chemin invalide) ; une pochette composée automatiquement est affichée.";
+"playlist_cover_unavailable" = "Fichier de pochette personnalisée illisible — pochette composée automatiquement affichée.";

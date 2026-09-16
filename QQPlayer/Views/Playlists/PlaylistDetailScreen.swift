@@ -19,6 +19,8 @@ struct PlaylistDetailScreen: View {
     @State private var showingImagePicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var customCoverImage: UIImage?
+    /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数 + 就地说明）。
+    @ObservedObject private var coverFailures = PlaylistCoverLoadFailuresStore.shared
     @State private var showCoverOptions = false
     @State private var artistNameCache: [Int64: String] = [:]
     @State private var artistDisplayNameCache: [String: String] = [:]
@@ -175,6 +177,17 @@ struct PlaylistDetailScreen: View {
                         }
                         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                         .frame(maxWidth: .infinity, alignment: .center)
+
+                        // 自定义封面读不到（INV-22 另一半，2026-09-16）：**就地**说明
+                        // （用户是在这里看到封面没了的），而不是只在设置页里计数。
+                        // 文案 key 与同步面板共用一处声明。
+                        if customCoverFailure != nil {
+                            Text("playlist_cover_unavailable".localized)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                        }
 
                         VStack(spacing: DesignTokens.space8) {
                             Text(playlist.title)
@@ -513,24 +526,39 @@ struct PlaylistDetailScreen: View {
         UserDefaults.standard.set(sortOption.rawValue, forKey: key)
     }
 
+    /// 当前歌单的自定义封面是否读取失败（nil = 没配封面或读到）。
+    private var customCoverFailure: PlaylistCoverLoadFailuresStore.Failure? {
+        let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
+        return coverFailures.failures.first { $0.playlistKey == key }
+    }
+
+    @MainActor
     private func loadCustomCover() {
-        // Check if playlist has a custom cover path
-        guard let customPath = playlist.customCoverImagePath,
-              !customPath.isEmpty else { return }
-
-        // Load image from shared container
-        guard let containerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
-        ) else {
-            print("❌ Failed to get shared container URL")
-            return
-        }
-
-        let fileURL = containerURL.appendingPathComponent(customPath)
-        if let data = try? Data(contentsOf: fileURL),
-           let image = UIImage(data: data) {
+        // 路径解析只有一处入口（`PlaylistCoverResolver`）：读不到**申报 + 上屏**
+        // （详情页封面下方会出橙色说明；INV-22 另一半）。
+        let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
+        switch PlaylistCoverResolver.resolve(customCoverImagePath: playlist.customCoverImagePath) {
+        case .none:
+            PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key)
+        case let .unavailable(reason):
+            PlaylistCoverLoadFailuresStore.shared.record(
+                playlistKey: key,
+                path: playlist.customCoverImagePath ?? "",
+                reason: reason
+            )
+        case let .available(fileURL):
+            guard let data = try? Data(contentsOf: fileURL),
+                  let image = UIImage(data: data) else {
+                PlaylistCoverLoadFailuresStore.shared.record(
+                    playlistKey: key,
+                    path: playlist.customCoverImagePath ?? "",
+                    reason: PlaylistCoverResolver.Reason.decodeFailed
+                )
+                return
+            }
+            PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key)
             customCoverImage = image
-            print("✅ Loaded custom playlist cover from \(customPath)")
+            print("✅ Loaded custom playlist cover from \(playlist.customCoverImagePath ?? "")")
         }
     }
 

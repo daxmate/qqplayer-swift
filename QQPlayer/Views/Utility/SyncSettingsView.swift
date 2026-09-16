@@ -26,6 +26,8 @@ struct SyncSettingsView: View {
     @ObservedObject private var passiveSync = IOSPassiveSyncCenter.shared
     /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）
     @ObservedObject private var wiringFacts = SyncWiringFactsStore.shared
+    /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数并上屏）。
+    @ObservedObject private var coverFailures = PlaylistCoverLoadFailuresStore.shared
 
     private let deviceStore = DeviceStore()
 
@@ -317,6 +319,28 @@ struct SyncSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(Array(lyricsRows.enumerated()), id: \.offset) { _, row in
+                    VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                        LabeledContent(row.labelKey.localized(with: row.count)) {
+                            Text("\(row.count)")
+                                .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
+                        }
+                        if let hintKey = row.hintKey {
+                            Text(hintKey.localized(with: row.count))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            // 歌单自定义封面读不到（INV-22 另一半，2026-09-16）：一行说明 + 说明文案。
+            // 数字与文案 key 全部来自唯一投影 `SyncEntityOutcomeDisclosure.coverRows`（UI 不自算）。
+            let coverRows = SyncEntityOutcomeDisclosure.coverRows(unavailable: coverFailures.count)
+            if !coverRows.isEmpty {
+                Text(SyncEntityOutcomeDisclosure.coverSectionTitleKey.localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(Array(coverRows.enumerated()), id: \.offset) { _, row in
                     VStack(alignment: .leading, spacing: DesignTokens.space4) {
                         LabeledContent(row.labelKey.localized(with: row.count)) {
                             Text("\(row.count)")

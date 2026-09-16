@@ -227,8 +227,14 @@
     `SyncDataSnapshots.swift` 声明；applier 里每处只准是注释或 `customCoverImagePath: nil`）
     + `syntheticPeerCoverWriteIsCaught`（合成「把对端封面写进本端」必须被抓到，fail-closed）。
   - 实现：`QQPlayer/Sync/SyncChangeLogApplier.swift` 的 `applyPlaylist`（更新保留本端封面 / 新建置 nil；`ed59f24`）。
-- **建议**：**面板披露**（封面加载失败计数）**仍未做**——消费点在 View 层静默回落（`try? Data(contentsOf:)`），
-  「封面加载失败」不是同步账目里的条目，本轮未纳入。
+- **面板披露（2026-09-16 已收）**：封面加载失败**计数 + 上屏**。
+  - 唯一解析入口 `QQPlayer/Services/PlaylistCoverResolver.swift`（`customCoverImagePath` → `.none` /
+    `.available(url)` / `.unavailable(reason)`；原因码 = 容器不可达 / 文件缺失 / 不是常规文件 / 解码失败）。
+    此前 4 个消费点各写一遍路径逻辑、**失败全静默**（`guard … else { return }`），现全部改走该入口。
+  - 登记处 `QQPlayer/Services/PlaylistCoverLoadFailuresStore.swift`：**按歌单去重**（数的是「多少个歌单的
+    封面出问题」，不是失败次数）、读到即清除；投影 `SyncEntityOutcomeDisclosure.coverRows`（五语 key）。
+  - 上屏：iOS「设置 → 同步 → 接收同步」区一行（>0 橙）+ **歌单详情页就地提示**（用户看到封面没了的地方）。
+  - 守护：`QQPlayerTests/PlaylistCoverLoadTests.swift`（解析四态 / 登记去重与清除 / 投影只出 >0）。
 
 ### INV-23　歌单自定义封面**不是**可跨端直接引用的值（`custom_cover_image_path` 是设备本地相对路径）
 

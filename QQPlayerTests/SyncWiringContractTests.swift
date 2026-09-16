@@ -1860,6 +1860,8 @@ enum SyncEntityDisclosureContract {
         keys += SyncRowOutcome.allCases.compactMap { SyncEntityOutcomeDisclosure.outcomeHintKey($0) }
         // F2（2026-09-16）：文件层（歌词）披露行的 key 同样要求五语齐全。
         keys += SyncEntityOutcomeDisclosure.lyricsKeys
+        // INV-22 另一半（2026-09-16）：文件层（封面）披露行的 key 也要求五语齐全。
+        keys += SyncEntityOutcomeDisclosure.coverKeys
         return keys
     }
 

@@ -465,22 +465,33 @@ private func drawAspectFill(_ image: UIImage, in rect: CGRect) {
 
 @MainActor
 private func loadCustomPlaylistCover(for playlist: Playlist) -> UIImage? {
-    guard let customPath = playlist.customCoverImagePath, !customPath.isEmpty else {
+    // 解析走唯一入口；读不到**申报**（CarPlay 没有披露面板，但计数与诊断同样要记，
+    // 用户回到手机设置页能看到「有 N 个歌单的自定义封面读不到」）。
+    let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
+    switch PlaylistCoverResolver.resolve(customCoverImagePath: playlist.customCoverImagePath) {
+    case .none:
+        PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key)
         return nil
-    }
-
-    guard let containerURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
-    ) else {
+    case let .unavailable(reason):
+        PlaylistCoverLoadFailuresStore.shared.record(
+            playlistKey: key,
+            path: playlist.customCoverImagePath ?? "",
+            reason: reason
+        )
         return nil
+    case let .available(fileURL):
+        guard let data = try? Data(contentsOf: fileURL),
+              let image = UIImage(data: data) else {
+            PlaylistCoverLoadFailuresStore.shared.record(
+                playlistKey: key,
+                path: playlist.customCoverImagePath ?? "",
+                reason: PlaylistCoverResolver.Reason.decodeFailed
+            )
+            return nil
+        }
+        PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key)
+        return image
     }
-
-    let fileURL = containerURL.appendingPathComponent(customPath)
-    guard let data = try? Data(contentsOf: fileURL) else {
-        return nil
-    }
-
-    return UIImage(data: data)
 }
 
 @MainActor
