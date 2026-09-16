@@ -3109,6 +3109,72 @@ do {
     check(false, "㊺ 抛错：\(error)")
 }
 
+// MARK: - ㊻ F2 对齐歌词补发：只补不覆盖 + 依附歌曲
+
+section("㊻ F2 补发计划：只补不覆盖 + 歌不在对端不推 / 不在本端不拉")
+
+let harnessLyricEntry: (String, String) -> ManifestEntry = { hash, contentHash in
+    ManifestEntry(
+        relativePath: "@lyrics/\(hash).json",
+        size: 12,
+        mtimeMs: 0,
+        contentHash: contentHash,
+        stableId: "sid"
+    )
+}
+let harnessAudioEntry: (String, String) -> ManifestEntry = { path, contentHash in
+    ManifestEntry(relativePath: path, size: 4_096, mtimeMs: 0, contentHash: contentHash, stableId: "sid")
+}
+
+// 两侧都有 → 谁都不动（内容不同也不动 = 只补不覆盖）
+let idlePlan = SyncLyricsResendPlanner.plan(
+    localLyrics: [harnessLyricEntry("h1", "本端版本")],
+    remoteEntries: [
+        harnessAudioEntry("Album/A.flac", "h1"),
+        harnessLyricEntry("h1", "对端版本"),
+    ]
+)
+check(idlePlan.isIdle, "F2 只补不覆盖：同路径两侧都有 → 零动作")
+checkEqual(idlePlan.present, ["@lyrics/h1.json"], "F2：两侧都有进 present")
+
+// 歌不在对端不推（推过去只会被丢弃，把「歌词丢弃」计数变成噪音）
+let gatedPlan = SyncLyricsResendPlanner.plan(
+    localLyrics: [harnessLyricEntry("hA", "x"), harnessLyricEntry("hB", "x")],
+    remoteEntries: [harnessAudioEntry("Album/B.flac", "hB"), harnessLyricEntry("hC", "x")]
+)
+checkEqual(gatedPlan.toPush.map(\.relativePath), ["@lyrics/hB.json"], "F2：歌不在对端不推")
+checkEqual(gatedPlan.present, [], "F2：对端有本端没有的歌词不进计划（单向，不回流）")
+
+// 非歌词命名空间条目进不了计划
+let namespacePlan = SyncLyricsResendPlanner.plan(
+    localLyrics: [harnessAudioEntry("Album/A.flac", "hA"), harnessLyricEntry("hB", "x")],
+    remoteEntries: [harnessAudioEntry("Album/B.flac", "hB")]
+)
+checkEqual(namespacePlan.toPush.map(\.relativePath), ["@lyrics/hB.json"], "F2：音频条目被排除（只补歌词）")
+
+check(SyncLyricsResendStateMachine.canTransition(from: .idle, to: .planning), "F2 状态机：idle → planning")
+check(SyncLyricsResendStateMachine.canTransition(from: .pushing, to: .done(SyncLyricsResendSummary())), "F2 状态机：推完收尾")
+check(
+    !SyncLyricsResendStateMachine.canTransition(from: .done(SyncLyricsResendSummary()), to: .planning),
+    "F2 状态机：终态不再迁"
+)
+check(
+    SyncLyricsResendAutoRunDecision.shouldStart(
+        isConnected: true,
+        hasSession: true,
+        didAutoRunForCurrentConnection: false
+    ),
+    "F2 自动轮：连接就绪跑一次"
+)
+check(
+    !SyncLyricsResendAutoRunDecision.shouldStart(
+        isConnected: true,
+        hasSession: true,
+        didAutoRunForCurrentConnection: true
+    ),
+    "F2 自动轮：一次连接只跑一次"
+)
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

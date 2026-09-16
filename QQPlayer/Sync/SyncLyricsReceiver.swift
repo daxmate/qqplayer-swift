@@ -9,6 +9,10 @@
 //  - 只有 aligned 歌词随歌同步；收到的是 wire 路径 `@lyrics/{歌曲 content_hash}.json`
 //    的字节 → 经 content_hash → 本端 stableId 映射 → 交给 `AlignedLyricsStore` 安装
 //    （不落进曲库根、不写孤儿文件）。
+//  - **只补不覆盖**（契约 F2 冲突规则，2026-09-16）：本端**已有**该歌的对齐歌词时
+//    **保留本端的**，对端字节只清临时文件、不落库（`.keptLocal`）。理由：对齐产物是
+//    「本机对齐过一次就够」的派生内容，覆盖会把对端更差的结果盖到本端更好的结果上；
+//    代价是「对端重新对齐后的更新不传播」——这正是契约写明的取舍（不是缺陷）。
 //  - **本端歌曲还没入库**（同一轮里歌比歌词先到 / 后到）：先暂存，收尾时再试一次映射；
 //    仍解析不出 → **丢弃**（歌词是依附歌曲的内容，不留孤儿），下次同步会从对端
 //    manifest 重新拉到（自愈），不引入第二套挂起队列。
@@ -27,6 +31,8 @@ final class SyncLyricsReceiver: @unchecked Sendable {
     enum Outcome: Equatable, Sendable {
         /// 已写进本端歌词库（值 = wire 路径）
         case installed(String)
+        /// 本端**已有**该歌的对齐歌词 → 保留本端、不覆盖（F2「只补不覆盖」）
+        case keptLocal(String)
         /// 本端还没有对应歌曲 → 已暂存，待收尾时重试
         case pending(String)
         /// 本端无对应歌曲（收尾后仍未映射到）→ 已丢弃临时文件；下次同步自愈
@@ -74,6 +80,9 @@ final class SyncLyricsReceiver: @unchecked Sendable {
         switch install(tempURL, wirePath: wirePath) {
         case .installed:
             return .installed(wirePath)
+        case .keptLocal:
+            try? fileManager.removeItem(at: tempURL)
+            return .keptLocal(wirePath)
         case .failed:
             try? fileManager.removeItem(at: tempURL)
             return .failed(wirePath)
@@ -106,6 +115,9 @@ final class SyncLyricsReceiver: @unchecked Sendable {
             switch install(item.fileURL, wirePath: item.wirePath) {
             case .installed:
                 return .installed(item.wirePath)
+            case .keptLocal:
+                try? fileManager.removeItem(at: item.fileURL)
+                return .keptLocal(item.wirePath)
             case .orphan:
                 try? fileManager.removeItem(at: item.fileURL)
                 return .discarded(item.wirePath)
@@ -131,6 +143,8 @@ final class SyncLyricsReceiver: @unchecked Sendable {
 
     private enum InstallOutcome {
         case installed
+        /// 本端已有该歌的对齐歌词 → 保留本端（只补不覆盖）
+        case keptLocal
         /// 本端还没有对应歌曲
         case orphan
         case failed
@@ -140,6 +154,9 @@ final class SyncLyricsReceiver: @unchecked Sendable {
         guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
               let stableId = lyricsMapping.stableIdForContentHash(songHash)
         else { return .orphan }
+        // F2 冲突规则：本端已有对齐结果 → 保留本端（只补不覆盖）。判定只看**有无**，
+        // 不比内容/不比对齐质量——比较必然要引入评分，那就成了第二个语义源。
+        guard !lyricsStore.contains(forStableId: stableId) else { return .keptLocal }
         do {
             try lyricsStore.install(receivedFileAt: tempURL, forStableId: stableId)
             return .installed

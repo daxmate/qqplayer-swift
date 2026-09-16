@@ -120,11 +120,11 @@
 | ① | 不适用 | 不走 outbox，走**文件帧**：`SyncCollectionSyncCoordinator.swift:540` `descriptor.lyricsEntries()`；命名空间 `SyncLyricsNamespace` `QQPlayer/Sync/SyncAlignedLyrics.swift:35-79`。**方向决策（2026-09-15 用户拍板）**：对齐歌词**单向（桌面 → 移动）**——AI 对齐只在桌面端做，移动端不生成；功能本身尚未实现，所以「移动端没有补发通道」**不是待补空格，而是设计边界**（实现时按单向接，不做双向补发） |
 | ② | 有 | `SyncLyricsNamespace.wirePath(songContentHash:)` `SyncAlignedLyrics.swift:48`（`@lyrics/{歌曲 content_hash}.json`）；生产映射 `SyncLyricsContentMapping.live(database:)` `SyncChangeLogMapping.swift:134`（复用 M4-2a resolver，不新写 SQL） |
 | ③ | 有 | `SyncLyricsReceiver`（install / pending / discarded / failed 四态）；测试 `QQPlayerTests/AlignedLyricsSyncTests.swift:348` |
-| ④ | 部分 | **无挂起表**，只有**会话内暂存**：`SyncLyricsReceiver.swift:96-111`（收尾再试一次映射，仍不行 → 丢弃 + 记账）；自愈靠「下次同步从对端 manifest 重新拉」（`:13`） |
-| ⑤ | **✗ 空格** | 无对账/补发通道。歌词只在「该歌被选中传输」时随行；**不选就永远不来**，且没有任何入口能把已有歌词补进传输集 |
-| ⑥ | 部分 | **计了数，但没上屏**：被动端 `SyncLibraryPassiveHost.swift:51` `discardedLyrics`（`:411` 追加）；拉取端 `SyncLibraryPullController.swift:451-453` `orphanLyricsSkipped`；但 `SyncUIReportSummary`（`QQPlayer/Services/SyncUIState.swift:449-500`）**没有**这两个字段 ⇒ UI 消费者看不到 |
-| ⑦ | 有 | `AlignedLyricsSyncTests.swift:138/149/160/181/234/348/374/394/426`；无模拟器 harness `scripts/sync-harness/main.swift:1194` |
-| ⑧ | △ | 无「歌词接收器已装配」的静态断言（`SyncWiringContractTests` 不含）；只有 `SyncLibraryPassiveTests.swift:355` 行为用例 |
+| ④ | **✅ 有（2026-09-16）** | **会话内暂存**（同轮歌后到 → 收尾重试，`SyncLyricsReceiver.flushPending`）+ **丢弃记账**（`discardedLyrics` / `orphanLyricsSkipped`）+ **下一轮自动补发**：补发轮每轮重新对账「对端缺什么」（`SyncLyricsResendPlanner`），未送达的进 `pendingResend` 并上屏 → 歌一到位，下一次连接就补上 |
+| ⑤ | ~~✗ 空格~~ **✅ 有（2026-09-16）** | 补发通道：`SyncLyricsResendController`（连接就绪自动一轮 `@lyrics/*` 对账 → 帧 10/11 → 14 → 4/5/6，**不新增帧 / 不加字段**）+ `MacLyricsResendAutoRunner`（一次连接一次，前置门 = 索引终态）；触发点 `SyncHostCenter.handleSessionPhase(.ready)`。**只推不拉**（方向 = F① 的单向） |
+| ⑥ | ~~部分~~ **✅ 有（2026-09-16）** | 计数 → 上屏（唯一投影 `SyncEntityOutcomeDisclosure.lyricsRows`，五语文案）：iOS「设置 → 同步 → 接收同步」区（`discardedLyrics` / `keptLocalLyrics`）+ Mac 同步面板（E 结果区 `SyncUIReportSummary.lyricsDiscarded` / `.lyricsKeptLocal`；补发区 `pendingResend` / `keptLocal`） |
+| ⑦ | 有 | `AlignedLyricsSyncTests.swift`（2026-09-16 新增：`resendPlanOnlyFills` / `resendPlanGatesOnSongPresence` / `resendPlanLyricsNamespaceOnly…` / `resendStateMachineAndAutoRunDecision` / `receiverKeepsLocalLyrics` / `lyricsDisclosureRows` / `lyricsResendRoundPushesMissingLyrics` / `lyricsResendRoundKeepsBothSides`）；无模拟器 harness `scripts/sync-harness/main.swift` ㊻ 节 |
+| ⑧ | △ | 无「歌词接收器已装配」的静态断言（`SyncWiringContractTests` 不含）；只有 `SyncLibraryPassiveTests.swift:355` 行为用例。**F2 的「只补不覆盖」同样只有行为用例**（`receiverKeepsLocalLyrics`），无静态断言 |
 
 ### G. 曲库音频文件（不在枚举）
 
@@ -196,7 +196,7 @@ i18n 键确认三个缺口口径：`sync_run_data_result_unresolved` = 未定位
 | 1 | **C⑤ playlist 结构无对账补发通道** | `reconcilableEntities` `SyncChangeLogMapping.swift:571` 不含 `.playlist`；`rowKey` `:706` 显式 nil | outbox 机制之前创建的歌单（名 / 封面 / 结构）**永不同步到对端**；面板全绿、日志无异常。用户看到的是「另一台设备上就是没这个歌单」 |
 | 2 | **E① playbackPosition 生产端 0 写点** | `grep -rn "entity: \.playbackPosition" QQPlayer/` 无输出；`v1Synced` `SyncDataSyncModels.swift:38` 不含 | 「播放位置上下文」这一整类**从未同步过**（设计文档 §6.2 承诺的范围里的一项，实际不存在） |
 | 3 | **H② 封面路径当跨端值传输** | `SyncDataSnapshots.swift:69/79`；`SyncChangeLogApplier.swift:166/179` 原样落库 | 对端歌单封面**必然加载不出**（路径指向发送端设备），静默回落自动封面，零报错 |
-| 4 | **F⑤ aligned 歌词无补发通道** | 无（歌词只随「被选中传输的歌」走） | 已有的对齐歌词，只要没跟歌一起传过，就**永不到达对端** |
+| 4 | ~~**F⑤ aligned 歌词无补发通道**~~ **已收（2026-09-16）** | 修法：连接就绪自动跑一轮 `@lyrics/*` 补发（`SyncLyricsResendController`，Mac 发起、不新增帧）；歌不在对端不推（避免丢弃噪音），未送达进 `pendingResend` 上屏 | 已有的对齐歌词不再要等用户手动「开始同步」 |
 
 ### 二级：数字误导（看着在干活，其实没干）
 
@@ -217,7 +217,7 @@ i18n 键确认三个缺口口径：`sync_run_data_result_unresolved` = 未定位
 | # | 空格 | 证据 | 用户可见后果 |
 | --- | --- | --- | --- |
 | 9 | **⑥ 披露不区分实体** | `MacSyncView.swift:983-1026` 全是总数 | 用户只能看到「有 110 条没定位」，无法判断该修哪条通道 |
-| 10 | **F⑥ 歌词丢弃计了数没上屏** | `SyncUIState.swift:449-500` 无 `discardedLyrics`/`orphanLyricsSkipped` | 歌词没到，用户不知道为什么 |
+| 10 | ~~**F⑥ 歌词丢弃计了数没上屏**~~ **已收（2026-09-16）** | 修法：`SyncUIReportSummary` 加 `lyricsDiscarded` / `lyricsKeptLocal`（编排 report 从拉取控制器 summary 合并）+ `SyncEntityOutcomeDisclosure.lyricsRows` 唯一投影 + 两端面板行（含「待补发」） | 歌词没到时，用户能看到「丢弃几条 / 待补发几条 / 保留本端几条」 |
 | 11 | ~~**iOS 端零 UI 披露**~~ **已收（2026-09-15）** | 修法：`IOSPassiveSyncCenter.dataSummary`（帧 8/9 回调累加，主线程）+ `IOSPassiveDataSyncPresenter`（`countRows`/`gapRows` 纯逻辑）+ iOS「设置 → 同步」新增「播放数据」账目区（计数行 + 缺口行 + 说明，>0 橙色；**复用 Mac 既有 key，无新增文案**）；未同步过 = 空态 | 手机侧也能看见「同步了什么 / 丢了多少」 |
 | 12 | **E⑦ 无 applier 用例** | `grep "Applier playback" QQPlayerTests/` 无 | 上述 5 号的误导行为不会被 CI 抓到 |
 

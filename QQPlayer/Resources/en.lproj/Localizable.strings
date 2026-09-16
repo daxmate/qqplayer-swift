@@ -1038,3 +1038,11 @@
 "sync_peer_error_timeout" = "Your iPhone didn't respond in time.";
 "sync_peer_error_cancelled" = "Request cancelled.";
 "sync_peer_error_other" = "Couldn't load your iPhone's content.";
+
+// F2 对齐歌词补发（2026-09-16）：丢弃 / 待补发 / 保留本端 的披露文案
+"sync_lyrics_section" = "Aligned lyrics";
+"sync_lyrics_discarded" = "%d aligned lyrics were dropped";
+"sync_lyrics_discarded_hint" = "The matching songs aren't on this device yet, so these lyrics were dropped. The next sync sends them again automatically.";
+"sync_lyrics_pending_resend" = "%d aligned lyrics waiting to be sent";
+"sync_lyrics_pending_resend_hint" = "These lyrics weren't confirmed as delivered this round. The next connection retries automatically.";
+"sync_lyrics_kept_local" = "Lyrics kept from this device";

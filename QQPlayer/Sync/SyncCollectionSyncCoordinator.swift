@@ -219,6 +219,10 @@ struct SyncCollectionSyncReport: Equatable, Sendable {
     var pullFailed: [SyncFileFetchFailure] = []
     /// 拉取方向被跳过的相对路径（本端已一致）
     var pullSkipped: [String] = []
+    /// 拉取方向收到、但本端**无对应歌曲**的 aligned 歌词（丢弃；下一轮自动补发，F2 ②）
+    var lyricsDiscarded: [String] = []
+    /// 拉取方向收到、本端**已有**对齐结果 → 保留本端（F2「只补不覆盖」，未覆盖）
+    var lyricsKeptLocal: [String] = []
     /// 拉取阶段中止原因（nil = 未中止）
     var pullAbortReason: String?
     /// 对端回报送达的相对路径（`sync_fetch_result.completed`；升序；诊断/携带定范围用）
@@ -369,6 +373,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             snapshot.pullFailed = summary.failed
             snapshot.pullSkipped = summary.unchanged
             snapshot.reportedPulled = summary.reportedCompleted.sorted()
+            snapshot.lyricsDiscarded = summary.orphanLyricsSkipped.sorted()
+            snapshot.lyricsKeptLocal = summary.keptLocalLyrics.sorted()
         }
         return snapshot
     }

@@ -54,7 +54,11 @@ def find_block(lines, target_id, folder="QQPlayer"):
     i = 0
     n = len(lines)
     while i < n:
-        if "PBXFileSystemSynchronizedBuildFileExceptionSet" in lines[i]:
+        # ⚠️ 段头注释行也含该字符串（`/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */`）：
+        # 不排掉它，本循环会从段头开始收集、在**第一份名单**的 `};` 处停下，
+        # 于是跳过真正的 block 头与 i 的推进（2026-09-16 实测：ios-exceptions 登记报
+        # 「找不到 target … 的 membershipExceptions 块」，而块其实就在下面几行）。
+        if "PBXFileSystemSynchronizedBuildFileExceptionSet" in lines[i] and not lines[i].lstrip().startswith("/*"):
             # 收集本块到 "};"
             j = i
             block = []

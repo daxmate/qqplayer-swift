@@ -390,6 +390,24 @@ final class SyncLibraryPushController: @unchecked Sendable {
         return descriptor.libraryRoot.appendingPathComponent(normalized)
     }
 
+    /// 摘掉本轮 manifest 帧钩子（幂等）。
+    ///
+    /// 用途（F2 补发轮，2026-09-16）：一轮编排里**串行**跑推送子轮 + 拉取子轮时，
+    /// 子轮终态后若不摘钩子，它的 `SyncManifestPeer` 仍挂在会话分发链上 → 它会响应
+    /// **后一个子轮**的 `manifest_response`，按自己那份选择集重算一次计划，
+    /// 可能发出多余的声明/请求，并与后一个子轮的帧交叠。
+    /// 单轮编排（推送与拉取互斥）跑不到这条路径；补发轮串行跑两个子轮就会，
+    /// 故子轮终态由调用方调用本方法（不调用则随实例释放自动摘除）。
+    func detachFrameHooks() {
+        lock.lock()
+        let peer = manifestPeer
+        manifestPeer = nil
+        lock.unlock()
+        peer?.onManifestReceived = nil
+        peer?.onDecodeFailure = nil
+        peer?.detach()
+    }
+
     // MARK: 串行推送（停等，一次一个）
 
     /// 驱动队列：给空闲的 sender 喂下一个文件。

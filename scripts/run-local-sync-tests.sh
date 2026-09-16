@@ -65,6 +65,9 @@ SOURCES=(
   QQPlayer/Sync/SyncLibraryPushController.swift
   QQPlayer/Sync/SyncLibraryPullController.swift
   QQPlayer/Sync/SyncLyricsReceiver.swift
+  # F2 对齐歌词补发（2026-09-16）：计划/账目纯逻辑 + 一轮编排（复用推/拉两个控制器）
+  QQPlayer/Sync/SyncLyricsResend.swift
+  QQPlayer/Sync/SyncLyricsResendController.swift
   QQPlayer/Sync/SyncLibraryPassiveHost.swift
   QQPlayer/Sync/SyncLocalLibraryScanner.swift
   QQPlayer/Sync/SyncAlignedLyrics.swift

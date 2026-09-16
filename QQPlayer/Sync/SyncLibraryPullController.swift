@@ -55,10 +55,12 @@ struct SyncLibraryPullSummary: Equatable, Sendable {
     var reportedCompleted: [String] = []
     /// 收到但本端无对应歌曲、未落库的 aligned 歌词（丢弃；下次同步自愈，审计用）
     var orphanLyricsSkipped: [String] = []
+    /// 本端**已有**对齐歌词、按 F2「只补不覆盖」保留本端的 wire 路径（升序；审计/上屏用）
+    var keptLocalLyrics: [String] = []
 
     /// 本次是否动了本端歌词库（诊断用）。
     var touchedLyrics: Bool {
-        (completed + failed.map(\.relativePath) + orphanLyricsSkipped)
+        (completed + failed.map(\.relativePath) + orphanLyricsSkipped + keptLocalLyrics)
             .contains { SyncLyricsNamespace.isLyricsPath($0) }
     }}
 
@@ -427,6 +429,24 @@ final class SyncLibraryPullController: @unchecked Sendable {
         finalize()
     }
 
+    /// 摘掉本轮 manifest 帧钩子（幂等）。
+    ///
+    /// 用途（F2 补发轮，2026-09-16）：一轮编排里**串行**跑推送子轮 + 拉取子轮时，
+    /// 子轮终态后若不摘钩子，它的 `SyncManifestPeer` 仍挂在会话分发链上 → 它会响应
+    /// **后一个子轮**的 `manifest_response`，按自己那份选择集重算一次计划，
+    /// 可能发出多余的声明/请求，并与后一个子轮的帧交叠。
+    /// 单轮编排（推送与拉取互斥）跑不到这条路径；补发轮串行跑两个子轮就会，
+    /// 故子轮终态由调用方调用本方法（不调用则随实例释放自动摘除）。
+    func detachFrameHooks() {
+        lock.lock()
+        let peer = manifestPeer
+        manifestPeer = nil
+        lock.unlock()
+        peer?.onManifestReceived = nil
+        peer?.onDecodeFailure = nil
+        peer?.detach()
+    }
+
     /// 收尾：先兜现暂存歌词（此时同轮先落下的歌多已入库），再落终态。
     /// **无删除阶段**（§6.1 + §12b 决策 7：删除不跨端传播）。
     private func finalize() {
@@ -451,6 +471,11 @@ final class SyncLibraryPullController: @unchecked Sendable {
         case let .discarded(wirePath):
             lock.lock()
             summaryValue.orphanLyricsSkipped.append(wirePath)
+            lock.unlock()
+        case let .keptLocal(wirePath):
+            // F2「只补不覆盖」：本端已有 → 保留本端，对端字节未落库（记账，不静默）
+            lock.lock()
+            summaryValue.keptLocalLyrics.append(wirePath)
             lock.unlock()
         case let .failed(wirePath):
             lock.lock()

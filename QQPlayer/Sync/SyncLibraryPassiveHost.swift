@@ -49,6 +49,8 @@ struct SyncLibraryPassiveSummary: Equatable, Sendable {
     var failed: [SyncPushFailure] = []
     /// 收到但本端无对应歌曲、被丢弃的 aligned 歌词（下次同步自愈；审计用）
     var discardedLyrics: [String] = []
+    /// 本端**已有**对齐歌词、按 F2「只补不覆盖」保留本端的 wire 路径（审计/上屏用）
+    var keptLocalLyrics: [String] = []
     /// 未声明过的传输名（不落位；审计用）
     var undeclaredTransfers: [String] = []
 
@@ -409,6 +411,11 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         case let .discarded(wirePath):
             lock.lock()
             summaryValue.discardedLyrics.append(wirePath)
+            lock.unlock()
+        case let .keptLocal(wirePath):
+            // F2「只补不覆盖」：本端已有 → 保留本端，对端字节未落库（记账，不静默）
+            lock.lock()
+            summaryValue.keptLocalLyrics.append(wirePath)
             lock.unlock()
         case let .failed(wirePath):
             lock.lock()

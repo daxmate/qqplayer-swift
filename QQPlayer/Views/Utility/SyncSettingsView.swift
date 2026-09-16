@@ -305,6 +305,32 @@ struct SyncSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            // F2 对齐歌词（2026-09-16）：丢弃 / 保留本端 必须计数上屏。
+            // 行与文案 key 全部来自唯一投影 `SyncEntityOutcomeDisclosure.lyricsRows`（UI 不自算）。
+            let lyricsRows = SyncEntityOutcomeDisclosure.lyricsRows(
+                discarded: passiveSync.summary.discardedLyrics.count,
+                pendingResend: 0,
+                keptLocal: passiveSync.summary.keptLocalLyrics.count
+            )
+            if !lyricsRows.isEmpty {
+                Text(SyncEntityOutcomeDisclosure.lyricsSectionTitleKey.localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(Array(lyricsRows.enumerated()), id: \.offset) { _, row in
+                    VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                        LabeledContent(row.labelKey.localized(with: row.count)) {
+                            Text("\(row.count)")
+                                .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
+                        }
+                        if let hintKey = row.hintKey {
+                            Text(hintKey.localized(with: row.count))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
             if !presentation.failures.isEmpty {
                 Text("sync_passive_progress_failures".localized(with: presentation.failures.count))
                     .font(.caption)

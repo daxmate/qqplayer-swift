@@ -1387,3 +1387,11 @@
 "sync_peer_error_timeout" = "iPhone 沒有及時回應。";
 "sync_peer_error_cancelled" = "請求已取消。";
 "sync_peer_error_other" = "無法讀取 iPhone 的內容。";
+
+// F2 对齐歌词补发（2026-09-16）：丢弃 / 待补发 / 保留本端 的披露文案
+"sync_lyrics_section" = "對齊歌詞";
+"sync_lyrics_discarded" = "丟棄 %d 條對齊歌詞";
+"sync_lyrics_discarded_hint" = "這些歌詞對應的歌曲本機還沒有，已丟棄；下一輪同步會自動重送。";
+"sync_lyrics_pending_resend" = "%d 條對齊歌詞待補送";
+"sync_lyrics_pending_resend_hint" = "本輪沒有確認送達的歌詞，下次連線會自動重試。";
+"sync_lyrics_kept_local" = "保留本機對齊歌詞";

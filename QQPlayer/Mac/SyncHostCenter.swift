@@ -229,6 +229,10 @@ final class SyncHostCenter: ObservableObject {
             // 连接就绪 → 后台自动跑一次「同步数据」（用户 2026-09-15 拍板：触发时机 = 连接后自动）。
             // 放在这里而不是面板 view model 里：面板没打开时也要跑（否则又变成“点过的才同步”）。
             MacDataSyncAutoRunner.shared.sessionDidBecomeReady(session, libraryRoot: libraryRootProvider())
+            // F2 对齐歌词补发（2026-09-16）：连接就绪自动跑一轮 `@lyrics/*` 增量对账
+            // （两个方向：对端缺的推过去、本端缺的拉回来）。与「同步数据」一样放在这里
+            // 而不是面板 view model：面板没打开时也要跑，否则又变成「点过的才同步」。
+            MacLyricsResendAutoRunner.shared.sessionDidBecomeReady(session, libraryRoot: libraryRootProvider())
         case .closed:
             clearConnection(ifMatching: session)
             libraryHost?.detach()
@@ -246,6 +250,7 @@ final class SyncHostCenter: ObservableObject {
         activeSession = nil
         // 会话下线：让自动触发的「一次连接一次」标记归位（下次连上再自动跑一轮）。
         MacDataSyncAutoRunner.shared.sessionDidClose()
+        MacLyricsResendAutoRunner.shared.sessionDidClose()
         // 装配自检事实同步归零（不是缺口——没有会话就谈不上装配）。
         SyncWiringFactsStore.shared.clear()
     }

@@ -459,4 +459,276 @@ struct AlignedLyricsSyncTests {
             (try FileManager.default.contentsOfDirectory(atPath: networkDir.path)).sorted() == ["s1.json"]
         )
     }
+
+    // MARK: - F2 补发通道（2026-09-16）
+
+    private func lyricEntry(_ songHash: String, contentHash: String? = "lyric-bytes") -> ManifestEntry {
+        ManifestEntry(
+            relativePath: "@lyrics/\(songHash).json",
+            size: 12,
+            mtimeMs: 0,
+            contentHash: contentHash,
+            stableId: "sid"
+        )
+    }
+
+    private func audioEntry(_ relativePath: String, contentHash: String) -> ManifestEntry {
+        ManifestEntry(
+            relativePath: relativePath,
+            size: 4_096,
+            mtimeMs: 0,
+            contentHash: contentHash,
+            stableId: "sid"
+        )
+    }
+
+    @Test("F2 补发计划：只补不覆盖 —— 同路径两侧都有就谁都不动（内容不同也不动）")
+    func resendPlanOnlyFills() {
+        let plan = SyncLyricsResendPlanner.plan(
+            localLyrics: [lyricEntry("h1", contentHash: "本端版本")],
+            remoteEntries: [
+                audioEntry("Album/A.flac", contentHash: "h1"),
+                lyricEntry("h1", contentHash: "对端版本"),
+            ]
+        )
+        #expect(plan.isIdle, "两侧都有 = 谁都不动（F2 只补不覆盖）")
+        #expect(plan.present == ["@lyrics/h1.json"])
+    }
+
+    @Test("F2 补发计划：歌不在对端不推；对端有本端没有的歌词不回流（单向）")
+    func resendPlanGatesOnSongPresence() {
+        let local = [lyricEntry("hA"), lyricEntry("hB")]
+        // 对端只有 B 这首歌（音频条目的 contentHash = 歌曲指纹），并带一条本端没有的歌词 hC
+        let remote = [audioEntry("Album/B.flac", contentHash: "hB"), lyricEntry("hC")]
+
+        let plan = SyncLyricsResendPlanner.plan(localLyrics: local, remoteEntries: remote)
+        // hA：对端没有这首歌 → 不推（推过去只会被丢弃，把「歌词丢弃」计数变成噪音）
+        #expect(plan.toPush.map(\.relativePath) == ["@lyrics/hB.json"])
+        // hC：本端没有 → 不回流（对齐歌词单向：桌面 → 移动，反方向是显式「从设备取回」）
+        #expect(plan.present.isEmpty)
+        #expect(plan.pendingCount == 1)
+    }
+
+    @Test("F2 补发计划：非歌词命名空间条目一律进不了补发计划")
+    func resendPlanLyricsNamespaceOnly() {
+        let plan = SyncLyricsResendPlanner.plan(
+            localLyrics: [audioEntry("Album/A.flac", contentHash: "h1"), lyricEntry("h1")],
+            remoteEntries: [audioEntry("Album/A.flac", contentHash: "h1")]
+        )
+        #expect(plan.toPush.map(\.relativePath) == ["@lyrics/h1.json"])
+        #expect(SyncLyricsResendPlanner.lyricsEntries(plan.toPush).count == plan.toPush.count)
+    }
+
+    @Test("F2 补发状态机 + 自动轮判定：合法迁移 / 终态不再迁 / 一次连接一次")
+    func resendStateMachineAndAutoRunDecision() {
+        #expect(SyncLyricsResendStateMachine.canTransition(from: .idle, to: .planning))
+        #expect(SyncLyricsResendStateMachine.canTransition(from: .planning, to: .pushing))
+        #expect(SyncLyricsResendStateMachine.canTransition(from: .planning, to: .done(SyncLyricsResendSummary())))
+        #expect(SyncLyricsResendStateMachine.canTransition(from: .pushing, to: .done(SyncLyricsResendSummary())))
+        #expect(!SyncLyricsResendStateMachine.canTransition(from: .idle, to: .pushing))
+        #expect(
+            !SyncLyricsResendStateMachine.canTransition(
+                from: .done(SyncLyricsResendSummary()),
+                to: .planning
+            ),
+            "终态不可再迁（幂等重跑不重开）"
+        )
+
+        #expect(SyncLyricsResendAutoRunDecision.shouldStart(
+            isConnected: true, hasSession: true, didAutoRunForCurrentConnection: false
+        ))
+        #expect(!SyncLyricsResendAutoRunDecision.shouldStart(
+            isConnected: true, hasSession: true, didAutoRunForCurrentConnection: true
+        ))
+        #expect(!SyncLyricsResendAutoRunDecision.shouldStart(
+            isConnected: false, hasSession: true, didAutoRunForCurrentConnection: false
+        ))
+    }
+
+    @Test("F2 接收侧只补不覆盖：本端已有 → 保留本端、不覆盖、临时文件清干净")
+    func receiverKeepsLocalLyrics() throws {
+        let store = AlignedLyricsStore(directory: try tempRoot("only-fill"))
+        let songHash = "h-only-fill"
+        try store.write(sampleLyrics("本端对齐结果"), forStableId: "sid-1")
+        let receiver = SyncLyricsReceiver(
+            lyricsStore: store,
+            lyricsMapping: mapping(["sid-1": songHash])
+        )
+        let incomingDir = try tempRoot("only-fill-incoming")
+        let incomingFile = incomingDir.appendingPathComponent("incoming.json")
+        try JSONEncoder().encode(sampleLyrics("对端发来的结果")).write(to: incomingFile)
+
+        let outcome = receiver.receive(tempURL: incomingFile, wirePath: "@lyrics/\(songHash).json")
+        #expect(outcome == .keptLocal("@lyrics/\(songHash).json"))
+        #expect(try store.read(forStableId: "sid-1")?.plainLyrics == "本端对齐结果")
+        #expect(!FileManager.default.fileExists(atPath: incomingFile.path), "保留本端时不留临时文件")
+
+        // 对照组：本端（映射表）没有这首歌 → 先暂存，收尾时仍映射不到才丢弃
+        let otherHash = "h-only-fill-new"
+        let second = incomingDir.appendingPathComponent("incoming2.json")
+        try JSONEncoder().encode(sampleLyrics("新来的结果")).write(to: second)
+        let buffered = receiver.receive(
+            tempURL: second,
+            wirePath: "@lyrics/\(otherHash).json"
+        )
+        #expect(buffered == .pending("@lyrics/\(otherHash).json"), "本端无对应歌曲 → 暂存待收尾重试")
+        #expect(receiver.flushPending() == [.discarded("@lyrics/\(otherHash).json")], "收尾仍映射不到 → 丢弃")
+        #expect(!FileManager.default.fileExists(atPath: second.path), "丢弃时不留临时文件")
+    }
+
+    @Test("F2 披露投影：只出计数 > 0 的行，顺序 = 丢弃 → 待补 → 保留本端")
+    func lyricsDisclosureRows() {
+        #expect(
+            SyncEntityOutcomeDisclosure
+                .lyricsRows(discarded: 0, pendingResend: 0, keptLocal: 0)
+                .isEmpty,
+            "全 0 = 空表（不做恒零噪音表）"
+        )
+        let rows = SyncEntityOutcomeDisclosure.lyricsRows(discarded: 2, pendingResend: 1, keptLocal: 3)
+        #expect(rows.map(\.labelKey) == [
+            SyncEntityOutcomeDisclosure.lyricsDiscardedLabelKey,
+            SyncEntityOutcomeDisclosure.lyricsPendingResendLabelKey,
+            SyncEntityOutcomeDisclosure.lyricsKeptLocalLabelKey,
+        ])
+        #expect(rows.map(\.count) == [2, 1, 3])
+        #expect(rows.map(\.isGap) == [true, true, false], "保留本端是正常计数行，不是缺口")
+        #expect(rows[0].hintKey == SyncEntityOutcomeDisclosure.lyricsDiscardedHintKey)
+        #expect(rows[2].hintKey == nil)
+    }
+
+    @Test("F2 端到端：补发轮把对端缺的对齐歌词推过去（帧 10/11/14/4-6）")
+    func lyricsResendRoundPushesMissingLyrics() throws {
+        let songA = Data(repeating: 0x71, count: 4_096)
+        let songB = Data(repeating: 0x72, count: 4_096)
+        let hashA = try contentHash(of: songA)
+        let hashB = try contentHash(of: songB)
+
+        let fixture = SessionFixture.pairedHandshake()
+        // 设备侧：A、B 两首歌都在；只有 B 的对齐歌词（本端缺 A 的歌词 → 等补发轮推）
+        let deviceRoot = try tempRoot("resend-device")
+        for (path, data) in [("Album/A.flac", songA), ("Album/B.flac", songB)] {
+            try writeFile(path, in: deviceRoot, data: data)
+        }
+        let deviceLyrics = AlignedLyricsStore(directory: try tempRoot("resend-device-lyrics"))
+        try deviceLyrics.write(sampleLyrics("设备侧对齐"), forStableId: "dev-sid-b")
+        let deviceManager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try deviceManager.createTables()
+        let deviceHost = SyncLibraryPassiveHost(
+            libraryRoot: deviceRoot,
+            sink: LyricsSinkSpy(),
+            database: deviceManager,
+            lyricsStore: deviceLyrics,
+            lyricsMapping: mapping(["dev-sid-a": hashA, "dev-sid-b": hashB])
+        )
+        _ = deviceHost.attach(to: fixture.clientSession)
+
+        // Mac 侧：有 A 的歌词（该推）、有 C 的歌词（**对端没有 C 这首歌** → 不推）；
+        // 本端没有 B 的歌词，对端有 → 单向：**不回流**
+        let songC = Data(repeating: 0x74, count: 4_096)
+        let hashC = try contentHash(of: songC)
+        let macRoot = try tempRoot("resend-mac")
+        let macLyrics = AlignedLyricsStore(directory: try tempRoot("resend-mac-lyrics"))
+        try macLyrics.write(sampleLyrics("Mac 侧 A"), forStableId: "mac-sid-a")
+        try macLyrics.write(sampleLyrics("Mac 侧 C"), forStableId: "mac-sid-c")
+        let macManager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try macManager.createTables()
+        let macMapping = mapping(["mac-sid-a": hashA, "mac-sid-c": hashC])
+        let descriptor = SyncLocalLibraryDescriptor(
+            libraryRoot: macRoot,
+            rootName: "测试 Mac 曲库",
+            lyricsRoot: macLyrics.directory,
+            sourceFiles: {
+                SyncLocalLibraryScanner.sourceFiles(in: macRoot, database: macManager)
+            },
+            lyricsEntries: {
+                SyncAlignedLyricsManifest.entries(store: macLyrics, mapping: macMapping)
+            },
+            contentHash: { _ in nil },
+            lyricsFileName: { wirePath in
+                guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
+                      let stableId = macMapping.stableIdForContentHash(songHash)
+                else { return nil }
+                return "\(stableId).json"
+            }
+        )
+        let controller = SyncLyricsResendController(session: fixture.hostSession, descriptor: descriptor)
+        try controller.start()
+
+        guard case let .done(summary) = controller.state else {
+            Issue.record("期望 done，实际 \(controller.state)")
+            return
+        }
+        #expect(summary.plannedPush == ["@lyrics/\(hashA).json"], "只把「对端有歌、且缺这条歌词」的列入计划")
+        #expect(summary.pushed == ["@lyrics/\(hashA).json"], "对端确认送达")
+        #expect(summary.pendingResend.isEmpty)
+        #expect(try deviceLyrics.read(forStableId: "dev-sid-a")?.plainLyrics == "Mac 侧 A")
+        // 对端没有 C 这首歌 → 不推（补发轮不抢跑；歌到位由下一次整轮同步负责）
+        #expect(!summary.plannedPush.contains("@lyrics/\(hashC).json"))
+        #expect(!deviceLyrics.contains(forStableId: "dev-sid-c"))
+        // 单向：设备侧的 B 歌词不回流本端
+        #expect(try macLyrics.read(forStableId: "mac-sid-b") == nil)
+        #expect(deviceLyrics.stableIds().sorted() == ["dev-sid-a", "dev-sid-b"])
+        // 歌词不落曲库根
+        #expect(!FileManager.default.fileExists(atPath: macRoot.appendingPathComponent("@lyrics/\(hashA).json").path))
+    }
+
+    @Test("F2 端到端：两侧都有 → 谁都不动（只补不覆盖，不覆盖对端已有结果）")
+    func lyricsResendRoundKeepsBothSides() throws {
+        let song = Data(repeating: 0x73, count: 4_096)
+        let hash = try contentHash(of: song)
+
+        let fixture = SessionFixture.pairedHandshake()
+        let deviceRoot = try tempRoot("keep-device")
+        try writeFile("Album/A.flac", in: deviceRoot, data: song)
+        let deviceLyrics = AlignedLyricsStore(directory: try tempRoot("keep-device-lyrics"))
+        try deviceLyrics.write(sampleLyrics("设备侧版本"), forStableId: "dev-sid")
+        let deviceManager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try deviceManager.createTables()
+        let deviceHost = SyncLibraryPassiveHost(
+            libraryRoot: deviceRoot,
+            sink: LyricsSinkSpy(),
+            database: deviceManager,
+            lyricsStore: deviceLyrics,
+            lyricsMapping: mapping(["dev-sid": hash])
+        )
+        _ = deviceHost.attach(to: fixture.clientSession)
+
+        let macRoot = try tempRoot("keep-mac")
+        let macLyrics = AlignedLyricsStore(directory: try tempRoot("keep-mac-lyrics"))
+        try macLyrics.write(sampleLyrics("Mac 侧版本"), forStableId: "mac-sid")
+        let macManager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try macManager.createTables()
+        let macMapping = mapping(["mac-sid": hash])
+        let descriptor = SyncLocalLibraryDescriptor(
+            libraryRoot: macRoot,
+            rootName: "测试 Mac 曲库",
+            lyricsRoot: macLyrics.directory,
+            sourceFiles: {
+                SyncLocalLibraryScanner.sourceFiles(in: macRoot, database: macManager)
+            },
+            lyricsEntries: {
+                SyncAlignedLyricsManifest.entries(store: macLyrics, mapping: macMapping)
+            },
+            contentHash: { _ in nil },
+            lyricsFileName: { wirePath in
+                guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),
+                      let stableId = macMapping.stableIdForContentHash(songHash)
+                else { return nil }
+                return "\(stableId).json"
+            }
+        )
+        let controller = SyncLyricsResendController(session: fixture.hostSession, descriptor: descriptor)
+        try controller.start()
+
+        guard case let .done(summary) = controller.state else {
+            Issue.record("期望 done，实际 \(controller.state)")
+            return
+        }
+        #expect(summary.pendingResend.isEmpty)
+        #expect(summary.didNothing, "两侧都有 = 零动作（只补不覆盖）")
+        #expect(summary.presentCount == 1)
+        // 两侧各自版本原样保留，谁也没被覆盖
+        #expect(try macLyrics.read(forStableId: "mac-sid")?.plainLyrics == "Mac 侧版本")
+        #expect(try deviceLyrics.read(forStableId: "dev-sid")?.plainLyrics == "设备侧版本")
+    }
 }

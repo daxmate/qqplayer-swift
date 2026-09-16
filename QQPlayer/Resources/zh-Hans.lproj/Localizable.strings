@@ -1043,3 +1043,11 @@
 "sync_peer_error_timeout" = "iPhone 没有及时响应。";
 "sync_peer_error_cancelled" = "请求已取消。";
 "sync_peer_error_other" = "无法读取 iPhone 的内容。";
+
+// F2 对齐歌词补发（2026-09-16）：丢弃 / 待补发 / 保留本端 的披露文案
+"sync_lyrics_section" = "对齐歌词";
+"sync_lyrics_discarded" = "丢弃 %d 条对齐歌词";
+"sync_lyrics_discarded_hint" = "这些歌词对应的歌曲本端还没有，已丢弃；下一轮同步会自动重发。";
+"sync_lyrics_pending_resend" = "%d 条对齐歌词待补发";
+"sync_lyrics_pending_resend_hint" = "本轮没有确认送达的歌词，下次连接会自动重试。";
+"sync_lyrics_kept_local" = "保留本端对齐歌词";

@@ -43,6 +43,8 @@ struct MacSyncRunSection: View {
     @StateObject private var dataModel: MacSyncDataViewModel
     /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）。
     @ObservedObject private var wiringFacts: SyncWiringFactsStore
+    /// F2 对齐歌词补发轮的事实（连接就绪自动跑的那一轮；nil = 本次连接还没跑过）。
+    @ObservedObject private var lyricsFacts: MacLyricsResendFactsStore
 
     /// 全曲库二次确认（Q4 决策：全库必须确认）。
     @State private var showLibraryWideConfirm = false
@@ -69,6 +71,7 @@ struct MacSyncRunSection: View {
         _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center, content: contentModel))
         _dataModel = StateObject(wrappedValue: MacSyncDataViewModel(hostCenter: center))
         _wiringFacts = ObservedObject(wrappedValue: .shared)
+        _lyricsFacts = ObservedObject(wrappedValue: .shared)
     }
 
     var body: some View {
@@ -78,6 +81,7 @@ struct MacSyncRunSection: View {
             selectionSection
             runSection
             resultSection
+            lyricsResendSection
             dataSection
         }
         .onAppear {
@@ -844,6 +848,32 @@ struct MacSyncRunSection: View {
                     if report.failedCount > 0 {
                         failureDisclosure(report)
                     }
+                    // F2 对齐歌词（2026-09-16）：丢弃 / 保留本端 必须计数上屏。
+                    // 行与文案 key 全部来自唯一投影（UI 不自算、不拼 key）。
+                    let lyricsRows = SyncEntityOutcomeDisclosure.lyricsRows(
+                        discarded: report.lyricsDiscarded.count,
+                        pendingResend: 0,
+                        keptLocal: report.lyricsKeptLocal.count
+                    )
+                    if !lyricsRows.isEmpty {
+                        Text(SyncEntityOutcomeDisclosure.lyricsSectionTitleKey.localized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(Array(lyricsRows.enumerated()), id: \.offset) { _, row in
+                            VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                                LabeledContent(row.labelKey.localized(with: row.count)) {
+                                    Text("\(row.count)")
+                                        .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
+                                }
+                                if let hintKey = row.hintKey {
+                                    Text(hintKey.localized(with: row.count))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 Text("sync_run_result_none".localized)
@@ -856,6 +886,53 @@ struct MacSyncRunSection: View {
                 .foregroundStyle(.secondary)
         } header: {
             Text("sync_run_result_section".localized)
+        }
+    }
+
+    // MARK: - E2 对齐歌词补发区（F2，2026-09-16）
+
+    /// 连接就绪自动跑的那一轮**对齐歌词补发**的结果。
+    ///
+    /// 数字来自账目（`MacLyricsResendFactsStore.lastSummary`），行与文案 key 来自唯一投影
+    /// `SyncEntityOutcomeDisclosure.lyricsRows`——本视图不自己算、不自己拼 key。
+    /// 整区只在**本次连接跑过一轮**时出现（nil = 还没跑 / 已随会话清空）。
+    ///
+    /// 这一轮**只推不拉**（对齐歌词单向：桌面 → 移动）：所以「丢弃 / 保留本端」两个数字
+    /// 在本区恒为 0（那是**接收侧**的事实，见 iOS「接收同步」区与 E 结果区），
+    /// 本区如实披露的是「已送达 / 待补发 / 两侧都有」。
+    @ViewBuilder
+    private var lyricsResendSection: some View {
+        if let summary = lyricsFacts.lastSummary {
+            let rows = SyncEntityOutcomeDisclosure.lyricsRows(
+                discarded: 0,
+                pendingResend: summary.pendingResend.count,
+                keptLocal: 0
+            )
+            Section {
+                HStack(alignment: .top, spacing: DesignTokens.space24) {
+                    metric("sync_run_result_pushed".localized, summary.pushed.count, .primary)
+                    metric("sync_run_result_skipped".localized, summary.presentCount, .secondary)
+                    Spacer()
+                }
+                .padding(.vertical, DesignTokens.space2)
+
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                        LabeledContent(row.labelKey.localized(with: row.count)) {
+                            Text("\(row.count)")
+                                .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
+                        }
+                        if let hintKey = row.hintKey {
+                            Text(hintKey.localized(with: row.count))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            } header: {
+                Text(SyncEntityOutcomeDisclosure.lyricsSectionTitleKey.localized)
+            }
         }
     }
 

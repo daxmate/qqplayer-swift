@@ -467,6 +467,10 @@ struct SyncUIReportSummary: Equatable, Sendable {
     var isLibraryWide: Bool = false
     /// 中止原因（推送优先；nil = 未中止）
     var abortReason: String?
+    /// F2：拉取方向收到但本端无对应歌曲的 aligned 歌词（丢弃；下一轮自动补发）
+    var lyricsDiscarded: [String] = []
+    /// F2：拉取方向收到但本端已有对齐结果 → 保留本端（只补不覆盖，未覆盖）
+    var lyricsKeptLocal: [String] = []
 
     /// 实际传输文件数。
     var transferredCount: Int { pushedCount + pulledCount }
@@ -496,7 +500,9 @@ struct SyncUIReportSummary: Equatable, Sendable {
             unknownPlaylistIDs: report.unknownPlaylistIDs,
             isEmptySelection: report.isEmptySelection,
             isLibraryWide: report.isLibraryWide,
-            abortReason: report.pushAbortReason ?? report.pullAbortReason
+            abortReason: report.pushAbortReason ?? report.pullAbortReason,
+            lyricsDiscarded: report.lyricsDiscarded,
+            lyricsKeptLocal: report.lyricsKeptLocal
         )
     }
 }

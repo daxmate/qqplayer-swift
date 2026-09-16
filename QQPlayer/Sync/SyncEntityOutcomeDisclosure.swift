@@ -193,4 +193,76 @@ enum SyncEntityOutcomeDisclosure {
             entityLabelKey(row.entity).localized
         )
     }
+
+    // MARK: - 文件层（歌词）披露（F2「歌词丢弃必须计数上屏」，2026-09-16）
+
+    /// 文件层披露行：一条**非 changeLog 实体**的计数（目前唯一 = 对齐歌词）。
+    ///
+    /// 为什么不塞进 `Row`：那里的维度是 changeLog **实体**（收藏 / 播放历史 / 歌单…，
+    /// 来自注册表），而对齐歌词是**文件层**事实（依附歌曲的内容），没有实体归属；
+    /// 硬凑一个实体 case 会把「注册表 = 实体唯一声明处」这条口径弄脏。
+    /// 两者共用同一条纪律：**数字由账目给、行文案 key 由投影给，界面层不自算**。
+    struct FileRow: Equatable {
+        /// 行标签 key（文案自带 `%d` 占位时由调用方 `localized(with:)` 填数）
+        var labelKey: String
+        /// 说明 key（缺口类才有；正常计数行为 nil）
+        var hintKey: String?
+        /// 是否算缺口（界面据此上色；颜色本身属界面层）
+        var isGap: Bool
+        var count: Int
+    }
+
+    /// 区标题 key（「对齐歌词」）。
+    static let lyricsSectionTitleKey = "sync_lyrics_section"
+    /// 一行行文案 key。
+    static let lyricsDiscardedLabelKey = "sync_lyrics_discarded"
+    static let lyricsDiscardedHintKey = "sync_lyrics_discarded_hint"
+    static let lyricsPendingResendLabelKey = "sync_lyrics_pending_resend"
+    static let lyricsPendingResendHintKey = "sync_lyrics_pending_resend_hint"
+    static let lyricsKeptLocalLabelKey = "sync_lyrics_kept_local"
+
+    /// 文件层（歌词）需要五语齐全的 key（契约测试遍历它；新增 key 即红）。
+    static let lyricsKeys: [String] = [
+        lyricsSectionTitleKey,
+        lyricsDiscardedLabelKey,
+        lyricsDiscardedHintKey,
+        lyricsPendingResendLabelKey,
+        lyricsPendingResendHintKey,
+        lyricsKeptLocalLabelKey,
+    ]
+
+    /// 歌词账目 → 披露行（**只出计数 > 0 的行**；顺序 = 丢弃 → 待补 → 保留本端）。
+    ///
+    /// 三个数字的口径（都来自账目，界面层不得补算）：
+    /// - `discarded`：收到但本端还没有对应歌曲 → 已丢弃（下一轮自动补发）
+    /// - `pendingResend`：本轮没确认送达的补发条目（下次机会重试）
+    /// - `keptLocal`：本端已有对齐结果 → 按 F2「只补不覆盖」保留本端（正常计数行，非缺口）
+    static func lyricsRows(discarded: Int, pendingResend: Int, keptLocal: Int) -> [FileRow] {
+        var rows: [FileRow] = []
+        if discarded > 0 {
+            rows.append(FileRow(
+                labelKey: lyricsDiscardedLabelKey,
+                hintKey: lyricsDiscardedHintKey,
+                isGap: true,
+                count: discarded
+            ))
+        }
+        if pendingResend > 0 {
+            rows.append(FileRow(
+                labelKey: lyricsPendingResendLabelKey,
+                hintKey: lyricsPendingResendHintKey,
+                isGap: true,
+                count: pendingResend
+            ))
+        }
+        if keptLocal > 0 {
+            rows.append(FileRow(
+                labelKey: lyricsKeptLocalLabelKey,
+                hintKey: nil,
+                isGap: false,
+                count: keptLocal
+            ))
+        }
+        return rows
+    }
 }
