@@ -98,6 +98,18 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         }
     }
 
+    /// 播放页控制器（**缺了就就地重建**）：
+    /// 右上角「正在播放」按钮的唯一入口，绝不因控制器缺失退回系统的「正在播放」屏
+    /// （系统屏不接受歌词注入 → 用户点了歌词入口却看到一页没有歌词的页面）。
+    /// 走到重建说明场景时序异常（didConnect 重入 / 断开重连竞态），打一行日志便于真机排查。
+    func playerPageControllerEnsuring() -> CarPlayPlayerPageController {
+        if let playerPageController { return playerPageController }
+        print("⚠️ CarPlay 播放页控制器缺失 → 就地重建（场景时序异常？）")
+        let controller = CarPlayPlayerPageController()
+        playerPageController = controller
+        return controller
+    }
+
     private func loadInitialCarPlayData() {
         artistNameCache = (try? DatabaseManager.shared.getAllArtistNamesById()) ?? [:]
         allSongsTotal = (try? DatabaseManager.shared.getTrackCount(excludingFormats: incompatibleFormats)) ?? 0
