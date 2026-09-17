@@ -143,7 +143,7 @@ struct MiniPlayerView: View {
                         // buttonStyle(.plain) and a contentShape per button stop
                         // the row's tap gesture (which expands the player) from
                         // swallowing these taps.
-                        HStack(spacing: DesignTokens.space14) {
+                        HStack(spacing: DesignTokens.space12) {
                             Button(action: {
                                 Task { await playerEngine.previousTrack() }
                             }) {

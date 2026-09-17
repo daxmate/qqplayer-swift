@@ -205,7 +205,7 @@ struct SyncQRScannerView: View {
 
     private func failedBody(_ failure: SyncConnectFailure) -> some View {
         let outcome = SyncPairOutcome(connectFailure: failure, hostName: nil)
-        return VStack(spacing: DesignTokens.space14) {
+        return VStack(spacing: DesignTokens.space12) {
             Image(systemName: outcome.symbol)
                 .font(.system(size: DesignTokens.font52))
                 .foregroundStyle(outcome.symbolColor)
@@ -334,7 +334,7 @@ private struct SyncConnectProgressView: View {
     let text: String
 
     var body: some View {
-        VStack(spacing: DesignTokens.space14) {
+        VStack(spacing: DesignTokens.space12) {
             ProgressView()
                 .controlSize(.large)
             Label(text, systemImage: symbol)

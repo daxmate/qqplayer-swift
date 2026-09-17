@@ -29,7 +29,7 @@
 | C3–C5 | 危险/成功/警告 | 系统语义色 ✅（**不做自造令牌**，见 §0.2） | 同 macOS | 保持系统语义色 | 已达标 |
 | C6–C9 | 中性面/文字/描边/阴影 | 系统语义色 ✅ | 同 | 保持 | — |
 | C10 | 圆角 | ✅ 令牌化（B2a）+ **归一（B2b）：11 种 / 152 处** | 同（同一张令牌表） | `DesignTokens.radius*` | M4（B2a ✅ / B2b ✅ 2026-09-16） |
-| C11 | 间距 | ✅ 令牌化（B2c-a）+ **归一进行中（B2c-b 第 1 笔）：33 种 → 18 档**（`DesignTokens.space*`，按值命名；归一后 845 处引用） | 同（同一张令牌表） | `DesignTokens.space*` | M4（B2c-a ✅ 零视觉变化；B2c-b 第 1 笔 ✅ 2026-09-17；第 2 笔 `14 → 12` 待做） |
+| C11 | 间距 | ✅ 令牌化（B2c-a）+ **归一（B2c-b）：33 种 → 17 档**（`DesignTokens.space*`，按值命名；归一后 845 处引用） | 同（同一张令牌表） | `DesignTokens.space*` | M4（B2c-a ✅ 零视觉变化；B2c-b ✅ 2026-09-17，两笔） |
 | C12 | 字号 | ✅ 令牌化（B2a）+ **归一（B2b）：24 种 / 116 处**（小数档已清零） | 同（同一张令牌表） | `DesignTokens.font*` | M4（B2a ✅ / B2b ✅ 2026-09-16） |
 | C13 | 主题解析 | 三态 `appearanceTheme` → `MacAppearance.apply(theme:)`（NSApp.appearance）✅ | `forceDarkMode` + `AppearanceTheme.resolved`（含旧数据迁移）✅ | **各自保持**（不统一，用户已定） | — |
 | C14 | 强调色传递 | 环境值 ✅ + **桌面窗/迷你窗第二路径** ⚠️ | **无环境值**：直读 settings 148 处 + prop 透传 18 处 ❌ | macOS：环境值 + 单一刷新点；iOS：新建环境值 | **M2 / I1** |
@@ -274,6 +274,27 @@
 - **守卫/断言**：新增用例「归一后间距刻度集合 == 预期集合」（`expectedSpaceNames`，本笔 18 档含待并的 `space14`），另两条（令牌名↔值自洽 / 每条都被引用）保持；`>= 33` 改为 `>= 18`。
 - **待第 2 笔**：`space14 → space12`（29 处引用 / 17 个文件，中等视觉影响）——做完后 18 档 → 17 档、`space14` 删定义、上文 C11 行与本节断言同步收尾。
 
+#### B2c-b 实施记录（第 2 笔 2026-09-17：`space14 → space12`，归一收尾）✅
+
+- **影响屏（请用户重点看）**：这 29 处集中在三类屏——
+  ① **同步页**（`SyncQRScannerView` 扫码页 / `SyncPairingViews` 配对页）；
+  ② **标签编辑器 + 搜索浮层**（`MacTagEditorView` / `MacSearchAnythingLayer` 的 6 处 `.padding(.horizontal)` 整块左内边距）；
+  ③ **歌词搜索 / 桌面小组件 / 设置页 / 提示卡**（`MacLyricsSearchView` / `MacDesktopWindowViews` / `MacSettingsView` / `HintCardView` / `WhatsNewView` / `FeatureGuideView` / `MacKaraokeControlBar` / `MacLibraryView` / `MacPlayerView` / `PlayerView` / `PlayerOverlays` / `LyricsSearchView` / `SongCardSnippetIntent`）。
+  ⚠️ `MacSearchAnythingLayer` 一个文件就 6 处（同一浮层内多处 14 → 12）：**整块会略微收紧**，是最容易一眼看出来的地方。
+- **顺序（按 B2c 既定纪律：先 `spacing:` 后 `.padding`）**：
+  - 第 1 遍容器 `spacing:` —— **14 处**（容器内节奏，子视图同步位移、不改元素尺寸与命中区）；
+  - 第 2 遍 `.padding`（含边参数写法；`Spacer(minLength:)` 随本批）—— **15 处**；
+  - 合计 **29 处 / 18 个文件**（原计划 17 个文件：`MacLyricsView` 是第 1 笔把表达式 `compact ? 14 : 32` 字面量令牌化后才多出来的第 18 个文件）。
+- **令牌**：删除 `space14` 定义；`space12` 引用 103 → **132 处**（padding 56 / spacing 74 / Spacer.minLength 1）。总引用数仍是 845 条（并档只改名不改处数）。
+- **断言**：`expectedSpaceNames` 去掉 `space14`（**17 档**）、用例名同步改为「归一后间距刻度集合 == 预期集合（17 档，B2c-b 验收物）」；`>= 18` 改 `>= 17`。
+- **归一完成后的刻度**：`0 / 2 / 4 / 6 / 8 / 10 / 12 / 16 / 20 / 24 / 32 / 40 / 48 / 64` + 大留白 `100 / 110 / 120` = **17 档**。
+- **删掉的 17 条令牌**（统一列在此便于以后考古）：`space1` / `space1_5` / `space3` / `space5` / `space7` / `space9` / `space14` / `space18` / `space22` / `space25` / `space26` / `space28` / `space30` / `space44` / `space50` / `space56` / `space60`。
+- **未做项（诚实记录，非漏做）**：
+  - `.padding()` 空参 **20 处**、`.padding(.<边>)` 仅边参数 **21 处** —— 没有数值可令牌化（仍是系统默认 16 / 各边默认）；
+  - 变量 / 声明 **9 处**：`spacing: Self.spacing`（4，指向 `SmartPlaylistGridLayout.spacing = 12`，已在刻度内）/ `spacing: CGFloat = 2`（`MacVisualizerView`）/ `static let spacing: CGFloat = 12`（`SmartPlaylistStore`）/ `spacing: CGFloat = spacing`（形参默认值）/ `.padding(.horizontal, Self.horizontalPadding)`（= 16）/ `.padding(.vertical, LyricLineEmphasis.linePadding(…))`；
+  - `nativeScale` 判据族 **5 处**整组不动（任务书 ② 拍板）+ 自适应夹取 **1 处**保留为例外（任务书 ③）+ 同判据但 `25` 越档 **1 处**已按表并 24；
+  - 大留白 `100/110/120`（共 10 处）**不动**（任务书 ③/拍板表第 3 批）。
+
 ## 4. 已做对的地方（保持，别改坏）
 
 - 强调色名单唯一：`MacAppearance.accentPresets`（6）；iOS `IOSAppearance`（8，值不同是**有意**的，见 §0.1）；
@@ -299,6 +320,7 @@
 | **归一后刻度集合 == 预期集合**（圆角 11 种 / 字号 24 种；B2b 2026-09-16 落地） | 令牌表 `Models/AppearanceTheme.swift`；改动刻度必须同步改断言 |
 | 禁裸间距字面量 `.padding(<数>)` / `.padding(.<边>, <数>)` / `spacing: <数>` / `Spacer(minLength: <数>)`（B2c-a 已落地） | 白名单为空（令牌定义行 `static let space8: CGFloat = 8` 不匹配调用点模式，实测命中 0 次） |
 | 间距令牌名 ↔ 值自洽 + 每条都有引用（B2c-a 已落地） | 令牌表 `Models/AppearanceTheme.swift` |
+| **归一后间距刻度集合 == 预期集合**（17 档；B2c-b 2026-09-17 落地） | 令牌表 `Models/AppearanceTheme.swift`；改动刻度必须同步改断言 |
 
 > B1 形状测试实现在 `QQPlayerTests/UIAccentContractTests.swift`（9 个用例；含合成源码自证与白名单腐烂检测；已反证：临时把一处改回 `Color.accentColor` → 套件转红并打印精确行号）。
 > B2a 同文件追加 `UIGeometryContract` + `UIGeometryContractTests`；B2c-a 再追加 `UISpacingContract` + `UISpacingContractTests`（3 条用例）——**三章共用同一套扫描纯函数，不另起测试文件**。B2c-a 已反证：`MacTagEditorView.swift:179` 的 `.padding(DesignTokens.space16)` 还原成 `.padding(7)` → 套件转红并打印精确路径:行号 → 撤销复跑转绿。
@@ -313,7 +335,7 @@
 | B2a | M4 第一步：圆角 152 处 + 字号 115 处**同值令牌化**（零视觉变化）+ 防裸值守卫 | **已实现（2026-09-15，未提交，待用户复核）** |
 | B2b | M4 第二步：**归一**（C10/C12 值并档 + 表达式内字面量；圆角 15→11 种、字号 26→24 种） | **已实现（2026-09-16，待用户真机验收）** |
 | B2c-a | M4 第三步之一：C11 间距**同值令牌化**（829 处 → `DesignTokens.space*`，零视觉变化）+ 防裸值守卫 | **已实现（2026-09-16，已提交，待用户复核）** |
-| B2c-b | M4 第三步之二：间距**归一对照表**（33 种取值并档 + 表达式内字面量） | **第 1 笔已实现（2026-09-17）：16 档并档（58 处 / 24 文件）→ 18 档**；第 2 笔 `14 → 12`（29 处 / 17 文件）待做；有视觉变化 ⇒ 待用户真机验收 |
+| B2c-b | M4 第三步之二：间距**归一对照表**（33 种取值并档 + 表达式内字面量） | **已实现（2026-09-17，两笔：微调档 58 处 → 第 1 笔；`14 → 12` 29 处 → 第 2 笔）33 种 → 17 档**；有视觉变化 ⇒ 待用户真机验收 |
 | B3 | 第 5 节形状测试 | B1 相关 6 条已落地；B2 的几何/字号断言随 B2 |
 | C | 控件层抽象（卡片/行/按钮/空态） | **暂缓，需用户单独拍板** |
 

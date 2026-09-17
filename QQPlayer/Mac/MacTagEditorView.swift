@@ -156,7 +156,7 @@ struct MacTagEditorView: View {
             .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, DesignTokens.space16)
-        .padding(.top, DesignTokens.space14)
+        .padding(.top, DesignTokens.space12)
         .padding(.bottom, DesignTokens.space10)
     }
 
@@ -164,7 +164,7 @@ struct MacTagEditorView: View {
 
     private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DesignTokens.space14) {
+            VStack(alignment: .leading, spacing: DesignTokens.space12) {
                 mainEditor
                 scrapeRow
                 candidatesSection
@@ -182,7 +182,7 @@ struct MacTagEditorView: View {
 
     /// 封面预览 + 表单（web tag-main 布局）
     private var mainEditor: some View {
-        HStack(alignment: .top, spacing: DesignTokens.space14) {
+        HStack(alignment: .top, spacing: DesignTokens.space12) {
             coverColumn
             formColumn
         }

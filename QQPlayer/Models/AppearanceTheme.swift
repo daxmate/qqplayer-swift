@@ -175,13 +175,13 @@ enum DesignTokens {
     /// `70` —— 改前 1 处。
     static let font70: CGFloat = 70
 
-    // MARK: 间距（C11：18 档 / 845 处，B2c-b 第 1 笔 2026-09-17）
+    // MARK: 间距（C11：17 档 / 845 处，B2c-b 归一完成 2026-09-17）
 
     /// 三类调用点的字面量都收敛到这里：`.padding`（含边参数写法）/ 容器 `spacing:` /
     /// `Spacer(minLength:)`。刻度 = 4pt 基准建议刻度（用户拍板表见
     /// `docs/ui-design-tokens.md` §「间距归一对照表（B2c-b）」）。
-    /// 第 1 笔并掉「位移 ≤2pt」的微调档；`space14 → space12` 是中等视觉影响，单独第 2 笔，
-    /// 故本笔它仍是合法刻度（下一笔会连定义一起删）。
+    /// 第 1 笔并掉「位移 ≤2pt」的微调档；第 2 笔并掉 `space14 → space12`（中等视觉影响，单独成笔）。
+    /// 至此 33 种 → 17 档（含保留不动的大留白 100/110/120）。
     /// 注释口径：`改前 N 处` = B2c-a 迁移前裸字面量实测；`归一后 N 处` = 本笔实测引用数
     /// （含表达式内字面量令牌化进来的那些）。
     /// `0` —— 改前 69 处 → 归一后 70 处（spacing 57 / Spacer.minLength 12）。
@@ -196,10 +196,8 @@ enum DesignTokens {
     static let space8: CGFloat = 8
     /// `10` —— 改前 64 处 → 归一后 64 处（未并档；padding 19 / spacing 45）。
     static let space10: CGFloat = 10
-    /// `12` —— 改前 103 处 → 归一后 103 处（未并档；第 2 笔会把 `space14` 的 29 处并进来）。
+    /// `12` —— 改前 103 处 → 归一后 132 处（含第 2 笔 `space14 → 12` 的 29 处；padding 56 / spacing 74 / Spacer.minLength 1）。
     static let space12: CGFloat = 12
-    /// `14` —— 改前 28 处 → 归一后 29 处（**第 2 笔并到 `space12`**；中等视觉影响，单独成笔）。
-    static let space14: CGFloat = 14
     /// `16` —— 改前 92 处 → 归一后 97 处（含 `18 → 16` 2 处 + 表达式内 3 处；padding 60 / spacing 34）。
     static let space16: CGFloat = 16
     /// `20` —— 改前 42 处 → 归一后 44 处（含 `22 → 20` 1 处 + 表达式内 1 处；padding 29 / spacing 12 / Spacer.minLength 2）。

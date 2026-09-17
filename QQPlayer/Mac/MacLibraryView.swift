@@ -384,7 +384,7 @@ struct MacLibraryView: View {
     private func importToastLabel(_ message: String) -> some View {
         Text(message)
             .font(.callout)
-            .padding(.horizontal, DesignTokens.space14)
+            .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space8)
             .background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Color.gray.opacity(0.3), lineWidth: 1))

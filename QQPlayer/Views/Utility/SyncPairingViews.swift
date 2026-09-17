@@ -23,7 +23,7 @@ struct SyncPairConfirmCardView: View {
     let onCancel: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space14) {
+        VStack(alignment: .leading, spacing: DesignTokens.space12) {
             HStack(spacing: DesignTokens.space12) {
                 Image(systemName: "iphone.and.arrow.forward")
                     .font(.system(size: DesignTokens.font26))
@@ -100,7 +100,7 @@ struct SyncPairOutcomeView: View {
     var symbolColor: Color = .secondary
 
     var body: some View {
-        VStack(spacing: DesignTokens.space14) {
+        VStack(spacing: DesignTokens.space12) {
             Image(systemName: symbol)
                 .font(.system(size: DesignTokens.font52))
                 .foregroundStyle(symbolColor)

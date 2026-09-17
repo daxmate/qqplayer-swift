@@ -340,7 +340,7 @@ struct LyricsSearchView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, DesignTokens.space14)
+            .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space12)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius12))
         }

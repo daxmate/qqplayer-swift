@@ -261,7 +261,7 @@ private struct MacAppearanceSettingsView: View {
             }
 
             Section(Localized.accentColor) {
-                HStack(spacing: DesignTokens.space14) {
+                HStack(spacing: DesignTokens.space12) {
                     ForEach(MacAppearance.accentPresets, id: \.key) { preset in
                         accentSwatch(preset)
                     }
