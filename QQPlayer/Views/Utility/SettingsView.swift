@@ -55,7 +55,9 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
 
                     VStack(alignment: .leading, spacing: DesignTokens.space12) {
-                        Text(Localized.backgroundColor)
+                        // 标题用「强调色」（2026-09-17）：与 macOS 设置页同一语义、同写
+                        // 唯一字段 accentColorName，两端不该两个措辞。
+                        Text(Localized.accentColor)
                             .font(.headline)
 
                         LazyVGrid(columns: [

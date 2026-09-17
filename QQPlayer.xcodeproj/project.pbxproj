@@ -38,6 +38,7 @@
 		26405C6B916442DD89637772 /* MusicBrainzClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB4AC50856B4C358B306CF3 /* MusicBrainzClientTests.swift */; };
 		29005B6B745A4F7B8E82BB29 /* SyncPeerLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1139E3955F7E4A2CB012E94B /* SyncPeerLibraryTests.swift */; };
 		2924887127FF4F248C6D9FC7 /* UIAccentContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199ACBBFFC5344E1ADE48676 /* UIAccentContractTests.swift */; };
+		2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */; };
 		2FD2772BDC0945A28C5C95FD /* DeleteSettingsScrapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */; };
 		30DAB1A7F72143F896180405 /* SyncCollectionSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E06019C08F5412791218224 /* SyncCollectionSelectionTests.swift */; };
 		3293AC27D12C405B88E3BADE /* MacSpectrumDSPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C20901A6FD47B9A5CD4B0B /* MacSpectrumDSPTests.swift */; };
@@ -157,9 +158,10 @@
 		FB93933AAC0442828F06D353 /* FavoriteBatchLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8015EDA9A74C5EAFDCA2FB /* FavoriteBatchLogicTests.swift */; };
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
-		2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */; };
 		E92357A489FB48C6A559409C /* LibraryImportOutcomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2F667CAE024B42896F1B1E /* LibraryImportOutcomeTests.swift */; };
 		A3C7261A31144068B74299A5 /* TrackIdentityTableContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCED22720C9D41208AD7BEC6 /* TrackIdentityTableContractTests.swift */; };
+		301987A26EE445F594205D31 /* ViewDataAccessContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98399E1EAC1E43AF9CFFC7E3 /* ViewDataAccessContractTests.swift */; };
+		33B5881F04CA4D598D2D3B71 /* TrackDeletionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -313,6 +315,7 @@
 		A4389FDA16154BE8A8B1DFE4 /* SyncBrowseSourceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncBrowseSourceTests.swift; sourceTree = "<group>"; };
 		A4B4D41BE71C4359A35B92CF /* TrackContentHashTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackContentHashTests.swift; sourceTree = "<group>"; };
 		A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryFactsStoreTests.swift; sourceTree = "<group>"; };
+		AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppNotificationContractTests.swift; sourceTree = "<group>"; };
 		AC5058067B2D43CF8366428C /* SyncCollectionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCollectionCoordinatorTests.swift; sourceTree = "<group>"; };
 		ADB2386BA4DB497A8C3193F9 /* PlayHistoryCleanupTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayHistoryCleanupTests.swift; sourceTree = "<group>"; };
 		B1A000000000000000000001 /* QQPlayerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QQPlayerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -366,9 +369,10 @@
 		F80B96B042B041BCB8133B08 /* SyncPairingApprovalModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingApprovalModelTests.swift; sourceTree = "<group>"; };
 		FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GraphicEQCodecTests.swift; sourceTree = "<group>"; };
 		FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StateManagerTests.swift; sourceTree = "<group>"; };
-		AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppNotificationContractTests.swift; sourceTree = "<group>"; };
 		0F2F667CAE024B42896F1B1E /* LibraryImportOutcomeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryImportOutcomeTests.swift; sourceTree = "<group>"; };
 		DCED22720C9D41208AD7BEC6 /* TrackIdentityTableContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackIdentityTableContractTests.swift; sourceTree = "<group>"; };
+		98399E1EAC1E43AF9CFFC7E3 /* ViewDataAccessContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewDataAccessContractTests.swift; sourceTree = "<group>"; };
+		FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackDeletionServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -528,8 +532,8 @@
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
 				Mac/SyncHostCenter.swift,
-				Models/AppNotifications.swift,
 				Models/AppearanceTheme.swift,
+				Models/AppNotifications.swift,
 				Models/DatabaseModels.swift,
 				"Models/DisplayText+Models.swift",
 				Models/SettingsModels.swift,
@@ -578,6 +582,7 @@
 				Services/InterruptionDiagnostics.swift,
 				Services/KaraokeController.swift,
 				Services/LibraryIndexer.swift,
+				Services/LibraryReads.swift,
 				Services/LocalDeviceName.swift,
 				Services/LyricsManager.swift,
 				Services/LyricsModels.swift,
@@ -996,6 +1001,8 @@
 				AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */,
 				0F2F667CAE024B42896F1B1E /* LibraryImportOutcomeTests.swift */,
 				DCED22720C9D41208AD7BEC6 /* TrackIdentityTableContractTests.swift */,
+				98399E1EAC1E43AF9CFFC7E3 /* ViewDataAccessContractTests.swift */,
+				FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1454,6 +1461,8 @@
 				2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */,
 				E92357A489FB48C6A559409C /* LibraryImportOutcomeTests.swift in Sources */,
 				A3C7261A31144068B74299A5 /* TrackIdentityTableContractTests.swift in Sources */,
+				301987A26EE445F594205D31 /* ViewDataAccessContractTests.swift in Sources */,
+				33B5881F04CA4D598D2D3B71 /* TrackDeletionServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
