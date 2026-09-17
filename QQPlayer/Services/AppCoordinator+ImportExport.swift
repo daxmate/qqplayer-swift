@@ -176,6 +176,10 @@ extension AppCoordinator {
 
     func renamePlaylist(playlistId: Int64, newTitle: String) throws {
         try databaseManager.renamePlaylist(playlistId: playlistId, newTitle: newTitle)
+        // 镜像一致性（2026-09-17 用户拍板）：镜像 `PlaylistState` 带 `title`，
+        // 改名后不同步 → 下次读镜像（小组件歌单列表 / 状态恢复）拿到的还是旧标题。
+        // 与 deletePlaylist 清镜像同一族：入口负责把本地镜像跟 DB 对齐。
+        syncPlaylistsToCloud()
         print("✅ Playlist renamed to '\(newTitle)'")
     }
 
