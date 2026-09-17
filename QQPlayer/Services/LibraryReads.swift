@@ -29,6 +29,11 @@ enum LibraryReads {
         try DatabaseManager.shared.getTrack(byStableId: stableId)
     }
 
+    /// 按文件路径取曲目（改名/迁移后用新路径回查）。
+    static func track(path: String) throws -> Track? {
+        try DatabaseManager.shared.getTrack(byPath: path)
+    }
+
     static func allTracks() throws -> [Track] {
         try DatabaseManager.shared.getAllTracks()
     }
