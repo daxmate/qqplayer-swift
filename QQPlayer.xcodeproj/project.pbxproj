@@ -163,6 +163,7 @@
 		301987A26EE445F594205D31 /* ViewDataAccessContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98399E1EAC1E43AF9CFFC7E3 /* ViewDataAccessContractTests.swift */; };
 		33B5881F04CA4D598D2D3B71 /* TrackDeletionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */; };
 		C013AF9F15FB4C8EA13C6097 /* SyncDeletionNonPropagationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0EAC3E96A14B35B792FA8C /* SyncDeletionNonPropagationContractTests.swift */; };
+		3500C7F72B9C446DB2DC9353 /* CharacterMapResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32762FE810F44761872B060C /* CharacterMapResourceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -375,6 +376,7 @@
 		98399E1EAC1E43AF9CFFC7E3 /* ViewDataAccessContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewDataAccessContractTests.swift; sourceTree = "<group>"; };
 		FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackDeletionServiceTests.swift; sourceTree = "<group>"; };
 		0A0EAC3E96A14B35B792FA8C /* SyncDeletionNonPropagationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDeletionNonPropagationContractTests.swift; sourceTree = "<group>"; };
+		32762FE810F44761872B060C /* CharacterMapResourceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CharacterMapResourceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -468,7 +470,10 @@
 		5C0DE00000000000000000A1 /* Exceptions for "QQPlayer" folder in "SiriIntentsExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Resources/SimplifiedToTraditional.tsv,
+				Resources/TraditionalToSimplified.tsv,
 				Services/ArtistNameNormalizer.swift,
+				Services/CharacterMapResourceLoader.swift,
 				Services/DisplayScriptLanguageOverride.swift,
 				Services/DisplayScriptNormalizer.swift,
 				Services/SimplifiedTraditionalMap.swift,
@@ -543,6 +548,8 @@
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
 				QQPlayerMacApp.swift,
+				Resources/SimplifiedToTraditional.tsv,
+				Resources/TraditionalToSimplified.tsv,
 				Services/AlignedLyricsStore.swift,
 				Services/AppCoordinator.swift,
 				"Services/AppCoordinator+iCloud.swift",
@@ -558,6 +565,7 @@
 				"Services/AudioMetadataParser+FLAC.swift",
 				"Services/AudioMetadataParser+MP3WAV.swift",
 				Services/BuiltinEQPresets.swift,
+				Services/CharacterMapResourceLoader.swift,
 				Services/CloudDownloadError.swift,
 				Services/CloudDownloadManager.swift,
 				Services/CloudFailureDetector.swift,
@@ -1006,6 +1014,7 @@
 				98399E1EAC1E43AF9CFFC7E3 /* ViewDataAccessContractTests.swift */,
 				FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */,
 				0A0EAC3E96A14B35B792FA8C /* SyncDeletionNonPropagationContractTests.swift */,
+				32762FE810F44761872B060C /* CharacterMapResourceTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1467,6 +1476,7 @@
 				301987A26EE445F594205D31 /* ViewDataAccessContractTests.swift in Sources */,
 				33B5881F04CA4D598D2D3B71 /* TrackDeletionServiceTests.swift in Sources */,
 				C013AF9F15FB4C8EA13C6097 /* SyncDeletionNonPropagationContractTests.swift in Sources */,
+				3500C7F72B9C446DB2DC9353 /* CharacterMapResourceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

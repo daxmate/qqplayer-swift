@@ -182,6 +182,67 @@ enum DisplayScriptContract {
         }
         return hits
     }
+
+    // MARK: - 形状守卫：数据下沉到资源后（2026-09-17 P2-①）
+
+    /// 两张表的**声明**源文件（数据已下沉到 Resources/*.tsv，这里只剩声明）
+    static let mapSourceFileSuffixes = [
+        "QQPlayer/Services/SimplifiedTraditionalMap.swift",
+        "QQPlayer/Services/TraditionalToSimplifiedMap.swift",
+    ]
+
+    /// 唯一允许读这两份资源的文件（防裸调：白名单只留入口自己）
+    static let mapResourceLoaderFileSuffix = "QQPlayer/Services/CharacterMapResourceLoader.swift"
+
+    /// 资源名（裸读扫描用）
+    static let mapResourceNames = ["SimplifiedToTraditional", "TraditionalToSimplified"]
+
+    /// 违规：映射表源文件里又出现 Swift 字典字面量条目（`"X": "Y",`）= 数据被内联回源码。
+    /// 下沉的意义就是「数据不进编译产物」，内联回来等于白做（且没人会再盯着比对）。
+    static func inlinedMapEntryViolations(inSource source: String, filePath: String) -> [String] {
+        guard mapSourceFileSuffixes.contains(where: { filePath.hasSuffix($0) }) else { return [] }
+        var violations: [String] = []
+        for (index, rawLine) in source.components(separatedBy: "\n").enumerated() {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*") else { continue }
+            let columns = trimmed.components(separatedBy: "\": \"")
+            guard columns.count == 2 else { continue }
+            guard columns[0].hasPrefix("\""), columns[0].count == 2,
+                  columns[1].hasSuffix("\","), columns[1].dropLast(2).count == 1
+            else { continue }
+            violations.append("\(filePath):\(index + 1): \(trimmed)  → 映射数据被内联回源码（数据源是 Resources/*.tsv 资源文件）")
+        }
+        return violations
+    }
+
+    /// 违规：映射表声明不是「资源加载」形态（声明必须来自 CharacterMapResourceLoader.load(…)）
+    static func nonResourceBackedDeclarationViolations(inSource source: String, filePath: String) -> [String] {
+        guard mapSourceFileSuffixes.contains(where: { filePath.hasSuffix($0) }) else { return [] }
+        var violations: [String] = []
+        for (index, rawLine) in source.components(separatedBy: "\n").enumerated() {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*") else { continue }
+            guard trimmed.contains("[Character: Character]") else { continue }
+            guard !trimmed.contains("CharacterMapResourceLoader.load(") else { continue }
+            violations.append("\(filePath):\(index + 1): \(trimmed)  → 表声明必须走资源加载入口（CharacterMapResourceLoader.load(…)）")
+        }
+        return violations
+    }
+
+    /// 违规：绕过唯一入口直接读这两份资源（防裸调；白名单只留 loader 自己）
+    static func resourceLoadViolations(inSource source: String, filePath: String) -> [String] {
+        guard !filePath.hasSuffix(mapResourceLoaderFileSuffix) else { return [] }
+        var violations: [String] = []
+        for (index, rawLine) in source.components(separatedBy: "\n").enumerated() {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*") else { continue }
+            guard trimmed.contains("url(forResource:"),
+                  mapResourceNames.contains(where: { trimmed.contains("\"\($0)") })
+            else { continue }
+            violations.append("\(filePath):\(index + 1): \(trimmed)  → 绕过 CharacterMapResourceLoader 裸读映射资源")
+        }
+        return violations
+    }
 }
 
 // SCAN-END
@@ -362,5 +423,62 @@ struct DisplayScriptContractTests {
         }
         #expect(hits.count == 1, "繁→简表声明了 \(hits.count) 处（同一语义只允许一处）：\n\(hits.joined(separator: "\n"))")
         #expect(hits.first?.contains("QQPlayer/Services/TraditionalToSimplifiedMap.swift") == true, "\(hits)")
+    }
+
+    // MARK: 形状守卫：数据下沉到资源后（2026-09-17 P2-①）
+    //
+    //  事实源从「Swift 字面量」变成「Resources/*.tsv 资源 + CharacterMapResourceLoader」：
+    //  - 声明仍在原文件（`reverseMapDeclaredOnce` 不变 → 唯一声明仍然只有一处，没有放宽）
+    //  - 新增三条：数据不许内联回源码 / 声明必须是资源加载形态 / 资源只许走唯一入口读
+    //  - 数据本身的一致性由 CharacterMapResourceTests（基线夹具逐键 + 哈希）守着
+
+    static func mapSourceFiles() -> [URL] {
+        Self.allSourceFiles.filter { url in
+            let relative = Self.relativePath(url)
+            return DisplayScriptContract.mapSourceFileSuffixes.contains { relative.hasSuffix($0) }
+        }
+    }
+
+    @Test("形状扫描自证：资源下沉后的三条新规则都能抓到合成违规")
+    func resourceShapeScanSelfCheck() {
+        let mapPath = "QQPlayer/Services/SimplifiedTraditionalMap.swift"
+        // ① 内联数据被抓
+        #expect(DisplayScriptContract.inlinedMapEntryViolations(inSource: "    \"㐷\": \"傌\",", filePath: mapPath).count == 1)
+        #expect(DisplayScriptContract.inlinedMapEntryViolations(inSource: "    \"台\": \"台\",", filePath: mapPath).count == 1)
+        #expect(DisplayScriptContract.inlinedMapEntryViolations(inSource: "// 反例：    \"㐷\": \"傌\",", filePath: mapPath).isEmpty)
+        #expect(DisplayScriptContract.inlinedMapEntryViolations(inSource: "    \"㐷\": \"傌\",", filePath: "QQPlayer/Services/Other.swift").isEmpty)
+        // ② 非资源声明被抓
+        #expect(DisplayScriptContract.nonResourceBackedDeclarationViolations(inSource: "let simplifiedToTraditionalMap: [Character: Character] = [", filePath: mapPath).count == 1)
+        #expect(DisplayScriptContract.nonResourceBackedDeclarationViolations(inSource: "let simplifiedToTraditionalMap: [Character: Character] = CharacterMapResourceLoader.load(.simplifiedToTraditional)", filePath: mapPath).isEmpty)
+        // ③ 裸读资源被抓（入口自己豁免）
+        let naked = "        Bundle.main.url(forResource: \"SimplifiedToTraditional\", withExtension: \"tsv\")"
+        #expect(DisplayScriptContract.resourceLoadViolations(inSource: naked, filePath: "QQPlayer/Views/Tmp.swift").count == 1)
+        #expect(DisplayScriptContract.resourceLoadViolations(inSource: naked, filePath: "QQPlayer/Services/CharacterMapResourceLoader.swift").isEmpty)
+    }
+
+    @Test("形状：映射表数据不在 Swift 源码里、声明走资源加载入口")
+    func mapDataLivesInResources() {
+        let files = Self.mapSourceFiles()
+        #expect(files.count == 2, "应扫到 2 个映射表声明文件，实际 \(files.count)：\(files.map { Self.relativePath($0) })")
+        var inlined: [String] = []
+        var notResourceBacked: [String] = []
+        for file in files {
+            guard let source = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            let path = Self.relativePath(file)
+            inlined.append(contentsOf: DisplayScriptContract.inlinedMapEntryViolations(inSource: source, filePath: path))
+            notResourceBacked.append(contentsOf: DisplayScriptContract.nonResourceBackedDeclarationViolations(inSource: source, filePath: path))
+        }
+        #expect(inlined.isEmpty, "映射数据又内联回源码了（数据源是 QQPlayer/Resources/*.tsv）：\n\(inlined.joined(separator: "\n"))")
+        #expect(notResourceBacked.isEmpty, "表声明不是资源加载形态：\n\(notResourceBacked.joined(separator: "\n"))")
+    }
+
+    @Test("形状：全仓只有 CharacterMapResourceLoader 读这两份资源（防裸调）")
+    func mapResourcesHaveSingleLoadEntryPoint() {
+        var violations: [String] = []
+        for file in Self.allSourceFiles {
+            guard let source = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            violations.append(contentsOf: DisplayScriptContract.resourceLoadViolations(inSource: source, filePath: Self.relativePath(file)))
+        }
+        #expect(violations.isEmpty, "有地方绕过唯一入口裸读映射资源：\n\(violations.joined(separator: "\n"))")
     }
 }
