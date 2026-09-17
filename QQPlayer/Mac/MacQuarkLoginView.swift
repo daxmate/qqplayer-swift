@@ -61,8 +61,8 @@ struct MacQuarkLoginView: View {
                     .multilineTextAlignment(.center)
                 statusArea
             }
-            .padding(.horizontal, DesignTokens.space22)
-            .padding(.vertical, DesignTokens.space18)
+            .padding(.horizontal, DesignTokens.space20)
+            .padding(.vertical, DesignTokens.space16)
         }
         .frame(width: 320)
         .onAppear {

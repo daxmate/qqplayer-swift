@@ -280,13 +280,22 @@ enum UIGeometryContract {
 /// 「这一屏留白到底几 pt」只能靠 grep 盘点 ⇒ B2c-a 收成 `DesignTokens.space*`
 /// （**同值令牌化，零视觉变化**：每个令牌的值 = 迁移前那处裸字面量，逐字相同），本条契约保证它不散回去。
 ///
+/// B2c-b（2026-09-17）把 33 种刻度按 4pt 基准建议刻度**归一**（迁移前实测 836 条引用）：
+/// 第 1 笔并掉位移 ≤2pt 的微调档（`1/1.5→2`、`3/5→4`、`7/9→8`、`18→16`、`22→20`、
+/// `25/26/28→24`、`30→32`、`44→40`、`50/56→48`、`60→64`，并新增 `space48`），
+/// 第 2 笔单独并 `14→12`（中等视觉影响）。归一后的刻度集合由
+/// `expectedSpaceNames` + 用例「归一后间距刻度集合 == 预期集合」锁住（改动刻度必须同步改断言）。
+///
 /// 与 B2a 同款 fail-closed 难点：这条规则的目标状态就是 **0 命中** ⇒ 不能用「命中数 > 0」证明非空转，
 /// 改用 ① 合成源码正反例（裸值恰好被抓、令牌/变量/表达式/注释不误报）；② 令牌引用条数下限 + 定义↔引用一一对应。
 ///
 /// 刻意**不抓**的形态（本阶段边界，「不迁移清单」见 `docs/ui-design-tokens.md` §3 M4）：
 /// - `.padding()` 空参（= 系统默认 16）、`.padding(.horizontal)` 仅边参数——没有数值可令牌化；
-/// - 变量 / 表达式：`spacing: someVar`、`spacing: Self.spacing`、`.padding(compact ? 20 : 44)`、
-///   `spacing: … ? 12 : 16`、`.padding(.horizontal, max(16, …))`（这些是 B2c-b 归一的输入）；
+/// - 变量 / 表达式：`spacing: someVar`、`spacing: Self.spacing`、
+///   `spacing: … ? 12 : 16`（刻意的设备差异，B2c-b 整组不动）、
+///   `.padding(.horizontal, max(16, …))`（自适应夹取，B2c-b 保留为例外，源码处带注释）；
+///   档位选择式三元（`.padding(compact ? 20 : 44)` 一类）已在 B2c-b 令牌化，
+///   令牌化后同样不命中本规则（规则锚在 `padding(` / `spacing:` 后紧跟数字）。
 /// - 声明而非调用点：`let spacing: CGFloat = 2`、`static let spacing: CGFloat = 12`、`spacing: CGFloat = spacing`。
 ///
 /// 已知边界（line-based 扫描的固有局限，与 B1/B2a 同款）：只认同一行内的写法；
@@ -664,7 +673,7 @@ struct UIGeometryContractTests {
         let spaceTokens = tokens.filter { $0.name.hasPrefix("space") }
         #expect(radiusTokens.count >= 11, "圆角令牌数异常（B2b 归一后 11 种）：\(radiusTokens.count)")
         #expect(fontTokens.count >= 24, "字号令牌数异常（B2b 归一后 24 种）：\(fontTokens.count)")
-        #expect(spaceTokens.count >= 33, "间距令牌数异常（B2c-a 实测 33 种）：\(spaceTokens.count)")
+        #expect(spaceTokens.count >= 17, "间距令牌数异常（B2c-b 归一后 17 档）：\(spaceTokens.count)")
 
         let inconsistent = UIGeometryContract.selfInconsistent(tokens)
         #expect(inconsistent.isEmpty, "令牌名与值不自洽（拼错名 = 值静默变成另一个数）：\n\(inconsistent.joined(separator: "\n"))")
@@ -854,6 +863,9 @@ struct UISpacingContractTests {
         add("        Text(\"q\").padding(size * 0.5)")
         add("        Text(\"r\").padding(DesignTokens.space8 * scale)")
         add("        Text(\"s\").padding(compact ? 20 : 44)")
+        // 不该抓：B2c-b 令牌化后的三元形态（档位选择式；规则锚在实参开头就是数字）
+        add("        Text(\"s2\").padding(compact ? DesignTokens.space20 : DesignTokens.space40)")
+        add("        VStack(spacing: compact ? DesignTokens.space14 : DesignTokens.space32) {")
         add("        Text(\"t\").padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))")
         add("        Text(\"u\").padding(.horizontal, max(16, min(20, UIScreen.main.bounds.width * 0.05)))")
         add("        Text(\"v\").padding(.horizontal, Self.horizontalPadding)")
@@ -892,7 +904,8 @@ struct UISpacingContractTests {
         #expect(files.count >= 250, "扫描范围异常（B2a 实测 QQPlayer/** 301 个 .swift）：\(files.count)")
         #expect(files.contains(Self.tokenFileURL), "令牌定义文件不在扫描范围内：\(Self.tokenFileURL.path)")
 
-        // 非空转佐证：迁移后全仓应有 ≈829 条 DesignTokens.space* 引用（B2c-a 实测 829 处）
+        // 非空转佐证：归一后全仓应有 ≈845 条 DesignTokens.space* 引用（B2c-b 第 1 笔实测 845 条；
+        // B2c-a 令牌化后是 836 条，归一本身不增减引用，增量来自表达式内字面量令牌化）
         let references = Self.spaceTokenNames(in: files)
         #expect(
             references.count >= UISpacingContract.minimumReferenceCount,
@@ -906,11 +919,39 @@ struct UISpacingContractTests {
         )
     }
 
+    /// B2c-b 归一后的**目标刻度集合**（归一验收物：刻度只能少、不能再长出零散值）。
+    /// 33 种 → 17 档（`1/1.5→2`、`3/5→4`、`7/9→8`、`14→12`、`18→16`、`22→20`、
+    /// `25/26/28→24`、`30→32`、`44→40`、`50/56→48`、`60→64`，并新增 `space48`）；
+    /// 大留白 `100/110/120` 按拍板表**保留不动**（不参与并档）。
+    /// 第 1 笔状态：`space14 → space12` 是中等视觉影响、单独第 2 笔，故此处暂时 18 档。
+    /// 改动刻度必须同时改本断言——这是「归一没被新零散值静默回退」的唯一兜底。
+    static let expectedSpaceNames: Set<String> = [
+        "space0", "space2", "space4", "space6", "space8", "space10", "space12", "space14",
+        "space16", "space20", "space24", "space32", "space40", "space48", "space64",
+        "space100", "space110", "space120",
+    ]
+
+    @Test("归一后间距刻度集合 == 预期集合（B2c-b 验收物）")
+    func normalizedScaleMatchesExpectedSet() throws {
+        let source = try String(contentsOf: Self.tokenFileURL, encoding: .utf8)
+        let space = Set(
+            UIGeometryContract.parseTokens(source: source).map(\.name).filter { $0.hasPrefix("space") }
+        )
+        #expect(
+            space == Self.expectedSpaceNames,
+            """
+            间距刻度与归一验收物不一致。
+            多出（又长回零散值 / 忘了删旧令牌）：\(space.subtracting(Self.expectedSpaceNames).sorted())
+            缺失（被误删）：\(Self.expectedSpaceNames.subtracting(space).sorted())
+            """
+        )
+    }
+
     @Test("间距令牌名 ↔ 值自洽，且每条都被引用（防拼错名静默改值 / 防死令牌）")
     func spacingTokenTableIsSelfConsistentAndFullyReferenced() throws {
         let source = try String(contentsOf: Self.tokenFileURL, encoding: .utf8)
         let tokens = UIGeometryContract.parseTokens(source: source).filter { $0.name.hasPrefix("space") }
-        #expect(tokens.count >= 33, "间距令牌数异常（B2c-a 实测 33 种）：\(tokens.count)")
+        #expect(tokens.count >= 18, "间距令牌数异常（B2c-b 第 1 笔：18 档，含待并的 space14）：\(tokens.count)")
 
         let inconsistent = UIGeometryContract.selfInconsistent(tokens)
         #expect(

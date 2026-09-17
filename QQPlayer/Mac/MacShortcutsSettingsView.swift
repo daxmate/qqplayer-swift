@@ -54,7 +54,7 @@ struct MacShortcutsSettingsView: View {
     // MARK: - 行
 
     private func shortcutRow(_ def: MacShortcutDef) -> some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space3) {
+        VStack(alignment: .leading, spacing: DesignTokens.space4) {
             HStack(spacing: DesignTokens.space10) {
                 Text(def.labelKey.localized)
                     .font(.callout)
@@ -70,7 +70,7 @@ struct MacShortcutsSettingsView: View {
                         .monospaced()
                         .foregroundColor(.secondary)
                         .padding(.horizontal, DesignTokens.space8)
-                        .padding(.vertical, DesignTokens.space3)
+                        .padding(.vertical, DesignTokens.space4)
                         .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius4))
                 }
                 Button(recordingID == def.id ? "shortcuts_cancel".localized : "shortcuts_record".localized) {

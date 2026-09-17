@@ -154,6 +154,8 @@ struct PlayerView: View {
 
     private var mainContent: some View {
         contentView
+            // 刻意例外（B2c-b 保留，非漏做）：这是自适应夹取——左右留白随屏宽变化
+            // （5% 屏宽，夹在 16…20pt 之间），不是「哪个档位」的选择，无法表达为刻度令牌。
             .padding(.horizontal, max(16, min(20, UIScreen.main.bounds.width * 0.05)))
             .padding(.vertical)
             .onChange(of: playerEngine.currentTrack) { _, _ in
@@ -222,7 +224,7 @@ struct PlayerView: View {
     private var contentView: some View {
         VStack(spacing: DesignTokens.space0) {
             if let currentTrack = playerEngine.currentTrack {
-                VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 20 : 25) {
+                VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 20 : 24) {
                     artworkSection
                     titleAndArtistSection(track: currentTrack)
                 }

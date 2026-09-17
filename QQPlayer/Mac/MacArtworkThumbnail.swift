@@ -142,8 +142,8 @@ struct MacArtworkCollage: View {
                     .frame(width: size, height: size)
             } else {
                 LazyVGrid(
-                    columns: [GridItem(.fixed(cell), spacing: DesignTokens.space1), GridItem(.fixed(cell), spacing: DesignTokens.space1)],
-                    spacing: DesignTokens.space1
+                    columns: [GridItem(.fixed(cell), spacing: DesignTokens.space2), GridItem(.fixed(cell), spacing: DesignTokens.space2)],
+                    spacing: DesignTokens.space2
                 ) {
                     ForEach(available.prefix(4).indices, id: \.self) { index in
                         Image(nsImage: available[index])

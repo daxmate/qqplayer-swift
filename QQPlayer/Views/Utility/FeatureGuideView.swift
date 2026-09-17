@@ -141,7 +141,7 @@ struct FeatureGuideView: View {
                                 .frame(width: 28, height: 28)
                                 .background(accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.radius8))
 
-                            VStack(alignment: .leading, spacing: DesignTokens.space3) {
+                            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                                 Text(item.title)
                                     .font(.subheadline.weight(.medium))
                                     .foregroundColor(.primary)

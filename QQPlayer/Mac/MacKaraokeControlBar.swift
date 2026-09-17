@@ -148,7 +148,7 @@ struct MacKaraokeControlBar: View {
             }
         } label: {
             pill(isHighlighted: karaoke.speed != 1.0) {
-                HStack(spacing: DesignTokens.space3) {
+                HStack(spacing: DesignTokens.space4) {
                     Text(String(format: "%.1fx", karaoke.speed))
                     Image(systemName: "chevron.down")
                         .font(.system(size: DesignTokens.font8, weight: .bold))

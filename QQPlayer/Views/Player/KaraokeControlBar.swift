@@ -43,12 +43,12 @@ struct KaraokeControlBar: View {
                     .font(.caption2.weight(.medium))
                     .foregroundColor(accentColor)
                     .padding(.horizontal, DesignTokens.space12)
-                    .padding(.vertical, DesignTokens.space5)
+                    .padding(.vertical, DesignTokens.space4)
                     .background(Capsule().fill(.ultraThinMaterial))
             }
 
             // 播放控制三键：上一句 / 播放暂停 / 下一句（歌词行级，用户 2026-08-29 拍板）
-            HStack(spacing: DesignTokens.space26) {
+            HStack(spacing: DesignTokens.space24) {
                 prevLineButton
                 playPauseButton
                 nextLineButton
@@ -181,7 +181,7 @@ struct KaraokeControlBar: View {
             .font(.footnote.weight(.semibold))
             .foregroundColor(isHighlighted ? accentColor : .primary.opacity(0.85))
             .padding(.horizontal, DesignTokens.space16)
-            .padding(.vertical, DesignTokens.space9)
+            .padding(.vertical, DesignTokens.space8)
             .background(Capsule().fill(.ultraThinMaterial))
             .overlay(Capsule().fill(isHighlighted ? accentColor.opacity(0.16) : Color.clear))
             .overlay(

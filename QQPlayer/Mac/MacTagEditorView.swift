@@ -126,7 +126,7 @@ struct MacTagEditorView: View {
                 .padding(.vertical, DesignTokens.space8)
                 .padding(.horizontal, DesignTokens.space16)
                 .background(.regularMaterial, in: Capsule())
-                .padding(.bottom, DesignTokens.space50)
+                .padding(.bottom, DesignTokens.space48)
                 .transition(.opacity)
             }
         }
@@ -273,7 +273,7 @@ struct MacTagEditorView: View {
     }
 
     private func field(_ label: String, text: Binding<String>, disabled: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space3) {
+        VStack(alignment: .leading, spacing: DesignTokens.space4) {
             Text(label)
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -358,7 +358,7 @@ struct MacTagEditorView: View {
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, DesignTokens.space18)
+                .padding(.vertical, DesignTokens.space16)
             } else {
                 VStack(alignment: .leading, spacing: DesignTokens.space10) {
                     ForEach(orderedSources, id: \.self) { source in
@@ -398,7 +398,7 @@ struct MacTagEditorView: View {
         source: String
     ) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.space6) {
-            HStack(spacing: DesignTokens.space5) {
+            HStack(spacing: DesignTokens.space4) {
                 Image(systemName: icon)
                     .font(.caption2)
                 Text(title)
@@ -471,7 +471,7 @@ struct MacTagEditorView: View {
             Button {
                 save()
             } label: {
-                HStack(spacing: DesignTokens.space5) {
+                HStack(spacing: DesignTokens.space4) {
                     if saving {
                         ProgressView()
                             .controlSize(.small)

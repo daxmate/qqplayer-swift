@@ -403,7 +403,7 @@ private struct MacLibrarySettingsView: View {
                     Text("." + ext)
                         .font(.system(.callout, design: .monospaced))
                         .padding(.horizontal, DesignTokens.space10)
-                        .padding(.vertical, DesignTokens.space5)
+                        .padding(.vertical, DesignTokens.space4)
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: DesignTokens.radius6)

@@ -590,7 +590,7 @@ struct MacSyncRunSection: View {
     private func trackRow(_ option: SyncUITrackOption) -> some View {
         Toggle(isOn: trackBinding(option.relativePath)) {
             HStack(spacing: DesignTokens.space8) {
-                VStack(alignment: .leading, spacing: DesignTokens.space1) {
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
                     // 曲目行是「渲染出来的歌曲文本」（含对端曲库）→ 按 UI 语言归一字形；
                     // 勾选/传输仍用 relativePath（原始字段，不受显示层影响）
                     Text(DisplayScriptNormalizer.display(option.title))
@@ -1200,7 +1200,7 @@ struct MacSyncRunSection: View {
             // 数字与顺序全部来自唯一投影 `SyncEntityOutcomeDisclosure`（UI 不自算、不枚举实体）。
             let entityRows = SyncEntityOutcomeDisclosure.rows(report.tally)
             if !entityRows.isEmpty {
-                VStack(alignment: .leading, spacing: DesignTokens.space3) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(SyncEntityOutcomeDisclosure.breakdownTitleKey.localized)
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -86,8 +86,8 @@ struct MacTagEditorCandidateRow: View {
         Text(candidate.source == "netease" ? "source_netease".localized : "source_musicbrainz".localized)
             .font(.system(size: DesignTokens.font9))
             .foregroundColor(.secondary)
-            .padding(.horizontal, DesignTokens.space5)
-            .padding(.vertical, DesignTokens.space1_5)
+            .padding(.horizontal, DesignTokens.space4)
+            .padding(.vertical, DesignTokens.space2)
             .background(Color.gray.opacity(0.15), in: Capsule())
             .lineLimit(1)
     }

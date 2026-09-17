@@ -55,7 +55,7 @@ struct MacSearchAnythingLayer: View {
 
             VStack {
                 panel
-                    .padding(.top, DesignTokens.space60)
+                    .padding(.top, DesignTokens.space64)
                 Spacer()
             }
             .padding(.horizontal, DesignTokens.space120)
@@ -177,7 +177,7 @@ struct MacSearchAnythingLayer: View {
                     Text(statusMessage)
                         .font(.caption)
                         .foregroundColor(.red)
-                        .padding(.vertical, DesignTokens.space5)
+                        .padding(.vertical, DesignTokens.space4)
                         .padding(.horizontal, DesignTokens.space10)
                         .background(.regularMaterial, in: Capsule())
                         .padding(.bottom, DesignTokens.space6)
@@ -220,7 +220,7 @@ struct MacSearchAnythingLayer: View {
             }
             .contentShape(Rectangle())
             .padding(.horizontal, DesignTokens.space14)
-            .padding(.vertical, DesignTokens.space5)
+            .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
     }
@@ -241,7 +241,7 @@ struct MacSearchAnythingLayer: View {
             }
             .contentShape(Rectangle())
             .padding(.horizontal, DesignTokens.space14)
-            .padding(.vertical, DesignTokens.space5)
+            .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
     }
@@ -267,7 +267,7 @@ struct MacSearchAnythingLayer: View {
             }
             .contentShape(Rectangle())
             .padding(.horizontal, DesignTokens.space14)
-            .padding(.vertical, DesignTokens.space5)
+            .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
     }
@@ -293,7 +293,7 @@ struct MacSearchAnythingLayer: View {
                 .frame(width: 28, height: 28)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius4))
 
-                VStack(alignment: .leading, spacing: DesignTokens.space1) {
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
                     Text(DisplayScriptNormalizer.display(song.title)).lineLimit(1)
                     Text(DisplayScriptNormalizer.display(onlineSubtitle(song)))
                         .font(.caption)
@@ -305,7 +305,7 @@ struct MacSearchAnythingLayer: View {
             }
             .contentShape(Rectangle())
             .padding(.horizontal, DesignTokens.space14)
-            .padding(.vertical, DesignTokens.space5)
+            .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
     }
@@ -352,7 +352,7 @@ struct MacSearchAnythingLayer: View {
                     }
                     .contentShape(Rectangle())
                     .padding(.horizontal, DesignTokens.space14)
-                    .padding(.vertical, DesignTokens.space5)
+                    .padding(.vertical, DesignTokens.space4)
                 }
                 .buttonStyle(.plain)
             }
@@ -368,7 +368,7 @@ struct MacSearchAnythingLayer: View {
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, DesignTokens.space60)
+                .padding(.horizontal, DesignTokens.space64)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

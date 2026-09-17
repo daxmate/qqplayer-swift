@@ -313,7 +313,7 @@ struct AlbumDetailScreen: View {
                                         Spacer()
                                     }
                                     .padding(.horizontal)
-                                    .padding(.top, disc.discNumber > 1 ? 16 : 0)
+                                    .padding(.top, disc.discNumber > 1 ? DesignTokens.space16 : DesignTokens.space0)
                                     .padding(.bottom, DesignTokens.space8)
                                 }
 
@@ -360,7 +360,7 @@ struct AlbumDetailScreen: View {
                                     let isLastTrackOfDisc = index == disc.tracks.count - 1
                                     let isLastDisc = disc.discNumber == groupedByDisc.last?.discNumber
                                     if !isLastTrackOfDisc || !isLastDisc {
-                                        Divider().padding(.leading, DesignTokens.space60)
+                                        Divider().padding(.leading, DesignTokens.space64)
                                     }
                                 }
                             }
