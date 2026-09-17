@@ -197,6 +197,15 @@
 "drag_import_skipped_count" = "已跳過 %d 個不支援的檔案";
 "drag_import_partial_count" = "已匯入 %1$d 個檔案，跳過 %2$d 個";
 
+/* 匯入結果彙總（出錯必須如實說，不許報成「已在媒體庫中」） */
+"import_result_separator" = "，";
+"import_result_added_one" = "已匯入 1 首";
+"import_result_added_many" = "已匯入 %d 首";
+"import_result_updated_many" = "已更新 %d 首";
+"import_result_present_many" = "已在媒體庫中 %d 首";
+"import_result_excluded_many" = "已排除 %d 首";
+"import_result_failed_many" = "%d 首失敗";
+
 /* Track list context menu (A3) */
 "show_artist" = "進歌手";
 "show_album" = "進專輯";

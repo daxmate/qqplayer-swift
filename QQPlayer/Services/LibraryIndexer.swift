@@ -19,6 +19,35 @@ enum LibraryIndexerError: Error {
     case metadataParsingFailed
 }
 
+/// 外部文件导入的**唯一结果语义**（反屎山 B1）。
+///
+/// 旧 `processExternalFile -> Bool` 把 4 条不同路径压成同一个 `false`
+/// （已在库 / 被排除 / 解析落库出错 / 已在库但重解析），消费方（导入面板）
+/// 只能把 `false` 一律说成「already in library」——**面板主动说谎**，用户不会重试。
+/// 本枚举由 `LibraryIndexer.processExternalFileOutcome` 唯一产出，别处不得再判定一份。
+enum ExternalImportOutcome: Equatable {
+    /// 新入库（旧 Bool 语义里唯一返回 `true` 的路径）。
+    case imported
+    /// 已在库、但指纹变了 → 重新解析并覆盖元数据（旧实现返回 `false`，但不是「已在库」）。
+    case updatedExisting
+    /// 已在库且元数据最新（旧 `return false`）。
+    case alreadyPresent
+    /// 曾被用户从库中移除（排除），且未要求重导（旧 `return false`）。
+    case excluded
+    /// 没能导入（旧 `return false`）：含目录拒绝、超时、解析/落库报错。
+    case failed(ExternalImportFailure)
+}
+
+/// `ExternalImportOutcome.failed` 的失败原因，逐条对应 `processExternalFileOutcome` 里的真实分支。
+enum ExternalImportFailure: Equatable {
+    /// 非本地文件（http/https/ftp/sftp），根本没进解析。
+    case unsupportedLocation
+    /// 解析超时（`LibraryIndexerError.parseTimeout`）。
+    case parseTimeout
+    /// 解析或落库抛错（`catch` 兜底分支）。
+    case processing
+}
+
 private struct ParsedAudioFile {
     let track: Track
     let trackArtistIds: [Int64]
@@ -79,8 +108,15 @@ class LibraryIndexer: NSObject, ObservableObject {
         return (rows ?? 0) > 0
     }
 
-    private let databaseManager = DatabaseManager.shared
+    private let databaseManager: DatabaseManager
     private let stateManager = StateManager.shared
+
+    /// 依赖注入缝（测试用）：指向内存库，避免用例写进真机 app 库。
+    /// 生产恒走默认值 `.shared`，与 `DatabaseManager.init(dbWriter:)` 同一套路。
+    init(databaseManager: DatabaseManager = .shared) {
+        self.databaseManager = databaseManager
+        super.init()
+    }
 
     func start() {
         guard !isIndexing else { return }
@@ -279,12 +315,27 @@ class LibraryIndexer: NSObject, ObservableObject {
         )
     }
 
+    /// 旧 API：`Bool` 视图。语义 = `== .imported`（**只有新入库才是 true**），
+    /// 与重构前的返回值逐分支一致，既有调用点行为零变化。
+    /// 判定逻辑只在下面 `processExternalFileOutcome` 一处，本函数不得再长逻辑。
     @discardableResult
     func processExternalFile(_ fileURL: URL, allowExcludedReimport: Bool = false) async -> Bool {
+        await processExternalFileOutcome(
+            fileURL,
+            allowExcludedReimport: allowExcludedReimport
+        ) == .imported
+    }
+
+    /// 导入一个外部文件的**唯一入口**：返回穷尽的导入结果（见 `ExternalImportOutcome`）。
+    @discardableResult
+    func processExternalFileOutcome(
+        _ fileURL: URL,
+        allowExcludedReimport: Bool = false
+    ) async -> ExternalImportOutcome {
         // Reject network URLs
         if let scheme = fileURL.scheme?.lowercased(), ["http", "https", "ftp", "sftp"].contains(scheme) {
             print("❌ Rejected network URL: \(fileURL.absoluteString)")
-            return false
+            return .failed(.unsupportedLocation)
         }
 
         do {
@@ -308,7 +359,7 @@ class LibraryIndexer: NSObject, ObservableObject {
                 if allowExcludedReimport {
                     NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
                 }
-                return false
+                return .alreadyPresent
             }
             if existingTrack != nil {
                 print("🔄 File changed; reparsing external metadata: \(fileURL.lastPathComponent)")
@@ -318,7 +369,7 @@ class LibraryIndexer: NSObject, ObservableObject {
             let isExcluded = DeleteSettings.isTrackExcluded(stableId)
             if isExcluded && !allowExcludedReimport {
                 print("⏭️ Track excluded from library: \(fileURL.lastPathComponent)")
-                return false
+                return .excluded
             }
             if isExcluded && allowExcludedReimport {
                 print("🔁 Re-importing excluded track by user request: \(fileURL.lastPathComponent)")
@@ -340,17 +391,18 @@ class LibraryIndexer: NSObject, ObservableObject {
                 print("✅ Cleared exclusion for re-imported track: \(fileURL.lastPathComponent)")
             }
 
-            return existingTrack == nil
+            // 指纹变了的老行重解析成功 = 「更新」，不是「已在库」也不是「新入库」。
+            return existingTrack == nil ? .imported : .updatedExisting
 
         } catch LibraryIndexerError.parseTimeout {
             print("⏰ Timeout parsing external audio file: \(fileURL.lastPathComponent)")
             print("❌ Skipping external file due to parsing timeout")
-            return false
+            return .failed(.parseTimeout)
         } catch {
             print("❌ Failed to process external track at \(fileURL.lastPathComponent): \(error)")
             print("❌ Error type: \(type(of: error))")
             print("❌ Error details: \(String(describing: error))")
-            return false
+            return .failed(.processing)
         }
     }
 
