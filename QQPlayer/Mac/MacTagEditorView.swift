@@ -20,7 +20,7 @@
 //    文件名与模板渲染结果一致才 ON，否则 OFF；ON 时展示渲染目标名实时预览）
 //  - 保存语义：表单非空文本才进 request（空 = 不写该字段，TagWriterService
 //    语义）；coverData 只在用户选了候选封面时给；removeCover 用户点了才给
-//  - 保存 = TagWriterService.writeTags → renamed 时 DatabaseManager.moveTrack
+//  - 保存 = TagWriterService.writeTags → renamed 时 AppCoordinator.moveTrack
 //    迁移引用 → 通知刷新（LibraryFolderContentChanged 一次性）→ 成功反馈；
 //    播放队列中该曲目改名 → 队列/当前曲目路径跟随（不打断播放）
 //  - 错误处理：TagWriterError.unsupportedFormat → 弹提示「该格式不支持写标签」；
@@ -688,11 +688,14 @@ struct MacTagEditorView: View {
                 )
                 if result.renamed {
                     // 改名 → moveTrack 迁移引用（幂等；文件已改名但迁移失败 → 提示重扫）
-                    try DatabaseManager.shared.moveTrack(
-                        from: originalPath,
-                        to: result.finalURL.path
-                    )
-                    let migrated = try DatabaseManager.shared.getTrack(byPath: result.finalURL.path)
+                    // 写操作唯一入口是 @MainActor 的 AppCoordinator → 从后台 hop 回主线程执行
+                    try await MainActor.run {
+                        try AppCoordinator.shared.moveTrack(
+                            from: originalPath,
+                            to: result.finalURL.path
+                        )
+                    }
+                    let migrated = try LibraryReads.track(path: result.finalURL.path)
                     await MainActor.run {
                         finishSaveSuccess(renamed: true, oldStableId: oldStableId, migrated: migrated, finalPath: result.finalURL.path)
                     }
@@ -752,7 +755,7 @@ struct MacTagEditorView: View {
             // DB 已同步到最新标签 → 把播放上下文（当前曲目/队列）替换成 DB 新行，
             // 未改名时播放页标题/歌手也立即跟随（改名场景已在上面用 migrated 处理，
             // 此处按 oldStableId 匹配为幂等 no-op）
-            if let fresh = try? DatabaseManager.shared.getTrack(byPath: finalPath) {
+            if let fresh = try? LibraryReads.track(path: finalPath) {
                 followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: fresh)
             }
             // 兜底补发（processExternalFile 提前返回/指纹未变时也保证列表刷新）

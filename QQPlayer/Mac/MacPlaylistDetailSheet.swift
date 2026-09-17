@@ -141,7 +141,7 @@ struct MacManualPlaylistDetailView: View {
         let title = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         do {
-            try DatabaseManager.shared.renamePlaylist(playlistId: playlist.id ?? 0, newTitle: title)
+            try AppCoordinator.shared.renamePlaylist(playlistId: playlist.id ?? 0, newTitle: title)
             currentTitle = title
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
@@ -151,7 +151,7 @@ struct MacManualPlaylistDetailView: View {
 
     private func deletePlaylist() {
         do {
-            try DatabaseManager.shared.deletePlaylist(playlistId: playlist.id ?? 0)
+            try AppCoordinator.shared.deletePlaylist(playlistId: playlist.id ?? 0)
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             onExit()
         } catch {

@@ -337,7 +337,7 @@ struct MacTrackListView: View {
         if let playlistId {
             Divider()
             Button("playlist_manage_remove_from_playlist".localized, role: .destructive) {
-                try? DatabaseManager.shared.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
+                try? AppCoordinator.shared.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
                 NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             }
         }
@@ -346,7 +346,7 @@ struct MacTrackListView: View {
         Menu("add_to_playlist".localized) {
             ForEach(playlists, id: \.id) { playlist in
                 Button(playlist.title) {
-                    try? DatabaseManager.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
+                    try? AppCoordinator.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
                     NotificationCenter.default.post(name: .playlistsChanged, object: nil)
                 }
             }
@@ -542,8 +542,8 @@ struct MacTrackListView: View {
         let title = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, let track = pendingTrack else { return }
         do {
-            let playlist = try DatabaseManager.shared.createPlaylist(title: title)
-            try DatabaseManager.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
+            let playlist = try AppCoordinator.shared.createPlaylist(title: title)
+            try AppCoordinator.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             print("❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
