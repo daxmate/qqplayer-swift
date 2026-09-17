@@ -94,7 +94,11 @@ enum SyncLWWReconcile {
                 applyRemote.append(remote)
             } else if remote.updatedAtMs == local.updatedAtMs {
                 // 平局：delete 压 upsert（显式删除意图优先）；否则本端胜
-                if remote.opValue == .delete && local.opValue == .upsert {
+                // 判定走单一事实源（2026-09-17）：本文件不得再出现第二处 delete 判定。
+                if SyncChangeLogDeletionPolicy.tieBreakPrefersRemoteDelete(
+                    remoteOp: remote.op,
+                    localOp: local.op
+                ) {
                     applyRemote.append(remote)
                 } else {
                     localWins.append(local)

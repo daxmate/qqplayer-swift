@@ -34,6 +34,11 @@ enum SyncChangeLogDeletionPolicy {
     /// 与 `SyncChangeOp.delete.rawValue` 对齐（契约测试兜底）。
     static let deleteOperation = "delete"
 
+    /// 与 `SyncChangeOp.upsert.rawValue` 对齐（契约测试兜底）。
+    /// 本文件必须能被 `scripts/run-local-sync-tests.sh` 无模拟器直编，
+    /// 所以这里是字面量常量，不引用 `SyncChangeOp`——对齐由测试守住。
+    static let upsertOperation = "upsert"
+
     /// 该 op 是否为删除。
     static func isDelete(op: String) -> Bool {
         op == deleteOperation
@@ -79,5 +84,16 @@ enum SyncChangeLogDeletionPolicy {
     /// （拦截必须发生在 localize 之前，否则会被判成"本地缺歌"挂起）。
     static func shouldIgnore(op: String) -> Bool {
         isDelete(op: op)
+    }
+
+    /// LWW 同键**平局**裁决：远端 delete 压本地 upsert（显式删除意图优先）。
+    ///
+    /// 这是第三类"delete 怎么算"的判定（既不是发送过滤、也不是接收忽略），
+    /// 原先裸写在 `SyncLWWReconcile` 里——同样属于本文件该收的形状：
+    /// 调用方只传两侧 op，判定只此一处（2026-09-17 静态契约收口）。
+    ///
+    /// 语义与裸写版**逐字一致**：本地不是 upsert（含未知 op）时一律不采远端。
+    static func tieBreakPrefersRemoteDelete(remoteOp: String, localOp: String) -> Bool {
+        isDelete(op: remoteOp) && localOp == upsertOperation
     }
 }
