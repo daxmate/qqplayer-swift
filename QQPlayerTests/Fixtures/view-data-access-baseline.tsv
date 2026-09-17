@@ -9,26 +9,10 @@
 #   删除曲目 → QQPlayer/Services/TrackDeletionService.swift
 #   播放列表写操作 → AppCoordinator 既有的 playlist API（见 AppCoordinator+ImportExport.swift）
 #
-# 进度：108 → 101（第 1 批：7 处删除仪式收进 TrackDeletionService；TrackBulkSelection 清零已删行）
+# 进度：108 → 50（第 1 批：7 处删除仪式收进 TrackDeletionService、TrackBulkSelection 清零；第 2 批：iOS 视图查询收口，16 个文件清零）
 # 格式：路径<TAB>引用数
-QQPlayer/Views/Albums/AlbumViews.swift	6
-QQPlayer/Views/Artists/ArtistRowViews.swift	3
-QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	1
-QQPlayer/Views/Library/SearchResultsViews.swift	9
-QQPlayer/Views/Library/SearchView.swift	6
-QQPlayer/Views/Library/TrackListView.swift	3
-QQPlayer/Views/Player/LyricsSearchView.swift	1
-QQPlayer/Views/Player/PlayerOverlays.swift	1
-QQPlayer/Views/Player/PlayerView.swift	4
-QQPlayer/Views/Player/QueueManagementView.swift	2
-QQPlayer/Views/Player/TrackRowView.swift	3
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	3
-QQPlayer/Views/Playlists/PlaylistManagementView.swift	1
-QQPlayer/Views/Playlists/PlaylistSelectionView.swift	2
-QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	2
-QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	3
-QQPlayer/Views/Utility/SettingsView.swift	3
+QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Mac/MacAlbumArtistViews.swift	4
 QQPlayer/Mac/MacArtworkThumbnail.swift	3
 QQPlayer/Mac/MacDesktopWindowViews.swift	1

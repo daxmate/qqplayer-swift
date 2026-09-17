@@ -9,7 +9,7 @@ struct SettingsView: View {
 
     private func deleteExistingFolderPlaylists() {
         do {
-            let folderPlaylists = try DatabaseManager.shared.getAllFolderPlaylists()
+            let folderPlaylists = try LibraryReads.folderPlaylists()
             for playlist in folderPlaylists {
                 if let id = playlist.id {
                     try DatabaseManager.shared.deletePlaylist(playlistId: id)

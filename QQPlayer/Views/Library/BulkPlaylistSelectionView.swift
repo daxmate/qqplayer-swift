@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 // MARK: - Bulk Selection Components
@@ -99,7 +98,7 @@ struct BulkPlaylistSelectionView: View {
 
     private func loadPlaylists() {
         do {
-            playlists = try DatabaseManager.shared.getAllPlaylists()
+            playlists = try LibraryReads.playlists()
         } catch {
             print("Failed to load playlists: \(error)")
         }

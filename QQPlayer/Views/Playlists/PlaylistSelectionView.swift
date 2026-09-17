@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 struct PlaylistSelectionView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
@@ -164,14 +163,9 @@ struct PlaylistSelectionView: View {
 
     private func loadPlaylists() {
         do {
-            playlists = try DatabaseManager.shared.getAllPlaylists()
+            playlists = try LibraryReads.playlists()
             // 一次性查出本曲所在歌单 id 集合（替代排序比较器/ForEach 内逐次同步 DB 读）
-            let containingIds = try DatabaseManager.shared.read { db in
-                try PlaylistItem
-                    .filter(Column("track_stable_id") == track.stableId)
-                    .fetchAll(db)
-                    .map(\.playlistId)
-            }
+            let containingIds = try LibraryReads.playlistIdsContaining(trackStableId: track.stableId)
             playlistsContainingTrack = Set(containingIds)
         } catch {
             print("Failed to load playlists: \(error)")

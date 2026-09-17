@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 struct TrackRowView: View, @MainActor Equatable {
@@ -43,7 +42,7 @@ struct TrackRowView: View, @MainActor Equatable {
             return artistName
         }
 
-        return try? DatabaseManager.shared.getArtistDisplayName(
+        return try? LibraryReads.artistDisplayName(
             forTrackStableId: track.stableId,
             fallbackArtistId: track.artistId
         )
@@ -148,8 +147,8 @@ struct TrackRowView: View, @MainActor Equatable {
                     }
 
                     if let artistId = track.artistId,
-                       let artist = try? DatabaseManager.shared.read({ db in try Artist.fetchOne(db, key: artistId) }),
-                       let allArtistTracks = try? DatabaseManager.shared.getTracksByArtistId(artistId) {
+                       let artist = try? LibraryReads.artist(id: artistId),
+                       let allArtistTracks = try? LibraryReads.tracks(artistId: artistId) {
                         NavigationLink(destination: ArtistDetailScreenWrapper(artistName: artist.name, allTracks: allArtistTracks)) {
                             Label(Localized.showArtistPage, systemImage: "person.circle")
                         }

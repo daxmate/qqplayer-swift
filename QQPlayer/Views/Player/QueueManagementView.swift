@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 struct QueueManagementView: View {
@@ -91,7 +90,7 @@ struct QueueManagementView: View {
 
     private func loadArtistNameCache() {
         do {
-            artistNameCache = try DatabaseManager.shared.getAllArtistNamesById()
+            artistNameCache = try LibraryReads.artistNamesById()
         } catch {
             print("Failed to load queue artist cache: \(error)")
         }
@@ -104,7 +103,7 @@ struct QueueManagementView: View {
         if let artistId = track.artistId, let cached = artistNameCache[artistId] {
             return cached
         }
-        return try? DatabaseManager.shared.getArtistDisplayName(
+        return try? LibraryReads.artistDisplayName(
             forTrackStableId: track.stableId,
             fallbackArtistId: track.artistId
         )

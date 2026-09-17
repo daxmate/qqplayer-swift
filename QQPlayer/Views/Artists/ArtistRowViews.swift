@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 struct ArtistTrackRowView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
@@ -67,10 +66,8 @@ struct ArtistTrackRowView: View {
                 }
 
                 if let artistId = track.artistId,
-                   let artist = try? DatabaseManager.shared.read({ db in
-                       try Artist.fetchOne(db, key: artistId)
-                   }),
-                   let allArtistTracks = try? DatabaseManager.shared.getTracksByArtistId(artistId) {
+                   let artist = try? LibraryReads.artist(id: artistId),
+                   let allArtistTracks = try? LibraryReads.tracks(artistId: artistId) {
                     NavigationLink(destination: ArtistDetailScreenWrapper(artistName: artist.name, allTracks: allArtistTracks)) {
                         Label(Localized.showArtistPage, systemImage: "person.circle")
                     }
@@ -136,7 +133,7 @@ struct ArtistTrackRowView: View {
 
     private func checkFavoriteStatus() {
         do {
-            isFavorite = try DatabaseManager.shared.isFavorite(trackStableId: track.stableId)
+            isFavorite = try LibraryReads.isFavorite(trackStableId: track.stableId)
         } catch {
             print("Failed to check favorite status: \(error)")
         }

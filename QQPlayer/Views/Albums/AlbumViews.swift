@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 struct AlbumsScreen: View {
@@ -331,7 +330,7 @@ struct AlbumDetailScreen: View {
                                         AlbumTrackRowView(
                                             track: track,
                                             trackNumber: track.trackNo ?? (index + 1),
-                                            artistName: (try? DatabaseManager.shared.getArtistDisplayName(forTrackStableId: track.stableId, fallbackArtistId: track.artistId)) ?? track.artistId.flatMap { artistNameCache[$0] },
+                                            artistName: (try? LibraryReads.artistDisplayName(forTrackStableId: track.stableId, fallbackArtistId: track.artistId)) ?? track.artistId.flatMap { artistNameCache[$0] },
                                             onTap: {
                                                 // While selecting, a tap toggles instead of playing.
                                                 if isBulkMode {
@@ -434,7 +433,7 @@ struct AlbumDetailScreen: View {
 
     private func loadArtistNameCache() {
         do {
-            artistNameCache = try DatabaseManager.shared.getAllArtistNamesById()
+            artistNameCache = try LibraryReads.artistNamesById()
         } catch {
             print("Failed to load album artist cache: \(error)")
         }
@@ -529,10 +528,8 @@ struct AlbumTrackRowView: View {
                 }
 
                 if let artistId = track.artistId,
-                   let artist = try? DatabaseManager.shared.read({ db in
-                       try Artist.fetchOne(db, key: artistId)
-                   }),
-                   let allArtistTracks = try? DatabaseManager.shared.getTracksByArtistId(artistId) {
+                   let artist = try? LibraryReads.artist(id: artistId),
+                   let allArtistTracks = try? LibraryReads.tracks(artistId: artistId) {
                     NavigationLink(destination: ArtistDetailScreenWrapper(artistName: artist.name, allTracks: allArtistTracks)) {
                         Label(Localized.showArtistPage, systemImage: "person.circle")
                     }
@@ -596,7 +593,7 @@ struct AlbumTrackRowView: View {
 
     private func checkFavoriteStatus() {
         do {
-            isFavorite = try DatabaseManager.shared.isFavorite(trackStableId: track.stableId)
+            isFavorite = try LibraryReads.isFavorite(trackStableId: track.stableId)
         } catch {
             print("Failed to check favorite status: \(error)")
         }
@@ -642,7 +639,7 @@ struct ArtistDetailScreenWrapper: View {
         do {
             // searchArtists 已做简繁归一：输"周杰伦"也能命中"周傑倫"行；
             // 同名简繁两行归为一组，组内全部 artist 传入详情聚合曲目
-            let matched = try DatabaseManager.shared.searchArtists(query: artistName, limit: 100)
+            let matched = try LibraryReads.searchArtists(query: artistName, limit: 100)
             let grouped = ArtistNameNormalizer.groupedArtists(matched)
             let target = grouped.first { $0.artists.contains { $0.name == artistName } } ?? grouped.first
             artists = target?.artists ?? [Artist(id: nil, name: artistName)]
