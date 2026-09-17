@@ -215,7 +215,7 @@ struct MacSyncCenterView: View {
         Text(row.isOnline ? "sync_device_status_online".localized : "sync_device_status_offline".localized)
             .font(.caption2)
             .padding(.horizontal, DesignTokens.space6)
-            .padding(.vertical, DesignTokens.space1)
+            .padding(.vertical, DesignTokens.space2)
             .background(
                 (row.isOnline ? Color.green : Color.secondary).opacity(0.14),
                 in: Capsule()
@@ -345,7 +345,7 @@ struct MacSyncCenterView: View {
         Text(role == .host ? "sync_role_host".localized : "sync_role_client".localized)
             .font(.caption2)
             .padding(.horizontal, DesignTokens.space6)
-            .padding(.vertical, DesignTokens.space1)
+            .padding(.vertical, DesignTokens.space2)
             .background(role == .host ? Color.blue.opacity(0.14) : Color.green.opacity(0.14), in: Capsule())
     }
 

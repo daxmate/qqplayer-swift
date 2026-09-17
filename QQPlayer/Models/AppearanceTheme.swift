@@ -175,75 +175,49 @@ enum DesignTokens {
     /// `70` —— 改前 1 处。
     static let font70: CGFloat = 70
 
-    // MARK: 间距（C11：33 种 / 829 处，值 = 迁移前裸字面量，B2c-a 2026-09-16）
+    // MARK: 间距（C11：18 档 / 845 处，B2c-b 第 1 笔 2026-09-17）
 
-    /// 副标题：`padding`（含边参数写法）/ 容器 `spacing:` / `Spacer(minLength:)` 三类调用点的字面量。
-    /// 每行注释里的「改前 N 处」是迁移前实测（口径 = B2c 迁移脚本同一套正则），
-    /// 供下一阶段（B2c-b 归一）直接读数，不必再 grep。
-    /// `0` —— 改前 69 处（spacing 57 / Spacer.minLength 12）。
+    /// 三类调用点的字面量都收敛到这里：`.padding`（含边参数写法）/ 容器 `spacing:` /
+    /// `Spacer(minLength:)`。刻度 = 4pt 基准建议刻度（用户拍板表见
+    /// `docs/ui-design-tokens.md` §「间距归一对照表（B2c-b）」）。
+    /// 第 1 笔并掉「位移 ≤2pt」的微调档；`space14 → space12` 是中等视觉影响，单独第 2 笔，
+    /// 故本笔它仍是合法刻度（下一笔会连定义一起删）。
+    /// 注释口径：`改前 N 处` = B2c-a 迁移前裸字面量实测；`归一后 N 处` = 本笔实测引用数
+    /// （含表达式内字面量令牌化进来的那些）。
+    /// `0` —— 改前 69 处 → 归一后 70 处（spacing 57 / Spacer.minLength 12）。
     static let space0: CGFloat = 0
-    /// `1` —— 改前 11 处（padding 5 / spacing 6）。
-    static let space1: CGFloat = 1
-    /// `1.5` —— 改前 1 处（padding 1）。
-    static let space1_5: CGFloat = 1.5
-    /// `2` —— 改前 63 处（padding 24 / spacing 39）。
+    /// `2` —— 改前 63 处 → 归一后 76 处（含 `1 → 2` 11 处、`1.5 → 2` 1 处；padding 31 / spacing 45）。
     static let space2: CGFloat = 2
-    /// `3` —— 改前 11 处（padding 3 / spacing 8）。
-    static let space3: CGFloat = 3
-    /// `4` —— 改前 65 处（padding 32 / spacing 32 / Spacer.minLength 1）。
+    /// `4` —— 改前 65 处 → 归一后 92 处（含 `3 → 4` 11 处、`5 → 4` 12 处；padding 45 / spacing 46 / Spacer.minLength 1）。
     static let space4: CGFloat = 4
-    /// `5` —— 改前 12 处（padding 10 / spacing 2）。
-    static let space5: CGFloat = 5
-    /// `6` —— 改前 44 处（padding 19 / spacing 24 / Spacer.minLength 1）。
+    /// `6` —— 改前 44 处 → 归一后 44 处（未并档；padding 19 / spacing 24 / Spacer.minLength 1）。
     static let space6: CGFloat = 6
-    /// `7` —— 改前 2 处（padding 2）。
-    static let space7: CGFloat = 7
-    /// `8` —— 改前 154 处（padding 62 / spacing 92）。
+    /// `8` —— 改前 154 处 → 归一后 160 处（含 `7 → 8` 2 处、`9 → 8` 3 处；padding 67 / spacing 93）。
     static let space8: CGFloat = 8
-    /// `9` —— 改前 3 处（padding 3）。
-    static let space9: CGFloat = 9
-    /// `10` —— 改前 64 处（padding 19 / spacing 45）。
+    /// `10` —— 改前 64 处 → 归一后 64 处（未并档；padding 19 / spacing 45）。
     static let space10: CGFloat = 10
-    /// `12` —— 改前 103 处（padding 41 / spacing 61 / Spacer.minLength 1）。
+    /// `12` —— 改前 103 处 → 归一后 103 处（未并档；第 2 笔会把 `space14` 的 29 处并进来）。
     static let space12: CGFloat = 12
-    /// `14` —— 改前 28 处（padding 15 / spacing 13）。
+    /// `14` —— 改前 28 处 → 归一后 29 处（**第 2 笔并到 `space12`**；中等视觉影响，单独成笔）。
     static let space14: CGFloat = 14
-    /// `16` —— 改前 92 处（padding 58 / spacing 34）。
+    /// `16` —— 改前 92 处 → 归一后 97 处（含 `18 → 16` 2 处 + 表达式内 3 处；padding 60 / spacing 34）。
     static let space16: CGFloat = 16
-    /// `18` —— 改前 2 处（padding 2）。
-    static let space18: CGFloat = 18
-    /// `20` —— 改前 42 处（padding 28 / spacing 12 / Spacer.minLength 2）。
+    /// `20` —— 改前 42 处 → 归一后 44 处（含 `22 → 20` 1 处 + 表达式内 1 处；padding 29 / spacing 12 / Spacer.minLength 2）。
     static let space20: CGFloat = 20
-    /// `22` —— 改前 1 处（padding 1）。
-    static let space22: CGFloat = 22
-    /// `24` —— 改前 18 处（padding 13 / spacing 3 / Spacer.minLength 2）。
+    /// `24` —— 改前 18 处 → 归一后 25 处（含 `25 → 24` 1 处、`26 → 24` 3 处、`28 → 24` 1 处 + 表达式内 1 处）。
     static let space24: CGFloat = 24
-    /// `25` —— 改前 1 处（spacing 1）。
-    static let space25: CGFloat = 25
-    /// `26` —— 改前 3 处（padding 2 / spacing 1）。
-    static let space26: CGFloat = 26
-    /// `28` —— 改前 1 处（spacing 1）。
-    static let space28: CGFloat = 28
-    /// `30` —— 改前 2 处（padding 2）。
-    static let space30: CGFloat = 30
-    /// `32` —— 改前 10 处（padding 7 / spacing 3）。
+    /// `32` —— 改前 10 处 → 归一后 13 处（含 `30 → 32` 2 处 + 表达式内 1 处；padding 9 / spacing 3）。
     static let space32: CGFloat = 32
-    /// `40` —— 改前 8 处（padding 8）。
+    /// `40` —— 改前 8 处 → 归一后 12 处（含 `44 → 40` 3 处 + 表达式内 1 处；全部是 padding）。
     static let space40: CGFloat = 40
-    /// `44` —— 改前 3 处（padding 3）。
-    static let space44: CGFloat = 44
-    /// `50` —— 改前 1 处（padding 1）。
-    static let space50: CGFloat = 50
-    /// `56` —— 改前 1 处（padding 1）。
-    static let space56: CGFloat = 56
-    /// `60` —— 改前 3 处（padding 3）。
-    static let space60: CGFloat = 60
-    /// `64` —— 改前 1 处（padding 1）。
+    /// `48` —— 改前 0 处（**本笔新增档位**）→ 归一后 2 处，收 `50 → 48` 1 处、`56 → 48` 1 处。
+    static let space48: CGFloat = 48
+    /// `64` —— 改前 1 处 → 归一后 4 处（含 `60 → 64` 3 处；全部是 padding）。
     static let space64: CGFloat = 64
-    /// `100` —— 改前 7 处（padding 7）。
+    /// `100` —— 7 处。大留白（多为底部播放条让位），语义特殊，**归一不动**。
     static let space100: CGFloat = 100
-    /// `110` —— 改前 1 处（padding 1）。
+    /// `110` —— 1 处。同上（大留白）。
     static let space110: CGFloat = 110
-    /// `120` —— 改前 2 处（padding 2）。
+    /// `120` —— 2 处。同上（大留白）。
     static let space120: CGFloat = 120
 }

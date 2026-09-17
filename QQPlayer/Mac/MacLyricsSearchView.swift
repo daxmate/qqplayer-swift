@@ -80,7 +80,7 @@ struct MacLyricsSearchView: View {
                         }
                     }
                 )
-                .padding(.top, DesignTokens.space56)
+                .padding(.top, DesignTokens.space48)
                 .padding(.horizontal, DesignTokens.space20)
             }
         }
@@ -251,7 +251,7 @@ struct MacLyricsSearchView: View {
                     .padding(.vertical, DesignTokens.space4)
                     .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
 
-                VStack(alignment: .leading, spacing: DesignTokens.space3) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(DisplayScriptNormalizer.display(candidate.title))
                         .font(.subheadline.weight(.medium))
                         .foregroundColor(.primary)
@@ -271,7 +271,7 @@ struct MacLyricsSearchView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundColor(appAccentColor)
                         .padding(.horizontal, DesignTokens.space6)
-                        .padding(.vertical, DesignTokens.space3)
+                        .padding(.vertical, DesignTokens.space4)
                         .overlay(
                             RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .stroke(appAccentColor.opacity(0.6), lineWidth: 1)

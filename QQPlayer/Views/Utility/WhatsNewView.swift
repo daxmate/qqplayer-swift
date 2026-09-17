@@ -17,7 +17,7 @@ struct WhatsNewView: View {
         NavigationView {
             VStack(spacing: DesignTokens.space0) {
                 ScrollView {
-                    VStack(spacing: DesignTokens.space28) {
+                    VStack(spacing: DesignTokens.space24) {
                         Spacer(minLength: DesignTokens.space24)
 
                         Image(systemName: "sparkles")
@@ -67,7 +67,7 @@ struct WhatsNewView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .padding(.horizontal, DesignTokens.space30)
+                .padding(.horizontal, DesignTokens.space32)
                 .padding(.vertical, DesignTokens.space16)
             }
             #if os(iOS)

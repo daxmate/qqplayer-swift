@@ -37,7 +37,7 @@ struct MusicFilesStepView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: DesignTokens.space25) {
+            VStack(spacing: DesignTokens.space24) {
                 Spacer(minLength: DesignTokens.space20)
 
                 Image(systemName: "music.note")
@@ -109,7 +109,7 @@ struct MusicFilesStepView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                 }
-                .padding(.horizontal, DesignTokens.space30)
+                .padding(.horizontal, DesignTokens.space32)
                 .padding(.bottom, DesignTokens.space40)
                 .background(Color(.systemBackground))
             }

@@ -69,7 +69,7 @@ struct MacScrapeBatchProgressView: View {
                 .font(.system(size: DesignTokens.font15))
                 .foregroundColor(appAccentColor)
                 .padding(.top, DesignTokens.space2)
-            VStack(alignment: .leading, spacing: DesignTokens.space3) {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
                 Text(libraryMode ? "scraping_batch_run_library".localized : "context_batch_scrape".localized)
                     .font(.headline)
                 Text(libraryMode ? "batch_mode_library".localized : "batch_mode_paths".localized)
@@ -145,7 +145,7 @@ struct MacScrapeBatchProgressView: View {
             }
             Spacer(minLength: DesignTokens.space4)
         }
-        .padding(.vertical, DesignTokens.space5)
+        .padding(.vertical, DesignTokens.space4)
         .padding(.horizontal, DesignTokens.space8)
         .background(Color.gray.opacity(0.05), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
     }
@@ -167,7 +167,7 @@ struct MacScrapeBatchProgressView: View {
         return Image(systemName: icon)
             .foregroundColor(color)
             .font(.system(size: DesignTokens.font13))
-            .padding(.top, DesignTokens.space1)
+            .padding(.top, DesignTokens.space2)
     }
 
     /// written → 写成的字段（本地化字段名）；skipped/failed → reason（web 同文案）

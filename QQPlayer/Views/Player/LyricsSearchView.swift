@@ -187,7 +187,7 @@ struct LyricsSearchView: View {
                     .textFieldStyle(.plain)
                     .font(.subheadline)
                     .padding(.horizontal, DesignTokens.space12)
-                    .padding(.vertical, DesignTokens.space9)
+                    .padding(.vertical, DesignTokens.space8)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                     .submitLabel(.search)
                     .onSubmit { doSearch() }
@@ -196,7 +196,7 @@ struct LyricsSearchView: View {
                     .textFieldStyle(.plain)
                     .font(.subheadline)
                     .padding(.horizontal, DesignTokens.space12)
-                    .padding(.vertical, DesignTokens.space9)
+                    .padding(.vertical, DesignTokens.space8)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.radius10))
                     .submitLabel(.search)
                     .onSubmit { doSearch() }
@@ -302,7 +302,7 @@ struct LyricsSearchView: View {
                     .padding(.vertical, DesignTokens.space4)
                     .background(sourceColor(candidate.source), in: RoundedRectangle(cornerRadius: DesignTokens.radius6))
 
-                VStack(alignment: .leading, spacing: DesignTokens.space3) {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     // 候选行是渲染出来的歌曲文本（转字形只影响显示；id/source 等取歌词用字段不动）
                     Text(DisplayScriptNormalizer.display(candidate.title))
                         .font(.subheadline.weight(.medium))
@@ -323,7 +323,7 @@ struct LyricsSearchView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundColor(accentColor)
                         .padding(.horizontal, DesignTokens.space6)
-                        .padding(.vertical, DesignTokens.space3)
+                        .padding(.vertical, DesignTokens.space4)
                         .overlay(
                             RoundedRectangle(cornerRadius: DesignTokens.radius6)
                                 .stroke(accentColor.opacity(0.6), lineWidth: 1)

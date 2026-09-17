@@ -240,7 +240,7 @@ struct LyricsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, DesignTokens.space32)
-        .padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))
+        .padding(.vertical, karaoke.isKaraokeOn ? DesignTokens.space16 : (isActive ? DesignTokens.space24 : DesignTokens.space16))
         .id(index)
         .scaleEffect(karaoke.isKaraokeOn ? 1.0 : (isActive ? 1.02 : (distance <= 1 ? 0.97 : 0.94)), anchor: .center)
         .opacity(lineOpacity(distance: distance, isActive: isActive))
@@ -267,7 +267,7 @@ struct LyricsView: View {
                 Circle()
                     .fill(accentColor)
                     .frame(width: 7, height: 7)
-                    .padding(.trailing, DesignTokens.space26)
+                    .padding(.trailing, DesignTokens.space24)
             }
         }
     }
@@ -457,7 +457,7 @@ struct LyricsView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(DesignTokens.space44)
+            .padding(DesignTokens.space40)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius28)
@@ -566,7 +566,7 @@ struct LyricsView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(DesignTokens.space44)
+            .padding(DesignTokens.space40)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius28)
@@ -675,7 +675,7 @@ struct LyricsView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            .padding(DesignTokens.space44)
+            .padding(DesignTokens.space40)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.radius28)

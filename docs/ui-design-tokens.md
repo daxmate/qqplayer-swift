@@ -29,7 +29,7 @@
 | C3–C5 | 危险/成功/警告 | 系统语义色 ✅（**不做自造令牌**，见 §0.2） | 同 macOS | 保持系统语义色 | 已达标 |
 | C6–C9 | 中性面/文字/描边/阴影 | 系统语义色 ✅ | 同 | 保持 | — |
 | C10 | 圆角 | ✅ 令牌化（B2a）+ **归一（B2b）：11 种 / 152 处** | 同（同一张令牌表） | `DesignTokens.radius*` | M4（B2a ✅ / B2b ✅ 2026-09-16） |
-| C11 | 间距 | ✅ 令牌化（B2c-a）：`DesignTokens.space*`（**33 种 / 829 处**，按值命名；padding 376 / spacing 434 / Spacer.minLength 19） | 同（同一张令牌表） | `DesignTokens.space*` | M4（B2c-a ✅ 零视觉变化；归一 B2c-b 待拍板） |
+| C11 | 间距 | ✅ 令牌化（B2c-a）+ **归一进行中（B2c-b 第 1 笔）：33 种 → 18 档**（`DesignTokens.space*`，按值命名；归一后 845 处引用） | 同（同一张令牌表） | `DesignTokens.space*` | M4（B2c-a ✅ 零视觉变化；B2c-b 第 1 笔 ✅ 2026-09-17；第 2 笔 `14 → 12` 待做） |
 | C12 | 字号 | ✅ 令牌化（B2a）+ **归一（B2b）：24 种 / 116 处**（小数档已清零） | 同（同一张令牌表） | `DesignTokens.font*` | M4（B2a ✅ / B2b ✅ 2026-09-16） |
 | C13 | 主题解析 | 三态 `appearanceTheme` → `MacAppearance.apply(theme:)`（NSApp.appearance）✅ | `forceDarkMode` + `AppearanceTheme.resolved`（含旧数据迁移）✅ | **各自保持**（不统一，用户已定） | — |
 | C14 | 强调色传递 | 环境值 ✅ + **桌面窗/迷你窗第二路径** ⚠️ | **无环境值**：直读 settings 148 处 + prop 透传 18 处 ❌ | macOS：环境值 + 单一刷新点；iOS：新建环境值 | **M2 / I1** |
@@ -245,6 +245,35 @@
 - **表达式类的处理（三步）**：① 先做「字面量 → 令牌」的零视觉替换（`compact ? 20 : 44` → `compact ? DesignTokens.space20 : DesignTokens.space44`），让分支只表达「哪个档位」；② `UIScreen.main.scale < UIScreen.main.nativeScale ? …` 一类是**刻意的设备差异**（7 处同一个判据）→ 归一时必须**整组同进同退**，否则同屏出现两套节奏；③ `max(16, min(20, width * 0.05))` 是自适应夹取 → **建议保留为例外**（它刻意随屏幕宽度变化），列入白名单并写理由。
 - **验收**：本阶段（B2c-a）零视觉变化，无需验收；B2c-b 有可见位移 ⇒ 按屏幕分批 + **用户真机验收**（不自己截图）。
 
+#### B2c-b 实施记录（第 1 笔 2026-09-17：微调档并档 + 表达式内字面量令牌化）✅
+
+- **拍板依据**：上表（本页）＝用户拍板输入；「A 或 B」一律取**表内首项**（= 就近取整、等距取较小，与 B2b 圆角先例一致）。
+- **口径**：全仓 `DesignTokens.space*` 引用（`QQPlayer/**`，注释行不计）改前/改后各跑一次同一套扫描脚本逐值计数——**不用「grep 名字存在」判定已改**（B2a 踩过的坑）。
+- **逐值映射（本笔 16 档 → 58 处引用 / 24 个文件）**：
+
+| 旧令牌 | 新令牌 | 处数 | 位移 | 旧令牌 | 新令牌 | 处数 | 位移 |
+|---|---|---|---|---|---|---|---|
+| `space1` | `space2` | 11 | +1 | `space18` | `space16` | 2 | −2 |
+| `space1_5` | `space2` | 1 | +0.5 | `space22` | `space20` | 1 | −2 |
+| `space3` | `space4` | 11 | +1 | `space25` | `space24` | 1 | −1 |
+| `space5` | `space4` | 12 | −1 | `space26` | `space24` | 3 | −2 |
+| `space7` | `space8` | 2 | +1 | `space28` | `space24` | 1 | **−4** |
+| `space9` | `space8` | 3 | −1 | `space30` | `space32` | 2 | +2 |
+| `space44` | `space40` | 3 | −4 | `space50` | `space48` | 1 | −2 |
+| `space56` | `space48` | 1 | −8 | `space60` | `space64` | 3 | +4 |
+
+> ⚠️ **两处位移超出「≤2pt」的档**（照拍板表首项执行，非擅自扩权）：`space28 → space24`（−4，表内首项；次项 32 是 +4）、`space56 → space48`（−8，表内首项；次项 64 是 +8）；`space60 → space64`（+4）、`space44 → space40`（−4）同属「大留白/大间距」一档，屏幕上是卡片外框留白而非元素贴身间距。**这几处是本次唯一可能看出来位移的地方，请重点看**。
+- **新增令牌**：`space48`（原表无此档，收 `50`/`56` 两处；否则 48 会变成第二份刻度）。
+- **删除令牌（16 条）**：`space1` / `space1_5` / `space3` / `space5` / `space7` / `space9` / `space18` / `space22` / `space25` / `space26` / `space28` / `space30` / `space44` / `space50` / `space56` / `space60`。
+- **表达式内字面量（B2c-a 刻意留下的 11 处调用点）逐条处置**：
+  - **档位选择式三元 → 令牌化**（4 处）：`.padding(compact ? 20 : 44)` → `? DesignTokens.space20 : DesignTokens.space40`（44→40 属本笔）；`.padding(compact ? 14 : 32)` → `? DesignTokens.space14 : DesignTokens.space32`（14→12 归第 2 笔）；`.padding(.top, disc.discNumber > 1 ? 16 : 0)` → `? DesignTokens.space16 : DesignTokens.space0`（两分支都在目标刻度内，零位移）；`.padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))` → `DesignTokens.space16 / space24 / space16`（18→16）。
+  - **设备差异整组（`UIScreen.main.scale < UIScreen.main.nativeScale`）→ 不动**（5 处）：`? 12 : 16`（`CollapsiblePlayerControls` / `PlayerProgressViews`）、`? 16 : 20`（`PlayerView` 的 `HStack(spacing:)` + 两处 `Spacer(minLength:)`）——两个分支值都已在目标刻度内，判据本身是刻意的设备差异，**整组同进同退 ⇒ 整组不动**。
+  - **同判据但分支越档（1 处）**：`PlayerView` 的 `spacing: … ? 20 : 25` —— `25` 不在目标刻度内（拍板表 `25 → 24`），故按表并档为 `? 20 : 24`；判据与三元结构保持不动。
+  - **自适应夹取 → 保留为例外**（1 处）：`PlayerView` 的 `.padding(.horizontal, max(16, min(20, UIScreen.main.bounds.width * 0.05)))` 随屏宽变化，不是「哪个档位」的选择；**已在源码处加注释写明理由**（刻意例外，不是漏做）。
+- **实际枚数**：生产代码（`QQPlayer/**`）表达式实参调用点实测 **11 处**（不是任务书估的 13 处；`nativeScale` 判据族共 **6** 处，另 11 处同判据用法是 `.font(…)` 属 C12 字号、不在本阶段范围）。
+- **守卫/断言**：新增用例「归一后间距刻度集合 == 预期集合」（`expectedSpaceNames`，本笔 18 档含待并的 `space14`），另两条（令牌名↔值自洽 / 每条都被引用）保持；`>= 33` 改为 `>= 18`。
+- **待第 2 笔**：`space14 → space12`（29 处引用 / 17 个文件，中等视觉影响）——做完后 18 档 → 17 档、`space14` 删定义、上文 C11 行与本节断言同步收尾。
+
 ## 4. 已做对的地方（保持，别改坏）
 
 - 强调色名单唯一：`MacAppearance.accentPresets`（6）；iOS `IOSAppearance`（8，值不同是**有意**的，见 §0.1）；
@@ -284,7 +313,7 @@
 | B2a | M4 第一步：圆角 152 处 + 字号 115 处**同值令牌化**（零视觉变化）+ 防裸值守卫 | **已实现（2026-09-15，未提交，待用户复核）** |
 | B2b | M4 第二步：**归一**（C10/C12 值并档 + 表达式内字面量；圆角 15→11 种、字号 26→24 种） | **已实现（2026-09-16，待用户真机验收）** |
 | B2c-a | M4 第三步之一：C11 间距**同值令牌化**（829 处 → `DesignTokens.space*`，零视觉变化）+ 防裸值守卫 | **已实现（2026-09-16，已提交，待用户复核）** |
-| B2c-b | M4 第三步之二：间距**归一对照表**（33 种取值并档 + 表达式内字面量） | 待用户拍板（有视觉变化；对照表见 M4） |
+| B2c-b | M4 第三步之二：间距**归一对照表**（33 种取值并档 + 表达式内字面量） | **第 1 笔已实现（2026-09-17）：16 档并档（58 处 / 24 文件）→ 18 档**；第 2 笔 `14 → 12`（29 处 / 17 文件）待做；有视觉变化 ⇒ 待用户真机验收 |
 | B3 | 第 5 节形状测试 | B1 相关 6 条已落地；B2 的几何/字号断言随 B2 |
 | C | 控件层抽象（卡片/行/按钮/空态） | **暂缓，需用户单独拍板** |
 

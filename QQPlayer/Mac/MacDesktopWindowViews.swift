@@ -123,7 +123,7 @@ struct MacMiniPlayerView: View {
                     }
                     .help("mini_lyrics_enabled".localized)
                 }
-                .padding(.top, DesignTokens.space1)
+                .padding(.top, DesignTokens.space2)
             }
             Spacer(minLength: DesignTokens.space0)
         }

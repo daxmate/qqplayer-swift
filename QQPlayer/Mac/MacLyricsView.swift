@@ -400,7 +400,7 @@ struct MacLyricsView: View {
     }
 
     private func emptyCard(_ kind: MacLyricsEmptyKind, compact: Bool) -> some View {
-        VStack(spacing: compact ? 14 : 32) {
+        VStack(spacing: compact ? DesignTokens.space14 : DesignTokens.space32) {
             ZStack {
                 glassGlow(size: compact ? 120 : 200)
 
@@ -429,7 +429,7 @@ struct MacLyricsView: View {
                 }
             }
         }
-        .padding(compact ? 20 : 44)
+        .padding(compact ? DesignTokens.space20 : DesignTokens.space40)
         .background(cardBackground)
         .padding(.horizontal, DesignTokens.space40)
     }
@@ -675,7 +675,7 @@ struct MacLyricsView: View {
                 Circle()
                     .fill(appAccentColor)
                     .frame(width: 7, height: 7)
-                    .padding(.trailing, DesignTokens.space26)
+                    .padding(.trailing, DesignTokens.space24)
             }
         }
     }

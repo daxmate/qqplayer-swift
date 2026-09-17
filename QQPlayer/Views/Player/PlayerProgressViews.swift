@@ -16,7 +16,7 @@ struct EqualizerBarsExact: View {
     private var restartKey: String { "\(isActive)-\(trackId ?? "")" }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: DesignTokens.space1) {
+        HStack(alignment: .bottom, spacing: DesignTokens.space2) {
             ForEach(0 ..< 4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: DesignTokens.radius0)
                     .fill(color)
