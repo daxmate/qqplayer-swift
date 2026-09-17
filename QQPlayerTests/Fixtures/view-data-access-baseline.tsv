@@ -1,0 +1,45 @@
+# 视图层 DatabaseManager 直连存量清单（棘轮基线，只能减不能增）
+#
+# 由 QQPlayerTests/ViewDataAccessContractTests.swift 守护：
+#   - 新增视图文件直连 / 既有文件引用数回涨 → CI 红
+#   - 某文件整改到 0 或文件消失 → 必须删掉本行，否则 CI 红（名单不腐烂）
+#
+# 整改去向（2026-09-17 P0）：
+#   查询 → QQPlayer/Services/LibraryReads.swift
+#   删除曲目 → QQPlayer/Services/TrackDeletionService.swift
+#   播放列表写操作 → AppCoordinator 既有的 playlist API（见 AppCoordinator+ImportExport.swift）
+#
+# 进度：108 → 101（第 1 批：7 处删除仪式收进 TrackDeletionService；TrackBulkSelection 清零已删行）
+# 格式：路径<TAB>引用数
+QQPlayer/Views/Albums/AlbumViews.swift	6
+QQPlayer/Views/Artists/ArtistRowViews.swift	3
+QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	1
+QQPlayer/Views/Library/SearchResultsViews.swift	9
+QQPlayer/Views/Library/SearchView.swift	6
+QQPlayer/Views/Library/TrackListView.swift	3
+QQPlayer/Views/Player/LyricsSearchView.swift	1
+QQPlayer/Views/Player/PlayerOverlays.swift	1
+QQPlayer/Views/Player/PlayerView.swift	4
+QQPlayer/Views/Player/QueueManagementView.swift	2
+QQPlayer/Views/Player/TrackRowView.swift	3
+QQPlayer/Views/Playlists/PlaylistCardView.swift	1
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	3
+QQPlayer/Views/Playlists/PlaylistManagementView.swift	1
+QQPlayer/Views/Playlists/PlaylistSelectionView.swift	2
+QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	2
+QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	3
+QQPlayer/Views/Utility/SettingsView.swift	3
+QQPlayer/Mac/MacAlbumArtistViews.swift	4
+QQPlayer/Mac/MacArtworkThumbnail.swift	3
+QQPlayer/Mac/MacDesktopWindowViews.swift	1
+QQPlayer/Mac/MacLibraryView.swift	9
+QQPlayer/Mac/MacLyricsSearchView.swift	1
+QQPlayer/Mac/MacPlayerView.swift	1
+QQPlayer/Mac/MacPlaylistDetailSheet.swift	5
+QQPlayer/Mac/MacScrapeBatchProgressView.swift	1
+QQPlayer/Mac/MacScrapeSettingsView.swift	3
+QQPlayer/Mac/MacSearchAnythingLayer.swift	5
+QQPlayer/Mac/MacSearchView.swift	3
+QQPlayer/Mac/MacSmartPlaylistViews.swift	1
+QQPlayer/Mac/MacTagEditorView.swift	5
+QQPlayer/Mac/MacTrackListView.swift	5

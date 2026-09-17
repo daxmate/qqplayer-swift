@@ -611,23 +611,8 @@ struct AlbumTrackRowView: View {
 
     private func deleteFile() {
         Task {
-            do {
-                let settings = DeleteSettings.load()
-                if settings.deleteFromLibraryOnly {
-                    DeleteSettings.addExcludedTrack(track.stableId)
-                } else {
-                    do {
-                        try FileManager.default.removeItem(at: URL(fileURLWithPath: track.path))
-                    } catch {
-                        print("⚠️ Could not remove file from disk: \(error.localizedDescription)")
-                    }
-                }
-
-                try DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
-                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
-            } catch {
-                print("❌ Failed to delete track: \(error)")
-            }
+            // 删除仪式（设置分支 / 删文件 / 删 DB 引用 / 通知刷新）见 TrackDeletionService
+            TrackDeletionService.delete(items: [TrackDeletionService.Item(track: track)])
         }
     }
 }

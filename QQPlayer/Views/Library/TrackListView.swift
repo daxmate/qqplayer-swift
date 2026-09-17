@@ -121,20 +121,11 @@ struct TrackListView: View {
 
     private func bulkDelete() {
         Task {
-            let deleteSettings = DeleteSettings.load()
             // 先建 stableId → Track 字典，避免对每个选中曲目 O(n) first(where:)（总 O(n²)）
             let tracksByStableId = Dictionary(uniqueKeysWithValues: sortedTracks.map { ($0.stableId, $0) })
-            for trackId in selectedTracks {
-                if let track = tracksByStableId[trackId] {
-                    if deleteSettings.deleteFromLibraryOnly {
-                        DeleteSettings.addExcludedTrack(track.stableId)
-                    } else {
-                        try? FileManager.default.removeItem(at: URL(fileURLWithPath: track.path))
-                    }
-                    try? DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
-                }
-            }
-            NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
+            let items = selectedTracks.compactMap { tracksByStableId[$0] }.map { TrackDeletionService.Item(track: $0) }
+            // 删除仪式（设置分支 / 删文件 / 删 DB 引用 / 一次通知刷新）见 TrackDeletionService
+            TrackDeletionService.delete(items: items)
             exitBulkMode()
         }
     }

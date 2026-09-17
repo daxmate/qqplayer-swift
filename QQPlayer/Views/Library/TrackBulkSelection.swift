@@ -118,19 +118,9 @@ struct TrackBulkActionsModifier: ViewModifier {
 
     private func bulkDelete() {
         Task {
-            let deleteSettings = DeleteSettings.load()
-            for track in orderedSelection() {
-                if deleteSettings.deleteFromLibraryOnly {
-                    DeleteSettings.addExcludedTrack(track.stableId)
-                } else {
-                    try? FileManager.default.removeItem(at: URL(fileURLWithPath: track.path))
-                }
-                try? DatabaseManager.shared.deleteTrack(byStableId: track.stableId)
-            }
-            NotificationCenter.default.post(
-                name: .libraryNeedsRefresh,
-                object: nil
-            )
+            // 删除仪式（设置分支 / 删文件 / 删 DB 引用 / 一次通知刷新）见 TrackDeletionService
+            let items = orderedSelection().map { TrackDeletionService.Item(track: $0) }
+            TrackDeletionService.delete(items: items)
             exitBulkMode()
         }
     }
