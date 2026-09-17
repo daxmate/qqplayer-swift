@@ -335,7 +335,7 @@ struct MacScrapeBatchProgressView: View {
 
     private func estimatedTargetCount(files: [String], libraryMode: Bool) async -> Int {
         if libraryMode {
-            return (try? DatabaseManager.shared.getTracksMissingYearOrGenre().count) ?? 0
+            return (try? LibraryReads.tracksMissingYearOrGenre().count) ?? 0
         }
         return files.count
     }

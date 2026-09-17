@@ -365,7 +365,7 @@ struct MacSmartPlaylistDetailView: View {
     }
 
     private func resolveArtistName(for track: Track) -> String? {
-        try? DatabaseManager.shared.getArtistDisplayName(
+        try? LibraryReads.artistDisplayName(
             forTrackStableId: track.stableId,
             fallbackArtistId: track.artistId
         )

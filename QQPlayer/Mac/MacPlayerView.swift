@@ -583,7 +583,7 @@ private struct MacQueuePanelView: View {
                 Text(track.displayTitle)
                     .fontWeight(isCurrent ? .semibold : .regular)
                     .lineLimit(1)
-                if let artist = try? DatabaseManager.shared.getArtistDisplayName(
+                if let artist = try? LibraryReads.artistDisplayName(
                     forTrackStableId: track.stableId,
                     fallbackArtistId: track.artistId
                 ) {

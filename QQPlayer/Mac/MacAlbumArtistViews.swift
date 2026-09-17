@@ -83,7 +83,7 @@ struct MacAlbumGridView: View {
 
     private func openAlbum(_ album: Album) {
         do {
-            let tracks = try DatabaseManager.shared.getTracksByAlbumId(album.id ?? 0)
+            let tracks = try LibraryReads.tracks(albumId: album.id ?? 0)
             albumTracks = tracks
             selectedAlbum = album
             showAlbumSheet = true
@@ -215,7 +215,7 @@ struct MacArtistListView: View {
 
     private func openArtist(_ artist: Artist) {
         do {
-            let tracks = try DatabaseManager.shared.getTracksByArtistId(artist.id ?? 0)
+            let tracks = try LibraryReads.tracks(artistId: artist.id ?? 0)
             artistTracks = tracks
             selectedArtist = artist
             showArtistSheet = true
@@ -269,9 +269,7 @@ struct MacArtistDetailSheet: View {
 
     private func albumTitle(for track: Track) -> String {
         guard let albumId = track.albumId,
-              let album = try? DatabaseManager.shared.read({ db in
-                  try Album.fetchOne(db, key: albumId)
-              }) else {
+              let album = try? LibraryReads.album(id: albumId) else {
             return ""
         }
         return album.displayTitle

@@ -138,11 +138,11 @@ struct MacScrapeSettingsView: View {
     }
 
     private func firstSampleTrack() -> (values: TagRenameLogic.Values, ext: String)? {
-        guard let tracks = try? DatabaseManager.shared.getAllTracks() else { return nil }
+        guard let tracks = try? LibraryReads.allTracks() else { return nil }
         for track in tracks {
             let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty else { continue }
-            let artistName = (try? DatabaseManager.shared.getArtistDisplayName(
+            let artistName = (try? LibraryReads.artistDisplayName(
                 forTrackStableId: track.stableId,
                 fallbackArtistId: track.artistId
             )) ?? ""
@@ -150,7 +150,7 @@ struct MacScrapeSettingsView: View {
             var albumTitle: String?
             var year: Int?
             if let albumId = track.albumId,
-               let album = try? DatabaseManager.shared.getAlbum(byId: albumId) {
+               let album = try? LibraryReads.album(id: albumId) {
                 albumTitle = album.title
                 year = album.year
             }

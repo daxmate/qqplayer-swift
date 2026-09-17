@@ -13,15 +13,15 @@ import SwiftUI
 enum MacArtworkResolver {
     static func representativeTrack(forAlbum album: Album) -> Track? {
         guard let albumId = album.id else { return nil }
-        return (try? DatabaseManager.shared.getTracksByAlbumId(albumId))?.first
+        return (try? LibraryReads.tracks(albumId: albumId))?.first
     }
 
     static func representativeTrack(forPlaylist playlist: Playlist) -> Track? {
         guard let playlistId = playlist.id else { return nil }
-        guard let item = (try? DatabaseManager.shared.getPlaylistItems(playlistId: playlistId))?.first else {
+        guard let item = (try? LibraryReads.playlistItems(playlistId: playlistId))?.first else {
             return nil
         }
-        return try? DatabaseManager.shared.getTrack(byStableId: item.trackStableId)
+        return try? LibraryReads.track(stableId: item.trackStableId)
     }
 }
 

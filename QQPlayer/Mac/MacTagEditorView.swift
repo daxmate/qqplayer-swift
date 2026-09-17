@@ -534,7 +534,7 @@ struct MacTagEditorView: View {
         if let year = metadata?.year {
             formYear = String(year)
         } else if let albumId = track.albumId,
-                  let album = try? DatabaseManager.shared.getAlbum(byId: albumId),
+                  let album = try? LibraryReads.album(id: albumId),
                   let albumYear = album.year {
             formYear = String(albumYear) // 专辑 year 兜底（文件解析无 year）
         }

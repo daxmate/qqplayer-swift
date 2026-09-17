@@ -535,7 +535,7 @@ struct MacTrackListView: View {
     }
 
     private func reloadPlaylists() {
-        playlists = (try? DatabaseManager.shared.getAllPlaylists()) ?? []
+        playlists = (try? LibraryReads.playlists()) ?? []
     }
 
     private func createPlaylistAndAdd() {
