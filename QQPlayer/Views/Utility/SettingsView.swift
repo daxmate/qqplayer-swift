@@ -12,7 +12,7 @@ struct SettingsView: View {
             let folderPlaylists = try LibraryReads.folderPlaylists()
             for playlist in folderPlaylists {
                 if let id = playlist.id {
-                    try DatabaseManager.shared.deletePlaylist(playlistId: id)
+                    try AppCoordinator.shared.deletePlaylist(playlistId: id)
                 }
             }
             print("🗑️ Deleted \(folderPlaylists.count) folder playlist(s) after disabling auto-creation")
@@ -200,7 +200,7 @@ struct SettingsView: View {
                             if newValue {
                                 // Re-enabled: clear tombstones so folder playlists
                                 // can be recreated on the next scan
-                                try? DatabaseManager.shared.clearDeletedFolderPlaylistTombstones()
+                                try? AppCoordinator.shared.clearDeletedFolderPlaylistTombstones()
                             } else {
                                 showDeleteFolderPlaylistsPrompt = true
                             }

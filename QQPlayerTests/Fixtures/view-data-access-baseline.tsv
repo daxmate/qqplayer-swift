@@ -12,11 +12,6 @@
 #     INV-13 / SyncChangeLogDeletionPolicy 在 changelog 层管）
 #
 # 进度：108 → 101（批1 删除收口）→ 50（批2 iOS 查询）→ 14（批3 Mac 查询）
-# 剩余全部是**写操作**（批4 范围）+ 两处缺入口的按路径查询（MacTagEditorView）。
+#   → 0（批4 写操作收口，2026-09-17 清空）
+# 现状：视图层已无 DatabaseManager 直连。棘轮停在 0——以后任何新增直连都直接红。
 # 格式：路径<TAB>引用数
-QQPlayer/Views/Playlists/PlaylistCardView.swift	1
-QQPlayer/Views/Utility/SettingsView.swift	2
-QQPlayer/Mac/MacAlbumArtistViews.swift	1
-QQPlayer/Mac/MacPlaylistDetailSheet.swift	2
-QQPlayer/Mac/MacTagEditorView.swift	4
-QQPlayer/Mac/MacTrackListView.swift	4

@@ -243,8 +243,8 @@ struct PlaylistCardView: View {
             try jpegData.write(to: fileURL)
             print("✅ Saved custom cover to \(filename)")
 
-            // Update database with custom cover path
-            try DatabaseManager.shared.updatePlaylistCustomCover(
+            // Update database with custom cover path（写操作唯一入口：AppCoordinator）
+            try AppCoordinator.shared.updatePlaylistCustomCover(
                 playlistId: playlistId,
                 imagePath: filename
             )
