@@ -158,6 +158,7 @@
 		FBF36E13AEB04A2196326383 /* NeteaseOnlineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979DA904F7D24001BB613FA9 /* NeteaseOnlineClientTests.swift */; };
 		FDE46537E071CEBB0C1EE7EC /* PlayerGestureLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEBABE2EEDADE3CF1549D8A /* PlayerGestureLogicTests.swift */; };
 		2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */; };
+		E92357A489FB48C6A559409C /* LibraryImportOutcomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2F667CAE024B42896F1B1E /* LibraryImportOutcomeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -365,6 +366,7 @@
 		FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GraphicEQCodecTests.swift; sourceTree = "<group>"; };
 		FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StateManagerTests.swift; sourceTree = "<group>"; };
 		AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppNotificationContractTests.swift; sourceTree = "<group>"; };
+		0F2F667CAE024B42896F1B1E /* LibraryImportOutcomeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryImportOutcomeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -990,6 +992,7 @@
 				74235A3C260E43DE8B44FAD5 /* LyricOffsetStoreTests.swift */,
 				002735D27EE746F1B4513B74 /* PlaybackOrderIconContractTests.swift */,
 				AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */,
+				0F2F667CAE024B42896F1B1E /* LibraryImportOutcomeTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1446,6 +1449,7 @@
 				010A16423D5743D1B8AE5D85 /* LyricOffsetStoreTests.swift in Sources */,
 				9F5AE1CE0FDF439F91C09D34 /* PlaybackOrderIconContractTests.swift in Sources */,
 				2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */,
+				E92357A489FB48C6A559409C /* LibraryImportOutcomeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

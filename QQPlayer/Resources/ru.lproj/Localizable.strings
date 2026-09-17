@@ -111,6 +111,15 @@
 "drag_import_skipped_count" = "Пропущено неподдерживаемых файлов: %d";
 "drag_import_partial_count" = "Импортировано файлов: %1$d, пропущено: %2$d";
 
+/* Import result summary (панель обязана говорить об ошибке, а не «уже в библиотеке») */
+"import_result_separator" = ", ";
+"import_result_added_one" = "Импортирован 1 трек";
+"import_result_added_many" = "Импортировано треков: %d";
+"import_result_updated_many" = "Обновлено треков: %d";
+"import_result_present_many" = "Уже в библиотеке: %d";
+"import_result_excluded_many" = "Исключено из библиотеки: %d";
+"import_result_failed_many" = "Ошибок: %d";
+
 /* Track list context menu (A3) */
 "show_artist" = "К исполнителю";
 "show_album" = "К альбому";

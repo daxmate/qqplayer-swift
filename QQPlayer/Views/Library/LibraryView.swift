@@ -92,21 +92,84 @@ struct LibraryView: View {
         }
     }
 
+    /// 导入结果分桶：面板只把**唯一入口**（`LibraryIndexer.processExternalFileOutcome`）
+    /// 给出的结果分桶，不在这里重复判定（旧代码把 `false` 一律说成「already in library」）。
+    private struct ImportOutcomeTally {
+        var added = 0
+        var updated = 0
+        var alreadyPresent = 0
+        var excluded = 0
+        var failed = 0
+
+        mutating func record(_ outcome: ExternalImportOutcome) {
+            switch outcome {
+            case .imported: added += 1
+            case .updatedExisting: updated += 1
+            case .alreadyPresent: alreadyPresent += 1
+            case .excluded: excluded += 1
+            case .failed: failed += 1
+            }
+        }
+
+        /// 一个文件都没走过 → 不弹 toast。
+        var isEmpty: Bool {
+            added + updated + alreadyPresent + excluded + failed == 0
+        }
+
+        /// 曲库内容真的变了（决定要不要触发一次手动同步对齐）。
+        var changedLibrary: Bool { added > 0 || updated > 0 }
+
+        /// 只列非零桶；有失败必须说出来。
+        var summary: String {
+            var parts: [String] = []
+            if added > 0 {
+                parts.append(
+                    added == 1
+                        ? "import_result_added_one".localized
+                        : String(format: "import_result_added_many".localized, added)
+                )
+            }
+            if updated > 0 {
+                parts.append(String(format: "import_result_updated_many".localized, updated))
+            }
+            if alreadyPresent > 0 {
+                parts.append(String(format: "import_result_present_many".localized, alreadyPresent))
+            }
+            if excluded > 0 {
+                parts.append(String(format: "import_result_excluded_many".localized, excluded))
+            }
+            if failed > 0 {
+                parts.append(String(format: "import_result_failed_many".localized, failed))
+            }
+            return parts.joined(separator: "import_result_separator".localized)
+        }
+
+        /// 有失败 → 警示图标（用户才会去重试）。
+        var icon: String {
+            if failed > 0 { return "exclamationmark.triangle.fill" }
+            if added > 0 { return "plus.circle.fill" }
+            if updated > 0 { return "checkmark.circle.fill" }
+            return "info.circle.fill"
+        }
+
+        var color: Color {
+            if failed > 0 { return .orange }
+            if added > 0 || updated > 0 { return .green }
+            return .blue
+        }
+    }
+
     private func importMusicFiles(_ urls: [URL]) {
         Task {
-            var addedCount = 0
-            var skippedCount = 0
+            var tally = ImportOutcomeTally()
 
             for url in urls {
-                // Reject network URLs
-                if let scheme = url.scheme?.lowercased(), ["http", "https", "ftp", "sftp"].contains(scheme) {
-                    print("❌ Rejected network URL: \(url.absoluteString)")
-                    continue
-                }
-
-                // Start accessing security-scoped resource
+                // 网络 URL 不在这里自行判定：唯一判定入口是 LibraryIndexer
+                // （它会返回 .failed(.unsupportedLocation)）。
+                // 安全作用域打不开 = 真的导入不了，计入失败（以前是 print 完静默丢弃）。
                 guard url.startAccessingSecurityScopedResource() else {
-                    print("Failed to access security scoped resource for: \(url.lastPathComponent)")
+                    print("❌ Cannot read file (security scope denied): \(url.lastPathComponent)")
+                    tally.failed += 1
                     continue
                 }
 
@@ -122,64 +185,50 @@ struct LibraryView: View {
                     await storeBookmarkData(bookmarkData, for: url)
 
                     // Process the file directly from its original location
-                    let imported = await libraryIndexer.processExternalFile(url, allowExcludedReimport: true)
-                    if imported {
-                        addedCount += 1
-                        print("✅ Imported and bookmarked file from original location: \(url.lastPathComponent)")
-                    } else {
-                        skippedCount += 1
-                        print("⏭️ Skipped import (already exists/excluded/error): \(url.lastPathComponent)")
-                    }
+                    let outcome = await libraryIndexer.processExternalFileOutcome(
+                        url,
+                        allowExcludedReimport: true
+                    )
+                    tally.record(outcome)
+                    print("📥 Import outcome for \(url.lastPathComponent): \(outcome)")
 
                 } catch {
-                    print("Failed to create bookmark for \(url.lastPathComponent): \(error)")
+                    // 书签建不出来：文件以后可能打不开。以前这条只 print 就吞了 → 计入 failed。
+                    print("❌ Failed to create bookmark for \(url.lastPathComponent): \(error)")
+                    tally.failed += 1
 
                     // Still try to process the file even if bookmark creation fails
-                    let imported = await libraryIndexer.processExternalFile(url, allowExcludedReimport: true)
-                    if imported {
-                        addedCount += 1
-                        print("✅ Imported file from original location (no bookmark): \(url.lastPathComponent)")
-                    } else {
-                        skippedCount += 1
-                        print("⏭️ Skipped import (already exists/excluded/error): \(url.lastPathComponent)")
-                    }
+                    let outcome = await libraryIndexer.processExternalFileOutcome(
+                        url,
+                        allowExcludedReimport: true
+                    )
+                    tally.record(outcome)
+                    print("📥 Import outcome for \(url.lastPathComponent) (no bookmark): \(outcome)")
                 }
             }
 
             // Show feedback
             await MainActor.run {
-                if addedCount > 0 || skippedCount > 0 {
-                    syncToastIcon = "plus.circle.fill"
-                    syncToastColor = .green
-                    if skippedCount == 0 {
-                        if addedCount == 1 {
-                            syncToastMessage = "1 song imported"
-                        } else {
-                            syncToastMessage = "\(addedCount) songs imported"
-                        }
-                    } else if addedCount == 0 {
-                        syncToastIcon = "info.circle.fill"
-                        syncToastColor = .blue
-                        syncToastMessage = "\(skippedCount) already in library"
-                    } else {
-                        syncToastMessage = "\(addedCount) imported, \(skippedCount) skipped"
-                    }
+                guard !tally.isEmpty else { return }
 
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showSyncToast = true
-                    }
+                syncToastIcon = tally.icon
+                syncToastColor = tally.color
+                syncToastMessage = tally.summary
 
-                    // Auto-hide toast after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showSyncToast = false
-                        }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showSyncToast = true
+                }
+
+                // Auto-hide toast after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showSyncToast = false
                     }
                 }
             }
 
             // Trigger library refresh to update UI
-            if addedCount > 0, let onManualSync = onManualSync {
+            if tally.changedLibrary, let onManualSync = onManualSync {
                 _ = await onManualSync()
             }
         }

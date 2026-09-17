@@ -123,6 +123,15 @@
 "drag_import_skipped_count" = "已跳过 %d 个不支持的文件";
 "drag_import_partial_count" = "已导入 %1$d 个文件，跳过 %2$d 个";
 
+/* 导入结果汇总（反屎山 B1：出错必须如实说，不许报成「已在库中」） */
+"import_result_separator" = "，";
+"import_result_added_one" = "已导入 1 首";
+"import_result_added_many" = "已导入 %d 首";
+"import_result_updated_many" = "已更新 %d 首";
+"import_result_present_many" = "已在库中 %d 首";
+"import_result_excluded_many" = "已排除 %d 首";
+"import_result_failed_many" = "%d 首失败";
+
 /* Track list context menu (A3) */
 "show_artist" = "进歌手";
 "show_album" = "进专辑";
