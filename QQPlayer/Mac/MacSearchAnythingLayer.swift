@@ -227,7 +227,7 @@ struct MacSearchAnythingLayer: View {
 
     private func artistRow(_ artist: Artist) -> some View {
         Button {
-            let tracks = (try? DatabaseManager.shared.getTracksByArtistId(artist.id ?? 0)) ?? []
+            let tracks = (try? LibraryReads.tracks(artistId: artist.id ?? 0)) ?? []
             guard !tracks.isEmpty else { return }
             onPlayArtist(artist, tracks)
             state.isOpen = false
@@ -248,7 +248,7 @@ struct MacSearchAnythingLayer: View {
 
     private func albumRow(_ album: Album) -> some View {
         Button {
-            let tracks = (try? DatabaseManager.shared.getTracksByAlbumId(album.id ?? 0)) ?? []
+            let tracks = (try? LibraryReads.tracks(albumId: album.id ?? 0)) ?? []
             guard !tracks.isEmpty else { return }
             onPlayAlbum(album, tracks)
             state.isOpen = false
@@ -407,9 +407,9 @@ struct MacSearchAnythingLayer: View {
 
         // 本地多路（同步快，先出）
         do {
-            localSongs = Array(try DatabaseManager.shared.searchTracks(query: q, limit: 8))
-            artists = try DatabaseManager.shared.searchArtists(query: q, limit: 5)
-            albums = try DatabaseManager.shared.searchAlbums(query: q, limit: 5)
+            localSongs = Array(try LibraryReads.searchTracks(query: q, limit: 8))
+            artists = try LibraryReads.searchArtists(query: q, limit: 5)
+            albums = try LibraryReads.searchAlbums(query: q, limit: 5)
         } catch {
             localSongs = []
             artists = []

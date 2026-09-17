@@ -161,9 +161,9 @@ struct MacManualPlaylistDetailView: View {
 
     private func loadTracks() {
         do {
-            let items = try DatabaseManager.shared.getPlaylistItems(playlistId: playlist.id ?? 0)
+            let items = try LibraryReads.playlistItems(playlistId: playlist.id ?? 0)
             let stableIds = items.map { $0.trackStableId }
-            tracks = try DatabaseManager.shared.getTracksByStableIdsPreservingOrder(stableIds)
+            tracks = try LibraryReads.tracksPreservingOrder(stableIds: stableIds)
             isLoading = false
         } catch {
             print("❌ MacManualPlaylistDetailView loadTracks failed: \(error)")
@@ -172,7 +172,7 @@ struct MacManualPlaylistDetailView: View {
     }
 
     private func resolveArtistName(for track: Track) -> String? {
-        try? DatabaseManager.shared.getArtistDisplayName(
+        try? LibraryReads.artistDisplayName(
             forTrackStableId: track.stableId,
             fallbackArtistId: track.artistId
         )

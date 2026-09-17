@@ -10,6 +10,10 @@
 #   播放列表写操作 → AppCoordinator 既有的 playlist API（见 AppCoordinator+ImportExport.swift）
 #
 # 进度：108 → 101（第 1 批：7 处删除仪式收进 TrackDeletionService；TrackBulkSelection 清零已删行）
+#            → 65（第 3 批：Mac 视图查询 36 处收进 LibraryReads，10 个 Mac 文件清零删行；
+#                   余 11 处＝待用户拍板的写操作 10 处 + MacTagEditorView 注释提及 1 处）
+# 第 3 批已知缺口（LibraryReads 无对应方法，未自行新增第二实现）：
+#   MacTagEditorView.swift:695 / :755 用 `getTrack(byPath:)` 按路径取曲目——无入口（只报了缺口）。
 # 格式：路径<TAB>引用数
 QQPlayer/Views/Albums/AlbumViews.swift	6
 QQPlayer/Views/Artists/ArtistRowViews.swift	3
@@ -29,17 +33,7 @@ QQPlayer/Views/Playlists/PlaylistSelectionView.swift	2
 QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	2
 QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	3
 QQPlayer/Views/Utility/SettingsView.swift	3
-QQPlayer/Mac/MacAlbumArtistViews.swift	4
-QQPlayer/Mac/MacArtworkThumbnail.swift	3
-QQPlayer/Mac/MacDesktopWindowViews.swift	1
-QQPlayer/Mac/MacLibraryView.swift	9
-QQPlayer/Mac/MacLyricsSearchView.swift	1
-QQPlayer/Mac/MacPlayerView.swift	1
-QQPlayer/Mac/MacPlaylistDetailSheet.swift	5
-QQPlayer/Mac/MacScrapeBatchProgressView.swift	1
-QQPlayer/Mac/MacScrapeSettingsView.swift	3
-QQPlayer/Mac/MacSearchAnythingLayer.swift	5
-QQPlayer/Mac/MacSearchView.swift	3
-QQPlayer/Mac/MacSmartPlaylistViews.swift	1
-QQPlayer/Mac/MacTagEditorView.swift	5
-QQPlayer/Mac/MacTrackListView.swift	5
+QQPlayer/Mac/MacAlbumArtistViews.swift	1
+QQPlayer/Mac/MacPlaylistDetailSheet.swift	2
+QQPlayer/Mac/MacTagEditorView.swift	4
+QQPlayer/Mac/MacTrackListView.swift	4

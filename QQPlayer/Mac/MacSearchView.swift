@@ -12,7 +12,7 @@ import SwiftUI
 
 // MARK: - Search results model
 
-/// Result buckets returned by the shared `DatabaseManager` search APIs.
+/// Result buckets returned by the shared library search APIs (`LibraryReads`).
 struct MacSearchResults {
     var songs: [Track] = []
     var artists: [Artist] = []
@@ -159,7 +159,7 @@ struct MacSearchResultsView: View {
 
     private func openAlbum(_ album: Album) {
         do {
-            albumTracks = try DatabaseManager.shared.getTracksByAlbumId(album.id ?? 0)
+            albumTracks = try LibraryReads.tracks(albumId: album.id ?? 0)
             selectedAlbum = album
             showAlbumSheet = true
         } catch {
@@ -169,7 +169,7 @@ struct MacSearchResultsView: View {
 
     private func openArtist(_ artist: Artist) {
         do {
-            artistTracks = try DatabaseManager.shared.getTracksByArtistId(artist.id ?? 0)
+            artistTracks = try LibraryReads.tracks(artistId: artist.id ?? 0)
             selectedArtist = artist
             showArtistSheet = true
         } catch {
