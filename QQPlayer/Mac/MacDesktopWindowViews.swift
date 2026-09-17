@@ -94,7 +94,7 @@ struct MacMiniPlayerView: View {
                     .disabled(player.currentTrack == nil)
                 }
 
-                HStack(spacing: DesignTokens.space14) {
+                HStack(spacing: DesignTokens.space12) {
                     controlButton("backward.fill", size: 15) {
                         Task { @MainActor in await player.previousTrack() }
                     }
@@ -200,7 +200,7 @@ struct MacDesktopLyricView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, DesignTokens.space24)
-        .padding(.vertical, DesignTokens.space14)
+        .padding(.vertical, DesignTokens.space12)
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             let settings = DeleteSettings.load()
             fontSize = settings.desktopLyricFontSize

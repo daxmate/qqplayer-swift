@@ -400,7 +400,7 @@ struct MacLyricsView: View {
     }
 
     private func emptyCard(_ kind: MacLyricsEmptyKind, compact: Bool) -> some View {
-        VStack(spacing: compact ? DesignTokens.space14 : DesignTokens.space32) {
+        VStack(spacing: compact ? DesignTokens.space12 : DesignTokens.space32) {
             ZStack {
                 glassGlow(size: compact ? 120 : 200)
 

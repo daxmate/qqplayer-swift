@@ -34,7 +34,7 @@ struct WhatsNewView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        VStack(alignment: .leading, spacing: DesignTokens.space14) {
+                        VStack(alignment: .leading, spacing: DesignTokens.space12) {
                             ForEach(WhatsNewContent.all.first?.items ?? [], id: \.self) { item in
                                 HStack(alignment: .top, spacing: DesignTokens.space12) {
                                     Image(systemName: "checkmark.circle.fill")

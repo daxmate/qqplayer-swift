@@ -78,7 +78,7 @@
 
                 Spacer(minLength: DesignTokens.space0)
 
-                HStack(spacing: DesignTokens.space14) {
+                HStack(spacing: DesignTokens.space12) {
                     Button(intent: EnqueueTrackIntent(trackStableId: trackStableId, playNext: true)) {
                         Image(systemName: "text.line.first.and.arrowtriangle.forward")
                             .font(.body)

@@ -192,7 +192,7 @@ struct MacSearchAnythingLayer: View {
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
-                .padding(.horizontal, DesignTokens.space14)
+                .padding(.horizontal, DesignTokens.space12)
                 .padding(.top, DesignTokens.space8)
                 .padding(.bottom, DesignTokens.space2)
             content()
@@ -219,7 +219,7 @@ struct MacSearchAnythingLayer: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space14)
+            .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
@@ -240,7 +240,7 @@ struct MacSearchAnythingLayer: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space14)
+            .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
@@ -266,7 +266,7 @@ struct MacSearchAnythingLayer: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space14)
+            .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
@@ -304,7 +304,7 @@ struct MacSearchAnythingLayer: View {
                 downloadBadge(for: song)
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space14)
+            .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space4)
         }
         .buttonStyle(.plain)
@@ -351,7 +351,7 @@ struct MacSearchAnythingLayer: View {
                         Spacer()
                     }
                     .contentShape(Rectangle())
-                    .padding(.horizontal, DesignTokens.space14)
+                    .padding(.horizontal, DesignTokens.space12)
                     .padding(.vertical, DesignTokens.space4)
                 }
                 .buttonStyle(.plain)

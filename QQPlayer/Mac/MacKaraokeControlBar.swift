@@ -48,7 +48,7 @@ struct MacKaraokeControlBar: View {
                 abEndHint
             }
 
-            HStack(spacing: DesignTokens.space14) {
+            HStack(spacing: DesignTokens.space12) {
                 HStack(spacing: DesignTokens.space12) {
                     prevLineButton
                     playPauseButton

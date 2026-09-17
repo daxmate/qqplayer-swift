@@ -113,7 +113,7 @@ struct MacPlayerView: View {
                 Text(message)
                     .font(.footnote)
                     .foregroundColor(.white)
-                    .padding(.horizontal, DesignTokens.space14)
+                    .padding(.horizontal, DesignTokens.space12)
                     .padding(.vertical, DesignTokens.space8)
                     .background(Capsule().fill(Color.red.opacity(0.9)))
                     .padding(.top, DesignTokens.space10)

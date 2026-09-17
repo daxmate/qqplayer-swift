@@ -134,7 +134,7 @@ struct FeatureGuideView: View {
             ForEach(sections) { section in
                 Section(section.title) {
                     ForEach(section.items) { item in
-                        HStack(alignment: .top, spacing: DesignTokens.space14) {
+                        HStack(alignment: .top, spacing: DesignTokens.space12) {
                             Image(systemName: item.icon)
                                 .font(.system(size: DesignTokens.font18, weight: .medium))
                                 .foregroundColor(accentColor)

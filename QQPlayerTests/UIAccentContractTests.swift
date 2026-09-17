@@ -865,7 +865,7 @@ struct UISpacingContractTests {
         add("        Text(\"s\").padding(compact ? 20 : 44)")
         // 不该抓：B2c-b 令牌化后的三元形态（档位选择式；规则锚在实参开头就是数字）
         add("        Text(\"s2\").padding(compact ? DesignTokens.space20 : DesignTokens.space40)")
-        add("        VStack(spacing: compact ? DesignTokens.space14 : DesignTokens.space32) {")
+        add("        VStack(spacing: compact ? DesignTokens.space12 : DesignTokens.space32) {")
         add("        Text(\"t\").padding(.vertical, karaoke.isKaraokeOn ? 18 : (isActive ? 24 : 16))")
         add("        Text(\"u\").padding(.horizontal, max(16, min(20, UIScreen.main.bounds.width * 0.05)))")
         add("        Text(\"v\").padding(.horizontal, Self.horizontalPadding)")
@@ -923,15 +923,14 @@ struct UISpacingContractTests {
     /// 33 种 → 17 档（`1/1.5→2`、`3/5→4`、`7/9→8`、`14→12`、`18→16`、`22→20`、
     /// `25/26/28→24`、`30→32`、`44→40`、`50/56→48`、`60→64`，并新增 `space48`）；
     /// 大留白 `100/110/120` 按拍板表**保留不动**（不参与并档）。
-    /// 第 1 笔状态：`space14 → space12` 是中等视觉影响、单独第 2 笔，故此处暂时 18 档。
     /// 改动刻度必须同时改本断言——这是「归一没被新零散值静默回退」的唯一兜底。
     static let expectedSpaceNames: Set<String> = [
-        "space0", "space2", "space4", "space6", "space8", "space10", "space12", "space14",
+        "space0", "space2", "space4", "space6", "space8", "space10", "space12",
         "space16", "space20", "space24", "space32", "space40", "space48", "space64",
         "space100", "space110", "space120",
     ]
 
-    @Test("归一后间距刻度集合 == 预期集合（B2c-b 验收物）")
+    @Test("归一后间距刻度集合 == 预期集合（17 档，B2c-b 验收物）")
     func normalizedScaleMatchesExpectedSet() throws {
         let source = try String(contentsOf: Self.tokenFileURL, encoding: .utf8)
         let space = Set(
@@ -951,7 +950,7 @@ struct UISpacingContractTests {
     func spacingTokenTableIsSelfConsistentAndFullyReferenced() throws {
         let source = try String(contentsOf: Self.tokenFileURL, encoding: .utf8)
         let tokens = UIGeometryContract.parseTokens(source: source).filter { $0.name.hasPrefix("space") }
-        #expect(tokens.count >= 18, "间距令牌数异常（B2c-b 第 1 笔：18 档，含待并的 space14）：\(tokens.count)")
+        #expect(tokens.count >= 17, "间距令牌数异常（B2c-b 归一后 17 档）：\(tokens.count)")
 
         let inconsistent = UIGeometryContract.selfInconsistent(tokens)
         #expect(

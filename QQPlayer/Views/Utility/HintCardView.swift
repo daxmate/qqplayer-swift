@@ -54,7 +54,7 @@ struct HintCardView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(DesignTokens.space14)
+        .padding(DesignTokens.space12)
         // 卡片最大宽度封顶：overlay 中不会撑满全屏，卡片外区域自然不拦截手势
         .frame(maxWidth: 360)
         .background(
