@@ -144,11 +144,23 @@ extension AppCoordinator {
         return try databaseManager.isTrackInPlaylist(playlistId: playlistId, trackStableId: trackStableId)
     }
 
+    /// 删歌单：唯一入口（2026-09-17 用户拍板 A）。
+    ///
+    /// 与视图里原先裸调 `DatabaseManager.deletePlaylist` 的差别就一条：本入口**顺手清掉
+    /// 本地镜像 JSON**（`Documents/qqplayer-playlists/playlist-<slug>.json`）——否则镜像里
+    /// 留着已删歌单（幽灵文件），下次启动又被写回。
+    ///
+    /// **不涉及跨端删除**：删除能不能过端由 INV-13 / `SyncChangeLogDeletionPolicy`
+    /// 在 changelog 层决定（delete 一律不上线、收到一律忽略），与调哪个入口无关。
+    ///
+    /// 幂等（同拍板）：歌单已不存在时不再抛 `playlistNotFound`，直接返回——
+    /// 「已经没了」与「刚删掉」对调用方是同一种结果。
     func deletePlaylist(playlistId: Int64) throws {
         // Get playlist info before deleting from database
         let playlists = try databaseManager.getAllPlaylists()
         guard let playlist = playlists.first(where: { $0.id == playlistId }) else {
-            throw AppCoordinatorError.playlistNotFound
+            print("⏭️ deletePlaylist: playlist \(playlistId) 已不存在，幂等跳过")
+            return
         }
 
         let playlistSlug = playlist.slug
@@ -165,6 +177,24 @@ extension AppCoordinator {
     func renamePlaylist(playlistId: Int64, newTitle: String) throws {
         try databaseManager.renamePlaylist(playlistId: playlistId, newTitle: newTitle)
         print("✅ Playlist renamed to '\(newTitle)'")
+    }
+
+    /// 自定义封面：唯一入口。
+    /// 刻意**不** `syncPlaylistsToCloud()`：本地镜像 `PlaylistState` 不含封面字段，
+    /// 同步只会重写同一份 JSON（白写 IO）。
+    func updatePlaylistCustomCover(playlistId: Int64, imagePath: String?) throws {
+        try databaseManager.updatePlaylistCustomCover(playlistId: playlistId, imagePath: imagePath)
+    }
+
+    /// 清空「文件夹歌单不再重建」墓碑（重新打开自动创建时用）。纯本地表，无镜像/无同步。
+    func clearDeletedFolderPlaylistTombstones() throws {
+        try databaseManager.clearDeletedFolderPlaylistTombstones()
+    }
+
+    /// 曲目换路径后迁移库内引用（改名场景）。纯 DB 动作：
+    /// 刷新通知由调用方按自己已有的节奏发（不在此处额外发，避免改动既有刷新时序）。
+    func moveTrack(from oldPath: String, to newPath: String) throws {
+        try databaseManager.moveTrack(from: oldPath, to: newPath)
     }
 
     func updatePlaylistAccessed(playlistId: Int64) throws {
