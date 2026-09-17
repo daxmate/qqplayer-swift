@@ -111,6 +111,15 @@
 "drag_import_skipped_count" = "%d fichier(s) non pris en charge ignoré(s)";
 "drag_import_partial_count" = "%1$d fichier(s) importé(s), %2$d ignoré(s)";
 
+/* Import result summary (le panneau doit dire l'échec, pas « déjà dans la bibliothèque ») */
+"import_result_separator" = ", ";
+"import_result_added_one" = "1 chanson importée";
+"import_result_added_many" = "%d chansons importées";
+"import_result_updated_many" = "%d mises à jour";
+"import_result_present_many" = "%d déjà dans la bibliothèque";
+"import_result_excluded_many" = "%d exclues de la bibliothèque";
+"import_result_failed_many" = "%d échec(s)";
+
 /* Track list context menu (A3) */
 "show_artist" = "Voir l'artiste";
 "show_album" = "Voir l'album";

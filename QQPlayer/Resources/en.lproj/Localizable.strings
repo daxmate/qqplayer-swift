@@ -123,6 +123,15 @@
 "drag_import_skipped_count" = "Skipped %d unsupported file(s)";
 "drag_import_partial_count" = "Imported %1$d file(s), skipped %2$d";
 
+/* Import result summary (import panel must report failure, not "already in library") */
+"import_result_separator" = ", ";
+"import_result_added_one" = "1 song imported";
+"import_result_added_many" = "%d songs imported";
+"import_result_updated_many" = "%d songs updated";
+"import_result_present_many" = "%d already in library";
+"import_result_excluded_many" = "%d excluded from library";
+"import_result_failed_many" = "%d failed";
+
 /* Track list context menu (A3) */
 "show_artist" = "Go to Artist";
 "show_album" = "Go to Album";
