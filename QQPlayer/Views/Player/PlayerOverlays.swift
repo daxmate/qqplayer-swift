@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 /// 封面下方的小歌词窗口：显示当前句（+翻译），跟随播放进度更新；点击进入全屏歌词。
@@ -125,9 +124,7 @@ struct MiniPlayerView: View {
                                 .lineLimit(1)
 
                             if let artistId = playerEngine.currentTrack?.artistId,
-                               let artist = try? DatabaseManager.shared.read({ db in
-                                   try Artist.fetchOne(db, key: artistId)
-                               }) {
+                               let artist = try? LibraryReads.artist(id: artistId) {
                                 Text(ArtistNameNormalizer.displayName(artist.name))
                                     .font(.caption)
                                     .foregroundColor(.secondary)

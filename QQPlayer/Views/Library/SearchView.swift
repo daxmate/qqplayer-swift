@@ -1,5 +1,4 @@
 import Combine
-import GRDB
 import SwiftUI
 
 // MARK: - Search View
@@ -50,10 +49,10 @@ struct SearchView: View {
 
                 do {
                     // Use optimized database-level search
-                    songs = try DatabaseManager.shared.searchTracks(query: normalizedQuery, limit: 50)
-                    artists = try DatabaseManager.shared.searchArtists(query: normalizedQuery, limit: 20)
-                    albums = try DatabaseManager.shared.searchAlbums(query: normalizedQuery, limit: 30)
-                    playlists = try DatabaseManager.shared.searchPlaylists(query: normalizedQuery, limit: 15)
+                    songs = try LibraryReads.searchTracks(query: normalizedQuery, limit: 50)
+                    artists = try LibraryReads.searchArtists(query: normalizedQuery, limit: 20)
+                    albums = try LibraryReads.searchAlbums(query: normalizedQuery, limit: 30)
+                    playlists = try LibraryReads.searchPlaylists(query: normalizedQuery, limit: 15)
 
                     // Also include songs and albums from matched artists
                     let matchedArtistIds = artists.compactMap { $0.id }
@@ -62,12 +61,12 @@ struct SearchView: View {
                         let existingAlbumIds = Set(albums.compactMap { $0.id })
 
                         for artistId in matchedArtistIds {
-                            let artistTracks = try DatabaseManager.shared.getTracksByArtistId(artistId)
+                            let artistTracks = try LibraryReads.tracks(artistId: artistId)
                             for track in artistTracks where !existingSongIds.contains(track.stableId) {
                                 songs.append(track)
                             }
 
-                            let artistAlbums = try DatabaseManager.shared.getAlbumsByArtistId(artistId)
+                            let artistAlbums = try LibraryReads.albums(artistId: artistId)
                             for album in artistAlbums {
                                 guard let albumId = album.id, !existingAlbumIds.contains(albumId) else { continue }
                                 albums.append(album)

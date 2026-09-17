@@ -274,17 +274,17 @@ struct SmartPlaylistTrackList: View {
 }
 
 /// Artist display-name resolution shared by the smart playlist screens
-/// (简繁归一 via ArtistNameNormalizer inside DatabaseManager).
+/// (简繁归一 via ArtistNameNormalizer inside the query layer).
 enum SmartPlaylistArtistCache {
     static func load(for tracks: [Track]) -> (byId: [Int64: String], byStableId: [String: String]) {
         do {
-            let byId = try DatabaseManager.shared.getAllArtistNamesById()
+            let byId = try LibraryReads.artistNamesById()
             let fallbackArtistIds = tracks.reduce(into: [String: Int64]()) { result, track in
                 if let artistId = track.artistId {
                     result[track.stableId] = artistId
                 }
             }
-            let byStableId = try DatabaseManager.shared.getArtistDisplayNames(
+            let byStableId = try LibraryReads.artistDisplayNames(
                 forTrackStableIds: tracks.map(\.stableId),
                 fallbackArtistIdsByStableId: fallbackArtistIds
             )

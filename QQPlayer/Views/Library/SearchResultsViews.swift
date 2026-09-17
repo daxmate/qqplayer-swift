@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 enum SearchCategory: String, CaseIterable {
@@ -55,13 +54,13 @@ struct SearchResultsView: View {
 
     private func loadArtistCache() {
         do {
-            artistNameCache = try DatabaseManager.shared.getAllArtistNamesById()
+            artistNameCache = try LibraryReads.artistNamesById()
             let fallbackArtistIds = results.songs.reduce(into: [String: Int64]()) { result, track in
                 if let artistId = track.artistId {
                     result[track.stableId] = artistId
                 }
             }
-            artistDisplayNameCache = try DatabaseManager.shared.getArtistDisplayNames(
+            artistDisplayNameCache = try LibraryReads.artistDisplayNames(
                 forTrackStableIds: results.songs.map(\.stableId),
                 fallbackArtistIdsByStableId: fallbackArtistIds
             )
@@ -412,10 +411,8 @@ struct SearchSongRowView: View {
                 }
 
                 if let artistId = track.artistId,
-                   let artist = try? DatabaseManager.shared.read({ db in
-                       try Artist.fetchOne(db, key: artistId)
-                   }),
-                   let allArtistTracks = try? DatabaseManager.shared.getTracksByArtistId(artistId) {
+                   let artist = try? LibraryReads.artist(id: artistId),
+                   let allArtistTracks = try? LibraryReads.tracks(artistId: artistId) {
                     NavigationLink(destination: ArtistDetailScreenWrapper(artistName: artist.name, allTracks: allArtistTracks)) {
                         Label(Localized.showArtistPage, systemImage: "person.circle")
                     }
@@ -448,7 +445,7 @@ struct SearchSongRowView: View {
 
     private func checkFavoriteStatus() {
         do {
-            isFavorite = try DatabaseManager.shared.isFavorite(trackStableId: track.stableId)
+            isFavorite = try LibraryReads.isFavorite(trackStableId: track.stableId)
         } catch {
             print("Failed to check favorite status: \(error)")
         }
@@ -485,7 +482,7 @@ struct SearchArtistRowView: View {
         Button(action: {
             let artistTracks: [Track]
             if let artistId = artist.id {
-                artistTracks = (try? DatabaseManager.shared.getTracksByArtistId(artistId)) ?? []
+                artistTracks = (try? LibraryReads.tracks(artistId: artistId)) ?? []
             } else {
                 artistTracks = []
             }
@@ -559,8 +556,8 @@ struct SearchArtistAlbumsRow: View {
     private func loadArtistData() {
         guard let artistId = artist.id else { return }
         Task {
-            let tracks = (try? DatabaseManager.shared.getTracksByArtistId(artistId)) ?? []
-            let albums = (try? DatabaseManager.shared.getAlbumsByArtistId(artistId)) ?? []
+            let tracks = (try? LibraryReads.tracks(artistId: artistId)) ?? []
+            let albums = (try? LibraryReads.albums(artistId: artistId)) ?? []
             await MainActor.run {
                 artistTracks = tracks
                 artistAlbums = albums
@@ -690,7 +687,7 @@ struct SearchAlbumRowView: View {
         guard let albumId = album.id else { return }
 
         Task {
-            let tracks = (try? DatabaseManager.shared.getTracksByAlbumId(albumId)) ?? []
+            let tracks = (try? LibraryReads.tracks(albumId: albumId)) ?? []
             await MainActor.run {
                 albumTracks = tracks
             }

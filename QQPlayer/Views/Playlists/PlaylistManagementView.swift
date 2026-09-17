@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 struct PlaylistManagementView: View {
     @Environment(\.dismiss) private var dismiss
@@ -83,7 +82,7 @@ struct PlaylistManagementView: View {
 
     private func loadPlaylists() {
         do {
-            playlists = try DatabaseManager.shared.getAllPlaylists()
+            playlists = try LibraryReads.playlists()
         } catch {
             print("Failed to load playlists: \(error)")
         }

@@ -1,5 +1,4 @@
 import AVKit
-import GRDB
 import SwiftUI
 
 private enum ArtworkSwipeDirection: Equatable {
@@ -676,20 +675,16 @@ struct PlayerView: View {
         }
 
         if let albumId = currentTrack.albumId {
-            trackAlbum = try? DatabaseManager.shared.read({ db in
-                try Album.fetchOne(db, key: albumId)
-            })
+            trackAlbum = try? LibraryReads.album(id: albumId)
         } else {
             trackAlbum = nil
         }
 
         if let artistId = currentTrack.artistId {
-            let artist = try? DatabaseManager.shared.read({ db in
-                try Artist.fetchOne(db, key: artistId)
-            })
+            let artist = try? LibraryReads.artist(id: artistId)
             trackArtist = artist
             trackArtistDisplayName = artist.map {
-                (try? DatabaseManager.shared.getArtistDisplayName(forTrackStableId: currentTrack.stableId, fallbackArtistId: artistId)) ?? ArtistNameNormalizer.displayName($0.name)
+                (try? LibraryReads.artistDisplayName(forTrackStableId: currentTrack.stableId, fallbackArtistId: artistId)) ?? ArtistNameNormalizer.displayName($0.name)
             }
         } else {
             trackArtist = nil
@@ -944,7 +939,7 @@ struct PlayerView: View {
         }
 
         do {
-            isFavorite = try DatabaseManager.shared.isFavorite(trackStableId: currentTrack.stableId)
+            isFavorite = try LibraryReads.isFavorite(trackStableId: currentTrack.stableId)
         } catch {
             print("Failed to check favorite status: \(error)")
             isFavorite = false

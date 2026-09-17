@@ -87,9 +87,7 @@ struct LyricsSearchView: View {
                 // 预填歌手名（原 init 内同步 DB 读挪到这里；先填再搜，首次自动搜索带歌手过滤）
                 let artistName: String = {
                     guard let artistId = track.artistId,
-                          let artist = try? DatabaseManager.shared.read({ db in
-                              try Artist.fetchOne(db, key: artistId)
-                          }) else {
+                          let artist = try? LibraryReads.artist(id: artistId) else {
                         return ""
                     }
                     return artist.name

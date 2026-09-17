@@ -1,4 +1,3 @@
-import GRDB
 import SwiftUI
 
 struct TrackListView: View {
@@ -77,13 +76,11 @@ struct TrackListView: View {
         // Fetch all artists in one query
         var cache: [Int64: String] = [:]
         do {
-            try DatabaseManager.shared.read { db in
-                let artists = try Artist.filter(artistIds.contains(Column("id"))).fetchAll(db)
-                for artist in artists {
-                    if let id = artist.id {
-                        // 简繁归一：同一歌手的繁/简两行归一到同一字形
-                        cache[id] = ArtistNameNormalizer.displayName(artist.name)
-                    }
+            let artists = try LibraryReads.artists(ids: Array(artistIds))
+            for artist in artists {
+                if let id = artist.id {
+                    // 简繁归一：同一歌手的繁/简两行归一到同一字形
+                    cache[id] = ArtistNameNormalizer.displayName(artist.name)
                 }
             }
         } catch {
@@ -303,13 +300,13 @@ struct TrackListContentView: View {
 
     private func loadArtistNameCache() {
         do {
-            artistNameCache = try DatabaseManager.shared.getAllArtistNamesById()
+            artistNameCache = try LibraryReads.artistNamesById()
             let fallbackArtistIds = tracks.reduce(into: [String: Int64]()) { result, track in
                 if let artistId = track.artistId {
                     result[track.stableId] = artistId
                 }
             }
-            artistDisplayNameCache = try DatabaseManager.shared.getArtistDisplayNames(
+            artistDisplayNameCache = try LibraryReads.artistDisplayNames(
                 forTrackStableIds: tracks.map(\.stableId),
                 fallbackArtistIdsByStableId: fallbackArtistIds
             )
