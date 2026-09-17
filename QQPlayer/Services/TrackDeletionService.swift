@@ -19,13 +19,15 @@
 //
 //  这里把它收成一个入口：视图只负责「把哪些曲目打包成 Item」，其余全在此处。
 //
-//  行为（**逐字保留修复前的可观察行为**，只做去重，不改语义）：
-//  - `libraryOnly == true`：只加排除标记（文件留在磁盘，下次扫描不再入库），不删文件；
-//  - `libraryOnly == false`：删文件；文件删失败只记数 + 打日志，**不影响** DB 引用删除
-//    （与 iOS 侧既有实现一致；macOS 的「trash 失败则保留曲目」是另一套语义，
-//     见 `MacTrashService`，后续批次再决定是否合流）；
+//  行为（2026-09-17 用户确认后修正）：
+//  - `libraryOnly == true`：只加排除标记（文件留在磁盘，下次扫描不再入库），再删 DB 引用；
+//  - `libraryOnly == false`：先删文件——**文件没删掉就不删库引用**（曲目留在库里，计 failed）。
+//    这是用户 2026-09-17 明确的纠正：旧实现「文件删失败仍删库引用」不是本意，
+//    那会让曲目从库里消失而文件留在磁盘上（用户看不见、也删不掉）。
+//    Mac 端 `MacTrashService` 一直是这个语义（trash 失败则保留曲目），两端现已对齐。
+//  - **文件已不在磁盘 = 已达成目的**：不当失败，照常清 DB 引用（同 Mac 语义）；
 //  - DB 删除失败 → 该曲目计 failed，其余照常继续；
-//  - 每次调用只 post **一次** `.libraryNeedsRefresh`（单曲=1 次，批量=末尾 1 次，同现状）。
+//  - 每次调用只 post **一次** `.libraryNeedsRefresh`（单曲=1 次，批量=末尾 1 次）。
 //
 //  依赖注入（4 个闭包）只为可测：生产走 `delete(items:)`，测试走 `delete(items:...)` 核心。
 //
@@ -53,11 +55,11 @@ enum TrackDeletionService {
     struct Outcome: Sendable, Equatable {
         /// 文件（或排除标记）与 DB 引用都处理完成的曲目数。
         var deleted: Int = 0
-        /// DB 引用删除失败（曲目仍在库）的曲目数。
+        /// 未能完成的曲目数（文件删不掉→保留，或 DB 删除失败）。
         var failed: Int = 0
         /// 走「只从曲库移除、保留文件」分支的曲目数（含在 `deleted` 内）。
         var excludedFromLibrary: Int = 0
-        /// 磁盘文件删除失败的曲目数（DB 引用照常删除，故不并入 `failed`）。
+        /// 其中因磁盘文件删不掉而保留的曲目数（`failed` 的子集，诊断用）。
         var fileRemovalFailed: Int = 0
 
         var deletedAny: Bool { deleted > 0 }
@@ -73,6 +75,7 @@ enum TrackDeletionService {
         let outcome = delete(
             items: items,
             libraryOnly: settings.deleteFromLibraryOnly,
+            fileExists: { FileManager.default.fileExists(atPath: $0) },
             excludeFromLibrary: { DeleteSettings.addExcludedTrack($0) },
             removeFile: { path in
                 try FileManager.default.removeItem(at: URL(fileURLWithPath: path))
@@ -91,6 +94,7 @@ enum TrackDeletionService {
     static func delete(
         items: [Item],
         libraryOnly: Bool,
+        fileExists: (String) -> Bool,
         excludeFromLibrary: (String) -> Void,
         removeFile: (String) throws -> Void,
         deleteReference: (String) throws -> Void
@@ -100,14 +104,18 @@ enum TrackDeletionService {
             if libraryOnly {
                 excludeFromLibrary(item.stableId)
                 outcome.excludedFromLibrary += 1
-            } else {
+            } else if fileExists(item.path) {
                 do {
                     try removeFile(item.path)
                 } catch {
+                    // 文件没删掉 → **曲目留在库里**（旧实现会继续删库引用，导致曲目消失而文件赖在磁盘上）
+                    outcome.failed += 1
                     outcome.fileRemovalFailed += 1
-                    print("⚠️ Could not remove file from disk: \(error.localizedDescription)")
+                    print("⚠️ 文件删除失败，保留曲目 \(item.stableId)：\(error.localizedDescription)")
+                    continue
                 }
             }
+            // 走到这里：文件已删掉 / 文件本来就不在磁盘 / 只从曲库移除 → 清 DB 引用
 
             do {
                 try deleteReference(item.stableId)
