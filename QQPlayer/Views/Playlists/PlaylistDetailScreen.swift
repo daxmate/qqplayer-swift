@@ -416,7 +416,7 @@ struct PlaylistDetailScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
             loadPlaylistTracks()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
         }
         .confirmationDialog(NSLocalizedString("playlist_cover", value: "Playlist Cover", comment: ""), isPresented: $showCoverOptions) {

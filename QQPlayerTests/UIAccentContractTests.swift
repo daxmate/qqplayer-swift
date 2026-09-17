@@ -60,20 +60,33 @@ enum UIAccentContract {
         ]
     )
 
-    /// 规则 2：iOS 视图不得直读设置里的强调色。
-    /// 注入点在 App 根（ContentView），视图统一读 `@Environment(\.appAccentColor)`。
+    /// 规则 2：iOS 视图不得直读配色设置字段（唯一字段 = `accentColorName`）。
+    /// 注入点在 App 根（ContentView），视图统一读 `@Environment(\.appAccentColor)`；要色值走
+    /// `IOSAppearance` 名单（唯一取数入口），不在视图里自己查表。
+    /// 2026-09-17 设置字段层收口：旧字段 `backgroundColorChoice`（hex）退役，本规则改盯新字段名——
+    /// 否则规则会变成「盯一个不存在的字段」的空转。
     static let iosDirectReadRule = Rule(
-        name: "iOS 视图读环境值 appAccentColor，不得直读 settings.backgroundColorChoice.color",
-        pattern: #"backgroundColorChoice\.color"#,
+        name: "iOS 视图读环境值 appAccentColor，不得直读 settings.accentColorName",
+        pattern: #"accentColorName"#,
         whitelist: [
-            // 注入点 ContentView.swift 与其它非视图消费点（锁屏 Now Playing 取 hex、
-            // iCloud 备份取 rawValue）都不在 Views/** 扫描范围内，故无条目。
+            WhitelistEntry(
+                fileSuffix: "QQPlayer/Views/Utility/SettingsView.swift",
+                lineSnippet: "deleteSettings.accentColorName == preset.key",
+                reason: "设置页配色选择器：读当前 token 做选中态（设置页本身要读写这个字段）"
+            ),
+            WhitelistEntry(
+                fileSuffix: "QQPlayer/Views/Utility/SettingsView.swift",
+                lineSnippet: "deleteSettings.accentColorName = preset.key",
+                reason: "设置页配色选择器：写新 token（iOS 侧唯一写点）"
+            ),
         ]
     )
 
     /// 规则 3：macOS 「当前强调色」只能有一处读取（M2）。
     /// 允许读 `accentColorName` 的只有两者：`MacAppearance`（取值唯一入口）与
     /// `MacSettingsView`（设置页本身要读/写这个字段）。窗口/视图里再自读就是第二条路径。
+    /// （`accentColorName` 自 2026-09-17 起是**两端共用的唯一配色字段**，iOS 侧同名约束见规则 2；
+    /// 下方 setter 那行是 macOS 侧唯一写点。）
     static let macAccentReadRule = Rule(
         name: "macOS 当前强调色只能由 MacAppearance 唯一读取（设置页读写除外）",
         pattern: #"accentColorName"#,
@@ -92,6 +105,28 @@ enum UIAccentContract {
                 fileSuffix: "QQPlayer/Mac/MacSettingsView.swift",
                 lineSnippet: "settings.accentColorName = preset.key",
                 reason: "设置页强调色选择器：写入新值（唯一写点）"
+            ),
+        ]
+    )
+
+    /// 规则 4：**已退役的配色字段不得复活**（2026-09-17 设置字段层收口）。
+    ///
+    /// 唯一配色字段 = `DeleteSettings.accentColorName`（token）。旧 iOS 字段 `backgroundColorChoice`
+    /// （hex rawValue）只剩「读老数据」一处合法出现（`SettingsModels` 的 `LegacyCodingKeys`）。
+    /// 复活 = 又出现第二份配色语义：macOS 读到 iOS 的旧值、或读到从未被写入的默认值（读错字段拿错色）。
+    static let retiredColorFieldRule = Rule(
+        name: "配色字段唯一 accentColorName，旧字段 backgroundColorChoice 只允许出现在迁移读取处",
+        pattern: #"backgroundColorChoice"#,
+        whitelist: [
+            WhitelistEntry(
+                fileSuffix: "QQPlayer/Models/SettingsModels.swift",
+                lineSnippet: "case backgroundColorChoice",
+                reason: "旧字段名的唯一声明处（LegacyCodingKeys，只为读老数据、不再写回）"
+            ),
+            WhitelistEntry(
+                fileSuffix: "QQPlayer/Models/SettingsModels.swift",
+                lineSnippet: "forKey: .backgroundColorChoice",
+                reason: "老数据迁移的唯一读取点（decode 时把旧 hex 映射成 token）"
             ),
         ]
     )
@@ -434,7 +469,7 @@ struct UIAccentContractTests {
             "struct V: View {",
             "    @State private var settings = DeleteSettings.load()",
             "    var body: some View {",
-            "        Text(\"a\").foregroundColor(settings.backgroundColorChoice.color)",
+            "        Text(\"a\").foregroundColor(IOSAppearance.accentColor(forKey: settings.accentColorName))",
             "    }",
             "}",
         ].joined(separator: "\n")
@@ -459,7 +494,7 @@ struct UIAccentContractTests {
             "        Text(\"b\").tint(.red)",
             "        Text(Localized.accentColor)",
             "        // 反例说明：不要写 Color.accentColor",
-            "        /// 反例说明：不要写 settings.backgroundColorChoice.color",
+            "        /// 反例说明：不要写 settings.accentColorName",
             "    }",
             "}",
             "struct W: View {",
@@ -467,14 +502,26 @@ struct UIAccentContractTests {
             "    var body: some View { Text(\"c\") }",
             "}",
         ].joined(separator: "\n")
+        // 按端分开扫：规则分端靠**扫描范围**（Views/** vs Mac/**），不靠正则——
+        // iOS 规则的模式是「字段名」，拿它扫 Mac 文件会把 Mac 设置页那行误判成违规。
         let report = UIAccentContract.scan(
             source: source,
             filePath: "QQPlayer/Mac/MacSettingsView.swift",
-            rules: [UIAccentContract.macSystemAccentRule, UIAccentContract.iosDirectReadRule, UIAccentContract.macAccentReadRule]
+            rules: [UIAccentContract.macSystemAccentRule, UIAccentContract.macAccentReadRule]
         )
         let settingsWhitelisted = report.whitelistHits.contains("\(UIAccentContract.macAccentReadRule.name)|1")
         #expect(report.violations.isEmpty, "\(report.violations)")
         #expect(settingsWhitelisted, "设置页那行应命中白名单（证明白名单匹配的是行内容而非只按文件）")
+
+        // 同一份合成源码换成 Views 路径 + iOS 规则：设置页读那行应走 iOS 规则白名单
+        let iosReport = UIAccentContract.scan(
+            source: source,
+            filePath: "QQPlayer/Views/Utility/SettingsView.swift",
+            rules: [UIAccentContract.iosDirectReadRule]
+        )
+        #expect(iosReport.violations.isEmpty, "iOS 规则扫 Views 范围时应放行设置页读写：\(iosReport.violations)")
+        #expect(iosReport.whitelistHits.contains("\(UIAccentContract.iosDirectReadRule.name)|0"),
+                "设置页读那行应命中 iOS 规则白名单：\(iosReport.whitelistHits)")
     }
 
     // MARK: 真实源码扫描
@@ -487,7 +534,7 @@ struct UIAccentContractTests {
         #expect(result.violations.isEmpty, "macOS 出现 Color.accentColor（改读 @Environment(\\.appAccentColor)，或补白名单说明理由）：\n\(result.violations.joined(separator: "\n"))")
     }
 
-    @Test("iOS 视图层无直读 backgroundColorChoice.color")
+    @Test("iOS 视图层无直读 accentColorName（配色字段唯一入口）")
     func iosViewsHaveNoDirectSettingsRead() {
         let files = UIAccentContract.swiftFiles(under: UIAccentContract.iosViewScanPaths, repoRoot: Self.repoRoot)
         let result = Self.scanFiles(files, rules: [UIAccentContract.iosDirectReadRule])
@@ -496,7 +543,7 @@ struct UIAccentContractTests {
         // 规则非空转：同一模式在注入点（ContentView）确实命中（否则是模式/路径写错了）
         let injection = Self.repoRoot.appendingPathComponent(UIAccentContract.iosInjectionFile)
         let injectionResult = Self.scanFiles([injection], rules: [UIAccentContract.iosDirectReadRule])
-        #expect(injectionResult.forbiddenLines > 0, "扫描没匹配到任何 backgroundColorChoice.color = 规则空转")
+        #expect(injectionResult.forbiddenLines > 0, "扫描没匹配到任何 accentColorName = 规则空转")
     }
 
     @Test("macOS 当前强调色读取点唯一（MacAppearance + 设置页）")
@@ -550,6 +597,32 @@ struct UIAccentContractTests {
         }
         #expect(iosInjections.count == 1, "iOS 强调色注入点必须唯一（目前 = ContentView）：\(iosInjections)")
         #expect(iosInjections.first?.hasPrefix(UIAccentContract.iosInjectionFile) == true, "iOS 注入点应是 App 根 ContentView：\(iosInjections)")
+    }
+
+    @Test("配色设置字段唯一：两端设置页写的是同一个字段，且字段声明只有一处")
+    func colorSettingFieldIsSingleAcrossPlatforms() {
+        let files = UIAccentContract.appSourceFiles(repoRoot: Self.repoRoot)
+
+        // 字段声明唯一（旧 iOS 字段 backgroundColorChoice 已退役，正则见 retiredColorFieldRule）
+        let declarations = Self.linesContaining(#"var accentColorName\s*:"#, in: files)
+        #expect(declarations.count == 1, "配色设置字段声明必须唯一：\n\(declarations.joined(separator: "\n"))")
+        #expect(declarations.first?.hasPrefix("QQPlayer/Models/SettingsModels.swift") == true, "字段应定义在共享设置模型里：\(declarations)")
+
+        // 写点：iOS 设置页 / macOS 设置页各一处，写的都是同一个字段名（`[^=]` 排除 `==` 比较）
+        let writes = Self.linesContaining(#"(?:deleteSettings|settings)\.accentColorName\s*=[^=]"#, in: files)
+        #expect(writes.count == 2, "配色写点应只有两处（iOS / macOS 设置页）：\n\(writes.joined(separator: "\n"))")
+        #expect(writes.contains { $0.hasPrefix("QQPlayer/Views/Utility/SettingsView.swift") }, "iOS 设置页应写 accentColorName：\(writes)")
+        #expect(writes.contains { $0.hasPrefix("QQPlayer/Mac/MacSettingsView.swift") }, "macOS 设置页应写 accentColorName：\(writes)")
+    }
+
+    @Test("已退役的配色字段不得复活（唯一配色字段 = accentColorName）")
+    func retiredColorFieldDoesNotComeBack() {
+        let files = UIAccentContract.appSourceFiles(repoRoot: Self.repoRoot)
+        let result = Self.scanFiles(files, rules: [UIAccentContract.retiredColorFieldRule])
+        #expect(result.forbiddenLines > 0, "扫描没匹配到任何 backgroundColorChoice = 规则空转（模式或路径写错了）")
+        #expect(result.violations.isEmpty, "旧配色字段复活（唯一字段是 accentColorName）：\n\(result.violations.joined(separator: "\n"))")
+        #expect(result.hits.count == UIAccentContract.retiredColorFieldRule.whitelist.count,
+                "旧字段白名单条目没全部命中（代码改了 → 条目要同步改）：\(result.hits)")
     }
 }
 

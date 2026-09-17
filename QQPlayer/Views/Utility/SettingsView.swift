@@ -64,22 +64,24 @@ struct SettingsView: View {
                             GridItem(.flexible()),
                             GridItem(.flexible()),
                         ], spacing: DesignTokens.space16) {
-                            ForEach(BackgroundColor.allCases, id: \.self) { color in
+                            ForEach(IOSAppearance.accentPresets, id: \.key) { preset in
                                 Button(action: {
-                                    deleteSettings.backgroundColorChoice = color
+                                    // 唯一配色字段（2026-09-17 字段层收口）：写 token。
+                                    // save() 本身已发 .qqplayerSettingsDidChange（设置变更唯一信号）——
+                                    // 不再补发第二个「配色变更」事件（.backgroundColorChanged 已退役）。
+                                    deleteSettings.accentColorName = preset.key
                                     deleteSettings.save()
-                                    NotificationCenter.default.post(name: .backgroundColorChanged, object: nil)
                                 }) {
                                     ZStack {
                                         Circle()
-                                            .fill(color.color)
+                                            .fill(IOSAppearance.accentColor(forKey: preset.key))
                                             .frame(width: 44, height: 44)
                                             .overlay(
                                                 Circle()
-                                                    .stroke(deleteSettings.backgroundColorChoice == color ? Color.primary : Color.clear, lineWidth: 3)
+                                                    .stroke(deleteSettings.accentColorName == preset.key ? Color.primary : Color.clear, lineWidth: 3)
                                             )
 
-                                        if deleteSettings.backgroundColorChoice == color {
+                                        if deleteSettings.accentColorName == preset.key {
                                             Image(systemName: "checkmark")
                                                 .font(.system(size: DesignTokens.font16, weight: .bold))
                                                 .foregroundColor(.white)

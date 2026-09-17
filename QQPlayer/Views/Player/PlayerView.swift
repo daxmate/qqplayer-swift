@@ -196,9 +196,6 @@ struct PlayerView: View {
                 loadLyrics()
                 loadTrackMetadata()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
-                settings = DeleteSettings.load()
-            }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()
             }

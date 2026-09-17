@@ -16,10 +16,11 @@ struct ContentView: View {
     var body: some View {
         mainContent
             .background(.clear)
-            .accentColor(settings.backgroundColorChoice.color)
+            .accentColor(accentColor)
             // App 强调色环境值（iOS 唯一注入点，2026-09-15 I1）：值来自 8 色 iOS 名单
-            // `BackgroundColor`，视图统一读 @Environment(\.appAccentColor)，不再直读 settings。
-            .environment(\.appAccentColor, settings.backgroundColorChoice.color)
+            // `IOSAppearance`（输入 = 唯一配色字段 `settings.accentColorName`，2026-09-17 字段层收口）；
+            // 视图统一读 @Environment(\.appAccentColor)，不再直读 settings。
+            .environment(\.appAccentColor, accentColor)
             .onAppear {
                 AppearanceResolver.apply(forceDark: settings.forceDarkMode)
             }
@@ -39,6 +40,10 @@ struct ContentView: View {
                 showSettings: $showSettings
             ))
     }
+
+    /// 当前强调色。唯一取数入口 = `IOSAppearance`（8 色名单），唯一字段 = `accentColorName`
+    /// （2026-09-17 设置字段层收口：不再有 `backgroundColorChoice`）。
+    private var accentColor: Color { IOSAppearance.accentColor(forKey: settings.accentColorName) }
 
     private var mainContent: some View {
         LibraryView(
@@ -194,6 +199,9 @@ struct SheetModifier: ViewModifier {
     @Binding var showSettings: Bool
     @State private var settings = DeleteSettings.load()
 
+    /// 当前强调色（同 ContentView：唯一取数 = `IOSAppearance`，唯一字段 = `accentColorName`）
+    private var accentColor: Color { IOSAppearance.accentColor(forKey: settings.accentColorName) }
+
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showTutorial) {
@@ -203,21 +211,21 @@ struct SheetModifier: ViewModifier {
                     // 再弹 WhatsNew（下次升级才弹）
                     WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
                 })
-                .accentColor(settings.backgroundColorChoice.color)
+                .accentColor(accentColor)
             }
             .sheet(isPresented: $showWhatsNew) {
                 WhatsNewView(onClose: {
                     showWhatsNew = false
                 })
-                .accentColor(settings.backgroundColorChoice.color)
+                .accentColor(accentColor)
             }
             .sheet(isPresented: $showPlaylistManagement) {
                 PlaylistManagementView()
-                    .accentColor(settings.backgroundColorChoice.color)
+                    .accentColor(accentColor)
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
-                    .accentColor(settings.backgroundColorChoice.color)
+                    .accentColor(accentColor)
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()

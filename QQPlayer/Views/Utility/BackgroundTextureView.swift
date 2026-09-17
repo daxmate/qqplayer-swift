@@ -62,7 +62,6 @@ struct BackgroundTextureView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let design: BackgroundDesign
-    @State private var settings = DeleteSettings.load()
 
     init(design: BackgroundDesign) {
         self.design = design
@@ -86,9 +85,6 @@ struct BackgroundTextureView: View {
             case .softBlur:
                 softBlurDesign
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
-            settings = DeleteSettings.load()
         }
     }
 

@@ -237,7 +237,7 @@ struct MiniPlayerView: View {
                         isExpanded = false
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
+                .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                     settings = DeleteSettings.load()
                 }
             }

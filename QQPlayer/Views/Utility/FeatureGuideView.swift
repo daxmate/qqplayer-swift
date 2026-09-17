@@ -161,7 +161,7 @@ struct FeatureGuideView: View {
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
         #endif
-            .onReceive(NotificationCenter.default.publisher(for: .backgroundColorChanged)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()
             }
     }

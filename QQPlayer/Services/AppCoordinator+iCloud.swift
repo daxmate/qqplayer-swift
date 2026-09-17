@@ -186,9 +186,10 @@ extension AppCoordinator {
                         }
                     }
 
-                    // Get theme color from settings
+                    // Get theme color from settings（唯一取数 = IOSAppearance 名单；
+                    // 字段 = accentColorName，2026-09-17 字段层收口；hex 字串与历史 rawValue 逐字相同）
                     let settings = DeleteSettings.load()
-                    let colorHex = settings.backgroundColorChoice.rawValue
+                    let colorHex = IOSAppearance.accentHex(forKey: settings.accentColorName)
 
                     let widgetPlaylist = WidgetPlaylistData(
                         id: String(playlistId),

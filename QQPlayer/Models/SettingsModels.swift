@@ -48,32 +48,73 @@ enum LibraryAudioFormats {
     }
 #endif
 
-enum BackgroundColor: String, CaseIterable, Codable {
-    case violet = "b11491"
-    case red = "e74c3c"
-    case blue = "3498db"
-    case green = "27ae60"
-    case orange = "f39c12"
-    case pink = "e91e63"
-    case teal = "1abc9c"
-    case purple = "9b59b6"
+/// iOS 强调色名单（8 色）+ **唯一读取入口**（对称 macOS 的 `Mac/MacAppearance.swift`）。
+///
+/// 2026-09-17 「设置字段层收口」（反屎山审计复核，用户拍板走「iOS 迁到 accentColorName」）：
+/// - **字段名单一**：iOS / macOS 都读写 `DeleteSettings.accentColorName`（token 名）。
+///   原 iOS 字段 `backgroundColorChoice`（枚举 rawValue = hex）退役，老数据在
+///   `DeleteSettings.init(from:)` 里按 hex → token 迁移 → **iOS 视觉零变化**。
+/// - **色表按端独立**（用户 2026-09-15 已拍板，`docs/ui-design-tokens.md` §0.1）：iOS 8 色饱和表、
+///   macOS / web 6 色 pastel 表**有意不同**，不做跨端色值对拍；每端内部唯一入口即可。
+/// - hex 解析一律走全仓唯一入口 `Color(hex:)`（Models/AppearanceTheme.swift，M3）。
+///
+/// **不要在视图里自读 `DeleteSettings.accentColorName`**——注入点 `ContentView` 从这里取
+/// （形状契约见 `QQPlayerTests/UIAccentContractTests.swift`）。
+enum IOSAppearance {
+    /// iOS 强调色预设（token → hex）。色值 = 历史 `BackgroundColor` 各 case 的 rawValue，逐字未改。
+    static let accentPresets: [(key: String, hex: String)] = [
+        ("violet", "b11491"),
+        ("red", "e74c3c"),
+        ("blue", "3498db"),
+        ("green", "27ae60"),
+        ("orange", "f39c12"),
+        ("pink", "e91e63"),
+        ("teal", "1abc9c"),
+        ("purple", "9b59b6"),
+    ]
 
-    var name: String {
-        switch self {
-        case .violet: return "Violet (Default)"
-        case .red: return "Red"
-        case .blue: return "Blue"
-        case .green: return "Green"
-        case .orange: return "Orange"
-        case .pink: return "Pink"
-        case .teal: return "Teal"
-        case .purple: return "Purple"
-        }
+    /// 默认 token（8 色表首项，历史默认；`AppAccentDefault.key` 在 iOS 上取它）。
+    static let defaultAccentKey = accentPresets[0].key
+
+    /// token → 色值。未知 token 回退默认色（对齐 macOS `MacAppearance.accentColor(forKey:)`
+    /// 的兜底语义），调用方无需自行 find / 兜底。
+    static func accentColor(forKey key: String) -> Color {
+        Color(hex: accentHex(forKey: key))
     }
 
-    var color: Color {
-        // hex 解析走全仓唯一入口 Color(hex:)（Models/AppearanceTheme.swift，2026-09-15 M3 收口）
-        Color(hex: rawValue)
+    /// token → hex 字符串（widget 跨进程传递用；widget 侧只有 hex，没有 token 名单）。
+    static func accentHex(forKey key: String) -> String {
+        accentPresets.first { $0.key == key }?.hex ?? accentPresets[0].hex
+    }
+
+    /// 旧数据迁移：历史 `backgroundColorChoice` 的 hex rawValue → token（不在名单里 → nil）。
+    /// 只用于 `DeleteSettings.init(from:)` 一处。
+    static func legacyKey(fromHex hex: String) -> String? {
+        accentPresets.first { $0.hex.caseInsensitiveCompare(hex) == .orderedSame }?.key
+    }
+
+    // MARK: - 当前强调色（全 App 唯一读取入口）
+
+    /// 当前强调色 token（from `DeleteSettings.accentColorName`）。
+    /// 窗口 / 视图 / 服务一律从这里取，不要各自 `DeleteSettings.load().accentColorName`。
+    static var currentAccentKey: String { DeleteSettings.load().accentColorName }
+
+    /// 当前强调色色值（= `currentAccentKey` 经 8 色名单解析）。
+    static var currentAccentColor: Color { accentColor(forKey: currentAccentKey) }
+}
+
+/// 强调色字段（`DeleteSettings.accentColorName`）的默认 token。
+///
+/// 两端默认**有意不同**（= 各自色表首项，保持历史默认行为）：iOS = 8 色表 `violet`，
+/// macOS = 6 色表 `orange`（对齐 web）。放在共享文件是因为 `DeleteSettings` 的默认值
+/// 必须在两端各自编译时取对，而 macOS 名单（`MacAppearance`）不在 iOS target 内。
+enum AppAccentDefault {
+    static var key: String {
+        #if os(iOS)
+            return IOSAppearance.defaultAccentKey
+        #else
+            return "orange"
+        #endif
     }
 }
 
@@ -144,16 +185,25 @@ struct HomeSectionItem: Codable, Identifiable, Equatable {
     ]
 }
 
+/// 已退役的旧配色字段（`DeleteSettings` 字段层收口 2026-09-17，只读一次用于老数据迁移）。
+/// 字符串字面量**只允许出现在这一处**：形状契约（`UIAccentContractTests`）禁止全仓再出现
+/// `backgroundColorChoice`（防字段复活 = 防第二份配色语义）。
+private enum LegacyCodingKeys: String, CodingKey {
+    case backgroundColorChoice
+}
+
 struct DeleteSettings: Codable {
     var hasShownDeletePopup: Bool = false
     var minimalistIcons: Bool = false
-    var backgroundColorChoice: BackgroundColor = .violet
     var forceDarkMode: Bool = false
     /// 外观三态主题（system/dark/light，对齐 web 版 theme 语义）。macOS 设置页写入；
     /// 旧数据（无此 key）用 forceDarkMode 推导，见 init(from:) 与 AppearanceTheme.resolved。
     var appearanceTheme: String = "system"
-    /// 强调色预设 key（orange/blue/green/purple/pink/teal，对齐 web 版 ACCENT_OPTIONS）
-    var accentColorName: String = "orange"
+    /// 强调色预设 token——**两端唯一的配色设置字段**（2026-09-17 字段层收口）。
+    /// iOS 名单 8 色（`IOSAppearance`）/ macOS 名单 6 色（orange/blue/green/purple/pink/teal，
+    /// 色值对齐 web `ACCENT_OPTIONS`）；色表按端独立是用户已拍板的（`docs/ui-design-tokens.md` §0.1）。
+    /// 旧 iOS 字段 `backgroundColorChoice` 已退役，老数据迁移见 `init(from:)`。
+    var accentColorName: String = AppAccentDefault.key
     var dsdPlaybackMode: DSDPlaybackMode = .pcm
     var deleteFromLibraryOnly: Bool = true
     var lastLibraryScanDate: Date?
@@ -235,13 +285,22 @@ struct DeleteSettings: Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
         hasShownDeletePopup = try container.decodeIfPresent(Bool.self, forKey: .hasShownDeletePopup) ?? false
         minimalistIcons = try container.decodeIfPresent(Bool.self, forKey: .minimalistIcons) ?? false
-        backgroundColorChoice = try container.decodeIfPresent(BackgroundColor.self, forKey: .backgroundColorChoice) ?? .violet
         forceDarkMode = try container.decodeIfPresent(Bool.self, forKey: .forceDarkMode) ?? false
         appearanceTheme = try container.decodeIfPresent(String.self, forKey: .appearanceTheme)
             ?? (forceDarkMode ? "dark" : "system")
-        accentColorName = try container.decodeIfPresent(String.self, forKey: .accentColorName) ?? "orange"
+        // 强调色：老 iOS 数据只有 `backgroundColorChoice`（hex rawValue，如 "b11491"）→ 迁移成 token。
+        // **旧字段优先**：老 iOS plist 里同时躺着一个从未被 iOS 用过的 `accentColorName`
+        // 默认值 "orange"（save() 整体编码），认它会把老用户的 violet 变成 orange。
+        // 迁移期只读这两个 key，不再写回旧 key（旧 key 在下一次 save() 时自然消失）。
+        if let legacyHex = try legacyContainer.decodeIfPresent(String.self, forKey: .backgroundColorChoice) {
+            accentColorName = IOSAppearance.legacyKey(fromHex: legacyHex) ?? AppAccentDefault.key
+        } else {
+            accentColorName = try container.decodeIfPresent(String.self, forKey: .accentColorName)
+                ?? AppAccentDefault.key
+        }
         dsdPlaybackMode = try container.decodeIfPresent(DSDPlaybackMode.self, forKey: .dsdPlaybackMode) ?? .pcm
         // Default to app-only deletion - deleting the user's actual files
         // should always be an explicit opt-in

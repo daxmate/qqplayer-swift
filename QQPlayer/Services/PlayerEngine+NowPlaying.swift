@@ -134,9 +134,9 @@
                     artistName = Localized.unknownArtist
                 }
 
-                // Get theme color
+                // Get theme color（唯一取数 = IOSAppearance 名单；字段 = accentColorName，2026-09-17 收口）
                 let settings = DeleteSettings.load()
-                let colorHex = settings.backgroundColorChoice.color.toHex()
+                let colorHex = IOSAppearance.accentHex(forKey: settings.accentColorName)
 
                 // 同曲校验（2026-09-12 审计 P5）：上面两次 await（封面 / 后台编码）期间可能已切歌，
                 // 旧曲写进去会一直留在小组件（saveCurrentTrack 同步写盘 + reloadAllTimelines）。

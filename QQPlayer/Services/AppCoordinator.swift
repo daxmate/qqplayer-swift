@@ -28,6 +28,11 @@ class AppCoordinator: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    /// 上次已同步到小组件的强调色 token（配色变更去重；见 `setupBindings`）。
+    /// 设置事件是所有设置项共用的信号，而 `syncPlaylistsToCloud()` 会写盘——
+    /// 只有 token 真的变了才做 widget 同步。
+    private var lastSyncedAccentKey: String = ""
+
     private init() {
         setupBindings()
     }
@@ -112,15 +117,21 @@ class AppCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Listen for background color changes to update widget theme
-        NotificationCenter.default.publisher(for: .backgroundColorChanged)
+        // 配色变更 → 刷新小组件主题（2026-09-17 事件层收口）：唯一信号 = `.qqplayerSettingsDidChange`
+        // （`DeleteSettings.save()` 每次写入都发它）；旧 `.backgroundColorChanged` 已退役。
+        lastSyncedAccentKey = IOSAppearance.currentAccentKey
+        NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    print("🎨 Background color changed - updating widget theme")
+                    guard let self else { return }
+                    let key = IOSAppearance.currentAccentKey
+                    guard key != self.lastSyncedAccentKey else { return }
+                    self.lastSyncedAccentKey = key
+                    print("🎨 强调色变更 (\(key)) - 刷新小组件主题")
                     // Update playlist widget colors
-                    self?.syncPlaylistsToCloud()
+                    self.syncPlaylistsToCloud()
                     // Update now playing widget color
-                    self?.playerEngine.updateWidgetData()
+                    self.playerEngine.updateWidgetData()
                 }
             }
             .store(in: &cancellables)

@@ -32,12 +32,11 @@ enum AppNotificationContract {
     /// 唯一入口文件（全 App 唯一允许出现 `Notification.Name("…")` 字面量的地方）
     static let entryFileSuffix = "QQPlayer/Models/AppNotifications.swift"
 
-    /// 18 个常量的期望清单：`字符串值 → 常量属性名`（顺序即入口文件里的声明顺序）。
+    /// 17 个常量的期望清单：`字符串值 → 常量属性名`（顺序即入口文件里的声明顺序）。
     /// 少一个 / 多一个 / 拼错名 / 字符串值被改动 → 契约红。
     static let expectedConstants: [(value: String, property: String)] = [
         ("LibraryNeedsRefresh", "libraryNeedsRefresh"),
         ("PlaylistsChanged", "playlistsChanged"),
-        ("BackgroundColorChanged", "backgroundColorChanged"),
         ("LibraryFolderContentChanged", "libraryFolderContentChanged"),
         ("FavoritesChanged", "favoritesChanged"),
         ("QQPlayerArtworkRefreshed", "qqplayerArtworkRefreshed"),
@@ -55,9 +54,14 @@ enum AppNotificationContract {
         ("MacSyncDevicesChanged", "macSyncDevicesChanged"),
     ]
 
-    /// 2026-09-16 收口时**删除的死事件**（0 订阅方，审计核实）：不得再出现在源码里，
+    /// 收口时**删除的死事件**（0 订阅方，审计核实）：不得再出现在源码里，
     /// 也不得有常量（谁把 post 加回来而没有订阅方 → 红）。
-    static let retiredValues = ["PlayerStateChanged", "PlayerSeekFailed"]
+    /// - `PlayerStateChanged` / `PlayerSeekFailed`：2026-09-16 通知收口时删（CarPlay 态改由
+    ///   MPNowPlayingInfoCenter / MPRemoteCommandCenter 驱动）。
+    /// - `BackgroundColorChanged`：2026-09-17 设置字段层收口时删（**冗余事件**：iOS 设置页写配色
+    ///   本就调 `DeleteSettings.save()`，而 save() 每次都发 `QQPlayerSettingsDidChange`；
+    ///   11 个订阅方里 3 个还是重复订阅同一动作）。
+    static let retiredValues = ["PlayerStateChanged", "PlayerSeekFailed", "BackgroundColorChanged"]
 
     /// 白名单条目：文件路径尾段 + 行内容片段 + 理由（理由必写明「为什么这里合法」）
     struct WhitelistEntry {
@@ -87,7 +91,7 @@ enum AppNotificationContract {
             WhitelistEntry(
                 fileSuffix: entryFileSuffix,
                 lineSnippet: #"Notification.Name(""#,
-                reason: "唯一入口文件本身：18 个常量的字符串值在此定义，字符串值必须与历史字面量逐字相同"
+                reason: "唯一入口文件本身：17 个常量的字符串值在此定义，字符串值必须与历史字面量逐字相同"
             ),
         ]
     )
@@ -599,7 +603,6 @@ struct AppNotificationContractTests {
             switch property {
             case "libraryNeedsRefresh": matched = Notification.Name.libraryNeedsRefresh.rawValue
             case "playlistsChanged": matched = Notification.Name.playlistsChanged.rawValue
-            case "backgroundColorChanged": matched = Notification.Name.backgroundColorChanged.rawValue
             case "libraryFolderContentChanged": matched = Notification.Name.libraryFolderContentChanged.rawValue
             case "favoritesChanged": matched = Notification.Name.favoritesChanged.rawValue
             case "qqplayerArtworkRefreshed": matched = Notification.Name.qqplayerArtworkRefreshed.rawValue
@@ -631,7 +634,7 @@ struct AppNotificationContractTests {
         #expect(gaps.isEmpty, "形状缺口（0 订阅方的广播 / 0 发送方的订阅）：\n\(gaps.joined(separator: "\n"))")
     }
 
-    @Test("死事件已删：PlayerStateChanged / PlayerSeekFailed 不再出现在 App 源码里")
+    @Test("死事件已删：PlayerStateChanged / PlayerSeekFailed / BackgroundColorChanged 不再出现在 App 源码里")
     func retiredEventsAreGone() {
         let files = AppNotificationContract.appSourceFiles(repoRoot: Self.repoRoot)
         let code = Self.strippedAppCode(files)

@@ -20,8 +20,10 @@ extension Notification.Name {
     /// 歌单增删改后广播（Mac 导入 / 歌单详情面板 / 拖拽写入点）→ 侧栏与列表重拉歌单。
     static let playlistsChanged = Notification.Name("PlaylistsChanged")
 
-    /// 背景色设置改变（设置页写入）→ 各背景视图与桌面小组件主题重读。
-    static let backgroundColorChanged = Notification.Name("BackgroundColorChanged")
+    // 已退役：`backgroundColorChanged`（"BackgroundColorChanged"）。
+    // 2026-09-17 事件层收口：iOS 设置页写配色时本就调 `DeleteSettings.save()`，而 save()
+    // 每次写入都发 `.qqplayerSettingsDidChange`——「配色变更」不再需要第二个事件。
+    // 死事件清单见 `QQPlayerTests/AppNotificationContractTests.swift` 的 retiredValues（防复活）。
 
     /// 曲库文件夹内容变化（导入落盘 / 在线下载完成 / 刮削落库）→ 触发重扫收录。
     static let libraryFolderContentChanged = Notification.Name("LibraryFolderContentChanged")

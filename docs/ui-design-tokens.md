@@ -7,6 +7,8 @@
 ## 0. 前提（用户已拍板）
 
 1. **macOS / iOS 配色不必与 Web 一致**（苹果自有风格）⇒ **不做跨端色值对拍测试**；每端内部唯一入口即可。
+   - 追加（2026-09-17）：**字段名唯一、色表按端独立**——「当前跟的是哪一套配色」在两端是**同一个设置语义** ⇒ 共享同一字段
+     `DeleteSettings.accentColorName`（token 名，iOS 8 色 / macOS 6 色各自解析）；**不做** token→色值的跨端对拍（承本条）。见 §3 A1。
 2. **C3–C5 语义状态色（危险/成功/警告）不在 Apple 端做自造令牌**。理由（本轮取证）：
    - 现状已统一在 Apple 系统语义色：`role: .destructive` 34 处、`.red` 34 处、`.green` 14 处、`.orange` 15 处；
    - 自造颜色字面量全仓仅 3 处，且都是**品牌色**（`MacLyricsSearchView.swift:303` / `Views/Player/LyricsSearchView.swift:355` 网易云品牌红、`Models/SettingsModels.swift:97` 灰色）——不是语义状态色；
@@ -16,13 +18,13 @@
 
 ## 1. 结论一句话
 
-强调色的**名单是唯一的**（`MacAppearance.accentPresets` / iOS `BackgroundColor` 枚举），问题在**传递机制**：macOS 有第二注入路径（桌面歌词/迷你窗）、iOS 根本没有环境值（148 处直读 + 18 处 prop 透传）；另有一个**已修复缺陷在新代码里复发**（MacSyncView 3 处 `Color.accentColor`，现网可见）；几何/排版**完全没有令牌**。
+强调色的**名单是唯一的**（`MacAppearance.accentPresets` / iOS `IOSAppearance`），问题在**传递机制**：macOS 有第二注入路径（桌面歌词/迷你窗）、iOS 根本没有环境值（148 处直读 + 18 处 prop 透传）；另有一个**已修复缺陷在新代码里复发**（MacSyncView 3 处 `Color.accentColor`，现网可见）；几何/排版**完全没有令牌**。
 
 ## 2. L0 契约表
 
 | # | 语义角色 | macOS 现状 | iOS 现状 | 目标唯一入口 | 缺口 |
 |---|---|---|---|---|---|
-| C1 | 强调色主值 | `MacAppearance.accentPresets`（6 预设）+ `.environment(\.appAccentColor)` 注入 ✅，18 文件消费 | `BackgroundColor` 枚举（8 色，violet `b11491` 默认）✅，但**传递两套** | macOS：`appAccentColor` 环境值；iOS：**新建同名环境值** | **M1 / M2 / I1** |
+| C1 | 强调色主值 | `MacAppearance.accentPresets`（6 预设）+ `.environment(\.appAccentColor)` 注入 ✅，18 文件消费 | `IOSAppearance` 名单（8 色，violet `b11491` 默认）✅，但**传递两套** | macOS：`appAccentColor` 环境值；iOS：**新建同名环境值** | **M1 / M2 / I1**（字段层 2026-09-17 已收口，见 A1） |
 | C2 | 强调色衍生 | 无令牌，各写 `.opacity(x)` | 同 macOS | 需要时补派生函数（低优先） | — |
 | C3–C5 | 危险/成功/警告 | 系统语义色 ✅（**不做自造令牌**，见 §0.2） | 同 macOS | 保持系统语义色 | 已达标 |
 | C6–C9 | 中性面/文字/描边/阴影 | 系统语义色 ✅ | 同 | 保持 | — |
@@ -61,6 +63,33 @@
 - 收口：iOS 侧也引入 `appAccentColor` 环境值（在 iOS App 根注入），视图统一读环境值；`accentColor:` prop 与 148 处直读迁移过去（**不新增第二实现**）。
 - 测试：静态扫描禁 `QQPlayer/Views/**` 出现 `backgroundColorChoice.color`（白名单注入点）。
 - **实施记录**：实测直读 142 处（清单写 148，含 `deleteSettings.` 变体与注释）/ 22 个文件 → 全部改读 `@Environment(\.appAccentColor)`；注入点 = `ContentView`（App 根，唯一）；`accentColor:` prop 9 处声明 → 8 处删除改读环境值，仅 `HintCardView` 保留（表现层参数 + 预览注入 `.blue` 的 seam，调用方全部传环境值）。`PlaylistsScreen.swift:168` 原有 1 处 `Color.accentColor`（iOS 侧的第三条路径）一并改读环境值。预览改用 `.environment(\.appAccentColor, …)` 显式注入。
+
+### A1 · 配色设置字段层收口（2026-09-17）✅ 已实现
+- 背景（审计 2026-09-16 报「`.backgroundColorChanged` 1 发 11 收」，09-17 复核改判）：**不是静默失败 bug**，是
+  **两套配色设置字段并存**——iOS 用 `DeleteSettings.backgroundColorChoice`（枚举 rawValue = hex，8 色），
+  macOS 用 `DeleteSettings.accentColorName`（String token，6 色，对齐 web `ACCENT_OPTIONS`）；macOS 侧无人写旧字段
+  ⇒ 旧字段在 macOS 上是死值，11 个订阅方在 macOS 侧是死订阅。
+- 另一处取证（审计未提）：`.backgroundColorChanged` **是 100% 冗余事件**——iOS 设置页本就在 post 前调
+  `deleteSettings.save()`，而 `save()` 每次写入都发 `.qqplayerSettingsDidChange`；11 个订阅方里 3 个
+  （`LibraryView` / `PlayerView` / `QueueManagementView`）甚至**同时订阅两个事件、动作逐字相同**；
+  `BackgroundTextureView` 还有个只赋值、从不读取的 `@State settings`（死状态）。
+- 用户拍板（2026-09-17）：走「**iOS 迁到 `accentColorName`**」（而非让 macOS 改用 iOS 的 8 色枚举——那会让 macOS
+  与 web 的 pastel 视觉语言分裂）。已按此实现（见下）。
+- 收口三点：
+  1. **字段唯一**：iOS 名单收成 `IOSAppearance`（token → hex，色值逐字未改）+ 唯一读取入口
+     `currentAccentKey` / `currentAccentColor` / `accentColor(forKey:)`（对称 macOS 的 `MacAppearance`）；
+     旧字段退役，老数据在 `DeleteSettings.init(from:)` 按 hex → token 迁移（**旧字段优先**：老 plist 里那个 iOS
+     从未写入过的 `accentColorName = "orange"` 占位值不作数），**iOS 用户视觉零变化**；
+     默认值按端不同（`AppAccentDefault`：iOS `violet` / macOS `orange`，= 各自色表首项）。
+  2. **事件唯一**：删 `.backgroundColorChanged`（已登记进 `AppNotificationContractTests.retiredValues`）；
+     订阅方收回唯一设置信号 `.qqplayerSettingsDidChange`；widget 主题刷新收成一个**带去重的刷新点**
+     （`AppCoordinator` 比较上次已同步的 token——无关设置项不再触发写盘同步）。
+  3. **形状契约**：旧字段禁复活 / 字段声明唯一 + 两端设置页写同一字段 / iOS 视图禁直读 `accentColorName`
+     （白名单 = iOS 设置页两行）——见第 5 节表格。
+- 消费点全查（承 2026-08-27 纪律「修一个 bug 先 grep 同类消费点」）：设置页色块、App 根注入（`.accentColor` +
+  `appAccentColor`）、锁屏 Now Playing 取 hex、iCloud widget 备份取 hex、模板/预览——一次性全改。
+- 回归测试：`AppearanceThemeTests` 新增 5 条（8 色逐一迁移 / 旧字段优先 / 新格式 / 未知 hex 回落本端默认 /
+  迁移单向不回写）+ 名单自洽 1 条（token / hex 不重复、默认 token 可解、共用 token 名齐全）。
 
 ### I2 · 主题模型与 macOS 不同（保持）
 - iOS `forceDarkMode` + `AppearanceTheme.resolved`（有迁移测试 `AppearanceThemeTests`）；macOS 三态 + `NSApp.appearance`。按用户指示**不做统一**。
@@ -218,7 +247,8 @@
 
 ## 4. 已做对的地方（保持，别改坏）
 
-- 强调色名单唯一：`MacAppearance.accentPresets`（6）；iOS `BackgroundColor`（8，值不同是**有意**的，见 §0.1）
+- 强调色名单唯一：`MacAppearance.accentPresets`（6）；iOS `IOSAppearance`（8，值不同是**有意**的，见 §0.1）；
+  且**配色设置字段唯一** = `DeleteSettings.accentColorName`（两端设置页写同一个字段，A1 2026-09-17）
 - 主题应用唯一：`MacAppearance.apply(theme:)`（NSApp.appearance，所有窗口跟随）
 - 系统语义色用得好：`.destructive`/`.red`/`.green`/`.orange`，几乎无自造色
 - macOS 18 个文件已统一消费 `appAccentColor`（M1 只是 3 处例外）
@@ -228,7 +258,10 @@
 | 断言 | 白名单 |
 |---|---|
 | 禁 `QQPlayer/Mac/**` 出现 `Color.accentColor`（含裸 `.accentColor` 字面量；正则排除 `self.accentColor` / `Localized.accentColor` / `.accentColorName` / `.accentColor(forKey:)`） | `Models/AppearanceTheme.swift` 的 `defaultValue`（环境值定义随 M3 移到共享文件） |
-| 禁 `QQPlayer/Views/**` 直读 `backgroundColorChoice.color` | 无（注入点 `ContentView.swift` 不在 Views 范围）；非空转佐证 = 注入点仍命中 |
+| 禁 `QQPlayer/Views/**` 直读 `accentColorName`（A1：字段名随收口改为两端共用的那个） | iOS 设置页读写两行（`Views/Utility/SettingsView.swift`）；非空转佐证 = 注入点 `ContentView.swift` 仍命中 |
+| 配色字段唯一：`var accentColorName` 声明恰好 1 处 + 写点恰好 2 处（iOS / macOS 设置页） | 无（写点即白名单本身） |
+| 禁旧配色字段 `backgroundColorChoice` 复活（A1 退役） | `Models/SettingsModels.swift` 的 `LegacyCodingKeys` 声明行 + 迁移读取行 |
+| 禁 `.backgroundColorChanged` 事件复活（A1 退役：与 `.qqplayerSettingsDidChange` 冗余） | 无——由 `AppNotificationContractTests.retiredValues` 兜（常量清单里也不得有它） |
 | macOS 当前强调色只由 `MacAppearance` 唯一读取 | `MacAppearance.swift`（读）+ `MacSettingsView.swift`（设置页读写） |
 | hex→Color 解析唯一（`init(hex:)` 恰好 1 处，无第二套 `color(hex:)`） | 唯一工具 `Models/AppearanceTheme.swift` |
 | 强调色环境值定义唯一 + iOS 注入点唯一（`ContentView`） | `Models/AppearanceTheme.swift`；预览注入算 seam |
@@ -241,6 +274,7 @@
 > B1 形状测试实现在 `QQPlayerTests/UIAccentContractTests.swift`（9 个用例；含合成源码自证与白名单腐烂检测；已反证：临时把一处改回 `Color.accentColor` → 套件转红并打印精确行号）。
 > B2a 同文件追加 `UIGeometryContract` + `UIGeometryContractTests`；B2c-a 再追加 `UISpacingContract` + `UISpacingContractTests`（3 条用例）——**三章共用同一套扫描纯函数，不另起测试文件**。B2c-a 已反证：`MacTagEditorView.swift:179` 的 `.padding(DesignTokens.space16)` 还原成 `.padding(7)` → 套件转红并打印精确路径:行号 → 撤销复跑转绿。
 > 先例：`SyncIdentityContract` / `SyncOutcomeContract` / `SyncEntityRegistry`（同步）、`DisplayScriptContractTests`（UI 显示层）、`AppearanceThemeTests`（主题迁移）。
+> A1（2026-09-17 配色设置字段层收口）在 `UIAccentContractTests` 追加 2 条（字段唯一 + 旧字段禁复活），并改了 iOS 直读规则盯的字段名。
 
 ## 6. 分批
 
