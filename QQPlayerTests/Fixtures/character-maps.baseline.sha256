@@ -1,0 +1,4 @@
+# 简繁映射表基线哈希（由 scripts/gen-character-maps.sh --ref HEAD 生成）
+# 格式：<sha256>  <文件名>（文件名相对仓库根）
+de8fcb8064deb6a5fb23d45bb60f253407904466c396cc8cec8e286b57c9017f  QQPlayerTests/Fixtures/simplified-to-traditional.baseline.tsv
+111f232bd4e34d77683b73fb61a1b20e5cba9f0779ca17a08a67c2b01e297539  QQPlayerTests/Fixtures/traditional-to-simplified.baseline.tsv
