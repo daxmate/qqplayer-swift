@@ -44,6 +44,36 @@ struct TrackIdentityFileMigrationReport: Equatable {
 }
 
 enum TrackIdentityMigration {
+    // MARK: - 身份列引用表名单（**唯一名单**）
+
+    /// 身份列名：schema 侧凡含此列的表都是 `stable_id` 的引用表。
+    static let identityColumn = "track_stable_id"
+
+    /// 「身份列引用表」的**唯一名单**。
+    ///
+    /// 语义：`track.stable_id` 被重命名（刮削改名、外部文件移动、iCloud 容器 UUID
+    /// 变化、旧库 filename→path 迁移）时，**所有引用 `track_stable_id` 的表都必须
+    /// 跟着迁移**。哪些表算引用表，只由这份名单定义。
+    ///
+    /// **新增一张带 `track_stable_id` 的表 → 必须同时做两件事**：
+    ///   1. 把表名加进本名单；
+    ///   2. 在 `migrateDatabaseReferences(_:remapping:)` 里补上对应的 UPDATE/DELETE。
+    ///
+    /// 少做任何一件，`QQPlayerTests/TrackIdentityTableContractTests.swift` 都会红：
+    ///   - (a) 与真实 schema（`createTables()` 建出的含身份列的表集合）**双向相等**；
+    ///   - (b) 名单里每张表都必须出现在迁移源码的 UPDATE/DELETE 中（无白名单）。
+    ///
+    /// 为什么要有这份显式名单（审计 2026-09-12 B2 遗留 / 反屎山计划第④条）：
+    /// 「引用表集合」过去只隐含在 SQL 语句里、没有任何测试把它和**真实 schema**
+    /// 对齐 → 新增引用表会**静默漏迁**（2026-09-14 手机真库定位事故就是「引用了
+    /// 一份已经改名的旧表」的形状：迁移没漏表，但没人保证表集合本身没漂移）。
+    static let identityCoupledTables: Set<String> = [
+        "favorite",
+        "play_history",
+        "playlist_item",
+        "track_artist",
+    ]
+
     // MARK: - DB 侧（调用方事务内；与 track 行的 stable_id 变更同事务）
 
     /// 四表引用跟随新 stableId。`favorite`/`playlist_item`/`track_artist` 有主键或
