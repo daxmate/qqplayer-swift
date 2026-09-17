@@ -620,7 +620,7 @@ struct MacLibraryView: View {
     }
 
     private func resolveArtistName(for track: Track) -> String? {
-        try? DatabaseManager.shared.getArtistDisplayName(
+        try? LibraryReads.artistDisplayName(
             forTrackStableId: track.stableId,
             fallbackArtistId: track.artistId
         )
@@ -684,10 +684,10 @@ struct MacLibraryView: View {
                 var playlists: [Playlist] = []
 
                 do {
-                    songs = try DatabaseManager.shared.searchTracks(query: normalizedQuery, limit: 50)
-                    artists = try DatabaseManager.shared.searchArtists(query: normalizedQuery, limit: 20)
-                    albums = try DatabaseManager.shared.searchAlbums(query: normalizedQuery, limit: 30)
-                    playlists = try DatabaseManager.shared.searchPlaylists(query: normalizedQuery, limit: 15)
+                    songs = try LibraryReads.searchTracks(query: normalizedQuery, limit: 50)
+                    artists = try LibraryReads.searchArtists(query: normalizedQuery, limit: 20)
+                    albums = try LibraryReads.searchAlbums(query: normalizedQuery, limit: 30)
+                    playlists = try LibraryReads.searchPlaylists(query: normalizedQuery, limit: 15)
                 } catch {
                     print("❌ macOS search failed: \(error)")
                 }
@@ -707,7 +707,7 @@ struct MacLibraryView: View {
     private func showArtist(for track: Track) {
         guard let artistId = track.artistId else { return }
         do {
-            artistTracks = try DatabaseManager.shared.getTracksByArtistId(artistId)
+            artistTracks = try LibraryReads.tracks(artistId: artistId)
         } catch {
             print("❌ showArtist tracks failed: \(error)")
         }
@@ -721,7 +721,7 @@ struct MacLibraryView: View {
     private func showAlbum(for track: Track) {
         guard let albumId = track.albumId else { return }
         do {
-            albumTracks = try DatabaseManager.shared.getTracksByAlbumId(albumId)
+            albumTracks = try LibraryReads.tracks(albumId: albumId)
         } catch {
             print("❌ showAlbum tracks failed: \(error)")
         }
@@ -747,9 +747,9 @@ struct MacLibraryView: View {
 
     private func openPlaylist(_ playlist: Playlist) {
         do {
-            let items = try DatabaseManager.shared.getPlaylistItems(playlistId: playlist.id ?? 0)
+            let items = try LibraryReads.playlistItems(playlistId: playlist.id ?? 0)
             let stableIds = items.map { $0.trackStableId }
-            let tracks = try DatabaseManager.shared.getTracksByStableIdsPreservingOrder(stableIds)
+            let tracks = try LibraryReads.tracksPreservingOrder(stableIds: stableIds)
             guard let first = tracks.first else { return }
             Task {
                 await player.playTrack(first, queue: tracks)

@@ -138,7 +138,7 @@ struct MacMiniPlayerView: View {
                 artistName = ""
                 return
             }
-            artistName = (try? DatabaseManager.shared.getArtistDisplayName(
+            artistName = (try? LibraryReads.artistDisplayName(
                 forTrackStableId: track.stableId,
                 fallbackArtistId: track.artistId
             )) ?? ""

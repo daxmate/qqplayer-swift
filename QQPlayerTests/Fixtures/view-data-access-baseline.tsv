@@ -7,23 +7,16 @@
 # 整改去向（2026-09-17 P0）：
 #   查询 → QQPlayer/Services/LibraryReads.swift
 #   删除曲目 → QQPlayer/Services/TrackDeletionService.swift
-#   播放列表写操作 → AppCoordinator 既有的 playlist API（见 AppCoordinator+ImportExport.swift）
+#   播放列表写操作 → AppCoordinator 既有 playlist API（用户 2026-09-17 拍板 A：统一，
+#     语义是「本地镜像 JSON 一并清理 + 幂等」，**不含**跨端删除传播——那条由
+#     INV-13 / SyncChangeLogDeletionPolicy 在 changelog 层管）
 #
-# 进度：108 → 50（第 1 批：7 处删除仪式收进 TrackDeletionService、TrackBulkSelection 清零；第 2 批：iOS 视图查询收口，16 个文件清零）
+# 进度：108 → 101（批1 删除收口）→ 50（批2 iOS 查询）→ 14（批3 Mac 查询）
+# 剩余全部是**写操作**（批4 范围）+ 两处缺入口的按路径查询（MacTagEditorView）。
 # 格式：路径<TAB>引用数
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1
 QQPlayer/Views/Utility/SettingsView.swift	2
-QQPlayer/Mac/MacAlbumArtistViews.swift	4
-QQPlayer/Mac/MacArtworkThumbnail.swift	3
-QQPlayer/Mac/MacDesktopWindowViews.swift	1
-QQPlayer/Mac/MacLibraryView.swift	9
-QQPlayer/Mac/MacLyricsSearchView.swift	1
-QQPlayer/Mac/MacPlayerView.swift	1
-QQPlayer/Mac/MacPlaylistDetailSheet.swift	5
-QQPlayer/Mac/MacScrapeBatchProgressView.swift	1
-QQPlayer/Mac/MacScrapeSettingsView.swift	3
-QQPlayer/Mac/MacSearchAnythingLayer.swift	5
-QQPlayer/Mac/MacSearchView.swift	3
-QQPlayer/Mac/MacSmartPlaylistViews.swift	1
-QQPlayer/Mac/MacTagEditorView.swift	5
-QQPlayer/Mac/MacTrackListView.swift	5
+QQPlayer/Mac/MacAlbumArtistViews.swift	1
+QQPlayer/Mac/MacPlaylistDetailSheet.swift	2
+QQPlayer/Mac/MacTagEditorView.swift	4
+QQPlayer/Mac/MacTrackListView.swift	4
