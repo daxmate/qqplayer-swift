@@ -164,6 +164,7 @@
 		33B5881F04CA4D598D2D3B71 /* TrackDeletionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */; };
 		C013AF9F15FB4C8EA13C6097 /* SyncDeletionNonPropagationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0EAC3E96A14B35B792FA8C /* SyncDeletionNonPropagationContractTests.swift */; };
 		3500C7F72B9C446DB2DC9353 /* CharacterMapResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32762FE810F44761872B060C /* CharacterMapResourceTests.swift */; };
+		DE759C5F1F6640F09F6B6ABF /* ObservationMigrationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C389508FEB24359A167E2B9 /* ObservationMigrationContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -377,6 +378,7 @@
 		FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackDeletionServiceTests.swift; sourceTree = "<group>"; };
 		0A0EAC3E96A14B35B792FA8C /* SyncDeletionNonPropagationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDeletionNonPropagationContractTests.swift; sourceTree = "<group>"; };
 		32762FE810F44761872B060C /* CharacterMapResourceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CharacterMapResourceTests.swift; sourceTree = "<group>"; };
+		7C389508FEB24359A167E2B9 /* ObservationMigrationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationMigrationContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1015,6 +1017,7 @@
 				FCEB7EA9033E41F880920001 /* TrackDeletionServiceTests.swift */,
 				0A0EAC3E96A14B35B792FA8C /* SyncDeletionNonPropagationContractTests.swift */,
 				32762FE810F44761872B060C /* CharacterMapResourceTests.swift */,
+				7C389508FEB24359A167E2B9 /* ObservationMigrationContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1477,6 +1480,7 @@
 				33B5881F04CA4D598D2D3B71 /* TrackDeletionServiceTests.swift in Sources */,
 				C013AF9F15FB4C8EA13C6097 /* SyncDeletionNonPropagationContractTests.swift in Sources */,
 				3500C7F72B9C446DB2DC9353 /* CharacterMapResourceTests.swift in Sources */,
+				DE759C5F1F6640F09F6B6ABF /* ObservationMigrationContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

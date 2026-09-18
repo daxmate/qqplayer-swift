@@ -1,0 +1,135 @@
+# @Observable 迁移棘轮基线（2026-09-18 批 1 立；只能减不能增）
+#
+# 由 QQPlayerTests/ObservationMigrationContractTests.swift 守护：
+#   - 新增迁移标记（文件+种类）/ 既有计数回涨 → 测试红
+#   - 某行整改到更少或清零 → 必须删掉/改小本行，否则测试红（名单不腐烂）
+#
+# 迁移方向（方案见 memory/2026-09-18.md §二）：
+#   ObservableObject → @Observable；@Published var x → var x；
+#   @StateObject → @State；@ObservedObject → 普通 let/var；
+#   @EnvironmentObject → @Environment(T.self)
+#
+# 范围：QQPlayer/**/*.swift（iOS + Mac 共享源文件）。
+# 统计口径：**注释与字符串字面量不算代码**（扫描器先剥离再计数）。
+#
+# 进度：起始 217 处 / 119 行（批 1「叶子」动手前）。
+# 格式：路径<TAB>标记<TAB>计数
+QQPlayer/ContentView.swift	@EnvironmentObject	1
+QQPlayer/ContentView.swift	@StateObject	1
+QQPlayer/Mac/MacAlbumArtistViews.swift	@ObservedObject	3
+QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	4
+QQPlayer/Mac/MacDesktopWindowsManager.swift	@Published	2
+QQPlayer/Mac/MacDesktopWindowsManager.swift	ObservableObject	1
+QQPlayer/Mac/MacEQImportView.swift	@StateObject	1
+QQPlayer/Mac/MacEQSettingsView.swift	@StateObject	1
+QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	@StateObject	1
+QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	3
+QQPlayer/Mac/MacLibraryView.swift	@ObservedObject	1
+QQPlayer/Mac/MacLibraryView.swift	@StateObject	3
+QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
+QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
+QQPlayer/Mac/MacLyricsView.swift	@ObservedObject	1
+QQPlayer/Mac/MacManualEQEditorView.swift	@StateObject	2
+QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	3
+QQPlayer/Mac/MacPlayerView.swift	@StateObject	1
+QQPlayer/Mac/MacPlaylistDetailSheet.swift	@StateObject	1
+QQPlayer/Mac/MacSearchAnythingLayer.swift	@ObservedObject	1
+QQPlayer/Mac/MacSearchAnythingLayer.swift	@Published	1
+QQPlayer/Mac/MacSearchAnythingLayer.swift	ObservableObject	1
+QQPlayer/Mac/MacSearchView.swift	@ObservedObject	3
+QQPlayer/Mac/MacSmartPlaylistViews.swift	@StateObject	1
+QQPlayer/Mac/MacSpectrumAnalyzer.swift	@Published	2
+QQPlayer/Mac/MacSpectrumAnalyzer.swift	ObservableObject	1
+QQPlayer/Mac/MacSyncCenterView.swift	@ObservedObject	1
+QQPlayer/Mac/MacSyncContentModel.swift	@Published	14
+QQPlayer/Mac/MacSyncContentModel.swift	ObservableObject	1
+QQPlayer/Mac/MacSyncDataViewModel.swift	@Published	5
+QQPlayer/Mac/MacSyncDataViewModel.swift	ObservableObject	1
+QQPlayer/Mac/MacSyncRunViewModel.swift	@Published	8
+QQPlayer/Mac/MacSyncRunViewModel.swift	ObservableObject	1
+QQPlayer/Mac/MacSyncView.swift	@ObservedObject	3
+QQPlayer/Mac/MacSyncView.swift	@StateObject	3
+QQPlayer/Mac/MacTrackListView.swift	@ObservedObject	1
+QQPlayer/Mac/MacTrackListView.swift	@StateObject	1
+QQPlayer/Mac/SyncHostCenter.swift	@Published	5
+QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
+QQPlayer/QQPlayerApp.swift	@StateObject	1
+QQPlayer/Services/AppCoordinator.swift	@Published	1
+QQPlayer/Services/AppCoordinator.swift	ObservableObject	1
+QQPlayer/Services/ArtworkManager.swift	ObservableObject	1
+QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
+QQPlayer/Services/EQManager.swift	@Published	5
+QQPlayer/Services/EQManager.swift	ObservableObject	1
+QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
+QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
+QQPlayer/Services/IOSPassiveSyncCenter.swift	@Published	4
+QQPlayer/Services/IOSPassiveSyncCenter.swift	ObservableObject	1
+QQPlayer/Services/KaraokeController.swift	@Published	4
+QQPlayer/Services/KaraokeController.swift	ObservableObject	1
+QQPlayer/Services/LibraryIndexer.swift	@Published	6
+QQPlayer/Services/LibraryIndexer.swift	ObservableObject	1
+QQPlayer/Services/LyricOffsetStore.swift	@Published	4
+QQPlayer/Services/LyricOffsetStore.swift	ObservableObject	1
+QQPlayer/Services/MacLibraryFactsStore.swift	ObservableObject	1
+QQPlayer/Services/PlaybackModels.swift	@Published	1
+QQPlayer/Services/PlaybackModels.swift	ObservableObject	1
+QQPlayer/Services/PlayerEngine.swift	@Published	10
+QQPlayer/Services/PlayerEngine.swift	ObservableObject	1
+QQPlayer/Services/PlaylistCoverLoadFailuresStore.swift	@Published	1
+QQPlayer/Services/PlaylistCoverLoadFailuresStore.swift	ObservableObject	1
+QQPlayer/Services/SFBAudioEngineManager.swift	@Published	4
+QQPlayer/Services/SFBAudioEngineManager.swift	ObservableObject	1
+QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
+QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
+QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
+QQPlayer/ViewModels/TutorialViewModel.swift	@Published	1
+QQPlayer/ViewModels/TutorialViewModel.swift	ObservableObject	1
+QQPlayer/Views/Albums/AlbumViews.swift	@EnvironmentObject	3
+QQPlayer/Views/Artists/ArtistDetailScreen.swift	@EnvironmentObject	1
+QQPlayer/Views/Artists/ArtistDetailScreen.swift	@StateObject	1
+QQPlayer/Views/Artists/ArtistRowViews.swift	@EnvironmentObject	1
+QQPlayer/Views/Artists/ArtistsScreen.swift	@EnvironmentObject	1
+QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	@EnvironmentObject	1
+QQPlayer/Views/Library/LibraryScreens.swift	@EnvironmentObject	2
+QQPlayer/Views/Library/LibraryView.swift	@EnvironmentObject	1
+QQPlayer/Views/Library/LibraryView.swift	@StateObject	1
+QQPlayer/Views/Library/SearchResultsViews.swift	@EnvironmentObject	1
+QQPlayer/Views/Library/SearchResultsViews.swift	@StateObject	1
+QQPlayer/Views/Library/SearchView.swift	@EnvironmentObject	1
+QQPlayer/Views/Library/TrackBulkSelection.swift	@EnvironmentObject	1
+QQPlayer/Views/Library/TrackListView.swift	@EnvironmentObject	2
+QQPlayer/Views/Library/TrackListView.swift	@StateObject	1
+QQPlayer/Views/Player/CollapsiblePlayerControls.swift	@ObservedObject	1
+QQPlayer/Views/Player/KaraokeControlBar.swift	@ObservedObject	3
+QQPlayer/Views/Player/LyricsView.swift	@ObservedObject	1
+QQPlayer/Views/Player/PlayerOverlays.swift	@ObservedObject	3
+QQPlayer/Views/Player/PlayerOverlays.swift	@StateObject	2
+QQPlayer/Views/Player/PlayerProgressViews.swift	@ObservedObject	1
+QQPlayer/Views/Player/PlayerView.swift	@EnvironmentObject	1
+QQPlayer/Views/Player/PlayerView.swift	@StateObject	2
+QQPlayer/Views/Player/QueueManagementView.swift	@StateObject	2
+QQPlayer/Views/Player/TrackRowView.swift	@EnvironmentObject	1
+QQPlayer/Views/Playlists/PlaylistCardView.swift	@StateObject	1
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@EnvironmentObject	1
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@ObservedObject	1
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@StateObject	1
+QQPlayer/Views/Playlists/PlaylistManagementView.swift	@EnvironmentObject	1
+QQPlayer/Views/Playlists/PlaylistSelectionView.swift	@EnvironmentObject	1
+QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@EnvironmentObject	1
+QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	2
+QQPlayer/Views/Playlists/PlaylistsScreen.swift	@EnvironmentObject	2
+QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	@StateObject	1
+QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	@EnvironmentObject	2
+QQPlayer/Views/TutorialView.swift	@ObservedObject	1
+QQPlayer/Views/TutorialView.swift	@StateObject	1
+QQPlayer/Views/Utility/EQImportViews.swift	@StateObject	1
+QQPlayer/Views/Utility/EQSettingsView.swift	@StateObject	1
+QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	@StateObject	1
+QQPlayer/Views/Utility/ManualEQEditorView.swift	@StateObject	2
+QQPlayer/Views/Utility/SettingsView.swift	@ObservedObject	1
+QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
+QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
+QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
+QQPlayer/Views/Utility/SyncQRScannerView.swift	@StateObject	2
+QQPlayer/Views/Utility/SyncQRScannerView.swift	ObservableObject	1
+QQPlayer/Views/Utility/SyncSettingsView.swift	@ObservedObject	3
