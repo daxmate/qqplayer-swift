@@ -198,7 +198,8 @@ final class SyncBrowser: @unchecked Sendable {
             "🧭 connect target=\(SyncConnectDiag.describe(endpoint)) "
                 + "expectedPeer=\(expectedPeerDeviceID.map { String($0.prefix(8)) } ?? "-") candidate=\(candidate != nil)"
         )
-        let connection = NWConnection(to: endpoint, using: .tcp)
+        // 共用同步 TCP 参数（noDelay；唯一入口 SyncTCPParameters，与 listener 同源）
+        let connection = NWConnection(to: endpoint, using: SyncTCPParameters.make())
         let channel = NWPeerChannel(connection: connection, queue: queue)
         let session = SyncPeerSession(
             role: .client,

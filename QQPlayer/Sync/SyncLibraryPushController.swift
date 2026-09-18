@@ -199,6 +199,10 @@ final class SyncLibraryPushController: @unchecked Sendable {
     private struct PendingPush {
         let entry: SyncPushEntry
         let fileURL: URL
+        /// 声明时就已算好的全文件 SHA-256（= `entry.sha256Hex`）。传给 sender 复用，
+        /// 省一次全文件重读；同时保证**声明里的 sha 与 file_meta 里的 sha 恒为同一个值**
+        /// （否则两处在不同时刻各算一次，理论上会漂移）。
+        var sha256Hex: String { entry.sha256Hex }
     }
 
     init(
@@ -449,7 +453,8 @@ final class SyncLibraryPushController: @unchecked Sendable {
                 try sender.send(
                     fileURL: pending.fileURL,
                     fileID: pending.entry.fileID,
-                    name: pending.entry.transferName
+                    name: pending.entry.transferName,
+                    precomputedSHA256: pending.sha256Hex
                 )
             } catch {
                 appendFailure(
