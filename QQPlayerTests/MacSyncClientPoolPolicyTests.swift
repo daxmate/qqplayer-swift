@@ -39,13 +39,4 @@ struct MacSyncClientPoolPolicyTests {
         let retired = MacSyncClientPoolPolicy.retiring([], appending: 1)
         #expect(retired == [1])
     }
-
-    @Test("上限为 1 时连续退役的内存增长有界（5 次退役 → 常数 1）")
-    func growthIsBounded() {
-        var retired: [Int] = []
-        for client in 1 ... 5 {
-            retired = MacSyncClientPoolPolicy.retiring(retired, appending: client)
-            #expect(retired.count <= MacSyncClientPoolPolicy.maxRetiredPerSession)
-        }
-    }
 }

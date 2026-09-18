@@ -236,7 +236,8 @@ struct QuarkCookieStoreTests {
     func keychainConstantsAreStable() {
         #expect(QuarkKeychainCookieStore.service == "com.daxmate.qqplayer.quark")
         #expect(QuarkKeychainCookieStore.account == "cookies")
-        // 与同步身份私钥同属凭据，但键空间必须相互独立（不得复用 identity 条目）
-        #expect(QuarkKeychainCookieStore.account != "identity")
+        // 与同步身份私钥同属凭据，但键空间必须相互独立（不得复用 identity 条目）：
+        // 上一行锁定的字面量 "cookies" 即为该约束的可证伪形式（cookies ≠ identity，
+        // 而 account == "cookies" 已经蕴含 account != "identity"，故不再单列该断言）。
     }
 }

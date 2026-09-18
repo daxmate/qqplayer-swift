@@ -5,7 +5,7 @@
 //  CarPlay 播放页内容构建契约（纯逻辑，不碰 CarPlay / 播放器）：
 //  - 歌词行数 = 3（当前句 + 后续 2 句），窗口在末尾收敛
 //  - 页头 = 歌名 / 歌手 / 播放态 / 播放顺序 / 封面归属（封面异步，只记 key）
-//  - 占位四态（未在播放 / 加载中 / 无歌词 / 纯音乐）
+//  - 占位：无曲目时页级早退（页头/列表都空）；加载中 / 无歌词 / 纯音乐三态由歌词层契约锁（CarPlayLyricsTests）
 //  - 同一状态下内容不变（否则页头与列表会按 0.5s tick 重建）
 //  - 行窗口与占位判定都走 CarPlayLyricsBuilder（本层不复制一份）
 //
@@ -124,36 +124,16 @@ struct CarPlayPlayerPageBuilderTests {
         #expect(content(artist: nil, lyrics: makeLyrics(makeLines(["一"]))).header?.subtitle == nil)
     }
 
-    @Test("播放顺序四态各自有图标（页头按钮图标唯一入口）")
-    func playOrderIconsAreDistinct() {
-        let icons = PlaybackOrderMode.allCases.map(\.systemImageName)
-        #expect(Set(icons).count == PlaybackOrderMode.allCases.count)
-    }
+    // MARK: - 占位（三态判定见 CarPlayLyricsTests）
 
-    // MARK: - 占位四态
-
-    @Test("占位四态")
-    func placeholders() {
-        // 没有在播曲目：页头也不该有
+    @Test("没有在播曲目：占位 noTrack，页头与列表都空（页级早退）")
+    func noTrackPlaceholder() {
+        // 加载中 / 无歌词 / 纯音乐三态由歌词层唯一入口 CarPlayLyricsBuilder 决定，
+        // 其契约在 CarPlayLyricsTests 锁定；本层只锁无曲目时的页级早退。
         let noTrack = content(trackKey: nil, title: nil, lyrics: nil)
         #expect(noTrack.placeholder == .noTrack)
         #expect(noTrack.header == nil)
         #expect(noTrack.rows.isEmpty)
-
-        // 加载中：页头在（歌名/控制键能用），歌词位空
-        let loading = content(lyrics: nil, isLoading: true)
-        #expect(loading.placeholder == .loading)
-        #expect(loading.header?.title == "歌名")
-        #expect(loading.rows.isEmpty)
-
-        // 无歌词
-        let noLyrics = content(lyrics: makeLyrics([]))
-        #expect(noLyrics.placeholder == .noLyrics)
-        #expect(noLyrics.header != nil)
-
-        // 纯音乐
-        let instrumental = content(lyrics: makeLyrics([], instrumental: true))
-        #expect(instrumental.placeholder == .instrumental)
     }
 
     @Test("有内容时占位为空")

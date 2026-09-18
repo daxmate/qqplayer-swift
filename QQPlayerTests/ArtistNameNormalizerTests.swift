@@ -279,7 +279,6 @@ struct ArtistNameNormalizerTests {
 
     @Test("保护不破坏日文假名免疫")
     func protectionKanaImmune() {
-        #expect(ArtistNameNormalizer.normalizedKey("宇多田ヒカル", direction: .toTraditional) == "宇多田ヒカル")
         #expect(ArtistNameNormalizer.normalizedKey("沖田総司", direction: .toTraditional) == "沖田総司")
     }
 

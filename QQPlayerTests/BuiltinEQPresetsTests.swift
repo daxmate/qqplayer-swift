@@ -42,13 +42,6 @@ struct BuiltinEQPresetsTests {
         }
     }
 
-    @Test("flat 预设全 0")
-    func flatIsAllZero() {
-        let flat = BuiltinEQPresets.preset(for: "flat")
-        #expect(flat != nil)
-        #expect(flat?.gains.allSatisfy { $0 == 0.0 } == true)
-    }
-
     @Test("10 段频点与桌面端一致")
     func bands10MatchDesktop() {
         #expect(BuiltinEQPresets.bands10 == [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000])

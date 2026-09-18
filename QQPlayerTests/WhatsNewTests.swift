@@ -23,15 +23,19 @@ struct WhatsNewTests {
         WhatsNewStore(defaults: UserDefaults(suiteName: suiteName)!)
     }
 
-    @Test("无已读记录（含老用户首次升级）→ 弹")
-    func firstLaunchShowsForUpgrade() {
+    @Test("已读版本 != 当前版本（无记录 / 旧版本记录）→ 弹")
+    func lastSeenNotCurrentShows() {
         let store = makeStore()
         store.resetForTesting()
 
-        // 老用户升级场景：从旧版升到本版、从未看过通告 → 应弹
+        // 无已读记录：从旧版升到本版、从未看过通告 → 应弹
         // （全新安装不弹由挂载层保证：Tutorial 显示期间不检查，完成时 markSeen）
         #expect(store.lastSeenVersion() == nil)
         #expect(store.shouldShowCurrent() == true)
+
+        // 老用户升级：已读的是旧版本号（生产真实升级路径）→ 仍弹
+        store.markSeen("0.9.0 (50)")
+        #expect(store.shouldShowCurrent(version: "9.9.9 (999)") == true)
     }
 
     @Test("看过后同版本不再弹")
@@ -42,23 +46,6 @@ struct WhatsNewTests {
         store.markSeen(WhatsNewContent.currentVersion)
         #expect(store.shouldShowCurrent() == false)
         #expect(store.shouldShowCurrent(version: WhatsNewContent.currentVersion) == false)
-    }
-
-    @Test("模拟升级到新版本 → 弹")
-    func upgradedVersionShows() {
-        let store = makeStore()
-        store.resetForTesting()
-
-        // 上个版本已读（构造任意旧版本号），当前版本 → 应弹
-        store.markSeen("0.9.0 (50)")
-        #expect(store.shouldShowCurrent() == true)
-
-        // 注入任意"新版本号"同样触发
-        #expect(store.shouldShowCurrent(version: "9.9.9 (999)") == true)
-
-        // 已读当前版本后不再弹
-        store.markSeen(WhatsNewContent.currentVersion)
-        #expect(store.shouldShowCurrent() == false)
     }
 
     @Test("markSeen 持久化（跨 store 实例）")

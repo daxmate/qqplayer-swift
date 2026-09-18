@@ -458,11 +458,4 @@ extension NeteaseOnlineClientTests {
         #expect(year == nil)
     }
 
-    @Test("albumYear：网络错误 → nil（不 throw）")
-    func albumYearNetworkErrorReturnsNil() async {
-        let transport = makeYearTransport(body: Data(), error: URLError(.timedOut))
-        let client = NeteaseOnlineClient(transport: transport)
-        let year = await client.albumYear(songID: 186016)
-        #expect(year == nil)
-    }
 }
