@@ -43,7 +43,9 @@ struct MacLibraryView: View {
     @StateObject private var indexer = LibraryIndexer.shared
     @StateObject private var progress = PlayerEngine.shared.progress
     /// search anything 开关（⌘K 菜单命令与浮层共用同一单例）
-    @ObservedObject private var searchAnythingState = MacSearchAnythingState.shared
+    /// 2026-09-18 批 1：@ObservedObject → 普通 let（@Observable 类型不需要包装器；
+    /// body 里读 `isOpen` 即建立按属性追踪，⌘K 弹出/收起的刷新路径不变）。
+    private let searchAnythingState = MacSearchAnythingState.shared
 
     @State private var section: MacLibrarySection = .tracks
     @State private var tracks: [Track] = []
