@@ -6,10 +6,8 @@
 #   - 某文件行数下降/已退出超长区间           → 必须同步改/删本行，否则红（名单不腐烂）
 #   - 合计 > TOTAL                            → 红
 #
-# 重新生成本文件（口径由 StructuralBudgetRule 唯一实现，禁止手抄）：
-#   swiftc -O -o /tmp/strat-harness \
-#     QQPlayerTests/StructuralBudgetRule.swift <harness>/main.swift && /tmp/strat-harness emit
-# 本轮只立棘轮、不动生产代码：清债时把对应行改小/删掉（只减不增）。
+# 重新生成（口径由 StructuralBudgetRule 唯一实现，禁止手抄）：
+#   scripts/check-structural-budget.sh emit
 QQPlayer/Mac/MacLibraryView.swift	825
 QQPlayer/Mac/MacLyricsView.swift	698
 QQPlayer/Mac/MacOnlineSearchView.swift	751
