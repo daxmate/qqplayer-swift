@@ -645,6 +645,7 @@
 				"Services/PlayerEngine+SFB.swift",
 				Services/PlayHistoryRecorder.swift,
 				Services/QuarkClient.swift,
+				Services/QuarkModels.swift,
 				Services/ScrapeBatchService.swift,
 				Services/ScrapeLogic.swift,
 				Services/SFBAudioEngineManager.swift,
