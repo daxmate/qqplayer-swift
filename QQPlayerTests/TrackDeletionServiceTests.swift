@@ -17,7 +17,10 @@
 //  文件删不掉时**必须保留曲目**（不删 DB 引用）——旧实现「删失败仍删库引用」不是本意，
 //  那会让曲目从库里消失、文件赖在磁盘上（用户看不见也删不掉）。
 //
-//  2026-09-18 用户拍板的唯一语义变更：默认文件动作 = **进废纸篓**（可恢复优先）。
+//  2026-09-18 的默认值决策（两次拍板，先第一版默认废纸篓，实测后改回）：
+//  iOS 容器**没有废纸篓宗卷**（`trashItem` 抛 NSCocoaErrorDomain 3328，本文件实测套件取证）
+//  → iOS 默认 `.delete`（= 合流前 iOS 行为，**行为零变化**）；macOS 默认 `.trash`（可恢复）。
+//  差异只是**调用点传入的数据**（`Policy.ios(libraryOnly:)` / `Policy.mac()`），不是第二份实现。
 //
 
 import Foundation
@@ -148,10 +151,20 @@ private func macItem(_ index: Int) -> TrackDeletionService.Item {
 
 @Suite("曲目删除唯一入口 · 核心语义（策略 × 失败路径）")
 struct TrackDeletionServiceTests {
-    @Test("默认策略 = 进废纸篓（用户 2026-09-18 拍板：可恢复优先）")
-    func defaultPolicyIsTrash() {
-        #expect(TrackDeletionService.Policy.default.fileAction == .trash)
-        #expect(TrackDeletionService.Policy.default.libraryOnly == false)
+    @Test("平台默认值 = 数据：iOS 默认 .delete（行为零变化）/ macOS 默认 .trash")
+    func platformDefaultsAreData() {
+        // iOS：永久删除——实测 iOS 容器无废纸篓宗卷，默认 .trash 会让「关掉只从曲库移除」的删歌永远失败
+        #expect(TrackDeletionService.Policy.ios(libraryOnly: false).fileAction == .delete)
+        #expect(TrackDeletionService.Policy.ios(libraryOnly: true).fileAction == .delete)
+        // libraryOnly 按设置透传（沿用既有开关语义）
+        #expect(TrackDeletionService.Policy.ios(libraryOnly: true).libraryOnly)
+        #expect(!TrackDeletionService.Policy.ios(libraryOnly: false).libraryOnly)
+
+        // macOS：进废纸篓（可恢复）；Mac 没有「只从曲库移除」开关（现状保留）
+        #expect(TrackDeletionService.Policy.mac().fileAction == .trash)
+        #expect(!TrackDeletionService.Policy.mac().libraryOnly)
+
+        // `.trash` 仍是合法策略（只是不是 iOS 默认）——两条腿都在
         #expect(TrackDeletionService.FileAction.allCases == [.trash, .delete])
     }
 

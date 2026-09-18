@@ -18,13 +18,19 @@
 //  带进度回调）。同一语义两处实现 = 迟早不一致（AGENTS.md 2026-09-15「共享语义唯一入口」），
 //  于是把「两份实现」改为「**一个入口 + 显式策略参数**」：
 //
-//    - `fileAction`：`.trash`（默认，进废纸篓可恢复）/ `.delete`（永久删除）——用户 2026-09-18 拍板
+//    - `fileAction`：`.trash`（进废纸篓可恢复）/ `.delete`（永久删除）——**默认值按平台**，
+//      且默认值本身就是数据（`Policy.ios(libraryOnly:)` / `Policy.mac()`），不是分支判断：
+//        · iOS → `.delete`（合流前 iOS 行为，行为零变化。依据：2026-09-18 实测 iOS 容器**没有
+//          废纸篓宗卷**，`trashItem` 运行时抛 NSCocoaErrorDomain 3328（"宗卷没有废纸篓"）
+//          → 若 iOS 默认 `.trash`，关掉「只从曲库移除」的用户删歌会**永远失败**）
+//        · macOS → `.trash`（合流前 Mac 行为，进废纸篓可恢复）
 //    - `libraryOnly`：沿用既有开关语义（iOS 读 `DeleteSettings.deleteFromLibraryOnly`）
 //    - 进度 / 取消：Mac 既有能力原样保留（`onProgress` / `Environment.isCancelled`）
 //
-//  平台差异从此是**数据**（Policy），不再是第二份代码。
+//  平台差异从此只是**调用点传入的数据**；核心逐首仪式只有一份实现，且**没有隐式默认**
+//  （`Policy.fileAction` 无默认值、核心 `policy:` 参数无默认值 → 谁也不能默默拾到一个错默认值）。
 //
-//  语义（两端逐条保留，唯一变化 = 用户拍板的「默认文件动作改为进废纸篓」）：
+//  语义（两端逐条保留，除「默认文件动作按平台」外零行为变化）：
 //  - `libraryOnly == true`：只加排除标记（文件留在磁盘，下次扫描不再入库），再删 DB 引用；
 //  - 文件动作失败 → **保留曲目**（不删 DB 引用）并计 failed——曲目留在库里，用户看得见也删得掉；
 //  - 文件已不在磁盘 → 不当失败，照常清 DB 引用（Mac 既有语义）；
@@ -72,9 +78,11 @@ enum TrackDeletionService {
 
     /// 磁盘文件动作。
     enum FileAction: String, Sendable, CaseIterable {
-        /// 移到系统废纸篓（可恢复）——**生产默认**（用户 2026-09-18 拍板：可恢复优先）。
+        /// 移到系统废纸篓（可恢复）。
+        /// macOS 默认；**iOS 上运行时会失败**（容器无废纸篓宗卷，抛 NSCocoaErrorDomain 3328，
+        /// 实测见 `QQPlayerTests/TrackDeletionServiceTests.swift` 的实测套件）——所以 iOS 不默认走它。
         case trash
-        /// 永久删除（不可恢复）。
+        /// 永久删除（不可恢复）。iOS 默认。
         case delete
 
         /// 日志标签（沿用 Mac 端历史日志文本 `trashItem 成功` / `removeItem 成功`）。
@@ -87,14 +95,26 @@ enum TrackDeletionService {
     }
 
     /// 一次删除的策略（显式传入，不从环境里偷偷读）。
+    /// **没有隐式默认值**：默认值就是下面两个工厂，由两个生产适配器各自显式传。
     struct Policy: Sendable {
-        /// 磁盘文件动作（默认进废纸篓）。
-        var fileAction: FileAction = .trash
+        /// 磁盘文件动作（无默认——必须显式给，避免某个调用点默默拾到错的动作）。
+        var fileAction: FileAction
         /// 沿用既有开关语义：true = 只从曲库移除，不碰磁盘（连存在性都不查）。
         var libraryOnly: Bool = false
 
-        /// 生产默认：进废纸篓 + 全删。`libraryOnly` 由调用点按设置覆盖。
-        static let `default` = Policy()
+        /// iOS 生产默认：**永久删除**（= 合流前 iOS 的 `removeItem` 行为，行为零变化）。
+        /// 依据（2026-09-18 实测）：iOS 容器没有废纸篓宗卷，`trashItem` 抛 3328 必失败；
+        /// 默认 `.trash` 会让「关掉只从曲库移除」的 iOS 用户删歌永远失败（功能回退）。
+        /// `libraryOnly` 由 iOS 设置（`DeleteSettings.deleteFromLibraryOnly`）决定。
+        static func ios(libraryOnly: Bool) -> Policy {
+            Policy(fileAction: .delete, libraryOnly: libraryOnly)
+        }
+
+        /// macOS 生产默认：**进废纸篓**（= 合流前 Mac 的 `trashItem` 行为，行为零变化）。
+        /// Mac 端没有「只从曲库移除」开关（现状保留），故 `libraryOnly` 固定 false。
+        static func mac() -> Policy {
+            Policy(fileAction: .trash, libraryOnly: false)
+        }
     }
 
     // MARK: - 结论
@@ -152,7 +172,7 @@ enum TrackDeletionService {
         var isCancelled: @Sendable () -> Bool
 
         /// 生产实现：系统废纸篓/永久删除 + 曲库 DB。
-        /// `trashItem` 在 iOS 18 SDK 与 macOS 同样可用（2026-09-18 实测：两端均可编译）。
+        /// 两个动作都实现（策略挑一个）：`.trash` 由 macOS 走，iOS 上运行时必失败（容器无废纸篓）。
         static func live(
             log: @escaping @Sendable (String) -> Void,
             isCancelled: @escaping @Sendable () -> Bool = { false }
@@ -179,17 +199,15 @@ enum TrackDeletionService {
     // MARK: - 生产路径 · iOS（主线程同步；每次调用一次通知）
 
     /// 删除若干曲目。iOS 视图层只调这一个方法，不再自己读设置 / 碰文件 / 碰数据库。
-    /// 线程语义保留（这一直是主线程同步逐首；iOS 无进度/取消需求）。
+    /// 线程语义保留（这一直是主线程同步逐首；iOS 无进度/取消需求）；
+    /// 文件动作 = `Policy.ios(...)` = **永久删除**（合流前 iOS 行为，行为零变化）。
     @MainActor
     @discardableResult
     static func delete(items: [Item]) -> Outcome {
         let settings = DeleteSettings.load()
         let outcome = delete(
             items: items,
-            policy: Policy(
-                fileAction: .trash,
-                libraryOnly: settings.deleteFromLibraryOnly
-            ),
+            policy: .ios(libraryOnly: settings.deleteFromLibraryOnly),
             environment: .live(log: { _ in })
         )
         NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
@@ -200,7 +218,7 @@ enum TrackDeletionService {
 
     /// 批量「移到废纸篓」（沿用原 `MacTrashService.trash` 语义：非主 actor 逐首执行、
     /// 可取消（由 `environment.isCancelled` 提供探测）、带进度回调；
-    /// 等价于 `Policy(fileAction: .trash, libraryOnly: false)` 的核心调用）。
+    /// 文件动作 = `Policy.mac()` = **进废纸篓**，等价于 `Policy(fileAction: .trash, libraryOnly: false)`）。
     ///
     /// - Parameters:
     ///   - items: 待删除曲目（顺序 = 处理顺序）
@@ -215,7 +233,7 @@ enum TrackDeletionService {
     ) async -> Outcome {
         delete(
             items: items,
-            policy: Policy(fileAction: .trash, libraryOnly: false),
+            policy: .mac(),
             environment: environment,
             onItemProcessed: onItemProcessed,
             onProgress: onProgress
@@ -225,9 +243,10 @@ enum TrackDeletionService {
     // MARK: - 核心（依赖注入，测试用；两端生产路径唯一实现）
 
     /// 逐首执行删除；**不做隔离假设**，调用方决定在哪个 actor 上跑。
+    /// `policy` 无默认值：文件动作必须由调用方显式给（见 `Policy.ios(libraryOnly:)` / `Policy.mac()`）。
     static func delete(
         items: [Item],
-        policy: Policy = .default,
+        policy: Policy,
         environment: Environment,
         onItemProcessed: (@Sendable (Item, ItemOutcome) -> Void)? = nil,
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
