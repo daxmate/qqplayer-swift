@@ -243,7 +243,7 @@ struct MacLibraryView: View {
                 reloadLibrary()
             }
         }
-        .onChange(of: searchText) { newValue in
+        .onChange(of: searchText) { _, newValue in
             debounceTask?.cancel()
             debounceTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 300ms

@@ -110,7 +110,7 @@ struct MacSearchAnythingLayer: View {
         }
         .padding(.horizontal, DesignTokens.space16)
         .padding(.vertical, DesignTokens.space12)
-        .onChange(of: query) { _ in
+        .onChange(of: query) { _, _ in
             scheduleSearch()
         }
     }

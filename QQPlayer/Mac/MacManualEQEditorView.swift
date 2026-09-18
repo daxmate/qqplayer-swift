@@ -219,7 +219,7 @@ struct MacManualEQEditorView: View {
                     }
                 }
                 .formStyle(.grouped)
-                .onChange(of: editableBandCount) { newCount in
+                .onChange(of: editableBandCount) { _, newCount in
                     if newCount == 0 {
                         selectedBandIndex = nil
                     } else if let selectedBandIndex, selectedBandIndex >= newCount {

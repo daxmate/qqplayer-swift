@@ -25,7 +25,7 @@ struct MacDesktopWindowsSettingsView: View {
         Form {
             Section {
                 Toggle("mini_window_button_enabled".localized, isOn: $deleteSettings.showMiniWindowButton)
-                    .onChange(of: deleteSettings.showMiniWindowButton) { _ in
+                    .onChange(of: deleteSettings.showMiniWindowButton) { _, _ in
                         deleteSettings.save()
                     }
             } footer: {
@@ -36,7 +36,7 @@ struct MacDesktopWindowsSettingsView: View {
 
             Section {
                 Toggle("mini_lyrics_enabled".localized, isOn: $deleteSettings.miniLyricsEnabled)
-                    .onChange(of: deleteSettings.miniLyricsEnabled) { _ in
+                    .onChange(of: deleteSettings.miniLyricsEnabled) { _, _ in
                         deleteSettings.save()
                     }
                 VStack(alignment: .leading, spacing: DesignTokens.space8) {
@@ -48,7 +48,7 @@ struct MacDesktopWindowsSettingsView: View {
                             .monospacedDigit()
                     }
                     Slider(value: $deleteSettings.desktopLyricFontSize, in: 18 ... 40, step: 1)
-                        .onChange(of: deleteSettings.desktopLyricFontSize) { _ in
+                        .onChange(of: deleteSettings.desktopLyricFontSize) { _, _ in
                             deleteSettings.save()
                         }
                 }

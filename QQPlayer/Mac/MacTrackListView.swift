@@ -134,11 +134,11 @@ struct MacTrackListView: View {
                 reloadPlaylists()
                 syncDisplayedRows()
             }
-            .onChange(of: sortOrder) { newSort in
+            .onChange(of: sortOrder) { _, newSort in
                 // 用 onChange 传入的新排序重建，不用旧闭包捕获的 self.sortOrder
                 syncDisplayedRows(sort: newSort)
             }
-            .onChange(of: tracks) { newTracks in
+            .onChange(of: tracks) { _, newTracks in
                 // 关键修复（2026-09-03 现场探针定位）：onChange 闭包捕获的是变化前的
                 // 旧 self，读 self.tracks 会拿到删除前的旧数组 → 用旧数据重建会把刚
                 // 删掉的行“复活”，且后续重载不再触发 onChange，幽灵行直到重启才消失。
@@ -268,7 +268,7 @@ struct MacTrackListView: View {
                 play(row.track)
             }
         }
-        .onChange(of: locateRequestID) { _ in
+        .onChange(of: locateRequestID) { _, _ in
             // 定位当前播放：选中当前行（Table 无公开 scrollTo，选中高亮定位）
             if let activeTrackId {
                 selectedRows = [activeTrackId]
