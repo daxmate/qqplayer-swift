@@ -1,0 +1,15 @@
+# 曲目删除语义 · 文件动作调用点白名单（形状契约，2026-09-18 P1 两端合流）
+#
+# 由 QQPlayerTests/TrackDeletionShapeContractTests.swift 守护：
+#   - 除白名单外，任何文件出现 `trashItem` 调用 → 红（废纸篓动作的第二处实现）
+#   - 除白名单外，任何文件**同时**出现文件删除（`removeItem`）与曲目库引用删除（`deleteTrack(`）→ 红
+#     （= 「删除一首歌」仪式被抄了第二份：碰磁盘 + 碰曲库）
+#   - 白名单里的文件必须真实存在，且确实命中上述模式 → 否则红（名单不许空转/腐烂）
+#
+# 为什么不做「全仓 removeItem 只许一处」这种更宽的断言：
+#   全仓有 40+ 处 `removeItem` 是**与曲目删除无关**的临时文件清理（缓存/下载暂存/sync 中转/
+#   测试 teardown）。真正要防的形状是「同一套删除仪式出现第二份实现」——判据取
+#   「文件删除 + 曲目库引用删除同现」。注释/字符串不算代码（扫描前先剥注释）。
+#
+# 格式：路径<TAB>模式（trashItem | track-file-deletion），多个模式用逗号分隔
+QQPlayer/Services/TrackDeletionService.swift	trashItem,track-file-deletion

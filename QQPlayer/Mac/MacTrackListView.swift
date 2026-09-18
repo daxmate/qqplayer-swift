@@ -85,7 +85,7 @@ struct MacTrackListView: View {
     /// 批量移到废纸篓的执行任务句柄（可取消：进度条上的取消按钮）
     @State private var trashTask: Task<Void, Never>?
     /// 批量删除进度（nil = 无进行中的批次）；磁盘/DB 在全局执行器上跑，回主线程落表
-    @State private var trashProgress: MacTrashService.Progress?
+    @State private var trashProgress: TrackDeletionService.Progress?
     /// 播放器（删除当前播放曲目时切下一首/停止）
     @StateObject private var player = PlayerEngine.shared
     /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
@@ -429,27 +429,30 @@ struct MacTrackListView: View {
         // 整批 stableId：沿用修复前语义（本地即时移除 + 播放队列联动都按整批算，
         // 失败项随后由 LibraryNeedsRefresh 重载回列表）
         let items = tracks.map {
-            MacTrashService.Item(stableId: $0.stableId, title: $0.title, path: $0.path)
+            TrackDeletionService.Item(stableId: $0.stableId, title: $0.title, path: $0.path)
         }
         let deletedStableIds = Set(items.map(\.stableId))
 
         // 重入保护：上一批仍在跑时先取消它（避免两次批次交错写同一批状态）
         trashTask?.cancel()
-        trashProgress = MacTrashService.Progress(done: 0, total: items.count)
+        trashProgress = TrackDeletionService.Progress(done: 0, total: items.count)
         trashTask = Task { @MainActor in
-            // 磁盘 trash + DB 删除走 MacTrashService（nonisolated async → 全局执行器）：
+            // 磁盘 trash + DB 删除走 TrackDeletionService（唯一删除入口，nonisolated async → 全局执行器）：
             // 修复前整批在主 actor 上同步执行，多选数百首/iCloud dataless 文件会把窗口
             // 卡死数十秒且无法取消（审计 H1）。主线程只负责落 @State 与发通知。
-            let outcome = await MacTrashService.trash(
+            let outcome = await TrackDeletionService.trash(
                 items: items,
-                environment: .live(log: { MacTrashLogger.log($0) }),
+                environment: .live(
+                    log: { MacTrashLogger.log($0) },
+                    isCancelled: { Task.isCancelled }
+                ),
                 onProgress: { done, total in
                     DispatchQueue.main.async {
-                        trashProgress = MacTrashService.Progress(done: done, total: total)
+                        trashProgress = TrackDeletionService.Progress(done: done, total: total)
                     }
                 }
             )
-            let failedCount = outcome.failedCount
+            let failedCount = outcome.failed
             let deletedAny = outcome.deletedAny
             trashProgress = nil
             trashTask = nil
