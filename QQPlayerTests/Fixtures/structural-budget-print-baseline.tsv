@@ -65,7 +65,10 @@ QQPlayer/Services/PlayHistoryRecorder.swift	4
 QQPlayer/Services/PlayerEngine+AudioScheduling.swift	12
 QQPlayer/Services/PlayerEngine+AudioSession.swift	47
 QQPlayer/Services/PlayerEngine+NowPlaying.swift	51
-QQPlayer/Services/PlayerEngine+PlaybackControl.swift	85
+QQPlayer/Services/PlayerEngine+PlaybackControl+Mac.swift	22
+QQPlayer/Services/PlayerEngine+PlaybackControl+Seek.swift	10
+QQPlayer/Services/PlayerEngine+PlaybackControl+Transport.swift	30
+QQPlayer/Services/PlayerEngine+PlaybackControl.swift	23
 QQPlayer/Services/PlayerEngine+Queue.swift	10
 QQPlayer/Services/PlayerEngine.swift	24
 QQPlayer/Services/QuarkClient.swift	14
