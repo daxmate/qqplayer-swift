@@ -12,7 +12,10 @@
 //   (a) `trashItem` 调用只允许出现在白名单文件（唯一入口）里；
 //   (b) 「删除一首歌」仪式（**同时**碰磁盘文件 + 删曲目库引用）只允许出现在白名单文件里；
 //   (c) 白名单里每条必须真实存在且确实命中模式（名单不许空转、不许腐烂）；
-//   (d) 唯一入口在位，且两条文件动作腿（进废纸篓 + 永久删除）都还在。
+//   (d) 唯一入口在位，且两条文件动作腿（进废纸篓 + 永久删除）都还在；
+//   (e) **平台默认值只是数据**：iOS 适配器传 `Policy.ios(...)`（.delete），Mac 适配器传
+//       `Policy.mac()`（.trash），且核心 `policy:` 与 `Policy.fileAction` 都**没有隐式默认**
+//       ——谁也不能默默拾到一个错的动作（2026-09-18 实测：iOS 无废纸篓宗卷，trash 必失败）。
 //
 //  全部 fail-closed：目录读不到 / 白名单格式错 / 入口文件读不到 = 红，绝不静默通过。
 //  注释与字符串不算代码（扫描前先剥注释）——靠注释「提到」不算第二实现。
@@ -23,6 +26,8 @@
 
 import Foundation
 import Testing
+
+@testable import QQPlayer
 
 private enum DeleteShapeContract {
     static let repositoryRoot: URL = URL(fileURLWithPath: #filePath)
@@ -106,6 +111,12 @@ private enum DeleteShapeContract {
             index += 1
         }
         return output
+    }
+
+    /// 子串出现次数（形状判据用：只做「有几处这么写」的计数，不解析语法）。
+    static func occurrences(of needle: String, in haystack: String) -> Int {
+        guard !needle.isEmpty else { return 0 }
+        return haystack.components(separatedBy: needle).count - 1
     }
 
     static func swiftFiles(under relativeDirectory: String) throws -> [URL] {
@@ -214,7 +225,7 @@ struct TrackDeletionShapeContractTests {
         }
     }
 
-    @Test("(d) 唯一入口在位：两条文件动作腿都在（.trash 默认 / .delete 保留）")
+    @Test("(d) 唯一入口在位：两条文件动作腿都在（.trash / .delete）")
     func entryDeclaresBothFileActions() throws {
         let entryPath = "QQPlayer/Services/TrackDeletionService.swift"
         let url = DeleteShapeContract.repositoryRoot.appendingPathComponent(entryPath)
@@ -230,6 +241,45 @@ struct TrackDeletionShapeContractTests {
             (try DeleteShapeContract.detectedHits())[.trashItem]?.contains(entryPath) == true,
             "入口文件没被扫描到命中（扫描范围/剥注释逻辑坏了 = 契约静默失效）"
         )
+    }
+
+    @Test("(e) 平台默认值只是数据：适配器各传自己的 Policy 工厂，核心无隐式默认")
+    func platformDefaultsArePassedAsData() throws {
+        let entryPath = "QQPlayer/Services/TrackDeletionService.swift"
+        let url = DeleteShapeContract.repositoryRoot.appendingPathComponent(entryPath)
+        let code = DeleteShapeContract.codeOnly(try String(contentsOf: url, encoding: .utf8))
+
+        // ① 默认值必须是显式数据：核心参数与 Policy.fileAction 都不得有默认值
+        #expect(
+            !code.contains("policy: Policy ="),
+            "核心 `policy:` 不得有默认值（默认值必须是平台数据，不能隐式拾取）"
+        )
+        #expect(
+            !code.contains("var fileAction: FileAction ="),
+            "`Policy.fileAction` 不得有隐式默认（防某个调用点默默走错动作）"
+        )
+
+        // ② 两个适配器各传自己的工厂（防「工厂写了但适配器不用」/两平台写反）
+        #expect(
+            code.contains("policy: .ios(libraryOnly: settings.deleteFromLibraryOnly)"),
+            "iOS 适配器必须传 Policy.ios(libraryOnly:)（.delete + 既有开关语义）"
+        )
+        #expect(
+            code.contains("policy: .mac()"),
+            "Mac 适配器必须传 Policy.mac()（.trash + 既有进度/取消能力）"
+        )
+
+        // ③ 带字面量动作的 Policy 构造只允许出现在两个工厂里（= 差异收敛到一处）
+        #expect(
+            DeleteShapeContract.occurrences(of: "Policy(fileAction:", in: code) == 2,
+            "带字面量 fileAction 的 Policy 只应有两个工厂（ios/mac），别处不得再拼策略"
+        )
+        #expect(code.contains("fileAction: .delete, libraryOnly: libraryOnly"))
+        #expect(code.contains("fileAction: .trash, libraryOnly: false"))
+
+        // ④ 工厂本身的行为（防止两个工厂被写反）
+        #expect(TrackDeletionService.Policy.ios(libraryOnly: false).fileAction == .delete)
+        #expect(TrackDeletionService.Policy.mac().fileAction == .trash)
     }
 
     @Test("自证：剥注释 + 模式判定对合成输入有效（fail-closed 反向验证）")
