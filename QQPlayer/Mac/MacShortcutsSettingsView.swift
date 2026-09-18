@@ -42,7 +42,7 @@ struct MacShortcutsSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onChange(of: recordingID) { newValue in
+        .onChange(of: recordingID) { _, newValue in
             refreshRecorder(for: newValue)
         }
         .onDisappear {

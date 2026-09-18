@@ -434,7 +434,7 @@ struct MacTagEditorView: View {
                     .font(.callout)
             }
             .disabled(saving)
-            .onChange(of: renameEnabled) { _ in
+            .onChange(of: renameEnabled) { _, _ in
                 updateRenamePreview()
             }
             HStack(spacing: DesignTokens.space8) {
@@ -451,11 +451,11 @@ struct MacTagEditorView: View {
             }
             .padding(.leading, DesignTokens.space2)
         }
-        .onChange(of: formTitle) { _ in updateRenamePreview() }
-        .onChange(of: formArtist) { _ in updateRenamePreview() }
-        .onChange(of: formAlbum) { _ in updateRenamePreview() }
-        .onChange(of: formYear) { _ in updateRenamePreview() }
-        .onChange(of: formTrack) { _ in updateRenamePreview() }
+        .onChange(of: formTitle) { _, _ in updateRenamePreview() }
+        .onChange(of: formArtist) { _, _ in updateRenamePreview() }
+        .onChange(of: formAlbum) { _, _ in updateRenamePreview() }
+        .onChange(of: formYear) { _, _ in updateRenamePreview() }
+        .onChange(of: formTrack) { _, _ in updateRenamePreview() }
     }
 
     // MARK: - Footer

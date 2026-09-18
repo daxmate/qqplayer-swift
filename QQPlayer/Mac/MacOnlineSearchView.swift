@@ -82,7 +82,7 @@ struct MacOnlineSearchView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 520, height: 480)
-        .onChange(of: source) { _ in
+        .onChange(of: source) { _, _ in
             switchSource()
         }
         .sheet(isPresented: $showQuarkLogin, onDismiss: {
@@ -164,7 +164,7 @@ struct MacOnlineSearchView: View {
                 .buttonStyle(.plain)
             }
         }
-        .onChange(of: query) { _ in
+        .onChange(of: query) { _, _ in
             // 历史项点击已立即搜索（suppress 消费一次，见 applyHistory）
             guard !suppressNextQueryDebounce else {
                 suppressNextQueryDebounce = false

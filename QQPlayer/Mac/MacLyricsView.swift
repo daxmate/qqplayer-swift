@@ -61,7 +61,7 @@ private func lyricEmphasisProgress(_ emphasis: Double) -> CGFloat {
 }
 
 /// 语义色 → accent 的跨档位混色（fraction 0 = 语义色，1 = accent）。
-/// macOS 13 兼容：NSColor.blended(withFraction:of:)；Color.mix 是 macOS 15+ API，部署目标 13.0 不可用。
+/// 用 NSColor.blended(withFraction:of:)：`Color.mix` 是 macOS 15+ API（2026-09-18 部署目标由 13.0 提到 14.0，本条结论不变，仍用不了）。
 private func blendSemantic(
     _ base: NSColor,
     alpha: CGFloat,
@@ -562,7 +562,7 @@ struct MacLyricsView: View {
                     }
                     .allowsHitTesting(false)
                 }
-                .onChange(of: activeIndex) { newIndex in
+                .onChange(of: activeIndex) { _, newIndex in
                     guard let newIndex else { return }
                     // 等选 AB 终点（b == nil）时暂停自动滚动：让用户手动滚动找 B 句
                     // （对齐 iOS updateActiveLineAndScroll，用户拍板 2026-08-29）

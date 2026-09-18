@@ -32,7 +32,7 @@ struct MacOnlineSettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .onChange(of: deleteSettings.onlineDownloadQuality) { _ in
+                .onChange(of: deleteSettings.onlineDownloadQuality) { _, _ in
                     deleteSettings.save()
                 }
             }
@@ -44,7 +44,7 @@ struct MacOnlineSettingsView: View {
                     Text("FLAC").tag("flac")
                 }
                 .labelsHidden()
-                .onChange(of: deleteSettings.quarkQuality) { _ in
+                .onChange(of: deleteSettings.quarkQuality) { _, _ in
                     deleteSettings.save()
                 }
             }
@@ -56,7 +56,7 @@ struct MacOnlineSettingsView: View {
                     Text("settings_download_engine_aria2".localized).tag("aria2")
                 }
                 .labelsHidden()
-                .onChange(of: deleteSettings.downloadEngine) { _ in
+                .onChange(of: deleteSettings.downloadEngine) { _, _ in
                     deleteSettings.save()
                 }
                 Text("settings_download_engine_hint".localized)
@@ -69,7 +69,7 @@ struct MacOnlineSettingsView: View {
                         prompt: Text("http://localhost:6800/jsonrpc")
                     )
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: deleteSettings.aria2Rpc) { _ in
+                    .onChange(of: deleteSettings.aria2Rpc) { _, _ in
                         deleteSettings.save()
                     }
                     SecureField(
@@ -78,7 +78,7 @@ struct MacOnlineSettingsView: View {
                         prompt: Text("settings_download_aria2_secret_placeholder".localized)
                     )
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: deleteSettings.aria2Secret) { _ in
+                    .onChange(of: deleteSettings.aria2Secret) { _, _ in
                         deleteSettings.save()
                     }
                 }
@@ -89,7 +89,7 @@ struct MacOnlineSettingsView: View {
                     format: .number
                 )
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: deleteSettings.downloadMaxSpeed) { _ in
+                .onChange(of: deleteSettings.downloadMaxSpeed) { _, _ in
                     deleteSettings.save()
                 }
             } header: {
