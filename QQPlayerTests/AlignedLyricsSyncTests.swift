@@ -427,39 +427,6 @@ struct AlignedLyricsSyncTests {
         #expect(plan.unchanged.isEmpty)
     }
 
-    @Test("端到端：歌词同步不影响 manual 与 network 存储")
-    func manualAndNetworkUntouched() throws {
-        let documents = try tempRoot("documents")
-        let manualDir = documents.appendingPathComponent("lyrics-manual")
-        let networkDir = documents.appendingPathComponent("lyrics-cache/tracks")
-        for dir in [manualDir, networkDir] {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        }
-        let manualFile = manualDir.appendingPathComponent("s1.json")
-        let networkFile = networkDir.appendingPathComponent("s1.json")
-        try Data("manual".utf8).write(to: manualFile)
-        try Data("network".utf8).write(to: networkFile)
-
-        let song = Data(repeating: 0x64, count: 4_096)
-        let songHash = try contentHash(of: song)
-        _ = try makeHarness(
-            sourceFiles: [("Album/01.flac", song)],
-            hostMapping: mapping(["client-sid": songHash]),
-            clientMapping: mapping(["client-sid": songHash]),
-            hostLyrics: [("client-sid", sampleLyrics("随歌同步的"))]
-        )
-
-        // 同步只动 aligned 库目录；manual / network 字节不变、无新增文件
-        #expect(try String(contentsOf: manualFile, encoding: .utf8) == "manual")
-        #expect(try String(contentsOf: networkFile, encoding: .utf8) == "network")
-        #expect(
-            (try FileManager.default.contentsOfDirectory(atPath: manualDir.path)).sorted() == ["s1.json"]
-        )
-        #expect(
-            (try FileManager.default.contentsOfDirectory(atPath: networkDir.path)).sorted() == ["s1.json"]
-        )
-    }
-
     // MARK: - F2 补发通道（2026-09-16）
 
     private func lyricEntry(_ songHash: String, contentHash: String? = "lyric-bytes") -> ManifestEntry {

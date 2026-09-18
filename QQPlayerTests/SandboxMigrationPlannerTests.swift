@@ -63,7 +63,7 @@ struct SandboxMigrationPlannerTests {
         #expect(plan.items.first?.action == .alreadyInSandbox)
     }
 
-    @Test("沙盒存在同路径且同 hash → alreadyInSandbox（幂等：重跑不重复复制）")
+    @Test("沙盒存在同路径且同 hash → alreadyInSandbox（不重复复制）")
     func idempotentWhenAlreadyCopied() {
         let plan = SandboxMigrationPlanner.makePlan(
             cloudFiles: [cloud("a.flac", "h1")],
@@ -72,13 +72,6 @@ struct SandboxMigrationPlannerTests {
         )
         #expect(plan.filesToCopy.isEmpty)
         #expect(plan.items.first?.action == .alreadyInSandbox)
-        // 断点语义：第二次 makePlan（沙盒已是复制后状态）不再要求复制
-        let rerun = SandboxMigrationPlanner.makePlan(
-            cloudFiles: [cloud("a.flac", "h1")],
-            sandboxFiles: [sandbox("a.flac", "h1")],
-            cloudTracks: []
-        )
-        #expect(rerun.filesToCopy.isEmpty)
     }
 
     // MARK: - nameConflict

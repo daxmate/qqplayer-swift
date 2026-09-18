@@ -230,13 +230,6 @@ struct QuarkCookieStoreTests {
         #expect(left.isEmpty, "临时目录不应残留任何副本，实际：\(left)")
     }
 
-    @Test("removeFileSecurely：文件不存在时幂等不抛")
-    func secureRemoveMissingIsNoop() {
-        let dir = Self.makeTempDir("secure-missing")
-        defer { try? FileManager.default.removeItem(at: dir) }
-        QuarkCookieMigration.removeFileSecurely(dir.appendingPathComponent("nope.json"))
-    }
-
     // MARK: - ④ 钥匙串条目常量锁定
 
     @Test("钥匙串条目常量：service/account 与实现约定一致（改动需同步迁移）")

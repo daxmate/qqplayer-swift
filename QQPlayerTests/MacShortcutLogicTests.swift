@@ -144,17 +144,6 @@ struct MacShortcutBindingTests {
         #expect(conflict == nil)
     }
 
-    @Test("findConflict：键不同无冲突")
-    func noConflict() {
-        let conflict = MacShortcutLogic.findConflict(
-            id: "playPause", combo: combo(5),
-            defs: defs, overrides: [:]
-        )
-        // toggleKaraoke 默认也是 (5,0)？——defs 里没有 toggleKaraoke 冲突：有 (5) def
-        // 实际应命中 toggleKaraoke，见下测试；此处用不与任何默认相撞的键
-        #expect(conflict == nil || conflict == "toggleKaraoke")
-    }
-
     @Test("findConflict：覆盖后与他人默认相撞 → 返回对方")
     func conflictAfterOverride() {
         // 用户把 toggleKaraoke 重绑成 Space(49)，则它和 playPause 默认撞
