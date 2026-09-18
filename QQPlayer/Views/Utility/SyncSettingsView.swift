@@ -23,11 +23,12 @@ struct SyncSettingsView: View {
     @State private var loadError: String?
     @State private var pendingUnpair: PeerDevice?
     /// App 级被动同步中心（Mac 推送接收状态；T4/T5）
-    @ObservedObject private var passiveSync = IOSPassiveSyncCenter.shared
+    /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
+    @Environment(IOSPassiveSyncCenter.self) private var passiveSync
     /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）
     @ObservedObject private var wiringFacts = SyncWiringFactsStore.shared
     /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数并上屏）。
-    @ObservedObject private var coverFailures = PlaylistCoverLoadFailuresStore.shared
+    @Environment(PlaylistCoverLoadFailuresStore.self) private var coverFailures
 
     private let deviceStore = DeviceStore()
 
@@ -461,4 +462,8 @@ struct SyncSettingsView: View {
     NavigationView {
         SyncSettingsView()
     }
+    // Preview 是组合根之外的第二个合法装配点（App 根注入不覆盖画布）→ 显式装配。
+    // 代价：这两行占棘轮预算（预算账本见 QQPlayerTests/Fixtures/shared-singleton-budget-plan.md）。
+    .environment(IOSPassiveSyncCenter.shared)
+    .environment(PlaylistCoverLoadFailuresStore.shared)
 }

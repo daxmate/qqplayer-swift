@@ -23,6 +23,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import Observation
 
 // MARK: - 路由
 
@@ -78,19 +79,28 @@ enum LyricOffsetResolution {
 
 // MARK: - 当前路由 + 偏移
 
-/// 当前输出路由、系统延迟、手动校准值（@Published：设置页要跟着变）
+/// 当前输出路由、系统延迟、手动校准值（视图读；设置页要跟着变）
+///
+/// 2026-09-19（视图层单例收口「下降预算」批 2）：`ObservableObject` → `@Observable`。
+/// 唯一视图消费点（iOS 设置页歌词延迟区）不再 `@ObservedObject … = .shared`，
+/// 改由 iOS 组合根（`QQPlayerApp` 的 `WindowGroup` 根）`.environment(...)` 注入、
+/// `@Environment(LyricOffsetStore.self)` 取。
+/// 刷新路径核对：视图读的后 4 个存储属性（`route` / `routeName` / `systemLatency` / `manualOffset`）
+/// 全在设置页 `body` 可达路径上（行文案 + Slider 绑定）→ 按属性追踪后刷新不变；
+/// 路由变化由 `AVAudioSession.routeChangeNotification` 驱动写入，机制未变。
 @MainActor
-final class LyricOffsetStore: ObservableObject {
+@Observable
+final class LyricOffsetStore {
     static let shared = LyricOffsetStore()
 
     /// 当前输出路由
-    @Published private(set) var route: LyricOffsetRoute = .other
+    private(set) var route: LyricOffsetRoute = .other
     /// 当前输出端口名（系统已本地化，如 "CarPlay"）
-    @Published private(set) var routeName: String?
+    private(set) var routeName: String?
     /// 系统给的输出延迟（设置页用于说明「初值多少」）
-    @Published private(set) var systemLatency: TimeInterval = 0
+    private(set) var systemLatency: TimeInterval = 0
     /// 当前路由的手动校准值（nil = 没校准过 → 用自动初值）
-    @Published private(set) var manualOffset: Double?
+    private(set) var manualOffset: Double?
 
     private var cancellables = Set<AnyCancellable>()
     /// 设置快照：effectiveOffset 会被 0.5s tick 读到，别在里面做 UserDefaults 读取

@@ -4,7 +4,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var deleteSettings = DeleteSettings.load()
     /// 歌词延迟校准（按输出路由存；车里最常用）
-    @ObservedObject private var lyricOffsetStore = LyricOffsetStore.shared
+    /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
+    @Environment(LyricOffsetStore.self) private var lyricOffsetStore
     @State private var showDeleteFolderPlaylistsPrompt = false
 
     private func deleteExistingFolderPlaylists() {
@@ -340,4 +341,6 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        // Preview 是组合根之外的第二个合法装配点 → 显式装配（计预算，见预算账本）。
+        .environment(LyricOffsetStore.shared)
 }

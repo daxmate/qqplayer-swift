@@ -19,7 +19,8 @@ struct PlaylistDetailScreen: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var customCoverImage: UIImage?
     /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数 + 就地说明）。
-    @ObservedObject private var coverFailures = PlaylistCoverLoadFailuresStore.shared
+    /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
+    @Environment(PlaylistCoverLoadFailuresStore.self) private var coverFailures
     @State private var showCoverOptions = false
     @State private var artistNameCache: [Int64: String] = [:]
     @State private var artistDisplayNameCache: [String: String] = [:]
@@ -536,9 +537,9 @@ struct PlaylistDetailScreen: View {
         let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
         switch PlaylistCoverResolver.resolve(customCoverImagePath: playlist.customCoverImagePath) {
         case .none:
-            PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key)
+            coverFailures.clear(playlistKey: key)
         case let .unavailable(reason):
-            PlaylistCoverLoadFailuresStore.shared.record(
+            coverFailures.record(
                 playlistKey: key,
                 path: playlist.customCoverImagePath ?? "",
                 reason: reason
@@ -546,14 +547,14 @@ struct PlaylistDetailScreen: View {
         case let .available(fileURL):
             guard let data = try? Data(contentsOf: fileURL),
                   let image = UIImage(data: data) else {
-                PlaylistCoverLoadFailuresStore.shared.record(
+                coverFailures.record(
                     playlistKey: key,
                     path: playlist.customCoverImagePath ?? "",
                     reason: PlaylistCoverResolver.Reason.decodeFailed
                 )
                 return
             }
-            PlaylistCoverLoadFailuresStore.shared.clear(playlistKey: key)
+            coverFailures.clear(playlistKey: key)
             customCoverImage = image
             print("✅ Loaded custom playlist cover from \(playlist.customCoverImagePath ?? "")")
         }

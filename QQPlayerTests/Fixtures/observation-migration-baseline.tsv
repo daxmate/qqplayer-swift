@@ -6,7 +6,7 @@
 #
 # 迁移方向（方案见 memory/2026-09-18.md §二）：
 #   ObservableObject → @Observable；@Published var x → var x；
-#   @StateObject → @State；@ObservedObject → 普通 let/var；
+#   @StateObject → @State；@ObservedObject → 普通 let/`@Environment`；
 #   @EnvironmentObject → @Environment(T.self)
 #
 # 范围：QQPlayer/**/*.swift（iOS + Mac 共享源文件）。
@@ -14,6 +14,10 @@
 #
 # 进度：起始 217 处 / 119 行 → 213 / 115（批 1 第一刀：iOS TutorialViewModel + TutorialView）
 #   → 209 / 111（同批第二刀：Mac MacSearchAnythingState + 两个视图包装器；部署目标同日 13.0→14.0）
+#   → **193 / 103**（2026-09-19 批 2：PlaylistCoverLoadFailuresStore / IOSPassiveSyncCenter /
+#     LyricOffsetStore 三个 iOS 叶子 store 迁 @Observable + 视图改 `@Environment` 注入；
+#     同步删除：3 个类各 1 `ObservableObject` + 9 个 `@Published`、视图 4 处 `@ObservedObject`）
+#   账本见 `shared-singleton-budget-plan.md`（每批迁移后基线随之下调）。
 # 格式：路径<TAB>标记<TAB>计数
 QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/ContentView.swift	@StateObject	1
@@ -59,21 +63,15 @@ QQPlayer/Services/EQManager.swift	@Published	5
 QQPlayer/Services/EQManager.swift	ObservableObject	1
 QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
-QQPlayer/Services/IOSPassiveSyncCenter.swift	@Published	4
-QQPlayer/Services/IOSPassiveSyncCenter.swift	ObservableObject	1
 QQPlayer/Services/KaraokeController.swift	@Published	4
 QQPlayer/Services/KaraokeController.swift	ObservableObject	1
 QQPlayer/Services/LibraryIndexer.swift	@Published	6
 QQPlayer/Services/LibraryIndexer.swift	ObservableObject	1
-QQPlayer/Services/LyricOffsetStore.swift	@Published	4
-QQPlayer/Services/LyricOffsetStore.swift	ObservableObject	1
 QQPlayer/Services/MacLibraryFactsStore.swift	ObservableObject	1
 QQPlayer/Services/PlaybackModels.swift	@Published	1
 QQPlayer/Services/PlaybackModels.swift	ObservableObject	1
 QQPlayer/Services/PlayerEngine.swift	@Published	10
 QQPlayer/Services/PlayerEngine.swift	ObservableObject	1
-QQPlayer/Services/PlaylistCoverLoadFailuresStore.swift	@Published	1
-QQPlayer/Services/PlaylistCoverLoadFailuresStore.swift	ObservableObject	1
 QQPlayer/Services/SFBAudioEngineManager.swift	@Published	4
 QQPlayer/Services/SFBAudioEngineManager.swift	ObservableObject	1
 QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
@@ -106,7 +104,6 @@ QQPlayer/Views/Player/QueueManagementView.swift	@StateObject	2
 QQPlayer/Views/Player/TrackRowView.swift	@EnvironmentObject	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	@StateObject	1
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@EnvironmentObject	1
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@ObservedObject	1
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@StateObject	1
 QQPlayer/Views/Playlists/PlaylistManagementView.swift	@EnvironmentObject	1
 QQPlayer/Views/Playlists/PlaylistSelectionView.swift	@EnvironmentObject	1
@@ -119,10 +116,9 @@ QQPlayer/Views/Utility/EQImportViews.swift	@StateObject	1
 QQPlayer/Views/Utility/EQSettingsView.swift	@StateObject	1
 QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	@StateObject	1
 QQPlayer/Views/Utility/ManualEQEditorView.swift	@StateObject	2
-QQPlayer/Views/Utility/SettingsView.swift	@ObservedObject	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@StateObject	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	ObservableObject	1
-QQPlayer/Views/Utility/SyncSettingsView.swift	@ObservedObject	3
+QQPlayer/Views/Utility/SyncSettingsView.swift	@ObservedObject	1

@@ -117,6 +117,12 @@ struct QQPlayerApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appCoordinator)
+                // 视图层 App 级对象的**唯一装配点**（组合根，2026-09-19「下降预算」批 2）。
+                // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
+                // 需要这些对象的视图一律 `@Environment(T.self)` 从这里继承。新增一个对象 = 在此登记一行。
+                .environment(IOSPassiveSyncCenter.shared)
+                .environment(PlaylistCoverLoadFailuresStore.shared)
+                .environment(LyricOffsetStore.shared)
                 .task {
                     DatabaseSuspensionCoordinator.shared.start()
                     await appCoordinator.initialize()

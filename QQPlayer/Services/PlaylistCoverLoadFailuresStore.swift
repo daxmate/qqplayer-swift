@@ -16,12 +16,20 @@
 //
 // target: ios-only（消费点都在 iOS UI：歌单卡片 / 详情 / CarPlay / 设置页；Mac 侧没有歌单自定义封面消费点）
 //
+//  2026-09-19（视图层单例收口「下降预算」批 2）：`ObservableObject` → `@Observable`。
+//  视图不再 `@ObservedObject … = Store.shared`，改由 **iOS 组合根**（`QQPlayerApp` 的
+//  `WindowGroup` 根）`.environment(...)` 注入唯一实例，消费点用
+//  `@Environment(PlaylistCoverLoadFailuresStore.self)` 取（环境注入是视图拿依赖的唯一入口）。
+//  刷新路径核对：唯一存储属性 `failures` 只被视图 `body` 可达路径读（歌单卡片 / 详情 / 设置页行），
+//  按属性追踪后刷新行为不变；本类型无跨对象订阅、无手写 `objectWillChange`、无 Combine publisher 消费点。
+//
 
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class PlaylistCoverLoadFailuresStore: ObservableObject {
+@Observable
+final class PlaylistCoverLoadFailuresStore {
     static let shared = PlaylistCoverLoadFailuresStore()
 
     /// 一个歌单的自定义封面读不到（按歌单去重）。
@@ -37,7 +45,7 @@ final class PlaylistCoverLoadFailuresStore: ObservableObject {
     }
 
     /// 失败清单（按歌单键升序；同一歌单只占一条）。
-    @Published private(set) var failures: [Failure] = []
+    private(set) var failures: [Failure] = []
 
     private init() {}
 

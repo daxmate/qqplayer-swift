@@ -92,7 +92,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批次 | 对象 | 结果（上限 X → Y） | 验证 |
 | --- | --- | --- | --- |
 | 批 1（2026-09-18，历史） | `TutorialViewModel`、`MacSearchAnythingState`（迁移棘轮 213 → 209） | 迁移棘轮 213 → 209 | iOS 全量 1627 绿 + Mac 构建零警告 |
-| 批 2（2026-09-19，本批） | `PlaylistCoverLoadFailuresStore`、`IOSPassiveSyncCenter`、`LyricOffsetStore` | 直连棘轮 174 → **165**（真迁 12 处；preview 装配 +3）；口径收紧后再曝光既有存量 4 处 → **169**；迁移棘轮 209 → **195** | iOS 全量 + Mac 构建零警告 + target 门禁 |
+| 批 2（2026-09-19，本批） | `PlaylistCoverLoadFailuresStore`、`IOSPassiveSyncCenter`、`LyricOffsetStore` | 直连棘轮 174 → **165**（真迁 12 处；preview 装配 +3）；口径收紧后再曝光既有存量 4 处 → **169**；迁移棘轮 209 → **193** | iOS 全量 + Mac 构建零警告 + target 门禁 |
 
 > 批 2 的两个数字要说清：**口径收紧（前导点简写）与真迁移是两个方向的动作**——
 > 前者让 4 处此前看不见的既有直连显形（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），
@@ -181,7 +181,9 @@ let center = hostCenter ?? .shared                     // MacSyncView.swift:68
 ```
 
 即"把直连换个写法就能压低上限"。批 2 已把 `.shared` 简写并入检测（含自证用例），
-暴露既有存量 4 处（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），其中 2 处随批 3 迁移。
+暴露既有存量 4 处（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1）。
+**这 4 处本批一处未迁**（MacSyncView 的 `hostCenter` 默认值属热点 `SyncHostCenter`；其余三处需 Mac 链装配，见批 3；
+`LocalDeviceNameStore` 的默认参数属非 Observable 读取器，见批 4）——它们已如实计入 169 的预算，不属"看不看得见"问题。
 
 ### 5.2 `#Preview` 装配点的预算成本
 视图的 `@Environment(T.self)` 一旦上收，`#Preview` 也必须显式装配，而 preview 只能拿真实实例

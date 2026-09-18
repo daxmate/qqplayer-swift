@@ -49,6 +49,7 @@
     import Combine
     import Foundation
     import Network
+    import Observation
     import UIKit
 
     // MARK: - 状态（契约 C3）
@@ -363,18 +364,26 @@
     // MARK: - 中心（App 级单例）
 
     /// iOS App 级被动同步中心（契约 C3）：一个实例至多一个活动会话，只应答 + 接收。
+    ///
+    /// 2026-09-19（视图层单例收口「下降预算」批 2）：`ObservableObject` → `@Observable`。
+    /// 唯一视图消费点（iOS 设置页同步页）不再 `@ObservedObject … = .shared`，改由 iOS 组合根
+    /// （`QQPlayerApp` 的 `WindowGroup` 根）`.environment(...)` 注入、`@Environment(IOSPassiveSyncCenter.self)` 取。
+    /// 刷新路径核对：视图读的 `state` / `summary` / `dataSummary` / `pairedHostCount` 四个存储属性
+    /// 全部在 `body` 可达路径上（设置页状态行 / 数据区 / 已配对主机行）→ 按属性追踪后刷新不变；
+    /// 本类型无跨对象 `objectWillChange` 订阅、无 Combine publisher 消费点（订阅的是 `LibraryIndexer`，不是自己）。
     @MainActor
-    final class IOSPassiveSyncCenter: ObservableObject {
+    @Observable
+    final class IOSPassiveSyncCenter {
         static let shared = IOSPassiveSyncCenter()
 
         /// 连接状态
-        @Published private(set) var state: IOSPassiveSyncState = .idle
+        private(set) var state: IOSPassiveSyncState = .idle
         /// 接收账目（`onFileLanded` / `onBatchCompleted` 驱动）
-        @Published private(set) var summary = SyncLibraryPassiveSummary()
+        private(set) var summary = SyncLibraryPassiveSummary()
         /// **数据同步**（帧 8/9）账目：手机侧的“同步了什么 / 丢了多少”（矩阵四级空格，2026-09-15）
-        @Published private(set) var dataSummary = IOSPassiveDataSyncSummary()
+        private(set) var dataSummary = IOSPassiveDataSyncSummary()
         /// 已配对主机数（设置页据此区分「未配对」与「未连接」）
-        @Published private(set) var pairedHostCount = 0
+        private(set) var pairedHostCount = 0
 
         private let identityStore: SyncIdentityStore
         private let deviceStore: DeviceStore
