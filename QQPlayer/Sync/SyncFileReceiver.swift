@@ -17,10 +17,17 @@
 //    file_ack：接收端不收 ack → 静默忽略（有测试锁定）
 //    cancel()/会话断连：清理内存状态；.part 保留磁盘（断点数据源，不删）
 //
+//  块大小**只按 meta 声明值**行事（`Active.chunkSize`；不读 `SyncFileTransfer.chunkSize`
+//  常量）——发送端声明多大就按多大校验/对齐/截断，两端才可能各自演进块大小。
+//
 //  并发：@unchecked Sendable + NSLock。锁内只迁移状态 + 落盘；发 ack / 用户回调
 //  一律在锁外执行（内存回环同步投递下对端 ack 会同步重入本对象，持锁发帧必死锁）。
 //  会话回调槽位（onApplicationFrame/onClosed）为会话单槽：挂接时链式保留既有
 //  handler（先己后彼）；本对象结束用 enabled 开关静默自己，不拆链（避免误伤后挂者）。
+//
+//  计时诊断（2026-09-18 提速）：本轮实际收完字节的传输记**一行** `SyncTransferMetrics`
+//  （字节数 / 块数 / 声明块大小 / 耗时），经 `SyncConnectDiag.log` 落到本端既有诊断
+//  通道（iOS：容器 `Documents/sync-diag.log`）。只走完 ack 的幂等/空文件不记（噪声）。
 //
 
 import Foundation
@@ -71,13 +78,28 @@ final class SyncFileReceiver: @unchecked Sendable {
         let fileID: String
         let name: String
         let totalSize: Int64
+        /// 本轮**声明**的块大小（= file_meta.chunkSize；校验/对齐/截断都用它）
         let chunkSize: Int64
         let sha256Hex: String
         let finalURL: URL
         let partURL: URL
+        /// 本轮起点（0 = 从头；> 0 = 断点续传；诊断用）
+        let startOffset: Int64
+        /// 本轮开始时刻（诊断计时基线）
+        let startedAt: Date
         var handle: FileHandle?
         /// .part 当前完整字节数（= 下一块期望 offset）
         var received: Int64
+        /// 本轮已写盘块数（诊断用）
+        var chunksReceived: Int
+    }
+
+    /// 收尾时的进度快照（诊断用；`completePartLocked` 已脱离 Active，故显式携带）。
+    private struct Progress {
+        let startedAt: Date
+        let chunks: Int
+        let chunkSize: Int64
+        let startOffset: Int64
     }
 
     private var active: Active?
@@ -111,7 +133,9 @@ final class SyncFileReceiver: @unchecked Sendable {
             guard let current = self.active else { return [] }
             self.active = nil
             self.closeHandle(current)
-            return [.finish(.failed(.cancelled(current.fileID)))]
+            let error = SyncFileTransferError.cancelled(current.fileID)
+            return [.log(self.metrics(current, succeeded: false, error: error)),
+                    .finish(.failed(error))]
         }
     }
 
@@ -121,7 +145,9 @@ final class SyncFileReceiver: @unchecked Sendable {
             guard let current = self.active else { return [] }
             self.active = nil
             self.closeHandle(current)
-            return [.finish(.failed(.sessionClosed(current.fileID)))]
+            let error = SyncFileTransferError.sessionClosed(current.fileID)
+            return [.log(self.metrics(current, succeeded: false, error: error)),
+                    .finish(.failed(error))]
         }
     }
 
@@ -145,9 +171,11 @@ final class SyncFileReceiver: @unchecked Sendable {
                     guard let current = self.active else { return [] }
                     self.active = nil
                     self.closeHandle(current)
+                    let error = SyncFileTransferError.protocolError(current.fileID, "块解码失败")
                     return [.sendAck(self.ack(fileID: current.fileID, receivedBytes: current.received,
                                               error: .protocolError)),
-                            .finish(.failed(.protocolError(current.fileID, "块解码失败")))]
+                            .log(self.metrics(current, succeeded: false, error: error)),
+                            .finish(.failed(error))]
                 }
                 return
             }
@@ -170,8 +198,10 @@ final class SyncFileReceiver: @unchecked Sendable {
             }
             self.active = nil
             self.closeHandle(current)
+            let error = SyncFileTransferError.protocolError(fileID, reason)
             return [.sendAck(self.ack(fileID: fileID, receivedBytes: current.received, error: .protocolError)),
-                    .finish(.failed(.protocolError(fileID, reason)))]
+                    .log(self.metrics(current, succeeded: false, error: error)),
+                    .finish(.failed(error))]
         }
     }
 
@@ -242,7 +272,7 @@ final class SyncFileReceiver: @unchecked Sendable {
         }
 
         let rawPart = partSize(partURL) ?? 0
-        // 断点对齐：offset 永远对齐块边界（半块残留先 truncate，见下方统一对齐分支）
+        // 断点对齐：offset 永远对齐**声明**块边界（半块残留先 truncate，见下方统一对齐分支）
         let alignedPart = alignDown(rawPart, to: meta.chunkSize)
 
         // 无 .part 且 startOffset > 0：没有可续的数据源 → resumeMismatch
@@ -280,13 +310,17 @@ final class SyncFileReceiver: @unchecked Sendable {
             // 续传起点已含全部字节（上一轮收齐但未及改名）→ 直接整文件校验收尾
             if meta.startOffset > 0, alignedPart == meta.totalSize {
                 return completePartLocked(fileID: meta.fileID, totalSize: meta.totalSize,
-                                          sha256Hex: meta.sha256Hex, partURL: partURL, finalURL: finalURL)
+                                          sha256Hex: meta.sha256Hex, partURL: partURL, finalURL: finalURL,
+                                          progress: Progress(startedAt: Date(), chunks: 0,
+                                                             chunkSize: meta.chunkSize,
+                                                             startOffset: meta.startOffset))
             }
 
             let handle = try openPartForAppending(partURL)
             active = Active(fileID: meta.fileID, name: meta.name, totalSize: meta.totalSize,
                             chunkSize: meta.chunkSize, sha256Hex: sha, finalURL: finalURL,
-                            partURL: partURL, handle: handle, received: received)
+                            partURL: partURL, startOffset: meta.startOffset, startedAt: Date(),
+                            handle: handle, received: received, chunksReceived: 0)
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: received, done: false))]
         } catch {
             let code = errorCode(for: error)
@@ -306,16 +340,18 @@ final class SyncFileReceiver: @unchecked Sendable {
             return [.sendAck(ack(fileID: chunk.fileID, receivedBytes: 0, error: .protocolError))]
         }
 
+        let abortError = SyncFileTransferError.protocolError(current.fileID, "块序违例")
         let abort: [Action] = [.sendAck(ack(fileID: current.fileID, receivedBytes: current.received,
                                             error: .protocolError)),
-                               .finish(.failed(.protocolError(current.fileID, "块序违例")))]
+                               .log(metrics(current, succeeded: false, error: abortError)),
+                               .finish(.failed(abortError))]
         // offset 必须 == 期望偏移（= 已收完整字节）；跳/乱序 → protocolError 中止
         guard chunk.offset == current.received else {
             active = nil
             closeHandle(current)
             return abort
         }
-        // 块大小/长度边界防御
+        // 块大小/长度边界防御（上界 = **声明**块大小，不是本地常量）
         let byteCount = Int64(chunk.data.count)
         guard byteCount > 0,
               byteCount <= current.chunkSize,
@@ -332,12 +368,15 @@ final class SyncFileReceiver: @unchecked Sendable {
             let code = errorCode(for: error)
             active = nil
             closeHandle(current)
+            let error = localError(code, fileID: current.fileID)
             return [.sendAck(ack(fileID: current.fileID, receivedBytes: current.received, error: code)),
-                    .finish(.failed(localError(code, fileID: current.fileID)))]
+                    .log(metrics(current, succeeded: false, error: error)),
+                    .finish(.failed(error))]
         }
 
         var advanced = current
         advanced.received += byteCount
+        advanced.chunksReceived += 1
         active = advanced
 
         if advanced.received == advanced.totalSize {
@@ -346,7 +385,11 @@ final class SyncFileReceiver: @unchecked Sendable {
             active = nil
             return completePartLocked(fileID: advanced.fileID, totalSize: advanced.totalSize,
                                       sha256Hex: advanced.sha256Hex, partURL: advanced.partURL,
-                                      finalURL: advanced.finalURL)
+                                      finalURL: advanced.finalURL,
+                                      progress: Progress(startedAt: advanced.startedAt,
+                                                         chunks: advanced.chunksReceived,
+                                                         chunkSize: advanced.chunkSize,
+                                                         startOffset: advanced.startOffset))
         }
         return [.sendAck(ack(fileID: advanced.fileID, receivedBytes: advanced.received, done: false))]
     }
@@ -354,18 +397,22 @@ final class SyncFileReceiver: @unchecked Sendable {
     /// 收齐收尾（锁内）：算 SHA-256，匹配 → 原子改名去 .part + ack(done)；
     /// 不匹配 → 删 .part + ack(checksumMismatch)。IO 失败 → ioError 中止（.part 保留）。
     private func completePartLocked(fileID: String, totalSize: Int64, sha256Hex: String,
-                                    partURL: URL, finalURL: URL) -> [Action] {
+                                    partURL: URL, finalURL: URL, progress: Progress) -> [Action] {
         let sha: String
         do {
             sha = try SyncFileChecksum.sha256Hex(ofFile: partURL).lowercased()
         } catch {
             return [.sendAck(ack(fileID: fileID, receivedBytes: totalSize, error: .ioError)),
+                    .log(metricsLocked(fileID: fileID, totalSize: totalSize, progress: progress,
+                                       succeeded: false, error: .ioError(fileID))),
                     .finish(.failed(.ioError(fileID)))]
         }
         guard sha == sha256Hex.lowercased() else {
             // 校验失败：删 .part（发送端可从头重发）
             try? FileManager.default.removeItem(at: partURL)
             return [.sendAck(ack(fileID: fileID, receivedBytes: 0, error: .checksumMismatch)),
+                    .log(metricsLocked(fileID: fileID, totalSize: totalSize, progress: progress,
+                                       succeeded: false, error: .checksumMismatch(fileID))),
                     .finish(.failed(.checksumMismatch(fileID)))]
         }
         do {
@@ -373,9 +420,13 @@ final class SyncFileReceiver: @unchecked Sendable {
             _ = try FileManager.default.replaceItemAt(finalURL, withItemAt: partURL)
         } catch {
             return [.sendAck(ack(fileID: fileID, receivedBytes: totalSize, error: .ioError)),
+                    .log(metricsLocked(fileID: fileID, totalSize: totalSize, progress: progress,
+                                       succeeded: false, error: .ioError(fileID))),
                     .finish(.failed(.ioError(fileID)))]
         }
         return [.sendAck(ack(fileID: fileID, receivedBytes: totalSize, done: true)),
+                .log(metricsLocked(fileID: fileID, totalSize: totalSize, progress: progress,
+                                   succeeded: true, error: nil)),
                 .finish(.received(ReceivedFile(fileID: fileID,
                                                sha256Hex: sha256Hex.lowercased(),
                                                url: finalURL)))]
@@ -417,7 +468,7 @@ final class SyncFileReceiver: @unchecked Sendable {
         try handle.truncate(atOffset: UInt64(offset))
     }
 
-    /// 对齐到块边界（断点/truncate 语义的唯一对齐入口）。
+    /// 对齐到块边界（断点/truncate 语义的唯一对齐入口；`chunkSize` 由调用方给声明值）。
     private func alignDown(_ value: Int64, to chunkSize: Int64) -> Int64 {
         value - value % chunkSize
     }
@@ -470,14 +521,44 @@ final class SyncFileReceiver: @unchecked Sendable {
         FileAckPayload(fileID: fileID, receivedBytes: receivedBytes, done: done, error: error)
     }
 
+    // MARK: 计时诊断（锁内取快照）
+
+    /// 进行中传输的计时快照（锁内调用；只读状态）。
+    private func metrics(_ current: Active, succeeded: Bool,
+                         error: SyncFileTransferError?) -> SyncTransferMetrics {
+        metricsLocked(fileID: current.fileID, totalSize: current.totalSize,
+                      progress: Progress(startedAt: current.startedAt, chunks: current.chunksReceived,
+                                         chunkSize: current.chunkSize, startOffset: current.startOffset),
+                      succeeded: succeeded, error: error)
+    }
+
+    /// 由显式进度构造计时行（收尾路径 Active 已清，故走这条）。
+    private func metricsLocked(fileID: String, totalSize: Int64, progress: Progress,
+                               succeeded: Bool, error: SyncFileTransferError?) -> SyncTransferMetrics {
+        SyncTransferMetrics(
+            role: .receive,
+            fileID: fileID,
+            startOffset: progress.startOffset,
+            totalSize: totalSize,
+            chunkSize: progress.chunkSize,
+            chunks: progress.chunks,
+            milliseconds: Int(Date().timeIntervalSince(progress.startedAt) * 1000),
+            firstChunkWaitMs: nil,
+            lastChunkWaitMs: nil,
+            succeeded: succeeded,
+            errorLine: error.map { "\($0)" }
+        )
+    }
+
     // MARK: 锁 + 效果执行
 
     private enum Action {
         case sendAck(FileAckPayload)
+        case log(SyncTransferMetrics)
         case finish(Outcome)
     }
 
-    /// 锁内跑状态机，锁外执行效果（发 ack / 用户回调）。所有路径的 ack 发送都在锁外，
+    /// 锁内跑状态机，锁外执行效果（发 ack / 日志 / 用户回调）。所有路径的 ack 发送都在锁外，
     /// 保证同步回环下对端 ack 重入本对象不死锁。
     private func runLocked(_ body: () -> [Action]) {
         lock.lock()
@@ -487,6 +568,8 @@ final class SyncFileReceiver: @unchecked Sendable {
             switch action {
             case let .sendAck(ack):
                 sendAck(ack)
+            case let .log(metrics):
+                SyncConnectDiag.log(metrics.logLine)
             case let .finish(outcome):
                 onCompletion?(outcome)
             }

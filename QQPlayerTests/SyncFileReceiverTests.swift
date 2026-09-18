@@ -79,7 +79,8 @@ struct SyncFileReceiverTests {
 
     @Test("篡改块：中途改某 chunk 数据 → 校验失败 checksumMismatch、.part 删除")
     func tamperedChunkChecksumMismatch() throws {
-        let source = pseudoRandomData(300_000) // 2 块
+        // 2 块：内容尺寸按声明块大小推导（调块大小不用改用例）
+        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 4_000)
         let (receiver, dir, log) = try makeReceiver()
         let fileID = "tamper"
         let name = "song.bin"
@@ -113,7 +114,7 @@ struct SyncFileReceiverTests {
 
     @Test("乱序块：跳过 offset 0 直接发块 1 → protocolError 中止")
     func outOfOrderChunkProtocolError() throws {
-        let source = pseudoRandomData(300_000)
+        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 4_000)
         let (receiver, dir, log) = try makeReceiver()
         let fileID = "order"
 
@@ -138,9 +139,9 @@ struct SyncFileReceiverTests {
         #expect(!fileExists(dir, "song.bin"))
     }
 
-    @Test("超长块（> chunkSize）→ protocolError 中止")
+    @Test("超长块（> 声明 chunkSize）→ protocolError 中止")
     func oversizedChunkProtocolError() throws {
-        let source = pseudoRandomData(300_000)
+        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 4_000)
         let (receiver, _, log) = try makeReceiver()
         let fileID = "oversize"
 
@@ -203,21 +204,21 @@ struct SyncFileReceiverTests {
         let invalidMetas: [(FileMetaPayload, String)] = [
             (FileMetaPayload(fileID: "m1", name: "a.bin", totalSize: 1_000, chunkSize: 0,
                              sha256Hex: validSha, startOffset: 0), "chunkSize=0"),
-            (FileMetaPayload(fileID: "m2", name: "a.bin", totalSize: 1_000, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m2", name: "a.bin", totalSize: 1_000, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: "zz", startOffset: 0), "sha 非法"),
-            (FileMetaPayload(fileID: "m3", name: "a/b.bin", totalSize: 1_000, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m3", name: "a/b.bin", totalSize: 1_000, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: 0), "name 含路径"),
-            (FileMetaPayload(fileID: "m4", name: "a.bin", totalSize: -1, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m4", name: "a.bin", totalSize: -1, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: 0), "totalSize 负"),
-            (FileMetaPayload(fileID: "m5", name: "", totalSize: 1_000, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m5", name: "", totalSize: 1_000, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: 0), "name 空"),
-            (FileMetaPayload(fileID: "m6", name: "a.bin", totalSize: 0, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m6", name: "a.bin", totalSize: 0, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: 0), "0 字节但 sha 非空数据"),
-            (FileMetaPayload(fileID: "m7", name: "a.bin", totalSize: 1_000, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m7", name: "a.bin", totalSize: 1_000, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: 100_000), "startOffset > totalSize"),
-            (FileMetaPayload(fileID: "m8", name: "a.bin", totalSize: 1_000, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m8", name: "a.bin", totalSize: 1_000, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: -1), "startOffset 负"),
-            (FileMetaPayload(fileID: "m9", name: "a.bin", totalSize: 1_000, chunkSize: 262_144,
+            (FileMetaPayload(fileID: "m9", name: "a.bin", totalSize: 1_000, chunkSize: SyncFileTransfer.chunkSize,
                              sha256Hex: validSha, startOffset: 100), "startOffset 不对齐"),
             (FileMetaPayload(fileID: "m10", name: "a.bin", totalSize: 1_000, chunkSize: 20 * 1024 * 1024,
                              sha256Hex: validSha, startOffset: 0), "chunkSize > 16MB"),
@@ -248,7 +249,7 @@ struct SyncFileReceiverTests {
 
     @Test("传输中同 fileID 新 meta（startOffset=0）→ 重启从头收，最终一致")
     func sameFileMetaRestart() throws {
-        let source = pseudoRandomData(300_000) // 2 块
+        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 4_000) // 2 块
         let (receiver, dir, log) = try makeReceiver()
         let fileID = "restart"
         let name = "song.bin"
@@ -286,7 +287,8 @@ struct SyncFileReceiverTests {
 
     @Test("无 .part 且 startOffset>0 → resumeMismatch（resume 数据源缺失）")
     func resumeWithoutPartMismatch() throws {
-        let source = pseudoRandomData(300_000)
+        // startOffset 必须是合法的块边界且 ≤ totalSize，故文件必须 > 1 块
+        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 4_000)
         let (receiver, _, log) = try makeReceiver()
         receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
             fileID: "nopart", name: "song.bin", totalSize: Int64(source.count),
@@ -348,5 +350,97 @@ struct SyncFileReceiverTests {
         #expect(log.outcomes == [.failed(.checksumMismatch(fileID))])
         #expect(!fileExists(dir, name + ".part"))
         #expect(!fileExists(dir, name))
+    }
+
+    // MARK: 按 meta **声明值**行事（不是本地常量）
+    //
+    // 2026-09-18：块大小从常量改为发送端声明（256KB → 1MB）后新增的契约防线。
+    // 若接收端任何一处（校验上界 / 断点对齐 / 截断）用了 `SyncFileTransfer.chunkSize`
+    // 而非 `meta.chunkSize`，下面三个用例就会红——块大小以后才能各自演进。
+
+    @Test("声明 4096 块：多块传输成功、ack 推进量按声明值")
+    func honorsDeclaredChunkSize() throws {
+        let declared: Int64 = 4_096
+        let source = pseudoRandomData(10_000) // 2 整块 + 尾块
+        let (receiver, _, log) = try makeReceiver()
+        let fileID = "declared-1"
+        let name = "song.bin"
+
+        receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
+            fileID: fileID, name: name, totalSize: Int64(source.count),
+            chunkSize: declared, sha256Hex: SyncFileChecksum.sha256Hex(of: source), startOffset: 0
+        )))
+        var offset: Int64 = 0
+        while offset < Int64(source.count) {
+            let end = min(offset + declared, Int64(source.count))
+            receiver.handleInboundFrame(try chunkFrame(FileChunkPayload(
+                fileID: fileID, offset: offset, data: Data(source[Int(offset) ..< Int(end)])
+            )))
+            offset = end
+        }
+
+        #expect(log.acks.map(\.receivedBytes) == [0, declared, declared * 2, Int64(source.count)])
+        #expect(log.acks.last?.done == true)
+        guard case let .received(receivedFile)? = log.outcomes.last else {
+            Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
+            return
+        }
+        #expect(try Data(contentsOf: receivedFile.url) == source)
+    }
+
+    @Test("块超过声明大小（但远小于本地常量）→ protocolError（上界用声明值）")
+    func chunkBeyondDeclaredSizeProtocolError() throws {
+        let declared: Int64 = 4_096
+        let source = pseudoRandomData(10_000)
+        let (receiver, _, log) = try makeReceiver()
+        let fileID = "declared-2"
+
+        receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
+            fileID: fileID, name: "song.bin", totalSize: Int64(source.count),
+            chunkSize: declared, sha256Hex: SyncFileChecksum.sha256Hex(of: source), startOffset: 0
+        )))
+        // 一块 4097 字节：超声明 4096，但远小于本地常量 → 必须以**声明值**为上界拒掉
+        receiver.handleInboundFrame(try chunkFrame(FileChunkPayload(
+            fileID: fileID, offset: 0, data: pseudoRandomData(Int(declared) + 1)
+        )))
+
+        #expect(log.acks.last?.error == .protocolError)
+        #expect(!receiver.isActive)
+    }
+
+    @Test("断点对齐用声明块大小：.part 半块残留按 4096 截断后续传成功")
+    func resumeAlignsToDeclaredChunkSize() throws {
+        let declared: Int64 = 4_096
+        let source = pseudoRandomData(10_000)
+        let (receiver, dir, log) = try makeReceiver()
+        let fileID = "declared-3"
+        let name = "song.bin"
+        // .part = 1 整块 + 100 字半块残留（模拟写块中途中断）
+        let partURL = dir.appendingPathComponent(name + ".part")
+        try source.prefix(Int(declared) + 100).write(to: partURL)
+
+        receiver.handleInboundFrame(try metaFrame(FileMetaPayload(
+            fileID: fileID, name: name, totalSize: Int64(source.count),
+            chunkSize: declared, sha256Hex: SyncFileChecksum.sha256Hex(of: source),
+            startOffset: declared
+        )))
+        // 首 ack = 对齐到**声明**块边界后的完整字节数（截断生效；用本地常量算会得 0）
+        #expect(log.acks.first?.receivedBytes == declared)
+        #expect(log.acks.first?.error == FileTransferErrorCode.none)
+        var offset = declared
+        while offset < Int64(source.count) {
+            let end = min(offset + declared, Int64(source.count))
+            receiver.handleInboundFrame(try chunkFrame(FileChunkPayload(
+                fileID: fileID, offset: offset, data: Data(source[Int(offset) ..< Int(end)])
+            )))
+            offset = end
+        }
+        #expect(log.acks.last?.done == true)
+        guard case let .received(receivedFile)? = log.outcomes.last else {
+            Issue.record("期望 received，实际 \(String(describing: log.outcomes))")
+            return
+        }
+        #expect(try Data(contentsOf: receivedFile.url) == source)
+        #expect(!fileExists(dir, name + ".part"))
     }
 }

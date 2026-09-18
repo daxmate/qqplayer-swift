@@ -642,6 +642,7 @@
 				Services/SpotifyAPI.swift,
 				Services/StateManager.swift,
 				Services/StateManagerModels.swift,
+				Services/SyncConnectDiag.swift,
 				Services/SyncDeviceListModel.swift,
 				Services/SyncHostGate.swift,
 				Services/SyncSelectionStore.swift,

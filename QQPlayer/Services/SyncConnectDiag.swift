@@ -17,30 +17,51 @@
 //  会话关闭原因、发现超时。都是低频决策点（每轮几行），不进收帧热路径。
 //
 //  约束：纯观测（每个调用点只记一行，不改业务分支）；写盘失败静默；环形截断
-//  （超 256KB 留尾部 64KB）；只编 iOS（文件头 `// target: ios-only` 标记，
-//  Mac target 完全不受影响）。
+//  （超 256KB 留尾部 64KB）。
 //
-// target: ios-only
+//  文件传输计时（2026-09-18 提速）也走本入口（`log(metrics.logLine)`），**每文件一行**
+//  （不逐块刷屏）：两端各记一行，同一 fileID 可对照。
+//
+//  ⚙️ 目标归属（2026-09-18 改）：本文件**两端都编**（原为 ios-only）。
+//  为什么：文件传输的计时日志发送端在 Mac（推送/拉取的发起方）、接收端在 iOS，
+//  同一份「同步诊断」语义不该按平台分家（两端各写一份 = 多处手工维护）。
+//  落点按平台取各自**已有**的通道：
+//    - iOS：App 容器 `Documents/sync-diag.log`（真机 print 取不到，必须落盘；用
+//      `xcrun devicectl device copy from` 拉回）
+//    - macOS：`print` → `~/Library/Logs/QQPlayerMac/stdout.log`（QQPlayerMacApp 启动时
+//      已把 stdout 重定向到该文件，与 scan.log/stderr.log 同口径）
+//
+// target: shared（两端都编；见上「目标归属」）
 //
 
 import Foundation
 import Network
 
-#if os(iOS)
-    enum SyncConnectDiag {
-        /// 总开关（需要静默时置 false）。
-        static let enabled = true
+enum SyncConnectDiag {
+    /// 总开关（需要静默时置 false）。
+    static let enabled = true
 
-        private static let queue = DispatchQueue(label: "com.daxmate.qqplayer.sync.diag")
+    private static let queue = DispatchQueue(label: "com.daxmate.qqplayer.sync.diag")
 
-        // MARK: 落盘
+    // MARK: 落点（唯一出口）
 
-        static func log(_ message: String) {
-            guard enabled else { return }
-            let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+    /// 记一行同步诊断（唯一出口；调用方不关心平台落点）。
+    static func log(_ message: String) {
+        guard enabled else { return }
+        let line = "[\(timestamp())] \(message)\n"
+        #if os(iOS)
             queue.async { append(line) }
-        }
+        #else
+            // macOS：走既有 stdout 重定向（print 即落到 stdout.log；无额外文件 IO）
+            print(line, terminator: "")
+        #endif
+    }
 
+    private static func timestamp() -> String {
+        ISO8601DateFormatter().string(from: Date())
+    }
+
+    #if os(iOS)
         private static func append(_ line: String) {
             guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
                 .first?.appendingPathComponent("sync-diag.log") else { return }
@@ -66,23 +87,23 @@ import Network
                 // 诊断失败不影响同步主流程
             }
         }
+    #endif
 
-        // MARK: endpoint 描述（含类型/域/接口，用于判 endpoint 是否合法）
+    // MARK: endpoint 描述（含类型/域/接口，用于判 endpoint 是否合法）
 
-        static func describe(_ endpoint: NWEndpoint) -> String {
-            switch endpoint {
-            case let .hostPort(host, port):
-                return "hostPort(\(host):\(port))"
-            case let .service(name, type, domain, interface):
-                let scope = interface.map { "\($0.name):\($0.type)" } ?? "nil"
-                return "service(name=\(name) type=\(type) domain=\(domain) if=\(scope))"
-            case let .unix(path):
-                return "unix(\(path))"
-            case let .url(url):
-                return "url(\(url))"
-            default:
-                return "\(endpoint)"
-            }
+    static func describe(_ endpoint: NWEndpoint) -> String {
+        switch endpoint {
+        case let .hostPort(host, port):
+            return "hostPort(\(host):\(port))"
+        case let .service(name, type, domain, interface):
+            let scope = interface.map { "\($0.name):\($0.type)" } ?? "nil"
+            return "service(name=\(name) type=\(type) domain=\(domain) if=\(scope))"
+        case let .unix(path):
+            return "unix(\(path))"
+        case let .url(url):
+            return "url(\(url))"
+        default:
+            return "\(endpoint)"
         }
     }
-#endif
+}
