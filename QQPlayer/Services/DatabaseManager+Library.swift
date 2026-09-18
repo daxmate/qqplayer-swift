@@ -11,13 +11,18 @@ import Foundation
 extension DatabaseManager {
     // MARK: - Artist operations
 
+    /// 歌手入库唯一入口。落库的名字与判据都用**规范形**（简体，与 UI 语言解耦）：
+    /// artist.name 是 COLLATE NOCASE，对汉字无效，「周杰倫 / 周杰伦」在原文精确匹配下
+    /// 会各建一行 = 用户看到的重复歌手（2026-09-18 用户拍板「落库全部是简体中文」）。
+    /// 此前 _only_ 显示层做过字形归一（ArtistNameNormalizer.displayName），库里仍是两行。
     func upsertArtist(name: String) throws -> Artist {
+        let canonicalName = DisplayScriptNormalizer.canonical(name)
         return try write { db in
-            if let existing = try Artist.filter(Column("name") == name).fetchOne(db) {
+            if let existing = try Artist.filter(Column("name") == canonicalName).fetchOne(db) {
                 return existing
             }
 
-            let artist = Artist(name: name)
+            let artist = Artist(name: canonicalName)
             return try artist.insertAndFetch(db)!
         }
     }
@@ -44,7 +49,7 @@ extension DatabaseManager {
 
     func upsertAlbum(title: String, artistId: Int64?, year: Int?, albumArtist: String?, candidateArtistIds: [Int64] = []) throws -> Album {
         return try write { db in
-            let normalizedTitle = self.normalizeAlbumTitle(title)
+            let normalizedTitle = self.albumMatchKey(title)
 
             // Match albums by title and primary artist. The same album title can exist for different artists.
             if let existing = try Album
@@ -64,7 +69,7 @@ extension DatabaseManager {
                 .fetchAll(db)
 
             for existing in existingAlbums {
-                let existingNormalized = self.normalizeAlbumTitle(existing.title)
+                let existingNormalized = self.albumMatchKey(existing.title)
 
                 // Match by normalized title (case-insensitive)
                 guard existing.artistId == artistId else { continue }
@@ -91,7 +96,7 @@ extension DatabaseManager {
                     // Same title but conflicting years = genuinely different albums
                     if let existingYear = existing.year, let year, existingYear != year { continue }
 
-                    let existingNormalized = self.normalizeAlbumTitle(existing.title)
+                    let existingNormalized = self.albumMatchKey(existing.title)
                     if existingNormalized.lowercased() == normalizedTitle.lowercased() ||
                         self.areSimilarTitles(existingNormalized, normalizedTitle) {
                         return try self.albumWithYearFilled(existing, year: year, db: db)
@@ -100,7 +105,14 @@ extension DatabaseManager {
             }
 
             // No existing match found, create new album
-            let album = Album(artistId: artistId, title: normalizedTitle, year: year, albumArtist: albumArtist)
+            // album_artist 与 title 同源：入库一律写规范形（存量迁移也会改这一列），
+            // 否则旧行简体、新行繁体，同一列里两种字形并存。
+            let album = Album(
+                artistId: artistId,
+                title: normalizedTitle,
+                year: year,
+                albumArtist: albumArtist.map(DisplayScriptNormalizer.canonical)
+            )
             return try album.insertAndFetch(db)!
         }
     }
@@ -154,6 +166,13 @@ extension DatabaseManager {
         }
 
         return false
+    }
+
+    /// 专辑判据（含归名）的**唯一构造**：先写规范形（简体，与 UI 语言解耦），
+    /// 再去结构性后缀/空白。upsertAlbum 的全部比较点与 issue #81 的分组键都用它 ——
+    /// 少一层简繁归一，简繁分裂的同名专辑就永远分不到同一组（2026-09-18）。
+    private func albumMatchKey(_ title: String) -> String {
+        normalizeAlbumTitle(DisplayScriptNormalizer.canonical(title))
     }
 
     private func normalizeAlbumTitle(_ title: String) -> String {
@@ -509,6 +528,137 @@ extension DatabaseManager {
         }
     }
 
+    /// 存量归名（库内简繁归一的第一步，必须在 #16 / #81 之前跑）：
+    /// `artist.name` / `album.title` / `album.album_artist` / `track.title`
+    /// 全部写成**规范形**（简体，与 UI 语言设置解耦，2026-09-18 用户拍板
+    /// 「落库全部是简体中文」），随后按归一名合并同形歌手行。
+    ///
+    /// 顺序不能反：先归名、后合并。名字没归一时分组的 key 是原文，
+    /// 「周傳雄 / 周传雄」永远进不了同一组。
+    ///
+    /// 为什么歌手合并写在这里而不是复用 #16：`migrateSplitCombinedArtistNames` 只按
+    /// `;` / `\\` 拆**合唱歌手名**，不管简繁分裂；而简繁分裂出来的两行是**同一个歌手**
+    /// （名字即身份），合并安全。
+    ///
+    /// 专辑同形合并**不在这里重写一遍**：名字归到规范形后，既有的
+    /// `migrateMergeSplitAlbums()`（issue #81）分组键 `albumMatchKey`
+    /// 立刻能看见简繁分裂的同名专辑，由它按「共享歌手 + 年份不冲突」护栏合并
+    /// —— 一处语义一处实现（同形 ≠ 同一专辑：`丝路` 同时是梁静茹 2005 与齐秦 1996
+    /// 两张不同专辑，标题相同也必须留两行）。
+    ///
+    /// 保留行规则：**曲目多者优先，并列取 id 小者**；保留行的名字 = 规范形（第 1 步已写）。
+    /// 引用面（全仓引用 artist.id 的只有这 4 处，全部重挂后才删除行）：
+    /// `track.artist_id` / `track_artist.artist_id` / `album.artist_id` /
+    /// `album_artist_link.artist_id`。其中 `album.artist_id` 是 `ON DELETE CASCADE`，
+    /// **必须在删行前重挂**，否则整张专辑会跟着被删掉。
+    ///
+    /// 不动的数据：英文/日文名（映射表不覆盖即原样返回）、
+    /// 用户文件标签、同步载荷（同步集合不含 artist/album/track 文本）。
+    ///
+    /// ⚠️ **不可逆的数据改写**：名字被规范形覆盖后，原字形无法从库内恢复。
+    /// 跑之前请备份 DB（迁移只改库，不动用户文件）：
+    ///   `cp ~/Library/Containers/<bundle-id>/Data/Documents/qqplayer.db{,.bak}`
+    /// 或直接拷一份 App 容器目录。
+    ///
+    /// 幂等：第二次运行没有可改的名字、也没有同形组 → 无事发生（有测试锁定）。
+    func migrateCanonicalizeScriptForms() throws {
+        defer { invalidateArtistDisplayNameCache() }
+        try write { db in
+            // 1) 全库归名：库内形态一律写成规范形
+            var renamedArtists = 0
+            for artist in try Artist.fetchAll(db) {
+                guard let id = artist.id else { continue }
+                let canonical = DisplayScriptNormalizer.canonical(artist.name)
+                guard canonical != artist.name else { continue }
+                try db.execute(sql: "UPDATE artist SET name = ? WHERE id = ?", arguments: [canonical, id])
+                renamedArtists += 1
+            }
+
+            var renamedAlbums = 0
+            for album in try Album.fetchAll(db) {
+                guard let id = album.id else { continue }
+                let canonicalTitle = DisplayScriptNormalizer.canonical(album.title)
+                let canonicalAlbumArtist = album.albumArtist.map(DisplayScriptNormalizer.canonical)
+                guard canonicalTitle != album.title || canonicalAlbumArtist != album.albumArtist else { continue }
+                try db.execute(
+                    sql: "UPDATE album SET title = ?, album_artist = ? WHERE id = ?",
+                    arguments: [canonicalTitle, canonicalAlbumArtist, id]
+                )
+                renamedAlbums += 1
+            }
+
+            // track 是最大的表：只要 id/title，不物化整个模型
+            var renamedTracks = 0
+            for row in try Row.fetchAll(db, sql: "SELECT id, title FROM track") {
+                let id: Int64 = row["id"]
+                let title: String = row["title"]
+                let canonical = DisplayScriptNormalizer.canonical(title)
+                guard canonical != title else { continue }
+                try db.execute(sql: "UPDATE track SET title = ? WHERE id = ?", arguments: [canonical, id])
+                renamedTracks += 1
+            }
+
+            // 2) 同形歌手行合并（第 1 步后 key = 规范形；名字相同 = 同一歌手）
+            var groups: [String: [Artist]] = [:]
+            for artist in try Artist.fetchAll(db) {
+                groups[artist.name, default: []].append(artist)
+            }
+
+            var mergedGroups = 0
+            for (name, group) in groups where group.count > 1 {
+                let ranked: [(artist: Artist, trackCount: Int)] = try group.compactMap { artist in
+                    guard let id = artist.id else { return nil }
+                    // 曲目数 = 主歌手引用 ∪ 多歌手链接引用（去重，同一首只算一次）
+                    let count = try Int.fetchOne(db, sql: """
+                        SELECT COUNT(*) FROM (
+                            SELECT stable_id AS stable_id FROM track WHERE artist_id = ?
+                            UNION
+                            SELECT track_stable_id FROM track_artist WHERE artist_id = ?
+                        )
+                    """, arguments: [id, id]) ?? 0
+                    return (artist, count)
+                }.sorted {
+                    if $0.trackCount != $1.trackCount { return $0.trackCount > $1.trackCount }
+                    return ($0.artist.id ?? 0) < ($1.artist.id ?? 0)
+                }
+
+                guard let keeper = ranked.first, let keeperId = keeper.artist.id else { continue }
+                for entry in ranked.dropFirst() {
+                    guard let loserId = entry.artist.id, loserId != keeperId else { continue }
+
+                    try db.execute(
+                        sql: "UPDATE track SET artist_id = ? WHERE artist_id = ?",
+                        arguments: [keeperId, loserId]
+                    )
+                    try db.execute(sql: """
+                        INSERT OR IGNORE INTO track_artist (track_stable_id, artist_id, position)
+                        SELECT track_stable_id, ?, position FROM track_artist WHERE artist_id = ?
+                    """, arguments: [keeperId, loserId])
+                    try db.execute(sql: "DELETE FROM track_artist WHERE artist_id = ?", arguments: [loserId])
+
+                    // 删行前先重挂：album.artist_id 是 ON DELETE CASCADE
+                    try db.execute(
+                        sql: "UPDATE album SET artist_id = ? WHERE artist_id = ?",
+                        arguments: [keeperId, loserId]
+                    )
+                    try db.execute(sql: """
+                        INSERT OR IGNORE INTO album_artist_link (album_id, artist_id, position)
+                        SELECT album_id, ?, position FROM album_artist_link WHERE artist_id = ?
+                    """, arguments: [keeperId, loserId])
+                    try db.execute(sql: "DELETE FROM album_artist_link WHERE artist_id = ?", arguments: [loserId])
+
+                    try db.execute(sql: "DELETE FROM artist WHERE id = ?", arguments: [loserId])
+                }
+                mergedGroups += 1
+                print("🈶 Canonicalized artist group '\(name)': merged \(group.count) rows into id \(keeperId)")
+            }
+
+            if renamedArtists + renamedAlbums + renamedTracks > 0 || mergedGroups > 0 {
+                print("🈶 Script canonicalization: artists renamed \(renamedArtists), albums \(renamedAlbums), tracks \(renamedTracks), merged artist groups \(mergedGroups)")
+            }
+        }
+    }
+
     /// Repairs libraries indexed before multi-artist splitting: artist rows
     /// like "A; B" or "A\\B" are split into individual artists and every
     /// reference re-linked (issue #16). Idempotent - split rows are deleted,
@@ -530,13 +680,20 @@ extension DatabaseManager {
                 }
                 var seen = Set<String>()
                 let names: [String] = parts.compactMap {
-                    let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // 拆出来的每一段也走规范形：否则 "周杰倫; 周杰伦" 会拆出两个名字、
+                    // 建出两行（本迁移之后紧跟的存量归名不会再跑，等于漏网）
+                    let trimmed = DisplayScriptNormalizer.canonical($0.trimmingCharacters(in: .whitespacesAndNewlines))
                     let key = trimmed.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
                     guard !trimmed.isEmpty, !seen.contains(key) else { return nil }
                     seen.insert(key)
                     return trimmed
                 }
-                guard names.count > 1 else { continue }
+                // 拆完后只剩一个名字的情况也要处理：归名会把 "周杰倫; 周杰伦"
+                // 写成 "周杰伦; 周杰伦"，去重后 names == ["周杰伦"] ——
+                // 这行不是合唱、就是同一个歌手的重复写法，应当并到同名行
+                // （否则库里永远留着一行带分号的 "周杰伦; 周杰伦"）。
+                // 下面的重挂逻辑对单元素数组同样成立。
+                guard names.count > 1 || names.first != combinedArtist.name else { continue }
 
                 var artistIds: [Int64] = []
                 for name in names {
@@ -607,7 +764,7 @@ extension DatabaseManager {
             let albums = try Album.fetchAll(db)
             var groups: [String: [Album]] = [:]
             for album in albums {
-                groups[self.normalizeAlbumTitle(album.title).lowercased(), default: []].append(album)
+                groups[self.albumMatchKey(album.title).lowercased(), default: []].append(album)
             }
 
             for (_, group) in groups where group.count > 1 {

@@ -133,6 +133,24 @@ enum DisplayScriptNormalizer {
         display(text, direction: current)
     }
 
+    // MARK: - 库内规范形（入库 / 存量迁移用）
+
+    /// 库内规范形 = **简体**（2026-09-18 用户拍板：「落库全部是简体中文」）。
+    ///
+    /// 与显示方向**解耦**：这里固定 `.toSimplified`，不跟 `current`（Bundle 语言）走。
+    /// 若跟语言走，用户改一次语言设置就会把库内形态重新分叉（旧行繁体 + 新行简体），
+    /// 重复行随即再现——这正是本入口存在的理由。
+    ///
+    /// 实现即本文件的 `display(_:direction:)` 固定方向：同一套映射表、同一套假名豁免，
+    /// **不是第二份实现**（契约测试锁 `canonical(t) == display(t, direction: .toSimplified)` 恒等）。
+    ///
+    /// 允许的调用点只有两类：**入库写入**（upsertArtist / upsertAlbum / upsertTrack）
+    /// 与**存量迁移**（migrateCanonicalizeScriptForms）。显示路径不许用它
+    /// （显示走 `display(_:)`，否则繁体界面也被拉成简体）。
+    static func canonical(_ text: String) -> String {
+        display(text, direction: .toSimplified)
+    }
+
     // MARK: - 搜索变体
 
     /// 搜索变体：query 本身 + 双向字形转换（去重），供 SQL LIKE OR 匹配。

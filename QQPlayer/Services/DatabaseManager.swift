@@ -285,6 +285,15 @@ class DatabaseManager: @unchecked Sendable {
         // scheduleContentHashBackfillInBackground）。
         scheduleContentHashBackfillInBackground()
 
+        // 存量字形归一（库内简繁归一）：名字全部写规范形（简体），并按归一名合并
+        // 同形歌手行。**必须排在下面两条之前** —— 归名后 #81 的分组键
+        // （albumMatchKey）才能看见简繁分裂的同名专辑。（2026-09-18 用户拍板：
+        // 落库全部是简体中文 + 存量数据同意一次迁移）
+        do {
+            try migrateCanonicalizeScriptForms()
+        } catch {
+            print("⚠️ Script canonicalization migration failed (non-fatal): \(error)")
+        }
         // Split combined multi-artist rows ("A; B") left by the old parser
         // (issue #16), then heal libraries where deleted tracks left empty
         // artists/albums behind (issue #74). Both are idempotent and cheap,
