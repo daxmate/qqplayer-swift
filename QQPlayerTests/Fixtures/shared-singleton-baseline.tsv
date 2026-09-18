@@ -1,0 +1,65 @@
+# 视图层直连单例（`<Type>.shared`）存量清单 —— 棘轮基线，只能减不能增
+#
+# 由 QQPlayerTests/ViewSharedSingletonContractTests.swift 守护（Swift Testing）：
+#   - 出现基线里没有的视图文件（新增直连） → 红
+#   - 既有文件计数回涨（> 本行数值） → 红
+#   - 某文件计数下降（含归零）或文件消失 → 必须同步改/删本行，否则红（名单不腐烂）
+#   - 总数 > TOTAL → 红
+#
+# 范围：视图层 = `QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中声明 SwiftUI View 的文件
+# 口径：只算**代码行**（`//` 之后剥离、整行注释不计；文档注释里的字面量不算）
+# 粒度为「类型 + 点 + shared」的出现次数（`grep -oE '[A-Za-z_]+\.shared'` 同口径）
+#
+# 本文件只加防护，不含迁移去向：直连单例的整改方向（依赖注入 / 环境对象 / 生命周期归属）
+# 尚未拍板，待决策后再补「整改去向」段落并开始清存量。
+#
+# TOTAL: 174
+# 格式：路径<TAB>计数（按计数降序、同计数按路径）
+QQPlayer/Mac/MacLibraryView.swift	13
+QQPlayer/Mac/MacPlayerView.swift	13
+QQPlayer/Views/Player/PlayerView.swift	9
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	9
+QQPlayer/Mac/MacTrackListView.swift	8
+QQPlayer/Views/Artists/ArtistDetailScreen.swift	8
+QQPlayer/Mac/MacDesktopWindowViews.swift	7
+QQPlayer/Views/Playlists/PlaylistCardView.swift	7
+QQPlayer/Mac/MacKaraokeControlBar.swift	5
+QQPlayer/Views/Library/SearchResultsViews.swift	5
+QQPlayer/Views/Player/KaraokeControlBar.swift	5
+QQPlayer/Views/Player/PlayerOverlays.swift	5
+QQPlayer/Views/Utility/SyncSettingsView.swift	5
+QQPlayer/Mac/MacAlbumArtistViews.swift	4
+QQPlayer/Mac/MacLyricsSearchView.swift	4
+QQPlayer/Mac/MacTagEditorView.swift	4
+QQPlayer/Mac/MacVisualizerView.swift	4
+QQPlayer/Views/Player/LyricsSearchView.swift	4
+QQPlayer/Views/Utility/SettingsView.swift	4
+QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
+QQPlayer/Mac/MacSearchView.swift	3
+QQPlayer/Views/Albums/AlbumViews.swift	3
+QQPlayer/Views/Library/TrackListView.swift	3
+QQPlayer/Views/Player/LyricsView.swift	3
+QQPlayer/Views/Player/QueueManagementView.swift	3
+QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	3
+QQPlayer/Mac/MacArtworkThumbnail.swift	2
+QQPlayer/Mac/MacLyricsView.swift	2
+QQPlayer/Mac/MacManualEQEditorView.swift	2
+QQPlayer/Mac/MacSearchAnythingLayer.swift	2
+QQPlayer/Views/Artists/ArtistRowViews.swift	2
+QQPlayer/Views/Utility/EQSettingsView.swift	2
+QQPlayer/Views/Utility/ManualEQEditorView.swift	2
+QQPlayer/Views/Utility/SyncQRScannerView.swift	2
+QQPlayer/Mac/MacEQImportView.swift	1
+QQPlayer/Mac/MacEQSettingsView.swift	1
+QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	1
+QQPlayer/Mac/MacOnlineSearchView.swift	1
+QQPlayer/Mac/MacSettingsView.swift	1
+QQPlayer/Mac/MacSmartPlaylistViews.swift	1
+QQPlayer/Mac/MacSyncCenterView.swift	1
+QQPlayer/Views/Library/LibraryView.swift	1
+QQPlayer/Views/Player/CollapsiblePlayerControls.swift	1
+QQPlayer/Views/Player/PlayerProgressViews.swift	1
+QQPlayer/Views/Player/TrackRowView.swift	1
+QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	1
+QQPlayer/Views/Utility/EQImportViews.swift	1
+QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	1
