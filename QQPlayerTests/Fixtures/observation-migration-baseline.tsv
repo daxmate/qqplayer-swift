@@ -12,7 +12,8 @@
 # 范围：QQPlayer/**/*.swift（iOS + Mac 共享源文件）。
 # 统计口径：**注释与字符串字面量不算代码**（扫描器先剥离再计数）。
 #
-# 进度：起始 217 处 / 119 行（批 1「叶子」动手前）。
+# 进度：起始 217 处 / 119 行 → 213 / 115（批 1 第一刀：iOS TutorialViewModel + TutorialView）
+#   → 209 / 111（同批第二刀：Mac MacSearchAnythingState + 两个视图包装器；部署目标同日 13.0→14.0）
 # 格式：路径<TAB>标记<TAB>计数
 QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/ContentView.swift	@StateObject	1
@@ -24,7 +25,6 @@ QQPlayer/Mac/MacEQImportView.swift	@StateObject	1
 QQPlayer/Mac/MacEQSettingsView.swift	@StateObject	1
 QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	@StateObject	1
 QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	3
-QQPlayer/Mac/MacLibraryView.swift	@ObservedObject	1
 QQPlayer/Mac/MacLibraryView.swift	@StateObject	3
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
@@ -33,9 +33,6 @@ QQPlayer/Mac/MacManualEQEditorView.swift	@StateObject	2
 QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	3
 QQPlayer/Mac/MacPlayerView.swift	@StateObject	1
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	@StateObject	1
-QQPlayer/Mac/MacSearchAnythingLayer.swift	@ObservedObject	1
-QQPlayer/Mac/MacSearchAnythingLayer.swift	@Published	1
-QQPlayer/Mac/MacSearchAnythingLayer.swift	ObservableObject	1
 QQPlayer/Mac/MacSearchView.swift	@ObservedObject	3
 QQPlayer/Mac/MacSmartPlaylistViews.swift	@StateObject	1
 QQPlayer/Mac/MacSpectrumAnalyzer.swift	@Published	2
