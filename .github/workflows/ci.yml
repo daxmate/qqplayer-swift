@@ -153,9 +153,17 @@ jobs:
       # + 工程级警告（行尾含 "(in target ...)"，如缺 LSApplicationCategory）一律拦截，当场清零。
       # 排除 appintentsmetadataprocessor 的 "Metadata extraction skipped"（无 AppIntents 依赖的
       # 正常工具提示，非编译警告）。三方 SPM 包（路径在 SourcePackages/checkouts）不拦——改不到。
+      # if: always()（2026-09-19）：本步骤原先只在 Test 成功后执行，「测试红」会把同一次
+      # 运行里的编译警告整个盖住（run 35315228532 的未使用变量警告就是这样被下一次运行的
+      # 红灯盖住、一直留在 main 上）→ 改成永远执行，两类红灯同时可见。
       - name: Check zero warnings (source + target-level)
+        if: always()
         run: |
           set -euo pipefail
+          if [ ! -f /tmp/xcodebuild-ios.log ]; then
+            echo "⚠️ 未产出构建日志（前置步骤未跑到编译）——本步骤跳过，构建失败本身已由前置步骤报红"
+            exit 0
+          fi
           WARN="$(grep -E 'warning:' /tmp/xcodebuild-ios.log \
             | grep -v 'Metadata extraction skipped' \
             | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
@@ -203,9 +211,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-macos.log
 
       # 编译警告零容忍（同 swift job）：macOS target 源码同在 QQPlayer/ 目录，覆盖 QQPlayer/Mac/*
+      # if: always()：同上（swift job）——构建失败时也把警告一并报出来，不被单一红灯掩盖。
       - name: Check zero warnings (source + target-level)
+        if: always()
         run: |
           set -euo pipefail
+          if [ ! -f /tmp/xcodebuild-macos.log ]; then
+            echo "⚠️ 未产出构建日志（前置步骤未跑到编译）——本步骤跳过，构建失败本身已由前置步骤报红"
+            exit 0
+          fi
           WARN="$(grep -E 'warning:' /tmp/xcodebuild-macos.log \
             | grep -v 'Metadata extraction skipped' \
             | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
