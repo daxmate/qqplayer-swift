@@ -39,6 +39,9 @@ enum MacLibrarySection: String, CaseIterable, Identifiable {
 struct MacLibraryView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
+    /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；与 App 菜单「设置…」同源）。
+    /// 替代已失效的私有 selector `showSettingsWindow:`。
+    @Environment(\.openSettings) private var openSettings
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var indexer = LibraryIndexer.shared
     @StateObject private var progress = PlayerEngine.shared.progress
@@ -179,7 +182,7 @@ struct MacLibraryView: View {
                     onPlayLocal: { playSearchSongs($0, queue: $1) },
                     onPlayArtist: playArtist,
                     onPlayAlbum: playAlbum,
-                    onOpenSettings: openSettingsCategory,
+                    onOpenSettings: openSettingsRow,
                     artistNameResolver: { resolveArtistName(for: $0) }
                 )
                 .transition(.opacity)
@@ -645,15 +648,11 @@ struct MacLibraryView: View {
         }
     }
 
-    /// search anything 设置行：打开系统设置窗口并定位到对应分类
-    private func openSettingsCategory(_ category: String) {
-        NotificationCenter.default.post(
-            name: .macSettingsOpenCategory,
-            object: nil,
-            userInfo: ["category": category]
-        )
-        // SwiftUI Settings scene 的官方唤起（App 菜单 Settings… 同款 action）
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    /// search anything 设置行：打开设置窗口并定位到分类（有项时滚到该项 + 高亮）
+    private func openSettingsRow(_ match: MacSettingsCatalog.Match) {
+        // 先开窗再投递定位请求：窗口没建好时通知没有订阅者，由 MacSettingsRouter.pending 兜底
+        openSettings()
+        MacSettingsRouter.open(.init(category: match.category, itemID: match.itemID))
     }
 
     private func playSearchSongs(_ track: Track, queue: [Track]) {

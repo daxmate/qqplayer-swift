@@ -12,61 +12,20 @@ import AppKit
 import SwiftUI
 
 struct MacSettingsView: View {
-    /// 设置分类（web 版左导航语义；后续加歌词/快捷键等分类时在此扩展）
-    private enum SettingsCategory: String, CaseIterable, Hashable {
-        case playback
-        case lyrics
-        case desktopWindows
-        case library
-        case download
-        case scraping
-        case shortcuts
-        case sync
-        case appearance
-        case about
-
-        var title: String {
-            switch self {
-            case .playback: return Localized.settingsCategoryPlayback
-            case .lyrics: return Localized.settingsCategoryLyrics
-            // E3：桌面浮窗（迷你窗 + 桌面歌词）统一收纳；web 语义是迷你窗/桌面歌词
-            // 分开在顶栏与歌词设置组，分类形态待用户确认（v1 任务拍板新分类）
-            case .desktopWindows: return Localized.settingsCategoryDesktopLyric
-            case .library: return Localized.settingsCategoryLibrary
-            case .download: return Localized.settingsCategoryDownload
-            case .scraping: return Localized.settingsCategoryScraping
-            case .shortcuts: return Localized.settingsCategoryShortcuts
-            // S2 M1-UI：局域网同步中心（Host 侧身份/QR + 已配对设备）
-            case .sync: return "settings_category_sync".localized
-            case .appearance: return Localized.settingsCategoryAppearance
-            case .about: return Localized.settingsCategoryAbout
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .playback: return "play.circle"
-            case .lyrics: return "text.quote"
-            case .desktopWindows: return "macwindow"
-            case .library: return "music.note.list"
-            case .download: return "arrow.down.circle"
-            case .scraping: return "tag"
-            case .shortcuts: return "keyboard"
-            case .sync: return "arrow.triangle.2.circlepath"
-            case .appearance: return "paintbrush"
-            case .about: return "info.circle"
-            }
-        }
-    }
-
-    @State private var selectedCategory: SettingsCategory = .playback
+    @State private var selectedCategory: MacSettingsCatalog.Category = .playback
     @State private var deleteSettings = DeleteSettings.load()
     @State private var showEQSettings = false
+    /// ⌘K 深链待滚动锚点（切分类后内容才建好 → 延后一次布局再滚）
+    @State private var pendingScrollID: String?
+    /// 当前短暂高亮的锚点 id（约 1.5s 后自动熄灭；环境值注入给 .settingsAnchor）
+    @State private var highlightedID: String?
+    @State private var highlightTask: Task<Void, Never>?
 
     var body: some View {
         // 左侧分类导航 + 右侧内容区（web 版布局；分类多了比顶部 tab 更合理）
+        // 分类名单 = MacSettingsCatalog.Category（唯一注册表，⌘K 搜同一份）
         HStack(spacing: DesignTokens.space0) {
-            List(SettingsCategory.allCases, id: \.self, selection: $selectedCategory) { category in
+            List(MacSettingsCatalog.Category.allCases, id: \.self, selection: $selectedCategory) { category in
                 Label(category.title, systemImage: category.icon)
                     .tag(category)
             }
@@ -75,31 +34,48 @@ struct MacSettingsView: View {
 
             Divider()
 
-            Group {
-                switch selectedCategory {
-                case .playback:
-                    MacPlaybackSettingsView(showEQSettings: $showEQSettings)
-                case .lyrics:
-                    MacLyricsSettingsView()
-                case .desktopWindows:
-                    MacDesktopWindowsSettingsView()
-                case .library:
-                    MacLibrarySettingsView()
-                case .download:
-                    MacOnlineSettingsView()
-                case .scraping:
-                    MacScrapeSettingsView()
-                case .shortcuts:
-                    MacShortcutsSettingsView()
-                case .sync:
-                    MacSyncSettingsView()
-                case .appearance:
-                    MacAppearanceSettingsView()
-                case .about:
-                    MacAboutSettingsView()
+            // ScrollViewReader 提供锚点滚动（锚点 id 只能来自目录条目常量）
+            ScrollViewReader { proxy in
+                Group {
+                    switch selectedCategory {
+                    case .playback:
+                        MacPlaybackSettingsView(showEQSettings: $showEQSettings)
+                    case .lyrics:
+                        MacLyricsSettingsView()
+                    case .desktopWindows:
+                        MacDesktopWindowsSettingsView()
+                    case .library:
+                        MacLibrarySettingsView()
+                    case .download:
+                        MacOnlineSettingsView()
+                    case .scraping:
+                        MacScrapeSettingsView()
+                    case .shortcuts:
+                        MacShortcutsSettingsView()
+                    case .sync:
+                        MacSyncSettingsView()
+                    case .appearance:
+                        MacAppearanceSettingsView()
+                    case .about:
+                        MacAboutSettingsView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .environment(\.macSettingsHighlightedID, highlightedID)
+                .onChange(of: pendingScrollID) { _, anchorID in
+                    guard let anchorID else { return }
+                    pendingScrollID = nil
+                    Task { @MainActor in
+                        // 切分类后的首帧目标行还没建好；等一次布局再滚（失败也不报错，
+                        // 仅高亮仍生效）
+                        try? await Task.sleep(nanoseconds: 150_000_000)
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            proxy.scrollTo(anchorID, anchor: .center)
+                        }
+                        highlight(anchorID)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 620, minHeight: 420)
         .sheet(isPresented: $showEQSettings) {
@@ -110,12 +86,33 @@ struct MacSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
-        // search anything 设置行：⌘K 浮层点击设置分类 → 打开本窗口并定位
+        // search anything 设置行：定位分类 + 项（通知路径：窗口已开时命中）
         .onReceive(NotificationCenter.default.publisher(for: .macSettingsOpenCategory)) { note in
-            if let raw = note.userInfo?["category"] as? String,
-               let category = SettingsCategory(rawValue: raw) {
-                selectedCategory = category
-            }
+            guard let request = MacSettingsRouter.request(from: note) else { return }
+            apply(request)
+        }
+        // 窗口后建路径：通知没订阅者会丢，这里消费 pending 兜底（⌘K 首次唤起常见）
+        .onAppear {
+            guard let request = MacSettingsRouter.consumePending() else { return }
+            apply(request)
+        }
+    }
+
+    /// 应用一次定位请求：切到分类；带项时排队滚动 + 高亮。
+    private func apply(_ request: MacSettingsRouter.Request) {
+        selectedCategory = request.category
+        guard let itemID = request.itemID else { return }
+        pendingScrollID = itemID
+    }
+
+    /// 短暂高亮目标项（约 1.5s 自动熄灭；同一项连续请求重置计时）。
+    private func highlight(_ anchorID: String) {
+        highlightTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.2)) { highlightedID = anchorID }
+        highlightTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { highlightedID = nil }
         }
     }
 }
@@ -145,6 +142,7 @@ private struct MacPlaybackSettingsView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .settingsAnchor(MacSettingsCatalog.playbackEqualizer)
             }
 
             Section(Localized.playerControls) {
@@ -152,10 +150,12 @@ private struct MacPlaybackSettingsView: View {
                     .onChange(of: deleteSettings.showSleepTimerButton) { _, _ in
                         deleteSettings.save()
                     }
+                    .settingsAnchor(MacSettingsCatalog.playbackSleepTimerButton)
                 Toggle(Localized.visualizerEnabled, isOn: $deleteSettings.visualizerEnabled)
                     .onChange(of: deleteSettings.visualizerEnabled) { _, _ in
                         deleteSettings.save()
                     }
+                    .settingsAnchor(MacSettingsCatalog.playbackVisualizer)
             }
         }
         .formStyle(.grouped)
@@ -188,14 +188,17 @@ private struct MacLyricsSettingsView: View {
                             deleteSettings.save()
                         }
                 }
+                .settingsAnchor(MacSettingsCatalog.lyricsFontSize)
                 Toggle(Localized.lyricsShowTranslation, isOn: $deleteSettings.lyricShowTranslation)
                     .onChange(of: deleteSettings.lyricShowTranslation) { _, _ in
                         deleteSettings.save()
                     }
+                    .settingsAnchor(MacSettingsCatalog.lyricsShowTranslation)
                 Toggle(Localized.lyricsShowRoman, isOn: $deleteSettings.lyricShowRoman)
                     .onChange(of: deleteSettings.lyricShowRoman) { _, _ in
                         deleteSettings.save()
                     }
+                    .settingsAnchor(MacSettingsCatalog.lyricsShowRoman)
             }
 
             Section {
@@ -217,6 +220,7 @@ private struct MacLyricsSettingsView: View {
                             deleteSettings.save()
                         }
                 }
+                .settingsAnchor(MacSettingsCatalog.lyricsOffset)
             } header: {
                 Text(Localized.lyricsCalibration)
             } footer: {
@@ -258,6 +262,7 @@ private struct MacAppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .settingsAnchor(MacSettingsCatalog.appearanceTheme)
             }
 
             Section(Localized.accentColor) {
@@ -267,6 +272,7 @@ private struct MacAppearanceSettingsView: View {
                     }
                 }
                 .padding(.vertical, DesignTokens.space4)
+                .settingsAnchor(MacSettingsCatalog.appearanceAccentColor)
             }
         }
         .formStyle(.grouped)
@@ -356,6 +362,7 @@ private struct MacLibrarySettingsView: View {
                 }
             } header: {
                 Text(Localized.libraryFolders)
+                    .settingsAnchor(MacSettingsCatalog.libraryFolders)
             }
 
             Section {
@@ -373,6 +380,7 @@ private struct MacLibrarySettingsView: View {
                 fileTypeChips
             } header: {
                 Text(Localized.libraryFileTypes)
+                    .settingsAnchor(MacSettingsCatalog.libraryFileTypes)
             } footer: {
                 Text(Localized.libraryFileTypesFooter)
                     .font(.caption)
@@ -486,6 +494,7 @@ private struct MacAboutSettingsView: View {
                     Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
                         .foregroundColor(.secondary)
                 }
+                .settingsAnchor(MacSettingsCatalog.aboutVersion)
 
                 HStack {
                     Text(Localized.appName)
@@ -493,6 +502,7 @@ private struct MacAboutSettingsView: View {
                     Text(Localized.qqplayerName)
                         .foregroundColor(.secondary)
                 }
+                .settingsAnchor(MacSettingsCatalog.aboutAppName)
 
                 Button {
                     if let url = URL(string: "https://github.com/daxmate/qqplayer-swift") {
@@ -510,6 +520,7 @@ private struct MacAboutSettingsView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .settingsAnchor(MacSettingsCatalog.aboutGitHub)
             }
         }
         .formStyle(.grouped)

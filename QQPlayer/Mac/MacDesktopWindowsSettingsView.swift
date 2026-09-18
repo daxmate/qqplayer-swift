@@ -28,6 +28,7 @@ struct MacDesktopWindowsSettingsView: View {
                     .onChange(of: deleteSettings.showMiniWindowButton) { _, _ in
                         deleteSettings.save()
                     }
+                    .settingsAnchor(MacSettingsCatalog.desktopWindowsMiniWindowButton)
             } footer: {
                 Text("mini_window_button_hint".localized)
                     .font(.caption)
@@ -39,6 +40,7 @@ struct MacDesktopWindowsSettingsView: View {
                     .onChange(of: deleteSettings.miniLyricsEnabled) { _, _ in
                         deleteSettings.save()
                     }
+                    .settingsAnchor(MacSettingsCatalog.desktopWindowsMiniLyrics)
                 VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     HStack {
                         Text("desktop_lyric_font_size".localized)
@@ -52,6 +54,7 @@ struct MacDesktopWindowsSettingsView: View {
                             deleteSettings.save()
                         }
                 }
+                .settingsAnchor(MacSettingsCatalog.desktopWindowsLyricFontSize)
             } footer: {
                 Text("desktop_lyric_translation_hint".localized)
                     .font(.caption)

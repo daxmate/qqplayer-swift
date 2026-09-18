@@ -35,6 +35,7 @@ struct MacOnlineSettingsView: View {
                 .onChange(of: deleteSettings.onlineDownloadQuality) { _, _ in
                     deleteSettings.save()
                 }
+                .settingsAnchor(MacSettingsCatalog.downloadQuality)
             }
 
             // 歌曲海音质（web quarkQuality：mp3 默认/flac；格式名不本地化）
@@ -47,6 +48,7 @@ struct MacOnlineSettingsView: View {
                 .onChange(of: deleteSettings.quarkQuality) { _, _ in
                     deleteSettings.save()
                 }
+                .settingsAnchor(MacSettingsCatalog.downloadQuarkQuality)
             }
 
             // 下载引擎 + aria2 专属字段 + 限速（web download.engine/maxSpeed 对齐）
@@ -59,6 +61,7 @@ struct MacOnlineSettingsView: View {
                 .onChange(of: deleteSettings.downloadEngine) { _, _ in
                     deleteSettings.save()
                 }
+                .settingsAnchor(MacSettingsCatalog.downloadEngine)
                 Text("settings_download_engine_hint".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -92,6 +95,7 @@ struct MacOnlineSettingsView: View {
                 .onChange(of: deleteSettings.downloadMaxSpeed) { _, _ in
                     deleteSettings.save()
                 }
+                .settingsAnchor(MacSettingsCatalog.downloadMaxSpeed)
             } header: {
                 Text("settings_download_engine".localized)
             } footer: {

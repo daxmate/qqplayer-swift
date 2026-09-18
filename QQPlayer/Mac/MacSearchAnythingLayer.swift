@@ -26,7 +26,7 @@ struct MacSearchAnythingLayer: View {
     let onPlayLocal: (Track, [Track]) -> Void
     let onPlayArtist: (Artist, [Track]) -> Void
     let onPlayAlbum: (Album, [Track]) -> Void
-    let onOpenSettings: (String) -> Void
+    let onOpenSettings: (MacSettingsCatalog.Match) -> Void
     let artistNameResolver: (Track) -> String?
 
     @ObservedObject private var state = MacSearchAnythingState.shared
@@ -336,25 +336,32 @@ struct MacSearchAnythingLayer: View {
             }
     }
 
+    /// 设置分组：目录（`MacSettingsCatalog`）按 query 过滤——分类名 + 项标题 + 别名。
+    /// 无匹配则整个分组不显示（原实现无条件渲染固定分类列表 = 「⌘K 只是分类快捷入口，
+    /// 设置项搜不到」的根因）。
+    @ViewBuilder
     private var settingsSection: some View {
-        section("search_badge_setting".localized) {
-            ForEach(MacSearchAnythingLayer.settingCategories, id: \.self) { category in
-                Button {
-                    onOpenSettings(category)
-                    state.isOpen = false
-                } label: {
-                    HStack(spacing: DesignTokens.space10) {
-                        Image(systemName: "gearshape")
-                            .foregroundColor(.secondary)
-                            .frame(width: 14)
-                        Text(categoryTitle(category)).lineLimit(1)
-                        Spacer()
+        let matches = settingsMatches
+        if !matches.isEmpty {
+            section("search_badge_setting".localized) {
+                ForEach(matches) { match in
+                    Button {
+                        onOpenSettings(match)
+                        state.isOpen = false
+                    } label: {
+                        HStack(spacing: DesignTokens.space10) {
+                            Image(systemName: match.icon)
+                                .foregroundColor(.secondary)
+                                .frame(width: 14)
+                            Text(match.title).lineLimit(1)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                        .padding(.horizontal, DesignTokens.space12)
+                        .padding(.vertical, DesignTokens.space4)
                     }
-                    .contentShape(Rectangle())
-                    .padding(.horizontal, DesignTokens.space12)
-                    .padding(.vertical, DesignTokens.space4)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -373,8 +380,13 @@ struct MacSearchAnythingLayer: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// 设置分组命中（纯函数、随 query 即时得到；空 query → 空）
+    private var settingsMatches: [MacSettingsCatalog.Match] {
+        MacSettingsCatalog.matches(for: query)
+    }
+
     private var hasNoResults: Bool {
-        localSongs.isEmpty && artists.isEmpty && albums.isEmpty && onlineSongs.isEmpty
+        localSongs.isEmpty && artists.isEmpty && albums.isEmpty && onlineSongs.isEmpty && settingsMatches.isEmpty
     }
 
     // MARK: - 搜索
@@ -473,18 +485,4 @@ struct MacSearchAnythingLayer: View {
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    // MARK: - 设置分类注册表（MacSettingsView 左导航分类，顺序一致）
-
-    static let settingCategories: [String] = ["playback", "library", "download", "appearance", "about"]
-
-    private func categoryTitle(_ category: String) -> String {
-        switch category {
-        case "playback": return "settings_category_playback".localized
-        case "library": return "settings_category_library".localized
-        case "download": return "settings_category_download".localized
-        case "appearance": return "settings_category_appearance".localized
-        case "about": return "settings_category_about".localized
-        default: return category
-        }
-    }
 }
