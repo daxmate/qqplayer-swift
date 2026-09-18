@@ -114,7 +114,7 @@ $ for f in QQPlayer/Mac/*.swift; do grep -qE ': View' "$f" || echo "  $f"; done
 
 已经在 `Services/` 里、已有测试的 Mac 逻辑（**不需要**新 target）：
 `MacPlaybackGate`、`MacIndexingGate`、`MacShortcutLogic`、`MacSpectrumDSP`、
-`MacAria2Client`、`MacFolderWatchPolicy`、`MacImportNaming`、`MacTrashService`、
+`MacAria2Client`、`MacFolderWatchPolicy`、`MacImportNaming`、`TrackDeletionService`（Mac 批量废纸篓路径，2026-09-18 由 `MacTrashService` 合流进唯一删除入口）、
 `MacLibraryFactsStore`、`MacOnlineDownloadService`、`MacSyncClientPoolPolicy`。
 
 仍无自动化验证、且**看起来值得有**的一类（都在 `QQPlayer/Mac/`）：
