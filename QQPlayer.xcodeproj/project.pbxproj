@@ -168,6 +168,8 @@
 		AF373C87629E4F02BAF8B75E /* TrackDeletionShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECFCA639DC045D79B1CF1F8 /* TrackDeletionShapeContractTests.swift */; };
 		DE759C5F1F6640F09F6B6ABF /* ObservationMigrationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C389508FEB24359A167E2B9 /* ObservationMigrationContractTests.swift */; };
 		8ABBDAD833924584B33E0040 /* MacSettingsSearchContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C594C14EC1064884915D4159 /* MacSettingsSearchContractTests.swift */; };
+		33BF5FCEDBD047849CDD513B /* StructuralBudgetRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF86BA39795049F29714AD44 /* StructuralBudgetRule.swift */; };
+		6BDE96F06B8D42059BE5A877 /* StructuralBudgetContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DA45E5F44AD4A5CAE021A6D /* StructuralBudgetContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -385,6 +387,8 @@
 		7ECFCA639DC045D79B1CF1F8 /* TrackDeletionShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackDeletionShapeContractTests.swift; sourceTree = "<group>"; };
 		7C389508FEB24359A167E2B9 /* ObservationMigrationContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationMigrationContractTests.swift; sourceTree = "<group>"; };
 		C594C14EC1064884915D4159 /* MacSettingsSearchContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSettingsSearchContractTests.swift; sourceTree = "<group>"; };
+		AF86BA39795049F29714AD44 /* StructuralBudgetRule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StructuralBudgetRule.swift; sourceTree = "<group>"; };
+		4DA45E5F44AD4A5CAE021A6D /* StructuralBudgetContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StructuralBudgetContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1031,6 +1035,8 @@
 				7ECFCA639DC045D79B1CF1F8 /* TrackDeletionShapeContractTests.swift */,
 				7C389508FEB24359A167E2B9 /* ObservationMigrationContractTests.swift */,
 				C594C14EC1064884915D4159 /* MacSettingsSearchContractTests.swift */,
+				AF86BA39795049F29714AD44 /* StructuralBudgetRule.swift */,
+				4DA45E5F44AD4A5CAE021A6D /* StructuralBudgetContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1497,6 +1503,8 @@
 				AF373C87629E4F02BAF8B75E /* TrackDeletionShapeContractTests.swift in Sources */,
 				DE759C5F1F6640F09F6B6ABF /* ObservationMigrationContractTests.swift in Sources */,
 				8ABBDAD833924584B33E0040 /* MacSettingsSearchContractTests.swift in Sources */,
+				33BF5FCEDBD047849CDD513B /* StructuralBudgetRule.swift in Sources */,
+				6BDE96F06B8D42059BE5A877 /* StructuralBudgetContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

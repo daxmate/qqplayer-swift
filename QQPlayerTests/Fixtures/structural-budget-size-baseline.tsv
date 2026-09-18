@@ -1,0 +1,47 @@
+# 超长文件存量清单（单文件 > 600 行）—— 结构预算棘轮基线，只能减不能增
+#
+# 由 QQPlayerTests/StructuralBudgetContractTests.swift 守护（口径实现 StructuralBudgetRule.swift）：
+#   - 出现基线里没有的超长文件（新增未登记） → 红
+#   - 既有文件行数回涨（> 本行数值）         → 红
+#   - 某文件行数下降/已退出超长区间           → 必须同步改/删本行，否则红（名单不腐烂）
+#   - 合计 > TOTAL                            → 红
+#
+# 重新生成本文件（口径由 StructuralBudgetRule 唯一实现，禁止手抄）：
+#   swiftc -O -o /tmp/strat-harness \
+#     QQPlayerTests/StructuralBudgetRule.swift <harness>/main.swift && /tmp/strat-harness emit
+# 本轮只立棘轮、不动生产代码：清债时把对应行改小/删掉（只减不增）。
+QQPlayer/Mac/MacLibraryView.swift	825
+QQPlayer/Mac/MacLyricsView.swift	698
+QQPlayer/Mac/MacOnlineSearchView.swift	751
+QQPlayer/Mac/MacPlayerView.swift	617
+QQPlayer/Mac/MacSearchAnythingLayer.swift	727
+QQPlayer/Mac/MacSyncView.swift	1236
+QQPlayer/Mac/MacTagEditorView.swift	818
+QQPlayer/Services/AppCoordinator.swift	645
+QQPlayer/Services/ArtworkExtraction.swift	651
+QQPlayer/Services/DatabaseManager+Library.swift	903
+QQPlayer/Services/DatabaseManager+Playlists.swift	627
+QQPlayer/Services/DatabaseManager+Tracks.swift	685
+QQPlayer/Services/DatabaseManager.swift	1460
+QQPlayer/Services/EQManager.swift	618
+QQPlayer/Services/GequhaiClient.swift	619
+QQPlayer/Services/IOSPassiveSyncCenter.swift	981
+QQPlayer/Services/LibraryIndexer.swift	1370
+QQPlayer/Services/NeteaseOnlineClient.swift	658
+QQPlayer/Services/PlayerEngine+AudioSession.swift	709
+QQPlayer/Services/PlayerEngine+NowPlaying.swift	1111
+QQPlayer/Services/PlayerEngine+PlaybackControl.swift	1255
+QQPlayer/Services/QuarkClient.swift	1263
+QQPlayer/Services/SFBAudioEngineManager+Playback.swift	771
+QQPlayer/Sync/SyncChangeLogMapping.swift	945
+QQPlayer/Sync/SyncCollectionSyncCoordinator.swift	874
+QQPlayer/Sync/SyncEntityRegistry.swift	651
+QQPlayer/Sync/SyncFileReceiver.swift	607
+QQPlayer/Sync/SyncPeerSession+Frames.swift	649
+QQPlayer/Views/Albums/AlbumViews.swift	651
+QQPlayer/Views/Library/LibraryView.swift	691
+QQPlayer/Views/Library/SearchResultsViews.swift	746
+QQPlayer/Views/Player/LyricsView.swift	758
+QQPlayer/Views/Player/PlayerView.swift	985
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	640
+# TOTAL: 28195
