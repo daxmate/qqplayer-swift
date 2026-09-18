@@ -82,8 +82,6 @@ QQPlayer/Services/SFBAudioEngineManager.swift	ObservableObject	1
 QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
-QQPlayer/ViewModels/TutorialViewModel.swift	@Published	1
-QQPlayer/ViewModels/TutorialViewModel.swift	ObservableObject	1
 QQPlayer/Views/Albums/AlbumViews.swift	@EnvironmentObject	3
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	@EnvironmentObject	1
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	@StateObject	1
@@ -120,8 +118,6 @@ QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	2
 QQPlayer/Views/Playlists/PlaylistsScreen.swift	@EnvironmentObject	2
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	@StateObject	1
 QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	@EnvironmentObject	2
-QQPlayer/Views/TutorialView.swift	@ObservedObject	1
-QQPlayer/Views/TutorialView.swift	@StateObject	1
 QQPlayer/Views/Utility/EQImportViews.swift	@StateObject	1
 QQPlayer/Views/Utility/EQSettingsView.swift	@StateObject	1
 QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	@StateObject	1
