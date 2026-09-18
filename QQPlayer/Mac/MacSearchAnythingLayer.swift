@@ -43,7 +43,10 @@ struct MacSearchAnythingLayer: View {
     @State private var artists: [Artist] = []
     @State private var albums: [Album] = []
     @State private var onlineSongs: [NeteaseOnlineSong] = []
-    @State private var isSearching = false
+    /// 防抖窗口 + 本地多路检索中（本地同步，通常一帧内结束）
+    @State private var isSearchPending = false
+    /// 在线（网易云）追尾中——**与本地无关**，不得用来遮本地结果
+    @State private var isOnlineSearching = false
     @State private var searchSeq = 0
     @State private var searchTask: Task<Void, Never>?
     @State private var downloadingIDs: Set<Int> = []
@@ -83,10 +86,22 @@ struct MacSearchAnythingLayer: View {
             // 浮层有 0.12s 转场，等一次布局再设（单次 DispatchQueue.main.async 仍在转场中间，不可靠）
             try? await Task.sleep(nanoseconds: 80_000_000)
             focused = true
-            #if DEBUG
-                try? await Task.sleep(nanoseconds: 120_000_000)
-                print("[SearchAnything] 设焦点后 firstResponder=\(Self.describeFirstResponder())")
-            #endif
+            // 校验 + AppKit 兜底。决策仍在 `@FocusState`（谁该有焦点）；这里只在它没落地时
+            // 把 first responder 交过去（执行层），避免「静默无焦点 → 打开面板打不了字」。
+            for attempt in 1 ... 3 {
+                try? await Task.sleep(nanoseconds: 60_000_000)
+                if Self.isTextInputFocused {
+                    #if DEBUG
+                        print("[SearchAnything] 设焦点后 firstResponder=\(Self.describeFirstResponder())（第 \(attempt) 次校验）")
+                    #endif
+                    return
+                }
+                let fixed = Self.makeSearchFieldFirstResponder()
+                #if DEBUG
+                    print("[SearchAnything] SwiftUI 焦点未落地 → AppKit 兜底 attempt=\(attempt) ok=\(fixed) firstResponder=\(Self.describeFirstResponder())")
+                #endif
+                if fixed { return }
+            }
         }
         // Esc 的唯一处理点（AppKit 本地监听；为什么不挂在 panel 上见 SearchAnythingEscapeMonitor）
         .modifier(SearchAnythingEscapeMonitor { state.isOpen = false })
@@ -116,7 +131,7 @@ struct MacSearchAnythingLayer: View {
         HStack(spacing: DesignTokens.space8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            TextField("search_any_placeholder".localized, text: $query)
+            TextField(Self.searchPlaceholder, text: $query)
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .focused($focused)
@@ -152,7 +167,10 @@ struct MacSearchAnythingLayer: View {
     private var resultsView: some View {
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             emptyHint
-        } else if isSearching {
+        } else if isSearchPending, !hasAnyResult {
+            // 本地还没出、且当前没有任何可显示内容 → 这一刻才允许整块 loading
+            // （旧实现拿「在线还在跑」当这个条件，于是本地结果被网络等待整块遮住 =
+            //  用户实测「搜设置项特别费时，应该秒出」的根因）
             VStack(spacing: DesignTokens.space10) {
                 ProgressView()
                 Text("search_any_loading".localized)
@@ -183,6 +201,12 @@ struct MacSearchAnythingLayer: View {
                             ForEach(onlineSongs) { song in
                                 onlineRow(song)
                             }
+                        }
+                    } else if isOnlineSearching {
+                        // 在线还在跑：只在**在线分组内**做行内提示，绝不整块遮罩
+                        // （本地结果此刻已经渲染出来了）
+                        section("search_badge_online".localized) {
+                            onlineSearchingRow
                         }
                     }
                     if !artists.isEmpty {
@@ -411,19 +435,42 @@ struct MacSearchAnythingLayer: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// 在线检索中的**行内**提示（复用既有 loading 文案，不新增本地化 key）
+    private var onlineSearchingRow: some View {
+        HStack(spacing: DesignTokens.space10) {
+            ProgressView()
+                .controlSize(.small)
+            Text("search_any_loading".localized)
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, DesignTokens.space12)
+        .padding(.vertical, DesignTokens.space4)
+    }
+
     /// 设置分组命中（纯函数、随 query 即时得到；空 query → 空）
     private var settingsMatches: [MacSettingsCatalog.Match] {
         MacSettingsCatalog.matches(for: query)
     }
 
+    /// 当前是否有任何可渲染的结果（本地 / 在线 / 设置目录命中）
+    private var hasAnyResult: Bool {
+        !localSongs.isEmpty || !artists.isEmpty || !albums.isEmpty
+            || !onlineSongs.isEmpty || !settingsMatches.isEmpty
+    }
+
+    /// 「没有结果」只在线都跑完、且哪儿都空时才成立。
+    /// 在线没回来就判定无结果 → 会先闪一下空态、再被在线结果顶掉（用户看到的就是“闪”）。
     private var hasNoResults: Bool {
-        localSongs.isEmpty && artists.isEmpty && albums.isEmpty && onlineSongs.isEmpty && settingsMatches.isEmpty
+        !isSearchPending && !isOnlineSearching && !hasAnyResult
     }
 
     // MARK: - 搜索
 
     private func scheduleSearch() {
         searchTask?.cancel()
+        // 防抖窗口也算「检索中」：否则第一帧会拿旧状态判“无结果”、闪一下空态
+        isSearchPending = true
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
@@ -440,15 +487,18 @@ struct MacSearchAnythingLayer: View {
             artists = []
             albums = []
             onlineSongs = []
-            isSearching = false
+            isSearchPending = false
+            isOnlineSearching = false
             return
         }
         searchSeq += 1
         let seq = searchSeq
-        isSearching = true
         statusMessage = nil
 
-        // 本地多路（同步快，先出）
+        // 阶段 1：本地多路（同步、快）——**先出结果**，不等在线
+        #if DEBUG
+            let localStarted = DispatchTime.now().uptimeNanoseconds
+        #endif
         do {
             localSongs = Array(try LibraryReads.searchTracks(query: q, limit: 8))
             artists = try LibraryReads.searchArtists(query: q, limit: 5)
@@ -458,9 +508,19 @@ struct MacSearchAnythingLayer: View {
             artists = []
             albums = []
         }
+        #if DEBUG
+            let localMs = Double(DispatchTime.now().uptimeNanoseconds - localStarted) / 1_000_000
+            print(String(
+                format: "[SearchAnything] 本地检索 %.1fms（tracks=%d artists=%d albums=%d，防抖另计 250ms）",
+                localMs, localSongs.count, artists.count, albums.count
+            ))
+        #endif
+        guard seq == searchSeq else { return } // 已被更新的查询取代：本地结果不落
+        isSearchPending = false // 本地已就绪 → 立即渲染（不再等在线）
 
-        // 在线（异步追尾，失败静默降级不打断本地结果）
+        // 阶段 2：在线（异步追尾，失败静默降级不打断本地结果）
         onlineSongs = []
+        isOnlineSearching = true
         do {
             let songs = try await NeteaseOnlineClient.shared.search(query: q, limit: 20)
             guard seq == searchSeq, !Task.isCancelled else { return }
@@ -469,7 +529,7 @@ struct MacSearchAnythingLayer: View {
             guard seq == searchSeq, !Task.isCancelled else { return }
         }
         if seq == searchSeq {
-            isSearching = false
+            isOnlineSearching = false
         }
     }
 
@@ -504,6 +564,39 @@ struct MacSearchAnythingLayer: View {
     }
 
     // MARK: - 小工具
+
+    /// 输入框 placeholder（唯一来源：输入框与 AppKit 兜底定位共用，避免兜底指错别的搜索框）
+    private static let searchPlaceholder = "search_any_placeholder".localized
+
+    /// 焦点是否已经在文本输入上（编辑中的 field editor = NSTextView，或文本框本身）
+    private static var isTextInputFocused: Bool {
+        guard let responder = NSApp.keyWindow?.firstResponder else { return false }
+        if let textView = responder as? NSTextView { return textView.isEditable }
+        return responder is NSTextField
+    }
+
+    /// AppKit 兜底：把浮层输入框设成第一响应者。
+    /// 调用方先校验 `isTextInputFocused`——只有在 SwiftUI 的 `@FocusState` **没落地**时才走到这里，
+    /// 所以不会出现两套焦点来源：决策仍在 `@FocusState`，本方法只执行「交权」这一动作。
+    @MainActor
+    private static func makeSearchFieldFirstResponder() -> Bool {
+        guard let window = NSApp.keyWindow,
+              let field = editableTextField(in: window.contentView, placeholder: searchPlaceholder)
+        else { return false }
+        return window.makeFirstResponder(field)
+    }
+
+    /// 视图树里定位浮层输入框：可编辑、且 placeholder 等于本面板 placeholder 的 NSTextField
+    private static func editableTextField(in view: NSView?, placeholder: String) -> NSTextField? {
+        guard let view else { return nil }
+        if let field = view as? NSTextField, field.isEditable, field.placeholderString == placeholder {
+            return field
+        }
+        for subview in view.subviews {
+            if let found = editableTextField(in: subview, placeholder: placeholder) { return found }
+        }
+        return nil
+    }
 
     /// 诊断用（仅 Debug 打印）：当前 key window 的第一响应者是谁（组字中会标出来）。
     /// 用户报「打开面板打不了字 / Esc 收不起来」时，日志里这一行就是直接证据。
