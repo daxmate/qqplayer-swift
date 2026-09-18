@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct TutorialView: View {
-    @StateObject private var viewModel = TutorialViewModel()
+    // 2026-09-18 批 1：@StateObject → @State（TutorialViewModel 已迁 @Observable，按属性追踪）。
+    @State private var viewModel = TutorialViewModel()
     @Environment(\.dismiss) private var dismiss
     var onComplete: (() -> Void)?
     @State private var settings = DeleteSettings.load()
@@ -30,7 +31,9 @@ struct TutorialView: View {
 struct MusicFilesStepView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
-    @ObservedObject var viewModel: TutorialViewModel
+    // 2026-09-18 批 1：@ObservedObject → 普通 let（@Observable 类型不需要包装器；
+    // 本视图 body 不读 VM 的任何属性，只在按钮动作里调 completeTutorial()）。
+    let viewModel: TutorialViewModel
     @Environment(\.dismiss) private var dismiss
     var onComplete: (() -> Void)?
     @State private var settings = DeleteSettings.load()
