@@ -134,6 +134,7 @@ struct MacSearchAnythingLayer: View {
             TextField(Self.searchPlaceholder, text: $query)
                 .textFieldStyle(.plain)
                 .font(.title3)
+                .accessibilityIdentifier(Self.searchFieldIdentifier)
                 .focused($focused)
                 .onSubmit {
                     if let first = localSongs.first {
@@ -568,6 +569,9 @@ struct MacSearchAnythingLayer: View {
     /// 输入框 placeholder（唯一来源：输入框与 AppKit 兜底定位共用，避免兜底指错别的搜索框）
     private static let searchPlaceholder = "search_any_placeholder".localized
 
+    /// 输入框稳定标识（AppKit 兜底定位的第一判据；比 placeholder 更不容易被改文案影响）
+    private static let searchFieldIdentifier = "qqplayer.searchAnything.field"
+
     /// 焦点是否已经在文本输入上（编辑中的 field editor = NSTextView，或文本框本身）
     private static var isTextInputFocused: Bool {
         guard let responder = NSApp.keyWindow?.firstResponder else { return false }
@@ -580,22 +584,45 @@ struct MacSearchAnythingLayer: View {
     /// 所以不会出现两套焦点来源：决策仍在 `@FocusState`，本方法只执行「交权」这一动作。
     @MainActor
     private static func makeSearchFieldFirstResponder() -> Bool {
-        guard let window = NSApp.keyWindow,
-              let field = editableTextField(in: window.contentView, placeholder: searchPlaceholder)
-        else { return false }
-        return window.makeFirstResponder(field)
+        guard let window = NSApp.keyWindow else { return false }
+        if let field = editableTextField(in: window.contentView) {
+            return window.makeFirstResponder(field)
+        }
+        #if DEBUG
+            // 定位失败时把窗口里的可编辑文本框全部打出来——真机一次跑就能看出判据哪里不对
+            let candidates = editableFields(in: window.contentView).map {
+                "id=\($0.accessibilityIdentifier()) placeholder=\($0.placeholderString ?? "-")"
+            }
+            print("[SearchAnything] 兜底定位失败，窗口内可编辑文本框：\(candidates)")
+        #endif
+        return false
     }
 
-    /// 视图树里定位浮层输入框：可编辑、且 placeholder 等于本面板 placeholder 的 NSTextField
-    private static func editableTextField(in view: NSView?, placeholder: String) -> NSTextField? {
+    /// 视图树里定位浮层输入框：先认稳定标识（可能挂在包装视图上），再认 placeholder 常量
+    private static func editableTextField(in view: NSView?) -> NSTextField? {
         guard let view else { return nil }
-        if let field = view as? NSTextField, field.isEditable, field.placeholderString == placeholder {
+        if view.accessibilityIdentifier() == searchFieldIdentifier {
+            if let field = view as? NSTextField, field.isEditable { return field }
+            if let nested = editableFields(in: view).first { return nested }
+        }
+        if let field = view as? NSTextField, field.isEditable, field.placeholderString == searchPlaceholder {
             return field
         }
         for subview in view.subviews {
-            if let found = editableTextField(in: subview, placeholder: placeholder) { return found }
+            if let found = editableTextField(in: subview) { return found }
         }
         return nil
+    }
+
+    /// 子树里全部可编辑文本框（仅定位失败时的取证打印用）
+    private static func editableFields(in view: NSView?) -> [NSTextField] {
+        guard let view else { return [] }
+        var result: [NSTextField] = []
+        if let field = view as? NSTextField, field.isEditable { result.append(field) }
+        for subview in view.subviews {
+            result.append(contentsOf: editableFields(in: subview))
+        }
+        return result
     }
 
     /// 诊断用（仅 Debug 打印）：当前 key window 的第一响应者是谁（组字中会标出来）。
