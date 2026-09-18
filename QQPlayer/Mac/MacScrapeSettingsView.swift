@@ -49,6 +49,7 @@ struct MacScrapeSettingsView: View {
                 }
             } header: {
                 Text("scraping_rename_template".localized)
+                    .settingsAnchor(MacSettingsCatalog.scrapingRenameTemplate)
             }
 
             // 源优先级（web「源优先级」组：netease/musicbrainz 上下移）
@@ -71,11 +72,13 @@ struct MacScrapeSettingsView: View {
                 }
             } header: {
                 Text("scraping_source_order".localized)
+                    .settingsAnchor(MacSettingsCatalog.scrapingSourceOrder)
             }
 
             // 批量刮削（web「批量刮削」组：开关默认关 + 开启后一键整库按钮）
             Section {
                 Toggle("scraping_batch_enabled".localized, isOn: batchEnabledBinding)
+                    .settingsAnchor(MacSettingsCatalog.scrapingBatchEnabled)
                 if deleteSettings.scrapingBatchEnabled {
                     Button {
                         showBatchProgress = true
