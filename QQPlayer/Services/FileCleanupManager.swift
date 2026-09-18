@@ -12,10 +12,19 @@ import Foundation
 class FileCleanupManager: ObservableObject {
     static let shared = FileCleanupManager()
 
-    private let databaseManager = DatabaseManager.shared
-    private let stateManager = StateManager.shared
+    /// 构造注入（默认值 = 生产单例，行为与改动前的硬编码 `.shared` 完全相同）。
+    /// 测试注入内存库即可覆盖 `reconcileMissingFiles` 的选择逻辑，
+    /// 照 `IOSPassiveSyncCenter(identityStore:deviceStore:libraryRoot:database:)` 既有做法。
+    private let databaseManager: DatabaseManager
+    private let stateManager: StateManager
 
-    private init() {}
+    init(
+        databaseManager: DatabaseManager = .shared,
+        stateManager: StateManager = .shared
+    ) {
+        self.databaseManager = databaseManager
+        self.stateManager = stateManager
+    }
 
     /// Reconciles only roots that the indexer successfully enumerated during
     /// this scan. This avoids treating an unavailable root as an empty library
