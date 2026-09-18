@@ -149,11 +149,11 @@ private struct MacPlaybackSettingsView: View {
 
             Section(Localized.playerControls) {
                 Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
-                    .onChange(of: deleteSettings.showSleepTimerButton) { _ in
+                    .onChange(of: deleteSettings.showSleepTimerButton) { _, _ in
                         deleteSettings.save()
                     }
                 Toggle(Localized.visualizerEnabled, isOn: $deleteSettings.visualizerEnabled)
-                    .onChange(of: deleteSettings.visualizerEnabled) { _ in
+                    .onChange(of: deleteSettings.visualizerEnabled) { _, _ in
                         deleteSettings.save()
                     }
             }
@@ -184,16 +184,16 @@ private struct MacLyricsSettingsView: View {
                             .monospacedDigit()
                     }
                     Slider(value: $deleteSettings.lyricFontSize, in: 12 ... 22, step: 1)
-                        .onChange(of: deleteSettings.lyricFontSize) { _ in
+                        .onChange(of: deleteSettings.lyricFontSize) { _, _ in
                             deleteSettings.save()
                         }
                 }
                 Toggle(Localized.lyricsShowTranslation, isOn: $deleteSettings.lyricShowTranslation)
-                    .onChange(of: deleteSettings.lyricShowTranslation) { _ in
+                    .onChange(of: deleteSettings.lyricShowTranslation) { _, _ in
                         deleteSettings.save()
                     }
                 Toggle(Localized.lyricsShowRoman, isOn: $deleteSettings.lyricShowRoman)
-                    .onChange(of: deleteSettings.lyricShowRoman) { _ in
+                    .onChange(of: deleteSettings.lyricShowRoman) { _, _ in
                         deleteSettings.save()
                     }
             }
@@ -213,7 +213,7 @@ private struct MacLyricsSettingsView: View {
                         .disabled(deleteSettings.lyricOffset == 0)
                     }
                     Slider(value: $deleteSettings.lyricOffset, in: -5 ... 5, step: 0.1)
-                        .onChange(of: deleteSettings.lyricOffset) { _ in
+                        .onChange(of: deleteSettings.lyricOffset) { _, _ in
                             deleteSettings.save()
                         }
                 }

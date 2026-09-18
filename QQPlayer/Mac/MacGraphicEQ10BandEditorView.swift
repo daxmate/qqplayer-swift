@@ -46,7 +46,7 @@ struct MacGraphicEQ10BandEditorView: View {
                                 step: gainStep
                             )
                             .tint(.blue)
-                            .onChange(of: gains[index]) { _ in
+                            .onChange(of: gains[index]) { _, _ in
                                 applyChanges()
                             }
 

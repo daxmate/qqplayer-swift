@@ -407,10 +407,10 @@ struct MacPlayerView: View {
         .padding(.top, DesignTokens.space24)
         .padding(.horizontal, DesignTokens.space32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: player.isPlaying) { _ in
+        .onChange(of: player.isPlaying) { _, _ in
             updateSpectrumTap()
         }
-        .onChange(of: track?.stableId) { _ in
+        .onChange(of: track?.stableId) { _, _ in
             updateSpectrumTap()
         }
         // 视图离场/回场收尾（2026-09-12 审计 L4）：修复前 tap 只由 isPlaying/切歌/

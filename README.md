@@ -17,7 +17,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 | 平台 | 形态 | 版本 | 系统要求 |
 |------|------|------|----------|
 | 📱 iOS | App Store「QQPlayer」（iPhone / iPad，付费买断·无内购） | **1.0.0** | iOS 18.5+ |
-| 🖥️ macOS | QQPlayerMac 原生应用（仓库内 target，自行构建） | 随仓库迭代 | macOS 13.0+ |
+| 🖥️ macOS | QQPlayerMac 原生应用（仓库内 target，自行构建） | 随仓库迭代 | macOS 14.0+ |
 
 - **iOS 与 macOS 共享同一套 Core 逻辑**（数据库、播放引擎、歌词 / 跟唱、均衡器、元数据解析、本地化），两平台行为一致、同步演进。
 - 仓库：<https://github.com/daxmate/qqplayer-swift>（原 qqplayer-ios，2026-08-30 更名）

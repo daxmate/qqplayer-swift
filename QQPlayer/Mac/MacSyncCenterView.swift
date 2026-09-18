@@ -22,7 +22,9 @@
 //  本视图只做控制面（读状态 / 展示批准卡 / 注册 QR nonce / 选目标 / 批准或拒绝）。
 //  设备区的选中决策在 `SyncDeviceListModel`（纯逻辑，有单测），本文件不写判断。
 //
-//  macOS 13 兼容：不使用 macOS 14+ API（`onChange` 单参数闭包、`ContentUnavailableView`）。
+//  ⚠️ 历史（2026-09-18 前）：曾要求「macOS 13 兼容：不使用 macOS 14+ API（`onChange` 单参数闭包、
+//  `ContentUnavailableView`）」。同日部署目标提到 14.0，此约束解除；本文件内的 `onChange`
+//  已改为两参数签名。新增代码仍以「不引入 macOS 15+ API」为惯例。
 //
 
 import CoreImage
@@ -83,7 +85,7 @@ struct MacSyncCenterView: View {
             reloadDevices()
         }
         // 连接状态变化（移动端连上/断开）→ 重算在线态与默认选中
-        .onChange(of: hostCenter.connectedPeer?.peerID) { _ in
+        .onChange(of: hostCenter.connectedPeer?.peerID) { _, _ in
             syncTargetSelection()
         }
         .alert(

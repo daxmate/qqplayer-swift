@@ -23,8 +23,9 @@
 //  全部来自 `MacSyncRunViewModel` + `MacSyncContentModel` + `SyncUIState` /
 //  `SyncUIDirectionContent`（纯逻辑，有单测）。View 里不写判断。
 //
-//  macOS 13 兼容：不使用 macOS 14+ API（`onChange` 单参数闭包、不用
-//  `ContentUnavailableView`）。
+//  ⚠️ 历史（2026-09-18 前）：曾要求「macOS 13 兼容：不使用 macOS 14+ API（`onChange` 单参数闭包、
+//  不用 `ContentUnavailableView`）」。同日部署目标提到 14.0，此约束解除；
+//  文件内的 `onChange` 已改为两参数签名。新增代码仍以「不引入 macOS 15+ API」为惯例。
 //
 
 import SwiftUI
@@ -539,7 +540,7 @@ struct MacSyncRunSection: View {
             sourcePicker
             TextField("sync_run_track_search_placeholder".localized, text: $content.trackQuery)
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: content.trackQuery) { _ in
+                .onChange(of: content.trackQuery) { _, _ in
                     searchTask?.cancel()
                     searchTask = Task { @MainActor in
                         try? await Task.sleep(nanoseconds: SyncUIContentLimits.searchDebounceNanoseconds)
@@ -992,7 +993,7 @@ struct MacSyncRunSection: View {
             // 跨端续播开关（默认关；关 = 本端既不上报也不接受播放位置）。
             // 文案必须与真实行为逐字一致：本步开也只允许交换，上报/落点见下一版本。
             Toggle("sync_run_playback_position_toggle".localized, isOn: $deleteSettings.syncPlaybackPositionEnabled)
-                .onChange(of: deleteSettings.syncPlaybackPositionEnabled) { _ in
+                .onChange(of: deleteSettings.syncPlaybackPositionEnabled) { _, _ in
                     deleteSettings.save()
                 }
                 .help("sync_run_playback_position_help".localized)
