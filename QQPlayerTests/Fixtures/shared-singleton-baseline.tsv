@@ -13,8 +13,14 @@
 # 本文件只加防护，不含迁移去向：直连单例的整改方向（依赖注入 / 环境对象 / 生命周期归属）
 # 尚未拍板，待决策后再补「整改去向」段落并开始清存量。
 #
-# TOTAL: 174
+# TOTAL: 178
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
+#
+# 2026-09-19：口径收紧（补「前导点 `.shared` 简写」检测）后重新校准：
+#   174 → 178，增量 4 处 = **此前看不见的既有存量**（不是本批新增直连）：
+#     QQPlayer/Mac/MacSyncView.swift 3（hostCenter ?? .shared / wiringFacts / lyricsFacts）
+#     QQPlayer/Views/Utility/SyncDeviceNameEditorView.swift 1（store: LocalDeviceNameStore = .shared）
+#   账本见 `shared-singleton-budget-plan.md`（批 2 已吃掉其中 2 处，其余 2 处已排进批 3/批 4）。
 QQPlayer/Mac/MacLibraryView.swift	13
 QQPlayer/Mac/MacPlayerView.swift	13
 QQPlayer/Views/Player/PlayerView.swift	9
@@ -36,6 +42,7 @@ QQPlayer/Views/Player/LyricsSearchView.swift	4
 QQPlayer/Views/Utility/SettingsView.swift	4
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
 QQPlayer/Mac/MacSearchView.swift	3
+QQPlayer/Mac/MacSyncView.swift	3
 QQPlayer/Views/Albums/AlbumViews.swift	3
 QQPlayer/Views/Library/TrackListView.swift	3
 QQPlayer/Views/Player/LyricsView.swift	3
@@ -63,3 +70,4 @@ QQPlayer/Views/Player/TrackRowView.swift	1
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	1
 QQPlayer/Views/Utility/EQImportViews.swift	1
 QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	1
+QQPlayer/Views/Utility/SyncDeviceNameEditorView.swift	1
