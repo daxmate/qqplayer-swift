@@ -68,7 +68,26 @@ struct MacSearchAnythingLayer: View {
             .padding(.horizontal, DesignTokens.space120)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { focused = true }
+        // 打开面板即可直接打字（用户要求）。两层都走公开 API，各管一个时序：
+        //  ① `.defaultFocus` —— macOS 原生「默认焦点」，管「窗口刚成为 key」这一刻；
+        //  ② `.task` —— 管「视图进窗口 + 首帧布局完成」这一刻。
+        // 为什么不在 `onAppear` 里直接设：那一刻输入框还没进窗口响应链，写 @FocusState
+        // 会被静默丢弃（实测「面板打开后打字进不去」的根因就是这个时序，不是绑定写错）。
+        .defaultFocus($focused, true)
+        .task {
+            // 诊断（仅 Debug，落 ~/Library/Logs/QQPlayerMac/stdout.log）：面板出现这一刻的
+            // 第一响应者 = 焦点问题的根因证据（真机取证用，验完可删）
+            #if DEBUG
+                print("[SearchAnything] 面板出现 firstResponder=\(Self.describeFirstResponder())")
+            #endif
+            // 浮层有 0.12s 转场，等一次布局再设（单次 DispatchQueue.main.async 仍在转场中间，不可靠）
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            focused = true
+            #if DEBUG
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                print("[SearchAnything] 设焦点后 firstResponder=\(Self.describeFirstResponder())")
+            #endif
+        }
     }
 
     // MARK: - 面板
@@ -480,6 +499,14 @@ struct MacSearchAnythingLayer: View {
     }
 
     // MARK: - 小工具
+
+    /// 诊断用（仅 Debug 打印）：当前 key window 的第一响应者是谁（组字中会标出来）。
+    /// 用户报「打开面板打不了字 / Esc 收不起来」时，日志里这一行就是直接证据。
+    private static func describeFirstResponder() -> String {
+        guard let responder = NSApp.keyWindow?.firstResponder else { return "nil（无 key window）" }
+        let marked = (responder as? NSTextView)?.hasMarkedText() ?? false
+        return "\(type(of: responder))\(marked ? "（组字中）" : "")"
+    }
 
     private func onlineSubtitle(_ song: NeteaseOnlineSong) -> String {
         var parts: [String] = [song.artist]
