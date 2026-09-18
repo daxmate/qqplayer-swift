@@ -374,7 +374,7 @@ struct MacSettingsSearchContractTests {
             for row in MacSettingsSearchContract.captureGroups(pattern: #"Selector\s*\(\s*\("#, in: code) {
                 hits.append("\(file.path): \(row[0])…")
             }
-            for row in MacSettingsSearchContract.captureGroups(pattern: #"NSSelector"# + #"FromString\s*\("#, in: code) {
+            for _ in MacSettingsSearchContract.captureGroups(pattern: #"NSSelector"# + #"FromString\s*\("#, in: code) {
                 hits.append("\(file.path): NSSelector" + "FromString")
             }
         }
