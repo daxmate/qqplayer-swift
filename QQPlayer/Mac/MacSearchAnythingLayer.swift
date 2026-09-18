@@ -11,13 +11,19 @@
 //
 
 import AppKit
+import Observation
 import SwiftUI
 
 /// ⌘K 开关共享单例（QQPlayerMacApp commands 与 MacLibraryView overlay 共用）
+///
+/// 2026-09-18 批 1「叶子」：ObservableObject → @Observable（部署目标同日提到 14.0，解锁）。
+/// 本类型无跨对象订阅、无显式 objectWillChange 依赖，唯一状态 `isOpen` 只被视图 body 读——
+/// 按属性追踪后刷新路径不变。
 @MainActor
-final class MacSearchAnythingState: ObservableObject {
+@Observable
+final class MacSearchAnythingState {
     static let shared = MacSearchAnythingState()
-    @Published var isOpen = false
+    var isOpen = false
     private init() {}
 }
 
@@ -29,7 +35,8 @@ struct MacSearchAnythingLayer: View {
     let onOpenSettings: (MacSettingsCatalog.Match) -> Void
     let artistNameResolver: (Track) -> String?
 
-    @ObservedObject private var state = MacSearchAnythingState.shared
+    // 2026-09-18 批 1：@ObservedObject → 普通 let（@Observable 类型不需要包装器）。
+    private let state = MacSearchAnythingState.shared
 
     @State private var query = ""
     @State private var localSongs: [Track] = []
