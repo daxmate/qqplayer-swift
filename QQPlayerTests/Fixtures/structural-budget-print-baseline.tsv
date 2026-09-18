@@ -3,10 +3,10 @@
 # 口径：剥掉 `//` 之后的行尾注释再数 `print(`（与 `grep 'print('` 同口径；
 #       整行注释不计；字符串字面量里的 `print(` 会误计，已知且可接受）。
 # 守护：QQPlayerTests/StructuralBudgetContractTests.swift
-#   诊断输出必须走统一出口（`AppLog`）；存量解基线，只能减不能增；
+#   诊断输出必须走统一出口（`AppLog`）；存量钉基线，只能减不能增；
 #   新文件带裸 print → 红（确需登记则加行并在提交信息说明理由）。
 #
-# 重新生成（口径由 StructuralBudgetRule 唯一实现）：/tmp/strat-harness emit-prints
+# 重新生成：scripts/check-structural-budget.sh emit-prints
 QQPlayer/AppIntents/FoundationModels/MixGenerator.swift	2
 QQPlayer/AppIntents/SpotlightLibraryIndexer.swift	1
 QQPlayer/CarPlay+PlayerPage.swift	1
