@@ -73,6 +73,8 @@ SOURCES=(
   QQPlayer/Sync/SyncAlignedLyrics.swift
   QQPlayer/Services/LyricsModels.swift
   QQPlayer/Services/AlignedLyricsStore.swift
+  # 同步诊断唯一出口（2026-09-18：文件传输计时走它；两端都编，macOS 分支 = print）
+  QQPlayer/Services/SyncConnectDiag.swift
   # v2 §12b-7「删除不跨端传播」单一事实源：纯 op 字符串判定，无 GRDB 依赖，
   # 可直接进无模拟器 harness（真跑断言）。
   QQPlayer/Sync/SyncChangeLogDeletionPolicy.swift

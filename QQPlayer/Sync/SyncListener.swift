@@ -15,6 +15,29 @@
 import Foundation
 import Network
 
+// MARK: - 同步传输层 TCP 参数（唯一入口）
+
+/// 同步链路的 TCP 参数（listener 与连接侧共用**同一个入口**，避免两端各写一份）。
+///
+/// 为什么 `noDelay = true`（2026-09-18 提速，用户反馈「只传 3 首也要等一会儿」）：
+/// 文件传输是**停等**协议（每块一次 ack 往返），协议帧都很小（ack 约百字节），
+/// 而 Nagle 会把小帧攒着等前序数据的 ACK、对端 delayed-ACK 又故意拖 ~40ms
+/// ——每次往返白加一档固定延迟，块数越多越明显（256KB 块传 24MB = 96 次往返）。
+/// 关掉 Nagle 让每个 ack 立刻上线；本链路本来就是「一块一往返」的小帧交互，
+/// 合并写的机会本来就不存在，不会因此增加网络包量。
+///
+/// 参数构造用**显式** `NWParameters(tls:tcp:)`（而非 `NWParameters.tcp` + 强转取 TCP 槽位）：
+/// 强转失败会静默返回 nil，看起来「设了」实际没设。已用真机/本机 NWListener+NWConnection
+/// 探针验证：该参数下 Bonjour 广播 + DNS-SD 发现 + 连接 + 双向字节均正常（不重蹈
+/// 2026-09-17 `NWBrowser` 参数踩坑：那是**发现侧**参数的事，现已改用 DNS-SD 浏览）。
+enum SyncTCPParameters {
+    static func make() -> NWParameters {
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        return NWParameters(tls: nil, tcp: tcp)
+    }
+}
+
 // MARK: - NWConnection 帧通道（Listener/Browser 共用）
 
 /// NWConnection ↔ SyncPeerSession 的字节通道适配器：收字节喂会话（会话内部
@@ -172,7 +195,8 @@ final class SyncListener: @unchecked Sendable {
     /// 开始监听（Bonjour 广播）。port 0 = 系统分配。
     func start(port: UInt16 = 0) throws {
         stop()
-        let parameters = NWParameters.tcp
+        // 共用同步 TCP 参数（noDelay；唯一入口 SyncTCPParameters）
+        let parameters = SyncTCPParameters.make()
         let listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
         let txt = NWTXTRecord(["protoVer": Self.txtProtoVersion, "name": deviceName])
         listener.service = NWListener.Service(name: deviceName, type: Self.serviceType, txtRecord: txt)

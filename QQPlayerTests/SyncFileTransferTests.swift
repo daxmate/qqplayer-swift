@@ -49,11 +49,16 @@ struct SyncFileTransferTests {
         log.filter { $0.count >= 10 && $0[$0.startIndex + 8] == type.rawValue }.count
     }
 
-    // MARK: 1. 完整传输（300KB：1 整块 + 1 尾块）
+    // MARK: 1. 完整传输（1 整块 + 1 尾块）
 
-    @Test("完整传输 300KB：字节一致、无 .part、双方 done")
-    func fullTransfer300KB() throws {
-        let source = pseudoRandomData(300_000)
+    @Test("完整传输（1 整块 + 尾块）：字节一致、无 .part、双方 done、进度按声明块大小推进")
+    func fullTransferWholeChunkAndTail() throws {
+        // 块大小由发送端声明（`SyncFileTransfer.chunkSize`）：用例按它取尺寸，不写死块
+        // 字节数——否则改块大小就得改用例（历史教训：写死 262144 后调块大小会测不出新块）。
+        // 断言看的是「接收端 ack 的推进量 == 发送端声明的块大小」，即窄义上的跨端契约。
+        let chunkSize = SyncFileTransfer.chunkSize
+        let tailBytes = 44_000
+        let source = pseudoRandomData(Int(chunkSize) + tailBytes)
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let sourceURL = try writeSource(source, into: dir)
@@ -64,8 +69,10 @@ struct SyncFileTransferTests {
 
         var senderOutcome: SyncFileSender.Outcome?
         var receiverOutcome: SyncFileReceiver.Outcome?
+        var acks: [FileAckPayload] = []
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
         receiver.onCompletion = { receiverOutcome = $0 }
+        receiver.onAckSent = { acks.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
         sender.onCompletion = { senderOutcome = $0 }
 
@@ -79,17 +86,21 @@ struct SyncFileTransferTests {
         let finalURL = receivedFile.url
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
-        // 2 块：262144 + 尾块
+        // 2 块：1 整块（= 声明块大小）+ 尾块
         #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 2)
+        // ack 序列：meta(0) → 整块(chunkSize) → done(全量)。第一块推进量恰为一个声明块。
+        #expect(acks.map(\.receivedBytes) == [0, chunkSize, Int64(source.count)])
+        #expect(acks.last?.done == true)
     }
 
     // MARK: 2. 多块大文件（5 整块）
 
-    @Test("多块 5 整块（1_310_720B）：完整传输")
+    @Test("多块 5 整块：完整传输、每块推进量 = 声明块大小")
     func multiBlockFiveWholeChunks() throws {
-        // 任务包写“1.2MB（5 块整）”：262144 × 5 = 1_310_720B ≈ 1.25MB，
-        // 与 1.2MB 表述矛盾——取 5 整块精确值（“5 块整”语义优先）
-        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) * 5)
+        // 任务包写“除块大小外不改判据”：这里尺寸改由声明块大小推导（原写死 262144×5），
+        // 块数仍为 5，测的还是「多块停等往返 + 末块 done 字节对得上」。
+        let chunkSize = SyncFileTransfer.chunkSize
+        let source = pseudoRandomData(Int(chunkSize) * 5)
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let sourceURL = try writeSource(source, into: dir)
@@ -100,8 +111,10 @@ struct SyncFileTransferTests {
 
         var senderOutcome: SyncFileSender.Outcome?
         var receiverOutcome: SyncFileReceiver.Outcome?
+        var acks: [FileAckPayload] = []
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
         receiver.onCompletion = { receiverOutcome = $0 }
+        receiver.onAckSent = { acks.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
         sender.onCompletion = { senderOutcome = $0 }
 
@@ -116,6 +129,10 @@ struct SyncFileTransferTests {
         #expect(try Data(contentsOf: finalURL) == source)
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
         #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 5)
+        // 5 整块：除末块 ack（done = 全量）外，每次进度 ack 都恰推进一个声明块
+        #expect(acks.map(\.receivedBytes) == [0, chunkSize, chunkSize * 2, chunkSize * 3, chunkSize * 4,
+                                              Int64(source.count)])
+        #expect(acks.last?.done == true)
     }
 
     // MARK: 3. 空文件
@@ -157,16 +174,17 @@ struct SyncFileTransferTests {
 
     @Test("断点续传：传 1 整块 + 半块残留后中断 → 新会话续传一致")
     func resumeAfterInterruptWithHalfTail() throws {
-        // 600KB ≈ 2.3 块。真实协议 ack 只在整块写完后发出，停等中断点永远是整块；
+        // 1 整块 + 尾部零头。真实协议 ack 只在整块写完后发出，停等中断点永远是整块；
         // “中断在写块中途”留下的半块残留无法经协议自然产生，这里手工追加模拟
         // （覆盖 3.3 的 truncate 对齐路径）
-        let source = pseudoRandomData(600_000)
+        let chunkSize = SyncFileTransfer.chunkSize
+        let tailBytes = 12_345
+        let source = pseudoRandomData(Int(chunkSize) + tailBytes)
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let sourceURL = try writeSource(source, into: dir)
         let fileID = "resume-1"
         let name = "song.bin"
-        let chunkSize = SyncFileTransfer.chunkSize
         let sha = SyncFileChecksum.sha256Hex(of: source)
 
         // 阶段 1：手动喂 meta + 第 1 整块（无 sender，直接驱动 receiver）
@@ -234,7 +252,9 @@ struct SyncFileTransferTests {
 
     @Test("resume 不匹配：.part 与 startOffset 不符 → resumeMismatch，随后从头重传成功")
     func resumeMismatchThenRestart() throws {
-        let source = pseudoRandomData(300_000)
+        // 文件 > 1 块，才有合法的 startOffset = chunkSize 可试（否则 send 前置校验直接拒）
+        let chunkSize = SyncFileTransfer.chunkSize
+        let source = pseudoRandomData(Int(chunkSize) + 100_000)
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let sourceURL = try writeSource(source, into: dir)
@@ -256,7 +276,7 @@ struct SyncFileTransferTests {
         let sender = SyncFileSender(session: fixture.hostSession)
         sender.onCompletion = { outcomes.append($0) }
 
-        // 第一轮：startOffset=262144 与本地 .part（500B）不符 → resumeMismatch
+        // 第一轮：startOffset=chunkSize 与本地 .part（500B）不符 → resumeMismatch
         try sender.send(fileURL: sourceURL, fileID: fileID, name: name,
                         startOffset: SyncFileTransfer.chunkSize)
         #expect(outcomes == [.failed(.resumeMismatch(fileID))])
@@ -280,7 +300,8 @@ struct SyncFileTransferTests {
 
     @Test("幂等：目标已存在同 sha → 直接 done，文件不重写、0 块帧")
     func idempotentExistingFile() throws {
-        let source = pseudoRandomData(300_000)
+        // 尺寸 > 1 块：幂等真的省了块传输（而不是本来就只有 1 块）
+        let source = pseudoRandomData(Int(SyncFileTransfer.chunkSize) + 44_000)
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let sourceURL = try writeSource(source, into: dir)
@@ -335,5 +356,80 @@ struct SyncFileTransferTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = try writeSource(Data("abc".utf8), into: dir)
         #expect(try SyncFileChecksum.sha256Hex(ofFile: url) == SyncFileChecksum.sha256Hex(of: Data("abc".utf8)))
+    }
+
+    // MARK: 8. 复用调用方已算好的 SHA-256（省一次全文件读）
+
+    @Test("precomputedSHA256：复用合法值 → 传输成功，sha 与调用方给的一致")
+    func precomputedSHA256ReuseSucceeds() throws {
+        let source = pseudoRandomData(8_000)
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sourceURL = try writeSource(source, into: dir)
+        let sha = SyncFileChecksum.sha256Hex(of: source)
+
+        let fixture = SessionFixture.pairedHandshake()
+        let receiverDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: receiverDir) }
+
+        var senderOutcome: SyncFileSender.Outcome?
+        var receiverOutcome: SyncFileReceiver.Outcome?
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
+        receiver.onCompletion = { receiverOutcome = $0 }
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.onCompletion = { senderOutcome = $0 }
+
+        try sender.send(fileURL: sourceURL, fileID: "pre-1", name: "song.bin", precomputedSHA256: sha)
+
+        #expect(senderOutcome == .succeeded)
+        guard case let .received(receivedFile)? = receiverOutcome else {
+            Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
+            return
+        }
+        // 接收端落地的身份 sha 就是调用方声明的那一个（声明与实传同一个值）
+        #expect(receivedFile.sha256Hex == sha)
+        #expect(try Data(contentsOf: receivedFile.url) == source)
+    }
+
+    @Test("precomputedSHA256：传入错值 → 接收端仍校验内容 → checksumMismatch（不会静默落错数据）")
+    func precomputedSHA256WrongValueStillCaughtOnReceive() throws {
+        let source = pseudoRandomData(8_000)
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sourceURL = try writeSource(source, into: dir)
+        let wrongSha = SyncFileChecksum.sha256Hex(of: Data("别的文件".utf8))
+
+        let fixture = SessionFixture.pairedHandshake()
+        let receiverDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: receiverDir) }
+
+        var senderOutcome: SyncFileSender.Outcome?
+        var receiverOutcome: SyncFileReceiver.Outcome?
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
+        receiver.onCompletion = { receiverOutcome = $0 }
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.onCompletion = { senderOutcome = $0 }
+
+        try sender.send(fileURL: sourceURL, fileID: "pre-2", name: "song.bin", precomputedSHA256: wrongSha)
+
+        // 复用只是省一次本地读，不是绕过校验：接收端仍按内容算 SHA-256 并拒绝
+        #expect(senderOutcome == .failed(.checksumMismatch("pre-2")))
+        #expect(receiverOutcome == .failed(.checksumMismatch("pre-2")))
+        #expect(!FileManager.default.fileExists(atPath: receiverDir.appendingPathComponent("song.bin").path))
+    }
+
+    @Test("precomputedSHA256：格式非法（调用方 bug）→ 前置抛 invalidArgument，不开传输")
+    func precomputedSHA256MalformedThrows() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sourceURL = try writeSource(pseudoRandomData(1_000), into: dir)
+
+        let fixture = SessionFixture.pairedHandshake()
+        let sender = SyncFileSender(session: fixture.hostSession)
+
+        #expect(throws: SyncFileTransferError.invalidArgument("precomputedSHA256 非法：zz")) {
+            try sender.send(fileURL: sourceURL, fileID: "pre-3", precomputedSHA256: "zz")
+        }
+        #expect(!sender.isActive)
     }
 }

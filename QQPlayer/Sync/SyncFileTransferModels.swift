@@ -9,7 +9,8 @@
 //  - FileTransferErrorCode：线上错误码（ack.error / 帧级中止原因）
 //  - SyncFileTransferError：本端视角错误（含线上码映射；resumeMismatch 等供调用方做重试决策）
 //
-//  字段名与任务定案一致（可加字段不可改名）；分块大小固定 256KB。帧加密由 M2a
+//  字段名与任务定案一致（可加字段不可改名）；分块大小由发送端声明
+//  （`SyncFileTransfer.chunkSize`，接收端**只能**按 meta 声明值行事）。帧加密由 M2a
 //  会话层完成；状态机见 SyncFileSender.swift / SyncFileReceiver.swift。
 //
 
@@ -17,9 +18,76 @@ import Foundation
 
 /// 文件传输常量（v1 定案）。
 enum SyncFileTransfer {
-    /// 分块大小（发送端定）。256KB 块 base64 后 ~342KB，远小于 16MB 帧限
-    /// （v1 全 JSON 统一风格，性能优化不做）。
-    static let chunkSize: Int64 = 262_144
+    /// 分块大小（发送端定；接收端按 meta 声明值行事，不读本常量）。
+    ///
+    /// 2026-09-18 提速：256KB → 1MB。停等协议下吞吐 ≈ chunkSize ÷ 有效往返，每块
+    /// 一次往返的固定开销（含 Nagle/delayed-ACK、Wi-Fi 唤醒、帧加解密与 JSON 编解码）
+    /// 在「只传 3 首」时占大头——放大块把块数（= 往返次数）压到 1/4。
+    /// 1MB 块 base64 后 ~1.37MB，仍远小于 16MB 帧限（`SyncFrame.maxPayloadSize`）；
+    /// 保守起步，滑动窗口/并发留待实测数据后再定。
+    static let chunkSize: Int64 = 1_048_576
+}
+
+/// 一轮文件传输的实测计时（**纯值，无 IO**；落点见 `SyncConnectDiag.log`）。
+///
+/// 为什么带上 `chunkSize` / `chunks`：下一轮优化的判据是「往返次数 × 每次往返耗时」，
+/// 而不是笼统的「慢」——先取到每文件的字节数/块数/耗时/块间等 ack 往返，再决定是否上
+/// 滑动窗口或并发。发送端与接收端各记一行（同一 fileID 可两端对照）。
+struct SyncTransferMetrics: Equatable, Sendable {
+    /// 本端角色。
+    enum Role: String, Equatable, Sendable {
+        case send
+        case receive
+    }
+
+    let role: Role
+    /// 传输唯一 ID（`file_meta.fileID`）
+    let fileID: String
+    /// 本轮起点（0 = 从头；> 0 = 断点续传）
+    let startOffset: Int64
+    /// 本轮涉及的**整文件**总字节数
+    let totalSize: Int64
+    /// 发送端声明的分块大小（接收端据此断言「按声明值行事」）
+    let chunkSize: Int64
+    /// 本轮实际走完的块数
+    let chunks: Int
+    /// 本轮耗时（毫秒）
+    let milliseconds: Int
+    /// 块间等 ack 往返：首块 / 尾块（毫秒；接收端恒为 nil）。每块只记首末两次，
+    /// 不刷屏（中间块的数量已由 `chunks` 表达）。
+    let firstChunkWaitMs: Int?
+    let lastChunkWaitMs: Int?
+    let succeeded: Bool
+    /// 失败时的简短原因（成功为 nil）
+    let errorLine: String?
+
+    /// 单行日志（键=值，便于 grep/切分；一行一个文件）。
+    var logLine: String {
+        let mark = succeeded ? "✅" : "❌"
+        let arrow = role == .send ? "📤" : "📥"
+        let seconds = Double(milliseconds) / 1000
+        // 速率按**本轮实际走过的字节**算（续传轮分母是剩余字节，不是 totalSize），
+        // 用 totalSize - startOffset 做基准；秒数为 0 时不打印速率（避免 inf）
+        let moved = max(0, totalSize - startOffset)
+        var parts = [
+            "\(arrow) transfer \(role.rawValue) \(mark)",
+            "fileID=\(fileID)",
+            "bytes=\(totalSize)",
+            "moved=\(moved)",
+            "startOffset=\(startOffset)",
+            "chunkSize=\(chunkSize)",
+            "chunks=\(chunks)",
+            "ms=\(milliseconds)",
+        ]
+        if seconds > 0 {
+            let mbPerSecond = Double(moved) / seconds / 1_048_576
+            parts.append(String(format: "rate=%.2fMB/s", mbPerSecond))
+        }
+        if let first = firstChunkWaitMs { parts.append("ackWaitFirst=\(first)ms") }
+        if let last = lastChunkWaitMs { parts.append("ackWaitLast=\(last)ms") }
+        if let errorLine { parts.append("error=\(errorLine)") }
+        return parts.joined(separator: " ")
+    }
 }
 
 /// file_meta 载荷：接收端据它做幂等 / 断点对齐 / 参数校验。
