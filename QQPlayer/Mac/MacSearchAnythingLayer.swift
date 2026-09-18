@@ -88,6 +88,8 @@ struct MacSearchAnythingLayer: View {
                 print("[SearchAnything] 设焦点后 firstResponder=\(Self.describeFirstResponder())")
             #endif
         }
+        // Esc 的唯一处理点（AppKit 本地监听；为什么不挂在 panel 上见 SearchAnythingEscapeMonitor）
+        .modifier(SearchAnythingEscapeMonitor { state.isOpen = false })
     }
 
     // MARK: - 面板
@@ -104,7 +106,10 @@ struct MacSearchAnythingLayer: View {
         .overlay(RoundedRectangle(cornerRadius: DesignTokens.radius12).strokeBorder(Color.gray.opacity(0.25), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
-        .onExitCommand { state.isOpen = false }
+        // ⚠️ Esc 不在这里处理：`.onExitCommand` 依赖键盘事件沿响应链走到浮层，而浮层弹出后
+        // 第一响应者是输入框的 field editor（NSTextView），Esc 先被它按「取消编辑」吃掉，
+        // `cancelOperation:` 到不了浮层 → 实测「Esc 基本收不起来」。唯一入口 = 下面的
+        // `SearchAnythingEscapeMonitor`（与焦点无关，见其注释）。
     }
 
     private var searchRow: some View {
@@ -519,4 +524,76 @@ struct MacSearchAnythingLayer: View {
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
+}
+
+// MARK: - Esc（唯一入口）
+
+/// Esc 的**唯一处理点**：浮层可见期间的 AppKit 本地事件监听（keyCode 53）。
+///
+/// 为什么不用 `.onExitCommand`（本文件原来就挂在 panel 上）：它靠响应链把 `cancelOperation:`
+/// 送达浮层。而面板弹出后第一响应者是输入框的 field editor（NSTextView），Esc 先被它按
+/// 「取消编辑」语义吃掉，事件根本到不了浮层的 SwiftUI 响应链 → 用户实测「Esc 基本收不起来，
+/// 点空白能收」（点空白走鼠标路径，不经键盘响应链）。
+/// 为什么不用 `.onKeyPress(.escape)`：同属 SwiftUI 键盘事件路径，前置条件仍是焦点在浮层的
+/// 焦点域内；焦点被输入框/输入法持有时事件到不了（同一个坑换了个写法）。
+/// 本地监听装在 App 事件分发**之前**、与焦点无关：只要浮层在，Esc 一定先到我们手里。
+///
+/// 行为（用户 2026-09-18 拍板方案 a）：
+///  - 输入法**组字中**（field editor `hasMarkedText()`）：**不拦截**，事件原样放给输入法——
+///    第一次 Esc 只取消组字、浮层不关（macOS 习惯）；
+///  - 其余情况：关浮层，且**只有真处理了才吞事件**（`nil`），否则原样 `return event`。
+///
+/// 生命周期：随浮层出现安装、消失立刻移除——否则浮层关了监听还在，会把别的界面的 Esc 一起吞掉。
+private struct SearchAnythingEscapeMonitor: ViewModifier {
+    /// 关浮层动作（调用方唯一入口：`state.isOpen = false`）
+    let onEscape: @MainActor () -> Void
+
+    @State private var monitor: Any?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { install() }
+            .onDisappear { remove() }
+    }
+
+    /// 安装（幂等：先移除再装，重复出现不会装出第二个）
+    private func install() {
+        remove()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 本地监听由主线程分发（AppKit 同一 @MainActor 域）→ 直接同步处理；
+            // 不用 `MainActor.assumeIsolated`：NSEvent 非 Sendable，跨域捕获会触发警告
+            Self.handle(event, onEscape: onEscape)
+        }
+    }
+
+    private func remove() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+    }
+
+    /// nil = 已处理（吞掉）；原样返回 = 放行
+    @MainActor
+    private static func handle(_ event: NSEvent, onEscape: @MainActor () -> Void) -> NSEvent? {
+        guard event.keyCode == Self.escapeKeyCode else { return event }
+        // 组字中：放给输入法（第一次 Esc 只取消组字，不关浮层）
+        let composing = isComposingMarkedText
+        #if DEBUG
+            print("[SearchAnything] Esc：组字中=\(composing) → \(composing ? "放行给输入法" : "关浮层")")
+        #endif
+        guard !composing else { return event }
+        onEscape()
+        return nil
+    }
+
+    /// Esc 的 keyCode（AppKit 与输入法都用 53）
+    private static let escapeKeyCode: UInt16 = 53
+
+    /// 是否正在输入法组字：编辑中的第一响应者是 field editor（NSTextView），
+    /// 有未上屏的标记文本（拼音/假名候选）时 `hasMarkedText()` 为真。
+    @MainActor
+    private static var isComposingMarkedText: Bool {
+        (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
+    }
 }
