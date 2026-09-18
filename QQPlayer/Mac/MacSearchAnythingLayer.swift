@@ -212,8 +212,11 @@ struct MacSearchAnythingLayer: View {
                     }
                     if !artists.isEmpty {
                         section("search_badge_artist".localized) {
-                            ForEach(artists, id: \.id) { artist in
-                                artistRow(artist)
+                            // 歌手分组走唯一入口（ArtistNameNormalizer.groupedArtists）：
+                            // 库里同一歌手可能残留简/繁两行（存量未归一的库），逐行渲染
+                            // 会出现两个同形歌手行且各自只播一半曲目（2026-09-18 收口）。
+                            ForEach(groupedArtists, id: \.id) { group in
+                                artistRow(group)
                             }
                         }
                     }
@@ -257,6 +260,11 @@ struct MacSearchAnythingLayer: View {
 
     // MARK: - 行
 
+    /// 歌手行的唯一分组入口（库里同形两行 → 一行；两边曲目合并播）。
+    private var groupedArtists: [ArtistNameNormalizer.NormalizedArtist] {
+        ArtistNameNormalizer.groupedArtists(artists)
+    }
+
     private func songRow(_ track: Track) -> some View {
         Button {
             onPlayLocal(track, localSongs)
@@ -281,18 +289,18 @@ struct MacSearchAnythingLayer: View {
         .buttonStyle(.plain)
     }
 
-    private func artistRow(_ artist: Artist) -> some View {
+    private func artistRow(_ group: ArtistNameNormalizer.NormalizedArtist) -> some View {
         Button {
-            let tracks = (try? LibraryReads.tracks(artistId: artist.id ?? 0)) ?? []
+            let tracks = group.artistIds.flatMap { (try? LibraryReads.tracks(artistId: $0)) ?? [] }
             guard !tracks.isEmpty else { return }
-            onPlayArtist(artist, tracks)
+            onPlayArtist(group.primaryArtist, tracks)
             state.isOpen = false
         } label: {
             HStack(spacing: DesignTokens.space10) {
                 Image(systemName: "music.mic")
                     .foregroundColor(.secondary)
                     .frame(width: 14)
-                Text(ArtistNameNormalizer.displayName(artist.name)).lineLimit(1)
+                Text(group.displayName).lineLimit(1)
                 Spacer()
             }
             .contentShape(Rectangle())

@@ -14,6 +14,10 @@ extension DatabaseManager {
     func upsertTrack(_ track: Track) throws {
         defer { invalidateArtistDisplayNameCache() }
         var trackToSave = track
+        // 曲名落库一律规范形（简体，与 UI 语言解耦）——入库字形的唯一收口点之一，
+        // 与 upsertArtist / upsertAlbum 同一入口（DisplayScriptNormalizer.canonical）。
+        // 只改库内形态：用户文件标签与同步载荷不受影响。
+        trackToSave.title = DisplayScriptNormalizer.canonical(trackToSave.title)
 
         // M3-1: 入库时算一次 content_hash（跨端歌曲身份 = 文件内容 SHA-256）。
         // 已存在（非 nil）不重算；文件缺失/读失败保持 nil，由惰性回填
