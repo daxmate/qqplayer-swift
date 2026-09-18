@@ -10,11 +10,18 @@
 //
 
 import Foundation
+import Observation
 
+// target: ios-only（QQPlayer/ViewModels 不在 QQPlayerMac 白名单）
+//
+// 2026-09-18 批 1「叶子」：ObservableObject → @Observable（按属性追踪）。
+// 本类型无跨对象订阅、无 fanout（唯一消费点 TutorialView）、无显式 objectWillChange 依赖，
+// 字段也只有 currentStep 一个且全仓无人读 —— 迁移不改变任何可见刷新时机。
 @MainActor
-class TutorialViewModel: ObservableObject {
+@Observable
+class TutorialViewModel {
     /// 单步引导，保留计数字段以兼容既有视图结构（当前恒为 0）。
-    @Published var currentStep: Int = 0
+    var currentStep: Int = 0
 
     func nextStep() {
         // 单步引导无下一步（保留 API 以最小化视图改动）。
