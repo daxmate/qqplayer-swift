@@ -29,7 +29,7 @@ QQPlayer/Services/NeteaseOnlineClient.swift	658
 QQPlayer/Services/PlayerEngine+AudioSession.swift	709
 QQPlayer/Services/PlayerEngine+NowPlaying.swift	1111
 QQPlayer/Services/PlayerEngine+PlaybackControl.swift	1255
-QQPlayer/Services/QuarkClient.swift	1263
+QQPlayer/Services/QuarkClient.swift	1175
 QQPlayer/Services/SFBAudioEngineManager+Playback.swift	771
 QQPlayer/Sync/SyncChangeLogMapping.swift	945
 QQPlayer/Sync/SyncCollectionSyncCoordinator.swift	874
@@ -42,4 +42,4 @@ QQPlayer/Views/Library/SearchResultsViews.swift	746
 QQPlayer/Views/Player/LyricsView.swift	758
 QQPlayer/Views/Player/PlayerView.swift	985
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	640
-# TOTAL: 28195
+# TOTAL: 28107
