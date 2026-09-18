@@ -283,7 +283,7 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 ### 测试与 CI
 - QQPlayerTests：**104 个测试文件**（口径：`ls QQPlayerTests/*.swift | wc -l`，含 Fixtures/Mock 辅助文件；注册完整性 104/104），用例与 suite 数以 CI 日志为准（最近实测 **1115 个用例 / 130 个 suite**，run 34687194257），覆盖共享 Core 与双平台决策逻辑（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析、局域网同步全链等）
 - 无模拟器 harness：`scripts/run-local-sync-tests.sh` 用 `swiftc` 直编生产源码（Sync 纯逻辑 + 扫描器）真跑断言，覆盖帧编解码 / 路径解析 / 应答器计划 / 控制器状态机 / 端到端场景
-- CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（最近实测 1115 用例）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step
+- CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（最近实测 1115 用例）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step；这两个 job 同时是 `main` 的**合入门禁**（ruleset 强制，见下方「参与贡献」的分支流程）
 - 本地提交钩子（`scripts/git-hooks/pre-commit`）同样拦截增量编译警告，不等 CI
 
 ---
@@ -404,7 +404,23 @@ LICENSE / NOTICE.md / PRIVACY.md
 
 欢迎贡献代码、翻译与 issue 反馈！
 
-- **分支流程**：从 `main` 建 `feat/xxx` 或 `fix/xxx` 分支 → 提交 → PR 合入 `main`（CI 必须绿）
+- **分支流程（ruleset 已强制，2026-09-19 起）**：`main` 受仓库 ruleset「main: CI 门禁（两个 job 绿 + 禁强推/禁删除，无绕过）」保护，**直推 `main` 会被 GitHub 拒绝**（实测 `GH013: Repository rule violations found`），必须走 PR：
+
+  ```bash
+  git switch -c fix/xxx            # 从最新 main 建分支
+  git commit -m "fix(scope): 描述" && git push -u origin fix/xxx
+  gh pr create --fill              # CI 由 pull_request 事件自动触发
+  gh pr checks --watch             # 等两个 job 变绿
+  gh pr merge --merge --delete-branch   # 保持与历史一致的 merge commit 风格
+  ```
+
+  门禁细节：
+  - **必须通过的 check 名 = `.github/workflows/ci.yml` 的两个 job 名**（改 job 名必须同步改 ruleset，否则合入会被卡住）：
+    `Swift (swiftlint + swiftformat + xcodebuild test)`、`macOS (build QQPlayerMac + 资源产物断言)`
+  - 同时禁止强推（non-fast-forward）与删除 `main`
+  - **没有 admin 绕过**：CI 红时任何人都不能合入 `main`（包括维护者本人）——这是有意的。此前 `main` 曾两次「先合入、后变红」（CI run 35334674871 / 35315228532），CI 只是事后通知；现在它是合入前的真门禁
+  - **不要求 PR 分支先更新到最新 main**（ruleset 的 strict 关闭）：单人维护、PR 分支通常只领先 main，避免每次 rebase 白跑一遍 40 分钟 CI
+  - **紧急例外只允许临时开**：若 CI 自身坏掉必须直推修复，临时在 ruleset 加 bypass（或把 enforcement 设为 `disabled`），修完立刻恢复原状——**不要常驻 bypass**，否则门禁即失效
 - **提交信息**：conventional commits——`feat(scope): 描述` / `fix(scope): 描述` / `docs` / `refactor` / `test` / `chore`（scope 如 `mac`、`ios`、`lyrics`、`carplay`）
 - **代码风格**：提交前跑 `swiftlint lint` 与 `swiftformat --lint .`（双 target 都须通过）
 - **测试**：共享逻辑与双平台决策逻辑必须配 Swift Testing 单测；新测试文件用 `python3 scripts/add-test-file.py <文件>` 注册进 QQPlayerTests target；涉及共享 Services 新文件时同步登记 QQPlayerMac target 文件白名单（pbxproj membershipExceptions）与 iOS 侧（synchronized folder 自动包含）
