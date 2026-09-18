@@ -12,6 +12,12 @@
 //  收敛后：订阅 isIndexing（无忙等、可取消）+ 超时兜底（到期放行，用户不会被永久卡住）。
 //  决策下沉为纯逻辑 IndexingWaitPolicy；等待本身可注入状态源，均可单测。
 //
+//  2026-09-19 追加注入点 `IndexingWaitSleeping`（唯一生产实现 `TaskSleepSleeper`）：
+//  超时兜底原先直接 `Task.sleep`，导致唯一能证明「超时真的会放行」的用例只能断言墙钟
+//  ——而 CI 模拟器把 MainActor 定时器唤醒放大 60x~345x（0.2s 策略实测 12.2s / 69.0s，
+//  run 34702157359 / 35334674871），墙钟上界两次放宽到 60s 后仍被击穿。
+//  把「睡」抽成 seam 后，超时路径与正常放行路径都能确定性验证，与 runner 饿不饿无关。
+//
 //  2026-09-15 追加**第二件事**（同一文件的同一个语义家族：索引状态 → 能不能继续）：
 //  `IndexingGate.isReadyForChangeLogSync` = changeLog 同步的**唯一前置门**（本端曲库
 //  索引未到终态 → 不装配数据同步端）。它是那个判定的唯一实现；"等"（waitUntilIdle）
@@ -76,6 +82,21 @@ enum IndexingWaitOutcome: Equatable {
     case timedOut
 }
 
+/// 「睡一觉」的唯一入口：超时兜底的计时经由这里，不在别处直接 `Task.sleep`。
+///
+/// 之所以是协议而不是可选闭包：这是**测试 seam**（生产唯一实现是 `TaskSleepSleeper`），
+/// 调用方不传就必须走生产实现，不存在第二份计时。
+protocol IndexingWaitSleeping: Sendable {
+    func sleep(nanoseconds: UInt64) async
+}
+
+/// 生产实现（唯一）：真睡。
+struct TaskSleepSleeper: IndexingWaitSleeping {
+    func sleep(nanoseconds: UInt64) async {
+        try? await Task.sleep(nanoseconds: nanoseconds)
+    }
+}
+
 @MainActor
 enum IndexingGate {
     // MARK: - changeLog 同步前置门（唯一实现）
@@ -99,9 +120,12 @@ enum IndexingGate {
     }
 
     /// 等索引结束。不做忙等；超时返回 `.timedOut` 由调用方兜底继续。
+    /// - Parameter sleeper: 计时入口。生产调用方一律用默认值；只有测试传假实现，
+    ///   用「立即到点 / 永不到点」两种假钟取代墙钟，杜绝计时敏感用例。
     static func waitUntilIdle(
         _ source: IndexingStateProviding,
-        policy: IndexingWaitPolicy = .standard
+        policy: IndexingWaitPolicy = .standard,
+        sleeper: some IndexingWaitSleeping = TaskSleepSleeper()
     ) async -> IndexingWaitOutcome {
         if !source.isIndexing { return .alreadyIdle }
 
@@ -123,7 +147,7 @@ enum IndexingGate {
 
             // 超时兜底：索引异常 / 视图销毁也不会让等待悬死
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: policy.timeoutNanoseconds)
+                await sleeper.sleep(nanoseconds: policy.timeoutNanoseconds)
                 resumeOnce(.timedOut)
             }
         }
