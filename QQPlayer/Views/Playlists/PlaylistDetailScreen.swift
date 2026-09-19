@@ -19,7 +19,6 @@ struct PlaylistDetailScreen: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var customCoverImage: UIImage?
     /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数 + 就地说明）。
-    /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
     @Environment(PlaylistCoverLoadFailuresStore.self) private var coverFailures
     @State private var showCoverOptions = false
     @State private var artistNameCache: [Int64: String] = [:]

@@ -199,3 +199,37 @@ let center = hostCenter ?? .shared                     // MacSyncView.swift:68
 ### 5.3 系统单例不是债
 `UIApplication` / `WidgetCenter` / `URLSession` / `NSWorkspace` 共 11 处，永远留在基线里，
 账本按"可迁预算 163"看进度，而不是把 174 当成 100%。
+
+### 5.4 与结构预算棘轮的冲突（批 2 实测）
+结构预算棘轮（`structural-budget-size-baseline.tsv`）对 **>600 行的文件**规定「只能减不能增」，
+于是**迁移本身**就会顶破预算——任何对象迁 `@Observable` 至少要 +2 行（`import Observation`、
+`@Observable` 属性行），长文件里再多写一行说明就超。批 2 首版实测：`IOSPassiveSyncCenter.swift`
+981 → 990，被行数预算拦下。
+
+处置（已落地，可照抄）：
+1. **长文件里不写迁移说明**——迁移理由一律记在本账本 + 提交信息，源文件只留代码（本批因预算为零，
+   `IOSPassiveSyncCenter` 的类文档保持原样，一行注释都没加）；
+2. **让出等量行数**（无损清理优先）：本批删掉该文件里早已不用的 `import UIKit`、
+   把 `defaultClientName` 的 4 行文档合并为 3 行 → 981 = 981，TOTAL 25046 不涨。
+
+纪律：**动 >600 行文件前先算预算余量**（`scripts/check-structural-budget.sh check`）。
+余量为 0 而迁移必须 +2 时，要么让出等量行，要么先拆文件（属结构清债批次），
+**不要**改基线放行（`emit` 只允许收紧后替换）。
+
+### 5.5 批 2 的「刷新路径核对」（长文件那份搬到这里）
+§四.2 要求逐对象写出「迁移前 vs 迁移后」的刷新对照，但 `IOSPassiveSyncCenter.swift` 受行数预算
+约束（§5.4），说明不能内联在源文件里 → 按 §5.4 口径记在此处：
+
+- **`IOSPassiveSyncCenter`**（唯一边界：`IOSPassiveSyncCenter.swift`）
+  - 迁移前：视图 `@ObservedObject … = .shared`，靠整对象 `objectWillChange` 失效 → 全量重算；
+  - 迁移后：`@Observable` 按属性追踪。视图读的 4 个存储属性
+    （`state` / `summary` / `dataSummary` / `pairedHostCount`）全部在设置页 `body` 可达路径上
+    （状态行 / 数据区 / 已配对主机行）→ 刷新行为不变；
+  - 无跨对象 `objectWillChange` 订阅、无 Combine publisher 消费点（它订阅的是 `LibraryIndexer`，不是自己）
+    → 无「迁移后不刷新」的静默坑。
+- **`PlaylistCoverLoadFailuresStore`**（消费点 `PlaylistDetailScreen` / `PlaylistCardView` / `SyncSettingsView`）
+  - 唯一存储属性 `failures` 只被 `body` 可达路径读（卡片/详情/设置页行）→ 刷新行为不变；
+  - 完整说明保留在 `PlaylistCoverLoadFailuresStore.swift` 文件头（该文件 <600 行，不受预算约束）；
+    `PlaylistDetailScreen.swift`（640 行，受约束）内的那行重复说明已撒回。
+- **`LyricOffsetStore`**（消费点 `SettingsView`）：后 4 个存储属性全在设置页 `body` 可达路径（行文案 + Slider 绑定）；
+  路由变化由 `AVAudioSession.routeChangeNotification` 驱动写入，机制未变。
