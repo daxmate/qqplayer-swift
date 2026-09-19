@@ -35,8 +35,8 @@ struct MacSearchAnythingLayer: View {
     let onOpenSettings: (MacSettingsCatalog.Match) -> Void
     let artistNameResolver: (Track) -> String?
 
-    // 2026-09-18 批 1：@ObservedObject → 普通 let（@Observable 类型不需要包装器）。
-    private let state = MacSearchAnythingState.shared
+    // 2026-09-18 批 1：@ObservedObject → 普通 let；2026-09-19 批 3a：直连 `.shared` → 组合根环境注入。
+    @Environment(MacSearchAnythingState.self) private var state
 
     @State private var query = ""
     @State private var localSongs: [Track] = []

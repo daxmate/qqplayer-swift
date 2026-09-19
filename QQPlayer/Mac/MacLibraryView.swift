@@ -45,10 +45,11 @@ struct MacLibraryView: View {
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var indexer = LibraryIndexer.shared
     @StateObject private var progress = PlayerEngine.shared.progress
-    /// search anything 开关（⌘K 菜单命令与浮层共用同一单例）
-    /// 2026-09-18 批 1：@ObservedObject → 普通 let（@Observable 类型不需要包装器；
-    /// body 里读 `isOpen` 即建立按属性追踪，⌘K 弹出/收起的刷新路径不变）。
-    private let searchAnythingState = MacSearchAnythingState.shared
+    /// search anything 开关（⌘K 命令；2026-09-19 批 3a 起由 Mac 组合根注入，读 `isOpen` 按属性追踪）
+    @Environment(MacSearchAnythingState.self) private var searchAnythingState
+    /// 曲库卡事实（批 3a：同上，由 Mac 组合根注入）
+    @Environment(MacLibraryFactsStore.self) private var libraryFacts
+    @Environment(AppServices.self) private var services
 
     @State private var section: MacLibrarySection = .tracks
     @State private var tracks: [Track] = []
@@ -166,7 +167,7 @@ struct MacLibraryView: View {
         }
         .sheet(isPresented: $showWhatsNew) {
             WhatsNewView(onClose: {
-                WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
+                services.whatsNew.markSeen(WhatsNewContent.currentVersion)
                 showWhatsNew = false
             })
         }
@@ -200,7 +201,7 @@ struct MacLibraryView: View {
             // 启动即应用全局外观（NSApp.appearance，设置窗口等所有窗口跟随）
             applyMacAppearance()
             // 新功能通告：当前版本未读过则弹（升级场景）；全新安装也会弹一次
-            if WhatsNewStore.shared.shouldShowCurrent() {
+            if services.whatsNew.shouldShowCurrent() {
                 showWhatsNew = true
             }
             // FSEvents 实时监控（web 版 watchdog 对齐，2026-09-03 B 组）：
@@ -262,7 +263,7 @@ struct MacLibraryView: View {
             searchTask?.cancel()
             libraryRefreshTask?.cancel()
             libraryLoadTask?.cancel()
-            MacFolderMonitor.shared.stop()
+            services.folderMonitor.stop()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.favoritesChanged)) { _ in
             // 收藏变化后刷新“我喜欢的音乐”列表（含正在展示时的实时移除）
@@ -529,19 +530,18 @@ struct MacLibraryView: View {
 
     // MARK: - Data
 
-    /// 曲库加载：四表全量读在全局执行器上跑（审计 M2——以前同步跑在主线程，
-    /// 且由 7+ 处通知反复触发）。拿到快照后先预取卡片事实再落表，
-    /// 卡片渲染时计数已就位（不闪 0）。
+    /// 曲库加载：四表全量读在全局执行器上跑（审计 M2——以前同步跑在主线程、且由 7+ 处通知反复触发）。
+    /// 拿到快照后先预取卡片事实再落表，卡片渲染时计数已就位（不闪 0）。
     private func reloadLibrary() {
         libraryLoadTask?.cancel()
         // 曲库数据可能已变：作废在途事实（旧值保留到预取完，不闪 0）
-        MacLibraryFactsStore.shared.invalidate()
+        libraryFacts.invalidate()
         libraryLoadTask = Task { @MainActor in
             let loaded = await MacLibraryLoader.load()
             guard !Task.isCancelled else { return }
             switch loaded {
             case .success(let snapshot):
-                await MacLibraryFactsStore.shared.preload(
+                await libraryFacts.preload(
                     tracks: snapshot.tracks,
                     albums: snapshot.albums,
                     artists: snapshot.artists,
@@ -583,10 +583,10 @@ struct MacLibraryView: View {
     /// 启动/重启曲库文件夹实时监控。监控根 = 当前配置文件夹集合
     /// （默认 ~/Music/QQPlayer + 设置页添加的外部文件夹，StateManager 归一）。
     private func startFolderMonitoring() {
-        let folders = StateManager.shared.getMusicFolderURLs()
+        let folders = services.stateManager.getMusicFolderURLs()
         let paths = MacFolderWatchPolicy.relevantFolders(folders).map(\.path)
         MacScanLogger.log("FSEvents watch start, folders: \(paths)")
-        MacFolderMonitor.shared.start(paths: paths) {
+        services.folderMonitor.start(paths: paths) {
             // 已在主线程（MacFolderMonitor 去抖后 main 投递）。经通知转发，
             // 与 LibraryFoldersChanged 共用「reload + start/排队」语义，避免
             // 此处重复实现扫描中排队逻辑。

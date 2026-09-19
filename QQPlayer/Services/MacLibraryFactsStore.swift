@@ -16,14 +16,14 @@
 //  - 预取路径：MacLibraryView.reloadLibrary 拿到曲库快照后整体 `preload`，
 //    卡片渲染时事已就位 → 不闪现 0；
 //  - 兜底路径：预取之外的 id（搜索结果等）首次访问返回默认值并异步补齐，
-//    补齐后 `objectWillChange` 触发重绘（`invalidate` 只递增代号，不清空旧值 →
+//    补齐后按属性追踪触发重绘（`invalidate` 只递增代号，不清空旧值 →
 //    重载期间不闪 0）；
 //  - 取数口径与修复前逐条一致（同一个 DatabaseManager API），仅执行位置/时机改变；
 //  - 取数闭包可注入 → 语义可单测（不需要真 DB）。
 //
 
-import Combine
 import Foundation
+import Observation
 
 /// 曲库快照（reload 路径一次读四表；跨隔离返回）。
 struct MacLibrarySnapshot {
@@ -55,8 +55,12 @@ enum MacLibraryLoader {
 }
 
 /// 曲库卡片事实（缓存 + 异步预取）。
+/// 2026-09-19（视图层单例收口「下降预算」批 3a）：`ObservableObject` → `@Observable`，
+/// 不再手工 `objectWillChange.send()`（字典就地写入走 `_modify` 访问器，按属性追踪生效）；
+/// 视图侧改由 Mac 组合根 `.environment(...)` 注入 + `@Environment(MacLibraryFactsStore.self)` 取。
 @MainActor
-final class MacLibraryFactsStore: ObservableObject {
+@Observable
+final class MacLibraryFactsStore {
     static let shared = MacLibraryFactsStore()
 
     /// 专辑卡事实（曲目数 / 代表曲目 / 标题——标题同时供歌曲 Table 的 album 列）。
@@ -187,7 +191,6 @@ final class MacLibraryFactsStore: ObservableObject {
         albumFactsById = albumFacts
         artistTrackCountById = artistCounts
         playlistFactsById = playlistFacts
-        objectWillChange.send()
     }
 
     /// 曲库数据变化：递增代号并在途结果作废。**不清空已发布值**——
@@ -209,7 +212,6 @@ final class MacLibraryFactsStore: ObservableObject {
             self.inFlight.remove("album-\(id)")
             guard generation == self.generation else { return }
             self.albumFactsById[id] = facts
-            self.objectWillChange.send()
         }
     }
 
@@ -223,7 +225,6 @@ final class MacLibraryFactsStore: ObservableObject {
             self.inFlight.remove("artist-\(id)")
             guard generation == self.generation else { return }
             self.artistTrackCountById[id] = count
-            self.objectWillChange.send()
         }
     }
 
@@ -237,7 +238,6 @@ final class MacLibraryFactsStore: ObservableObject {
             self.inFlight.remove("playlist-\(id)")
             guard generation == self.generation else { return }
             self.playlistFactsById[id] = facts
-            self.objectWillChange.send()
         }
     }
 

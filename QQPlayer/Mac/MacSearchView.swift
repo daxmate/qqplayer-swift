@@ -235,7 +235,7 @@ private struct MacSearchAlbumRow: View {
     let onOpen: () -> Void
 
     /// 卡片事实缓存（审计 M2：以前每行每帧一次整表查询）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
 
     var body: some View {
         Button(action: onOpen) {
@@ -269,7 +269,7 @@ private struct MacSearchArtistRow: View {
     let onOpen: () -> Void
 
     /// 歌手曲目数缓存（审计 M2）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
 
     var body: some View {
         Button(action: onOpen) {
@@ -298,7 +298,7 @@ private struct MacSearchPlaylistRow: View {
     let onOpen: () -> Void
 
     /// 歌单事实缓存（审计 M2）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
 
     var body: some View {
         let playlistFacts = facts.playlistFacts(for: playlist)

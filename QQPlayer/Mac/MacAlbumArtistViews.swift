@@ -23,7 +23,7 @@ struct MacAlbumGridView: View {
     private let gridColumns = [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: DesignTokens.space16)]
 
     /// 专辑卡事实缓存（审计 M2：以前每张卡每帧 2 次整表查询）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
     /// 进专辑失败提示（审计 L7：以前只 print）
     @State private var openError: String?
 
@@ -165,7 +165,7 @@ struct MacArtistListView: View {
     @Binding var showArtistSheet: Bool
 
     /// 歌手行曲目数缓存（审计 M2：以前每行每帧 1 次整表查询）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
     /// 进歌手失败提示（审计 L7）
     @State private var openError: String?
 
@@ -302,7 +302,7 @@ struct MacPlaylistListView: View {
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
     /// 歌单行事实缓存（审计 M2：以前每行每帧 2–3 次查询）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
     /// 卡片条重算任务句柄（审计 M2）
     @State private var smartTask: Task<Void, Never>?
     /// 新建歌单失败提示（审计 L7：以前弹窗静默关闭）

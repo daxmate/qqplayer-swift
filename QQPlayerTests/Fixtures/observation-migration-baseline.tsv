@@ -17,11 +17,12 @@
 #   → **193 / 103**（2026-09-19 批 2：PlaylistCoverLoadFailuresStore / IOSPassiveSyncCenter /
 #     LyricOffsetStore 三个 iOS 叶子 store 迁 @Observable + 视图改 `@Environment` 注入；
 #     同步删除：3 个类各 1 `ObservableObject` + 9 个 `@Published`、视图 4 处 `@ObservedObject`）
+#   → **185 / 99**（2026-09-19 批 3a：MacLibraryFactsStore 迁 @Observable；Mac 侧 5 个视图 +
+#     1 个浮层改 `@Environment` 注入。同步删除：1 个 `ObservableObject`、6 处 `@ObservedObject`）
 #   账本见 `shared-singleton-budget-plan.md`（每批迁移后基线随之下调）。
 # 格式：路径<TAB>标记<TAB>计数
 QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/ContentView.swift	@StateObject	1
-QQPlayer/Mac/MacAlbumArtistViews.swift	@ObservedObject	3
 QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	4
 QQPlayer/Mac/MacDesktopWindowsManager.swift	@Published	2
 QQPlayer/Mac/MacDesktopWindowsManager.swift	ObservableObject	1
@@ -37,7 +38,6 @@ QQPlayer/Mac/MacManualEQEditorView.swift	@StateObject	2
 QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	3
 QQPlayer/Mac/MacPlayerView.swift	@StateObject	1
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	@StateObject	1
-QQPlayer/Mac/MacSearchView.swift	@ObservedObject	3
 QQPlayer/Mac/MacSmartPlaylistViews.swift	@StateObject	1
 QQPlayer/Mac/MacSpectrumAnalyzer.swift	@Published	2
 QQPlayer/Mac/MacSpectrumAnalyzer.swift	ObservableObject	1
@@ -50,7 +50,6 @@ QQPlayer/Mac/MacSyncRunViewModel.swift	@Published	8
 QQPlayer/Mac/MacSyncRunViewModel.swift	ObservableObject	1
 QQPlayer/Mac/MacSyncView.swift	@ObservedObject	3
 QQPlayer/Mac/MacSyncView.swift	@StateObject	3
-QQPlayer/Mac/MacTrackListView.swift	@ObservedObject	1
 QQPlayer/Mac/MacTrackListView.swift	@StateObject	1
 QQPlayer/Mac/SyncHostCenter.swift	@Published	5
 QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
@@ -67,7 +66,6 @@ QQPlayer/Services/KaraokeController.swift	@Published	4
 QQPlayer/Services/KaraokeController.swift	ObservableObject	1
 QQPlayer/Services/LibraryIndexer.swift	@Published	6
 QQPlayer/Services/LibraryIndexer.swift	ObservableObject	1
-QQPlayer/Services/MacLibraryFactsStore.swift	ObservableObject	1
 QQPlayer/Services/PlaybackModels.swift	@Published	1
 QQPlayer/Services/PlaybackModels.swift	ObservableObject	1
 QQPlayer/Services/PlayerEngine.swift	@Published	10
