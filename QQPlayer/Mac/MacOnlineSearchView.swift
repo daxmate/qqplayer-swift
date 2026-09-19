@@ -29,14 +29,14 @@ struct MacOnlineSearchView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var services
 
     @State private var source: OnlineSource = .netease
     @State private var query = ""
     @State private var results: [OnlineItem] = []
     @State private var status: Status = .idle
     @State private var searchTask: Task<Void, Never>?
-    /// 行级下载任务句柄（rowID → Task；审计 L5：修复前无句柄，关 sheet 后在途下载
-    /// 继续跑并写已卸载视图的 @State）
+    /// 行级下载任务句柄（rowID → Task；关 sheet 后在途下载不得写已卸载视图的 @State）
     @State private var downloadTasks: [String: Task<Void, Never>] = [:]
     @State private var searchSeq = 0
     @State private var downloadingIDs: Set<String> = []
@@ -404,7 +404,7 @@ struct MacOnlineSearchView: View {
             switch source {
             case .netease:
                 do {
-                    let songs = try await NeteaseOnlineClient.shared.search(query: q, limit: 20)
+                    let songs = try await services.neteaseOnlineClient.search(query: q, limit: 20)
                     guard !Task.isCancelled, seq == searchSeq else { return } // 过期响应丢弃
                     results = songs.map { OnlineItem.netease($0) }
                     status = .loaded

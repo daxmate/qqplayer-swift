@@ -14,8 +14,7 @@
 //     （成功态 dismiss）；被拒/超时/未发现 = 失败态展示原因 + [重试]/[完成]。
 //     本地记录失败时保留（TOFU 已知主机，用户可手动删）。
 //
-//  状态机实例由本页持有（每进入一次扫描 = 一次配对流程）；nonce 过期由
-//  expireCheck 驱动。
+//  状态机实例由本页持有（每进入一次扫描 = 一次配对流程）；nonce 过期由 expireCheck 驱动。
 //
 
 import AVFoundation
@@ -25,6 +24,7 @@ import UIKit
 /// iOS 扫码配对页。
 struct SyncQRScannerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var services
     @StateObject private var controller = SyncScannerController()
     @StateObject private var autoConnect = SyncAutoConnectController()
     @State private var machine = PairingStateMachine()
@@ -294,7 +294,7 @@ struct SyncQRScannerView: View {
             candidate: pairingCandidate,
             expectedPeerDeviceID: approved.deviceID,
             hostName: approved.displayName,
-            clientName: LocalDeviceNameStore.shared.name
+            clientName: services.localDeviceName.name
         )
         flow = .connecting
     }

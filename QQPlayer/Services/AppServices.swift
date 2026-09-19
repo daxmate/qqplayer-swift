@@ -37,6 +37,21 @@ final class AppServices {
     /// 曲库目录等 App 级设置的读写入口。
     let stateManager = StateManager.shared
 
+    // MARK: - 批 4：无状态客户端/读取器入口
+    //
+    // 判据仍是「视图侧是否读属性」（见账本 §批 3b 机制边界）：
+    // 下面四者在视图侧全是**方法调用 / 一次性取值**，不产生按属性追踪需求，故走容器而非
+    // `@Environment(T.self)`。
+
+    /// 本机展示名读写（`name` 一次性取值 + `setName` 调用；设备名变更不是视图状态源）。
+    let localDeviceName = LocalDeviceNameStore.shared
+    /// 多源歌手信息聚合（视图侧只有 `searchArtist` / `searchAlternativeArtist` / `searchSimilarArtist`）。
+    let hybridMusicAPI = HybridMusicAPIService.shared
+    /// 歌词候选检索（视图侧只有 `search`）。
+    let lyricsSearchProvider = LyricsSearchProvider.shared
+    /// 网易云在线检索（视图侧只有 `search`）。
+    let neteaseOnlineClient = NeteaseOnlineClient.shared
+
     #if os(macOS)
         /// 曲库文件夹监视（Mac 专属；`start(paths:)` / `stop()` 由曲库加载路径驱动）。
         let folderMonitor = MacFolderMonitor.shared
