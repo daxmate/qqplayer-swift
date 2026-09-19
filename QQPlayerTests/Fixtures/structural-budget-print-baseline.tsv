@@ -57,7 +57,10 @@ QQPlayer/Services/GequhaiClient.swift	3
 QQPlayer/Services/HybridMusicAPI.swift	28
 QQPlayer/Services/IOSPassiveSyncCenter.swift	17
 QQPlayer/Services/KaraokeController.swift	1
-QQPlayer/Services/LibraryIndexer.swift	124
+QQPlayer/Services/LibraryIndexer+Parsing.swift	19
+QQPlayer/Services/LibraryIndexer+Scanning.swift	21
+QQPlayer/Services/LibraryIndexer+SharedImport.swift	29
+QQPlayer/Services/LibraryIndexer.swift	55
 QQPlayer/Services/LyricsManager.swift	16
 QQPlayer/Services/LyricsParsing.swift	3
 QQPlayer/Services/LyricsSearch.swift	19
