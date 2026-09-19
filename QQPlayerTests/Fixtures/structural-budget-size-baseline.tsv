@@ -22,7 +22,6 @@ QQPlayer/Services/DatabaseManager+Tracks.swift	685
 QQPlayer/Services/EQManager.swift	618
 QQPlayer/Services/GequhaiClient.swift	619
 QQPlayer/Services/IOSPassiveSyncCenter.swift	981
-QQPlayer/Services/LibraryIndexer.swift	1370
 QQPlayer/Services/NeteaseOnlineClient.swift	658
 QQPlayer/Services/PlayerEngine+AudioSession.swift	709
 QQPlayer/Services/PlayerEngine+NowPlaying.swift	1111
@@ -39,4 +38,4 @@ QQPlayer/Views/Library/SearchResultsViews.swift	746
 QQPlayer/Views/Player/LyricsView.swift	758
 QQPlayer/Views/Player/PlayerView.swift	985
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	640
-# TOTAL: 23810
+# TOTAL: 22440
