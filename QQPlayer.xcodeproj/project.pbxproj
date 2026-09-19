@@ -170,6 +170,7 @@
 		8ABBDAD833924584B33E0040 /* MacSettingsSearchContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C594C14EC1064884915D4159 /* MacSettingsSearchContractTests.swift */; };
 		33BF5FCEDBD047849CDD513B /* StructuralBudgetRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF86BA39795049F29714AD44 /* StructuralBudgetRule.swift */; };
 		6BDE96F06B8D42059BE5A877 /* StructuralBudgetContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DA45E5F44AD4A5CAE021A6D /* StructuralBudgetContractTests.swift */; };
+		4C2CDA3D0C47482A8F8D0F55 /* EnvironmentInjectionContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D7D1C791E254D7F863058AE /* EnvironmentInjectionContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -389,6 +390,7 @@
 		C594C14EC1064884915D4159 /* MacSettingsSearchContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSettingsSearchContractTests.swift; sourceTree = "<group>"; };
 		AF86BA39795049F29714AD44 /* StructuralBudgetRule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StructuralBudgetRule.swift; sourceTree = "<group>"; };
 		4DA45E5F44AD4A5CAE021A6D /* StructuralBudgetContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StructuralBudgetContractTests.swift; sourceTree = "<group>"; };
+		4D7D1C791E254D7F863058AE /* EnvironmentInjectionContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EnvironmentInjectionContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1060,6 +1062,7 @@
 				C594C14EC1064884915D4159 /* MacSettingsSearchContractTests.swift */,
 				AF86BA39795049F29714AD44 /* StructuralBudgetRule.swift */,
 				4DA45E5F44AD4A5CAE021A6D /* StructuralBudgetContractTests.swift */,
+				4D7D1C791E254D7F863058AE /* EnvironmentInjectionContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1528,6 +1531,7 @@
 				8ABBDAD833924584B33E0040 /* MacSettingsSearchContractTests.swift in Sources */,
 				33BF5FCEDBD047849CDD513B /* StructuralBudgetRule.swift in Sources */,
 				6BDE96F06B8D42059BE5A877 /* StructuralBudgetContractTests.swift in Sources */,
+				4C2CDA3D0C47482A8F8D0F55 /* EnvironmentInjectionContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

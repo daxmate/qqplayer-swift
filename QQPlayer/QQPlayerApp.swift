@@ -123,6 +123,11 @@ struct QQPlayerApp: App {
                 .environment(IOSPassiveSyncCenter.shared)
                 .environment(PlaylistCoverLoadFailuresStore.shared)
                 .environment(LyricOffsetStore.shared)
+                // App 级无状态入口容器（方案 A；批 4 起 iOS 侧视图也用 `@Environment(AppServices.self)` 取
+                // HybridMusicAPIService / LocalDeviceNameStore / LyricsSearchProvider / …）。
+                // ⚠️ 漏了这一行的后果：视图 `@Environment(AppServices.self)` 在**运行时**致命错
+                // （编译期与单测都发现不了），`SyncSettingsView.onAppear` 这种必读点会一进页就崩。
+                .environment(AppServices.live)
                 .task {
                     DatabaseSuspensionCoordinator.shared.start()
                     await appCoordinator.initialize()
