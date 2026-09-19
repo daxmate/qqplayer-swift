@@ -25,9 +25,17 @@
 //    `QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中声明了 SwiftUI View
 //    （`: View` / `some View`）的文件。`QQPlayer/Mac/` 下的服务不在范围内。
 //  计数口径：只算**代码行**（`//` 之后剥离、整行注释不计——文档注释里的字面量会误伤自己），
-//    粒度为 `<Type>.shared` 的出现次数，与 `grep -oE '[A-Za-z_]+\.shared'` 同口径。
+//    粒度为「`<Type>.shared` 的出现次数」，两种写法都算：
+//      · 显式 `Foo.shared`（与 `grep -oE '[A-Za-z_]+\.shared'` 同口径）
+//      · **前导点简写** `.shared`（2026-09-19 收紧）——`store: T = .shared` /
+//        `ObservedObject(wrappedValue: .shared)` / `hostCenter ?? .shared`。
+//    此前只认显式写法，于是「把 `Foo.shared` 改写成 `.shared`」就能压低上限 =
+//    棘轮可被绕过。收紧后暴露既有存量 4 处（MacSyncView 3 / SyncDeviceNameEditorView 1）。
 //
 //  基线文件：`QQPlayerTests/Fixtures/shared-singleton-baseline.tsv`（`路径<TAB>计数` + `# TOTAL:`）。
+//  预算账本 + 分批计划：`QQPlayerTests/Fixtures/shared-singleton-budget-plan.md`
+//    （每批迁完必须把 TOTAL 与涉及文件的行值**下调到实测值**——本棘轮只防变差，
+//      "变好"靠那份账本驱动）。
 //
 
 import Foundation
@@ -66,8 +74,14 @@ private enum ViewSharedSingletonContract {
         }
     }
 
-    /// 与用户侧口径一致：`grep -oE '[A-Za-z_]+\.shared'`。
-    private static let sharedPattern = try! NSRegularExpression(pattern: "[A-Za-z_]+[.]shared")
+    /// 显式写法（与用户侧口径一致：`grep -oE '[A-Za-z_]+\.shared'`）。
+    private static let explicitSharedPattern = try! NSRegularExpression(pattern: "[A-Za-z_]+[.]shared")
+    /// **前导点简写** `.shared`：点号前不是标识符字符/点，点号后不是标识符字符。
+    /// 例：`= .shared` / `: .shared` / `(wrappedValue: .shared)` / `?? .shared` / `foo().shared`。
+    /// 与显式写法互斥（`Foo.shared` 的点号前是标识符 → 这里不重复计数）。
+    private static let shorthandSharedPattern = try! NSRegularExpression(
+        pattern: "(?<![A-Za-z0-9_.])[.]shared(?![A-Za-z0-9_])"
+    )
     private static let totalPattern = try! NSRegularExpression(pattern: "^#\\s*TOTAL:\\s*([0-9]+)\\s*$")
 
     /// 是否声明了 SwiftUI View（决定 `QQPlayer/Mac/` 下的文件算不算视图层）。
@@ -77,11 +91,12 @@ private enum ViewSharedSingletonContract {
         return false
     }
 
-    /// 单行代码里的出现次数（先剥掉 `//` 之后的注释部分）。
+    /// 单行代码里的出现次数（先剥掉 `//` 之后的注释部分）：显式写法 + 前导点简写。
     static func occurrences(inCodeLine line: String) -> Int {
         let code = line.components(separatedBy: "//").first ?? ""
         let range = NSRange(code.startIndex ..< code.endIndex, in: code)
-        return sharedPattern.numberOfMatches(in: code, range: range)
+        return explicitSharedPattern.numberOfMatches(in: code, range: range)
+            + shorthandSharedPattern.numberOfMatches(in: code, range: range)
     }
 
     /// 一份源码里的出现次数（只算代码行）。
@@ -253,6 +268,19 @@ struct ViewSharedSingletonContractTests {
         #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "// 整行注释 X.shared") == 0)
         #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let x = URLSession.shared") == 1)
         #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let y = something.sharedThing") == 1)
+
+        // 2026-09-19 收紧：前导点简写必须计入（此前正是「换写法压低上限」的漏洞）
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "store: LocalDeviceNameStore = .shared") == 1)
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "_x = ObservedObject(wrappedValue: .shared)") == 1)
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let a = hostCenter ?? .shared") == 1)
+        // 显式写法不得被简写规则重复计数（`Foo.shared` 仍只算 1）
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let b = Foo.shared") == 1)
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let c = Foo.shared.bar") == 1)
+        // 链式/可选链后的简写同样算（点号前不是标识符）
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let d = foo().shared") == 1)
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let e = maker()?.shared") == 1)
+        // 词边界：`shared` 后面还有标识符字符 → 不是单例访问
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let f = .sharedThing") == 0)
 
         let serviceSource = """
         import Foundation
