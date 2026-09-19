@@ -16,6 +16,7 @@ private enum ArtworkSwipeDirection: Equatable {
 struct PlayerView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
+    @Environment(AppServices.self) private var services
     @StateObject private var playerEngine = PlayerEngine.shared
     @StateObject private var artworkManager = ArtworkManager.shared
     @EnvironmentObject private var appCoordinator: AppCoordinator
@@ -23,8 +24,7 @@ struct PlayerView: View {
     @State private var nextArtwork: UIImage?
     @State private var previousArtwork: UIImage?
     @State private var dragOffset: CGFloat = 0
-    /// 封面拖动手势的方向锁定（nil = 未定）：首次判定后锁定，防下拉过程中手指微斜
-    /// 导致横/纵分支来回切换（abs(width) vs abs(height) 瞬时翻转）→ 视图抖动
+    /// 封面拖动手势的方向锁定（nil = 未定）：首次判定后锁定，防下拉过程中手指微斜导致横/纵分支来回切换（abs(width) vs abs(height) 瞬时翻转）→ 视图抖动
     @State private var gestureAxis: Axis?
     /// 下拉移动的宿主 UIView（fullScreenCover 的 hosting view）：
     /// 纵向跟手直接驱动 UIKit transform，完全绕过 SwiftUI 状态重算/布局（Apple Music 同款底层），
@@ -829,7 +829,7 @@ struct PlayerView: View {
         isLoadingLyrics = true
 
         Task {
-            let lyrics = await LyricsManager.shared.getLyrics(for: currentTrack)
+            let lyrics = await services.lyricsManager.getLyrics(for: currentTrack)
 
             await MainActor.run {
                 // 切歌后当前歌曲已变，丢弃旧请求结果，不写任何状态（isLoadingLyrics 由新任务接管）
