@@ -567,6 +567,7 @@
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
+				Services/AppServices.swift,
 				QQPlayerMacApp.swift,
 				Resources/SimplifiedToTraditional.tsv,
 				Resources/TraditionalToSimplified.tsv,

@@ -59,6 +59,13 @@ struct QQPlayerMacApp: App {
                 .tint(MacAppearance.currentAccentColor)
                 // App 强调色环境值（Color.accentColor 在 macOS 跟随系统而非 App tint）
                 .environment(\.appAccentColor, MacAppearance.currentAccentColor)
+                // 视图层单例收口（「下降预算」批 3a）：App 级叶子 store 的**唯一装配点**。
+                // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
+                // 新增一个对象 = 在此与 `Settings` 根各登记一行。
+                .environment(MacSearchAnythingState.shared)
+                .environment(MacLibraryFactsStore.shared)
+                // App 级无状态入口容器（批 3b・方案 A）：WhatsNewStore / StateManager / MacFolderMonitor
+                .environment(AppServices.live)
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                     deleteSettings = DeleteSettings.load()
                 }
@@ -71,6 +78,10 @@ struct QQPlayerMacApp: App {
             MacSettingsView()
                 .tint(MacAppearance.currentAccentColor)
                 .environment(\.appAccentColor, MacAppearance.currentAccentColor)
+                // 同 WindowGroup 根：Settings 是独立场景，不继承主窗环境（批 3a）。
+                .environment(MacSearchAnythingState.shared)
+                .environment(MacLibraryFactsStore.shared)
+                .environment(AppServices.live)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
         .commands {
