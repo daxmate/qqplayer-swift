@@ -64,6 +64,8 @@ struct QQPlayerMacApp: App {
                 // 新增一个对象 = 在此与 `Settings` 根各登记一行。
                 .environment(MacSearchAnythingState.shared)
                 .environment(MacLibraryFactsStore.shared)
+                // App 级无状态入口容器（批 3b・方案 A）：WhatsNewStore / StateManager / MacFolderMonitor
+                .environment(AppServices.live)
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                     deleteSettings = DeleteSettings.load()
                 }
@@ -79,6 +81,7 @@ struct QQPlayerMacApp: App {
                 // 同 WindowGroup 根：Settings 是独立场景，不继承主窗环境（批 3a）。
                 .environment(MacSearchAnythingState.shared)
                 .environment(MacLibraryFactsStore.shared)
+                .environment(AppServices.live)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
         .commands {
