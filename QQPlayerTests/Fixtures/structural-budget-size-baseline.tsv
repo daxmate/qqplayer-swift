@@ -13,7 +13,6 @@ QQPlayer/Mac/MacLyricsView.swift	698
 QQPlayer/Mac/MacOnlineSearchView.swift	751
 QQPlayer/Mac/MacPlayerView.swift	617
 QQPlayer/Mac/MacSearchAnythingLayer.swift	727
-QQPlayer/Mac/MacSyncView.swift	1236
 QQPlayer/Mac/MacTagEditorView.swift	818
 QQPlayer/Services/AppCoordinator.swift	645
 QQPlayer/Services/ArtworkExtraction.swift	651
@@ -40,4 +39,4 @@ QQPlayer/Views/Library/SearchResultsViews.swift	746
 QQPlayer/Views/Player/LyricsView.swift	758
 QQPlayer/Views/Player/PlayerView.swift	985
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	640
-# TOTAL: 25046
+# TOTAL: 23810
