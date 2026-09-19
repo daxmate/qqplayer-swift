@@ -6,8 +6,7 @@
 //  Spotlight 式主窗内全屏浮层：⌘K 唤起（QQPlayerMacApp .commands 切换本层开关），
 //  Esc/点空白收起。分组结果：本地歌曲 / 在线（下载）/ 歌手 / 专辑 / 设置——
 //  与侧栏 MacSearchView（库内检索含歌单）共存，本层为全局超集（web 语义：歌单不入）。
-//  250ms 防抖（web useSearchAnything 对齐）；本地多路 DB 搜索 + 在线网易云异步追尾。
-//  用户 2026-09-04 拍板：在线行动作 = 下载落盘入曲库（v1，无试听/网络登记）。
+//  250ms 防抖（web useSearchAnything 对齐）；本地多路 DB 搜索 + 在线网易云异步追尾。用户 2026-09-04 拍板：在线行动作 = 下载落盘入曲库（v1，无试听/网络登记）。
 //
 
 import AppKit
@@ -37,6 +36,7 @@ struct MacSearchAnythingLayer: View {
 
     // 2026-09-18 批 1：@ObservedObject → 普通 let；2026-09-19 批 3a：直连 `.shared` → 组合根环境注入。
     @Environment(MacSearchAnythingState.self) private var state
+    @Environment(AppServices.self) private var services
 
     @State private var query = ""
     @State private var localSongs: [Track] = []
@@ -531,7 +531,7 @@ struct MacSearchAnythingLayer: View {
         onlineSongs = []
         isOnlineSearching = true
         do {
-            let songs = try await NeteaseOnlineClient.shared.search(query: q, limit: 20)
+            let songs = try await services.neteaseOnlineClient.search(query: q, limit: 20)
             guard seq == searchSeq, !Task.isCancelled else { return }
             onlineSongs = songs
         } catch {

@@ -95,6 +95,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 2（2026-09-19，本批） | `PlaylistCoverLoadFailuresStore`、`IOSPassiveSyncCenter`、`LyricOffsetStore` | 直连棘轮 174 → **165**（真迁 12 处；preview 装配 +3）；口径收紧后再曝光既有存量 4 处 → **169**；迁移棘轮 209 → **193** | iOS 全量 + Mac 构建零警告 + target 门禁 |
 | 批 3a（2026-09-19） | `MacLibraryFactsStore`（迁 `@Observable`）+ `MacSearchAnythingState`（只改注入） | 直连棘轮 169 → **158**（真迁 11 处，**0 preview 成本**）；迁移棘轮 193 → **185** | Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 3b（2026-09-19） | `WhatsNewStore` / `StateManager` / `MacFolderMonitor`（非 Observable 入口） | 直连棘轮 158 → **153**（真迁 5 处，0 preview 成本） | Mac 构建零警告 + 行数/print 预算 + target 门禁 |
+| 批 4（2026-09-19） | `LocalDeviceNameStore` / `HybridMusicAPIService` / `LyricsSearchProvider` / `NeteaseOnlineClient`（无状态入口 → `AppServices` 容器） | 直连棘轮 153 → **141**（真迁 12 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 
 > 批 2 的两个数字要说清：**口径收紧（前导点简写）与真迁移是两个方向的动作**——
 > 前者让 4 处此前看不见的既有直连显形（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），
@@ -165,16 +166,33 @@ iOS 侧批 4 的同需求直接复用同一容器（不另建第二份）。
 **⚠️ 迁移未覆盖**：`MacImportService.swift:44` 仍有 `StateManager.shared`——该文件是**服务**（未声明
 SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠账。
 
-### 批 4：非 Observable 的「无状态入口」（需要注入机制决策）
-目标：`LocalDeviceNameStore`（3 处 + `SyncDeviceNameEditorView` 的 `= .shared` 默认参数）、
-`HybridMusicAPIService`（4 处）、`LyricsSearchProvider`（2 处）、`NeteaseOnlineClient`（2 处）。
-- **前置（本批真正的决策项）**：这类对象**不是** `@Observable` 状态源，`@Environment(T.self)`
-  不适用，需要在两种机制里拍板：
-  1. 自定义 `EnvironmentKey` + 默认值 —— 默认值必须**不能**是 `.shared`（否则就是把直连
-     藏进环境键，属 §二.3 禁止的"换写法绕过"）；
-  2. 组合根暴露一个 App 级服务容器对象（`@Observable`，只读持有这些无状态入口），
-     视图 `@Environment(AppServices.self)` 取——代价是引入一层容器。
-- 预估：−11 处。
+### 批 4：非 Observable 的「无状态入口」——实测完成（2026-09-19）
+
+**机制结论（沿用批 3b 方案 A，未自创第三条道）**：这批 4 个对象在视图侧全是**方法调用或一次性取值**
+（`searchArtist` / `search` / `name` 读一次 / `setName`），不产生按属性追踪需求 → 判据命中「无状态入口」
+→ 一律走 `AppServices` 容器，不给它们开 `@Environment(T.self)`（它们本就不是 `@Observable`）。
+
+**实测（真实扫描器逐站点表，开工时复核）**：
+
+| 对象 | 站点 | 处置 |
+| --- | ---: | --- |
+| `HybridMusicAPIService` | 4 | `ArtistDetailScreen`：删 `@StateObject private var hybridAPI = …shared`（**该属性除声明外零引用 = 死代码**），3 处方法调用改 `services.hybridMusicAPI.*` |
+| `LocalDeviceNameStore` | 4 | `SyncSettingsView` 2 处 + `SyncQRScannerView` 1 处改 `services.localDeviceName.name`；`SyncDeviceNameEditorView` 的 `store: = .shared` **默认参数改必传**（生产调用方从容器取，`#Preview` 自建实例） |
+| `NeteaseOnlineClient` | 2 | `MacOnlineSearchView` / `MacSearchAnythingLayer` 各 1 处改 `services.neteaseOnlineClient.search` |
+| `LyricsSearchProvider` | 2 | `LyricsSearchView`（iOS）/ `MacLyricsSearchView` 各 1 处改 `services.lyricsSearchProvider.search` |
+
+**刷新路径核对（§四.2）**：四个对象都**不是**观测源——视图侧读的只有 `LocalDeviceNameStore.name` 这一次性取值，
+且它落进 `@State deviceName`（`onAppear` / 保存回调刷新），迁移前后刷新时机逐字一致；
+其余三者的返回值本身就落 `@State`（`results` / `onlineSongs` / `unifiedArtist`）。
+**无跨对象 `objectWillChange` 订阅、无 Combine publisher 消费点** → 不存在「迁移后不刷新」的静默坑。
+
+**行数预算（§5.4 照抄做法）**：`MacOnlineSearchView`（751，基线内）与 `MacSearchAnythingLayer`（727，基线内）
+各需 +1 行注入属性、余量为 0 → 各合并一条既有注释让出等量行（751=751 / 727=727）；
+`SyncQRScannerView` 599 → **600**（阈值 `> 600`，未入基线，仍未越线）。
+**本批 0 处 preview 成本**：涉及视图中只有 `SyncDeviceNameEditorView` 有 `#Preview`，它自建实例（不引用 `.shared`，不计预算）。
+
+**延后项不变**：`SyncHostCenter`（订阅机制）、`SyncWiringFactsStore` / `MacLyricsResendFactsStore`（preview 成本净亏）
+未见批 4 顺手解决，仍按批 3a 结论挂在后续批次。
 
 ### 批 5：中频对象（两端共享 Services）
 目标：`EQManager`（10）、`LyricsManager`（8）、`SFBAudioEngineManager`（4）、

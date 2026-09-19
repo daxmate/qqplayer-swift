@@ -29,6 +29,8 @@ struct SyncSettingsView: View {
     @ObservedObject private var wiringFacts = SyncWiringFactsStore.shared
     /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数并上屏）。
     @Environment(PlaylistCoverLoadFailuresStore.self) private var coverFailures
+    /// 2026-09-19 批 4：无状态服务入口（组合根 `AppServices` 注入）
+    @Environment(AppServices.self) private var services
 
     private let deviceStore = DeviceStore()
 
@@ -97,8 +99,8 @@ struct SyncSettingsView: View {
             Section {
                 // 本机名称（用户可改；改的是握手 hello 携带的展示名 → Mac 设备列表显示名）
                 NavigationLink {
-                    SyncDeviceNameEditorView(initialName: deviceName) {
-                        deviceName = LocalDeviceNameStore.shared.name
+                    SyncDeviceNameEditorView(initialName: deviceName, store: services.localDeviceName) {
+                        deviceName = services.localDeviceName.name
                     }
                 } label: {
                     LabeledContent("sync_device_name".localized) {
@@ -190,7 +192,7 @@ struct SyncSettingsView: View {
             loadIdentityIfNeeded()
             reloadHosts()
             // 本机名称：每次进页都从 store 取值（编辑页返回也走这里刷新）
-            deviceName = LocalDeviceNameStore.shared.name
+            deviceName = services.localDeviceName.name
             // 幂等：进页时确保被动端在跑（配对完成后也由此重新检查主机）
             passiveSync.start()
         }

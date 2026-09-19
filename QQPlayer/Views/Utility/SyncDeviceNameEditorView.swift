@@ -24,7 +24,7 @@ struct SyncDeviceNameEditorView: View {
     /// 编辑中的文本（预填当前展示名）。
     @State private var draft: String
 
-    /// 名字读写入口（默认生产单例；预览/单测可注入）。
+    /// 名字读写入口（由调用方注入；预览自建实例，不隐含回退单例）。
     private let store: LocalDeviceNameStore
 
     /// 保存成功回调（同步页据此刷新 @State）。
@@ -32,11 +32,11 @@ struct SyncDeviceNameEditorView: View {
 
     /// - Parameters:
     ///   - initialName: 预填值（调用方传当前展示名；缺省直接读 store）
-    ///   - store: 名字读写入口
+    ///   - store: 名字读写入口（必传；生产由 `SyncSettingsView` 从 `AppServices` 取）
     ///   - onSaved: 保存成功后回调（在 dismiss 前调用）
     init(
         initialName: String? = nil,
-        store: LocalDeviceNameStore = .shared,
+        store: LocalDeviceNameStore,
         onSaved: @escaping () -> Void = {}
     ) {
         self.store = store
@@ -77,6 +77,6 @@ struct SyncDeviceNameEditorView: View {
 
 #Preview {
     NavigationView {
-        SyncDeviceNameEditorView()
+        SyncDeviceNameEditorView(store: LocalDeviceNameStore())
     }
 }
