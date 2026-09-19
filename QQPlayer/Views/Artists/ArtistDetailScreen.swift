@@ -7,7 +7,8 @@ struct ArtistDetailScreen: View {
     let artists: [Artist]
     let allTracks: [Track]
     @EnvironmentObject private var appCoordinator: AppCoordinator
-    @StateObject private var hybridAPI = HybridMusicAPIService.shared
+    /// 2026-09-19 批 4：无状态服务入口（组合根 `AppServices` 注入）——原 `@StateObject` 持有单例已删。
+    @Environment(AppServices.self) private var services
     @State private var unifiedArtist: UnifiedArtist?
     @State private var isLoading = false
     @State private var artistImage: UIImage?
@@ -456,7 +457,7 @@ struct ArtistDetailScreen: View {
         isLoading = true
         Task { @MainActor in
             do {
-                let fetchedArtist = try await HybridMusicAPIService.shared.searchArtist(name: displayName)
+                let fetchedArtist = try await services.hybridMusicAPI.searchArtist(name: displayName)
                 self.unifiedArtist = fetchedArtist
                 self.isLoading = false
                 if let fetchedArtist = fetchedArtist { await loadArtistImage(from: fetchedArtist.images) }
@@ -476,12 +477,18 @@ struct ArtistDetailScreen: View {
 
                 // First try different source with same name
                 print("🔄 Trying different source for: \(displayName)")
-                var fetchedArtist = try await HybridMusicAPIService.shared.searchAlternativeArtist(name: displayName, currentSource: currentSource)
+                var fetchedArtist = try await services.hybridMusicAPI.searchAlternativeArtist(
+                    name: displayName,
+                    currentSource: currentSource
+                )
 
                 // If that fails, try similar names with different sources
                 if fetchedArtist == nil {
                     print("🔄 Trying similar names for: \(displayName)")
-                    fetchedArtist = try await HybridMusicAPIService.shared.searchSimilarArtist(originalName: displayName, currentSource: currentSource)
+                    fetchedArtist = try await services.hybridMusicAPI.searchSimilarArtist(
+                        originalName: displayName,
+                        currentSource: currentSource
+                    )
                 }
 
                 if let fetchedArtist = fetchedArtist {

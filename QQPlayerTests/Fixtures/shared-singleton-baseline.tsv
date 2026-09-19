@@ -18,7 +18,7 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 153
+# TOTAL: 141
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
 # 2026-09-19 账目（与预算账本同步）：
@@ -32,9 +32,13 @@
 #   （非视图层文件，不计预算）；本批 **0 处 preview 成本**（涉及视图本就没有 #Preview）。
 #   → **153**（批 3b・方案 A：AppServices 容器收 WhatsNewStore / StateManager / MacFolderMonitor）
 #   批 3b 逐项：MacLibraryView 10→6（3 个无状态入口改走容器）；容器与组合根不在视图层，不计预算。
+#   → **141**（批 4：无状态入口 LocalDeviceNameStore / HybridMusicAPIService / LyricsSearchProvider / NeteaseOnlineClient）
+#   批 4 逐项：ArtistDetailScreen 8→4、SyncSettingsView 5→3、LyricsSearchView 4→3、MacLyricsSearchView 4→3、
+#   SyncQRScannerView 2→1；MacOnlineSearchView / MacSearchAnythingLayer / SyncDeviceNameEditorView 归零删行。
+#   SyncDeviceNameEditorView 的 `store:` 默认参数（`.shared` 简写）改必传（生产由 SyncSettingsView 从容器取）；
+#   本批 **0 处 preview 成本**（涉及视图的 #Preview 自建实例或不含被注入对象）。
 QQPlayer/Mac/MacPlayerView.swift	13
 QQPlayer/Views/Player/PlayerView.swift	9
-QQPlayer/Views/Artists/ArtistDetailScreen.swift	8
 QQPlayer/Mac/MacDesktopWindowViews.swift	7
 QQPlayer/Mac/MacTrackListView.swift	7
 QQPlayer/Mac/MacKaraokeControlBar.swift	5
@@ -42,34 +46,32 @@ QQPlayer/Mac/MacLibraryView.swift	5
 QQPlayer/Views/Library/SearchResultsViews.swift	5
 QQPlayer/Views/Player/KaraokeControlBar.swift	5
 QQPlayer/Views/Player/PlayerOverlays.swift	5
-QQPlayer/Views/Utility/SyncSettingsView.swift	5
-QQPlayer/Mac/MacLyricsSearchView.swift	4
 QQPlayer/Mac/MacTagEditorView.swift	4
 QQPlayer/Mac/MacVisualizerView.swift	4
-QQPlayer/Views/Player/LyricsSearchView.swift	4
+QQPlayer/Views/Artists/ArtistDetailScreen.swift	4
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	4
 QQPlayer/Views/Utility/SettingsView.swift	4
+QQPlayer/Mac/MacLyricsSearchView.swift	3
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
 QQPlayer/Mac/MacSyncView.swift	3
 QQPlayer/Views/Albums/AlbumViews.swift	3
 QQPlayer/Views/Library/TrackListView.swift	3
+QQPlayer/Views/Player/LyricsSearchView.swift	3
 QQPlayer/Views/Player/LyricsView.swift	3
 QQPlayer/Views/Player/QueueManagementView.swift	3
 QQPlayer/Views/Playlists/PlaylistCardView.swift	3
 QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	3
+QQPlayer/Views/Utility/SyncSettingsView.swift	3
 QQPlayer/Mac/MacArtworkThumbnail.swift	2
 QQPlayer/Mac/MacLyricsView.swift	2
 QQPlayer/Mac/MacManualEQEditorView.swift	2
 QQPlayer/Views/Artists/ArtistRowViews.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	2
 QQPlayer/Views/Utility/ManualEQEditorView.swift	2
-QQPlayer/Views/Utility/SyncQRScannerView.swift	2
 QQPlayer/Mac/MacAlbumArtistViews.swift	1
 QQPlayer/Mac/MacEQImportView.swift	1
 QQPlayer/Mac/MacEQSettingsView.swift	1
 QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	1
-QQPlayer/Mac/MacOnlineSearchView.swift	1
-QQPlayer/Mac/MacSearchAnythingLayer.swift	1
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSmartPlaylistViews.swift	1
 QQPlayer/Mac/MacSyncCenterView.swift	1
@@ -80,4 +82,4 @@ QQPlayer/Views/Player/TrackRowView.swift	1
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	1
 QQPlayer/Views/Utility/EQImportViews.swift	1
 QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	1
-QQPlayer/Views/Utility/SyncDeviceNameEditorView.swift	1
+QQPlayer/Views/Utility/SyncQRScannerView.swift	1

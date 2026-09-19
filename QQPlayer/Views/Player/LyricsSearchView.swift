@@ -13,6 +13,8 @@ struct LyricsSearchView: View {
     let track: Track
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
+    /// 2026-09-19 批 4：无状态服务入口（组合根 `AppServices` 注入）
+    @Environment(AppServices.self) private var services
     let onClose: () -> Void
     /// 应用搜索结果（选中候选）或恢复自动（nil）；由外层负责刷新歌词显示
     let onApply: (Lyrics?) -> Void
@@ -371,7 +373,7 @@ struct LyricsSearchView: View {
         let artist = searchArtist.trimmingCharacters(in: .whitespaces)
 
         Task {
-            let candidates = await LyricsSearchProvider.shared.search(title: title, artist: artist)
+            let candidates = await services.lyricsSearchProvider.search(title: title, artist: artist)
             await MainActor.run {
                 results = candidates
                 searched = true

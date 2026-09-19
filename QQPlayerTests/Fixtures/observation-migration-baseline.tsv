@@ -19,6 +19,8 @@
 #     同步删除：3 个类各 1 `ObservableObject` + 9 个 `@Published`、视图 4 处 `@ObservedObject`）
 #   → **185 / 99**（2026-09-19 批 3a：MacLibraryFactsStore 迁 @Observable；Mac 侧 5 个视图 +
 #     1 个浮层改 `@Environment` 注入。同步删除：1 个 `ObservableObject`、6 处 `@ObservedObject`）
+#   → **184 / 98**（2026-09-19 批 4：ArtistDetailScreen 删掉零引用的 `@StateObject hybridAPI`——
+#     `HybridMusicAPIService` 改走 `AppServices` 容器；同批另三个无状态入口本就没有迁移家族标记）。
 #   账本见 `shared-singleton-budget-plan.md`（每批迁移后基线随之下调）。
 # 格式：路径<TAB>标记<TAB>计数
 QQPlayer/ContentView.swift	@EnvironmentObject	1
@@ -77,7 +79,6 @@ QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
 QQPlayer/Views/Albums/AlbumViews.swift	@EnvironmentObject	3
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	@EnvironmentObject	1
-QQPlayer/Views/Artists/ArtistDetailScreen.swift	@StateObject	1
 QQPlayer/Views/Artists/ArtistRowViews.swift	@EnvironmentObject	1
 QQPlayer/Views/Artists/ArtistsScreen.swift	@EnvironmentObject	1
 QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	@EnvironmentObject	1
