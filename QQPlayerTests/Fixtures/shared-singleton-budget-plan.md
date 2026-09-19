@@ -93,6 +93,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | --- | --- | --- | --- |
 | 批 1（2026-09-18，历史） | `TutorialViewModel`、`MacSearchAnythingState`（迁移棘轮 213 → 209） | 迁移棘轮 213 → 209 | iOS 全量 1627 绿 + Mac 构建零警告 |
 | 批 2（2026-09-19，本批） | `PlaylistCoverLoadFailuresStore`、`IOSPassiveSyncCenter`、`LyricOffsetStore` | 直连棘轮 174 → **165**（真迁 12 处；preview 装配 +3）；口径收紧后再曝光既有存量 4 处 → **169**；迁移棘轮 209 → **193** | iOS 全量 + Mac 构建零警告 + target 门禁 |
+| 批 3a（2026-09-19） | `MacLibraryFactsStore`（迁 `@Observable`）+ `MacSearchAnythingState`（只改注入） | 直连棘轮 169 → **158**（真迁 11 处，**0 preview 成本**）；迁移棘轮 193 → **185** | Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 
 > 批 2 的两个数字要说清：**口径收紧（前导点简写）与真迁移是两个方向的动作**——
 > 前者让 4 处此前看不见的既有直连显形（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），
@@ -115,6 +116,27 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 - **同时处理**：`MacSyncView` 的 `#Preview` 装配（preview 是组合根之外的第二个合法装配点，
   见 §五.2 的预算成本）；
 - 预估：−15 处左右（含 2 处简写）。
+
+### 批 3a：实际范围与延后项（2026-09-19 实测修正）
+
+开工盘点（真实扫描器 + 订阅方 grep 复核）**推翻了「批 3 全是叶子」的假设**，因此只做了净收益部分：
+
+| 目标 | 站点 | 本批 | 原因 |
+| --- | ---: | --- | --- |
+| `MacLibraryFactsStore` | 9 | ✅ 迁 `@Observable` + 视图/浮层注入 | 无外部 `objectWillChange` 订阅；手工 `send()` ×4 随迁删除（字典就地写入走 `_modify`，按属性追踪生效）；读取面 `albumFacts(forAlbumId:)` 等直接读字典 → 追踪成立 |
+| `MacSearchAnythingState` | 2 | ✅ 改注入 | 已是 `@Observable`（批 1），只差注入 |
+| `SyncWiringFactsStore` / `MacLyricsResendFactsStore` | 2 | ⏸ 延后 | 唯二消费点都在 `MacSyncRunSection`，而它被 2 个 `#Preview` 覆盖 → 迁 2 处要付 4 处 preview 成本，**净亏 +2** |
+| `SyncHostCenter` | 2 | ⏸ 延后 | 被 `MacSyncRunViewModel` / `MacSyncContentModel` / `MacSyncDataViewModel` 以 `center.objectWillChange` 订阅（3 处）→ 迁 `@Observable` 会**静默失效**，需先改订阅机制（属热点批） |
+| `WhatsNewStore` / `MacFolderMonitor` / `StateManager` | 5 | ⏸ 延后 | 三者**都不是** Observable 对象（站点全是方法调用）→ 需要一个「非 Observable 对象」的注入机制，即批 4 的前置拍板项 |
+
+**纪律（批 3a 实测）**：分批计划里的「叶子」标签必须在开工时用真实扫描器 + 订阅方 grep 复核，
+并先算清 **preview 成本**（`#Preview` 里每个 `@Environment` 对象 = +1 预算），
+否则会出现「计划 −15、实际净亏」的批次。
+
+**Mac 组合根装配（本批已定）**：`QQPlayerMacApp` 的两个场景根（`WindowGroup` + `Settings`）
+各显式注入同一组对象（Settings 是独立场景、不继承主窗环境）；`MacDesktopWindowsManager` 的浮窗
+是手工 `NSHostingView`、不继承场景环境，**当前两个浮窗视图（`MacMiniPlayerView` / `MacDesktopLyricView`）
+未消费任何被注入对象**，故本批无需在彼处装配（将来浮窗用到时按同一清单补）。
 
 ### 批 4：非 Observable 的「无状态入口」（需要注入机制决策）
 目标：`LocalDeviceNameStore`（3 处 + `SyncDeviceNameEditorView` 的 `= .shared` 默认参数）、
@@ -215,6 +237,11 @@ let center = hostCenter ?? .shared                     // MacSyncView.swift:68
 纪律：**动 >600 行文件前先算预算余量**（`scripts/check-structural-budget.sh check`）。
 余量为 0 而迁移必须 +2 时，要么让出等量行，要么先拆文件（属结构清债批次），
 **不要**改基线放行（`emit` 只允许收紧后替换）。
+
+**批 3a 补充（每文件余量为 0 时的两种做法）**：
+- `MacLibraryView.swift`（825 行，在基线内）需要**新增** 1 行 `@Environment(MacLibraryFactsStore.self)` 属性，
+  余量为 0 → 把原有 3 行注释合并为 2 行让出 1 行（825 = 825）；
+- `MacSearchAnythingLayer.swift`（727 行，在基线内）→ 迁移只做 **1:1 行替换**，一行说明都不加。
 
 ### 5.5 批 2 的「刷新路径核对」（长文件那份搬到这里）
 §四.2 要求逐对象写出「迁移前 vs 迁移后」的刷新对照，但 `IOSPassiveSyncCenter.swift` 受行数预算

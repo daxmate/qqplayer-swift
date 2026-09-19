@@ -67,7 +67,7 @@ struct MacTrackListView: View {
     var onShowAlbum: ((Track) -> Void)?
 
     /// 曲库卡片事实缓存（审计 M2：body 里的同步全量 DB 查询→缓存/异步）
-    @ObservedObject private var facts = MacLibraryFactsStore.shared
+    @Environment(MacLibraryFactsStore.self) private var facts
     @State private var selectedRows = Set<String>()
     @State private var favoriteIds: Set<String> = []
     @State private var playlists: [Playlist] = []

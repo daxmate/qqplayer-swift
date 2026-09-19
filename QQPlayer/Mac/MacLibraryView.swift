@@ -45,10 +45,10 @@ struct MacLibraryView: View {
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var indexer = LibraryIndexer.shared
     @StateObject private var progress = PlayerEngine.shared.progress
-    /// search anything 开关（⌘K 菜单命令与浮层共用同一单例）
-    /// 2026-09-18 批 1：@ObservedObject → 普通 let（@Observable 类型不需要包装器；
-    /// body 里读 `isOpen` 即建立按属性追踪，⌘K 弹出/收起的刷新路径不变）。
-    private let searchAnythingState = MacSearchAnythingState.shared
+    /// search anything 开关（⌘K 命令；2026-09-19 批 3a 起由 Mac 组合根注入，读 `isOpen` 按属性追踪）
+    @Environment(MacSearchAnythingState.self) private var searchAnythingState
+    /// 曲库卡事实（批 3a：同上，由 Mac 组合根注入）
+    @Environment(MacLibraryFactsStore.self) private var libraryFacts
 
     @State private var section: MacLibrarySection = .tracks
     @State private var tracks: [Track] = []
@@ -535,13 +535,13 @@ struct MacLibraryView: View {
     private func reloadLibrary() {
         libraryLoadTask?.cancel()
         // 曲库数据可能已变：作废在途事实（旧值保留到预取完，不闪 0）
-        MacLibraryFactsStore.shared.invalidate()
+        libraryFacts.invalidate()
         libraryLoadTask = Task { @MainActor in
             let loaded = await MacLibraryLoader.load()
             guard !Task.isCancelled else { return }
             switch loaded {
             case .success(let snapshot):
-                await MacLibraryFactsStore.shared.preload(
+                await libraryFacts.preload(
                     tracks: snapshot.tracks,
                     albums: snapshot.albums,
                     artists: snapshot.artists,
