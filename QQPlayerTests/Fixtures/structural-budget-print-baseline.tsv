@@ -41,10 +41,14 @@ QQPlayer/Services/AudioMetadataParser+DSD.swift	34
 QQPlayer/Services/AudioMetadataParser+FLAC.swift	8
 QQPlayer/Services/AudioMetadataParser+MP3WAV.swift	31
 QQPlayer/Services/AudioMetadataParser.swift	1
+QQPlayer/Services/DatabaseManager+ContentHash.swift	5
 QQPlayer/Services/DatabaseManager+Library.swift	4
+QQPlayer/Services/DatabaseManager+Migration.swift	26
 QQPlayer/Services/DatabaseManager+Playlists.swift	38
+QQPlayer/Services/DatabaseManager+Schema.swift	8
 QQPlayer/Services/DatabaseManager+Tracks.swift	24
-QQPlayer/Services/DatabaseManager.swift	60
+QQPlayer/Services/DatabaseManager.swift	20
+QQPlayer/Services/DatabaseSuspensionCoordinator.swift	1
 QQPlayer/Services/DiscogsAPI.swift	13
 QQPlayer/Services/EQManager.swift	21
 QQPlayer/Services/ExternalFileBookmarkStore.swift	1
