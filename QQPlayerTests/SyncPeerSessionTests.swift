@@ -402,17 +402,22 @@ struct SyncPeerSessionTests {
         #expect(fixture.hostSession.closeReason == .remoteClosed)
     }
 
-    @Test("握手超时：host 等不到 client hello → handshakeTimeout",
-          .disabled("CI 模拟器 3 轮验证：asyncAfter 超时从未触发（实现 review 无 bug：deadline 调度/锁/close 路径均正确；同 suite 其他时序测试全过）。疑 Swift Testing 并发环境与 DispatchQueue.asyncAfter 交互问题。待 macOS 测试 target 或模拟器调试验证（2026-09-09）"))
-    func handshakeTimeout() async throws {
-        let fixture = SessionFixture.make(config: SyncSessionConfiguration(handshakeTimeout: 0.1))
+    @Test("握手超时：host 等不到 client hello → handshakeTimeout")
+    func handshakeTimeout() throws {
+        // 2026-09-20 恢复：原先用真实定时器 + 轮询，`.disabled` 的理由是「CI 模拟器 3 轮
+        // 验证 asyncAfter 超时从未触发（实现 review 无 bug）」。根因同 🟡T4：超时项排在
+        // GCD 全局 `.utility` 队列上，池被占满/被节流时过了 deadline 也拿不到线程。
+        // 改走注入的手动调度器后**显式触发**，不再依赖 runner 调度。
+        let deadlines = ManualDeadlineScheduler()
+        let fixture = SessionFixture.make(
+            config: SyncSessionConfiguration(handshakeTimeout: 0.1),
+            deadlineScheduler: deadlines
+        )
         fixture.hostSession.handleTransportReady()
         #expect(fixture.hostSession.phase == .waitingForPeerHello)
-        // 轮询等待超时关闭：asyncAfter 在 CI 模拟器高负载下可能延迟，不依赖精确 sleep
-        let deadline = Date().addingTimeInterval(3)
-        while fixture.hostSession.phase != .closed, Date() < deadline {
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        #expect(deadlines.pendingCount == 1) // 等对端 hello 期间挂着握手超时
+
+        #expect(deadlines.fireAll() == 1)
         #expect(fixture.hostSession.phase == .closed)
         #expect(fixture.hostSession.closeReason == .handshakeTimeout)
     }
