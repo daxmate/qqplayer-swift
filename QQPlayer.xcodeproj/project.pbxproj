@@ -175,6 +175,7 @@
 		6FACE121064745CC9EADFA7F /* SyncDeadlineSchedulingContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2243A53A77AE483A8ED843A7 /* SyncDeadlineSchedulingContractTests.swift */; };
 		EDD34526F4B84A259D637FE9 /* SyncConnectDiagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1317BB92FEDE4560841BFEEF /* SyncConnectDiagTests.swift */; };
 		4A9E937D8D0D4A0FBC477EF9 /* ShuffleOrderModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C5EA9428BC54B9EA6ED3FE6 /* ShuffleOrderModeTests.swift */; };
+		8F5D8461D59A424F9ADAF508 /* AppLogShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E65F3325CF04B38991906B4 /* AppLogShapeContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -399,6 +400,7 @@
 		2243A53A77AE483A8ED843A7 /* SyncDeadlineSchedulingContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDeadlineSchedulingContractTests.swift; sourceTree = "<group>"; };
 		1317BB92FEDE4560841BFEEF /* SyncConnectDiagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncConnectDiagTests.swift; sourceTree = "<group>"; };
 		3C5EA9428BC54B9EA6ED3FE6 /* ShuffleOrderModeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShuffleOrderModeTests.swift; sourceTree = "<group>"; };
+		6E65F3325CF04B38991906B4 /* AppLogShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppLogShapeContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -579,6 +581,7 @@
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
+				Services/AppLog.swift,
 				Services/AppServices.swift,
 				QQPlayerMacApp.swift,
 				Resources/SimplifiedToTraditional.tsv,
@@ -638,6 +641,7 @@
 				Services/LibraryIndexerModels.swift,
 				Services/LibraryReads.swift,
 				Services/LocalDeviceName.swift,
+				Services/LogRotation.swift,
 				Services/LyricsManager.swift,
 				Services/LyricsModels.swift,
 				Services/LyricsParsing.swift,
@@ -1078,6 +1082,7 @@
 				2243A53A77AE483A8ED843A7 /* SyncDeadlineSchedulingContractTests.swift */,
 				1317BB92FEDE4560841BFEEF /* SyncConnectDiagTests.swift */,
 				3C5EA9428BC54B9EA6ED3FE6 /* ShuffleOrderModeTests.swift */,
+				6E65F3325CF04B38991906B4 /* AppLogShapeContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1551,6 +1556,7 @@
 				6FACE121064745CC9EADFA7F /* SyncDeadlineSchedulingContractTests.swift in Sources */,
 				EDD34526F4B84A259D637FE9 /* SyncConnectDiagTests.swift in Sources */,
 				4A9E937D8D0D4A0FBC477EF9 /* ShuffleOrderModeTests.swift in Sources */,
+				8F5D8461D59A424F9ADAF508 /* AppLogShapeContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
