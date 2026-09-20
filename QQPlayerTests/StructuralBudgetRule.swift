@@ -98,13 +98,39 @@ enum StructuralBudgetRule {
         return source.hasSuffix("\n") ? newlines : newlines + 1
     }
 
-    /// 裸 `print(` 口径：先剥掉 `//` 之后的行尾注释，再数 `print(` 出现次数。
-    /// 与 `grep 'print('` 同口径（整行注释不计；字符串字面量里的 `print(` 会误计，已知且可接受）。
+    /// 裸 `print(` 口径：先剥掉 `//` 之后的行尾注释，再数**词边界**上的 `print(` 出现次数。
+    /// 词边界 = 紧邻的前一个字符不是标识符字符（字母/数字/下划线）——`fileFingerprint(` /
+    /// `FileFingerprint(` 这类标识符不算调用（2026-09-21 前是朴素子串口径，把这 4 处误算成 print，
+    /// 详见 `AppLogShapeContractTests` 守卫③ 的说明）。
+    /// 整行注释不计；字符串字面量里的 `print(` 仍会误计，已知且可接受。
     static func printCalls(in source: String) -> Int {
         source.split(separator: "\n", omittingEmptySubsequences: false).reduce(0) { partial, rawLine in
             let code = rawLine.components(separatedBy: "//").first ?? ""
-            return partial + occurrences(of: "print(", in: code)
+            return partial + callOccurrences(of: "print(", in: code)
         }
+    }
+
+    /// **调用点计数（词边界口径）的唯一实现**：只把词边界上的 `needle`（形如 `print(` / `NSLog(`）算一次。
+    /// 判定：紧邻 `needle` **之前**的字符若是字母/数字/下划线，说明它是更长标识符的一部分（如
+    /// `fileFingerprint(` 里的 `print(`），不计。`needle` 以 `(` 结尾，故右侧天然是边界。
+    /// 为什么单列成函数：`print(` 与 `NSLog(` 必须同口径（2026-09-21 任务），而「同口径」唯一的
+    /// 落地方式是同一份实现被复用——别处不得再写一份子串/正则判断。
+    static func callOccurrences(of needle: String, in haystack: String) -> Int {
+        guard !needle.isEmpty else { return 0 }
+        var count = 0
+        var searchStart = haystack.startIndex
+        while let found = haystack.range(of: needle, range: searchStart ..< haystack.endIndex) {
+            if !isIdentifierCharacter(at: found.lowerBound, in: haystack) { count += 1 }
+            searchStart = found.upperBound
+        }
+        return count
+    }
+
+    /// `index` 的前一个字符是否为标识符字符（字母/数字/下划线）；行首返回 false。
+    static func isIdentifierCharacter(at index: String.Index, in text: String) -> Bool {
+        guard index > text.startIndex else { return false }
+        let previous = text[text.index(before: index)]
+        return previous.isLetter || previous.isNumber || previous == "_"
     }
 
     static func occurrences(of needle: String, in haystack: String) -> Int {

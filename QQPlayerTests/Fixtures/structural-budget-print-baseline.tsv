@@ -1,7 +1,7 @@
 # 裸 `print(` 存量清单 —— 结构预算棘轮基线，只能减不能增
 #
-# 口径：剥掉 `//` 之后的行尾注释再数 `print(`（与 `grep 'print('` 同口径；
-#       整行注释不计；字符串字面量里的 `print(` 会误计，已知且可接受）。
+# 口径：剥掉 `//` 之后的行尾注释，再数**词边界**上的 `print(`（`fileFingerprint(` 这类标识符不算）；
+#       整行注释不计；字符串字面量里的 `print(` 仍会误计，已知且可接受。
 # 守护：QQPlayerTests/StructuralBudgetContractTests.swift
 #   诊断输出必须走统一出口（`AppLog`）；存量钉基线，只能减不能增；
 #   新文件带裸 print → 红（确需登记则加行并在提交信息说明理由）。
@@ -29,8 +29,6 @@ QQPlayer/Mac/SyncHostCenter.swift	8
 QQPlayer/Models/SFBTrack.swift	16
 QQPlayer/Models/WidgetData.swift	30
 QQPlayer/QQPlayerApp.swift	33
-QQPlayer/Services/LibraryIndexer+Parsing.swift	1
-QQPlayer/Services/LibraryIndexer.swift	3
 QQPlayer/Services/SyncConnectDiag.swift	1
 QQPlayer/ViewModels/TutorialViewModel.swift	1
-# TOTAL: 151
+# TOTAL: 147

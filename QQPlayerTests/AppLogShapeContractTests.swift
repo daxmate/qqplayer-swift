@@ -65,17 +65,16 @@ private enum AppLogShapeContract {
     /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（迁移完成的文件逐个登记）。
     /// 当前 = 批 2（sync 5）+ 批 3（migration/DB 9）+ 批 4a/4b（播放引擎 12）
     /// + 批 5（音频元数据·封面·歌词 12）+ 批 6（索引/扫描/清理 5）+ 批 7（服务·协调·网络 18）
-    /// + 批 8（Views 层 24）= 85 文件。
+    /// 当前 = 批 2（sync 5）+ 批 3（migration/DB 9）+ 批 4a/4b（播放引擎 12）+ 批 6（索引/扫描/清理 5）
+    /// + 批 5（音频元数据·封面·歌词 12）+ 批 7（服务/协调/网络 18）+ 批 8（Views 24）
+    /// + 口径收口批（批 6 遗留 2）= 87 文件。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     ///
-    /// ⚠️ 批 6 有 2 个文件**已完成迁移但未登记**（`print()` 调用已全部清零，卡在本守卫的计数口径上）：
-    /// `QQPlayer/Services/LibraryIndexer.swift` 与 `QQPlayer/Services/LibraryIndexer+Parsing.swift`。
-    /// 原因：`StructuralBudgetRule.printCalls` 是 `print(` 子串口径，会把 `fileFingerprint(` /
-    /// `FileFingerprint(` 这种标识符一并计入（这两文件残留 3 处 / 1 处，实测 `emit-prints` 得
-    /// `TOTAL 661` 而非按「处数」算的 657 —— 差额 4 即这 4 个标识符）。登记进来会让
-    /// ③(a)（仍有裸 print）与 ③(b)（不得同时在基线 TSV 里）同时变红，故暂不登记。
-    /// 待 maintainer 决定：口径改词边界，或该 API 改名（不属本批范围，未擅自改）。
+    /// 批 6 曾把 `QQPlayer/Services/LibraryIndexer.swift` 与
+    /// `QQPlayer/Services/LibraryIndexer+Parsing.swift` 卡住：当时的朴素子串口径把
+    /// `fileFingerprint(` / `FileFingerprint(` 这类标识符也算成 print 调用（残留 3 处 / 1 处）。
+    /// 2026-09-21 口径已改**词边界**（`StructuralBudgetRule.callOccurrences`），两个文件随之登记。
     static let migratedChains: Set<String> = [
         "QQPlayer/AppIntents/SpotlightLibraryIndexer.swift",
         "QQPlayer/Services/AppCoordinator+ImportExport.swift",
@@ -105,8 +104,10 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/HybridMusicAPI.swift",
         "QQPlayer/Services/IOSPassiveSyncCenter.swift",
         "QQPlayer/Services/KaraokeController.swift",
+        "QQPlayer/Services/LibraryIndexer+Parsing.swift",
         "QQPlayer/Services/LibraryIndexer+Scanning.swift",
         "QQPlayer/Services/LibraryIndexer+SharedImport.swift",
+        "QQPlayer/Services/LibraryIndexer.swift",
         "QQPlayer/Services/LyricsManager.swift",
         "QQPlayer/Services/LyricsParsing.swift",
         "QQPlayer/Services/LyricsSearch.swift",
@@ -332,14 +333,14 @@ private enum AppLogShapeContract {
 
     // MARK: - 守卫③
 
-    /// `NSLog(` 计数：复用 `StructuralBudgetRule.occurrences` 的行内计数口径
-    /// （**不另写一份 print 计数正则**；剥注释口径与 `StructuralBudgetRule.printCalls` 一致）。
+    /// `NSLog(` 计数：复用 `StructuralBudgetRule` 的**同一份词边界口径**
+    /// （`callOccurrences`——**不另写一份 print/NSLog 计数正则**；剥注释口径与 `printCalls` 一致）。
     static func nsLogCalls(in source: String) -> Int {
         source
             .split(separator: "\n", omittingEmptySubsequences: false)
             .reduce(0) { partial, rawLine in
                 let code = String(rawLine).components(separatedBy: "//").first ?? ""
-                return partial + occurrences(of: "NSLog(", in: code)
+                return partial + StructuralBudgetRule.callOccurrences(of: "NSLog(", in: code)
             }
     }
 

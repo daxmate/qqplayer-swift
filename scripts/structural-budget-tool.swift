@@ -40,8 +40,8 @@ func emitPrintBaseline() throws {
     print("""
     # 裸 `print(` 存量清单 —— 结构预算棘轮基线，只能减不能增
     #
-    # 口径：剥掉 `//` 之后的行尾注释再数 `print(`（与 `grep 'print('` 同口径；
-    #       整行注释不计；字符串字面量里的 `print(` 会误计，已知且可接受）。
+    # 口径：剥掉 `//` 之后的行尾注释，再数**词边界**上的 `print(`（`fileFingerprint(` 这类标识符不算）；
+    #       整行注释不计；字符串字面量里的 `print(` 仍会误计，已知且可接受。
     # 守护：QQPlayerTests/StructuralBudgetContractTests.swift
     #   诊断输出必须走统一出口（`AppLog`）；存量钉基线，只能减不能增；
     #   新文件带裸 print → 红（确需登记则加行并在提交信息说明理由）。
@@ -101,6 +101,24 @@ func runSelfTest() throws {    check("行数：结尾换行不计额外行", Str
     check("print：行尾注释不计", StructuralBudgetRule.printCalls(in: "print(a) // print(b)\n") == 1)
     check("print：一行两处都算", StructuralBudgetRule.printCalls(in: "print(a); print(b)\n") == 2)
     check("print：无 print 为 0", StructuralBudgetRule.printCalls(in: "let x = 1\n") == 0)
+    // 词边界口径（2026-09-21）：标识符里的 `print(` 不算调用；真调用仍算。
+    // 这两条必须能变红——把 `callOccurrences` 换回朴素 `occurrences` 即失败。
+    check(
+        "print：词边界——标识符 fileFingerprint( 计 0 处",
+        StructuralBudgetRule.printCalls(in: "let x = fileFingerprint(url)\n") == 0
+    )
+    check(
+        "print：词边界——标识符 FileFingerprint( 计 0 处",
+        StructuralBudgetRule.printCalls(in: "return FileFingerprint(from: url)\n") == 0
+    )
+    check(
+        "print：词边界——真调用 print(\"x\") 计 1 处",
+        StructuralBudgetRule.printCalls(in: "print(\"x\")\n") == 1
+    )
+    check(
+        "print：词边界——NSLog 同口径（MyNSLog( 计 0 处）",
+        StructuralBudgetRule.callOccurrences(of: "NSLog(", in: "MyNSLog(\"x\")\n") == 0
+    )
 
     let root = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent("StructuralBudgetToolSelfTest-\(UUID().uuidString)")
