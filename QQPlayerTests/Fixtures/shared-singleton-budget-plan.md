@@ -109,7 +109,8 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 6-1（2026-09-20） | `MacSpectrumAnalyzer`（`ObservableObject` → `@Observable`；5 处 / 2 文件；Mac 专属频谱分析器） | 直连棘轮 **116 → 111**（真迁 5 处，0 preview 成本：`MacVisualizerView` 4 → 归零删行、`MacPlayerView` 12 → 11）；迁移棘轮 159/84 → **155/81**（删 1 `ObservableObject` + 2 `@Published` + 1 `@StateObject`） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + `MacPlayerView.swift` 行数净零（617） |
 | 批 6-2（2026-09-20） | `LibraryIndexer`（`ObservableObject` → `@Observable`；曲库索引状态源，ios+mac 共享；真迁 4 处 / 3 文件 + **订阅机制重做**） | 直连棘轮 **111 → 107**（真迁 4 处，0 preview 成本：`ContentView` 2 → 1、`MacLibraryView` 4 → 3、`MacTagEditorView` 4 → 3、`LibraryView` 1 → 归零删行）；迁移棘轮 155/81 → **145/77**（删 1 `ObservableObject` + 6 `@Published` + 3 处视图 `@StateObject` 归零，`MacLibraryView` 该行 3 → 2） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 | 批 6-3（2026-09-20） | **非视图消费者的观察入口收口**（无对象迁移；`PlayerEngine` 两个 façade publisher + 形状契约 `NonViewObservationRatchet`） | 直连棘轮 **107（不动）**；迁移棘轮 **145/77（不动）**；新建「观察入口唯一」契约（禁跨文件 `<Target>.shared.$…` / `objectWillChange`） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
-| **批 6-4（2026-09-20，本批）** | `AppCoordinator`（`ObservableObject` → `@Observable`；全局协调器，2 个共享源 + 26 处视图注入） | 直连棘轮 **107 → 90**（真迁 17 处 / 8 文件）；迁移棘轮 **145/77 → 116/54**（删 1 `ObservableObject` + 1 `@Published` + 1 `@StateObject` + **26 处视图 `@EnvironmentObject`（20 文件）**） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
+| 批 6-4（2026-09-20） | `AppCoordinator`（`ObservableObject` → `@Observable`；全局协调器，2 个共享源 + 26 处视图注入） | 直连棘轮 **107 → 90**（真迁 17 处 / 8 文件）；迁移棘轮 **145/77 → 116/54**（删 1 `ObservableObject` + 1 `@Published` + 1 `@StateObject` + **26 处视图 `@EnvironmentObject`（20 文件）**） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
+| **批 6-5（2026-09-20，本批）** | `ArtworkManager` 走 **`AppServices` 容器**（判据实测：`@Published` 0 / 视图读属性 0 / 全仓订阅 0 ⇒ 「无状态入口」）+ 本体 `ObservableObject` → `@Observable`（存储属性全 `@ObservationIgnored`） | 直连棘轮 **90 → 67**（真迁 23 处 / 14 文件：`MacArtworkThumbnail` 2→0、`AlbumViews` 2→0、`ArtistRowViews` 2→0、`TrackRowView` 1→0、`SmartPlaylistCardView` 1→0 删行；`MacPlayerView` 8→6、`PlayerView` 8→7、`SearchResultsViews` 5→1、`PlayerOverlays` 5→4、`QueueManagementView` 3→1、`PlaylistCardView` 2→1、`PlaylistDetailScreen` 3→2、`PlaylistTrackRowView` 3→1、`TrackListView` 2→1）；迁移棘轮 **116/54 → 108/50**（删 1 `ObservableObject` + 4 处视图 `@StateObject` 归零 + 4 处降 1） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -389,13 +390,35 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
   `MacKeyboardShortcuts`（静态快捷键表）、`IntentPlaybackService`（意图层唯一门面）、`QQPlayerApp` 的 Siri 处理段。
 - **基线**：直连 107 → **90**；迁移 145/77 → **116/54**。`ContentView` 的 `#Preview` 仍按脚手架成本计入（1 处）。
 
+### 批 6-5：`ArtworkManager` 走 `AppServices` 容器（热点里唯一「零观察面」的一个）—— 实测完成（2026-09-20）
+
+**先侦察后开工**（核算存档：workspace `memory/qqplayer/batch6-5-artworkmanager-recon.md`）。开工前把 23 处站点逐条列出
+（复刻扫描器与基线逐文件零差异自证），结果**推翻了「热点 = 必须 `@Environment(T.self)`」的默认假设**：
+
+- **判据实测（三条独立证据）**：本体 `@Published` = **0**（只有裸存储属性 + `NSCache`）；视图侧 **0 处读属性**
+  （23 处全是 `await ….<method>(…)`）；全仓 **0 处订阅**（无 `$` 投影 / `objectWillChange` / Combine 消费点）。
+  ⇒ 按账本 §批 3b 判据命中「**无状态 / 非 Observable 入口**」→ 通道 = `@Environment(AppServices.self)`
+  （与批 4 `HybridMusicAPIService`、批 5 `LyricsManager` 同款），**不是** `@Environment(ArtworkManager.self)`。
+- **连带省下的成本**：**0 组合根新行**（两个根早已 `.environment(AppServices.live)`）、**0 preview 成本**
+  （14 个靶子文件都没有 `#Preview`；唯一的传递路径 `ContentView #Preview → MiniPlayerView` 由 `ContentView` body
+  自己的装配链覆盖）；也**不存在 6-2 那种「订阅静默失效」坑**（0 个 `@Published`）。
+- **本体**：`ObservableObject` → `@Observable`，全部存储属性 `@ObservationIgnored`（原 `@Published` 为 0 ⇒ 追踪面
+  为零、语义逐字不变）；`MacArtworkCollage.load` 是 `static func`（无环境链）⇒ 显式传 `artwork:` 参数，
+  **不**把 `.shared` 藏进默认参数（§二.3 禁止的绕过手法）。
+- **行数净零**：`SearchResultsViews`(746) / `AlbumViews`(643) 的新增声明靠**合并既有注释**让行（746 / 643 不变）；
+  `PlayerView` 985 → **984**（删 `@StateObject` 净减，允许）；`MacPlayerView`(617) / `PlaylistDetailScreen`(631)
+  因替换是 1:1（`@StateObject` → `@Environment`）而持平。
+- **非视图层保留 `.shared`**（合法、不在棘轮口径）：CarPlay 2 文件 / `AppCoordinator+ImportExport` / `+iCloud` /
+  `LibraryIndexer` / `PlayerEngine+NowPlaying` / `TrackIdentityMigration` / `IntentArtworkService`。
+
 ### 批 6+：四个热点（最后）
-`PlayerEngine`（24）、`KaraokeController`（23）、`ArtworkManager`（23）；`AppCoordinator` 已在批 6-4 清完（18 → 0）。
+`PlayerEngine`（24）、`KaraokeController`（23）；`AppCoordinator` 已在批 6-4 清完（18 → 0）、
+`ArtworkManager` 已在批 6-5 清完（23 → 0，走容器通道）。
 - ✅ **前置已完成（批 6-3，2026-09-20）**：场景根自身不在环境链上、`.shared` 直连合法（不在棘轮口径内），
   真正的前置是**非视图消费者的观察入口** —— 已收成 façade publisher + 形状契约 `NonViewObservationRatchet`
   （禁跳文件 `<Target>.shared.$…` / `objectWillChange`）。
 - 这四类一动，涉及 21 个视图文件 + 跨端行为一致性，必须分批、每批真机验收。
-- 预估：−87 处（可迁预算清零）。
+- 预估：−64 处（可迁预算清零）。
 
 ### 批 6-0：扫描口径补齐 + 显形债清理 —— 实测完成（2026-09-20）
 

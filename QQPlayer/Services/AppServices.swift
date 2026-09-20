@@ -58,6 +58,13 @@ final class AppServices {
     /// 不读属性 ⇒ 不产生按属性追踪需求，故走容器而非 `@Environment(T.self)`）。
     let lyricsManager = LyricsManager.shared
 
+    // MARK: - 批 6-5：封面入口
+
+    /// 封面加载 / 缓存（视图侧 23 处全是 `await ArtworkManager.shared.<method>(…)` 调用，
+    /// **读属性 0 处、订阅 0 处**（本体 `@Published` 也是 0 个）⇒ 判据命中「无状态入口」，
+    /// 故走容器而非 `@Environment(ArtworkManager.self)`（与批 4/5 同款）。
+    let artworkManager = ArtworkManager.shared
+
     #if os(macOS)
         /// 曲库文件夹监视（Mac 专属；`start(paths:)` / `stop()` 由曲库加载路径驱动）。
         let folderMonitor = MacFolderMonitor.shared

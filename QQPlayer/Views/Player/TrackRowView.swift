@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TrackRowView: View, @MainActor Equatable {
+    @Environment(AppServices.self) private var services
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     // 1. Pass these in instead of observing PlayerEngine
@@ -196,7 +197,7 @@ struct TrackRowView: View, @MainActor Equatable {
 
     private func loadArtwork() {
         Task {
-            artworkImage = await ArtworkManager.shared.getThumbnail(for: track)
+            artworkImage = await services.artworkManager.getThumbnail(for: track)
         }
     }
 

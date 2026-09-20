@@ -61,7 +61,7 @@ enum SmartPlaylistUILogic {
 struct SmartPlaylistCardView: View {
     let info: SmartPlaylistCardInfo
 
-    @StateObject private var artworkManager = ArtworkManager.shared
+    @Environment(AppServices.self) private var services
     @State private var artworks: [UIImage] = []
     @State private var didLoadCovers = false
 
@@ -152,7 +152,7 @@ struct SmartPlaylistCardView: View {
         guard let tracks = try? SmartPlaylistStore.coverTracks(for: info.kind) else { return }
         var loaded: [UIImage] = []
         for track in tracks.prefix(4) {
-            if let artwork = await artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
+            if let artwork = await services.artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
                 loaded.append(artwork)
             }
         }

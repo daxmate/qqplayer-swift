@@ -69,7 +69,6 @@ QQPlayer/Mac/MacSyncView.swift	@StateObject	3
 QQPlayer/Mac/MacTrackListView.swift	@StateObject	1
 QQPlayer/Mac/SyncHostCenter.swift	@Published	5
 QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
-QQPlayer/Services/ArtworkManager.swift	ObservableObject	1
 QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
 QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
@@ -88,14 +87,11 @@ QQPlayer/Views/Player/CollapsiblePlayerControls.swift	@ObservedObject	1
 QQPlayer/Views/Player/KaraokeControlBar.swift	@ObservedObject	3
 QQPlayer/Views/Player/LyricsView.swift	@ObservedObject	1
 QQPlayer/Views/Player/PlayerOverlays.swift	@ObservedObject	3
-QQPlayer/Views/Player/PlayerOverlays.swift	@StateObject	2
+QQPlayer/Views/Player/PlayerOverlays.swift	@StateObject	1
 QQPlayer/Views/Player/PlayerProgressViews.swift	@ObservedObject	1
-QQPlayer/Views/Player/PlayerView.swift	@StateObject	2
-QQPlayer/Views/Player/QueueManagementView.swift	@StateObject	2
-QQPlayer/Views/Playlists/PlaylistCardView.swift	@StateObject	1
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@StateObject	1
-QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	2
-QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	@StateObject	1
+QQPlayer/Views/Player/PlayerView.swift	@StateObject	1
+QQPlayer/Views/Player/QueueManagementView.swift	@StateObject	1
+QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3

@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct QueueManagementView: View {
+    @Environment(AppServices.self) private var services
     @StateObject private var playerEngine = PlayerEngine.shared
-    @StateObject private var artworkManager = ArtworkManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var draggedTrack: Track?
     @State private var settings = DeleteSettings.load()
@@ -178,6 +178,7 @@ struct QueueManagementView: View {
 }
 
 struct QueueTrackRow: View {
+    @Environment(AppServices.self) private var services
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let track: Track
@@ -266,7 +267,7 @@ struct QueueTrackRow: View {
 
     private func loadArtwork() {
         Task {
-            artworkImage = await ArtworkManager.shared.getThumbnail(for: track)
+            artworkImage = await services.artworkManager.getThumbnail(for: track)
         }
     }
 }

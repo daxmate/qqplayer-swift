@@ -93,6 +93,7 @@ private struct EmptyAlbumsView: View {
 
 // Album card with artwork loading
 private struct AlbumCardView: View {
+    @Environment(AppServices.self) private var services
     let album: Album
     let tracks: [Track]
     @State private var artworkImage: UIImage?
@@ -138,13 +139,14 @@ private struct AlbumCardView: View {
         // Use the first track in the album to get artwork
         guard let firstTrack = tracks.first else { return }
         Task {
-            artworkImage = await ArtworkManager.shared.getThumbnail(for: firstTrack, maxPixelSize: 512)
+            artworkImage = await services.artworkManager.getThumbnail(for: firstTrack, maxPixelSize: 512)
         }
     }
 }
 
 // Album detail view reconstructed
 struct AlbumDetailScreen: View {
+    @Environment(AppServices.self) private var services
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let album: Album
@@ -337,11 +339,9 @@ struct AlbumDetailScreen: View {
                                         )
                                     }
                                     .contentShape(Rectangle())
-                                    // simultaneousGesture rather than
-                                    // onLongPressGesture: this row's root is a
-                                    // Button, whose own press recogniser wins an
-                                    // ordinary long press, so selection could
-                                    // never be entered by holding a track.
+                                    // simultaneousGesture rather than onLongPressGesture: this row's root is a
+                                    // Button, whose own press recogniser wins an ordinary long press, so
+                                    // selection could never be entered by holding a track.
                                     .simultaneousGesture(
                                         LongPressGesture(minimumDuration: 0.5)
                                             .onEnded { _ in beginSelection(with: track) }
@@ -415,7 +415,7 @@ struct AlbumDetailScreen: View {
         guard let first = filteredAlbumTracks.first else { return }
         Task {
             do {
-                let image = await ArtworkManager.shared.getArtwork(for: first)
+                let image = await services.artworkManager.getArtwork(for: first)
                 await MainActor.run {
                     artworkImage = image
                 }

@@ -1,5 +1,6 @@
 import SwiftUI
 struct ArtistTrackRowView: View {
+    @Environment(AppServices.self) private var services
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let track: Track
@@ -141,7 +142,7 @@ struct ArtistTrackRowView: View {
 
     private func loadArtwork() {
         Task {
-            artworkImage = await ArtworkManager.shared.getThumbnail(for: track)
+            artworkImage = await services.artworkManager.getThumbnail(for: track)
         }
     }
 
@@ -161,6 +162,7 @@ struct ArtistTrackRowView: View {
 }
 
 struct ArtistAlbumCardView: View {
+    @Environment(AppServices.self) private var services
     let album: Album
     let tracks: [Track]
     @State private var artworkImage: UIImage?
@@ -205,7 +207,7 @@ struct ArtistAlbumCardView: View {
         guard let firstTrack = albumTracks.first else { return }
 
         Task {
-            let image = await ArtworkManager.shared.getThumbnail(for: firstTrack, maxPixelSize: 384)
+            let image = await services.artworkManager.getThumbnail(for: firstTrack, maxPixelSize: 384)
             await MainActor.run {
                 self.artworkImage = image
             }

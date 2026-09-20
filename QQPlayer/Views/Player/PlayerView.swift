@@ -18,7 +18,6 @@ struct PlayerView: View {
     @Environment(\.appAccentColor) private var accentColor
     @Environment(AppServices.self) private var services
     @StateObject private var playerEngine = PlayerEngine.shared
-    @StateObject private var artworkManager = ArtworkManager.shared
     @Environment(AppCoordinator.self) private var appCoordinator
     @State private var currentArtwork: UIImage?
     @State private var nextArtwork: UIImage?
@@ -855,7 +854,7 @@ struct PlayerView: View {
         }
 
         let trackId = track.stableId
-        let artwork = await artworkManager.getArtwork(for: track)
+        let artwork = await services.artworkManager.getArtwork(for: track)
         guard playerEngine.currentTrack?.stableId == trackId else { return }
         currentArtwork = artwork
     }
@@ -870,7 +869,7 @@ struct PlayerView: View {
         }
 
         let nextTrackId = track.stableId
-        let artwork = await artworkManager.getArtwork(for: track)
+        let artwork = await services.artworkManager.getArtwork(for: track)
         guard playerEngine.currentTrack?.stableId == currentTrackId,
               getNextTrack()?.stableId == nextTrackId else { return }
         nextArtwork = artwork
@@ -886,7 +885,7 @@ struct PlayerView: View {
         }
 
         let previousTrackId = track.stableId
-        let artwork = await artworkManager.getArtwork(for: track)
+        let artwork = await services.artworkManager.getArtwork(for: track)
         guard playerEngine.currentTrack?.stableId == currentTrackId,
               getPreviousTrack()?.stableId == previousTrackId else { return }
         previousArtwork = artwork

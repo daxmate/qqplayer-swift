@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import Observation
 #if os(iOS)
     import UIKit
     typealias ArtworkImage = UIImage
@@ -17,28 +18,33 @@ import Foundation
     typealias ArtworkImage = NSImage
 #endif
 
+/// 封面加载 / 缓存（iOS + macOS 共用）。
+/// 2026-09-20 批 6-5：`ObservableObject` → `@Observable`；本类**迁移前就没有任何 `@Published`**
+/// （视图侧 0 处读属性、全仓 0 处订阅）⇒ 全部存储属性保持不被追踪（`@ObservationIgnored`），
+/// 刷新语义逐字不变；视图侧改由 `AppServices` 容器取（判据＝「视图侧是否读属性」）。
 @MainActor
-class ArtworkManager: ObservableObject {
+@Observable
+class ArtworkManager {
     static let shared = ArtworkManager()
 
     // Memory cache for quick access
-    let memoryCache = NSCache<NSString, ArtworkImage>()
+    @ObservationIgnored let memoryCache = NSCache<NSString, ArtworkImage>()
     // Small row/grid-sized artwork, keyed by "\(stableId)-\(pixelSize)"
-    let thumbnailCache = NSCache<NSString, ArtworkImage>()
-    var cachedTrackIds: Set<String> = []
-    private var notificationObservers: [NSObjectProtocol] = []
+    @ObservationIgnored let thumbnailCache = NSCache<NSString, ArtworkImage>()
+    @ObservationIgnored var cachedTrackIds: Set<String> = []
+    @ObservationIgnored private var notificationObservers: [NSObjectProtocol] = []
 
     // Persistent disk cache directory
-    let diskCacheURL: URL
+    @ObservationIgnored let diskCacheURL: URL
 
     // Mapping file URL (maps track.stableId -> artwork hash)
-    let mappingFileURL: URL
+    @ObservationIgnored let mappingFileURL: URL
 
     // In-memory mapping cache
-    var artworkMapping: [String: String] = [:]
+    @ObservationIgnored var artworkMapping: [String: String] = [:]
 
-    private let maxMemoryCacheItems = 250
-    private let maxMemoryCacheCost = 40 * 1024 * 1024
+    @ObservationIgnored private let maxMemoryCacheItems = 250
+    @ObservationIgnored private let maxMemoryCacheCost = 40 * 1024 * 1024
 
     private init() {
         // Create artwork cache directory
@@ -92,8 +98,8 @@ class ArtworkManager: ObservableObject {
     // for every newly-cached artwork, and rewriting the whole plist per call
     // was a synchronous main-thread IO storm on the first scroll (audit). A
     // dirty flag plus one coalescing task writes at most every 500ms.
-    var mappingDirty = false
-    var mappingSaveTask: Task<Void, Never>?
+    @ObservationIgnored var mappingDirty = false
+    @ObservationIgnored var mappingSaveTask: Task<Void, Never>?
 
     func clearCache() {
         memoryCache.removeAllObjects()

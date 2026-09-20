@@ -27,6 +27,7 @@ enum MacArtworkResolver {
 
 /// 固定尺寸封面缩略图：异步加载 + 占位图标兜底。
 struct MacArtworkThumbnail: View {
+    @Environment(AppServices.self) private var services
     let track: Track?
     let size: CGFloat
     var cornerRadius: CGFloat = 8
@@ -70,7 +71,7 @@ struct MacArtworkThumbnail: View {
             image = nil
             return
         }
-        image = await ArtworkManager.shared.getThumbnail(for: track, maxPixelSize: max(size * 2, 80))
+        image = await services.artworkManager.getThumbnail(for: track, maxPixelSize: max(size * 2, 80))
     }
 }
 
@@ -96,6 +97,7 @@ struct MacArtworkThumbnailFill: View {
 /// 智能歌单卡片封面：最多 4 张曲目封面 2x2 拼贴（对齐 web 版/iOS 拼贴），
 /// 单曲退化为单图，无图显示占位图标。
 struct MacArtworkCollage: View {
+    @Environment(AppServices.self) private var services
     let tracks: [Track]
     let size: CGFloat
     var cornerRadius: CGFloat = 8
@@ -117,7 +119,7 @@ struct MacArtworkCollage: View {
                 }
             }
             .task(id: tracks.map(\.stableId)) {
-                images = await Self.load(tracks: tracks, size: size)
+                images = await Self.load(tracks: tracks, size: size, artwork: services.artworkManager)
             }
             // 封面被重写（标签保存刮削）后，stableId 不变不会自动重载 → 监听重拉
             .onReceive(NotificationCenter.default.publisher(
@@ -126,7 +128,7 @@ struct MacArtworkCollage: View {
                 guard let refreshedId = notification.object as? String,
                       tracks.contains(where: { $0.stableId == refreshedId }) else { return }
                 Task {
-                    images = await Self.load(tracks: tracks, size: size)
+                    images = await Self.load(tracks: tracks, size: size, artwork: services.artworkManager)
                 }
             }
     }
@@ -157,11 +159,12 @@ struct MacArtworkCollage: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 
-    private static func load(tracks: [Track], size: CGFloat) async -> [ArtworkImage?] {
+    /// 封面入口由调用方从 `AppServices` 容器取（静态方法无环境链，故显式传入）。
+    private static func load(tracks: [Track], size: CGFloat, artwork: ArtworkManager) async -> [ArtworkImage?] {
         let pixelSize = max(size, 80)
         var result: [ArtworkImage?] = []
         for track in tracks.prefix(4) {
-            result.append(await ArtworkManager.shared.getThumbnail(for: track, maxPixelSize: pixelSize))
+            result.append(await artwork.getThumbnail(for: track, maxPixelSize: pixelSize))
         }
         return result
     }

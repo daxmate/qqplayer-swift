@@ -36,14 +36,13 @@ struct SearchResults {
 }
 
 struct SearchResultsView: View {
-    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
-    @Environment(\.appAccentColor) private var accentColor
+    @Environment(AppServices.self) private var services
+    @Environment(\.appAccentColor) private var accentColor // App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     let results: SearchResults
     let selectedCategory: SearchCategory
     let allTracks: [Track]
-    /// 关闭搜索 sheet（同步发起，不等收起动画）：`dismiss()` 本身不提供"已收起"回调，
-    /// 修前声明成 `() async -> Void` + `await` 是假等待（await 立即返回）。
-    /// 需要"真等待"的地方不要在视图层猜，改用状态驱动的导航（本仓既有做法）。
+    /// 关闭搜索 sheet（同步发起，不等收起动画）：`dismiss()` 本身不提供"已收起"回调；修前声明成
+    /// `() async -> Void` + `await` 是假等待——需要"真等待"的地方改用状态驱动的导航（本仓既有做法）。
     let onDismiss: () -> Void
     let onNavigateToArtist: (Artist, [Track]) -> Void
     let onNavigateToAlbum: (Album, [Track]) -> Void
@@ -204,7 +203,7 @@ struct SearchResultsView: View {
                     loadArtistCache()
                 }
                 let visibleIds = Array(results.songs.prefix(20)).map { $0.stableId }
-                ArtworkManager.shared.updateVisibleArtworkWindow(visibleTrackIds: visibleIds)
+                services.artworkManager.updateVisibleArtworkWindow(visibleTrackIds: visibleIds)
             }
             .onChange(of: results.songs.map(\.stableId)) { _, _ in
                 loadArtistCache()
@@ -214,8 +213,8 @@ struct SearchResultsView: View {
 }
 
 struct SearchSongRowView: View {
-    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
-    @Environment(\.appAccentColor) private var accentColor
+    @Environment(AppServices.self) private var services
+    @Environment(\.appAccentColor) private var accentColor // App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     let track: Track
     let allTracks: [Track]
     let artistName: String?
@@ -453,7 +452,7 @@ struct SearchSongRowView: View {
 
     private func loadArtwork() {
         Task {
-            artworkImage = await ArtworkManager.shared.getThumbnail(for: track)
+            artworkImage = await services.artworkManager.getThumbnail(for: track)
         }
     }
 
@@ -566,6 +565,7 @@ struct SearchArtistAlbumsRow: View {
     }
 
     struct SearchArtistAlbumCard: View {
+        @Environment(AppServices.self) private var services
         let album: Album
         let tracks: [Track]
         @State private var artworkImage: UIImage?
@@ -604,7 +604,7 @@ struct SearchArtistAlbumsRow: View {
             let albumTracks = tracks.filter { $0.albumId == album.id }
             guard let firstTrack = albumTracks.first else { return }
             Task {
-                let image = await ArtworkManager.shared.getThumbnail(for: firstTrack, maxPixelSize: 320)
+                let image = await services.artworkManager.getThumbnail(for: firstTrack, maxPixelSize: 320)
                 await MainActor.run { artworkImage = image }
             }
         }
@@ -613,6 +613,7 @@ struct SearchArtistAlbumsRow: View {
 }
 
 struct SearchAlbumRowView: View {
+    @Environment(AppServices.self) private var services
     let album: Album
     let albumArtistName: String?
     let onDismiss: () -> Void
@@ -627,8 +628,7 @@ struct SearchAlbumRowView: View {
             onNavigate(album, albumTracks)
         }) {
             HStack(spacing: DesignTokens.space12) {
-                // Album artwork
-                Group {
+                Group { // Album artwork
                     if let artworkImage = artworkImage {
                         Image(uiImage: artworkImage)
                             .resizable().scaledToFill()
@@ -693,7 +693,7 @@ struct SearchAlbumRowView: View {
             }
 
             guard let firstTrack = tracks.first else { return }
-            let artwork = await ArtworkManager.shared.getThumbnail(for: firstTrack)
+            let artwork = await services.artworkManager.getThumbnail(for: firstTrack)
             await MainActor.run {
                 artworkImage = artwork
             }

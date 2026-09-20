@@ -86,7 +86,7 @@ struct MiniPlayerView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     @StateObject private var playerEngine = PlayerEngine.shared
-    @StateObject private var artworkManager = ArtworkManager.shared
+    @Environment(AppServices.self) private var services
     @State private var isExpanded = false
     @State private var currentArtwork: UIImage?
     @State private var settings = DeleteSettings.load()
@@ -211,7 +211,7 @@ struct MiniPlayerView: View {
                 }
                 .task(id: playerEngine.currentTrack?.stableId) {
                     if let track = playerEngine.currentTrack {
-                        currentArtwork = await artworkManager.getArtwork(for: track)
+                        currentArtwork = await services.artworkManager.getArtwork(for: track)
                     } else {
                         currentArtwork = nil
                     }

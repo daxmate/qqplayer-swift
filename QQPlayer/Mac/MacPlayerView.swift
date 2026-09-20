@@ -146,7 +146,7 @@ struct MacPlayerView: View {
                 KaraokeController.shared.resetForNewTrack()
                 return
             }
-            let art = await ArtworkManager.shared.getArtwork(for: track)
+            let art = await services.artworkManager.getArtwork(for: track)
             artwork = art
             artworkTrackId = track.stableId
             // 切歌时刷新当前曲目的收藏状态
@@ -167,7 +167,7 @@ struct MacPlayerView: View {
                   (notification.object as? String) == stableId else { return }
             Task {
                 if let track {
-                    artwork = await ArtworkManager.shared.getArtwork(for: track)
+                    artwork = await services.artworkManager.getArtwork(for: track)
                     artworkTrackId = track.stableId
                 }
             }

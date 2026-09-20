@@ -14,7 +14,7 @@ struct PlaylistTrackRowView: View {
     @State private var showDeleteConfirmation = false
     @State private var deleteSettings = DeleteSettings.load()
     @State private var artworkImage: UIImage?
-    @StateObject private var artworkManager = ArtworkManager.shared
+    @Environment(AppServices.self) private var services
 
     // Check if this track is currently playing
     private var isCurrentlyPlaying: Bool {
@@ -169,7 +169,7 @@ struct PlaylistTrackRowView: View {
 
     private func loadArtwork() {
         Task {
-            artworkImage = await ArtworkManager.shared.getThumbnail(for: track)
+            artworkImage = await services.artworkManager.getThumbnail(for: track)
         }
     }
 

@@ -10,7 +10,7 @@ struct PlaylistCardView: View {
     let isEditMode: Bool
     let onEdit: (() -> Void)?
     let onDelete: (() -> Void)?
-    @StateObject private var artworkManager = ArtworkManager.shared
+    @Environment(AppServices.self) private var services
     @State private var artworks: [UIImage] = []
     @State private var customCoverImage: UIImage?
     @State private var showingImagePicker = false
@@ -178,7 +178,7 @@ struct PlaylistCardView: View {
         let tracksToLoad = Array(allTracks.prefix(4))
 
         for track in tracksToLoad {
-            if let artwork = await artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
+            if let artwork = await services.artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
                 loadedArtworks.append(artwork)
             }
         }

@@ -236,6 +236,7 @@ struct TrackListView: View {
 }
 
 struct TrackListContentView: View {
+    @Environment(AppServices.self) private var services
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let tracks: [Track]
@@ -311,7 +312,7 @@ struct TrackListContentView: View {
     private func updateArtworkWindow() {
         let visibleWindowIds = Array(displayedTracks.suffix(120)).map { $0.stableId }
         let prefetchIds = Array(tracks.dropFirst(displayLimit).prefix(20)).map { $0.stableId }
-        ArtworkManager.shared.updateVisibleArtworkWindow(
+        services.artworkManager.updateVisibleArtworkWindow(
             visibleTrackIds: visibleWindowIds,
             prefetchTrackIds: prefetchIds
         )

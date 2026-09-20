@@ -14,7 +14,7 @@ struct PlaylistDetailScreen: View {
     @State private var sortOption: TrackSortOption = .playlistOrder
     @State private var showSortMenu = false
     @State private var recentlyActedTracks: Set<String> = []
-    @StateObject private var artworkManager = ArtworkManager.shared
+    @Environment(AppServices.self) private var services
     @State private var showingImagePicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var customCoverImage: UIImage?
@@ -472,7 +472,7 @@ struct PlaylistDetailScreen: View {
         let tracksToLoad = Array(tracks.prefix(4))
 
         for track in tracksToLoad {
-            if let artwork = await artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
+            if let artwork = await services.artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
                 loadedArtworks.append(artwork)
             }
         }
