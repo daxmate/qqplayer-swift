@@ -313,12 +313,12 @@ struct SyncPeerLibraryTests {
             playlists: [SyncPeerPlaylistItem(id: "jazz", name: "Jazz", trackCount: 0)],
             tracks: [SyncPeerTrackItem(relativePath: "Jazz/a.flac", title: "A", sizeBytes: 10)]
         )
-        var decodeFailures: [String] = []
+        let decodeBox = ValueListBox<String>()
         let responder = SyncPeerLibraryResponder(
             session: fixture.clientSession,
             catalogProvider: { catalogBox }
         )
-        responder.onDecodeFailure = { decodeFailures.append($0) }
+        responder.onDecodeFailure = { decodeBox.values.append($0) }
         _ = deviceRoot
 
         // 非 JSON 载荷（协议违例）→ 只记账，不抛、不断会话
@@ -326,7 +326,7 @@ struct SyncPeerLibraryTests {
             type: .peerLibraryRequest,
             payload: Data("not-json".utf8)
         )
-        #expect(decodeFailures.count == 1)
+        #expect(decodeBox.values.count == 1)
         #expect(fixture.clientSession.isReady, "垃圾载荷不得断会话")
 
         // 合法请求（非法 scope）→ 仍应答空清单
@@ -404,9 +404,9 @@ struct SyncPeerLibraryTests {
             tracks: [SyncPeerTrackItem(relativePath: "A/x.flac", title: "X", sizeBytes: 5)]
         )
         let responder = SyncPeerLibraryResponder(session: fixture.clientSession, catalogProvider: { catalogBox })
-        var unexpected: [UInt64] = []
+        let unexpectedBox = ValueListBox<UInt64>()
         let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: 3)
-        client.onUnexpectedResponse = { unexpected.append($0.requestID) }
+        client.onUnexpectedResponse = { unexpectedBox.values.append($0.requestID) }
         _ = responder
 
         // 伪造一个 requestID 无人认领的响应 → 客户端丢弃
@@ -418,7 +418,7 @@ struct SyncPeerLibraryTests {
             type: .peerLibraryResponse,
             payload: try SyncPeerLibraryCodec.encode(bogus)
         )
-        #expect(unexpected == [999])
+        #expect(unexpectedBox.values == [999])
         #expect(client.pendingRequestCount == 0)
 
         // 之后的正常请求不受影响
@@ -594,4 +594,11 @@ struct SyncPeerLibrarySourceOrderTests {
         #expect(paths(playlistID: "recent", query: "flac") == ["Jazz/03 c.flac", "Jazz/01 a.flac"])
         #expect(paths(playlistID: nil, query: "03") == ["Jazz/03 c.flac"])
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：同步层的回调/时钟 seam 标 `@Sendable` 后，
+/// 闭包不能再捕获可变局部量（`mutation/reference of captured var in concurrently-executing code`），
+/// 状态改放盒子里、闭包只读写盒子（与既有 `*Box` / `ReceiverLog` 同款）。
+private final class ValueListBox<T>: @unchecked Sendable {
+    var values: [T] = []
 }

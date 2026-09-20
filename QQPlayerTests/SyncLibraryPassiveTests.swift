@@ -160,12 +160,12 @@ struct SyncLibraryPassiveTests {
         #expect(host.attach(to: fixture.clientSession))
 
         let macPeer = SyncManifestPeer(session: fixture.hostSession)
-        var response: SyncManifestResponse?
-        macPeer.onManifestReceived = { response = $0 }
+        let responseBox = ManifestResponseBox<SyncManifestResponse>()
+        macPeer.onManifestReceived = { responseBox.value = $0 }
         try macPeer.requestManifest()
 
         #expect(
-            response?.entries.map(\.relativePath)
+            responseBox.value?.entries.map(\.relativePath)
                 == ["@lyrics/\(songHash).json", "Album/01 Song.flac", "Imported/device-only.flac"]
         )
     }
@@ -415,9 +415,15 @@ struct SyncLibraryPassiveTests {
         #expect(!host.isAttached)
 
         let macPeer = SyncManifestPeer(session: fixture.hostSession)
-        var response: SyncManifestResponse?
-        macPeer.onManifestReceived = { response = $0 }
+        let responseBox = ManifestResponseBox<SyncManifestResponse>()
+        macPeer.onManifestReceived = { responseBox.value = $0 }
         try macPeer.requestManifest()
-        #expect(response == nil)
+        #expect(responseBox.value == nil)
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：同步层回调标 `@Sendable` 后，闭包不能再捕获
+/// 可变局部量（`mutation of captured var in concurrently-executing code`）⇒ 状态放盒子里。
+private final class ManifestResponseBox<T>: @unchecked Sendable {
+    var value: T?
 }

@@ -67,20 +67,18 @@ struct SyncFileTransferTests {
         let receiverDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: receiverDir) }
 
-        var senderOutcome: SyncFileSender.Outcome?
-        var receiverOutcome: SyncFileReceiver.Outcome?
-        var acks: [FileAckPayload] = []
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcome = $0 }
-        receiver.onAckSent = { acks.append($0) }
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { senderOutcome = $0 }
+        sender.onCompletion = { box.senderOutcome = $0 }
 
         try sender.send(fileURL: sourceURL, fileID: "t1", name: "song.bin")
 
-        #expect(senderOutcome == .succeeded)
-        guard case let .received(receivedFile)? = receiverOutcome else {
-            Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
+        #expect(box.senderOutcome == .succeeded)
+        guard case let .received(receivedFile)? = box.receiverOutcome else {
+            Issue.record("期望 received，实际 \(String(describing: box.receiverOutcome))")
             return
         }
         let finalURL = receivedFile.url
@@ -89,8 +87,8 @@ struct SyncFileTransferTests {
         // 2 块：1 整块（= 声明块大小）+ 尾块
         #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 2)
         // ack 序列：meta(0) → 整块(chunkSize) → done(全量)。第一块推进量恰为一个声明块。
-        #expect(acks.map(\.receivedBytes) == [0, chunkSize, Int64(source.count)])
-        #expect(acks.last?.done == true)
+        #expect(box.acks.map(\.receivedBytes) == [0, chunkSize, Int64(source.count)])
+        #expect(box.acks.last?.done == true)
     }
 
     // MARK: 2. 多块大文件（5 整块）
@@ -109,20 +107,18 @@ struct SyncFileTransferTests {
         let receiverDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: receiverDir) }
 
-        var senderOutcome: SyncFileSender.Outcome?
-        var receiverOutcome: SyncFileReceiver.Outcome?
-        var acks: [FileAckPayload] = []
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcome = $0 }
-        receiver.onAckSent = { acks.append($0) }
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { senderOutcome = $0 }
+        sender.onCompletion = { box.senderOutcome = $0 }
 
         try sender.send(fileURL: sourceURL, fileID: "t2", name: "big.bin")
 
-        #expect(senderOutcome == .succeeded)
-        guard case let .received(receivedFile)? = receiverOutcome else {
-            Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
+        #expect(box.senderOutcome == .succeeded)
+        guard case let .received(receivedFile)? = box.receiverOutcome else {
+            Issue.record("期望 received，实际 \(String(describing: box.receiverOutcome))")
             return
         }
         let finalURL = receivedFile.url
@@ -130,9 +126,9 @@ struct SyncFileTransferTests {
         #expect(!FileManager.default.fileExists(atPath: finalURL.path + ".part"))
         #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 5)
         // 5 整块：除末块 ack（done = 全量）外，每次进度 ack 都恰推进一个声明块
-        #expect(acks.map(\.receivedBytes) == [0, chunkSize, chunkSize * 2, chunkSize * 3, chunkSize * 4,
-                                              Int64(source.count)])
-        #expect(acks.last?.done == true)
+        let expectedAcks: [Int64] = [0, chunkSize, chunkSize * 2, chunkSize * 3, chunkSize * 4, Int64(source.count)]
+        #expect(box.acks.map(\.receivedBytes) == expectedAcks)
+        #expect(box.acks.last?.done == true)
     }
 
     // MARK: 3. 空文件
@@ -148,18 +144,17 @@ struct SyncFileTransferTests {
         let receiverDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: receiverDir) }
 
-        var senderOutcome: SyncFileSender.Outcome?
-        var receiverOutcome: SyncFileReceiver.Outcome?
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcome = $0 }
+        receiver.onCompletion = { box.receiverOutcome = $0 }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { senderOutcome = $0 }
+        sender.onCompletion = { box.senderOutcome = $0 }
 
         try sender.send(fileURL: sourceURL, fileID: "t3", name: "empty.dat")
 
-        #expect(senderOutcome == .succeeded)
-        guard case let .received(receivedFile)? = receiverOutcome else {
-            Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
+        #expect(box.senderOutcome == .succeeded)
+        guard case let .received(receivedFile)? = box.receiverOutcome else {
+            Issue.record("期望 received，实际 \(String(describing: box.receiverOutcome))")
             return
         }
         let finalURL = receivedFile.url
@@ -191,9 +186,9 @@ struct SyncFileTransferTests {
         let fixture1 = SessionFixture.pairedHandshake()
         let receiverDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: receiverDir) }
-        var phase1Outcome: SyncFileReceiver.Outcome?
+        let box = TransferBox()
         let receiver1 = SyncFileReceiver(session: fixture1.clientSession, directory: receiverDir)
-        receiver1.onCompletion = { phase1Outcome = $0 }
+        receiver1.onCompletion = { box.phase1Outcome = $0 }
 
         let meta1 = FileMetaPayload(fileID: fileID, name: name, totalSize: Int64(source.count),
                                     chunkSize: chunkSize, sha256Hex: sha, startOffset: 0)
@@ -216,8 +211,8 @@ struct SyncFileTransferTests {
 
         // 断连/取消：内存状态清理，.part 保留
         receiver1.cancel()
-        guard case let .failed(.cancelled(cancelFileID))? = phase1Outcome else {
-            Issue.record("期望 cancelled，实际 \(String(describing: phase1Outcome))")
+        guard case let .failed(.cancelled(cancelFileID))? = box.phase1Outcome else {
+            Issue.record("期望 cancelled，实际 \(String(describing: box.phase1Outcome))")
             return
         }
         #expect(cancelFileID == fileID)
@@ -225,22 +220,19 @@ struct SyncFileTransferTests {
 
         // 阶段 2：新会话 + 新 sender 以 startOffset=已收完整字节续传
         let fixture2 = SessionFixture.pairedHandshake()
-        var phase2Outcome: SyncFileReceiver.Outcome?
-        var senderOutcome: SyncFileSender.Outcome?
-        var acks: [FileAckPayload] = []
         let receiver2 = SyncFileReceiver(session: fixture2.clientSession, directory: receiverDir)
-        receiver2.onCompletion = { phase2Outcome = $0 }
-        receiver2.onAckSent = { acks.append($0) }
+        receiver2.onCompletion = { box.phase2Outcome = $0 }
+        receiver2.onAckSent = { box.acks.append($0) }
         let sender2 = SyncFileSender(session: fixture2.hostSession)
-        sender2.onCompletion = { senderOutcome = $0 }
+        sender2.onCompletion = { box.senderOutcome = $0 }
 
         try sender2.send(fileURL: sourceURL, fileID: fileID, name: name,
                          startOffset: chunkSize)
 
-        #expect(senderOutcome == .succeeded)
-        #expect(acks.first?.receivedBytes == chunkSize) // 首 ack = 对齐后完整字节（truncate 生效）
-        guard case let .received(receivedFile)? = phase2Outcome else {
-            Issue.record("期望 received，实际 \(String(describing: phase2Outcome))")
+        #expect(box.senderOutcome == .succeeded)
+        #expect(box.acks.first?.receivedBytes == chunkSize) // 首 ack = 对齐后完整字节（truncate 生效）
+        guard case let .received(receivedFile)? = box.phase2Outcome else {
+            Issue.record("期望 received，实际 \(String(describing: box.phase2Outcome))")
             return
         }
         let finalURL = receivedFile.url
@@ -269,27 +261,26 @@ struct SyncFileTransferTests {
         let partURL = receiverDir.appendingPathComponent(name + ".part")
         try pseudoRandomData(500).write(to: partURL)
 
-        var outcomes: [SyncFileSender.Outcome] = []
-        var receiverOutcomes: [SyncFileReceiver.Outcome] = []
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcomes.append($0) }
+        receiver.onCompletion = { box.receiverOutcomes.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { outcomes.append($0) }
+        sender.onCompletion = { box.outcomes.append($0) }
 
         // 第一轮：startOffset=chunkSize 与本地 .part（500B）不符 → resumeMismatch
         try sender.send(fileURL: sourceURL, fileID: fileID, name: name,
                         startOffset: SyncFileTransfer.chunkSize)
-        #expect(outcomes == [.failed(.resumeMismatch(fileID))])
-        #expect(receiverOutcomes == [.failed(.resumeMismatch(fileID))]) // 接收端同步中止
+        #expect(box.outcomes == [.failed(.resumeMismatch(fileID))])
+        #expect(box.receiverOutcomes == [.failed(.resumeMismatch(fileID))]) // 接收端同步中止
         #expect(FileManager.default.fileExists(atPath: partURL.path)) // 中止不动盘
 
         // 第二轮：startOffset=0 从头重传（receiver 删残留 .part 重建）→ 成功
         try sender.send(fileURL: sourceURL, fileID: fileID, name: name, startOffset: 0)
-        #expect(outcomes.last == .succeeded)
-        if case let .received(receivedFile)? = receiverOutcomes.last {
+        #expect(box.outcomes.last == .succeeded)
+        if case let .received(receivedFile)? = box.receiverOutcomes.last {
             #expect(receivedFile.url == receiverDir.appendingPathComponent(name))
         } else {
-            Issue.record("期望 received，实际 \(String(describing: receiverOutcomes))")
+            Issue.record("期望 received，实际 \(String(describing: box.receiverOutcomes))")
         }
         let finalURL = receiverDir.appendingPathComponent(name)
         #expect(try Data(contentsOf: finalURL) == source)
@@ -315,18 +306,17 @@ struct SyncFileTransferTests {
         let oldDate = Date(timeIntervalSince1970: 1_600_000_000)
         try FileManager.default.setAttributes([.modificationDate: oldDate], ofItemAtPath: finalURL.path)
 
-        var senderOutcome: SyncFileSender.Outcome?
-        var receiverOutcome: SyncFileReceiver.Outcome?
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcome = $0 }
+        receiver.onCompletion = { box.receiverOutcome = $0 }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { senderOutcome = $0 }
+        sender.onCompletion = { box.senderOutcome = $0 }
 
         try sender.send(fileURL: sourceURL, fileID: "idem", name: "song.bin")
 
-        #expect(senderOutcome == .succeeded)
-        guard case let .received(returnedFile)? = receiverOutcome else {
-            Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
+        #expect(box.senderOutcome == .succeeded)
+        guard case let .received(returnedFile)? = box.receiverOutcome else {
+            Issue.record("期望 received，实际 \(String(describing: box.receiverOutcome))")
             return
         }
         #expect(returnedFile.url == finalURL)
@@ -372,18 +362,17 @@ struct SyncFileTransferTests {
         let receiverDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: receiverDir) }
 
-        var senderOutcome: SyncFileSender.Outcome?
-        var receiverOutcome: SyncFileReceiver.Outcome?
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcome = $0 }
+        receiver.onCompletion = { box.receiverOutcome = $0 }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { senderOutcome = $0 }
+        sender.onCompletion = { box.senderOutcome = $0 }
 
         try sender.send(fileURL: sourceURL, fileID: "pre-1", name: "song.bin", precomputedSHA256: sha)
 
-        #expect(senderOutcome == .succeeded)
-        guard case let .received(receivedFile)? = receiverOutcome else {
-            Issue.record("期望 received，实际 \(String(describing: receiverOutcome))")
+        #expect(box.senderOutcome == .succeeded)
+        guard case let .received(receivedFile)? = box.receiverOutcome else {
+            Issue.record("期望 received，实际 \(String(describing: box.receiverOutcome))")
             return
         }
         // 接收端落地的身份 sha 就是调用方声明的那一个（声明与实传同一个值）
@@ -403,18 +392,17 @@ struct SyncFileTransferTests {
         let receiverDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: receiverDir) }
 
-        var senderOutcome: SyncFileSender.Outcome?
-        var receiverOutcome: SyncFileReceiver.Outcome?
+        let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
-        receiver.onCompletion = { receiverOutcome = $0 }
+        receiver.onCompletion = { box.receiverOutcome = $0 }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.onCompletion = { senderOutcome = $0 }
+        sender.onCompletion = { box.senderOutcome = $0 }
 
         try sender.send(fileURL: sourceURL, fileID: "pre-2", name: "song.bin", precomputedSHA256: wrongSha)
 
         // 复用只是省一次本地读，不是绕过校验：接收端仍按内容算 SHA-256 并拒绝
-        #expect(senderOutcome == .failed(.checksumMismatch("pre-2")))
-        #expect(receiverOutcome == .failed(.checksumMismatch("pre-2")))
+        #expect(box.senderOutcome == .failed(.checksumMismatch("pre-2")))
+        #expect(box.receiverOutcome == .failed(.checksumMismatch("pre-2")))
         #expect(!FileManager.default.fileExists(atPath: receiverDir.appendingPathComponent("song.bin").path))
     }
 
@@ -432,4 +420,17 @@ struct SyncFileTransferTests {
         }
         #expect(!sender.isActive)
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：`onCompletion` / `onAckSent` 是 `@Sendable`
+/// 类型 ⇒ 闭包不能再捕获可变局部量（`mutation of captured var in concurrently-executing code`），
+/// 状态改放盒子里、闭包只写盒子（与 `SyncFileReceiverTests.ReceiverLog`、既有 `*Box` 同款）。
+private final class TransferBox: @unchecked Sendable {
+    var senderOutcome: SyncFileSender.Outcome?
+    var receiverOutcome: SyncFileReceiver.Outcome?
+    var phase1Outcome: SyncFileReceiver.Outcome?
+    var phase2Outcome: SyncFileReceiver.Outcome?
+    var acks: [FileAckPayload] = []
+    var outcomes: [SyncFileSender.Outcome] = []
+    var receiverOutcomes: [SyncFileReceiver.Outcome] = []
 }

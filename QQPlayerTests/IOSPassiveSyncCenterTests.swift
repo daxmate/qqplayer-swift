@@ -491,37 +491,252 @@ struct IOSPassiveSyncCenterTests {
         #expect(try pending.pendingCount() == 1)
     }
 
-    /// 形状契约：**会话队列回调必须 `@Sendable`**。
+    // MARK: - 形状契约：会话/网络队列回调必须 @Sendable（2026-09-20 真机闪退家族收口）
+
+    /// 名录：文件 → 必须标 `@Sendable` 的**存储型闭包属性**（含回调、链式转发的 prior*、注入 seam）。
     ///
-    /// 两条会话队列回调（`SyncChangeLogPeer` / `SyncLibraryPassiveHost`）都在 NW 通道队列被同步调用，
-    /// 漏标一处 = 该回调在 iOS 上重新继承主线程隔离 = 真机闪退（见上面回归用例）。
-    /// 口径：声明形如 `var onXxx: ((…) -> Void)?` 的行必须带 `@Sendable`；计数变化 = 有人增删回调，
-    /// 必须同步本基线（有意为之的摩擦：新增回调要过这一关）。
-    @Test("形状契约：会话队列回调声明必须 @Sendable（漏一处 = 真机闪退）")
+    /// 为什么是硬约束：这些属性都在**会话/网络队列**（NW 通道队列，非主线程）被同步调用；
+    /// 类型不标 `@Sendable` 时，`@MainActor` 上下文里写的闭包会**继承主线程隔离**（Swift 6 语义）
+    /// → 闭包体内首次隔离访问触发运行时 executor 断言 = EXC_BREAKPOINT / SIGTRAP = App 直接退出
+    /// （2026-09-20 真机闪退；根因、崩溃栈与复现路径见上面那条回归用例）。
+    /// 标在**属性类型**上而不是赋值处的字面量上，才拦得住所有赋值点（含将来新增的）。
+    private static let sendableCallbackRoster: [String: [String]] = [
+        "QQPlayer/Sync/SyncPeerSession.swift": [
+            "onStateChange",
+            "onClosed",
+            "onApplicationFrame",
+            "pairApprovalHandler",
+        ],
+        "QQPlayer/Sync/SyncPeerSession+Frames.swift": [
+            "readCurrent",
+            "install",
+        ],
+        "QQPlayer/Sync/SyncListener.swift": [
+            "onStateUpdate",
+            "onReady",
+            "onStopped",
+            "onSessionStateChange",
+            "onSessionClosed",
+            "pairApprovalHandler",
+        ],
+        "QQPlayer/Sync/SyncBrowser.swift": [
+            "onResultsChanged",
+            "onBrowseFailure",
+        ],
+        "QQPlayer/Sync/SyncFileReceiver.swift": [
+            "onCompletion",
+            "onAckSent",
+            "partAlignmentHook",
+            "priorAppHandler",
+            "priorClosedHandler",
+        ],
+        "QQPlayer/Sync/SyncFileSender.swift": [
+            "onCompletion",
+            "priorAppHandler",
+            "priorClosedHandler",
+        ],
+        "QQPlayer/Sync/SyncManifestPeer.swift": [
+            "localManifestProvider",
+            "localRootName",
+            "onManifestReceived",
+            "onDecodeFailure",
+            "onProviderUnavailable",
+        ],
+        "QQPlayer/Sync/SyncPeerLibraryClient.swift": [
+            "onUnexpectedResponse",
+            "onDecodeFailure",
+            "onSessionClosed",
+        ],
+        "QQPlayer/Sync/SyncPeerLibraryResponder.swift": [
+            "catalogProvider",
+            "onDecodeFailure",
+            "onResponseSent",
+        ],
+        "QQPlayer/Sync/SyncLibraryFetchResponder.swift": [
+            "contentHashProvider",
+            "lyricsFileNameProvider",
+            "computedChecksumProvider",
+            "onResultSent",
+            "onDecodeFailure",
+        ],
+        "QQPlayer/Sync/SyncChangeLogPeer.swift": [
+            "onPullHandled",
+            "onPushApplied",
+            "onPushSuspended",
+            "onPushUnresolved",
+            "onPushIgnoredDeletes",
+            "onPushAmbiguous",
+            "onPushUnsupported",
+            "onPushSkippedMissingParent",
+            "onPushApplyFailed",
+            "onDecodeFailure",
+            "onIncrementSent",
+            "onIncrementMissingIdentity",
+            "onPullMissingIdentity",
+            "priorAppHandler",
+            "priorClosedHandler",
+        ],
+        "QQPlayer/Sync/SyncChangeLogApplier.swift": [
+            "playbackPositionSink",
+            "onPlaybackPositionUnsupported",
+            "onSkippedMissingParent",
+            "onRowApplyFailed",
+        ],
+        "QQPlayer/Sync/SyncLibraryPassiveHost.swift": [
+            "membersProvider",
+            "peerLibraryProvider",
+            "priorAppHandler",
+            "priorClosedHandler",
+            "onFileLanded",
+            "onBatchCompleted",
+            "onFetchResult",
+            "onProviderUnavailable",
+            "fetchResultHandler",
+            "providerUnavailableHandler",
+        ],
+        "QQPlayer/Sync/SyncLocalLibraryProvider.swift": [
+            "onFetchResult",
+            "onProviderUnavailable",
+        ],
+        "QQPlayer/Sync/SyncLibraryPushController.swift": [
+            "onStateChange",
+            "onFilePushed",
+        ],
+        "QQPlayer/Sync/SyncLibraryPullController.swift": [
+            "priorAppHandler",
+            "onStateChange",
+            "onFileApplied",
+        ],
+        "QQPlayer/Sync/SyncLyricsResendController.swift": [
+            "onStateChange",
+        ],
+        "QQPlayer/Sync/SyncCollectionSyncCoordinator.swift": [
+            "onStateChange",
+            "onFileTransferred",
+            "onPeerManifestReceived",
+        ],
+        "QQPlayer/Sync/SyncDataSyncCoordinator.swift": [
+            "onStateChange",
+        ],
+        "QQPlayer/Sync/SyncSessionModels.swift": [
+            "now",
+        ],
+        "QQPlayer/Mac/MacSyncLibraryHost.swift": [
+            "membersProvider",
+            "onFetchResult",
+            "fetchResultHandler",
+        ],
+        "QQPlayer/Services/IOSPassiveSyncCenter.swift": [],
+    ]
+
+    /// 该文件里「存储型闭包属性」声明**总数**基线（有意为之的摩擦：新增/删除闭包属性必须过这一关）。
+    private static let sendableCallbackCounts: [String: Int] = [
+        "QQPlayer/Sync/SyncPeerSession.swift": 4,
+        "QQPlayer/Sync/SyncPeerSession+Frames.swift": 3,
+        "QQPlayer/Sync/SyncListener.swift": 6,
+        "QQPlayer/Sync/SyncBrowser.swift": 2,
+        "QQPlayer/Sync/SyncFileReceiver.swift": 5,
+        "QQPlayer/Sync/SyncFileSender.swift": 3,
+        "QQPlayer/Sync/SyncManifestPeer.swift": 5,
+        "QQPlayer/Sync/SyncPeerLibraryClient.swift": 3,
+        "QQPlayer/Sync/SyncPeerLibraryResponder.swift": 3,
+        "QQPlayer/Sync/SyncLibraryFetchResponder.swift": 5,
+        "QQPlayer/Sync/SyncChangeLogPeer.swift": 15,
+        "QQPlayer/Sync/SyncChangeLogApplier.swift": 4,
+        "QQPlayer/Sync/SyncLibraryPassiveHost.swift": 10,
+        "QQPlayer/Sync/SyncLocalLibraryProvider.swift": 7,
+        "QQPlayer/Sync/SyncLibraryPushController.swift": 2,
+        "QQPlayer/Sync/SyncLibraryPullController.swift": 3,
+        "QQPlayer/Sync/SyncLyricsResendController.swift": 1,
+        "QQPlayer/Sync/SyncCollectionSyncCoordinator.swift": 3,
+        "QQPlayer/Sync/SyncDataSyncCoordinator.swift": 1,
+        "QQPlayer/Sync/SyncSessionModels.swift": 1,
+        "QQPlayer/Mac/MacSyncLibraryHost.swift": 3,
+        "QQPlayer/Services/IOSPassiveSyncCenter.swift": 2,
+    ]
+
+    /// 经审计的豁免（逐条给理由；不许静默漏 —— 未登记也未豁免的闭包属性会直接报错）。
+    private static let sendableCallbackExemptions: [String: [String: String]] = [
+        "QQPlayer/Sync/SyncPeerSession+Frames.swift": [
+            "removal": "内部管道：闭包捕获私有引用计数对象 Entry（非 Sendable），要标就得给 Entry 加 @unchecked Sendable = 本任务禁止的糊法；构造与调用都在本层非隔离调用栈内。",
+        ],
+        "QQPlayer/Sync/SyncLocalLibraryProvider.swift": [
+            "sourceFiles": "值类型描述符字段：唯一生产构造点 = 非隔离的 live() 工厂，闭包捕获 FileManager（SDK 未标 Sendable）⇒ 标 @Sendable 只能靠 @unchecked 盒子或改运行时行为，两者都被本任务禁止。",
+            "lyricsEntries": "同上（描述符字段，构造点在非隔离 live() 工厂）。",
+            "contentHash": "同上（描述符字段，构造点在非隔离 live() 工厂）。",
+            "lyricsFileName": "同上（描述符字段，构造点在非隔离 live() 工厂）。",
+            "members": "同上（描述符字段，构造点在非隔离 live() 工厂）。",
+        ],
+        "QQPlayer/Services/IOSPassiveSyncCenter.swift": [
+            "libraryRoot": "DI seam：调用点全在主线程（@MainActor 类内部装配），不出会话队列。",
+            "clientName": "DI seam：调用点全在主线程（@MainActor 类内部装配），不出会话队列。",
+        ],
+    ]
+
+    /// 行式扫描「存储型闭包属性」声明：形如 `[修饰符] var|let 名字: <含 -> 的类型>`。
+    /// 剥注释（`//` 起始行不算）、不解析语法 —— 与结构预算棘轮同风格，够用且易核对。
+    private static func closurePropertyDeclarations(in source: String) -> [(name: String, hasSendable: Bool)] {
+        source.split(separator: "\n", omittingEmptySubsequences: false).compactMap { rawLine in
+            let trimmed = String(rawLine).trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), trimmed.contains("->") else { return nil }
+            let tokens = trimmed.split(separator: " ", omittingEmptySubsequences: true)
+            guard let keywordIndex = tokens.firstIndex(where: { $0 == "var" || $0 == "let" }),
+                  keywordIndex + 1 < tokens.count
+            else { return nil }
+            let nameToken = tokens[keywordIndex + 1]
+            guard nameToken.hasSuffix(":") else { return nil }
+            return (name: String(nameToken.dropLast()), hasSendable: trimmed.contains("@Sendable"))
+        }
+    }
+
+    /// 形状契约：**会话/网络队列回调必须 `@Sendable`**（全家族）。
+    ///
+    /// PR #12（`SyncChangeLogPeer` + `SyncLibraryPassiveHost`，真机闪退当场所修）只守住了两类；
+    /// 本用例把同一口径扩到**全家族**：凡是「在会话/网络队列被调用」的存储型闭包属性，一律标在
+    /// 属性类型上。判据三条：① 名录里的属性必须带 `@Sendable`；② 每个文件的闭包属性**计数**必须
+    /// 与基线一致（增删都要过这一关）；③ 既不在名录也没豁免的闭包属性 = 红（防"新增回调漏标"）。
+    /// 反向验证：撤掉任一名录属性的 `@Sendable` → 本用例当场变红（已在交办里做过）。
+    @Test("形状契约：会话/网络队列回调声明必须 @Sendable（全家族；漏一处 = 真机闪退）")
     func sessionQueueCallbacksDeclareSendable() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let targets = [
-            ("QQPlayer/Sync/SyncChangeLogPeer.swift", 13),
-            ("QQPlayer/Sync/SyncLibraryPassiveHost.swift", 2),
-        ]
-        for (relativePath, expectedCount) in targets {
+        let roster = Self.sendableCallbackRoster
+        #expect(!roster.isEmpty && roster.count == Self.sendableCallbackCounts.count, "名录与计数基线必须成对且非空（fail-closed）")
+        var scannedTotal = 0
+        for (relativePath, expectedNames) in roster.sorted(by: { $0.key < $1.key }) {
             let source = try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
-            let declarations = source.split(separator: "\n").filter { line in
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                return trimmed.hasPrefix("var on") && trimmed.contains(": (") && trimmed.hasSuffix(")?")
-            }
+            let declarations = Self.closurePropertyDeclarations(in: source)
+            let exemptions = Self.sendableCallbackExemptions[relativePath] ?? [:]
+            scannedTotal += declarations.count
             #expect(
-                declarations.count == expectedCount,
-                "\(relativePath) 会话队列回调声明数变了（\(declarations.count) ≠ \(expectedCount)）：新增/删回调须同步本基线"
+                declarations.count == Self.sendableCallbackCounts[relativePath],
+                "\(relativePath) 存储型闭包属性数变了（\(declarations.count) ≠ \(Self.sendableCallbackCounts[relativePath] ?? -1)）：新增/删除闭包属性须同步本基线"
             )
-            for line in declarations {
-                #expect(
-                    line.contains("@Sendable"),
-                    "\(relativePath) 有回调没标 @Sendable（会话队列调用 = 真机闪退）：\(line.trimmingCharacters(in: .whitespaces))"
-                )
+            for declaration in declarations {
+                if expectedNames.contains(declaration.name) {
+                    #expect(
+                        declaration.hasSendable,
+                        "\(relativePath).\(declaration.name) 没标 @Sendable：它在会话/网络队列被调用，漏标 = iOS 上重新继承主线程隔离 = 真机闪退"
+                    )
+                } else if let reason = exemptions[declaration.name] {
+                    #expect(!reason.isEmpty, "\(relativePath).\(declaration.name) 的豁免必须写明理由")
+                } else {
+                    Issue.record(
+                        "\(relativePath).\(declaration.name) 是未登记的存储型闭包属性：要么标 @Sendable 并登记名录，要么写进豁免表（带理由）"
+                    )
+                }
+            }
+            for name in expectedNames where !declarations.contains(where: { $0.name == name }) {
+                Issue.record("\(relativePath) 名录里的 \(name) 已不存在：删回调须同步名录")
+            }
+            for name in exemptions.keys where !declarations.contains(where: { $0.name == name }) {
+                Issue.record("\(relativePath) 豁免表里的 \(name) 已不存在：删掉这条豁免")
             }
         }
+        #expect(
+            scannedTotal == Self.sendableCallbackCounts.values.reduce(0, +),
+            "扫描面与基线不一致（一个文件没扫到 = 判据坏了）"
+        )
     }
 }

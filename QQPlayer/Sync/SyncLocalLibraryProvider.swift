@@ -189,9 +189,9 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
     private var responder: SyncLibraryFetchResponder?
 
     /// 一次拉取（对端请求文件）的结论（诊断/UI 用）。
-    var onFetchResult: ((SyncFetchResult) -> Void)?
+    var onFetchResult: (@Sendable (SyncFetchResult) -> Void)?
     /// 对端请求了 manifest 但本地未接线（诊断）。
-    var onProviderUnavailable: (() -> Void)?
+    var onProviderUnavailable: (@Sendable () -> Void)?
 
     init(descriptor: SyncLocalLibraryDescriptor, fileManager: FileManager = .default) {
         self.descriptor = descriptor
