@@ -92,7 +92,7 @@ struct QueueManagementView: View {
         do {
             artistNameCache = try LibraryReads.artistNamesById()
         } catch {
-            print("Failed to load queue artist cache: \(error)")
+            AppLog.error(.ui, "Failed to load queue artist cache: \(error)")
         }
     }
 

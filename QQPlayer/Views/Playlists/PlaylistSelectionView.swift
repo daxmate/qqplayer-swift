@@ -168,7 +168,7 @@ struct PlaylistSelectionView: View {
             let containingIds = try LibraryReads.playlistIdsContaining(trackStableId: track.stableId)
             playlistsContainingTrack = Set(containingIds)
         } catch {
-            print("Failed to load playlists: \(error)")
+            AppLog.error(.ui, "Failed to load playlists: \(error)")
         }
     }
 
@@ -182,39 +182,36 @@ struct PlaylistSelectionView: View {
 
             // Automatically add the track to the new playlist
             guard let playlistId = playlist.id else {
-                print("Error: Created playlist has no ID")
                 return
             }
             try appCoordinator.addToPlaylist(playlistId: playlistId, trackStableId: track.stableId)
             dismiss()
         } catch {
-            print("Failed to create playlist: \(error)")
+            AppLog.error(.ui, "Failed to create playlist: \(error)")
         }
     }
 
     private func addToPlaylist(_ playlist: Playlist) {
         do {
             guard let playlistId = playlist.id else {
-                print("Error: Playlist has no ID")
                 return
             }
             try appCoordinator.addToPlaylist(playlistId: playlistId, trackStableId: track.stableId)
             dismiss()
         } catch {
-            print("Failed to add to playlist: \(error)")
+            AppLog.error(.ui, "Failed to add to playlist: \(error)")
         }
     }
 
     private func removeFromPlaylist(_ playlist: Playlist) {
         do {
             guard let playlistId = playlist.id else {
-                print("Error: Playlist has no ID")
                 return
             }
             try appCoordinator.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
             dismiss()
         } catch {
-            print("Failed to remove from playlist: \(error)")
+            AppLog.error(.ui, "Failed to remove from playlist: \(error)")
         }
     }
 
@@ -227,7 +224,7 @@ struct PlaylistSelectionView: View {
             playlists.removeAll { $0.id == playlistId }
             playlistToDelete = nil
         } catch {
-            print("Failed to delete playlist: \(error)")
+            AppLog.error(.ui, "Failed to delete playlist: \(error)")
         }
     }
 }

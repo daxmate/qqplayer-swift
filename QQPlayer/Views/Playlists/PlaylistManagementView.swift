@@ -84,7 +84,7 @@ struct PlaylistManagementView: View {
         do {
             playlists = try LibraryReads.playlists()
         } catch {
-            print("Failed to load playlists: \(error)")
+            AppLog.error(.ui, "Failed to load playlists: \(error)")
         }
     }
 
@@ -97,7 +97,7 @@ struct PlaylistManagementView: View {
             playlists.removeAll { $0.id == playlistId }
             playlistToDelete = nil
         } catch {
-            print("Failed to delete playlist: \(error)")
+            AppLog.error(.ui, "Failed to delete playlist: \(error)")
         }
     }
 

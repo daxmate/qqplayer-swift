@@ -17,9 +17,9 @@ struct SettingsView: View {
                     try appCoordinator.deletePlaylist(playlistId: id)
                 }
             }
-            print("🗑️ Deleted \(folderPlaylists.count) folder playlist(s) after disabling auto-creation")
+            AppLog.info(.ui, "🗑️ Deleted \(folderPlaylists.count) folder playlist(s) after disabling auto-creation")
         } catch {
-            print("❌ Failed to delete folder playlists: \(error)")
+            AppLog.error(.ui, "❌ Failed to delete folder playlists: \(error)")
         }
     }
 
@@ -294,12 +294,11 @@ struct SettingsView: View {
                     }
 
                     Button(action: {
-                        print("🔗 GitHub repository button tapped")
                         if let url = URL(string: "https://github.com/daxmate/qqplayer-ios") {
-                            print("🔗 Opening URL: \(url)")
+                            AppLog.info(.ui, "🔗 Opening URL: \(url)")
                             UIApplication.shared.open(url)
                         } else {
-                            print("❌ Invalid GitHub URL")
+                            AppLog.error(.ui, "❌ Invalid GitHub URL")
                         }
                     }) {
                         HStack {

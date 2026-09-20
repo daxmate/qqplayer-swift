@@ -109,7 +109,7 @@ struct PlaylistTrackRowView: View {
                             try appCoordinator.toggleFavorite(trackStableId: track.stableId)
                             isFavorite.toggle()
                         } catch {
-                            print("Failed to toggle favorite: \(error)")
+                            AppLog.error(.ui, "Failed to toggle favorite: \(error)")
                         }
                     }) {
                         HStack {
@@ -187,7 +187,7 @@ struct PlaylistTrackRowView: View {
                 try appCoordinator.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
                 NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             } catch {
-                print("❌ Failed to remove from playlist: \(error)")
+                AppLog.error(.ui, "❌ Failed to remove from playlist: \(error)")
             }
         }
     }

@@ -95,7 +95,7 @@ struct ArtistsScreen: View {
             // 简繁归一：同名简繁两行按归一 key 分组，每组一个显示项
             artists = ArtistNameNormalizer.groupedArtists(allArtists)
         } catch {
-            print("Failed to load artists: \(error)")
+            AppLog.error(.ui, "Failed to load artists: \(error)")
         }
     }
 }

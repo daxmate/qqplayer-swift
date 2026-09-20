@@ -925,9 +925,9 @@ struct PlayerView: View {
     private func loadTracks() async {
         do {
             allTracks = try appCoordinator.getAllTracks()
-            print("✅ Loaded \(allTracks.count) tracks for artist navigation")
+            AppLog.info(.ui, "✅ Loaded \(allTracks.count) tracks for artist navigation")
         } catch {
-            print("❌ Failed to load tracks: \(error)")
+            AppLog.error(.ui, "❌ Failed to load tracks: \(error)")
         }
     }
 
@@ -940,7 +940,7 @@ struct PlayerView: View {
         do {
             isFavorite = try LibraryReads.isFavorite(trackStableId: currentTrack.stableId)
         } catch {
-            print("Failed to check favorite status: \(error)")
+            AppLog.error(.ui, "Failed to check favorite status: \(error)")
             isFavorite = false
         }
     }
@@ -952,7 +952,7 @@ struct PlayerView: View {
             try appCoordinator.toggleFavorite(trackStableId: currentTrack.stableId)
             isFavorite.toggle()
         } catch {
-            print("Failed to toggle favorite: \(error)")
+            AppLog.error(.ui, "Failed to toggle favorite: \(error)")
         }
     }
 
@@ -964,13 +964,13 @@ struct PlayerView: View {
     private func showAirPlayPicker() {
         guard let picker = routePickerView else {
             // 理论上不会发生：按钮只在 PlayerView 挂载后可见
-            print("⚠️ AirPlay: route picker 未挂载，无法弹出选择器")
+            AppLog.warn(.ui, "⚠️ AirPlay: route picker 未挂载，无法弹出选择器")
             return
         }
         if let button = Self.routePickerButton(in: picker) {
             button.sendActions(for: .touchUpInside)
         } else {
-            print("⚠️ AirPlay: 未找到 route picker 内部按钮（系统版本可能变化）")
+            AppLog.warn(.ui, "⚠️ AirPlay: 未找到 route picker 内部按钮（系统版本可能变化）")
         }
     }
 

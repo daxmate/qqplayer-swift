@@ -74,7 +74,7 @@ struct SearchView: View {
                         }
                     }
                 } catch {
-                    print("Search error: \(error)")
+                    AppLog.error(.ui, "Search error: \(error)")
                 }
 
                 return SearchResults(

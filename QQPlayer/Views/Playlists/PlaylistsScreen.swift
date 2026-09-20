@@ -211,7 +211,7 @@ struct PlaylistsScreen: View {
             let trackIds = playlistItems.map { $0.trackStableId }
             return try appCoordinator.databaseManager.getTracksByStableIdsPreservingOrder(trackIds)
         } catch {
-            print("Failed to get playlist tracks: \(error)")
+            AppLog.error(.ui, "Failed to get playlist tracks: \(error)")
             return []
         }
     }
@@ -228,7 +228,7 @@ struct PlaylistsScreen: View {
             }
             playlistTracksCache = cache
         } catch {
-            print("Failed to load playlists: \(error)")
+            AppLog.error(.ui, "Failed to load playlists: \(error)")
         }
         // Pinned smart cards: keep showing entries even if the query fails
         // (count 0 placeholder), so the grid always has the four fixed cards.
@@ -245,7 +245,7 @@ struct PlaylistsScreen: View {
             loadPlaylists()
             newPlaylistName = ""
         } catch {
-            print("Failed to create playlist: \(error)")
+            AppLog.error(.ui, "Failed to create playlist: \(error)")
         }
     }
 
@@ -257,7 +257,7 @@ struct PlaylistsScreen: View {
             playlistToEdit = nil
             editPlaylistName = ""
         } catch {
-            print("Failed to rename playlist: \(error)")
+            AppLog.error(.ui, "Failed to rename playlist: \(error)")
         }
     }
 
@@ -268,7 +268,7 @@ struct PlaylistsScreen: View {
             loadPlaylists()
             playlistToDelete = nil
         } catch {
-            print("Failed to delete playlist: \(error)")
+            AppLog.error(.ui, "Failed to delete playlist: \(error)")
         }
     }
 }
@@ -382,7 +382,7 @@ struct PlaylistsScreen: View {
                     isGenerating = false
                     showCreated = true
                 } catch {
-                    print("❌ AI playlist generation failed: \(error)")
+                    AppLog.error(.ui, "❌ AI playlist generation failed: \(error)")
                     showError = true
                     isGenerating = false
                 }

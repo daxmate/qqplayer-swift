@@ -87,7 +87,7 @@ struct LikedSongsScreen: View {
             let favoriteIds = try appCoordinator.getFavorites()
             likedTracks = allTracks.filter { favoriteIds.contains($0.stableId) }
         } catch {
-            print("Failed to load liked tracks: \(error)")
+            AppLog.error(.ui, "Failed to load liked tracks: \(error)")
         }
     }
 }

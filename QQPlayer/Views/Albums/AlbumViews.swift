@@ -68,7 +68,7 @@ struct AlbumsScreen: View {
         do {
             albums = try appCoordinator.getAllAlbums()
         } catch {
-            print("Failed to load albums: \(error)")
+            AppLog.error(.ui, "Failed to load albums: \(error)")
         }
         rebuildAlbumTrackIndex()
     }
@@ -407,7 +407,7 @@ struct AlbumDetailScreen: View {
         do {
             albumTracks = try appCoordinator.databaseManager.getTracksByAlbumId(albumId)
         } catch {
-            print("Failed to load album tracks: \(error)")
+            AppLog.error(.ui, "Failed to load album tracks: \(error)")
         }
     }
 
@@ -427,7 +427,7 @@ struct AlbumDetailScreen: View {
         do {
             artistNameCache = try LibraryReads.artistNamesById()
         } catch {
-            print("Failed to load album artist cache: \(error)")
+            AppLog.error(.ui, "Failed to load album artist cache: \(error)")
         }
     }
 }
@@ -508,7 +508,7 @@ struct AlbumTrackRowView: View {
                         try appCoordinator.toggleFavorite(trackStableId: track.stableId)
                         isFavorite.toggle()
                     } catch {
-                        print("Failed to toggle favorite: \(error)")
+                        AppLog.error(.ui, "Failed to toggle favorite: \(error)")
                     }
                 }) {
                     HStack {
@@ -587,7 +587,7 @@ struct AlbumTrackRowView: View {
         do {
             isFavorite = try LibraryReads.isFavorite(trackStableId: track.stableId)
         } catch {
-            print("Failed to check favorite status: \(error)")
+            AppLog.error(.ui, "Failed to check favorite status: \(error)")
         }
     }
 
@@ -636,7 +636,7 @@ struct ArtistDetailScreenWrapper: View {
             let target = grouped.first { $0.artists.contains { $0.name == artistName } } ?? grouped.first
             artists = target?.artists ?? [Artist(id: nil, name: artistName)]
         } catch {
-            print("Failed to load artist: \(error)")
+            AppLog.error(.ui, "Failed to load artist: \(error)")
             artists = [Artist(id: nil, name: artistName)]
         }
     }

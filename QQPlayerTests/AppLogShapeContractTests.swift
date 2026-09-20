@@ -64,7 +64,8 @@ private enum AppLogShapeContract {
 
     /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（迁移完成的文件逐个登记）。
     /// 当前 = 批 2（sync 5）+ 批 3（migration/DB 9）+ 批 4a/4b（播放引擎 12）
-    /// + 批 5（音频元数据·封面·歌词 12）+ 批 6（索引/扫描/清理 5）+ 批 7（服务·协调·网络 18）= 61 文件。
+    /// + 批 5（音频元数据·封面·歌词 12）+ 批 6（索引/扫描/清理 5）+ 批 7（服务·协调·网络 18）
+    /// + 批 8（Views 层 24）= 85 文件。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     ///
@@ -137,6 +138,30 @@ private enum AppLogShapeContract {
         "QQPlayer/Sync/SyncChangeLogPendingStore.swift",
         "QQPlayer/Sync/SyncFileReceiver.swift",
         "QQPlayer/Sync/SyncWiringSelfCheck.swift",
+        "QQPlayer/Views/Albums/AlbumViews.swift",
+        "QQPlayer/Views/Artists/ArtistDetailScreen.swift",
+        "QQPlayer/Views/Artists/ArtistRowViews.swift",
+        "QQPlayer/Views/Artists/ArtistsScreen.swift",
+        "QQPlayer/Views/Library/BulkPlaylistSelectionView.swift",
+        "QQPlayer/Views/Library/LibraryScreens.swift",
+        "QQPlayer/Views/Library/LibraryView.swift",
+        "QQPlayer/Views/Library/SearchResultsViews.swift",
+        "QQPlayer/Views/Library/SearchView.swift",
+        "QQPlayer/Views/Library/TrackListView.swift",
+        "QQPlayer/Views/Player/PlayerView.swift",
+        "QQPlayer/Views/Player/QueueManagementView.swift",
+        "QQPlayer/Views/Player/TrackRowView.swift",
+        "QQPlayer/Views/Playlists/PlaylistCardView.swift",
+        "QQPlayer/Views/Playlists/PlaylistDetailScreen.swift",
+        "QQPlayer/Views/Playlists/PlaylistManagementView.swift",
+        "QQPlayer/Views/Playlists/PlaylistSelectionView.swift",
+        "QQPlayer/Views/Playlists/PlaylistTrackRowView.swift",
+        "QQPlayer/Views/Playlists/PlaylistsScreen.swift",
+        "QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift",
+        "QQPlayer/Views/TutorialView.swift",
+        "QQPlayer/Views/Utility/EQSettingsView.swift",
+        "QQPlayer/Views/Utility/ManualEQEditorView.swift",
+        "QQPlayer/Views/Utility/SettingsView.swift",
     ]
 
     /// 守卫③(c)：既有棘轮的文件（缺一即红，防「名单腐烂 / 守卫被删」）。

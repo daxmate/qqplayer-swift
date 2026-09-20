@@ -290,7 +290,7 @@ enum SmartPlaylistArtistCache {
             )
             return (byId, byStableId)
         } catch {
-            print("Failed to load smart playlist artist cache: \(error)")
+            AppLog.error(.ui, "Failed to load smart playlist artist cache: \(error)")
             return ([:], [:])
         }
     }

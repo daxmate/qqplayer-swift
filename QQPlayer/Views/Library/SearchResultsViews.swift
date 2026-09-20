@@ -64,7 +64,7 @@ struct SearchResultsView: View {
                 fallbackArtistIdsByStableId: fallbackArtistIds
             )
         } catch {
-            print("Failed to load search artist cache: \(error)")
+            AppLog.error(.ui, "Failed to load search artist cache: \(error)")
         }
     }
 
@@ -382,7 +382,7 @@ struct SearchSongRowView: View {
                         try appCoordinator.toggleFavorite(trackStableId: track.stableId)
                         isFavorite.toggle()
                     } catch {
-                        print("Failed to toggle favorite: \(error)")
+                        AppLog.error(.ui, "Failed to toggle favorite: \(error)")
                     }
                 }) {
                     Label(
@@ -446,7 +446,7 @@ struct SearchSongRowView: View {
         do {
             isFavorite = try LibraryReads.isFavorite(trackStableId: track.stableId)
         } catch {
-            print("Failed to check favorite status: \(error)")
+            AppLog.error(.ui, "Failed to check favorite status: \(error)")
         }
     }
 

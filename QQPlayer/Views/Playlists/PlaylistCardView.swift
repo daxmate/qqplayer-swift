@@ -227,7 +227,7 @@ struct PlaylistCardView: View {
         guard let containerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
         ) else {
-            print("❌ Failed to get shared container URL")
+            AppLog.error(.ui, "❌ Failed to get shared container URL")
             return
         }
 
@@ -238,14 +238,14 @@ struct PlaylistCardView: View {
 
         // Save a normalized square image so all playlist covers match standard artwork sizing.
         guard let jpegData = coverImage.jpegData(compressionQuality: 0.85) else {
-            print("❌ Failed to convert image to JPEG")
+            AppLog.error(.ui, "❌ Failed to convert image to JPEG")
             return
         }
 
         do {
             // Save image to shared container
             try jpegData.write(to: fileURL)
-            print("✅ Saved custom cover to \(filename)")
+            AppLog.info(.ui, "✅ Saved custom cover to \(filename)")
 
             // Update database with custom cover path（写操作唯一入口：AppCoordinator）
             try appCoordinator.updatePlaylistCustomCover(
@@ -262,9 +262,9 @@ struct PlaylistCardView: View {
             // Refresh the playlist list
             NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
 
-            print("✅ Custom cover saved and database updated")
+            AppLog.info(.ui, "✅ Custom cover saved and database updated")
         } catch {
-            print("❌ Failed to save custom cover: \(error)")
+            AppLog.error(.ui, "❌ Failed to save custom cover: \(error)")
         }
     }
 }

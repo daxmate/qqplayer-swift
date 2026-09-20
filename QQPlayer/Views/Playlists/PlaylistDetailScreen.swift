@@ -90,7 +90,7 @@ struct PlaylistDetailScreen: View {
                 }
             }
         } catch {
-            print("Failed to build artist cache: \(error)")
+            AppLog.error(.ui, "Failed to build artist cache: \(error)")
         }
         return cache
     }
@@ -313,7 +313,7 @@ struct PlaylistDetailScreen: View {
                                 // Reload tracks from database to reflect new order
                                 loadPlaylistTracks()
                             } catch {
-                                print("Failed to reorder tracks: \(error)")
+                                AppLog.error(.ui, "Failed to reorder tracks: \(error)")
                             }
                         } : nil)
                     } header: {
@@ -463,7 +463,7 @@ struct PlaylistDetailScreen: View {
                 await loadArtworks()
             }
         } catch {
-            print("Failed to load playlist tracks: \(error)")
+            AppLog.error(.ui, "Failed to load playlist tracks: \(error)")
         }
     }
 
@@ -504,7 +504,7 @@ struct PlaylistDetailScreen: View {
                 fallbackArtistIdsByStableId: fallbackArtistIds
             )
         } catch {
-            print("Failed to load playlist artist cache: \(error)")
+            AppLog.error(.ui, "Failed to load playlist artist cache: \(error)")
         }
     }
 
@@ -546,7 +546,7 @@ struct PlaylistDetailScreen: View {
             }
             coverFailures.clear(playlistKey: key)
             customCoverImage = image
-            print("✅ Loaded custom playlist cover from \(playlist.customCoverImagePath ?? "")")
+            AppLog.info(.ui, "✅ Loaded custom playlist cover from \(playlist.customCoverImagePath ?? "")")
         }
     }
 
@@ -558,7 +558,7 @@ struct PlaylistDetailScreen: View {
         guard let containerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
         ) else {
-            print("❌ Failed to get shared container URL")
+            AppLog.error(.ui, "❌ Failed to get shared container URL")
             return
         }
 
@@ -569,14 +569,14 @@ struct PlaylistDetailScreen: View {
 
         // Save a normalized square image so all playlist covers match standard artwork sizing.
         guard let jpegData = coverImage.jpegData(compressionQuality: 0.85) else {
-            print("❌ Failed to convert image to JPEG")
+            AppLog.error(.ui, "❌ Failed to convert image to JPEG")
             return
         }
 
         do {
             // Save image to shared container
             try jpegData.write(to: fileURL)
-            print("✅ Saved custom cover to \(filename)")
+            AppLog.info(.ui, "✅ Saved custom cover to \(filename)")
 
             // Update database with custom cover path
             try appCoordinator.databaseManager.updatePlaylistCustomCover(
@@ -590,9 +590,9 @@ struct PlaylistDetailScreen: View {
             // Notify widgets to refresh
             WidgetCenter.shared.reloadAllTimelines()
 
-            print("✅ Custom cover saved and database updated")
+            AppLog.info(.ui, "✅ Custom cover saved and database updated")
         } catch {
-            print("❌ Failed to save custom cover: \(error)")
+            AppLog.error(.ui, "❌ Failed to save custom cover: \(error)")
         }
     }
 
@@ -614,7 +614,7 @@ struct PlaylistDetailScreen: View {
                ) {
                 let fileURL = containerURL.appendingPathComponent(customPath)
                 try? FileManager.default.removeItem(at: fileURL)
-                print("✅ Removed custom cover file")
+                AppLog.info(.ui, "✅ Removed custom cover file")
             }
 
             // Update UI
@@ -623,9 +623,9 @@ struct PlaylistDetailScreen: View {
             // Notify widgets to refresh
             WidgetCenter.shared.reloadAllTimelines()
 
-            print("✅ Custom cover removed")
+            AppLog.info(.ui, "✅ Custom cover removed")
         } catch {
-            print("❌ Failed to remove custom cover: \(error)")
+            AppLog.error(.ui, "❌ Failed to remove custom cover: \(error)")
         }
     }
 }

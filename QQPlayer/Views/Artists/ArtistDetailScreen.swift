@@ -455,7 +455,7 @@ struct ArtistDetailScreen: View {
                 if let fetchedArtist = fetchedArtist { await loadArtistImage(from: fetchedArtist.images) }
             } catch {
                 self.isLoading = false
-                print("❌ Failed to load artist data: \(error)")
+                AppLog.error(.ui, "❌ Failed to load artist data: \(error)")
             }
         }
     }
@@ -468,7 +468,7 @@ struct ArtistDetailScreen: View {
                 let currentSource = unifiedArtist?.source
 
                 // First try different source with same name
-                print("🔄 Trying different source for: \(displayName)")
+                AppLog.info(.ui, "🔄 Trying different source for: \(displayName)")
                 var fetchedArtist = try await services.hybridMusicAPI.searchAlternativeArtist(
                     name: displayName,
                     currentSource: currentSource
@@ -476,7 +476,7 @@ struct ArtistDetailScreen: View {
 
                 // If that fails, try similar names with different sources
                 if fetchedArtist == nil {
-                    print("🔄 Trying similar names for: \(displayName)")
+                    AppLog.info(.ui, "🔄 Trying similar names for: \(displayName)")
                     fetchedArtist = try await services.hybridMusicAPI.searchSimilarArtist(
                         originalName: displayName,
                         currentSource: currentSource
@@ -487,15 +487,15 @@ struct ArtistDetailScreen: View {
                     self.unifiedArtist = fetchedArtist
                     self.artistImage = nil // Clear old image
                     await loadArtistImage(from: fetchedArtist.images)
-                    print("✅ Found alternative artist: \(fetchedArtist.name) from \(fetchedArtist.source.rawValue)")
+                    AppLog.info(.ui, "✅ Found alternative artist: \(fetchedArtist.name) from \(fetchedArtist.source.rawValue)")
                 } else {
-                    print("❌ No alternative artist found with different source or similar names")
+                    AppLog.error(.ui, "❌ No alternative artist found with different source or similar names")
                 }
 
                 self.isLoading = false
             } catch {
                 self.isLoading = false
-                print("❌ Failed to find alternative artist: \(error)")
+                AppLog.error(.ui, "❌ Failed to find alternative artist: \(error)")
             }
         }
     }
@@ -513,7 +513,7 @@ struct ArtistDetailScreen: View {
                 await MainActor.run { self.artistImage = img }
             }
         } catch {
-            print("❌ Failed to load artist image: \(error)")
+            AppLog.error(.ui, "❌ Failed to load artist image: \(error)")
         }
     }
 }

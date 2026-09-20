@@ -266,7 +266,7 @@ struct EQSettingsView: View {
             do {
                 try await eqManager.deletePreset(preset)
             } catch {
-                print("❌ \(Localized.failedToDelete): \(error)")
+                AppLog.error(.ui, "❌ \(Localized.failedToDelete): \(error)")
                 await MainActor.run {
                     actionError = Localized.failedToDelete
                 }
@@ -286,7 +286,7 @@ struct EQSettingsView: View {
                     }
                 }
             } catch {
-                print("❌ \(Localized.failedToExport): \(error)")
+                AppLog.error(.ui, "❌ \(Localized.failedToExport): \(error)")
                 await MainActor.run {
                     actionError = Localized.failedToExport
                 }

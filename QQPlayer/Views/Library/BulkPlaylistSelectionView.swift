@@ -100,7 +100,7 @@ struct BulkPlaylistSelectionView: View {
         do {
             playlists = try LibraryReads.playlists()
         } catch {
-            print("Failed to load playlists: \(error)")
+            AppLog.error(.ui, "Failed to load playlists: \(error)")
         }
     }
 
@@ -122,13 +122,12 @@ struct BulkPlaylistSelectionView: View {
             onComplete()
             dismiss()
         } catch {
-            print("Failed to create playlist: \(error)")
+            AppLog.error(.ui, "Failed to create playlist: \(error)")
         }
     }
 
     private func addToPlaylist(_ playlist: Playlist) {
         guard let playlistId = playlist.id else {
-            print("Error: Playlist has no ID")
             return
         }
 

@@ -33,28 +33,4 @@ QQPlayer/Services/LibraryIndexer+Parsing.swift	1
 QQPlayer/Services/LibraryIndexer.swift	3
 QQPlayer/Services/SyncConnectDiag.swift	1
 QQPlayer/ViewModels/TutorialViewModel.swift	1
-QQPlayer/Views/Albums/AlbumViews.swift	6
-QQPlayer/Views/Artists/ArtistDetailScreen.swift	7
-QQPlayer/Views/Artists/ArtistRowViews.swift	2
-QQPlayer/Views/Artists/ArtistsScreen.swift	1
-QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	3
-QQPlayer/Views/Library/LibraryScreens.swift	1
-QQPlayer/Views/Library/LibraryView.swift	10
-QQPlayer/Views/Library/SearchResultsViews.swift	3
-QQPlayer/Views/Library/SearchView.swift	1
-QQPlayer/Views/Library/TrackListView.swift	2
-QQPlayer/Views/Player/PlayerView.swift	6
-QQPlayer/Views/Player/QueueManagementView.swift	1
-QQPlayer/Views/Player/TrackRowView.swift	2
-QQPlayer/Views/Playlists/PlaylistCardView.swift	5
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	13
-QQPlayer/Views/Playlists/PlaylistManagementView.swift	2
-QQPlayer/Views/Playlists/PlaylistSelectionView.swift	8
-QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	2
-QQPlayer/Views/Playlists/PlaylistsScreen.swift	6
-QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	1
-QQPlayer/Views/TutorialView.swift	2
-QQPlayer/Views/Utility/EQSettingsView.swift	2
-QQPlayer/Views/Utility/ManualEQEditorView.swift	2
-QQPlayer/Views/Utility/SettingsView.swift	5
-# TOTAL: 244
+# TOTAL: 151

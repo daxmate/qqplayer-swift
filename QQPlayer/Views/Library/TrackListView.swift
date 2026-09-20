@@ -77,7 +77,7 @@ struct TrackListView: View {
                 }
             }
         } catch {
-            print("Failed to build artist cache: \(error)")
+            AppLog.error(.ui, "Failed to build artist cache: \(error)")
         }
         return cache
     }
@@ -305,7 +305,7 @@ struct TrackListContentView: View {
                 fallbackArtistIdsByStableId: fallbackArtistIds
             )
         } catch {
-            print("Failed to load artist name cache: \(error)")
+            AppLog.error(.ui, "Failed to load artist name cache: \(error)")
         }
     }
 

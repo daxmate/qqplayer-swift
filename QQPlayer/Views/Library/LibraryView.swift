@@ -168,7 +168,7 @@ struct LibraryView: View {
                 // （它会返回 .failed(.unsupportedLocation)）。
                 // 安全作用域打不开 = 真的导入不了，计入失败（以前是 print 完静默丢弃）。
                 guard url.startAccessingSecurityScopedResource() else {
-                    print("❌ Cannot read file (security scope denied): \(url.lastPathComponent)")
+                    AppLog.error(.ui, "❌ Cannot read file (security scope denied): \(url.lastPathComponent)")
                     tally.failed += 1
                     continue
                 }
@@ -190,11 +190,11 @@ struct LibraryView: View {
                         allowExcludedReimport: true
                     )
                     tally.record(outcome)
-                    print("📥 Import outcome for \(url.lastPathComponent): \(outcome)")
+                    if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "📥 Import outcome for \(url.lastPathComponent): \(outcome)") }
 
                 } catch {
                     // 书签建不出来：文件以后可能打不开。以前这条只 print 就吞了 → 计入 failed。
-                    print("❌ Failed to create bookmark for \(url.lastPathComponent): \(error)")
+                    AppLog.error(.ui, "❌ Failed to create bookmark for \(url.lastPathComponent): \(error)")
                     tally.failed += 1
 
                     // Still try to process the file even if bookmark creation fails
@@ -203,7 +203,7 @@ struct LibraryView: View {
                         allowExcludedReimport: true
                     )
                     tally.record(outcome)
-                    print("📥 Import outcome for \(url.lastPathComponent) (no bookmark): \(outcome)")
+                    if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "📥 Import outcome for \(url.lastPathComponent) (no bookmark): \(outcome)") }
                 }
             }
 
@@ -237,7 +237,7 @@ struct LibraryView: View {
     private func storeBookmarkData(_ bookmarkData: Data, for url: URL) async {
         // 书签唯一入口：原子写（此前是原地截断写，被杀即整份书签不可解析，见审计 🔴-2）
         guard let store = ExternalFileBookmarkStore.default else {
-            print("Failed to resolve documents directory")
+            AppLog.error(.ui, "Failed to resolve documents directory")
             return
         }
 
@@ -248,9 +248,9 @@ struct LibraryView: View {
             // Store bookmark using stableId as key (survives file moves)
             try store.upsert(bookmarkData, forStableId: stableId)
 
-            print("Stored bookmark for external file: \(url.lastPathComponent) with stableId: \(stableId)")
+            if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "Stored bookmark for external file: \(url.lastPathComponent) with stableId: \(stableId)") }
         } catch {
-            print("Failed to store bookmark data: \(error)")
+            AppLog.error(.ui, "Failed to store bookmark data: \(error)")
         }
     }
 
@@ -543,10 +543,10 @@ struct LibraryView: View {
                     let playlists = try appCoordinator.databaseManager.getAllPlaylists()
                     if let playlist = playlists.first(where: { $0.id == playlistId }) {
                         playlistToNavigate = playlist
-                        print("✅ LibraryView: Navigating to playlist \(playlist.title)")
+                        AppLog.info(.ui, "✅ LibraryView: Navigating to playlist \(playlist.title)")
                     }
                 } catch {
-                    print("❌ LibraryView: Failed to find playlist: \(error)")
+                    AppLog.error(.ui, "❌ LibraryView: Failed to find playlist: \(error)")
                 }
             }
         }
@@ -608,7 +608,7 @@ struct LibraryView: View {
     private func runSync() async {
         let outcome = await IndexingGate.waitUntilIdle(libraryIndexer)
         if outcome == .timedOut {
-            print("⏱️ LibrarySync: indexing wait timed out — proceeding without waiting")
+            AppLog.warn(.ui, "⏱️ LibrarySync: indexing wait timed out — proceeding without waiting")
         }
 
         // For pull-to-refresh, use manual sync if available, otherwise just refresh

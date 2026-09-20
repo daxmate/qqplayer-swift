@@ -103,9 +103,8 @@ struct MusicFilesStepView: View {
                     Spacer()
 
                     Button(Localized.getStarted) {
-                        print("🎯 Get Started button tapped")
                         viewModel.completeTutorial()
-                        print("🎯 About to dismiss tutorial")
+                        AppLog.info(.ui, "🎯 About to dismiss tutorial")
                         onComplete?()
                         dismiss()
                     }
