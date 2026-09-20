@@ -6,7 +6,10 @@
 #   - 某文件计数下降（含归零）或文件消失 → 必须同步改/删本行，否则红（名单不腐烂）
 #   - 总数 > TOTAL → 红
 #
-# 范围：视图层 = `QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中声明 SwiftUI View 的文件
+# 范围（2026-09-20 口径补齐）：视图层 = **全 `QQPlayer/**` 中声明了 SwiftUI View（`: View` / `some View`）的文件**
+#   ⊕ 并集保留 `QQPlayer/Views/**` 全部文件（含 `UIViewRepresentable` / `UIViewControllerRepresentable` /
+#     `UIImage` 扩展这类不声明 `: View` 的视图层 helper）——**口径只紧不松**，不因改口径丢既有覆盖。
+#   旧口径 = `QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中的 View 文件（根目录 / `AppIntents/**` 视图不可见）。
 # 口径：只算**代码行**（`//` 之后剥离、整行注释不计；文档注释里的字面量不算）
 # 粒度 = 「`<Type>.shared` 的出现次数」，**显式写法与前导点简写都算**（2026-09-19 收紧）：
 #   `Foo.shared` 与 `= .shared` / `: .shared` / `(wrappedValue: .shared)` / `?? .shared` 同口径
@@ -18,8 +21,28 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 118
+# TOTAL: 116
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
+#
+# ═══ 2026-09-20：口径补齐（本文件**唯一一次上调**，不是新增直连）════════════════
+#   原因：旧口径漏掉了「仓库根目录 / `AppIntents/**` 里声明了 SwiftUI View 的文件」。
+#   口径改为「全 `QQPlayer/**` 中声明 View 的文件 ⊕ `QQPlayer/Views/**` 全部」。
+#   ⇒ 首次可见的 2 个文件行（**历史债，因口径补齐首次可见**，并非本次新增的直连）：
+#       QQPlayer/ContentView.swift                                7
+#       QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift  1
+#   即 TOTAL 118 → **126**（+8 全部是既有存量显形）——按账本 §二.2「口径收紧要记账」，
+#   否则会与「只能减不能增」冲突；这批同轮已把 ↑ 的 8 处全部清掉（见下）。
+#   同轮清理（真迁移/收口 8 处，上限 126 → **116**）：
+#     · ContentView 7 → 2：`WhatsNewStore` ×3 → `AppServices.whatsNew`（批 3b 容器）；
+#       `DatabaseManager.shared.getAllTracks()` → `LibraryReads.allTracks()`（数据访问唯一入口）；
+#       CarPlay 格式过滤 → `CarPlayTrackFilter`（判据上收，见下条）；
+#       残留 2 处 = `LibraryIndexer.shared`（热点，带 `$isIndexing` 订阅，需先改订阅机制 → 批 6）
+#       + `#Preview` 里的 `.environmentObject(AppCoordinator.shared)`（脚手架成本，按 §5.2 计预算）。
+#     · SongCardSnippetIntent 1 → 0（删行）：`ArtworkManager.shared` → `IntentArtworkService`
+#       （意图层 `@Dependency` 唯一入口，与 `IntentPlaybackService` 同款）。
+#     · **CarPlay 格式过滤判据上收**（`CarPlayTrackFilter`）：同一段「剔除 ogg/opus/dsf/dff」
+#       原先在 5 个视图文件里各写一遍（同一行为五处实现）→ 收口后 AlbumViews 3→2、
+#       ArtistDetailScreen 4→3、TrackListView 3→2、PlaylistDetailScreen 4→3、ContentView 7→4（再随其余清理降）。
 #
 # 2026-09-19 账目（与预算账本同步）：
 #   174（旧口径）→ 178（收紧：补前导点简写检测，暴露既有存量 4 处：MacSyncView 3 / SyncDeviceNameEditorView 1）
@@ -61,22 +84,23 @@ QQPlayer/Views/Player/PlayerOverlays.swift	5
 QQPlayer/Mac/MacLibraryView.swift	4
 QQPlayer/Mac/MacTagEditorView.swift	4
 QQPlayer/Mac/MacVisualizerView.swift	4
-QQPlayer/Views/Artists/ArtistDetailScreen.swift	4
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	4
 QQPlayer/Views/Utility/SettingsView.swift	4
 QQPlayer/Mac/MacDesktopWindowViews.swift	3
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
 QQPlayer/Mac/MacSyncView.swift	3
-QQPlayer/Views/Albums/AlbumViews.swift	3
-QQPlayer/Views/Library/TrackListView.swift	3
+QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	3
 QQPlayer/Views/Player/QueueManagementView.swift	3
 QQPlayer/Views/Playlists/PlaylistCardView.swift	3
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	3
 QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	3
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
+QQPlayer/ContentView.swift	2
 QQPlayer/Mac/MacArtworkThumbnail.swift	2
 QQPlayer/Mac/MacLyricsView.swift	2
+QQPlayer/Views/Albums/AlbumViews.swift	2
 QQPlayer/Views/Artists/ArtistRowViews.swift	2
+QQPlayer/Views/Library/TrackListView.swift	2
 QQPlayer/Mac/MacAlbumArtistViews.swift	1
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSmartPlaylistViews.swift	1
