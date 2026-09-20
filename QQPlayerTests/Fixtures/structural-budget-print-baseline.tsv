@@ -63,8 +63,6 @@ QQPlayer/Services/MacOnlineDownloadService.swift	12
 QQPlayer/Services/NeteaseOnlineClient.swift	3
 QQPlayer/Services/PlayHistoryRecorder.swift	4
 QQPlayer/Services/PlayerEngine+AudioScheduling.swift	12
-QQPlayer/Services/PlayerEngine+AudioSession.swift	47
-QQPlayer/Services/PlayerEngine+NowPlaying.swift	51
 QQPlayer/Services/PlayerEngine+PlaybackControl+Mac.swift	22
 QQPlayer/Services/PlayerEngine+PlaybackControl+Seek.swift	10
 QQPlayer/Services/PlayerEngine+PlaybackControl+Transport.swift	30
@@ -72,7 +70,6 @@ QQPlayer/Services/PlayerEngine+PlaybackControl.swift	23
 QQPlayer/Services/PlayerEngine+Queue.swift	10
 QQPlayer/Services/PlayerEngine.swift	24
 QQPlayer/Services/QuarkClient.swift	14
-QQPlayer/Services/SFBAudioEngineManager+Playback.swift	102
 QQPlayer/Services/SFBAudioEngineManager+Queue.swift	4
 QQPlayer/Services/SFBAudioEngineManager.swift	36
 QQPlayer/Services/SpotifyAPI.swift	13
@@ -104,4 +101,4 @@ QQPlayer/Views/TutorialView.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	2
 QQPlayer/Views/Utility/ManualEQEditorView.swift	2
 QQPlayer/Views/Utility/SettingsView.swift	5
-# TOTAL: 1224
+# TOTAL: 1024

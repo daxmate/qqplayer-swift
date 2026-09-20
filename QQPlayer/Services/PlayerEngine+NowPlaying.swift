@@ -26,7 +26,7 @@
             // Play command handler - will be called from Control Center
             cc.playCommand.addTarget { [weak self] _ in
                 Task { @MainActor in
-                    print("🎛️ Play command from Control Center")
+                    AppLog.info(.general, "🎛️ Play command from Control Center")
                     self?.play()
                 }
                 return .success
@@ -35,7 +35,7 @@
             // Pause command handler - will be called from Control Center
             cc.pauseCommand.addTarget { [weak self] _ in
                 Task { @MainActor in
-                    print("🎛️ Pause command from Control Center")
+                    AppLog.info(.general, "🎛️ Pause command from Control Center")
                     self?.pause(fromControlCenter: true)
                 }
                 return .success
@@ -62,11 +62,11 @@
 
                 // Perform seek synchronously for CarPlay
                 let positionTime = e.positionTime
-                print("🎯 CarPlay seek request to: \(positionTime)s")
+                AppLog.info(.general, "🎯 CarPlay seek request to: \(positionTime)s")
 
                 Task { @MainActor in
                     await self.seek(to: positionTime)
-                    print("✅ Seek completed to: \(positionTime)s")
+                    AppLog.info(.general, "✅ Seek completed to: \(positionTime)s")
                 }
 
                 return .success
@@ -94,7 +94,7 @@
 
             // Enable seeking in CarPlay
             cc.changePlaybackPositionCommand.isEnabled = true
-            print("✅ CarPlay seek command enabled")
+            AppLog.info(.general, "✅ CarPlay seek command enabled")
         }
 
         // MARK: - Widget Integration
@@ -141,7 +141,7 @@
                 // 同曲校验（2026-09-12 审计 P5）：上面两次 await（封面 / 后台编码）期间可能已切歌，
                 // 旧曲写进去会一直留在小组件（saveCurrentTrack 同步写盘 + reloadAllTimelines）。
                 guard PlaybackTrackGate.isStillCurrent(trackId: trackId, currentTrackId: currentTrack?.stableId) else {
-                    print("↩️ widget 更新丢弃：\(track.title) 已不是当前曲目")
+                    AppLog.warn(.general, "↩️ widget 更新丢弃：\(track.title) 已不是当前曲目")
                     return
                 }
 
@@ -171,7 +171,7 @@
                 // Clear Now Playing info if no track
                 DispatchQueue.main.async {
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-                    print("🎛️ Cleared Control Center - no track loaded")
+                    AppLog.info(.general, "🎛️ Cleared Control Center - no track loaded")
                 }
                 return
             }
@@ -208,9 +208,9 @@
             // Add cached artwork
             if let cachedArtwork = cachedArtwork, cachedArtworkTrackId == track.stableId {
                 info[MPMediaItemPropertyArtwork] = cachedArtwork
-                print("🎨 Added cached artwork to Now Playing info for: \(track.title)")
+                AppLog.info(.general, "🎨 Added cached artwork to Now Playing info for: \(track.title)")
             } else {
-                print("⚠️ No cached artwork available for: \(track.title) (cached: \(cachedArtwork != nil), trackId match: \(cachedArtworkTrackId == track.stableId))")
+                AppLog.warn(.general, "⚠️ No cached artwork available for: \(track.title) (cached: \(cachedArtwork != nil), trackId match: \(cachedArtworkTrackId == track.stableId))")
             }
 
             // Update with explicit synchronization
@@ -234,8 +234,8 @@
                 // Trigger CarPlay Now Playing button update
                 MPNowPlayingInfoCenter.default().playbackState = self.isPlaying ? .playing : .paused
 
-                print("🎛️ Enhanced Control Center update - playing: \(self.isPlaying)")
-                print("🎛️ Title: \(track.title), Time: \(currentTime)")
+                AppLog.info(.general, "🎛️ Enhanced Control Center update - playing: \(self.isPlaying)")
+                AppLog.info(.general, "🎛️ Title: \(track.title), Time: \(currentTime)")
             }
 
             if cachedArtworkTrackId != track.stableId,
@@ -261,13 +261,13 @@
             // SwiftUI view redraws that spike CPU and trigger the iOS watchdog.
             // Background track-end detection is handled by backgroundCheckTimer instead.
             if isInBackground {
-                print("🔄 Skipping playback timer start - app is in background")
+                AppLog.warn(.general, "🔄 Skipping playback timer start - app is in background")
                 return
             }
 
             let appState = UIApplication.shared.applicationState
             if hasSetupSiriBackgroundSession && appState == .background {
-                print("🔄 Skipping playback timer start - Siri background mode active")
+                AppLog.warn(.general, "🔄 Skipping playback timer start - Siri background mode active")
                 return
             }
 
@@ -343,7 +343,7 @@
         func suspendUITimersForBackground() {
             isInBackground = true
             stopPlaybackTimer()
-            print("⏸️ Suspended UI timers for background")
+            AppLog.info(.general, "⏸️ Suspended UI timers for background")
         }
 
         /// Restart UI timers when returning to foreground.
@@ -352,7 +352,7 @@
             if isPlaying {
                 startPlaybackTimer()
             }
-            print("▶️ Resumed UI timers for foreground")
+            AppLog.info(.general, "▶️ Resumed UI timers for foreground")
         }
 
         // MARK: - Now Playing Info
@@ -386,7 +386,7 @@
                     fallbackArtistId: track.artistId
                 )
             } catch {
-                print("Failed to fetch metadata: \(error)")
+                AppLog.error(.general, "Failed to fetch metadata: \(error)")
                 artistName = nil
             }
 
@@ -413,7 +413,7 @@
                     self.cachedArtwork = artwork
                     self.cachedArtworkTrackId = track.stableId
                     self.updateNowPlayingInfoWithCachedArtwork()
-                    print("🎨 Cached artwork from ArtworkManager for: \(track.title)")
+                    AppLog.info(.general, "🎨 Cached artwork from ArtworkManager for: \(track.title)")
                 }
                 return
             }
@@ -433,7 +433,7 @@
                 let artwork: MPMediaItemArtwork? = try await withCheckedThrowingContinuation { continuation in
                     DispatchQueue.global(qos: .utility).async {
                         let fileExtension = url.pathExtension.lowercased()
-                        print("🎵 Loading artwork from file: \(url.lastPathComponent)")
+                        AppLog.info(.general, "🎵 Loading artwork from file: \(url.lastPathComponent)")
 
                         if fileExtension == "dsf" || fileExtension == "dff" {
                             if let art = self.loadArtworkFromSFBAudioEngine(url: url) ?? self.loadArtworkFromDSDFile(url: url) {
@@ -463,16 +463,16 @@
                         self.cachedArtwork = artwork
                         self.cachedArtworkTrackId = track.stableId
                         self.updateNowPlayingInfoWithCachedArtwork()
-                        print("🎨 Cached artwork from file for: \(track.title)")
+                        AppLog.info(.general, "🎨 Cached artwork from file for: \(track.title)")
                     } else {
                         // Mark as attempted so we don't retry
                         self.cachedArtworkTrackId = track.stableId
-                        print("🎨 No artwork found for: \(track.title)")
+                        AppLog.info(.general, "🎨 No artwork found for: \(track.title)")
                     }
                 }
 
             } catch {
-                print("❌ Failed to load artwork for caching: \(error)")
+                AppLog.error(.general, "❌ Failed to load artwork for caching: \(error)")
                 // Mark as attempted so we don't keep retrying and crashing on large files
                 await MainActor.run {
                     self.cachedArtworkTrackId = track.stableId
@@ -490,7 +490,7 @@
                     if metadataItem.commonKey == .commonKeyArtwork,
                        let data = try await metadataItem.load(.dataValue),
                        let originalImage = UIImage(data: data) {
-                        print("🎨 Found artwork in AVAsset metadata (size: \(Int(originalImage.size.width))x\(Int(originalImage.size.height)))")
+                        AppLog.info(.general, "🎨 Found artwork in AVAsset metadata (size: \(Int(originalImage.size.width))x\(Int(originalImage.size.height)))")
 
                         // Crop to square if width is significantly larger than height
                         let processedImage = self.cropToSquareIfNeeded(image: originalImage)
@@ -506,10 +506,10 @@
                     }
                 }
 
-                print("⚠️ No artwork found in AVAsset metadata")
+                AppLog.warn(.general, "⚠️ No artwork found in AVAsset metadata")
                 return nil
             } catch {
-                print("⚠️ Failed to load artwork from AVAsset: \(error.localizedDescription)")
+                AppLog.warn(.general, "⚠️ Failed to load artwork from AVAsset: \(error.localizedDescription)")
                 return nil
             }
         }
@@ -521,7 +521,7 @@
 
                 // Look for FLAC PICTURE metadata block
                 if let artwork = extractFLACPictureBlock(from: data) {
-                    print("🎨 Found artwork in FLAC PICTURE block")
+                    AppLog.info(.general, "🎨 Found artwork in FLAC PICTURE block")
 
                     let processedImage = self.cropToSquareIfNeeded(image: artwork)
 
@@ -530,11 +530,11 @@
                     return mpArtwork
                 }
 
-                print("⚠️ No PICTURE block found in FLAC file")
+                AppLog.warn(.general, "⚠️ No PICTURE block found in FLAC file")
                 return nil
 
             } catch {
-                print("❌ Direct FLAC metadata reading failed: \(error)")
+                AppLog.error(.general, "❌ Direct FLAC metadata reading failed: \(error)")
                 return nil
             }
         }
@@ -547,7 +547,7 @@
             // Check for FLAC signature
             let signature = data.subdata(in: 0 ..< 4)
             guard signature == Data([0x66, 0x4C, 0x61, 0x43]) else { // "fLaC"
-                print("⚠️ Invalid FLAC signature")
+                AppLog.warn(.general, "⚠️ Invalid FLAC signature")
                 return nil
             }
 
@@ -568,10 +568,10 @@
 
                 // Check if this is a PICTURE block (type 6)
                 if blockType == 6 {
-                    print("🖼️ Found FLAC PICTURE block at offset \(offset), length: \(blockLength)")
+                    AppLog.info(.general, "🖼️ Found FLAC PICTURE block at offset \(offset), length: \(blockLength)")
 
                     guard offset + blockLength <= data.count else {
-                        print("❌ PICTURE block extends beyond file")
+                        AppLog.error(.general, "❌ PICTURE block extends beyond file")
                         break
                     }
 
@@ -673,12 +673,12 @@
                 // SFBAudioEngine AudioMetadata doesn't expose raw artwork data directly
                 // The current SFBAudioEngine API doesn't provide easy access to embedded artwork
                 // We'll need to use the direct file parsing method instead
-                print("🔍 SFBAudioEngine metadata available but artwork extraction not directly supported")
-                print("🔍 Metadata - Title: \(metadata.title ?? "nil"), Artist: \(metadata.artist ?? "nil")")
+                AppLog.info(.general, "🔍 SFBAudioEngine metadata available but artwork extraction not directly supported")
+                AppLog.info(.general, "🔍 Metadata - Title: \(metadata.title ?? "nil"), Artist: \(metadata.artist ?? "nil")")
 
                 return nil
             } catch {
-                print("⚠️ SFBAudioEngine artwork extraction failed: \(error)")
+                AppLog.warn(.general, "⚠️ SFBAudioEngine artwork extraction failed: \(error)")
                 return nil
             }
         }
@@ -691,14 +691,14 @@
                 // For DSF files, try ID3v2 APIC frame extraction first
                 if fileExtension == "dsf" {
                     if let image = extractDSFArtworkFromID3(data: data, filename: url.lastPathComponent) {
-                        print("🎨 Extracted artwork from DSF ID3v2 APIC frame")
+                        AppLog.info(.general, "🎨 Extracted artwork from DSF ID3v2 APIC frame")
                         let processedImage = self.cropToSquareIfNeeded(image: image)
                         return self.makeMediaItemArtwork(from: processedImage)
                     }
                 }
 
                 // Fallback to binary signature search for both DSF and DFF files
-                print("⚠️ No ID3v2 artwork found, searching for binary signatures in: \(url.lastPathComponent)")
+                AppLog.warn(.general, "⚠️ No ID3v2 artwork found, searching for binary signatures in: \(url.lastPathComponent)")
 
                 // Image signatures to look for
                 let jpegSignature = Data([0xFF, 0xD8, 0xFF])
@@ -719,7 +719,7 @@
                         let imageData = data.subdata(in: startOffset ..< endOffset)
 
                         if let image = UIImage(data: imageData) {
-                            print("🎨 Extracted JPEG artwork from DSD file (binary search)")
+                            AppLog.info(.general, "🎨 Extracted JPEG artwork from DSD file (binary search)")
                             let processedImage = self.cropToSquareIfNeeded(image: image)
                             return self.makeMediaItemArtwork(from: processedImage)
                         }
@@ -738,7 +738,7 @@
                         let imageData = data.subdata(in: startOffset ..< min(endOffset, data.count))
 
                         if let image = UIImage(data: imageData) {
-                            print("🎨 Extracted PNG artwork from DSD file (binary search)")
+                            AppLog.info(.general, "🎨 Extracted PNG artwork from DSD file (binary search)")
                             let processedImage = self.cropToSquareIfNeeded(image: image)
                             return self.makeMediaItemArtwork(from: processedImage)
                         }
@@ -747,7 +747,7 @@
 
                 return nil
             } catch {
-                print("⚠️ Direct DSD artwork extraction failed: \(error)")
+                AppLog.warn(.general, "⚠️ Direct DSD artwork extraction failed: \(error)")
                 return nil
             }
         }
@@ -764,7 +764,7 @@
             // If width is more than 20% larger than height, crop to square
             let aspectRatio = width / height
             if aspectRatio > 1.2 {
-                print("🖼️ Cropping wide artwork (aspect ratio: \(String(format: "%.2f", aspectRatio))) to square")
+                AppLog.info(.general, "🖼️ Cropping wide artwork (aspect ratio: \(String(format: "%.2f", aspectRatio))) to square")
 
                 // Calculate the square size (use height as the dimension)
                 let squareSize = height
@@ -775,7 +775,7 @@
 
                 // Perform the crop
                 guard let cgImage = image.cgImage?.cropping(to: cropRect) else {
-                    print("⚠️ Failed to crop image, returning original")
+                    AppLog.warn(.general, "⚠️ Failed to crop image, returning original")
                     return image
                 }
 
@@ -798,7 +798,7 @@
             // Validate DSF signature: 'D', 'S', 'D', ' ' (includes 1 space)
             guard data.count >= 28,
                   data[0] == 0x44, data[1] == 0x53, data[2] == 0x44, data[3] == 0x20 else {
-                print("⚠️ Invalid DSF signature in: \(filename)")
+                AppLog.warn(.general, "⚠️ Invalid DSF signature in: \(filename)")
                 return nil
             }
 
@@ -806,7 +806,7 @@
             let metadataPointer = readLittleEndianUInt64(from: data, offset: 20)
 
             guard metadataPointer > 0 && metadataPointer < data.count else {
-                print("⚠️ No metadata pointer in DSF file: \(filename)")
+                AppLog.warn(.general, "⚠️ No metadata pointer in DSF file: \(filename)")
                 return nil
             }
 
@@ -817,11 +817,11 @@
                   data[metadataOffset] == 0x49, // 'I'
                   data[metadataOffset + 1] == 0x44, // 'D'
                   data[metadataOffset + 2] == 0x33 else { // '3'
-                print("⚠️ No ID3v2 tag found at metadata pointer in: \(filename)")
+                AppLog.warn(.general, "⚠️ No ID3v2 tag found at metadata pointer in: \(filename)")
                 return nil
             }
 
-            print("🏷️ Found ID3v2 tag in DSF file: \(filename)")
+            AppLog.info(.general, "🏷️ Found ID3v2 tag in DSF file: \(filename)")
 
             let id3Data = data.subdata(in: metadataOffset ..< data.count)
             return extractArtworkFromID3v2(data: id3Data, filename: filename)
@@ -835,7 +835,7 @@
             let majorVersion = data[3]
             let tagSize = Int((UInt32(data[6]) << 21) | (UInt32(data[7]) << 14) | (UInt32(data[8]) << 7) | UInt32(data[9]))
 
-            print("🏷️ Searching for APIC frame in ID3v2.\(majorVersion) tag, size: \(tagSize) bytes")
+            AppLog.info(.general, "🏷️ Searching for APIC frame in ID3v2.\(majorVersion) tag, size: \(tagSize) bytes")
 
             // Parse frames to find APIC (attached picture)
             var offset = 10
@@ -862,7 +862,7 @@
                 }
 
                 if frameId == "APIC" {
-                    print("🎨 Found APIC frame in \(filename), size: \(frameSize) bytes")
+                    AppLog.info(.general, "🎨 Found APIC frame in \(filename), size: \(frameSize) bytes")
 
                     let frameData = data.subdata(in: offset ..< offset + frameSize)
 
@@ -897,31 +897,31 @@
 
                     // Extract image data
                     guard frameOffset < frameData.count else {
-                        print("⚠️ Invalid APIC frame structure in: \(filename)")
+                        AppLog.warn(.general, "⚠️ Invalid APIC frame structure in: \(filename)")
                         break
                     }
 
                     let imageData = frameData.subdata(in: frameOffset ..< frameData.count)
 
                     if let image = UIImage(data: imageData) {
-                        print("✅ Successfully extracted artwork from ID3v2 APIC frame: \(filename)")
+                        AppLog.info(.general, "✅ Successfully extracted artwork from ID3v2 APIC frame: \(filename)")
                         return image
                     } else {
-                        print("⚠️ Could not create UIImage from APIC data in: \(filename)")
+                        AppLog.warn(.general, "⚠️ Could not create UIImage from APIC data in: \(filename)")
                     }
                 }
 
                 offset += frameSize
             }
 
-            print("⚠️ No APIC frame found in ID3v2 tag: \(filename)")
+            AppLog.warn(.general, "⚠️ No APIC frame found in ID3v2 tag: \(filename)")
             return nil
         }
 
         // Safe byte reading helper for DSF format (little-endian)
         private nonisolated func readLittleEndianUInt64(from data: Data, offset: Int) -> UInt64 {
             guard offset >= 0 && offset + 8 <= data.count else {
-                print("⚠️ Invalid byte access in player: offset=\(offset), dataSize=\(data.count)")
+                AppLog.warn(.general, "⚠️ Invalid byte access in player: offset=\(offset), dataSize=\(data.count)")
                 return 0
             }
 

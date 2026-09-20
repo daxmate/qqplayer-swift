@@ -20,7 +20,7 @@
             } else if let format = format {
                 // Check if sample rate has changed - if so, force reconfiguration
                 if abs(format.sampleRate - lastSampleRate) > 0.1 {
-                    print("📊 Sample rate changed from \(lastSampleRate)Hz to \(format.sampleRate)Hz - forcing reconfiguration")
+                    AppLog.info(.general, "📊 Sample rate changed from \(lastSampleRate)Hz to \(format.sampleRate)Hz - forcing reconfiguration")
                     reconfigureAudioEngineForNewFormat(format)
                     lastSampleRate = format.sampleRate
 
@@ -34,7 +34,7 @@
                     if isPlaying {
                         startPlaybackTimer()
                     }
-                    print("🔄 Reset timing state and timer for new sample rate")
+                    AppLog.info(.general, "🔄 Reset timing state and timer for new sample rate")
                 }
             }
         }
@@ -44,20 +44,20 @@
             let wasRunning = audioEngine.isRunning
             if wasRunning {
                 audioEngine.stop()
-                print("🛑 Stopped audio engine for reconfiguration")
+                AppLog.info(.general, "🛑 Stopped audio engine for reconfiguration")
             }
-            print("🔧 Reconfiguring audio engine for new format: \(format.sampleRate)Hz")
+            AppLog.info(.general, "🔧 Reconfiguring audio engine for new format: \(format.sampleRate)Hz")
             // Rebuild the graph: playerNode -> timePitch（倍速）-> EQ -> mainMixerNode
             connectPlaybackChain(format: format)
             audioEngine.prepare()
-            print("✅ Audio engine reconfigured with EQ + timePitch for sample rate: \(format.sampleRate)Hz")
+            AppLog.info(.general, "✅ Audio engine reconfigured with EQ + timePitch for sample rate: \(format.sampleRate)Hz")
             // Restart engine if it was running
             if wasRunning {
                 do {
                     try audioEngine.start()
-                    print("▶️ Restarted audio engine after reconfiguration")
+                    AppLog.info(.general, "▶️ Restarted audio engine after reconfiguration")
                 } catch {
-                    print("❌ Failed to restart audio engine: \(error)")
+                    AppLog.error(.general, "❌ Failed to restart audio engine: \(error)")
                 }
             }
         }
@@ -77,7 +77,7 @@
             // CRITICAL: Prepare the engine to guarantee render loop activity
             audioEngine.prepare()
             // Don't start the engine here - wait until we actually need to play
-            print("✅ Audio engine configured and prepared with EQ + timePitch integration, format: \(format?.description ?? "auto")")
+            AppLog.info(.general, "✅ Audio engine configured and prepared with EQ + timePitch integration, format: \(format?.description ?? "auto")")
         }
 
         /// 播放链接线：playerNode → timePitch（倍速）→ EQ → mainMixerNode
@@ -98,7 +98,7 @@
             do {
                 try setupAudioSessionCategory()
             } catch {
-                print("Failed to setup audio session category: \(error)")
+                AppLog.error(.general, "Failed to setup audio session category: \(error)")
                 // Continue anyway - we'll try to handle this when actually playing
             }
         }
@@ -197,7 +197,7 @@
 
             switch type {
             case .began:
-                print("🚫 Audio session interruption began - pausing playback")
+                AppLog.warn(.general, "🚫 Audio session interruption began - pausing playback")
                 isAudioSessionInterrupted = true
                 // Scope the route flag to this interruption. On an unplug the
                 // .oldDeviceUnavailable route change arrives after this .began and
@@ -235,7 +235,7 @@
                     + "appState=\(appState.rawValue) playbackTime=\(playbackTime)s "
                     + "playbackTimeAge=\(String(format: "%.1f", frozenAge))s "
                     + "lastKnown=\(lastKnownPlaybackPosition)s lastKnownAge=\(String(format: "%.1f", lastKnownAge))s"
-                print(diagLine)
+                AppLog.info(.general, diagLine)
                 InterruptionDiagnostics.log(diagLine)
                 wasPlayingBeforeInterruption = wasPlaying
 
@@ -270,19 +270,19 @@
 
                 // Restore the saved position (pause() may have updated it)
                 playbackTime = savedPosition
-                print("💾 Saved playback position: \(savedPosition)s (was playing: \(wasPlaying))")
+                AppLog.info(.general, "💾 Saved playback position: \(savedPosition)s (was playing: \(wasPlaying))")
 
             case .ended:
-                print("✅ Audio session interruption ended")
+                AppLog.info(.general, "✅ Audio session interruption ended")
                 isAudioSessionInterrupted = false
-                print("💾 Will restore to position: \(playbackTime)s when playback resumes")
+                AppLog.info(.general, "💾 Will restore to position: \(playbackTime)s when playback resumes")
 
                 // Re-activate our audio session now that the interruption is over
                 do {
                     try AVAudioSession.sharedInstance().setActive(true, options: [])
-                    print("🔊 Audio session re-activated after interruption")
+                    AppLog.info(.general, "🔊 Audio session re-activated after interruption")
                 } catch {
-                    print("⚠️ Failed to re-activate audio session: \(error)")
+                    AppLog.warn(.general, "⚠️ Failed to re-activate audio session: \(error)")
                 }
 
                 // NOTE: the native engine is deliberately NOT restarted here.
@@ -299,10 +299,10 @@
                 if let optionsValue {
                     let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                     shouldResume = options.contains(.shouldResume)
-                    print("🔍 Interruption options: shouldResume = \(shouldResume)")
+                    AppLog.info(.general, "🔍 Interruption options: shouldResume = \(shouldResume)")
                 } else {
                     shouldResume = false
-                    print("🔍 No interruption options - will not auto-resume")
+                    AppLog.info(.general, "🔍 No interruption options - will not auto-resume")
                 }
 
                 // Only auto-resume if:
@@ -329,7 +329,7 @@
                     + "resumeAllowed=\(resumeAllowed) playbackTime=\(playbackTime)s "
                     + "seekOffset=\(seekTimeOffset)s audioFile=\(diagAudioFile) "
                     + "usingSFB=\(usingSFBEngine) isPlaying=\(isPlaying)"
-                print(resumeDiag)
+                AppLog.info(.general, resumeDiag)
                 InterruptionDiagnostics.log(resumeDiag)
 
                 // Consume the flags so they can never leak into a later
@@ -338,11 +338,11 @@
                 outputDeviceBecameUnavailable = false
 
                 if resumeAllowed {
-                    print("▶️ Auto-resuming playback after interruption (was playing before)")
+                    AppLog.info(.general, "▶️ Auto-resuming playback after interruption (was playing before)")
                     // 中断诊断（2026-08-29）：恢复前快照，确认 play() 用的 playbackTime 是否被
                     // 重置/回退（从头播根因排查）
                     let resumeSnapshot = "🔍 [intr] .ended resume: playbackTime=\(playbackTime)s seekOffset=\(seekTimeOffset)s audioFile=\(audioFile != nil) usingSFB=\(usingSFBEngine) isPlaying=\(isPlaying) state=\(playbackState)"
-                    print(resumeSnapshot)
+                    AppLog.info(.general, resumeSnapshot)
                     InterruptionDiagnostics.log(resumeSnapshot)
                     // 中断诊断（2026-08-30）双保险：.began 修正未生效的边角场景下，
                     // playbackTime 仍是冻结值（playbackTimeUpdatedAt 久未刷新）时，
@@ -356,12 +356,12 @@
                         lastKnown: lastKnownPlaybackPosition,
                         lastKnownAge: resumeLastKnownAge
                     ) {
-                        print("🩹 Resume position corrected: \(playbackTime)s → \(correctedPosition)s (frozen playbackTime)")
+                        AppLog.info(.general, "🩹 Resume position corrected: \(playbackTime)s → \(correctedPosition)s (frozen playbackTime)")
                         playbackTime = correctedPosition
                     }
                     play()
                 } else {
-                    print("⏸️ Not auto-resuming - user must manually resume")
+                    AppLog.info(.general, "⏸️ Not auto-resuming - user must manually resume")
 
                     // Ensure playback state is correct but keep position saved
                     isPlaying = false
@@ -388,7 +388,7 @@
                 let currentOutputs = AVAudioSession.sharedInstance().currentRoute.outputs
                 let fellBackToSpeaker = currentOutputs.isEmpty || currentOutputs.contains { $0.portType == .builtInSpeaker }
                 if fellBackToSpeaker {
-                    print("🎧 Audio device disconnected (fell back to speaker) - pausing playback")
+                    AppLog.warn(.general, "🎧 Audio device disconnected (fell back to speaker) - pausing playback")
                     // Record this even when playback is already stopped. On iOS 17+
                     // the unplug arrives as an interruption whose .began has
                     // already paused us, so `isPlaying` is false by the time we get
@@ -399,7 +399,7 @@
                         pause()
                     }
                 } else {
-                    print("🎧 Route changed but still on external output (\(currentOutputs.map { $0.portType.rawValue })) - continuing")
+                    AppLog.info(.general, "🎧 Route changed but still on external output (\(currentOutputs.map { $0.portType.rawValue })) - continuing")
                 }
             default:
                 break
@@ -407,7 +407,7 @@
         }
 
         private func processMediaServicesReset() async {
-            print("🔄 Media services were reset - need to recreate audio engine and nodes")
+            AppLog.warn(.general, "🔄 Media services were reset - need to recreate audio engine and nodes")
 
             // Stop current playback
             let wasPlaying = isPlaying
@@ -465,7 +465,7 @@
 
                 let resumeTime = self.nowPlayingElapsedTime()
                 self.playbackTime = resumeTime
-                print("🔧 Audio engine configuration changed - restarting playback at \(resumeTime)s")
+                AppLog.warn(.general, "🔧 Audio engine configuration changed - restarting playback at \(resumeTime)s")
 
                 // The engine has already stopped; go through the resume path so
                 // the segment is scheduled once at the preserved position.
@@ -482,7 +482,7 @@
         }
 
         private func processMemoryWarning() {
-            print("⚠️ Memory warning received - cleaning up audio resources")
+            AppLog.warn(.general, "⚠️ Memory warning received - cleaning up audio resources")
 
             // Clear cached artwork to free memory
             cachedArtwork = nil
@@ -493,10 +493,10 @@
             if !isPlaying && !isLoadingTrack {
                 audioEngine.stop()
                 playerNode.stop()
-                print("🛑 Stopped audio engine due to memory pressure")
+                AppLog.warn(.general, "🛑 Stopped audio engine due to memory pressure")
             }
 
-            print("🧹 Cleaned up audio resources due to memory warning")
+            AppLog.info(.general, "🧹 Cleaned up audio resources due to memory warning")
         }
 
         // MARK: - Audio Session Management
@@ -523,7 +523,7 @@
                 try s.setPreferredIOBufferDuration(0.023) // 23ms buffer - good balance for iOS 18
             }
 
-            print("🎧 Audio session category configured for primary playback (no mixWithOthers)")
+            AppLog.info(.general, "🎧 Audio session category configured for primary playback (no mixWithOthers)")
         }
 
         func activateAudioSession() throws {
@@ -531,7 +531,7 @@
             let isCarPlayEnvironment = sfbAudioManager.isCarPlayEnvironment
                 || s.currentRoute.outputs.contains { $0.portType == .carAudio }
 
-            print("🎧 Audio session state - Category: \(s.category), Other audio: \(s.isOtherAudioPlaying)")
+            AppLog.info(.general, "🎧 Audio session state - Category: \(s.category), Other audio: \(s.isOtherAudioPlaying)")
 
             // Changing category/options on an already configured CarPlay session
             // forces another hardware route rebuild. Configure only when the
@@ -542,16 +542,16 @@
 
             // Always try to activate (iOS manages the actual state)
             try s.setActive(true, options: [])
-            print("🎧 Audio session activation attempted successfully")
+            AppLog.info(.general, "🎧 Audio session activation attempted successfully")
 
             UIApplication.shared.beginReceivingRemoteControlEvents()
-            print("🎧 Remote control events enabled")
+            AppLog.info(.general, "🎧 Remote control events enabled")
         }
 
         // MARK: - iOS 18 Audio Engine Reset Management
 
         private func cleanupAudioEngineForReset() async {
-            print("🧹 Cleaning up audio engine for reset")
+            AppLog.info(.general, "🧹 Cleaning up audio engine for reset")
 
             // Stop all audio activity
             playerNode.stop()
@@ -564,11 +564,11 @@
             // Clear any scheduled buffers
             playerNode.reset()
 
-            print("✅ Audio engine cleanup complete")
+            AppLog.info(.general, "✅ Audio engine cleanup complete")
         }
 
         private func recreateAudioEngine() {
-            print("🔄 Recreating audio engine and nodes")
+            AppLog.info(.general, "🔄 Recreating audio engine and nodes")
             // Create detached instances. setupAudioEngine is the single owner of
             // node attachment and graph wiring; attaching here and then clearing
             // hasSetupAudioEngine made the next load attach the same node twice.
@@ -590,19 +590,19 @@
             // ② setupAudioSessionNotifications 追加第二套 observer → 中断 .ended 被处理两次
             //    （第二次强制 paused 把恢复的播放停住）；③ notificationObservers 数组无界增长。
             // 保持标志为 true = 各注册恰好一次，永不重复。
-            print("✅ Audio engine recreated successfully with EQ")
+            AppLog.info(.general, "✅ Audio engine recreated successfully with EQ")
         }
 
         // MARK: - Audio Session Configuration
 
         /// Reset AVAudioEngine to clean state when switching from SFBAudioEngine
         func resetAudioEngineForNative() {
-            print("🔄 Resetting AVAudioEngine for native playback")
+            AppLog.info(.general, "🔄 Resetting AVAudioEngine for native playback")
 
             // Stop and reset the audio engine completely
             if audioEngine.isRunning {
                 audioEngine.stop()
-                print("✅ AVAudioEngine stopped")
+                AppLog.info(.general, "✅ AVAudioEngine stopped")
             }
 
             // Reset player node
@@ -622,7 +622,7 @@
             hasSetupAudioEngine = false
             lastSampleRate = 0
 
-            print("✅ AVAudioEngine reset complete for native playback")
+            AppLog.info(.general, "✅ AVAudioEngine reset complete for native playback")
         }
 
         /// Reset audio session to standard configuration when switching from SFBAudioEngine
@@ -634,7 +634,7 @@
                     do {
                         let session = AVAudioSession.sharedInstance()
 
-                        print("🔄 Resetting audio session for native playback after SFBAudioEngine")
+                        AppLog.info(.general, "🔄 Resetting audio session for native playback after SFBAudioEngine")
 
                         // Deactivate first to clear any SFBAudioEngine DoP/DSD configuration
                         try session.setActive(false)
@@ -648,10 +648,10 @@
 
                         // Reactivate with new settings
                         try session.setActive(true)
-                        print("✅ Audio session reset and reactivated for native playback")
+                        AppLog.info(.general, "✅ Audio session reset and reactivated for native playback")
 
                     } catch {
-                        print("⚠️ Audio session reset failed (continuing): \(error)")
+                        AppLog.warn(.general, "⚠️ Audio session reset failed (continuing): \(error)")
                         // Continue anyway - the next configureAudioSession call will fix it
                     }
                     continuation.resume()
@@ -683,13 +683,13 @@
                             // AVAudioEngine performs the conversion from the file
                             // rate; requesting 44.1/96/192 kHz here can tear down
                             // the live route and crash while starting playback.
-                            print("🚗 Keeping CarPlay hardware sample rate: \(session.sampleRate)")
+                            AppLog.info(.general, "🚗 Keeping CarPlay hardware sample rate: \(session.sampleRate)")
                         }
 
-                        print("Configured audio session - session rate: \(session.sampleRate), file rate: \(format.sampleRate)")
+                        AppLog.info(.general, "Configured audio session - session rate: \(session.sampleRate), file rate: \(format.sampleRate)")
 
                     } catch {
-                        print("Failed to configure audio session: \(error)")
+                        AppLog.error(.general, "Failed to configure audio session: \(error)")
                     }
                     continuation.resume()
                 }
