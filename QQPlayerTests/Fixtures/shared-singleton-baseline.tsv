@@ -20,6 +20,9 @@
 # 合法装配点（不算违例，但只在**非视图层**文件里）：App 组合根
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
+#   **场景根之外的运行期组合根**（手工 `NSHostingView` 浮窗根等）走本文件末尾的登记区 B
+#   （`#@` 条目，批 7-B 立）：只登记、**不放宽扫描口径** ⇒ 仍计入 `# TOTAL`，只是不再算「可迁」。
+#   5 处 `#Preview` 装配**未登记**（已知脚手架成本，如实留在可迁里，见批 7-B 条目）。
 #
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
@@ -143,20 +146,21 @@
 #   · ⚠️ 白名单不是豁免的终点：它只说明「这 11 处不该由我们迁」，不是「以后可以再往视图里写系统单例」——
 #     新增任何 `<Type>.shared`（含系统单例）仍被 (a)(b)(d) 三条拦下。
 #
-# ═══ 白名单区：系统单例（不可迁移，永远留在基线里）════════════════════════════════════
-#   条目格式（**只此一份，契约测试直接读它**）：`#+` TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数
-#   契约 (e) 空转检查：每条必须在源码里仍能对上 >= 该数的**显式** `<Type>.shared` 站点；
-#   源码里消失了 ⇒ 红（防白名单变成僵尸豁免）；条目与下面的文件行数值包含关系也必须自洽（(f)）。
-#+	UIApplication	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
-#+	UIApplication	QQPlayer/Views/Utility/EQSettingsView.swift	1
-#+	UIApplication	QQPlayer/Views/Utility/SettingsView.swift	1
-#+	UIApplication	QQPlayer/Views/Utility/SyncQRScannerView.swift	1
-#+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistCardView.swift	1
-#+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	2
-#+	URLSession	QQPlayer/Mac/MacTagEditorView.swift	1
-#+	URLSession	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
-#+	NSWorkspace	QQPlayer/Mac/MacSettingsView.swift	1
-#+	NSWorkspace	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
+# ═══ 2026-09-20 批 7-B：运行期组合根 3 处登记为「合法装配点」（备案式；**无产品代码改动**）════
+#   · 落点 = `QQPlayer/Mac/MacDesktopWindowsManager.swift` 两个手工 hosting 根的
+#     `.environment(PlayerEngine.shared)` ×2（`:215` `.mini` 根 / `:220` `.lyric` 根）
+#     + `.environment(KaraokeController.shared)` ×1（`:222`，`.lyric` 根）。
+#     手工 `NSHostingView` 不继承 App 场景环境 ⇒ 这三行是**运行期真装配**，不是视图层自作主张。
+#   · 路线 = **备案式 (b)**：只登记 + 加守卫，**不放宽扫描口径**（扫描器照旧计数）。TOTAL 21 不动（6-8 后的实测值）。
+#   · 口径（随 rebase 到 6-8 基线后按实测重算）：`可迁 = TOTAL − 系统单例 11 − 已登记装配点 3` ⇒ **10 → 7**。
+#     分解：`21 = 系统单例 11 + 已登记装配点 3 + #Preview 脚手架 5 + 待迁 2`。
+#   · ⚠ **未登记的 5 处 `#Preview` 脚手架**（用户本次只认上述 3 条装配行），仍算成本、不豁免：
+#       `QQPlayer/ContentView.swift:239`（`AppCoordinator.shared`）
+#       `QQPlayer/Views/Utility/SettingsView.swift:346`（`LyricOffsetStore.shared`）
+#       `QQPlayer/Views/Utility/SyncSettingsView.swift:469,470`（`IOSPassiveSyncCenter.shared`
+#       + `PlaylistCoverLoadFailuresStore.shared`）
+#       `QQPlayer/Views/Player/LyricsView.swift:757`（`KaraokeController.shared`）
+#   · 类别合计行（本文件新增，契约 (f) 校验）：`# SYSTEM-SINGLETON TOTAL:` / `# COMPOSITION-ROOT TOTAL:`。
 
 # ═══ 2026-09-20 批 6-8：SyncHostCenter / SyncWiringFactsStore / MacLyricsResendFactsStore 迁 @Observable（方案 A 修红）════════════════
 #   · 迁移本体（提交 5c5742f / 1df037a）：三个对象 `ObservableObject` → `@Observable`；`SyncHostCenter` 的
@@ -176,6 +180,33 @@
 #     （`MacSyncCenterView.swift: 1 → 0`、`MacSyncView.swift: 3 → 1`）+ 复跑全绿（(a)(b)(c)(d) 全过 ⇒
 #     实测集合与基线逐行相等）。
 
+# ═══ 登记区 A：系统单例（**不消除、本批不上收**，永远留在基线里）════════════════════════════
+#   条目格式（**只此一份，契约测试直接读它**）：`#+` TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数
+#   契约 (e) 空转检查：每条必须在源码里仍能对上 >= 该数的**显式** `<Type>.shared` 站点；
+#   源码里消失了 ⇒ 红（防白名单变成僵尸豁免）；条目与下面的文件行数值包含关系也必须自洽（(f)）。
+#+	UIApplication	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/EQSettingsView.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/SettingsView.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/SyncQRScannerView.swift	1
+#+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistCardView.swift	1
+#+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	2
+#+	URLSession	QQPlayer/Mac/MacTagEditorView.swift	1
+#+	URLSession	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
+#+	NSWorkspace	QQPlayer/Mac/MacSettingsView.swift	1
+#+	NSWorkspace	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
+
+# SYSTEM-SINGLETON TOTAL: 11
+
+# ═══ 登记区 B：合法装配点（运行期组合根；**只登记，不放宽扫描口径**）════════════════════════
+#   与登记区 A 的区别（**用前缀 + 各自合计行区分，语义不同故分开**）：
+#     `#+` = Apple 系统入口（不归我们管，永远不迁）；
+#     `#@` = 我们自己的运行期组合根（归我们管，但落点就在这里，本批不再上收）。
+#   条目格式（**只此一份，契约测试直接读它**）：`#@` TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数
+#   契约 (e) 空转检查同样适用：源码里对不上 ⇒ 红；本区为空 ⇒ fail-closed（不静默放行）。
+#@	PlayerEngine	QQPlayer/Mac/MacDesktopWindowsManager.swift	2
+#@	KaraokeController	QQPlayer/Mac/MacDesktopWindowsManager.swift	1
+# COMPOSITION-ROOT TOTAL: 3
+
 
 
 QQPlayer/ContentView.swift	1
@@ -192,7 +223,9 @@ QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
-# TOTAL = 视图层直连总数（**含**白名单里的 11 个系统单例）= 棘轮上限，只能减不能增。
+# TOTAL = 视图层直连总数（**含**全部已登记条目：系统单例 11 + 合法装配点 3）= 棘轮上限，只能减不能增。
 # TOTAL: 21
-# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 白名单合计 11）= 进度只看这一行。
-# MIGRATABLE TOTAL: 10
+# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 系统单例 11 − 合法装配点 3）= 进度只看这一行。
+#   当代分解（随 rebase 到 6-8 基线后按实测重算）：21 = 系统单例 11 + 已登记装配点 3
+#     + #Preview 脚手架 5（尚未登记，仍计在可迁里）+ 待迁 2
+# MIGRATABLE TOTAL: 7

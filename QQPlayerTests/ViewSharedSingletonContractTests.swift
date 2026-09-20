@@ -20,8 +20,9 @@
 //   (b) 计数回涨：某文件出现次数 > 基线 → 红
 //   (c) 名单不腐烂：基线里的文件计数下降（含归零）或文件已不存在 → 红（该改/删行了）
 //   (d) 总数上限：全部视图文件出现次数之和 > 基线 TOTAL → 红
-//   (e) 白名单不空转：白名单里的系统单例条目必须在源码里仍对得上站点 → 红（防僵尸豁免）
-//   (f) 口径自洽：`可迁 TOTAL == TOTAL − 白名单合计` → 红
+//   (e) 登记条目不空转：登记区 A（系统单例 `#+`）/ B（合法装配点 `#@`）的每条条目必须在源码里
+//       仍对得上站点 → 红（防僵尸豁免）
+//   (f) 口径自洽：`可迁 TOTAL == TOTAL − Σ(全部登记条目)`，且每类合计行 == 该类条目求和 → 红
 //
 //  视图层判定（2026-09-20 口径补齐）：
 //    ① 全 `QQPlayer/**` 中**声明了 SwiftUI View**（`: View` / `some View`）的文件
@@ -54,8 +55,18 @@
 //  ⚠️ 白名单**不是**「以后可以继续往视图里写系统单例」的许可：新增任何 `<Type>.shared`
 //  （含这 4 个系统类型）仍被 (a)(b)(d) 三条拦下——白名单只说明「这 11 处不该由我们迁」。
 //
+//  **合法装配点（批 7-B 落地）：运行期组合根也不是债（备案式，不放宽扫描口径）。**
+//  场景根之外还有**运行期组合根**：`MacDesktopWindowsManager` 的手工 `NSHostingView` 浮窗根
+//  不继承 App 场景环境，视图读的 `@Environment(T.self)` 必须在那里显式注入
+//  ⇒ 那 3 行是「谁装配谁」的正确落点，不是视图层自己决定生命周期。
+//  与系统单例**语义不同**（系统入口不归我们管；运行期组合根归我们管，只是本批不上收），
+//  故在基线 TSV 里用**独立前缀 `#@` + 独立合计行**登记，且**不放宽扫描口径**
+//  （仍计入 `# TOTAL`，只是不再算「可迁」）。
+//
 //  基线文件：`QQPlayerTests/Fixtures/shared-singleton-baseline.tsv`
-//    （`路径<TAB>计数` + `# TOTAL:` + `# MIGRATABLE TOTAL:` + `#+` 白名单条目）。
+//    （`路径<TAB>计数` + `# TOTAL:` + `# MIGRATABLE TOTAL:` + 各类别合计行
+//      + `#+` 系统单例条目 + `#@` 合法装配点条目）。
+//  **登记只有一份来源**：两张登记区都写在基线 TSV 里，本文件只解析，不另存手工清单。
 //  预算账本 + 分批计划：`QQPlayerTests/Fixtures/shared-singleton-budget-plan.md`
 //    （每批迁完必须把 TOTAL 与涉及文件的行值**下调到实测值**——本棘轮只防变差，
 //      "变好"靠那份账本驱动）。
@@ -78,15 +89,54 @@ private enum ViewSharedSingletonContract {
 
     struct Baseline {
         var total: Int
-        /// 可迁预算（= `total` − 白名单合计）；进度只看这个数。
+        /// 可迁预算（= `total` − Σ 全部登记条目）；进度只看这个数。
         var migratableTotal: Int
-        /// 白名单（系统单例，不可迁移）；条目来自基线 TSV 的 `#+` 行，不另存手工清单。
-        var whitelist: [WhitelistEntry]
+        /// 全部登记条目（登记区 A + B）；来自基线 TSV，不另存手工清单。
+        var registrations: [RegistrationEntry]
+        /// 各类别合计行声明的数值（`# SYSTEM-SINGLETON TOTAL:` / `# COMPOSITION-ROOT TOTAL:`）。
+        var categoryTotals: [RegistrationCategory: Int]
         var perFile: [String: Int]
+
+        /// 某类别的登记条目。
+        func entries(of category: RegistrationCategory) -> [RegistrationEntry] {
+            registrations.filter { $0.category == category }
+        }
     }
 
-    /// 白名单条目（`#+` TAB 类型 TAB 相对路径 TAB 站点数）。
-    struct WhitelistEntry: Equatable {
+    /// 登记条目类别：**前缀即类别标记**（`#+` = 系统单例；`#@` = 合法装配点 / 运行期组合根）。
+    /// 两类语义不同（系统入口不归我们管 vs 我们的运行期组合根），故分开登记、各自合计。
+    enum RegistrationCategory: String, CaseIterable {
+        case systemSingleton
+        case compositionRoot
+
+        /// 基线 TSV 里的条目行前缀（类别即前缀，机器可读、两类可区分）。
+        var linePrefix: String {
+            switch self {
+            case .systemSingleton: return "#+"
+            case .compositionRoot: return "#@"
+            }
+        }
+
+        /// 类别合计行标签（`# <标签> TOTAL: N`）。
+        var totalLineLabel: String {
+            switch self {
+            case .systemSingleton: return "SYSTEM-SINGLETON"
+            case .compositionRoot: return "COMPOSITION-ROOT"
+            }
+        }
+
+        /// 报告用中文名。
+        var label: String {
+            switch self {
+            case .systemSingleton: return "系统单例（`#+`）"
+            case .compositionRoot: return "合法装配点 / 运行期组合根（`#@`）"
+            }
+        }
+    }
+
+    /// 登记条目（`#+` / `#@` TAB 类型 TAB 相对路径 TAB 站点数）。
+    struct RegistrationEntry: Equatable {
+        var category: RegistrationCategory
         var type: String
         var relativePath: String
         var count: Int
@@ -97,7 +147,8 @@ private enum ViewSharedSingletonContract {
         case baselineMalformed(String)
         case baselineTotalMissing
         case migratableTotalMissing
-        case whitelistMissing
+        case registrationCategoryEmpty(RegistrationCategory)
+        case categoryTotalMissing(RegistrationCategory)
 
         var description: String {
             switch self {
@@ -109,8 +160,10 @@ private enum ViewSharedSingletonContract {
                 return "基线缺少 `# TOTAL: <数字>` 行（fail-closed）"
             case .migratableTotalMissing:
                 return "基线缺少 `# MIGRATABLE TOTAL: <数字>` 行（口径拆分，fail-closed）"
-            case .whitelistMissing:
-                return "基线缺少 `#+` 白名单条目（系统单例白名单为空，fail-closed）"
+            case .registrationCategoryEmpty(let category):
+                return "基线缺少 \(category.label) 登记条目（该类别为空，fail-closed：不静默放行）"
+            case .categoryTotalMissing(let category):
+                return "基线缺少 `# \(category.totalLineLabel) TOTAL: <数字>` 类别合计行（fail-closed）"
             }
         }
     }
@@ -128,10 +181,17 @@ private enum ViewSharedSingletonContract {
     private static let migratableTotalPattern = try! NSRegularExpression(
         pattern: "^#\\s*MIGRATABLE\\s+TOTAL:\\s*([0-9]+)\\s*$"
     )
-    /// 白名单条目：`#+` TAB 类型 TAB 相对路径 TAB 站点数。
-    private static let whitelistPattern = try! NSRegularExpression(
-        pattern: "^#\\+\\t([A-Za-z_][A-Za-z0-9_]*)\\t([^\\t]+?)\\t([0-9]+)\\s*$"
+    /// 登记条目（**唯一实现**，两类共用一条正则）：**前缀即类别** —— `#+` 系统单例 / `#@` 合法装配点
+    /// （前缀整段在捕获组 1）；后三段 = TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数。
+    private static let registrationPattern = try! NSRegularExpression(
+        pattern: "^(#[+@])\\t([A-Za-z_][A-Za-z0-9_]*)\\t([^\\t]+?)\\t([0-9]+)\\s*$"
     )
+
+    /// 类别合计行（`# SYSTEM-SINGLETON TOTAL: N` / `# COMPOSITION-ROOT TOTAL: N`）。
+    /// 由类别标签拼出（单一来源：标签只在 `totalLineLabel` 定义一次）。
+    static func categoryTotalPattern(for category: RegistrationCategory) -> NSRegularExpression {
+        try! NSRegularExpression(pattern: "^#\\s*\(category.totalLineLabel)\\s+TOTAL:\\s*([0-9]+)\\s*$")
+    }
 
     /// 是否声明了 SwiftUI View（决定该文件算不算视图层）。
     static func declaresSwiftUIView(_ source: String) -> Bool {
@@ -148,25 +208,31 @@ private enum ViewSharedSingletonContract {
             + shorthandSharedPattern.numberOfMatches(in: code, range: range)
     }
 
-    /// 白名单条目解析（**唯一实现**：`baseline()` 与自证用例共用）；非白名单行返回 nil。
-    static func parseWhitelistEntry(for line: String) -> WhitelistEntry? {
+    /// 登记条目解析（**唯一实现**：`parseBaseline` 与自证用例共用）；非登记行返回 nil。
+    /// 前缀决定类别：`#+` → `.systemSingleton`；`#@` → `.compositionRoot`；其它前缀 → nil。
+    static func parseRegistrationEntry(for line: String) -> RegistrationEntry? {
         let range = NSRange(line.startIndex ..< line.endIndex, in: line)
-        guard let match = whitelistPattern.firstMatch(in: line, range: range),
-              let typeRange = Range(match.range(at: 1), in: line),
-              let pathRange = Range(match.range(at: 2), in: line),
-              let countRange = Range(match.range(at: 3), in: line),
-              let count = Int(line[countRange]) else { return nil }
-        return WhitelistEntry(
+        guard let match = registrationPattern.firstMatch(in: line, range: range),
+              let prefixRange = Range(match.range(at: 1), in: line),
+              let typeRange = Range(match.range(at: 2), in: line),
+              let pathRange = Range(match.range(at: 3), in: line),
+              let countRange = Range(match.range(at: 4), in: line),
+              let count = Int(line[countRange]),
+              let category = RegistrationCategory.allCases.first(where: {
+                  $0.linePrefix == String(line[prefixRange])
+              }) else { return nil }
+        return RegistrationEntry(
+            category: category,
             type: String(line[typeRange]),
             relativePath: String(line[pathRange]),
             count: count
         )
     }
 
-    /// 白名单站点核对：某文件里**显式** `<Type>.shared` 的出现次数（只算代码行，剥 `//` 后注释）。
-    /// 只认显式写法——白名单登记的是具体类型，前导点简写无法归属到某个类型
-    /// （简写写法会让本检查判红，这正是 (e) 想要的：站点换了写法就该回来看白名单）。
-    static func whitelistSiteCount(type: String, in source: String) -> Int {
+    /// 登记站点核对（登记区 A / B 共用）：某文件里**显式** `<Type>.shared` 的出现次数
+    /// （只算代码行，剥 `//` 后注释）。只认显式写法——登记的是具体类型，前导点简写无法归属到某个类型
+    /// （简写写法会让本检查判红，这正是 (e) 想要的：站点换了写法就该回来看登记条目）。
+    static func registrationSiteCount(type: String, in source: String) -> Int {
         // 编译不出来 = 返回 0 ⇒ 空转检查判红（fail-closed，不静默通过）。
         guard let pattern = try? NSRegularExpression(
             pattern: "(?<![A-Za-z0-9_])\(NSRegularExpression.escapedPattern(for: type))[.]shared"
@@ -241,19 +307,16 @@ private enum ViewSharedSingletonContract {
         detectedOccurrences(in: try repositoryFiles())
     }
 
-    /// 基线清单（`路径<TAB>计数`，`#` 开头是注释，`# TOTAL: N` 是总数上限，
-    /// `# MIGRATABLE TOTAL: N` 是可迁预算，`#+` 行是白名单条目）。
-    static func baseline() throws -> Baseline {
-        let url = repositoryRoot.appendingPathComponent(baselinePath)
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            throw ContractError.directoryUnreadable(baselinePath)
-        }
-        let text = try String(contentsOf: url, encoding: .utf8)
-
+    /// 基线清单解析（**纯函数**：文本 → `Baseline`；读盘在 `baseline()`）。
+    /// 解析口径：`路径<TAB>计数`；`#` 开头是注释，其中 `# TOTAL: N` = 棘轮上限、
+    /// `# MIGRATABLE TOTAL: N` = 可迁预算、`# <类别> TOTAL: N` = 类别合计、
+    /// `#+` / `#@` 行 = 登记条目（`#+` 系统单例 / `#@` 合法装配点）。
+    static func parseBaseline(_ text: String) throws -> Baseline {
         var perFile: [String: Int] = [:]
         var total: Int?
         var migratableTotal: Int?
-        var whitelist: [WhitelistEntry] = []
+        var registrations: [RegistrationEntry] = []
+        var categoryTotals: [RegistrationCategory: Int] = [:]
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.isEmpty { continue }
@@ -267,8 +330,15 @@ private enum ViewSharedSingletonContract {
                    let valueRange = Range(match.range(at: 1), in: line) {
                     migratableTotal = Int(line[valueRange])
                 }
-                if let entry = parseWhitelistEntry(for: line) {
-                    whitelist.append(entry)
+                for category in RegistrationCategory.allCases {
+                    let pattern = categoryTotalPattern(for: category)
+                    if let match = pattern.firstMatch(in: line, range: range),
+                       let valueRange = Range(match.range(at: 1), in: line) {
+                        categoryTotals[category] = Int(line[valueRange])
+                    }
+                }
+                if let entry = parseRegistrationEntry(for: line) {
+                    registrations.append(entry)
                 }
                 continue
             }
@@ -281,13 +351,31 @@ private enum ViewSharedSingletonContract {
         }
         guard let total else { throw ContractError.baselineTotalMissing }
         guard let migratableTotal else { throw ContractError.migratableTotalMissing }
-        guard !whitelist.isEmpty else { throw ContractError.whitelistMissing }
+        // fail-closed：**每个登记类别都必须有条目 + 类别合计行**（缺一即红，绝不静默放行）。
+        for category in RegistrationCategory.allCases {
+            guard registrations.contains(where: { $0.category == category }) else {
+                throw ContractError.registrationCategoryEmpty(category)
+            }
+            guard categoryTotals[category] != nil else {
+                throw ContractError.categoryTotalMissing(category)
+            }
+        }
         return Baseline(
             total: total,
             migratableTotal: migratableTotal,
-            whitelist: whitelist,
+            registrations: registrations,
+            categoryTotals: categoryTotals,
             perFile: perFile
         )
+    }
+
+    /// 基线清单（读盘；fail-closed：文件不存在/读不到 = 抛错）。
+    static func baseline() throws -> Baseline {
+        let url = repositoryRoot.appendingPathComponent(baselinePath)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ContractError.directoryUnreadable(baselinePath)
+        }
+        return try parseBaseline(try String(contentsOf: url, encoding: .utf8))
     }
 }
 
@@ -362,44 +450,56 @@ struct ViewSharedSingletonContractTests {
         )
     }
 
-    @Test("(e) 白名单不空转：白名单条目必须在源码里仍对得上站点（防僵尸豁免）")
-    func whitelistEntriesStillHitSource() throws {
+    @Test("(e) 登记条目不空转：系统单例 + 合法装配点的每条条目必须在源码里仍对得上站点（防僵尸豁免）")
+    func registrationEntriesStillHitSource() throws {
         let baseline = try ViewSharedSingletonContract.baseline()
-        #expect(!baseline.whitelist.isEmpty, "白名单区为空（fail-closed）：基线缺少 `#+` 条目")
+        for category in ViewSharedSingletonContract.RegistrationCategory.allCases {
+            #expect(
+                !baseline.entries(of: category).isEmpty,
+                "\(category.label) 登记区为空（fail-closed）：基线缺少 `\(category.linePrefix)` 条目"
+            )
+        }
 
         var stale: [String] = []
-        for entry in baseline.whitelist {
+        for entry in baseline.registrations {
             let fileURL = ViewSharedSingletonContract.repositoryRoot.appendingPathComponent(entry.relativePath)
             guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else {
-                stale.append("\(entry.type) @ \(entry.relativePath)：文件不存在或读不到")
+                stale.append("[\(entry.category.totalLineLabel)] \(entry.type) @ \(entry.relativePath)：文件不存在或读不到")
                 continue
             }
-            let found = ViewSharedSingletonContract.whitelistSiteCount(type: entry.type, in: source)
+            let found = ViewSharedSingletonContract.registrationSiteCount(type: entry.type, in: source)
             if found < entry.count {
-                stale.append("\(entry.type) @ \(entry.relativePath)：登记 \(entry.count) 处，实测 \(found) 处")
+                stale.append("[参与类别 \(entry.category.totalLineLabel)] \(entry.type) @ \(entry.relativePath)：登记 \(entry.count) 处，实测 \(found) 处")
             }
         }
         #expect(
             stale.isEmpty,
             """
-            白名单条目已失效（源码里找不到登记的站点）——请同步改/删条目，别让白名单变僵尸豁免：
+            登记条目已失效（源码里找不到登记的站点）——请同步改/删条目，别让登记变僵尸豁免：
             \(stale.sorted())
             """
         )
     }
 
-    @Test("(f) TOTAL 口径自洽：可迁 TOTAL = TOTAL − 白名单合计")
+    @Test("(f) 口径自洽：可迁 TOTAL = TOTAL − Σ(全部登记条目)，且每类合计行 == 该类条目求和")
     func migratableTotalMatchesCaliber() throws {
         let baseline = try ViewSharedSingletonContract.baseline()
-        let whitelistSum = baseline.whitelist.map(\.count).reduce(0, +)
+        let registeredSum = baseline.registrations.map(\.count).reduce(0, +)
         #expect(
-            baseline.migratableTotal == baseline.total - whitelistSum,
-            "可迁 TOTAL 口径不自洽：TOTAL \(baseline.total) − 白名单 \(whitelistSum) ≠ 可迁 TOTAL \(baseline.migratableTotal)"
+            baseline.migratableTotal == baseline.total - registeredSum,
+            "可迁 TOTAL 口径不自洽：TOTAL \(baseline.total) − 登记合计 \(registeredSum) ≠ 可迁 TOTAL \(baseline.migratableTotal)"
         )
+        for category in ViewSharedSingletonContract.RegistrationCategory.allCases {
+            let entrySum = baseline.entries(of: category).map(\.count).reduce(0, +)
+            #expect(
+                baseline.categoryTotals[category] == entrySum,
+                "`# \(category.totalLineLabel) TOTAL:` 合计行与条目求和不一致：声明 \(baseline.categoryTotals[category].map(String.init) ?? "缺失") vs 条目合计 \(entrySum)"
+            )
+        }
     }
 
-    @Test("自证：白名单口径（条目解析 + 站点计数只认代码行/显式写法）")
-    func whitelistCaliberSelfTest() {
+    @Test("自证：登记口径（条目解析 + 类别前缀 + 站点计数只认代码行/显式写法）")
+    func registrationCaliberSelfTest() {
         // 站点计数：剥注释；只认显式写法（前导点简写无法归属到具体类型）
         let source = """
         import UIKit
@@ -409,27 +509,104 @@ struct ViewSharedSingletonContractTests {
             func scene() -> UIApplication { UIApplication.shared }
         }
         """
-        #expect(ViewSharedSingletonContract.whitelistSiteCount(type: "UIApplication", in: source) == 2)
+        #expect(ViewSharedSingletonContract.registrationSiteCount(type: "UIApplication", in: source) == 2)
         // 相近类型名不误伤（`Application` 不是 `UIApplication`）
-        #expect(ViewSharedSingletonContract.whitelistSiteCount(type: "Application", in: source) == 0)
-        // 条目解析：真条目 → 解析成功
+        #expect(ViewSharedSingletonContract.registrationSiteCount(type: "Application", in: source) == 0)
+        // 条目解析：`#+` → 系统单例
         #expect(
-            ViewSharedSingletonContract.parseWhitelistEntry(
+            ViewSharedSingletonContract.parseRegistrationEntry(
                 for: "#+\tUIApplication\tQQPlayer/Views/Artists/ArtistDetailScreen.swift\t2"
-            ) == ViewSharedSingletonContract.WhitelistEntry(
+            ) == ViewSharedSingletonContract.RegistrationEntry(
+                category: .systemSingleton,
                 type: "UIApplication",
                 relativePath: "QQPlayer/Views/Artists/ArtistDetailScreen.swift",
                 count: 2
             )
         )
-        // 非白名单行不得被当成条目（普通文件行 / TOTAL 行 / 普通注释）
-        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "QQPlayer/ContentView.swift\t1") == nil)
-        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "# TOTAL: 24") == nil)
-        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "# MIGRATABLE TOTAL: 13") == nil)
-        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "# 普通注释") == nil)
-        // 缺字段 / 计数非数字 → nil（不静默当 0）
-        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "#+\tUIApplication\tA.swift") == nil)
-        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "#+\tUIApplication\tA.swift\tx") == nil)
+        // 条目解析：`#@` → 合法装配点（类别由前缀决定，两类可区分）
+        #expect(
+            ViewSharedSingletonContract.parseRegistrationEntry(
+                for: "#@\tPlayerEngine\tQQPlayer/Mac/MacDesktopWindowsManager.swift\t2"
+            ) == ViewSharedSingletonContract.RegistrationEntry(
+                category: .compositionRoot,
+                type: "PlayerEngine",
+                relativePath: "QQPlayer/Mac/MacDesktopWindowsManager.swift",
+                count: 2
+            )
+        )
+        // 非登记行不得被当成条目（普通文件行 / TOTAL 行 / 可迁行 / 两个类别合计行 / 普通注释）
+        for line in [
+            "QQPlayer/ContentView.swift\t1",
+            "# TOTAL: 24",
+            "# MIGRATABLE TOTAL: 13",
+            "# SYSTEM-SINGLETON TOTAL: 11",
+            "# COMPOSITION-ROOT TOTAL: 3",
+            "# 普通注释",
+        ] {
+            #expect(ViewSharedSingletonContract.parseRegistrationEntry(for: line) == nil, "误吃：\(line)")
+        }
+        // 缺字段 / 计数非数字 / 未知前缀 → nil（不静默当 0）
+        #expect(ViewSharedSingletonContract.parseRegistrationEntry(for: "#+\tUIApplication\tA.swift") == nil)
+        #expect(ViewSharedSingletonContract.parseRegistrationEntry(for: "#+\tUIApplication\tA.swift\tx") == nil)
+        #expect(ViewSharedSingletonContract.parseRegistrationEntry(for: "#%\tUIApplication\tA.swift\t1") == nil)
+    }
+
+    @Test("自证：类别口径 fail-closed（缺一类别 / 缺合计行 / 缺可迁行 ⇒ 抛错，不静默放行）")
+    func registrationFailClosedSelfTest() throws {
+        let good = "# TOTAL: 3\n"
+            + "# MIGRATABLE TOTAL: 1\n"
+            + "#+\tUIApplication\tA.swift\t2\n"
+            + "# SYSTEM-SINGLETON TOTAL: 2\n"
+            + "#@\tPlayerEngine\tB.swift\t1\n"
+            + "# COMPOSITION-ROOT TOTAL: 1\n"
+            + "A.swift\t2\n"
+            + "B.swift\t1\n"
+
+        // 正向：两个类别都解析出来，类别合计 / 条目 / 文件行各自到位
+        let parsed = try ViewSharedSingletonContract.parseBaseline(good)
+        #expect(parsed.total == 3)
+        #expect(parsed.migratableTotal == 1)
+        #expect(parsed.registrations.count == 2)
+        #expect(parsed.entries(of: .systemSingleton).count == 1)
+        #expect(parsed.entries(of: .compositionRoot).count == 1)
+        #expect(parsed.categoryTotals[.systemSingleton] == 2)
+        #expect(parsed.categoryTotals[.compositionRoot] == 1)
+        #expect(parsed.perFile["A.swift"] == 2)
+
+        // 反向（每条都必须抛错，不得静默放行）：
+        // 新类别 `#@` 整区缺失
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "#@\tPlayerEngine\tB.swift\t1\n", with: "")
+            )
+        }
+        // 既有系统单例类别整区缺失
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "#+\tUIApplication\tA.swift\t2\n", with: "")
+            )
+        }
+        // 缺新类别合计行
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "# COMPOSITION-ROOT TOTAL: 1\n", with: "")
+            )
+        }
+        // 缺可迁口径行 / 缺上限行
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "# MIGRATABLE TOTAL: 1\n", with: "")
+            )
+        }
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "# TOTAL: 3\n", with: "")
+            )
+        }
+        // 文件行格式坏
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(good + "坏行\n")
+        }
     }
 
     @Test("自证：检测规则本身能抓到合成输入（fail-closed 反向验证）")
