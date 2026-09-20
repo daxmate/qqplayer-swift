@@ -1,19 +1,19 @@
 //
 //  EQManager.swift
-//  QQPlayer
-//
-//  Graphic equalizer management service
+//  QQPlayer — Graphic equalizer management service（iOS / macOS 共用）
 //
 
 import AVFoundation
 import Foundation
 import GRDB
+import Observation
 
 @MainActor
-class EQManager: ObservableObject {
+@Observable
+class EQManager {
     static let shared = EQManager()
 
-    @Published var isEnabled: Bool = false {
+    var isEnabled: Bool = false {
         didSet {
             if isEnabled != oldValue {
                 applyEQSettings()
@@ -22,7 +22,7 @@ class EQManager: ObservableObject {
         }
     }
 
-    @Published var currentPreset: EQPreset? {
+    var currentPreset: EQPreset? {
         didSet {
             if currentPreset?.id != oldValue?.id {
                 applyEQSettings()
@@ -31,7 +31,7 @@ class EQManager: ObservableObject {
         }
     }
 
-    @Published var globalGain: Double = 0.0 {
+    var globalGain: Double = 0.0 {
         didSet {
             if abs(globalGain - oldValue) > 0.01 {
                 applyGlobalGain()
@@ -40,24 +40,24 @@ class EQManager: ObservableObject {
         }
     }
 
-    @Published var availablePresets: [EQPreset] = []
+    var availablePresets: [EQPreset] = []
 
     /// 当前选中的内置预设 key（nil = 未使用内置预设；"custom" = 自定义 10 段）
-    @Published var activeBuiltinKey: String?
+    var activeBuiltinKey: String?
 
     // Runtime EQ data used by both AVAudioEngine and SFBAudioEngine backends
-    private var eqFrequencies: [Double] = []
-    private var eqGains: [Double] = []
-    private var eqBandwidths: [Double] = []
+    @ObservationIgnored private var eqFrequencies: [Double] = []
+    @ObservationIgnored private var eqGains: [Double] = []
+    @ObservationIgnored private var eqBandwidths: [Double] = []
 
     // Public getters for SFBAudioEngine integration
     var currentEQFrequencies: [Double] { eqFrequencies }
     var currentEQGains: [Double] { eqGains }
     var currentEQBandwidths: [Double] { eqBandwidths }
 
-    let databaseManager = DatabaseManager.shared
-    private var audioEngine: AVAudioEngine?
-    private var eqNode: AVAudioUnitEQ?
+    @ObservationIgnored let databaseManager = DatabaseManager.shared
+    @ObservationIgnored private var audioEngine: AVAudioEngine?
+    @ObservationIgnored private var eqNode: AVAudioUnitEQ?
 
     private init() {
         loadSettings()

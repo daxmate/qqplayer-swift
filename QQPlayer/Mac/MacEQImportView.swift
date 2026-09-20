@@ -11,7 +11,7 @@ import SwiftUI
 
 struct MacEQImportView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var eqManager = EQManager.shared
+    @Environment(EQManager.self) private var eqManager
 
     @State private var presetName = ""
     @State private var textContent = ""

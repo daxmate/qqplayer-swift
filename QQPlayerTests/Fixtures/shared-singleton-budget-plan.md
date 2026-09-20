@@ -98,6 +98,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 4（2026-09-19） | `LocalDeviceNameStore` / `HybridMusicAPIService` / `LyricsSearchProvider` / `NeteaseOnlineClient`（无状态入口 → `AppServices` 容器） | 直连棘轮 153 → **141**（真迁 12 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 5（2026-09-19） | `LyricsManager`（**`actor`**，8 处）→ `AppServices` 容器 | 直连棘轮 141 → **133**（真迁 8 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 5b-1（2026-09-20） | `DesktopWindowsManager`（`ObservableObject` → `@Observable`，5 处；Mac 专属浮窗） | 直连棘轮 133 → **128**（真迁 5 处，0 preview 成本）；迁移棘轮 184/98 → **180/96** | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 + 长文件行数净零 |
+| 批 5b-2（2026-09-20） | `EQManager`（`ObservableObject` → `@Observable`，10 处 / 8 文件 / 9 个 struct） | 直连棘轮 128 → **118**（真迁 10 处，0 preview 成本）；迁移棘轮 180/96 → **164/86** | iOS 全量 1679/211 + Mac 零警告 + 预算/print 双绿 + target 门禁 + `EQManager.swift` 行数净零 |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -109,6 +110,15 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 > ① App 场景根（`WindowGroup` / `Settings`、`#Preview` 各算自己的）· ② `#Preview` · ③ **手工 hosting 根**。
 > 新增 `ManualHostingEnvironmentContractTests` 守护第三个，判据同款：**剥注释**、泛型写法（`NSHostingView<AnyView>(`）也算、
 > fail-closed 自证、**且 `self` 装配必须发生在被消费类型自己身上**（否则随便一个 `.environment(self)` 就能骗绿）。
+
+> 批 5b-2 的三条结论都**先做最小实验才动手**（`@Observable` 迁移的细节不能靠记忆）：
+> ① **`@Observable` 保留 `didSet`** —— 合成探针实测：普通 `var` 与 `private(set) var` 的 `didSet` 均照常触发。
+>    ⇒ `EQManager` 那 5 个「一改就下发 EQ 设置」的 `@Published` 迁成裸 `var` **不会静默丢掉**
+>    `applyEQSettings()` / `saveSettings()`。**带副作用的属性是迁移前必须先验的第一件事。**
+> ② **`$object.property` 绑定需 `@Bindable`** —— `@Environment(T.self)` 拿到的是普通引用，`$eqManager.isEnabled` 不再可用；
+>    在用到绑定的 computed view 属性里写一行 `@Bindable var eqManager = eqManager`（配 `return`）即可，**无需回退 `@StateObject`**。
+> ③ 零行为变化的做法：**只让原先 `@Published` 的属性保持被追踪**，其余存储属性（运行时 EQ 数据 / `audioEngine` / `eqNode` / `databaseManager`）
+>    一律 `@ObservationIgnored` —— 它们迁移前就不发通知，迁后也不发（读它们的代码在 `loadInitialGains()` 这类 helper 里，不在 `body`）。
 
 > 批 2 的两个数字要说清：**口径收紧（前导点简写）与真迁移是两个方向的动作**——
 > 前者让 4 处此前看不见的既有直连显形（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），
@@ -250,6 +260,26 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
   故迁 `@Observable` 无静默失效风险（对照 `MacSpectrumAnalyzer` / `LibraryIndexer` 各有订阅，仍挂在表上）。
 - **行数预算**：`MacLibraryView`(825) 零余量 ⇒ 新增「注释 + 属性」2 行靠合并**两组**既有注释对让出 2 行，净零 825。
 - **基线**：直连 133 → 128；迁移 184/98 → 180/96（一批同动两条棘轮，属预期；「已清零行」报红是设计如此）。
+
+##### 批 5b-2：`EQManager` —— 实测完成（2026-09-20）
+
+本批面最大（10 处 / 8 文件 / 9 个 struct），而且踩到两个「和上一批不同」的点，都靠**先做最小实验**解决：
+
+- **① 带 `didSet` 的 `@Published` 是迁移的最大风险点**：`EQManager` 的 5 个 `@Published` 全都带副作用
+  （`applyEQSettings()` / `saveSettings()`）—— 若 `@Observable` 丢掉属性观察器，就是**静默行为丢失**
+  （EQ 设置永不下发）。合成探针实测：**`@Observable` 完整保留 `didSet`**（普通 `var` 与 `private(set) var` 均触发）
+  ⇒ 迁成裸 `var` 语义不变。
+- **② `$eqManager.isEnabled` 绑定需 `@Bindable`**：4 处（2 个 Toggle + 2 个 Slider，分布在 3 个 `some View` computed 属性里）
+  ⇒ 各写一行局部 `@Bindable var eqManager = eqManager`（配 `return`），**不回退 `@StateObject`**。
+- **③ 刷新时机守零变化**：只让原 `@Published` 的 5 个属性保持被追踪；`eqFrequencies/eqGains/eqBandwidths`
+  （运行时数据，经 `currentEQGains` 等 getter 读）、`databaseManager`、`audioEngine`、`eqNode` 全 `@ObservationIgnored`
+  —— 读它们的唯一视图位置是 `loadInitialGains()`（helper，不在 `body`）。
+- **装配点**：iOS 组合根（单一 `WindowGroup`）+ Mac 组合根（`WindowGroup` / `Settings`）各登记 1 行；
+  两处都被 `EnvironmentInjectionContractTests` 判绿（这是首例「**两端**同时新增同一对象装配」的批次）。
+- **行数预算**：`EQManager.swift`(618) 零余量 ⇒ 压缩 6 行文件头为 4 行让出 2 行（`import Observation` + `@Observable`），净零 618。
+- **基线**：直连 128 → 118（7 文件归零删行；`EQSettingsView` 2→1，残留那处是 `UIApplication.shared` —— 系统单例，非债）；
+  迁移 180/96 → 164/86（删 1 个 `ObservableObject` + 5 个 `@Published` + 10 处 `@StateObject`）。
+- **本批 0 处 preview 成本**：8 个文件均无 `#Preview`。
 
 ### 批 6+：四个热点（最后）
 `AppCoordinator`（17）、`PlayerEngine`（24）、`KaraokeController`（23）、`ArtworkManager`（23）。
