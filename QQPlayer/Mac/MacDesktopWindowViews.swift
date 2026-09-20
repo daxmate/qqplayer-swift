@@ -25,8 +25,8 @@ struct MacMiniPlayerView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @ObservedObject private var player = PlayerEngine.shared
-    /// 桌面浮窗管理器（歌词按钮点亮态 = isLyricVisible）
-    @ObservedObject private var desktopWindows = DesktopWindowsManager.shared
+    /// 桌面浮窗管理器（歌词按钮点亮态 = isLyricVisible；批 5b 起由浮窗装配点注入，读属性追踪）
+    @Environment(DesktopWindowsManager.self) private var desktopWindows
     /// 当前曲目歌手名（Track 无 artist 冗余字段，按 stableId 查库解析）
     @State private var artistName = ""
     /// 拖动进度条中的暂存值（松手才 seek）
@@ -44,7 +44,7 @@ struct MacMiniPlayerView: View {
             // 封面（点击返回主窗——v2 迷你模式与主窗互斥，封面是返回出口；
             // hover 手型提示可点击）
             Button {
-                DesktopWindowsManager.shared.showMainWindow()
+                desktopWindows.showMainWindow()
             } label: {
                 MacArtworkThumbnail(track: player.currentTrack, size: 76, cornerRadius: DesignTokens.radius8)
             }
@@ -56,7 +56,7 @@ struct MacMiniPlayerView: View {
             VStack(alignment: .leading, spacing: DesignTokens.space6) {
                 // 标题 / 歌手（点击返回主窗，hover 手型同封面）
                 Button {
-                    DesktopWindowsManager.shared.showMainWindow()
+                    desktopWindows.showMainWindow()
                 } label: {
                     VStack(alignment: .leading, spacing: DesignTokens.space2) {
                         Text(player.currentTrack?.displayTitle ?? "mini_window_no_track".localized)
@@ -119,7 +119,7 @@ struct MacMiniPlayerView: View {
                         size: 14,
                         accent: desktopWindows.isLyricVisible ? appAccentColor : nil
                     ) {
-                        DesktopWindowsManager.shared.setMiniLyricsEnabled(!DeleteSettings.load().miniLyricsEnabled)
+                        desktopWindows.setMiniLyricsEnabled(!DeleteSettings.load().miniLyricsEnabled)
                     }
                     .help("mini_lyrics_enabled".localized)
                 }

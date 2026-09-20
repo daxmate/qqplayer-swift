@@ -97,10 +97,18 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 3b（2026-09-19） | `WhatsNewStore` / `StateManager` / `MacFolderMonitor`（非 Observable 入口） | 直连棘轮 158 → **153**（真迁 5 处，0 preview 成本） | Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 4（2026-09-19） | `LocalDeviceNameStore` / `HybridMusicAPIService` / `LyricsSearchProvider` / `NeteaseOnlineClient`（无状态入口 → `AppServices` 容器） | 直连棘轮 153 → **141**（真迁 12 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 5（2026-09-19） | `LyricsManager`（**`actor`**，8 处）→ `AppServices` 容器 | 直连棘轮 141 → **133**（真迁 8 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
+| 批 5b-1（2026-09-20） | `DesktopWindowsManager`（`ObservableObject` → `@Observable`，5 处；Mac 专属浮窗） | 直连棘轮 133 → **128**（真迁 5 处，0 preview 成本）；迁移棘轮 184/98 → **180/96** | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 + 长文件行数净零 |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
 > 本棘轮只保证「没人直连」，**不保证「有人装配」**，两者是互补的两条契约。
+
+> 批 5b-1 补的是**第三个装配点**（与 PR #9 同形状的盲区）：浮窗内容由 `NSHostingView` **手工**承载，
+> **不继承 App 场景环境** ⇒ 只改组合根照样运行时崩（证据：唯一的手工 hosting 根
+> `MacDesktopWindowsManager.rootView(for:)`）。于是装配点共有三个：
+> ① App 场景根（`WindowGroup` / `Settings`、`#Preview` 各算自己的）· ② `#Preview` · ③ **手工 hosting 根**。
+> 新增 `ManualHostingEnvironmentContractTests` 守护第三个，判据同款：**剥注释**、泛型写法（`NSHostingView<AnyView>(`）也算、
+> fail-closed 自证、**且 `self` 装配必须发生在被消费类型自己身上**（否则随便一个 `.environment(self)` 就能骗绿）。
 
 > 批 2 的两个数字要说清：**口径收紧（前导点简写）与真迁移是两个方向的动作**——
 > 前者让 4 处此前看不见的既有直连显形（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），
@@ -227,6 +235,21 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 - 每迁一个对象**单独跑一次全量**（不合并成一批大 diff）；迁 `@Observable` 前必做：
   `grep -rn '<Type>' --include='*.swift' | grep -E 'objectWillChange|\.\$'` 找订阅方。
 - 预估剩余：−27 处（不含批 6 的四个热点 −87）。
+
+##### 批 5b-1：`DesktopWindowsManager` —— 实测完成（2026-09-20）
+
+上表五个里最干净的一个（Mac 专属 · 1 个视图可见属性 · 无 Combine 订阅 · 无 `objectWillChange` 订阅）
+⇒ 用它把「观察迁移 + 环境注入」流程跑通，后四个照抄：
+
+- **迁移**：`ObservableObject` → `@Observable`；`@Published` → 裸 `private(set) var`；非 UI 状态的
+  存储属性（面板句柄 / 观察者 token / 模式状态机 / `didStart`）一律 `@ObservationIgnored`（避免无意义失效）。
+- **装配点有两个（本批最大收获）**：App 场景根（WindowGroup + Settings **各一行**）**以及**管理器自己构造
+  浮窗时的 `rootView(for:)`（`.environment(self)`）—— 手工 `NSHostingView` 不继承场景环境，
+  漏掉后者 = **进迷你模式即运行时致命错**。
+- **前置 `grep` 实测**：`grep -rn 'DesktopWindowsManager' | grep -E 'objectWillChange|\.\$'` → **0 处订阅**，
+  故迁 `@Observable` 无静默失效风险（对照 `MacSpectrumAnalyzer` / `LibraryIndexer` 各有订阅，仍挂在表上）。
+- **行数预算**：`MacLibraryView`(825) 零余量 ⇒ 新增「注释 + 属性」2 行靠合并**两组**既有注释对让出 2 行，净零 825。
+- **基线**：直连 133 → 128；迁移 184/98 → 180/96（一批同动两条棘轮，属预期；「已清零行」报红是设计如此）。
 
 ### 批 6+：四个热点（最后）
 `AppCoordinator`（17）、`PlayerEngine`（24）、`KaraokeController`（23）、`ArtworkManager`（23）。
