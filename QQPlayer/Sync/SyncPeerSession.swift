@@ -15,11 +15,9 @@
 //  加密发帧、超时调度、效果队列执行。收帧分发与各阶段处理器在
 //  SyncPeerSession+Frames.swift（extension）；支撑类型见 SyncSessionModels.swift。
 //
-//  并发：@unchecked Sendable + NSLock（照现有 Services 并发风格）。网络回调
-//  线程入 handleInboundData/handleTransportClosed；所有用户回调（onStateChange/
-//  onClosed/pairApprovalHandler/onApplicationFrame/transport 发送）一律在锁外
-//  的 flush 阶段执行——NSLock 不可重入，回调里再进会话 API 不会死锁。
-//  纯逻辑测试：注入内存 SyncPeerTransport 回环，不经 NWConnection。
+//  并发：@unchecked Sendable + NSLock（照现有 Services 并发风格）。网络回调线程入
+//  handleInboundData/handleTransportClosed；所有用户回调一律在锁外的 flush 阶段执行
+//  ——NSLock 不可重入，回调里再进会话 API 不会死锁。纯逻辑测试走内存回环（不经 NWConnection）。
 //
 
 import CryptoKit
@@ -38,16 +36,17 @@ final class SyncPeerSession: @unchecked Sendable {
 
     /// 底层通道（弱引用：channel 持有 session，session 不反向持有）
     weak var transport: (any SyncPeerTransport)?
+    // ⚠️ 下面四个回调一律 `@Sendable`（2026-09-20 全家族收口）：本类在**会话/网络队列**
+    // （非主线程）同步调用它们；类型不标 `@Sendable` 时，`@MainActor` 上下文里写的闭包会继承
+    // 主线程隔离 → 闭包体内首次隔离访问即 SIGTRAP（真机闪退）。漏标一处 = 该回调一触发就崩。
     /// 阶段变化回调（含 .closed；在状态迁移线程同步触发，UI 层自行跳主线程）
-    var onStateChange: ((SyncSessionPhase) -> Void)?
+    var onStateChange: (@Sendable (SyncSessionPhase) -> Void)?
     /// 关闭回调（仅一次，携带原因）
-    var onClosed: ((SyncSessionCloseReason) -> Void)?
-    /// ready 后业务帧回调（file_meta/file_chunk/file_ack，payload 已解密；
-    /// M2b 文件传输接入点。nil = 忽略）
-    var onApplicationFrame: ((SyncFrame) -> Void)?
-    /// Host 侧待批准配对回调（验签通过后触发；UI 层弹窗后调用
-    /// approvePairing/rejectPairing）
-    var pairApprovalHandler: ((SyncPeerSession, PendingPairRequest) -> Void)?
+    var onClosed: (@Sendable (SyncSessionCloseReason) -> Void)?
+    /// ready 后业务帧回调（file_meta/file_chunk/file_ack，payload 已解密；M2b 接入点。nil = 忽略）
+    var onApplicationFrame: (@Sendable (SyncFrame) -> Void)?
+    /// Host 侧待批准配对回调（验签后触发；UI 弹窗后调 approvePairing/rejectPairing）
+    var pairApprovalHandler: (@Sendable (SyncPeerSession, PendingPairRequest) -> Void)?
 
     // 会话握手配置（extension 文件（Frames）与本文件读取 clientDisplayName：
     // 两端发 hello / client 发 PairRequest 携带本机展示名，故 internal）

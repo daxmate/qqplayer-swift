@@ -54,7 +54,9 @@ struct SyncFileReceiverTests {
     /// 回调日志（引用语义盒子）。⚠️ 不能把数组按值随 tuple 返回：闭包捕获的 var 是
     /// 装箱存储，return 时拷贝的是当时的空值，之后闭包 append 只写 box——测试侧永远
     /// 读不到（曾致全套 ack/outcome 断言全盲，CI 全红）。class 承载引用共享。
-    private final class ReceiverLog {
+    /// `@unchecked Sendable`：会话回调标 `@Sendable` 后（2026-09-20 家族收口），闭包捕获的
+    /// 记录器必须是 Sendable 类型；本类只在测试线程内读写，故用显式盒子（与既有 XxxBox 同款）。
+    private final class ReceiverLog: @unchecked Sendable {
         var acks: [FileAckPayload] = []
         var outcomes: [SyncFileReceiver.Outcome] = []
     }

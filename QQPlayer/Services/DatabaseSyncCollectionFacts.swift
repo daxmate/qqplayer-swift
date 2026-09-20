@@ -212,7 +212,7 @@ extension DatabaseSyncCollectionFacts {
     /// 让 `.all` / `.tracks` 请求零 DB 查询（见 `SyncLocalLibraryProvider.members(for:)`）。
     static func liveMembersProvider(
         database: DatabaseManager = .shared
-    ) -> () -> SyncCollectionMembers {
+    ) -> @Sendable () -> SyncCollectionMembers {
         { buildMembers(database: database) }
     }
 }

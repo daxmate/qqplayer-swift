@@ -119,8 +119,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     private var applierBatchTally = SyncOutcomeTally()
 
     // 会话槽位链式挂接
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
+    private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
+    private var priorClosedHandler: (@Sendable (SyncSessionCloseReason) -> Void)?
     private var forwardingEnabled = true
 
     init(

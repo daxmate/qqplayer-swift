@@ -39,9 +39,9 @@ final class SyncBrowser: @unchecked Sendable {
     static let serviceType = "_qqplayer-sync._tcp"
 
     /// 浏览结果变化回调（任意线程；UI 层自行跳主线程）
-    var onResultsChanged: (([SyncDiscoveredHost]) -> Void)?
+    var onResultsChanged: (@Sendable ([SyncDiscoveredHost]) -> Void)?
     /// 浏览启动失败
-    var onBrowseFailure: ((NWError) -> Void)?
+    var onBrowseFailure: (@Sendable (NWError) -> Void)?
 
     private let localIdentity: SyncIdentity
     private let trustStore: any SyncTrustStore

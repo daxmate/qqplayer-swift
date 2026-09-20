@@ -23,20 +23,20 @@ import Foundation
 final class SyncPeerLibraryResponder: @unchecked Sendable {
     private let session: SyncPeerSession
     /// 本端内容清单事实提供者（每请求一次求值：歌单成员随用户编辑而变，不做缓存）。
-    private let catalogProvider: () -> SyncPeerLibraryCatalog
+    private let catalogProvider: @Sendable () -> SyncPeerLibraryCatalog
 
     // MARK: 诊断回调（锁外触发；仅供上层观测，不参与协议）
 
     /// 载荷解码失败（协议违例；对端拿不到响应会超时，此处只记账）。
-    var onDecodeFailure: ((String) -> Void)?
+    var onDecodeFailure: (@Sendable (String) -> Void)?
     /// 已回应答（测试/诊断用）。
-    var onResponseSent: ((SyncPeerLibraryResponsePayload) -> Void)?
+    var onResponseSent: (@Sendable (SyncPeerLibraryResponsePayload) -> Void)?
 
     // MARK: 会话槽位挂接（分发链）
 
     private var attachment: SyncSessionAttachment?
 
-    init(session: SyncPeerSession, catalogProvider: @escaping () -> SyncPeerLibraryCatalog) {
+    init(session: SyncPeerSession, catalogProvider: @escaping @Sendable () -> SyncPeerLibraryCatalog) {
         self.session = session
         self.catalogProvider = catalogProvider
         attachment = SyncSessionAttachment(

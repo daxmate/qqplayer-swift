@@ -57,11 +57,11 @@ final class SyncPeerLibraryClient: @unchecked Sendable {
     private var attachment: SyncSessionAttachment?
 
     /// 收到「无对应在途请求」的响应（重复/过期；仅诊断，不参与协议）。
-    var onUnexpectedResponse: ((SyncPeerLibraryResponsePayload) -> Void)?
+    var onUnexpectedResponse: (@Sendable (SyncPeerLibraryResponsePayload) -> Void)?
     /// 响应载荷解码失败（诊断）。
-    var onDecodeFailure: ((String) -> Void)?
+    var onDecodeFailure: (@Sendable (String) -> Void)?
     /// 会话关闭（在途请求已全部失败）。
-    var onSessionClosed: (() -> Void)?
+    var onSessionClosed: (@Sendable () -> Void)?
 
     init(session: SyncPeerSession, timeout: TimeInterval = 10) {
         self.session = session

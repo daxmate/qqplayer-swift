@@ -194,7 +194,7 @@ struct AlignedLyricsSyncTests {
         )
         let roots = SyncFetchRoots(libraryRoot: try tempRoot("plan-lib"), lyricsRoot: lyricsRoot)
 
-        let provider: (String) -> String? = { wirePath in
+        let provider: @Sendable (String) -> String? = { wirePath in
             switch SyncLyricsNamespace.songContentHash(fromWirePath: wirePath) {
             case "s1": return "s1.json"
             case "escape": return "escape.json"

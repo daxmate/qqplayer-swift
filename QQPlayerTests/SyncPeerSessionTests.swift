@@ -36,28 +36,28 @@ struct SyncPeerSessionTests {
         #expect(fixture.clientSession.phase == .ready)
 
         // client → host 加密 file_meta 帧
-        var received: [SyncFrame] = []
+        let box = SyncCallbackBox()
         fixture.hostSession.onApplicationFrame = { frame in
-            received.append(frame)
+            box.frames.append(frame)
         }
         let meta = Data("曲目元数据".utf8)
         try fixture.clientSession.sendApplicationFrame(type: .fileMeta, payload: meta)
-        #expect(received.count == 1)
-        #expect(received[0].type == .fileMeta)
-        #expect(received[0].payload == meta)
-        #expect(!received[0].isEncrypted) // 分发时已解密
+        #expect(box.frames.count == 1)
+        #expect(box.frames[0].type == .fileMeta)
+        #expect(box.frames[0].payload == meta)
+        #expect(!box.frames[0].isEncrypted) // 分发时已解密
     }
 
     @Test("已配对握手：host→client 加密 chunk 大 payload 往返")
     func pairedChunkLargePayload() throws {
         let fixture = SessionFixture.pairedHandshake()
-        var received: [SyncFrame] = []
-        fixture.clientSession.onApplicationFrame = { received.append($0) }
+        let box = SyncCallbackBox()
+        fixture.clientSession.onApplicationFrame = { box.frames.append($0) }
         let chunk = Data((0 ..< 200_000).map { UInt8($0 & 0xFF) })
         try fixture.hostSession.sendApplicationFrame(type: .fileChunk, payload: chunk)
-        #expect(received.count == 1)
-        #expect(received[0].type == .fileChunk)
-        #expect(received[0].payload == chunk)
+        #expect(box.frames.count == 1)
+        #expect(box.frames[0].type == .fileChunk)
+        #expect(box.frames[0].payload == chunk)
         // 线上帧无破坏性截断（加密后仍小于 16MB 上限）；sentLog 含握手帧，
         // 数据帧是最后一条（first = 握手 hello）
         #expect(fixture.hostChannel.sentLog.last!.count == chunk.count + SyncFrame.headerLength + 28)
@@ -112,10 +112,10 @@ struct SyncPeerSessionTests {
         #expect(hostRecord?.displayName == "MacBook Pro")
         #expect(hostRecord?.role == .host)
         // 配对完成后可以发加密业务帧（信任表已生效）
-        var received: [SyncFrame] = []
-        fixture.hostSession.onApplicationFrame = { received.append($0) }
+        let box = SyncCallbackBox()
+        fixture.hostSession.onApplicationFrame = { box.frames.append($0) }
         try fixture.clientSession.sendApplicationFrame(type: .fileAck, payload: Data([9]))
-        #expect(received.count == 1)
+        #expect(box.frames.count == 1)
     }
 
     @Test("配对流：host 拒绝 → client 收到 pairingRejected")
@@ -434,8 +434,8 @@ struct SyncPeerSessionTests {
     @Test("阶段回调顺序：host 经历 waitingForPeerHello → ready → closed")
     func stateChangeSequence() throws {
         let fixture = SessionFixture.make()
-        var states: [SyncSessionPhase] = []
-        fixture.hostSession.onStateChange = { states.append($0) }
+        let box = SyncCallbackBox()
+        fixture.hostSession.onStateChange = { box.states.append($0) }
         fixture.hostTrust.seed(deviceID: fixture.clientIdentity.deviceID,
                                publicKeyRaw: fixture.clientIdentity.publicKeyRaw,
                                role: .client)
@@ -444,9 +444,9 @@ struct SyncPeerSessionTests {
                                  role: .host)
         fixture.hostSession.handleTransportReady()
         fixture.clientSession.handleTransportReady()
-        #expect(states.contains(.ready))
+        #expect(box.states.contains(.ready))
         fixture.hostSession.cancel()
-        #expect(states.last == .closed)
+        #expect(box.states.last == .closed)
     }
 
     // MARK: DeviceStore → SyncTrustStore 适配（真实 GRDB 内存库）
@@ -477,4 +477,12 @@ struct SyncPeerSessionTests {
         #expect(try store.peerPublicKey(deviceID: identity.deviceID) == nil)
         try store.removePeer(deviceID: identity.deviceID) // 再删不抛
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：`onApplicationFrame` / `onStateChange` 是
+/// `@Sendable` 类型 ⇒ 闭包不能再捕获可变局部量（`mutation of captured var in concurrently-executing code`），
+/// 状态改放盒子里、闭包只写盒子（与 `SyncFileReceiverTests.ReceiverLog` 同款）。
+private final class SyncCallbackBox: @unchecked Sendable {
+    var frames: [SyncFrame] = []
+    var states: [SyncSessionPhase] = []
 }

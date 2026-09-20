@@ -46,7 +46,7 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
     /// 会话（strong：channel 是会话的唯一持有者；会话对 channel 弱引用，无环）
     var session: SyncPeerSession?
     /// 连接状态变化（UI 设备列表用；线程 = 本通道串行队列）
-    var onStateUpdate: ((NWConnection.State) -> Void)?
+    var onStateUpdate: (@Sendable (NWConnection.State) -> Void)?
 
     private let connection: NWConnection
     private let queue: DispatchQueue
@@ -153,15 +153,15 @@ final class SyncListener: @unchecked Sendable {
     static let txtProtoVersion = "1"
 
     /// 监听就绪（port 已定，可查）
-    var onReady: ((UInt16) -> Void)?
+    var onReady: (@Sendable (UInt16) -> Void)?
     /// 监听失败/停止
-    var onStopped: ((NWError?) -> Void)?
+    var onStopped: (@Sendable (NWError?) -> Void)?
     /// 会话状态变化（新连接建会话起，含 ready/closed）
-    var onSessionStateChange: ((SyncPeerSession, SyncSessionPhase) -> Void)?
+    var onSessionStateChange: (@Sendable (SyncPeerSession, SyncSessionPhase) -> Void)?
     /// 会话关闭
-    var onSessionClosed: ((SyncPeerSession, SyncSessionCloseReason) -> Void)?
+    var onSessionClosed: (@Sendable (SyncPeerSession, SyncSessionCloseReason) -> Void)?
     /// 待批准配对回调（转发给每个 host 会话；UI 设置后对后续会话生效）
-    var pairApprovalHandler: ((SyncPeerSession, PendingPairRequest) -> Void)?
+    var pairApprovalHandler: (@Sendable (SyncPeerSession, PendingPairRequest) -> Void)?
     /// 会话握手配置（超时等）
     var sessionConfig = SyncSessionConfiguration()
 

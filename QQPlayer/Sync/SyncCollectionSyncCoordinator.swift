@@ -311,11 +311,11 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     private var pullController: SyncLibraryPullController?
 
     /// 每态回调（锁外触发；会话线程）。
-    var onStateChange: ((SyncCollectionSyncState) -> Void)?
+    var onStateChange: (@Sendable (SyncCollectionSyncState) -> Void)?
     /// 一个文件完成传输（推送送达 / 拉取落盘；锁外触发；进度用）。
-    var onFileTransferred: ((String) -> Void)?
+    var onFileTransferred: (@Sendable (String) -> Void)?
     /// 收到对端 manifest 时回调（锁外；诊断/进度用）。
-    var onPeerManifestReceived: ((SyncManifestResponse) -> Void)?
+    var onPeerManifestReceived: (@Sendable (SyncManifestResponse) -> Void)?
 
     init(
         session: SyncPeerSession,

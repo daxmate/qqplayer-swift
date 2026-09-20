@@ -47,12 +47,12 @@ final class SyncFileSender: @unchecked Sendable {
     private let deadlineScheduler: any SyncDeadlineScheduling
 
     /// 传输结论回调（锁外触发）。
-    var onCompletion: ((Outcome) -> Void)?
+    var onCompletion: (@Sendable (Outcome) -> Void)?
 
     // MARK: 会话槽位链式挂接
 
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
+    private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
+    private var priorClosedHandler: (@Sendable (SyncSessionCloseReason) -> Void)?
     private var forwardingEnabled = true
 
     // MARK: 当前传输（锁保护）

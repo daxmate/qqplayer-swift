@@ -60,7 +60,7 @@ final class SyncPairingNonceRegistry: @unchecked Sendable {
 
     private let lock = NSLock()
     private let nonceTTL: TimeInterval
-    private let now: () -> Date
+    private let now: @Sendable () -> Date
     private var pending: [Entry] = []
 
     /// - Parameters:
@@ -68,7 +68,7 @@ final class SyncPairingNonceRegistry: @unchecked Sendable {
     ///   - now: 时钟（测试注入假时钟；缺省系统时间）。
     init(
         nonceTTL: TimeInterval = SyncPairingNonceRegistry.defaultNonceTTL,
-        now: @escaping () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.nonceTTL = nonceTTL
         self.now = now

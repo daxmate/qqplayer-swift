@@ -192,9 +192,9 @@ final class SyncLibraryPushController: @unchecked Sendable {
     private var summaryValue = SyncLibraryPushSummary()
 
     /// 每态回调（锁外触发；会话线程）。
-    var onStateChange: ((SyncLibraryPushState) -> Void)?
+    var onStateChange: (@Sendable (SyncLibraryPushState) -> Void)?
     /// 一个文件确认送达（锁外触发；进度用）。
-    var onFilePushed: ((String) -> Void)?
+    var onFilePushed: (@Sendable (String) -> Void)?
 
     private struct PendingPush {
         let entry: SyncPushEntry

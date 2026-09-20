@@ -278,11 +278,11 @@ struct SyncPlaylistMembersTests {
         #expect(deviceHost.attach(to: fixture.clientSession))
 
         let peer = SyncManifestPeer(session: fixture.hostSession)
-        var received: SyncManifestResponse?
-        peer.onManifestReceived = { response in received = response }
+        let receivedBox = ManifestValueBox<SyncManifestResponse>()
+        peer.onManifestReceived = { receivedBox.value = $0 }
         try peer.requestManifest(collection: .playlists(["jazz"]))
 
-        let response = try #require(received)
+        let response = try #require(receivedBox.value)
         // 改造前这里是空数组（成员表恒空）→ Mac「按歌单下载」拿不回任何文件
         #expect(response.entries.map(\.relativePath) == ["jazz/one.flac"])
         #expect(response.entries.map(\.stableId) == ["t1"])
@@ -311,11 +311,18 @@ struct SyncPlaylistMembersTests {
         #expect(deviceHost.attach(to: fixture.clientSession))
 
         let peer = SyncManifestPeer(session: fixture.hostSession)
-        var received: SyncManifestResponse?
-        peer.onManifestReceived = { response in received = response }
+        let receivedBox = ManifestValueBox<SyncManifestResponse>()
+        peer.onManifestReceived = { receivedBox.value = $0 }
         try peer.requestManifest(collection: .all)
 
-        let response = try #require(received)
+        let response = try #require(receivedBox.value)
         #expect(response.entries.map(\.relativePath) == ["jazz/one.flac", "rock/three.flac"])
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：同步层的回调/时钟 seam 标 `@Sendable` 后，
+/// 闭包不能再捕获可变局部量（`mutation/reference of captured var in concurrently-executing code`），
+/// 状态改放盒子里、闭包只读写盒子（与既有 `*Box` / `ReceiverLog` 同款）。
+private final class ManifestValueBox<T>: @unchecked Sendable {
+    var value: T?
 }
