@@ -4,8 +4,8 @@
 //  Playback models used by PlayerEngine: playback order modes, the fast
 //  playback-position observable, and playback errors.
 //
-import Combine
 import Foundation
+import Observation
 
 /// 播放顺序四态：顺序播放 → 随机播放 → 循环列表 → 单曲循环 → 顺序播放
 enum PlaybackOrderMode: Int, CaseIterable {
@@ -33,9 +33,13 @@ enum PlaybackOrderMode: Int, CaseIterable {
 /// Holds the fast-changing playback position so that only views showing the
 /// progress bar/time labels re-render at the 10Hz timer rate. Observing
 /// PlayerEngine itself must not subscribe views to these updates.
+/// 2026-09-20 批 6-6：`ObservableObject` → `@Observable`（唯一属性 `playbackTime` 保持被追踪）。
+/// 消费方式＝从引擎取实例后在 `body` 里读：`playerEngine.progress.playbackTime`（方案 B：
+/// 进度只有一条到达路径，不再单独进环境，也没有 `@ObservedObject` 直连）。
 @MainActor
-final class PlaybackProgress: ObservableObject {
-    @Published var playbackTime: TimeInterval = 0
+@Observable
+final class PlaybackProgress {
+    var playbackTime: TimeInterval = 0
 }
 
 enum PlayerError: Error {

@@ -167,7 +167,7 @@ struct MacSmartPlaylistDetailView: View {
     /// Pop one level: decade bucket → bucket list; root → playlists home page.
     let onBack: () -> Void
 
-    @StateObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
 
     @State private var tracks: [Track] = []
     @State private var buckets: [DecadeBucketInfo] = []

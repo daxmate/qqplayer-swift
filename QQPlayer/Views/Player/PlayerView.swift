@@ -17,7 +17,7 @@ struct PlayerView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     @Environment(AppServices.self) private var services
-    @StateObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @Environment(AppCoordinator.self) private var appCoordinator
     @State private var currentArtwork: UIImage?
     @State private var nextArtwork: UIImage?

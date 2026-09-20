@@ -2,7 +2,7 @@ import SwiftUI
 
 struct QueueManagementView: View {
     @Environment(AppServices.self) private var services
-    @StateObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @Environment(\.dismiss) private var dismiss
     @State private var draggedTrack: Track?
     @State private var settings = DeleteSettings.load()

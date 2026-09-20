@@ -131,6 +131,8 @@ struct QQPlayerApp: App {
                 // ⚠️ 漏了这一行的后果：视图 `@Environment(AppServices.self)` 在**运行时**致命错
                 // （编译期与单测都发现不了），`SyncSettingsView.onAppear` 这种必读点会一进页就崩。
                 .environment(AppServices.live)
+                // 播放引擎（批 6-6）：视图按属性追踪驱动重绘（播放状态 / 队列 / 进度）
+                .environment(PlayerEngine.shared)
                 .task {
                     DatabaseSuspensionCoordinator.shared.start()
                     await appCoordinator.initialize()

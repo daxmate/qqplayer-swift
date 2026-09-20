@@ -210,9 +210,14 @@ final class DesktopWindowsManager {
                 // 否则进迷你模式即运行时致命错（编译与单测都发现不了）。
                 .environment(self)
                 .environment(\.appAccentColor, accent)
+                // 播放引擎（批 6-6）：浮窗视图读 `@Environment(PlayerEngine.self)`，
+                // 手工 hosting 不继承场景环境 ⇒ 必须在此显式注入。
+                .environment(PlayerEngine.shared)
                 .tint(accent)
         case .lyric:
             MacDesktopLyricView()
+                // 批 6-6：桌面歌词窗读 `@Environment(PlayerEngine.self)`（playbackTime 驱动行定位）
+                .environment(PlayerEngine.shared)
         }
     }
 

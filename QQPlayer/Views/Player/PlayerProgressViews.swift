@@ -51,7 +51,7 @@ struct EqualizerBarsExact: View {
 /// Owns the fast-changing progress observation so the complete PlayerView
 /// (artwork, sheets and controls) is not recomputed four times per second.
 struct PlayerProgressSection: View {
-    @ObservedObject private var progress = PlayerEngine.shared.progress
+    @Environment(PlayerEngine.self) private var playerEngine
     let duration: TimeInterval
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
@@ -59,7 +59,7 @@ struct PlayerProgressSection: View {
 
     private var fraction: Double {
         guard duration > 0 else { return 0 }
-        let value = progress.playbackTime / duration
+        let value = playerEngine.progress.playbackTime / duration
         guard value.isFinite else { return 0 }
         return max(0, min(1, value))
     }
@@ -73,7 +73,7 @@ struct PlayerProgressSection: View {
             .frame(height: 1)
 
             HStack {
-                Text(formatTime(progress.playbackTime))
+                Text(formatTime(playerEngine.progress.playbackTime))
                     .font(.caption)
                     .foregroundColor(.secondary)
 

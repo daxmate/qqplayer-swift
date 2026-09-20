@@ -17,33 +17,48 @@ import Combine
 import Foundation
 import GRDB
 import MediaPlayer
+import Observation
 #if os(iOS)
     import UIKit
 #endif
 
+/// 音频播放引擎（iOS + macOS 共用，AVAudioEngine 高解析播放）。
+/// 2026-09-20 批 6-6：`ObservableObject` → `@Observable`。10 个原 `@Published` 保持**被追踪**，
+/// 其余存储属性一律 `@ObservationIgnored`（不进观察图）——判据见账本§批 6-6：视图 `body`
+/// 只读这 10 个属性 + `progress.playbackTime`，逐条核对过 `nextTrack` / `originalQueue` /
+/// `usingSFBEngine` / `audioEngine` 四个边界属性（均非 body 读取，不承担重绘依赖）。
 @MainActor
-class PlayerEngine: NSObject, ObservableObject {
+@Observable
+class PlayerEngine: NSObject {
     static let shared = PlayerEngine()
 
-    @Published var currentTrack: Track?
-    @Published var isPlaying = false
+    var currentTrack: Track? {
+        didSet { currentTrackSubject.send(currentTrack) }
+    }
+
+    var isPlaying = false {
+        didSet { isPlayingSubject.send(isPlaying) }
+    }
 
     // MARK: - 非视图消费者的观察入口（批 6-3）
 
     /// `currentTrack` 的变化信号。**非视图消费者的唯一观察入口**（CarPlay 场景根等）。
-    /// 迁移 `@Observable` 之日只换内芯（`CurrentValueSubject`），消费者一行都不用改。
-    /// 为什么要有它：`$currentTrack` 是 `@Published` 的合成投影，迁移后**编译期**就消失；
-    /// 消费者各自造一套订阅 = 第二处观察实现 ⇒ 迁移时必漏一处（2026-09-15 形状纪律）。
+    /// 2026-09-20 批 6-6：`@Observable` 下 `$currentTrack` 合成投影**编译期消失** ⇒ 内芯换成
+    /// `CurrentValueSubject`（由上面的 `didSet` 喂）——**消费者一行都没改**（6-3 立此入口就是为了这天）。
     /// 形状契约：`NonViewObservationRatchet`（生产码不得再跨文件写 `<Target>.shared.$…`）。
+    @ObservationIgnored private let currentTrackSubject = CurrentValueSubject<Track?, Never>(nil)
+
     var currentTrackPublisher: AnyPublisher<Track?, Never> {
-        $currentTrack.eraseToAnyPublisher()
+        currentTrackSubject.eraseToAnyPublisher()
     }
 
     /// `isPlaying` 的变化信号（同上）。
+    @ObservationIgnored private let isPlayingSubject = CurrentValueSubject<Bool, Never>(false)
+
     var isPlayingPublisher: AnyPublisher<Bool, Never> {
-        $isPlaying.eraseToAnyPublisher()
+        isPlayingSubject.eraseToAnyPublisher()
     }
-    let progress = PlaybackProgress()
+    @ObservationIgnored let progress = PlaybackProgress()
     var playbackTime: TimeInterval {
         get { progress.playbackTime }
         set { progress.playbackTime = newValue }
@@ -51,7 +66,7 @@ class PlayerEngine: NSObject, ObservableObject {
     /// 中断诊断（2026-08-30）：playbackTime 最后一次由前台 UI timer 刷新的时刻。
     /// 后台/锁屏时 timer 不跑，此时间戳与 Date() 的间隔 = playbackTime 的"冻结时长"，
     /// 用于判断中断 .began 保存的位置是否是过期的冻结值（从头播根因排查）。
-    var playbackTimeUpdatedAt = Date()
+    @ObservationIgnored var playbackTimeUpdatedAt = Date()
     /// 中断诊断（2026-08-30 中断后从头播）：引擎存活时最后读取到的实时播放位置缓存。
     /// 背景：后台/锁屏时 0.25s UI timer 不跑 → playbackTime 冻结；系统音频抢占时
     /// interruption .began 通知延迟到达 → 引擎已停，currentNodeSampleTime() 失效，
@@ -61,96 +76,97 @@ class PlayerEngine: NSObject, ObservableObject {
     /// 否则会把冻结值污染进缓存。
     /// 注：setter 为 internal（同 playbackTimeUpdatedAt 模式）——private(set) 的 setter
     /// 仅限声明文件内可写，而刷新发生在跨文件的 extension 中，会编译失败。
-    var lastKnownPlaybackPosition: TimeInterval = 0
-    var lastKnownPlaybackPositionUpdatedAt = Date()
-    @Published var duration: TimeInterval = 0
-    @Published var playbackState: PlaybackState = .stopped
+    @ObservationIgnored var lastKnownPlaybackPosition: TimeInterval = 0
+    @ObservationIgnored var lastKnownPlaybackPositionUpdatedAt = Date()
+    var duration: TimeInterval = 0
+    var playbackState: PlaybackState = .stopped
+
     /// 播放失败的用户可见文案（2026-09-12 审计 P8）。
     /// 背景：载入失败（如 DSD 不被任何引擎支持）以前只 print，playTrack 拿到 false
     /// 直接 return → 用户侧表现是"点了不播"、无任何提示。载入开始/成功时清空，
     /// 失败时设置并在几秒后自动消失（不堵界面）。
-    @Published private(set) var playbackErrorMessage: String?
-    @Published var playbackQueue: [Track] = []
-    @Published var currentIndex = 0
-    @Published var isRepeating = false
-    @Published var isShuffled = false
-    @Published var isLoopingSong = false
+    private(set) var playbackErrorMessage: String?
+    var playbackQueue: [Track] = []
+    var currentIndex = 0
+    var isRepeating = false
+    var isShuffled = false
+    var isLoopingSong = false
 
-    var originalQueue: [String] = []
-    private let maxPersistedQueueSize = 2000
+    @ObservationIgnored var originalQueue: [String] = []
+    @ObservationIgnored private let maxPersistedQueueSize = 2000
 
     // Generation token to prevent stale completion handlers from firing
-    var scheduleGeneration: UInt64 = 0
+    @ObservationIgnored var scheduleGeneration: UInt64 = 0
 
-    var seekTimeOffset: TimeInterval = 0
-    var lastSampleRate: Double = 0
+    @ObservationIgnored var seekTimeOffset: TimeInterval = 0
+    @ObservationIgnored var lastSampleRate: Double = 0
 
-    lazy var audioEngine = AVAudioEngine()
-    lazy var playerNode = AVAudioPlayerNode()
+    @ObservationIgnored lazy var audioEngine = AVAudioEngine()
+    @ObservationIgnored lazy var playerNode = AVAudioPlayerNode()
     /// 倍速音频节点（跟唱模式变速不变调：rate 档位，pitch 保持 0）
-    lazy var timePitchNode = AVAudioUnitTimePitch()
-    var audioFile: AVAudioFile?
-    var playbackTimer: Timer?
+    @ObservationIgnored lazy var timePitchNode = AVAudioUnitTimePitch()
+    @ObservationIgnored var audioFile: AVAudioFile?
+    @ObservationIgnored var playbackTimer: Timer?
 
     // Gapless playback support
-    var nextAudioFile: AVAudioFile?
-    var nextTrack: Track?
-    var nextTrackIndex: Int?
-    var isPreloadingNext = false
-    var gaplessScheduled = false
-    var preloadNextTask: Task<Void, Never>?
-    var nodeTimelineStartSampleTime: AVAudioFramePosition = 0
-    var nextTimelineStartSampleTime: AVAudioFramePosition?
-    var engineConfigurationRecoveryTask: Task<Void, Never>?
+    @ObservationIgnored var nextAudioFile: AVAudioFile?
+    @ObservationIgnored var nextTrack: Track?
+    @ObservationIgnored var nextTrackIndex: Int?
+    @ObservationIgnored var isPreloadingNext = false
+    @ObservationIgnored var gaplessScheduled = false
+    @ObservationIgnored var preloadNextTask: Task<Void, Never>?
+    @ObservationIgnored var nodeTimelineStartSampleTime: AVAudioFramePosition = 0
+    @ObservationIgnored var nextTimelineStartSampleTime: AVAudioFramePosition?
+    @ObservationIgnored var engineConfigurationRecoveryTask: Task<Void, Never>?
     // NotificationCenter may invoke audio callbacks on Core Audio's private
     // queues. Keep block-observer tokens so every callback can explicitly hop
     // to MainActor before it touches player state.
-    nonisolated(unsafe) var notificationObservers: [NSObjectProtocol] = []
+    @ObservationIgnored nonisolated(unsafe) var notificationObservers: [NSObjectProtocol] = []
 
     // SFBAudioEngine integration
-    lazy var sfbAudioManager = SFBAudioEngineManager.shared
-    var usingSFBEngine = false
+    @ObservationIgnored lazy var sfbAudioManager = SFBAudioEngineManager.shared
+    @ObservationIgnored var usingSFBEngine = false
     var isUsingSFBEngine: Bool { usingSFBEngine }
     // EQ integration
-    let eqManager = EQManager.shared
+    @ObservationIgnored let eqManager = EQManager.shared
 
-    var isLoadingTrack = false
-    var currentLoadTask: Task<Bool, Never>?
+    @ObservationIgnored var isLoadingTrack = false
+    @ObservationIgnored var currentLoadTask: Task<Bool, Never>?
     /// 失败提示的自动清除任务（重复上报时取消上一个，见 reportPlaybackFailure）
-    private var playbackErrorClearTask: Task<Void, Never>?
-    var loadGeneration: UInt64 = 0
-    var hasRestoredState = false
-    var hasSetupAudioEngine = false
-    var hasSetupAudioSession = false
-    var hasSetupSiriBackgroundSession = false
-    var isAudioSessionInterrupted = false
-    var wasPlayingBeforeInterruption = false
+    @ObservationIgnored private var playbackErrorClearTask: Task<Void, Never>?
+    @ObservationIgnored var loadGeneration: UInt64 = 0
+    @ObservationIgnored var hasRestoredState = false
+    @ObservationIgnored var hasSetupAudioEngine = false
+    @ObservationIgnored var hasSetupAudioSession = false
+    @ObservationIgnored var hasSetupSiriBackgroundSession = false
+    @ObservationIgnored var isAudioSessionInterrupted = false
+    @ObservationIgnored var wasPlayingBeforeInterruption = false
     /// Set when the current interruption is accompanied by the output device
     /// disappearing (headphones unplugged, Bluetooth disconnected). Scoped to a
     /// single interruption: cleared on .began, consulted on .ended. iOS 17+
     /// reports an unplug as an *interruption* whose .ended carries
     /// .shouldResume, so without this the app would resume into the speaker.
-    var outputDeviceBecameUnavailable = false
+    @ObservationIgnored var outputDeviceBecameUnavailable = false
     #if os(iOS)
-        var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+        @ObservationIgnored var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     #endif
-    var isInBackground = false
-    var hasSetupRemoteCommands = false
-    nonisolated(unsafe) var hasSetupAudioSessionNotifications = false
-    var backgroundCheckTimer: Timer?
+    @ObservationIgnored var isInBackground = false
+    @ObservationIgnored var hasSetupRemoteCommands = false
+    @ObservationIgnored nonisolated(unsafe) var hasSetupAudioSessionNotifications = false
+    @ObservationIgnored var backgroundCheckTimer: Timer?
 
     // Artwork caching
-    var cachedArtwork: MPMediaItemArtwork?
-    var cachedArtworkTrackId: String?
-    var artworkLoadTask: Task<Void, Never>?
-    var artworkLoadTaskTrackId: String?
-    var cachedNowPlayingArtistTrackId: String?
-    var cachedNowPlayingArtistName: String?
+    @ObservationIgnored var cachedArtwork: MPMediaItemArtwork?
+    @ObservationIgnored var cachedArtworkTrackId: String?
+    @ObservationIgnored var artworkLoadTask: Task<Void, Never>?
+    @ObservationIgnored var artworkLoadTaskTrackId: String?
+    @ObservationIgnored var cachedNowPlayingArtistTrackId: String?
+    @ObservationIgnored var cachedNowPlayingArtistName: String?
 
     // Security-scoped resource tracking for external files
-    var currentSecurityScopedURL: URL?
+    @ObservationIgnored var currentSecurityScopedURL: URL?
 
-    let databaseManager = DatabaseManager.shared
+    @ObservationIgnored let databaseManager = DatabaseManager.shared
 
     // Enhanced Control Center synchronization (replaces MPNowPlayingSession approach)
 
@@ -158,7 +174,7 @@ class PlayerEngine: NSObject, ObservableObject {
     // System output volume is already applied by iOS; polling outputVolume and
     // mirroring it onto the mixer caused synchronous audio-session XPC calls on
     // the main thread and effectively applied volume twice.
-    var pausedSilentPlayer: AVAudioPlayer?
+    @ObservationIgnored var pausedSilentPlayer: AVAudioPlayer?
 
     enum PlaybackState {
         case stopped
@@ -201,12 +217,12 @@ class PlayerEngine: NSObject, ObservableObject {
     // MARK: - Playback Control
 
     /// 当前倍速（KaraokeController 驱动；接入 AVAudioUnitTimePitch 由跟唱任务实现）
-    var currentPlaybackRate: Double = 1.0
+    @ObservationIgnored var currentPlaybackRate: Double = 1.0
 
     /// 设置播放倍速（0.5-1.0 慢速档；跟唱模式专用）。
     /// 主引擎路径：AVAudioUnitTimePitch.rate（变速不变调）；SFBAudioEngine 路径暂不支持。
 
-    var lastControlCenterUpdate: TimeInterval = 0
+    @ObservationIgnored var lastControlCenterUpdate: TimeInterval = 0
 
     // MARK: - State Persistence
 

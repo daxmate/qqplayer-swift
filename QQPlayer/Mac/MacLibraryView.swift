@@ -41,9 +41,8 @@ struct MacLibraryView: View {
     @Environment(\.appAccentColor) private var appAccentColor
     /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；替代已失效的私有 selector）。
     @Environment(\.openSettings) private var openSettings
-    @StateObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
     @Environment(LibraryIndexer.self) private var indexer
-    @StateObject private var progress = PlayerEngine.shared.progress
     /// search anything 开关（⌘K 命令；2026-09-19 批 3a 起由 Mac 组合根注入，读 `isOpen` 按属性追踪）
     @Environment(MacSearchAnythingState.self) private var searchAnythingState
     /// 曲库卡事实（批 3a：同上，由 Mac 组合根注入）
@@ -112,7 +111,7 @@ struct MacLibraryView: View {
                 artistName: currentArtistName,
                 isPlaying: player.isPlaying,
                 duration: player.duration,
-                playbackTime: progress.playbackTime,
+                playbackTime: player.progress.playbackTime,
                 onPlayPause: togglePlayPause,
                 onNext: { Task { await player.nextTrack(autoplay: true) } },
                 onPrevious: { Task { await player.previousTrack(autoplay: true) } },

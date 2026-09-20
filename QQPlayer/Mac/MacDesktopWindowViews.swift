@@ -24,7 +24,7 @@ import SwiftUI
 struct MacMiniPlayerView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
-    @ObservedObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
     /// 桌面浮窗管理器（歌词按钮点亮态 = isLyricVisible；批 5b 起由浮窗装配点注入，读属性追踪）
     @Environment(DesktopWindowsManager.self) private var desktopWindows
     /// 当前曲目歌手名（Track 无 artist 冗余字段，按 stableId 查库解析）
@@ -183,7 +183,7 @@ struct MacMiniPlayerView: View {
 
 struct MacDesktopLyricView: View {
     @ObservedObject private var karaoke = KaraokeController.shared
-    @ObservedObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
     /// 字号（设置页改动经 qqplayerSettingsDidChange 刷新）
     @State private var fontSize: Double = DeleteSettings.load().desktopLyricFontSize
     @State private var showTranslation = DeleteSettings.load().lyricShowTranslation

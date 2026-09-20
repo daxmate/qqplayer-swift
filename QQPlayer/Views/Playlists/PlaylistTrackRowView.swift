@@ -8,7 +8,7 @@ struct PlaylistTrackRowView: View {
     let artistName: String?
     let onTap: () -> Void
     @Environment(AppCoordinator.self) private var appCoordinator
-    @StateObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @State private var isFavorite = false
     @State private var showPlaylistDialog = false
     @State private var showDeleteConfirmation = false

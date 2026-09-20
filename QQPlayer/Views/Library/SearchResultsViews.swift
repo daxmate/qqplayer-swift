@@ -220,7 +220,7 @@ struct SearchSongRowView: View {
     let artistName: String?
     let onDismiss: () -> Void
     @Environment(AppCoordinator.self) private var appCoordinator
-    @StateObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @State private var settings = DeleteSettings.load()
     @State private var artworkImage: UIImage?
     @State private var swipeOffset: CGFloat = 0

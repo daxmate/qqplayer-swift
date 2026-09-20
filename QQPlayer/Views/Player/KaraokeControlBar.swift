@@ -16,14 +16,13 @@ import SwiftUI
 /// 状态全部读自 KaraokeController.shared（本组件只消费，不做决策）。
 struct KaraokeControlBar: View {
     @ObservedObject private var karaoke = KaraokeController.shared
-    @ObservedObject private var progress = PlayerEngine.shared.progress
-    @ObservedObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
 
     /// 当前句 index（AB 单击取 A 点）；还没到第一句时为 nil
     private var currentLineIndex: Int? {
-        LyricTiming.activeLineIndex(time: progress.playbackTime, in: karaoke.currentLines)
+        LyricTiming.activeLineIndex(time: playerEngine.progress.playbackTime, in: karaoke.currentLines)
     }
 
     /// 等选终点态：AB 已启用但 b 未设（长按后、点歌词设终点前）
@@ -67,7 +66,7 @@ struct KaraokeControlBar: View {
 
     private var prevLineButton: some View {
         Button {
-            KaraokeController.shared.stepLine(delta: -1, currentTime: progress.playbackTime)
+            KaraokeController.shared.stepLine(delta: -1, currentTime: playerEngine.progress.playbackTime)
         } label: {
             Image(systemName: "chevron.up")
                 .font(.system(size: DesignTokens.font17, weight: .semibold))
@@ -101,7 +100,7 @@ struct KaraokeControlBar: View {
 
     private var nextLineButton: some View {
         Button {
-            KaraokeController.shared.stepLine(delta: 1, currentTime: progress.playbackTime)
+            KaraokeController.shared.stepLine(delta: 1, currentTime: playerEngine.progress.playbackTime)
         } label: {
             Image(systemName: "chevron.down")
                 .font(.system(size: DesignTokens.font17, weight: .semibold))

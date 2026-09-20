@@ -3,7 +3,7 @@ import SwiftUI
 /// 封面下方的小歌词窗口：显示当前句（+翻译），跟随播放进度更新；点击进入全屏歌词。
 /// 独立 struct 观察 progress，避免整个 PlayerView 每秒重绘四次。
 struct LyricMiniSection: View {
-    @ObservedObject private var progress = PlayerEngine.shared.progress
+    @Environment(PlayerEngine.self) private var playerEngine
     let lyrics: Lyrics?
     let isLoading: Bool
     /// App 强调色（读环境值；根注入见 ContentView）
@@ -11,7 +11,7 @@ struct LyricMiniSection: View {
 
     /// 当前句 index（syncedLyrics 中）；还没到第一句时返回 0
     private var activeIndex: Int? {
-        LyricTiming.activeLineIndex(time: progress.playbackTime, in: lyrics?.syncedLyrics ?? []) ?? 0
+        LyricTiming.activeLineIndex(time: playerEngine.progress.playbackTime, in: lyrics?.syncedLyrics ?? []) ?? 0
     }
 
     private func line(_ index: Int, in lines: [LyricsLine]) -> LyricsLine? {
@@ -67,7 +67,7 @@ struct LyricMiniSection: View {
 /// Keeps lyric timing updates inside the presented lyrics content instead of
 /// invalidating the player and any underlying list.
 struct LiveLyricsSheet: View {
-    @ObservedObject private var progress = PlayerEngine.shared.progress
+    @Environment(PlayerEngine.self) private var playerEngine
     let lyrics: Lyrics?
     let isLoading: Bool
     let onClose: () -> Void
@@ -75,7 +75,7 @@ struct LiveLyricsSheet: View {
     var body: some View {
         LyricsView(
             lyrics: lyrics,
-            currentTime: progress.playbackTime,
+            currentTime: playerEngine.progress.playbackTime,
             isLoading: isLoading,
             onClose: onClose
         )
@@ -85,7 +85,7 @@ struct LiveLyricsSheet: View {
 struct MiniPlayerView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
-    @StateObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @Environment(AppServices.self) private var services
     @State private var isExpanded = false
     @State private var currentArtwork: UIImage?
@@ -246,14 +246,14 @@ struct MiniPlayerView: View {
 /// its transform; it does not resize the safe-area inset or ask the underlying
 /// Library List to perform a collection diff on every playback tick.
 private struct MiniPlayerProgressBar: View {
-    @ObservedObject private var progress = PlayerEngine.shared.progress
+    @Environment(PlayerEngine.self) private var playerEngine
     let duration: TimeInterval
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
 
     private var fraction: CGFloat {
         guard duration > 0 else { return 0 }
-        let value = progress.playbackTime / duration
+        let value = playerEngine.progress.playbackTime / duration
         return CGFloat(max(0, min(1, value.isFinite ? value : 0)))
     }
 

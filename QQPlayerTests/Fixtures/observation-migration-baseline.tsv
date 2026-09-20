@@ -48,15 +48,15 @@
 #     （`IndexingGate` / `SyncHostCenter` / `MacLyricsResendAutoRunner` / `AppCoordinator` /
 #     `SpotlightLibraryIndexer`）会**静默失去事件** ⇒ 新增 `isIndexingSubject` / `terminalStateSubject`
 #     （`CurrentValueSubject`）作为状态写入唯一入口，保住「订阅即得当前值」语义。）
-QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	3
-QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	3
-QQPlayer/Mac/MacLibraryView.swift	@StateObject	2
+
+
+
+QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	1
+QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
 QQPlayer/Mac/MacLyricsView.swift	@ObservedObject	1
-QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	3
-QQPlayer/Mac/MacPlaylistDetailSheet.swift	@StateObject	1
-QQPlayer/Mac/MacSmartPlaylistViews.swift	@StateObject	1
+QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	1
 QQPlayer/Mac/MacSyncCenterView.swift	@ObservedObject	1
 QQPlayer/Mac/MacSyncContentModel.swift	@Published	14
 QQPlayer/Mac/MacSyncContentModel.swift	ObservableObject	1
@@ -66,7 +66,6 @@ QQPlayer/Mac/MacSyncRunViewModel.swift	@Published	8
 QQPlayer/Mac/MacSyncRunViewModel.swift	ObservableObject	1
 QQPlayer/Mac/MacSyncView.swift	@ObservedObject	3
 QQPlayer/Mac/MacSyncView.swift	@StateObject	3
-QQPlayer/Mac/MacTrackListView.swift	@StateObject	1
 QQPlayer/Mac/SyncHostCenter.swift	@Published	5
 QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
 QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
@@ -74,28 +73,14 @@ QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
 QQPlayer/Services/KaraokeController.swift	@Published	4
 QQPlayer/Services/KaraokeController.swift	ObservableObject	1
-QQPlayer/Services/PlaybackModels.swift	@Published	1
-QQPlayer/Services/PlaybackModels.swift	ObservableObject	1
-QQPlayer/Services/PlayerEngine.swift	@Published	10
-QQPlayer/Services/PlayerEngine.swift	ObservableObject	1
 QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
-QQPlayer/Views/Library/SearchResultsViews.swift	@StateObject	1
-QQPlayer/Views/Library/TrackListView.swift	@StateObject	1
-QQPlayer/Views/Player/CollapsiblePlayerControls.swift	@ObservedObject	1
-QQPlayer/Views/Player/KaraokeControlBar.swift	@ObservedObject	3
+QQPlayer/Views/Player/KaraokeControlBar.swift	@ObservedObject	1
 QQPlayer/Views/Player/LyricsView.swift	@ObservedObject	1
-QQPlayer/Views/Player/PlayerOverlays.swift	@ObservedObject	3
-QQPlayer/Views/Player/PlayerOverlays.swift	@StateObject	1
-QQPlayer/Views/Player/PlayerProgressViews.swift	@ObservedObject	1
-QQPlayer/Views/Player/PlayerView.swift	@StateObject	1
-QQPlayer/Views/Player/QueueManagementView.swift	@StateObject	1
-QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@StateObject	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	@ObservedObject	1
-

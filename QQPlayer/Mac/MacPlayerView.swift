@@ -34,7 +34,7 @@ struct MacPlayerView: View {
     @State private var sleepTimerEndDate: Date?
     @State private var sleepTimerTask: Task<Void, Never>?
     @ObservedObject private var karaoke = KaraokeController.shared
-    @ObservedObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
 
     /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：睡眠定时器隐藏）
     @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
@@ -105,7 +105,7 @@ struct MacPlayerView: View {
             }
         }
         .sheet(isPresented: $showQueuePanel) {
-            MacQueuePanelView(player: player)
+            MacQueuePanelView()
         }
         .overlay(alignment: .top) {
             // 播放失败提示（2026-09-12 审计 P8）：载入失败不再静默（Opus/DSD 以前是
@@ -502,7 +502,7 @@ struct MacPlayerView: View {
 private struct MacQueuePanelView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
-    @ObservedObject var player: PlayerEngine
+    @Environment(PlayerEngine.self) private var player
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

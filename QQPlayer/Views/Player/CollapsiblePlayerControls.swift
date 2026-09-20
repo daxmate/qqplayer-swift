@@ -4,7 +4,7 @@ import SwiftUI
 /// 上滑展开更多按钮（播放顺序 + 队列/定时/歌词/隔空播放），下滑收起。
 /// 三键行与展开工具行均为透明容器：按钮用 Spacer 均匀分布、与进度条同宽。
 struct CollapsiblePlayerControls: View {
-    @ObservedObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @State private var isExpanded = false
 
     let duration: TimeInterval

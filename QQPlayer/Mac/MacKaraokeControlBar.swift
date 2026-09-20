@@ -23,13 +23,12 @@ import SwiftUI
 
 struct MacKaraokeControlBar: View {
     @ObservedObject private var karaoke = KaraokeController.shared
-    @ObservedObject private var progress = PlayerEngine.shared.progress
-    @ObservedObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     let accentColor: Color
 
     /// 当前句 index（AB 单击取 A 点）；还没到第一句时为 nil
     private var currentLineIndex: Int? {
-        LyricTiming.activeLineIndex(time: progress.playbackTime, in: karaoke.currentLines)
+        LyricTiming.activeLineIndex(time: playerEngine.progress.playbackTime, in: karaoke.currentLines)
     }
 
     /// 等选终点态：AB 已启用但 b 未设（点歌词设终点前）
@@ -80,7 +79,7 @@ struct MacKaraokeControlBar: View {
             isAccentFilled: false,
             accentColor: accentColor,
             action: {
-                KaraokeController.shared.stepLine(delta: -1, currentTime: progress.playbackTime)
+                KaraokeController.shared.stepLine(delta: -1, currentTime: playerEngine.progress.playbackTime)
             }
         ) {
             Image(systemName: "chevron.up")
@@ -123,7 +122,7 @@ struct MacKaraokeControlBar: View {
             isAccentFilled: false,
             accentColor: accentColor,
             action: {
-                KaraokeController.shared.stepLine(delta: 1, currentTime: progress.playbackTime)
+                KaraokeController.shared.stepLine(delta: 1, currentTime: playerEngine.progress.playbackTime)
             }
         ) {
             Image(systemName: "chevron.down")

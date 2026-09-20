@@ -20,7 +20,7 @@ struct MacManualPlaylistDetailView: View {
     /// Pop back to the playlists page (also called after deleting the playlist).
     let onExit: () -> Void
 
-    @StateObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
 
     @State private var currentTitle: String
     @State private var tracks: [Track] = []

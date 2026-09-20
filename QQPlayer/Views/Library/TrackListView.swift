@@ -250,7 +250,7 @@ struct TrackListContentView: View {
     let onEnterBulkMode: (String?) -> Void
 
     // Only THIS view updates when the song progresses
-    @StateObject private var playerEngine = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var playerEngine
     @Environment(AppCoordinator.self) private var appCoordinator
     @State private var settings = DeleteSettings.load()
     @State private var displayLimit = 50

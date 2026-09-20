@@ -36,6 +36,7 @@ import AppKit
 import SwiftUI
 
 struct MacTagEditorView: View {
+    @Environment(PlayerEngine.self) private var playerEngine
     @Environment(AppCoordinator.self) private var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
@@ -794,12 +795,11 @@ struct MacTagEditorView: View {
         }
     }
 
-    /// 播放队列路径跟随（web「改名后目标歌曲路径跟随，不打断播放」语义）：
-    /// 编辑对象若在播放队列/正在播放 → 用迁移后的新 Track 替换（含新 stableId），
+    /// 播放队列路径跟随（web「改名后目标歌曲路径跟随，不打断播放」语义）：编辑对象若在播放队列/正在播放 → 用迁移后的新 Track 替换（含新 stableId），
     /// 不调 loadTrack/playTrack —— 已加载的音频继续播，下次切到它用新路径加载。
     @MainActor
     private func followRenamedTrackInPlayback(oldStableId: String, newTrack: Track) {
-        let player = PlayerEngine.shared
+        let player = playerEngine
         if player.currentTrack?.stableId == oldStableId {
             player.currentTrack = newTrack
         }

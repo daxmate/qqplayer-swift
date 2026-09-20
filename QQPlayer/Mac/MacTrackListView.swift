@@ -88,7 +88,7 @@ struct MacTrackListView: View {
     /// 批量删除进度（nil = 无进行中的批次）；磁盘/DB 在全局执行器上跑，回主线程落表
     @State private var trashProgress: TrackDeletionService.Progress?
     /// 播放器（删除当前播放曲目时切下一首/停止）
-    @StateObject private var player = PlayerEngine.shared
+    @Environment(PlayerEngine.self) private var player
     /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
     /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
