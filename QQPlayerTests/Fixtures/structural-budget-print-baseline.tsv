@@ -88,11 +88,6 @@ QQPlayer/Services/StateManager.swift	26
 QQPlayer/Services/SyncConnectDiag.swift	1
 QQPlayer/Services/TrackDeletionService.swift	2
 QQPlayer/Services/TrackIdentityMigration.swift	4
-QQPlayer/Sync/SyncChangeLogApplier.swift	4
-QQPlayer/Sync/SyncChangeLogPeer.swift	4
-QQPlayer/Sync/SyncChangeLogPendingStore.swift	3
-QQPlayer/Sync/SyncFileReceiver.swift	1
-QQPlayer/Sync/SyncWiringSelfCheck.swift	2
 QQPlayer/ViewModels/TutorialViewModel.swift	1
 QQPlayer/Views/Albums/AlbumViews.swift	6
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	7
@@ -118,4 +113,4 @@ QQPlayer/Views/TutorialView.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	2
 QQPlayer/Views/Utility/ManualEQEditorView.swift	2
 QQPlayer/Views/Utility/SettingsView.swift	5
-# TOTAL: 1379
+# TOTAL: 1365

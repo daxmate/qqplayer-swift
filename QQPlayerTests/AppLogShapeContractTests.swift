@@ -17,7 +17,7 @@
 //   ② `rotateIfNeeded` / `trimTailIfNeeded` 只允许**定义**在 `LogRotation.swift`；
 //      调用点白名单制（名单里的文件不存在、或不真的调用 = 红）
 //   ③ 复用**既有裸 print 棘轮**（`StructuralBudgetRule` + 既有 TSV 基线），不另建第二套口径：
-//      (a) `migratedChains`（本批为空集）里的文件裸 `print(` == 0 且 `NSLog(` == 0
+//      (a) `migratedChains`（批 2 起非空：sync 链路 5 文件 / 14 处）里的文件裸 `print(` == 0 且 `NSLog(` == 0
 //      (b) `migratedChains` 里的文件不得同时出现在既有 print 基线 TSV 里（两处口径打架 = 红）
 //      (c) 既有棘轮仍在且可用：口径文件 + 两份基线存在/可读/可解析且 TOTAL 自洽
 //
@@ -62,10 +62,16 @@ private enum AppLogShapeContract {
     /// 受管的轮转入口名（定义唯一 + 调用点白名单制都按这份清单查）。
     static let rotationEntries: Set<String> = ["rotateIfNeeded", "trimTailIfNeeded"]
 
-    /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（**本批为空集**）。
+    /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（批 2：sync 链路 5 文件 / 14 处）。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
-    static let migratedChains: Set<String> = []
+    static let migratedChains: Set<String> = [
+        "QQPlayer/Sync/SyncChangeLogApplier.swift",
+        "QQPlayer/Sync/SyncChangeLogPeer.swift",
+        "QQPlayer/Sync/SyncChangeLogPendingStore.swift",
+        "QQPlayer/Sync/SyncFileReceiver.swift",
+        "QQPlayer/Sync/SyncWiringSelfCheck.swift",
+    ]
 
     /// 守卫③(c)：既有棘轮的文件（缺一即红，防「名单腐烂 / 守卫被删」）。
     static let ratchetRulePath = "QQPlayerTests/StructuralBudgetRule.swift"
