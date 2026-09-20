@@ -78,6 +78,11 @@ struct QQPlayerMacApp: App {
                 // 播放引擎（批 6-6）：Mac 视图（播放页 / 列表高亮 / 浮窗 / 卡拉OK 条）按属性追踪
                 .environment(PlayerEngine.shared)
                 .environment(KaraokeController.shared)
+                // 同步三件（批 6-8）：`SyncHostCenter` / 装配自检事实 / 歌词补发事实迁 `@Observable`
+                // ⇒ 同步面板（设置页与工具栏面板）、相关视图改环境注入。新增一个对象 = 三处都登记。
+                .environment(SyncHostCenter.shared)
+                .environment(SyncWiringFactsStore.shared)
+                .environment(MacLyricsResendFactsStore.shared)
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                     deleteSettings = DeleteSettings.load()
                 }
@@ -102,6 +107,10 @@ struct QQPlayerMacApp: App {
                 // 播放引擎（批 6-6）：Settings 是独立场景，不继承主窗环境
                 .environment(PlayerEngine.shared)
                 .environment(KaraokeController.shared)
+                // 同步三件（批 6-8）：Settings 是独立场景，不继承主窗环境（同上一行原因）
+                .environment(SyncHostCenter.shared)
+                .environment(SyncWiringFactsStore.shared)
+                .environment(MacLyricsResendFactsStore.shared)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
         .commands {

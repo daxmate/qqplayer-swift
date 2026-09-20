@@ -26,7 +26,8 @@ struct SyncSettingsView: View {
     /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
     @Environment(IOSPassiveSyncCenter.self) private var passiveSync
     /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）
-    @ObservedObject private var wiringFacts = SyncWiringFactsStore.shared
+    /// 2026-09-20 批 6-8：迁 `@Observable` ⇒ 改环境注入（组合根 `QQPlayerApp` 装配，与 passiveSync 同款）。
+    @Environment(SyncWiringFactsStore.self) private var wiringFacts
     /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数并上屏）。
     @Environment(PlaylistCoverLoadFailuresStore.self) private var coverFailures
     /// 2026-09-19 批 4：无状态服务入口（组合根 `AppServices` 注入）
@@ -468,4 +469,6 @@ struct SyncSettingsView: View {
     // 代价：这两行占棘轮预算（预算账本见 QQPlayerTests/Fixtures/shared-singleton-budget-plan.md）。
     .environment(IOSPassiveSyncCenter.shared)
     .environment(PlaylistCoverLoadFailuresStore.shared)
+    // 批 6-8：装配自检事实 store 迁 `@Observable` ⇒ 本页改环境注入，预览需显式装配。
+    .environment(SyncWiringFactsStore.shared)
 }

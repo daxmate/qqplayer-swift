@@ -48,7 +48,8 @@ struct MacSyncCenterView: View {
     /// 设备区选中项（= 本次同步目标；存 peerID，选中决策见 `SyncDeviceListModel`）
     @State private var targetDeviceID: String?
     /// S2 接线：App 级 Host 监听中心（**同一个 shared 实例**，生命周期不归本视图）
-    @ObservedObject private var hostCenter = SyncHostCenter.shared
+    /// 2026-09-20 批 6-8：迁 `@Observable` ⇒ 改组合根环境注入（设置页与工具栏面板两个根各自装配）。
+    @Environment(SyncHostCenter.self) private var hostCenter
 
     private let deviceStore = DeviceStore()
 
@@ -444,4 +445,8 @@ enum SyncQRImageFactory {
     }
     .formStyle(.grouped)
     .frame(width: 560, height: 640)
+    // Preview 是组合根之外的第二个合法装配点（App 根注入不覆盖画布）→ 显式装配（批 6-8）。
+    .environment(SyncHostCenter.shared)
+    .environment(SyncWiringFactsStore.shared)
+    .environment(MacLyricsResendFactsStore.shared)
 }

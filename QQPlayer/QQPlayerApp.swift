@@ -121,6 +121,8 @@ struct QQPlayerApp: App {
                 // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
                 // 需要这些对象的视图一律 `@Environment(T.self)` 从这里继承。新增一个对象 = 在此登记一行。
                 .environment(IOSPassiveSyncCenter.shared)
+                // 装配自检事实 store（批 6-8）：迁 `@Observable` ⇒ `SyncSettingsView` 改环境注入
+                .environment(SyncWiringFactsStore.shared)
                 .environment(PlaylistCoverLoadFailuresStore.shared)
                 .environment(LyricOffsetStore.shared)
                 .environment(EQManager.shared)

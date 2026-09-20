@@ -32,7 +32,9 @@ import SwiftUI
 
 /// 同步操作区（在 `MacSyncSettingsView` 的 `Form` 内渲染）。
 struct MacSyncRunSection: View {
-    @ObservedObject var hostCenter: SyncHostCenter
+    /// 2026-09-20 批 6-8：中心迁 `@Observable` ⇒ 视图侧改**组合根环境注入**（读属性即按需重绘）。
+    /// 两个入口（设置页 `MacSyncSettingsView` / 工具栏面板 `MacSyncCenterView`）共用本视图。
+    @Environment(SyncHostCenter.self) private var envHostCenter
     /// App 强调色（读环境值，与主窗同源；macOS 上 `Color.accentColor` 跟随系统强调色而非
     /// App tint——2026-09-05 已统一，本文件 2026-09-11 新增时复发，见 M1）
     @Environment(\.appAccentColor) var accentColor
@@ -43,9 +45,14 @@ struct MacSyncRunSection: View {
     /// 数据同步侧（S2-T12：收藏 / 播放历史 / 歌单结构）。
     @StateObject var dataModel: MacSyncDataViewModel
     /// 运行时装配自检事实（L5：本端声明的能力真的装配上了吗；缺口 = 0 时面板空态）。
-    @ObservedObject var wiringFacts: SyncWiringFactsStore
+    /// 2026-09-20 批 6-8：迁 `@Observable` ⇒ 环境注入（非 private：`MacSyncView+Run.swift` 分区文件要用）。
+    @Environment(SyncWiringFactsStore.self) var wiringFacts
     /// F2 对齐歌词补发轮的事实（连接就绪自动跑的那一轮；nil = 本次连接还没跑过）。
-    @ObservedObject var lyricsFacts: MacLyricsResendFactsStore
+    @Environment(MacLyricsResendFactsStore.self) var lyricsFacts
+    /// 发起方显式传入的中心实例（`init(hostCenter:)`；nil = 用环境值）。
+    private let injectedHostCenter: SyncHostCenter?
+    /// 本视图实际使用的中心：**显式传入优先**，否则环境值（保留 init 注入语义，与环境注入并存）。
+    var hostCenter: SyncHostCenter { injectedHostCenter ?? envHostCenter }
 
     /// 全曲库二次确认（Q4 决策：全库必须确认）。
     @State var showLibraryWideConfirm = false
@@ -63,16 +70,18 @@ struct MacSyncRunSection: View {
     /// ⚠️ 默认值是 `nil` 而不是 `.shared`：View 的 init 是非隔离上下文，
     /// 默认实参里直接引用 `@MainActor` 的 `.shared` 会报隔离错报（Swift 6 下是错误）
     /// （与两个 ViewModel 同一处理）。
+    /// 2026-09-20 批 6-8：参数**保留**（调用方可传实例），只是不再用它建 `ObservedObject` ——
+    /// 观察走环境注入；`hostCenter` 计算属性 = 显式传入 ?? 环境值。
+    /// 注：三个 view model 仍在 init 里用 `hostCenter ?? .shared` 建（init 读不到环境值）；
+    /// 组合根注入的就是同一个 `.shared`，两个入口传入的也是环境值 → 三处同一个实例。
     @MainActor
     init(hostCenter: SyncHostCenter? = nil) {
         let center = hostCenter ?? .shared
         let contentModel = MacSyncContentModel(hostCenter: center)
-        _hostCenter = ObservedObject(wrappedValue: center)
+        injectedHostCenter = hostCenter
         _content = StateObject(wrappedValue: contentModel)
         _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center, content: contentModel))
         _dataModel = StateObject(wrappedValue: MacSyncDataViewModel(hostCenter: center))
-        _wiringFacts = ObservedObject(wrappedValue: .shared)
-        _lyricsFacts = ObservedObject(wrappedValue: .shared)
     }
 
     var body: some View {
@@ -145,4 +154,8 @@ struct MacSyncRunSection: View {
     }
     .formStyle(.grouped)
     .frame(width: 560, height: 720)
+    // Preview 是组合根之外的第二个合法装配点（App 根注入不覆盖画布）→ 显式装配（批 6-8）。
+    .environment(SyncHostCenter.shared)
+    .environment(SyncWiringFactsStore.shared)
+    .environment(MacLyricsResendFactsStore.shared)
 }

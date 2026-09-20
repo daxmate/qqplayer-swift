@@ -92,13 +92,16 @@ final class MacSyncRunViewModel: ObservableObject {
         self.deviceStore = deviceStore
         self.makeCoordinator = makeCoordinator
         // 监听中心变化（连接/断开/开关）→ 主线程刷新可用性与运行态。
-        // objectWillChange 是**变更前**通知 → 用 Task 排到主线程队列尾，读到的就是新值。
-        center.objectWillChange
+        // 2026-09-20 批 6-8：中心迁 `@Observable` 后 `objectWillChange` **编译期消失** ⇒ 改走中心
+        // 自己的 façade `hostStatePublisher`（批 6-3「非视图消费者的唯一观察入口」形状，
+        // 不新增第二套订阅）。语义与迁移前一致：变更后发信号、不重放当前值。
+        center.hostStatePublisher
             .sink { [weak self] _ in
                 Task { @MainActor in self?.hostDidChange() }
             }
             .store(in: &cancellables)
         // 内容变化（选方向 / 勾选 / 换内容源）→ 刷新按钮可用性。
+        // ⚠️ `MacSyncContentModel` 本批**未**迁 `@Observable`（仍 ObservableObject）→ 保持原样。
         content.objectWillChange
             .sink { [weak self] _ in
                 Task { @MainActor in self?.refreshAvailability() }

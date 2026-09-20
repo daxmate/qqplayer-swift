@@ -109,7 +109,9 @@ final class MacSyncContentModel: ObservableObject {
         self.libraryRoot = root
         self.local = MacSyncLocalContentProvider(database: database, libraryRoot: root)
         // 连接断开 → 对端内容失效（清掉对端清单，避免把上一台设备的内容留在屏上）。
-        center.objectWillChange
+        // 2026-09-20 批 6-8：中心迁 `@Observable` 后无 `objectWillChange` ⇒ 走中心 façade
+        // `hostStatePublisher`（批 6-3 形状）。
+        center.hostStatePublisher
             .sink { [weak self] _ in
                 Task { @MainActor in self?.hostDidChange() }
             }

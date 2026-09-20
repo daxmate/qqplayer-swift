@@ -90,8 +90,9 @@ final class MacSyncDataViewModel: ObservableObject {
             try SyncChangeLogDanglingRepair().run()
         }
         // 监听中心变化（连接 / 断开）→ 主线程刷新可用性与运行态。
-        // objectWillChange 是**变更前**通知 → 用 Task 排到主线程队列尾，读到的就是新值。
-        center.objectWillChange
+        // 2026-09-20 批 6-8：中心迁 `@Observable` 后 `objectWillChange` 编译期消失 ⇒ 走 façade
+        // `hostStatePublisher`（批 6-3 形状，不新增第二套订阅）。
+        center.hostStatePublisher
             .sink { [weak self] _ in
                 Task { @MainActor in self?.hostDidChange() }
             }

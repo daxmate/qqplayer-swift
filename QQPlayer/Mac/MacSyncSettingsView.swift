@@ -26,4 +26,8 @@ struct MacSyncSettingsView: View {
 #Preview {
     MacSyncSettingsView()
         .frame(width: 560, height: 640)
+        // Preview 是组合根之外的第二个合法装配点（App 根注入不覆盖画布）→ 显式装配（批 6-8）。
+        .environment(SyncHostCenter.shared)
+        .environment(SyncWiringFactsStore.shared)
+        .environment(MacLyricsResendFactsStore.shared)
 }

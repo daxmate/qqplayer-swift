@@ -19,6 +19,9 @@ extension MacSyncRunSection {
 
     @ViewBuilder
     var connectionSection: some View {
+        // 2026-09-20 批 6-8：中心迁 `@Observable` 后视图改环境注入，`$hostCenter.…` 不再可用
+        // （计算属性不可投影）⇒ 局部 `@Bindable`（与 MacEQSettingsView 同款既有写法），双向写回保留。
+        @Bindable var center = hostCenter
         Section {
             if let peer = model.connectedPeer {
                 connectedRow(peer)
@@ -28,7 +31,7 @@ extension MacSyncRunSection {
                     .foregroundStyle(.secondary)
             }
 
-            Toggle("sync_run_allow_lan".localized, isOn: $hostCenter.allowsLANConnections)
+            Toggle("sync_run_allow_lan".localized, isOn: $center.allowsLANConnections)
 
             if !model.isListening {
                 Text("sync_run_listener_off_hint".localized)
