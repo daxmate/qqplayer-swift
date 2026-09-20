@@ -39,8 +39,7 @@ enum MacLibrarySection: String, CaseIterable, Identifiable {
 struct MacLibraryView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
-    /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；与 App 菜单「设置…」同源）。
-    /// 替代已失效的私有 selector `showSettingsWindow:`。
+    /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；替代已失效的私有 selector）。
     @Environment(\.openSettings) private var openSettings
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var indexer = LibraryIndexer.shared
@@ -50,6 +49,8 @@ struct MacLibraryView: View {
     /// 曲库卡事实（批 3a：同上，由 Mac 组合根注入）
     @Environment(MacLibraryFactsStore.self) private var libraryFacts
     @Environment(AppServices.self) private var services
+    /// 桌面浮窗管理器（批 5b：Mac 组合根注入；迷你模式入口按钮直调方法，不读属性）
+    @Environment(DesktopWindowsManager.self) private var desktopWindows
 
     @State private var section: MacLibrarySection = .tracks
     @State private var tracks: [Track] = []
@@ -70,8 +71,7 @@ struct MacLibraryView: View {
     @State private var albumTracks: [Track] = []
     @State private var artistTracks: [Track] = []
     @State private var selectedTrackId: String?
-    /// 专辑/歌手详情 sheet 开关（上收自 MacAlbumGridView/MacArtistListView，
-    /// 支持歌曲右键「进专辑/进歌手」外部触发）
+    /// 专辑/歌手详情 sheet 开关（上收自 MacAlbumGridView/MacArtistListView；支持歌曲右键「进专辑/进歌手」触发）
     @State private var showAlbumSheet = false
     @State private var showArtistSheet = false
     /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
@@ -129,7 +129,7 @@ struct MacLibraryView: View {
             ToolbarItem {
                 if deleteSettings.showMiniWindowButton {
                     Button {
-                        DesktopWindowsManager.shared.enterMiniMode()
+                        desktopWindows.enterMiniMode()
                     } label: {
                         Image(systemName: "pip.enter")
                     }

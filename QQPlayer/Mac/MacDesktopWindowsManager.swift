@@ -24,10 +24,15 @@
 //  点控件不抢前台 app 焦点）。
 //
 import AppKit
+import Observation
 import SwiftUI
 
+//  2026-09-20 批 5b：ObservableObject → @Observable（视图按属性追踪读 isLyricVisible）。
+//  浮窗内容由手工 NSHostingView 承载、**不继承场景环境** → 本类同时是浮窗的装配点
+//  （见 rootView(for:) 的显式注入），两处装配由 EnvironmentInjectionContractTests 守护。
 @MainActor
-final class DesktopWindowsManager: ObservableObject {
+@Observable
+final class DesktopWindowsManager {
     static let shared = DesktopWindowsManager()
 
     /// 窗种类（frame key / 默认落点 / 内容尺寸按种类区分）
@@ -51,21 +56,21 @@ final class DesktopWindowsManager: ObservableObject {
     }
 
     /// 迷你模式激活（迷你窗可见；主窗此时收起）。
-    @Published private(set) var isMiniActive = false
+    private(set) var isMiniActive = false
     /// 桌面歌词窗显隐（仅迷你模式中可为 true；mini 窗歌词按钮点亮态绑定）。
-    @Published private(set) var isLyricVisible = false
+    private(set) var isLyricVisible = false
     /// 模式状态机（决策单一事实源；isMiniActive/isLyricVisible 与之恒镜像，UI 绑定用）
-    private var mode = DesktopWindowModeState()
+    @ObservationIgnored private var mode = DesktopWindowModeState()
 
-    private var miniPanel: NSPanel?
-    private var lyricPanel: NSPanel?
+    @ObservationIgnored private var miniPanel: NSPanel?
+    @ObservationIgnored private var lyricPanel: NSPanel?
     /// 各浮窗的 hosting view（强调色设置变化时重建 rootView 刷新）
-    private var panelHosts: [PanelKind: NSHostingView<AnyView>] = [:]
+    @ObservationIgnored private var panelHosts: [PanelKind: NSHostingView<AnyView>] = [:]
     /// 当前已注入浮窗的强调色 key（变化时重建 rootView）
-    private var lastInjectedAccentName: String?
-    private var settingsObserver: NSObjectProtocol?
-    private var moveObservers: [NSObjectProtocol] = []
-    private var didStart = false
+    @ObservationIgnored private var lastInjectedAccentName: String?
+    @ObservationIgnored private var settingsObserver: NSObjectProtocol?
+    @ObservationIgnored private var moveObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var didStart = false
 
     private init() {}
 
@@ -200,6 +205,10 @@ final class DesktopWindowsManager: ObservableObject {
             // ——值取 MacAppearance.currentAccentColor（与主窗同一读取入口，M2）。
             let accent = MacAppearance.currentAccentColor
             MacMiniPlayerView()
+                // 本类是浮窗的装配点：手工 NSHostingView 不继承 App 场景环境（与上方强调色同因），
+                // 视图读的 `@Environment(DesktopWindowsManager.self)` 必须在此显式注入，
+                // 否则进迷你模式即运行时致命错（编译与单测都发现不了）。
+                .environment(self)
                 .environment(\.appAccentColor, accent)
                 .tint(accent)
         case .lyric:

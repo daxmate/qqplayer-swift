@@ -18,7 +18,7 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 133
+# TOTAL: 128
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
 # 2026-09-19 账目（与预算账本同步）：
@@ -43,20 +43,24 @@
 #   `await …shared.<method>(…)` 调用）⇒ 与批 4 同款容器通道，**0 处 preview 成本**；
 #   PlayerView / MacPlayerView 在行数棘轮基线内（985 / 617，零余量）⇒ 新增 `@Environment(AppServices.self)`
 #   的 +1 行靠合并既有两行注释让出等量行抵消，净零（**注意：`///` 文档注释 + 声明 = +2 行，不是 +1**）。
+#   → **128**（批 5b：DesktopWindowsManager 迁 @Observable；Mac 视图改 `@Environment` 注入）
+#   批 5b 逐项：MacDesktopWindowViews 7→3、MacLibraryView 5→4；Mac 组合根新增装配 2 行（非视图层，不计预算）。
+#   浮窗由管理器手工 hosting（`NSHostingView`）⇒ 装配点在其 `rootView(for:)` 的 `.environment(self)`，
+#   由 EnvironmentInjectionContractTests 新增的 ManualHostingEnvironmentContractTests 守护；本批 **0 处 preview 成本**。
 QQPlayer/Mac/MacPlayerView.swift	12
 QQPlayer/Views/Player/PlayerView.swift	8
-QQPlayer/Mac/MacDesktopWindowViews.swift	7
 QQPlayer/Mac/MacTrackListView.swift	7
 QQPlayer/Mac/MacKaraokeControlBar.swift	5
-QQPlayer/Mac/MacLibraryView.swift	5
 QQPlayer/Views/Library/SearchResultsViews.swift	5
 QQPlayer/Views/Player/KaraokeControlBar.swift	5
 QQPlayer/Views/Player/PlayerOverlays.swift	5
+QQPlayer/Mac/MacLibraryView.swift	4
 QQPlayer/Mac/MacTagEditorView.swift	4
 QQPlayer/Mac/MacVisualizerView.swift	4
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	4
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	4
 QQPlayer/Views/Utility/SettingsView.swift	4
+QQPlayer/Mac/MacDesktopWindowViews.swift	3
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
 QQPlayer/Mac/MacSyncView.swift	3
 QQPlayer/Views/Albums/AlbumViews.swift	3

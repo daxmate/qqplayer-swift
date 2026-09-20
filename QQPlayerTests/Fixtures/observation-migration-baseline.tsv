@@ -23,11 +23,11 @@
 #     `HybridMusicAPIService` 改走 `AppServices` 容器；同批另三个无状态入口本就没有迁移家族标记）。
 #   账本见 `shared-singleton-budget-plan.md`（每批迁移后基线随之下调）。
 # 格式：路径<TAB>标记<TAB>计数
+#   → **180 / 96**（2026-09-20 批 5b：DesktopWindowsManager 迁 @Observable + 浮窗视图改 `@Environment`。
+#     同步删除：1 个 `ObservableObject` + 2 个 `@Published`，视图 1 处 `@ObservedObject` 降为 3）
 QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/ContentView.swift	@StateObject	1
-QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	4
-QQPlayer/Mac/MacDesktopWindowsManager.swift	@Published	2
-QQPlayer/Mac/MacDesktopWindowsManager.swift	ObservableObject	1
+QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	3
 QQPlayer/Mac/MacEQImportView.swift	@StateObject	1
 QQPlayer/Mac/MacEQSettingsView.swift	@StateObject	1
 QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	@StateObject	1
