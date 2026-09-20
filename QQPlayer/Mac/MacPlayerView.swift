@@ -40,7 +40,7 @@ struct MacPlayerView: View {
     @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
     /// 播放页频谱（D4，web Visualizer 对齐；设置「播放」分类开关，默认开）
     @State private var visualizerEnabled: Bool = DeleteSettings.load().visualizerEnabled
-    @StateObject private var spectrumAnalyzer = MacSpectrumAnalyzer.shared
+    @Environment(MacSpectrumAnalyzer.self) private var spectrumAnalyzer
     /// 歌词搜索 sheet（手动指定歌词）
     @State private var showLyricsSearch = false
     /// 播放队列面板（B 组队列排序持久化：可拖排/删除/点行跳转，重排即持久化）

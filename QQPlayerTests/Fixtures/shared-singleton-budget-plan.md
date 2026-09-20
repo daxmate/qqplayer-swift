@@ -42,7 +42,7 @@
 | `MacLibraryFactsStore` | 9 | 4 | 叶子（账目） | 批 3 |
 | `LyricsManager` | 8 | 4 | 中频 | 两端都用 |
 | `DesktopWindowsManager` | 5 | 2 | 中频 | Mac 专属 |
-| `MacSpectrumAnalyzer` | 5 | 2 | 中频 | Mac 专属 |
+| `MacSpectrumAnalyzer` | 5 | 2 | 中频 | Mac 专属（**批 6-1 ✅**） |
 | `SFBAudioEngineManager` | 4 | 4 | 中频 | 音频引擎门面 |
 | `HybridMusicAPIService` | 4 | 1 | 叶子（无状态入口） | 批 4（需非 Observable 注入机制） |
 | `LibraryIndexer` | 3 | 3 | 中频 | 索引状态源 |
@@ -105,7 +105,8 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 5b-1（2026-09-20） | `DesktopWindowsManager`（`ObservableObject` → `@Observable`，5 处；Mac 专属浮窗） | 直连棘轮 133 → **128**（真迁 5 处，0 preview 成本）；迁移棘轮 184/98 → **180/96** | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 + 长文件行数净零 |
 | 批 5b-2（2026-09-20） | `EQManager`（`ObservableObject` → `@Observable`，10 处 / 8 文件 / 9 个 struct） | 直连棘轮 128 → **118**（真迁 10 处，0 preview 成本）；迁移棘轮 180/96 → **164/86** | iOS 全量 1679/211 + Mac 零警告 + 预算/print 双绿 + target 门禁 + `EQManager.swift` 行数净零 |
 | 批 5b-3（2026-09-20） | `SFBAudioEngineManager`（`ObservableObject` → `@Observable`；**视图侧已由 PR #18 收口，本批只动本体**） | 直连棘轮 **116 → 116（不动）**；迁移棘轮 164/86 → **159/84** | iOS 全量 1684/212 + Mac 零警告 + 预算双绿（22423/1379）+ target 门禁 |
-| **批 6-0（2026-09-20，本批）** | **口径补齐 + 8 处显形债**（无新对象迁移；`CarPlayTrackFilter` / `IntentArtworkService` 两个唯一入口） | 直连棘轮 118 →（口径）**126** →（清 8 处）**116**。逐项：`WhatsNewStore`×3 → `AppServices.whatsNew`；`DatabaseManager.shared`×1 → `LibraryReads.allTracks()`；CarPlay 格式过滤 5 文件判据收口 → `CarPlayTrackFilter`（真迁 5 处）；意图封面 ×1 → `IntentArtworkService`；残留 2 处＝`LibraryIndexer.shared`（批 6 热点）+ `#Preview` 装配（脚手架） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
+| **批 6-0（2026-09-20）** | **口径补齐 + 8 处显形债**（无新对象迁移；`CarPlayTrackFilter` / `IntentArtworkService` 两个唯一入口） | 直连棘轮 118 →（口径）**126** →（清 8 处）**116**。逐项：`WhatsNewStore`×3 → `AppServices.whatsNew`；`DatabaseManager.shared`×1 → `LibraryReads.allTracks()`；CarPlay 格式过滤 5 文件判据收口 → `CarPlayTrackFilter`（真迁 5 处）；意图封面 ×1 → `IntentArtworkService`；残留 2 处＝`LibraryIndexer.shared`（批 6 热点）+ `#Preview` 装配（脚手架） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
+| **批 6-1（2026-09-20，本批）** | `MacSpectrumAnalyzer`（`ObservableObject` → `@Observable`；5 处 / 2 文件；Mac 专属频谱分析器） | 直连棘轮 **116 → 111**（真迁 5 处，0 preview 成本：`MacVisualizerView` 4 → 归零删行、`MacPlayerView` 12 → 11）；迁移棘轮 159/84 → **155/81**（删 1 `ObservableObject` + 2 `@Published` + 1 `@StateObject`） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + `MacPlayerView.swift` 行数净零（617） |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -244,7 +245,7 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 | 对象 | 处数 | 站点形态 | 结论 |
 | --- | ---: | --- | --- |
 | `SFBAudioEngineManager` | 4 | `if SFBAudioEngineManager.shared.isCarPlayEnvironment {…}` | ⚠️ 该属性是 **`@Published`** → 先定「视图是否需要刷新追踪」；要追踪则只能 `@Environment(T.self)` + 迁 `@Observable` |
-| `MacSpectrumAnalyzer` | 5 | `.onReceive(MacSpectrumAnalyzer.shared.$isActive/.$levels)` | ❌ **Combine 订阅** → 迁 `@Observable` 会静默失效，需先改 `withObservationTracking`/回调 |
+| ~~`MacSpectrumAnalyzer`~~ | ~~5~~ | `.onReceive(MacSpectrumAnalyzer.shared.$isActive/.$levels)` | ✅ **已完成（批 6-1）**：订阅 → `@Environment(T.self)` + body 读属性；直连 116 → 111 |
 | `EQManager` | 10 | 全是 `@StateObject … = EQManager.shared` | ⚠️ 需观察迁移（视图读 EQ 曲线/预设） |
 | `DesktopWindowsManager` | 5 | `@ObservedObject … = .shared` + 方法调用 | ⚠️ 需观察迁移（Mac 专属） |
 | `LibraryIndexer` | 3 | `@StateObject … = .shared` ×2 + 1 方法调用 | ⚠️ 需观察迁移 |
@@ -355,6 +356,28 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 `DatabaseManager`）用的仍是旧口径（`Views/**` + `Mac/**`），**根目录视图同样不可见**——
 本批 `ContentView` 那处 `DatabaseManager.shared.getAllTracks()` 它本来就看不见。
 口径补齐需单独一批（要重新测存量并再基线）。
+
+### 批 6-1：`MacSpectrumAnalyzer` 迁 `@Observable` —— 实测完成（2026-09-20）
+
+Mac 专属实时频谱分析器（77 行，`QQPlayer/Mac/`，仅 `QQPlayerMac` target）。挑它先做（而不是计划里的 `LibraryIndexer`）
+的理由：**爆炸半径＝一个可视化视图**，而 `LibraryIndexer` 的订阅链挂在**同步前置门**上（`IndexingGate.isReadyForChangeLogSync` +
+`SyncHostCenter` / `MacLyricsResendAutoRunner` / `AppCoordinator` / `SpotlightLibraryIndexer` 四处消费者）⇒ 单独一批、先改机制再迁。
+
+- **迁移**：`ObservableObject` → `@Observable`；`levels` / `isActive` 两个原 `@Published` 迁为被追踪的 `private(set) var`；
+  `dsp` / `installedEngine` 迁移前即非 `@Published`（不发通知）⇒ `@ObservationIgnored`（与 5b-2/5b-3 同口径）。
+- **重绘驱动守住零变化（本批唯一的坑）**：原先靠 `.onReceive(analyzer.$levels)` 把值写进 `@State` 再绘；
+  迁后 body 直读 `analyzer.isActive` / `analyzer.levels`（按属性追踪）。
+  ⚠️ **`levels` 必须在 body 求值期取成局部量**再交给 `Canvas` 渲染闭包——渲染闭包不在 body 求值范围内，
+  在里面读 `@Observable` 属性**不会登记依赖** ⇒ 会直犯 2026-09-08 那个「频谱条恒为最低高度、像一条虚线」的老 bug。
+- **装配点**：Mac 组合根 `QQPlayerMacApp` 的**两个**场景根（`WindowGroup` + `Settings`）各一行——`Settings` 是独立场景，
+  不继承主窗环境（批 3a 结论）；`EnvironmentInjectionContractTests` 判绿。`MacPlayerView` / `MacVisualizerView` 均无 `#Preview`，**0 处脚手架成本**。
+- **行数预算**：`MacPlayerView`(617) 零余量 ⇒ `@StateObject` → `@Environment` 做 **1:1 行替换**
+  （首改写了「`///` 注释 + 声明」= +2 行，被 `check-structural-budget.sh` 当场抓住 ⇒ 改裸声明，净零 617）。
+- **基线**：直连 116 → **111**（`MacVisualizerView` 4 → 归零删行）；迁移 159/84 → **155/81**（一批同动两条棘轮，属预期）。
+
+- **下一步（批 6-2）**：`LibraryIndexer`（先改订阅机制：`$isIndexing` 3 个消费者 + `indexingTerminalStatePublisher`
+  2 个消费者 + `IndexingStateProviding` 协议本身 + `IndexingGate.waitUntilIdle` 的 `.first(where:)`），再 `SyncHostCenter` /
+  `SyncWiringFactsStore` 两个延后项。
 
 
 ---

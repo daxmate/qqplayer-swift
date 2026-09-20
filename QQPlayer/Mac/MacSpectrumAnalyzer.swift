@@ -22,20 +22,25 @@
 
 import AVFoundation
 import Foundation
+import Observation
 
 /// 主混音器实时频谱（QQPlayerMac target only）。
+/// 2026-09-20 批 6-1：`ObservableObject` → `@Observable`（两个原 `@Published` 保持被追踪，其余存储属性
+/// 迁移前即不发通知 ⇒ 全部 `@ObservationIgnored`；视图侧改由 Mac 组合根注入，按属性追踪驱动重绘）。
 @MainActor
-final class MacSpectrumAnalyzer: ObservableObject {
+@Observable
+final class MacSpectrumAnalyzer {
     static let shared = MacSpectrumAnalyzer()
 
     /// 频段能量（0...1，对数频率分布，视觉条高度用；主线程只读）
-    @Published private(set) var levels: [Float] = []
+    private(set) var levels: [Float] = []
     /// 是否有实时数据（播放中且 tap 已装；false = 视觉化应隐藏/静止）
-    @Published private(set) var isActive = false
+    private(set) var isActive = false
 
     /// DSP 核（无隔离；音频线程只碰它）
-    private let dsp = MacSpectrumDSP()
-    private weak var installedEngine: AVAudioEngine?
+    @ObservationIgnored private let dsp = MacSpectrumDSP()
+    /// 迁移前即非 `@Published`（不发通知）⇒ 保持不被追踪（批 6-1）
+    @ObservationIgnored private weak var installedEngine: AVAudioEngine?
 
     private init() {
         levels = Array(repeating: 0, count: MacSpectrumDSP.binCount)

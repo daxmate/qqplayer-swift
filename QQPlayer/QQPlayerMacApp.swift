@@ -67,6 +67,8 @@ struct QQPlayerMacApp: App {
                 // 桌面浮窗管理器（批 5b）；浮窗内容另由管理器手工 hosting 装配（见 MacDesktopWindowsManager）
                 .environment(DesktopWindowsManager.shared)
                 .environment(EQManager.shared)
+                // 频谱分析器（批 6-1）：播放页视觉条按属性追踪驱动重绘
+                .environment(MacSpectrumAnalyzer.shared)
                 // App 级无状态入口容器（批 3b・方案 A）：WhatsNewStore / StateManager / MacFolderMonitor
                 .environment(AppServices.live)
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
@@ -86,6 +88,7 @@ struct QQPlayerMacApp: App {
                 .environment(MacLibraryFactsStore.shared)
                 .environment(DesktopWindowsManager.shared)
                 .environment(EQManager.shared)
+                .environment(MacSpectrumAnalyzer.shared)
                 .environment(AppServices.live)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）

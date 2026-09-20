@@ -30,6 +30,12 @@
 #   → **159 / 84**（2026-09-20 批 5b-3：SFBAudioEngineManager 迁 @Observable。
 #     同步删除：1 个 `ObservableObject` + 4 个 `@Published`（其余存储属性——音频引擎/解码器/EQ 句柄——全 `@ObservationIgnored`）。
 #     注：视图侧对该对象的 5 处直连读已由 PR #18（CarPlayTrackFilter 单一入口）收口，故本批**不动**直连基线。）
+#   → **155 / 81**（2026-09-20 批 6-1：`MacSpectrumAnalyzer` 迁 @Observable（Mac 专属频谱分析器）。
+#     同步删除：1 个 `ObservableObject` + 2 个 `@Published`（`levels` / `isActive` 迁后为被追踪的
+#     `private(set) var`；`dsp` / `installedEngine` 迁移前即非 `@Published` ⇒ `@ObservationIgnored`）、
+#     1 处 `@StateObject`（`MacPlayerView` → `@Environment(MacSpectrumAnalyzer.self)`）。
+#     重绘驱动不变：body 读 `isActive` / `levels`（原 `.onReceive` 订阅 → 现按属性追踪）；
+#     ⚠️ `levels` 必须在 body 求值期取局部量再交给 `Canvas` 渲染闭包（渲染闭包不登记依赖）。）
 QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/ContentView.swift	@StateObject	1
 QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	3
@@ -39,11 +45,8 @@ QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
 QQPlayer/Mac/MacLyricsView.swift	@ObservedObject	1
 QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	3
-QQPlayer/Mac/MacPlayerView.swift	@StateObject	1
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	@StateObject	1
 QQPlayer/Mac/MacSmartPlaylistViews.swift	@StateObject	1
-QQPlayer/Mac/MacSpectrumAnalyzer.swift	@Published	2
-QQPlayer/Mac/MacSpectrumAnalyzer.swift	ObservableObject	1
 QQPlayer/Mac/MacSyncCenterView.swift	@ObservedObject	1
 QQPlayer/Mac/MacSyncContentModel.swift	@Published	14
 QQPlayer/Mac/MacSyncContentModel.swift	ObservableObject	1

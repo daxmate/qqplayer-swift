@@ -21,8 +21,14 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 116
+# TOTAL: 111
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
+#
+# ═══ 2026-09-20 批 6-1：MacSpectrumAnalyzer 迁 @Observable（真迁 5 处，116 → 111）════════════════
+#   · MacVisualizerView 4 → 归零删行：`.onReceive(analyzer.$isActive/$levels)` + `.onAppear` 直读
+#     → `@Environment(MacSpectrumAnalyzer.self)`，body 读属性（按属性追踪驱动重绘）；
+#   · MacPlayerView 12 → 11：`@StateObject … = MacSpectrumAnalyzer.shared` → 同款 `@Environment`；
+#   · 装配点：Mac 组合根 `QQPlayerMacApp` 的两个场景根（WindowGroup / Settings）各一行。
 #
 # ═══ 2026-09-20：口径补齐（本文件**唯一一次上调**，不是新增直连）════════════════
 #   原因：旧口径漏掉了「仓库根目录 / `AppIntents/**` 里声明了 SwiftUI View 的文件」。
@@ -74,7 +80,7 @@
 #   批 5b-2 逐项：MacManualEQEditorView 2→0、ManualEQEditorView 2→0、EQSettingsView 2→1（残留那处非 EQ 直连）、
 #   其余 5 文件 1→0（MacEQImportView / MacEQSettingsView / MacGraphicEQ10BandEditorView / EQImportViews /
 #   GraphicEQ10BandEditorView）；iOS+Mac **两个组合根各登记 1 行**（非视图层，不计预算）；**0 处 preview 成本**。
-QQPlayer/Mac/MacPlayerView.swift	12
+QQPlayer/Mac/MacPlayerView.swift	11
 QQPlayer/Views/Player/PlayerView.swift	8
 QQPlayer/Mac/MacTrackListView.swift	7
 QQPlayer/Mac/MacKaraokeControlBar.swift	5
@@ -83,7 +89,6 @@ QQPlayer/Views/Player/KaraokeControlBar.swift	5
 QQPlayer/Views/Player/PlayerOverlays.swift	5
 QQPlayer/Mac/MacLibraryView.swift	4
 QQPlayer/Mac/MacTagEditorView.swift	4
-QQPlayer/Mac/MacVisualizerView.swift	4
 QQPlayer/Views/Utility/SettingsView.swift	4
 QQPlayer/Mac/MacDesktopWindowViews.swift	3
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	3

@@ -20,38 +20,37 @@ import SwiftUI
 /// 当时的理由是减少每帧 body 重算（那条 layout 递归结论后来被推翻，白框根因是
 /// sheet 的 item 时序竞态）。改完的后果：数据到达不再触发 SwiftUI 失效，重绘只剩
 /// TimelineView 调度一条路——播放中 32 根条常年停在最低高度 2pt，肉眼像一条虚线。
-/// 现改回**数据驱动重绘**：订阅 levels（@Published，~30fps 节流）作为绘制输入，
-/// 数据一变即重绘。本视图是叶子节点，body 只有 Group + Canvas，逐帧重算负担可忽略。
+/// 现改回**数据驱动重绘**：body 读 `analyzer.isActive` / `analyzer.levels`（`@Observable`
+/// 按属性追踪，`levels` 由 tap 回调 ~30fps 节流发布）作为绘制输入，数据一变即重绘。
+/// 本视图是叶子节点，body 只有 Group + Canvas，逐帧重算负担可忽略。
 /// 保留 2026-09-08 的合理部分：不活跃时整体不绘制（不空转 Canvas）。
+///
+/// 2026-09-20 批 6-1：`@Published` 订阅（`.onReceive(…$levels)`）→ 组合根注入的
+/// `@Environment(MacSpectrumAnalyzer.self)`。⚠️ `levels` 必须在 **body 求值期**读
+/// （下面那行局部 `let`）——不能只在 `Canvas` 渲染闭包里读：渲染闭包不在 body 求值
+/// 范围内，读 `@Observable` 属性**不会登记依赖**，数据到达就不触发重绘。
 struct MacVisualizerView: View {
-    /// 是否正在输出频谱数据（播放中 native 引擎曲目）
-    @State private var isActive = false
-    /// 当前频谱数据（~30fps 发布；作为绘制输入，数据驱动重绘）
-    @State private var levels: [Float] = []
+    /// 频谱分析器（Mac 组合根注入；按属性追踪驱动重绘）
+    @Environment(MacSpectrumAnalyzer.self) private var analyzer
     /// 当前强调色（唯一读取入口 MacAppearance.currentAccentColor；设置页改动经
     /// qqplayerSettingsDidChange 刷新）
     @State private var accentColor: Color = MacAppearance.currentAccentColor
 
     var body: some View {
         Group {
-            if isActive {
+            if analyzer.isActive {
+                let levels = analyzer.levels
                 Canvas { context, size in
-                    drawBars(in: &context, size: size)
+                    drawBars(levels: levels, in: &context, size: size)
                 }
             }
-        }
-        .onReceive(MacSpectrumAnalyzer.shared.$isActive) { isActive = $0 }
-        .onReceive(MacSpectrumAnalyzer.shared.$levels) { levels = $0 }
-        .onAppear {
-            isActive = MacSpectrumAnalyzer.shared.isActive
-            levels = MacSpectrumAnalyzer.shared.levels
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             accentColor = MacAppearance.currentAccentColor
         }
     }
 
-    private func drawBars(in context: inout GraphicsContext, size: CGSize) {
+    private func drawBars(levels: [Float], in context: inout GraphicsContext, size: CGSize) {
         guard !levels.isEmpty, size.width > 0, size.height > 0 else { return }
 
         let spacing: CGFloat = 2
