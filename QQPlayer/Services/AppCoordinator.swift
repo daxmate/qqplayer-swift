@@ -107,7 +107,7 @@ class AppCoordinator: ObservableObject {
     }
 
     private func setupBindings() {
-        libraryIndexer.$isIndexing
+        libraryIndexer.isIndexingPublisher
             .sink { [weak self] isIndexing in
                 if !isIndexing {
                     Task { @MainActor in

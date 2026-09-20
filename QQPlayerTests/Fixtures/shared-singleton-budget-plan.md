@@ -106,7 +106,8 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 5b-2（2026-09-20） | `EQManager`（`ObservableObject` → `@Observable`，10 处 / 8 文件 / 9 个 struct） | 直连棘轮 128 → **118**（真迁 10 处，0 preview 成本）；迁移棘轮 180/96 → **164/86** | iOS 全量 1679/211 + Mac 零警告 + 预算/print 双绿 + target 门禁 + `EQManager.swift` 行数净零 |
 | 批 5b-3（2026-09-20） | `SFBAudioEngineManager`（`ObservableObject` → `@Observable`；**视图侧已由 PR #18 收口，本批只动本体**） | 直连棘轮 **116 → 116（不动）**；迁移棘轮 164/86 → **159/84** | iOS 全量 1684/212 + Mac 零警告 + 预算双绿（22423/1379）+ target 门禁 |
 | **批 6-0（2026-09-20）** | **口径补齐 + 8 处显形债**（无新对象迁移；`CarPlayTrackFilter` / `IntentArtworkService` 两个唯一入口） | 直连棘轮 118 →（口径）**126** →（清 8 处）**116**。逐项：`WhatsNewStore`×3 → `AppServices.whatsNew`；`DatabaseManager.shared`×1 → `LibraryReads.allTracks()`；CarPlay 格式过滤 5 文件判据收口 → `CarPlayTrackFilter`（真迁 5 处）；意图封面 ×1 → `IntentArtworkService`；残留 2 处＝`LibraryIndexer.shared`（批 6 热点）+ `#Preview` 装配（脚手架） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
-| **批 6-1（2026-09-20，本批）** | `MacSpectrumAnalyzer`（`ObservableObject` → `@Observable`；5 处 / 2 文件；Mac 专属频谱分析器） | 直连棘轮 **116 → 111**（真迁 5 处，0 preview 成本：`MacVisualizerView` 4 → 归零删行、`MacPlayerView` 12 → 11）；迁移棘轮 159/84 → **155/81**（删 1 `ObservableObject` + 2 `@Published` + 1 `@StateObject`） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + `MacPlayerView.swift` 行数净零（617） |
+| 批 6-1（2026-09-20） | `MacSpectrumAnalyzer`（`ObservableObject` → `@Observable`；5 处 / 2 文件；Mac 专属频谱分析器） | 直连棘轮 **116 → 111**（真迁 5 处，0 preview 成本：`MacVisualizerView` 4 → 归零删行、`MacPlayerView` 12 → 11）；迁移棘轮 159/84 → **155/81**（删 1 `ObservableObject` + 2 `@Published` + 1 `@StateObject`） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + `MacPlayerView.swift` 行数净零（617） |
+| **批 6-2（2026-09-20，本批）** | `LibraryIndexer`（`ObservableObject` → `@Observable`；曲库索引状态源，ios+mac 共享；真迁 4 处 / 3 文件 + **订阅机制重做**） | 直连棘轮 **111 → 107**（真迁 4 处，0 preview 成本：`ContentView` 2 → 1、`MacLibraryView` 4 → 3、`MacTagEditorView` 4 → 3、`LibraryView` 1 → 归零删行）；迁移棘轮 155/81 → **145/77**（删 1 `ObservableObject` + 6 `@Published` + 3 处视图 `@StateObject` 归零，`MacLibraryView` 该行 3 → 2） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -305,6 +306,41 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 - **基线**：迁移 164/86 → 159/84（删 1 个 `ObservableObject` + 4 个 `@Published`）；**直连基线不动**（本批不涉及视图层）。
 - **本批 0 处 preview 成本**：2 个文件（对象本体 + 基线）均无 `#Preview`。
 
+### 批 6-2：`LibraryIndexer` 迁 `@Observable` —— 实测完成（2026-09-20）
+
+批 6 的第一个热点（原计划排 6-2；6-1 先做了 `MacSpectrumAnalyzer` 探路）。挑 `LibraryIndexer` 的代价不在视图层，
+在**订阅机制**：它的状态挂在「changeLog 同步前置门」上，4 个非视图消费者直接吃 Combine publisher。
+
+- **改动主体（`Services/LibraryIndexer.swift`）**：`ObservableObject` → `@Observable`；6 个 `@Published` 全部摘掉。
+- **本批真正的机制（唯一有风险的处）**：`@Published` 的合成 publisher **订阅即送当前值**（当前值语义），
+  而 `@Observable` 不合成 publisher ⇒ 若只是把 `$isIndexing` 换成别的，`IndexingGate.waitUntilIdle` /
+  `SyncHostCenter` / `MacLyricsResendAutoRunner` / `AppCoordinator` / `SpotlightLibraryIndexer` 这些消费者
+  会**静默失去事件**（编译还过、测试可能还绿，只有真机行为变）。做法：
+  - 新增 `isIndexingSubject` / `terminalStateSubject`（均为 `CurrentValueSubject`），**订阅即得当前值**，语义与迁移前等价；
+  - **状态写入唯一入口**：`markScanStarted()` / `markScanEnded()` / `markMainScanCompletedThisLaunch()` 三个 mutator
+    负责「改状态 + 发信号」同源（2026-09-15 形状纪律：状态与信号必须同源，不靠人记得）；
+  - `isIndexing` / `hasCompletedScanThisLaunch` 收成 `private(set)`，跨文件写入口只在 mutator 里
+    ⇒ **编译期**拦死「直接赋值、绕过信号」这条老路；
+  - `indexingProgress` / `tracksFound` / `currentlyProcessing` / `queuedFiles` 迁为被追踪的普通存储属性（视图按属性追踪读，无信号需求）；
+  - `IndexingGate.swift` 里原本承载 `= $isIndexing.eraseToAnyPublisher()` 的 `extension LibraryIndexer: IndexingStateProviding`
+    整块搬回 `LibraryIndexer.swift`（conformance 与唯一写入入口同文件），`IndexingGate.swift` 只留协议与判定 —— **判定不复述**。
+  - **唯一非等价细节（更正确）**：`@Published` 在 **willSet** 就发（值还没落盘），现在是赋值后再发 ⇒ 订阅方读到的是**新值**，
+    消掉了「收到 `false` 但属性仍是 `true`」的窗口。
+- **视图层（4 处）**：`ContentView` / `LibraryView` / `MacLibraryView` / `MacTagEditorView` 各 1 处直连 → `@Environment(LibraryIndexer.self)`；
+  `MacLibraryView` 原来的 `.onReceive(indexer.$isIndexing)` / `.onReceive(indexer.$tracksFound)` → `.onChange(of:)`（按属性追踪）。
+- **装配点**：iOS 组合根 `QQPlayerApp` 的 `WindowGroup` 根 1 行 + Mac 组合根 `QQPlayerMacApp` 的**两个**场景根各 1 行
+  （`Settings` 是独立场景，不继承主窗环境——批 3a 结论）。非视图层文件，不计预算。
+- **基线**：直连 111 → **107**；迁移 155/81 → **145/77**（一批同动两条棘轮，属预期）。
+- **本批 0 处 preview 成本**：4 个视图文件中唯一带 `#Preview` 的是 `ContentView`，其 preview 装配的是 `AppCoordinator.shared`
+  （批 6-0 起就记在预算里），本批未新增 preview 注入。
+- **账外发现（本批未处理）**：`QQPlayer/Services/IOSPassiveSyncCenter.swift:435` 的默认参数
+  `indexingState: IndexingStateProviding = LibraryIndexer.shared` 仍是单例直连（服务文件，不在视图棘轮口径内），
+  与 `AppCoordinator:25` 的 `let libraryIndexer = LibraryIndexer.shared` 同类 —— 属「非视图层单例直连」这条更大的欠账，
+  棘轮目前不覆盖（`AppCoordinator` / `PlayerEngine` / `ArtworkManager` / `KaraokeController` 四个热点同理）。
+
+- **下一步（批 6-3）**：`SyncHostCenter` / `SyncWiringFactsStore` 两个延后项，之后进批 6+ 四个热点
+  （`AppCoordinator` / `PlayerEngine` / `KaraokeController` / `ArtworkManager`，−87 处）。
+
 ### 批 6+：四个热点（最后）
 `AppCoordinator`（17）、`PlayerEngine`（24）、`KaraokeController`（23）、`ArtworkManager`（23）。
 - 前置：先补齐"组合根 + 环境注入"在 **CarPlay 场景 / 锁屏与控制中心 / Widget 扩展** 三条
@@ -378,6 +414,8 @@ Mac 专属实时频谱分析器（77 行，`QQPlayer/Mac/`，仅 `QQPlayerMac` t
 - **下一步（批 6-2）**：`LibraryIndexer`（先改订阅机制：`$isIndexing` 3 个消费者 + `indexingTerminalStatePublisher`
   2 个消费者 + `IndexingStateProviding` 协议本身 + `IndexingGate.waitUntilIdle` 的 `.first(where:)`），再 `SyncHostCenter` /
   `SyncWiringFactsStore` 两个延后项。
+  ✅ **已完成（2026-09-20，见下节「批 6-2」）**：订阅机制改走 `CurrentValueSubject` 唯一入口，4 处视图直连收口。
+- **下一步（批 6-3）**：`SyncHostCenter` / `SyncWiringFactsStore` 两个延后项。
 
 
 ---

@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @Environment(AppServices.self) private var services
-    @StateObject private var libraryIndexer = LibraryIndexer.shared
+    @Environment(LibraryIndexer.self) private var libraryIndexer
 
     @State private var tracks: [Track] = []
     @State private var selectedTab = 0

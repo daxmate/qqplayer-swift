@@ -69,6 +69,8 @@ struct QQPlayerMacApp: App {
                 .environment(EQManager.shared)
                 // 频谱分析器（批 6-1）：播放页视觉条按属性追踪驱动重绘
                 .environment(MacSpectrumAnalyzer.shared)
+                // 曲库索引器（批 6-2）：MacLibraryView 读 isIndexing/tracksFound 按属性追踪
+                .environment(LibraryIndexer.shared)
                 // App 级无状态入口容器（批 3b・方案 A）：WhatsNewStore / StateManager / MacFolderMonitor
                 .environment(AppServices.live)
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
@@ -89,6 +91,7 @@ struct QQPlayerMacApp: App {
                 .environment(DesktopWindowsManager.shared)
                 .environment(EQManager.shared)
                 .environment(MacSpectrumAnalyzer.shared)
+                .environment(LibraryIndexer.shared)
                 .environment(AppServices.live)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）

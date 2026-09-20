@@ -29,7 +29,7 @@ struct LibraryView: View {
     let onRefresh: () async -> (before: Int, after: Int)
     let onManualSync: (() async -> (before: Int, after: Int))?
     @EnvironmentObject private var appCoordinator: AppCoordinator
-    @StateObject private var libraryIndexer = LibraryIndexer.shared
+    @Environment(LibraryIndexer.self) private var libraryIndexer
     @State private var artistToNavigate: Artist?
     @State private var artistAllTracks: [Track] = []
     @State private var albumToNavigate: Album?

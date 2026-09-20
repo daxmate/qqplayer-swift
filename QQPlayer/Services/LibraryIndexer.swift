@@ -12,17 +12,22 @@ import Combine
 import CryptoKit
 import Foundation
 import GRDB
+import Observation
 import SFBAudioEngine
 
 @MainActor
-class LibraryIndexer: NSObject, ObservableObject {
+@Observable
+class LibraryIndexer: NSObject, IndexingStateProviding {
     static let shared = LibraryIndexer()
 
-    @Published var isIndexing = false
-    @Published var indexingProgress: Double = 0.0
-    @Published var tracksFound = 0
-    @Published var currentlyProcessing: String = ""
-    @Published var queuedFiles: [String] = []
+    /// 索引是否在跑。**写入唯一入口** = `markScanStarted()` / `markScanEnded()`。
+    /// `private(set)`：编译期拦死「直接赋值、绕过信号」（状态与信号必须同源）。
+    private(set) var isIndexing = false
+    /// 进度展示态：视图按属性追踪读，无信号需求。
+    var indexingProgress: Double = 0.0
+    var tracksFound = 0
+    var currentlyProcessing: String = ""
+    var queuedFiles: [String] = []
     private var hasPendingLibraryRefresh = false
     /// Bumped by stop(), so work deferred by an in-flight start() can tell that
     /// it belongs to a run that has since been cancelled.
@@ -35,9 +40,8 @@ class LibraryIndexer: NSObject, ObservableObject {
 
     // MARK: - 曲库索引终态（changeLog 同步前置门的事实位）
 
-    /// **本启动**内一次完整主扫（含空库）是否已跑完。
-    /// 分片：跨文件可见（原 private(set)）
-    @Published var hasCompletedScanThisLaunch = false
+    /// **本启动**内一次完整主扫（含空库）是否已跑完。写入唯一入口 = `markMainScanCompletedThisLaunch()`。
+    private(set) var hasCompletedScanThisLaunch = false
 
     #if os(macOS)
         /// 云端（dataless）文件下载完成后自动补扫入列：60s 后重扫一轮，最多 5 轮。
@@ -46,6 +50,36 @@ class LibraryIndexer: NSObject, ObservableObject {
         /// 分片：跨文件可见（原 private）
         var macRescanRounds = 0
     #endif
+
+    // MARK: - 状态写入唯一入口（状态与信号同源）
+
+    /// 两个信号都只由下面三个 mutator 写入（别处没有写入口）。
+    /// 必须是 `CurrentValueSubject`（**订阅即送当前值**，原 `@Published` 语义）：
+    /// `IndexingGate` / `SyncHostCenter` 等订阅方依赖它，换 `PassthroughSubject` 会静默丢事件。
+    private let isIndexingSubject: CurrentValueSubject<Bool, Never>
+    /// 终态 latch 的变化信号（与上一个同入口，只是载荷语义不同）。
+    private let terminalStateSubject: CurrentValueSubject<Bool, Never>
+
+    /// 开一轮扫描：**唯一**把 `isIndexing` 置 true 的入口（进度字段一并重置）。
+    func markScanStarted() {
+        isIndexing = true
+        indexingProgress = 0.0
+        tracksFound = 0
+        isIndexingSubject.send(true)
+    }
+
+    /// 结束一轮扫描：**唯一**把 `isIndexing` 置 false 的入口（正常结束 / 取消 / 失败同此）。
+    func markScanEnded() {
+        isIndexing = false
+        isIndexingSubject.send(false)
+    }
+
+    /// 本启动主扫跑完：**唯一**把终态 latch 置 true 的入口。
+    func markMainScanCompletedThisLaunch() {
+        guard !hasCompletedScanThisLaunch else { return }
+        hasCompletedScanThisLaunch = true
+        terminalStateSubject.send(true)
+    }
 
     /// 曲库索引是否已到达终态（= 曲库行已由一次完整主扫建立）。
     ///
@@ -60,10 +94,14 @@ class LibraryIndexer: NSObject, ObservableObject {
         return libraryHasIndexedRows()
     }
 
-    /// 终态事实**变化**信号（不携带值）：订阅方收到后重新走 `IndexingGate` 的唯一判定
-    /// （本文件不复述判定，只报“变了”）。
+    /// 终态事实**变化**信号（不携带值）：订阅方收到后重走 `IndexingGate` 的唯一判定（此处不复述）。
     var indexingTerminalStatePublisher: AnyPublisher<Void, Never> {
-        $hasCompletedScanThisLaunch.map { _ in () }.eraseToAnyPublisher()
+        terminalStateSubject.map { _ in () }.eraseToAnyPublisher()
+    }
+
+    /// `isIndexing` 的同源变化信号。
+    var isIndexingPublisher: AnyPublisher<Bool, Never> {
+        isIndexingSubject.eraseToAnyPublisher()
     }
 
     /// `track` 表是否已有行。读失败按 false（fail-closed，宁可不放行）。
@@ -83,6 +121,8 @@ class LibraryIndexer: NSObject, ObservableObject {
     /// 生产恒走默认值 `.shared`，与 `DatabaseManager.init(dbWriter:)` 同一套路。
     init(databaseManager: DatabaseManager = .shared) {
         self.databaseManager = databaseManager
+        self.isIndexingSubject = CurrentValueSubject(false)
+        self.terminalStateSubject = CurrentValueSubject(false)
         super.init()
     }
 
@@ -97,9 +137,7 @@ class LibraryIndexer: NSObject, ObservableObject {
         #else
             // iOS 数据源：FileManager 扫描沙盒 Documents（M3-2 切主扫，退役
             // NSMetadataQuery/iCloud ubiquity 路径）。启动全扫 + 手动刷新。
-            isIndexing = true
-            indexingProgress = 0.0
-            tracksFound = 0
+            markScanStarted()
 
             let generation = indexingGeneration
 
@@ -129,9 +167,7 @@ class LibraryIndexer: NSObject, ObservableObject {
     func startOfflineMode() {
         guard !isIndexing else { return }
 
-        isIndexing = true
-        indexingProgress = 0.0
-        tracksFound = 0
+        markScanStarted()
 
         let generation = indexingGeneration
         activeScanTask = Task {
@@ -141,7 +177,7 @@ class LibraryIndexer: NSObject, ObservableObject {
 
     func stop() {
         indexingGeneration &+= 1
-        isIndexing = false
+        markScanEnded()
         // 取消在途扫描：generation 只让任务组内的 guard 提前 return，任务组仍会
         // 等已入队文件跑完（审计 🔵-9）；cancel 让取消向子任务传播，配合扫描内
         // 的 Task.isCancelled 检查快速退出。

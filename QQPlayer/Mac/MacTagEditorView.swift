@@ -40,6 +40,7 @@ struct MacTagEditorView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @Environment(\.dismiss) private var dismiss
+    @Environment(LibraryIndexer.self) private var libraryIndexer
 
     /// 编辑目标（右键的那首歌；值拷贝，保存期间不依赖外部变化）
     let track: Track
@@ -744,14 +745,13 @@ struct MacTagEditorView: View {
         if renamed, let migrated {
             followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: migrated)
         }
-        // 单文件入库同步：保存只改了文件，DB 里的 title/artist/album/genre/year 与
-        // 封面缓存仍是旧值 → 列表不刷新（旧实现只发 LibraryFolderContentChanged，
-        // 要等整库重扫扫到这首歌才更新，歌单/自动歌单详情容器还不监听）。
+        // 单文件入库同步：保存只改了文件，DB 里的标签与封面缓存仍是旧值 → 列表不刷新
+        // （旧实现只发 LibraryFolderContentChanged，要等整库重扫扫到这首歌才更新）。
         // 这里直接对该文件跑一次 indexer 单文件处理：解析 → upsert DB →
         // forceRefreshArtwork（封面缓存）→ 完成后内部 post LibraryNeedsRefresh，
         // 所有列表容器（主库/歌单详情/自动歌单/专辑卡）立即重拉新值。
         Task {
-            _ = await LibraryIndexer.shared.processExternalFile(URL(fileURLWithPath: finalPath))
+            _ = await libraryIndexer.processExternalFile(URL(fileURLWithPath: finalPath))
             // DB 已同步到最新标签 → 把播放上下文（当前曲目/队列）替换成 DB 新行，
             // 未改名时播放页标题/歌手也立即跟随（改名场景已在上面用 migrated 处理，
             // 此处按 oldStableId 匹配为幂等 no-op）

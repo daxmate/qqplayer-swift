@@ -30,7 +30,7 @@
         /// Call once, after AppCoordinator has initialized the database.
         func activate() {
             guard indexingObserver == nil else { return }
-            indexingObserver = LibraryIndexer.shared.$isIndexing
+            indexingObserver = LibraryIndexer.shared.isIndexingPublisher
                 .removeDuplicates()
                 .dropFirst()
                 .filter { !$0 }

@@ -42,7 +42,7 @@ struct MacLibraryView: View {
     /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；替代已失效的私有 selector）。
     @Environment(\.openSettings) private var openSettings
     @StateObject private var player = PlayerEngine.shared
-    @StateObject private var indexer = LibraryIndexer.shared
+    @Environment(LibraryIndexer.self) private var indexer
     @StateObject private var progress = PlayerEngine.shared.progress
     /// search anything 开关（⌘K 命令；2026-09-19 批 3a 起由 Mac 组合根注入，读 `isOpen` 按属性追踪）
     @Environment(MacSearchAnythingState.self) private var searchAnythingState
@@ -225,7 +225,7 @@ struct MacLibraryView: View {
                 indexer.start()
             }
         }
-        .onReceive(indexer.$isIndexing) { isIndexing in
+        .onChange(of: indexer.isIndexing) { _, isIndexing in
             if !isIndexing {
                 reloadLibrary()
                 if !debouncedSearchText.isEmpty {
@@ -238,7 +238,7 @@ struct MacLibraryView: View {
                 }
             }
         }
-        .onReceive(indexer.$tracksFound) { _ in
+        .onChange(of: indexer.tracksFound) { _, _ in
             // 索引中增量刷新：新解析完成的歌陆续出现在列表，不让用户干等
             // （防抖 1.5s，避免每首歌都全量 reload）
             libraryRefreshTask?.cancel()

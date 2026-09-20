@@ -36,11 +36,19 @@
 #     1 处 `@StateObject`（`MacPlayerView` → `@Environment(MacSpectrumAnalyzer.self)`）。
 #     重绘驱动不变：body 读 `isActive` / `levels`（原 `.onReceive` 订阅 → 现按属性追踪）；
 #     ⚠️ `levels` 必须在 body 求值期取局部量再交给 `Canvas` 渲染闭包（渲染闭包不登记依赖）。）
+#   → **145 / 77**（2026-09-20 批 6-2：`LibraryIndexer` 迁 @Observable（曲库索引状态源，ios+mac 共享）。
+#     同步删除：1 个 `ObservableObject` + 6 个 `@Published`（`isIndexing` / `hasCompletedScanThisLaunch`
+#     迁为 `private(set)` 且写入收口到 mutator；`indexingProgress` / `tracksFound` / `currentlyProcessing` /
+#     `queuedFiles` 迁为被追踪的普通存储属性）、视图侧 3 处 `@StateObject` 改 `@Environment`
+#     （`ContentView` / `LibraryView` 该行归零删行；`MacLibraryView` 该行 3 → 2）。
+#     ⚠️ 本批真正的机制改动：`@Published` 的 publisher **订阅即送当前值**，迁 @Observable 后原 4 个消费者
+#     （`IndexingGate` / `SyncHostCenter` / `MacLyricsResendAutoRunner` / `AppCoordinator` /
+#     `SpotlightLibraryIndexer`）会**静默失去事件** ⇒ 新增 `isIndexingSubject` / `terminalStateSubject`
+#     （`CurrentValueSubject`）作为状态写入唯一入口，保住「订阅即得当前值」语义。）
 QQPlayer/ContentView.swift	@EnvironmentObject	1
-QQPlayer/ContentView.swift	@StateObject	1
 QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	3
 QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	3
-QQPlayer/Mac/MacLibraryView.swift	@StateObject	3
+QQPlayer/Mac/MacLibraryView.swift	@StateObject	2
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
 QQPlayer/Mac/MacLyricsView.swift	@ObservedObject	1
@@ -68,8 +76,6 @@ QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
 QQPlayer/Services/KaraokeController.swift	@Published	4
 QQPlayer/Services/KaraokeController.swift	ObservableObject	1
-QQPlayer/Services/LibraryIndexer.swift	@Published	6
-QQPlayer/Services/LibraryIndexer.swift	ObservableObject	1
 QQPlayer/Services/PlaybackModels.swift	@Published	1
 QQPlayer/Services/PlaybackModels.swift	ObservableObject	1
 QQPlayer/Services/PlayerEngine.swift	@Published	10
@@ -84,7 +90,6 @@ QQPlayer/Views/Artists/ArtistsScreen.swift	@EnvironmentObject	1
 QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	@EnvironmentObject	1
 QQPlayer/Views/Library/LibraryScreens.swift	@EnvironmentObject	2
 QQPlayer/Views/Library/LibraryView.swift	@EnvironmentObject	1
-QQPlayer/Views/Library/LibraryView.swift	@StateObject	1
 QQPlayer/Views/Library/SearchResultsViews.swift	@EnvironmentObject	1
 QQPlayer/Views/Library/SearchResultsViews.swift	@StateObject	1
 QQPlayer/Views/Library/SearchView.swift	@EnvironmentObject	1

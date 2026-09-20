@@ -158,9 +158,9 @@ extension LibraryIndexer {
             postPendingLibraryRefresh()
 
             await MainActor.run {
-                isIndexing = false
+                markScanEnded()
                 // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
-                hasCompletedScanThisLaunch = true
+                markMainScanCompletedThisLaunch()
                 print("✅ iOS library scan completed. Found \(tracksFound) tracks.")
             }
 
@@ -168,7 +168,7 @@ extension LibraryIndexer {
             await processFolderPlaylists(allMusicFiles: musicFiles)
         } catch {
             await MainActor.run {
-                isIndexing = false
+                markScanEnded()
                 print("Offline library scan failed: \(error)")
             }
         }
@@ -186,9 +186,7 @@ extension LibraryIndexer {
             // scanMusicFolder 首行的 guard（否则扫描被直接拦截、永远不会执行）。
             guard MacIndexingGate.shouldBeginScan(currentlyIndexing: isIndexing) else { return }
 
-            isIndexing = true
-            indexingProgress = 0.0
-            tracksFound = 0
+            markScanStarted()
 
             let generation = indexingGeneration
             activeScanTask = Task {
@@ -250,7 +248,7 @@ extension LibraryIndexer {
                 guard !musicFiles.isEmpty else {
                     // 全为云端未下载：不 reconcile（避免误删本地入列曲目）
                     guard generation == indexingGeneration else { return }
-                    isIndexing = false
+                    markScanEnded()
                     print("❌ All \(skippedDataless) files are dataless; nothing to index this round")
                     autoscheduleRescan(skippedDataless: skippedDataless)
                     return
@@ -308,9 +306,9 @@ extension LibraryIndexer {
                 await FileCleanupManager.shared.reconcileMissingFiles(in: folders)
                 postPendingLibraryRefresh()
 
-                isIndexing = false
+                markScanEnded()
                 // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
-                hasCompletedScanThisLaunch = true
+                markMainScanCompletedThisLaunch()
                 print("✅ macOS scan completed. Found \(tracksFound) tracks.")
                 MacScanLogger.log("scan completed, tracksFound: \(tracksFound), skippedDataless: \(skippedDataless)")
 
@@ -321,7 +319,7 @@ extension LibraryIndexer {
             } catch {
                 print("❌ macOS scan failed: \(error)")
                 MacScanLogger.log("scan failed: \(error)")
-                isIndexing = false
+                markScanEnded()
             }
         }
     #endif

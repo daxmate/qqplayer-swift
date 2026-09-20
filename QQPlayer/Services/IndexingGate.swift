@@ -26,8 +26,9 @@
 import Combine
 import Foundation
 
-/// 索引状态来源。生产实现是 `LibraryIndexer`；测试注入假实现，
-/// 避免测试触碰 DatabaseManager 单例。
+/// 生产实现 = `LibraryIndexer`（conformance 声明与唯一写入入口都在
+/// `Services/LibraryIndexer.swift`，本文件只留协议与判定——判定不许复述）。
+/// 测试注入假实现，避免测试触碰 DatabaseManager 单例。
 @MainActor
 protocol IndexingStateProviding: AnyObject {
     var isIndexing: Bool { get }
@@ -40,12 +41,6 @@ protocol IndexingStateProviding: AnyObject {
     /// 为什么是信号而不是值：事实由多个来源合成（本启动 latch + 曲库已有行），
     /// 在这里只声明「变了」，判定只有一处（不在这里复述）。
     var indexingTerminalStatePublisher: AnyPublisher<Void, Never> { get }
-}
-
-extension LibraryIndexer: IndexingStateProviding {
-    var isIndexingPublisher: AnyPublisher<Bool, Never> {
-        $isIndexing.eraseToAnyPublisher()
-    }
 }
 
 /// 等待索引结束的时长策略（纯逻辑，可单测）。

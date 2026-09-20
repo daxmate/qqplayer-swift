@@ -21,9 +21,22 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 111
+# TOTAL: 107
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
+# ═══ 2026-09-20 批 6-2：LibraryIndexer 迁 @Observable（真迁 4 处，111 → 107）════════════════
+#   · ContentView 2 → 1：`@StateObject … = LibraryIndexer.shared` → `@Environment(LibraryIndexer.self)`
+#     （残余 1 处 = `#Preview` 里的 `AppCoordinator.shared`，脚手架成本）；
+#   · MacLibraryView 4 → 3：同款 `@StateObject` → `@Environment`（读 `isIndexing`/`tracksFound` 改 `onChange`）；
+#   · MacTagEditorView 4 → 3：`LibraryIndexer.shared.processExternalFile(…)` → 环境实例方法调用；
+#   · LibraryView 1 → 归零删行：同款 `@StateObject` → `@Environment`；
+#   · 装配点：iOS 组合根 `QQPlayerApp` 的 `WindowGroup` 根 + Mac 组合根 `QQPlayerMacApp` 的两个场景根。
+#   · **本批最大的坑不在视图层，在订阅机制**：`@Published` 的 publisher 会「订阅即送当前值」，
+#     直接换成 `@Observable` 后原有 4 个消费者（`IndexingGate` / `SyncHostCenter` /
+#     `MacLyricsResendAutoRunner` / `AppCoordinator` / `SpotlightLibraryIndexer`）会静默失去事件 ⇒
+#     本批先立 `isIndexingSubject` / `terminalStateSubject` 两个 `CurrentValueSubject` 作为**状态写入唯一入口**
+#     （`markScanStarted()` / `markScanEnded()` / `markMainScanCompletedThisLaunch()`），
+#     并把 `isIndexing` / `hasCompletedScanThisLaunch` 收成 `private(set)` —— 编译期拦死「直接赋值、绕过信号」。
 # ═══ 2026-09-20 批 6-1：MacSpectrumAnalyzer 迁 @Observable（真迁 5 处，116 → 111）════════════════
 #   · MacVisualizerView 4 → 归零删行：`.onReceive(analyzer.$isActive/$levels)` + `.onAppear` 直读
 #     → `@Environment(MacSpectrumAnalyzer.self)`，body 读属性（按属性追踪驱动重绘）；
@@ -87,12 +100,12 @@ QQPlayer/Mac/MacKaraokeControlBar.swift	5
 QQPlayer/Views/Library/SearchResultsViews.swift	5
 QQPlayer/Views/Player/KaraokeControlBar.swift	5
 QQPlayer/Views/Player/PlayerOverlays.swift	5
-QQPlayer/Mac/MacLibraryView.swift	4
-QQPlayer/Mac/MacTagEditorView.swift	4
 QQPlayer/Views/Utility/SettingsView.swift	4
 QQPlayer/Mac/MacDesktopWindowViews.swift	3
+QQPlayer/Mac/MacLibraryView.swift	3
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
 QQPlayer/Mac/MacSyncView.swift	3
+QQPlayer/Mac/MacTagEditorView.swift	3
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	3
 QQPlayer/Views/Player/QueueManagementView.swift	3
@@ -100,17 +113,16 @@ QQPlayer/Views/Playlists/PlaylistCardView.swift	3
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	3
 QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	3
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
-QQPlayer/ContentView.swift	2
 QQPlayer/Mac/MacArtworkThumbnail.swift	2
 QQPlayer/Mac/MacLyricsView.swift	2
 QQPlayer/Views/Albums/AlbumViews.swift	2
 QQPlayer/Views/Artists/ArtistRowViews.swift	2
 QQPlayer/Views/Library/TrackListView.swift	2
+QQPlayer/ContentView.swift	1
 QQPlayer/Mac/MacAlbumArtistViews.swift	1
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSmartPlaylistViews.swift	1
 QQPlayer/Mac/MacSyncCenterView.swift	1
-QQPlayer/Views/Library/LibraryView.swift	1
 QQPlayer/Views/Player/CollapsiblePlayerControls.swift	1
 QQPlayer/Views/Player/PlayerProgressViews.swift	1
 QQPlayer/Views/Player/TrackRowView.swift	1
