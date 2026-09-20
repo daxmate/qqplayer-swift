@@ -4,7 +4,7 @@ import SwiftUI
 
 struct GraphicEQImportView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var eqManager = EQManager.shared
+    @Environment(EQManager.self) private var eqManager
 
     @State private var showingDocumentPicker = false
     @State private var presetName = ""

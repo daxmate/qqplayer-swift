@@ -25,18 +25,16 @@
 # 格式：路径<TAB>标记<TAB>计数
 #   → **180 / 96**（2026-09-20 批 5b：DesktopWindowsManager 迁 @Observable + 浮窗视图改 `@Environment`。
 #     同步删除：1 个 `ObservableObject` + 2 个 `@Published`，视图 1 处 `@ObservedObject` 降为 3）
+#   → **164 / 86**（2026-09-20 批 5b-2：EQManager 迁 @Observable + 8 个视图文件 10 处 `@StateObject` 改 `@Environment`。
+#     同步删除：1 个 `ObservableObject` + 5 个 `@Published`、10 处 `@StateObject`）
 QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/ContentView.swift	@StateObject	1
 QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	3
-QQPlayer/Mac/MacEQImportView.swift	@StateObject	1
-QQPlayer/Mac/MacEQSettingsView.swift	@StateObject	1
-QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	@StateObject	1
 QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	3
 QQPlayer/Mac/MacLibraryView.swift	@StateObject	3
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
 QQPlayer/Mac/MacLyricsView.swift	@ObservedObject	1
-QQPlayer/Mac/MacManualEQEditorView.swift	@StateObject	2
 QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	3
 QQPlayer/Mac/MacPlayerView.swift	@StateObject	1
 QQPlayer/Mac/MacPlaylistDetailSheet.swift	@StateObject	1
@@ -60,8 +58,6 @@ QQPlayer/Services/AppCoordinator.swift	@Published	1
 QQPlayer/Services/AppCoordinator.swift	ObservableObject	1
 QQPlayer/Services/ArtworkManager.swift	ObservableObject	1
 QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
-QQPlayer/Services/EQManager.swift	@Published	5
-QQPlayer/Services/EQManager.swift	ObservableObject	1
 QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
 QQPlayer/Services/KaraokeController.swift	@Published	4
@@ -111,10 +107,6 @@ QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	2
 QQPlayer/Views/Playlists/PlaylistsScreen.swift	@EnvironmentObject	2
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	@StateObject	1
 QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	@EnvironmentObject	2
-QQPlayer/Views/Utility/EQImportViews.swift	@StateObject	1
-QQPlayer/Views/Utility/EQSettingsView.swift	@StateObject	1
-QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	@StateObject	1
-QQPlayer/Views/Utility/ManualEQEditorView.swift	@StateObject	2
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
