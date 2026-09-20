@@ -57,31 +57,31 @@
 #     `KaraokeControlBar` / `LyricsView`）。
 #     注：本对象**无任何跳文件订阅**（0 `objectWillChange` / 0 `$` 投影）⇒ 无 6-2 那种「订阅静默失效」风险。
 #     （注：6-5 / 6-6 两批未在本头部追加进度行，本行数字为对当前实测基线的收口值。）
+#   → **45 / 16**（2026-09-20 批 6-8：`SyncHostCenter` / `SyncWiringFactsStore`（`SyncWiringSelfCheck.swift`）/
+#     `MacLyricsResendFactsStore`（`MacLyricsResendAutoRunner.swift`）三类型迁 @Observable。
+#     同步删除 9 行陈旧名单：3 个 `ObservableObject` + 5 个 `@Published`（`SyncHostCenter` 5 →
+#     `private(set) var` + 1 `ObservableObject`；`SyncWiringFactsStore` / `MacLyricsResendFactsStore` 各 1+1）
+#     + 视图侧 5 处 `@ObservedObject`（`MacSyncCenterView` 1 / `MacSyncView` 3 / `SyncSettingsView` 1，
+#     均改 `@Environment(T.self)` 并归零删行）。
+#     注：本批 `MacSyncView` 的 3 个 `@StateObject`（三个 view model）**未动**，故该行保留。
+#     ⚠️ 同批的「视图层直连单例」棘轮**反向抬升**（24 → 30，新增 `#Preview` 装配行），本文件只收紧、
+#     不含直连口径，故此处不受影响（直连基线停在批 6-7 的实测值，等发起方拍板）。
 
 
 
-QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
-QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
-QQPlayer/Mac/MacSyncCenterView.swift	@ObservedObject	1
 QQPlayer/Mac/MacSyncContentModel.swift	@Published	14
 QQPlayer/Mac/MacSyncContentModel.swift	ObservableObject	1
 QQPlayer/Mac/MacSyncDataViewModel.swift	@Published	5
 QQPlayer/Mac/MacSyncDataViewModel.swift	ObservableObject	1
 QQPlayer/Mac/MacSyncRunViewModel.swift	@Published	8
 QQPlayer/Mac/MacSyncRunViewModel.swift	ObservableObject	1
-QQPlayer/Mac/MacSyncView.swift	@ObservedObject	3
 QQPlayer/Mac/MacSyncView.swift	@StateObject	3
-QQPlayer/Mac/SyncHostCenter.swift	@Published	5
-QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
 QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
 QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
 QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
-QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
-QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@StateObject	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	ObservableObject	1
-QQPlayer/Views/Utility/SyncSettingsView.swift	@ObservedObject	1
