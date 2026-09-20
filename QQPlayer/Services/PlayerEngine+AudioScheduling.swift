@@ -177,12 +177,58 @@
             print("✅ Gapless next track scheduled: \(nextTrack.title)")
         }
 
-        private func promoteGaplessNextIfAvailable() -> Bool {
+        /// 播放顺序 / 队列成员变化后作废「已预载（可能已排入 playerNode）的无缝下一首」的唯一入口。
+        ///
+        /// 为什么要重排当前曲目（而非只清状态）：`scheduleGaplessNextIfPossible()` 把下一首的**音频段**
+        /// 排进了 `playerNode`，而 AVAudioEngine 没有「撤销单个已排段」的 API —— 只清状态的话，
+        /// 曲终那个陈旧段仍会先响（加载慢时能响好几秒，听感就是「随机没生效」）。
+        /// `seek(to: 当前实际位置)` 会 stop + 按新 generation 重排当前曲目，顺带把陈旧段冲掉；
+        /// 随后按**新队列**重新预载下一首。
+        ///
+        /// 调用方：`PlayerEngine+Queue.swift` 的 `invalidatePreloadedNextAfterQueueChange()`
+        /// （随机切换 / 队列重排 / 队列增删 / 插播都汇到那一个入口）。
+        func invalidatePreloadedNextForOrderChange() {
+            let hadScheduledSegment = gaplessScheduled
+            clearPreloadedNext()
+
+            guard hadScheduledSegment else {
+                // 没有已排段（暂停中 / 未播 / 还没预载完）：清干净后按新队列重排预载即可。
+                preloadAndScheduleNextIfNeeded()
+                return
+            }
+
+            let rescheduleGeneration = loadGeneration
+            Task { @MainActor [weak self] in
+                guard let self, loadGeneration == rescheduleGeneration else { return }
+                // 正在播就用**实时渲染位置**（playbackTime 由 UI timer 刷新，后台/锁屏会冻结）
+                let position = isPlaying ? nowPlayingElapsedTime() : playbackTime
+                await seek(to: position)
+                preloadAndScheduleNextIfNeeded()
+            }
+        }
+
+        /// 提升被拒后清掉陈旧排段状态（幂等）：让下一次预载按**当前队列**重建，
+        /// 避免陈旧 index 在后续曲终被反复尝试提升。
+        private func clearStaleScheduledNextIfNeeded() {
+            guard gaplessScheduled || nextTrack != nil || nextTrackIndex != nil else { return }
+            clearPreloadedNext()
+        }
+
+        /// 提升已预载的无缝下一首。**队列一致性是硬前提**：`nextTrackIndex` 指向的必须仍是同一首。
+        ///
+        /// 2026-09-20 真机 bug：随机重排（或队列增删）后旧 index 已指向别的歌，但这里只校验了
+        /// `indices.contains` ⇒ 提升成功 = 接着播重排前的邻居 = 「随机开着仍按原顺序播」。
+        /// 现在不一致则拒绝提升 + 清陈旧状态，交回 `handleTrackEnd()` 按当前队列推进（牺牲一次
+        /// 无缝衔接，换取顺序正确 —— 顺序是语义，无缝是优化）。
+        /// 测试 seam：internal（QQPlayerTests 构造陈旧预载状态验回归）。
+        func promoteGaplessNextIfAvailable() -> Bool {
             guard gaplessScheduled,
-                  let nextFile = nextAudioFile,
                   let next = nextTrack,
                   let nextIndex = nextTrackIndex,
-                  playbackQueue.indices.contains(nextIndex) else {
+                  playbackQueue.indices.contains(nextIndex),
+                  playbackQueue[nextIndex].stableId == next.stableId,
+                  let nextFile = nextAudioFile else {
+                clearStaleScheduledNextIfNeeded()
                 return false
             }
 

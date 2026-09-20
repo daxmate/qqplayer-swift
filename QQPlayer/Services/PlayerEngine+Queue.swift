@@ -90,6 +90,13 @@ extension PlayerEngine {
 
         normalizeIndexAndTrack()
 
+        // 开着随机时，新队列也按随机顺序播（锚 = 用户点的那首；`originalQueue` 仍记**列表原顺序**，
+        // 关随机可原样恢复）。2026-09-20 审计：此前 `playTrack` 直接覆盖队列、完全不看 `isShuffled`
+        // ⇒ 「开着随机从列表点歌 = 顺序播放」——与真机反馈的随机失效同属一条语义。
+        if isShuffled {
+            shuffleQueue()
+        }
+
         let loaded = await loadTrack(track)
         guard loaded else { return }
 
@@ -184,11 +191,27 @@ extension PlayerEngine {
 
     func addToQueue(_ track: Track) {
         playbackQueue.append(track)
+        invalidatePreloadedNextAfterQueueChange()
     }
 
     func insertNext(_ track: Track) {
         let insertIndex = currentIndex + 1
         playbackQueue.insert(track, at: min(insertIndex, playbackQueue.count))
+        // 插到当前曲目之后 = 「下一首」换了 ⇒ 已预载/已排段的无缝下一首必须作废
+        invalidatePreloadedNextAfterQueueChange()
+    }
+
+    /// 队列顺序 / 成员变化后作废「已预载（可能已排入 playerNode）的无缝下一首」（跨平台入口）。
+    ///
+    /// 为什么必须有（2026-09-20 真机 bug）：预载状态机在 iOS 分支（`PlayerEngine+AudioScheduling.swift`），
+    /// 而改动队列的入口全在本文件（跨平台）。此前两者没有连接 —— 点「随机」只重排了 `playbackQueue`，
+    /// 已排入 `playerNode` 的旧邻居段仍在，曲终 `promoteGaplessNextIfAvailable()` 直接提升旧 index ⇒
+    /// 用户听到的是「随机开着，自动播的下一首还是原顺序」。
+    /// macOS 无无缝预载状态机 ⇒ 空实现（平台差异收在这一处，调用点保持一行）。
+    private func invalidatePreloadedNextAfterQueueChange() {
+        #if os(iOS)
+            invalidatePreloadedNextForOrderChange()
+        #endif
     }
 
     // MARK: - Queue 手动重排（macOS 队列面板，2026-09-03 B 组对齐 web 队列持久化）
@@ -212,6 +235,7 @@ extension PlayerEngine {
             currentIndex: currentIndex
         )
         print("🔀 Queue reordered: \(moved.title) to \(insertAt), currentIndex=\(currentIndex)")
+        invalidatePreloadedNextAfterQueueChange()
         savePlayerState()
     }
 
@@ -255,6 +279,7 @@ extension PlayerEngine {
 
         playbackQueue = newQueue
         normalizeIndexAndTrack()
+        invalidatePreloadedNextAfterQueueChange()
         print("🗑️ Queue items removed, remaining \(playbackQueue.count)")
         savePlayerState()
     }
@@ -362,6 +387,10 @@ extension PlayerEngine {
         }
 
         normalizeIndexAndTrack()
+
+        // 顺序变了：作废陈旧的无缝预载。否则曲终 `handleTrackEnd()`/完成回调会先提升
+        // 重排前的邻居（`nextTrackIndex` 已指向别的歌）⇒ 用户看到「随机开着却按原顺序播」。
+        invalidatePreloadedNextAfterQueueChange()
     }
 
     private func shuffleQueue() {
