@@ -128,6 +128,35 @@
 #   · 非视图层保留 `.shared`（合法、不在本棘轮口径）：`MacKeyboardShortcuts`（静态快捷键表）/ `PlayerEngine+NowPlaying` /
 #     `PlayerEngine+PlaybackControl` / `+Mac`；`KaraokeControllerTests` 31 处 `.shared` 为既有测试 seam，未动。
 #   · 行数净零：PlayerView 984（合并注释对让行）/ LyricsView 758（压缩文件头让行）。
+#
+# ═══ 2026-09-20 批 7-A：11 个系统单例正式登记为白名单（口径落地；**无产品代码改动**）════════
+#   · 11 处「系统单例」此前被当可迁债计入 TOTAL，但它们（`UIApplication` 4 / `WidgetCenter` 3 /
+#     `URLSession` 2 / `NSWorkspace` 2）是 **Apple 系统入口**——没有「我们的生命周期」可收口，
+#     视图层直接调它就是正确写法 ⇒ **不可迁移，永远留在基线里**（§5.3 口径，本批之前只是口头记着）。
+#   · 本批落地三处口径（全部在共享产物里，`QQPlayer/**` 一行未改）：
+#     ① 本文件末两行拆出两个 TOTAL：`# TOTAL:`（含系统单例，棘轮上限）+
+#        `# MIGRATABLE TOTAL:`（可迁预算，进度只看这一行）；
+#     ② 下节白名单区（`#+` 条目 = 类型 / 文件 / 站点数），共 10 条 / 11 站点 / 4 类型 / 8 文件；
+#     ③ `ViewSharedSingletonContractTests` 新增 (e) 白名单空转检查 + (f) 口径自洽，
+#        条目**从本文件读**（白名单只有这一份来源，不存第二份手工清单）。
+#   · 结果（随 rebase 到 6-8 基线后按实测重算）：TOTAL 21（登记不是迁移）；**可迁 21 − 11 = 10**。
+#   · ⚠️ 白名单不是豁免的终点：它只说明「这 11 处不该由我们迁」，不是「以后可以再往视图里写系统单例」——
+#     新增任何 `<Type>.shared`（含系统单例）仍被 (a)(b)(d) 三条拦下。
+#
+# ═══ 白名单区：系统单例（不可迁移，永远留在基线里）════════════════════════════════════
+#   条目格式（**只此一份，契约测试直接读它**）：`#+` TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数
+#   契约 (e) 空转检查：每条必须在源码里仍能对上 >= 该数的**显式** `<Type>.shared` 站点；
+#   源码里消失了 ⇒ 红（防白名单变成僵尸豁免）；条目与下面的文件行数值包含关系也必须自洽（(f)）。
+#+	UIApplication	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/EQSettingsView.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/SettingsView.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/SyncQRScannerView.swift	1
+#+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistCardView.swift	1
+#+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	2
+#+	URLSession	QQPlayer/Mac/MacTagEditorView.swift	1
+#+	URLSession	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
+#+	NSWorkspace	QQPlayer/Mac/MacSettingsView.swift	1
+#+	NSWorkspace	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
 
 # ═══ 2026-09-20 批 6-8：SyncHostCenter / SyncWiringFactsStore / MacLyricsResendFactsStore 迁 @Observable（方案 A 修红）════════════════
 #   · 迁移本体（提交 5c5742f / 1df037a）：三个对象 `ObservableObject` → `@Observable`；`SyncHostCenter` 的
@@ -163,4 +192,7 @@ QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
+# TOTAL = 视图层直连总数（**含**白名单里的 11 个系统单例）= 棘轮上限，只能减不能增。
 # TOTAL: 21
+# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 白名单合计 11）= 进度只看这一行。
+# MIGRATABLE TOTAL: 10

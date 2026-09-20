@@ -24,10 +24,12 @@
 > **仓库根目录与 `AppIntents/**` 里的视图完全不在扫描范围**（下文 174 / 118 等历史数字都是旧口径）。
 > 本批先补齐口径（118 → 126，+8 全是既有存量显形），再把那 8 处清掉（126 → **116**）。
 
-- **174 处 / 48 个视图文件 / 29 个对象**
+- **174 处 / 48 个视图文件 / 29 个对象**（2026-09-19 历史数字）
 - 其中 **11 处是 Apple 的系统单例**（`UIApplication` 4 / `WidgetCenter` 3 / `URLSession` 2 /
   `NSWorkspace` 2）——**不可迁移**，它们是系统入口，不是我们的生命周期问题。
-  故**可迁预算 = 174 − 11 = 163 处**（后续账目以可迁数为准，总数仍以 174 口径记）。
+  **可迁预算 = 当期 TOTAL − 白名单合计**（白名单口径见 §5.3）：
+  174 时代 = 174 − 11 = **163**；**批 7-A 落地后（base `45433ca`，TOTAL 24）= 24 − 11 = 13**。
+  后续账目一律以**可迁数**为准，总数仍以**含系统单例的 TOTAL** 记。
 
 ### 1.1 按对象归组（可迁数降序）
 
@@ -113,6 +115,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | **批 6-5（2026-09-20，本批）** | `ArtworkManager` 走 **`AppServices` 容器**（判据实测：`@Published` 0 / 视图读属性 0 / 全仓订阅 0 ⇒ 「无状态入口」）+ 本体 `ObservableObject` → `@Observable`（存储属性全 `@ObservationIgnored`） | 直连棘轮 **90 → 67**（真迁 23 处 / 14 文件：`MacArtworkThumbnail` 2→0、`AlbumViews` 2→0、`ArtistRowViews` 2→0、`TrackRowView` 1→0、`SmartPlaylistCardView` 1→0 删行；`MacPlayerView` 8→6、`PlayerView` 8→7、`SearchResultsViews` 5→1、`PlayerOverlays` 5→4、`QueueManagementView` 3→1、`PlaylistCardView` 2→1、`PlaylistDetailScreen` 3→2、`PlaylistTrackRowView` 3→1、`TrackListView` 2→1）；迁移棘轮 **116/54 → 108/50**（删 1 `ObservableObject` + 4 处视图 `@StateObject` 归零 + 4 处降 1） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 
 | **批 6-6（2026-09-20，本批）** | `PlayerEngine` + `PlaybackProgress` 迁 `@Observable`（**方案 B**：视图只取 `@Environment(PlayerEngine.self)`，进度读 `playerEngine.progress.playbackTime`，删掉 7 处独立 `progress` wrapper）；6-3 façade 换内芯 `CurrentValueSubject`（由 `didSet` 喂，2 个非视图消费者一行不改）；本体 10 个原 `@Published` 保持追踪 + 54 个存储属性 `@ObservationIgnored` | 直连棘轮 **67 → 45**（真迁 24 处 / 17 文件；浮窗 hosting 新增装配 2 行按账本约定计入）；迁移棘轮 **108/50 → 71/33**（删 2 `ObservableObject` + 11 `@Published`；视图 wrapper 24 处全清：11 处 `@StateObject` / 5 处 `@ObservedObject` 删行 + 4 处降 2） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
+| **批 7-A（2026-09-20）** | **口径批：11 个系统单例正式登记为白名单**（`UIApplication` 4 / `WidgetCenter` 3 / `URLSession` 2 / `NSWorkspace` 2；**不含任何产品代码改动**） | 直连棘轮 **24 → 24（不动：登记不是迁移）**；口径拆为 `# TOTAL: 24`（含系统单例）+ `# MIGRATABLE TOTAL: 13`（可迁，见 §5.3）；白名单区 10 条 / 11 站点 / 4 类型 / 8 文件；新增契约 (e) 白名单空转检查 + (f) 口径自洽 | iOS 契约测试绿 + 结构预算 / target 门禁 + swiftformat / swiftlint |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -540,9 +543,19 @@ let center = hostCenter ?? .shared                     // MacSyncView.swift:68
 - (b) 扫描口径把 `#Preview` 块排除（**属放宽，须先把当前 preview 内的存量单独记账**，
   不能变成"数字变小的免费午餐"）。
 
-### 5.3 系统单例不是债
-`UIApplication` / `WidgetCenter` / `URLSession` / `NSWorkspace` 共 11 处，永远留在基线里，
-账本按"可迁预算 163"看进度，而不是把 174 当成 100%。
+### 5.3 系统单例不是债（**批 7-A 已落地登记**）
+`UIApplication` / `WidgetCenter` / `URLSession` / `NSWorkspace` 共 11 处，永远留在基线里；
+账本按**可迁预算 = 当期 TOTAL − 白名单合计**看进度，而不是把 TOTAL 当成 100%
+（174 时代 = 174 − 11 = 163；当期 = 24 − 11 = **13**）。
+
+**批 7-A（2026-09-20，base `45433ca`）把这条口径从口头笔记变成机制**（无产品代码改动）：
+- `shared-singleton-baseline.tsv` 末尾拆两个口径：`# TOTAL: 24`（含系统单例 = 棘轮上限）
+  + `# MIGRATABLE TOTAL: 13`（可迁预算 = 进度只看这行）；白名单区 = `#+` TAB 类型 TAB 路径 TAB 站点数，
+  共 **10 条 / 11 站点 / 4 类型 / 8 文件**；
+- `ViewSharedSingletonContractTests` 新增两条契约：(e) **白名单空转检查**（条目在源码里对不上站点 ⇒ 红，
+  防僵尸豁免）+ (f) **口径自洽**（`可迁 TOTAL == TOTAL − 白名单合计`）；
+- 白名单**同源只有一份**：契约从 TSV 读（`#+` 区），不另存手工清单（2026-09-15「同一语义只有一处入口」）；
+- 白名单**不是许可**：新增任何 `<Type>.shared`（含这 4 个系统类型）仍被 (a)(b)(d) 拦下。
 
 ### 5.4 与结构预算棘轮的冲突（批 2 实测）
 结构预算棘轮（`structural-budget-size-baseline.tsv`）对 **>600 行的文件**规定「只能减不能增」，

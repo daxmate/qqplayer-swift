@@ -15,11 +15,13 @@
 //  新写视图直连单例 → 本测试立刻红；清掉一处 → 必须同步改基线行
 //  （留陈旧行也红，保证名单不腐烂）。
 //
-//  四条契约（全部 fail-closed：读不到源码/目录 = 红，绝不静默通过）：
+//  六条契约（全部 fail-closed：读不到源码/目录 = 红，绝不静默通过）：
 //   (a) 新增违规：检测到的视图文件不在基线里 → 红
 //   (b) 计数回涨：某文件出现次数 > 基线 → 红
 //   (c) 名单不腐烂：基线里的文件计数下降（含归零）或文件已不存在 → 红（该改/删行了）
 //   (d) 总数上限：全部视图文件出现次数之和 > 基线 TOTAL → 红
+//   (e) 白名单不空转：白名单里的系统单例条目必须在源码里仍对得上站点 → 红（防僵尸豁免）
+//   (f) 口径自洽：`可迁 TOTAL == TOTAL − 白名单合计` → 红
 //
 //  视图层判定（2026-09-20 口径补齐）：
 //    ① 全 `QQPlayer/**` 中**声明了 SwiftUI View**（`: View` / `some View`）的文件
@@ -43,7 +45,17 @@
 //    此前只认显式写法，于是「把 `Foo.shared` 改写成 `.shared`」就能压低上限 =
 //    棘轮可被绕过。收紧后暴露既有存量 4 处（MacSyncView 3 / SyncDeviceNameEditorView 1）。
 //
-//  基线文件：`QQPlayerTests/Fixtures/shared-singleton-baseline.tsv`（`路径<TAB>计数` + `# TOTAL:`）。
+//  **白名单（批 7-A 落地）：系统单例不是债。** `UIApplication` / `WidgetCenter` / `URLSession` /
+//  `NSWorkspace` 是 **Apple 系统入口** —— 视图层直接调它就是正确写法，没有「生命周期归谁」可收口
+//  ⇒ **不可迁移**，正式登记为白名单（永久留在基线里）。口径拆两行：`# TOTAL:`（**含**系统单例，
+//  棘轮上限）+ `# MIGRATABLE TOTAL:`（**可迁预算** = TOTAL − 白名单合计，进度只看这一行）。
+//  **白名单只有一份来源**：条目写在基线 TSV 的 `#+` 区（`#+` TAB 类型 TAB 路径 TAB 站点数），
+//  本文件从 TSV 读，不另存手工清单（2026-09-15「同一语义只有一处入口」纪律）。
+//  ⚠️ 白名单**不是**「以后可以继续往视图里写系统单例」的许可：新增任何 `<Type>.shared`
+//  （含这 4 个系统类型）仍被 (a)(b)(d) 三条拦下——白名单只说明「这 11 处不该由我们迁」。
+//
+//  基线文件：`QQPlayerTests/Fixtures/shared-singleton-baseline.tsv`
+//    （`路径<TAB>计数` + `# TOTAL:` + `# MIGRATABLE TOTAL:` + `#+` 白名单条目）。
 //  预算账本 + 分批计划：`QQPlayerTests/Fixtures/shared-singleton-budget-plan.md`
 //    （每批迁完必须把 TOTAL 与涉及文件的行值**下调到实测值**——本棘轮只防变差，
 //      "变好"靠那份账本驱动）。
@@ -66,13 +78,26 @@ private enum ViewSharedSingletonContract {
 
     struct Baseline {
         var total: Int
+        /// 可迁预算（= `total` − 白名单合计）；进度只看这个数。
+        var migratableTotal: Int
+        /// 白名单（系统单例，不可迁移）；条目来自基线 TSV 的 `#+` 行，不另存手工清单。
+        var whitelist: [WhitelistEntry]
         var perFile: [String: Int]
+    }
+
+    /// 白名单条目（`#+` TAB 类型 TAB 相对路径 TAB 站点数）。
+    struct WhitelistEntry: Equatable {
+        var type: String
+        var relativePath: String
+        var count: Int
     }
 
     enum ContractError: Error, CustomStringConvertible {
         case directoryUnreadable(String)
         case baselineMalformed(String)
         case baselineTotalMissing
+        case migratableTotalMissing
+        case whitelistMissing
 
         var description: String {
             switch self {
@@ -82,6 +107,10 @@ private enum ViewSharedSingletonContract {
                 return "基线格式错误（fail-closed）：\(line)"
             case .baselineTotalMissing:
                 return "基线缺少 `# TOTAL: <数字>` 行（fail-closed）"
+            case .migratableTotalMissing:
+                return "基线缺少 `# MIGRATABLE TOTAL: <数字>` 行（口径拆分，fail-closed）"
+            case .whitelistMissing:
+                return "基线缺少 `#+` 白名单条目（系统单例白名单为空，fail-closed）"
             }
         }
     }
@@ -95,6 +124,14 @@ private enum ViewSharedSingletonContract {
         pattern: "(?<![A-Za-z0-9_.])[.]shared(?![A-Za-z0-9_])"
     )
     private static let totalPattern = try! NSRegularExpression(pattern: "^#\\s*TOTAL:\\s*([0-9]+)\\s*$")
+    /// 可迁预算行：`# MIGRATABLE TOTAL: N`（与 `# TOTAL:` 互斥——后者要求 `#` 后直接跟 TOTAL）。
+    private static let migratableTotalPattern = try! NSRegularExpression(
+        pattern: "^#\\s*MIGRATABLE\\s+TOTAL:\\s*([0-9]+)\\s*$"
+    )
+    /// 白名单条目：`#+` TAB 类型 TAB 相对路径 TAB 站点数。
+    private static let whitelistPattern = try! NSRegularExpression(
+        pattern: "^#\\+\\t([A-Za-z_][A-Za-z0-9_]*)\\t([^\\t]+?)\\t([0-9]+)\\s*$"
+    )
 
     /// 是否声明了 SwiftUI View（决定该文件算不算视图层）。
     static func declaresSwiftUIView(_ source: String) -> Bool {
@@ -109,6 +146,38 @@ private enum ViewSharedSingletonContract {
         let range = NSRange(code.startIndex ..< code.endIndex, in: code)
         return explicitSharedPattern.numberOfMatches(in: code, range: range)
             + shorthandSharedPattern.numberOfMatches(in: code, range: range)
+    }
+
+    /// 白名单条目解析（**唯一实现**：`baseline()` 与自证用例共用）；非白名单行返回 nil。
+    static func parseWhitelistEntry(for line: String) -> WhitelistEntry? {
+        let range = NSRange(line.startIndex ..< line.endIndex, in: line)
+        guard let match = whitelistPattern.firstMatch(in: line, range: range),
+              let typeRange = Range(match.range(at: 1), in: line),
+              let pathRange = Range(match.range(at: 2), in: line),
+              let countRange = Range(match.range(at: 3), in: line),
+              let count = Int(line[countRange]) else { return nil }
+        return WhitelistEntry(
+            type: String(line[typeRange]),
+            relativePath: String(line[pathRange]),
+            count: count
+        )
+    }
+
+    /// 白名单站点核对：某文件里**显式** `<Type>.shared` 的出现次数（只算代码行，剥 `//` 后注释）。
+    /// 只认显式写法——白名单登记的是具体类型，前导点简写无法归属到某个类型
+    /// （简写写法会让本检查判红，这正是 (e) 想要的：站点换了写法就该回来看白名单）。
+    static func whitelistSiteCount(type: String, in source: String) -> Int {
+        // 编译不出来 = 返回 0 ⇒ 空转检查判红（fail-closed，不静默通过）。
+        guard let pattern = try? NSRegularExpression(
+            pattern: "(?<![A-Za-z0-9_])\(NSRegularExpression.escapedPattern(for: type))[.]shared"
+        ) else { return 0 }
+        return source
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .reduce(0) { partial, rawLine in
+                let code = String(rawLine).components(separatedBy: "//").first ?? ""
+                let range = NSRange(code.startIndex ..< code.endIndex, in: code)
+                return partial + pattern.numberOfMatches(in: code, range: range)
+            }
     }
 
     /// 一份源码里的出现次数（只算代码行）。
@@ -172,7 +241,8 @@ private enum ViewSharedSingletonContract {
         detectedOccurrences(in: try repositoryFiles())
     }
 
-    /// 基线清单（`路径<TAB>计数`，`#` 开头是注释，`# TOTAL: N` 是总数上限）。
+    /// 基线清单（`路径<TAB>计数`，`#` 开头是注释，`# TOTAL: N` 是总数上限，
+    /// `# MIGRATABLE TOTAL: N` 是可迁预算，`#+` 行是白名单条目）。
     static func baseline() throws -> Baseline {
         let url = repositoryRoot.appendingPathComponent(baselinePath)
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -182,6 +252,8 @@ private enum ViewSharedSingletonContract {
 
         var perFile: [String: Int] = [:]
         var total: Int?
+        var migratableTotal: Int?
+        var whitelist: [WhitelistEntry] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.isEmpty { continue }
@@ -190,6 +262,13 @@ private enum ViewSharedSingletonContract {
                 if let match = totalPattern.firstMatch(in: line, range: range),
                    let valueRange = Range(match.range(at: 1), in: line) {
                     total = Int(line[valueRange])
+                }
+                if let match = migratableTotalPattern.firstMatch(in: line, range: range),
+                   let valueRange = Range(match.range(at: 1), in: line) {
+                    migratableTotal = Int(line[valueRange])
+                }
+                if let entry = parseWhitelistEntry(for: line) {
+                    whitelist.append(entry)
                 }
                 continue
             }
@@ -201,7 +280,14 @@ private enum ViewSharedSingletonContract {
             perFile[String(parts[0]).trimmingCharacters(in: .whitespaces)] = count
         }
         guard let total else { throw ContractError.baselineTotalMissing }
-        return Baseline(total: total, perFile: perFile)
+        guard let migratableTotal else { throw ContractError.migratableTotalMissing }
+        guard !whitelist.isEmpty else { throw ContractError.whitelistMissing }
+        return Baseline(
+            total: total,
+            migratableTotal: migratableTotal,
+            whitelist: whitelist,
+            perFile: perFile
+        )
     }
 }
 
@@ -274,6 +360,76 @@ struct ViewSharedSingletonContractTests {
             baselineTotal == baseline.total,
             "基线自相矛盾：行数合计 \(baselineTotal) ≠ TOTAL \(baseline.total)"
         )
+    }
+
+    @Test("(e) 白名单不空转：白名单条目必须在源码里仍对得上站点（防僵尸豁免）")
+    func whitelistEntriesStillHitSource() throws {
+        let baseline = try ViewSharedSingletonContract.baseline()
+        #expect(!baseline.whitelist.isEmpty, "白名单区为空（fail-closed）：基线缺少 `#+` 条目")
+
+        var stale: [String] = []
+        for entry in baseline.whitelist {
+            let fileURL = ViewSharedSingletonContract.repositoryRoot.appendingPathComponent(entry.relativePath)
+            guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                stale.append("\(entry.type) @ \(entry.relativePath)：文件不存在或读不到")
+                continue
+            }
+            let found = ViewSharedSingletonContract.whitelistSiteCount(type: entry.type, in: source)
+            if found < entry.count {
+                stale.append("\(entry.type) @ \(entry.relativePath)：登记 \(entry.count) 处，实测 \(found) 处")
+            }
+        }
+        #expect(
+            stale.isEmpty,
+            """
+            白名单条目已失效（源码里找不到登记的站点）——请同步改/删条目，别让白名单变僵尸豁免：
+            \(stale.sorted())
+            """
+        )
+    }
+
+    @Test("(f) TOTAL 口径自洽：可迁 TOTAL = TOTAL − 白名单合计")
+    func migratableTotalMatchesCaliber() throws {
+        let baseline = try ViewSharedSingletonContract.baseline()
+        let whitelistSum = baseline.whitelist.map(\.count).reduce(0, +)
+        #expect(
+            baseline.migratableTotal == baseline.total - whitelistSum,
+            "可迁 TOTAL 口径不自洽：TOTAL \(baseline.total) − 白名单 \(whitelistSum) ≠ 可迁 TOTAL \(baseline.migratableTotal)"
+        )
+    }
+
+    @Test("自证：白名单口径（条目解析 + 站点计数只认代码行/显式写法）")
+    func whitelistCaliberSelfTest() {
+        // 站点计数：剥注释；只认显式写法（前导点简写无法归属到具体类型）
+        let source = """
+        import UIKit
+        struct Foo: View {
+            // 整行注释里的 UIApplication.shared 不算
+            func open(_ url: URL) { UIApplication.shared.open(url) } // 行尾注释 UIApplication.shared 也不算
+            func scene() -> UIApplication { UIApplication.shared }
+        }
+        """
+        #expect(ViewSharedSingletonContract.whitelistSiteCount(type: "UIApplication", in: source) == 2)
+        // 相近类型名不误伤（`Application` 不是 `UIApplication`）
+        #expect(ViewSharedSingletonContract.whitelistSiteCount(type: "Application", in: source) == 0)
+        // 条目解析：真条目 → 解析成功
+        #expect(
+            ViewSharedSingletonContract.parseWhitelistEntry(
+                for: "#+\tUIApplication\tQQPlayer/Views/Artists/ArtistDetailScreen.swift\t2"
+            ) == ViewSharedSingletonContract.WhitelistEntry(
+                type: "UIApplication",
+                relativePath: "QQPlayer/Views/Artists/ArtistDetailScreen.swift",
+                count: 2
+            )
+        )
+        // 非白名单行不得被当成条目（普通文件行 / TOTAL 行 / 普通注释）
+        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "QQPlayer/ContentView.swift\t1") == nil)
+        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "# TOTAL: 24") == nil)
+        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "# MIGRATABLE TOTAL: 13") == nil)
+        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "# 普通注释") == nil)
+        // 缺字段 / 计数非数字 → nil（不静默当 0）
+        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "#+\tUIApplication\tA.swift") == nil)
+        #expect(ViewSharedSingletonContract.parseWhitelistEntry(for: "#+\tUIApplication\tA.swift\tx") == nil)
     }
 
     @Test("自证：检测规则本身能抓到合成输入（fail-closed 反向验证）")
