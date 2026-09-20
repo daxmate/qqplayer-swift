@@ -15,8 +15,10 @@
 //
 //  **口径**：扫描范围 = 声明了 SwiftUI View 的全部 `QQPlayer/**` 文件（组合根自身除外）；
 //  注释里的写法不算；`@Environment(\.keyPath)` 形式不算（那是环境值，不是 App 级对象）。
-//  合法例外：视图文件的 `#Preview` 是第二个装配点（preview 不继承场景环境），本契约只管组合根，
+//  合法例外：视图文件的 `#Preview` 是第二个装配点（preview 不继承场景环境），本契约只管**组合根**，
 //  与直连单例棘轮的口径一致（见 `shared-singleton-budget-plan.md` §五.2）。
+//  **手工 hosting 根**（`NSHostingView` 承载的 NSPanel 浮窗）是第三个装配点，同样不继承场景环境，
+//  由本文件下方的 `ManualHostingEnvironmentContractTests` 守护（2026-09-20 批 5b 立）。
 //
 
 import Foundation
@@ -137,6 +139,145 @@ private enum EnvironmentInjectionContract {
         }
         return result
     }
+
+    // MARK: - 手工 hosting 根（批 5b 立）
+
+    //  盲区：上方的组合根契约只管 **App 场景根**；手工 `NSHostingView` 承载的视图
+    //  （NSPanel 浮窗）不继承场景环境，装配点在那个构造方文件里。批 5b 上浮窗时实证：
+    //  只改 App 根，进迷你模式即运行时致命错（编译与单测都看不见）。
+
+    /// 顶层类型声明的起点（`struct/class/enum/actor Name`）。
+    private static let typeDeclarationPattern = try! NSRegularExpression(
+        pattern: "\\b(?:struct|class|enum|actor) ([A-Za-z_][A-Za-z0-9_]*)\\b"
+    )
+
+    /// 声明了 SwiftUI View 的类型声明行（`: …View`；`ViewModifier` 不匹配，`some View` 函数行不算）。
+    private static let viewDeclarationPattern = try! NSRegularExpression(
+        pattern: "\\b(?:struct|class|enum) [A-Za-z_][A-Za-z0-9_]*\\s*:[^{]*\\bView\\b"
+    )
+
+    /// AppKit 手工承载 SwiftUI 内容的入口（按标识符判，兼容 `NSHostingView<AnyView>(…)` 泛型写法）。
+    private static let hostingEntryPattern = try! NSRegularExpression(
+        pattern: "\\bNSHosting(?:View|Controller|Menu)\\b"
+    )
+
+    /// `.environment(self)`（对象把自己的引用注入环境）。
+    private static let selfInjectionPattern = try! NSRegularExpression(
+        pattern: "[.]environment\\(\\s*self\\s*\\)"
+    )
+
+    /// 逐行剥注释后的源码（`stripped` 只处理单行，多行文本必须先按行拆再拼）。
+    static func strippedSource(_ source: String) -> String {
+        source.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { stripped(String($0)) }
+            .joined(separator: "\n")
+    }
+
+    /// 该行声明的类型名（无则 nil）。
+    static func declaredTypeName(in codeLine: String) -> String? {
+        let range = NSRange(codeLine.startIndex ..< codeLine.endIndex, in: codeLine)
+        guard let match = typeDeclarationPattern.firstMatch(in: codeLine, range: range),
+              let nameRange = Range(match.range(at: 1), in: codeLine)
+        else { return nil }
+        return String(codeLine[nameRange])
+    }
+
+    /// 承载手工 hosting 的那个类型：hosting 入口前最近的一个**顶层（缩进 0）**类型声明。
+    /// 口径：本仓库约定一个文件一个 App 级类；缩进判据足以定位（不做完整语法解析）。
+    static func hostingEnclosingType(_ source: String) -> String? {
+        var enclosing: String?
+        for rawLine in source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            let code = stripped(rawLine)
+            if !code.isEmpty, code.first != " ", code.first != "\t",
+               let name = declaredTypeName(in: code) {
+                enclosing = name
+            }
+            let range = NSRange(code.startIndex ..< code.endIndex, in: code)
+            if hostingEntryPattern.firstMatch(in: code, range: range) != nil {
+                return enclosing
+            }
+        }
+        return nil
+    }
+
+    /// 该文件是否构造了手工 hosting 根。
+    static func buildsManualHostingRoot(_ source: String) -> Bool {
+        let code = strippedSource(source)
+        let range = NSRange(code.startIndex ..< code.endIndex, in: code)
+        return hostingEntryPattern.firstMatch(in: code, range: range) != nil
+    }
+
+    /// hosting 文件里出现过的、仓库内已定义的视图类型名（= 它承载的内容视图）。
+    static func hostedViewTypes(in source: String, known: [String: Set<String>]) -> [String] {
+        let code = strippedSource(source)
+        return known.keys
+            .filter { code.range(of: "\\b" + $0 + "\\b", options: .regularExpression) != nil }
+            .sorted()
+    }
+
+    /// 该文件是否装配了 `type`：字面量 `.environment(Type.…)`，
+    /// 或（承载 hosting 的那个类型就是 Type 时）`.environment(self)`。
+    static func injects(_ type: String, in source: String) -> Bool {
+        if rootInjects(type, in: source) { return true }
+        guard hostingEnclosingType(source) == type else { return false }
+        let code = strippedSource(source)
+        let range = NSRange(code.startIndex ..< code.endIndex, in: code)
+        return selfInjectionPattern.firstMatch(in: code, range: range) != nil
+    }
+
+    /// 单文件判定：hosting 了哪些内容视图、缺哪些装配（契约与自证共用同一口径）。
+    static func hostingGaps(
+        in source: String,
+        consumedByViewType: [String: Set<String>]
+    ) -> (hosted: [String], missing: [String]) {
+        guard buildsManualHostingRoot(source) else { return ([], []) }
+        let hosted = hostedViewTypes(in: source, known: consumedByViewType)
+        var required: Set<String> = []
+        for type in hosted {
+            required.formUnion(consumedByViewType[type] ?? [])
+        }
+        return (hosted, required.filter { !injects($0, in: source) }.sorted())
+    }
+
+    /// 视图类型 → 该类型（按类型声明行切块，不是按整文件）读的 `@Environment(T.self)` 类型集合。
+    static func consumedTypesByViewType() throws -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for url in try swiftFiles() {
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for (name, types) in viewConsumedTypes(in: source) {
+                result[name, default: []].formUnion(types)
+            }
+        }
+        return result
+    }
+
+    /// 按类型声明行切块（近似解析：声明须自成一行；每个声明开一块，到下一个声明为止）。
+    static func viewTypeBlocks(in source: String) -> [(name: String, body: String)] {
+        var blocks: [(name: String, body: String)] = []
+        var currentName: String?
+        var currentLines: [String] = []
+
+        func flush() {
+            guard let name = currentName else { return }
+            blocks.append((name, currentLines.joined(separator: "\n")))
+        }
+
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            let code = stripped(line)
+            if let name = declaredTypeName(in: code).flatMap({ candidate -> String? in
+                let range = NSRange(code.startIndex ..< code.endIndex, in: code)
+                return viewDeclarationPattern.firstMatch(in: code, range: range) != nil ? candidate : nil
+            }) {
+                flush()
+                currentName = name
+                currentLines = [line]
+            } else if currentName != nil {
+                currentLines.append(line)
+            }
+        }
+        flush()
+        return blocks
+    }
 }
 
 @Suite("组合根装配契约（视图消费 @Environment(T.self) ⟹ 该平台组合根必须装配）")
@@ -200,5 +341,120 @@ struct EnvironmentInjectionContractTests {
                 in: "// 漏了这一行的后果：视图 `@Environment(AppServices.self)` 会运行时致命错"
             ) == false
         )
+    }
+}
+
+@Suite("手工 hosting 根装配契约（NSHostingView 承载的视图 ⟹ 构造方必须自己装配环境）")
+struct ManualHostingEnvironmentContractTests {
+    @Test("(a) 手工 hosting 根必须装配内容视图读的 App 级对象（场景环境到不了这里）")
+    func manualHostingRootsInjectConsumedObjects() throws {
+        let consumedByViewType = try EnvironmentInjectionContract.consumedTypesByViewType()
+        let prefix = EnvironmentInjectionContract.repositoryRoot.path + "/"
+        var scanned = 0
+        var missing: [String] = []
+
+        for url in try EnvironmentInjectionContract.swiftFiles() {
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            guard EnvironmentInjectionContract.buildsManualHostingRoot(source) else { continue }
+            scanned += 1
+            let relative = url.path.replacingOccurrences(of: prefix, with: "")
+            let gaps = EnvironmentInjectionContract.hostingGaps(
+                in: source,
+                consumedByViewType: consumedByViewType
+            )
+            for type in gaps.missing {
+                missing.append(
+                    "`\(relative)` 手工 hosting 了 \(gaps.hosted.joined(separator: ", "))"
+                        + "，但没装配 `\(type)` → 手工 hosting 的内容**不继承 App 场景环境**，"
+                        + "运行时会致命错（编译与单测都发现不了）"
+                )
+            }
+        }
+
+        #expect(
+            missing.isEmpty,
+            """
+            手工 hosting 根的装配缺口（内容视图读 `@Environment(T.self)`，而构造方没注入 T）：
+            \(missing.sorted().joined(separator: "\n"))
+            """
+        )
+        // fail-closed：一个 hosting 根都没识别到 = 扫描器入口判据失效（写法变了），不是「没有缺口」。
+        // 若这套浮窗机制被整体移除，本行应随之下线（而不是把断言删掉）。
+        #expect(scanned > 0, "没识别到任何手工 hosting 根：入口判据可能已失效（fail-closed）")
+    }
+
+    @Test("(b) 扫描器自证：缺失必报、按名装配算、self 装配算、注释不算、泛型写法也算")
+    func scannerSelfTest() {
+        let consumed: [String: Set<String>] = ["MiniPlayer": ["Windows"], "Lyrics": []]
+
+        func missing(_ source: String) -> [String] {
+            EnvironmentInjectionContract.hostingGaps(in: source, consumedByViewType: consumed).missing
+        }
+
+        // 泛型 hosting 写法也算 hosting 根；缺装配 → 必须报
+        let noInjection = """
+        final class Windows {
+            let host = NSHostingView<AnyView>(rootView: MiniPlayer())
+        }
+        """
+        #expect(EnvironmentInjectionContract.buildsManualHostingRoot(noInjection))
+        #expect(missing(noInjection) == ["Windows"])
+
+        // 按名装配 → 不报
+        #expect(missing("let r = NSHostingView(rootView: MiniPlayer().environment(Windows.shared))") == [])
+
+        // `self` 装配（承载 hosting 的类型就是被消费的类型）→ 不报
+        let selfInjection = """
+        final class Windows {
+            func rootView() -> some View {
+                MiniPlayer().environment(self)
+            }
+        }
+        """
+        #expect(missing(selfInjection) == [])
+
+        // `self` 但承载类型不是被消费的那个 → 必须报（防「随便一个 self 也算过」）
+        let wrongSelf = """
+        final class Other {
+            let host = NSHostingView(rootView: MiniPlayer().environment(self))
+        }
+        """
+        #expect(missing(wrongSelf) == ["Windows"])
+
+        // 注释里的 hosting 入口 / 注释掉的装配 → 不算（否则注掉装配仍会假绿）
+        #expect(!EnvironmentInjectionContract.buildsManualHostingRoot("// let h = NSHostingView(rootView: Lyrics())"))
+        let commented = """
+        let root = NSHostingView(rootView: MiniPlayer())
+        // 漏了 .environment(self) 会崩（注释里提一次不算数）
+        """
+        #expect(missing(commented) == ["Windows"])
+
+        // 内容视图不读环境对象 → 无要求
+        #expect(missing("final class W { let h = NSHostingView(rootView: Lyrics()) }") == [])
+
+        // 切块口径：同文件多视图按声明行切开，消费集合不得互相污染
+        let twoViews = """
+        struct MiniPlayer: View {
+            @Environment(Windows.self) private var windows
+            var body: some View { EmptyView() }
+        }
+        struct Lyrics: View {
+            var body: some View { EmptyView() }
+        }
+        """
+        let byType = EnvironmentInjectionContract.viewConsumedTypes(in: twoViews)
+        #expect(byType["MiniPlayer"] == ["Windows"])
+        #expect(byType["Lyrics"] == Set<String>())
+    }
+}
+
+private extension EnvironmentInjectionContract {
+    /// 单文件：视图类型 → 该类型读的 `@Environment(T.self)` 集合（纯函数，契约与自证共用一个口径）。
+    static func viewConsumedTypes(in source: String) -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for block in viewTypeBlocks(in: source) {
+            result[block.name, default: []].formUnion(consumedTypes(in: block.body))
+        }
+        return result
     }
 }
