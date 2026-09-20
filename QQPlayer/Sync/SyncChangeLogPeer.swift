@@ -71,42 +71,48 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     /// 本端视角的对端 Device ID（sync_cursor.peer_id；推进游标用）。
     let peerID: String
 
+    // ⚠️ 回调一律 `@Sendable`（2026-09-20 真机闪退）：本类在**会话队列**（NW 通道队列
+    // `com.daxmate.qqplayer.sync.browser`，非主线程）**同步调用**这些回调。类型不是 `@Sendable`
+    // 时，调用方在 `@MainActor` 上下文里写的闭包会**继承主线程隔离** → 闭包体内首次隔离访问
+    // （如 `groups.reduce`）即触发运行时 executor 断言（EXC_BREAKPOINT / SIGTRAP，App 直接退出）。
+    // 漏标一处 = 该回调一被触发就闪退；守护 = IOSPassiveSyncCenterTests 的回归 + 形状契约用例。
+
     /// pull 请求处理结果（测试断言/诊断用；锁外触发）。
-    var onPullHandled: ((SyncChangeLogPullRequest, Int) -> Void)?
+    var onPullHandled: (@Sendable (SyncChangeLogPullRequest, Int) -> Void)?
     /// push 应用完成（applied 行数；锁外触发）。
-    var onPushApplied: ((Int) -> Void)?
+    var onPushApplied: (@Sendable (Int) -> Void)?
     /// push 中因本地缺歌而挂起的行数（**按实体分组**；锁外触发）。
     /// ⚠️ 本回调**恒触发**（无挂起 = 空数组）：调用方据「任一应答类回调到达」判定
     /// 「对端已应答」（见 `SyncDataSyncCoordinator` 的收尾语义），分组不得改掉这条语义。
-    var onPushSuspended: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPushSuspended: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// push 中因缺身份键而未落库的行数（引用歌曲但两把身份键都拿不到 → 不落库、
     /// 不挂起；**按实体分组**；锁外触发）。**恒触发**（空数组 = 本批无未定位行）。
-    var onPushUnresolved: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPushUnresolved: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// push 中被忽略的 delete 行数（v2 删除不传播；锁外触发；0 = 无忽略）。
-    var onPushIgnoredDeletes: ((Int) -> Void)?
+    var onPushIgnoredDeletes: (@Sendable (Int) -> Void)?
     /// push 中因**身份歧义**（第二身份相对路径命中多首本地曲目）而未落库的行数
     /// （不落库、不挂起；**按实体分组**；锁外触发；空 = 无歧义、不触发）。
-    var onPushAmbiguous: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPushAmbiguous: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// push 中**没落到本地位置**的 playback_position 行数（跨端续播开关关 = 默认，
     /// 或开关开但落点未接；这些行不计入 `onPushApplied`）。**按实体分组**；
     /// 锁外触发；空 = 无、不触发。
-    var onPushUnsupported: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPushUnsupported: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// push 中因**父行/被引用行不存在**而跳过的行数（歌单结构未到 / 引用歌本地查无）。
     /// **按实体分组**；锁外触发；空 = 无、不触发（矩阵三级 #8：静默失败必须计数上屏）。
-    var onPushSkippedMissingParent: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPushSkippedMissingParent: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// push 中**应用失败**的行数（载荷解不开 / 落库抛错），**按实体分组**；锁外触发；
     /// 空 = 无、不触发。以前这类失败只进日志（面板零信号）——L0 契约 C 行要求
     /// 「歌单级失败必须单独计数上屏」，这条就是它的落点（歌单行失败 → 实体 = playlist）。
-    var onPushApplyFailed: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPushApplyFailed: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
-    var onDecodeFailure: ((DecodeError) -> Void)?
+    var onDecodeFailure: (@Sendable (DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
-    var onIncrementSent: ((Int) -> Void)?
+    var onIncrementSent: (@Sendable (Int) -> Void)?
     /// 主动推送增量中缺身份键的行数（两把身份键都拿不到，对端定位不了）。
     /// **按实体分组**（明细行自带实体）；锁外触发；空 = 无、不触发。
-    var onIncrementMissingIdentity: (([SyncEntityOutcomeCount]) -> Void)?
+    var onIncrementMissingIdentity: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// 应答远端拉取时，本批上线行里缺身份键的行数（**按实体分组**；锁外触发；空 = 不触发）。
-    var onPullMissingIdentity: (([SyncEntityOutcomeCount]) -> Void)?
+    var onPullMissingIdentity: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
 
     /// 本批 applier 报回的类别计数（`handlePush` 内单线程读写：`applier.apply` 之前清零、
     /// 之后读数上报）。⚠️ 计数只进 `SyncOutcomeTally`，本类不再自建分类计数器（L6 形状契约）。
