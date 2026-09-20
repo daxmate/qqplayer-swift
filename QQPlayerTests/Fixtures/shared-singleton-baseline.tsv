@@ -129,13 +129,30 @@
 #     `PlayerEngine+PlaybackControl` / `+Mac`；`KaraokeControllerTests` 31 处 `.shared` 为既有测试 seam，未动。
 #   · 行数净零：PlayerView 984（合并注释对让行）/ LyricsView 758（压缩文件头让行）。
 
+# ═══ 2026-09-20 批 6-8：SyncHostCenter / SyncWiringFactsStore / MacLyricsResendFactsStore 迁 @Observable（方案 A 修红）════════════════
+#   · 迁移本体（提交 5c5742f / 1df037a）：三个对象 `ObservableObject` → `@Observable`；`SyncHostCenter` 的
+#     `objectWillChange` 换为 `hostStatePublisher`（`PassthroughSubject` façade，三个非视图消费者——
+#     同步面板 view model——的唯一观察入口）；视图面 4 处 `@ObservedObject` → `@Environment`；
+#     装配点：iOS 组合根 `QQPlayerApp` + Mac 组合根 `QQPlayerMacApp` 的两个场景根。
+#   · **修红（本块，方案 A）**：4 处视图站点改环境注入后，3 个 Mac 视图的 `#Preview` 各欠 3 行装配
+#     （+9）⇒ **反向上涨**（上一份收尾报告实测 30），账本口径「`emit` 只允许收紧后替换」⇒ 不允许抬基线放行。
+#     处置：把「取真实例」这一步收进**非视图层 helper** `QQPlayer/Mac/MacSyncPreviewEnvironment.swift`
+#     （只暴露实例、不包装视图——helper 不命中 `isViewLayerFile` 的任何一侧：不在 `QQPlayer/Views/` 下，
+#     源码里也不出现视图声明标记）⇒ 视图文件里不再出现单例直连，preview 仍可用同样的实例。
+#   · 逐项（本块实测）：`MacSyncSettingsView.swift` 3 → **0**（新文件，3 处全是 preview 装配 → 不进名单）；
+#     `MacSyncCenterView.swift` 1 → **0**（删行）；`MacSyncView.swift` 3 → **1**
+#     （残留 1 = `init` 里的 `hostCenter ?? .shared`：View init 是非隔离上下文、读不到环境值，
+#      属热点自身的合法残留，本批未动其语义）。
+#   · 数字来源：`30` = 上一份收尾报告实测；`21` = 本次契约测试权威输出的 decreased 清单
+#     （`MacSyncCenterView.swift: 1 → 0`、`MacSyncView.swift: 3 → 1`）+ 复跑全绿（(a)(b)(c)(d) 全过 ⇒
+#     实测集合与基线逐行相等）。
+
 
 
 QQPlayer/ContentView.swift	1
 QQPlayer/Mac/MacDesktopWindowsManager.swift	3
 QQPlayer/Mac/MacSettingsView.swift	1
-QQPlayer/Mac/MacSyncCenterView.swift	1
-QQPlayer/Mac/MacSyncView.swift	3
+QQPlayer/Mac/MacSyncView.swift	1
 QQPlayer/Mac/MacTagEditorView.swift	1
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	1
@@ -146,4 +163,4 @@ QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
-# TOTAL: 24
+# TOTAL: 21
