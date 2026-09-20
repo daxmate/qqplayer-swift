@@ -27,9 +27,10 @@
 - **174 处 / 48 个视图文件 / 29 个对象**（2026-09-19 历史数字）
 - 其中 **11 处是 Apple 的系统单例**（`UIApplication` 4 / `WidgetCenter` 3 / `URLSession` 2 /
   `NSWorkspace` 2）——**不可迁移**，它们是系统入口，不是我们的生命周期问题。
-  **可迁预算 = 当期 TOTAL − 白名单合计**（白名单口径见 §5.3）：
-  174 时代 = 174 − 11 = **163**；**批 7-A 落地后（base `45433ca`，TOTAL 24）= 24 − 11 = 13**。
-  后续账目一律以**可迁数**为准，总数仍以**含系统单例的 TOTAL** 记。
+  **可迁预算 = 当期 TOTAL − 已登记条目合计**（白名单口径见 §5.3）：
+  174 时代 = 174 − 11 = **163**；批 7-A 落地后（base `45433ca`，TOTAL 24）= 24 − 11 = 13；
+  **批 7-C 并入 6-8 基线后（base `dc48473`，TOTAL 21）= 21 − 11 − 3 − 6 = 1**。
+  后续账目一律以**可迁数**为准，总数仍以**含全部登记条目的 TOTAL** 记。
 
 ### 1.1 按对象归组（可迁数降序）
 
@@ -117,6 +118,11 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | **批 6-6（2026-09-20，本批）** | `PlayerEngine` + `PlaybackProgress` 迁 `@Observable`（**方案 B**：视图只取 `@Environment(PlayerEngine.self)`，进度读 `playerEngine.progress.playbackTime`，删掉 7 处独立 `progress` wrapper）；6-3 façade 换内芯 `CurrentValueSubject`（由 `didSet` 喂，2 个非视图消费者一行不改）；本体 10 个原 `@Published` 保持追踪 + 54 个存储属性 `@ObservationIgnored` | 直连棘轮 **67 → 45**（真迁 24 处 / 17 文件；浮窗 hosting 新增装配 2 行按账本约定计入）；迁移棘轮 **108/50 → 71/33**（删 2 `ObservableObject` + 11 `@Published`；视图 wrapper 24 处全清：11 处 `@StateObject` / 5 处 `@ObservedObject` 删行 + 4 处降 2） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 | **批 7-A（2026-09-20）** | **口径批：11 个系统单例正式登记为白名单**（`UIApplication` 4 / `WidgetCenter` 3 / `URLSession` 2 / `NSWorkspace` 2；**不含任何产品代码改动**） | 直连棘轮 **24 → 24（不动：登记不是迁移）**；口径拆为 `# TOTAL: 24`（含系统单例）+ `# MIGRATABLE TOTAL: 13`（可迁，见 §5.3）；白名单区 10 条 / 11 站点 / 4 类型 / 8 文件；新增契约 (e) 白名单空转检查 + (f) 口径自洽 | iOS 契约测试绿 + 结构预算 / target 门禁 + swiftformat / swiftlint |
 | **批 7-B（2026-09-20）** | **登记批：运行期组合根 3 处登记为「合法装配点」**（`MacDesktopWindowsManager.swift` 两个手工 `NSHostingView` 浮窗根的 `.environment(PlayerEngine.shared)` ×2 + `.environment(KaraokeController.shared)` ×1；**备案式 (b)：只登记、不放宽扫描口径**；**不含任何产品代码改动**） | 直连棘轮 **24 → 24（不动：登记不是迁移）**；`# MIGRATABLE TOTAL: 13 → 10`（= 24 − 系统单例 11 − 装配点 3）；新增登记区 B（`#@` 条目 2 条 / 3 站点）+ 两个类别合计行；契约 (e)(f) 扩到新类别（含类别合计行自洽）；口径分解见 §5.3 | iOS 契约测试绿 + 结构预算 / target 门禁 + swiftformat / swiftlint + 反向破坏实验（改大登记数 / 删新类别区） |
+| **批 7-C（2026-09-20）** | **并入 6-8 基线 + `#Preview` 脚手架登记为第三类**（`#~` 条目 6 条 / 6 站点 / 6 类型 / 4 文件；**只登记、不放宽扫描口径**；**不含任何产品代码改动**） | 直连棘轮 **21（= 6-8 实测；登记不是迁移）**；`# MIGRATABLE TOTAL` 按 rebase 后实测重算 **7 → 1**（= 21 − 11 − 3 − 6）；契约 (e)(f) 自动扩到第三类（`RegistrationCategory` 新增一个 case），新类别为空 / 缺合计行 ⇒ fail-closed | iOS 契约测试绿 + 破坏实验（改大登记数 / 删新类别区）+ 反向验证（注入直连点名）+ 结构预算 / target 门禁 + swiftformat / swiftlint |
+
+> **批 7-A / 7-B 行的数字是 rebase 前口径**（base `45433ca` = main，TOTAL 24）：批 7-C 把它们变基到 6-8
+> （`dc48473`，TOTAL 21）之后，TOTAL 与可迁数一律按 rebase 后的**实测**重算（7-A：24 − 11 = 13 →
+> **21 − 11 = 10**；7-B：24 − 11 − 3 = 10 → **21 − 11 − 3 = 7**）。两行「登记不是迁移」的语义不变。
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -464,7 +470,7 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
   `ObservableObject`，且**有 `$isIndexing` Combine 订阅方**（`SpotlightLibraryIndexer.swift:33`）
   ⇒ 裸迁 `@Observable` 会**静默失效**（同 `MacSpectrumAnalyzer`）；且视图按属性追踪 `isIndexing`，
   也不能走「无状态容器」通道（会丢 `onChange` 刷新）。**必须先改订阅机制，属批 6 热点。**
-- `#Preview` 里的 `.environmentObject(AppCoordinator.shared)`：preview 只能拿真实例，按 §5.2 计脚手架成本。
+- `#Preview` 里的 `.environmentObject(AppCoordinator.shared)`：preview 只能拿真实例，按 §5.2 计脚手架成本（批 7-C 起登记进基线 TSV 登记区 C）。
 
 **⑤ 发现的同类盲区（未在本批处理）**：`ViewDataAccessContractTests`（视图不得直连
 `DatabaseManager`）用的仍是旧口径（`Views/**` + `Mac/**`），**根目录视图同样不可见**——
@@ -544,10 +550,11 @@ let center = hostCenter ?? .shared                     // MacSyncView.swift:68
 - (b) 扫描口径把 `#Preview` 块排除（**属放宽，须先把当前 preview 内的存量单独记账**，
   不能变成"数字变小的免费午餐"）。
 
-### 5.3 系统单例不是债（**批 7-A 落地登记；批 7-B 修正措辞并扩大登记范围**）
+### 5.3 系统单例不是债（**批 7-A 落地登记；批 7-B 扩到运行期组合根；批 7-C 扩到 `#Preview` 脚手架**）
 `UIApplication` / `WidgetCenter` / `URLSession` / `NSWorkspace` 共 11 处，永远留在基线里；
 账本按**可迁预算 = 当期 TOTAL − 已登记条目合计**看进度，而不是把 TOTAL 当成 100%
-（174 时代 = 174 − 11 = 163；批 7-A 后 = 24 − 11 = 13；**批 7-B 后 = 24 − 11 − 3 = 10**）。
+（174 时代 = 174 − 11 = 163；批 7-A 后 = 24 − 11 = 13；批 7-B 后 = 24 − 11 − 3 = 10；
+**批 7-C 并入 6-8 基线后 = 21 − 11 − 3 − 6 = 1**）。
 
 **⚠️ 措辞修正（批 7-B 核算要求）：这 11 处不是「不可迁」，而是「不消除、本批不上收」。**
 它们**都有抽象空间**，只是本批不做（列出来是给后人留依据，不是免责声明）：
@@ -578,18 +585,34 @@ let center = hostCenter ?? .shared                     // MacSyncView.swift:68
   **新类别缺失/为空、类别合计行缺失 ⇒ fail-closed 抛错**（与 7-A 同风格，不静默放行）；
 - **登记只有一份来源**：两个登记区都写在基线 TSV 里，契约只解析、不另存清单。
 
-**当代算式（批 7-B 后）**：
+**批 7-C（2026-09-20）：并入 6-8 基线 + `#Preview` 脚手架登记为第三类**（同样无产品代码改动）。
+- ① **并入 6-8**（`dc48473`，直连棘轮 30 → 21）：7-A/7-B 变基到 6-8 之上，冲突只在
+  `shared-singleton-baseline.tsv` ⇒ **取 6-8 侧的文件行与 `# TOTAL`**（21），7 侧只保留两个登记区；
+  `# MIGRATABLE TOTAL` 按 rebase 后的**实测**重算（不把两边数字相加、不手写猜测）；
+- ② **登记区 C**（前缀 `#~` + 独立合计行 `# PREVIEW TOTAL:`）：`#Preview` 脚手架 = 组合根之外的
+  第二个合法装配点，但是**成本不是债**（预览画布拿不到 App 根注入，只能显式装配）⇒ 单独一类，
+  只登记、**不放宽扫描口径**（仍计入 `# TOTAL`）；
+- 机制**零新增手工清单**：`RegistrationCategory` 加一个 case（前缀 / 合计行标签 / 中文名）即继承 (e)(f)
+  全套守卫，**本区为空 / 缺合计行 / 条目在源码里对不上 ⇒ fail-closed 抛错**（与 A/B 同款）；
+- **登记口径修正（实测推翻任务包数字）**：7-B 当时记的是「5 处未登记」，并入 6-8 后**实测 6 处**
+  —— 6-8 给 `SyncSettingsView` 的预览又加了一条 `.environment(SyncWiringFactsStore.shared)`。
+  按「逐处实地核对文件 + 行号」原则，以实测为准。
+
+**当代算式（批 7-C，并入 6-8 基线后）**：
 
 ```
-TOTAL 24 = 系统单例 11（登记区 A） + 已登记装配点 3（登记区 B） + #Preview 脚手架 5 + 待迁（批 6-8 靶子）5
-可迁 10 = #Preview 脚手架 5 + 待迁 5
-批 6-8 合入后：TOTAL → 19、可迁 → 5（真债 0，只剩 5 处 preview 已知成本）
+TOTAL 21 = 系统单例 11（登记区 A） + 已登记装配点 3（登记区 B） + #Preview 脚手架 6（登记区 C） + 待迁 1
+可迁 1  = 待迁 1（= QQPlayer/Mac/MacSyncView.swift:79 的 `hostCenter ?? .shared`）
 ```
 
-**未登记的 5 处 `#Preview` 脚手架**（用户本次只认那 3 条装配行，故不登记；如实留在可迁里，不许藏）：
+**已登记的 6 处 `#Preview` 脚手架**（批 7-C，逐处实地核对文件 + 行号；行号 = 并入 6-8 后的）：
 `QQPlayer/ContentView.swift:239`（`AppCoordinator.shared`）/ `QQPlayer/Views/Utility/SettingsView.swift:346`
-（`LyricOffsetStore.shared`）/ `QQPlayer/Views/Utility/SyncSettingsView.swift:469,470`（`IOSPassiveSyncCenter.shared`
-+ `PlaylistCoverLoadFailuresStore.shared`）/ `QQPlayer/Views/Player/LyricsView.swift:757`（`KaraokeController.shared`）。
+（`LyricOffsetStore.shared`）/ `QQPlayer/Views/Utility/SyncSettingsView.swift:470,471,473`（`IOSPassiveSyncCenter.shared`
++ `PlaylistCoverLoadFailuresStore.shared` + `SyncWiringFactsStore.shared`）/ `QQPlayer/Views/Player/LyricsView.swift:757`
+（`KaraokeController.shared`）。
+
+**剩余可迁逐条点名（实测 1 处）**：`QQPlayer/Mac/MacSyncView.swift:79` 的 `hostCenter ?? .shared`
+—— View 的 `init` 是非隔离上下文、读不到环境值（6-8 已把同类其余 3 处收口），这处是热点自身的合法残留。
 
 ### 5.4 与结构预算棘轮的冲突（批 2 实测）
 结构预算棘轮（`structural-budget-size-baseline.tsv`）对 **>600 行的文件**规定「只能减不能增」，

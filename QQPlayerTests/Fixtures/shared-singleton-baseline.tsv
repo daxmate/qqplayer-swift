@@ -22,7 +22,8 @@
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #   **场景根之外的运行期组合根**（手工 `NSHostingView` 浮窗根等）走本文件末尾的登记区 B
 #   （`#@` 条目，批 7-B 立）：只登记、**不放宽扫描口径** ⇒ 仍计入 `# TOTAL`，只是不再算「可迁」。
-#   5 处 `#Preview` 装配**未登记**（已知脚手架成本，如实留在可迁里，见批 7-B 条目）。
+#   `#Preview` 脚手架走登记区 C（`#~` 条目，批 7-C 立；**实测 6 处 / 6 类型 / 4 文件**）：
+#   同为只登记 + 不放宽扫描口径 ⇒ 仍计入 `# TOTAL`、从可迁里扣掉（预览不可避免的装配成本，不是债）。
 #
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
@@ -153,12 +154,15 @@
 #     手工 `NSHostingView` 不继承 App 场景环境 ⇒ 这三行是**运行期真装配**，不是视图层自作主张。
 #   · 路线 = **备案式 (b)**：只登记 + 加守卫，**不放宽扫描口径**（扫描器照旧计数）。TOTAL 21 不动（6-8 后的实测值）。
 #   · 口径（随 rebase 到 6-8 基线后按实测重算）：`可迁 = TOTAL − 系统单例 11 − 已登记装配点 3` ⇒ **10 → 7**。
-#     分解：`21 = 系统单例 11 + 已登记装配点 3 + #Preview 脚手架 5 + 待迁 2`。
-#   · ⚠ **未登记的 5 处 `#Preview` 脚手架**（用户本次只认上述 3 条装配行），仍算成本、不豁免：
+#     分解：`21 = 系统单例 11 + 已登记装配点 3 + #Preview 脚手架 5 + 待迁 2`（**5 / 2 是 7-B 当时口径**；
+#     批 7-C 实测修正为 **6 / 1**，见下方 7-C 区块与登记区 C）。
+#   · ⚠ **未登记的 `#Preview` 脚手架**（本批只认上述 3 条装配行），当时仍算成本、不豁免；
+#     ✅ 批 7-C 已按实测逐处登记进登记区 C（实测 **6 处**，不是本批当时记的 5 处——6-8 又给
+#     `SyncSettingsView` 的预览添了一条 `.environment(SyncWiringFactsStore.shared)`）：
 #       `QQPlayer/ContentView.swift:239`（`AppCoordinator.shared`）
 #       `QQPlayer/Views/Utility/SettingsView.swift:346`（`LyricOffsetStore.shared`）
-#       `QQPlayer/Views/Utility/SyncSettingsView.swift:469,470`（`IOSPassiveSyncCenter.shared`
-#       + `PlaylistCoverLoadFailuresStore.shared`）
+#       `QQPlayer/Views/Utility/SyncSettingsView.swift:470,471,473`（`IOSPassiveSyncCenter.shared`
+#       + `PlaylistCoverLoadFailuresStore.shared` + `SyncWiringFactsStore.shared`）
 #       `QQPlayer/Views/Player/LyricsView.swift:757`（`KaraokeController.shared`）
 #   · 类别合计行（本文件新增，契约 (f) 校验）：`# SYSTEM-SINGLETON TOTAL:` / `# COMPOSITION-ROOT TOTAL:`。
 
@@ -179,6 +183,19 @@
 #   · 数字来源：`30` = 上一份收尾报告实测；`21` = 本次契约测试权威输出的 decreased 清单
 #     （`MacSyncCenterView.swift: 1 → 0`、`MacSyncView.swift: 3 → 1`）+ 复跑全绿（(a)(b)(c)(d) 全过 ⇒
 #     实测集合与基线逐行相等）。
+
+# ═══ 2026-09-20 批 7-C：并入 6-8 基线 + `#Preview` 脚手架登记（第三类；**无产品代码改动**）══════
+#   · ① 并入 6-8（`dc48473`）：7-A/7-B 变基到 6-8 之上，冲突只在本文件——**取 6-8 侧的文件行与
+#     `# TOTAL`**（21），7 侧只保留两个登记区；`# MIGRATABLE TOTAL` 每次按 rebase 后的**实测**重算，
+#     不把两边数字相加、不手写猜测。
+#   · ② 登记区 C（`#~`）：`#Preview` 脚手架正式登记为第三类（前缀 `#~` + 独立合计行
+#     `# PREVIEW TOTAL:`），与 A/B 同款：条目从本文件读、契约 (e) 空转检查 + 本区为空即 fail-closed
+#     （`RegistrationCategory` 加一个 case 即继承全部四道守卫，不另写手工清单）。
+#   · ③ 逐处实地核对（行号 = 并入 6-8 基线后的）：实测 **6 处 / 6 类型 / 4 文件**（见登记区 C）；
+#     任务包给的 5 处是 7-B 当时的口径，6-8 又给 `SyncSettingsView` 的预览添了一条装配。
+#   · 数字：TOTAL 21（不改，登记不是迁移）；`可迁 = 21 − 11 − 3 − 6` ⇒ **7 → 1**。
+#     剩余 1 处 = `QQPlayer/Mac/MacSyncView.swift:79` 的 `hostCenter ?? .shared`
+#     （View init 非隔离上下文、读不到环境值；6-8 已把该类其余 3 处收口），逐条点名见文件末尾。
 
 # ═══ 登记区 A：系统单例（**不消除、本批不上收**，永远留在基线里）════════════════════════════
 #   条目格式（**只此一份，契约测试直接读它**）：`#+` TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数
@@ -207,6 +224,27 @@
 #@	KaraokeController	QQPlayer/Mac/MacDesktopWindowsManager.swift	1
 # COMPOSITION-ROOT TOTAL: 3
 
+# ═══ 登记区 C：`#Preview` 脚手架（预览装配成本；**只登记，不放宽扫描口径**）════════════════
+#   与 A / B 的区别：预览是**组合根之外的第二个合法装配点**，但它的 `<Type>.shared` 是预览画布
+#   逼出来的成本（App 场景根注入不覆盖 preview 画布）——既不是「债」（不该由某批迁移消掉），
+#   也不是「我们的运行期组合根」（B 区）⇒ 独立第三类。
+#   条目格式（**只此一份，契约测试直接读它**）：`#~` TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数
+#   契约 (e) 空转检查同样适用：源码里对不上 ⇒ 红；本区为空 ⇒ fail-closed（不静默放行）。
+#   批 7-C 实测（逐处实地核对文件 + 行号，行号 = 并入 6-8 基线后的）：
+#     `QQPlayer/ContentView.swift:239` `AppCoordinator.shared`
+#     `QQPlayer/Views/Utility/SettingsView.swift:346` `LyricOffsetStore.shared`
+#     `QQPlayer/Views/Utility/SyncSettingsView.swift:470` `IOSPassiveSyncCenter.shared`
+#     `QQPlayer/Views/Utility/SyncSettingsView.swift:471` `PlaylistCoverLoadFailuresStore.shared`
+#     `QQPlayer/Views/Utility/SyncSettingsView.swift:473` `SyncWiringFactsStore.shared`
+#     `QQPlayer/Views/Player/LyricsView.swift:757` `KaraokeController.shared`
+#~	AppCoordinator	QQPlayer/ContentView.swift	1
+#~	LyricOffsetStore	QQPlayer/Views/Utility/SettingsView.swift	1
+#~	IOSPassiveSyncCenter	QQPlayer/Views/Utility/SyncSettingsView.swift	1
+#~	PlaylistCoverLoadFailuresStore	QQPlayer/Views/Utility/SyncSettingsView.swift	1
+#~	SyncWiringFactsStore	QQPlayer/Views/Utility/SyncSettingsView.swift	1
+#~	KaraokeController	QQPlayer/Views/Player/LyricsView.swift	1
+# PREVIEW TOTAL: 6
+
 
 
 QQPlayer/ContentView.swift	1
@@ -223,9 +261,11 @@ QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
-# TOTAL = 视图层直连总数（**含**全部已登记条目：系统单例 11 + 合法装配点 3）= 棘轮上限，只能减不能增。
+# TOTAL = 视图层直连总数（**含**全部已登记条目：系统单例 11 + 合法装配点 3 + `#Preview` 脚手架 6）
+#   = 棘轮上限，只能减不能增。
 # TOTAL: 21
-# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 系统单例 11 − 合法装配点 3）= 进度只看这一行。
-#   当代分解（随 rebase 到 6-8 基线后按实测重算）：21 = 系统单例 11 + 已登记装配点 3
-#     + #Preview 脚手架 5（尚未登记，仍计在可迁里）+ 待迁 2
-# MIGRATABLE TOTAL: 7
+# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 系统单例 11 − 合法装配点 3 − `#Preview` 脚手架 6）= 进度只看这一行。
+#   当代分解（并入 6-8 基线后按实测重算）：21 = 系统单例 11 + 已登记装配点 3 + #Preview 脚手架 6 + 待迁 1
+#   逐条点名剩余可迁（实测 1 处）：`QQPlayer/Mac/MacSyncView.swift:79` 的 `hostCenter ?? .shared`
+#     （View init 是非隔离上下文、读不到环境值；6-8 已把该类其余 3 处收口，这处属热点自身残留）
+# MIGRATABLE TOTAL: 1

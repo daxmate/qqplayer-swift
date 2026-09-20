@@ -20,8 +20,8 @@
 //   (b) 计数回涨：某文件出现次数 > 基线 → 红
 //   (c) 名单不腐烂：基线里的文件计数下降（含归零）或文件已不存在 → 红（该改/删行了）
 //   (d) 总数上限：全部视图文件出现次数之和 > 基线 TOTAL → 红
-//   (e) 登记条目不空转：登记区 A（系统单例 `#+`）/ B（合法装配点 `#@`）的每条条目必须在源码里
-//       仍对得上站点 → 红（防僵尸豁免）
+//   (e) 登记条目不空转：登记区 A（系统单例 `#+`）/ B（合法装配点 `#@`）/ C（`#Preview` 脚手架 `#~`）
+//       的每条条目必须在源码里仍对得上站点 → 红（防僵尸豁免）
 //   (f) 口径自洽：`可迁 TOTAL == TOTAL − Σ(全部登记条目)`，且每类合计行 == 该类条目求和 → 红
 //
 //  视图层判定（2026-09-20 口径补齐）：
@@ -63,9 +63,16 @@
 //  故在基线 TSV 里用**独立前缀 `#@` + 独立合计行**登记，且**不放宽扫描口径**
 //  （仍计入 `# TOTAL`，只是不再算「可迁」）。
 //
+//  **`#Preview` 脚手架（批 7-C 落地）：预览装配是「成本」不是「债」。**
+//  视图的 `#Preview` 要渲染就必须自己装配真实例（App 根注入不覆盖画布）⇒ `<Type>.shared`
+//  出现在预览块里不可避免（`ContentView` / `SettingsView` / `SyncSettingsView` / `LyricsView`，
+//  实测 6 处）。旧账本一直把它「如实计在可迁里」但**不登记** ⇒ 可迁预算永远清不到 0。
+//  批 7-C 把它收成第三类（前缀 `#~` + 独立合计行 `# PREVIEW TOTAL:`），与 A/B 同款 fail-closed
+//  （区缺失 / 为空 → 抛错，不静默放行），且同样**不放宽扫描口径**（仍计入 `# TOTAL`）。
+//
 //  基线文件：`QQPlayerTests/Fixtures/shared-singleton-baseline.tsv`
 //    （`路径<TAB>计数` + `# TOTAL:` + `# MIGRATABLE TOTAL:` + 各类别合计行
-//      + `#+` 系统单例条目 + `#@` 合法装配点条目）。
+//      + `#+` 系统单例条目 + `#@` 合法装配点条目 + `#~` `#Preview` 脚手架条目）。
 //  **登记只有一份来源**：两张登记区都写在基线 TSV 里，本文件只解析，不另存手工清单。
 //  预算账本 + 分批计划：`QQPlayerTests/Fixtures/shared-singleton-budget-plan.md`
 //    （每批迁完必须把 TOTAL 与涉及文件的行值**下调到实测值**——本棘轮只防变差，
@@ -93,7 +100,7 @@ private enum ViewSharedSingletonContract {
         var migratableTotal: Int
         /// 全部登记条目（登记区 A + B）；来自基线 TSV，不另存手工清单。
         var registrations: [RegistrationEntry]
-        /// 各类别合计行声明的数值（`# SYSTEM-SINGLETON TOTAL:` / `# COMPOSITION-ROOT TOTAL:`）。
+        /// 各类别合计行声明的数值（`# SYSTEM-SINGLETON TOTAL:` / `# COMPOSITION-ROOT TOTAL:` / `# PREVIEW TOTAL:`）。
         var categoryTotals: [RegistrationCategory: Int]
         var perFile: [String: Int]
 
@@ -103,17 +110,21 @@ private enum ViewSharedSingletonContract {
         }
     }
 
-    /// 登记条目类别：**前缀即类别标记**（`#+` = 系统单例；`#@` = 合法装配点 / 运行期组合根）。
-    /// 两类语义不同（系统入口不归我们管 vs 我们的运行期组合根），故分开登记、各自合计。
+    /// 登记条目类别：**前缀即类别标记**（`#+` = 系统单例；`#@` = 合法装配点 / 运行期组合根；
+    /// `#~` = `#Preview` 脚手架）。
+    /// 三类语义不同（系统入口不归我们管 vs 我们的运行期组合根 vs 预览的不可避免装配成本），
+    /// 故分开登记、各自合计。
     enum RegistrationCategory: String, CaseIterable {
         case systemSingleton
         case compositionRoot
+        case preview
 
-        /// 基线 TSV 里的条目行前缀（类别即前缀，机器可读、两类可区分）。
+        /// 基线 TSV 里的条目行前缀（类别即前缀，机器可读、各类可区分）。
         var linePrefix: String {
             switch self {
             case .systemSingleton: return "#+"
             case .compositionRoot: return "#@"
+            case .preview: return "#~"
             }
         }
 
@@ -122,6 +133,7 @@ private enum ViewSharedSingletonContract {
             switch self {
             case .systemSingleton: return "SYSTEM-SINGLETON"
             case .compositionRoot: return "COMPOSITION-ROOT"
+            case .preview: return "PREVIEW"
             }
         }
 
@@ -130,11 +142,12 @@ private enum ViewSharedSingletonContract {
             switch self {
             case .systemSingleton: return "系统单例（`#+`）"
             case .compositionRoot: return "合法装配点 / 运行期组合根（`#@`）"
+            case .preview: return "`#Preview` 脚手架（`#~`）"
             }
         }
     }
 
-    /// 登记条目（`#+` / `#@` TAB 类型 TAB 相对路径 TAB 站点数）。
+    /// 登记条目（`#+` / `#@` / `#~` TAB 类型 TAB 相对路径 TAB 站点数）。
     struct RegistrationEntry: Equatable {
         var category: RegistrationCategory
         var type: String
@@ -181,13 +194,13 @@ private enum ViewSharedSingletonContract {
     private static let migratableTotalPattern = try! NSRegularExpression(
         pattern: "^#\\s*MIGRATABLE\\s+TOTAL:\\s*([0-9]+)\\s*$"
     )
-    /// 登记条目（**唯一实现**，两类共用一条正则）：**前缀即类别** —— `#+` 系统单例 / `#@` 合法装配点
-    /// （前缀整段在捕获组 1）；后三段 = TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数。
+    /// 登记条目（**唯一实现**，各类别共用一条正则）：**前缀即类别** —— `#+` 系统单例 / `#@` 合法装配点 /
+    /// `#~` `#Preview` 脚手架（前缀整段在捕获组 1）；后三段 = TAB 类型名 TAB 相对路径 TAB 该类型在该文件的站点数。
     private static let registrationPattern = try! NSRegularExpression(
-        pattern: "^(#[+@])\\t([A-Za-z_][A-Za-z0-9_]*)\\t([^\\t]+?)\\t([0-9]+)\\s*$"
+        pattern: "^(#[+@~])\\t([A-Za-z_][A-Za-z0-9_]*)\\t([^\\t]+?)\\t([0-9]+)\\s*$"
     )
 
-    /// 类别合计行（`# SYSTEM-SINGLETON TOTAL: N` / `# COMPOSITION-ROOT TOTAL: N`）。
+    /// 类别合计行（`# SYSTEM-SINGLETON TOTAL: N` / `# COMPOSITION-ROOT TOTAL: N` / `# PREVIEW TOTAL: N`）。
     /// 由类别标签拼出（单一来源：标签只在 `totalLineLabel` 定义一次）。
     static func categoryTotalPattern(for category: RegistrationCategory) -> NSRegularExpression {
         try! NSRegularExpression(pattern: "^#\\s*\(category.totalLineLabel)\\s+TOTAL:\\s*([0-9]+)\\s*$")
@@ -209,7 +222,7 @@ private enum ViewSharedSingletonContract {
     }
 
     /// 登记条目解析（**唯一实现**：`parseBaseline` 与自证用例共用）；非登记行返回 nil。
-    /// 前缀决定类别：`#+` → `.systemSingleton`；`#@` → `.compositionRoot`；其它前缀 → nil。
+    /// 前缀决定类别：`#+` → `.systemSingleton`；`#@` → `.compositionRoot`；`#~` → `.preview`；其它前缀 → nil。
     static func parseRegistrationEntry(for line: String) -> RegistrationEntry? {
         let range = NSRange(line.startIndex ..< line.endIndex, in: line)
         guard let match = registrationPattern.firstMatch(in: line, range: range),
@@ -310,7 +323,7 @@ private enum ViewSharedSingletonContract {
     /// 基线清单解析（**纯函数**：文本 → `Baseline`；读盘在 `baseline()`）。
     /// 解析口径：`路径<TAB>计数`；`#` 开头是注释，其中 `# TOTAL: N` = 棘轮上限、
     /// `# MIGRATABLE TOTAL: N` = 可迁预算、`# <类别> TOTAL: N` = 类别合计、
-    /// `#+` / `#@` 行 = 登记条目（`#+` 系统单例 / `#@` 合法装配点）。
+    /// `#+` / `#@` / `#~` 行 = 登记条目（`#+` 系统单例 / `#@` 合法装配点 / `#~` `#Preview` 脚手架）。
     static func parseBaseline(_ text: String) throws -> Baseline {
         var perFile: [String: Int] = [:]
         var total: Int?
@@ -450,7 +463,7 @@ struct ViewSharedSingletonContractTests {
         )
     }
 
-    @Test("(e) 登记条目不空转：系统单例 + 合法装配点的每条条目必须在源码里仍对得上站点（防僵尸豁免）")
+    @Test("(e) 登记条目不空转：系统单例 + 合法装配点 + `#Preview` 脚手架的每条条目必须在源码里仍对得上站点（防僵尸豁免）")
     func registrationEntriesStillHitSource() throws {
         let baseline = try ViewSharedSingletonContract.baseline()
         for category in ViewSharedSingletonContract.RegistrationCategory.allCases {
@@ -534,13 +547,25 @@ struct ViewSharedSingletonContractTests {
                 count: 2
             )
         )
-        // 非登记行不得被当成条目（普通文件行 / TOTAL 行 / 可迁行 / 两个类别合计行 / 普通注释）
+        // 条目解析：`#~` → `#Preview` 脚手架（类别由前缀决定，三类可区分）
+        #expect(
+            ViewSharedSingletonContract.parseRegistrationEntry(
+                for: "#~\tAppCoordinator\tQQPlayer/ContentView.swift\t1"
+            ) == ViewSharedSingletonContract.RegistrationEntry(
+                category: .preview,
+                type: "AppCoordinator",
+                relativePath: "QQPlayer/ContentView.swift",
+                count: 1
+            )
+        )
+        // 非登记行不得被当成条目（普通文件行 / TOTAL 行 / 可迁行 / 三个类别合计行 / 普通注释）
         for line in [
             "QQPlayer/ContentView.swift\t1",
-            "# TOTAL: 24",
-            "# MIGRATABLE TOTAL: 13",
+            "# TOTAL: 21",
+            "# MIGRATABLE TOTAL: 1",
             "# SYSTEM-SINGLETON TOTAL: 11",
             "# COMPOSITION-ROOT TOTAL: 3",
+            "# PREVIEW TOTAL: 6",
             "# 普通注释",
         ] {
             #expect(ViewSharedSingletonContract.parseRegistrationEntry(for: line) == nil, "误吃：\(line)")
@@ -553,24 +578,29 @@ struct ViewSharedSingletonContractTests {
 
     @Test("自证：类别口径 fail-closed（缺一类别 / 缺合计行 / 缺可迁行 ⇒ 抛错，不静默放行）")
     func registrationFailClosedSelfTest() throws {
-        let good = "# TOTAL: 3\n"
-            + "# MIGRATABLE TOTAL: 1\n"
+        let good = "# TOTAL: 4\n"
+            + "# MIGRATABLE TOTAL: 0\n"
             + "#+\tUIApplication\tA.swift\t2\n"
             + "# SYSTEM-SINGLETON TOTAL: 2\n"
             + "#@\tPlayerEngine\tB.swift\t1\n"
             + "# COMPOSITION-ROOT TOTAL: 1\n"
+            + "#~\tAppCoordinator\tC.swift\t1\n"
+            + "# PREVIEW TOTAL: 1\n"
             + "A.swift\t2\n"
             + "B.swift\t1\n"
+            + "C.swift\t1\n"
 
-        // 正向：两个类别都解析出来，类别合计 / 条目 / 文件行各自到位
+        // 正向：三个类别都解析出来，类别合计 / 条目 / 文件行各自到位
         let parsed = try ViewSharedSingletonContract.parseBaseline(good)
-        #expect(parsed.total == 3)
-        #expect(parsed.migratableTotal == 1)
-        #expect(parsed.registrations.count == 2)
+        #expect(parsed.total == 4)
+        #expect(parsed.migratableTotal == 0)
+        #expect(parsed.registrations.count == 3)
         #expect(parsed.entries(of: .systemSingleton).count == 1)
         #expect(parsed.entries(of: .compositionRoot).count == 1)
+        #expect(parsed.entries(of: .preview).count == 1)
         #expect(parsed.categoryTotals[.systemSingleton] == 2)
         #expect(parsed.categoryTotals[.compositionRoot] == 1)
+        #expect(parsed.categoryTotals[.preview] == 1)
         #expect(parsed.perFile["A.swift"] == 2)
 
         // 反向（每条都必须抛错，不得静默放行）：
@@ -592,15 +622,26 @@ struct ViewSharedSingletonContractTests {
                 good.replacingOccurrences(of: "# COMPOSITION-ROOT TOTAL: 1\n", with: "")
             )
         }
-        // 缺可迁口径行 / 缺上限行
+        // 批 7-C 新类别 `#~`（`#Preview` 脚手架）整区缺失 / 缺其合计行 ⇒ 同样 fail-closed
         #expect(throws: ViewSharedSingletonContract.ContractError.self) {
             _ = try ViewSharedSingletonContract.parseBaseline(
-                good.replacingOccurrences(of: "# MIGRATABLE TOTAL: 1\n", with: "")
+                good.replacingOccurrences(of: "#~\tAppCoordinator\tC.swift\t1\n", with: "")
             )
         }
         #expect(throws: ViewSharedSingletonContract.ContractError.self) {
             _ = try ViewSharedSingletonContract.parseBaseline(
-                good.replacingOccurrences(of: "# TOTAL: 3\n", with: "")
+                good.replacingOccurrences(of: "# PREVIEW TOTAL: 1\n", with: "")
+            )
+        }
+        // 缺可迁口径行 / 缺上限行
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "# MIGRATABLE TOTAL: 0\n", with: "")
+            )
+        }
+        #expect(throws: ViewSharedSingletonContract.ContractError.self) {
+            _ = try ViewSharedSingletonContract.parseBaseline(
+                good.replacingOccurrences(of: "# TOTAL: 4\n", with: "")
             )
         }
         // 文件行格式坏
