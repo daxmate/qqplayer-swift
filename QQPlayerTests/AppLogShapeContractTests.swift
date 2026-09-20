@@ -844,9 +844,21 @@ struct AppLogBehaviorTests {
 
         AppLog.warn(.db, "⚠️ 打开失败\nerror=disk full")
         let written = try String(contentsOf: url, encoding: .utf8)
-        #expect(written.split(separator: "\n", omittingEmptySubsequences: false).count == 2)
-        #expect(written.contains("[WARN] [db] ⚠️ 打开失败⏎error=disk full"))
-        #expect(written.hasPrefix("[") && written.hasSuffix("error=disk full\n"))
+        // 不能做「文件内容全等 / 行数全等」断言：`logFileURLOverride` 是**进程级全局**，
+        // Swift Testing 会并行跑本套件之外的用例，别的测试的 warn+ 记录（实测混入 `[db]` 行）
+        // 会落到同一文件 → 全等断言偶发红。故改为「断言本测试期望的那一行确实在文件里，
+        // 且时间戳/级别/类别/消息形态都正确」——信息量不降，只是不再要求文件里没有别的行。
+        let expectedMessage = "⚠️ 打开失败⏎error=disk full"
+        let matched = written
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { $0.contains(expectedMessage) }
+        #expect(!matched.isEmpty, "期望的 WARN 行没落盘，实际内容：\(written)")
+        for line in matched {
+            #expect(line.hasPrefix("["), "缺时间戳前缀：\(line)")
+            #expect(line.contains("[WARN] [db] \(expectedMessage)"), "级别/类别/消息不对：\(line)")
+            #expect(line.hasSuffix(expectedMessage), "消息被截断：\(line)")
+        }
     }
 }
 
