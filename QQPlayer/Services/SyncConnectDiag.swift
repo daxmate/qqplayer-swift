@@ -50,7 +50,10 @@ enum SyncConnectDiag {
         guard enabled else { return }
         let line = "[\(timestamp())] \(message)\n"
         #if os(iOS)
-            queue.async { append(line) }
+            queue.async {
+                guard let url = logFileURL() else { return }
+                append(line, to: url)
+            }
         #else
             // macOS：走既有 stdout 重定向（print 即落到 stdout.log；无额外文件 IO）
             print(line, terminator: "")
@@ -62,9 +65,25 @@ enum SyncConnectDiag {
     }
 
     #if os(iOS)
-        private static func append(_ line: String) {
-            guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-                .first?.appendingPathComponent("sync-diag.log") else { return }
+        /// 落点覆盖（测试注入；默认 nil ⇒ App 容器 `Documents/sync-diag.log`）。
+        ///
+        /// 为什么留这个缝：落点原本写死在 App 容器里，环形截断（超 256KB 留尾部 64KB）
+        /// 这一行为在测试内**无法确定性观察**（全进程共享单文件 + 真机容器路径）——
+        /// 真机出问题时只能靠人肉拉日志推断。缝只影响落点解析，不改任何业务分支。
+        /// `nonisolated(unsafe)` 与 `LyricsManager.manualLyricsDirectoryOverride` 同款：
+        /// 只由测试在用例内写入（串行用例 + 结束即复原），生产只读。
+        nonisolated(unsafe) static var logFileURLOverride: URL?
+
+        /// 落点解析（唯一出口）。
+        static func logFileURL() -> URL? {
+            if let logFileURLOverride { return logFileURLOverride }
+            return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+                .first?.appendingPathComponent("sync-diag.log")
+        }
+
+        /// 环形截断 + 追加（同步实现：`log()` 在诊断队列上调用它）。
+        /// 超 256KB → 先留尾部 64KB，再追加本次这一行。
+        static func append(_ line: String, to url: URL) {
             do {
                 if FileManager.default.fileExists(atPath: url.path),
                    let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
