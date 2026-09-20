@@ -65,7 +65,10 @@ final class SyncPeerSession: @unchecked Sendable {
     var pairingCandidate: SyncPairingCandidate?
     var sendCipher: SyncCipher?
     var receiveCipher: SyncCipher?
-    private var deadlineItem: DispatchWorkItem?
+    private var deadlineItem: (any SyncScheduledDeadline)?
+
+    /// 超时调度入口（唯一入口；测试注入手动调度器 = 显式触发，不等真实定时器）
+    private let deadlineScheduler: any SyncDeadlineScheduling
 
     // MARK: init / 公开查询
 
@@ -75,7 +78,8 @@ final class SyncPeerSession: @unchecked Sendable {
         trustStore: any SyncTrustStore,
         config: SyncSessionConfiguration = SyncSessionConfiguration(),
         pairingNonces: SyncPairingNonceRegistry? = nil,
-        transport: (any SyncPeerTransport)? = nil
+        transport: (any SyncPeerTransport)? = nil,
+        deadlineScheduler: any SyncDeadlineScheduling = DispatchSyncDeadlineScheduler.shared
     ) {
         self.role = role
         self.localIdentity = localIdentity
@@ -83,6 +87,7 @@ final class SyncPeerSession: @unchecked Sendable {
         self.config = config
         self.pairingNonces = pairingNonces
         self.transport = transport
+        self.deadlineScheduler = deadlineScheduler
     }
 
     var phase: SyncSessionPhase {
@@ -313,16 +318,12 @@ final class SyncPeerSession: @unchecked Sendable {
 
     // MARK: 超时
 
+    /// 重挂握手超时（走注入的调度入口；手在批准阶段不调用，见 `phaseNeedsHandshakeDeadline`）。
     func scheduleDeadlineLocked() {
         cancelDeadlineLocked()
-        let workItem = DispatchWorkItem { [weak self] in
+        deadlineItem = deadlineScheduler.schedule(after: config.handshakeTimeout) { [weak self] in
             self?.handleDeadline()
         }
-        deadlineItem = workItem
-        DispatchQueue.global(qos: .utility).asyncAfter(
-            deadline: .now() + config.handshakeTimeout,
-            execute: workItem
-        )
     }
 
     func cancelDeadlineLocked() {
