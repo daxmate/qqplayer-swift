@@ -15,9 +15,14 @@
 
 ## 一、现状盘点（2026-09-19，卡在 HEAD `625ae43`）
 
-**口径**（与 `ViewSharedSingletonContractTests` 逐字一致）：视图层 = `QQPlayer/Views/**` 全部
-+ `QQPlayer/Mac/**` 中声明了 SwiftUI View（`: View` / `some View`）的文件；只算代码行
+**口径**（2026-09-20 已补齐，与 `ViewSharedSingletonContractTests` 逐字一致）：视图层 =
+**全 `QQPlayer/**` 中声明了 SwiftUI View（`: View` / `some View`）的文件** ⊕ `QQPlayer/Views/**` 全部
+（并集保留通配：`UIViewRepresentable` / `UIImage` 扩展这类不声明 View 的视图层 helper）；只算代码行
 （`//` 之后剥离），粒度为 `<Type>.shared` 的出现次数。
+
+> ⚠️ 旧口径（≤2026-09-19）= `QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中的 View 文件：
+> **仓库根目录与 `AppIntents/**` 里的视图完全不在扫描范围**（下文 174 / 118 等历史数字都是旧口径）。
+> 本批先补齐口径（118 → 126，+8 全是既有存量显形），再把那 8 处清掉（126 → **116**）。
 
 - **174 处 / 48 个视图文件 / 29 个对象**
 - 其中 **11 处是 Apple 的系统单例**（`UIApplication` 4 / `WidgetCenter` 3 / `URLSession` 2 /
@@ -99,6 +104,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 5（2026-09-19） | `LyricsManager`（**`actor`**，8 处）→ `AppServices` 容器 | 直连棘轮 141 → **133**（真迁 8 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 5b-1（2026-09-20） | `DesktopWindowsManager`（`ObservableObject` → `@Observable`，5 处；Mac 专属浮窗） | 直连棘轮 133 → **128**（真迁 5 处，0 preview 成本）；迁移棘轮 184/98 → **180/96** | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 + 长文件行数净零 |
 | 批 5b-2（2026-09-20） | `EQManager`（`ObservableObject` → `@Observable`，10 处 / 8 文件 / 9 个 struct） | 直连棘轮 128 → **118**（真迁 10 处，0 preview 成本）；迁移棘轮 180/96 → **164/86** | iOS 全量 1679/211 + Mac 零警告 + 预算/print 双绿 + target 门禁 + `EQManager.swift` 行数净零 |
+| **批 6-0（2026-09-20，本批）** | **口径补齐 + 8 处显形债**（无新对象迁移；`CarPlayTrackFilter` / `IntentArtworkService` 两个唯一入口） | 直连棘轮 118 →（口径）**126** →（清 8 处）**116**。逐项：`WhatsNewStore`×3 → `AppServices.whatsNew`；`DatabaseManager.shared`×1 → `LibraryReads.allTracks()`；CarPlay 格式过滤 5 文件判据收口 → `CarPlayTrackFilter`（真迁 5 处）；意图封面 ×1 → `IntentArtworkService`；残留 2 处＝`LibraryIndexer.shared`（批 6 热点）+ `#Preview` 装配（脚手架） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
 > 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
@@ -288,11 +294,51 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 - 这四类一动，涉及 21 个视图文件 + 跨端行为一致性，必须分批、每批真机验收。
 - 预估：−87 处（可迁预算清零）。
 
-### 批 7：扫描范围补洞（收尾）
-把 `QQPlayer/` 根目录下的**真实视图文件**纳入扫描（现在 `QQPlayer/ContentView.swift`、
-`QQPlayer/CarPlay+PlayerPage.swift` 等不在 `Views/**` 也不在 `Mac/**`，`ContentView` 里
-`@StateObject private var libraryIndexer = LibraryIndexer.shared` 这类直连**完全没被计数**）。
-- 需要先测出这些文件的实际存量，再一次性并进 TOTAL（属"口径收紧"，账本同样要记账）。
+### 批 6-0：扫描口径补齐 + 显形债清理 —— 实测完成（2026-09-20）
+
+原先挂在「批 7：扫描范围补洞」的那件事（根目录视图不在扫描范围）在本批先做完了。
+
+**① 口径（`ViewSharedSingletonContractTests`）**：
+- 旧：`QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中的 View 文件；
+- 新：**全 `QQPlayer/**` 中声明 SwiftUI View 的文件** ⊕ `QQPlayer/Views/**` 全部
+  （与 `EnvironmentInjectionContractTests` 同款口径；保留 `Views/**` 通配是为了**不放松**——
+  实测该目录下有 6 个不声明 `: View` 的视图层 helper：`MusicFilePicker`（`UIViewControllerRepresentable`）、
+  `PlayerUtilityViews`（`UIViewRepresentable`）、`PlayerGestureLogic`、`SyncAutoConnect`、
+  `PlaylistSharedViews`、`UtilityViews`），
+- 口径判定抽成 `isViewLayerFile(relativePath:source:)` 唯一实现，检测抽成纯函数
+  `detectedOccurrences(in:)` ⇒ **口径自证用例**（合成一个根目录视图文件确认被抓到，
+  且服务层文件不误伤）+ 磁盘真实文件的反向断言；
+- 同一轮把 `repositoryFiles()` 的**逐文件读取失败定义为抛错**（fail-closed，不静默当「没违规」）。
+
+**② 首次可见的存量（`# TOTAL` 118 → 126，+8 = 纯口径变化，不是新增直连）**：
+
+| 文件 | 处数 | 处置 |
+| --- | ---: | --- |
+| `QQPlayer/ContentView.swift` | 7 | `WhatsNewStore`×3 → `services.whatsNew`（批 3b 容器）；`DatabaseManager.shared.getAllTracks()` → **`LibraryReads.allTracks()`**（数据访问唯一入口，视图侧本就不允许直连 DB）；CarPlay 过滤 → `CarPlayTrackFilter`；**残留 2**：`LibraryIndexer.shared`（热点，见下）+ `#Preview` 的 `.environmentObject(AppCoordinator.shared)`（脚手架成本，§5.2） |
+| `QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift` | 1 | `ArtworkManager.shared` → **`IntentArtworkService`**（意图层 `@Dependency` 唯一入口，与 `IntentPlaybackService` 同款；意图没有环境链，服务就是它的通道）→ 归零删行 |
+
+**③ 顺带收口的同类消费点（纪律：修一处先 grep 同类）**：
+「CarPlay 下剔除 ogg/opus/dsf/dff」这段判据原先在 **5 个视图文件**里各写一遍
+（`ContentView` / `PlaylistDetailScreen` / `TrackListView` / `ArtistDetailScreen` / `AlbumViews`，
+名单是同一份字面量）⇒ 新建唯一入口 `QQPlayer/Services/CarPlayTrackFilter.swift`
+（`isActive` / `isCompatible(_:)` / `filtered(_:)`），5 处全部改调用：真迁 5 处，
+`AlbumViews` 3→2、`ArtistDetailScreen` 4→3、`TrackListView` 3→2、`PlaylistDetailScreen` 4→3、`ContentView` 7→2。
+- 行为零变化：名单内容 / 扩展名小写化 / 过滤时机均未变；视图仍在同一处读环境值
+  （原先直读 `.shared` 本就不产生订阅，现在同样不产生 → 刷新时机一致）；
+- 隔离：`SFBAudioEngineManager` 是 `@MainActor`，故入口标 `@MainActor`（否则本批会直接编译红——实测）。
+
+**④ 本批不动的两处（有意留在基线里）**：
+- `ContentView` 的 `@StateObject private var libraryIndexer = LibraryIndexer.shared`：`LibraryIndexer` 是
+  `ObservableObject`，且**有 `$isIndexing` Combine 订阅方**（`SpotlightLibraryIndexer.swift:33`）
+  ⇒ 裸迁 `@Observable` 会**静默失效**（同 `MacSpectrumAnalyzer`）；且视图按属性追踪 `isIndexing`，
+  也不能走「无状态容器」通道（会丢 `onChange` 刷新）。**必须先改订阅机制，属批 6 热点。**
+- `#Preview` 里的 `.environmentObject(AppCoordinator.shared)`：preview 只能拿真实例，按 §5.2 计脚手架成本。
+
+**⑤ 发现的同类盲区（未在本批处理）**：`ViewDataAccessContractTests`（视图不得直连
+`DatabaseManager`）用的仍是旧口径（`Views/**` + `Mac/**`），**根目录视图同样不可见**——
+本批 `ContentView` 那处 `DatabaseManager.shared.getAllTracks()` 它本来就看不见。
+口径补齐需单独一批（要重新测存量并再基线）。
+
 
 ---
 

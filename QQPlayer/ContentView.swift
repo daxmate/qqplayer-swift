@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppServices.self) private var services
     @StateObject private var libraryIndexer = LibraryIndexer.shared
 
     @State private var tracks: [Track] = []
@@ -72,16 +73,13 @@ struct ContentView: View {
     @Sendable private func refreshLibrary() async {
         do {
             let allTracks = try await Task.detached(priority: .userInitiated) {
-                try DatabaseManager.shared.getAllTracks()
+                // 视图层只读查询的唯一入口（LibraryReads），不直连 DatabaseManager
+                try LibraryReads.allTracks()
             }.value
 
-            // Filter out incompatible formats when connected to CarPlay
-            if SFBAudioEngineManager.shared.isCarPlayEnvironment {
-                tracks = allTracks.filter { track in
-                    let ext = URL(fileURLWithPath: track.path).pathExtension.lowercased()
-                    let incompatibleFormats = ["ogg", "opus", "dsf", "dff"]
-                    return !incompatibleFormats.contains(ext)
-                }
+            // CarPlay 连接时剔除不兼容格式：判据与名单的唯一实现在 CarPlayTrackFilter
+            if CarPlayTrackFilter.isActive {
+                tracks = CarPlayTrackFilter.filtered(allTracks)
                 print("🚗 CarPlay: Filtered \(allTracks.count - tracks.count) incompatible tracks")
             } else {
                 tracks = allTracks
@@ -127,6 +125,7 @@ struct LifecycleModifier: ViewModifier {
     @Binding var showTutorial: Bool
     @Binding var showWhatsNew: Bool
     let onRefresh: @Sendable () async -> Void
+    @Environment(AppServices.self) private var services
     @State private var hasPendingIndexRefresh = false
 
     /// 启动流程 sheet 决策：Tutorial 优先（首次引导）；Tutorial 不需要时检查
@@ -134,9 +133,9 @@ struct LifecycleModifier: ViewModifier {
     private func checkStartupSheets() {
         if TutorialViewModel.shouldShowTutorial() {
             showTutorial = true
-        } else if WhatsNewStore.shared.shouldShowCurrent() {
+        } else if services.whatsNew.shouldShowCurrent() {
             showWhatsNew = true
-            WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
+            services.whatsNew.markSeen(WhatsNewContent.currentVersion)
         }
     }
 
@@ -197,6 +196,7 @@ struct SheetModifier: ViewModifier {
     @Binding var showWhatsNew: Bool
     @Binding var showPlaylistManagement: Bool
     @Binding var showSettings: Bool
+    @Environment(AppServices.self) private var services
     @State private var settings = DeleteSettings.load()
 
     /// 当前强调色（同 ContentView：唯一取数 = `IOSAppearance`，唯一字段 = `accentColorName`）
@@ -209,7 +209,7 @@ struct SheetModifier: ViewModifier {
                     showTutorial = false
                     // 全新安装用户引导完成 = 已看过本版通告：记已读，避免 Tutorial 后
                     // 再弹 WhatsNew（下次升级才弹）
-                    WhatsNewStore.shared.markSeen(WhatsNewContent.currentVersion)
+                    services.whatsNew.markSeen(WhatsNewContent.currentVersion)
                 })
                 .accentColor(accentColor)
             }

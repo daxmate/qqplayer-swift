@@ -57,16 +57,8 @@ struct ArtistDetailScreen: View {
             }
         }
 
-        // Filter out incompatible formats when connected to CarPlay
-        if SFBAudioEngineManager.shared.isCarPlayEnvironment {
-            cachedArtistTracks = tracks.filter { track in
-                let ext = URL(fileURLWithPath: track.path).pathExtension.lowercased()
-                let incompatibleFormats = ["ogg", "opus", "dsf", "dff"]
-                return !incompatibleFormats.contains(ext)
-            }
-        } else {
-            cachedArtistTracks = tracks
-        }
+        // CarPlay 连接时剔除不兼容格式（名单与判据的唯一入口 = CarPlayTrackFilter）
+        cachedArtistTracks = CarPlayTrackFilter.filtered(tracks)
         artistTracksLoaded = true
     }
 

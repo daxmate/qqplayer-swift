@@ -32,10 +32,10 @@ QQPlayer/Sync/SyncCollectionSyncCoordinator.swift	874
 QQPlayer/Sync/SyncEntityRegistry.swift	651
 QQPlayer/Sync/SyncFileReceiver.swift	607
 QQPlayer/Sync/SyncPeerSession+Frames.swift	649
-QQPlayer/Views/Albums/AlbumViews.swift	651
+QQPlayer/Views/Albums/AlbumViews.swift	643
 QQPlayer/Views/Library/LibraryView.swift	691
 QQPlayer/Views/Library/SearchResultsViews.swift	746
 QQPlayer/Views/Player/LyricsView.swift	758
 QQPlayer/Views/Player/PlayerView.swift	985
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	640
-# TOTAL: 22440
+QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	631
+# TOTAL: 22423

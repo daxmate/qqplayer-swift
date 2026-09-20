@@ -16,6 +16,7 @@ enum AppIntentsDependencies {
         #if canImport(MediaIntents)
             if #available(iOS 27.0, *) {
                 AppDependencyManager.shared.add(dependency: IntentEntityStore())
+                AppDependencyManager.shared.add(dependency: IntentArtworkService())
             }
         #endif
     }

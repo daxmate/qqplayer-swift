@@ -34,15 +34,8 @@ struct TrackListView: View {
 
     // Sorting logic stays here
     private var sortedTracks: [Track] {
-        let filteredTracks: [Track]
-        if SFBAudioEngineManager.shared.isCarPlayEnvironment {
-            filteredTracks = tracks.filter { track in
-                let ext = URL(fileURLWithPath: track.path).pathExtension.lowercased()
-                return !["ogg", "opus", "dsf", "dff"].contains(ext)
-            }
-        } else {
-            filteredTracks = tracks
-        }
+        // CarPlay 连接时剔除不兼容格式（名单与判据的唯一入口 = CarPlayTrackFilter）
+        let filteredTracks = CarPlayTrackFilter.filtered(tracks)
 
         switch sortOption {
         case .playlistOrder: return filteredTracks

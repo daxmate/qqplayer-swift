@@ -21,9 +21,20 @@
 //   (c) 名单不腐烂：基线里的文件计数下降（含归零）或文件已不存在 → 红（该改/删行了）
 //   (d) 总数上限：全部视图文件出现次数之和 > 基线 TOTAL → 红
 //
-//  视图层判定（与 `ViewDataAccessContractTests` 同一口径）：
-//    `QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中声明了 SwiftUI View
-//    （`: View` / `some View`）的文件。`QQPlayer/Mac/` 下的服务不在范围内。
+//  视图层判定（2026-09-20 口径补齐）：
+//    ① 全 `QQPlayer/**` 中**声明了 SwiftUI View**（`: View` / `some View`）的文件
+//       —— 与 `EnvironmentInjectionContractTests` 同款口径；
+//    ② 并集保留 `QQPlayer/Views/**` 全部文件（含 `UIViewRepresentable` / `UIViewControllerRepresentable` /
+//       `UIImage` 扩展这类不声明 `: View` 的视图层 helper）——**口径只紧不松**，
+//       新口径是并集的一侧，不能因为改口径把既有覆盖丢掉。
+//    非视图文件（`Services/**` 中不声明 View 的服务、`Mac/**` 下的服务等）不在范围内。
+//
+//  **口径事故（本次修）**：原口径是「`QQPlayer/Views/**` 全部 + `QQPlayer/Mac/**` 中的 View 文件」
+//  ⇒ **仓库根目录视图（`QQPlayer/ContentView.swift`）与 `QQPlayer/AppIntents/**` 里的 View**
+//  完全不在扫描范围，其直连 `.shared` 一处都看不见（实测漏检 2 文件 / 8 处：
+//  `ContentView` 7 · `AppIntents/Snippets/SongCardSnippetIntent` 1）。
+//  同类口径问题在 `EnvironmentInjectionContractTests` 已修过一次（根目录视图漏检）——
+//  两处口径现已对齐，且各自带「口径自证」用例（合成根目录视图必须被抓到）。
 //  计数口径：只算**代码行**（`//` 之后剥离、整行注释不计——文档注释里的字面量会误伤自己），
 //    粒度为「`<Type>.shared` 的出现次数」，两种写法都算：
 //      · 显式 `Foo.shared`（与 `grep -oE '[A-Za-z_]+\.shared'` 同口径）
@@ -46,10 +57,11 @@ private enum ViewSharedSingletonContract {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
 
-    /// `QQPlayer/Views/**` 全部算视图层。
-    static let unfilteredViewDirectory = "QQPlayer/Views"
-    /// `QQPlayer/Mac/` 下只有声明了 SwiftUI View 的文件算视图层。
-    static let filteredViewDirectory = "QQPlayer/Mac"
+    /// 扫描根目录：全 `QQPlayer/**`（2026-09-20 口径补齐——根目录 / `AppIntents/**` 的视图此前不可见）。
+    static let scannedDirectory = "QQPlayer"
+    /// 视图层 helper 目录：`QQPlayer/Views/**` 全部文件仍计入（含不声明 `: View` 的视图层 helper）。
+    /// **口径只紧不松**：新口径（声明 View 的文件）是并集的一侧，通配保留不放松既有覆盖。
+    static let legacyViewDirectory = "QQPlayer/Views"
     static let baselinePath = "QQPlayerTests/Fixtures/shared-singleton-baseline.tsv"
 
     struct Baseline {
@@ -84,7 +96,7 @@ private enum ViewSharedSingletonContract {
     )
     private static let totalPattern = try! NSRegularExpression(pattern: "^#\\s*TOTAL:\\s*([0-9]+)\\s*$")
 
-    /// 是否声明了 SwiftUI View（决定 `QQPlayer/Mac/` 下的文件算不算视图层）。
+    /// 是否声明了 SwiftUI View（决定该文件算不算视图层）。
     static func declaresSwiftUIView(_ source: String) -> Bool {
         if source.contains(": View") { return true }
         if source.contains("some View") { return true }
@@ -106,44 +118,58 @@ private enum ViewSharedSingletonContract {
             .reduce(0) { $0 + occurrences(inCodeLine: String($1)) }
     }
 
-    static func swiftFiles(under relativeDirectory: String) throws -> [URL] {
-        let directory = repositoryRoot.appendingPathComponent(relativeDirectory)
+    /// 口径判定（**唯一实现**：契约与自证共用）：
+    /// `QQPlayer/Views/**` 全部 + 其余位置里声明了 SwiftUI View 的文件。
+    static func isViewLayerFile(relativePath: String, source: String) -> Bool {
+        if relativePath.hasPrefix(legacyViewDirectory + "/") { return true }
+        return declaresSwiftUIView(source)
+    }
+
+    /// 仓库内全部 `QQPlayer/**` Swift 文件（相对路径 + 源码）。
+    /// 逐文件读取，读不出来即抛错（fail-closed，绝不静默当成「没违规」）。
+    static func repositoryFiles() throws -> [(relativePath: String, source: String)] {
+        let directory = repositoryRoot.appendingPathComponent(scannedDirectory)
         guard let enumerator = FileManager.default.enumerator(
             at: directory,
             includingPropertiesForKeys: [.isRegularFileKey]
         ) else {
-            throw ContractError.directoryUnreadable(relativeDirectory)
+            throw ContractError.directoryUnreadable(scannedDirectory)
         }
-        var files: [URL] = []
+        let prefix = repositoryRoot.path + "/"
+        var files: [(relativePath: String, source: String)] = []
+        var unreadable: [String] = []
         for case let url as URL in enumerator where url.pathExtension == "swift" {
-            files.append(url)
+            let relative = url.path.replacingOccurrences(of: prefix, with: "")
+            if let source = try? String(contentsOf: url, encoding: .utf8) {
+                files.append((relative, source))
+            } else {
+                unreadable.append(relative)
+            }
         }
-        return files.sorted { $0.path < $1.path }
+        guard unreadable.isEmpty else {
+            throw ContractError.directoryUnreadable("以下文件读不到：\(unreadable.sorted())")
+        }
+        return files.sorted { $0.relativePath < $1.relativePath }
     }
 
-    /// 实际检测结果：相对路径 → 出现次数（只含 > 0 的文件）。
-    static func detectedOccurrences() throws -> [String: Int] {
+    /// 检测结果：相对路径 → 出现次数（只含 > 0 的**视图层**文件）。
+    /// 纯函数（输入 = 文件清单）——口径自证用例靠它合成根目录视图文件，不必真写盘。
+    static func detectedOccurrences(
+        in files: [(relativePath: String, source: String)]
+    ) -> [String: Int] {
         var result: [String: Int] = [:]
-        let prefix = repositoryRoot.path + "/"
-
-        var scanned: [URL] = []
-        for url in try swiftFiles(under: unfilteredViewDirectory) {
-            scanned.append(url)
-        }
-        for url in try swiftFiles(under: filteredViewDirectory) {
-            let source = try String(contentsOf: url, encoding: .utf8)
-            guard declaresSwiftUIView(source) else { continue }
-            scanned.append(url)
-        }
-
-        for url in scanned {
-            let source = try String(contentsOf: url, encoding: .utf8)
-            let count = occurrenceCount(in: source)
+        for file in files {
+            guard isViewLayerFile(relativePath: file.relativePath, source: file.source) else { continue }
+            let count = occurrenceCount(in: file.source)
             guard count > 0 else { continue }
-            let relative = url.path.replacingOccurrences(of: prefix, with: "")
-            result[relative] = count
+            result[file.relativePath] = count
         }
         return result
+    }
+
+    /// 实际检测结果（仓库真实文件）。
+    static func detectedOccurrences() throws -> [String: Int] {
+        detectedOccurrences(in: try repositoryFiles())
     }
 
     /// 基线清单（`路径<TAB>计数`，`#` 开头是注释，`# TOTAL: N` 是总数上限）。
@@ -290,5 +316,67 @@ struct ViewSharedSingletonContractTests {
         """
         #expect(!ViewSharedSingletonContract.declaresSwiftUIView(serviceSource))
         #expect(ViewSharedSingletonContract.occurrenceCount(in: serviceSource) == 1)
+    }
+
+    @Test("口径自证：声明 View 的文件一律在口径内（含根目录 / 意图层；fail-closed 反向验证）")
+    func scopeSelfTest() throws {
+        let viewSource = """
+        import SwiftUI
+        struct RootScreen: View {
+            @StateObject private var indexer = LibraryIndexer.shared
+            var body: some View { EmptyView() }
+        }
+        """
+        // 非视图文件，但确实含一处直连（否则会被「计数为 0 不进名单」当成过）
+        let serviceSource = """
+        import Foundation
+        final class FooService {
+            func load() { _ = PlayerEngine.shared.currentTrack }
+        }
+        """
+
+        let detected = ViewSharedSingletonContract.detectedOccurrences(in: [
+            ("QQPlayer/ContentView.swift", viewSource),
+            ("QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift", viewSource),
+            ("QQPlayer/Services/DatabaseManager.swift", serviceSource),
+            ("QQPlayer/Mac/MacImportService.swift", serviceSource),
+            ("QQPlayer/Views/Player/PlayerGestureLogic.swift", serviceSource),
+        ])
+
+        // 口径补齐前，这两类位置的视图文件一处都看不见（本次事故形态：根目录视图 + 意图层视图）
+        #expect(detected["QQPlayer/ContentView.swift"] == 1)
+        #expect(detected["QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift"] == 1)
+        // 不声明 View 的服务不在口径内（不误伤服务层）
+        #expect(detected["QQPlayer/Services/DatabaseManager.swift"] == nil)
+        #expect(detected["QQPlayer/Mac/MacImportService.swift"] == nil)
+        // `QQPlayer/Views/**` 通配保留：不声明 `: View` 的视图层 helper 仍在口径内（口径只紧不松）
+        #expect(detected["QQPlayer/Views/Player/PlayerGestureLogic.swift"] == 1)
+        // 口径判定本身（与计数无关，直接断言集合归属）
+        #expect(ViewSharedSingletonContract.isViewLayerFile(
+            relativePath: "QQPlayer/Views/Player/PlayerGestureLogic.swift", source: serviceSource
+        ))
+        #expect(!ViewSharedSingletonContract.isViewLayerFile(
+            relativePath: "QQPlayer/Services/DatabaseManager.swift", source: serviceSource
+        ))
+
+        // 反向验证（磁盘真实文件）：口径判定对真实仓库成立——
+        // 根目录 / 意图层 / Mac 视图在口径内，服务层文件不在。
+        let inScope = try ViewSharedSingletonContract.repositoryFiles()
+            .filter { ViewSharedSingletonContract.isViewLayerFile(relativePath: $0.relativePath, source: $0.source) }
+            .map(\.relativePath)
+        for path in [
+            "QQPlayer/ContentView.swift",
+            "QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift",
+            "QQPlayer/Views/Player/PlayerGestureLogic.swift",
+            "QQPlayer/Mac/MacLibraryView.swift",
+        ] {
+            #expect(inScope.contains(path), "口径漏了：\(path)")
+        }
+        for path in ["QQPlayer/Services/DatabaseManager.swift", "QQPlayer/Mac/MacImportService.swift"] {
+            #expect(!inScope.contains(path), "口径过宽：\(path)")
+        }
+        // fail-closed：口径内文件数不应明显偏小（枚举/判定失灵时本断言先红，绝不静默通过）
+        #expect(inScope.filter { $0.hasPrefix("QQPlayer/Views/") }.count > 40)
+        #expect(inScope.count > 60)
     }
 }
