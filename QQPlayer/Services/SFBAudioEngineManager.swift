@@ -12,6 +12,7 @@ import AVFoundation
     import CarPlay
 #endif
 import Foundation
+import Observation
 import SFBAudioEngine
 #if os(iOS)
     import UIKit
@@ -22,13 +23,15 @@ private struct AVAudioUnitEQBox: @unchecked Sendable {
 }
 
 @MainActor
-class SFBAudioEngineManager: NSObject, ObservableObject, AudioPlayer.Delegate {
+@Observable
+class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
     static let shared = SFBAudioEngineManager()
 
-    var audioPlayer: AudioPlayer?
-    var currentTrack: SFBTrack?
-    var updateTimer: Timer?
-    private var eqAttachmentFailed = false
+    // 非 UI 状态（迁移前即非 @Published ⇒ 不参与刷新信号）：保留 @ObservationIgnored，刷新时机与迁移前一致。
+    @ObservationIgnored var audioPlayer: AudioPlayer?
+    @ObservationIgnored var currentTrack: SFBTrack?
+    @ObservationIgnored var updateTimer: Timer?
+    @ObservationIgnored private var eqAttachmentFailed = false
 
     nonisolated private func configureDefaultSFBBands(for equalizer: AVAudioUnitEQ) {
         let numberOfBands = equalizer.bands.count
@@ -366,22 +369,22 @@ class SFBAudioEngineManager: NSObject, ObservableObject, AudioPlayer.Delegate {
     }
 
     // Store decoder properties for seeking when AudioFile properties are unavailable
-    var decoderFrameLength: Int64 = 0
-    var decoderSampleRate: Double = 0
+    @ObservationIgnored var decoderFrameLength: Int64 = 0
+    @ObservationIgnored var decoderSampleRate: Double = 0
 
     // EQ integration for SFBAudioEngine (native approach following wiki)
-    let eqManager = EQManager.shared
-    var sfbEqualizer: AVAudioUnitEQ?
+    @ObservationIgnored let eqManager = EQManager.shared
+    @ObservationIgnored var sfbEqualizer: AVAudioUnitEQ?
     // Track last sample rate to avoid unnecessary changes
-    var lastConfiguredSampleRate: Double = 0
+    @ObservationIgnored var lastConfiguredSampleRate: Double = 0
 
-    @Published var isPlaying = false
-    @Published var currentTime: TimeInterval = 0
-    @Published var duration: TimeInterval = 0
+    var isPlaying = false
+    var currentTime: TimeInterval = 0
+    var duration: TimeInterval = 0
 
     // CarPlay environment detection
     #if os(iOS)
-        @Published var isCarPlayEnvironment = false
+        var isCarPlayEnvironment = false
     #endif
 
     private override init() {
