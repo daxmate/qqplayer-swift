@@ -115,23 +115,30 @@
 #   · 非视图层保留 `.shared`（合法、不在本棘轮口径）：CarPlay 2 文件 / AppCoordinator+ImportExport /
 #     AppCoordinator+iCloud / LibraryIndexer / PlayerEngine+NowPlaying / TrackIdentityMigration /
 #     IntentArtworkService（6-0 已立的意图层唯一入口）。
+# ═══ 2026-09-20 批 6-7：KaraokeController 迁 @Observable（真迁 23 处，45 → 24）════════════
+#   · 通道判据实测：本体 4 个 `@Published`（`isKaraokeOn` / `speed` / `isSingleLineLoop` / `abLoop`）、
+#     视图侧**大量读属性**（`karaoke.isKaraokeOn` ≈30 处 + `.speed` / `.isSingleLineLoop` / `.abLoop`）、
+#     全仓 **0 处** `objectWillChange` / `$` 投影 / Combine 消费者 ⇒ 命中「有状态且视图读属性」
+#     ⇒ 通道 = `@Environment(KaraokeController.self)`（**不是** `AppServices` 容器）。
+#   · 逐项：PlayerView 6→0、MacPlayerView 5→0、KaraokeControlBar 3→0、MacKaraokeControlBar 3→0、
+#     LyricsView 3→**1**（残留 = `#Preview` 脚手架装配）、MacLyricsView 2→0、MacDesktopWindowViews 1→0。
+#   · 装配点 3+1：iOS `QQPlayerApp` 的 `WindowGroup` 根 +1；Mac `QQPlayerMacApp` **两个场景根**各 +1；
+#     `MacDesktopWindowsManager.rootView(for:)` 的 **`.lyric` 分支** +1（手工 `NSHostingView` 不继承
+#     场景环境，浮窗消费方是 `MacDesktopLyricView`）⇒ 本文件 2 → 3（合法装配点，非新增直连）。
+#   · 非视图层保留 `.shared`（合法、不在本棘轮口径）：`MacKeyboardShortcuts`（静态快捷键表）/ `PlayerEngine+NowPlaying` /
+#     `PlayerEngine+PlaybackControl` / `+Mac`；`KaraokeControllerTests` 31 处 `.shared` 为既有测试 seam，未动。
+#   · 行数净零：PlayerView 984（合并注释对让行）/ LyricsView 758（压缩文件头让行）。
 
 
 
 QQPlayer/ContentView.swift	1
-QQPlayer/Mac/MacDesktopWindowViews.swift	1
-QQPlayer/Mac/MacDesktopWindowsManager.swift	2
-QQPlayer/Mac/MacKaraokeControlBar.swift	3
-QQPlayer/Mac/MacLyricsView.swift	2
-QQPlayer/Mac/MacPlayerView.swift	5
+QQPlayer/Mac/MacDesktopWindowsManager.swift	3
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSyncCenterView.swift	1
 QQPlayer/Mac/MacSyncView.swift	3
 QQPlayer/Mac/MacTagEditorView.swift	1
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
-QQPlayer/Views/Player/KaraokeControlBar.swift	3
-QQPlayer/Views/Player/LyricsView.swift	3
-QQPlayer/Views/Player/PlayerView.swift	6
+QQPlayer/Views/Player/LyricsView.swift	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	1
@@ -139,4 +146,4 @@ QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
-# TOTAL: 45
+# TOTAL: 24

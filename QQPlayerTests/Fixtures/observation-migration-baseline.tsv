@@ -48,15 +48,20 @@
 #     （`IndexingGate` / `SyncHostCenter` / `MacLyricsResendAutoRunner` / `AppCoordinator` /
 #     `SpotlightLibraryIndexer`）会**静默失去事件** ⇒ 新增 `isIndexingSubject` / `terminalStateSubject`
 #     （`CurrentValueSubject`）作为状态写入唯一入口，保住「订阅即得当前值」语义。）
+#   → **60 / 25**（2026-09-20 批 6-7：`KaraokeController` 迁 @Observable（跟唱控制器，ios+mac 共享）。
+#     同步删除：1 个 `ObservableObject` + 4 个 `@Published`（`isKaraokeOn` / `speed` / `isSingleLineLoop` /
+#     `abLoop` 迁为被追踪的 `private(set) var`；其余存储属性——`currentLines` / `actions` / `lyricOffset` /
+#     `jumpQuietUntil` / `pendingJumpLine*` / `karaokeLine` / `lastTickTime`——全 `@ObservationIgnored`，
+#     守住「迁前即不发通知」的零行为变化）；视图侧 6 处 `@ObservedObject` 改 `@Environment(KaraokeController.self)`
+#     并归零删行（`MacPlayerView` / `MacDesktopWindowViews` / `MacKaraokeControlBar` / `MacLyricsView` /
+#     `KaraokeControlBar` / `LyricsView`）。
+#     注：本对象**无任何跳文件订阅**（0 `objectWillChange` / 0 `$` 投影）⇒ 无 6-2 那种「订阅静默失效」风险。
+#     （注：6-5 / 6-6 两批未在本头部追加进度行，本行数字为对当前实测基线的收口值。）
 
 
 
-QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	1
-QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	@Published	1
 QQPlayer/Mac/MacLyricsResendAutoRunner.swift	ObservableObject	1
-QQPlayer/Mac/MacLyricsView.swift	@ObservedObject	1
-QQPlayer/Mac/MacPlayerView.swift	@ObservedObject	1
 QQPlayer/Mac/MacSyncCenterView.swift	@ObservedObject	1
 QQPlayer/Mac/MacSyncContentModel.swift	@Published	14
 QQPlayer/Mac/MacSyncContentModel.swift	ObservableObject	1
@@ -71,13 +76,9 @@ QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
 QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
 QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
 QQPlayer/Services/HybridMusicAPI.swift	ObservableObject	1
-QQPlayer/Services/KaraokeController.swift	@Published	4
-QQPlayer/Services/KaraokeController.swift	ObservableObject	1
 QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
-QQPlayer/Views/Player/KaraokeControlBar.swift	@ObservedObject	1
-QQPlayer/Views/Player/LyricsView.swift	@ObservedObject	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
