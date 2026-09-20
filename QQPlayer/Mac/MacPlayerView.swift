@@ -13,6 +13,7 @@ import SwiftUI
 struct MacPlayerView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
+    @Environment(AppServices.self) private var services
     let track: Track?
     let artistName: String?
     let isPlaying: Bool
@@ -153,13 +154,12 @@ struct MacPlayerView: View {
 
             // 歌词：优先缓存/本地，在线搜索失败不阻塞 UI（跟 iOS 语义一致）
             lyricsLoading = true
-            lyrics = await LyricsManager.shared.getLyrics(for: track)
+            lyrics = await services.lyricsManager.getLyrics(for: track)
             // 跟唱：歌词行注入（句末自动停/单句循环/AB/上一句下一句依赖；对齐 iOS PlayerView:829）
             KaraokeController.shared.setLyrics(lyrics?.syncedLyrics ?? [])
             lyricsLoading = false
         }
-        // 当前曲目标签被刮削保存（封面 forceRefreshArtwork 重写）后重拉封面
-        // （stableId 不变 task(id:) 不重载；2026-09-06 播放页封面不刷新修复）
+        // 当前曲目标签被刮削保存（封面 forceRefreshArtwork 重写）后重拉封面（stableId 不变 task(id:) 不重载；2026-09-06 播放页封面不刷新修复）
         .onReceive(NotificationCenter.default.publisher(
             for: .qqplayerArtworkRefreshed
         )) { notification in

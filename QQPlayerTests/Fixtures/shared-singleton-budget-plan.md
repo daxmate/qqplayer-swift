@@ -96,6 +96,11 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 3a（2026-09-19） | `MacLibraryFactsStore`（迁 `@Observable`）+ `MacSearchAnythingState`（只改注入） | 直连棘轮 169 → **158**（真迁 11 处，**0 preview 成本**）；迁移棘轮 193 → **185** | Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 3b（2026-09-19） | `WhatsNewStore` / `StateManager` / `MacFolderMonitor`（非 Observable 入口） | 直连棘轮 158 → **153**（真迁 5 处，0 preview 成本） | Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 4（2026-09-19） | `LocalDeviceNameStore` / `HybridMusicAPIService` / `LyricsSearchProvider` / `NeteaseOnlineClient`（无状态入口 → `AppServices` 容器） | 直连棘轮 153 → **141**（真迁 12 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
+| 批 5（2026-09-19） | `LyricsManager`（**`actor`**，8 处）→ `AppServices` 容器 | 直连棘轮 141 → **133**（真迁 8 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
+
+> 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
+> 编译器 / 单测 / 本棘轮**三者都看不见** ⇒ 新增 `EnvironmentInjectionContractTests`（形状契约）。
+> 本棘轮只保证「没人直连」，**不保证「有人装配」**，两者是互补的两条契约。
 
 > 批 2 的两个数字要说清：**口径收紧（前导点简写）与真迁移是两个方向的动作**——
 > 前者让 4 处此前看不见的既有直连显形（`MacSyncView` 3 / `SyncDeviceNameEditorView` 1），
@@ -195,13 +200,33 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 未见批 4 顺手解决，仍按批 3a 结论挂在后续批次。
 
 ### 批 5：中频对象（两端共享 Services）
-目标：`EQManager`（10）、`LyricsManager`（8）、`SFBAudioEngineManager`（4）、
-`LibraryIndexer`（3）、`DesktopWindowsManager`（5）、`MacSpectrumAnalyzer`（5）。
-- 这些对象**跨端共享且有实时刷新语义**（EQ 曲线 / 歌词行 / 频谱），迁移前必须逐条核对
-  "谁在订阅 `objectWillChange`"（`MacSyncRunViewModel` 那种 `center.objectWillChange` 用法
-  在 @Observable 下会失效，需改成 `withObservationTracking` 或显式回调）；
-- 每迁一个对象单独跑一次全量（不合并成一批大 diff）。
-- 预估：−35 处。
+
+#### 批 5a：`LyricsManager` —— 实测完成（2026-09-19）
+8 处站点全在视图层（`LyricsSearchView` 3 · `MacLyricsSearchView` 3 · `PlayerView` 1 · `MacPlayerView` 1），
+**全部是 `await LyricsManager.shared.<method>(…)` 方法调用**（`getLyrics` / `hasManualLyrics` / `apply` /
+`clearManualLyrics`），无属性读、无 `objectWillChange` 订阅 ⇒ 与批 4 同款**容器通道**。
+
+- **判据关键**：`LyricsManager` 声明为 **`actor`**（不是 `ObservableObject`）—— 天然无「按属性追踪」语义，
+  不存在迁 `@Observable` 时的静默失效风险，这是它比同批其余对象都干净的原因。
+- **预算**：真迁 8 处 / 0 preview 成本 / 棘轮 141 → **133**。
+- **行数棘轮的交互（实测）**：`PlayerView`(985) 与 `MacPlayerView`(617) 都在**行数基线内且零余量**，
+  两个文件都要新增 `@Environment(AppServices.self)`（+1 行）⇒ 各合并一处既有两行注释让出等量行，**净零**。
+  ⚠️ **再记一次同一个坑：`///` 文档注释 + 声明 = +2 行，不是 +1**（首改就把两个文件各顶超 1 行，被
+  `check-structural-budget.sh` 当场抓住）；按批 4 风格改裸声明（「为什么」写在 `AppServices.swift` 容器里）。
+  `LyricsSearchView`(418) / `MacLyricsSearchView`(350) 不在超长区间内，无此约束。
+
+#### 批 5b：其余中频对象（**开工前必须逐条判刷新语义**，侦察已完成 2026-09-19）
+| 对象 | 处数 | 站点形态 | 结论 |
+| --- | ---: | --- | --- |
+| `SFBAudioEngineManager` | 4 | `if SFBAudioEngineManager.shared.isCarPlayEnvironment {…}` | ⚠️ 该属性是 **`@Published`** → 先定「视图是否需要刷新追踪」；要追踪则只能 `@Environment(T.self)` + 迁 `@Observable` |
+| `MacSpectrumAnalyzer` | 5 | `.onReceive(MacSpectrumAnalyzer.shared.$isActive/.$levels)` | ❌ **Combine 订阅** → 迁 `@Observable` 会静默失效，需先改 `withObservationTracking`/回调 |
+| `EQManager` | 10 | 全是 `@StateObject … = EQManager.shared` | ⚠️ 需观察迁移（视图读 EQ 曲线/预设） |
+| `DesktopWindowsManager` | 5 | `@ObservedObject … = .shared` + 方法调用 | ⚠️ 需观察迁移（Mac 专属） |
+| `LibraryIndexer` | 3 | `@StateObject … = .shared` ×2 + 1 方法调用 | ⚠️ 需观察迁移 |
+
+- 每迁一个对象**单独跑一次全量**（不合并成一批大 diff）；迁 `@Observable` 前必做：
+  `grep -rn '<Type>' --include='*.swift' | grep -E 'objectWillChange|\.\$'` 找订阅方。
+- 预估剩余：−27 处（不含批 6 的四个热点 −87）。
 
 ### 批 6+：四个热点（最后）
 `AppCoordinator`（17）、`PlayerEngine`（24）、`KaraokeController`（23）、`ArtworkManager`（23）。

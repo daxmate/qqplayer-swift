@@ -85,7 +85,7 @@ struct LyricsSearchView: View {
                 showHint = HintCoordinator.showIfNeeded(.lyricsSearchPage)
             }
             Task {
-                manualActive = await LyricsManager.shared.hasManualLyrics(for: track)
+                manualActive = await services.lyricsManager.hasManualLyrics(for: track)
                 // 预填歌手名（原 init 内同步 DB 读挪到这里；先填再搜，首次自动搜索带歌手过滤）
                 let artistName: String = {
                     guard let artistId = track.artistId,
@@ -232,7 +232,7 @@ struct LyricsSearchView: View {
 
             Button {
                 Task {
-                    await LyricsManager.shared.clearManualLyrics(for: track)
+                    await services.lyricsManager.clearManualLyrics(for: track)
                     manualActive = false
                     onApply(nil) // 恢复自动：外层重新加载
                 }
@@ -388,7 +388,7 @@ struct LyricsSearchView: View {
         searchError = ""
 
         Task {
-            let lyrics = await LyricsManager.shared.apply(candidate: candidate, for: track)
+            let lyrics = await services.lyricsManager.apply(candidate: candidate, for: track)
             await MainActor.run {
                 applyingIndex = nil
                 if let lyrics {

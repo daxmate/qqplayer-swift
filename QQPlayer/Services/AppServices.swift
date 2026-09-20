@@ -52,6 +52,12 @@ final class AppServices {
     /// 网易云在线检索（视图侧只有 `search`）。
     let neteaseOnlineClient = NeteaseOnlineClient.shared
 
+    // MARK: - 批 5：无状态歌词入口
+
+    /// 歌词读取 / 手动指定 / 应用（`actor`；视图侧 8 处全是 `await LyricsManager.shared.<method>(…)` 调用，
+    /// 不读属性 ⇒ 不产生按属性追踪需求，故走容器而非 `@Environment(T.self)`）。
+    let lyricsManager = LyricsManager.shared
+
     #if os(macOS)
         /// 曲库文件夹监视（Mac 专属；`start(paths:)` / `stop()` 由曲库加载路径驱动）。
         let folderMonitor = MacFolderMonitor.shared
