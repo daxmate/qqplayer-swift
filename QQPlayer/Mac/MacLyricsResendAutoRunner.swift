@@ -33,17 +33,26 @@
 
 import Combine
 import Foundation
+import Observation
 
 /// 最近一轮补发的事实（面板只读；由 runner 在这一轮收尾时写入）。
 ///
 /// 面板不自己算任何数字：行与文案 key 由唯一投影 `SyncEntityOutcomeDisclosure.lyricsRows`
 /// 给出，本 store 只负责把**账目**搬到 UI 能取到的地方（与 `SyncWiringFactsStore` 同风格）。
+/// 面板不自己算任何数字：行与文案 key 由唯一投影 `SyncEntityOutcomeDisclosure.lyricsRows`
+/// 给出，本 store 只负责把**账目**搬到 UI 能取到的地方（与 `SyncWiringFactsStore` 同风格）。
+///
+/// 2026-09-20 批 6-8：`ObservableObject` → `@Observable`（判定依据：唯一 `@Published` 是
+/// `lastSummary`，**全仓 0 处跨文件订阅**（无 `$lastSummary` / `objectWillChange` 消费点），
+/// 写入方 `MacLyricsResendAutoRunner` 只是写入不观察 ⇒ 与 `SyncWiringFactsStore` 同款，
+/// 只需视图侧改环境注入 + 按属性追踪）。
 @MainActor
-final class MacLyricsResendFactsStore: ObservableObject {
+@Observable
+final class MacLyricsResendFactsStore {
     static let shared = MacLyricsResendFactsStore()
 
     /// 最近一轮补发的账目（nil = 本次连接还没跑过 / 已清）。
-    @Published private(set) var lastSummary: SyncLyricsResendSummary?
+    private(set) var lastSummary: SyncLyricsResendSummary?
 
     private init() {}
 

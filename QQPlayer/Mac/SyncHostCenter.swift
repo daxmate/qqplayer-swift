@@ -27,6 +27,7 @@
 import Combine
 import Foundation
 import Network
+import Observation
 
 /// 当前已连接的对端（同步设置页「连接状态区」展示用）。
 struct SyncConnectedPeer: Equatable, Sendable {
@@ -38,11 +39,25 @@ struct SyncConnectedPeer: Equatable, Sendable {
     var connectedAt: Date
 }
 
-/// Mac Host 侧同步监听中心（App 级单例；`@Published` 状态恒在主线程）。
+/// Mac Host 侧同步监听中心（App 级单例；被追踪状态恒在主线程）。
+///
+/// 2026-09-20 批 6-8：`ObservableObject` → `@Observable`（视图侧改组合根环境注入，
+/// 按属性追踪刷新）；原先的 `@Published` 投影/`objectWillChange` 由下面的
+/// `hostStatePublisher` façade 取代 —— 非视图消费者（三个同步面板 view model）
+/// 只订阅它（批 6-3「非视图消费者的观察入口」形状）。
 @MainActor
-final class SyncHostCenter: ObservableObject {
+@Observable
+final class SyncHostCenter {
     /// App 级单例（App 启动即 start；设置页只读它）。
     static let shared = SyncHostCenter()
+
+    /// 主机状态变化信号 —— 非视图消费者的**唯一**观察入口。
+    /// 五个状态属性各自的 `didSet` 喂它（状态与信号同源，不靠人记得）。
+    private let stateChanges = PassthroughSubject<Void, Never>()
+
+    /// 订阅即监听「连接 / 断开 / 开关 / 待批准 / 启动错误」任一变化（非视图消费者用）。
+    /// 语义与迁移前的 `objectWillChange` 一致（不重放当前值）。
+    var hostStatePublisher: AnyPublisher<Void, Never> { stateChanges.eraseToAnyPublisher() }
 
     /// 「允许局域网设备连接」开关的持久化键（缺省 true = 与旧行为一致：装上就监听）。
     static let allowsLANDefaultsKey = "sync.allowsLANConnections.v1"
@@ -50,14 +65,16 @@ final class SyncHostCenter: ObservableObject {
     // MARK: 对外状态（契约 C1）
 
     /// 监听是否在运行。
-    @Published private(set) var isRunning = false
+    private(set) var isRunning = false { didSet { stateChanges.send() } }
     /// 当前已连接对端（nil = 无连接）。会话 ready 时置位，会话关闭 / stop 后清空。
-    @Published private(set) var connectedPeer: SyncConnectedPeer?
+    private(set) var connectedPeer: SyncConnectedPeer? { didSet { stateChanges.send() } }
 
     /// 允许局域网设备连接（UserDefaults 持久化，缺省 **true**）。
     /// 置 false → `stop()`；置 true → `start()`（走 `SyncHostGate` 判定，幂等）。
-    @Published var allowsLANConnections: Bool {
+    var allowsLANConnections: Bool {
         didSet {
+            // 信号先发且不看值是否变化：迁移前的 `@Published` 就是「每次赋值都发」。
+            stateChanges.send()
             guard oldValue != allowsLANConnections else { return }
             defaults.set(allowsLANConnections, forKey: Self.allowsLANDefaultsKey)
             applyToggle()
@@ -65,44 +82,44 @@ final class SyncHostCenter: ObservableObject {
     }
 
     /// 待批准配对卡（nil = 无待批准）。批准 / 拒绝后清空。
-    @Published private(set) var pendingCard: SyncPairingApprovalCard?
+    private(set) var pendingCard: SyncPairingApprovalCard? { didSet { stateChanges.send() } }
     /// 监听启动失败原因（设置页弹窗展示用）。
-    @Published private(set) var startError: String?
+    private(set) var startError: String? { didSet { stateChanges.send() } }
 
     /// 已 attach 的 ready 会话（同步控制面读）。会话关闭 / stop 后为 nil。
-    private(set) var activeSession: SyncPeerSession?
+    @ObservationIgnored private(set) var activeSession: SyncPeerSession?
 
     /// 设备列表已变化（批准落库后触发；设置页 reloadDevices()）。
-    var onDevicesChanged: (() -> Void)?
+    @ObservationIgnored var onDevicesChanged: (() -> Void)?
     /// 拉取结论（诊断/UI 用；M6 T3 接进度展示）。
-    var onFetchResult: ((SyncFetchResult) -> Void)?
+    @ObservationIgnored var onFetchResult: ((SyncFetchResult) -> Void)?
 
     // MARK: 内部状态
 
     private let defaults: UserDefaults
     private let trustStore: DeviceStore
-    private var listener: SyncListener?
-    private var pendingSession: SyncPeerSession?
+    @ObservationIgnored private var listener: SyncListener?
+    @ObservationIgnored private var pendingSession: SyncPeerSession?
     /// 已连接会话（`connectedPeer` 的来源，见 `clearConnection(ifMatching:)`）。
-    private var connectedSession: SyncPeerSession?
+    @ObservationIgnored private var connectedSession: SyncPeerSession?
     /// 已就绪会话的曲库接线（M3-3b：manifest 应答 + 按路径拉取推送）。
     /// 每个 ready 会话一份；会话关闭 / 服务停止时拆除。
-    private var libraryHost: MacSyncLibraryHost?
+    @ObservationIgnored private var libraryHost: MacSyncLibraryHost?
 
     /// 曲库根（注入便于测试/多根演进；默认 ~/Music/QQPlayer，与 macOS 扫描默认一致）。
-    var libraryRootProvider: () -> URL = {
+    @ObservationIgnored var libraryRootProvider: () -> URL = {
         MusicFolderResolver.macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
     }
 
     /// 本机身份加载（Keychain；失败 → 记 startError 且不启动，绝不静默换 ID）。
-    var identityProvider: () throws -> SyncIdentity = {
+    @ObservationIgnored var identityProvider: () throws -> SyncIdentity = {
         try SyncIdentityStore().loadOrCreateIdentity()
     }
 
     /// 本机展示名（Bonjour 友好名；与设置页 QR hostName 同源）。
     /// 默认取 `LocalDeviceNameStore`：用户命过名用用户的名，否则回落系统默认名
     /// （macOS = `Host.current().localizedName ?? 主机名`，与提升前逐字等价）。
-    var deviceNameProvider: () -> String = { LocalDeviceNameStore.shared.name }
+    @ObservationIgnored var deviceNameProvider: () -> String = { LocalDeviceNameStore.shared.name }
 
     init(defaults: UserDefaults = .standard, trustStore: DeviceStore = DeviceStore()) {
         self.defaults = defaults

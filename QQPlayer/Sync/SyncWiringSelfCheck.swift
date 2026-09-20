@@ -31,6 +31,7 @@
 
 import Combine
 import Foundation
+import Observation
 
 // MARK: - 探针
 
@@ -175,8 +176,11 @@ enum SyncWiringSelfCheckPresenter {
 /// 判定一律走纯函数 `SyncWiringSelfCheck.gaps(items:)`。
 ///
 /// ⚠️ 只许**装配点**写入（谁装配谁申报）；UI 不得在这里补算任何事实。
+/// 2026-09-20 批 6-8：`ObservableObject` → `@Observable`（视图侧改组合根环境注入，按属性追踪刷新）。
+/// 全仓 0 处跨文件订阅（无 `$gaps` / `objectWillChange` 消费点）⇒ 只需视图侧注入，无需 façade。
 @MainActor
-final class SyncWiringFactsStore: ObservableObject {
+@Observable
+final class SyncWiringFactsStore {
     static let shared = SyncWiringFactsStore()
 
     /// 本进程所属平台（口径与注册表装配点一致；由编译目标决定，不手写平台字符串）。
@@ -189,9 +193,10 @@ final class SyncWiringFactsStore: ObservableObject {
     }
 
     /// 探针事实（**缺键 = 本次不适用**，如门控关：不计缺口）。
-    private(set) var facts: [SyncWiringProbe: Bool] = [:]
+    /// 只被 `record` / `recompute` 读写（不在任何 `body` 里）⇒ 不参与追踪。
+    @ObservationIgnored private(set) var facts: [SyncWiringProbe: Bool] = [:]
     /// 缺口（空数组 = 无缺口 → 面板空态）。
-    @Published private(set) var gaps: [SyncWiringGap] = []
+    private(set) var gaps: [SyncWiringGap] = []
 
     private init() {}
 
