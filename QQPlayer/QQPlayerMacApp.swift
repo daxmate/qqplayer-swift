@@ -77,6 +77,7 @@ struct QQPlayerMacApp: App {
                 .environment(AppServices.live)
                 // 播放引擎（批 6-6）：Mac 视图（播放页 / 列表高亮 / 浮窗 / 卡拉OK 条）按属性追踪
                 .environment(PlayerEngine.shared)
+                .environment(KaraokeController.shared)
                 .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                     deleteSettings = DeleteSettings.load()
                 }
@@ -100,6 +101,7 @@ struct QQPlayerMacApp: App {
                 .environment(AppServices.live)
                 // 播放引擎（批 6-6）：Settings 是独立场景，不继承主窗环境
                 .environment(PlayerEngine.shared)
+                .environment(KaraokeController.shared)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
         .commands {

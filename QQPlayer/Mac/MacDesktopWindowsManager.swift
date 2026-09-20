@@ -218,6 +218,8 @@ final class DesktopWindowsManager {
             MacDesktopLyricView()
                 // 批 6-6：桌面歌词窗读 `@Environment(PlayerEngine.self)`（playbackTime 驱动行定位）
                 .environment(PlayerEngine.shared)
+                // 批 6-7：桌面歌词窗读 `@Environment(KaraokeController.self)`（跟唱行/AB 态）
+                .environment(KaraokeController.shared)
         }
     }
 

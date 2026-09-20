@@ -3,7 +3,6 @@
 //  QQPlayer
 //
 //  Lyrics display with synchronized scrolling
-//
 
 import SwiftUI
 
@@ -21,7 +20,7 @@ struct LyricsView: View {
     @State private var showHint = false
     /// 上次自动滚动的行号：仅 activeIndex 变化才 scrollTo（替代每 tick 全量遍历 + 对未变行也发起滚动）
     @State private var lastScrolledIndex: Int?
-    @ObservedObject private var karaoke = KaraokeController.shared
+    @Environment(KaraokeController.self) private var karaoke
 
     var body: some View {
         ZStack {
@@ -121,7 +120,7 @@ struct LyricsView: View {
         .highPriorityGesture(
             TapGesture(count: 2)
                 .onEnded {
-                    KaraokeController.shared.toggleKaraokeMode()
+                    karaoke.toggleKaraokeMode()
                 }
         )
     }
@@ -258,7 +257,7 @@ struct LyricsView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             guard karaoke.isKaraokeOn else { return }
-            KaraokeController.shared.clickLine(index: index)
+            karaoke.clickLine(index: index)
         }
         // 加分项：AB 激活时端点行加 accentColor 小圆点（桌面 AB 区间高亮的 iOS 简化）
         .overlay(alignment: .trailing) {
@@ -755,4 +754,5 @@ struct LyricsView: View {
         isLoading: false,
         onClose: {}
     )
+    .environment(KaraokeController.shared)
 }

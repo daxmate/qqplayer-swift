@@ -182,7 +182,7 @@ struct MacMiniPlayerView: View {
 // MARK: - 桌面歌词窗
 
 struct MacDesktopLyricView: View {
-    @ObservedObject private var karaoke = KaraokeController.shared
+    @Environment(KaraokeController.self) private var karaoke
     @Environment(PlayerEngine.self) private var player
     /// 字号（设置页改动经 qqplayerSettingsDidChange 刷新）
     @State private var fontSize: Double = DeleteSettings.load().desktopLyricFontSize

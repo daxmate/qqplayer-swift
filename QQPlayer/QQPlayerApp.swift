@@ -133,6 +133,8 @@ struct QQPlayerApp: App {
                 .environment(AppServices.live)
                 // 播放引擎（批 6-6）：视图按属性追踪驱动重绘（播放状态 / 队列 / 进度）
                 .environment(PlayerEngine.shared)
+                // 跟唱控制器（批 6-7）：歌词页 / 控制条按属性追踪跟唱态与速度
+                .environment(KaraokeController.shared)
                 .task {
                     DatabaseSuspensionCoordinator.shared.start()
                     await appCoordinator.initialize()

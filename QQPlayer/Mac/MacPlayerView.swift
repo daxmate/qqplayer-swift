@@ -33,7 +33,7 @@ struct MacPlayerView: View {
     @State private var favoriteIds: Set<String> = []
     @State private var sleepTimerEndDate: Date?
     @State private var sleepTimerTask: Task<Void, Never>?
-    @ObservedObject private var karaoke = KaraokeController.shared
+    @Environment(KaraokeController.self) private var karaoke
     @Environment(PlayerEngine.self) private var player
 
     /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：睡眠定时器隐藏）
@@ -99,7 +99,7 @@ struct MacPlayerView: View {
                     onApply: { newLyrics in
                         // 应用搜索结果：更新歌词显示 + 跟唱行注入（nil = 恢复自动）
                         lyrics = newLyrics
-                        KaraokeController.shared.setLyrics(newLyrics?.syncedLyrics ?? [])
+                        karaoke.setLyrics(newLyrics?.syncedLyrics ?? [])
                     }
                 )
             }
@@ -142,8 +142,8 @@ struct MacPlayerView: View {
                 lyrics = nil
                 favoriteIds = []
                 // 跟唱：无曲目时清空歌词注入 + 清 AB（对齐 iOS PlayerView 切歌语义）
-                KaraokeController.shared.setLyrics([])
-                KaraokeController.shared.resetForNewTrack()
+                karaoke.setLyrics([])
+                karaoke.resetForNewTrack()
                 return
             }
             let art = await services.artworkManager.getArtwork(for: track)
@@ -156,7 +156,7 @@ struct MacPlayerView: View {
             lyricsLoading = true
             lyrics = await services.lyricsManager.getLyrics(for: track)
             // 跟唱：歌词行注入（句末自动停/单句循环/AB/上一句下一句依赖；对齐 iOS PlayerView:829）
-            KaraokeController.shared.setLyrics(lyrics?.syncedLyrics ?? [])
+            karaoke.setLyrics(lyrics?.syncedLyrics ?? [])
             lyricsLoading = false
         }
         // 当前曲目标签被刮削保存（封面 forceRefreshArtwork 重写）后重拉封面（stableId 不变 task(id:) 不重载；2026-09-06 播放页封面不刷新修复）

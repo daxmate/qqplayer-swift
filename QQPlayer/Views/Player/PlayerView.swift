@@ -18,6 +18,7 @@ struct PlayerView: View {
     @Environment(\.appAccentColor) private var accentColor
     @Environment(AppServices.self) private var services
     @Environment(PlayerEngine.self) private var playerEngine
+    @Environment(KaraokeController.self) private var karaoke
     @Environment(AppCoordinator.self) private var appCoordinator
     @State private var currentArtwork: UIImage?
     @State private var nextArtwork: UIImage?
@@ -174,10 +175,9 @@ struct PlayerView: View {
                 // Clear current lyrics
                 currentLyrics = nil
 
-                // 跟唱：切歌清空歌词注入 + 清 AB（旧歌行号在新歌上失效；resetForNewTrack 幂等，
-                // PlayerEngine 侧若已接入同款调用，重复执行无副作用）
-                KaraokeController.shared.setLyrics([])
-                KaraokeController.shared.resetForNewTrack()
+                // 跟唱：切歌清空歌词注入 + 清 AB（旧歌行号在新歌上失效；resetForNewTrack 幂等）
+                karaoke.setLyrics([])
+                karaoke.resetForNewTrack()
 
                 // 小歌词窗口常驻：切歌自动加载歌词（不再等按钮点击）
                 loadLyrics()
@@ -208,13 +208,13 @@ struct PlayerView: View {
             .onChange(of: showLyricsSheet) { _, isOpen in
                 // 离开全屏歌词界面：退出跟唱模式（用户 2026-08-29 拍板）
                 if !isOpen {
-                    KaraokeController.shared.setKaraokeOn(false)
+                    karaoke.setKaraokeOn(false)
                 }
             }
             .onChange(of: scenePhase) { _, phase in
                 // App 到后台：退出跟唱模式（用户 2026-08-29 拍板）
                 if phase == .background {
-                    KaraokeController.shared.setKaraokeOn(false)
+                    karaoke.setKaraokeOn(false)
                 }
             }
     }
@@ -761,7 +761,7 @@ struct PlayerView: View {
         .highPriorityGesture(
             TapGesture(count: 2)
                 .onEnded {
-                    KaraokeController.shared.setKaraokeOn(true)
+                    karaoke.setKaraokeOn(true)
                     withAnimation(.easeOut(duration: 0.26)) {
                         showLyricsSheet = true
                     }
@@ -835,7 +835,7 @@ struct PlayerView: View {
                 guard playerEngine.currentTrack?.stableId == trackId else { return }
                 currentLyrics = lyrics
                 // 跟唱模式歌词注入（LyricsView / 控制条共用 PlayerView 的 currentLyrics 数据源）
-                KaraokeController.shared.setLyrics(lyrics?.syncedLyrics ?? [])
+                karaoke.setLyrics(lyrics?.syncedLyrics ?? [])
                 isLoadingLyrics = false
             }
         }

@@ -244,7 +244,7 @@ struct MacLyricsView: View {
     /// 歌词搜索入口（播放页 sheet 弹出 MacLyricsSearchView）
     let onLyricsSearch: () -> Void
 
-    @ObservedObject private var karaoke = KaraokeController.shared
+    @Environment(KaraokeController.self) private var karaoke
 
     /// 歌词设置（D3，web 版 lyric 设置对齐）：字号/译文行/整体延迟校准。
     /// 启动与 qqplayerSettingsDidChange 时从 DeleteSettings 刷新；offset 同时
@@ -666,7 +666,7 @@ struct MacLyricsView: View {
         // 单击等双击窗口判定失败后触发（与 iOS 结构一致）
         .onTapGesture {
             guard karaoke.isKaraokeOn else { return }
-            KaraokeController.shared.clickLine(index: index)
+            karaoke.clickLine(index: index)
         }
         // 对齐 iOS LyricsView：AB 激活时端点行加 accentColor 小圆点
         .overlay(alignment: .trailing) {

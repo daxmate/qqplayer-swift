@@ -14,7 +14,7 @@
 //  - 单句循环：点击切换，开启高亮
 //  - AB 循环：单击切换（用户 2026-08-29 拍板：不用长按）——未启用 → 以当前句为 A
 //    进入等选终点态（显示 "AB…" + 提示），已启用 → 单击退出
-//  状态全部读自 KaraokeController.shared（本组件只消费，不做决策）。
+//  状态全部读自注入的 KaraokeController（本组件只消费，不做决策）。
 //
 //  keyboard 提示只写 MacKeyboardShortcuts.swift 已确证存在的组合（Space / A / B / [ ]）。
 //
@@ -22,7 +22,7 @@
 import SwiftUI
 
 struct MacKaraokeControlBar: View {
-    @ObservedObject private var karaoke = KaraokeController.shared
+    @Environment(KaraokeController.self) private var karaoke
     @Environment(PlayerEngine.self) private var playerEngine
     let accentColor: Color
 
@@ -79,7 +79,7 @@ struct MacKaraokeControlBar: View {
             isAccentFilled: false,
             accentColor: accentColor,
             action: {
-                KaraokeController.shared.stepLine(delta: -1, currentTime: playerEngine.progress.playbackTime)
+                karaoke.stepLine(delta: -1, currentTime: playerEngine.progress.playbackTime)
             }
         ) {
             Image(systemName: "chevron.up")
@@ -122,7 +122,7 @@ struct MacKaraokeControlBar: View {
             isAccentFilled: false,
             accentColor: accentColor,
             action: {
-                KaraokeController.shared.stepLine(delta: 1, currentTime: playerEngine.progress.playbackTime)
+                karaoke.stepLine(delta: 1, currentTime: playerEngine.progress.playbackTime)
             }
         ) {
             Image(systemName: "chevron.down")
