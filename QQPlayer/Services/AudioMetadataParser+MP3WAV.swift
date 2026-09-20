@@ -71,7 +71,7 @@ extension AudioMetadataParser {
     }
 
     static func parseMp3MetadataSync(from url: URL) async throws -> AudioMetadata {
-        print("📖 Reading MP3 metadata for: \(url.lastPathComponent)")
+        AppLog.info(.general, "📖 Reading MP3 metadata for: \(url.lastPathComponent)")
 
         // Use NSFileCoordinator for iCloud files (same as FLAC)
         let asset: AVURLAsset = try await withCheckedThrowingContinuation { continuation in
@@ -82,7 +82,7 @@ extension AudioMetadataParser {
                 coordinator.coordinate(readingItemAt: url, options: .withoutChanges, error: &error) { (readingURL) in
                     // Create fresh URL to avoid stale metadata
                     let freshURL = URL(fileURLWithPath: readingURL.path)
-                    print("🔄 Using NSFileCoordinator for MP3: \(freshURL.lastPathComponent)")
+                    AppLog.info(.general, "🔄 Using NSFileCoordinator for MP3: \(freshURL.lastPathComponent)")
 
                     // Check if file actually exists at path
                     guard FileManager.default.fileExists(atPath: freshURL.path) else {
@@ -91,12 +91,12 @@ extension AudioMetadataParser {
                     }
 
                     let asset = AVURLAsset(url: freshURL)
-                    print("✅ MP3 AVURLAsset created successfully via NSFileCoordinator")
+                    AppLog.info(.general, "✅ MP3 AVURLAsset created successfully via NSFileCoordinator")
                     continuation.resume(returning: asset)
                 }
 
                 if let error = error {
-                    print("❌ NSFileCoordinator error for MP3: \(error)")
+                    AppLog.error(.general, "❌ NSFileCoordinator error for MP3: \(error)")
                     continuation.resume(throwing: error)
                 }
             }
@@ -125,7 +125,7 @@ extension AudioMetadataParser {
                     title = try? await item.load(.stringValue)
                 case .commonKeyArtist:
                     artist = try? await item.load(.stringValue)
-                    print("🎤 Found artist in common metadata: \(artist ?? "nil")")
+                    AppLog.info(.general, "🎤 Found artist in common metadata: \(artist ?? "nil")")
                 case .commonKeyAlbumName:
                     album = try? await item.load(.stringValue)
                 case .commonKeyCreationDate:
@@ -157,7 +157,7 @@ extension AudioMetadataParser {
                 // on commonKey).
                 if genre == nil, let genreValue = await Self.genreString(from: metadata) {
                     genre = genreValue
-                    print("🎸 Found genre from \(metadata.identifier?.rawValue ?? "tag"): \(genreValue)")
+                    AppLog.info(.general, "🎸 Found genre from \(metadata.identifier?.rawValue ?? "tag"): \(genreValue)")
                 }
                 if let key = metadata.commonKey?.rawValue {
                     switch key {
@@ -167,7 +167,7 @@ extension AudioMetadataParser {
                         // Additional check for artist in common key
                         if artist == nil {
                             artist = try? await metadata.load(.stringValue)
-                            print("🎤 Found artist in additional common key: \(artist ?? "nil")")
+                            AppLog.info(.general, "🎤 Found artist in additional common key: \(artist ?? "nil")")
                         }
                     case "trackNumber":
                         if trackNumber == nil {
@@ -181,7 +181,7 @@ extension AudioMetadataParser {
                         break
                     }
                 } else if let identifier = metadata.identifier {
-                    print("🔍 Checking ID3 tag: \(identifier.rawValue)")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Checking ID3 tag: \(identifier.rawValue)") }
                     switch identifier.rawValue {
                     case "id3/TRCK":
                         if trackNumber == nil {
@@ -193,12 +193,12 @@ extension AudioMetadataParser {
                         }
                     case "id3/TPE2":
                         albumArtist = try? await metadata.load(.stringValue)
-                        print("🎤 Found album artist in TPE2: \(albumArtist ?? "nil")")
+                        AppLog.info(.general, "🎤 Found album artist in TPE2: \(albumArtist ?? "nil")")
                     case "id3/TPE1":
                         // Fallback for main artist if not found in common metadata
                         if artist == nil {
                             artist = try? await metadata.load(.stringValue)
-                            print("🎤 Found artist in TPE1: \(artist ?? "nil")")
+                            AppLog.info(.general, "🎤 Found artist in TPE1: \(artist ?? "nil")")
                         }
                     // Add more ID3 artist tag variations
                     case "id3/TIT2":
@@ -219,7 +219,7 @@ extension AudioMetadataParser {
                         if year == nil {
                             if let yearString = try? await metadata.load(.stringValue) {
                                 year = Int(String(yearString.prefix(4)))
-                                print("🎤 Found year from \(identifier.rawValue): \(yearString) → \(year ?? -1)")
+                                AppLog.info(.general, "🎤 Found year from \(identifier.rawValue): \(yearString) → \(year ?? -1)")
                             }
                         }
                     default:
@@ -242,20 +242,20 @@ extension AudioMetadataParser {
                         if album == nil &&
                             (identifierValue.contains("%a9alb") || identifierValue.contains("©alb")) {
                             album = try? await metadata.load(.stringValue)
-                            print("🎵 Found album from MP4 ©ALB: \(album ?? "nil")")
+                            AppLog.info(.general, "🎵 Found album from MP4 ©ALB: \(album ?? "nil")")
                         }
                         if year == nil &&
                             (identifierValue.contains("%a9day") || identifierValue.contains("©day")) {
                             if let yearString = try? await metadata.load(.stringValue) {
                                 year = Int(String(yearString.prefix(4)))
-                                print("🎤 Found year from MP4 ©day: \(yearString) → \(year ?? -1)")
+                                AppLog.info(.general, "🎤 Found year from MP4 ©day: \(yearString) → \(year ?? -1)")
                             }
                         }
 
                         // Debug: log unhandled tags that might contain artist info
                         if identifier.rawValue.contains("ART") || identifier.rawValue.contains("TPE") {
                             let value = try? await metadata.load(.stringValue)
-                            print("🔍 Unhandled artist-related tag \(identifier.rawValue): \(value ?? "nil")")
+                            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Unhandled artist-related tag \(identifier.rawValue): \(value ?? "nil")") }
                         }
                     }
                 }
@@ -266,7 +266,7 @@ extension AudioMetadataParser {
             // stop, not keep going)
             throw CancellationError()
         } catch {
-            print("Failed to load asset metadata: \(error)")
+            AppLog.error(.general, "Failed to load asset metadata: \(error)")
         }
 
         // Get actual audio format info
@@ -294,7 +294,7 @@ extension AudioMetadataParser {
                     durationMs = Int(CMTimeGetSeconds(duration) * 1000)
                 }
             } catch {
-                print("Failed to load duration: \(error)")
+                AppLog.error(.general, "Failed to load duration: \(error)")
             }
 
             // Use reasonable defaults for format if we can't determine
@@ -315,12 +315,12 @@ extension AudioMetadataParser {
             }
         }
 
-        print("🎵 Final MP3 metadata for \(url.lastPathComponent):")
-        print("   Title: \(title ?? "nil")")
-        print("   Artist: \(artist ?? "nil")")
-        print("   Album: \(album ?? "nil")")
-        print("   Album Artist: \(albumArtist ?? "nil")")
-        print("   Genre: \(genre ?? "nil")")
+        AppLog.info(.general, "🎵 Final MP3 metadata for \(url.lastPathComponent):"
+            + "\n   Title: \(title ?? "nil")"
+            + "\n   Artist: \(artist ?? "nil")"
+            + "\n   Album: \(album ?? "nil")"
+            + "\n   Album Artist: \(albumArtist ?? "nil")"
+            + "\n   Genre: \(genre ?? "nil")")
 
         return AudioMetadata(
             title: title,
@@ -344,7 +344,7 @@ extension AudioMetadataParser {
     }
 
     static func parseWavMetadataSync(from url: URL) async throws -> AudioMetadata {
-        print("📖 Reading WAV metadata for: \(url.lastPathComponent)")
+        AppLog.info(.general, "📖 Reading WAV metadata for: \(url.lastPathComponent)")
 
         // For WAV files, use AVAudioFile to get format info and try AVAsset for metadata
         var sampleRate: Int?
@@ -378,7 +378,7 @@ extension AudioMetadataParser {
                 bitDepth = settings
             }
         } catch {
-            print("⚠️ Failed to read WAV audio format: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to read WAV audio format: \(error)")
         }
 
         // Try to get metadata from AVAsset (some WAV files may have ID3 tags or other metadata)
@@ -417,7 +417,7 @@ extension AudioMetadataParser {
                 }
             }
         } catch {
-            print("⚠️ Failed to read WAV metadata: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to read WAV metadata: \(error)")
         }
 
         // Fallback to filename parsing if no metadata found
@@ -438,12 +438,12 @@ extension AudioMetadataParser {
         channels = channels ?? 2
         bitDepth = bitDepth ?? 16
 
-        print("🎵 Final WAV metadata for \(url.lastPathComponent):")
-        print("   Title: \(title ?? "nil")")
-        print("   Artist: \(artist ?? "nil")")
-        print("   Sample Rate: \(sampleRate ?? 0) Hz")
-        print("   Channels: \(channels ?? 0)")
-        print("   Bit Depth: \(bitDepth ?? 0)")
+        AppLog.info(.general, "🎵 Final WAV metadata for \(url.lastPathComponent):"
+            + "\n   Title: \(title ?? "nil")"
+            + "\n   Artist: \(artist ?? "nil")"
+            + "\n   Sample Rate: \(sampleRate ?? 0) Hz"
+            + "\n   Channels: \(channels ?? 0)"
+            + "\n   Bit Depth: \(bitDepth ?? 0)")
 
         return AudioMetadata(
             title: title,

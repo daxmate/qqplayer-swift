@@ -10,7 +10,7 @@ import Foundation
 extension AudioMetadataParser {
     // Parse DSD metadata with proper ID3v2 tag extraction from DSF files
     static func parseDSDBasicMetadata(_ url: URL) async throws -> AudioMetadata {
-        print("📖 Reading DSD metadata with ID3v2 extraction for: \(url.lastPathComponent)")
+        AppLog.info(.general, "📖 Reading DSD metadata with ID3v2 extraction for: \(url.lastPathComponent)")
 
         var title: String?
         var artist: String?
@@ -38,9 +38,9 @@ extension AudioMetadataParser {
                 hasEmbeddedArt = metadata.hasEmbeddedArt
                 sampleRate = metadata.sampleRate
                 channels = metadata.channels
-                print("✅ Successfully extracted DSF metadata for: \(url.lastPathComponent)")
+                AppLog.info(.general, "✅ Successfully extracted DSF metadata for: \(url.lastPathComponent)")
             } catch {
-                print("⚠️ Failed to extract DSF metadata, falling back to filename parsing: \(error)")
+                AppLog.warn(.general, "⚠️ Failed to extract DSF metadata, falling back to filename parsing: \(error)")
             }
         }
 
@@ -62,14 +62,14 @@ extension AudioMetadataParser {
             hasEmbeddedArt = await checkForEmbeddedArtwork(url: url)
         }
 
-        print("🎵 DSD metadata for \(url.lastPathComponent):")
-        print("   Title: \(title ?? "Unknown")")
-        print("   Artist: \(artist ?? "Unknown")")
-        print("   Album: \(album ?? "Unknown")")
-        print("   Track: \(trackNumber?.description ?? "Unknown")")
-        print("   Sample Rate: \(sampleRate > 0 ? "\(sampleRate) Hz" : "Unknown")")
-        print("   Channels: \(channels > 0 ? "\(channels)" : "Unknown")")
-        print("   Has Artwork: \(hasEmbeddedArt)")
+        AppLog.info(.general, "🎵 DSD metadata for \(url.lastPathComponent):"
+            + "\n   Title: \(title ?? "Unknown")"
+            + "\n   Artist: \(artist ?? "Unknown")"
+            + "\n   Album: \(album ?? "Unknown")"
+            + "\n   Track: \(trackNumber?.description ?? "Unknown")"
+            + "\n   Sample Rate: \(sampleRate > 0 ? "\(sampleRate) Hz" : "Unknown")"
+            + "\n   Channels: \(channels > 0 ? "\(channels)" : "Unknown")"
+            + "\n   Has Artwork: \(hasEmbeddedArt)")
 
         return AudioMetadata(
             title: title,
@@ -97,7 +97,7 @@ extension AudioMetadataParser {
         // Add memory safety check - avoid large file loading during startup if low memory
         let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         if fileSize > 50_000_000 { // Skip files larger than 50MB to prevent memory pressure
-            print("⚠️ Skipping large DSF file during startup: \(url.lastPathComponent) (\(fileSize) bytes)")
+            AppLog.warn(.general, "⚠️ Skipping large DSF file during startup: \(url.lastPathComponent) (\(fileSize) bytes)")
             return (nil, nil, nil, nil, nil, nil, nil, false, 0, 0)
         }
 
@@ -114,10 +114,10 @@ extension AudioMetadataParser {
         let totalFileSize = readLittleEndianUInt64(from: data, offset: 12)
         let metadataPointer = readLittleEndianUInt64(from: data, offset: 20)
 
-        print("📊 DSF Header Analysis for \(url.lastPathComponent):")
-        print("   Chunk Size: \(chunkSize)")
-        print("   Total File Size: \(totalFileSize)")
-        print("   Metadata Pointer: \(metadataPointer)")
+        AppLog.info(.general, "📊 DSF Header Analysis for \(url.lastPathComponent):"
+            + "\n   Chunk Size: \(chunkSize)"
+            + "\n   Total File Size: \(totalFileSize)"
+            + "\n   Metadata Pointer: \(metadataPointer)")
 
         // Parse format chunk to get sample rate and channels
         var sampleRate = 0
@@ -139,11 +139,11 @@ extension AudioMetadataParser {
                 sampleRate = Int(sampleFrequency)
                 channels = Int(channelNum)
 
-                print("   Format Version: \(formatVersion)")
-                print("   Format ID: \(formatId)")
-                print("   Channel Type: \(channelType)")
-                print("   Channels: \(channels)")
-                print("   Sample Rate: \(sampleRate) Hz")
+                AppLog.info(.general, "   Format Version: \(formatVersion)"
+                    + "\n   Format ID: \(formatId)"
+                    + "\n   Channel Type: \(channelType)"
+                    + "\n   Channels: \(channels)"
+                    + "\n   Sample Rate: \(sampleRate) Hz")
             }
         }
 
@@ -164,7 +164,7 @@ extension AudioMetadataParser {
             if data.count >= metadataOffset + 10 &&
                 data[metadataOffset] == 0x49 && data[metadataOffset + 1] == 0x44 && data[metadataOffset + 2] == 0x33 { // "ID3"
 
-                print("🏷️ Found ID3v2 tag at offset \(metadataOffset)")
+                AppLog.info(.general, "🏷️ Found ID3v2 tag at offset \(metadataOffset)")
 
                 let id3Data = data.subdata(in: metadataOffset ..< data.count)
                 let parsedTags = parseID3v2Tags(from: id3Data)
@@ -206,7 +206,7 @@ extension AudioMetadataParser {
         // Read size (synchsafe integer)
         let tagSize = Int((UInt32(data[6]) << 21) | (UInt32(data[7]) << 14) | (UInt32(data[8]) << 7) | UInt32(data[9]))
 
-        print("🏷️ ID3v2.\(majorVersion).\(revision) tag, size: \(tagSize) bytes, flags: 0x\(String(flags, radix: 16))")
+        AppLog.info(.general, "🏷️ ID3v2.\(majorVersion).\(revision) tag, size: \(tagSize) bytes, flags: 0x\(String(flags, radix: 16))")
 
         var title: String?
         var artist: String?
@@ -269,7 +269,7 @@ extension AudioMetadataParser {
                 }
             case "APIC": // Attached picture
                 hasArtwork = true
-                print("🎨 Found embedded artwork in ID3v2 tag")
+                AppLog.info(.general, "🎨 Found embedded artwork in ID3v2 tag")
             default:
                 break
             }
@@ -277,14 +277,14 @@ extension AudioMetadataParser {
             offset += frameSize
         }
 
-        print("🎵 Parsed ID3v2 metadata:")
-        print("   Title: \(title ?? "nil")")
-        print("   Artist: \(artist ?? "nil")")
-        print("   Album: \(album ?? "nil")")
-        print("   Album Artist: \(albumArtist ?? "nil")")
-        print("   Track: \(trackNumber?.description ?? "nil")")
-        print("   Year: \(year?.description ?? "nil")")
-        print("   Has Artwork: \(hasArtwork)")
+        AppLog.info(.general, "🎵 Parsed ID3v2 metadata:"
+            + "\n   Title: \(title ?? "nil")"
+            + "\n   Artist: \(artist ?? "nil")"
+            + "\n   Album: \(album ?? "nil")"
+            + "\n   Album Artist: \(albumArtist ?? "nil")"
+            + "\n   Track: \(trackNumber?.description ?? "nil")"
+            + "\n   Year: \(year?.description ?? "nil")"
+            + "\n   Has Artwork: \(hasArtwork)")
 
         return (title, artist, album, albumArtist, trackNumber, discNumber, year, hasArtwork)
     }
@@ -314,7 +314,7 @@ extension AudioMetadataParser {
     // Safe byte reading helpers for DSF format (little-endian)
     private static func readLittleEndianUInt64(from data: Data, offset: Int) -> UInt64 {
         guard offset >= 0 && offset + 8 <= data.count else {
-            print("⚠️ Invalid byte access: offset=\(offset), dataSize=\(data.count)")
+            AppLog.warn(.general, "⚠️ Invalid byte access: offset=\(offset), dataSize=\(data.count)")
             return 0
         }
 
@@ -332,7 +332,7 @@ extension AudioMetadataParser {
 
     private static func readLittleEndianUInt32(from data: Data, offset: Int) -> UInt32 {
         guard offset >= 0 && offset + 4 <= data.count else {
-            print("⚠️ Invalid byte access: offset=\(offset), dataSize=\(data.count)")
+            AppLog.warn(.general, "⚠️ Invalid byte access: offset=\(offset), dataSize=\(data.count)")
             return 0
         }
 

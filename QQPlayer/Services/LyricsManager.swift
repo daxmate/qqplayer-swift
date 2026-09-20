@@ -99,7 +99,7 @@ actor LyricsManager {
     func clearMemoryCache() {
         cache.removeAll()
         cacheRecency.removeAll()
-        print("🗑️ Lyrics memory cache cleared")
+        AppLog.info(.general, "🗑️ Lyrics memory cache cleared")
     }
 
     /// 手动歌词磁盘已恢复标记（actor 方法：init 的 Task 是 nonisolated，不能直写属性）
@@ -120,20 +120,20 @@ actor LyricsManager {
         }
         // 用户手动指定歌词优先（搜索页选择，持久化；不自动更新，尊重用户选择）
         if let manual = manualOverrides[track.stableId] {
-            print("📝 Using manually specified lyrics for: \(track.title)")
+            AppLog.info(.general, "📝 Using manually specified lyrics for: \(track.title)")
             return manual
         }
 
         // Check memory cache first
         if let cached = cache[track.stableId] {
             markCacheAccess(track.stableId)
-            print("📝 Using cached lyrics for: \(track.title)")
+            AppLog.info(.general, "📝 Using cached lyrics for: \(track.title)")
             return cached
         }
 
         // Check disk cache
         if let diskCached = await loadLyricsFromDisk(trackId: track.stableId) {
-            print("📝 Loaded lyrics from disk for: \(track.title)")
+            AppLog.info(.general, "📝 Loaded lyrics from disk for: \(track.title)")
             cacheLyrics(diskCached, for: track.stableId)
             return diskCached
         }
@@ -141,13 +141,13 @@ actor LyricsManager {
         // 负面缓存：7 天内确认无歌词 → 跳过内嵌/网易云/lrclib 全链路直接返回
         // （此前无歌词曲目每次播放都重走全链路，每次都有网络请求）
         if await isNegativeCached(trackId: track.stableId) {
-            print("⏭️ Negative lyrics cache hit, skipping fetch: \(track.title)")
+            AppLog.warn(.general, "⏭️ Negative lyrics cache hit, skipping fetch: \(track.title)")
             return nil
         }
 
         // Try embedded lyrics first
         if let embedded = await getEmbeddedLyrics(for: track) {
-            print("📝 Found embedded lyrics for: \(track.title)")
+            AppLog.info(.general, "📝 Found embedded lyrics for: \(track.title)")
             cacheLyrics(embedded, for: track.stableId)
             await saveLyricsToDisk(lyrics: embedded, trackId: track.stableId)
             return embedded
@@ -158,9 +158,9 @@ actor LyricsManager {
             // 头部 credits 型坏数据（如部分歌网易云只返回「作词/作曲/编曲」头）
             // 不缓存、继续 lrclib fallback——避免缓存成"歌词不动"的静态几行
             if isHeaderOnlyLyrics(fetched) {
-                print("⚠️ Netease returned header-only lyrics, skipping: \(track.title)")
+                AppLog.warn(.general, "⚠️ Netease returned header-only lyrics, skipping: \(track.title)")
             } else {
-                print("📝 Fetched lyrics from Netease for: \(track.title)")
+                AppLog.info(.general, "📝 Fetched lyrics from Netease for: \(track.title)")
                 cacheLyrics(fetched, for: track.stableId)
                 await saveLyricsToDisk(lyrics: fetched, trackId: track.stableId)
                 return fetched
@@ -171,10 +171,10 @@ actor LyricsManager {
         if let fetched = await fetchFromLRCLib(for: track) {
             if isHeaderOnlyLyrics(fetched) {
                 // lrclib 已是最后在线源：坏数据不缓存不记负面，下次播放重试
-                print("⚠️ lrclib.net returned header-only lyrics, treating as no lyrics: \(track.title)")
+                AppLog.warn(.general, "⚠️ lrclib.net returned header-only lyrics, treating as no lyrics: \(track.title)")
                 return nil
             }
-            print("📝 Fetched lyrics from lrclib.net for: \(track.title)")
+            AppLog.info(.general, "📝 Fetched lyrics from lrclib.net for: \(track.title)")
             cacheLyrics(fetched, for: track.stableId)
             await saveLyricsToDisk(lyrics: fetched, trackId: track.stableId)
             return fetched
@@ -182,7 +182,7 @@ actor LyricsManager {
 
         // 全链路无歌词：记录负面缓存（7 天 TTL），避免每次播放重走网络
         await recordNegativeCache(trackId: track.stableId)
-        print("⚠️ No lyrics found for: \(track.title)")
+        AppLog.warn(.general, "⚠️ No lyrics found for: \(track.title)")
         return nil
     }
 
@@ -194,7 +194,7 @@ actor LyricsManager {
             await clearDiskCache()
         }
 
-        print("🗑️ Lyrics cache cleared")
+        AppLog.info(.general, "🗑️ Lyrics cache cleared")
     }
 
     /// 头部 credits 型坏歌词：synced 行全部 ≤0 时间戳且正文缺失（如部分歌曲
@@ -234,7 +234,7 @@ actor LyricsManager {
             await saveManualLyricsToDisk(lyrics: lyrics, trackId: track.stableId)
             await clearNegativeCache(trackId: track.stableId) // 已有歌词：清除负面标记
         }
-        print("📝 Manual lyrics saved for: \(track.title) (\(lyrics.source.rawValue))")
+        AppLog.info(.general, "📝 Manual lyrics saved for: \(track.title) (\(lyrics.source.rawValue))")
     }
 
     /// 清除手动指定歌词，恢复自动获取
@@ -246,7 +246,7 @@ actor LyricsManager {
             await removeManualLyricsFromDisk(trackId: track.stableId)
             await clearNegativeCache(trackId: track.stableId) // 恢复自动：重走全链路，不残留旧负面标记
         }
-        print("📝 Manual lyrics cleared for: \(track.title)")
+        AppLog.info(.general, "📝 Manual lyrics cleared for: \(track.title)")
     }
 
     // MARK: - 手动歌词磁盘存储（Documents/lyrics-manual/{stableId}.json，与自动缓存目录分离）
@@ -272,14 +272,14 @@ actor LyricsManager {
 
     private func saveManualLyricsToDisk(lyrics: Lyrics, trackId: String) async {
         guard let fileURL = getManualLyricsFileURL(trackId: trackId) else {
-            print("❌ Failed to get manual lyrics file URL")
+            AppLog.error(.general, "❌ Failed to get manual lyrics file URL")
             return
         }
         do {
             let data = try encoder.encode(lyrics)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            print("❌ Failed to save manual lyrics to disk: \(error)")
+            AppLog.error(.general, "❌ Failed to save manual lyrics to disk: \(error)")
         }
     }
 

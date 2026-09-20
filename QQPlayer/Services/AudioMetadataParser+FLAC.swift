@@ -30,7 +30,7 @@ extension AudioMetadataParser {
 
         // Check if file is actually readable first
         guard FileManager.default.isReadableFile(atPath: url.path) else {
-            print("❌ FLAC file is not readable: \(url.lastPathComponent)")
+            AppLog.error(.general, "❌ FLAC file is not readable: \(url.lastPathComponent)")
             throw AudioParseError.fileNotReadable
         }
 
@@ -40,15 +40,15 @@ extension AudioMetadataParser {
             throw AudioParseError.fileNotReadable
         }
 
-        print("📊 FLAC file size: \(fileSize) bytes for \(url.lastPathComponent)")
+        AppLog.info(.general, "📊 FLAC file size: \(fileSize) bytes for \(url.lastPathComponent)")
 
         // or too small (<1KB)
         guard fileSize > 1024 else {
-            print("❌ FLAC file size is unreasonable: \(fileSize) bytes")
+            AppLog.error(.general, "❌ FLAC file size is unreasonable: \(fileSize) bytes")
             throw AudioParseError.fileSizeError
         }
 
-        print("📖 Reading FLAC data for: \(url.lastPathComponent)")
+        AppLog.info(.general, "📖 Reading FLAC data for: \(url.lastPathComponent)")
 
         // Use NSFileCoordinator to properly read iCloud files
         let data: Data = try await withCheckedThrowingContinuation { continuation in
@@ -62,7 +62,7 @@ extension AudioMetadataParser {
                     do {
                         // Create fresh URL to avoid stale metadata
                         let freshURL = URL(fileURLWithPath: readingURL.path)
-                        print("🔄 Using NSFileCoordinator to read: \(freshURL.lastPathComponent)")
+                        AppLog.info(.general, "🔄 Using NSFileCoordinator to read: \(freshURL.lastPathComponent)")
 
                         // Check if file actually exists at path
                         guard FileManager.default.fileExists(atPath: freshURL.path) else {
@@ -73,15 +73,15 @@ extension AudioMetadataParser {
                         // Map instead of loading the whole file - metadata lives at
                         // the start, and 2000 x full FLAC reads spikes memory
                         coordinatedData = try Data(contentsOf: freshURL, options: .mappedIfSafe)
-                        print("✅ FLAC data read successfully via NSFileCoordinator: \(coordinatedData?.count ?? 0) bytes")
+                        AppLog.info(.general, "✅ FLAC data read successfully via NSFileCoordinator: \(coordinatedData?.count ?? 0) bytes")
                     } catch {
-                        print("❌ Failed to read FLAC data via NSFileCoordinator: \(error)")
+                        AppLog.error(.general, "❌ Failed to read FLAC data via NSFileCoordinator: \(error)")
                         coordinatedError = error
                     }
                 }
 
                 if let error = error {
-                    print("❌ NSFileCoordinator error: \(error)")
+                    AppLog.error(.general, "❌ NSFileCoordinator error: \(error)")
                     continuation.resume(throwing: error)
                 } else if let coordinatedError = coordinatedError {
                     continuation.resume(throwing: coordinatedError)

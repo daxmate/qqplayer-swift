@@ -64,7 +64,7 @@ private enum AppLogShapeContract {
 
     /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（迁移完成的文件逐个登记）。
     /// 当前 = 批 2（sync 5）+ 批 3（migration/DB 9）+ 批 4a/4b（播放引擎 12）
-    /// + 批 6（索引/扫描/清理 5）= 31 文件。
+    /// + 批 5（音频元数据·封面·歌词 12）+ 批 6（索引/扫描/清理 5）= 43 文件。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     ///
@@ -78,6 +78,14 @@ private enum AppLogShapeContract {
     static let migratedChains: Set<String> = [
         "QQPlayer/AppIntents/SpotlightLibraryIndexer.swift",
         "QQPlayer/Services/AppCoordinator+ImportExport.swift",
+        "QQPlayer/Services/ArtworkCache.swift",
+        "QQPlayer/Services/ArtworkExtraction.swift",
+        "QQPlayer/Services/ArtworkManager.swift",
+        "QQPlayer/Services/AudioMetadataParser+Basic.swift",
+        "QQPlayer/Services/AudioMetadataParser+DSD.swift",
+        "QQPlayer/Services/AudioMetadataParser+FLAC.swift",
+        "QQPlayer/Services/AudioMetadataParser+MP3WAV.swift",
+        "QQPlayer/Services/AudioMetadataParser.swift",
         "QQPlayer/Services/DatabaseManager+ContentHash.swift",
         "QQPlayer/Services/DatabaseManager+Library.swift",
         "QQPlayer/Services/DatabaseManager+Migration.swift",
@@ -88,6 +96,10 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/FileCleanupManager.swift",
         "QQPlayer/Services/LibraryIndexer+Scanning.swift",
         "QQPlayer/Services/LibraryIndexer+SharedImport.swift",
+        "QQPlayer/Services/LyricsManager.swift",
+        "QQPlayer/Services/LyricsParsing.swift",
+        "QQPlayer/Services/LyricsSearch.swift",
+        "QQPlayer/Services/LyricsSearchProvider.swift",
         "QQPlayer/Services/PlayerEngine+AudioScheduling.swift",
         "QQPlayer/Services/PlayerEngine+AudioSession.swift",
         "QQPlayer/Services/PlayerEngine+NowPlaying.swift",

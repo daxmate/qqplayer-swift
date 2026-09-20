@@ -91,7 +91,7 @@ class ArtworkManager {
             )
         #endif
 
-        print("📁 ArtworkManager initialized - Disk cache: \(diskCacheURL.path)")
+        AppLog.info(.general, "📁 ArtworkManager initialized - Disk cache: \(diskCacheURL.path)")
     }
 
     // Mapping persistence is debounced: updateMapping runs on the main actor
@@ -105,7 +105,7 @@ class ArtworkManager {
         memoryCache.removeAllObjects()
         thumbnailCache.removeAllObjects()
         cachedTrackIds.removeAll()
-        print("🗑️ ArtworkManager memory cache cleared")
+        AppLog.info(.general, "🗑️ ArtworkManager memory cache cleared")
     }
 
     func forceRefreshArtwork(for track: Track) async -> ArtworkImage? {
@@ -120,7 +120,7 @@ class ArtworkManager {
         artworkMapping.removeValue(forKey: track.stableId)
         saveMapping()
 
-        print("🔄 Force refreshing artwork for: \(track.title)")
+        AppLog.info(.general, "🔄 Force refreshing artwork for: \(track.title)")
         let refreshed = await getArtwork(for: track)
         // 已显示的缩略图/卡片用 .task(id: stableId) 缓存，stableId 不变不会自动重载；
         // 发通知让正在展示该曲目封面的视图重拉（2026-09-06 刮削保存封面后不刷新修复）

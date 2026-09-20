@@ -55,14 +55,14 @@ extension AudioMetadataParser {
 
             return false
         } catch {
-            print("⚠️ Artwork detection failed for \(url.lastPathComponent): \(error)")
+            AppLog.warn(.general, "⚠️ Artwork detection failed for \(url.lastPathComponent): \(error)")
             return false
         }
     }
 
     // Parse basic metadata from filename (for SFBAudioEngine formats to avoid hangs)
     static func parseBasicMetadata(_ url: URL, format: String) async throws -> AudioMetadata {
-        print("📖 Reading basic metadata for \(format): \(url.lastPathComponent)")
+        AppLog.info(.general, "📖 Reading basic metadata for \(format): \(url.lastPathComponent)")
 
         // Use filename parsing for all SFBAudioEngine formats
         let filename = url.deletingPathExtension().lastPathComponent
@@ -96,12 +96,11 @@ extension AudioMetadataParser {
             hasEmbeddedArt = await checkForEmbeddedArtwork(url: url)
         }
 
-        print("🎵 Basic metadata for \(url.lastPathComponent):")
-        print("   Title: \(title)")
-        print("   Artist: \(artist ?? "Unknown")")
-        print("   Format: \(format)")
-        print("   Sample Rate: Unknown (will be detected during playback)")
-        print("   Has Artwork: \(hasEmbeddedArt)")
+        AppLog.info(.general, "🎵 Basic metadata for \(url.lastPathComponent):"
+            + "\n   Title: \(title)"
+            + "\n   Artist: \(artist ?? "Unknown")"
+            + "\n   Format: \(format)"
+            + "\n   Has Artwork: \(hasEmbeddedArt)")
 
         return AudioMetadata(
             title: title,

@@ -25,10 +25,10 @@ extension ArtworkManager {
             let data = try Data(contentsOf: mappingFileURL)
             if let mapping = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: String] {
                 artworkMapping = mapping
-                print("📊 Loaded artwork mapping: \(artworkMapping.count) entries")
+                AppLog.info(.general, "📊 Loaded artwork mapping: \(artworkMapping.count) entries")
             }
         } catch {
-            print("⚠️ Failed to load artwork mapping: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to load artwork mapping: \(error)")
         }
     }
 
@@ -37,7 +37,7 @@ extension ArtworkManager {
             let data = try PropertyListSerialization.data(fromPropertyList: artworkMapping, format: .xml, options: 0)
             try data.write(to: mappingFileURL, options: .atomic)
         } catch {
-            print("⚠️ Failed to save artwork mapping: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to save artwork mapping: \(error)")
         }
     }
 
@@ -75,9 +75,9 @@ extension ArtworkManager {
             cachedTrackIds.removeAll()
             artworkMapping.removeAll()
             saveMapping()
-            print("🗑️ Cleared \(files.count) artwork files from disk cache")
+            AppLog.info(.general, "🗑️ Cleared \(files.count) artwork files from disk cache")
         } catch {
-            print("❌ Failed to clear disk cache: \(error)")
+            AppLog.error(.general, "❌ Failed to clear disk cache: \(error)")
         }
     }
 
@@ -196,7 +196,7 @@ extension ArtworkManager {
         let cappedImage = Self.downsampled(image, maxPixelSize: Self.maxFullArtworkPixelSize)
         // Compress to JPEG at 85% quality for faster loading and smaller size
         guard let imageData = Self.jpegData(cappedImage, compressionQuality: 0.85) else {
-            print("❌ Failed to compress artwork to JPEG")
+            AppLog.error(.general, "❌ Failed to compress artwork to JPEG")
             return
         }
 
@@ -210,7 +210,7 @@ extension ArtworkManager {
         if FileManager.default.fileExists(atPath: diskFile.path) {
             // Artwork already cached, just update mapping
             await updateMapping(stableId: stableId, artworkHash: hashString)
-            print("♻️ Reused existing artwork: \(hashString).jpg for track \(stableId)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "♻️ Reused existing artwork: \(hashString).jpg for track \(stableId)") }
             return
         }
 
@@ -218,9 +218,9 @@ extension ArtworkManager {
         do {
             try imageData.write(to: diskFile, options: .atomic)
             await updateMapping(stableId: stableId, artworkHash: hashString)
-            print("💾 Saved artwork to disk cache: \(hashString).jpg (\(imageData.count / 1024) KB)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "💾 Saved artwork to disk cache: \(hashString).jpg (\(imageData.count / 1024) KB)") }
         } catch {
-            print("❌ Failed to save artwork to disk: \(error)")
+            AppLog.error(.general, "❌ Failed to save artwork to disk: \(error)")
         }
     }
 
@@ -240,7 +240,7 @@ extension ArtworkManager {
 
         if removedMappings > 0 {
             saveMapping()
-            print("🗑️ Removed \(removedMappings) orphaned mapping entries")
+            AppLog.info(.general, "🗑️ Removed \(removedMappings) orphaned mapping entries")
         }
 
         // Build set of artwork hashes still in use
@@ -260,10 +260,10 @@ extension ArtworkManager {
             }
 
             if removedCount > 0 {
-                print("🗑️ Cleaned up \(removedCount) unused artwork files")
+                AppLog.info(.general, "🗑️ Cleaned up \(removedCount) unused artwork files")
             }
         } catch {
-            print("❌ Failed to cleanup orphaned artwork: \(error)")
+            AppLog.error(.general, "❌ Failed to cleanup orphaned artwork: \(error)")
         }
     }
 }

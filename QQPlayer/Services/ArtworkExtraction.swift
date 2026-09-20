@@ -72,13 +72,13 @@ extension ArtworkManager {
                                 return
                             }
                         } catch {
-                            print("Failed to load artwork data: \(error)")
+                            AppLog.error(.general, "Failed to load artwork data: \(error)")
                         }
                     }
 
                     continuation.resume(returning: nil)
                 } catch {
-                    print("Failed to load MP3 metadata: \(error)")
+                    AppLog.error(.general, "Failed to load MP3 metadata: \(error)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -125,7 +125,7 @@ extension ArtworkManager {
                     continuation.resume(returning: nil)
 
                 } catch {
-                    print("Failed to extract FLAC artwork: \(error)")
+                    AppLog.error(.general, "Failed to extract FLAC artwork: \(error)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -180,15 +180,15 @@ extension ArtworkManager {
                 if item.commonKey == .commonKeyArtwork,
                    let data = try await item.load(.dataValue),
                    let image = ArtworkImage(data: data) {
-                    print("🎨 Extracted M4A artwork: \(url.lastPathComponent)")
+                    AppLog.info(.general, "🎨 Extracted M4A artwork: \(url.lastPathComponent)")
                     return image
                 }
             }
 
-            print("⚠️ No artwork found in M4A file: \(url.lastPathComponent)")
+            AppLog.warn(.general, "⚠️ No artwork found in M4A file: \(url.lastPathComponent)")
             return nil
         } catch {
-            print("⚠️ Failed to load M4A artwork: \(error.localizedDescription)")
+            AppLog.warn(.general, "⚠️ Failed to load M4A artwork: \(error.localizedDescription)")
             return nil
         }
     }
@@ -207,7 +207,7 @@ extension ArtworkManager {
             }
 
             // Fallback to binary signature search for both DSF and DFF files
-            print("⚠️ No ID3v2 artwork found, searching for binary signatures in: \(url.lastPathComponent)")
+            AppLog.warn(.general, "⚠️ No ID3v2 artwork found, searching for binary signatures in: \(url.lastPathComponent)")
 
             // Image signatures to look for
             let jpegSignature = Data([0xFF, 0xD8, 0xFF])
@@ -227,7 +227,7 @@ extension ArtworkManager {
                     let imageData = data.subdata(in: startOffset ..< endOffset)
 
                     if let image = ArtworkImage(data: imageData) {
-                        print("🎨 Extracted JPEG artwork from DSD file (binary search): \(url.lastPathComponent)")
+                        AppLog.info(.general, "🎨 Extracted JPEG artwork from DSD file (binary search): \(url.lastPathComponent)")
                         return image
                     }
                 }
@@ -244,16 +244,16 @@ extension ArtworkManager {
                     let imageData = data.subdata(in: startOffset ..< min(endOffset, data.count))
 
                     if let image = ArtworkImage(data: imageData) {
-                        print("🎨 Extracted PNG artwork from DSD file (binary search): \(url.lastPathComponent)")
+                        AppLog.info(.general, "🎨 Extracted PNG artwork from DSD file (binary search): \(url.lastPathComponent)")
                         return image
                     }
                 }
             }
 
-            print("⚠️ No artwork found in DSD file: \(url.lastPathComponent)")
+            AppLog.warn(.general, "⚠️ No artwork found in DSD file: \(url.lastPathComponent)")
             return nil
         } catch {
-            print("❌ DSD artwork extraction failed: \(error)")
+            AppLog.error(.general, "❌ DSD artwork extraction failed: \(error)")
             return nil
         }
     }
@@ -263,7 +263,7 @@ extension ArtworkManager {
         // Validate DSF signature: 'D', 'S', 'D', ' ' (includes 1 space)
         guard data.count >= 28,
               data[0] == 0x44, data[1] == 0x53, data[2] == 0x44, data[3] == 0x20 else {
-            print("⚠️ Invalid DSF signature in: \(filename)")
+            AppLog.warn(.general, "⚠️ Invalid DSF signature in: \(filename)")
             return nil
         }
 
@@ -271,7 +271,7 @@ extension ArtworkManager {
         let metadataPointer = readLittleEndianUInt64(from: data, offset: 20)
 
         guard metadataPointer > 0 && metadataPointer < data.count else {
-            print("⚠️ No metadata pointer in DSF file: \(filename)")
+            AppLog.warn(.general, "⚠️ No metadata pointer in DSF file: \(filename)")
             return nil
         }
 
@@ -282,11 +282,11 @@ extension ArtworkManager {
               data[metadataOffset] == 0x49, // 'I'
               data[metadataOffset + 1] == 0x44, // 'D'
               data[metadataOffset + 2] == 0x33 else { // '3'
-            print("⚠️ No ID3v2 tag found at metadata pointer in: \(filename)")
+            AppLog.warn(.general, "⚠️ No ID3v2 tag found at metadata pointer in: \(filename)")
             return nil
         }
 
-        print("🏷️ Found ID3v2 tag in DSF file: \(filename)")
+        AppLog.info(.general, "🏷️ Found ID3v2 tag in DSF file: \(filename)")
 
         let id3Data = data.subdata(in: metadataOffset ..< data.count)
         return extractArtworkFromID3v2(data: id3Data, filename: filename)
@@ -300,7 +300,7 @@ extension ArtworkManager {
         let majorVersion = data[3]
         let tagSize = Int((UInt32(data[6]) << 21) | (UInt32(data[7]) << 14) | (UInt32(data[8]) << 7) | UInt32(data[9]))
 
-        print("🏷️ Searching for APIC frame in ID3v2.\(majorVersion) tag, size: \(tagSize) bytes")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🏷️ Searching for APIC frame in ID3v2.\(majorVersion) tag, size: \(tagSize) bytes") }
 
         // Parse frames to find APIC (attached picture)
         var offset = 10
@@ -327,7 +327,7 @@ extension ArtworkManager {
             }
 
             if frameId == "APIC" {
-                print("🎨 Found APIC frame in \(filename), size: \(frameSize) bytes")
+                AppLog.info(.general, "🎨 Found APIC frame in \(filename), size: \(frameSize) bytes")
 
                 let frameData = data.subdata(in: offset ..< offset + frameSize)
 
@@ -362,31 +362,31 @@ extension ArtworkManager {
 
                 // Extract image data
                 guard frameOffset < frameData.count else {
-                    print("⚠️ Invalid APIC frame structure in: \(filename)")
+                    AppLog.warn(.general, "⚠️ Invalid APIC frame structure in: \(filename)")
                     break
                 }
 
                 let imageData = frameData.subdata(in: frameOffset ..< frameData.count)
 
                 if let image = ArtworkImage(data: imageData) {
-                    print("✅ Successfully extracted artwork from ID3v2 APIC frame: \(filename)")
+                    AppLog.info(.general, "✅ Successfully extracted artwork from ID3v2 APIC frame: \(filename)")
                     return image
                 } else {
-                    print("⚠️ Could not create ArtworkImage from APIC data in: \(filename)")
+                    AppLog.warn(.general, "⚠️ Could not create ArtworkImage from APIC data in: \(filename)")
                 }
             }
 
             offset += frameSize
         }
 
-        print("⚠️ No APIC frame found in ID3v2 tag: \(filename)")
+        AppLog.warn(.general, "⚠️ No APIC frame found in ID3v2 tag: \(filename)")
         return nil
     }
 
     // Safe byte reading helper for DSF format (little-endian)
     private nonisolated func readLittleEndianUInt64(from data: Data, offset: Int) -> UInt64 {
         guard offset >= 0 && offset + 8 <= data.count else {
-            print("⚠️ Invalid byte access in artwork: offset=\(offset), dataSize=\(data.count)")
+            AppLog.warn(.general, "⚠️ Invalid byte access in artwork: offset=\(offset), dataSize=\(data.count)")
             return 0
         }
 
@@ -414,11 +414,11 @@ extension ArtworkManager {
             let pictures = audioFile.metadata.attachedPictures
             let preferred = pictures.first(where: { $0.type == .frontCover }) ?? pictures.first
             if let preferred, let image = ArtworkImage(data: preferred.imageData) {
-                print("✅ Extracted artwork via SFBAudioEngine metadata: \(url.lastPathComponent) (\(preferred.imageData.count) bytes)")
+                AppLog.info(.general, "✅ Extracted artwork via SFBAudioEngine metadata: \(url.lastPathComponent) (\(preferred.imageData.count) bytes)")
                 return image
             }
         } catch {
-            print("⚠️ SFBAudioEngine metadata read failed for \(url.lastPathComponent): \(error)")
+            AppLog.warn(.general, "⚠️ SFBAudioEngine metadata read failed for \(url.lastPathComponent): \(error)")
         }
 
         // Fallback: legacy Vorbis comment scan (works for single-page pictures)
@@ -428,10 +428,10 @@ extension ArtworkManager {
                 return artwork
             }
 
-            print("⚠️ No artwork found in Vorbis comments: \(url.lastPathComponent)")
+            AppLog.warn(.general, "⚠️ No artwork found in Vorbis comments: \(url.lastPathComponent)")
             return nil
         } catch {
-            print("❌ Generic artwork extraction failed: \(error)")
+            AppLog.error(.general, "❌ Generic artwork extraction failed: \(error)")
             return nil
         }
     }
@@ -445,7 +445,7 @@ extension ArtworkManager {
         let pictureTagData = Data("METADATA_BLOCK_PICTURE=".utf8)
 
         guard let tagRange = data.range(of: pictureTagData) else {
-            print("⚠️ No METADATA_BLOCK_PICTURE tag found in: \(filename)")
+            AppLog.warn(.general, "⚠️ No METADATA_BLOCK_PICTURE tag found in: \(filename)")
             return nil
         }
 
@@ -462,7 +462,7 @@ extension ArtworkManager {
             valueLength = Int(readLittleEndianUInt32(from: data, offset: lengthOffset))
             // Subtract the tag name length ("METADATA_BLOCK_PICTURE=".count)
             valueLength -= pictureTagData.count
-            print("🔍 Read Vorbis comment length field: \(valueLength) bytes")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Read Vorbis comment length field: \(valueLength) bytes") }
         } else {
             // Fallback: find null byte terminator
             var valueEnd = valueStart
@@ -474,11 +474,11 @@ extension ArtworkManager {
                 valueEnd += 1
             }
             valueLength = valueEnd - valueStart
-            print("🔍 Using null-terminated length: \(valueLength) bytes")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Using null-terminated length: \(valueLength) bytes") }
         }
 
         guard valueLength > 0 && valueStart + valueLength <= data.count else {
-            print("⚠️ Invalid METADATA_BLOCK_PICTURE length in: \(filename)")
+            AppLog.warn(.general, "⚠️ Invalid METADATA_BLOCK_PICTURE length in: \(filename)")
             return nil
         }
 
@@ -497,7 +497,7 @@ extension ArtworkManager {
 
         if isBinary {
             // Data is already in binary format (some tools store it this way)
-            print("🔍 Detected binary METADATA_BLOCK_PICTURE format (starts with 0x00) in: \(filename)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Detected binary METADATA_BLOCK_PICTURE format (starts with 0x00) in: \(filename)") }
             pictureBlockData = valueData
         } else {
             // Try to decode as base64-encoded (standard format)
@@ -508,7 +508,7 @@ extension ArtworkManager {
             )
 
             var filteredData = Data(valueData.filter { validBase64Chars.contains($0) })
-            print("🔍 Filtered base64 data: \(valueData.count) → \(filteredData.count) bytes")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Filtered base64 data: \(valueData.count) → \(filteredData.count) bytes") }
 
             // Add padding to make length a multiple of 4 (required for base64)
             let remainder = filteredData.count % 4
@@ -516,21 +516,21 @@ extension ArtworkManager {
                 let paddingNeeded = 4 - remainder
                 let paddingBytes = Data(repeating: UInt8(ascii: "="), count: paddingNeeded)
                 filteredData.append(paddingBytes)
-                print("🔍 Added \(paddingNeeded) padding bytes, new length: \(filteredData.count)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Added \(paddingNeeded) padding bytes, new length: \(filteredData.count)") }
             }
 
             // Try to decode the filtered and padded data
             if let decoded = Data(base64Encoded: filteredData, options: .ignoreUnknownCharacters) {
-                print("🔍 Successfully decoded base64 METADATA_BLOCK_PICTURE, size: \(decoded.count) bytes")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Successfully decoded base64 METADATA_BLOCK_PICTURE, size: \(decoded.count) bytes") }
                 pictureBlockData = decoded
             } else {
-                print("⚠️ Failed to decode filtered base64, treating as binary in: \(filename)")
+                AppLog.warn(.general, "⚠️ Failed to decode filtered base64, treating as binary in: \(filename)")
                 // Last resort: treat as binary data
                 pictureBlockData = valueData
             }
         }
 
-        print("🎨 Found METADATA_BLOCK_PICTURE in \(filename), size: \(pictureBlockData.count) bytes")
+        AppLog.info(.general, "🎨 Found METADATA_BLOCK_PICTURE in \(filename), size: \(pictureBlockData.count) bytes")
 
         // Parse FLAC picture block structure
         return parseFLACPictureBlock(data: pictureBlockData, filename: filename)
@@ -541,21 +541,21 @@ extension ArtworkManager {
         var offset = 0
 
         guard data.count >= 32 else {
-            print("⚠️ METADATA_BLOCK_PICTURE too small: \(filename)")
+            AppLog.warn(.general, "⚠️ METADATA_BLOCK_PICTURE too small: \(filename)")
             return nil
         }
 
         // Read picture type (32 bits, big-endian)
         let pictureType = readBigEndianUInt32(from: data, offset: offset)
         offset += 4
-        print("🖼️ Picture type: \(pictureType)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🖼️ Picture type: \(pictureType)") }
 
         // Read MIME type length (32 bits, big-endian)
         let mimeLength = Int(readBigEndianUInt32(from: data, offset: offset))
         offset += 4
 
         guard offset + mimeLength <= data.count else {
-            print("⚠️ Invalid MIME type length in: \(filename)")
+            AppLog.warn(.general, "⚠️ Invalid MIME type length in: \(filename)")
             return nil
         }
 
@@ -563,41 +563,41 @@ extension ArtworkManager {
         let mimeData = data.subdata(in: offset ..< offset + mimeLength)
         let mimeType = String(data: mimeData, encoding: .utf8) ?? ""
         offset += mimeLength
-        print("🖼️ MIME type: \(mimeType)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🖼️ MIME type: \(mimeType)") }
 
         // Read description length (32 bits, big-endian)
         guard offset + 4 <= data.count else {
-            print("⚠️ Not enough data for description length field")
+            AppLog.warn(.general, "⚠️ Not enough data for description length field")
             return nil
         }
         let descLength = Int(readBigEndianUInt32(from: data, offset: offset))
         offset += 4
-        print("🖼️ Description length: \(descLength)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🖼️ Description length: \(descLength)") }
 
         // Skip description
         guard offset + descLength <= data.count else {
-            print("⚠️ Invalid description length")
+            AppLog.warn(.general, "⚠️ Invalid description length")
             return nil
         }
         offset += descLength
 
         // Skip width, height, color depth, number of colors (4 × 32 bits = 16 bytes)
         guard offset + 16 <= data.count else {
-            print("⚠️ Not enough data for image dimensions")
+            AppLog.warn(.general, "⚠️ Not enough data for image dimensions")
             return nil
         }
         offset += 16
 
         // Read picture data length (32 bits, big-endian)
         guard offset + 4 <= data.count else {
-            print("⚠️ Not enough data for picture length field")
+            AppLog.warn(.general, "⚠️ Not enough data for picture length field")
             return nil
         }
         let pictureLength = Int(readBigEndianUInt32(from: data, offset: offset))
         offset += 4
 
-        print("🖼️ Picture data length field: \(pictureLength) bytes")
-        print("🖼️ Current offset: \(offset), Total data size: \(data.count), Remaining: \(data.count - offset)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🖼️ Picture data length field: \(pictureLength) bytes") }
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🖼️ Current offset: \(offset), Total data size: \(data.count), Remaining: \(data.count - offset)") }
 
         // Extract picture data - use remaining data if length field is incorrect
         let actualPictureLength: Int
@@ -606,17 +606,17 @@ extension ArtworkManager {
         } else {
             // Length field is wrong - just use all remaining data
             actualPictureLength = data.count - offset
-            print("⚠️ Picture length field incorrect, using all remaining \(actualPictureLength) bytes")
+            AppLog.warn(.general, "⚠️ Picture length field incorrect, using all remaining \(actualPictureLength) bytes")
         }
 
         // Extract picture data
         let pictureData = data.subdata(in: offset ..< offset + actualPictureLength)
 
         if let image = ArtworkImage(data: pictureData) {
-            print("✅ Successfully extracted \(mimeType) artwork from Vorbis comments: \(filename)")
+            AppLog.info(.general, "✅ Successfully extracted \(mimeType) artwork from Vorbis comments: \(filename)")
             return image
         } else {
-            print("⚠️ Could not create ArtworkImage from picture data in: \(filename)")
+            AppLog.warn(.general, "⚠️ Could not create ArtworkImage from picture data in: \(filename)")
             return nil
         }
     }

@@ -42,7 +42,7 @@ extension LyricsManager {
                 return lyricsText
             }
         } catch {
-            print("⚠️ Failed to read AVFoundation lyrics metadata for \(url.lastPathComponent): \(error)")
+            AppLog.warn(.general, "⚠️ Failed to read AVFoundation lyrics metadata for \(url.lastPathComponent): \(error)")
         }
 
         return nil
@@ -135,9 +135,9 @@ extension LyricsManager {
         }
 
         if let error = coordinatorError {
-            print("⚠️ Failed to coordinate lyrics metadata read from \(url.lastPathComponent): \(error)")
+            AppLog.warn(.general, "⚠️ Failed to coordinate lyrics metadata read from \(url.lastPathComponent): \(error)")
         } else if let error = readError {
-            print("⚠️ Failed to read lyrics metadata from \(url.lastPathComponent): \(error)")
+            AppLog.warn(.general, "⚠️ Failed to read lyrics metadata from \(url.lastPathComponent): \(error)")
         }
 
         return readData

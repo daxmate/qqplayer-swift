@@ -105,7 +105,7 @@ class AudioMetadataParser {
 
     // Parse AAC metadata using native AVFoundation
     private static func parseAacMetadata(_ url: URL) async throws -> AudioMetadata {
-        print("📖 Reading AAC metadata for: \(url.lastPathComponent)")
+        AppLog.info(.general, "📖 Reading AAC metadata for: \(url.lastPathComponent)")
 
         // Use similar logic to MP3 parsing since AAC can have similar metadata
         return try await parseMp3MetadataSync(from: url)
