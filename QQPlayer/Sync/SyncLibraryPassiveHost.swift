@@ -100,10 +100,13 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     /// 本批收尾是否已跑（幂等：一批恰一次）
     private var batchFinished = false
 
+    // ⚠️ 两个进度回调在**会话队列**（非主线程）锁外同步触发 ⇒ 类型必须 `@Sendable`，
+    // 否则 `@MainActor` 上下文（如 `IOSPassiveSyncCenter`）里写的闭包会继承主线程隔离 →
+    // 闭包体内首次隔离访问即 SIGTRAP（2026-09-20 真机闪退，根因见 `SyncChangeLogPeer` 同处注释）。
     /// 有文件已落位并交给入库入口（进度回调；锁外触发）。
-    var onFileLanded: ((String) -> Void)?
+    var onFileLanded: (@Sendable (String) -> Void)?
     /// 一批推送处理完毕（含暂存歌词收尾；锁外触发）。
-    var onBatchCompleted: ((SyncLibraryPassiveSummary) -> Void)?
+    var onBatchCompleted: (@Sendable (SyncLibraryPassiveSummary) -> Void)?
     /// 一次拉取（Mac 从设备下载）的结论（诊断/UI 用）。
     var onFetchResult: ((SyncFetchResult) -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return fetchResultHandler }
