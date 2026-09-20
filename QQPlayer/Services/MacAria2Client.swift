@@ -217,10 +217,10 @@ struct MacAria2Client: Sendable {
         // aria2 参数顺序固定：["token:<secret>", [[url], opts]]（web 逐字）
         let result = try await rpcCall(method: "aria2.addUri", params: [[url], opts])
         guard let gid = result as? String, !gid.isEmpty else {
-            print("❌ [aria2] addUri 响应无 gid url=\(url.prefix(160))")
+            AppLog.error(.general, "❌ [aria2] addUri 响应无 gid url=\(url.prefix(160))")
             throw Aria2ClientError.invalidResponse
         }
-        print("✅ [aria2] addUri 提交 gid=\(gid) url=\(url.prefix(160))")
+        AppLog.info(.general, "✅ [aria2] addUri 提交 gid=\(gid) url=\(url.prefix(160))")
         return gid
     }
 
@@ -233,7 +233,7 @@ struct MacAria2Client: Sendable {
     /// 移除下载任务（web aria2.remove 语义；服务层超时兜底调用，失败忽略）
     func remove(gid: String) async throws {
         _ = try await rpcCall(method: "aria2.remove", params: [gid])
-        print("✅ [aria2] remove gid=\(gid)")
+        AppLog.info(.general, "✅ [aria2] remove gid=\(gid)")
     }
 
     /// 单次 JSON-RPC 调用：POST body → 响应解析（error → throw）。
@@ -261,19 +261,19 @@ struct MacAria2Client: Sendable {
             (data, response) = try await session.data(for: request)
         } catch {
             // 连接失败（URLError）/ 传输层异常 → unreachable（web 降级语义的触发点）
-            print("❌ [aria2] RPC 连接失败 url=\(rpcURL.absoluteString) method=\(method) error=\(error)")
+            AppLog.error(.general, "❌ [aria2] RPC 连接失败 url=\(rpcURL.absoluteString) method=\(method) error=\(error)")
             throw Aria2ClientError.unreachable
         }
         guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            print("❌ [aria2] RPC HTTP \(statusCode) url=\(rpcURL.absoluteString) method=\(method)")
+            AppLog.error(.general, "❌ [aria2] RPC HTTP \(statusCode) url=\(rpcURL.absoluteString) method=\(method)")
             throw Aria2ClientError.unreachable
         }
 
         do {
             return try MacAria2Logic.responseResult(from: data)
         } catch let error as Aria2ClientError {
-            print("❌ [aria2] RPC error method=\(method) \(error.localizedDescription)")
+            AppLog.error(.general, "❌ [aria2] RPC error method=\(method) \(error.localizedDescription)")
             throw error
         }
     }

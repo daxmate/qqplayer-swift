@@ -277,7 +277,6 @@ enum TrackDeletionService {
                     outcome.fileRemovalFailed += 1
                     outcome.processed += 1
                     let message = "⚠️ \(policy.fileAction.logLabel) 失败，保留曲目 \(item.stableId)（\(item.logLabel)）：\(error)"
-                    print(message)
                     environment.log(message)
                     onItemProcessed?(item, .failed)
                     onProgress?(outcome.processed, total)
@@ -298,7 +297,6 @@ enum TrackDeletionService {
                 outcome.failed += 1
                 outcome.processed += 1
                 let message = "❌ Failed to delete track \(item.stableId)（\(item.logLabel)）: \(error)"
-                print(message)
                 environment.log(message)
                 onItemProcessed?(item, .failed)
             }

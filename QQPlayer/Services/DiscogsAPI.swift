@@ -179,11 +179,11 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
     // MARK: - Public API
 
     func searchArtist(name: String) async throws -> DiscogsArtist? {
-        print("🎵 Discogs: Searching for artist: \(name)")
+        AppLog.info(.general, "🎵 Discogs: Searching for artist: \(name)")
 
         // Check cache first
         if let cached = getCachedArtist(name: name), !cached.isExpired {
-            print("✅ Discogs: Found cached artist: \(name)")
+            AppLog.info(.general, "✅ Discogs: Found cached artist: \(name)")
             return cached.discogsArtist
         }
 
@@ -192,11 +192,11 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
 
         // Find best match (exact match or case-insensitive match)
         guard let bestMatch = findBestMatch(for: name, in: searchResults) else {
-            print("❌ Discogs: No matching artist found for: \(name)")
+            AppLog.error(.general, "❌ Discogs: No matching artist found for: \(name)")
             return nil
         }
 
-        print("🎯 Discogs: Found match: \(bestMatch.title)")
+        AppLog.info(.general, "🎯 Discogs: Found match: \(bestMatch.title)")
 
         // Get detailed artist information
         let artist = try await getArtistDetails(from: bestMatch.resourceUrl)
@@ -211,7 +211,7 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
 
     private func performSearch(query: String, type: String) async throws -> [DiscogsSearchResult] {
         guard isConfigured else {
-            print("🎵 Discogs: Skipped search (API keys not configured)")
+            AppLog.warn(.general, "🎵 Discogs: Skipped search (API keys not configured)")
             return []
         }
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
@@ -225,19 +225,19 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
         request.setValue("Discogs key=\(consumerKey ?? ""), secret=\(consumerSecret ?? "")", forHTTPHeaderField: "Authorization")
         request.setValue("QQPlayer/1.0", forHTTPHeaderField: "User-Agent")
 
-        print("🌐 Discogs: Making request to: \(urlString)")
+        AppLog.info(.general, "🌐 Discogs: Making request to: \(urlString)")
 
         let (data, response) = try await session.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
-            print("📡 Discogs: Response status: \(httpResponse.statusCode)")
+            AppLog.info(.general, "📡 Discogs: Response status: \(httpResponse.statusCode)")
             if httpResponse.statusCode != 200 {
                 throw DiscogsAPIError.httpError(httpResponse.statusCode)
             }
         }
 
         let searchResponse = try JSONDecoder().decode(DiscogsSearchResponse.self, from: data)
-        print("🔍 Discogs: Found \(searchResponse.results.count) results")
+        AppLog.info(.general, "🔍 Discogs: Found \(searchResponse.results.count) results")
 
         return searchResponse.results
     }
@@ -277,7 +277,7 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
         request.setValue("Discogs key=\(consumerKey ?? ""), secret=\(consumerSecret ?? "")", forHTTPHeaderField: "Authorization")
         request.setValue("QQPlayer/1.0", forHTTPHeaderField: "User-Agent")
 
-        print("🌐 Discogs: Fetching artist details from: \(resourceUrl)")
+        AppLog.info(.general, "🌐 Discogs: Fetching artist details from: \(resourceUrl)")
 
         let (data, response) = try await session.data(for: request)
 
@@ -335,9 +335,9 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
         do {
             let data = try JSONEncoder().encode(cached)
             try data.write(to: fileURL)
-            print("💾 Discogs: Cached artist data for: \(name)")
+            AppLog.info(.general, "💾 Discogs: Cached artist data for: \(name)")
         } catch {
-            print("❌ Discogs: Failed to cache artist data: \(error)")
+            AppLog.error(.general, "❌ Discogs: Failed to cache artist data: \(error)")
         }
     }
 
@@ -369,12 +369,12 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
                     try FileManager.default.removeItem(at: fileURL)
                     removed += 1
                 } catch {
-                    print("❌ Discogs: Failed to remove expired cache file: \(error)")
+                    AppLog.error(.general, "❌ Discogs: Failed to remove expired cache file: \(error)")
                 }
             }
 
             if removed > 0 {
-                print("🗑️ Discogs: Removed \(removed) expired cache file(s)")
+                AppLog.info(.general, "🗑️ Discogs: Removed \(removed) expired cache file(s)")
             }
         }.value
     }

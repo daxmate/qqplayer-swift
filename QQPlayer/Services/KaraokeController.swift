@@ -280,7 +280,7 @@ final class KaraokeController {
             } else if let deadline = pendingJumpDeadline, Date() > deadline {
                 // seek 失败/超时（如目标行无时间戳、音频未加载）：解除 pending 降级，
                 // 缓存行重定位到实际播放位置，不阻塞后续句末检测
-                print("⏭️ Karaoke pending jump timed out (line \(pending)) - relocating to actual position")
+                AppLog.warn(.general, "⏭️ Karaoke pending jump timed out (line \(pending)) - relocating to actual position")
                 pendingJumpLine = nil
                 pendingJumpDeadline = nil
                 karaokeLine = LyricTiming.activeLineIndex(time: tickTime, in: currentLines)

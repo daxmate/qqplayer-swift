@@ -102,7 +102,7 @@ final class PlayHistoryRecorder {
                 )
             }
         } catch {
-            print("⚠️ PlayHistoryRecorder: 写入播放记录失败: \(error)")
+            AppLog.warn(.general, "⚠️ PlayHistoryRecorder: 写入播放记录失败: \(error)")
         }
 
         activeRecordId = insertedId
@@ -140,7 +140,7 @@ final class PlayHistoryRecorder {
         // 墙钟分段：真实收听时长，前向 seek 不虚增、回退不虚减。
         // playbackTime 仅保留在签名里（PlayerEngine 调用契约），不参与计算。
         let elapsed = Date().timeIntervalSince(sessionStartWallTime)
-        print("🔬 accumulate: recordId=\(String(describing: activeRecordId)) wall=\(sessionStartWallTime) elapsed=\(elapsed)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔬 accumulate: recordId=\(String(describing: activeRecordId)) wall=\(sessionStartWallTime) elapsed=\(elapsed)") }
         // Only positive, finite segments: out-of-order events or corrupt
         // values must not pollute the duration.
         guard elapsed > 0, elapsed <= Self.maxSegmentDurationSeconds else { return }
@@ -155,7 +155,7 @@ final class PlayHistoryRecorder {
                 )
             }
         } catch {
-            print("⚠️ PlayHistoryRecorder: 更新播放时长失败: \(error)")
+            AppLog.warn(.general, "⚠️ PlayHistoryRecorder: 更新播放时长失败: \(error)")
         }
 
         // Advance the checkpoint so the next accumulate covers only the new
@@ -189,7 +189,7 @@ final class PlayHistoryRecorder {
                     )
                 }
             } catch {
-                print("⚠️ PlayHistoryRecorder: 同步变更日志写入失败: \(error)")
+                AppLog.warn(.general, "⚠️ PlayHistoryRecorder: 同步变更日志写入失败: \(error)")
             }
         }
         activeSessionTrackStableId = nil

@@ -79,21 +79,21 @@ class EQManager {
         let maxSafeBands = 16
         let requestedBands = !eqFrequencies.isEmpty ? min(eqFrequencies.count, maxSafeBands) : maxSafeBands
 
-        print("🎛️ Original bands: \(eqFrequencies.count), requesting: \(requestedBands) (limited to \(maxSafeBands))")
+        AppLog.info(.general, "🎛️ Original bands: \(eqFrequencies.count), requesting: \(requestedBands) (limited to \(maxSafeBands))")
 
         eqNode = AVAudioUnitEQ(numberOfBands: requestedBands)
         guard let eqNode = eqNode else { return }
 
         let actualBands = eqNode.bands.count
-        print("🎛️ Requested \(requestedBands) bands for GraphicEQ preset, iOS created \(actualBands) bands")
+        AppLog.info(.general, "🎛️ Requested \(requestedBands) bands for GraphicEQ preset, iOS created \(actualBands) bands")
 
         // Configure bands if we have frequency data
         if !eqFrequencies.isEmpty {
             configureEQBands()
             if eqFrequencies.count > maxSafeBands {
-                print("⚠️ GraphicEQ preset has \(eqFrequencies.count) bands, reduced to \(actualBands) bands (iOS limit)")
+                AppLog.warn(.general, "⚠️ GraphicEQ preset has \(eqFrequencies.count) bands, reduced to \(actualBands) bands (iOS limit)")
             } else {
-                print("✅ Using \(actualBands) bands from GraphicEQ preset")
+                AppLog.info(.general, "✅ Using \(actualBands) bands from GraphicEQ preset")
             }
         } else {
             // Default configuration for empty presets
@@ -110,7 +110,7 @@ class EQManager {
         // Attach the EQ node
         audioEngine.attach(eqNode)
 
-        print("✅ EQ node created with \(actualBands) bands")
+        AppLog.info(.general, "✅ EQ node created with \(actualBands) bands")
 
         // Apply current settings if enabled
         if isEnabled {
@@ -150,10 +150,10 @@ class EQManager {
                 eqNode.bands[i].bypass = true
             }
 
-            print("✅ Direct mapping: Using all \(inputBandCount) bands")
+            AppLog.info(.general, "✅ Direct mapping: Using all \(inputBandCount) bands")
         } else {
             // More input bands than available - group and average multiple bands
-            print("🔄 Reducing \(inputBandCount) bands to \(availableBands) bands using frequency grouping and averaging")
+            AppLog.info(.general, "🔄 Reducing \(inputBandCount) bands to \(availableBands) bands using frequency grouping and averaging")
 
             let bandsPerGroup = Double(inputBandCount) / Double(availableBands)
 
@@ -190,10 +190,10 @@ class EQManager {
                 band.filterType = .parametric
                 band.bypass = false
 
-                print("  Band \(i): \(avgFrequency.rounded(toPlaces: 1))Hz, \(avgGain.rounded(toPlaces: 1))dB (avg of \(groupSize) bands: \(startIndex)-\(endIndex - 1))")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "  Band \(i): \(avgFrequency.rounded(toPlaces: 1))Hz, \(avgGain.rounded(toPlaces: 1))dB (avg of \(groupSize) bands: \(startIndex)-\(endIndex - 1))") }
             }
 
-            print("✅ Applied frequency grouping and averaging (\(bandsPerGroup.rounded(toPlaces: 1)) bands per group)")
+            AppLog.info(.general, "✅ Applied frequency grouping and averaging (\(bandsPerGroup.rounded(toPlaces: 1)) bands per group)")
         }
     }
 
@@ -212,7 +212,7 @@ class EQManager {
             eqNode?.globalGain = 0.0
 
             SFBAudioEngineManager.shared.updateEQSettings()
-            print("🚫 EQ disabled - all bands bypassed")
+            AppLog.info(.general, "🚫 EQ disabled - all bands bypassed")
             return
         }
 
@@ -232,7 +232,7 @@ class EQManager {
                     requestedPresetId: preset.id,
                     currentPresetId: currentPreset?.id
                 ) else {
-                    print("↩️ EQ 预设加载结果已过期（\(preset.name)），丢弃不落地")
+                    AppLog.warn(.general, "↩️ EQ 预设加载结果已过期（\(preset.name)），丢弃不落地")
                     return
                 }
 
@@ -247,16 +247,16 @@ class EQManager {
 
                     if self.eqNode != nil {
                         self.configureEQBands()
-                        print("✅ Reconfigured existing EQ node with \(newFrequencies.count) input bands")
+                        AppLog.info(.general, "✅ Reconfigured existing EQ node with \(newFrequencies.count) input bands")
                     } else {
-                        print("ℹ️ Stored \(newFrequencies.count) EQ bands for SFBAudioEngine")
+                        AppLog.info(.general, "ℹ️ Stored \(newFrequencies.count) EQ bands for SFBAudioEngine")
                     }
                 }
 
                 applyGlobalGain()
-                print("✅ Applied EQ preset: \(preset.name)")
+                AppLog.info(.general, "✅ Applied EQ preset: \(preset.name)")
             } catch {
-                print("❌ Failed to apply EQ settings: \(error)")
+                AppLog.error(.general, "❌ Failed to apply EQ settings: \(error)")
             }
         }
     }
@@ -278,7 +278,7 @@ class EQManager {
                     self.availablePresets = presets
                 }
             } catch {
-                print("❌ Failed to load EQ presets: \(error)")
+                AppLog.error(.general, "❌ Failed to load EQ presets: \(error)")
             }
         }
     }
@@ -428,7 +428,7 @@ class EQManager {
                     try await databaseManager.saveEQSettings(defaultSettings)
                 }
             } catch {
-                print("❌ Failed to load EQ settings: \(error)")
+                AppLog.error(.general, "❌ Failed to load EQ settings: \(error)")
             }
         }
     }
@@ -444,7 +444,7 @@ class EQManager {
                 )
                 try await databaseManager.saveEQSettings(settings)
             } catch {
-                print("❌ Failed to save EQ settings: \(error)")
+                AppLog.error(.general, "❌ Failed to save EQ settings: \(error)")
             }
         }
     }
@@ -564,15 +564,15 @@ extension EQManager {
             eqNode?.bands.forEach { $0.bypass = true }
             eqNode?.globalGain = 0.0
             SFBAudioEngineManager.shared.updateEQSettings()
-            print("🚫 EQ disabled - all bands bypassed")
+            AppLog.info(.general, "🚫 EQ disabled - all bands bypassed")
             return
         }
 
         if eqNode != nil {
             configureEQBands()
-            print("✅ Applied builtin EQ '\(activeBuiltinKey ?? "?")' with \(eqFrequencies.count) bands")
+            AppLog.info(.general, "✅ Applied builtin EQ '\(activeBuiltinKey ?? "?")' with \(eqFrequencies.count) bands")
         } else {
-            print("ℹ️ Stored \(eqFrequencies.count) builtin EQ bands for SFBAudioEngine")
+            AppLog.info(.general, "ℹ️ Stored \(eqFrequencies.count) builtin EQ bands for SFBAudioEngine")
         }
 
         applyGlobalGain()

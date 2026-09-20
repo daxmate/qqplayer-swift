@@ -122,7 +122,7 @@ struct ExternalFileBookmarkStore {
         for (oldStableId, newStableId) in remapping where oldStableId != newStableId {
             guard let bookmarkData = bookmarks[oldStableId] else { continue }
             guard bookmarks[newStableId] == nil else {
-                print("🔖 Bookmark key migration skipped (target exists): \(oldStableId) → \(newStableId)")
+                AppLog.warn(.general, "🔖 Bookmark key migration skipped (target exists): \(oldStableId) → \(newStableId)")
                 continue
             }
             bookmarks.removeValue(forKey: oldStableId)

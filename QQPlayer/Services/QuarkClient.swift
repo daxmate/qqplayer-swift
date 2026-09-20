@@ -355,7 +355,7 @@ struct QuarkClient {
                 pwdID: pwdID, stoken: stoken, pdirFid: "0", depth: 1,
                 files: &files, seen: &seen
             )
-            print("✅ [夸克 resolve] 分享解析成功 shareURL=\(shareURL) files=\(files.count) stoken=\(stoken.prefix(8))…")
+            AppLog.info(.general, "✅ [夸克 resolve] 分享解析成功 shareURL=\(shareURL) files=\(files.count) stoken=\(stoken.prefix(8))…")
             return (files, stoken)
         } catch {
             // 诊断打点（2026-09-08 歌曲海下载 shareEmptyOrExpired 排查）：
@@ -363,7 +363,7 @@ struct QuarkClient {
             // shareEmptyOrExpired；这里把真实环节错误打出来（invalidShareURL /
             // stoken 获取失败 HTTP/目录列表失败/业务 message 等）。
             let detail = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-            print("❌ [夸克 resolve] 分享解析失败 shareURL=\(shareURL) error=\(detail)")
+            AppLog.error(.general, "❌ [夸克 resolve] 分享解析失败 shareURL=\(shareURL) error=\(detail)")
             return ([], "")
         }
     }
@@ -421,12 +421,12 @@ struct QuarkClient {
             // 删文件会导致扫码-下载-重扫死循环（web 注释原文）
             // 诊断打点（2026-09-08）：403 body 常含真实原因（如 41020 token 校验异常）
             let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            print("❌ [夸克直链] 取直链被拒 status=\(http.statusCode) body=\(bodyPreview)")
+            AppLog.error(.general, "❌ [夸克直链] 取直链被拒 status=\(http.statusCode) body=\(bodyPreview)")
             throw QuarkClientError.loginRequired
         }
         guard (200 ..< 300).contains(http.statusCode) else {
             let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            print("❌ [夸克直链] 取直链 HTTP 失败 status=\(http.statusCode) body=\(bodyPreview)")
+            AppLog.error(.general, "❌ [夸克直链] 取直链 HTTP 失败 status=\(http.statusCode) body=\(bodyPreview)")
             throw QuarkClientError.httpStatus(http.statusCode)
         }
         let payload = try Self.decode(data)
@@ -436,7 +436,7 @@ struct QuarkClient {
         let businessCode = (payload["code"] as? NSNumber)?.intValue
         if statusCode != 200 && businessCode != 0 {
             let message = payload["message"] as? String ?? ""
-            print("❌ [夸克直链] 取直链业务失败 status=\(statusCode ?? -1) code=\(businessCode ?? -1) message=\(message)")
+            AppLog.error(.general, "❌ [夸克直链] 取直链业务失败 status=\(statusCode ?? -1) code=\(businessCode ?? -1) message=\(message)")
             let detail = message.isEmpty ? "" : ": \(message)"
             throw QuarkClientError.serverMessage("获取下载直链失败\(detail)")
         }
@@ -456,7 +456,7 @@ struct QuarkClient {
         ]
         // 诊断打点（2026-09-08）：Cookie 值不打（日志卫生），只打是否携带；
         // url 截断（签名 URL 含 token，全量无意义且刷屏）
-        print("✅ [夸克直链] 取直链成功 url=\(downloadURLString.prefix(140))… cookie=\(downloadHeaders["Cookie"]?.isEmpty == false ? "携带(\(downloadHeaders["Cookie"]?.count ?? 0)字符)" : "无")")
+        AppLog.info(.general, "✅ [夸克直链] 取直链成功 url=\(downloadURLString.prefix(140))… cookie=\(downloadHeaders["Cookie"]?.isEmpty == false ? "携带(\(downloadHeaders["Cookie"]?.count ?? 0)字符)" : "无")")
         return QuarkDownload(urlString: downloadURLString, headers: downloadHeaders)
     }
 
@@ -646,7 +646,7 @@ struct QuarkClient {
         do {
             try cookieStore.saveCookiesData(data)
         } catch {
-            print("❌ [夸克会话] 写入钥匙串失败（不落明文降级）: \(error)")
+            AppLog.error(.general, "❌ [夸克会话] 写入钥匙串失败（不落明文降级）: \(error)")
             throw error
         }
     }
@@ -656,7 +656,7 @@ struct QuarkClient {
         do {
             try cookieStore.deleteCookies()
         } catch {
-            print("⚠️ [夸克会话] 删除钥匙串条目失败: \(error)")
+            AppLog.warn(.general, "⚠️ [夸克会话] 删除钥匙串条目失败: \(error)")
         }
         // 旧明文文件存在时一并清掉（已失效凭据不应继续留在盘上）
         if let legacy = legacyCookieFileURL {
@@ -675,13 +675,13 @@ struct QuarkClient {
         case .noLegacyFile:
             break
         case let .migrated(count):
-            print("✅ [夸克会话] 旧明文 cookie 已迁入钥匙串（\(count) 项），已删除明文文件")
+            AppLog.info(.general, "✅ [夸克会话] 旧明文 cookie 已迁入钥匙串（\(count) 项），已删除明文文件")
         case .alreadyInStore:
-            print("🔒 [夸克会话] 钥匙串已有凭据，已清理残留明文文件")
+            AppLog.info(.general, "🔒 [夸克会话] 钥匙串已有凭据，已清理残留明文文件")
         case .discardedEmptyLegacy:
-            print("🔒 [夸克会话] 旧明文文件无可迁移凭据，已删除")
+            AppLog.info(.general, "🔒 [夸克会话] 旧明文文件无可迁移凭据，已删除")
         case let .failed(message):
-            print("⚠️ [夸克会话] 迁移钥匙串失败，保留明文文件降级可读: \(message)")
+            AppLog.warn(.general, "⚠️ [夸克会话] 迁移钥匙串失败，保留明文文件降级可读: \(message)")
         }
     }
 
@@ -752,7 +752,7 @@ struct QuarkClient {
         guard (200 ..< 300).contains(http.statusCode) else {
             // 诊断打点（2026-09-08）：400/401 响应体带服务端真实原因（参数缺失提示等）
             let bodyPreview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
-            print("❌ [夸克 GET] HTTP \(http.statusCode) url=\(url.absoluteString) body=\(bodyPreview)")
+            AppLog.error(.general, "❌ [夸克 GET] HTTP \(http.statusCode) url=\(url.absoluteString) body=\(bodyPreview)")
             throw QuarkClientError.httpStatus(http.statusCode)
         }
         return try Self.decode(data)
@@ -769,7 +769,7 @@ struct QuarkClient {
         guard (200 ..< 300).contains(http.statusCode) else {
             // 诊断打点（2026-09-08）：400/401 响应体带服务端真实原因（参数缺失提示等）
             let bodyPreview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
-            print("❌ [夸克 POST] HTTP \(http.statusCode) url=\(url.absoluteString) body=\(bodyPreview)")
+            AppLog.error(.general, "❌ [夸克 POST] HTTP \(http.statusCode) url=\(url.absoluteString) body=\(bodyPreview)")
             throw QuarkClientError.httpStatus(http.statusCode)
         }
         return try Self.decode(data)

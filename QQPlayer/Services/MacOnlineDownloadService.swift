@@ -104,7 +104,7 @@ enum MacOnlineDownloadService {
         do {
             info = try await client.playInfo(songID: song.id, level: quality)
         } catch {
-            print("❌ [在线下载] 直链获取失败 songID=\(song.id) level=\(quality): \(error)")
+            AppLog.error(.general, "❌ [在线下载] 直链获取失败 songID=\(song.id) level=\(quality): \(error)")
             throw error
         }
 
@@ -160,7 +160,7 @@ enum MacOnlineDownloadService {
         let cleaned = NeteaseOnlineLogic.sanitizeFilename(suggestedFileName)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else {
-            print("❌ [直链下载] 文件名清洗后为空 suggestedFileName=\(suggestedFileName)")
+            AppLog.error(.general, "❌ [直链下载] 文件名清洗后为空 suggestedFileName=\(suggestedFileName)")
             throw NeteaseOnlineError.downloadFailed("invalid file name: \(suggestedFileName)")
         }
         return try await persistDownload(
@@ -198,13 +198,13 @@ enum MacOnlineDownloadService {
             configuredDirectory: settings.onlineDownloadDirectory,
             libraryDirectories: libraryDirectoryPaths()
         ) else {
-            print("❌ [\(logPrefix)] 无可用下载目录（onlineDownloadDirectory=空且曲库目录列表为空）")
+            AppLog.error(.general, "❌ [\(logPrefix)] 无可用下载目录（onlineDownloadDirectory=空且曲库目录列表为空）")
             throw NeteaseOnlineError.downloadFailed("no download directory")
         }
         do {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            print("❌ [\(logPrefix)] 创建目录失败 \(directory.path): \(error)")
+            AppLog.error(.general, "❌ [\(logPrefix)] 创建目录失败 \(directory.path): \(error)")
             throw error
         }
 
@@ -233,7 +233,7 @@ enum MacOnlineDownloadService {
                 )
             } catch {
                 // 任何 aria2 失败（addUri 连接失败/RPC 错/轮询 error/超时）→ 降级内置
-                print("⚠️ [下载引擎] aria2 不可用降级内置：\(error.localizedDescription)")
+                AppLog.warn(.general, "⚠️ [下载引擎] aria2 不可用降级内置：\(error.localizedDescription)")
                 try await downloadViaHTTP(
                     url: url,
                     partURL: partURL,
@@ -256,7 +256,7 @@ enum MacOnlineDownloadService {
         do {
             try fileManager.moveItem(at: partURL, to: destination)
         } catch {
-            print("❌ [\(logPrefix)] 落盘改名失败 \(partURL.path) → \(destination.path): \(error)")
+            AppLog.error(.general, "❌ [\(logPrefix)] 落盘改名失败 \(partURL.path) → \(destination.path): \(error)")
             throw error
         }
 
@@ -281,7 +281,7 @@ enum MacOnlineDownloadService {
                 progress: progress
             )
         } catch {
-            print("❌ [\(logPrefix)] 文件下载失败 url=\(url.absoluteString): \(error)")
+            AppLog.error(.general, "❌ [\(logPrefix)] 文件下载失败 url=\(url.absoluteString): \(error)")
             throw error
         }
     }
@@ -310,7 +310,7 @@ enum MacOnlineDownloadService {
             out: partURL.lastPathComponent,
             maxSpeedMbps: maxSpeedMbps
         )
-        print("✅ [下载引擎] aria2 提交 gid=\(gid)")
+        AppLog.info(.general, "✅ [下载引擎] aria2 提交 gid=\(gid)")
 
         // 轮询 1s 间隔；active/waiting → 进度回调；complete → 成功；error → 抛
         let deadline = Date().addingTimeInterval(300)
@@ -319,15 +319,17 @@ enum MacOnlineDownloadService {
             let status = try await client.tellStatus(gid: gid)
             switch status.status {
             case "active", "waiting":
-                print("✅ [下载引擎] aria2 轮询 gid=\(gid) status=\(status.status) "
-                    + "completed=\(status.completedLength)/\(status.totalLength)")
+                if AppLog.isEnabled(.debug, .general) {
+                    AppLog.debug(.general, "✅ [下载引擎] aria2 轮询 gid=\(gid) status=\(status.status) "
+                        + "completed=\(status.completedLength)/\(status.totalLength)")
+                }
                 progress?(status.completedLength, status.totalLength)
             case "complete":
-                print("✅ [下载引擎] aria2 下载完成 gid=\(gid)")
+                AppLog.info(.general, "✅ [下载引擎] aria2 下载完成 gid=\(gid)")
                 return
             case "error":
                 let message = status.errorMessage ?? status.status
-                print("❌ [下载引擎] aria2 下载 error gid=\(gid) message=\(message)")
+                AppLog.error(.general, "❌ [下载引擎] aria2 下载 error gid=\(gid) message=\(message)")
                 throw NeteaseOnlineError.downloadFailed("aria2 下载失败: \(message)")
             default:
                 // paused/removed 等非终态：继续轮询至超时（web 只认 complete/error）
@@ -336,7 +338,7 @@ enum MacOnlineDownloadService {
         }
         // 超时：先 remove 清理任务（失败忽略），再抛 → 调用方降级
         try? await client.remove(gid: gid)
-        print("❌ [下载引擎] aria2 下载超时 gid=\(gid)")
+        AppLog.error(.general, "❌ [下载引擎] aria2 下载超时 gid=\(gid)")
         throw NeteaseOnlineError.downloadFailed("aria2 下载超时")
     }
 }

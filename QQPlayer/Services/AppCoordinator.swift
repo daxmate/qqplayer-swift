@@ -38,7 +38,7 @@ class AppCoordinator {
     }
 
     func initialize() async {
-        print("🚀 AppCoordinator.initialize() started")
+        AppLog.info(.general, "🚀 AppCoordinator.initialize() started")
 
         // Cosmos → QQPlayer rebrand: rename legacy data paths once so
         // playlists/favorites/player-state created by older installs stay
@@ -55,13 +55,13 @@ class AppCoordinator {
 
         // Check if we should auto-scan based on last scan date
         var settings = DeleteSettings.load()
-        print("📅 Current lastLibraryScanDate: \(settings.lastLibraryScanDate?.description ?? "nil")")
+        AppLog.info(.general, "📅 Current lastLibraryScanDate: \(settings.lastLibraryScanDate?.description ?? "nil")")
         let shouldAutoScan = shouldPerformAutoScan(lastScanDate: settings.lastLibraryScanDate)
 
         if shouldAutoScan {
-            print("🔄 App launched after long time - starting automatic library scan")
+            AppLog.info(.general, "🔄 App launched after long time - starting automatic library scan")
         } else {
-            print("⏭️ Recent app launch - skipping automatic scan (use manual sync button)")
+            AppLog.warn(.general, "⏭️ Recent app launch - skipping automatic scan (use manual sync button)")
         }
 
         // M3-2：退役 iCloud 状态机后本地沙盒是唯一数据源，不再区分 online/offline
@@ -71,7 +71,7 @@ class AppCoordinator {
             settings.lastLibraryScanDate = Date()
             settings.save()
         }
-        print("App initialized with local sandbox music library")
+        AppLog.info(.general, "App initialized with local sandbox music library")
 
         // Restore UI state only to show user what was playing without interrupting other apps
         Task {
@@ -84,7 +84,7 @@ class AppCoordinator {
     private func shouldPerformAutoScan(lastScanDate: Date?) -> Bool {
         // If never scanned before, definitely scan
         guard let lastScanDate = lastScanDate else {
-            print("🆕 Never scanned before - will perform scan")
+            AppLog.info(.general, "🆕 Never scanned before - will perform scan")
             return true
         }
 
@@ -94,9 +94,9 @@ class AppCoordinator {
         let shouldScan = hoursSinceLastScan >= 1.0
 
         if shouldScan {
-            print("⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - will scan")
+            AppLog.info(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - will scan")
         } else {
-            print("⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - skipping")
+            AppLog.warn(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - skipping")
         }
 
         return shouldScan
@@ -127,7 +127,7 @@ class AppCoordinator {
                     let key = IOSAppearance.currentAccentKey
                     guard key != self.lastSyncedAccentKey else { return }
                     self.lastSyncedAccentKey = key
-                    print("🎨 强调色变更 (\(key)) - 刷新小组件主题")
+                    AppLog.info(.general, "🎨 强调色变更 (\(key)) - 刷新小组件主题")
                     // Update playlist widget colors
                     self.syncPlaylistsToCloud()
                     // Update now playing widget color
@@ -144,16 +144,16 @@ class AppCoordinator {
     }
 
     func manualSync() async {
-        print("🔄 Manual sync triggered - attempting library indexing")
+        AppLog.info(.general, "🔄 Manual sync triggered - attempting library indexing")
 
         // Check if we're already indexing
         if libraryIndexer.isIndexing {
-            print("⚠️ Library indexing already in progress - skipping manual sync")
+            AppLog.warn(.general, "⚠️ Library indexing already in progress - skipping manual sync")
             return
         }
 
         // For manual sync, always attempt to re-index to catch new files
-        print("📋 Performing manual sync - user requested fresh library scan")
+        AppLog.info(.general, "📋 Performing manual sync - user requested fresh library scan")
         await startLibraryIndexing()
     }
 
@@ -162,17 +162,17 @@ class AppCoordinator {
     }
 
     func toggleFavorite(trackStableId: String) throws {
-        print("🔄 Toggle favorite for track: \(trackStableId)")
+        AppLog.info(.general, "🔄 Toggle favorite for track: \(trackStableId)")
 
         let wasLiked = try databaseManager.isFavorite(trackStableId: trackStableId)
-        print("📊 Track was liked before toggle: \(wasLiked)")
+        AppLog.info(.general, "📊 Track was liked before toggle: \(wasLiked)")
 
         if wasLiked {
             try databaseManager.removeFromFavorites(trackStableId: trackStableId)
-            print("❌ Removed from favorites: \(trackStableId)")
+            AppLog.error(.general, "❌ Removed from favorites: \(trackStableId)")
         } else {
             try databaseManager.addToFavorites(trackStableId: trackStableId)
-            print("❤️ Added to favorites: \(trackStableId)")
+            AppLog.info(.general, "❤️ Added to favorites: \(trackStableId)")
         }
 
         try favoriteDidChange(trackStableId: trackStableId)
@@ -201,7 +201,7 @@ class AppCoordinator {
             isFavorite: { try self.isFavorite(trackStableId: $0) }
         )
         guard !toChange.isEmpty else {
-            print("❤️ Bulk favorite: nothing to change (\(trackStableIds.count) selected)")
+            AppLog.info(.general, "❤️ Bulk favorite: nothing to change (\(trackStableIds.count) selected)")
             return 0
         }
 
@@ -213,7 +213,7 @@ class AppCoordinator {
             }
         }
 
-        print("❤️ Bulk favorite: \(toChange.count)/\(trackStableIds.count) changed → \(wanted ? "liked" : "unliked")")
+        AppLog.info(.general, "❤️ Bulk favorite: \(toChange.count)/\(trackStableIds.count) changed → \(wanted ? "liked" : "unliked")")
         try favoriteDidChange(trackStableId: toChange.last)
         return toChange.count
     }
@@ -227,26 +227,26 @@ class AppCoordinator {
         // Verify the database operation worked
         if let trackStableId {
             let isNowLiked = try databaseManager.isFavorite(trackStableId: trackStableId)
-            print("📊 Track is now liked after toggle: \(isNowLiked)")
+            AppLog.info(.general, "📊 Track is now liked after toggle: \(isNowLiked)")
         }
 
         // Get current favorites count from database
         let currentFavorites = try databaseManager.getFavorites()
-        print("📊 Total favorites in database after toggle: \(currentFavorites.count)")
+        AppLog.info(.general, "📊 Total favorites in database after toggle: \(currentFavorites.count)")
 
         // Always save favorites (both locally and to iCloud if available)
         Task {
             do {
                 let favorites = try databaseManager.getFavorites()
-                print("📊 Favorites to save: \(favorites.count) - \(favorites)")
+                AppLog.info(.general, "📊 Favorites to save: \(favorites.count) - \(favorites)")
                 try stateManager.saveFavorites(favorites)
-                print("💾 Favorites saved: \(favorites.count) total")
+                AppLog.info(.general, "💾 Favorites saved: \(favorites.count) total")
 
                 // Verify save worked by loading back
                 let loadedFavorites = try stateManager.loadFavorites()
-                print("📊 Loaded favorites after save: \(loadedFavorites.count) - \(loadedFavorites)")
+                AppLog.info(.general, "📊 Loaded favorites after save: \(loadedFavorites.count) - \(loadedFavorites)")
             } catch {
-                print("❌ Failed to save favorites: \(error)")
+                AppLog.error(.general, "❌ Failed to save favorites: \(error)")
             }
         }
     }
@@ -288,7 +288,7 @@ class AppCoordinator {
                 case .music:
                     await handleGeneralMusicPlayback(userInfo: userInfo)
                 default:
-                    print("❌ Unsupported media type from Siri")
+                    AppLog.error(.general, "❌ Unsupported media type from Siri")
                 }
             } else if let mediaIdentifiers = userInfo["mediaIdentifiers"] as? [String] {
                 // Direct media identifiers provided
@@ -311,7 +311,7 @@ class AppCoordinator {
                     }
                 }
             } catch {
-                print("❌ Error playing song: \(error)")
+                AppLog.error(.general, "❌ Error playing song: \(error)")
             }
         }
 
@@ -329,7 +329,7 @@ class AppCoordinator {
                     }
                 }
             } catch {
-                print("❌ Error playing playlist: \(error)")
+                AppLog.error(.general, "❌ Error playing playlist: \(error)")
             }
         }
 
@@ -337,7 +337,7 @@ class AppCoordinator {
             do {
                 // Play all music - should always play all tracks, not favorites
                 let tracks = try databaseManager.getAllTracks()
-                print("🎵 Playing all music: \(tracks.count) tracks, starting with most recent")
+                AppLog.info(.general, "🎵 Playing all music: \(tracks.count) tracks, starting with most recent")
 
                 if let firstTrack = tracks.first {
                     // Set up background session BEFORE starting playback for Siri
@@ -345,7 +345,7 @@ class AppCoordinator {
                     await playerEngine.playTrack(firstTrack, queue: tracks)
                 }
             } catch {
-                print("❌ Error playing general music: \(error)")
+                AppLog.error(.general, "❌ Error playing general music: \(error)")
             }
         }
 
@@ -365,7 +365,7 @@ class AppCoordinator {
                     await playerEngine.playTrack(firstTrack, queue: tracks)
                 }
             } catch {
-                print("❌ Error with direct playback: \(error)")
+                AppLog.error(.general, "❌ Error with direct playback: \(error)")
             }
         }
 
@@ -376,7 +376,7 @@ class AppCoordinator {
                 return
             }
 
-            print("🎤 Handling Siri playback intent for: \(identifier)")
+            AppLog.info(.general, "🎤 Handling Siri playback intent for: \(identifier)")
 
             guard identifier != "qqplayer_not_found" else {
                 completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
@@ -386,7 +386,7 @@ class AppCoordinator {
             do {
                 if identifier.hasPrefix("search_song_") {
                     let songName = String(identifier.dropFirst(12)) // Remove "search_song_" prefix
-                    print("🎤 Searching for song: '\(songName)'")
+                    AppLog.info(.general, "🎤 Searching for song: '\(songName)'")
                     let tracks = try databaseManager.searchTracks(query: songName)
                     if let firstTrack = tracks.first {
                         // Set up background session BEFORE starting playback for Siri
@@ -398,7 +398,7 @@ class AppCoordinator {
                     }
                 } else if identifier.hasPrefix("search_playlist_") {
                     let playlistName = String(identifier.dropFirst(16)) // Remove "search_playlist_" prefix
-                    print("🎤 Searching for playlist: '\(playlistName)'")
+                    AppLog.info(.general, "🎤 Searching for playlist: '\(playlistName)'")
                     let playlists = try databaseManager.searchPlaylists(query: playlistName)
                     if let firstPlaylist = playlists.first, let playlistId = firstPlaylist.id {
                         let playlistItems = try databaseManager.getPlaylistItems(playlistId: playlistId)
@@ -433,23 +433,23 @@ class AppCoordinator {
                     }
                 } else if identifier.hasPrefix("playlist_") {
                     let playlistIdString = String(identifier.dropFirst(9)) // Remove "playlist_" prefix
-                    print("🎤 Playing playlist with ID: '\(playlistIdString)'")
+                    AppLog.info(.general, "🎤 Playing playlist with ID: '\(playlistIdString)'")
                     if let playlistId = Int64(playlistIdString) {
                         let playlistItems = try databaseManager.getPlaylistItems(playlistId: playlistId)
                         let trackStableIds = playlistItems.map { $0.trackStableId }
                         let tracks = try databaseManager.getTracksByStableIds(trackStableIds)
-                        print("🎤 Found \(tracks.count) tracks in playlist \(playlistId)")
+                        AppLog.info(.general, "🎤 Found \(tracks.count) tracks in playlist \(playlistId)")
                         if let firstTrack = tracks.first {
                             // Update playlist last played time
                             try databaseManager.updatePlaylistLastPlayed(playlistId: playlistId)
                             await playerEngine.playTrack(firstTrack, queue: tracks)
                             completion(INPlayMediaIntentResponse(code: .success, userActivity: nil))
                         } else {
-                            print("❌ No tracks found in playlist \(playlistId)")
+                            AppLog.error(.general, "❌ No tracks found in playlist \(playlistId)")
                             completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
                         }
                     } else {
-                        print("❌ Invalid playlist ID: '\(playlistIdString)'")
+                        AppLog.error(.general, "❌ Invalid playlist ID: '\(playlistIdString)'")
                         completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
                     }
                 } else if identifier == "search_playlist_unknown" {
@@ -472,7 +472,7 @@ class AppCoordinator {
                     }
                 } else if identifier.hasPrefix("search_album_") {
                     let albumName = String(identifier.dropFirst(13))
-                    print("🎤 Searching for album: '\(albumName)'")
+                    AppLog.info(.general, "🎤 Searching for album: '\(albumName)'")
                     let albums = try databaseManager.searchAlbums(query: albumName)
                     if let album = albums.first, let albumId = album.id {
                         let tracks = try databaseManager.getTracksByAlbumId(albumId)
@@ -486,7 +486,7 @@ class AppCoordinator {
                     completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
                 } else if identifier.hasPrefix("search_artist_") {
                     let artistName = String(identifier.dropFirst(14))
-                    print("🎤 Searching for artist: '\(artistName)'")
+                    AppLog.info(.general, "🎤 Searching for artist: '\(artistName)'")
                     let artists = try databaseManager.searchArtists(query: artistName)
                     if let artist = artists.first, let artistId = artist.id {
                         let tracks = try databaseManager.getTracksByArtistId(artistId)
@@ -502,7 +502,7 @@ class AppCoordinator {
                     // iOS 27 Siri often sends untyped media requests — cascade
                     // songs → albums → artists → playlists against the main DB.
                     let name = String(identifier.dropFirst(11))
-                    print("🎤 Untyped search: '\(name)'")
+                    AppLog.info(.general, "🎤 Untyped search: '\(name)'")
                     let tracks = try databaseManager.searchTracks(query: name)
                     if let firstTrack = tracks.first {
                         await prepareSiriAudioSession()
@@ -538,11 +538,11 @@ class AppCoordinator {
                             return
                         }
                     }
-                    print("❌ Untyped search found nothing for '\(name)'")
+                    AppLog.error(.general, "❌ Untyped search found nothing for '\(name)'")
                     completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
                 } else if identifier == "no_favorites" {
                     // User requested favorites but none exist
-                    print("🎵 No favorites found - user needs to add some favorites first")
+                    AppLog.info(.general, "🎵 No favorites found - user needs to add some favorites first")
                     completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
                 } else if identifier == "music_all" {
                     // Play all music
@@ -563,12 +563,12 @@ class AppCoordinator {
 
                         if favoriteIds.contains(identifier) {
                             // This is a favorite track - queue all favorites
-                            print("🎵 Playing favorite track with favorites queue")
+                            AppLog.info(.general, "🎵 Playing favorite track with favorites queue")
                             let favoritesTracks = try databaseManager.getTracksByStableIds(favoriteIds)
                             await playerEngine.playTrack(track, queue: favoritesTracks)
                         } else {
                             // Regular track - queue all tracks
-                            print("🎵 Playing regular track with all tracks queue")
+                            AppLog.info(.general, "🎵 Playing regular track with all tracks queue")
                             let allTracks = try databaseManager.getAllTracks()
                             // Set up background session BEFORE starting playback for Siri
                             await prepareSiriAudioSession()
@@ -580,7 +580,7 @@ class AppCoordinator {
                     }
                 }
             } catch {
-                print("❌ Error handling Siri playback: \(error)")
+                AppLog.error(.general, "❌ Error handling Siri playback: \(error)")
                 completion(INPlayMediaIntentResponse(code: .failure, userActivity: nil))
             }
         }
@@ -597,7 +597,7 @@ class AppCoordinator {
                 track = try? databaseManager.getTrack(byStableId: identifier)
             }
             guard let track else {
-                print("❌ AddMedia: no track to act on")
+                AppLog.error(.general, "❌ AddMedia: no track to act on")
                 completion(INAddMediaIntentResponse(code: .failure, userActivity: nil))
                 return
             }
@@ -607,22 +607,22 @@ class AppCoordinator {
                    !Self.isFavoritesDestination(playlistName) {
                     let playlists = try databaseManager.searchPlaylists(query: playlistName)
                     guard let playlist = playlists.first, let playlistId = playlist.id else {
-                        print("❌ AddMedia: playlist '\(playlistName)' not found")
+                        AppLog.error(.general, "❌ AddMedia: playlist '\(playlistName)' not found")
                         completion(INAddMediaIntentResponse(code: .failure, userActivity: nil))
                         return
                     }
                     try addToPlaylist(playlistId: playlistId, trackStableId: track.stableId)
-                    print("✅ AddMedia: added '\(track.title)' to playlist '\(playlist.title)'")
+                    AppLog.info(.general, "✅ AddMedia: added '\(track.title)' to playlist '\(playlist.title)'")
                 } else {
                     // Library/favorites destination — add to favorites, idempotent.
                     if try !isFavorite(trackStableId: track.stableId) {
                         try toggleFavorite(trackStableId: track.stableId)
                     }
-                    print("✅ AddMedia: '\(track.title)' is now a favorite")
+                    AppLog.info(.general, "✅ AddMedia: '\(track.title)' is now a favorite")
                 }
                 completion(INAddMediaIntentResponse(code: .success, userActivity: nil))
             } catch {
-                print("❌ AddMedia failed: \(error)")
+                AppLog.error(.general, "❌ AddMedia failed: \(error)")
                 completion(INAddMediaIntentResponse(code: .failure, userActivity: nil))
             }
         }

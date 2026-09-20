@@ -495,11 +495,11 @@ struct GequhaiClient {
             let parsed = GequhaiLogic.parsePlayHTML(html)
             // 诊断打点（2026-09-08）：shareURL=nil 时区分「页面无 mp3_extra_url」
             // 与「页面异常/反爬”（htmlLen 异常小）」。
-            print("ℹ️ [歌曲海] play 页 songID=\(sid) htmlLen=\((html ?? "").count) shareURL=\(parsed.shareURL ?? "nil") playID=\(parsed.playID ?? "nil")")
+            AppLog.info(.general, "ℹ️ [歌曲海] play 页 songID=\(sid) htmlLen=\((html ?? "").count) shareURL=\(parsed.shareURL ?? "nil") playID=\(parsed.playID ?? "nil")")
             return parsed
         } catch {
             // web get_share_url 顶层 except → {"share_url": None, "play_id": None} 对齐
-            print("❌ [歌曲海] play 页请求失败 songID=\(sid) error=\(error)")
+            AppLog.error(.general, "❌ [歌曲海] play 页请求失败 songID=\(sid) error=\(error)")
             return GequhaiShareInfo(shareURL: nil, playID: nil)
         }
     }
@@ -529,7 +529,7 @@ struct GequhaiClient {
         let (files, stoken) = await quark.resolveShareVerbose(shareURL)
         // 诊断打点（2026-09-08）：resolve 结果落日志；空时上游 [夸克 resolve] 打点
         // 已带具体失败原因，UI 层 shareEmptyOrExpired 只是最终业务错误。
-        print("ℹ️ [歌曲海] resolve 完成 shareURL=\(shareURL) files=\(files.count) stoken=\(stoken.isEmpty ? "空" : "非空")")
+        AppLog.info(.general, "ℹ️ [歌曲海] resolve 完成 shareURL=\(shareURL) files=\(files.count) stoken=\(stoken.isEmpty ? "空" : "非空")")
         guard !files.isEmpty else {
             throw GequhaiDownloadError.shareEmptyOrExpired
         }

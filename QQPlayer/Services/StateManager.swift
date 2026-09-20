@@ -38,13 +38,13 @@ class StateManager: @unchecked Sendable {
             if fm.fileExists(atPath: to.path) {
                 // New location already in use; the legacy copy is just residue.
                 try? fm.removeItem(at: from)
-                print("🧹 Removed legacy \(m.from) (new \(m.to) already exists)")
+                AppLog.info(.general, "🧹 Removed legacy \(m.from) (new \(m.to) already exists)")
             } else {
                 do {
                     try fm.moveItem(at: from, to: to)
-                    print("✅ Migrated \(m.from) → \(m.to)")
+                    AppLog.info(.general, "✅ Migrated \(m.from) → \(m.to)")
                 } catch {
-                    print("⚠️ Failed to migrate \(m.from): \(error)")
+                    AppLog.warn(.general, "⚠️ Failed to migrate \(m.from): \(error)")
                 }
             }
         }
@@ -56,10 +56,10 @@ class StateManager: @unchecked Sendable {
             if fm.fileExists(atPath: fromDB.path) {
                 if fm.fileExists(atPath: toDB.path) {
                     try? fm.removeItem(at: fromDB)
-                    print("🧹 Removed legacy cosmos_music.db (qqplayer.db exists)")
+                    AppLog.info(.general, "🧹 Removed legacy cosmos_music.db (qqplayer.db exists)")
                 } else {
                     try? fm.moveItem(at: fromDB, to: toDB)
-                    print("✅ Migrated cosmos_music.db → qqplayer.db")
+                    AppLog.info(.general, "✅ Migrated cosmos_music.db → qqplayer.db")
                 }
             }
         }
@@ -71,7 +71,7 @@ class StateManager: @unchecked Sendable {
     // MARK: - Favorites
 
     func saveFavorites(_ favorites: [String]) throws {
-        print("💾 StateManager: Saving \(favorites.count) favorites - \(favorites)")
+        AppLog.info(.general, "💾 StateManager: Saving \(favorites.count) favorites - \(favorites)")
         let favoritesState = FavoritesState(favorites: favorites)
 
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud 镜像）
@@ -82,20 +82,20 @@ class StateManager: @unchecked Sendable {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let localFavoritesURL = documentsURL.appendingPathComponent("qqplayer-favorites.json")
         try saveJSONAtomically(favoritesState, to: localFavoritesURL)
-        print("📱 Favorites saved locally to: \(localFavoritesURL.path)")
+        AppLog.info(.general, "📱 Favorites saved locally to: \(localFavoritesURL.path)")
     }
 
     func loadFavorites() throws -> [String] {
-        print("📂 StateManager: Loading favorites...")
+        AppLog.info(.general, "📂 StateManager: Loading favorites...")
 
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud fallback）
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let localFavoritesURL = documentsURL.appendingPathComponent("qqplayer-favorites.json")
 
-        print("📂 StateManager: Checking local file at: \(localFavoritesURL.path)")
+        AppLog.info(.general, "📂 StateManager: Checking local file at: \(localFavoritesURL.path)")
 
         guard FileManager.default.fileExists(atPath: localFavoritesURL.path) else {
-            print("📂 StateManager: Local file does not exist")
+            AppLog.info(.general, "📂 StateManager: Local file does not exist")
             return []
         }
 
@@ -104,10 +104,10 @@ class StateManager: @unchecked Sendable {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let favoritesState = try decoder.decode(FavoritesState.self, from: data)
-            print("📱 Loaded favorites from local storage: \(favoritesState.favorites.count) items - \(favoritesState.favorites)")
+            AppLog.info(.general, "📱 Loaded favorites from local storage: \(favoritesState.favorites.count) items - \(favoritesState.favorites)")
             return favoritesState.favorites
         } catch {
-            print("⚠️ Failed to load local favorites: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to load local favorites: \(error)")
             return []
         }
     }
@@ -131,17 +131,17 @@ class StateManager: @unchecked Sendable {
 
         let localPlaylistURL = localPlaylistsFolder.appendingPathComponent("playlist-\(playlist.slug).json")
         try saveJSONAtomically(playlist, to: localPlaylistURL)
-        print("📱 Playlist saved locally to: \(localPlaylistURL.path)")
+        AppLog.info(.general, "📱 Playlist saved locally to: \(localPlaylistURL.path)")
     }
 
     func loadPlaylist(slug: String) throws -> PlaylistState? {
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud 补充/迁移源）
         if let localPlaylist = try? loadPlaylistFromLocalDocuments(slug: slug) {
-            print("📱 Loaded playlist '\(slug)' from local Documents")
+            AppLog.info(.general, "📱 Loaded playlist '\(slug)' from local Documents")
             return localPlaylist
         }
 
-        print("⚠️ No local copy of playlist '\(slug)'")
+        AppLog.warn(.general, "⚠️ No local copy of playlist '\(slug)'")
         return nil
     }
 
@@ -201,7 +201,7 @@ class StateManager: @unchecked Sendable {
         for file in files {
             let destination = quarantineFolder.appendingPathComponent(file.lastPathComponent)
             try? FileManager.default.moveItem(at: file, to: destination)
-            print("🗄️ Moved corrupted file to quarantine: \(file.lastPathComponent)")
+            AppLog.info(.general, "🗄️ Moved corrupted file to quarantine: \(file.lastPathComponent)")
         }
     }
 
@@ -217,7 +217,7 @@ class StateManager: @unchecked Sendable {
 
         if FileManager.default.fileExists(atPath: localPlaylistURL.path) {
             try FileManager.default.removeItem(at: localPlaylistURL)
-            print("📱 Playlist deleted locally: \(localPlaylistURL.path)")
+            AppLog.info(.general, "📱 Playlist deleted locally: \(localPlaylistURL.path)")
         }
     }
 
@@ -263,7 +263,7 @@ class StateManager: @unchecked Sendable {
 
 extension StateManager {
     func savePlayerState(_ playerState: PlayerState) throws {
-        print("💾 StateManager: Saving player state - track: \(playerState.currentTrackStableId ?? "nil"), time: \(playerState.playbackTime)")
+        AppLog.info(.general, "💾 StateManager: Saving player state - track: \(playerState.currentTrackStableId ?? "nil"), time: \(playerState.playbackTime)")
 
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud 镜像）
         try savePlayerStateToLocalDocuments(playerState)
@@ -273,20 +273,20 @@ extension StateManager {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let localPlayerStateURL = documentsURL.appendingPathComponent("qqplayer-player-state.json")
         try saveJSONAtomically(playerState, to: localPlayerStateURL)
-        print("📱 Player state saved locally to: \(localPlayerStateURL.path)")
+        AppLog.info(.general, "📱 Player state saved locally to: \(localPlayerStateURL.path)")
     }
 
     func loadPlayerState() throws -> PlayerState? {
-        print("📂 StateManager: Loading player state...")
+        AppLog.info(.general, "📂 StateManager: Loading player state...")
 
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud fallback）
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let localPlayerStateURL = documentsURL.appendingPathComponent("qqplayer-player-state.json")
 
-        print("📂 StateManager: Checking local player state at: \(localPlayerStateURL.path)")
+        AppLog.info(.general, "📂 StateManager: Checking local player state at: \(localPlayerStateURL.path)")
 
         guard FileManager.default.fileExists(atPath: localPlayerStateURL.path) else {
-            print("📂 StateManager: Local player state file does not exist")
+            AppLog.info(.general, "📂 StateManager: Local player state file does not exist")
             return nil
         }
 
@@ -295,10 +295,10 @@ extension StateManager {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let playerState = try decoder.decode(PlayerState.self, from: data)
-            print("📱 Loaded player state from local storage - track: \(playerState.currentTrackStableId ?? "nil"), time: \(playerState.playbackTime)")
+            AppLog.info(.general, "📱 Loaded player state from local storage - track: \(playerState.currentTrackStableId ?? "nil"), time: \(playerState.playbackTime)")
             return playerState
         } catch {
-            print("⚠️ Failed to load local player state: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to load local player state: \(error)")
             return nil
         }
     }
@@ -349,7 +349,7 @@ enum PlaybackPositionResumeSink {
         ) else { return false }
         state["playbackTime"] = Double(snapshot.positionMs) / 1000
         defaults.set(state, forKey: playerStateKey)
-        print("ℹ️ 跨端续播：已接受对端播放位置（同曲续播）")
+        AppLog.info(.general, "ℹ️ 跨端续播：已接受对端播放位置（同曲续播）")
         return true
     }
 }
@@ -429,7 +429,7 @@ enum PlaybackPositionCapture {
                     updatedAtMs: nowMs
                 )
             } catch {
-                print("⚠️ 跨端续播：播放位置上报失败 \(error)")
+                AppLog.warn(.general, "⚠️ 跨端续播：播放位置上报失败 \(error)")
             }
         }
     }

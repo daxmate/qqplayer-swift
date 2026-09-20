@@ -21,19 +21,19 @@ extension AppCoordinator {
         do {
             try databaseManager.deduplicatePlaylistItems()
         } catch {
-            print("⚠️ Failed to deduplicate playlist items: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to deduplicate playlist items: \(error)")
         }
 
         // Clean up orphaned playlist items
         do {
             try databaseManager.cleanupOrphanedPlaylistItems()
         } catch {
-            print("⚠️ Failed to cleanup orphaned playlist items: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to cleanup orphaned playlist items: \(error)")
         }
 
         // Mark initial indexing as complete
         hasCompletedInitialIndexing = true
-        print("✅ Initial indexing completed - playlist sync enabled")
+        AppLog.info(.general, "✅ Initial indexing completed - playlist sync enabled")
 
         // Update widget with playlists
         syncPlaylistsToCloud()
@@ -46,14 +46,14 @@ extension AppCoordinator {
         Task { @MainActor in
             // Prevent concurrent sync operations
             guard !isSyncingPlaylists else {
-                print("⏭️ Skipping playlist sync - already in progress")
+                AppLog.warn(.general, "⏭️ Skipping playlist sync - already in progress")
                 return
             }
 
             // Safety: Don't sync until initial indexing is complete
             // This prevents overwriting cloud data with incomplete local data
             guard hasCompletedInitialIndexing else {
-                print("⏳ Skipping playlist sync - waiting for initial indexing to complete")
+                AppLog.warn(.general, "⏳ Skipping playlist sync - waiting for initial indexing to complete")
                 return
             }
 
@@ -101,8 +101,7 @@ extension AppCoordinator {
                     if !playlist.isFolderSynced && stateItems.isEmpty && libraryLooksUnreadable {
                         if let existingCloudPlaylist = try? stateManager.loadPlaylist(slug: playlist.slug),
                            !existingCloudPlaylist.items.isEmpty {
-                            print("⚠️ Skipping sync for '\(playlist.title)' - library is empty but cloud has \(existingCloudPlaylist.items.count) tracks")
-                            print("🛡️ This prevents accidental data loss. The cloud version is preserved.")
+                            AppLog.warn(.general, "⚠️ Skipping sync for '\(playlist.title)' - library is empty but cloud has \(existingCloudPlaylist.items.count) tracks\n🛡️ This prevents accidental data loss. The cloud version is preserved.")
                             continue
                         }
                     }
@@ -115,13 +114,13 @@ extension AppCoordinator {
                     )
                     try stateManager.savePlaylist(playlistState)
                 }
-                print("✅ Playlists synced to iCloud with \(playlists.count) playlists")
+                AppLog.info(.general, "✅ Playlists synced to iCloud with \(playlists.count) playlists")
 
                 // Update widget playlist data with artwork
                 await updateWidgetPlaylists(playlists: playlists)
 
             } catch {
-                print("❌ Failed to sync playlists to iCloud: \(error)")
+                AppLog.error(.general, "❌ Failed to sync playlists to iCloud: \(error)")
             }
         }
     }
@@ -132,7 +131,7 @@ extension AppCoordinator {
             guard let containerURL = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
             ) else {
-                print("⚠️ Widget: Failed to get shared container URL")
+                AppLog.warn(.general, "⚠️ Widget: Failed to get shared container URL")
                 return
             }
 
@@ -143,7 +142,7 @@ extension AppCoordinator {
 
             // Show only the top 3 most recently played playlists
             let playlistsToShow = Array(sortedPlaylists.prefix(3))
-            print("📊 Widget: Showing top 3 most recently played playlists out of \(playlists.count) total")
+            AppLog.info(.general, "📊 Widget: Showing top 3 most recently played playlists out of \(playlists.count) total")
 
             var widgetPlaylists: [WidgetPlaylistData] = []
 
@@ -181,7 +180,7 @@ extension AppCoordinator {
                             }
                             if hasData {
                                 artworkPaths.append(filename)
-                                print("✅ Widget: Saved artwork '\(track.title)' for playlist '\(playlist.title)' tile \(index)")
+                                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Widget: Saved artwork '\(track.title)' for playlist '\(playlist.title)' tile \(index)") }
                             }
                         }
                     }
@@ -202,16 +201,16 @@ extension AppCoordinator {
                     widgetPlaylists.append(widgetPlaylist)
 
                 } catch {
-                    print("❌ Failed to process playlist \(playlist.title): \(error)")
+                    AppLog.error(.general, "❌ Failed to process playlist \(playlist.title): \(error)")
                 }
             }
 
             PlaylistDataManager.shared.savePlaylists(widgetPlaylists)
-            print("✅ Widget playlist data updated with \(widgetPlaylists.count) playlists")
+            AppLog.info(.general, "✅ Widget playlist data updated with \(widgetPlaylists.count) playlists")
 
             // Force widget to reload immediately
             WidgetCenter.shared.reloadAllTimelines()
-            print("🔄 Widget timeline reload triggered")
+            AppLog.info(.general, "🔄 Widget timeline reload triggered")
         #endif
     }
 }

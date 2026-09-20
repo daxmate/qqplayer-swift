@@ -64,7 +64,7 @@ private enum AppLogShapeContract {
 
     /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（迁移完成的文件逐个登记）。
     /// 当前 = 批 2（sync 5）+ 批 3（migration/DB 9）+ 批 4a/4b（播放引擎 12）
-    /// + 批 5（音频元数据·封面·歌词 12）+ 批 6（索引/扫描/清理 5）= 43 文件。
+    /// + 批 5（音频元数据·封面·歌词 12）+ 批 6（索引/扫描/清理 5）+ 批 7（服务·协调·网络 18）= 61 文件。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     ///
@@ -78,6 +78,8 @@ private enum AppLogShapeContract {
     static let migratedChains: Set<String> = [
         "QQPlayer/AppIntents/SpotlightLibraryIndexer.swift",
         "QQPlayer/Services/AppCoordinator+ImportExport.swift",
+        "QQPlayer/Services/AppCoordinator+iCloud.swift",
+        "QQPlayer/Services/AppCoordinator.swift",
         "QQPlayer/Services/ArtworkCache.swift",
         "QQPlayer/Services/ArtworkExtraction.swift",
         "QQPlayer/Services/ArtworkManager.swift",
@@ -93,13 +95,25 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/DatabaseManager+Schema.swift",
         "QQPlayer/Services/DatabaseManager+Tracks.swift",
         "QQPlayer/Services/DatabaseManager.swift",
+        "QQPlayer/Services/DatabaseSuspensionCoordinator.swift",
+        "QQPlayer/Services/DiscogsAPI.swift",
+        "QQPlayer/Services/EQManager.swift",
+        "QQPlayer/Services/ExternalFileBookmarkStore.swift",
         "QQPlayer/Services/FileCleanupManager.swift",
+        "QQPlayer/Services/GequhaiClient.swift",
+        "QQPlayer/Services/HybridMusicAPI.swift",
+        "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+        "QQPlayer/Services/KaraokeController.swift",
         "QQPlayer/Services/LibraryIndexer+Scanning.swift",
         "QQPlayer/Services/LibraryIndexer+SharedImport.swift",
         "QQPlayer/Services/LyricsManager.swift",
         "QQPlayer/Services/LyricsParsing.swift",
         "QQPlayer/Services/LyricsSearch.swift",
         "QQPlayer/Services/LyricsSearchProvider.swift",
+        "QQPlayer/Services/MacAria2Client.swift",
+        "QQPlayer/Services/MacOnlineDownloadService.swift",
+        "QQPlayer/Services/NeteaseOnlineClient.swift",
+        "QQPlayer/Services/PlayHistoryRecorder.swift",
         "QQPlayer/Services/PlayerEngine+AudioScheduling.swift",
         "QQPlayer/Services/PlayerEngine+AudioSession.swift",
         "QQPlayer/Services/PlayerEngine+NowPlaying.swift",
@@ -109,10 +123,14 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/PlayerEngine+PlaybackControl.swift",
         "QQPlayer/Services/PlayerEngine+Queue.swift",
         "QQPlayer/Services/PlayerEngine.swift",
+        "QQPlayer/Services/QuarkClient.swift",
         "QQPlayer/Services/SFBAudioEngineManager+Playback.swift",
         "QQPlayer/Services/SFBAudioEngineManager+Queue.swift",
         "QQPlayer/Services/SFBAudioEngineManager.swift",
         "QQPlayer/Services/SandboxMigration.swift",
+        "QQPlayer/Services/SpotifyAPI.swift",
+        "QQPlayer/Services/StateManager.swift",
+        "QQPlayer/Services/TrackDeletionService.swift",
         "QQPlayer/Services/TrackIdentityMigration.swift",
         "QQPlayer/Sync/SyncChangeLogApplier.swift",
         "QQPlayer/Sync/SyncChangeLogPeer.swift",

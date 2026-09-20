@@ -153,84 +153,84 @@ class HybridMusicAPIService: ObservableObject, @unchecked Sendable {
     // MARK: - Public API
 
     func searchArtist(name: String) async throws -> UnifiedArtist? {
-        print("🎵 Hybrid: Searching for artist: \(name)")
+        AppLog.info(.general, "🎵 Hybrid: Searching for artist: \(name)")
 
         let cachedArtist = getCachedArtist(name: name)
         if let cached = cachedArtist, !cached.isExpired {
             if cached.unifiedArtist.source == .spotify {
-                print("✅ Hybrid: Found cached artist: \(name) (source: \(cached.unifiedArtist.source))")
+                AppLog.info(.general, "✅ Hybrid: Found cached artist: \(name) (source: \(cached.unifiedArtist.source))")
                 return cached.unifiedArtist
             }
 
-            print("ℹ️ Hybrid: Found cached Discogs artist for \(name); checking Spotify before reusing it")
+            AppLog.info(.general, "ℹ️ Hybrid: Found cached Discogs artist for \(name); checking Spotify before reusing it")
         }
 
         // Prefer Spotify so artist pages can expose Spotify artwork/links when available.
-        print("🎯 Hybrid: Trying Spotify for: \(name)")
+        AppLog.info(.general, "🎯 Hybrid: Trying Spotify for: \(name)")
         do {
             if let spotifyArtist = try await spotifyAPI.searchArtist(name: name) {
-                print("✅ Hybrid: Found on Spotify: \(spotifyArtist.name)")
+                AppLog.info(.general, "✅ Hybrid: Found on Spotify: \(spotifyArtist.name)")
                 let unifiedArtist = UnifiedArtist(from: spotifyArtist)
                 cacheArtist(name: name, artist: unifiedArtist)
                 return unifiedArtist
             }
         } catch {
-            print("⚠️ Hybrid: Spotify failed: \(error.localizedDescription)")
+            AppLog.warn(.general, "⚠️ Hybrid: Spotify failed: \(error.localizedDescription)")
         }
 
         if let cached = cachedArtist, !cached.isExpired {
-            print("✅ Hybrid: Reusing cached artist: \(name) (source: \(cached.unifiedArtist.source))")
+            AppLog.info(.general, "✅ Hybrid: Reusing cached artist: \(name) (source: \(cached.unifiedArtist.source))")
             return cached.unifiedArtist
         }
 
         // Fallback to Discogs for bios and artists unavailable on Spotify.
-        print("🎯 Hybrid: Falling back to Discogs for: \(name)")
+        AppLog.info(.general, "🎯 Hybrid: Falling back to Discogs for: \(name)")
         do {
             if let discogsArtist = try await discogsAPI.searchArtist(name: name) {
-                print("✅ Hybrid: Found on Discogs: \(discogsArtist.name)")
+                AppLog.info(.general, "✅ Hybrid: Found on Discogs: \(discogsArtist.name)")
                 let unifiedArtist = UnifiedArtist(from: discogsArtist)
                 cacheArtist(name: name, artist: unifiedArtist)
                 return unifiedArtist
             }
         } catch {
-            print("⚠️ Hybrid: Discogs failed: \(error.localizedDescription)")
+            AppLog.warn(.general, "⚠️ Hybrid: Discogs failed: \(error.localizedDescription)")
         }
 
-        print("❌ Hybrid: No artist found on either platform for: \(name)")
+        AppLog.error(.general, "❌ Hybrid: No artist found on either platform for: \(name)")
         return nil
     }
 
     // Search for alternative artist - try different source than current one
     func searchAlternativeArtist(name: String, currentSource: MusicAPISource?) async throws -> UnifiedArtist? {
-        print("🔄 Hybrid: Searching for alternative artist: \(name), avoiding source: \(currentSource?.rawValue ?? "none")")
+        AppLog.info(.general, "🔄 Hybrid: Searching for alternative artist: \(name), avoiding source: \(currentSource?.rawValue ?? "none")")
 
         // If current source is Discogs, try Spotify first
         if currentSource == .discogs {
-            print("🎯 Hybrid: Trying Spotify as alternative for: \(name)")
+            AppLog.info(.general, "🎯 Hybrid: Trying Spotify as alternative for: \(name)")
             do {
                 if let spotifyArtist = try await spotifyAPI.searchArtist(name: name) {
-                    print("✅ Hybrid: Found alternative on Spotify: \(spotifyArtist.name)")
+                    AppLog.info(.general, "✅ Hybrid: Found alternative on Spotify: \(spotifyArtist.name)")
                     let unifiedArtist = UnifiedArtist(from: spotifyArtist)
                     cacheArtist(name: name, artist: unifiedArtist)
                     return unifiedArtist
                 }
             } catch {
-                print("⚠️ Hybrid: Spotify alternative failed: \(error.localizedDescription)")
+                AppLog.warn(.general, "⚠️ Hybrid: Spotify alternative failed: \(error.localizedDescription)")
             }
         }
 
         // If current source is Spotify, try Discogs
         if currentSource == .spotify {
-            print("🎯 Hybrid: Trying Discogs as alternative for: \(name)")
+            AppLog.info(.general, "🎯 Hybrid: Trying Discogs as alternative for: \(name)")
             do {
                 if let discogsArtist = try await discogsAPI.searchArtist(name: name) {
-                    print("✅ Hybrid: Found alternative on Discogs: \(discogsArtist.name)")
+                    AppLog.info(.general, "✅ Hybrid: Found alternative on Discogs: \(discogsArtist.name)")
                     let unifiedArtist = UnifiedArtist(from: discogsArtist)
                     cacheArtist(name: name, artist: unifiedArtist)
                     return unifiedArtist
                 }
             } catch {
-                print("⚠️ Hybrid: Discogs alternative failed: \(error.localizedDescription)")
+                AppLog.warn(.general, "⚠️ Hybrid: Discogs alternative failed: \(error.localizedDescription)")
             }
         }
 
@@ -239,13 +239,13 @@ class HybridMusicAPIService: ObservableObject, @unchecked Sendable {
             return try await searchArtist(name: name)
         }
 
-        print("❌ Hybrid: No alternative found for: \(name)")
+        AppLog.error(.general, "❌ Hybrid: No alternative found for: \(name)")
         return nil
     }
 
     // Search for similar/alternative artist names
     func searchSimilarArtist(originalName: String, currentSource: MusicAPISource?) async throws -> UnifiedArtist? {
-        print("🔍 Hybrid: Searching for similar artist names for: \(originalName)")
+        AppLog.info(.general, "🔍 Hybrid: Searching for similar artist names for: \(originalName)")
 
         // Generate variations of the artist name
         let variations = generateNameVariations(originalName)
@@ -253,18 +253,18 @@ class HybridMusicAPIService: ObservableObject, @unchecked Sendable {
         for variation in variations {
             if variation == originalName { continue } // Skip original name
 
-            print("🎯 Hybrid: Trying variation: \(variation)")
+            AppLog.info(.general, "🎯 Hybrid: Trying variation: \(variation)")
             do {
                 if let result = try await searchAlternativeArtist(name: variation, currentSource: currentSource) {
-                    print("✅ Hybrid: Found artist with variation '\(variation)': \(result.name)")
+                    AppLog.info(.general, "✅ Hybrid: Found artist with variation '\(variation)': \(result.name)")
                     return result
                 }
             } catch {
-                print("⚠️ Hybrid: Variation '\(variation)' failed: \(error.localizedDescription)")
+                AppLog.warn(.general, "⚠️ Hybrid: Variation '\(variation)' failed: \(error.localizedDescription)")
             }
         }
 
-        print("❌ Hybrid: No similar artist found for: \(originalName)")
+        AppLog.error(.general, "❌ Hybrid: No similar artist found for: \(originalName)")
         return nil
     }
 
@@ -355,9 +355,9 @@ class HybridMusicAPIService: ObservableObject, @unchecked Sendable {
         do {
             let data = try JSONEncoder().encode(cached)
             try data.write(to: fileURL)
-            print("💾 Hybrid: Cached artist data for: \(name) (source: \(artist.source))")
+            AppLog.info(.general, "💾 Hybrid: Cached artist data for: \(name) (source: \(artist.source))")
         } catch {
-            print("❌ Hybrid: Failed to cache artist data: \(error)")
+            AppLog.error(.general, "❌ Hybrid: Failed to cache artist data: \(error)")
         }
     }
 
@@ -389,12 +389,12 @@ class HybridMusicAPIService: ObservableObject, @unchecked Sendable {
                     try FileManager.default.removeItem(at: fileURL)
                     removed += 1
                 } catch {
-                    print("❌ Hybrid: Failed to remove expired cache file: \(error)")
+                    AppLog.error(.general, "❌ Hybrid: Failed to remove expired cache file: \(error)")
                 }
             }
 
             if removed > 0 {
-                print("🗑️ Hybrid: Removed \(removed) expired cache file(s)")
+                AppLog.info(.general, "🗑️ Hybrid: Removed \(removed) expired cache file(s)")
             }
         }.value
     }

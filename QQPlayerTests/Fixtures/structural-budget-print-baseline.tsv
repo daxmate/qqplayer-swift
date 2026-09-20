@@ -29,27 +29,9 @@ QQPlayer/Mac/SyncHostCenter.swift	8
 QQPlayer/Models/SFBTrack.swift	16
 QQPlayer/Models/WidgetData.swift	30
 QQPlayer/QQPlayerApp.swift	33
-QQPlayer/Services/AppCoordinator+iCloud.swift	15
-QQPlayer/Services/AppCoordinator.swift	50
-QQPlayer/Services/DatabaseSuspensionCoordinator.swift	1
-QQPlayer/Services/DiscogsAPI.swift	13
-QQPlayer/Services/EQManager.swift	21
-QQPlayer/Services/ExternalFileBookmarkStore.swift	1
-QQPlayer/Services/GequhaiClient.swift	3
-QQPlayer/Services/HybridMusicAPI.swift	28
-QQPlayer/Services/IOSPassiveSyncCenter.swift	17
-QQPlayer/Services/KaraokeController.swift	1
 QQPlayer/Services/LibraryIndexer+Parsing.swift	1
 QQPlayer/Services/LibraryIndexer.swift	3
-QQPlayer/Services/MacAria2Client.swift	6
-QQPlayer/Services/MacOnlineDownloadService.swift	12
-QQPlayer/Services/NeteaseOnlineClient.swift	3
-QQPlayer/Services/PlayHistoryRecorder.swift	4
-QQPlayer/Services/QuarkClient.swift	14
-QQPlayer/Services/SpotifyAPI.swift	13
-QQPlayer/Services/StateManager.swift	26
 QQPlayer/Services/SyncConnectDiag.swift	1
-QQPlayer/Services/TrackDeletionService.swift	2
 QQPlayer/ViewModels/TutorialViewModel.swift	1
 QQPlayer/Views/Albums/AlbumViews.swift	6
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	7
@@ -75,4 +57,4 @@ QQPlayer/Views/TutorialView.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	2
 QQPlayer/Views/Utility/ManualEQEditorView.swift	2
 QQPlayer/Views/Utility/SettingsView.swift	5
-# TOTAL: 474
+# TOTAL: 244

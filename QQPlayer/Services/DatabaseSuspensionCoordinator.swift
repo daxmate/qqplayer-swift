@@ -89,7 +89,7 @@ final class DatabaseSuspensionCoordinator {
             name: shouldSuspend ? Database.suspendNotification : Database.resumeNotification,
             object: nil
         )
-        print(shouldSuspend
+        AppLog.info(.general, shouldSuspend
             ? "🛑 Database suspended (backgrounded, not playing)"
             : "▶️ Database resumed")
     }
