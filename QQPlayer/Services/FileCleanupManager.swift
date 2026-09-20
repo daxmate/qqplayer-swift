@@ -56,26 +56,26 @@ class FileCleanupManager: ObservableObject {
             }
 
             guard !removals.isEmpty else {
-                print("🧹 Scan reconciliation found no deleted files")
+                AppLog.info(.general, "🧹 Scan reconciliation found no deleted files")
                 return
             }
 
             let missingCount = removals.filter { $0.fileMissing }.count
-            print("🧹 Scan reconciliation removing \(removals.count) track(s) (\(missingCount) missing file, \(removals.count - missingCount) format disabled)")
+            AppLog.info(.general, "🧹 Scan reconciliation removing \(removals.count) track(s) (\(missingCount) missing file, \(removals.count - missingCount) format disabled)")
             for removal in removals {
                 do {
                     if removal.fileMissing {
                         try databaseManager.deleteTrack(byStableId: removal.track.stableId)
-                        print("🧹 Removed missing track: \(removal.track.title)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Removed missing track: \(removal.track.title)") }
                     } else {
                         // D7：取消收录的格式 → 文件与收藏/歌单/播放历史全部保留，
                         // 只把曲目行从库中移除（重扫入库后同一 stableId 自动重新关联）。
                         // 此前走的是全量 deleteTrack，勾回格式后收藏与歌单成员资格永久丢失。
                         try databaseManager.removeTrackFromLibrary(byStableId: removal.track.stableId)
-                        print("🧹 Removed format-disabled track from library (file and references kept): \(removal.track.title)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Removed format-disabled track from library (file and references kept): \(removal.track.title)") }
                     }
                 } catch {
-                    print("🧹 Failed to remove missing track \(removal.track.title): \(error)")
+                    AppLog.error(.general, "🧹 Failed to remove missing track \(removal.track.title): \(error)")
                 }
             }
 
@@ -84,12 +84,12 @@ class FileCleanupManager: ObservableObject {
                 object: nil
             )
         } catch {
-            print("🧹 Scan reconciliation failed: \(error)")
+            AppLog.error(.general, "🧹 Scan reconciliation failed: \(error)")
         }
     }
 
     func checkForOrphanedFiles() async {
-        print("🧹 Checking for library files that no longer exist...")
+        AppLog.info(.general, "🧹 Checking for library files that no longer exist...")
 
         // M3-2：退役 iCloud 容器——内部文件 = 本地 Documents（沙盒）内的文件；
         // 外部文件 = share/document picker 引入的安全域文件（走书签校验）。
@@ -98,26 +98,26 @@ class FileCleanupManager: ObservableObject {
         do {
             // Get all tracks from database
             let allTracks = try databaseManager.getAllTracks()
-            print("🧹 Found \(allTracks.count) tracks in database")
+            AppLog.info(.general, "🧹 Found \(allTracks.count) tracks in database")
 
             var nonExistentTracks: [Track] = []
 
             for track in allTracks {
                 let trackURL = URL(fileURLWithPath: track.path)
-                print("🧹 Checking track: \(trackURL.lastPathComponent)")
-                print("🧹   Path: \(trackURL.path)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Checking track: \(trackURL.lastPathComponent)") }
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Path: \(trackURL.path)") }
 
                 let isInternalFile = isURL(trackURL, inside: documentsURL) ||
                     trackURL.path.contains("/Documents/")
-                print("🧹   Is internal file: \(isInternalFile)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Is internal file: \(isInternalFile)") }
 
                 if isInternalFile {
                     // For internal files, simple existence check
                     let fileExists = FileManager.default.fileExists(atPath: trackURL.path)
-                    print("🧹   Internal file exists: \(fileExists)")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Internal file exists: \(fileExists)") }
 
                     if fileExists {
-                        print("🧹 ✅ Internal file exists (keeping): \(trackURL.lastPathComponent)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 ✅ Internal file exists (keeping): \(trackURL.lastPathComponent)") }
                     } else {
                         // Check if this is a local Documents file with a moved path
                         if trackURL.path.contains("/Documents/") {
@@ -126,9 +126,11 @@ class FileCleanupManager: ObservableObject {
                             let newURL = documentsURL.appendingPathComponent(filename)
 
                             if FileManager.default.fileExists(atPath: newURL.path) {
-                                print("🧹   Found file in current Documents folder, updating path...")
-                                print("🧹   Old path: \(trackURL.path)")
-                                print("🧹   New path: \(newURL.path)")
+                                if AppLog.isEnabled(.debug, .general) {
+                                    AppLog.debug(.general, "🧹   Found file in current Documents folder, updating path..."
+                                        + "\n🧹   Old path: \(trackURL.path)"
+                                        + "\n🧹   New path: \(newURL.path)")
+                                }
 
                                 // Update the track's path in the database
                                 do {
@@ -137,29 +139,29 @@ class FileCleanupManager: ObservableObject {
                                         oldStableId: track.stableId,
                                         newPath: newURL.path
                                     )
-                                    print("🧹 ✅ Updated path for: \(filename)")
+                                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 ✅ Updated path for: \(filename)") }
                                 } catch {
-                                    print("🧹 ❌ Failed to update path: \(error)")
+                                    AppLog.error(.general, "🧹 ❌ Failed to update path: \(error)")
                                     nonExistentTracks.append(track)
                                 }
                             } else {
-                                print("🧹   Internal file doesn't exist - will auto-clean from database")
+                                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Internal file doesn't exist - will auto-clean from database") }
                                 nonExistentTracks.append(track)
                             }
                         } else {
-                            print("🧹   Internal file doesn't exist - will auto-clean from database")
+                            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Internal file doesn't exist - will auto-clean from database") }
                             nonExistentTracks.append(track)
                         }
                     }
                 } else {
                     // For external files (from share/document picker), check if still accessible
                     let isAccessible = await checkExternalFileAccessibility(trackURL, stableId: track.stableId)
-                    print("🧹   External file accessible: \(isAccessible)")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   External file accessible: \(isAccessible)") }
 
                     if isAccessible {
-                        print("🧹 ✅ External file still accessible (keeping): \(trackURL.lastPathComponent)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 ✅ External file still accessible (keeping): \(trackURL.lastPathComponent)") }
                     } else {
-                        print("🧹   External file no longer accessible - will auto-clean from database")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   External file no longer accessible - will auto-clean from database") }
                         nonExistentTracks.append(track)
                     }
                 }
@@ -167,18 +169,18 @@ class FileCleanupManager: ObservableObject {
 
             // Auto-clean files that don't exist anywhere
             if !nonExistentTracks.isEmpty {
-                print("🧹 Auto-cleaning \(nonExistentTracks.count) files that don't exist anywhere")
+                AppLog.info(.general, "🧹 Auto-cleaning \(nonExistentTracks.count) files that don't exist anywhere")
 
                 for track in nonExistentTracks {
                     do {
-                        print("🧹 Auto-cleaning database entry for non-existent file: \(URL(fileURLWithPath: track.path).lastPathComponent)")
-                        print("🧹 Auto-removing track from database: \(track.title)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Auto-cleaning database entry for non-existent file: \(URL(fileURLWithPath: track.path).lastPathComponent)") }
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Auto-removing track from database: \(track.title)") }
                         // Use the ID stored with the row. Re-hashing the
                         // filename was incompatible with path-based IDs and
                         // silently left deleted tracks in previous builds.
                         try databaseManager.deleteTrack(byStableId: track.stableId)
                     } catch {
-                        print("🧹 Error auto-cleaning file \(track.path): \(error)")
+                        AppLog.error(.general, "🧹 Error auto-cleaning file \(track.path): \(error)")
                     }
                 }
 
@@ -186,10 +188,10 @@ class FileCleanupManager: ObservableObject {
                 NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             }
 
-            print("🧹 No additional cleanup needed")
+            AppLog.info(.general, "🧹 No additional cleanup needed")
 
         } catch {
-            print("🧹 Error checking for orphaned files: \(error)")
+            AppLog.error(.general, "🧹 Error checking for orphaned files: \(error)")
         }
     }
 
@@ -205,16 +207,16 @@ class FileCleanupManager: ObservableObject {
             // File exists at original path, try to access it
             do {
                 _ = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-                print("🧹     External file accessible at original path")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     External file accessible at original path") }
                 return true
             } catch {
-                print("🧹     External file exists but not accessible: \(error)")
+                AppLog.error(.general, "🧹     External file exists but not accessible: \(error)")
                 return false
             }
         }
 
         // File doesn't exist at original path, check if we have bookmark data for it
-        print("🧹     External file doesn't exist at original path, checking bookmark data")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     External file doesn't exist at original path, checking bookmark data") }
         return await checkBookmarkAccessibility(for: fileURL, stableId: stableId)
     }
 
@@ -232,20 +234,20 @@ class FileCleanupManager: ObservableObject {
         case .resolved(let resolvedURL):
             // Bookmark found! Check if file is still accessible
             if resolvedURL.path != fileURL.path {
-                print("🧹     File has been moved from \(fileURL.path) to \(resolvedURL.path) - bookmark is tracking it ✅")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     File has been moved from \(fileURL.path) to \(resolvedURL.path) - bookmark is tracking it ✅") }
             }
 
             // Test if the resolved location is accessible
             let isAccessible = await testFileAccessibility(resolvedURL)
             if isAccessible {
-                print("🧹     External file is accessible via bookmark ✅")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     External file is accessible via bookmark ✅") }
             }
             return isAccessible
 
         case .unknown(let error):
             // D2：书签 plist 在但读不出来 = 未知，**绝不能当作“无书签”去删曲目**
             // （一次非原子写的截断曾让全部书签不可解析 → 库里外部文件被批量误删）。
-            print("🧹     ⚠️ Bookmark store unreadable - keeping track conservatively: \(error)")
+            AppLog.warn(.general, "🧹     ⚠️ Bookmark store unreadable - keeping track conservatively: \(error)")
             return true
 
         case .missing:
@@ -254,13 +256,13 @@ class FileCleanupManager: ObservableObject {
 
         // 注：share extension 书签此前有一个恒返回 nil 的 stub 分支，已删除（零行为
         // 变化：该分支从未命中，控制流原样落到下面的「无有效书签」返回 false）。
-        print("🧹     No valid bookmark found for external file")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     No valid bookmark found for external file") }
         return false
     }
 
     private func resolveDocumentPickerBookmark(for stableId: String) async -> BookmarkResolution {
         guard let store = ExternalFileBookmarkStore.default else {
-            print("🧹     No document picker bookmarks file found")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     No document picker bookmarks file found") }
             return .missing
         }
 
@@ -273,7 +275,7 @@ class FileCleanupManager: ObservableObject {
         }
 
         guard let bookmarkData = bookmarks[stableId] else {
-            print("🧹     No bookmark found for stableId: \(stableId)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     No bookmark found for stableId: \(stableId)") }
             return .missing
         }
 
@@ -282,47 +284,47 @@ class FileCleanupManager: ObservableObject {
             let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
 
             if isStale {
-                print("🧹     Document picker bookmark is STALE for stableId: \(stableId)")
-                print("🧹     Resolved path: \(resolvedURL.path)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     Document picker bookmark is STALE for stableId: \(stableId)") }
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     Resolved path: \(resolvedURL.path)") }
                 // 同 D2 的“不确定不删”原则：stale = 位置信息需刷新，不是“文件没了”。
                 // 仍返回解析结果，由调用方的可访问性探测决定去留（探测不过才删）。
             }
 
-            print("🧹     Document picker bookmark resolved successfully for stableId: \(stableId)")
-            print("🧹     Resolved path: \(resolvedURL.path)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     Document picker bookmark resolved successfully for stableId: \(stableId)") }
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     Resolved path: \(resolvedURL.path)") }
             return .resolved(resolvedURL)
         } catch {
-            print("🧹     Failed to resolve document picker bookmark: \(error)")
+            AppLog.error(.general, "🧹     Failed to resolve document picker bookmark: \(error)")
             return .missing
         }
     }
 
     private func testFileAccessibility(_ fileURL: URL) async -> Bool {
-        print("🧹     Testing accessibility for resolved URL: \(fileURL.path)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     Testing accessibility for resolved URL: \(fileURL.path)") }
 
         guard fileURL.startAccessingSecurityScopedResource() else {
-            print("🧹     ❌ Failed to start accessing security-scoped resource")
+            AppLog.error(.general, "🧹     ❌ Failed to start accessing security-scoped resource")
             return false
         }
 
         defer {
             fileURL.stopAccessingSecurityScopedResource()
-            print("🧹     ⏹️ Stopped accessing security-scoped resource")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     ⏹️ Stopped accessing security-scoped resource") }
         }
 
         // Check if file exists at the resolved path
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("🧹     ❌ File doesn't exist at resolved bookmark path: \(fileURL.path)")
+            AppLog.error(.general, "🧹     ❌ File doesn't exist at resolved bookmark path: \(fileURL.path)")
             return false
         }
 
-        print("🧹     ✅ File exists at resolved path")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     ✅ File exists at resolved path") }
 
         do {
             // Try to get file attributes - this tests basic access permissions
             let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
             let fileSize = attributes[.size] as? Int64 ?? 0
-            print("🧹     ✅ Got file attributes - size: \(fileSize) bytes")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     ✅ Got file attributes - size: \(fileSize) bytes") }
 
             // For additional verification, try to actually read the file
             // This will catch cases where the file exists but is corrupted or inaccessible
@@ -330,25 +332,25 @@ class FileCleanupManager: ObservableObject {
             defer {
                 do {
                     try fileHandle.close()
-                    print("🧹     ✅ Successfully closed file handle")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     ✅ Successfully closed file handle") }
                 } catch {
-                    print("🧹     ⚠️ Error closing file handle: \(error)")
+                    AppLog.warn(.general, "🧹     ⚠️ Error closing file handle: \(error)")
                 }
             }
 
             let data = try fileHandle.read(upToCount: 1024)
 
             if let data = data, !data.isEmpty {
-                print("🧹     ✅ External file accessible and readable via bookmark (\(data.count) bytes read)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     ✅ External file accessible and readable via bookmark (\(data.count) bytes read)") }
                 return true
             } else {
-                print("🧹     ❌ External file exists but appears to be empty or unreadable")
+                AppLog.error(.general, "🧹     ❌ External file exists but appears to be empty or unreadable")
                 return false
             }
         } catch {
-            print("🧹     ❌ External file not accessible or readable via bookmark")
-            print("🧹     ❌ Error details: \(error)")
-            print("🧹     ❌ Error type: \(type(of: error))")
+            AppLog.error(.general, "🧹     ❌ External file not accessible or readable via bookmark"
+                + "\n🧹     ❌ Error details: \(error)"
+                + "\n🧹     ❌ Error type: \(type(of: error))")
             return false
         }
     }

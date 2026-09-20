@@ -17,10 +17,10 @@ import SFBAudioEngine
 extension LibraryIndexer {
     private func processFolderPlaylists(allMusicFiles: [URL]) async {
         guard DeleteSettings.load().autoCreateFolderPlaylists else {
-            print("📁 Folder playlist auto-creation disabled in settings - skipping")
+            AppLog.warn(.general, "📁 Folder playlist auto-creation disabled in settings - skipping")
             return
         }
-        print("📁 Processing folder playlists...")
+        AppLog.info(.general, "📁 Processing folder playlists...")
 
         // Group music files by their parent directory
         var folderGroups: [String: [URL]] = [:]
@@ -47,20 +47,20 @@ extension LibraryIndexer {
             folderGroups[folderPath]?.append(fileURL)
         }
 
-        print("📁 Found \(folderGroups.count) folders with music files")
+        AppLog.info(.general, "📁 Found \(folderGroups.count) folders with music files")
 
         for (folderPath, musicFiles) in folderGroups {
             await processFolderPlaylist(folderPath: folderPath, musicFiles: musicFiles)
         }
 
-        print("✅ Folder playlist processing completed")
+        AppLog.info(.general, "✅ Folder playlist processing completed")
     }
 
     private func processFolderPlaylist(folderPath: String, musicFiles: [URL]) async {
         let folderURL = URL(fileURLWithPath: folderPath)
         let folderName = folderURL.lastPathComponent
 
-        print("📂 Processing folder playlist for: \(folderName)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📂 Processing folder playlist for: \(folderName)") }
 
         do {
             // Generate stable IDs for all music files in this folder
@@ -71,35 +71,35 @@ extension LibraryIndexer {
                 trackStableIds.append(stableId)
             }
 
-            print("🎵 Found \(trackStableIds.count) tracks in folder: \(folderName)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎵 Found \(trackStableIds.count) tracks in folder: \(folderName)") }
 
             // Check if a folder playlist already exists for this path
             if let existingPlaylist = try databaseManager.getFolderPlaylist(forPath: folderPath) {
-                print("🔄 Syncing existing folder playlist: \(existingPlaylist.title)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 Syncing existing folder playlist: \(existingPlaylist.title)") }
 
                 // The DB primary key should never be nil here, but a nil row
                 // must not crash the folder-sync hot path (audit: force unwrap)
                 guard let playlistId = existingPlaylist.id else {
-                    print("❌ Skipping folder playlist sync - existing playlist has no id: \(existingPlaylist.title)")
+                    AppLog.error(.general, "❌ Skipping folder playlist sync - existing playlist has no id: \(existingPlaylist.title)")
                     return
                 }
                 try databaseManager.syncPlaylistWithFolder(playlistId: playlistId, trackStableIds: trackStableIds)
-                print("✅ Synced playlist '\(existingPlaylist.title)' with folder contents")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Synced playlist '\(existingPlaylist.title)' with folder contents") }
             } else {
                 // Create new folder playlist
-                print("➕ Creating new folder playlist: \(folderName)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "➕ Creating new folder playlist: \(folderName)") }
 
                 let playlist = try databaseManager.createFolderPlaylist(title: folderName, folderPath: folderPath)
                 guard let playlistId = playlist.id else {
-                    print("❌ Skipping folder playlist sync - created playlist has no id: \(playlist.title)")
+                    AppLog.error(.general, "❌ Skipping folder playlist sync - created playlist has no id: \(playlist.title)")
                     return
                 }
                 try databaseManager.syncPlaylistWithFolder(playlistId: playlistId, trackStableIds: trackStableIds)
-                print("✅ Created folder playlist '\(playlist.title)' with \(trackStableIds.count) tracks")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Created folder playlist '\(playlist.title)' with \(trackStableIds.count) tracks") }
             }
 
         } catch {
-            print("❌ Failed to process folder playlist for \(folderName): \(error)")
+            AppLog.error(.general, "❌ Failed to process folder playlist for \(folderName): \(error)")
         }
     }
 
@@ -161,7 +161,7 @@ extension LibraryIndexer {
                 markScanEnded()
                 // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
                 markMainScanCompletedThisLaunch()
-                print("✅ iOS library scan completed. Found \(tracksFound) tracks.")
+                AppLog.info(.general, "✅ iOS library scan completed. Found \(tracksFound) tracks.")
             }
 
             // Process folder playlists after scan completion
@@ -169,7 +169,7 @@ extension LibraryIndexer {
         } catch {
             await MainActor.run {
                 markScanEnded()
-                print("Offline library scan failed: \(error)")
+                AppLog.error(.general, "Offline library scan failed: \(error)")
             }
         }
     }
@@ -214,7 +214,7 @@ extension LibraryIndexer {
 
             // 多文件夹曲库：收集所有配置文件夹的音乐文件（去重后统一进度）
             let folders = stateManager.getMusicFolderURLs()
-            print("📁 macOS scanning folders: \(folders.map(\.path))")
+            AppLog.info(.general, "📁 macOS scanning folders: \(folders.map(\.path))")
             MacScanLogger.log("scan start, folders: \(folders.map(\.path))")
 
             do {
@@ -229,7 +229,7 @@ extension LibraryIndexer {
                     }
                 }
                 let totalFiles = musicFiles.count
-                print("📁 macOS found \(totalFiles) music files")
+                AppLog.info(.general, "📁 macOS found \(totalFiles) music files")
                 MacScanLogger.log("total files: \(totalFiles)")
 
                 // iCloud Drive dataless（云端未下载）本轮不 parse：无 iCloud
@@ -242,14 +242,14 @@ extension LibraryIndexer {
                 musicFiles = localFiles
                 if skippedDataless > 0 {
                     MacScanLogger.log("skipped dataless (cloud not downloaded): \(skippedDataless)")
-                    print("⏭️ Skipping \(skippedDataless) dataless iCloud files (not downloaded locally)")
+                    AppLog.warn(.general, "⏭️ Skipping \(skippedDataless) dataless iCloud files (not downloaded locally)")
                 }
 
                 guard !musicFiles.isEmpty else {
                     // 全为云端未下载：不 reconcile（避免误删本地入列曲目）
                     guard generation == indexingGeneration else { return }
                     markScanEnded()
-                    print("❌ All \(skippedDataless) files are dataless; nothing to index this round")
+                    AppLog.error(.general, "❌ All \(skippedDataless) files are dataless; nothing to index this round")
                     autoscheduleRescan(skippedDataless: skippedDataless)
                     return
                 }
@@ -309,7 +309,7 @@ extension LibraryIndexer {
                 markScanEnded()
                 // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
                 markMainScanCompletedThisLaunch()
-                print("✅ macOS scan completed. Found \(tracksFound) tracks.")
+                AppLog.info(.general, "✅ macOS scan completed. Found \(tracksFound) tracks.")
                 MacScanLogger.log("scan completed, tracksFound: \(tracksFound), skippedDataless: \(skippedDataless)")
 
                 // 云端文件下载完成后自动补扫入列（60s 后重扫，最多 5 轮）
@@ -317,7 +317,7 @@ extension LibraryIndexer {
 
                 await processFolderPlaylists(allMusicFiles: musicFiles)
             } catch {
-                print("❌ macOS scan failed: \(error)")
+                AppLog.error(.general, "❌ macOS scan failed: \(error)")
                 MacScanLogger.log("scan failed: \(error)")
                 markScanEnded()
             }

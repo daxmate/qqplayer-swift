@@ -43,36 +43,36 @@ extension LibraryIndexer {
         // 子任务继承父任务取消状态，此处早退即可（不写库、不做 IO）。
         guard !Task.isCancelled else { return }
         do {
-            print("🎵 Starting to process file: \(fileURL.lastPathComponent)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎵 Starting to process file: \(fileURL.lastPathComponent)") }
 
             // M3-2：iOS/macOS 统一按本地文件处理（iOS 沙盒 Documents / macOS 用户
             // 添加文件夹），无 iCloud 实体化/下载门。macOS dataless 文件已在
             // scanMusicFolder 分区时过滤。
 
-            print("🆔 Generating stable ID for: \(fileURL.lastPathComponent)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🆔 Generating stable ID for: \(fileURL.lastPathComponent)") }
             let stableId = try generateStableId(for: fileURL)
-            print("🆔 Generated stable ID: \(stableId)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🆔 Generated stable ID: \(stableId)") }
 
             let fingerprint = try fileFingerprint(for: fileURL)
             let existingTrack = try existingTrack(stableId: stableId, path: fileURL.path)
 
             if let existingTrack, !needsMetadataRefresh(existingTrack, fingerprint: fingerprint) {
-                print("⏭️ Track metadata is current: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "⏭️ Track metadata is current: \(fileURL.lastPathComponent)") }
                 return
             }
             if existingTrack != nil {
-                print("🔄 File changed; reparsing metadata: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 File changed; reparsing metadata: \(fileURL.lastPathComponent)") }
             }
 
             // Check if track was excluded (removed from library only)
             if DeleteSettings.isTrackExcluded(stableId) {
-                print("⏭️ Track excluded from library: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "⏭️ Track excluded from library: \(fileURL.lastPathComponent)") }
                 return
             }
 
-            print("🎶 Parsing audio file: \(fileURL.lastPathComponent)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎶 Parsing audio file: \(fileURL.lastPathComponent)") }
             let parsedFile = try await parseAudioFile(at: fileURL, stableId: stableId)
-            print("✅ Audio file parsed successfully: \(parsedFile.track.title)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Audio file parsed successfully: \(parsedFile.track.title)") }
             try await saveParsedFile(
                 parsedFile,
                 replacing: existingTrack,
@@ -80,12 +80,12 @@ extension LibraryIndexer {
             )
 
         } catch LibraryIndexerError.parseTimeout {
-            print("⏰ Timeout parsing audio file: \(fileURL.lastPathComponent)")
-            print("❌ Skipping file due to parsing timeout")
+            AppLog.warn(.general, "⏰ Timeout parsing audio file: \(fileURL.lastPathComponent)")
+            AppLog.error(.general, "❌ Skipping file due to parsing timeout")
         } catch {
-            print("❌ Failed to process local track at \(fileURL.lastPathComponent): \(error)")
-            print("❌ Error type: \(type(of: error))")
-            print("❌ Error details: \(String(describing: error))")
+            AppLog.error(.general, "❌ Failed to process local track at \(fileURL.lastPathComponent): \(error)"
+                + "\n❌ Error type: \(type(of: error))"
+                + "\n❌ Error details: \(String(describing: error))")
         }
     }
 
@@ -95,7 +95,7 @@ extension LibraryIndexer {
 
     /// 分片：跨文件可见（原 private）
     nonisolated func parseAudioFile(at url: URL, stableId: String) async throws -> ParsedAudioFile {
-        print("🔍 Calling AudioMetadataParser for: \(url.lastPathComponent)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Calling AudioMetadataParser for: \(url.lastPathComponent)") }
 
         // Add timeout to prevent hanging
         let metadata = try await withThrowingTaskGroup(of: AudioMetadata.self) { group in
@@ -121,13 +121,13 @@ extension LibraryIndexer {
             return result
         }
 
-        print("✅ AudioMetadataParser completed for: \(url.lastPathComponent)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ AudioMetadataParser completed for: \(url.lastPathComponent)") }
 
         let artistNames = parseArtistNames(metadata.artist)
         let rawAlbumArtist = metadata.albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let albumArtistNames = rawAlbumArtist.isEmpty ? artistNames : parseArtistNames(rawAlbumArtist)
         let displayAlbumArtist = displayArtistName(from: albumArtistNames)
-        print("🎤 Creating artist(s): '\(displayArtistName(from: artistNames))'")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎤 Creating artist(s): '\(displayArtistName(from: artistNames))'") }
 
         let artists = try artistNames.map { try databaseManager.upsertArtist(name: $0) }
         let albumArtists = try albumArtistNames.map { try databaseManager.upsertArtist(name: $0) }
@@ -252,10 +252,10 @@ extension LibraryIndexer {
     }
 
     func copyFilesFromSharedContainer() async {
-        print("📁 Checking shared container for new music files...")
+        AppLog.info(.general, "📁 Checking shared container for new music files...")
 
         guard let sharedContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios") else {
-            print("❌ Failed to get shared container URL")
+            AppLog.error(.general, "❌ Failed to get shared container URL")
             return
         }
 

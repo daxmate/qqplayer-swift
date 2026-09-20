@@ -144,7 +144,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             activeScanTask = Task {
                 // 取消检查：stop() 已取消本轮 → 不再复制共享容器文件、不再起扫
                 guard !Task.isCancelled else {
-                    print("🛑 iOS scan cancelled - indexing was stopped")
+                    AppLog.warn(.general, "🛑 iOS scan cancelled - indexing was stopped")
                     return
                 }
 
@@ -155,7 +155,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
                 // container was being processed. Without this the scan would run
                 // again just after being stopped.
                 guard generation == indexingGeneration, isIndexing else {
-                    print("🛑 iOS scan cancelled - indexing was stopped")
+                    AppLog.warn(.general, "🛑 iOS scan cancelled - indexing was stopped")
                     return
                 }
 
@@ -186,7 +186,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
     }
 
     func switchToOfflineMode() {
-        print("🔄 Switching LibraryIndexer to offline mode")
+        AppLog.info(.general, "🔄 Switching LibraryIndexer to offline mode")
         stop()
         startOfflineMode()
     }
@@ -239,7 +239,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             return nil
         }
 
-        print("🔁 Track already exists by path with old stable ID: \(existing.stableId)")
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔁 Track already exists by path with old stable ID: \(existing.stableId)") }
         try databaseManager.migrateTrackForMovedFile(oldStableId: existing.stableId, newPath: path)
         existing.stableId = stableId
         existing.path = path
@@ -276,7 +276,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             if existingTrack.modificationDate != nil {
                 _ = await ArtworkManager.shared.forceRefreshArtwork(for: track)
             }
-            print("🔄 Refreshed metadata for \(sourceDescription): \(track.title)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 Refreshed metadata for \(sourceDescription): \(track.title)") }
             if notifyImmediately {
                 // A changed album/artist can leave the old relationship empty.
                 try databaseManager.cleanupOrphanedLibraryEntries()
@@ -298,7 +298,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             // time. ArtworkManager.getArtwork/getThumbnail already extract and
             // fill the disk cache lazily the first time a row is displayed.
             let notificationTrack = track
-            print("📢 Posting TrackFound notification for \(sourceDescription): \(notificationTrack.title)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📢 Posting TrackFound notification for \(sourceDescription): \(notificationTrack.title)") }
             await MainActor.run {
                 self.tracksFound += 1
                 NotificationCenter.default.post(
@@ -317,7 +317,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             // Run once for the whole scan instead of once per refreshed row.
             try databaseManager.cleanupOrphanedLibraryEntries()
         } catch {
-            print("⚠️ Failed to clean orphaned metadata after refresh: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to clean orphaned metadata after refresh: \(error)")
         }
         NotificationCenter.default.post(
             name: .libraryNeedsRefresh,
@@ -344,27 +344,27 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
     ) async -> ExternalImportOutcome {
         // Reject network URLs
         if let scheme = fileURL.scheme?.lowercased(), ["http", "https", "ftp", "sftp"].contains(scheme) {
-            print("❌ Rejected network URL: \(fileURL.absoluteString)")
+            AppLog.error(.general, "❌ Rejected network URL: \(fileURL.absoluteString)")
             return .failed(.unsupportedLocation)
         }
 
         do {
-            print("🎵 Starting to process external file: \(fileURL.lastPathComponent)")
-            print("📱 Processing external file from: \(fileURL.path)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎵 Starting to process external file: \(fileURL.lastPathComponent)") }
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📱 Processing external file from: \(fileURL.path)") }
 
-            print("🆔 Generating stable ID for: \(fileURL.lastPathComponent)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🆔 Generating stable ID for: \(fileURL.lastPathComponent)") }
             let stableId = try generateStableId(for: fileURL)
-            print("🆔 Generated stable ID: \(stableId)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🆔 Generated stable ID: \(stableId)") }
 
             let fingerprint = try fileFingerprint(for: fileURL)
             let existingTrack = try existingTrack(stableId: stableId, path: fileURL.path)
 
             if let existingTrack, !needsMetadataRefresh(existingTrack, fingerprint: fingerprint) {
-                print("⏭️ Track metadata is current: \(fileURL.lastPathComponent)")
-                print("📍 Existing DB path: \(existingTrack.path)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "⏭️ Track metadata is current: \(fileURL.lastPathComponent)") }
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 Existing DB path: \(existingTrack.path)") }
                 if allowExcludedReimport && DeleteSettings.isTrackExcluded(stableId) {
                     DeleteSettings.removeExcludedTrack(stableId)
-                    print("✅ Cleared exclusion for already-present track: \(fileURL.lastPathComponent)")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Cleared exclusion for already-present track: \(fileURL.lastPathComponent)") }
                 }
                 if allowExcludedReimport {
                     NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
@@ -372,22 +372,22 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
                 return .alreadyPresent
             }
             if existingTrack != nil {
-                print("🔄 File changed; reparsing external metadata: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 File changed; reparsing external metadata: \(fileURL.lastPathComponent)") }
             }
 
             // Check if track was excluded (removed from library only)
             let isExcluded = DeleteSettings.isTrackExcluded(stableId)
             if isExcluded && !allowExcludedReimport {
-                print("⏭️ Track excluded from library: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "⏭️ Track excluded from library: \(fileURL.lastPathComponent)") }
                 return .excluded
             }
             if isExcluded && allowExcludedReimport {
-                print("🔁 Re-importing excluded track by user request: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔁 Re-importing excluded track by user request: \(fileURL.lastPathComponent)") }
             }
 
-            print("🎶 Parsing external audio file: \(fileURL.lastPathComponent)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎶 Parsing external audio file: \(fileURL.lastPathComponent)") }
             let parsedFile = try await parseAudioFile(at: fileURL, stableId: stableId)
-            print("✅ External audio file parsed successfully: \(parsedFile.track.title)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ External audio file parsed successfully: \(parsedFile.track.title)") }
             try await saveParsedFile(
                 parsedFile,
                 replacing: existingTrack,
@@ -398,20 +398,20 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             // Remove only this track from exclusion after successful explicit re-import.
             if isExcluded && allowExcludedReimport {
                 DeleteSettings.removeExcludedTrack(stableId)
-                print("✅ Cleared exclusion for re-imported track: \(fileURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Cleared exclusion for re-imported track: \(fileURL.lastPathComponent)") }
             }
 
             // 指纹变了的老行重解析成功 = 「更新」，不是「已在库」也不是「新入库」。
             return existingTrack == nil ? .imported : .updatedExisting
 
         } catch LibraryIndexerError.parseTimeout {
-            print("⏰ Timeout parsing external audio file: \(fileURL.lastPathComponent)")
-            print("❌ Skipping external file due to parsing timeout")
+            AppLog.warn(.general, "⏰ Timeout parsing external audio file: \(fileURL.lastPathComponent)")
+            AppLog.error(.general, "❌ Skipping external file due to parsing timeout")
             return .failed(.parseTimeout)
         } catch {
-            print("❌ Failed to process external track at \(fileURL.lastPathComponent): \(error)")
-            print("❌ Error type: \(type(of: error))")
-            print("❌ Error details: \(String(describing: error))")
+            AppLog.error(.general, "❌ Failed to process external track at \(fileURL.lastPathComponent): \(error)"
+                + "\n❌ Error type: \(type(of: error))"
+                + "\n❌ Error details: \(String(describing: error))")
             return .failed(.processing)
         }
     }
@@ -419,7 +419,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
     /// 分片：跨文件可见（原 private）
     func storeBookmarkPermanently(_ bookmarkData: Data, for url: URL) async {
         guard let store = ExternalFileBookmarkStore.default else {
-            print("❌ Failed to resolve documents directory for bookmarks")
+            AppLog.error(.general, "❌ Failed to resolve documents directory for bookmarks")
             return
         }
 
@@ -432,16 +432,16 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             // 整份书签 plist 不可解析 → 全部外部文件不再导入（审计 🔴-2）。
             try store.upsert(bookmarkData, forStableId: stableId)
 
-            print("💾 Stored permanent bookmark for shared file: \(url.lastPathComponent) with stableId: \(stableId)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "💾 Stored permanent bookmark for shared file: \(url.lastPathComponent) with stableId: \(stableId)") }
         } catch {
-            print("❌ Failed to store permanent bookmark for \(url.lastPathComponent): \(error)")
+            AppLog.error(.general, "❌ Failed to store permanent bookmark for \(url.lastPathComponent): \(error)")
         }
     }
 
     /// 分片：跨文件可见（原 private）
     func processStoredExternalBookmarks() async {
         guard let store = ExternalFileBookmarkStore.default else {
-            print("📁 No stored external bookmarks found")
+            AppLog.info(.general, "📁 No stored external bookmarks found")
             return
         }
 
@@ -450,18 +450,18 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
         case .loaded(let loaded) where !loaded.isEmpty:
             bookmarks = loaded
         case .loaded:
-            print("📁 No stored external bookmarks found")
+            AppLog.info(.general, "📁 No stored external bookmarks found")
             return
         case .unreadable(let error):
             // 读失败 ≠ 无书签：不拿空字典覆盖（还能救的书签会被抹掉），本轮跳过
-            print("❌ Invalid external bookmarks format: \(error)")
+            AppLog.error(.general, "❌ Invalid external bookmarks format: \(error)")
             return
         }
 
         // 键改名先收集、结束时经唯一入口一次原子落盘
         var bookmarkKeyRemapping: [String: String] = [:]
 
-        print("📁 Found \(bookmarks.count) stored external file bookmarks")
+        AppLog.info(.general, "📁 Found \(bookmarks.count) stored external file bookmarks")
 
         for (stableId, bookmarkData) in Array(bookmarks) {
             do {
@@ -470,13 +470,13 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
                 let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
 
                 if isStale {
-                    print("⚠️ Bookmark is stale for stableId: \(stableId)")
+                    AppLog.warn(.general, "⚠️ Bookmark is stale for stableId: \(stableId)")
                     continue
                 }
 
                 // Reject network URLs
                 if let scheme = resolvedURL.scheme?.lowercased(), ["http", "https", "ftp", "sftp"].contains(scheme) {
-                    print("❌ Rejected network URL: \(resolvedURL.absoluteString)")
+                    AppLog.error(.general, "❌ Rejected network URL: \(resolvedURL.absoluteString)")
                     continue
                 }
 
@@ -490,8 +490,8 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
                     trackAlreadyExists = true
                     // File exists in DB - check if path has changed
                     if existingTrack.path != resolvedURL.path {
-                        print("📍 File moved detected! Old: \(existingTrack.path)")
-                        print("📍 File moved detected! New: \(resolvedURL.path)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 File moved detected! Old: \(existingTrack.path)") }
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 File moved detected! New: \(resolvedURL.path)") }
 
                         try databaseManager.migrateTrackStableIdAndPath(
                             oldStableId: stableId,
@@ -499,27 +499,27 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
                             newPath: resolvedURL.path
                         )
                         // 书签键改名由迁移唯一入口（TrackIdentityMigration）一并完成
-                        print("✅ Updated database path for: \(resolvedURL.lastPathComponent)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Updated database path for: \(resolvedURL.lastPathComponent)") }
                     } else {
-                        print("📍 External file path unchanged: \(resolvedURL.lastPathComponent)")
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 External file path unchanged: \(resolvedURL.lastPathComponent)") }
                     }
                 } else if try databaseManager.getTrack(byStableId: resolvedStableId) != nil {
                     trackAlreadyExists = true
                     bookmarkKeyRemapping[stableId] = resolvedStableId
-                    print("🔁 Updated stale bookmark key for existing track: \(resolvedURL.lastPathComponent)")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔁 Updated stale bookmark key for existing track: \(resolvedURL.lastPathComponent)") }
                 }
 
                 // Check if track was excluded (removed from library only)
                 if !trackAlreadyExists &&
                     (DeleteSettings.isTrackExcluded(stableId) || DeleteSettings.isTrackExcluded(resolvedStableId)) {
-                    print("⏭️ Track excluded from library: \(resolvedURL.lastPathComponent)")
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "⏭️ Track excluded from library: \(resolvedURL.lastPathComponent)") }
                     continue
                 }
 
                 // File not in database yet - process it
                 // Start accessing security-scoped resource
                 guard resolvedURL.startAccessingSecurityScopedResource() else {
-                    print("❌ Failed to access security-scoped resource for: \(resolvedURL.lastPathComponent)")
+                    AppLog.error(.general, "❌ Failed to access security-scoped resource for: \(resolvedURL.lastPathComponent)")
                     continue
                 }
 
@@ -530,19 +530,19 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
                 // Import a new file or refresh an existing file whose
                 // fingerprint changed.
                 await processExternalFile(resolvedURL)
-                print("✅ Processed stored external file: \(resolvedURL.lastPathComponent)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Processed stored external file: \(resolvedURL.lastPathComponent)") }
 
             } catch {
-                print("❌ Failed to resolve bookmark for stableId \(stableId): \(error)")
+                AppLog.error(.general, "❌ Failed to resolve bookmark for stableId \(stableId): \(error)")
             }
         }
 
         if !bookmarkKeyRemapping.isEmpty {
             do {
                 let renamed = try store.renameKeys(bookmarkKeyRemapping)
-                print("✅ Updated \(renamed) external bookmark key(s) after stable ID migration")
+                AppLog.info(.general, "✅ Updated \(renamed) external bookmark key(s) after stable ID migration")
             } catch {
-                print("❌ Failed to update external bookmark keys: \(error)")
+                AppLog.error(.general, "❌ Failed to update external bookmark keys: \(error)")
             }
         }
     }
@@ -556,7 +556,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
         case .loaded(let loaded):
             bookmarks = loaded
         case .unreadable(let error):
-            print("⚠️ External bookmarks unreadable (treated as no bookmark): \(error)")
+            AppLog.warn(.general, "⚠️ External bookmarks unreadable (treated as no bookmark): \(error)")
             return nil
         }
 
@@ -570,7 +570,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             let resolvedURL = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
 
             if isStale {
-                print("⚠️ Bookmark is stale for: \(track.title)")
+                AppLog.warn(.general, "⚠️ Bookmark is stale for: \(track.title)")
                 return nil
             }
 
@@ -579,20 +579,20 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             // 内容指纹对账全部基于旧 id 追踪。改走完整迁移入口：stable_id + 四表引用
             // + 文件侧引用（书签键/歌词/封面）一次搬完。
             if track.path != resolvedURL.path {
-                print("📍 Playback: File moved detected! Old: \(track.path)")
-                print("📍 Playback: File moved detected! New: \(resolvedURL.path)")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 Playback: File moved detected! Old: \(track.path)") }
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 Playback: File moved detected! New: \(resolvedURL.path)") }
 
                 let migratedStableId = try databaseManager.migrateTrackForMovedFile(
                     oldStableId: track.stableId,
                     newPath: resolvedURL.path
                 )
-                print("✅ Updated database path for playback: \(resolvedURL.lastPathComponent) (stableId \(track.stableId) → \(migratedStableId ?? "no-op"))")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Updated database path for playback: \(resolvedURL.lastPathComponent) (stableId \(track.stableId) → \(migratedStableId ?? "no-op"))") }
             }
 
             return resolvedURL
 
         } catch {
-            print("❌ Failed to resolve bookmark for track \(track.title): \(error)")
+            AppLog.error(.general, "❌ Failed to resolve bookmark for track \(track.title): \(error)")
             return nil
         }
     }

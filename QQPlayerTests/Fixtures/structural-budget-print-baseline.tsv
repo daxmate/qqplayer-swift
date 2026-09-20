@@ -8,7 +8,6 @@
 #
 # 重新生成：scripts/check-structural-budget.sh emit-prints
 QQPlayer/AppIntents/FoundationModels/MixGenerator.swift	2
-QQPlayer/AppIntents/SpotlightLibraryIndexer.swift	1
 QQPlayer/CarPlay+PlayerPage.swift	1
 QQPlayer/CarPlaySceneDelegate.swift	3
 QQPlayer/ContentView.swift	4
@@ -30,7 +29,6 @@ QQPlayer/Mac/SyncHostCenter.swift	8
 QQPlayer/Models/SFBTrack.swift	16
 QQPlayer/Models/WidgetData.swift	30
 QQPlayer/QQPlayerApp.swift	33
-QQPlayer/Services/AppCoordinator+ImportExport.swift	15
 QQPlayer/Services/AppCoordinator+iCloud.swift	15
 QQPlayer/Services/AppCoordinator.swift	50
 QQPlayer/Services/ArtworkCache.swift	12
@@ -45,15 +43,12 @@ QQPlayer/Services/DatabaseSuspensionCoordinator.swift	1
 QQPlayer/Services/DiscogsAPI.swift	13
 QQPlayer/Services/EQManager.swift	21
 QQPlayer/Services/ExternalFileBookmarkStore.swift	1
-QQPlayer/Services/FileCleanupManager.swift	56
 QQPlayer/Services/GequhaiClient.swift	3
 QQPlayer/Services/HybridMusicAPI.swift	28
 QQPlayer/Services/IOSPassiveSyncCenter.swift	17
 QQPlayer/Services/KaraokeController.swift	1
-QQPlayer/Services/LibraryIndexer+Parsing.swift	19
-QQPlayer/Services/LibraryIndexer+Scanning.swift	21
-QQPlayer/Services/LibraryIndexer+SharedImport.swift	29
-QQPlayer/Services/LibraryIndexer.swift	55
+QQPlayer/Services/LibraryIndexer+Parsing.swift	1
+QQPlayer/Services/LibraryIndexer.swift	3
 QQPlayer/Services/LyricsManager.swift	16
 QQPlayer/Services/LyricsParsing.swift	3
 QQPlayer/Services/LyricsSearch.swift	19
@@ -92,4 +87,4 @@ QQPlayer/Views/TutorialView.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	2
 QQPlayer/Views/Utility/ManualEQEditorView.swift	2
 QQPlayer/Views/Utility/SettingsView.swift	5
-# TOTAL: 853
+# TOTAL: 661

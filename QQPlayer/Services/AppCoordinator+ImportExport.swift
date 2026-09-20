@@ -16,11 +16,11 @@ extension AppCoordinator {
     }
 
     private func runPostIndexMaintenance() async {
-        print("🔄 AppCoordinator: Starting deferred post-index maintenance...")
+        AppLog.info(.general, "🔄 AppCoordinator: Starting deferred post-index maintenance...")
         await verifyDatabaseRelationships()
         await fileCleanupManager.checkForOrphanedFiles()
         await pruneCachesForDeletedContent()
-        print("✅ AppCoordinator: Deferred post-index maintenance completed")
+        AppLog.info(.general, "✅ AppCoordinator: Deferred post-index maintenance completed")
     }
 
     /// Drops cached data belonging to content that no longer exists. Deleting a
@@ -39,13 +39,13 @@ extension AppCoordinator {
             // Passing an empty set through would erase the entire artwork
             // cache, so treat it the same way the playlist cleanup does.
             guard !validStableIds.isEmpty else {
-                print("⚠️ SAFETY: Skipping cache pruning - no tracks in database")
+                AppLog.warn(.general, "⚠️ SAFETY: Skipping cache pruning - no tracks in database")
                 return
             }
 
             await ArtworkManager.shared.cleanupOrphanedArtwork(validStableIds: validStableIds)
         } catch {
-            print("⚠️ Failed to prune artwork cache: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to prune artwork cache: \(error)")
         }
 
         // Artist metadata is keyed by artist name rather than track id, so it
@@ -56,12 +56,12 @@ extension AppCoordinator {
 
     private func verifyDatabaseRelationships() async {
         do {
-            print("🔍 Verifying database relationships...")
+            AppLog.info(.general, "🔍 Verifying database relationships...")
             let tracks = try databaseManager.getAllTracks()
             let albums = try databaseManager.getAllAlbums()
             let artists = try databaseManager.getAllArtists()
 
-            print("📊 Database stats - Tracks: \(tracks.count), Albums: \(albums.count), Artists: \(artists.count)")
+            AppLog.info(.general, "📊 Database stats - Tracks: \(tracks.count), Albums: \(albums.count), Artists: \(artists.count)")
 
             let validArtistIds = Set(artists.compactMap(\.id))
             let validAlbumIds = Set(albums.compactMap(\.id))
@@ -91,14 +91,14 @@ extension AppCoordinator {
                 }
             }
 
-            print("🔍 Verification complete:")
-            print("   - Tracks without artist: \(tracksWithoutArtist)")
-            print("   - Tracks without album: \(tracksWithoutAlbum)")
-            print("   - Invalid artist refs: \(invalidArtistRefs)")
-            print("   - Invalid album refs: \(invalidAlbumRefs)")
+            AppLog.info(.general, "🔍 Verification complete:"
+                + "\n   - Tracks without artist: \(tracksWithoutArtist)"
+                + "\n   - Tracks without album: \(tracksWithoutAlbum)"
+                + "\n   - Invalid artist refs: \(invalidArtistRefs)"
+                + "\n   - Invalid album refs: \(invalidAlbumRefs)")
 
         } catch {
-            print("❌ Failed to verify database relationships: \(error)")
+            AppLog.error(.general, "❌ Failed to verify database relationships: \(error)")
         }
     }
 
@@ -159,7 +159,7 @@ extension AppCoordinator {
         // Get playlist info before deleting from database
         let playlists = try databaseManager.getAllPlaylists()
         guard let playlist = playlists.first(where: { $0.id == playlistId }) else {
-            print("⏭️ deletePlaylist: playlist \(playlistId) 已不存在，幂等跳过")
+            AppLog.warn(.general, "⏭️ deletePlaylist: playlist \(playlistId) 已不存在，幂等跳过")
             return
         }
 
@@ -171,7 +171,7 @@ extension AppCoordinator {
         // Delete from iCloud and local storage
         try stateManager.deletePlaylist(slug: playlistSlug)
 
-        print("✅ Playlist '\(playlist.title)' deleted from database and cloud storage")
+        AppLog.info(.general, "✅ Playlist '\(playlist.title)' deleted from database and cloud storage")
     }
 
     func renamePlaylist(playlistId: Int64, newTitle: String) throws {
@@ -180,7 +180,7 @@ extension AppCoordinator {
         // 改名后不同步 → 下次读镜像（小组件歌单列表 / 状态恢复）拿到的还是旧标题。
         // 与 deletePlaylist 清镜像同一族：入口负责把本地镜像跟 DB 对齐。
         syncPlaylistsToCloud()
-        print("✅ Playlist renamed to '\(newTitle)'")
+        AppLog.info(.general, "✅ Playlist renamed to '\(newTitle)'")
     }
 
     /// 自定义封面：唯一入口。
