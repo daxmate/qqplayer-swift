@@ -207,10 +207,10 @@ struct SyncLibrarySyncE2ETests {
         let hostResponder = SyncLibraryFetchResponder(session: fixture.hostSession, libraryRoot: sourceRoot)
 
         // 捕获 client 收到的结果帧
-        var received: SyncFetchResult?
+        let receivedBox = FetchResultValueBox()
         fixture.clientSession.onApplicationFrame = { frame in
             if frame.type == .syncFetchResult {
-                received = try? SyncFetchCodec.decode(SyncFetchResult.self, from: frame.payload)
+                receivedBox.value = try? SyncFetchCodec.decode(SyncFetchResult.self, from: frame.payload)
             }
         }
 
@@ -226,7 +226,7 @@ struct SyncLibrarySyncE2ETests {
             payload: try SyncFetchCodec.encode(request)
         )
 
-        let result = try #require(received)
+        let result = try #require(receivedBox.value)
         #expect(result.completed.isEmpty)
         #expect(result.failed.count == 3)
         #expect(result.failed.allSatisfy { $0.reason == SyncFetchFailureReason.invalidPath })
@@ -237,4 +237,10 @@ struct SyncLibrarySyncE2ETests {
         #expect(!FileManager.default.fileExists(atPath: leaked.path))
         _ = hostResponder
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：`onApplicationFrame` 标 `@Sendable` 后，
+/// 闭包不能再捕获可变局部量 ⇒ 结果放盒子里。
+private final class FetchResultValueBox: @unchecked Sendable {
+    var value: SyncFetchResult?
 }

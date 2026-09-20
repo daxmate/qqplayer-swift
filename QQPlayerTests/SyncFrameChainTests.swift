@@ -167,8 +167,8 @@ struct SyncFrameChainTests {
     @Test("🟡F2：nonce 超过 TTL 即作废（验签不再命中，池里也清掉）")
     func nonceExpiresByTTL() throws {
         let start = Date(timeIntervalSince1970: 1_000_000)
-        var clock = start
-        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock })
+        let clock = ClockBox(start)
+        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock.value })
         let nonce = Data((0 ..< 16).map { UInt8($0) })
         registry.register(nonce)
         let request = try SyncPairingMessages.makePairRequest(
@@ -177,7 +177,7 @@ struct SyncFrameChainTests {
             clientName: "iPhone"
         )
 
-        clock = start.addingTimeInterval(301)
+        clock.value = start.addingTimeInterval(301)
 
         #expect(registry.matchingNonce(for: request) == nil)
         #expect(registry.pendingCount == 0)
@@ -187,8 +187,8 @@ struct SyncFrameChainTests {
     @Test("🟡F2：TTL 内 nonce 仍然有效并被消耗")
     func nonceValidWithinTTL() throws {
         let start = Date(timeIntervalSince1970: 2_000_000)
-        var clock = start
-        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock })
+        let clock = ClockBox(start)
+        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock.value })
         let nonce = Data((16 ..< 32).map { UInt8($0) })
         registry.register(nonce)
         let request = try SyncPairingMessages.makePairRequest(
@@ -197,7 +197,7 @@ struct SyncFrameChainTests {
             clientName: "iPhone"
         )
 
-        clock = start.addingTimeInterval(299)
+        clock.value = start.addingTimeInterval(299)
 
         #expect(registry.matchingNonce(for: request) == nonce)
         #expect(registry.pendingCount == 0) // 命中即消耗（防重放）
@@ -207,20 +207,20 @@ struct SyncFrameChainTests {
     @Test("🟡F2：重复注册 = 续期；注册时清理过期项")
     func registerRefreshesTTLAndPurgesExpired() {
         let start = Date(timeIntervalSince1970: 3_000_000)
-        var clock = start
-        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock })
+        let clock = ClockBox(start)
+        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock.value })
         let stale = Data([1, 2, 3])
         let fresh = Data([4, 5, 6])
         registry.register(stale)
 
-        clock = start.addingTimeInterval(200)
+        clock.value = start.addingTimeInterval(200)
         registry.register(stale) // 续期（距注册 200s 时重新展示同一张码）
         #expect(registry.pendingCount == 1)
 
-        clock = start.addingTimeInterval(301) // 距**续期**仅 101s → 未过期
+        clock.value = start.addingTimeInterval(301) // 距**续期**仅 101s → 未过期
         #expect(registry.pendingCount == 1)
 
-        clock = start.addingTimeInterval(501) // 距续期 301s → 过期，注册新码时清掉
+        clock.value = start.addingTimeInterval(501) // 距续期 301s → 过期，注册新码时清掉
         registry.register(fresh)
         #expect(registry.pendingCount == 1)
     }
@@ -228,8 +228,8 @@ struct SyncFrameChainTests {
     /// 清理入口：remove（展示新码→旧码立即失效）/ removeAll（配对完成 / 停止监听）。
     @Test("🟡F2：remove / removeAll 立即作废（不依赖 TTL 到点）")
     func cleanupEntryPointsInvalidateImmediately() throws {
-        let clock = Date(timeIntervalSince1970: 4_000_000)
-        let registry = SyncPairingNonceRegistry(now: { clock })
+        let clock = ClockBox(Date(timeIntervalSince1970: 4_000_000))
+        let registry = SyncPairingNonceRegistry(now: { clock.value })
         let identity = SyncIdentity.generate()
         let first = Data([7, 7, 7])
         let second = Data([8, 8, 8])
@@ -256,8 +256,8 @@ struct SyncFrameChainTests {
     @Test("🟡F2：过期 nonce 的配对请求明确失败（pairingRejected），不静默成功")
     func expiredNoncePairingFailsExplicitly() {
         let start = Date(timeIntervalSince1970: 5_000_000)
-        var clock = start
-        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock })
+        let clock = ClockBox(start)
+        let registry = SyncPairingNonceRegistry(nonceTTL: 300, now: { clock.value })
         let sessions = makePairingSessions(registry: registry)
         let nonce = Data((0 ..< 16).map { UInt8($0) })
         registry.register(nonce)
@@ -270,18 +270,18 @@ struct SyncFrameChainTests {
                 hostName: "MacBook Pro"
             )
         )
-        var approvalRequested = false
+        let approvalRequested = FlagBox()
         sessions.hostSession.pairApprovalHandler = { session, _ in
-            approvalRequested = true
+            approvalRequested.value = true
             session.approvePairing(displayName: nil)
         }
 
-        clock = start.addingTimeInterval(301) // 展示 300s 后旧码过期
+        clock.value = start.addingTimeInterval(301) // 展示 300s 后旧码过期
 
         sessions.hostSession.handleTransportReady()
         sessions.clientSession.handleTransportReady()
 
-        #expect(approvalRequested == false)
+        #expect(approvalRequested.value == false)
         #expect(sessions.hostSession.phase == .closed)
         #expect(sessions.clientSession.phase == .closed)
         #expect(sessions.clientSession.closeReason == .pairingRejected("无效或过期的 nonce 签名"))
@@ -328,4 +328,16 @@ struct SyncFrameChainTests {
         clientChannel.session = clientSession
         return (hostSession, clientSession, hostIdentity, clientIdentity, hostTrust)
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：同步层的回调/时钟 seam 标 `@Sendable` 后，
+/// 闭包不能再捕获可变局部量（`mutation/reference of captured var in concurrently-executing code`），
+/// 状态改放盒子里、闭包只读写盒子（与既有 `*Box` / `ReceiverLog` 同款）。
+private final class ClockBox: @unchecked Sendable {
+    var value: Date
+    init(_ value: Date) { self.value = value }
+}
+
+private final class FlagBox: @unchecked Sendable {
+    var value = false
 }

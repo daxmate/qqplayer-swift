@@ -406,8 +406,7 @@ enum SyncSessionEventSlot {
     static let closed = "closed"
 }
 
-/// 链挂接句柄：`detach()` 摘除自己那一项。
-/// 幂等；**随持有者释放自动摘除**（所以不需要"保活池"，链也不会无限变长）。
+/// 链挂接句柄：`detach()` 摘除自己那一项（幂等；**随持有者释放自动摘除**，无需"保活池"）。
 final class SyncEventHandlerToken: @unchecked Sendable {
     private let lock = NSLock()
     private var removal: (() -> Void)?
@@ -489,8 +488,9 @@ final class SyncEventHandlerChain<Event>: @unchecked Sendable {
 
     /// 会话槽位访问器（读当前 handler / 装分发闭包）。
     struct SlotAccess {
-        let readCurrent: () -> Handler?
-        let install: (Handler?) -> Void
+        let readCurrent: @Sendable () -> Handler?
+        /// 装分发闭包（参数是链对象：闭包参数默认非逃逸，存不进 `@Sendable` 槽位属性）。
+        let install: @Sendable (SyncEventHandlerChain<Event>) -> Void
     }
 
     /// 把 handler 挂到 (会话, 槽位) 的链上；返回可摘除句柄。
@@ -504,7 +504,7 @@ final class SyncEventHandlerChain<Event>: @unchecked Sendable {
     ) -> SyncEventHandlerToken {
         let chain = SyncEventHandlerChainRegistry.chain(session: session, slot: slot, eventType: Event.self) {
             let created = SyncEventHandlerChain<Event>(session: session, baseHandler: access.readCurrent())
-            access.install(created.dispatcher())
+            access.install(created)
             return created
         }
         let entry = Entry(owner: owner, handler: handler)
@@ -533,8 +533,8 @@ final class SyncEventHandlerChain<Event>: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// 装进会话槽位的分发闭包：强持有链（链随会话存活）。
-    private func dispatcher() -> Handler {
+    /// 装进会话槽位的分发闭包（`@Sendable`：槽位属性是 `@Sendable` 类型——会话队列调用，见交办）。
+    func dispatcher() -> @Sendable (Event) -> Void {
         { event in self.dispatch(event) }
     }
 
@@ -605,8 +605,8 @@ final class SyncSessionAttachment: @unchecked Sendable {
     init(
         session: SyncPeerSession,
         owner: AnyObject,
-        onFrame: ((SyncFrame) -> Void)? = nil,
-        onClosed: ((SyncSessionCloseReason) -> Void)? = nil
+        onFrame: (@Sendable (SyncFrame) -> Void)? = nil,
+        onClosed: (@Sendable (SyncSessionCloseReason) -> Void)? = nil
     ) {
         if let onFrame {
             tokens.append(SyncEventHandlerChain.attach(
@@ -615,7 +615,7 @@ final class SyncSessionAttachment: @unchecked Sendable {
                 slot: SyncSessionEventSlot.applicationFrame,
                 access: SyncEventHandlerChain<SyncFrame>.SlotAccess(
                     readCurrent: { session.onApplicationFrame },
-                    install: { session.onApplicationFrame = $0 }
+                    install: { session.onApplicationFrame = $0.dispatcher() }
                 ),
                 handler: onFrame
             ))
@@ -627,7 +627,7 @@ final class SyncSessionAttachment: @unchecked Sendable {
                 slot: SyncSessionEventSlot.closed,
                 access: SyncEventHandlerChain<SyncSessionCloseReason>.SlotAccess(
                     readCurrent: { session.onClosed },
-                    install: { session.onClosed = $0 }
+                    install: { session.onClosed = $0.dispatcher() }
                 ),
                 handler: onClosed
             ))

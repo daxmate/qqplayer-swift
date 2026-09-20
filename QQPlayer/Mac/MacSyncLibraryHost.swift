@@ -32,11 +32,11 @@ final class MacSyncLibraryHost: @unchecked Sendable {
 
     private let provider: SyncLocalLibraryProvider
     /// 歌单成员表 provider（T7b）：应答 `.playlists` manifest 时按需求值。
-    private let membersProvider: () -> SyncCollectionMembers
+    private let membersProvider: @Sendable () -> SyncCollectionMembers
     private let lock = NSLock()
 
     /// 一次拉取的结论（诊断/UI 用；M6 接进度展示）。
-    var onFetchResult: ((SyncFetchResult) -> Void)? {
+    var onFetchResult: (@Sendable (SyncFetchResult) -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return fetchResultHandler }
         set { lock.lock(); fetchResultHandler = newValue; lock.unlock() }
     }
@@ -45,7 +45,7 @@ final class MacSyncLibraryHost: @unchecked Sendable {
     /// 2026-09-12 审计 D1：该属性全仓无任何赋值/读取点（只有自身转发）——属「声明为
     /// 诊断用但没人接」的死链，已按死代码处置删除。
 
-    private var fetchResultHandler: ((SyncFetchResult) -> Void)?
+    private var fetchResultHandler: (@Sendable (SyncFetchResult) -> Void)?
 
     init(
         libraryRoot: URL,
@@ -54,7 +54,7 @@ final class MacSyncLibraryHost: @unchecked Sendable {
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
         lyricsMapping: SyncLyricsContentMapping? = nil,
-        membersProvider: (() -> SyncCollectionMembers)? = nil
+        membersProvider: (@Sendable () -> SyncCollectionMembers)? = nil
     ) {
         self.libraryRoot = libraryRoot
         self.rootName = rootName ?? libraryRoot.lastPathComponent

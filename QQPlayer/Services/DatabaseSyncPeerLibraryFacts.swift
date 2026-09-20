@@ -73,7 +73,7 @@ struct DatabaseSyncPeerLibraryFacts {
         libraryRoot: URL,
         favoritesName: String? = nil,
         smartNames: [SyncBrowseSmartKind: String]? = nil
-    ) -> () -> SyncPeerLibraryCatalog {
+    ) -> @Sendable () -> SyncPeerLibraryCatalog {
         let facts = DatabaseSyncPeerLibraryFacts(
             database: database,
             libraryRoot: libraryRoot,

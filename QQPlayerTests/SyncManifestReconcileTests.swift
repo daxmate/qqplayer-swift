@@ -138,49 +138,49 @@ struct SyncManifestReconcileTests {
             entry("a.flac", hash: "h-a", stableId: "s-a"),
             entry("dir/b.flac", hash: "h-b", stableId: "s-b"),
         ]
-        var requestedCollections: [SyncCollection] = []
+        let requestedBox = ManifestRequestListBox()
         harness.hostPeer.localManifestProvider = { collection in
-            requestedCollections.append(collection)
+            requestedBox.values.append(collection)
             return hostEntries
         }
         harness.hostPeer.localRootName = { "Mac 曲库" }
 
-        var received: [SyncManifestResponse] = []
-        harness.clientPeer.onManifestReceived = { received.append($0) }
+        let receivedBox = ManifestListBox()
+        harness.clientPeer.onManifestReceived = { receivedBox.values.append($0) }
 
         try harness.clientPeer.requestManifest(collection: .tracks(["s-a"]))
 
-        #expect(requestedCollections == [.tracks(["s-a"])]) // 集合参数透传
-        #expect(received.count == 1)
-        #expect(received[0].entries == hostEntries)
-        #expect(received[0].rootName == "Mac 曲库")
+        #expect(requestedBox.values == [.tracks(["s-a"])]) // 集合参数透传
+        #expect(receivedBox.values.count == 1)
+        #expect(receivedBox.values[0].entries == hostEntries)
+        #expect(receivedBox.values[0].rootName == "Mac 曲库")
     }
 
     @Test("会话往返：反向（host 请求 client 曲库 manifest）也通")
     func peerRoundtripReverse() throws {
         let harness = makeHarness()
         harness.clientPeer.localManifestProvider = { _ in [self.entry("phone.flac", hash: "h-p")] }
-        var received: [SyncManifestResponse] = []
-        harness.hostPeer.onManifestReceived = { received.append($0) }
+        let receivedBox = ManifestListBox()
+        harness.hostPeer.onManifestReceived = { receivedBox.values.append($0) }
 
         try harness.hostPeer.requestManifest()
 
-        #expect(received.first?.entries.map(\.relativePath) == ["phone.flac"])
-        #expect(received.first?.rootName == nil)
+        #expect(receivedBox.values.first?.entries.map(\.relativePath) == ["phone.flac"])
+        #expect(receivedBox.values.first?.rootName == nil)
     }
 
     @Test("★安全：host 提供者未接线 → 不应答（不回空 manifest 免对端误判为空库）")
     func peerUnavailableProviderDoesNotRespond() throws {
         let harness = makeHarness()
-        var unavailableCount = 0
-        harness.hostPeer.onProviderUnavailable = { unavailableCount += 1 }
-        var received: [SyncManifestResponse] = []
-        harness.clientPeer.onManifestReceived = { received.append($0) }
+        let unavailableBox = UnavailableCounterBox()
+        harness.hostPeer.onProviderUnavailable = { unavailableBox.value += 1 }
+        let receivedBox = ManifestListBox()
+        harness.clientPeer.onManifestReceived = { receivedBox.values.append($0) }
 
         try harness.clientPeer.requestManifest()
 
-        #expect(unavailableCount == 1)
-        #expect(received.isEmpty)
+        #expect(unavailableBox.value == 1)
+        #expect(receivedBox.values.isEmpty)
     }
 
     @Test("会话往返：对账闭环——远端 manifest 到本地后直接出 toFetch 决策")
@@ -193,14 +193,32 @@ struct SyncManifestReconcileTests {
             ]
         }
         let local = [self.entry("same.flac", hash: "h-s")]
-        var reconciliation: SyncManifestReconciliation?
+        let reconciliationBox = ReconcileValueBox()
         harness.clientPeer.onManifestReceived = { response in
-            reconciliation = SyncManifestReconciler.reconcile(remote: response.entries, local: local)
+            reconciliationBox.value = SyncManifestReconciler.reconcile(remote: response.entries, local: local)
         }
 
         try harness.clientPeer.requestManifest()
 
-        #expect(reconciliation?.toFetch.map(\.relativePath) == ["new.flac"])
-        #expect(reconciliation?.unchanged.map(\.relativePath) == ["same.flac"])
+        #expect(reconciliationBox.value?.toFetch.map(\.relativePath) == ["new.flac"])
+        #expect(reconciliationBox.value?.unchanged.map(\.relativePath) == ["same.flac"])
     }
+}
+
+/// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：manifest 回调标 `@Sendable` 后，闭包不能再
+/// 捕获可变局部量（`mutation of captured var in concurrently-executing code`）⇒ 状态放盒子里。
+private final class ManifestListBox: @unchecked Sendable {
+    var values: [SyncManifestResponse] = []
+}
+
+private final class ManifestRequestListBox: @unchecked Sendable {
+    var values: [SyncCollection] = []
+}
+
+private final class UnavailableCounterBox: @unchecked Sendable {
+    var value = 0
+}
+
+private final class ReconcileValueBox: @unchecked Sendable {
+    var value: SyncManifestReconciliation?
 }

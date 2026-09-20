@@ -30,15 +30,15 @@ final class SyncManifestPeer: @unchecked Sendable {
 
     /// 本地 manifest 提供者：收到请求 → 返回本地（已过滤）条目。
     /// M3-3b 接入 = 扫描曲库 + SyncManifestGenerator.generate + collection.filter。
-    var localManifestProvider: ((SyncCollection) -> [ManifestEntry])?
+    var localManifestProvider: (@Sendable (SyncCollection) -> [ManifestEntry])?
     /// 本地曲库根显示名（响应附带的诊断字段）。
-    var localRootName: (() -> String?)?
+    var localRootName: (@Sendable () -> String?)?
     /// 收到对端 manifest 响应（M3-3b 接 SyncManifestReconciler）。
-    var onManifestReceived: ((SyncManifestResponse) -> Void)?
+    var onManifestReceived: (@Sendable (SyncManifestResponse) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
-    var onDecodeFailure: ((DecodeError) -> Void)?
+    var onDecodeFailure: (@Sendable (DecodeError) -> Void)?
     /// 收到请求但本地提供者未接线（未应答；诊断用）。
-    var onProviderUnavailable: (() -> Void)?
+    var onProviderUnavailable: (@Sendable () -> Void)?
 
     // 会话槽位挂接（分发链）
     private var attachment: SyncSessionAttachment?

@@ -54,10 +54,10 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     private let fileManager: FileManager
     /// 本端内容指纹来源：相对路径 → content_hash（**必传**，见 init 注释）。
     /// 缺失时 fileID 回落现算 SHA-256——那是另一种口径，不是「没指纹也一样」。
-    private let contentHashProvider: (String) -> String?
+    private let contentHashProvider: @Sendable (String) -> String?
     /// wire 歌词路径（`@lyrics/{歌曲 content_hash}.json`）→ 本端库文件名（`{stableId}.json`）。
     /// `nil` = 本端不服务歌词命名空间（语义明确，非静默失效）。
-    private let lyricsFileNameProvider: ((String) -> String?)?
+    private let lyricsFileNameProvider: (@Sendable (String) -> String?)?
     private let lock = NSLock()
 
     /// 「无 DB 指纹来源」的**显式 seam**（单根初始化 + 测试/harness 用）：
@@ -66,9 +66,9 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     static let computedChecksumProvider: @Sendable (String) -> String? = { _ in nil }
 
     /// 一次拉取的结论已发出（含全失败/空请求的场景）。
-    var onResultSent: ((SyncFetchResult) -> Void)?
+    var onResultSent: (@Sendable (SyncFetchResult) -> Void)?
     /// sync_fetch_request 载荷解码失败（协议违例，诊断用）。
-    var onDecodeFailure: ((String) -> Void)?
+    var onDecodeFailure: (@Sendable (String) -> Void)?
 
     // MARK: 会话槽位挂接（分发链）
 
@@ -114,8 +114,8 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
         session: SyncPeerSession,
         roots: SyncFetchRoots,
         fileManager: FileManager = .default,
-        contentHashProvider: @escaping (String) -> String?,
-        lyricsFileNameProvider: ((String) -> String?)? = nil
+        contentHashProvider: @escaping @Sendable (String) -> String?,
+        lyricsFileNameProvider: (@Sendable (String) -> String?)? = nil
     ) {
         self.session = session
         self.roots = roots
@@ -159,7 +159,7 @@ final class SyncLibraryFetchResponder: @unchecked Sendable {
     static func makePlan(
         relativePaths: [String],
         roots: SyncFetchRoots,
-        lyricsFileNameProvider: ((String) -> String?)? = nil,
+        lyricsFileNameProvider: (@Sendable (String) -> String?)? = nil,
         fileManager: FileManager = .default
     ) -> Plan {
         var plan = Plan()

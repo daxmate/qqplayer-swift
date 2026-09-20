@@ -79,9 +79,9 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     private let lyricsMapping: SyncLyricsContentMapping
     /// 歌单成员表 provider（T7b）：应答 `.playlists` manifest 时按需求值
     /// （同一张表也决定了 Mac 侧「按歌单下载」能从本端拿回哪些文件）。
-    private let membersProvider: () -> SyncCollectionMembers
+    private let membersProvider: @Sendable () -> SyncCollectionMembers
     /// 内容清单 provider（T9）：应答 `peer_library_request`（帧 15）时按需求值。
-    private let peerLibraryProvider: () -> SyncPeerLibraryCatalog
+    private let peerLibraryProvider: @Sendable () -> SyncPeerLibraryCatalog
     /// 歌词接收编排：**每批声明重建**（暂存/收尾语义按批界定，与主动流程单轮等价）
     private var lyricsReceiver: SyncLyricsReceiver
     private let lock = NSLock()
@@ -89,8 +89,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     private var receiver: SyncFileReceiver?
     /// 内容清单应答器（T9；attach 时创建，detach 时静默）
     private var libraryResponder: SyncPeerLibraryResponder?
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
+    private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
+    private var priorClosedHandler: (@Sendable (SyncSessionCloseReason) -> Void)?
 
     // 锁保护状态
     private var claims = SyncPushClaimTable()
@@ -108,19 +108,19 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     /// 一批推送处理完毕（含暂存歌词收尾；锁外触发）。
     var onBatchCompleted: (@Sendable (SyncLibraryPassiveSummary) -> Void)?
     /// 一次拉取（Mac 从设备下载）的结论（诊断/UI 用）。
-    var onFetchResult: ((SyncFetchResult) -> Void)? {
+    var onFetchResult: (@Sendable (SyncFetchResult) -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return fetchResultHandler }
         set { lock.lock(); fetchResultHandler = newValue; lock.unlock() }
     }
 
     /// 对端请求了 manifest 但本地未接线（诊断）。
-    var onProviderUnavailable: (() -> Void)? {
+    var onProviderUnavailable: (@Sendable () -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return providerUnavailableHandler }
         set { lock.lock(); providerUnavailableHandler = newValue; lock.unlock() }
     }
 
-    private var fetchResultHandler: ((SyncFetchResult) -> Void)?
-    private var providerUnavailableHandler: (() -> Void)?
+    private var fetchResultHandler: (@Sendable (SyncFetchResult) -> Void)?
+    private var providerUnavailableHandler: (@Sendable () -> Void)?
 
     init(
         libraryRoot: URL,
@@ -131,8 +131,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         fileManager: FileManager = .default,
         lyricsStore: AlignedLyricsStore = .shared,
         lyricsMapping: SyncLyricsContentMapping? = nil,
-        membersProvider: (() -> SyncCollectionMembers)? = nil,
-        peerLibraryProvider: (() -> SyncPeerLibraryCatalog)? = nil
+        membersProvider: (@Sendable () -> SyncCollectionMembers)? = nil,
+        peerLibraryProvider: (@Sendable () -> SyncPeerLibraryCatalog)? = nil
     ) {
         let mapping = lyricsMapping ?? SyncLyricsContentMapping.live(database: database, libraryRoot: libraryRoot)
         self.libraryRoot = libraryRoot

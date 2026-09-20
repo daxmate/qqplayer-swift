@@ -138,7 +138,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private var timeoutItem: DispatchWorkItem?
 
     /// 每阶段回调（锁外触发；会话线程/超时队列）。
-    var onStateChange: ((SyncDataSyncPhase) -> Void)?
+    var onStateChange: (@Sendable (SyncDataSyncPhase) -> Void)?
 
     init(
         session: SyncPeerSession,

@@ -173,7 +173,7 @@ final class SyncLibraryPullController: @unchecked Sendable {
 
     private var manifestPeer: SyncManifestPeer?
     private var receiver: SyncFileReceiver?
-    private var priorAppHandler: ((SyncFrame) -> Void)?
+    private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
     /// 歌词接收安装编排（与被动端/旧主流程共用同一实现）
     private var lyricsReceiver: SyncLyricsReceiver
 
@@ -186,9 +186,9 @@ final class SyncLibraryPullController: @unchecked Sendable {
     private var claims = SyncPushClaimTable()
 
     /// 每态回调（会话线程触发，锁外）。
-    var onStateChange: ((SyncLibraryPullState) -> Void)?
+    var onStateChange: (@Sendable (SyncLibraryPullState) -> Void)?
     /// 落盘并交给入库入口时回调（进度用，锁外）。
-    var onFileApplied: ((String) -> Void)?
+    var onFileApplied: (@Sendable (String) -> Void)?
 
     init(
         session: SyncPeerSession,

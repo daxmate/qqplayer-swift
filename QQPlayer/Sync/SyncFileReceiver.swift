@@ -59,17 +59,17 @@ final class SyncFileReceiver: @unchecked Sendable {
     private let lock = NSLock()
 
     /// 传输结论回调（锁外触发）。
-    var onCompletion: ((Outcome) -> Void)?
+    var onCompletion: (@Sendable (Outcome) -> Void)?
     /// 每次发出 ack 的钩子（诊断/测试断言用）。
-    var onAckSent: ((FileAckPayload) -> Void)?
+    var onAckSent: (@Sendable (FileAckPayload) -> Void)?
 
     /// 断点对齐实现注入（**测试用**：覆盖 truncate 失败路径；nil = 真实 FileHandle）。
-    var partAlignmentHook: ((_ partURL: URL, _ offset: Int64) throws -> Void)?
+    var partAlignmentHook: (@Sendable (_ partURL: URL, _ offset: Int64) throws -> Void)?
 
     // MARK: 会话槽位链式挂接
 
-    private var priorAppHandler: ((SyncFrame) -> Void)?
-    private var priorClosedHandler: ((SyncSessionCloseReason) -> Void)?
+    private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
+    private var priorClosedHandler: (@Sendable (SyncSessionCloseReason) -> Void)?
     private var forwardingEnabled = true
 
     // MARK: 当前传输（锁保护）

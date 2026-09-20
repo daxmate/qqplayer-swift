@@ -51,7 +51,7 @@ final class SyncLyricsResendController: @unchecked Sendable {
     private var summaryValue = SyncLyricsResendSummary()
 
     /// 每态回调（锁外触发；会话线程）。
-    var onStateChange: ((SyncLyricsResendState) -> Void)?
+    var onStateChange: (@Sendable (SyncLyricsResendState) -> Void)?
 
     init(
         session: SyncPeerSession,
