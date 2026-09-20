@@ -98,6 +98,75 @@ final class LoopbackTransport: SyncPeerTransport, @unchecked Sendable {
     }
 }
 
+// MARK: - 手动截止时间调度器（测试用）
+
+/// 手动调度器：只**记录**排定的截止时间，由用例**显式触发** —— 超时判定不再等待真实
+/// 定时器，也与 CI runner 的线程调度无关（见 `SyncDeadlineScheduling` 文件头）。
+///
+/// 为什么需要（2026-09-20）：超时项原先排在同一批 GCD 全局 `.utility` 队列上；runner
+/// 线程饥饿时工作项过了 deadline 也拿不到线程 → `senderTimesOutWithoutAck` 在 60s 窗口内
+/// 都等不到 0.15s 的超时（CI run 35478148288 假失败），`handshakeTimeout` 更早因此被
+/// `.disabled`（2026-09-09）。
+final class ManualDeadlineScheduler: SyncDeadlineScheduling, @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: [ManualDeadline] = []
+
+    /// 当前挂着的截止时间数：断言「等待期间确实挂着超时」「终止后不残留」。
+    var pendingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return pending.count
+    }
+
+    /// 触发全部挂着的截止时间（按排定顺序）。
+    ///
+    /// 先摘出再执行：与真实调度一致（一次性到点即离开挂起表），因此触发期间发生的
+    /// `cancel()` 语义也一致（已到点的动作不因取消而跳过）。
+    /// - Returns: 实际触发的个数（用例据此断言「确实挂着超时」）。
+    @discardableResult
+    func fireAll() -> Int {
+        lock.lock()
+        let items = pending
+        pending.removeAll()
+        lock.unlock()
+        for item in items {
+            item.action()
+        }
+        return items.count
+    }
+
+    func schedule(after delay: TimeInterval, _ action: @escaping @Sendable () -> Void) -> any SyncScheduledDeadline {
+        let deadline = ManualDeadline(action: action) { [weak self] deadline in
+            self?.remove(deadline)
+        }
+        lock.lock()
+        pending.append(deadline)
+        lock.unlock()
+        return deadline
+    }
+
+    private func remove(_ deadline: ManualDeadline) {
+        lock.lock()
+        pending.removeAll { $0 === deadline }
+        lock.unlock()
+    }
+}
+
+/// 手动排定的截止时间（`cancel()` = 从挂起表摘除；幂等）。
+private final class ManualDeadline: SyncScheduledDeadline, @unchecked Sendable {
+    let action: @Sendable () -> Void
+    private let onCancel: (ManualDeadline) -> Void
+
+    init(action: @escaping @Sendable () -> Void, onCancel: @escaping (ManualDeadline) -> Void) {
+        self.action = action
+        self.onCancel = onCancel
+    }
+
+    func cancel() {
+        onCancel(self)
+    }
+}
+
 // MARK: - 夹具
 
 /// 一套 host+client 会话 + 回环通道（含信任表种子等）。
@@ -112,8 +181,11 @@ struct SessionFixture {
     let clientChannel: LoopbackTransport
 
     /// 双 ready（已配对握手）。调用方先在各自信任表 seed 对方公钥。
-    static func pairedHandshake(config: SyncSessionConfiguration = SyncSessionConfiguration()) -> SessionFixture {
-        let fixture = make(config: config)
+    static func pairedHandshake(
+        config: SyncSessionConfiguration = SyncSessionConfiguration(),
+        deadlineScheduler: (any SyncDeadlineScheduling)? = nil
+    ) -> SessionFixture {
+        let fixture = make(config: config, deadlineScheduler: deadlineScheduler)
         fixture.hostTrust.seed(deviceID: fixture.clientIdentity.deviceID,
                                publicKeyRaw: fixture.clientIdentity.publicKeyRaw,
                                displayName: "iPhone", role: .client)
@@ -125,7 +197,11 @@ struct SessionFixture {
         return fixture
     }
 
-    static func make(config: SyncSessionConfiguration = SyncSessionConfiguration()) -> SessionFixture {
+    static func make(
+        config: SyncSessionConfiguration = SyncSessionConfiguration(),
+        deadlineScheduler: (any SyncDeadlineScheduling)? = nil
+    ) -> SessionFixture {
+        let scheduler = deadlineScheduler ?? DispatchSyncDeadlineScheduler.shared
         let hostIdentity = SyncIdentity.generate()
         let clientIdentity = SyncIdentity.generate()
         let hostTrust = MemoryTrustStore()
@@ -141,14 +217,16 @@ struct SessionFixture {
             trustStore: hostTrust,
             config: config,
             pairingNonces: SyncPairingNonceRegistry(),
-            transport: hostChannel
+            transport: hostChannel,
+            deadlineScheduler: scheduler
         )
         let clientSession = SyncPeerSession(
             role: .client,
             localIdentity: clientIdentity,
             trustStore: clientTrust,
             config: config,
-            transport: clientChannel
+            transport: clientChannel,
+            deadlineScheduler: scheduler
         )
         hostChannel.session = hostSession
         clientChannel.session = clientSession

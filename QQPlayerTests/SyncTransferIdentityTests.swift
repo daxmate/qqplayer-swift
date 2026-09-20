@@ -490,23 +490,32 @@ struct SyncTransferIdentityTests {
     }
 
     @Test("🟡T4 发送端 ack 超时 → 失败并清状态（可重试，不留悬挂）")
-    func senderTimesOutWithoutAck() async throws {
+    func senderTimesOutWithoutAck() throws {
         let fixture = SessionFixture.pairedHandshake()
         let sourceURL = try writeFile(
             "src.bin", in: try makeTempRoot("t4-src"),
             data: Data(repeating: 0x5A, count: 1_024)
         )
-        let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.15)
+        // 超时判定走**注入的手动调度器**：用例显式触发，不等真实定时器。
+        // 为什么（2026-09-20 CI run 35478148288）：原先 0.15s 的超时排在同一批 GCD 全局
+        // `.utility` 队列上，runner 线程饥饿时工作项过了 deadline 也拿不到线程——轮询到
+        // 60s 上界仍没落地（“等待 file_ack 超时未在 60s 内落地”），卡红了与它无关的 PR。
+        // 手动触发后本用例与本机/runner 的调度延迟彻底无关（<1s 跑完）。
+        let deadlines = ManualDeadlineScheduler()
+        let sender = SyncFileSender(
+            session: fixture.hostSession,
+            ackTimeout: 0.15,
+            deadlineScheduler: deadlines
+        )
         let outcome = W2Box<SyncFileSender.Outcome>()
         sender.onCompletion = { outcome.set($0) }
 
         try sender.send(fileURL: sourceURL, fileID: "t4-timeout", name: "src.bin")
         #expect(sender.isActive) // 已发 meta，等 ack（对端无接收端 → 永远等不到）
+        #expect(deadlines.pendingCount == 1) // 等 ack 期间必须挂着超时（否则就是无超时的悬挂）
 
-        // 等超时回调落地：轮询而非固定 sleep——CI runner 线程饥饿时，注入的 0.15s 定时器
-        // 可能远晚于标称时间才被调度，固定 sleep 会假失败（2026-09-12 CI 实测）。
-        let timedOut = await waitUntil { outcome.value != nil }
-        #expect(timedOut, "等待 file_ack 超时未在 60s 内落地")
+        // 显式触发超时（真实调度器到点执行的同一个动作）
+        #expect(deadlines.fireAll() == 1)
 
         guard case let .failed(error)? = outcome.value else {
             Issue.record("期望超时失败，实际 \(String(describing: outcome.value))")
@@ -519,26 +528,14 @@ struct SyncTransferIdentityTests {
             Issue.record("期望 protocolError，实际 \(error)")
         }
         #expect(!sender.isActive) // 状态已清 → 可重试
-    }
+        #expect(deadlines.pendingCount == 0) // 超时项不残留（无悬挂等待）
 
-    /// CI 调度延迟下的等待：轮询到条件成立（默认 60s 上限）。
-    ///
-    /// 为什么不用固定 `Task.sleep`，也不是“等一会儿就断言”：注入超时（0.15s/0.2s）在
-    /// 本机 0.2s 内到点，但 **CI 模拟器里实测被推迟 10～16s**（后台应用 + 大量并行用例
-    /// 下 `DispatchQueue.global(qos: .utility)` 的 asyncAfter 会被节流；2026-09-12
-    /// 两轮 CI 实测：11.134s / 16.5s）。故窗口取 60s（≥3× 最差观测），条件成立即返回
-    /// （本机仍 ~0.2s），条件始终不成立则返回 false，由调用方 #expect 给出可读失败信息。
-    @discardableResult
-    private func waitUntil(
-        timeout: TimeInterval = 60,
-        _ condition: () -> Bool
-    ) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return true }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-        }
-        return condition()
+        // 可重试：清干净状态后同一个 sender 能再起一轮，且重新挂上超时（不是“超时后再也传不了”）
+        try sender.send(fileURL: sourceURL, fileID: "t4-timeout-retry", name: "src.bin")
+        #expect(sender.isActive)
+        #expect(deadlines.pendingCount == 1)
+        #expect(deadlines.fireAll() == 1)
+        #expect(!sender.isActive)
     }
 
     /// 2026-09-13 恢复：等人工批准不做超时。

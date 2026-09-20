@@ -43,6 +43,8 @@ final class SyncFileSender: @unchecked Sendable {
     private let lock = NSLock()
     /// 等待 file_ack 的超时（秒；0 = 禁用，测试用）
     private let ackTimeout: TimeInterval
+    /// 超时调度入口（唯一入口；测试注入手动调度器 = 显式触发，不等真实定时器）
+    private let deadlineScheduler: any SyncDeadlineScheduling
 
     /// 传输结论回调（锁外触发）。
     var onCompletion: ((Outcome) -> Void)?
@@ -79,8 +81,8 @@ final class SyncFileSender: @unchecked Sendable {
     }
 
     private var active: Active?
-    /// ack 超时调度（锁保护）
-    private var ackDeadlineItem: DispatchWorkItem?
+    /// 已排定的 ack 超时（锁保护；nil = 当前没在等 ack）
+    private var ackDeadlineItem: (any SyncScheduledDeadline)?
 
     /// 当前进行中传输的 fileID（nil = 空闲；诊断用）。
     var activeFileID: String? {
@@ -99,9 +101,19 @@ final class SyncFileSender: @unchecked Sendable {
     static let defaultAckTimeout: TimeInterval = 30
 
     /// init
-    init(session: SyncPeerSession, ackTimeout: TimeInterval = SyncFileSender.defaultAckTimeout) {
+    /// - Parameters:
+    ///   - session: 对端会话
+    ///   - ackTimeout: 等 file_ack 的超时（秒；0 = 禁用）
+    ///   - deadlineScheduler: 超时调度入口（缺省 GCD；测试注入手动调度器——见
+    ///     `SyncDeadlineScheduling` 文件头：超时判定不得依赖 runner 的线程调度）
+    init(
+        session: SyncPeerSession,
+        ackTimeout: TimeInterval = SyncFileSender.defaultAckTimeout,
+        deadlineScheduler: any SyncDeadlineScheduling = DispatchSyncDeadlineScheduler.shared
+    ) {
         self.session = session
         self.ackTimeout = ackTimeout
+        self.deadlineScheduler = deadlineScheduler
         attachHandlers()
     }
 
@@ -299,14 +311,14 @@ final class SyncFileSender: @unchecked Sendable {
     // MARK: ack 超时
 
     /// 重挂 ack 超时（锁内调用；0 = 禁用）。
+    ///
+    /// 走注入的调度入口：超时**何时**被判由调度器决定（生产 = GCD；测试 = 手动触发）。
     private func scheduleAckDeadlineLocked() {
         cancelAckDeadlineLocked()
         guard ackTimeout > 0 else { return }
-        let workItem = DispatchWorkItem { [weak self] in
+        ackDeadlineItem = deadlineScheduler.schedule(after: ackTimeout) { [weak self] in
             self?.handleAckDeadline()
         }
-        ackDeadlineItem = workItem
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + ackTimeout, execute: workItem)
     }
 
     private func cancelAckDeadlineLocked() {
