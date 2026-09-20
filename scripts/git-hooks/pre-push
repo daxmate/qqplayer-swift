@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# pre-push hook: 推送前门禁（2026-09-20 用户拍板：GitHub 端「必需状态检查」去掉，改由本钩子在推送前兜底）
+#
+#  ① main 上不得出现 merge 提交（历史必须线性；违反 = 「提交线又乱了」）
+#  ② swiftformat --lint + swiftlint（本次推送范围内改动的 .swift）
+#  ③ target 成员归属（QQPlayer 新增文件必须显式表态，纯 python，毫秒级）
+#
+# 为什么不跑编译/测试：那是 CI（.github/workflows/ci.yml 两个 job）的活，CI 仍在 main 上跑作最终兜底；
+# 本钩子只做「推送前必须拦的、秒级的」判断，避免 10 分钟级构建卡住每一次 push。
+# 放行策略：工具/脚本缺失 → 放行（CI 兜底）；确属环境问题可用 SKIP_PREPUSH=1 绕过（CI 仍兜底）。
+set -u
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+ZERO=0000000000000000000000000000000000000000
+fail=0
+tmp_files=$(mktemp) || exit 0
+tmp_added="$tmp_files.added"
+: >"$tmp_added"
+trap 'rm -f "$tmp_files" "$tmp_added"' EXIT
+
+while read -r _local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue # 删除分支
+
+  # ---- 范围与基准 ----
+  if [ "$remote_sha" = "$ZERO" ]; then
+    range="$local_sha"
+    base="$(git merge-base origin/main "$local_sha" 2>/dev/null || true)"
+  else
+    range="$remote_sha..$local_sha"
+    base="$remote_sha"
+  fi
+
+  # ---- ① 线性历史（只对 main）----
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    merges="$(git rev-list --min-parents=2 "$range" 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "${merges:-0}" -gt 0 ]; then
+      echo "❌ 拒绝推送 main：本次范围内有 $merges 个 merge 提交（main 必须线性）"
+      git rev-list --merges --oneline "$range" 2>/dev/null | sed 's/^/    /'
+      echo "   修法：git fetch origin && git rebase origin/main（或 git merge --squash 后重放），再推。"
+      fail=1
+    fi
+  fi
+
+  # ---- 收集改动/新增文件 ----
+  if [ -n "${base:-}" ]; then
+    git diff --name-only "$base" "$local_sha" 2>/dev/null >>"$tmp_files"
+    git diff --name-only --diff-filter=A "$base" "$local_sha" 2>/dev/null >>"$tmp_added"
+  else
+    git diff-tree --no-commit-id --name-only -r "$local_sha" 2>/dev/null >>"$tmp_files"
+  fi
+done
+
+swift_files="$(sort -u "$tmp_files" | grep -E '\.swift$' | tr '\n' ' ' || true)"
+added_files="$(sort -u "$tmp_added" 2>/dev/null | tr '\n' ' ' || true)"
+
+# ---- ③ target 成员归属（毫秒级）----
+if [ "${SKIP_MEMBERSHIP_CHECK:-0}" = "1" ]; then
+  echo "⚠️  SKIP_MEMBERSHIP_CHECK=1——跳过 target 成员归属检查（CI 仍兜底）"
+elif [ -f scripts/check-target-membership.py ] && command -v python3 >/dev/null 2>&1; then
+  echo "→ target 成员归属检查"
+  # shellcheck disable=SC2086
+  python3 scripts/check-target-membership.py --files $added_files || fail=1
+else
+  echo "⚠️  scripts/check-target-membership.py 不可用，跳过（CI 会兜底）"
+fi
+
+# ---- ② 格式 + lint（只查本次推送涉及的 .swift）----
+if [ -n "$swift_files" ]; then
+  if ! command -v swiftformat >/dev/null 2>&1; then
+    echo "⚠️  swiftformat 未安装，跳过格式检查（CI 会兜底）"
+  else
+    echo "→ swiftformat --lint"
+    # shellcheck disable=SC2086
+    swiftformat --lint $swift_files || fail=1
+  fi
+
+  if ! command -v swiftlint >/dev/null 2>&1; then
+    echo "⚠️  swiftlint 未安装，跳过 lint 检查（CI 会兜底）"
+  else
+    echo "→ swiftlint lint"
+    # shellcheck disable=SC2086
+    swiftlint lint $swift_files || fail=1
+  fi
+else
+  echo "（本次推送无 .swift 改动，跳过格式/lint）"
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "❌ pre-push 门禁未通过——已阻止推送。确属环境问题可用 SKIP_PREPUSH=1 绕过（CI 仍兜底）。"
+  exit 1
+fi
+
+echo "✅ pre-push 门禁通过（线性历史 ✓ 成员归属 ✓ 格式/lint ✓）"
+exit 0
