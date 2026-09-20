@@ -16,7 +16,7 @@ import SwiftUI
 struct SmartPlaylistDetailScreen: View {
     let kind: SmartPlaylistKind
 
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var tracks: [Track] = []
     @State private var buckets: [DecadeBucketInfo] = []
     @State private var artistNameCache: [Int64: String] = [:]
@@ -134,7 +134,7 @@ struct SmartPlaylistDecadeScreen: View {
     let key: String
     let label: String
 
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var tracks: [Track] = []
     @State private var artistNameCache: [Int64: String] = [:]
     @State private var artistDisplayNameCache: [String: String] = [:]

@@ -48,6 +48,7 @@ private struct BatchScrapeRequest: Identifiable {
 }
 
 struct MacTrackListView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     let tracks: [Track]
@@ -328,7 +329,7 @@ struct MacTrackListView: View {
 
         let isFavorite = favoriteIds.contains(track.stableId)
         Button {
-            try? AppCoordinator.shared.toggleFavorite(trackStableId: track.stableId)
+            try? appCoordinator.toggleFavorite(trackStableId: track.stableId)
         } label: {
             Label(isFavorite ? Localized.removeFromLikedSongs : Localized.addToLikedSongs,
                   systemImage: "heart.fill")
@@ -337,7 +338,7 @@ struct MacTrackListView: View {
         if let playlistId {
             Divider()
             Button("playlist_manage_remove_from_playlist".localized, role: .destructive) {
-                try? AppCoordinator.shared.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
+                try? appCoordinator.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
                 NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             }
         }
@@ -346,7 +347,7 @@ struct MacTrackListView: View {
         Menu("add_to_playlist".localized) {
             ForEach(playlists, id: \.id) { playlist in
                 Button(playlist.title) {
-                    try? AppCoordinator.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
+                    try? appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
                     NotificationCenter.default.post(name: .playlistsChanged, object: nil)
                 }
             }
@@ -534,7 +535,7 @@ struct MacTrackListView: View {
     // MARK: - Data helpers
 
     private func reloadFavorites() {
-        favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
+        favoriteIds = Set((try? appCoordinator.getFavorites()) ?? [])
     }
 
     private func reloadPlaylists() {
@@ -545,8 +546,8 @@ struct MacTrackListView: View {
         let title = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, let track = pendingTrack else { return }
         do {
-            let playlist = try AppCoordinator.shared.createPlaylist(title: title)
-            try AppCoordinator.shared.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
+            let playlist = try appCoordinator.createPlaylist(title: title)
+            try appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             print("❌ MacTrackListView createPlaylistAndAdd failed: \(error)")

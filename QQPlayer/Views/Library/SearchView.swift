@@ -10,7 +10,7 @@ struct SearchView: View {
     let onNavigateToArtist: (Artist, [Track]) -> Void
     let onNavigateToAlbum: (Album, [Track]) -> Void
     let onNavigateToPlaylist: (Playlist) -> Void
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var debouncedSearchText = ""

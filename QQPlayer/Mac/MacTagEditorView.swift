@@ -1,4 +1,3 @@
-//
 //  MacTagEditorView.swift
 //  QQPlayer
 //
@@ -37,6 +36,7 @@ import AppKit
 import SwiftUI
 
 struct MacTagEditorView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @Environment(\.dismiss) private var dismiss
@@ -691,7 +691,7 @@ struct MacTagEditorView: View {
                     // 改名 → moveTrack 迁移引用（幂等；文件已改名但迁移失败 → 提示重扫）
                     // 写操作唯一入口是 @MainActor 的 AppCoordinator → 从后台 hop 回主线程执行
                     try await MainActor.run {
-                        try AppCoordinator.shared.moveTrack(
+                        try appCoordinator.moveTrack(
                             from: originalPath,
                             to: result.finalURL.path
                         )

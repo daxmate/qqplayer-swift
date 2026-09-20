@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(AppServices.self) private var services
     @Environment(LibraryIndexer.self) private var libraryIndexer
 
@@ -236,5 +236,5 @@ struct SheetModifier: ViewModifier {
 
 #Preview {
     ContentView()
-        .environmentObject(AppCoordinator.shared)
+        .environment(AppCoordinator.shared)
 }

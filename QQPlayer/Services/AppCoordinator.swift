@@ -1,24 +1,24 @@
 //
 //  AppCoordinator.swift
 //  QQPlayer
-//
 //  Main app coordinator that manages all services
-//
 //  核心：状态属性/初始化流程/公开业务 API/播放入口/Siri 意图处理。
 //  拆分见 AppCoordinator+iCloud/ImportExport/Models.swift。
 //
 
 import Combine
 import Foundation
+import Observation
 #if os(iOS)
     import Intents
 #endif
 
 @MainActor
-class AppCoordinator: ObservableObject {
+@Observable
+class AppCoordinator {
     static let shared = AppCoordinator()
 
-    @Published var isInitialized = false
+    var isInitialized = false
 
     let databaseManager = DatabaseManager.shared
     let stateManager = StateManager.shared

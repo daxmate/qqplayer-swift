@@ -13,6 +13,7 @@
 import SwiftUI
 
 struct MacManualPlaylistDetailView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     let playlist: Playlist
     /// Plays the whole playlist (queue = playlist tracks), provided by the host.
     let onPlayAll: () -> Void
@@ -141,7 +142,7 @@ struct MacManualPlaylistDetailView: View {
         let title = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         do {
-            try AppCoordinator.shared.renamePlaylist(playlistId: playlist.id ?? 0, newTitle: title)
+            try appCoordinator.renamePlaylist(playlistId: playlist.id ?? 0, newTitle: title)
             currentTitle = title
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
@@ -151,7 +152,7 @@ struct MacManualPlaylistDetailView: View {
 
     private func deletePlaylist() {
         do {
-            try AppCoordinator.shared.deletePlaylist(playlistId: playlist.id ?? 0)
+            try appCoordinator.deletePlaylist(playlistId: playlist.id ?? 0)
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             onExit()
         } catch {

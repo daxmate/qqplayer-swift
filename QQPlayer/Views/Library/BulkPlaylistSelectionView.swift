@@ -8,7 +8,7 @@ struct BulkPlaylistSelectionView: View {
     let trackIds: [String]
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var playlists: [Playlist] = []
     @State private var showCreatePlaylist = false
     @State private var newPlaylistName = ""

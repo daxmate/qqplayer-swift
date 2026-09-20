@@ -21,7 +21,6 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 107
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
 # ═══ 2026-09-20 批 6-2：LibraryIndexer 迁 @Observable（真迁 4 处，111 → 107）════════════════
@@ -93,23 +92,23 @@
 #   批 5b-2 逐项：MacManualEQEditorView 2→0、ManualEQEditorView 2→0、EQSettingsView 2→1（残留那处非 EQ 直连）、
 #   其余 5 文件 1→0（MacEQImportView / MacEQSettingsView / MacGraphicEQ10BandEditorView / EQImportViews /
 #   GraphicEQ10BandEditorView）；iOS+Mac **两个组合根各登记 1 行**（非视图层，不计预算）；**0 处 preview 成本**。
-QQPlayer/Mac/MacPlayerView.swift	11
+QQPlayer/Mac/MacPlayerView.swift	8
 QQPlayer/Views/Player/PlayerView.swift	8
-QQPlayer/Mac/MacTrackListView.swift	7
+QQPlayer/Mac/MacTrackListView.swift	1
 QQPlayer/Mac/MacKaraokeControlBar.swift	5
 QQPlayer/Views/Library/SearchResultsViews.swift	5
 QQPlayer/Views/Player/KaraokeControlBar.swift	5
 QQPlayer/Views/Player/PlayerOverlays.swift	5
-QQPlayer/Views/Utility/SettingsView.swift	4
+QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Mac/MacDesktopWindowViews.swift	3
-QQPlayer/Mac/MacLibraryView.swift	3
-QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
+QQPlayer/Mac/MacLibraryView.swift	2
+QQPlayer/Mac/MacPlaylistDetailSheet.swift	1
 QQPlayer/Mac/MacSyncView.swift	3
-QQPlayer/Mac/MacTagEditorView.swift	3
+QQPlayer/Mac/MacTagEditorView.swift	2
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	3
 QQPlayer/Views/Player/QueueManagementView.swift	3
-QQPlayer/Views/Playlists/PlaylistCardView.swift	3
+QQPlayer/Views/Playlists/PlaylistCardView.swift	2
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	3
 QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	3
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
@@ -119,7 +118,6 @@ QQPlayer/Views/Albums/AlbumViews.swift	2
 QQPlayer/Views/Artists/ArtistRowViews.swift	2
 QQPlayer/Views/Library/TrackListView.swift	2
 QQPlayer/ContentView.swift	1
-QQPlayer/Mac/MacAlbumArtistViews.swift	1
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSmartPlaylistViews.swift	1
 QQPlayer/Mac/MacSyncCenterView.swift	1
@@ -129,3 +127,13 @@ QQPlayer/Views/Player/TrackRowView.swift	1
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	1
 QQPlayer/Views/Utility/EQSettingsView.swift	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
+
+# ═══ 2026-09-20 批 6-4：AppCoordinator 迁 @Observable（真迁 17 处，107 → 90）════════════
+#   · MacTrackListView 7 → 1（收藏/歌单写操作改走组合根注入的 coordinator）；MacPlayerView 11 → 8；
+#   · SettingsView 4 → 2；MacLibraryView 3 → 2；MacTagEditorView 3 → 2；PlaylistCardView 3 → 2；
+#   · MacPlaylistDetailSheet 3 → 1；MacAlbumArtistViews 1 → 归零删行；
+#   · 装配点：iOS 组合根 `QQPlayerApp`（`.environmentObject(…)` → `.environment(…)`）+ `PlaylistsScreen`
+#     的二次注入；`ContentView` 的 `#Preview` 仍按脚手架成本计入（1 处）。
+#   · 非视图层保留 `.shared`（合法、不在本棘轮口径）：`CarPlaySceneDelegate` / `CarPlay+Playback` /
+#     `MacKeyboardShortcuts`（静态快捷键表）/ `IntentPlaybackService`（意图层唯一门面）/ `QQPlayerApp` 的 Siri 段。
+# TOTAL: 90

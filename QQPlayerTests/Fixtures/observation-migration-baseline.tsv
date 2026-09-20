@@ -10,6 +10,9 @@
 #   @EnvironmentObject → @Environment(T.self)
 #
 # 范围：QQPlayer/**/*.swift（iOS + Mac 共享源文件）。
+#   → **115 / 54**（2026-09-20 批 6-4：`AppCoordinator` 迁 @Observable。删 1 `ObservableObject` +
+#     1 `@Published` + 1 `@StateObject`（组合根 `QQPlayerApp`）+ 26 处视图 `@EnvironmentObject`
+#     （20 文件）→ `@Environment(AppCoordinator.self)`，该 23 行归零删行。）
 # 统计口径：**注释与字符串字面量不算代码**（扫描器先剥离再计数）。
 #
 # 进度：起始 217 处 / 119 行 → 213 / 115（批 1 第一刀：iOS TutorialViewModel + TutorialView）
@@ -45,7 +48,6 @@
 #     （`IndexingGate` / `SyncHostCenter` / `MacLyricsResendAutoRunner` / `AppCoordinator` /
 #     `SpotlightLibraryIndexer`）会**静默失去事件** ⇒ 新增 `isIndexingSubject` / `terminalStateSubject`
 #     （`CurrentValueSubject`）作为状态写入唯一入口，保住「订阅即得当前值」语义。）
-QQPlayer/ContentView.swift	@EnvironmentObject	1
 QQPlayer/Mac/MacDesktopWindowViews.swift	@ObservedObject	3
 QQPlayer/Mac/MacKaraokeControlBar.swift	@ObservedObject	3
 QQPlayer/Mac/MacLibraryView.swift	@StateObject	2
@@ -67,9 +69,6 @@ QQPlayer/Mac/MacSyncView.swift	@StateObject	3
 QQPlayer/Mac/MacTrackListView.swift	@StateObject	1
 QQPlayer/Mac/SyncHostCenter.swift	@Published	5
 QQPlayer/Mac/SyncHostCenter.swift	ObservableObject	1
-QQPlayer/QQPlayerApp.swift	@StateObject	1
-QQPlayer/Services/AppCoordinator.swift	@Published	1
-QQPlayer/Services/AppCoordinator.swift	ObservableObject	1
 QQPlayer/Services/ArtworkManager.swift	ObservableObject	1
 QQPlayer/Services/DiscogsAPI.swift	ObservableObject	1
 QQPlayer/Services/FileCleanupManager.swift	ObservableObject	1
@@ -83,18 +82,7 @@ QQPlayer/Services/PlayerEngine.swift	ObservableObject	1
 QQPlayer/Services/SpotifyAPI.swift	ObservableObject	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	@Published	1
 QQPlayer/Sync/SyncWiringSelfCheck.swift	ObservableObject	1
-QQPlayer/Views/Albums/AlbumViews.swift	@EnvironmentObject	3
-QQPlayer/Views/Artists/ArtistDetailScreen.swift	@EnvironmentObject	1
-QQPlayer/Views/Artists/ArtistRowViews.swift	@EnvironmentObject	1
-QQPlayer/Views/Artists/ArtistsScreen.swift	@EnvironmentObject	1
-QQPlayer/Views/Library/BulkPlaylistSelectionView.swift	@EnvironmentObject	1
-QQPlayer/Views/Library/LibraryScreens.swift	@EnvironmentObject	2
-QQPlayer/Views/Library/LibraryView.swift	@EnvironmentObject	1
-QQPlayer/Views/Library/SearchResultsViews.swift	@EnvironmentObject	1
 QQPlayer/Views/Library/SearchResultsViews.swift	@StateObject	1
-QQPlayer/Views/Library/SearchView.swift	@EnvironmentObject	1
-QQPlayer/Views/Library/TrackBulkSelection.swift	@EnvironmentObject	1
-QQPlayer/Views/Library/TrackListView.swift	@EnvironmentObject	2
 QQPlayer/Views/Library/TrackListView.swift	@StateObject	1
 QQPlayer/Views/Player/CollapsiblePlayerControls.swift	@ObservedObject	1
 QQPlayer/Views/Player/KaraokeControlBar.swift	@ObservedObject	3
@@ -102,23 +90,16 @@ QQPlayer/Views/Player/LyricsView.swift	@ObservedObject	1
 QQPlayer/Views/Player/PlayerOverlays.swift	@ObservedObject	3
 QQPlayer/Views/Player/PlayerOverlays.swift	@StateObject	2
 QQPlayer/Views/Player/PlayerProgressViews.swift	@ObservedObject	1
-QQPlayer/Views/Player/PlayerView.swift	@EnvironmentObject	1
 QQPlayer/Views/Player/PlayerView.swift	@StateObject	2
 QQPlayer/Views/Player/QueueManagementView.swift	@StateObject	2
-QQPlayer/Views/Player/TrackRowView.swift	@EnvironmentObject	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	@StateObject	1
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@EnvironmentObject	1
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	@StateObject	1
-QQPlayer/Views/Playlists/PlaylistManagementView.swift	@EnvironmentObject	1
-QQPlayer/Views/Playlists/PlaylistSelectionView.swift	@EnvironmentObject	1
-QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@EnvironmentObject	1
 QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	@StateObject	2
-QQPlayer/Views/Playlists/PlaylistsScreen.swift	@EnvironmentObject	2
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	@StateObject	1
-QQPlayer/Views/Playlists/SmartPlaylistDetailScreen.swift	@EnvironmentObject	2
 QQPlayer/Views/Utility/SyncAutoConnect.swift	@Published	1
 QQPlayer/Views/Utility/SyncAutoConnect.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@Published	3
 QQPlayer/Views/Utility/SyncQRScannerView.swift	@StateObject	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	ObservableObject	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	@ObservedObject	1
+

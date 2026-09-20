@@ -9,7 +9,7 @@ struct TrackListView: View {
     let listIdentifier: String?
     let isLikedSongsScreen: Bool
 
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
 
     // Local State
     @State private var sortOption: TrackSortOption = .dateNewest
@@ -250,7 +250,7 @@ struct TrackListContentView: View {
 
     // Only THIS view updates when the song progresses
     @StateObject private var playerEngine = PlayerEngine.shared
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var settings = DeleteSettings.load()
     @State private var displayLimit = 50
     @State private var artistNameCache: [Int64: String] = [:]

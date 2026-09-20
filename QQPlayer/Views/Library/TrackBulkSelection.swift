@@ -26,7 +26,7 @@ struct TrackBulkActionsModifier: ViewModifier {
     /// Liked Songs phrases the favourite action as "remove" rather than "add".
     let isLikedContext: Bool
 
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var showPlaylistDialog = false
     @State private var showDeleteConfirmation = false
     @State private var settings = DeleteSettings.load()

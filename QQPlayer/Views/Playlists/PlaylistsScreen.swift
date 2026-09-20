@@ -6,7 +6,7 @@ import SwiftUI
 struct PlaylistsScreen: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var playlists: [Playlist] = []
     /// 歌单 id → 曲目（loadPlaylists 时批量加载一次，替代网格每卡片每次 body 求值查库）
     @State private var playlistTracksCache: [Int64: [Track]] = [:]
@@ -184,7 +184,7 @@ struct PlaylistsScreen: View {
                     AIPlaylistSheet {
                         loadPlaylists()
                     }
-                    .environmentObject(appCoordinator)
+                    .environment(appCoordinator)
                 }
             #endif
         }
@@ -279,7 +279,7 @@ struct PlaylistsScreen: View {
     /// is saved as a regular playlist.
     @available(iOS 26.0, *)
     struct AIPlaylistSheet: View {
-        @EnvironmentObject private var appCoordinator: AppCoordinator
+        @Environment(AppCoordinator.self) private var appCoordinator
         @Environment(\.dismiss) private var dismiss
 
         @State private var prompt = ""

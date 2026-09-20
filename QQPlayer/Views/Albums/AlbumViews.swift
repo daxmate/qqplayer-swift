@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AlbumsScreen: View {
     let allTracks: [Track]
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var albums: [Album] = []
     /// albumId → 曲目索引：卡片渲染不再对全库做线性 filter（修前每张卡片每次重绘一次 O(n) 扫描）
     @State private var tracksByAlbumId: [Int64: [Track]] = [:]
@@ -149,7 +149,7 @@ struct AlbumDetailScreen: View {
     @Environment(\.appAccentColor) private var accentColor
     let album: Album
     let allTracks: [Track]
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var artworkImage: UIImage?
     @State private var settings = DeleteSettings.load()
     @State private var albumTracks: [Track] = []
@@ -442,7 +442,7 @@ struct AlbumTrackRowView: View {
     /// Menu entry point into multi-select. The long press is unreliable over
     /// this row's Button root, so the menu is the dependable route.
     let onEnterBulkMode: (() -> Void)?
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var isFavorite = false
     @State private var showPlaylistDialog = false
     @State private var showDeleteConfirmation = false

@@ -19,7 +19,7 @@ struct PlayerView: View {
     @Environment(AppServices.self) private var services
     @StateObject private var playerEngine = PlayerEngine.shared
     @StateObject private var artworkManager = ArtworkManager.shared
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var currentArtwork: UIImage?
     @State private var nextArtwork: UIImage?
     @State private var previousArtwork: UIImage?

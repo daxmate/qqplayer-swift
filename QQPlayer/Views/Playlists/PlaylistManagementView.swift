@@ -1,7 +1,7 @@
 import SwiftUI
 struct PlaylistManagementView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var playlists: [Playlist] = []
     @State private var playlistToDelete: Playlist?
     @State private var showDeleteConfirmation = false

@@ -1,4 +1,3 @@
-//
 //  MacPlayerView.swift
 //  QQPlayer
 //
@@ -11,6 +10,7 @@ import AppKit
 import SwiftUI
 
 struct MacPlayerView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @Environment(AppServices.self) private var services
@@ -126,7 +126,7 @@ struct MacPlayerView: View {
         .animation(.easeInOut(duration: 0.25), value: isLyricsFullscreen)
         .onReceive(NotificationCenter.default.publisher(for: .favoritesChanged)) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
-            favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
+            favoriteIds = Set((try? appCoordinator.getFavorites()) ?? [])
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             // 设置页改了睡眠定时器开关后同步按钮可见性
@@ -150,7 +150,7 @@ struct MacPlayerView: View {
             artwork = art
             artworkTrackId = track.stableId
             // 切歌时刷新当前曲目的收藏状态
-            favoriteIds = Set((try? AppCoordinator.shared.getFavorites()) ?? [])
+            favoriteIds = Set((try? appCoordinator.getFavorites()) ?? [])
 
             // 歌词：优先缓存/本地，在线搜索失败不阻塞 UI（跟 iOS 语义一致）
             lyricsLoading = true
@@ -332,7 +332,7 @@ struct MacPlayerView: View {
                 // 当前曲目收藏（红心）
                 Button {
                     guard let track else { return }
-                    try? AppCoordinator.shared.toggleFavorite(trackStableId: track.stableId)
+                    try? appCoordinator.toggleFavorite(trackStableId: track.stableId)
                 } label: {
                     Image(systemName: currentTrackIsFavorite ? "heart.fill" : "heart")
                         .font(.system(size: DesignTokens.font16))

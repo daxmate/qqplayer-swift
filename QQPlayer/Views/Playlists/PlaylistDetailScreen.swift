@@ -6,7 +6,7 @@ struct PlaylistDetailScreen: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let playlist: Playlist
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var tracks: [Track] = []
     @State private var isEditMode: Bool = false
     @State private var artworks: [UIImage] = []

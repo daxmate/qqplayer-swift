@@ -14,7 +14,7 @@ struct TrackRowView: View, @MainActor Equatable {
     let showDirectDeleteButton: Bool
     let onEnterBulkMode: (() -> Void)?
 
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
 
     // Internal state only (does not trigger external redraws)
     @State private var isFavorite = false

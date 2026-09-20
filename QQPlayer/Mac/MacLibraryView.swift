@@ -1,4 +1,3 @@
-//
 //  MacLibraryView.swift
 //  QQPlayer
 //
@@ -37,6 +36,7 @@ enum MacLibrarySection: String, CaseIterable, Identifiable {
 }
 
 struct MacLibraryView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；替代已失效的私有 selector）。
@@ -571,7 +571,7 @@ struct MacLibraryView: View {
 
     private func reloadLikedTracks() {
         do {
-            let favoriteIds = try AppCoordinator.shared.getFavorites()
+            let favoriteIds = try appCoordinator.getFavorites()
             likedTracks = tracks.filter { favoriteIds.contains($0.stableId) }
         } catch {
             print("❌ macOS reloadLikedTracks failed: \(error)")

@@ -6,7 +6,7 @@ struct ArtistDetailScreen: View {
     /// 归一后的一组歌手（同名简繁两行归并后传入）；primaryArtist 用于专辑/网络信息
     let artists: [Artist]
     let allTracks: [Track]
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     /// 2026-09-19 批 4：无状态服务入口（组合根 `AppServices` 注入）——原 `@StateObject` 持有单例已删。
     @Environment(AppServices.self) private var services
     @State private var unifiedArtist: UnifiedArtist?

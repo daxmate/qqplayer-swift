@@ -2,7 +2,7 @@ import GRDB
 import SwiftUI
 struct ArtistsScreen: View {
     let allTracks: [Track]
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var artists: [ArtistNameNormalizer.NormalizedArtist] = []
     @State private var settings = DeleteSettings.load()
 

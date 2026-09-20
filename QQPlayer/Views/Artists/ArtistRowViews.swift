@@ -4,7 +4,7 @@ struct ArtistTrackRowView: View {
     @Environment(\.appAccentColor) private var accentColor
     let track: Track
     let onTap: () -> Void
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var isFavorite = false
     @State private var showPlaylistDialog = false
     @State private var showDeleteConfirmation = false

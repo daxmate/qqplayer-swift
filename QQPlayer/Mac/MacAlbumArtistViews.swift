@@ -292,6 +292,7 @@ private enum MacPlaylistDetailTarget {
 }
 
 struct MacPlaylistListView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     let playlists: [Playlist]
     /// Plays the whole playlist (queue = playlist tracks), used by the manual detail.
     let onPlay: (Playlist) -> Void
@@ -449,7 +450,7 @@ struct MacPlaylistListView: View {
         let title = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         do {
-            _ = try AppCoordinator.shared.createPlaylist(title: title)
+            _ = try appCoordinator.createPlaylist(title: title)
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             // 审计 L7：不再弹窗静默关闭——用户至少知道没建成

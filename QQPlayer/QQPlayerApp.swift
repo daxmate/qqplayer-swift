@@ -104,7 +104,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct QQPlayerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appCoordinator = AppCoordinator.shared
+    @State private var appCoordinator = AppCoordinator.shared
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -116,7 +116,7 @@ struct QQPlayerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(appCoordinator)
+                .environment(AppCoordinator.shared)
                 // 视图层 App 级对象的**唯一装配点**（组合根，2026-09-19「下降预算」批 2）。
                 // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
                 // 需要这些对象的视图一律 `@Environment(T.self)` 从这里继承。新增一个对象 = 在此登记一行。

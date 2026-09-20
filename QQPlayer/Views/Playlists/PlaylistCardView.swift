@@ -4,6 +4,7 @@ import SwiftUI
 import WidgetKit
 
 struct PlaylistCardView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     let playlist: Playlist
     let allTracks: [Track]
     let isEditMode: Bool
@@ -247,7 +248,7 @@ struct PlaylistCardView: View {
             print("✅ Saved custom cover to \(filename)")
 
             // Update database with custom cover path（写操作唯一入口：AppCoordinator）
-            try AppCoordinator.shared.updatePlaylistCustomCover(
+            try appCoordinator.updatePlaylistCustomCover(
                 playlistId: playlistId,
                 imagePath: filename
             )

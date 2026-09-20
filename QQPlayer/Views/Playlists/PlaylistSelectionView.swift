@@ -4,7 +4,7 @@ struct PlaylistSelectionView: View {
     @Environment(\.appAccentColor) private var accentColor
     let track: Track
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var appCoordinator: AppCoordinator
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var playlists: [Playlist] = []
     /// 本曲所在歌单 id 集合（loadPlaylists 时一次性查出，替代排序比较器/每行逐次同步 DB 读）
     @State private var playlistsContainingTrack: Set<Int64> = []

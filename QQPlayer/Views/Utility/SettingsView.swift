@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.dismiss) private var dismiss
     @State private var deleteSettings = DeleteSettings.load()
     /// 歌词延迟校准（按输出路由存；车里最常用）
@@ -13,7 +14,7 @@ struct SettingsView: View {
             let folderPlaylists = try LibraryReads.folderPlaylists()
             for playlist in folderPlaylists {
                 if let id = playlist.id {
-                    try AppCoordinator.shared.deletePlaylist(playlistId: id)
+                    try appCoordinator.deletePlaylist(playlistId: id)
                 }
             }
             print("🗑️ Deleted \(folderPlaylists.count) folder playlist(s) after disabling auto-creation")
@@ -201,7 +202,7 @@ struct SettingsView: View {
                             if newValue {
                                 // Re-enabled: clear tombstones so folder playlists
                                 // can be recreated on the next scan
-                                try? AppCoordinator.shared.clearDeletedFolderPlaylistTombstones()
+                                try? appCoordinator.clearDeletedFolderPlaylistTombstones()
                             } else {
                                 showDeleteFolderPlaylistsPrompt = true
                             }
