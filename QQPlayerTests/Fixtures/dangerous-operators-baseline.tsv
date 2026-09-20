@@ -1,0 +1,39 @@
+# 「一崩了之」操作存量清单（`try!` / `as!` / `fatalError(`）—— 棘轮基线，只能减不能增
+#
+# 由 QQPlayerTests/DangerousOperatorContractTests.swift 守护：
+#   - 出现基线里没有的文件/写法 → 红（不许顺手加：改用可恢复写法，或论证「不可达」后登记）
+#   - 既有条目计数回涨（> 本行数值） → 红
+#   - 既有条目计数下降（含归零）或文件消失 → 必须同步改/删本行，否则红（名单不腐烂）
+#   - 合计 > TOTAL → 红
+#
+# 范围：生产代码 `QQPlayer/**`（不含 QQPlayerTests）
+# 口径：**先剥字符串字面量与行注释，再匹配**
+#   （注释/日志文案里提到这些写法不算 —— 首次盘点 9 处命中里只有 6 处是真代码，
+#    账目因此虚高过一轮；同样的坑在 EnvironmentInjectionContractTests 也踩过）
+#   `try?` / `as?` / `preconditionFailure(` **不计**：前两者不崩，后者是**收口后的目标写法**。
+#
+# TOTAL: 3
+#
+# 2026-09-19 首次盘点与逐处处置（不是一刀切）：真代码 6 处 = `try!` ×3 + `as!` ×2 + `fatalError` ×1。
+# **收口 3 处**：
+#   ① SyncIdentity.generate()（try!）→ **结构性消除**：新增私有不抛 init
+#      （CryptoKit 生成密钥 raw 恒 32B，「长度非法 → throw」在生成侧结构上不存在）。
+#   ② GequhaiClient.makeRegex（try!）→ `do/catch + preconditionFailure`（带模式串与错误；
+#      同崩溃语义、可定位。原 2 行注释合并为 1 行以保持本文件行数净零 —— 行数棘轮基线内）。
+#   ③ LyricsParsing（as!）→ `NSMutableString(string:)` 强类型 API（**彻底没有 cast**）。
+# **保留 3 处**（各有具体理由，不是「懒得改」）：
+#   ④ SyncPeerSession+Frames.encodedPairResponse（try!）—— 载荷上限 =
+#      `SyncFrame.maxPayloadSize` = **16MB**，而 PairResponse 只有 bool + reason（内部错误文案）
+#      ⇒ 结构上不可达；补一条假错误路径只增加代码、不增加安全。
+#   ⑤ CharacterMapResourceLoader（fatalError）—— 简繁映射表 **fail-closed** 设计：
+#      读不到 / 解码失败 / 行格式错 → 崩溃，**绝不静默降级成空表**（静默降级会让简繁显示
+#      整片错误且无人发现）；只可能由打包错误触发，有三端包自证 + 单测覆盖。
+#   ⑥ SyncQRScannerView.previewLayer（as!）—— `override static var layerClass` 已把 backing layer
+#      固定为 `AVCaptureVideoPreviewLayer`，该 cast 由 UIKit 契约保证（结构上不可达）；
+#      转成 `guard let + preconditionFailure` 要多 3 行，而本文件已贴 600 行上限（598 行），
+#      ceremony 换不来安全 ⇒ 保留并钉住。
+#
+# 格式：路径<TAB>写法<TAB>计数
+QQPlayer/Services/CharacterMapResourceLoader.swift	fatalError	1
+QQPlayer/Sync/SyncPeerSession+Frames.swift	try!	1
+QQPlayer/Views/Utility/SyncQRScannerView.swift	as!	1

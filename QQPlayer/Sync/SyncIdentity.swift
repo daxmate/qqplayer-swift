@@ -119,9 +119,15 @@ struct SyncIdentity: Equatable, Sendable {
 
     /// 生成全新密钥对（首次启动路径）。
     static func generate() -> SyncIdentity {
-        // 32B raw 恒合法，init 不可能抛
-        // swiftlint:disable:next force_try
-        try! SyncIdentity(privateKeyRaw: Curve25519.Signing.PrivateKey().rawRepresentation)
+        // CryptoKit 新生成密钥的 rawRepresentation 恒 32B ⇒ 直接走**不校验长度**的 init，
+        // 「长度非法 → throw」这条路径在生成侧结构上不存在（因此不需要 `try!`）。
+        SyncIdentity(generatedKey: Curve25519.Signing.PrivateKey())
+    }
+
+    /// 仅供 `generate()`：密钥由 CryptoKit 当场生成，长度不变量由类型保证。
+    private init(generatedKey key: Curve25519.Signing.PrivateKey) {
+        privateKeyRaw = key.rawRepresentation
+        publicKeyRaw = key.publicKey.rawRepresentation
     }
 
     /// 签名用私钥（M2 对 sessionNonce 签名 / TLS 身份用）。
