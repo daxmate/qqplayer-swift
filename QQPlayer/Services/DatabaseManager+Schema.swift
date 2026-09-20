@@ -260,10 +260,10 @@ extension DatabaseManager {
                 try db.execute(sql: """
                     ALTER TABLE playlist ADD COLUMN last_played_at INTEGER DEFAULT 0
                 """)
-                print("✅ Database: Added last_played_at column to playlist table")
+                AppLog.info(.db, "✅ Database: Added last_played_at column to playlist table")
             } catch {
                 // Column may already exist, which is fine
-                print("ℹ️ Database migration: last_played_at column already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: last_played_at column already exists or migration failed: \(error)")
             }
 
             // Migration: Add preset_type column to eq_preset if it doesn't exist
@@ -271,10 +271,10 @@ extension DatabaseManager {
                 try db.execute(sql: """
                     ALTER TABLE eq_preset ADD COLUMN preset_type TEXT DEFAULT 'imported'
                 """)
-                print("✅ Database: Added preset_type column to eq_preset table")
+                AppLog.info(.db, "✅ Database: Added preset_type column to eq_preset table")
             } catch {
                 // Column may already exist, which is fine
-                print("ℹ️ Database migration: preset_type column already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: preset_type column already exists or migration failed: \(error)")
             }
         }
     }
@@ -285,9 +285,9 @@ extension DatabaseManager {
     static func addTrackGenreColumnIfNeeded(_ db: Database) throws {
         if try !db.columns(in: "track").contains(where: { $0.name == "genre" }) {
             try db.execute(sql: "ALTER TABLE track ADD COLUMN genre TEXT")
-            print("✅ Database: Added genre column to track table")
+            AppLog.info(.db, "✅ Database: Added genre column to track table")
         } else {
-            print("ℹ️ Database migration: genre column already exists")
+            AppLog.info(.db, "ℹ️ Database migration: genre column already exists")
         }
     }
 
@@ -298,9 +298,9 @@ extension DatabaseManager {
     static func addTrackContentHashColumnIfNeeded(_ db: Database) throws {
         if try !db.columns(in: "track").contains(where: { $0.name == "content_hash" }) {
             try db.execute(sql: "ALTER TABLE track ADD COLUMN content_hash TEXT")
-            print("✅ Database: Added content_hash column to track table")
+            AppLog.info(.db, "✅ Database: Added content_hash column to track table")
         } else {
-            print("ℹ️ Database migration: content_hash column already exists")
+            AppLog.info(.db, "ℹ️ Database migration: content_hash column already exists")
         }
     }
 }

@@ -138,7 +138,7 @@ class DatabaseManager: @unchecked Sendable {
         }
         guard !remapping.isEmpty else { return [:] }
         let outboxRows = try rewriteSyncOutboxReferences(db, remapping: remapping)
-        print("✅ Database: stableId 相对化迁移 \(remapping.count) 首（sync_outbox 改写 \(outboxRows) 行，跳过占用 \(skippedOccupied)）")
+        AppLog.info(.db, "✅ Database: stableId 相对化迁移 \(remapping.count) 首（sync_outbox 改写 \(outboxRows) 行，跳过占用 \(skippedOccupied)）")
         return remapping
     }
 
@@ -195,12 +195,12 @@ class DatabaseManager: @unchecked Sendable {
             do {
                 try setupDatabase()
                 dbDiagStats()
-                print("✅ Database initialized successfully on attempt \(attempt)")
+                AppLog.info(.db, "✅ Database initialized successfully on attempt \(attempt)")
                 return
             } catch {
                 lastError = error
                 dbDiag("⚠️ setup failed attempt \(attempt)/\(maxRetries) error=\(error)")
-                print("⚠️ Database setup failed on attempt \(attempt)/\(maxRetries): \(error)")
+                AppLog.warn(.db, "⚠️ Database setup failed on attempt \(attempt)/\(maxRetries): \(error)")
 
                 if attempt < maxRetries {
                     // Wait before retrying
@@ -211,7 +211,7 @@ class DatabaseManager: @unchecked Sendable {
 
         // If all retries failed, try to recover
         if let error = lastError {
-            print("❌ Database setup failed after \(maxRetries) attempts. Attempting recovery...")
+            AppLog.error(.db, "❌ Database setup failed after \(maxRetries) attempts. Attempting recovery...")
             attemptDatabaseRecovery(error: error)
         }
     }
@@ -235,7 +235,7 @@ class DatabaseManager: @unchecked Sendable {
             do {
                 try manager.backfillTrackContentHashesIfNeeded()
             } catch {
-                print("⚠️ Database: content_hash backfill failed (will retry next launch): \(error)")
+                AppLog.warn(.db, "⚠️ Database: content_hash backfill failed (will retry next launch): \(error)")
             }
             manager.logIdentityCensus()
         }
@@ -244,9 +244,11 @@ class DatabaseManager: @unchecked Sendable {
     /// 身份缺失普查汇总一行（只读诊断；失败只打印，绝不影响启动）。
     private func logIdentityCensus() {
         do {
-            print(try identityCensus().summaryLine)
+            // `try` 不能进 `AppLog.*` 的非 throwing autoclosure（编译期报错），先求值再传。
+            let census = try identityCensus()
+            AppLog.info(.db, census.summaryLine)
         } catch {
-            print("⚠️ Database: identity census failed (diagnostic only): \(error)")
+            AppLog.warn(.db, "⚠️ Database: identity census failed (diagnostic only): \(error)")
         }
     }
 
@@ -278,7 +280,7 @@ class DatabaseManager: @unchecked Sendable {
         // 文件 IO 不进写事务；失败只记日志（DB 侧已提交，下次入库/对账再走）。
         if !pendingStableIdFileRemapping.isEmpty {
             let report = TrackIdentityMigration.migrateFileReferences(remapping: pendingStableIdFileRemapping)
-            print("✅ Database: stableId 迁移文件侧引用（书签 \(report.bookmarksRenamed) / 歌词 \(report.lyricsFilesRenamed) / 封面 \(report.artworkKeysRenamed)）")
+            AppLog.info(.db, "✅ Database: stableId 迁移文件侧引用（书签 \(report.bookmarksRenamed) / 歌词 \(report.lyricsFilesRenamed) / 封面 \(report.artworkKeysRenamed)）")
             pendingStableIdFileRemapping = [:]
         }
         try migrateDatabaseIfNeeded()
@@ -296,7 +298,7 @@ class DatabaseManager: @unchecked Sendable {
         do {
             try migrateCanonicalizeScriptForms()
         } catch {
-            print("⚠️ Script canonicalization migration failed (non-fatal): \(error)")
+            AppLog.warn(.db, "⚠️ Script canonicalization migration failed (non-fatal): \(error)")
         }
         // Split combined multi-artist rows ("A; B") left by the old parser
         // (issue #16), then heal libraries where deleted tracks left empty
@@ -305,25 +307,25 @@ class DatabaseManager: @unchecked Sendable {
         do {
             try migrateSplitCombinedArtistNames()
         } catch {
-            print("⚠️ Combined artist split migration failed (non-fatal): \(error)")
+            AppLog.warn(.db, "⚠️ Combined artist split migration failed (non-fatal): \(error)")
         }
         // After artists are split, merge albums that the old per-track-artist
         // keying broke apart (issue #81)
         do {
             try migrateMergeSplitAlbums()
         } catch {
-            print("⚠️ Split album merge migration failed (non-fatal): \(error)")
+            AppLog.warn(.db, "⚠️ Split album merge migration failed (non-fatal): \(error)")
         }
         do {
             try cleanupOrphanedLibraryEntries()
         } catch {
-            print("⚠️ Orphaned library cleanup failed (non-fatal): \(error)")
+            AppLog.warn(.db, "⚠️ Orphaned library cleanup failed (non-fatal): \(error)")
         }
     }
 
     private func attemptDatabaseRecovery(error: Error) {
         dbDiag("🔧 recovery start originalError=\(error)")
-        print("🔧 Attempting database recovery...")
+        AppLog.info(.db, "🔧 Attempting database recovery...")
 
         do {
             let databaseURL = try getDatabaseURL()
@@ -333,22 +335,22 @@ class DatabaseManager: @unchecked Sendable {
             // Try to backup the corrupted database
             if FileManager.default.fileExists(atPath: databaseURL.path) {
                 try? FileManager.default.moveItem(at: databaseURL, to: backupURL)
-                print("📦 Backed up corrupted database to: \(backupURL.path)")
+                AppLog.info(.db, "📦 Backed up corrupted database to: \(backupURL.path)")
             }
 
             // Try to create a fresh database
             try setupDatabase()
             dbDiagStats()
             dbDiag("✅ recovery OK (fresh database created)")
-            print("✅ Database recovery successful - created fresh database")
+            AppLog.info(.db, "✅ Database recovery successful - created fresh database")
         } catch {
             // The database file is corrupted beyond repair. Fall back to an
             // in-memory database so the app keeps running (degraded, empty
             // library) instead of force-exiting at launch. Migrations are
             // intentionally skipped: an in-memory database has no old data.
             dbDiag("⚠️ recovery failed → in-memory fallback reason=\(error)")
-            print("❌ Database recovery failed: \(error)")
-            print("⚠️ Database corrupted, running with in-memory fallback")
+            AppLog.error(.db, "❌ Database recovery failed: \(error)")
+            AppLog.warn(.db, "⚠️ Database corrupted, running with in-memory fallback")
             setupInMemoryFallback()
         }
     }
@@ -370,12 +372,12 @@ class DatabaseManager: @unchecked Sendable {
             dbWriter = try DatabaseQueue(configuration: configuration)
             try createTables()
             dbDiag("✅ in-memory created (DEGRADED: library starts empty)")
-            print("✅ In-memory database created successfully (degraded mode: library starts empty)")
+            AppLog.info(.db, "✅ In-memory database created successfully (degraded mode: library starts empty)")
         } catch {
             // Absolute last resort - keep the app alive instead of crashing.
             dbDiag("❌ in-memory creation failed error=\(error)")
-            print("❌ Failed to create in-memory fallback database: \(error)")
-            print("⚠️ Continuing without a usable database (degraded mode)")
+            AppLog.error(.db, "❌ Failed to create in-memory fallback database: \(error)")
+            AppLog.warn(.db, "⚠️ Continuing without a usable database (degraded mode)")
             if dbWriter == nil {
                 dbWriter = try? DatabaseQueue()
             }

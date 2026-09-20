@@ -650,11 +650,11 @@ extension DatabaseManager {
                     try db.execute(sql: "DELETE FROM artist WHERE id = ?", arguments: [loserId])
                 }
                 mergedGroups += 1
-                print("🈶 Canonicalized artist group '\(name)': merged \(group.count) rows into id \(keeperId)")
+                if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "🈶 Canonicalized artist group '\(name)': merged \(group.count) rows into id \(keeperId)") }
             }
 
             if renamedArtists + renamedAlbums + renamedTracks > 0 || mergedGroups > 0 {
-                print("🈶 Script canonicalization: artists renamed \(renamedArtists), albums \(renamedAlbums), tracks \(renamedTracks), merged artist groups \(mergedGroups)")
+                AppLog.info(.db, "🈶 Script canonicalization: artists renamed \(renamedArtists), albums \(renamedAlbums), tracks \(renamedTracks), merged artist groups \(mergedGroups)")
             }
         }
     }
@@ -750,7 +750,7 @@ extension DatabaseManager {
                 try db.execute(sql: "UPDATE album SET artist_id = ? WHERE artist_id = ?", arguments: [primaryId, combinedId])
 
                 try db.execute(sql: "DELETE FROM artist WHERE id = ?", arguments: [combinedId])
-                print("🎤 Split combined artist '\(combinedArtist.name)' into: \(names.joined(separator: ", "))")
+                if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "🎤 Split combined artist '\(combinedArtist.name)' into: \(names.joined(separator: ", "))") }
             }
         }
     }
@@ -807,7 +807,7 @@ extension DatabaseManager {
                     """, arguments: [keeperId, dupId])
                     try db.execute(sql: "DELETE FROM album WHERE id = ?", arguments: [dupId])
                     keeperArtists.formUnion(dupArtists)
-                    print("💿 Merged split album '\(entry.album.title)' into '\(keeper.album.title)'")
+                    if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "💿 Merged split album '\(entry.album.title)' into '\(keeper.album.title)'") }
                 }
             }
         }

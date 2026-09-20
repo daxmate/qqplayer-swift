@@ -9,7 +9,7 @@ import Foundation
 
 extension DatabaseManager {
     func deduplicatePlaylistItems() throws {
-        print("🔍 Checking for duplicate playlist items...")
+        AppLog.info(.db, "🔍 Checking for duplicate playlist items...")
 
         let removedCount = try write { db in
             let playlists = try Playlist.fetchAll(db)
@@ -45,7 +45,7 @@ extension DatabaseManager {
                     if seenPaths.contains(path) {
                         // Duplicate found - mark for removal
                         itemsToRemove.append(PlaylistItem(playlistId: playlistId, position: position, trackStableId: trackStableId))
-                        print("⚠️ Playlist '\(playlist.title)': Found duplicate for path '\(path)' at position \(position)")
+                        AppLog.warn(.db, "⚠️ Playlist '\(playlist.title)': Found duplicate for path '\(path)' at position \(position)")
                     } else {
                         // First occurrence - keep it
                         seenPaths.insert(path)
@@ -61,7 +61,7 @@ extension DatabaseManager {
                 }
 
                 if !itemsToRemove.isEmpty {
-                    print("✅ Removed \(itemsToRemove.count) duplicate items from playlist '\(playlist.title)'")
+                    AppLog.info(.db, "✅ Removed \(itemsToRemove.count) duplicate items from playlist '\(playlist.title)'")
 
                     // Reorder remaining items to fill gaps
                     let remainingItems = try PlaylistItem
@@ -82,14 +82,14 @@ extension DatabaseManager {
         }
 
         if removedCount > 0 {
-            print("✅ Removed \(removedCount) duplicate playlist items across all playlists")
+            AppLog.info(.db, "✅ Removed \(removedCount) duplicate playlist items across all playlists")
         } else {
-            print("✅ No duplicate playlist items found")
+            AppLog.info(.db, "✅ No duplicate playlist items found")
         }
     }
 
     func cleanupOrphanedPlaylistItems() throws {
-        print("🧹 Cleaning up orphaned playlist items...")
+        AppLog.info(.db, "🧹 Cleaning up orphaned playlist items...")
 
         // SAFETY CHECK: Verify database is healthy before cleanup
         let trackCount = try read { db in
@@ -97,8 +97,8 @@ extension DatabaseManager {
         }
 
         if trackCount == 0 {
-            print("⚠️ SAFETY: Skipping playlist cleanup - no tracks in database (possible database error)")
-            print("⚠️ This prevents accidental deletion of all playlist items")
+            AppLog.warn(.db, "⚠️ SAFETY: Skipping playlist cleanup - no tracks in database (possible database error)")
+            AppLog.warn(.db, "⚠️ This prevents accidental deletion of all playlist items")
             return
         }
 
@@ -114,9 +114,9 @@ extension DatabaseManager {
         }
 
         if deletedCount > 0 {
-            print("✅ Cleaned up \(deletedCount) orphaned playlist items")
+            AppLog.info(.db, "✅ Cleaned up \(deletedCount) orphaned playlist items")
         } else {
-            print("✅ No orphaned playlist items found")
+            AppLog.info(.db, "✅ No orphaned playlist items found")
         }
     }
 
@@ -176,7 +176,7 @@ extension DatabaseManager {
             ) ?? 0
 
             if count > 0 {
-                print("⛔ Folder playlist '\(folderName)' was previously deleted by user, skipping recreation")
+                AppLog.warn(.db, "⛔ Folder playlist '\(folderName)' was previously deleted by user, skipping recreation")
                 throw DatabaseError.folderPlaylistDeleted
             }
 
@@ -185,7 +185,7 @@ extension DatabaseManager {
 
             // Check if a folder-synced playlist already exists for this path
             if let existingPlaylist = try Playlist.filter(Column("folder_path") == folderPath).fetchOne(db) {
-                print("📁 Folder playlist already exists: \(existingPlaylist.title)")
+                AppLog.info(.db, "📁 Folder playlist already exists: \(existingPlaylist.title)")
                 return existingPlaylist
             }
 
@@ -193,7 +193,7 @@ extension DatabaseManager {
             // This prevents data loss by not overwriting user-created playlists
             if let existingManualPlaylist = try Playlist.filter(Column("slug") == slug).fetchOne(db) {
                 if !existingManualPlaylist.isFolderSynced {
-                    print("⚠️ Manual playlist '\(title)' already exists - converting to folder-synced playlist")
+                    AppLog.warn(.db, "⚠️ Manual playlist '\(title)' already exists - converting to folder-synced playlist")
                     // Update the existing playlist to be folder-synced
                     var updatedPlaylist = existingManualPlaylist
                     updatedPlaylist.folderPath = folderPath
@@ -201,11 +201,11 @@ extension DatabaseManager {
                     updatedPlaylist.lastFolderSync = now
                     updatedPlaylist.updatedAt = now
                     try updatedPlaylist.update(db)
-                    print("✅ Converted manual playlist '\(title)' to folder-synced")
+                    AppLog.info(.db, "✅ Converted manual playlist '\(title)' to folder-synced")
                     return updatedPlaylist
                 } else {
                     // Another folder playlist with same name but different path
-                    print("⚠️ Folder playlist '\(title)' already exists with different path")
+                    AppLog.warn(.db, "⚠️ Folder playlist '\(title)' already exists with different path")
                     return existingManualPlaylist
                 }
             }
@@ -221,7 +221,7 @@ extension DatabaseManager {
                 isFolderSynced: true,
                 lastFolderSync: now
             )
-            print("📁 Creating folder-synced playlist: \(title) -> \(folderPath)")
+            AppLog.info(.db, "📁 Creating folder-synced playlist: \(title) -> \(folderPath)")
             return try playlist.insertAndFetch(db)!
         }
     }
@@ -255,7 +255,7 @@ extension DatabaseManager {
     }
 
     func addToPlaylist(playlistId: Int64, trackStableId: String) throws {
-        print("🎵 Adding track \(trackStableId) to playlist \(playlistId)")
+        AppLog.info(.db, "🎵 Adding track \(trackStableId) to playlist \(playlistId)")
         try write { db in
             // Check if track is already in playlist
             let existingItem = try PlaylistItem
@@ -263,7 +263,7 @@ extension DatabaseManager {
                 .fetchOne(db)
 
             if existingItem != nil {
-                print("⚠️ Track already in playlist")
+                AppLog.warn(.db, "⚠️ Track already in playlist")
                 return
             }
 
@@ -275,7 +275,7 @@ extension DatabaseManager {
                 .fetchOne(db) ?? 0
 
             let playlistItem = PlaylistItem(playlistId: playlistId, position: maxPosition + 1, trackStableId: trackStableId)
-            print("🎵 Creating playlist item with position \(maxPosition + 1)")
+            AppLog.info(.db, "🎵 Creating playlist item with position \(maxPosition + 1)")
             try playlistItem.insert(db)
             // S2 M4-1：手动歌单项新增 → outbox upsert（同一事务）。folder-synced
             // 歌单内容由本地扫描派生，不入跨端同步。
@@ -297,7 +297,7 @@ extension DatabaseManager {
                     ))
                 )
             }
-            print("✅ Successfully added track to playlist")
+            AppLog.info(.db, "✅ Successfully added track to playlist")
         }
     }
 
@@ -326,7 +326,7 @@ extension DatabaseManager {
     }
 
     func reorderPlaylistItems(playlistId: Int64, from sourceIndex: Int, to destinationIndex: Int) throws {
-        print("🔄 Database: Reordering playlist items from \(sourceIndex) to \(destinationIndex)")
+        AppLog.info(.db, "🔄 Database: Reordering playlist items from \(sourceIndex) to \(destinationIndex)")
         try write { db in
             // Get all playlist items ordered by position
             let items = try PlaylistItem
@@ -336,7 +336,7 @@ extension DatabaseManager {
 
             guard sourceIndex >= 0 && sourceIndex < items.count &&
                 destinationIndex >= 0 && destinationIndex < items.count else {
-                print("❌ Invalid indices for reordering")
+                AppLog.error(.db, "❌ Invalid indices for reordering")
                 return
             }
 
@@ -353,7 +353,7 @@ extension DatabaseManager {
             // 同一 position → 撞主键 → 整个重排事务回滚（审计 🔵-7）。
             // 阶段 1 的目标位置带 +10000 偏移，与阶段 2 的目标集不相交，两阶段
             // 内部目标位置各自唯一 ⇒ 不会互相撞键。
-            print("🔄 Phase 1: Shifting positions to avoid conflicts")
+            AppLog.info(.db, "🔄 Phase 1: Shifting positions to avoid conflicts")
             for (index, item) in mutableItems.enumerated() {
                 _ = try PlaylistItem
                     .filter(Column("playlist_id") == playlistId &&
@@ -362,7 +362,7 @@ extension DatabaseManager {
             }
 
             // Phase 2: Set final positions
-            print("🔄 Phase 2: Setting final positions")
+            AppLog.info(.db, "🔄 Phase 2: Setting final positions")
             // 阶段 2 只按「阶段 1 写入的临时 position」定位行，不读 item → 用 indices
             for index in mutableItems.indices {
                 _ = try PlaylistItem
@@ -395,7 +395,7 @@ extension DatabaseManager {
                 }
             }
 
-            print("✅ Successfully reordered playlist items")
+            AppLog.info(.db, "✅ Successfully reordered playlist items")
         }
     }
 
@@ -417,7 +417,7 @@ extension DatabaseManager {
     }
 
     func deletePlaylist(playlistId: Int64) throws {
-        print("🗑️ Database: Deleting playlist with ID - \(playlistId)")
+        AppLog.info(.db, "🗑️ Database: Deleting playlist with ID - \(playlistId)")
         let deletedCount = try write { db in
             // 先取歌单（记录 delete 行键用；folder-synced 歌单不入同步，但删除时
             // 若曾是手动歌单转 folder（历史遗留）也不补记——v1 只同步手动歌单生命周期）
@@ -455,12 +455,12 @@ extension DatabaseManager {
                     sql: "INSERT OR REPLACE INTO deleted_folder_playlist (folder_path, deleted_at) VALUES (?, ?)",
                     arguments: [folderName, now]
                 )
-                print("📝 Marked folder playlist '\(folderName)' as deleted to prevent recreation")
+                AppLog.info(.db, "📝 Marked folder playlist '\(folderName)' as deleted to prevent recreation")
             }
 
             return try Playlist.filter(Column("id") == playlistId).deleteAll(db)
         }
-        print("🗑️ Database: Deleted \(deletedCount) playlist(s)")
+        AppLog.info(.db, "🗑️ Database: Deleted \(deletedCount) playlist(s)")
     }
 
     func getAllFolderPlaylists() throws -> [Playlist] {
@@ -478,7 +478,7 @@ extension DatabaseManager {
     }
 
     func renamePlaylist(playlistId: Int64, newTitle: String) throws {
-        print("✏️ Database: Renaming playlist \(playlistId) to '\(newTitle)'")
+        AppLog.info(.db, "✏️ Database: Renaming playlist \(playlistId) to '\(newTitle)'")
         let now = Int64(Date().timeIntervalSince1970)
         let updatedCount = try write { db in
             let updated = try Playlist
@@ -512,11 +512,11 @@ extension DatabaseManager {
             }
             return updated
         }
-        print("✏️ Database: Updated \(updatedCount) playlist(s)")
+        AppLog.info(.db, "✏️ Database: Updated \(updatedCount) playlist(s)")
     }
 
     func syncPlaylistWithFolder(playlistId: Int64, trackStableIds: [String]) throws {
-        print("🔄 Syncing playlist \(playlistId) with folder tracks (additive-only sync)")
+        AppLog.info(.db, "🔄 Syncing playlist \(playlistId) with folder tracks (additive-only sync)")
 
         try write { db in
             // Get current playlist items
@@ -529,7 +529,7 @@ extension DatabaseManager {
             // library will be cleaned up automatically by database constraints)
             let tracksToAdd = newTrackIds.subtracting(currentTrackIds)
 
-            print("🔄 Folder sync: Adding \(tracksToAdd.count) new tracks from folder")
+            AppLog.info(.db, "🔄 Folder sync: Adding \(tracksToAdd.count) new tracks from folder")
 
             // Add new tracks from folder
             let maxPositionQuery = try PlaylistItem
@@ -567,29 +567,29 @@ extension DatabaseManager {
     }
 
     func updatePlaylistAccessed(playlistId: Int64) throws {
-        print("⏰ Database: Updating playlist \(playlistId) last accessed time")
+        AppLog.info(.db, "⏰ Database: Updating playlist \(playlistId) last accessed time")
         let now = Int64(Date().timeIntervalSince1970)
         let updatedCount = try write { db in
             return try Playlist
                 .filter(Column("id") == playlistId)
                 .updateAll(db, Column("updated_at").set(to: now))
         }
-        print("⏰ Database: Updated \(updatedCount) playlist(s)")
+        AppLog.info(.db, "⏰ Database: Updated \(updatedCount) playlist(s)")
     }
 
     func updatePlaylistLastPlayed(playlistId: Int64) throws {
-        print("🎵 Database: Updating playlist \(playlistId) last played time")
+        AppLog.info(.db, "🎵 Database: Updating playlist \(playlistId) last played time")
         let now = Int64(Date().timeIntervalSince1970)
         let updatedCount = try write { db in
             return try Playlist
                 .filter(Column("id") == playlistId)
                 .updateAll(db, Column("last_played_at").set(to: now))
         }
-        print("🎵 Database: Updated \(updatedCount) playlist(s) last played time")
+        AppLog.info(.db, "🎵 Database: Updated \(updatedCount) playlist(s) last played time")
     }
 
     func updatePlaylistCustomCover(playlistId: Int64, imagePath: String?) throws {
-        print("🎨 Database: Updating playlist \(playlistId) custom cover to '\(imagePath ?? "nil")'")
+        AppLog.info(.db, "🎨 Database: Updating playlist \(playlistId) custom cover to '\(imagePath ?? "nil")'")
         let now = Int64(Date().timeIntervalSince1970)
         let updatedCount = try write { db in
             let updated = try Playlist
@@ -622,6 +622,6 @@ extension DatabaseManager {
             }
             return updated
         }
-        print("🎨 Database: Updated \(updatedCount) playlist(s) custom cover")
+        AppLog.info(.db, "🎨 Database: Updated \(updatedCount) playlist(s) custom cover")
     }
 }

@@ -144,7 +144,7 @@ enum TrackIdentityMigration {
             do {
                 report.bookmarksRenamed = try store.renameKeys(remapping)
             } catch {
-                print("⚠️ TrackIdentityMigration: bookmark key rename failed: \(error)")
+                AppLog.warn(.migration, "⚠️ TrackIdentityMigration: bookmark key rename failed: \(error)")
                 report.skipped.append("bookmarks:readFailed")
             }
         }
@@ -159,7 +159,7 @@ enum TrackIdentityMigration {
                     guard FileManager.default.fileExists(atPath: source.path) else { continue }
                     guard !FileManager.default.fileExists(atPath: destination.path) else {
                         // 目标已存在：不覆盖、不删除（宁可留孤儿文件，也不丢用户歌词）
-                        print("🎤 TrackIdentityMigration: \(kind.rawValue) lyrics already exist for new id, kept source")
+                        if AppLog.isEnabled(.debug, .migration) { AppLog.debug(.migration, "🎤 TrackIdentityMigration: \(kind.rawValue) lyrics already exist for new id, kept source") }
                         report.skipped.append("\(kind.rawValue):targetExists")
                         continue
                     }
@@ -167,7 +167,7 @@ enum TrackIdentityMigration {
                         try FileManager.default.moveItem(at: source, to: destination)
                         report.lyricsFilesRenamed += 1
                     } catch {
-                        print("⚠️ TrackIdentityMigration: \(kind.rawValue) lyrics rename failed: \(error)")
+                        AppLog.warn(.migration, "⚠️ TrackIdentityMigration: \(kind.rawValue) lyrics rename failed: \(error)")
                         report.skipped.append("\(kind.rawValue):renameFailed")
                     }
                 }
@@ -182,7 +182,7 @@ enum TrackIdentityMigration {
         if !artworkRemapping.isEmpty {
             Task { @MainActor in
                 if migrateArtworkMappingKeys(remapping: artworkRemapping) {
-                    print("🖼️ TrackIdentityMigration: artwork mapping key(s) migrated")
+                    AppLog.info(.migration, "🖼️ TrackIdentityMigration: artwork mapping key(s) migrated")
                 }
             }
         }

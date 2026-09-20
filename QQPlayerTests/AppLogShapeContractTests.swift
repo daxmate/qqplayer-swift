@@ -62,10 +62,20 @@ private enum AppLogShapeContract {
     /// 受管的轮转入口名（定义唯一 + 调用点白名单制都按这份清单查）。
     static let rotationEntries: Set<String> = ["rotateIfNeeded", "trimTailIfNeeded"]
 
-    /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（批 2：sync 链路 5 文件 / 14 处）。
+    /// 守卫③(a)：已迁到 `AppLog` 的链路文件清单（迁移完成的文件逐个登记）。
+    /// 当前 = 批 2 sync 链路 5 文件 / 14 处 + 批 3 migration/DB 链路 9 文件 / 141 处，共 14 文件。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     static let migratedChains: Set<String> = [
+        "QQPlayer/Services/DatabaseManager+ContentHash.swift",
+        "QQPlayer/Services/DatabaseManager+Library.swift",
+        "QQPlayer/Services/DatabaseManager+Migration.swift",
+        "QQPlayer/Services/DatabaseManager+Playlists.swift",
+        "QQPlayer/Services/DatabaseManager+Schema.swift",
+        "QQPlayer/Services/DatabaseManager+Tracks.swift",
+        "QQPlayer/Services/DatabaseManager.swift",
+        "QQPlayer/Services/SandboxMigration.swift",
+        "QQPlayer/Services/TrackIdentityMigration.swift",
         "QQPlayer/Sync/SyncChangeLogApplier.swift",
         "QQPlayer/Sync/SyncChangeLogPeer.swift",
         "QQPlayer/Sync/SyncChangeLogPendingStore.swift",

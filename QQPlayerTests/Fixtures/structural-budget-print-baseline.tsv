@@ -41,13 +41,6 @@ QQPlayer/Services/AudioMetadataParser+DSD.swift	34
 QQPlayer/Services/AudioMetadataParser+FLAC.swift	8
 QQPlayer/Services/AudioMetadataParser+MP3WAV.swift	31
 QQPlayer/Services/AudioMetadataParser.swift	1
-QQPlayer/Services/DatabaseManager+ContentHash.swift	5
-QQPlayer/Services/DatabaseManager+Library.swift	4
-QQPlayer/Services/DatabaseManager+Migration.swift	26
-QQPlayer/Services/DatabaseManager+Playlists.swift	38
-QQPlayer/Services/DatabaseManager+Schema.swift	8
-QQPlayer/Services/DatabaseManager+Tracks.swift	24
-QQPlayer/Services/DatabaseManager.swift	20
 QQPlayer/Services/DatabaseSuspensionCoordinator.swift	1
 QQPlayer/Services/DiscogsAPI.swift	13
 QQPlayer/Services/EQManager.swift	21
@@ -82,12 +75,10 @@ QQPlayer/Services/QuarkClient.swift	14
 QQPlayer/Services/SFBAudioEngineManager+Playback.swift	102
 QQPlayer/Services/SFBAudioEngineManager+Queue.swift	4
 QQPlayer/Services/SFBAudioEngineManager.swift	36
-QQPlayer/Services/SandboxMigration.swift	12
 QQPlayer/Services/SpotifyAPI.swift	13
 QQPlayer/Services/StateManager.swift	26
 QQPlayer/Services/SyncConnectDiag.swift	1
 QQPlayer/Services/TrackDeletionService.swift	2
-QQPlayer/Services/TrackIdentityMigration.swift	4
 QQPlayer/ViewModels/TutorialViewModel.swift	1
 QQPlayer/Views/Albums/AlbumViews.swift	6
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	7
@@ -113,4 +104,4 @@ QQPlayer/Views/TutorialView.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	2
 QQPlayer/Views/Utility/ManualEQEditorView.swift	2
 QQPlayer/Views/Utility/SettingsView.swift	5
-# TOTAL: 1365
+# TOTAL: 1224

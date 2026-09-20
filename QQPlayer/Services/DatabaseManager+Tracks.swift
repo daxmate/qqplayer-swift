@@ -51,7 +51,7 @@ extension DatabaseManager {
             let normalizedPath = Self.standardizedPath(trackToSave.path)
             let duplicates = try Track.filter(Column("path") == normalizedPath && Column("stable_id") != trackToSave.stableId).fetchAll(db)
             if !duplicates.isEmpty {
-                print("⚠️ Found \(duplicates.count) duplicate(s) for path: \(normalizedPath)")
+                AppLog.warn(.db, "⚠️ Found \(duplicates.count) duplicate(s) for path: \(normalizedPath)")
                 for duplicate in duplicates {
                     // 引用迁移走唯一入口（D6：此前 favorite/playlist_item 是裸
                     // UPDATE，主键冲突会抛错并回滚**整次入库事务**，文件静默不入库）。
@@ -63,7 +63,7 @@ extension DatabaseManager {
                     // Delete the duplicate
                     try Track.filter(Column("id") == duplicate.id).deleteAll(db)
                     mergedDuplicateStableIds.append(duplicate.stableId)
-                    print("🗑️ Removed duplicate track with old stable_id: \(duplicate.stableId)")
+                    if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "🗑️ Removed duplicate track with old stable_id: \(duplicate.stableId)") }
                 }
             }
 
@@ -96,10 +96,10 @@ extension DatabaseManager {
                     libraryRoot: MusicFolderResolver.syncLibraryRoot
                 )
                 if replayed > 0 {
-                    print("🔁 Sync: 重放挂起变更 \(replayed) 条")
+                    AppLog.info(.db, "🔁 Sync: 重放挂起变更 \(replayed) 条")
                 }
             } catch {
-                print("⚠️ Sync: 挂起变更重放失败（下次入库重试）：\(error)")
+                AppLog.warn(.db, "⚠️ Sync: 挂起变更重放失败（下次入库重试）：\(error)")
             }
         }
     }
@@ -174,7 +174,7 @@ extension DatabaseManager {
                 try TrackIdentityMigration.migrateDatabaseReferences(db, from: stale.stableId, to: newTrack.stableId)
                 try Track.filter(Column("stable_id") == stale.stableId).deleteAll(db)
                 mergedStableIds.append(stale.stableId)
-                print("🗑️ Removed strict stale duplicate: \(stale.title)")
+                if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "🗑️ Removed strict stale duplicate: \(stale.title)") }
             }
         }
         // 文件侧引用（书签/歌词/封面映射）跟随新 stableId——事务外、幂等
@@ -196,7 +196,7 @@ extension DatabaseManager {
                 try TrackIdentityMigration.migrateDatabaseReferences(db, from: oldStableId, to: newStableId)
                 try Track.filter(Column("stable_id") == oldStableId).deleteAll(db)
                 didMigrate = true
-                print("🔁 Merged stale track ID \(oldStableId) into existing resolved ID \(newStableId)")
+                AppLog.info(.db, "🔁 Merged stale track ID \(oldStableId) into existing resolved ID \(newStableId)")
                 return
             }
 
@@ -205,7 +205,7 @@ extension DatabaseManager {
             try oldTrack.update(db)
             try TrackIdentityMigration.migrateDatabaseReferences(db, from: oldStableId, to: newStableId)
             didMigrate = true
-            print("🔁 Migrated track ID for moved file: \(oldStableId) -> \(newStableId)")
+            AppLog.info(.db, "🔁 Migrated track ID for moved file: \(oldStableId) -> \(newStableId)")
         }
         // D3：stableId 变更 = 六处引用一起搬（含此前完全没人迁的歌词与封面映射）
         if didMigrate {
@@ -400,7 +400,7 @@ extension DatabaseManager {
     // MARK: - Favorites operations
 
     func addToFavorites(trackStableId: String) throws {
-        print("🗃️ Database: Adding to favorites - \(trackStableId)")
+        AppLog.info(.db, "🗃️ Database: Adding to favorites - \(trackStableId)")
         try write { db in
             let favorite = Favorite(trackStableId: trackStableId)
             try favorite.insert(db)
@@ -412,7 +412,7 @@ extension DatabaseManager {
                 op: .upsert,
                 payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: trackStableId))
             )
-            print("🗃️ Database: Successfully inserted favorite")
+            AppLog.info(.db, "🗃️ Database: Successfully inserted favorite")
         }
     }
 
@@ -434,11 +434,11 @@ extension DatabaseManager {
                 )
             }
         }
-        print("🗃️ Database: Inserted \(trackStableIds.count) favorite(s) in one transaction")
+        AppLog.info(.db, "🗃️ Database: Inserted \(trackStableIds.count) favorite(s) in one transaction")
     }
 
     func removeFromFavorites(trackStableId: String) throws {
-        print("🗃️ Database: Removing from favorites - \(trackStableId)")
+        AppLog.info(.db, "🗃️ Database: Removing from favorites - \(trackStableId)")
         let deletedCount = try write { db in
             let count = try Favorite.filter(Column("track_stable_id") == trackStableId).deleteAll(db)
             // S2 M4-1：仅实际删除时记 outbox delete（0 行 = 本就没有，无需同步删除）
@@ -453,7 +453,7 @@ extension DatabaseManager {
             }
             return count
         }
-        print("🗃️ Database: Deleted \(deletedCount) favorite(s)")
+        AppLog.info(.db, "🗃️ Database: Deleted \(deletedCount) favorite(s)")
     }
 
     func isFavorite(trackStableId: String) throws -> Bool {
@@ -468,12 +468,12 @@ extension DatabaseManager {
         }
         // Count only - dumping every favorite ID spammed the log for large
         // libraries and leaked private track identifiers (audit)
-        print("🗃️ Database: Retrieved \(favorites.count) favorites")
+        AppLog.info(.db, "🗃️ Database: Retrieved \(favorites.count) favorites")
         return favorites
     }
 
     func deleteTrack(byStableId stableId: String) throws {
-        print("🗃️ Database: Deleting track with stable ID - \(stableId)")
+        AppLog.info(.db, "🗃️ Database: Deleting track with stable ID - \(stableId)")
         defer { invalidateArtistDisplayNameCache() }
         let deletedCount = try write { db in
             // D4：被删的引用行要在删前取出（删完就查不到了）——它们的 key 用来
@@ -492,17 +492,17 @@ extension DatabaseManager {
             // Remove from playlist items first
             let playlistItemsDeleted = try PlaylistItem.filter(Column("track_stable_id") == stableId).deleteAll(db)
             if playlistItemsDeleted > 0 {
-                print("🗑️ Removed track from \(playlistItemsDeleted) playlist position(s)")
+                AppLog.info(.db, "🗑️ Removed track from \(playlistItemsDeleted) playlist position(s)")
             }
 
             // Remove from favorites if it exists
             let favoritesDeleted = try Favorite.filter(Column("track_stable_id") == stableId).deleteAll(db)
             if favoritesDeleted > 0 {
-                print("🗃️ Database: Removed \(favoritesDeleted) favorite entries for track")
+                AppLog.info(.db, "🗃️ Database: Removed \(favoritesDeleted) favorite entries for track")
             }
 
             if playlistItemsDeleted > 0 {
-                print("🗃️ Database: Removed \(playlistItemsDeleted) playlist entries for track")
+                AppLog.info(.db, "🗃️ Database: Removed \(playlistItemsDeleted) playlist entries for track")
             }
 
             // Remove multi-artist link rows - track_artist has no FK to track,
@@ -561,7 +561,7 @@ extension DatabaseManager {
             // Delete the track
             return try Track.filter(Column("stable_id") == stableId).deleteAll(db)
         }
-        print("🗃️ Database: Deleted \(deletedCount) track(s)")
+        AppLog.info(.db, "🗃️ Database: Deleted \(deletedCount) track(s)")
 
         // Clean up orphaned albums and artists after track deletion
         try cleanupOrphanedLibraryEntries()
@@ -584,14 +584,14 @@ extension DatabaseManager {
     /// 也长期存活，需要「track 行保留 + 读取侧可见性过滤」的改造（产品决策），
     /// 本次不做；favorite 与 play_history 无孤儿清理，稳定保留。
     func removeTrackFromLibrary(byStableId stableId: String) throws {
-        print("🗃️ Database: Removing track from library only - \(stableId)")
+        AppLog.info(.db, "🗃️ Database: Removing track from library only - \(stableId)")
         defer { invalidateArtistDisplayNameCache() }
         let removedCount = try write { db in
             // 派生行（artist 关联）随行消失；重扫入库时由 setTrackArtists 重建
             try db.execute(sql: "DELETE FROM track_artist WHERE track_stable_id = ?", arguments: [stableId])
             return try Track.filter(Column("stable_id") == stableId).deleteAll(db)
         }
-        print("🗃️ Database: Removed \(removedCount) track row(s) (favorites/playlists/history kept)")
+        AppLog.info(.db, "🗃️ Database: Removed \(removedCount) track row(s) (favorites/playlists/history kept)")
 
         // 清理失去曲目的专辑/歌手（不动 favorite / playlist_item / play_history）
         try cleanupOrphanedLibraryEntries()
@@ -601,10 +601,10 @@ extension DatabaseManager {
         guard let store = ExternalFileBookmarkStore.default else { return }
         do {
             if try store.remove(forStableId: stableId) {
-                print("🔖 Removed external file bookmark for stableId: \(stableId)")
+                AppLog.info(.db, "🔖 Removed external file bookmark for stableId: \(stableId)")
             }
         } catch {
-            print("⚠️ Failed to remove external file bookmark: \(error.localizedDescription)")
+            AppLog.warn(.db, "⚠️ Failed to remove external file bookmark: \(error.localizedDescription)")
         }
     }
 
@@ -644,7 +644,7 @@ extension DatabaseManager {
                 try TrackIdentityMigration.migrateDatabaseReferences(db, from: track.stableId, to: newStableId)
                 try Track.filter(Column("id") == track.id).deleteAll(db)
                 didMigrate = true
-                print("🗂️ moveTrack: merged \(track.stableId) into existing \(newStableId)")
+                AppLog.info(.db, "🗂️ moveTrack: merged \(track.stableId) into existing \(newStableId)")
             } else {
                 var updated = track
                 updated.path = normalizedNew
@@ -655,7 +655,7 @@ extension DatabaseManager {
                 try updated.save(db)
                 try TrackIdentityMigration.migrateDatabaseReferences(db, from: track.stableId, to: newStableId)
                 didMigrate = true
-                print("🗂️ moveTrack: \(normalizedOld) → \(normalizedNew) (stableId \(track.stableId) → \(newStableId))")
+                AppLog.info(.db, "🗂️ moveTrack: \(normalizedOld) → \(normalizedNew) (stableId \(track.stableId) → \(newStableId))")
             }
         }
         // D3：改名后文件侧引用（书签键 / 三个歌词目录 / 封面映射）一起跟随新 stableId，

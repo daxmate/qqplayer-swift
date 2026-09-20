@@ -194,7 +194,7 @@ enum CloudCopyArchiver {
             guard FileManager.default.ubiquityIdentityToken != nil,
                   let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
             else {
-                print("📦 SandboxMigration: iCloud unavailable, skipping")
+                AppLog.info(.migration, "📦 SandboxMigration: iCloud unavailable, skipping")
                 return false
             }
 
@@ -204,10 +204,10 @@ enum CloudCopyArchiver {
             // 1) 列 iCloud 容器音乐文件 + 算 content_hash（文件不在本地则先触发实体化）
             let cloudFiles = await enumerateCloudMusicFiles(under: cloudRoot)
             guard !cloudFiles.isEmpty else {
-                print("📦 SandboxMigration: no music files in iCloud container")
+                AppLog.info(.migration, "📦 SandboxMigration: no music files in iCloud container")
                 return false
             }
-            print("📦 SandboxMigration: found \(cloudFiles.count) iCloud music file(s)")
+            AppLog.info(.migration, "📦 SandboxMigration: found \(cloudFiles.count) iCloud music file(s)")
 
             // 2) 沙盒现状
             let sandboxFiles = await enumerateSandboxFiles(under: sandboxRoot)
@@ -229,7 +229,7 @@ enum CloudCopyArchiver {
             )
 
             if plan.isEmpty {
-                print("📦 SandboxMigration: nothing to migrate")
+                AppLog.info(.migration, "📦 SandboxMigration: nothing to migrate")
                 return true
             }
 
@@ -260,7 +260,7 @@ enum CloudCopyArchiver {
             //    （归档 = 移到备份目录，可恢复；审计 🔵-10 前是直接删除）
             cleanupCloudCopies(plan: finalPlan, cloudRoot: cloudRoot, sandboxRoot: sandboxRoot)
 
-            print("📦 SandboxMigration: migration completed")
+            AppLog.info(.migration, "📦 SandboxMigration: migration completed")
             return true
         }
 
@@ -348,9 +348,9 @@ enum CloudCopyArchiver {
                         try? fm.removeItem(at: dest)
                     }
                     try fm.copyItem(at: source, to: dest)
-                    print("📦 SandboxMigration: copied \(rel)")
+                    if AppLog.isEnabled(.debug, .migration) { AppLog.debug(.migration, "📦 SandboxMigration: copied \(rel)") }
                 } catch {
-                    print("📦 SandboxMigration: copy failed \(rel): \(error)")
+                    AppLog.error(.migration, "📦 SandboxMigration: copy failed \(rel): \(error)")
                 }
                 // 让出主线程（迁移在启动路径上，分批不阻塞 UI）
                 await Task.yield()
@@ -371,9 +371,9 @@ enum CloudCopyArchiver {
                     oldStableId: pathSwitch.trackStableId,
                     newPath: newPath
                 )
-                print("📦 SandboxMigration: switched DB path → \(newPath)")
+                AppLog.info(.migration, "📦 SandboxMigration: switched DB path → \(newPath)")
             } catch {
-                print("📦 SandboxMigration: DB switch failed \(pathSwitch.trackStableId): \(error)")
+                AppLog.error(.migration, "📦 SandboxMigration: DB switch failed \(pathSwitch.trackStableId): \(error)")
             }
         }
 
@@ -396,12 +396,12 @@ enum CloudCopyArchiver {
                     // 审计 🔵-10：原先直接 removeItem 删原件（不可逆）；改为移到
                     // cloudRoot/_migrated-backup/<rel>，可人工恢复。
                     if let archived = try CloudCopyArchiver.archive(relativePath: rel, cloudRoot: cloudRoot) {
-                        print("📦 SandboxMigration: archived iCloud copy → \(archived.path)")
+                        if AppLog.isEnabled(.debug, .migration) { AppLog.debug(.migration, "📦 SandboxMigration: archived iCloud copy → \(archived.path)") }
                     } else {
-                        print("📦 SandboxMigration: cloud copy already archived, kept original \(rel)")
+                        if AppLog.isEnabled(.debug, .migration) { AppLog.debug(.migration, "📦 SandboxMigration: cloud copy already archived, kept original \(rel)") }
                     }
                 } catch {
-                    print("📦 SandboxMigration: cloud archive failed \(rel): \(error)")
+                    AppLog.error(.migration, "📦 SandboxMigration: cloud archive failed \(rel): \(error)")
                 }
             }
         }

@@ -31,26 +31,26 @@ extension DatabaseManager {
             // Migration: Add folder sync columns to playlist table
             do {
                 try db.execute(sql: "ALTER TABLE playlist ADD COLUMN folder_path TEXT")
-                print("✅ Database: Added folder_path column to playlist table")
+                AppLog.info(.db, "✅ Database: Added folder_path column to playlist table")
             } catch {
                 // Column may already exist, which is fine
-                print("ℹ️ Database migration: folder_path column already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: folder_path column already exists or migration failed: \(error)")
             }
 
             do {
                 try db.execute(sql: "ALTER TABLE playlist ADD COLUMN is_folder_synced BOOLEAN DEFAULT 0")
-                print("✅ Database: Added is_folder_synced column to playlist table")
+                AppLog.info(.db, "✅ Database: Added is_folder_synced column to playlist table")
             } catch {
                 // Column may already exist, which is fine
-                print("ℹ️ Database migration: is_folder_synced column already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: is_folder_synced column already exists or migration failed: \(error)")
             }
 
             do {
                 try db.execute(sql: "ALTER TABLE playlist ADD COLUMN last_folder_sync INTEGER")
-                print("✅ Database: Added last_folder_sync column to playlist table")
+                AppLog.info(.db, "✅ Database: Added last_folder_sync column to playlist table")
             } catch {
                 // Column may already exist, which is fine
-                print("ℹ️ Database migration: last_folder_sync column already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: last_folder_sync column already exists or migration failed: \(error)")
             }
 
             // Additive and nullable for compatibility with every existing
@@ -59,9 +59,9 @@ extension DatabaseManager {
             // are rewritten by this migration.
             if try !db.columns(in: "track").contains(where: { $0.name == "modification_date" }) {
                 try db.execute(sql: "ALTER TABLE track ADD COLUMN modification_date INTEGER")
-                print("✅ Database: Added modification_date column to track table")
+                AppLog.info(.db, "✅ Database: Added modification_date column to track table")
             } else {
-                print("ℹ️ Database migration: modification_date column already exists")
+                AppLog.info(.db, "ℹ️ Database migration: modification_date column already exists")
             }
 
             // E1-S3: genre column (web 版歌曲对象已含 genre；老库补列，新库
@@ -78,10 +78,10 @@ extension DatabaseManager {
             // Migration: Add custom_cover_image_path column to playlist table
             do {
                 try db.execute(sql: "ALTER TABLE playlist ADD COLUMN custom_cover_image_path TEXT")
-                print("✅ Database: Added custom_cover_image_path column to playlist table")
+                AppLog.info(.db, "✅ Database: Added custom_cover_image_path column to playlist table")
             } catch {
                 // Column may already exist, which is fine
-                print("ℹ️ Database migration: custom_cover_image_path column already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: custom_cover_image_path column already exists or migration failed: \(error)")
             }
 
             // Migration: Create deleted_folder_playlist table to prevent recreation of deleted folder playlists
@@ -92,9 +92,9 @@ extension DatabaseManager {
                         deleted_at INTEGER NOT NULL
                     )
                 """)
-                print("✅ Database: Created deleted_folder_playlist table")
+                AppLog.info(.db, "✅ Database: Created deleted_folder_playlist table")
             } catch {
-                print("ℹ️ Database migration: deleted_folder_playlist table already exists or migration failed: \(error)")
+                AppLog.info(.db, "ℹ️ Database migration: deleted_folder_playlist table already exists or migration failed: \(error)")
             }
 
             do {
@@ -114,9 +114,9 @@ extension DatabaseManager {
                     FROM track
                     WHERE artist_id IS NOT NULL
                 """)
-                print("✅ Database: Created/backfilled track_artist table")
+                AppLog.info(.db, "✅ Database: Created/backfilled track_artist table")
             } catch {
-                print("⚠️ Database migration: track_artist table setup failed: \(error)")
+                AppLog.warn(.db, "⚠️ Database migration: track_artist table setup failed: \(error)")
             }
 
             do {
@@ -136,9 +136,9 @@ extension DatabaseManager {
                     FROM album
                     WHERE artist_id IS NOT NULL
                 """)
-                print("✅ Database: Created/backfilled album_artist_link table")
+                AppLog.info(.db, "✅ Database: Created/backfilled album_artist_link table")
             } catch {
-                print("⚠️ Database migration: album_artist_link table setup failed: \(error)")
+                AppLog.warn(.db, "⚠️ Database migration: album_artist_link table setup failed: \(error)")
             }
 
             if needsLegacyMigration {
@@ -167,11 +167,11 @@ extension DatabaseManager {
                             try Track.filter(Column("id") == duplicate.id).deleteAll(db)
                         }
 
-                        print("✅ Database: Removed \(duplicates.count - 1) duplicate track row(s) for path: \(path)")
+                        if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "✅ Database: Removed \(duplicates.count - 1) duplicate track row(s) for path: \(path)") }
                     }
                     pathDedupSucceeded = true
                 } catch {
-                    print("⚠️ Database migration: Path duplicate cleanup failed: \(error)")
+                    AppLog.warn(.db, "⚠️ Database migration: Path duplicate cleanup failed: \(error)")
                 }
 
                 // Migration: filename-based stable IDs collapse same-named songs in different albums.
@@ -206,13 +206,13 @@ extension DatabaseManager {
                     }
 
                     if updatedCount > 0 {
-                        print("✅ Database: Migrated \(updatedCount) stable IDs from filename-based to path-based")
+                        AppLog.info(.db, "✅ Database: Migrated \(updatedCount) stable IDs from filename-based to path-based")
                     } else {
-                        print("ℹ️ Database: Stable IDs already path-based")
+                        AppLog.info(.db, "ℹ️ Database: Stable IDs already path-based")
                     }
                     stableIdMigrationSucceeded = true
                 } catch {
-                    print("⚠️ Database migration: Path-based stable ID migration failed: \(error)")
+                    AppLog.warn(.db, "⚠️ Database migration: Path-based stable ID migration failed: \(error)")
                 }
                 // D1：只有当前次两步都成功才上锁；失败 → 保持未置位，下次启动重试
                 // （两步均幂等，重跑不会重复副作用）。
@@ -221,9 +221,9 @@ extension DatabaseManager {
             // Add UNIQUE constraint to stable_id to prevent duplicates
             do {
                 try db.execute(sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_track_stable_id ON track(stable_id)")
-                print("✅ Database: Created UNIQUE index on track.stable_id")
+                AppLog.info(.db, "✅ Database: Created UNIQUE index on track.stable_id")
             } catch {
-                print("⚠️ Database migration: Failed to create UNIQUE index on stable_id: \(error)")
+                AppLog.warn(.db, "⚠️ Database migration: Failed to create UNIQUE index on stable_id: \(error)")
             }
 
             // 2026-09-14（同步事故修复）：iOS 把既有 stableId 从「绝对路径派生」迁到
@@ -241,7 +241,7 @@ extension DatabaseManager {
                         UserDefaults.standard.set(true, forKey: key)
                     }
                 } catch {
-                    print("⚠️ Database migration: stableId 相对化迁移失败（下次启动重试）：\(error)")
+                    AppLog.warn(.db, "⚠️ Database migration: stableId 相对化迁移失败（下次启动重试）：\(error)")
                 }
             #endif
 
@@ -249,9 +249,9 @@ extension DatabaseManager {
             // 幂等：CREATE INDEX IF NOT EXISTS；列刚由上方 ALTER 补上，必存在。
             do {
                 try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_track_content_hash ON track(content_hash)")
-                print("✅ Database: Created index on track.content_hash")
+                AppLog.info(.db, "✅ Database: Created index on track.content_hash")
             } catch {
-                print("⚠️ Database migration: Failed to create index on content_hash: \(error)")
+                AppLog.warn(.db, "⚠️ Database migration: Failed to create index on content_hash: \(error)")
             }
         }
 

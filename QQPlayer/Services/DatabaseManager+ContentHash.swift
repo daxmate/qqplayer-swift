@@ -53,7 +53,7 @@ extension DatabaseManager {
         isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
     ) throws -> ContentHashBackfillOutcome {
         if ContentHashBackfillMarker.removeRetiredCompletionGate(defaults: defaults) {
-            print("ℹ️ Database: 退役一次性 content_hash 回填门（改为每次启动自愈回填）")
+            AppLog.info(.db, "ℹ️ Database: 退役一次性 content_hash 回填门（改为每次启动自愈回填）")
         }
 
         let outcome = try backfillMissingContentHashesDetailed(isLocallyAvailable: isLocallyAvailable)
@@ -68,15 +68,15 @@ extension DatabaseManager {
                     libraryRoot: MusicFolderResolver.syncLibraryRoot
                 )
                 if replayed > 0 {
-                    print("🔁 Sync: 回填指纹后重放挂起变更 \(replayed) 条（hash=\(hash.prefix(12))…）")
+                    if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "🔁 Sync: 回填指纹后重放挂起变更 \(replayed) 条（hash=\(hash.prefix(12))…）") }
                 }
             } catch {
-                print("⚠️ Sync: 回填后挂起变更重放失败（下次回填/入库再试）：\(error)")
+                AppLog.warn(.db, "⚠️ Sync: 回填后挂起变更重放失败（下次回填/入库再试）：\(error)")
             }
         }
 
         if outcome.skippedCloudOnly > 0 {
-            print("⏭️ Database: content_hash backfill skipped \(outcome.skippedCloudOnly) cloud-only track(s); will retry next launch")
+            AppLog.info(.db, "⏭️ Database: content_hash backfill skipped \(outcome.skippedCloudOnly) cloud-only track(s); will retry next launch")
         }
         return outcome
     }
@@ -146,7 +146,7 @@ extension DatabaseManager {
                 )
             }
         }
-        print("✅ Database: Backfilled content_hash for \(pending.count) track(s)")
+        AppLog.info(.db, "✅ Database: Backfilled content_hash for \(pending.count) track(s)")
         return ContentHashBackfillOutcome(
             filledHashes: pending.map(\.hash),
             skippedCloudOnly: skippedCloudOnly,
