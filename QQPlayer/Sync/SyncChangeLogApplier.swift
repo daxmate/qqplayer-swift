@@ -148,7 +148,7 @@ struct SyncChangeLogApplier {
 
     /// 一行诊断（隐私：只打实体/键，不打曲目内容）。
     private static func logOrphanSkip(entity: SyncChangeEntity, stableId: String) {
-        print("⚠️ SyncChangeLogApplier: 跳过引用不存在歌曲的 \(entity.rawValue) 行（本地无 stable_id=\(stableId) 的 track）")
+        AppLog.warn(.sync, "⚠️ SyncChangeLogApplier: 跳过引用不存在歌曲的 \(entity.rawValue) 行（本地无 stable_id=\(stableId) 的 track）")
     }
 
     // MARK: favorite
@@ -307,19 +307,19 @@ struct SyncChangeLogApplier {
     private func applyPlaybackPosition(payloadJSON: String?) throws -> Bool {
         let snapshot = try SyncSnapshotCodec.decode(SyncPlaybackPositionSnapshot.self, from: payloadJSON)
         guard playbackPositionSyncEnabled else {
-            print("ℹ️ SyncChangeLogApplier: 跨端续播已关闭，不接受播放位置，跳过 \(snapshot.trackStableId)")
+            AppLog.info(.sync, "ℹ️ SyncChangeLogApplier: 跨端续播已关闭，不接受播放位置，跳过 \(snapshot.trackStableId)")
             onPlaybackPositionUnsupported?(.playbackPosition)
             return false
         }
         guard let playbackPositionSink else {
-            print("ℹ️ SyncChangeLogApplier: 跨端续播已开启但落点未接，跳过 \(snapshot.trackStableId)")
+            AppLog.info(.sync, "ℹ️ SyncChangeLogApplier: 跨端续播已开启但落点未接，跳过 \(snapshot.trackStableId)")
             onPlaybackPositionUnsupported?(.playbackPosition)
             return false
         }
         guard playbackPositionSink(snapshot) else {
             // 落点存在但**未接受**（不同曲 / 远端更旧 / 位置差过小）：仍然没落地，
             // 不能计「已应用」（INV-20 的口径对这两条路一视同仁）。
-            print("ℹ️ SyncChangeLogApplier: 跨端续播落点未接受这条位置，跳过 \(snapshot.trackStableId)")
+            AppLog.info(.sync, "ℹ️ SyncChangeLogApplier: 跨端续播落点未接受这条位置，跳过 \(snapshot.trackStableId)")
             onPlaybackPositionUnsupported?(.playbackPosition)
             return false
         }

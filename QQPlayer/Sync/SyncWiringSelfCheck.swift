@@ -229,9 +229,9 @@ final class SyncWiringFactsStore {
         guard updated != gaps else { return }
         gaps = updated
         if updated.isEmpty {
-            print("ℹ️ 装配自检（\(platform)）：无缺口")
+            AppLog.info(.sync, "ℹ️ 装配自检（\(platform)）：无缺口")
         } else {
-            print("⚠️ 装配自检（\(platform)）：\(updated.count) 项已声明但未装配 —— " + updated.map(\.logLine).joined(separator: "；"))
+            AppLog.warn(.sync, "⚠️ 装配自检（\(platform)）：\(updated.count) 项已声明但未装配 —— " + updated.map(\.logLine).joined(separator: "；"))
         }
     }
 }

@@ -308,7 +308,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
                 // 之前拦截（见文件头注释：否则会被误判为"本地缺歌"挂起）。
                 if SyncChangeLogDeletionPolicy.shouldIgnore(op: entry.op) {
                     batchTally.accumulate(.ignoredDelete)
-                    print("ℹ️ SyncChangeLogPeer: 忽略远端删除（删除不跨端传播）entity=\(entry.entity) rowKey=\(entry.rowKey)")
+                    AppLog.info(.sync, "ℹ️ SyncChangeLogPeer: 忽略远端删除（删除不跨端传播）entity=\(entry.entity) rowKey=\(entry.rowKey)")
                     continue
                 }
                 switch try mapper.localize(entry) {
@@ -433,7 +433,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         let samples = items.prefix(2)
             .map { "\($0.entity):\(String($0.rowKey.prefix(24)))" }
             .joined(separator: " | ")
-        print(
+        AppLog.warn(
+            .sync,
             "⚠️ SyncChangeLogPeer: 跳过未定位的远端行 共 \(items.count) 条"
                 + "（原因 \(byReason)；实体 \(byEntity)；样例 \(samples)）"
         )
@@ -458,7 +459,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         let samples = items.prefix(2)
             .map { "\($0.entity):\(String($0.rowKey.prefix(24)))#\($0.candidateCount)" }
             .joined(separator: " | ")
-        print(
+        AppLog.warn(
+            .sync,
             "⚠️ SyncChangeLogPeer: 跳过身份歧义的远端行 共 \(items.count) 条"
                 + "（键 \(byKey)；样例 \(samples)）"
         )
@@ -470,7 +472,7 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             .map { "\($0.key.rawValue)=\($0.value.count)" }
             .sorted()
             .joined(separator: " ")
-        print("⚠️ SyncChangeLogPeer: 本批 \(items.count) 行缺身份键（\(byReason)）→ 对端定位不了，不会落库")
+        AppLog.warn(.sync, "⚠️ SyncChangeLogPeer: 本批 \(items.count) 行缺身份键（\(byReason)）→ 对端定位不了，不会落库")
     }
 
     // MARK: 会话断连

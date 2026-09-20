@@ -170,7 +170,7 @@ enum SyncChangeLogReplay {
         }
         if !obsoleteDeleteIDs.isEmpty {
             try pendingStore.delete(ids: obsoleteDeleteIDs)
-            print("ℹ️ SyncChangeLogReplay: 丢弃 \(obsoleteDeleteIDs.count) 条历史 delete 挂起行（删除不跨端传播）")
+            AppLog.info(.sync, "ℹ️ SyncChangeLogReplay: 丢弃 \(obsoleteDeleteIDs.count) 条历史 delete 挂起行（删除不跨端传播）")
         }
         let applicable = pending.filter { !SyncChangeLogDeletionPolicy.shouldIgnore(op: $0.op) }
         guard !applicable.isEmpty else { return 0 }
@@ -178,7 +178,7 @@ enum SyncChangeLogReplay {
         // 0b) 挂起键 → 身份键组（非法键 = 回不到身份，保留挂起行并跳过：不可解释的键
         //     宁可不动，也不当成指纹硬查）。
         guard let identity = SyncPendingKey.identity(fromPendingKey: pendingKey) else {
-            print("⚠️ SyncChangeLogReplay: 挂起键不可解释，保留不动（key 前缀 \(String(pendingKey.prefix(16)))…）")
+            AppLog.warn(.sync, "⚠️ SyncChangeLogReplay: 挂起键不可解释，保留不动（key 前缀 \(String(pendingKey.prefix(16)))…）")
             return 0
         }
 
@@ -206,7 +206,8 @@ enum SyncChangeLogReplay {
                 // 歧义：**不落库**（写脏行比不写更糟），也不删挂起行（不丢远端事实）——
                 // 只计数 + 一行日志，等上层修复后重试。
                 ambiguousCount += 1
-                print(
+                AppLog.warn(
+                    .sync,
                     "⚠️ SyncChangeLogReplay: 身份歧义（\(key.rawValue) 命中 \(candidateCount) 首本地曲目）"
                         + "，不落库：entity=\(item.entity) rowKey=\(item.remoteRowKey)"
                 )

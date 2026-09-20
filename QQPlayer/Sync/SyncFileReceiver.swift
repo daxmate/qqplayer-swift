@@ -298,7 +298,7 @@ final class SyncFileReceiver: @unchecked Sendable {
                 try realignPart(partURL, to: alignedPart)
             } catch {
                 let code = errorCode(for: error)
-                print("⚠️ SyncFileReceiver: .part 断点对齐失败（fileID=\(meta.fileID) 目标偏移=\(alignedPart)）：\(error)")
+                AppLog.warn(.transfer, "⚠️ SyncFileReceiver: .part 断点对齐失败（fileID=\(meta.fileID) 目标偏移=\(alignedPart)）：\(error)")
                 return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: code)),
                         .finish(.failed(localError(code, fileID: meta.fileID)))]
             }
