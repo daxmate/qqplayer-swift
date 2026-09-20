@@ -18,7 +18,7 @@
 #   iOS `QQPlayer/QQPlayerApp.swift` 的 `WindowGroup` 根 / Mac `QQPlayerMacApp` 场景根；
 #   视图文件的 `#Preview` 需要真实例装配时，按处计入预算（脚手架成本，不豁免）。
 #
-# TOTAL: 128
+# TOTAL: 118
 # 格式：路径<TAB>计数（按计数降序、同计数按路径）
 #
 # 2026-09-19 账目（与预算账本同步）：
@@ -47,6 +47,10 @@
 #   批 5b 逐项：MacDesktopWindowViews 7→3、MacLibraryView 5→4；Mac 组合根新增装配 2 行（非视图层，不计预算）。
 #   浮窗由管理器手工 hosting（`NSHostingView`）⇒ 装配点在其 `rootView(for:)` 的 `.environment(self)`，
 #   由 EnvironmentInjectionContractTests 新增的 ManualHostingEnvironmentContractTests 守护；本批 **0 处 preview 成本**。
+#   → **118**（批 5b-2：EQManager 迁 @Observable —— 7 个文件归零删行、1 个降值）
+#   批 5b-2 逐项：MacManualEQEditorView 2→0、ManualEQEditorView 2→0、EQSettingsView 2→1（残留那处非 EQ 直连）、
+#   其余 5 文件 1→0（MacEQImportView / MacEQSettingsView / MacGraphicEQ10BandEditorView / EQImportViews /
+#   GraphicEQ10BandEditorView）；iOS+Mac **两个组合根各登记 1 行**（非视图层，不计预算）；**0 处 preview 成本**。
 QQPlayer/Mac/MacPlayerView.swift	12
 QQPlayer/Views/Player/PlayerView.swift	8
 QQPlayer/Mac/MacTrackListView.swift	7
@@ -72,14 +76,8 @@ QQPlayer/Views/Playlists/PlaylistTrackRowView.swift	3
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 QQPlayer/Mac/MacArtworkThumbnail.swift	2
 QQPlayer/Mac/MacLyricsView.swift	2
-QQPlayer/Mac/MacManualEQEditorView.swift	2
 QQPlayer/Views/Artists/ArtistRowViews.swift	2
-QQPlayer/Views/Utility/EQSettingsView.swift	2
-QQPlayer/Views/Utility/ManualEQEditorView.swift	2
 QQPlayer/Mac/MacAlbumArtistViews.swift	1
-QQPlayer/Mac/MacEQImportView.swift	1
-QQPlayer/Mac/MacEQSettingsView.swift	1
-QQPlayer/Mac/MacGraphicEQ10BandEditorView.swift	1
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSmartPlaylistViews.swift	1
 QQPlayer/Mac/MacSyncCenterView.swift	1
@@ -88,6 +86,5 @@ QQPlayer/Views/Player/CollapsiblePlayerControls.swift	1
 QQPlayer/Views/Player/PlayerProgressViews.swift	1
 QQPlayer/Views/Player/TrackRowView.swift	1
 QQPlayer/Views/Playlists/SmartPlaylistCardView.swift	1
-QQPlayer/Views/Utility/EQImportViews.swift	1
-QQPlayer/Views/Utility/GraphicEQ10BandEditorView.swift	1
+QQPlayer/Views/Utility/EQSettingsView.swift	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1

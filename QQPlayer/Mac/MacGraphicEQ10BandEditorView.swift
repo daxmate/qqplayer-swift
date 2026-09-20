@@ -12,7 +12,7 @@ import SwiftUI
 
 struct MacGraphicEQ10BandEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var eqManager = EQManager.shared
+    @Environment(EQManager.self) private var eqManager
 
     @State private var gains: [Double] = Array(repeating: 0.0, count: BuiltinEQPresets.bands10.count)
 

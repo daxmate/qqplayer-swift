@@ -4,7 +4,7 @@ import SwiftUI
 
 struct CreateManualEQView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var eqManager = EQManager.shared
+    @Environment(EQManager.self) private var eqManager
 
     @State private var presetName = ""
     @State private var bandCount = 0
@@ -85,7 +85,7 @@ struct CreateManualEQView: View {
 
 struct ManualEQEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var eqManager = EQManager.shared
+    @Environment(EQManager.self) private var eqManager
 
     let preset: EQPreset
     @State private var bandFrequencies: [Double] = []

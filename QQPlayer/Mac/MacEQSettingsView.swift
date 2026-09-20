@@ -12,7 +12,7 @@ import AppKit
 import SwiftUI
 
 struct MacEQSettingsView: View {
-    @StateObject private var eqManager = EQManager.shared
+    @Environment(EQManager.self) private var eqManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingImport = false
@@ -99,7 +99,8 @@ struct MacEQSettingsView: View {
     // MARK: - Sections
 
     private var enableSection: some View {
-        Section {
+        @Bindable var eqManager = eqManager
+        return Section {
             Toggle(Localized.enableEqualizer, isOn: $eqManager.isEnabled)
                 .tint(.blue)
         } footer: {
@@ -185,7 +186,8 @@ struct MacEQSettingsView: View {
     }
 
     private var globalGainSection: some View {
-        Section {
+        @Bindable var eqManager = eqManager
+        return Section {
             VStack(alignment: .leading, spacing: DesignTokens.space8) {
                 HStack {
                     Text(Localized.globalGain)
