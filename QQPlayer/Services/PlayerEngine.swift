@@ -27,6 +27,22 @@ class PlayerEngine: NSObject, ObservableObject {
 
     @Published var currentTrack: Track?
     @Published var isPlaying = false
+
+    // MARK: - 非视图消费者的观察入口（批 6-3）
+
+    /// `currentTrack` 的变化信号。**非视图消费者的唯一观察入口**（CarPlay 场景根等）。
+    /// 迁移 `@Observable` 之日只换内芯（`CurrentValueSubject`），消费者一行都不用改。
+    /// 为什么要有它：`$currentTrack` 是 `@Published` 的合成投影，迁移后**编译期**就消失；
+    /// 消费者各自造一套订阅 = 第二处观察实现 ⇒ 迁移时必漏一处（2026-09-15 形状纪律）。
+    /// 形状契约：`NonViewObservationRatchet`（生产码不得再跨文件写 `<Target>.shared.$…`）。
+    var currentTrackPublisher: AnyPublisher<Track?, Never> {
+        $currentTrack.eraseToAnyPublisher()
+    }
+
+    /// `isPlaying` 的变化信号（同上）。
+    var isPlayingPublisher: AnyPublisher<Bool, Never> {
+        $isPlaying.eraseToAnyPublisher()
+    }
     let progress = PlaybackProgress()
     var playbackTime: TimeInterval {
         get { progress.playbackTime }

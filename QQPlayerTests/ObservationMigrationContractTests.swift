@@ -338,3 +338,157 @@ struct ObservationMigrationContractTests {
         #expect(ObservationRatchet.occurrences(of: "ObservableObject", in: boundary) == 1)
     }
 }
+
+// MARK: - 非视图消费者的观察入口（批 6-3）
+
+/// 「观察入口唯一」形状契约（批 6-3 立）。
+///
+/// 判据：迁移目标对象的**跨文件观察**只允许走对象自己声明的 façade publisher —— 生产码里
+/// 不得出现 `<Target>.shared.$…`（`@Published` 的合成投影）或 `<Target>.shared.objectWillChange`。
+/// 为什么：前者迁 `@Observable` 后**编译期**消失、后者 `@Observable` 根本没有；不立规矩的话，
+/// 消费者只能各自造第二套订阅 ⇒ 迁移时必漏一处（2026-09-15 形状纪律：同一语义只有一个入口，
+/// 靠 CI 不靠人记得）。对象**自己的文件**（同名前缀，如 `PlayerEngine*.swift`）不受限：
+/// 那是实现内芯，迁移那天由编译器盯着。
+private enum NonViewObservationRatchet {
+    /// 迁移目标（与 `QQPlayerTests/Fixtures/shared-singleton-budget-plan.md` 批 6+ 热点一致）。
+    static let migrationTargets = [
+        "PlayerEngine", "KaraokeController", "ArtworkManager", "AppCoordinator",
+        "SyncHostCenter", "SyncWiringFactsStore", "LibraryIndexer",
+    ]
+
+    /// 已知跨文件消费者（白名单空转检查：这些入口必须真的被用上）。
+    static let knownConsumers: [(path: String, entry: String)] = [
+        ("QQPlayer/CarPlay+PlayerPage.swift", "PlayerEngine.shared.currentTrackPublisher"),
+        ("QQPlayer/Services/DatabaseSuspensionCoordinator.swift", "PlayerEngine.shared.isPlayingPublisher"),
+    ]
+
+    /// 一份源码里的违禁观察形态（空 = 该文件合规）。
+    static func violations(inSource source: String, relativePath: String) -> [String] {
+        let fileName = (relativePath as NSString).lastPathComponent
+        // 对象自己的文件 = 实现内芯（含同名前缀的 extension 文件），本契约不管
+        if migrationTargets.contains(where: { fileName.hasPrefix($0) }) { return [] }
+
+        let code = ObservationRatchet.stripped(source)
+        var result: [String] = []
+        for target in migrationTargets {
+            let base = "\(target).shared."
+            var searchStart = code.startIndex
+            while let range = code.range(of: base, range: searchStart ..< code.endIndex) {
+                let tail = code[range.upperBound...]
+                if tail.hasPrefix("$") {
+                    result.append(
+                        "\(relativePath)：`\(target).shared.$…` → 改用 façade publisher（如 `\(target).shared.<prop>Publisher`）"
+                    )
+                } else if tail.hasPrefix("objectWillChange") {
+                    result.append("\(relativePath)：`\(target).shared.objectWillChange` → 改用 façade publisher")
+                }
+                searchStart = range.upperBound
+            }
+        }
+        return result
+    }
+}
+
+@Suite("非视图消费者的观察入口契约（批 6-3）")
+struct NonViewObservationContractTests {
+    @Test("(a) 迁移目标的跨文件观察一律走 façade（生产码全量扫描，fail-closed）")
+    func noCrossFilePublishedProjection() throws {
+        var scanned = 0
+        var violations: [String] = []
+        let prefix = ObservationRatchet.repositoryRoot.path + "/"
+        for url in try ObservationRatchet.swiftFiles() {
+            let relative = url.path.replacingOccurrences(of: prefix, with: "")
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                violations.append("\(relative)：读取失败（fail-closed，不跳过）")
+                continue
+            }
+            scanned += 1
+            violations += NonViewObservationRatchet.violations(inSource: source, relativePath: relative)
+        }
+
+        #expect(scanned > 0, "扫描不到任何生产源文件 = 判定规则写坏（fail-closed）")
+        #expect(
+            violations.isEmpty,
+            """
+            生产码里出现对迁移目标的跨文件 `@Published` 投影 / `objectWillChange` 订阅：
+            \(violations.sorted().joined(separator: "\n"))
+
+            修法：在对象自己的文件里声明 façade publisher（如 `PlayerEngine.currentTrackPublisher`），
+            非视图消费者只订阅它 —— 迁 `@Observable` 之日只换内芯，消费者一行不动。
+            """
+        )
+    }
+
+    @Test("(b) 已知消费者真的在走 façade（白名单空转 → 必须失败）")
+    func knownConsumersUseFacade() throws {
+        let prefix = ObservationRatchet.repositoryRoot.path + "/"
+        var sources: [String: String] = [:]
+        for url in try ObservationRatchet.swiftFiles() {
+            sources[url.path.replacingOccurrences(of: prefix, with: "")] =
+                try String(contentsOf: url, encoding: .utf8)
+        }
+        for consumer in NonViewObservationRatchet.knownConsumers {
+            let source = sources[consumer.path]
+            #expect(source != nil, "已知消费者文件不存在：\(consumer.path)（契约白名单空转）")
+            #expect(
+                source?.contains(consumer.entry) == true,
+                "\(consumer.path) 必须通过 façade `\(consumer.entry)` 观察（空转 = 契约失效）"
+            )
+        }
+    }
+
+    @Test("(c) 扫描器自证：合成违例必被抓、对象自己文件放行、注释不算（fail-closed 反向验证）")
+    func scannerSelfTest() {
+        let projectionBypass = "PlayerEngine.shared.$isPlaying.removeDuplicates().sink { _ in }"
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: projectionBypass,
+                relativePath: "QQPlayer/CarPlay+X.swift"
+            ).count == 1,
+            "跳文件写 `X.shared.$…` 必须被抓到"
+        )
+        let willChangeBypass = "PlayerEngine.shared.objectWillChange.sink { _ in }"
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: willChangeBypass,
+                relativePath: "QQPlayer/Mac/SomeVM.swift"
+            ).count == 1,
+            "跳文件订阅 `X.shared.objectWillChange` 必须被抓到"
+        )
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: projectionBypass,
+                relativePath: "QQPlayer/Services/PlayerEngine.swift"
+            ).isEmpty,
+            "对象自己的文件（实现内芯）必须放行，否则契约不可用"
+        )
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: projectionBypass,
+                relativePath: "QQPlayer/Services/PlayerEngine+NowPlaying.swift"
+            ).isEmpty,
+            "同名前缀的 extension 文件（实现内芯）必须放行"
+        )
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: "// PlayerEngine.shared.$isPlaying",
+                relativePath: "QQPlayer/CarPlay+X.swift"
+            ).isEmpty,
+            "注释里提到不算代码"
+        )
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: "let playing = PlayerEngine.shared.isPlaying",
+                relativePath: "QQPlayer/CarPlay+X.swift"
+            ).isEmpty,
+            "普通状态读取（无 `$` / `objectWillChange`）不算违例"
+        )
+        #expect(
+            NonViewObservationRatchet.violations(
+                inSource: "DatabaseManager.shared.$x",
+                relativePath: "QQPlayer/CarPlay+X.swift"
+            ).isEmpty,
+            "非迁移目标对象不误伤"
+        )
+    }
+}

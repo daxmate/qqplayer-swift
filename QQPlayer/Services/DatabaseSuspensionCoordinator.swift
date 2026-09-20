@@ -70,7 +70,7 @@ final class DatabaseSuspensionCoordinator {
         #endif
 
         isPlaying = PlayerEngine.shared.isPlaying
-        playbackCancellable = PlayerEngine.shared.$isPlaying
+        playbackCancellable = PlayerEngine.shared.isPlayingPublisher
             .removeDuplicates()
             .sink { playing in
                 Task { @MainActor in

@@ -187,7 +187,7 @@ final class CarPlayPlayerPageController {
 
     private func startObserving() {
         // 只捕获 Sendable 值（stableId），播放器状态在 MainActor 回调里现读
-        PlayerEngine.shared.$currentTrack
+        PlayerEngine.shared.currentTrackPublisher
             .map { $0?.stableId }
             .removeDuplicates()
             .sink { [weak self] _ in
