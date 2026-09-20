@@ -97,6 +97,11 @@ jobs:
       - name: Guard Siri/AppIntents test line (structural)
         run: python3 scripts/siri-tests-guard.py
 
+      # 真机探测判据自测（纯 stdlib、不需真机）：防止有人把判据改回「只认 tunnelState=connected」
+      # 而重新引入「可达设备误报未连接」——那是 2026-09-20 只能绕开探测手工安装的事故根因。
+      - name: Device detection self-test
+        run: python3 scripts/detect-device-test.py
+
       - name: Lint (swiftlint)
         run: swiftlint lint
 
