@@ -457,7 +457,9 @@ extension LyricsManager {
             guard !matches.isEmpty else { continue }
 
             // 文本 = 行内容去掉全部时间戳标记后剩余部分（多时间戳行共享同一文本）
-            let textOnly = nsLine.mutableCopy() as! NSMutableString
+            // 直接构造可变字符串（原为 `nsLine.mutableCopy() as! NSMutableString`）：
+            // 语义相同（只用于按 range 删除时间戳），但**没有 cast**、也没有强制解包。
+            let textOnly = NSMutableString(string: line)
             for match in matches.reversed() {
                 textOnly.deleteCharacters(in: match.range)
             }

@@ -367,8 +367,8 @@ enum GequhaiLogic {
 
     /// 编译 DOTALL 正则（对应 web re.S）；内置模式均经测试验证，失败即编程错误
     private static func makeRegex(_ pattern: String) -> NSRegularExpression {
-        // swiftlint:disable:next force_try
-        try! NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
+        // 不用 `try!`：模式被改坏时给出可定位诊断（本文件在行数基线内 ⇒ 保持净零，见棘轮清单）
+        do { return try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) } catch { preconditionFailure("内置正则模式必须可编译（编程错误）：\(pattern) — \(error)") }
     }
 }
 
