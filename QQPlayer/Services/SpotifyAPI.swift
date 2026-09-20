@@ -198,11 +198,11 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
     // MARK: - Public API
 
     func searchArtist(name: String) async throws -> SpotifyArtist? {
-        AppLog.info(.general, "🎵 Spotify: Searching for artist: \(name)")
+        AppLog.info(.scrape, "🎵 Spotify: Searching for artist: \(name)")
 
         // Check cache first
         if let cached = getCachedArtist(name: name), !cached.isExpired {
-            AppLog.info(.general, "✅ Spotify: Found cached artist: \(name)")
+            AppLog.info(.scrape, "✅ Spotify: Found cached artist: \(name)")
             return cached.spotifyArtist
         }
 
@@ -214,11 +214,11 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
 
         // Find best match
         guard let bestMatch = findBestMatch(for: name, in: artists) else {
-            AppLog.error(.general, "❌ Spotify: No matching artist found for: \(name)")
+            AppLog.error(.scrape, "❌ Spotify: No matching artist found for: \(name)")
             return nil
         }
 
-        AppLog.info(.general, "🎯 Spotify: Found match: \(bestMatch.name)")
+        AppLog.info(.scrape, "🎯 Spotify: Found match: \(bestMatch.name)")
 
         // Cache the result
         cacheArtist(name: name, artist: bestMatch)
@@ -235,10 +235,10 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
         }
 
         // Need to get a new token
-        AppLog.info(.general, "🔐 Spotify: Getting new access token...")
+        AppLog.info(.scrape, "🔐 Spotify: Getting new access token...")
         let newToken = try await getAccessToken()
         writeTokenLocked { accessToken = newToken }
-        AppLog.info(.general, "✅ Spotify: Successfully obtained access token")
+        AppLog.info(.scrape, "✅ Spotify: Successfully obtained access token")
     }
 
     private func getAccessToken() async throws -> SpotifyAccessToken {
@@ -269,7 +269,7 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
         let (data, response) = try await session.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
-            AppLog.info(.general, "📡 Spotify Auth: Response status: \(httpResponse.statusCode)")
+            AppLog.info(.scrape, "📡 Spotify Auth: Response status: \(httpResponse.statusCode)")
             if httpResponse.statusCode != 200 {
                 throw SpotifyAPIError.httpError(httpResponse.statusCode)
             }
@@ -298,16 +298,16 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
         request.setValue("Bearer \(accessToken.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        AppLog.info(.general, "🌐 Spotify: Making request to: \(urlString)")
+        AppLog.info(.scrape, "🌐 Spotify: Making request to: \(urlString)")
 
         let (data, response) = try await session.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
-            AppLog.info(.general, "📡 Spotify: Response status: \(httpResponse.statusCode)")
+            AppLog.info(.scrape, "📡 Spotify: Response status: \(httpResponse.statusCode)")
             if httpResponse.statusCode != 200 {
                 let responseBody = String(data: data, encoding: .utf8)
                 if let responseBody, !responseBody.isEmpty {
-                    AppLog.error(.general, "📡 Spotify: Error response: \(responseBody)")
+                    AppLog.error(.scrape, "📡 Spotify: Error response: \(responseBody)")
                 }
 
                 if httpResponse.statusCode == 403 {
@@ -319,7 +319,7 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
         }
 
         let searchResponse = try JSONDecoder().decode(SpotifySearchResponse.self, from: data)
-        AppLog.info(.general, "🔍 Spotify: Found \(searchResponse.artists.items.count) results")
+        AppLog.info(.scrape, "🔍 Spotify: Found \(searchResponse.artists.items.count) results")
 
         return searchResponse.artists.items
     }
@@ -387,9 +387,9 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
         do {
             let data = try JSONEncoder().encode(cached)
             try data.write(to: fileURL)
-            AppLog.info(.general, "💾 Spotify: Cached artist data for: \(name)")
+            AppLog.info(.scrape, "💾 Spotify: Cached artist data for: \(name)")
         } catch {
-            AppLog.error(.general, "❌ Spotify: Failed to cache artist data: \(error)")
+            AppLog.error(.scrape, "❌ Spotify: Failed to cache artist data: \(error)")
         }
     }
 }

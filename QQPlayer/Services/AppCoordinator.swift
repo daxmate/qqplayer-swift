@@ -71,7 +71,6 @@ class AppCoordinator {
             settings.lastLibraryScanDate = Date()
             settings.save()
         }
-        AppLog.info(.general, "App initialized with local sandbox music library")
 
         // Restore UI state only to show user what was playing without interrupting other apps
         Task {

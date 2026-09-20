@@ -162,7 +162,7 @@ struct LyricsSearchProvider: Sendable {
         var hits = await simplifiedHits + traditionalHits
 
         if hits.isEmpty {
-            AppLog.warn(.general, "⚠️ lrclib search with artist returned 0, retrying by track name only")
+            AppLog.warn(.scrape, "⚠️ lrclib search with artist returned 0, retrying by track name only")
             async let fallbackSimplified = fetchLRCLibHits(
                 trackName: queries[0].trackName, artistName: nil
             )
@@ -219,7 +219,7 @@ struct LyricsSearchProvider: Sendable {
             }
             return (try? JSONDecoder().decode([LRCLibSearchHit].self, from: data)) ?? []
         } catch {
-            AppLog.error(.general, "❌ Failed to search lrclib.net: \(error)")
+            AppLog.error(.scrape, "❌ Failed to search lrclib.net: \(error)")
             return []
         }
     }

@@ -13,7 +13,7 @@ extension LyricsManager {
     func fetchFromNetease(for track: Track) async -> Lyrics? {
         guard let artistName = try? getArtistName(for: track),
               !track.title.isEmpty else {
-            AppLog.warn(.general, "⚠️ Missing metadata for Netease lookup")
+            AppLog.warn(.scrape, "⚠️ Missing metadata for Netease lookup")
             return nil
         }
 
@@ -33,13 +33,13 @@ extension LyricsManager {
             guard let best else { return nil }
 
             guard let result = try await provider.getLyric(songID: best.id) else {
-                AppLog.warn(.general, "⚠️ Netease returned no lyrics for: \(track.title)")
+                AppLog.warn(.scrape, "⚠️ Netease returned no lyrics for: \(track.title)")
                 return nil
             }
 
             return makeLyrics(fromLRC: result.lrc, tlyric: result.tlyric)
         } catch {
-            AppLog.error(.general, "❌ Failed to fetch from Netease: \(error)")
+            AppLog.error(.scrape, "❌ Failed to fetch from Netease: \(error)")
             return nil
         }
     }
@@ -97,7 +97,7 @@ extension LyricsManager {
         guard let artistName = try? getArtistName(for: track),
               let albumName = try? getAlbumName(for: track),
               !artistName.isEmpty else {
-            AppLog.warn(.general, "⚠️ Missing metadata for lrclib.net lookup")
+            AppLog.warn(.scrape, "⚠️ Missing metadata for lrclib.net lookup")
             return nil
         }
 
@@ -112,12 +112,12 @@ extension LyricsManager {
         ) {
             // If we got synced lyrics, return immediately
             if !lyrics.syncedLyrics.isEmpty {
-                AppLog.info(.general, "✅ Got synced lyrics from /api/get")
+                AppLog.info(.scrape, "✅ Got synced lyrics from /api/get")
                 return lyrics
             }
 
             // We got plain lyrics, but let's try to find synced via search
-            AppLog.warn(.general, "⚠️ Got plain lyrics, searching for synced version...")
+            AppLog.warn(.scrape, "⚠️ Got plain lyrics, searching for synced version...")
         }
 
         // Try search to find synced lyrics
@@ -126,7 +126,7 @@ extension LyricsManager {
             artistName: artistName,
             duration: durationSeconds
         ) {
-            AppLog.info(.general, "✅ Found synced lyrics via /api/search")
+            AppLog.info(.scrape, "✅ Found synced lyrics via /api/search")
             return syncedLyrics
         }
 
@@ -180,7 +180,7 @@ extension LyricsManager {
             return parseLRCLibResponse(lrcResponse)
 
         } catch {
-            AppLog.error(.general, "❌ Failed to fetch from lrclib.net: \(error)")
+            AppLog.error(.scrape, "❌ Failed to fetch from lrclib.net: \(error)")
             return nil
         }
     }
@@ -197,7 +197,7 @@ extension LyricsManager {
         // lrclib 收录的中文歌 artist 多为拉丁拼写（「孙燕姿」→ Stefanie Sun），
         // 带中文 artist 搜索必然 0 条——兑底只按歌名重搜，靠 duration 过滤保证相关度
         if results.isEmpty {
-            AppLog.warn(.general, "⚠️ lrclib search with artist returned 0, retrying by track name only")
+            AppLog.warn(.scrape, "⚠️ lrclib search with artist returned 0, retrying by track name only")
             results = await fetchLRCLibSearchResults(trackName: trackName, artistName: nil)
         }
 
@@ -216,13 +216,13 @@ extension LyricsManager {
         if let exactMatch = syncedResults.first(where: {
             abs($0.duration - duration) <= 2
         }) {
-            AppLog.info(.general, "📝 Found exact duration match with synced lyrics")
+            AppLog.info(.scrape, "📝 Found exact duration match with synced lyrics")
             return parseLRCLibResponse(exactMatch)
         }
 
         // Otherwise take first synced result
         if let firstSynced = syncedResults.first {
-            AppLog.info(.general, "📝 Using first synced lyrics result (duration mismatch)")
+            AppLog.info(.scrape, "📝 Using first synced lyrics result (duration mismatch)")
             return parseLRCLibResponse(firstSynced)
         }
 
@@ -259,7 +259,7 @@ extension LyricsManager {
             return (try? decoder.decode([LRCLibResponse].self, from: data)) ?? []
 
         } catch {
-            AppLog.error(.general, "❌ Failed to search lrclib.net: \(error)")
+            AppLog.error(.scrape, "❌ Failed to search lrclib.net: \(error)")
             return []
         }
     }
@@ -310,7 +310,7 @@ extension LyricsManager {
             let data = try encoder.encode(lyrics)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            AppLog.error(.general, "❌ Failed to save lyrics to disk: \(error)")
+            AppLog.error(.scrape, "❌ Failed to save lyrics to disk: \(error)")
         }
         await enforceDiskCacheLimit()
     }
@@ -329,7 +329,7 @@ extension LyricsManager {
             return lyrics
         } catch {
             // 损坏即删（单行日志，不逐文件刷屏）
-            AppLog.warn(.general, "⚠️ Corrupted lyrics cache, removing: \(fileURL.lastPathComponent)")
+            AppLog.warn(.scrape, "⚠️ Corrupted lyrics cache, removing: \(fileURL.lastPathComponent)")
             try? fileManager.removeItem(at: fileURL)
             return nil
         }
@@ -364,9 +364,9 @@ extension LyricsManager {
                 }
             }
             // 单行汇总（此前每文件 3-4 条日志，几百首歌上千行噪音）
-            AppLog.info(.general, "📁 Lyrics disk cache: loaded \(loadedCount)/\(recent.count) recent of \(jsonFiles.count) files")
+            AppLog.info(.scrape, "📁 Lyrics disk cache: loaded \(loadedCount)/\(recent.count) recent of \(jsonFiles.count) files")
         } catch {
-            AppLog.error(.general, "❌ Failed to load lyrics cache from disk: \(error)")
+            AppLog.error(.scrape, "❌ Failed to load lyrics cache from disk: \(error)")
         }
     }
 
@@ -376,9 +376,9 @@ extension LyricsManager {
         do {
             try fileManager.removeItem(at: cacheDir)
             try fileManager.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-            AppLog.info(.general, "💾 Cleared lyrics disk cache")
+            AppLog.info(.scrape, "💾 Cleared lyrics disk cache")
         } catch {
-            AppLog.error(.general, "❌ Failed to clear lyrics disk cache: \(error)")
+            AppLog.error(.scrape, "❌ Failed to clear lyrics disk cache: \(error)")
         }
     }
 
@@ -432,7 +432,7 @@ extension LyricsManager {
         for url in dated.map(\.url) where !keep.contains(url) {
             try? fileManager.removeItem(at: url)
         }
-        AppLog.info(.general, "📁 Lyrics disk cache trimmed to \(Self.diskCacheFileLimit) files")
+        AppLog.info(.scrape, "📁 Lyrics disk cache trimmed to \(Self.diskCacheFileLimit) files")
     }
 
     /// 缓存目录内参与 LRU 的文件

@@ -63,7 +63,7 @@
                 try await indexBatched(artists)
                 try await indexBatched(playlists)
             } catch {
-                AppLog.error(.general, "❌ Spotlight reindex failed: \(error)")
+                AppLog.error(.ui, "❌ Spotlight reindex failed: \(error)")
             }
         }
 

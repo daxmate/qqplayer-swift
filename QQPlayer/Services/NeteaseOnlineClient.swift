@@ -339,7 +339,7 @@ struct URLSessionNetworkTransport: NetworkTransport {
             }
             return "\(key)=\(value)"
         }.joined(separator: ", ")
-        AppLog.info(.general, "ℹ️ [网络下载] urlHost=\(url.host ?? "?") url=\(url.absoluteString.prefix(140))… headers=\(headerSummary)")
+        AppLog.info(.scrape, "ℹ️ [网络下载] urlHost=\(url.host ?? "?") url=\(url.absoluteString.prefix(140))… headers=\(headerSummary)")
 
         var request = URLRequest(url: url)
         request.timeoutInterval = timeout
@@ -364,9 +364,9 @@ struct URLSessionNetworkTransport: NetworkTransport {
             // 诊断打点（2026-09-08）：非 2xx 读响应体——夸克 CDN 403 返回 XML
             // （如 "require login [auth miss]"），仅打状态码无法区分原因。
             if let body = try? String(contentsOf: temporaryURL, encoding: .utf8) {
-                AppLog.error(.general, "❌ [网络下载] HTTP \(statusCode) body=\(body.prefix(300))")
+                AppLog.error(.scrape, "❌ [网络下载] HTTP \(statusCode) body=\(body.prefix(300))")
             } else {
-                AppLog.error(.general, "❌ [网络下载] HTTP \(statusCode)（响应体不可读）")
+                AppLog.error(.scrape, "❌ [网络下载] HTTP \(statusCode)（响应体不可读）")
             }
             try? FileManager.default.removeItem(at: temporaryURL)
             throw NeteaseOnlineError.httpError(statusCode)
