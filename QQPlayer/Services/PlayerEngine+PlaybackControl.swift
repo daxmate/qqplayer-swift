@@ -25,7 +25,7 @@
             if usingSFBEngine {
                 // SFB 引擎不支持变速：UI 立即复位显示（否则显示倍速档但实际没变速，
                 // 2026-08-29 审计 #7）。currentPlaybackRate 保留用户值：切回 native 曲目时恢复。
-                print("⚠️ SFBAudioEngine 暂不支持倍速（Opus/DSD 不变速）——复位跟唱倍速显示")
+                AppLog.warn(.general, "⚠️ SFBAudioEngine 暂不支持倍速（Opus/DSD 不变速）——复位跟唱倍速显示")
                 KaraokeController.shared.resetSpeedForUnsupportedEngine()
             }
         }
@@ -61,12 +61,12 @@
             // Determine actual format from file extension
             let url = URL(fileURLWithPath: track.path)
             let formatInfo = PlaybackRouter.getFormatInfo(for: url)
-            print("📀 loadTrack called for: \(track.title) (format: \(formatInfo.format))")
+            AppLog.info(.general, "📀 loadTrack called for: \(track.title) (format: \(formatInfo.format))")
 
             isLoadingTrack = true
             // 新一轮载入开始：清掉上一个失败提示（2026-09-12 审计 P8）
             clearPlaybackFailure()
-            print("🔄 Starting load process for: \(track.title)")
+            AppLog.info(.general, "🔄 Starting load process for: \(track.title)")
 
             // 切歌：清 AB 行号（保留跟唱模式/速度/单句循环）
             KaraokeController.shared.resetForNewTrack()
@@ -103,7 +103,7 @@
                 if let previousURL = currentSecurityScopedURL {
                     previousURL.stopAccessingSecurityScopedResource()
                     currentSecurityScopedURL = nil
-                    print("🔓 Stopped accessing previous security-scoped resource")
+                    AppLog.info(.general, "🔓 Stopped accessing previous security-scoped resource")
                 }
 
                 // Check if this is an external file with a bookmark (file may have moved)
@@ -113,18 +113,18 @@
                     guard isCurrentLoad(generation) else { return false }
 
                     // Bookmark found and resolved - use the current location
-                    print("📍 Using resolved bookmark location: \(resolvedURL.path)")
+                    AppLog.info(.general, "📍 Using resolved bookmark location: \(resolvedURL.path)")
                     url = resolvedURL
 
                     // Start accessing security-scoped resource for external files
                     guard url.startAccessingSecurityScopedResource() else {
-                        print("❌ Failed to start accessing security-scoped resource")
+                        AppLog.error(.general, "❌ Failed to start accessing security-scoped resource")
                         throw PlayerError.fileNotFound
                     }
 
                     // Store URL to stop access later
                     currentSecurityScopedURL = url
-                    print("🔐 Started accessing security-scoped resource for external file")
+                    AppLog.info(.general, "🔐 Started accessing security-scoped resource for external file")
                 } else {
                     // No bookmark - use path from database
                     url = URL(fileURLWithPath: track.path)
@@ -146,7 +146,7 @@
 
                 // Check if SFBAudioEngine can handle this format
                 if SFBAudioEngineManager.canHandle(url: url) {
-                    print("🚀 PlayerEngine delegating to SFBAudioEngine: \(url.lastPathComponent)")
+                    AppLog.info(.general, "🚀 PlayerEngine delegating to SFBAudioEngine: \(url.lastPathComponent)")
 
                     do {
                         try Task.checkCancellation()
@@ -162,7 +162,7 @@
                         // 复位 UI 显示（否则倍速静默失效而 UI/跟唱仍显示倍速档，
                         // 2026-08-29 审计 #7）。
                         if currentPlaybackRate != 1.0 {
-                            print("⚠️ SFBAudioEngine 不支持倍速（currentPlaybackRate=\(currentPlaybackRate)）——复位跟唱倍速显示")
+                            AppLog.warn(.general, "⚠️ SFBAudioEngine 不支持倍速（currentPlaybackRate=\(currentPlaybackRate)）——复位跟唱倍速显示")
                             KaraokeController.shared.resetSpeedForUnsupportedEngine()
                         }
 
@@ -171,11 +171,11 @@
                         // Sync duration from SFB engine
                         duration = sfbAudioManager.duration
                         isPlaying = sfbAudioManager.isPlaying
-                        print("🔄 PlayerEngine duration synced from SFBAudioEngine: \(duration)s")
+                        AppLog.info(.general, "🔄 PlayerEngine duration synced from SFBAudioEngine: \(duration)s")
 
-                        print("✅ Delegated to SFBAudioEngine: \(url.lastPathComponent)")
+                        AppLog.info(.general, "✅ Delegated to SFBAudioEngine: \(url.lastPathComponent)")
                     } catch {
-                        print("❌ SFBAudioEngine delegation failed: \(error)")
+                        AppLog.error(.general, "❌ SFBAudioEngine delegation failed: \(error)")
                         // DSD 的 "native fallback" 分支已删除（2026-09-12 审计 P8）：
                         // openNativeAudioFile 对 dsf/dff 无条件抛 3001，该分支**构造上必失败**
                         // （\(error) 只留下一条误导日志：“Attempting native playback fallback”），
@@ -190,7 +190,7 @@
 
                     if let preloadedAudioFile = takePreloadedAudioFile(for: track) {
                         audioFile = preloadedAudioFile
-                        print("⚡ Using preloaded native audio file: \(url.lastPathComponent)")
+                        AppLog.info(.general, "⚡ Using preloaded native audio file: \(url.lastPathComponent)")
                     } else {
                         let loadedAudioFile = try await openNativeAudioFile(at: url, qos: .userInitiated)
                         guard isCurrentLoad(generation) else { return false }
@@ -218,7 +218,7 @@
                     // audioFile 是属性（optional）：上方 if/else 加载块内的 guard 绑定
                     // 作用域到不了这里，重新绑定避免强解包（2026-08-29 审计 #2）。
                     guard let audioFile = audioFile else {
-                        print("⚠️ audioFile became nil before native graph setup")
+                        AppLog.warn(.general, "⚠️ audioFile became nil before native graph setup")
                         return false
                     }
                     if !preservePlaybackTime {
@@ -243,7 +243,7 @@
                     do {
                         try activateAudioSession()
                     } catch {
-                        print("⚠️ Could not activate native audio session before graph setup: \(error)")
+                        AppLog.warn(.general, "⚠️ Could not activate native audio session before graph setup: \(error)")
                     }
 
                     // 用上方 guard 绑定的局部 audioFile，不用属性强解包：中间隔了
@@ -278,7 +278,7 @@
                 }
                 return false
             } catch {
-                print("Failed to load track: \(error)")
+                AppLog.error(.general, "Failed to load track: \(error)")
                 if isCurrentLoad(generation) {
                     playbackState = .stopped
                     isLoadingTrack = false
@@ -297,11 +297,11 @@
             try await withCheckedThrowingContinuation { continuation in
                 DispatchQueue.global(qos: qos).async {
                     do {
-                        print("🎵 Loading native audio file: \(url.lastPathComponent)")
+                        AppLog.info(.general, "🎵 Loading native audio file: \(url.lastPathComponent)")
 
                         let fileExtension = url.pathExtension.lowercased()
                         if fileExtension == "dsf" || fileExtension == "dff" {
-                            print("⚠️ DSD file rejected by SFBAudioEngine - may be due to sample rate or format incompatibility")
+                            AppLog.warn(.general, "⚠️ DSD file rejected by SFBAudioEngine - may be due to sample rate or format incompatibility")
 
                             let dsdError = NSError(domain: "PlayerEngine", code: 3001, userInfo: [
                                 NSLocalizedDescriptionKey: "DSD file not supported",
@@ -318,10 +318,10 @@
                         }
 
                         let audioFile = try AVAudioFile(forReading: url)
-                        print("✅ Native AVAudioFile loaded successfully: \(url.lastPathComponent)")
+                        AppLog.info(.general, "✅ Native AVAudioFile loaded successfully: \(url.lastPathComponent)")
                         continuation.resume(returning: audioFile)
                     } catch {
-                        print("❌ Failed to load native AVAudioFile: \(error)")
+                        AppLog.error(.general, "❌ Failed to load native AVAudioFile: \(error)")
                         continuation.resume(throwing: error)
                     }
                 }
@@ -353,7 +353,7 @@
             nextTimelineStartSampleTime = nil
         }
         private func cleanupCurrentPlayback(resetTime: Bool = false) async {
-            print("🧹 Cleaning up current playback")
+            AppLog.info(.general, "🧹 Cleaning up current playback")
 
             cancelEngineConfigurationRecovery()
             // Stopping AVAudioPlayerNode invokes outstanding completion handlers.
@@ -365,7 +365,7 @@
             if let securedURL = currentSecurityScopedURL {
                 securedURL.stopAccessingSecurityScopedResource()
                 currentSecurityScopedURL = nil
-                print("🔓 Stopped accessing security-scoped resource during cleanup")
+                AppLog.info(.general, "🔓 Stopped accessing security-scoped resource during cleanup")
             }
 
             // Stop timer first
@@ -373,7 +373,7 @@
 
             // Stop appropriate audio engine
             if usingSFBEngine {
-                print("🛑 Stopping SFBAudioEngine")
+                AppLog.info(.general, "🛑 Stopping SFBAudioEngine")
                 sfbAudioManager.stop()
             } else {
                 // Stop player node

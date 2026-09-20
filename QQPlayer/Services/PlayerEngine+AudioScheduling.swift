@@ -16,25 +16,25 @@
         func scheduleSegment(from startFrame: AVAudioFramePosition, file: AVAudioFile, track: Track? = nil, trackIndex: Int? = nil) -> Bool {
             // Safety check: Ensure audio engine is running
             guard audioEngine.isRunning else {
-                print("❌ Cannot schedule segment: audio engine is not running")
+                AppLog.error(.general, "❌ Cannot schedule segment: audio engine is not running")
                 return false
             }
 
             // Validate startFrame is within bounds
             guard startFrame >= 0 && startFrame < file.length else {
-                print("❌ Invalid startFrame: \(startFrame), file length: \(file.length)")
+                AppLog.error(.general, "❌ Invalid startFrame: \(startFrame), file length: \(file.length)")
                 return false
             }
 
             let remaining = file.length - startFrame
             guard remaining > 0 else {
-                print("❌ No remaining frames to schedule: startFrame=\(startFrame), length=\(file.length)")
+                AppLog.error(.general, "❌ No remaining frames to schedule: startFrame=\(startFrame), length=\(file.length)")
                 return false
             }
 
             // Validate that frameCount doesn't overflow AVAudioFrameCount
             guard remaining <= AVAudioFrameCount.max else {
-                print("❌ Remaining frames exceed AVAudioFrameCount.max: \(remaining)")
+                AppLog.error(.general, "❌ Remaining frames exceed AVAudioFrameCount.max: \(remaining)")
                 return false
             }
 
@@ -59,7 +59,7 @@
                 }
             }
 
-            print("✅ Successfully scheduled segment: startFrame=\(startFrame), frameCount=\(remaining)")
+            AppLog.info(.general, "✅ Successfully scheduled segment: startFrame=\(startFrame), frameCount=\(remaining)")
 
             // Start background monitoring when we schedule a segment
             startBackgroundMonitoring()
@@ -143,7 +143,7 @@
                     self.isPreloadingNext = false
                 } catch {
                     self.isPreloadingNext = false
-                    print("⚠️ Failed to preload next track for gapless playback: \(error)")
+                    AppLog.warn(.general, "⚠️ Failed to preload next track for gapless playback: \(error)")
                 }
             }
         }
@@ -161,7 +161,7 @@
             }
 
             guard canGaplesslySchedule(currentFile, with: nextFile) else {
-                print("ℹ️ Next track format differs; using normal transition instead of gapless")
+                AppLog.info(.general, "ℹ️ Next track format differs; using normal transition instead of gapless")
                 return
             }
 
@@ -174,7 +174,7 @@
 
             nextTimelineStartSampleTime = nodeTimelineStartSampleTime + remainingFrames
             gaplessScheduled = true
-            print("✅ Gapless next track scheduled: \(nextTrack.title)")
+            AppLog.info(.general, "✅ Gapless next track scheduled: \(nextTrack.title)")
         }
 
         /// 播放顺序 / 队列成员变化后作废「已预载（可能已排入 playerNode）的无缝下一首」的唯一入口。
@@ -282,7 +282,7 @@
                 // 冻结的 playbackTime（后台 UI timer 不跑，锁屏早于播放开始则其值为 0）
                 let fallbackDiag = "🔍 [intr] currentTime fallback to playbackTime=\(playbackTime)s "
                     + "(audioFile=\(audioFile != nil) sampleTime=nil engineRunning=\(audioEngine.isRunning))"
-                print(fallbackDiag)
+                AppLog.warn(.general, fallbackDiag)
                 InterruptionDiagnostics.log(fallbackDiag)
                 return playbackTime
             }
@@ -322,7 +322,7 @@
             // Only create a background task if we don't already have one
             if backgroundTask == .invalid {
                 backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
-                    print("🚨 Background task expiring during playback")
+                    AppLog.warn(.general, "🚨 Background task expiring during playback")
                     Task { @MainActor in
                         self?.endBackgroundMonitoring()
                     }
@@ -351,7 +351,7 @@
         func stopSilentPlaybackForPause() {
             pausedSilentPlayer?.stop()
             pausedSilentPlayer = nil
-            print("🔇 Stopped silent playback for pause")
+            AppLog.info(.general, "🔇 Stopped silent playback for pause")
         }
 
         // NOTE: maintainAudioSessionForBackground() used to live here. It force-
@@ -457,7 +457,7 @@
                 fileLength: file.length,
                 maxFrameCount: Int64(AVAudioFrameCount.max)
             ) else {
-                print("❌ macOS scheduleSegment rejected (engine running=\(audioEngine.isRunning) start=\(startFrame) len=\(file.length))")
+                AppLog.error(.general, "❌ macOS scheduleSegment rejected (engine running=\(audioEngine.isRunning) start=\(startFrame) len=\(file.length))")
                 return false
             }
 

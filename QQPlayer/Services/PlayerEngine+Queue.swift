@@ -74,7 +74,7 @@ extension PlayerEngine {
     // MARK: - Queue Management
 
     func playTrack(_ track: Track, queue: [Track] = []) async {
-        print("🎵 Playing track: \(track.title)")
+        AppLog.info(.general, "🎵 Playing track: \(track.title)")
 
         // Restore player state on first interaction if not already done
         await ensurePlayerStateRestored()
@@ -234,7 +234,7 @@ extension PlayerEngine {
             insertAt: insertAt,
             currentIndex: currentIndex
         )
-        print("🔀 Queue reordered: \(moved.title) to \(insertAt), currentIndex=\(currentIndex)")
+        AppLog.info(.general, "🔀 Queue reordered: \(moved.title) to \(insertAt), currentIndex=\(currentIndex)")
         invalidatePreloadedNextAfterQueueChange()
         savePlayerState()
     }
@@ -280,7 +280,7 @@ extension PlayerEngine {
         playbackQueue = newQueue
         normalizeIndexAndTrack()
         invalidatePreloadedNextAfterQueueChange()
-        print("🗑️ Queue items removed, remaining \(playbackQueue.count)")
+        AppLog.info(.general, "🗑️ Queue items removed, remaining \(playbackQueue.count)")
         savePlayerState()
     }
 
@@ -359,23 +359,23 @@ extension PlayerEngine {
             // Off → Queue Loop
             isRepeating = true
             isLoopingSong = false
-            print("🔁 Queue loop mode: ON")
+            AppLog.info(.general, "🔁 Queue loop mode: ON")
         } else if isRepeating && !isLoopingSong {
             // Queue Loop → Song Loop
             isRepeating = false
             isLoopingSong = true
-            print("🔂 Song loop mode: ON")
+            AppLog.info(.general, "🔂 Song loop mode: ON")
         } else {
             // Song Loop → Off
             isRepeating = false
             isLoopingSong = false
-            print("🚫 Loop mode: OFF")
+            AppLog.info(.general, "🚫 Loop mode: OFF")
         }
     }
 
     func toggleShuffle() {
         isShuffled.toggle()
-        print("🔀 Shuffle mode: \(isShuffled ? "ON" : "OFF")")
+        AppLog.info(.general, "🔀 Shuffle mode: \(isShuffled ? "ON" : "OFF")")
 
         if isShuffled {
             // Save original order and shuffle the queue
@@ -403,7 +403,7 @@ extension PlayerEngine {
         playbackQueue = [anchor] + rest
         currentIndex = 0
 
-        print("🔀 Queue shuffled, current track remains at index 0")
+        AppLog.info(.general, "🔀 Queue shuffled, current track remains at index 0")
     }
 
     private func restoreOriginalQueue() {
@@ -425,14 +425,14 @@ extension PlayerEngine {
                let mergedIndex = mergedQueue.firstIndex(where: { $0.stableId == currentTrack.stableId }) {
                 playbackQueue = mergedQueue
                 currentIndex = mergedIndex
-                print("🔀 Original queue restored, current track at index \(mergedIndex)" +
+                AppLog.info(.general, "🔀 Original queue restored, current track at index \(mergedIndex)" +
                     (additions.isEmpty ? "" : ", \(additions.count) shuffled-era additions kept"))
             } else {
                 playbackQueue = mergedQueue
                 currentIndex = min(currentIndex, max(0, mergedQueue.count - 1))
             }
         } catch {
-            print("❌ Failed to restore original queue: \(error)")
+            AppLog.error(.general, "❌ Failed to restore original queue: \(error)")
         }
 
         normalizeIndexAndTrack()

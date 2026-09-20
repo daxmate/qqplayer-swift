@@ -10,7 +10,7 @@
     import Foundation
     extension PlayerEngine {
         func play() {
-            print("▶️ play() called - state: \(playbackState), loading: \(isLoadingTrack), usingSFBEngine: \(usingSFBEngine)")
+            AppLog.info(.general, "▶️ play() called - state: \(playbackState), loading: \(isLoadingTrack), usingSFBEngine: \(usingSFBEngine)")
 
             // Delegate to SFBAudioEngine if it's handling this track
             if usingSFBEngine {
@@ -19,7 +19,7 @@
                     isPlaying = true
                     playbackState = .playing
                     startPlaybackTimer()
-                    print("✅ SFBAudioEngine resumed playback")
+                    AppLog.info(.general, "✅ SFBAudioEngine resumed playback")
                     PlayHistoryRecorder.shared.playbackBegan(track: currentTrack, at: nowPlayingElapsedTime())
                     updateNowPlayingInfoEnhanced()
                     updateWidgetData()
@@ -31,7 +31,7 @@
                     // 失败时复位标志并落入下方 native 路径（不 return）：audioFile 为 nil 时自动走
                     // loadTrack 重载；audioFile 是上一首 native 曲目残留时置 nil 强制重载，
                     // 避免用错误文件出声。
-                    print("❌ Failed to play with SFBAudioEngine: \(error) — falling back to native engine")
+                    AppLog.error(.general, "❌ Failed to play with SFBAudioEngine: \(error) — falling back to native engine")
                     usingSFBEngine = false
                     isPlaying = false
                     playbackState = .paused
@@ -50,14 +50,14 @@
                     // If state was already restored but audioFile is nil (e.g., after interruption),
                     // we need to reload the current track with preserved position
                     if hasRestoredState {
-                        print("🔄 Reloading track after interruption, preserving position: \(playbackTime)s")
+                        AppLog.info(.general, "🔄 Reloading track after interruption, preserving position: \(playbackTime)s")
                         let savedPosition = playbackTime
                         loaded = await loadTrack(track, preservePlaybackTime: true)
 
                         // Restore position after reload
                         if loaded && savedPosition > 0 {
                             await seek(to: savedPosition)
-                            print("✅ Restored position after reload: \(savedPosition)s")
+                            AppLog.info(.general, "✅ Restored position after reload: \(savedPosition)s")
                         }
                     } else {
                         // First-time state restoration
@@ -75,7 +75,7 @@
             guard let audioFile = audioFile,
                   playbackState != .loading,
                   !isLoadingTrack else {
-                print("⚠️ Cannot play: audioFile=\(audioFile != nil), state=\(playbackState), loading=\(isLoadingTrack)")
+                AppLog.warn(.general, "⚠️ Cannot play: audioFile=\(audioFile != nil), state=\(playbackState), loading=\(isLoadingTrack)")
                 return
             }
 
@@ -90,12 +90,12 @@
             do {
                 try activateAudioSession()
             } catch {
-                print("❌ Session activate failed: \(error)")
+                AppLog.error(.general, "❌ Session activate failed: \(error)")
                 // Try to continue anyway - might still work
             }
 
             if playbackState == .paused {
-                print("▶️ Resuming from pause at position: \(playbackTime)s")
+                AppLog.info(.general, "▶️ Resuming from pause at position: \(playbackTime)s")
 
                 // When resuming from pause, we need to re-schedule audio from the correct position
                 // instead of just continuing the engine, because the timing may have drifted
@@ -116,10 +116,10 @@
                 do {
                     if !audioEngine.isRunning {
                         try audioEngine.start()
-                        print("✅ Started audio engine before scheduling (resume)")
+                        AppLog.info(.general, "✅ Started audio engine before scheduling (resume)")
                     }
                 } catch {
-                    print("❌ Failed to start audio engine when resuming: \(error)")
+                    AppLog.error(.general, "❌ Failed to start audio engine when resuming: \(error)")
                     return
                 }
 
@@ -136,7 +136,7 @@
                 endBackgroundMonitoring()
                 startBackgroundMonitoring()
 
-                print("✅ Resumed playback from position: \(playbackTime)s")
+                AppLog.info(.general, "✅ Resumed playback from position: \(playbackTime)s")
 
                 // Update Now Playing info with enhanced approach
                 updateNowPlayingInfoEnhanced()
@@ -148,15 +148,15 @@
             cancelPendingCompletions()
             playerNode.stop()
 
-            print("🔊 Audio format - Sample Rate: \(audioFile.processingFormat.sampleRate), Channels: \(audioFile.processingFormat.channelCount)")
-            print("🔊 Audio file length: \(audioFile.length) frames")
+            AppLog.info(.general, "🔊 Audio format - Sample Rate: \(audioFile.processingFormat.sampleRate), Channels: \(audioFile.processingFormat.channelCount)")
+            AppLog.info(.general, "🔊 Audio file length: \(audioFile.length) frames")
 
             // Check if the file length is reasonable: 固定 1e9 帧上限误杀长高解析度曲目
             // （96kHz≈2.9h、192kHz≈1.45h），按 sampleRate 换算小时数做上限
             // （2026-08-29 审计 #3）。Int64 + scheduleSegment 已有 AVAudioFrameCount.max 防护。
             let durationHours = Double(audioFile.length) / audioFile.processingFormat.sampleRate / 3600.0
             guard audioFile.length > 0, durationHours <= 24.0 else {
-                print("❌ Invalid audio file length: \(audioFile.length) frames (\(String(format: "%.1f", durationHours))h)")
+                AppLog.error(.general, "❌ Invalid audio file length: \(audioFile.length) frames (\(String(format: "%.1f", durationHours))h)")
                 return
             }
 
@@ -164,9 +164,9 @@
             if !audioEngine.isRunning {
                 do {
                     try audioEngine.start()
-                    print("✅ Audio engine started before scheduling")
+                    AppLog.info(.general, "✅ Audio engine started before scheduling")
                 } catch {
-                    print("❌ Failed to start audio engine: \(error)")
+                    AppLog.error(.general, "❌ Failed to start audio engine: \(error)")
                     return
                 }
             }
@@ -181,7 +181,7 @@
                 seekTimeOffset = currentPosition
                 nodeTimelineStartSampleTime = 0
                 scheduleSegment(from: startFrame, file: audioFile, track: currentTrack, trackIndex: currentIndex)
-                print("✅ Resuming playback from \(currentPosition)s (frame: \(startFrame))")
+                AppLog.info(.general, "✅ Resuming playback from \(currentPosition)s (frame: \(startFrame))")
             } else {
                 // Start from beginning - but only reset if we're actually at the beginning
                 if playbackTime > 1.0 {
@@ -190,24 +190,24 @@
                     seekTimeOffset = playbackTime
                     nodeTimelineStartSampleTime = 0
                     scheduleSegment(from: startFrame2, file: audioFile, track: currentTrack, trackIndex: currentIndex)
-                    print("✅ Resuming playback from current position: \(playbackTime)s")
+                    AppLog.info(.general, "✅ Resuming playback from current position: \(playbackTime)s")
                 } else {
                     // Actually starting from beginning
                     // 中断诊断（2026-08-29）：从头播路径——记录触发条件（playbackTime<=1 或 startFrame 越界）
                     let fromBeginningDiag = "🔍 [intr] PLAY FROM BEGINNING: playbackTime=\(playbackTime)s "
                         + "currentPosition=\(currentPosition)s startFrame=\(startFrame) "
                         + "fileLength=\(audioFile.length) sampleRate=\(audioFile.processingFormat.sampleRate)"
-                    print(fromBeginningDiag)
+                    AppLog.warn(.general, fromBeginningDiag)
                     InterruptionDiagnostics.log(fromBeginningDiag)
                     seekTimeOffset = 0
                     playbackTime = 0
                     nodeTimelineStartSampleTime = 0
                     scheduleSegment(from: 0, file: audioFile, track: currentTrack, trackIndex: currentIndex)
-                    print("✅ Starting playback from beginning")
+                    AppLog.info(.general, "✅ Starting playback from beginning")
                 }
             }
 
-            print("✅ Audio segment scheduled successfully")
+            AppLog.info(.general, "✅ Audio segment scheduled successfully")
 
             // Set up audio session notifications only when needed
             ensureAudioSessionNotificationsSetup()
@@ -226,11 +226,11 @@
             updateWidgetData()
             preloadAndScheduleNextIfNeeded()
 
-            print("✅ Playback started and control center claimed")
+            AppLog.info(.general, "✅ Playback started and control center claimed")
         }
 
         func pause(fromControlCenter: Bool = false) {
-            print("⏸️ pause() called - usingSFBEngine: \(usingSFBEngine)")
+            AppLog.info(.general, "⏸️ pause() called - usingSFBEngine: \(usingSFBEngine)")
 
             // Delegate to SFBAudioEngine if it's handling this track
             if usingSFBEngine {
@@ -246,13 +246,13 @@
                     // pause path below.
                     stopSilentPlaybackForPause()
                     endBackgroundMonitoring()
-                    print("✅ SFBAudioEngine paused")
+                    AppLog.info(.general, "✅ SFBAudioEngine paused")
                     PlayHistoryRecorder.shared.playbackPaused(track: currentTrack, at: nowPlayingElapsedTime())
                     updateNowPlayingInfoEnhanced()
                     updateWidgetData()
                     return
                 }
-                print("⚠️ SFBAudioEngine player unavailable in CarPlay — falling back to native pause")
+                AppLog.warn(.general, "⚠️ SFBAudioEngine player unavailable in CarPlay — falling back to native pause")
                 usingSFBEngine = false
             }
 
@@ -260,7 +260,7 @@
             if audioFile != nil {
                 let currentPosition = currentTimeForCurrentNativeFile()
 
-                print("🔄 Pausing at position: \(currentPosition)s (from Control Center: \(fromControlCenter))")
+                AppLog.info(.general, "🔄 Pausing at position: \(currentPosition)s (from Control Center: \(fromControlCenter))")
 
                 // Store the exact pause position
                 playbackTime = currentPosition
@@ -276,7 +276,7 @@
             stopPlaybackTimer()
             PlayHistoryRecorder.shared.playbackPaused(track: currentTrack, at: playbackTime)
 
-            print("🔄 Paused audio engine - stored position: \(playbackTime)s")
+            AppLog.info(.general, "🔄 Paused audio engine - stored position: \(playbackTime)s")
 
             // Update Now Playing info with enhanced approach
             updateNowPlayingInfoEnhanced()
@@ -319,7 +319,7 @@
             if let securedURL = currentSecurityScopedURL {
                 securedURL.stopAccessingSecurityScopedResource()
                 currentSecurityScopedURL = nil
-                print("🔓 Stopped accessing security-scoped resource on stop")
+                AppLog.info(.general, "🔓 Stopped accessing security-scoped resource on stop")
             }
             stopPlaybackTimer()
 
@@ -332,12 +332,12 @@
 
             // Don't clear remote commands during track transitions - keep Control Center connected
             // Remote commands should only be cleared when the app is truly shutting down
-            print("🎛️ Keeping remote commands connected for Control Center")
+            AppLog.info(.general, "🎛️ Keeping remote commands connected for Control Center")
 
             // Don't deactivate audio session during track transitions - keep Control Center connected
             // Audio session should stay active to maintain Control Center connection
             // Only deactivate when the app is truly backgrounded or user explicitly stops playback
-            print("🎧 Keeping audio session active to maintain Control Center connection")
+            AppLog.info(.general, "🎧 Keeping audio session active to maintain Control Center connection")
 
             // Save state when stopping
             savePlayerState()

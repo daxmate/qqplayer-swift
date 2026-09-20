@@ -63,7 +63,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
 
     nonisolated private func removeEqualizer(_ equalizer: AVAudioUnitEQ, from engine: AVAudioEngine) {
         guard engine.attachedNodes.contains(equalizer) else {
-            print("ℹ️ EQ node already detached")
+            AppLog.info(.general, "ℹ️ EQ node already detached")
             return
         }
 
@@ -83,12 +83,12 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
             engine.detach(equalizer)
 
             engine.connect(upstreamNode, to: engine.mainMixerNode, format: reconnectFormat)
-            print("🔗 Restored \(upstreamNode) → mainMixerNode after EQ removal")
+            AppLog.info(.general, "🔗 Restored \(upstreamNode) → mainMixerNode after EQ removal")
         } else {
             engine.disconnectNodeOutput(equalizer)
             engine.disconnectNodeInput(equalizer)
             engine.detach(equalizer)
-            print("🧹 Removed SFBAudioEngine EQ (no upstream reconnection needed)")
+            AppLog.info(.general, "🧹 Removed SFBAudioEngine EQ (no upstream reconnection needed)")
         }
     }
 
@@ -97,13 +97,13 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
 
         // Skip EQ if not enabled by user
         guard eqManager.isEnabled else {
-            print("ℹ️ EQ not enabled by user - skipping attachment")
+            AppLog.info(.general, "ℹ️ EQ not enabled by user - skipping attachment")
             return
         }
 
         // Skip EQ if previous attachment failed (prevents repeated crashes)
         if eqAttachmentFailed {
-            print("⚠️ EQ attachment previously failed - skipping to prevent crash")
+            AppLog.warn(.general, "⚠️ EQ attachment previously failed - skipping to prevent crash")
             return
         }
 
@@ -112,7 +112,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
         let globalGain = Float(eqManager.globalGain)
 
         guard formatSupportsSFBEQ(format) else {
-            print("⚠️ SFBAudioEngine EQ not supported for format: \(format?.description ?? "nil")")
+            AppLog.warn(.general, "⚠️ SFBAudioEngine EQ not supported for format: \(format?.description ?? "nil")")
             player.modifyProcessingGraph { [weak self] engine in
                 guard let self else { return }
                 if let existing = engine.attachedNodes.compactMap({ $0 as? AVAudioUnitEQ }).first {
@@ -143,10 +143,10 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                 self.configureDefaultSFBBands(for: newEQ)
                 engine.attach(newEQ)
                 equalizer = newEQ
-                print("✅ EQ node attached via modifyProcessingGraph")
+                AppLog.info(.general, "✅ EQ node attached via modifyProcessingGraph")
             } else if let eq = equalizer, !engine.attachedNodes.contains(where: { $0 === eq }) {
                 engine.attach(eq)
-                print("✅ Reattached existing SFBAudioEngine EQ node")
+                AppLog.info(.general, "✅ Reattached existing SFBAudioEngine EQ node")
             }
 
             guard let equalizer else { return }
@@ -162,7 +162,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                 .contains(where: { $0.node === engine.mainMixerNode })
 
             if eqConnectedToMain {
-                print("🎛️ SFBAudioEngine EQ already present in graph")
+                AppLog.info(.general, "🎛️ SFBAudioEngine EQ already present in graph")
                 return
             }
 
@@ -184,7 +184,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                         engine.connect(upstreamNode, to: equalizer, format: connectFormat)
                     })
                 } catch {
-                    print("❌ EQ connection failed in attachEqualizerToEngine: \(error.localizedDescription)")
+                    AppLog.error(.general, "❌ EQ connection failed in attachEqualizerToEngine: \(error.localizedDescription)")
                     // CRITICAL: the mixer input was already disconnected above.
                     // Restore the original connection or ALL SFB playback
                     // (Opus/Vorbis/DSD) stays silent (issue #75).
@@ -192,14 +192,14 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                         engine.disconnectNodeOutput(equalizer)
                         engine.connect(upstreamNode, to: engine.mainMixerNode, format: nodeFormat.sampleRate > 0 ? nodeFormat : nil)
                     })
-                    print("🔗 Restored direct connection after EQ failure")
+                    AppLog.info(.general, "🔗 Restored direct connection after EQ failure")
                     Task { @MainActor [weak self] in
                         self?.eqAttachmentFailed = true
                     }
                     return
                 }
 
-                print("🔗 Inserted EQ between \(upstreamNode) and mainMixerNode")
+                AppLog.info(.general, "🔗 Inserted EQ between \(upstreamNode) and mainMixerNode")
                 return
             }
 
@@ -222,25 +222,25 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                         engine.connect(equalizer, to: engine.mainMixerNode, format: connectFormat)
                     })
                 } catch {
-                    print("❌ EQ connection failed (fallback): \(error.localizedDescription)")
+                    AppLog.error(.general, "❌ EQ connection failed (fallback): \(error.localizedDescription)")
                     // CRITICAL: restore the direct connection or SFB playback
                     // stays silent (issue #75)
                     try? ObjCExceptionCatcher.tryCatch({
                         engine.disconnectNodeOutput(equalizer)
                         engine.connect(sourceNode, to: engine.mainMixerNode, format: nodeFormat.sampleRate > 0 ? nodeFormat : nil)
                     })
-                    print("🔗 Restored direct connection after EQ failure (fallback)")
+                    AppLog.info(.general, "🔗 Restored direct connection after EQ failure (fallback)")
                     Task { @MainActor [weak self] in
                         self?.eqAttachmentFailed = true
                     }
                     return
                 }
 
-                print("🔗 Inserted EQ between \(sourceNode) and mainMixerNode (fallback)")
+                AppLog.info(.general, "🔗 Inserted EQ between \(sourceNode) and mainMixerNode (fallback)")
                 return
             }
 
-            print("⚠️ Unable to locate upstream node for SFBAudioEngine EQ insertion")
+            AppLog.warn(.general, "⚠️ Unable to locate upstream node for SFBAudioEngine EQ insertion")
 
             if retryCount < maxRetries {
                 Task { @MainActor [weak self] in
@@ -282,10 +282,10 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                     equalizer.bands[i].bypass = true
                 }
 
-                print("🎛️ Direct mapping: Using all \(inputBandCount) EQ bands")
+                AppLog.info(.general, "🎛️ Direct mapping: Using all \(inputBandCount) EQ bands")
             } else {
                 // More input bands than available - group and average
-                print("🔄 Reducing \(inputBandCount) bands to \(availableBands) bands")
+                AppLog.info(.general, "🔄 Reducing \(inputBandCount) bands to \(availableBands) bands")
 
                 let bandsPerGroup = Double(inputBandCount) / Double(availableBands)
 
@@ -322,10 +322,12 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                     band.filterType = .parametric
                     band.bypass = false
 
-                    print("  Band \(i): \(Int(avgFrequency))Hz, \(String(format: "%.1f", avgGain))dB (avg of \(groupSize) bands)")
+                    if AppLog.isEnabled(.debug, .general) {
+                        AppLog.debug(.general, "  Band \(i): \(Int(avgFrequency))Hz, \(String(format: "%.1f", avgGain))dB (avg of \(groupSize) bands)")
+                    }
                 }
 
-                print("✅ Applied frequency grouping and averaging")
+                AppLog.info(.general, "✅ Applied frequency grouping and averaging")
             }
         } else {
             // No EQ data - configure with default geometric spacing
@@ -344,7 +346,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                 band.bypass = false
             }
 
-            print("🎛️ Configured \(bandCount) SFBAudioEngine EQ bands with default frequencies")
+            AppLog.info(.general, "🎛️ Configured \(bandCount) SFBAudioEngine EQ bands with default frequencies")
         }
     }
 
@@ -352,7 +354,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
     /// 平台无关（iOS/macOS 共用一份；EQManager 状态变化时被 updateEQSettings 调用）。
     func applySFBEQSettings() {
         guard let equalizer = sfbEqualizer else {
-            print("⚠️ No SFBAudioEngine equalizer to update")
+            AppLog.warn(.general, "⚠️ No SFBAudioEngine equalizer to update")
             return
         }
 
@@ -365,7 +367,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
         // Reconfigure bands with current EQ settings
         configureSFBEQBands(equalizer)
 
-        print("🎛️ SFBAudioEngine EQ updated: enabled=\(eqManager.isEnabled), globalGain=\(eqManager.globalGain)dB")
+        AppLog.info(.general, "🎛️ SFBAudioEngine EQ updated: enabled=\(eqManager.isEnabled), globalGain=\(eqManager.globalGain)dB")
     }
 
     // Store decoder properties for seeking when AudioFile properties are unavailable
@@ -391,7 +393,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
         super.init()
         #if os(iOS)
             isCarPlayEnvironment = Self.detectCarPlay()
-            print("🔄 SFBAudioEngine Manager initialized - CarPlay: \(isCarPlayEnvironment)")
+            AppLog.info(.general, "🔄 SFBAudioEngine Manager initialized - CarPlay: \(isCarPlayEnvironment)")
         #endif
     }
 
@@ -404,7 +406,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
                 for scene in UIApplication.shared.connectedScenes {
                     if scene is CPTemplateApplicationScene
                         || scene.session.role == .carTemplateApplication {
-                        print("🚗 CarPlay scene detected: \(scene)")
+                        AppLog.info(.general, "🚗 CarPlay scene detected: \(scene)")
                         return true
                     }
                 }
@@ -413,10 +415,10 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
             // Additional check: CarPlay audio routes
             let audioSession = AVAudioSession.sharedInstance()
             let currentRoute = audioSession.currentRoute
-            print("🎧 Current audio route: \(currentRoute.outputs.map { "\($0.portName) (\($0.portType))" }.joined(separator: ", "))")
+            AppLog.info(.general, "🎧 Current audio route: \(currentRoute.outputs.map { "\($0.portName) (\($0.portType))" }.joined(separator: ", "))")
 
             for output in currentRoute.outputs where output.portType == .carAudio {
-                print("🚗 CarPlay audio route detected: \(output.portName)")
+                AppLog.info(.general, "🚗 CarPlay audio route detected: \(output.portName)")
                 return true
             }
 
@@ -430,11 +432,11 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
 
             if wasCarPlay != isCarPlayEnvironment {
                 if isCarPlayEnvironment {
-                    print("🚗 Switched to CarPlay - stopping SFBAudioEngine")
+                    AppLog.info(.general, "🚗 Switched to CarPlay - stopping SFBAudioEngine")
                     stop()
                     audioPlayer = nil
                 } else {
-                    print("📱 Switched from CarPlay - SFBAudioEngine available again")
+                    AppLog.info(.general, "📱 Switched from CarPlay - SFBAudioEngine available again")
                 }
             }
         }
@@ -446,7 +448,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
         #if os(iOS)
             // Don't initialize SFBAudioEngine in CarPlay environment
             if isCarPlayEnvironment {
-                print("🚗 Skipping SFBAudioEngine setup - running in CarPlay")
+                AppLog.info(.general, "🚗 Skipping SFBAudioEngine setup - running in CarPlay")
                 return
             }
         #endif
@@ -456,12 +458,12 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
 
         // Verify player was created successfully
         guard audioPlayer != nil else {
-            print("⚠️ SFBAudioEngine AudioPlayer creation returned nil")
+            AppLog.warn(.general, "⚠️ SFBAudioEngine AudioPlayer creation returned nil")
             return
         }
 
         audioPlayer?.delegate = self
-        print("🔄 SFBAudioEngine AudioPlayer initialized successfully")
+        AppLog.info(.general, "🔄 SFBAudioEngine AudioPlayer initialized successfully")
     }
 
     func resetAudioPlayer() {
@@ -470,7 +472,7 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
         audioPlayer = nil
         audioPlayer = AudioPlayer()
         audioPlayer?.delegate = self
-        print("🔄 SFBAudioEngine AudioPlayer reset")
+        AppLog.info(.general, "🔄 SFBAudioEngine AudioPlayer reset")
     }
 
     nonisolated private func formatSupportsSFBEQ(_ format: AVAudioFormat?) -> Bool {
@@ -484,13 +486,13 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
     // MARK: - AudioPlayer.Delegate
 
     nonisolated func audioPlayer(_ audioPlayer: AudioPlayer, reconfigureProcessingGraph engine: AVAudioEngine, with format: AVAudioFormat) -> AVAudioNode {
-        print("🔄 SFBAudioEngine processing graph reconfiguration for format: \(format)")
-        print("🔍 Engine state - isRunning: \(engine.isRunning), attachedNodes: \(engine.attachedNodes.count)")
+        AppLog.info(.general, "🔄 SFBAudioEngine processing graph reconfiguration for format: \(format)")
+        AppLog.info(.general, "🔍 Engine state - isRunning: \(engine.isRunning), attachedNodes: \(engine.attachedNodes.count)")
 
         // We can't access MainActor properties from nonisolated context
         // So we always skip EQ in this delegate method and rely on attachEqualizerToEngine instead
         // This prevents crashes and keeps the delegate method simple
-        print("ℹ️ Skipping EQ in delegate - EQ will be attached via attachEqualizerToEngine if enabled")
+        AppLog.info(.general, "ℹ️ Skipping EQ in delegate - EQ will be attached via attachEqualizerToEngine if enabled")
         return engine.mainMixerNode
     }
 

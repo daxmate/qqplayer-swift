@@ -22,7 +22,7 @@
             timePitchNode.rate = Float(rate)
             if usingSFBEngine {
                 // SFB 引擎不支持变速：UI 立即复位显示（否则显示倍速档但实际没变速，对齐 iOS）
-                print("⚠️ SFBAudioEngine 暂不支持倍速（Opus/OGG/DSD 不变速）——复位跟唱倍速显示")
+                AppLog.warn(.general, "⚠️ SFBAudioEngine 暂不支持倍速（Opus/OGG/DSD 不变速）——复位跟唱倍速显示")
                 KaraokeController.shared.resetSpeedForUnsupportedEngine()
             }
         }
@@ -52,7 +52,7 @@
 
         private func performMacLoadTrack(_ track: Track, preservePlaybackTime: Bool, generation: UInt64) async -> Bool {
             let url = URL(fileURLWithPath: track.path)
-            print("📀 macOS loadTrack: \(track.title) (\(url.lastPathComponent))")
+            AppLog.info(.general, "📀 macOS loadTrack: \(track.title) (\(url.lastPathComponent))")
 
             // 切歌：清 AB 行号（保留跟唱模式/速度/单句循环；对齐 iOS performLoadTrack）
             KaraokeController.shared.resetForNewTrack()
@@ -77,7 +77,7 @@
             nodeTimelineStartSampleTime = 0
 
             guard FileManager.default.fileExists(atPath: url.path) else {
-                print("❌ macOS loadTrack: file not found \(url.path)")
+                AppLog.error(.general, "❌ macOS loadTrack: file not found \(url.path)")
                 playbackState = .stopped
                 isLoadingTrack = false
                 // 用户可见错误（2026-09-12 审计 P8）：macOS 失败同样不再静默
@@ -90,7 +90,7 @@
             // SFB formats (Opus/OGG/DSD) play through SFBAudioEngine's AudioPlayer
             // (cross-platform, supports macOS 11+).
             if SFBAudioEngineManager.canHandle(url: url) {
-                print("🚀 macOS loadTrack delegating to SFBAudioEngine: \(url.lastPathComponent)")
+                AppLog.info(.general, "🚀 macOS loadTrack delegating to SFBAudioEngine: \(url.lastPathComponent)")
                 do {
                     try await sfbAudioManager.loadAndPlay(url: url)
                     guard isCurrentLoad(generation) else {
@@ -103,10 +103,10 @@
                     currentTrack = track
                     playbackState = .stopped
                     isLoadingTrack = false
-                    print("✅ macOS delegated to SFBAudioEngine: \(url.lastPathComponent)")
+                    AppLog.info(.general, "✅ macOS delegated to SFBAudioEngine: \(url.lastPathComponent)")
                     return true
                 } catch {
-                    print("❌ macOS SFBAudioEngine delegation failed: \(error)")
+                    AppLog.error(.general, "❌ macOS SFBAudioEngine delegation failed: \(error)")
                     if isCurrentLoad(generation) {
                         usingSFBEngine = false
                         playbackState = .stopped
@@ -133,7 +133,7 @@
                 isLoadingTrack = false
                 return true
             } catch {
-                print("❌ macOS loadTrack failed: \(error)")
+                AppLog.error(.general, "❌ macOS loadTrack failed: \(error)")
                 if isCurrentLoad(generation) {
                     playbackState = .stopped
                     isLoadingTrack = false
@@ -151,7 +151,7 @@
                 do {
                     try sfbAudioManager.play()
                 } catch {
-                    print("❌ macOS SFB play failed: \(error)")
+                    AppLog.error(.general, "❌ macOS SFB play failed: \(error)")
                     return
                 }
                 isPlaying = true
@@ -159,7 +159,7 @@
                 startPlaybackTimer()
                 PlayHistoryRecorder.shared.playbackBegan(track: currentTrack, at: playbackTime)
                 updateNowPlayingInfoEnhanced()
-                print("✅ macOS SFB playback resumed: \(currentTrack?.title ?? "")")
+                AppLog.info(.general, "✅ macOS SFB playback resumed: \(currentTrack?.title ?? "")")
                 return
             }
 
@@ -177,7 +177,7 @@
                         loaded = await loadTrack(track, preservePlaybackTime: true)
                         if loaded, savedPosition > 0 {
                             await seek(to: savedPosition)
-                            print("✅ macOS restored position after reload: \(savedPosition)s")
+                            AppLog.info(.general, "✅ macOS restored position after reload: \(savedPosition)s")
                         }
                     } else {
                         await ensurePlayerStateRestored()
@@ -196,7 +196,7 @@
                       isLoadingTrack: isLoadingTrack,
                       playbackStateIsLoading: playbackState == .loading
                   ) else {
-                print("⚠️ macOS play skipped: audioFile=\(audioFile != nil) state=\(playbackState)")
+                AppLog.warn(.general, "⚠️ macOS play skipped: audioFile=\(audioFile != nil) state=\(playbackState)")
                 return
             }
 
@@ -206,7 +206,7 @@
                 do {
                     try audioEngine.start()
                 } catch {
-                    print("❌ macOS audioEngine start failed: \(error)")
+                    AppLog.error(.general, "❌ macOS audioEngine start failed: \(error)")
                     return
                 }
                 // AVAudioEngine.start() 异步生效：紧跟的 scheduleSegment 有 engineIsRunning guard
@@ -218,7 +218,7 @@
                     RunLoop.current.run(until: Date().addingTimeInterval(0.01))
                 }
                 if !audioEngine.isRunning {
-                    print("❌ macOS audioEngine did not become running after start")
+                    AppLog.error(.general, "❌ macOS audioEngine did not become running after start")
                     return
                 }
             }
@@ -240,7 +240,7 @@
                 nodeTimelineStartSampleTime = 0
                 lastKnownPlaybackPosition = 0
                 lastKnownPlaybackPositionUpdatedAt = Date()
-                print("↩️ macOS play: 位置 \(requestedSeconds)s（帧 \(requestedFrame)/\(audioFile.length)）已在末尾或越界，从 0 重播")
+                AppLog.warn(.general, "↩️ macOS play: 位置 \(requestedSeconds)s（帧 \(requestedFrame)/\(audioFile.length)）已在末尾或越界，从 0 重播")
             }
 
             // 对齐 iOS play（暂停恢复路径）：cancel + stop 再重新 schedule，避免队列残留旧 segment
@@ -255,7 +255,7 @@
                 playbackState = .stopped
                 stopPlaybackTimer()
                 updateNowPlayingInfoEnhanced()
-                print("❌ macOS play: scheduleSegment 失败（startFrame=\(startFrame)），保持停止态不置 isPlaying")
+                AppLog.error(.general, "❌ macOS play: scheduleSegment 失败（startFrame=\(startFrame)），保持停止态不置 isPlaying")
                 return
             }
 
@@ -265,7 +265,7 @@
             startPlaybackTimer()
             PlayHistoryRecorder.shared.playbackBegan(track: currentTrack, at: playbackTime)
             updateNowPlayingInfoEnhanced()
-            print("✅ macOS playback started: \(currentTrack?.title ?? "")")
+            AppLog.info(.general, "✅ macOS playback started: \(currentTrack?.title ?? "")")
         }
 
         func pause(fromControlCenter: Bool = false) {
@@ -279,7 +279,7 @@
                 stopPlaybackTimer()
                 PlayHistoryRecorder.shared.playbackPaused(track: currentTrack, at: playbackTime)
                 updateNowPlayingInfoEnhanced()
-                print("⏸️ macOS SFB paused at \(playbackTime)s")
+                AppLog.info(.general, "⏸️ macOS SFB paused at \(playbackTime)s")
                 return
             }
 
@@ -302,7 +302,7 @@
             stopPlaybackTimer()
             PlayHistoryRecorder.shared.playbackPaused(track: currentTrack, at: playbackTime)
             updateNowPlayingInfoEnhanced()
-            print("⏸️ macOS paused at \(playbackTime)s")
+            AppLog.info(.general, "⏸️ macOS paused at \(playbackTime)s")
         }
 
         func seek(to time: TimeInterval) async {
@@ -311,14 +311,14 @@
                 do {
                     try sfbAudioManager.seek(to: clamped)
                 } catch {
-                    print("❌ macOS SFB seek failed: \(error)")
+                    AppLog.error(.general, "❌ macOS SFB seek failed: \(error)")
                     return
                 }
                 playbackTime = clamped
                 lastKnownPlaybackPosition = clamped
                 lastKnownPlaybackPositionUpdatedAt = Date()
                 updateNowPlayingInfoEnhanced()
-                print("✅ macOS SFB seek to \(clamped)s")
+                AppLog.info(.general, "✅ macOS SFB seek to \(clamped)s")
                 return
             }
 
@@ -342,7 +342,7 @@
                     do {
                         try audioEngine.start()
                     } catch {
-                        print("❌ macOS seek: engine start failed \(error)")
+                        AppLog.error(.general, "❌ macOS seek: engine start failed \(error)")
                         return
                     }
                     // 等 isRunning（引擎启动通常 <100ms，1s 兜底）。async 上下文不能用
@@ -366,7 +366,7 @@
             lastKnownPlaybackPosition = clamped
             lastKnownPlaybackPositionUpdatedAt = Date()
             updateNowPlayingInfoEnhanced()
-            print("✅ macOS seek to \(clamped)s")
+            AppLog.info(.general, "✅ macOS seek to \(clamped)s")
         }
 
         func cancelPendingCompletions() {

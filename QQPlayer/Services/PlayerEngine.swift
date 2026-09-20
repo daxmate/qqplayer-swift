@@ -232,11 +232,11 @@ class PlayerEngine: NSObject {
             // This method manually sets up the background session that would normally
             // happen via handleWillResignActive() and handleDidEnterBackground()
 
-            print("🎤 Setting up background session for Siri-initiated playback")
+            AppLog.info(.general, "🎤 Setting up background session for Siri-initiated playback")
 
             // Check app state to confirm we're in background
             let appState = UIApplication.shared.applicationState
-            print("🎤 App state: \(appState == .background ? "background" : appState == .inactive ? "inactive" : "active")")
+            AppLog.info(.general, "🎤 App state: \(appState == .background ? "background" : appState == .inactive ? "inactive" : "active")")
 
             // Mark that we've set up Siri background session
             hasSetupSiriBackgroundSession = true
@@ -244,21 +244,21 @@ class PlayerEngine: NSObject {
             // Set up audio session for background (same as handleWillResignActive)
             // But don't re-grab if interrupted by alarm/call
             guard !isAudioSessionInterrupted else {
-                print("🎧 Audio session interrupted (alarm/call) - skipping Siri background session keepalive")
+                AppLog.warn(.general, "🎧 Audio session interrupted (alarm/call) - skipping Siri background session keepalive")
                 return
             }
             do {
                 // Don't call setCategory here - changing category/options on a live
                 // session forces a hardware reconfiguration that stops playback
                 try AVAudioSession.sharedInstance().setActive(true, options: [])
-                print("🎧 Session keepalive on resign active - success")
+                AppLog.info(.general, "🎧 Session keepalive on resign active - success")
             } catch {
-                print("❌ Session keepalive on resign active failed: \(error)")
+                AppLog.error(.general, "❌ Session keepalive on resign active failed: \(error)")
             }
 
             // Background diagnostic and state saving (same as handleDidEnterBackground)
             let backgroundTime = UIApplication.shared.backgroundTimeRemaining
-            print("🔍 DIAGNOSTIC - backgroundTimeRemaining: \(backgroundTime)")
+            AppLog.info(.general, "🔍 DIAGNOSTIC - backgroundTimeRemaining: \(backgroundTime)")
 
             // Stop all UI timers since we're in background
             suspendUITimersForBackground()
@@ -268,13 +268,13 @@ class PlayerEngine: NSObject {
         #else
             // macOS: no Siri-initiated background launch or background session
             // concept; audio keeps playing on the default output device.
-            print("ℹ️ setupBackgroundSessionForSiri: no-op on macOS")
+            AppLog.info(.general, "ℹ️ setupBackgroundSessionForSiri: no-op on macOS")
         #endif
     }
 
     func savePlayerState() {
         guard let currentTrack = currentTrack else {
-            print("🚫 No current track to save state for")
+            AppLog.warn(.general, "🚫 No current track to save state for")
             return
         }
 
@@ -310,7 +310,7 @@ class PlayerEngine: NSObject {
 
         UserDefaults.standard.set(playerState, forKey: "QQPlayerState")
         UserDefaults.standard.synchronize()
-        print("✅ Player state saved to UserDefaults (offline, per-device)")
+        AppLog.info(.general, "✅ Player state saved to UserDefaults (offline, per-device)")
 
         // S2-T12+（2026-09-15）：跨端续播（同步面板开关，默认关）。
         // 关 = `recordIfEnabled` 直接 return：不读设置外的任何东西、不碰 DB、不写 outbox。
@@ -344,42 +344,42 @@ class PlayerEngine: NSObject {
 
         // Only load the audio file if we have a current track from UI restoration
         if let currentTrack = currentTrack {
-            print("🔄 Loading audio for restored track: \(currentTrack.title)")
+            AppLog.info(.general, "🔄 Loading audio for restored track: \(currentTrack.title)")
             let savedPosition = playbackTime // Save the position before loadTrack
             await loadTrack(currentTrack, preservePlaybackTime: true)
 
             // Restore the playback position after loading (if position was saved)
             if savedPosition > 0 {
-                print("🔄 Seeking to restored position: \(savedPosition)s")
+                AppLog.info(.general, "🔄 Seeking to restored position: \(savedPosition)s")
                 await seek(to: savedPosition)
-                print("✅ Restored position: \(savedPosition)s")
+                AppLog.info(.general, "✅ Restored position: \(savedPosition)s")
             }
         }
     }
 
     func restoreUIStateOnly() async {
         guard let playerStateDict = UserDefaults.standard.dictionary(forKey: "QQPlayerState") else {
-            print("📭 No saved player state found in UserDefaults")
+            AppLog.info(.general, "📭 No saved player state found in UserDefaults")
             return
         }
 
         guard let lastSavedAt = playerStateDict["lastSavedAt"] as? Date else {
-            print("🚫 Invalid saved state format")
+            AppLog.warn(.general, "🚫 Invalid saved state format")
             return
         }
 
-        print("🔄 Restoring UI state only from \(lastSavedAt)")
+        AppLog.info(.general, "🔄 Restoring UI state only from \(lastSavedAt)")
 
         // Don't restore if the saved state is too old (more than 7 days)
         let daysSinceLastSave = Date().timeIntervalSince(lastSavedAt) / (24 * 60 * 60)
         if daysSinceLastSave > 7 {
-            print("⏰ Saved state is too old (\(Int(daysSinceLastSave)) days), skipping restore")
+            AppLog.warn(.general, "⏰ Saved state is too old (\(Int(daysSinceLastSave)) days), skipping restore")
             return
         }
 
         // Find the current track by stable ID
         guard let currentTrackStableId = playerStateDict["currentTrackStableId"] as? String else {
-            print("🚫 No current track in saved state")
+            AppLog.warn(.general, "🚫 No current track in saved state")
             return
         }
 
@@ -389,7 +389,7 @@ class PlayerEngine: NSObject {
             }
 
             guard let restoredTrack = track else {
-                print("🚫 Could not find saved track with ID: \(currentTrackStableId)")
+                AppLog.warn(.general, "🚫 Could not find saved track with ID: \(currentTrackStableId)")
                 return
             }
 
@@ -415,9 +415,9 @@ class PlayerEngine: NSObject {
 
                 // Validate restored state consistency
                 if self.isLoopingSong && self.playbackQueue.count == 1 {
-                    print("✅ Loop song mode validated with single track queue")
+                    AppLog.info(.general, "✅ Loop song mode validated with single track queue")
                 } else if self.isLoopingSong {
-                    print("⚠️ Loop song mode with multi-track queue - this is fine")
+                    AppLog.warn(.general, "⚠️ Loop song mode with multi-track queue - this is fine")
                 }
 
                 // Additional validation for shuffle state
@@ -428,10 +428,10 @@ class PlayerEngine: NSObject {
                        self.playbackQueue[self.currentIndex].stableId != currentTrack.stableId {
                         // Find the correct index for the current track
                         if let correctIndex = self.playbackQueue.firstIndex(where: { $0.stableId == currentTrack.stableId }) {
-                            print("⚠️ Fixed currentIndex from \(self.currentIndex) to \(correctIndex) for non-shuffled queue")
+                            AppLog.warn(.general, "⚠️ Fixed currentIndex from \(self.currentIndex) to \(correctIndex) for non-shuffled queue")
                             self.currentIndex = correctIndex
                         } else {
-                            print("⚠️ Current track not found in queue, resetting to index 0")
+                            AppLog.warn(.general, "⚠️ Current track not found in queue, resetting to index 0")
                             self.currentIndex = 0
                         }
                     }
@@ -452,14 +452,14 @@ class PlayerEngine: NSObject {
                 self.playbackState = .stopped
                 self.isPlaying = false
 
-                print("✅ UI state restored - track: \(restoredTrack.title), position: \(savedTime)s, duration: \(self.duration)s (no audio loaded)")
+                AppLog.info(.general, "✅ UI state restored - track: \(restoredTrack.title), position: \(savedTime)s, duration: \(self.duration)s (no audio loaded)")
 
                 // Normalize index and track after restoration
                 self.normalizeIndexAndTrack()
             }
 
         } catch {
-            print("❌ Failed to restore UI state: \(error)")
+            AppLog.error(.general, "❌ Failed to restore UI state: \(error)")
         }
     }
 

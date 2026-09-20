@@ -39,12 +39,12 @@ extension SFBAudioEngineManager {
         }
 
         // Log position every 10 seconds for debugging
-        if Int(currentTime * 10) % 100 == 0 {
-            print("🎵 SFBAudioEngine position: \(currentTime)/\(duration)")
+        if Int(currentTime * 10) % 100 == 0, AppLog.isEnabled(.debug, .general) {
+            AppLog.debug(.general, "🎵 SFBAudioEngine position: \(currentTime)/\(duration)")
         }
 
         if duration > 0 && currentTime >= duration {
-            print("🏁 SFBAudioEngine track completed: \(currentTime)/\(duration)")
+            AppLog.info(.general, "🏁 SFBAudioEngine track completed: \(currentTime)/\(duration)")
             // Track completion will be handled by PlayerEngine
             isPlaying = false
             updateTimer?.invalidate()
@@ -64,11 +64,11 @@ extension SFBAudioEngineManager {
         // For DSD files, let PlayerEngine handle the detailed sample rate validation
         // since it depends on whether we're using DoP or PCM conversion
         if basicCanHandle && (ext == "dsf" || ext == "dff") {
-            print("🔍 SFBAudioEngine.canHandle(\(url.lastPathComponent)): ext=\(ext), canHandle=true (DSD - validation deferred to PlayerEngine)")
+            AppLog.info(.general, "🔍 SFBAudioEngine.canHandle(\(url.lastPathComponent)): ext=\(ext), canHandle=true (DSD - validation deferred to PlayerEngine)")
             return true
         }
 
-        print("🔍 SFBAudioEngine.canHandle(\(url.lastPathComponent)): ext=\(ext), canHandle=\(basicCanHandle)")
+        AppLog.info(.general, "🔍 SFBAudioEngine.canHandle(\(url.lastPathComponent)): ext=\(ext), canHandle=\(basicCanHandle)")
         return basicCanHandle
     }
 }
