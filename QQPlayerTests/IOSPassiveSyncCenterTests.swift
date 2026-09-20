@@ -64,9 +64,35 @@ struct IOSPassiveSyncCenterTests {
     // MARK: - 夹具（数据同步端装配用：真会话 + 内存库 + 临时曲库根）
 
     private func makeManager() throws -> DatabaseManager {
-        let manager = DatabaseManager(dbWriter: try DatabaseQueue())
+        try makeManagerAndQueue().0
+    }
+
+    /// 内存库 + 其 queue（host 侧夹具要用裸 SQL 写 track 行）。
+    private func makeManagerAndQueue() throws -> (DatabaseManager, DatabaseQueue) {
+        let queue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: queue)
         try manager.createTables()
-        return manager
+        return (manager, queue)
+    }
+
+    /// host 侧夹具：一首手机上没有的歌（指纹 H-offmain）+ 一条收藏 → 接收侧「本地缺歌挂起」。
+    /// （写成同步 helper：async 上下文里直接调 `queue.write` 会被 GRDB 的 async 重载接管，
+    /// 那条重载要求 @Sendable 闭包且必须 await。）
+    private func seedHostMissingTrackFavorite(_ queue: DatabaseQueue) throws {
+        try queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, path, content_hash) VALUES (?, ?, ?, ?)",
+                arguments: ["host-track", "T", "/m/host-track.flac", "H-offmain"]
+            )
+            try SyncChangeLogStore.record(
+                db,
+                entity: .favorite,
+                rowKey: "host-track",
+                op: .upsert,
+                payloadJSON: try SyncSnapshotCodec.encode(SyncFavoriteSnapshot(trackStableId: "host-track")),
+                updatedAtMs: 1000
+            )
+        }
     }
 
     private func makeTempRoot(_ tag: String) throws -> URL {
@@ -414,5 +440,88 @@ struct IOSPassiveSyncCenterTests {
         #expect(IOSPassiveSyncPresenter.reasonKey(SyncPushFailureReason.invalidPath) == "sync_passive_reason_path")
         #expect(IOSPassiveSyncPresenter.reasonKey(SyncPushFailureReason.landFailed) == "sync_passive_reason_save")
         #expect(IOSPassiveSyncPresenter.reasonKey("unknown_reason") == "sync_passive_reason_other")
+    }
+
+    // MARK: - 回归：会话队列回调的隔离断言（2026-09-20 真机闪退）
+
+    /// 真机闪退（`QQPlayer-2026-09-20-0811/0812*.ips`：`EXC_BREAKPOINT` / SIGTRAP，队列
+    /// `com.daxmate.qqplayer.sync.browser`）根因回归。
+    ///
+    /// 根因：`attachDataSync` 在 **@MainActor** 上下文里写回调闭包 → 非 Sendable 闭包
+    /// **继承主线程隔离**（Swift 6 语义）；而 `SyncChangeLogPeer` 是在**会话队列**（NW 通道队列，
+    /// 非主线程）**同步调用**这些回调的 → 闭包体内首次隔离访问（`groups.reduce { $0 + $1.count }`）
+    /// 触发运行时 executor 断言 → SIGTRAP → App 直接退出（Mac 面板看是「同步完成」）。
+    ///
+    /// 触发条件（与真机逐条一致）：帧 9 从**非主线程**投递 + 分组**非空**——空批不会调用
+    /// reduce 的闭包，故「推空批不崩、对端缺歌（挂起/未定位）必崩」。
+    /// 修法（回调类型标 `@Sendable`）后：闭包不再继承隔离，同一路径必须跑完。
+    @MainActor
+    @Test("回归：帧 9 在会话队列（非主线程）送达时，生产回调不得触发隔离断言")
+    func dataSyncCallbacksSurviveOffMainPush() async throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let clientManager = try makeManager()
+        let root = try makeTempRoot("offmain")
+        let center = makeCenter(clientManager, root: root)
+        center.attachPassiveHost(to: fixture.clientSession)
+        #expect(center.isDataSyncAttached)
+
+        // host 侧：一首手机上没有的歌（指纹 H-offmain）+ 一条收藏 → 接收侧「本地缺歌挂起」
+        // ⇒ 分组非空（真机上正是这一路把 App 打崩）。
+        let (hostManager, hostQueue) = try makeManagerAndQueue()
+        try seedHostMissingTrackFavorite(hostQueue)
+        let hostPeer = SyncChangeLogPeer(
+            session: fixture.hostSession,
+            store: SyncChangeLogStore(database: hostManager),
+            applier: SyncChangeLogApplier(database: hostManager),
+            peerID: fixture.clientIdentity.deviceID,
+            libraryRoot: root
+        )
+
+        // 真机投递线程 = NW 通道队列（`com.daxmate.qqplayer.sync.browser`）；回环通道**同步投递**
+        // ⇒ 接收侧 `handlePush` 就在本线程跑完（不在主线程）。
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue(label: "com.daxmate.qqplayer.sync.browser.test").async {
+                _ = try? hostPeer.sendIncrement()
+                continuation.resume()
+            }
+        }
+
+        // 跑到这里 = 隔离断言没触发；挂起落库 = 非空分组那条分支真的走了。
+        let pending = SyncChangeLogPendingStore(database: clientManager)
+        #expect(try pending.pendingCount() == 1)
+    }
+
+    /// 形状契约：**会话队列回调必须 `@Sendable`**。
+    ///
+    /// 两条会话队列回调（`SyncChangeLogPeer` / `SyncLibraryPassiveHost`）都在 NW 通道队列被同步调用，
+    /// 漏标一处 = 该回调在 iOS 上重新继承主线程隔离 = 真机闪退（见上面回归用例）。
+    /// 口径：声明形如 `var onXxx: ((…) -> Void)?` 的行必须带 `@Sendable`；计数变化 = 有人增删回调，
+    /// 必须同步本基线（有意为之的摩擦：新增回调要过这一关）。
+    @Test("形状契约：会话队列回调声明必须 @Sendable（漏一处 = 真机闪退）")
+    func sessionQueueCallbacksDeclareSendable() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let targets = [
+            ("QQPlayer/Sync/SyncChangeLogPeer.swift", 13),
+            ("QQPlayer/Sync/SyncLibraryPassiveHost.swift", 2),
+        ]
+        for (relativePath, expectedCount) in targets {
+            let source = try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
+            let declarations = source.split(separator: "\n").filter { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return trimmed.hasPrefix("var on") && trimmed.contains(": (") && trimmed.hasSuffix(")?")
+            }
+            #expect(
+                declarations.count == expectedCount,
+                "\(relativePath) 会话队列回调声明数变了（\(declarations.count) ≠ \(expectedCount)）：新增/删回调须同步本基线"
+            )
+            for line in declarations {
+                #expect(
+                    line.contains("@Sendable"),
+                    "\(relativePath) 有回调没标 @Sendable（会话队列调用 = 真机闪退）：\(line.trimmingCharacters(in: .whitespaces))"
+                )
+            }
+        }
     }
 }
