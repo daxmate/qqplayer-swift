@@ -104,6 +104,7 @@ iOS/Mac 两端 + CarPlay + 锁屏/Control Center 的刷新路径都要重新核�
 | 批 5（2026-09-19） | `LyricsManager`（**`actor`**，8 处）→ `AppServices` 容器 | 直连棘轮 141 → **133**（真迁 8 处，0 preview 成本） | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 |
 | 批 5b-1（2026-09-20） | `DesktopWindowsManager`（`ObservableObject` → `@Observable`，5 处；Mac 专属浮窗） | 直连棘轮 133 → **128**（真迁 5 处，0 preview 成本）；迁移棘轮 184/98 → **180/96** | iOS 全量 + Mac 构建零警告 + 行数/print 预算 + target 门禁 + 长文件行数净零 |
 | 批 5b-2（2026-09-20） | `EQManager`（`ObservableObject` → `@Observable`，10 处 / 8 文件 / 9 个 struct） | 直连棘轮 128 → **118**（真迁 10 处，0 preview 成本）；迁移棘轮 180/96 → **164/86** | iOS 全量 1679/211 + Mac 零警告 + 预算/print 双绿 + target 门禁 + `EQManager.swift` 行数净零 |
+| 批 5b-3（2026-09-20） | `SFBAudioEngineManager`（`ObservableObject` → `@Observable`；**视图侧已由 PR #18 收口，本批只动本体**） | 直连棘轮 **116 → 116（不动）**；迁移棘轮 164/86 → **159/84** | iOS 全量 1684/212 + Mac 零警告 + 预算双绿（22423/1379）+ target 门禁 |
 | **批 6-0（2026-09-20，本批）** | **口径补齐 + 8 处显形债**（无新对象迁移；`CarPlayTrackFilter` / `IntentArtworkService` 两个唯一入口） | 直连棘轮 118 →（口径）**126** →（清 8 处）**116**。逐项：`WhatsNewStore`×3 → `AppServices.whatsNew`；`DatabaseManager.shared`×1 → `LibraryReads.allTracks()`；CarPlay 格式过滤 5 文件判据收口 → `CarPlayTrackFilter`（真迁 5 处）；意图封面 ×1 → `IntentArtworkService`；残留 2 处＝`LibraryIndexer.shared`（批 6 热点）+ `#Preview` 装配（脚手架） | iOS 全量 + Mac 零警告 + 行数/print 预算 + target 门禁 + swiftformat/swiftlint |
 
 > 批 4 合入后的**装配缺口热修**（PR #9）也已记账：组合根没装配 `@Environment(T.self)` 是**运行时**致命错，
@@ -286,6 +287,22 @@ SwiftUI View）故不在棘轮范围内，属批 7「扫描范围补洞」的欠
 - **基线**：直连 128 → 118（7 文件归零删行；`EQSettingsView` 2→1，残留那处是 `UIApplication.shared` —— 系统单例，非债）；
   迁移 180/96 → 164/86（删 1 个 `ObservableObject` + 5 个 `@Published` + 10 处 `@StateObject`）。
 - **本批 0 处 preview 成本**：8 个文件均无 `#Preview`。
+
+##### 批 5b-3：`SFBAudioEngineManager` —— 实测完成（2026-09-20）
+
+- **⚠️ 形状在动工后被 #18 改过**：main 合入 #18（`9fba34c`）引入单一入口 `CarPlayTrackFilter`
+  （`isActive` / `isCompatible(_:)` / `filtered(_:)`），把 5 个视图里 `SFBAudioEngineManager.shared.isCarPlayEnvironment`
+  的直连读**全部收口**（实测：main 上这 5 个视图对该对象引用 = **0**）⇒ 本批**删掉已废弃的视图侧改动与组合根注入**，
+  只留对象本体。**教训：开工前先 `git fetch` 看 main 是否已前进 —— 本批前半程是拿旧基线做的无效功**（同一批文件被 #18 重写）。
+- **迁移口径**（沿用 5b-2 规则）：原先 `@Published` 的 4 个保持被追踪；其余存储属性（`audioPlayer` / `currentTrack` /
+  `updateTimer` / `eqAttachmentFailed` / `decoderFrameLength` / `decoderSampleRate` / `eqManager` / `sfbEqualizer` /
+  `lastConfiguredSampleRate`）全 `@ObservationIgnored` —— 迁移前即不发通知，迁后也不发。
+- **一处行为细节（已在 PR 请用户定口径）**：`isCarPlayEnvironment` 迁移后被追踪，而 `CarPlayTrackFilter.isActive`
+  会在视图 `body` 求值路径读到它 ⇒ CarPlay 连接/断开时列表**会自动刷新**（迁移前靠场景重建）——「更正确但非零变化」。
+- **真实发现（本批未处理）**：`isPlaying` / `currentTime` / `duration` 三个 `@Published` 是**全仓库死代码**
+  （除声明行外无读也无写，`grep` 实证）—— 记录在迁移基线注释里，可另开「死状态清理」。
+- **基线**：迁移 164/86 → 159/84（删 1 个 `ObservableObject` + 4 个 `@Published`）；**直连基线不动**（本批不涉及视图层）。
+- **本批 0 处 preview 成本**：2 个文件（对象本体 + 基线）均无 `#Preview`。
 
 ### 批 6+：四个热点（最后）
 `AppCoordinator`（17）、`PlayerEngine`（24）、`KaraokeController`（23）、`ArtworkManager`（23）。
