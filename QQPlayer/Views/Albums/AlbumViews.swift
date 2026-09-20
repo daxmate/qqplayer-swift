@@ -162,16 +162,8 @@ struct AlbumDetailScreen: View {
     }
 
     private var filteredAlbumTracks: [Track] {
-        // Filter out incompatible formats when connected to CarPlay
-        if SFBAudioEngineManager.shared.isCarPlayEnvironment {
-            return albumTracks.filter { track in
-                let ext = URL(fileURLWithPath: track.path).pathExtension.lowercased()
-                let incompatibleFormats = ["ogg", "opus", "dsf", "dff"]
-                return !incompatibleFormats.contains(ext)
-            }
-        } else {
-            return albumTracks
-        }
+        // CarPlay 连接时剔除不兼容格式（名单与判据的唯一入口 = CarPlayTrackFilter）
+        CarPlayTrackFilter.filtered(albumTracks)
     }
 
     private var groupedByDisc: [(discNumber: Int, tracks: [Track])] {

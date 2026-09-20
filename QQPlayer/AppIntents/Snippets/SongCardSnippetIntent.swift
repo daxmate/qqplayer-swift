@@ -24,6 +24,7 @@
 
         @Dependency var playback: IntentPlaybackService
         @Dependency var store: IntentEntityStore
+        @Dependency var artworkService: IntentArtworkService
 
         init() {}
 
@@ -38,7 +39,7 @@
                 throw AppIntentError(wrapping: AudioIntentError.noAudioEntity)
             }
             let isLiked = try playback.isFavorite(trackStableId: track.stableId)
-            let artwork = await ArtworkManager.shared.getThumbnail(for: track, maxPixelSize: 256)
+            let artwork = await artworkService.thumbnail(for: track, maxPixelSize: 256)
 
             return .result(view: SongCardSnippetView(
                 trackStableId: track.stableId,
