@@ -168,4 +168,3 @@ extension MacSearchAnythingLayer {
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }
-

@@ -178,4 +178,3 @@ extension MacSearchAnythingLayer {
         }
     }
 }
-

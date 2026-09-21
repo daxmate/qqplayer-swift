@@ -159,4 +159,3 @@ struct SearchAnythingEscapeMonitor: ViewModifier {
         (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
     }
 }
-
