@@ -120,6 +120,8 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/DatabaseManager+ContentHash.swift",
         "QQPlayer/Services/DatabaseManager+Library.swift",
         "QQPlayer/Services/DatabaseManager+Migration.swift",
+        "QQPlayer/Services/DatabaseManager+PlaylistFolderSync.swift",
+        "QQPlayer/Services/DatabaseManager+PlaylistMaintenance.swift",
         "QQPlayer/Services/DatabaseManager+Playlists.swift",
         "QQPlayer/Services/DatabaseManager+Schema.swift",
         "QQPlayer/Services/DatabaseManager+Tracks.swift",

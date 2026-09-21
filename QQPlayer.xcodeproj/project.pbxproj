@@ -617,6 +617,8 @@
 				Services/CloudDownloadManager.swift,
 				Services/CloudFailureDetector.swift,
 				Services/CloudFileAvailability.swift,
+				"Services/DatabaseManager+PlaylistFolderSync.swift",
+				"Services/DatabaseManager+PlaylistMaintenance.swift",
 				Services/DatabaseManager.swift,
 				"Services/DatabaseManager+ContentHash.swift",
 				"Services/DatabaseManager+Diagnostics.swift",
