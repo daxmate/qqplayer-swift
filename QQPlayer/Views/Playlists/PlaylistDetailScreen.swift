@@ -1,3 +1,15 @@
+//
+//  PlaylistDetailScreen.swift
+//  QQPlayer
+//
+//  歌单**详情页**主体：全部 stored property（曲目/编辑态/封面/排序/歌手名缓存）+ `body`
+//  （封面区 + 歌单信息 + 曲目列表 + 滑动操作 + 排序菜单 + 封面选择）。
+//  其余按职责分片（2026-09-21 拆分，纯搬家、无逻辑变更）：
+//    · Views/Playlists/PlaylistDetailScreen+DataLoading.swift — 曲目/歌手名缓存加载
+//    · Views/Playlists/PlaylistDetailScreen+PlaybackActions.swift — 播放引擎门面 + 行操作反馈
+//    · Views/Playlists/PlaylistDetailScreen+Sorting.swift — 排序求值 + 排序偏好持久化
+//    · Views/Playlists/PlaylistDetailScreen+CustomCover.swift — 封面小图 + 自定义封面读写
+//
 import PhotosUI
 import SwiftUI
 import WidgetKit
@@ -6,94 +18,36 @@ struct PlaylistDetailScreen: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     @Environment(\.appAccentColor) private var accentColor
     let playlist: Playlist
-    @Environment(AppCoordinator.self) private var appCoordinator
-    @State private var tracks: [Track] = []
+    /// 分片：跨文件可见（原 private）
+    @Environment(AppCoordinator.self) var appCoordinator
+    /// 分片：跨文件可见（原 private）
+    @State var tracks: [Track] = []
     @State private var isEditMode: Bool = false
-    @State private var artworks: [UIImage] = []
+    /// 分片：跨文件可见（原 private）
+    @State var artworks: [UIImage] = []
     @State private var settings = DeleteSettings.load()
-    @State private var sortOption: TrackSortOption = .playlistOrder
+    /// 分片：跨文件可见（原 private）
+    @State var sortOption: TrackSortOption = .playlistOrder
     @State private var showSortMenu = false
-    @State private var recentlyActedTracks: Set<String> = []
-    @Environment(AppServices.self) private var services
+    /// 分片：跨文件可见（原 private）
+    @State var recentlyActedTracks: Set<String> = []
+    /// 分片：跨文件可见（原 private）
+    @Environment(AppServices.self) var services
     @State private var showingImagePicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var customCoverImage: UIImage?
+    /// 分片：跨文件可见（原 private）
+    @State var customCoverImage: UIImage?
+    /// 分片：跨文件可见（原 private）
     /// 歌单自定义封面读取失败的登记（INV-22 另一半：读不到必须计数 + 就地说明）。
-    @Environment(PlaylistCoverLoadFailuresStore.self) private var coverFailures
+    @Environment(PlaylistCoverLoadFailuresStore.self) var coverFailures
     @State private var showCoverOptions = false
-    @State private var artistNameCache: [Int64: String] = [:]
-    @State private var artistDisplayNameCache: [String: String] = [:]
+    /// 分片：跨文件可见（原 private）
+    @State var artistNameCache: [Int64: String] = [:]
+    /// 分片：跨文件可见（原 private）
+    @State var artistDisplayNameCache: [String: String] = [:]
+    /// 分片：跨文件可见（原 private）
     /// 按歌手排序时的歌手名缓存（.task 按需加载，替代 sortedTracks 每次求值全表查询）
-    @State private var artistSortCache: [Int64: String] = [:]
-
-    private var playerEngine: PlayerEngine {
-        appCoordinator.playerEngine
-    }
-
-    private func markAsActed(_ trackId: String) {
-        recentlyActedTracks.insert(trackId)
-        // Remove after 1 second so user can swipe again if needed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            recentlyActedTracks.remove(trackId)
-        }
-    }
-
-    private var sortedTracks: [Track] {
-        // CarPlay 连接时剔除不兼容格式（名单与判据的唯一入口 = CarPlayTrackFilter）
-        let filteredTracks = CarPlayTrackFilter.filtered(tracks)
-
-        switch sortOption {
-        case .playlistOrder:
-            // Respect the playlist position order (tracks are already loaded in position order)
-            return filteredTracks
-        case .dateNewest:
-            return filteredTracks.sorted { ($0.id ?? 0) > ($1.id ?? 0) }
-        case .dateOldest:
-            return filteredTracks.sorted { ($0.id ?? 0) < ($1.id ?? 0) }
-        case .nameAZ:
-            return filteredTracks.sorted { $0.title.lowercased() < $1.title.lowercased() }
-        case .nameZA:
-            return filteredTracks.sorted { $0.title.lowercased() > $1.title.lowercased() }
-        case .artistAZ:
-            // Pre-fetch all artist names for performance
-            return filteredTracks.sorted { track1, track2 in
-                let artist1 = artistSortCache[track1.artistId ?? -1] ?? ""
-                let artist2 = artistSortCache[track2.artistId ?? -1] ?? ""
-                return artist1.lowercased() < artist2.lowercased()
-            }
-        case .artistZA:
-            // Pre-fetch all artist names for performance
-            return filteredTracks.sorted { track1, track2 in
-                let artist1 = artistSortCache[track1.artistId ?? -1] ?? ""
-                let artist2 = artistSortCache[track2.artistId ?? -1] ?? ""
-                return artist1.lowercased() > artist2.lowercased()
-            }
-        case .sizeLargest:
-            return filteredTracks.sorted { ($0.fileSize ?? 0) > ($1.fileSize ?? 0) }
-        case .sizeSmallest:
-            return filteredTracks.sorted { ($0.fileSize ?? 0) < ($1.fileSize ?? 0) }
-        }
-    }
-
-    private func buildArtistCache(for tracks: [Track]) -> [Int64: String] {
-        // Get unique artist IDs
-        let artistIds = Set(tracks.compactMap { $0.artistId })
-
-        // Fetch all artists in one query
-        var cache: [Int64: String] = [:]
-        do {
-            let artists = try LibraryReads.artists(ids: Array(artistIds))
-            for artist in artists {
-                if let id = artist.id {
-                    // 简繁归一：行副标题按当前 UI 语言显示同一字形
-                    cache[id] = ArtistNameNormalizer.displayName(artist.name)
-                }
-            }
-        } catch {
-            AppLog.error(.ui, "Failed to build artist cache: \(error)")
-        }
-        return cache
-    }
+    @State var artistSortCache: [Int64: String] = [:]
 
     var body: some View {
         ZStack {
@@ -430,202 +384,4 @@ struct PlaylistDetailScreen: View {
         }
     }
 
-    @ViewBuilder
-    private func artworkView(at index: Int, size: CGFloat) -> some View {
-        if index < artworks.count {
-            Image(uiImage: artworks[index])
-                .resizable().scaledToFill()
-                .frame(width: size, height: size)
-                .clipped()
-        } else if index < tracks.count {
-            RoundedRectangle(cornerRadius: DesignTokens.radius0)
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: size, height: size)
-                .overlay(
-                    Image(systemName: "music.note")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: size / 4))
-                )
-        }
-    }
-
-    private func loadPlaylistTracks() {
-        guard let playlistId = playlist.id else { return }
-
-        do {
-            let playlistItems = try appCoordinator.databaseManager.getPlaylistItems(playlistId: playlistId)
-            let trackIds = playlistItems.map { $0.trackStableId }
-            tracks = try appCoordinator.databaseManager.getTracksByStableIdsPreservingOrder(trackIds)
-            loadArtistNameCache()
-
-            // Load artworks for the first 4 tracks
-            Task {
-                await loadArtworks()
-            }
-        } catch {
-            AppLog.error(.ui, "Failed to load playlist tracks: \(error)")
-        }
-    }
-
-    private func loadArtworks() async {
-        var loadedArtworks: [UIImage] = []
-        let tracksToLoad = Array(tracks.prefix(4))
-
-        for track in tracksToLoad {
-            if let artwork = await services.artworkManager.getThumbnail(for: track, maxPixelSize: 256) {
-                loadedArtworks.append(artwork)
-            }
-        }
-
-        await MainActor.run {
-            artworks = loadedArtworks
-        }
-    }
-
-    private func loadSortPreference() {
-        guard let playlistId = playlist.id else { return }
-        let key = "sortPreference_playlist_\(playlistId)"
-        if let savedRawValue = UserDefaults.standard.string(forKey: key),
-           let saved = TrackSortOption(rawValue: savedRawValue) {
-            sortOption = saved
-        }
-    }
-
-    private func loadArtistNameCache() {
-        do {
-            artistNameCache = try LibraryReads.artistNamesById()
-            let fallbackArtistIds = tracks.reduce(into: [String: Int64]()) { result, track in
-                if let artistId = track.artistId {
-                    result[track.stableId] = artistId
-                }
-            }
-            artistDisplayNameCache = try LibraryReads.artistDisplayNames(
-                forTrackStableIds: tracks.map(\.stableId),
-                fallbackArtistIdsByStableId: fallbackArtistIds
-            )
-        } catch {
-            AppLog.error(.ui, "Failed to load playlist artist cache: \(error)")
-        }
-    }
-
-    private func saveSortPreference() {
-        guard let playlistId = playlist.id else { return }
-        let key = "sortPreference_playlist_\(playlistId)"
-        UserDefaults.standard.set(sortOption.rawValue, forKey: key)
-    }
-
-    /// 当前歌单的自定义封面是否读取失败（nil = 没配封面或读到）。
-    private var customCoverFailure: PlaylistCoverLoadFailuresStore.Failure? {
-        let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
-        return coverFailures.failures.first { $0.playlistKey == key }
-    }
-
-    @MainActor
-    private func loadCustomCover() {
-        // 路径解析只有一处入口（`PlaylistCoverResolver`）：读不到**申报 + 上屏**
-        // （详情页封面下方会出橙色说明；INV-22 另一半）。
-        let key = PlaylistCoverResolver.playlistKey(id: playlist.id, slug: playlist.slug)
-        switch PlaylistCoverResolver.resolve(customCoverImagePath: playlist.customCoverImagePath) {
-        case .none:
-            coverFailures.clear(playlistKey: key)
-        case let .unavailable(reason):
-            coverFailures.record(
-                playlistKey: key,
-                path: playlist.customCoverImagePath ?? "",
-                reason: reason
-            )
-        case let .available(fileURL):
-            guard let data = try? Data(contentsOf: fileURL),
-                  let image = UIImage(data: data) else {
-                coverFailures.record(
-                    playlistKey: key,
-                    path: playlist.customCoverImagePath ?? "",
-                    reason: PlaylistCoverResolver.Reason.decodeFailed
-                )
-                return
-            }
-            coverFailures.clear(playlistKey: key)
-            customCoverImage = image
-            AppLog.info(.ui, "✅ Loaded custom playlist cover from \(playlist.customCoverImagePath ?? "")")
-        }
-    }
-
-    @MainActor
-    private func saveCustomCover(_ image: UIImage) async {
-        guard let playlistId = playlist.id else { return }
-
-        // Get shared container
-        guard let containerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
-        ) else {
-            AppLog.error(.ui, "❌ Failed to get shared container URL")
-            return
-        }
-
-        // Create unique filename for this playlist cover
-        let filename = "playlist_cover_\(playlistId).jpg"
-        let fileURL = containerURL.appendingPathComponent(filename)
-        let coverImage = image.squarePlaylistCover()
-
-        // Save a normalized square image so all playlist covers match standard artwork sizing.
-        guard let jpegData = coverImage.jpegData(compressionQuality: 0.85) else {
-            AppLog.error(.ui, "❌ Failed to convert image to JPEG")
-            return
-        }
-
-        do {
-            // Save image to shared container
-            try jpegData.write(to: fileURL)
-            AppLog.info(.ui, "✅ Saved custom cover to \(filename)")
-
-            // Update database with custom cover path
-            try appCoordinator.databaseManager.updatePlaylistCustomCover(
-                playlistId: playlistId,
-                imagePath: filename
-            )
-
-            // Update UI
-            customCoverImage = coverImage
-
-            // Notify widgets to refresh
-            WidgetCenter.shared.reloadAllTimelines()
-
-            AppLog.info(.ui, "✅ Custom cover saved and database updated")
-        } catch {
-            AppLog.error(.ui, "❌ Failed to save custom cover: \(error)")
-        }
-    }
-
-    private func removeCustomCover() {
-        guard let playlistId = playlist.id else { return }
-
-        // Remove from database
-        do {
-            try appCoordinator.databaseManager.updatePlaylistCustomCover(
-                playlistId: playlistId,
-                imagePath: nil
-            )
-
-            // Remove file from shared container if it exists
-            if let customPath = playlist.customCoverImagePath,
-               !customPath.isEmpty,
-               let containerURL = FileManager.default.containerURL(
-                   forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios"
-               ) {
-                let fileURL = containerURL.appendingPathComponent(customPath)
-                try? FileManager.default.removeItem(at: fileURL)
-                AppLog.info(.ui, "✅ Removed custom cover file")
-            }
-
-            // Update UI
-            customCoverImage = nil
-
-            // Notify widgets to refresh
-            WidgetCenter.shared.reloadAllTimelines()
-
-            AppLog.info(.ui, "✅ Custom cover removed")
-        } catch {
-            AppLog.error(.ui, "❌ Failed to remove custom cover: \(error)")
-        }
-    }
 }

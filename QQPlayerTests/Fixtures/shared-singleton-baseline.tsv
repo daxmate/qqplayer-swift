@@ -255,7 +255,7 @@ QQPlayer/Mac/MacTagEditorView+Scrape.swift	1
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1
-QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	2
+QQPlayer/Views/Playlists/PlaylistDetailScreen+CustomCover.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	1
 QQPlayer/Views/Utility/SettingsView.swift	2
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
