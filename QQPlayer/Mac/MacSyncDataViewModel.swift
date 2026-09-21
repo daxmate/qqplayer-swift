@@ -145,7 +145,7 @@ final class MacSyncDataViewModel: ObservableObject {
         // 与「连接后自动」共用同一个在飞门：同一会话只允许一轮（手动 / 自动互斥），
         // 取不到门 = 直接放弃本轮（不排队）。
         guard SyncDataRunGate.shared.acquire() else {
-            print("ℹ️ MacSyncDataViewModel: 已有一轮同步数据在跑（自动或手动），本轮跳过")
+            AppLog.info(.ui, "ℹ️ MacSyncDataViewModel: 已有一轮同步数据在跑（自动或手动），本轮跳过")
             return
         }
         stopReportRefresh()
@@ -160,10 +160,10 @@ final class MacSyncDataViewModel: ObservableObject {
         do {
             let reconcile = try repairDangling()
             if reconcile.didChange {
-                print("ℹ️ MacSyncDataViewModel: 同步前对账本地真值" + reconcile.logText)
+                AppLog.info(.ui, "ℹ️ MacSyncDataViewModel: 同步前对账本地真值" + reconcile.logText)
             }
         } catch {
-            print("⚠️ MacSyncDataViewModel: 同步前对账失败 \(error)")
+            AppLog.warn(.ui, "⚠️ MacSyncDataViewModel: 同步前对账失败 \(error)")
         }
 
         let coordinator = makeCoordinator(session)
@@ -206,16 +206,16 @@ final class MacSyncDataViewModel: ObservableObject {
             do {
                 let repair = try repairDangling()
                 if repair.didChange {
-                    print("ℹ️ MacSyncDataViewModel: 重置前对账出站悬空引用与本地真值" + repair.logText)
+                    AppLog.info(.ui, "ℹ️ MacSyncDataViewModel: 重置前对账出站悬空引用与本地真值" + repair.logText)
                 }
             } catch {
-                print("⚠️ MacSyncDataViewModel: 出站悬空引用对账失败 \(error)")
+                AppLog.warn(.ui, "⚠️ MacSyncDataViewModel: 出站悬空引用对账失败 \(error)")
             }
             try resetCursors(peerID)
             resetResultMessage = "sync_run_data_reset_done".localized
-            print("ℹ️ MacSyncDataViewModel: 已重置与对端的同步游标（peerID 已脱敏）")
+            AppLog.info(.ui, "ℹ️ MacSyncDataViewModel: 已重置与对端的同步游标（peerID 已脱敏）")
         } catch {
-            print("❌ MacSyncDataViewModel: 重置同步游标失败 \(error)")
+            AppLog.error(.ui, "❌ MacSyncDataViewModel: 重置同步游标失败 \(error)")
             resetResultMessage = "sync_run_data_reset_failed".localized
         }
     }

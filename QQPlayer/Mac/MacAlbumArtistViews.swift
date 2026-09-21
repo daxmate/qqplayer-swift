@@ -90,7 +90,7 @@ struct MacAlbumGridView: View {
         } catch {
             // 审计 L7：不再只 print（用户点卡无任何反应）
             openError = "album_load_failed".localized(with: error.localizedDescription)
-            print("❌ openAlbum failed: \(error)")
+            AppLog.error(.ui, "❌ openAlbum failed: \(error)")
         }
     }
 }
@@ -222,7 +222,7 @@ struct MacArtistListView: View {
         } catch {
             // 审计 L7：不再只 print（用户点行无任何反应）
             openError = "artist_load_failed".localized(with: error.localizedDescription)
-            print("❌ openArtist failed: \(error)")
+            AppLog.error(.ui, "❌ openArtist failed: \(error)")
         }
     }
 }
@@ -455,7 +455,7 @@ struct MacPlaylistListView: View {
         } catch {
             // 审计 L7：不再弹窗静默关闭——用户至少知道没建成
             createError = "playlist_create_failed".localized(with: error.localizedDescription)
-            print("❌ MacPlaylistListView createPlaylist failed: \(error)")
+            AppLog.error(.ui, "❌ MacPlaylistListView createPlaylist failed: \(error)")
         }
     }
 
@@ -471,7 +471,7 @@ struct MacPlaylistListView: View {
                     SmartPlaylistCardInfo(kind: $0, title: $0.rawValue, count: 0)
                 }
                 smartCoverTracks = [:]
-                print("❌ MacPlaylistListView smart cardInfos failed")
+                AppLog.error(.ui, "❌ MacPlaylistListView smart cardInfos failed")
                 return
             }
             smartCards = payload.cards

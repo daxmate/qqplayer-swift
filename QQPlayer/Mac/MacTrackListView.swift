@@ -550,7 +550,7 @@ struct MacTrackListView: View {
             try appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
-            print("❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
+            AppLog.error(.ui, "❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
         }
     }
 

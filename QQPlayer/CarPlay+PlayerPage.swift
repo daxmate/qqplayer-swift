@@ -449,7 +449,7 @@ final class CarPlayPlayerPageController {
             // 别赌系统丢弃，也别让多余按钮把页头挤崩
             let maxCount = CPListTemplateDetailsHeader.maximumActionButtonCount
             if maxCount > 0, buttons.count > maxCount {
-                print("⚠️ CarPlay 播放页页头动作按钮上限 \(maxCount)：已裁剪 \(buttons.count - maxCount) 个")
+                AppLog.warn(.ui, "⚠️ CarPlay 播放页页头动作按钮上限 \(maxCount)：已裁剪 \(buttons.count - maxCount) 个")
                 buttons = Array(buttons.prefix(maxCount))
             }
         }

@@ -7,28 +7,7 @@
 #   新文件带裸 print → 红（确需登记则加行并在提交信息说明理由）。
 #
 # 重新生成：scripts/check-structural-budget.sh emit-prints
-QQPlayer/AppIntents/FoundationModels/MixGenerator.swift	2
-QQPlayer/CarPlay+PlayerPage.swift	1
-QQPlayer/CarPlaySceneDelegate.swift	3
-QQPlayer/ContentView.swift	4
-QQPlayer/Helpers/EnvironmentLoader.swift	3
-QQPlayer/Mac/MacAlbumArtistViews.swift	4
-QQPlayer/Mac/MacEQSettingsView.swift	2
-QQPlayer/Mac/MacLibraryView.swift	6
-QQPlayer/Mac/MacLyricsResendAutoRunner.swift	4
-QQPlayer/Mac/MacManualEQEditorView.swift	2
-QQPlayer/Mac/MacOnlineSearchView.swift	4
-QQPlayer/Mac/MacPlaylistDetailSheet.swift	3
-QQPlayer/Mac/MacQuarkLoginView.swift	3
 QQPlayer/Mac/MacScanLogger.swift	1
-QQPlayer/Mac/MacSearchAnythingLayer.swift	6
-QQPlayer/Mac/MacSearchView.swift	2
-QQPlayer/Mac/MacSyncDataViewModel.swift	7
-QQPlayer/Mac/MacTrackListView.swift	1
-QQPlayer/Mac/SyncHostCenter.swift	8
-QQPlayer/Models/SFBTrack.swift	16
 QQPlayer/Models/WidgetData.swift	30
-QQPlayer/QQPlayerApp.swift	33
 QQPlayer/Services/SyncConnectDiag.swift	1
-QQPlayer/ViewModels/TutorialViewModel.swift	1
-# TOTAL: 147
+# TOTAL: 32

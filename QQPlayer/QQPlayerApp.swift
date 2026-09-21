@@ -77,10 +77,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
                         let playlistNames = NSOrderedSet(array: playlistVocabulary)
                         INVocabulary.shared().setVocabularyStrings(playlistNames, of: .mediaPlaylistTitle)
-                        print("✅ Set up vocabulary for \(playlistNames.count) playlist terms")
+                        AppLog.info(.general, "✅ Set up vocabulary for \(playlistNames.count) playlist terms")
 
                     } catch {
-                        print("❌ Failed to set up vocabulary: \\(error)")
+                        AppLog.error(.general, "❌ Failed to set up vocabulary: \\(error)")
                     }
                 }
 
@@ -93,7 +93,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                         context.subscriptionStatus = .notSubscribed // Since this is a local music app
                         context.becomeCurrent()
                     } catch {
-                        print("❌ Failed to set up media context: \\(error)")
+                        AppLog.error(.general, "❌ Failed to set up media context: \\(error)")
                     }
                 }
             }
@@ -193,7 +193,7 @@ struct QQPlayerApp: App {
             // 等 scene 激活完成、窗口几何/safe area 最终确定后再刷（实测即时刷会过早）
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
             guard !Task.isCancelled else { return }
-            print("🔄 Scene change detected - forcing main window layout refresh (safe-area workaround)")
+            AppLog.info(.general, "🔄 Scene change detected - forcing main window layout refresh (safe-area workaround)")
             for scene in UIApplication.shared.connectedScenes {
                 guard let windowScene = scene as? UIWindowScene,
                       windowScene.activationState == .foregroundActive else { continue }
@@ -223,13 +223,13 @@ struct QQPlayerApp: App {
     }
 
     private func handleDidEnterBackground() {
-        print("🔍 DIAGNOSTIC - backgroundTimeRemaining:", UIApplication.shared.backgroundTimeRemaining)
+        AppLog.info(.general, "🔍 DIAGNOSTIC - backgroundTimeRemaining: \(UIApplication.shared.backgroundTimeRemaining)")
 
         // Configure audio for background playback - critical for SFBAudioEngine stability
         Task { @MainActor in
             // Don't touch audio session if interrupted by alarm/call
             guard !PlayerEngine.shared.isAudioSessionInterrupted else {
-                print("🎧 Audio session interrupted - skipping background optimization")
+                AppLog.info(.general, "🎧 Audio session interrupted - skipping background optimization")
                 return
             }
 
@@ -262,10 +262,10 @@ struct QQPlayerApp: App {
             if !LibraryIndexer.shared.isIndexing {
                 let settings = DeleteSettings.load()
                 if shouldPerformAutoScan(lastScanDate: settings.lastLibraryScanDate) {
-                    print("🔄 Foreground: Starting library scan (been a while since last scan)")
+                    AppLog.info(.general, "🔄 Foreground: Starting library scan (been a while since last scan)")
                     LibraryIndexer.shared.start()
                 } else {
-                    print("⏭️ Foreground: Skipping auto-scan (use manual sync button)")
+                    AppLog.warn(.general, "⏭️ Foreground: Skipping auto-scan (use manual sync button)")
                 }
             }
         }
@@ -274,7 +274,7 @@ struct QQPlayerApp: App {
     private func shouldPerformAutoScan(lastScanDate: Date?) -> Bool {
         // If never scanned before, definitely scan
         guard let lastScanDate = lastScanDate else {
-            print("🆕 Never scanned before - will perform scan")
+            AppLog.info(.general, "🆕 Never scanned before - will perform scan")
             return true
         }
 
@@ -283,9 +283,9 @@ struct QQPlayerApp: App {
         let shouldScan = hoursSinceLastScan >= 1.0
 
         if shouldScan {
-            print("⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - will scan")
+            AppLog.info(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - will scan")
         } else {
-            print("⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - skipping")
+            AppLog.warn(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - skipping")
         }
 
         return shouldScan
@@ -294,13 +294,13 @@ struct QQPlayerApp: App {
     private func handleWillResignActive() {
         guard PlayerEngine.shared.isPlaying else {
             releaseAudioSessionIfIdle()
-            print("🎧 QQPlayer is not playing - leaving audio focus with the current app")
+            AppLog.info(.general, "🎧 QQPlayer is not playing - leaving audio focus with the current app")
             return
         }
 
         // Don't re-grab the audio session if we're being interrupted by an alarm or call
         guard !PlayerEngine.shared.isAudioSessionInterrupted else {
-            print("🎧 Audio session interrupted (alarm/call) - skipping session keepalive")
+            AppLog.info(.general, "🎧 Audio session interrupted (alarm/call) - skipping session keepalive")
             return
         }
 
@@ -310,9 +310,9 @@ struct QQPlayerApp: App {
         // every time the phone locks).
         do {
             try AVAudioSession.sharedInstance().setActive(true, options: [])
-            print("🎧 Session keepalive on resign active - success")
+            AppLog.info(.general, "🎧 Session keepalive on resign active - success")
         } catch {
-            print("❌ Session keepalive fail:", error)
+            AppLog.error(.general, "❌ Session keepalive fail: \(error)")
         }
     }
 
@@ -320,22 +320,22 @@ struct QQPlayerApp: App {
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("ℹ️ Audio session was already inactive or could not be released: \(error)")
+            AppLog.info(.general, "ℹ️ Audio session was already inactive or could not be released: \(error)")
         }
     }
 
     private func handleOpenURL(_ url: URL) {
-        print("🔗 Received URL: \(url.absoluteString)")
+        AppLog.info(.general, "🔗 Received URL: \(url.absoluteString)")
 
         guard url.scheme == "qqplayer" else {
-            print("❌ Unknown URL scheme: \(url.scheme ?? "nil")")
+            AppLog.error(.general, "❌ Unknown URL scheme: \(url.scheme ?? "nil")")
             return
         }
 
         Task { @MainActor in
             switch url.host {
             case "refresh":
-                print("📁 URL triggered library refresh - this is a manual refresh so always scan")
+                AppLog.info(.general, "📁 URL triggered library refresh - this is a manual refresh so always scan")
                 await LibraryIndexer.shared.copyFilesFromSharedContainer()
                 if !LibraryIndexer.shared.isIndexing {
                     LibraryIndexer.shared.start()
@@ -344,7 +344,7 @@ struct QQPlayerApp: App {
             case "playlist":
                 // Extract playlist ID from path
                 let playlistId = url.pathComponents.dropFirst().joined(separator: "/")
-                print("📋 Widget: Opening playlist - \(playlistId)")
+                AppLog.info(.general, "📋 Widget: Opening playlist - \(playlistId)")
 
                 // Navigate to playlist
                 if let playlistIdInt = Int64(playlistId) {
@@ -357,21 +357,21 @@ struct QQPlayerApp: App {
                                 object: nil,
                                 userInfo: ["playlistId": playlistIdInt]
                             )
-                            print("✅ Widget: Navigating to playlist \(playlist.title)")
+                            AppLog.info(.general, "✅ Widget: Navigating to playlist \(playlist.title)")
                         }
                     } catch {
-                        print("❌ Widget: Failed to find playlist: \(error)")
+                        AppLog.error(.general, "❌ Widget: Failed to find playlist: \(error)")
                     }
                 }
 
             default:
-                print("⚠️ Unknown URL host: \(url.host ?? "nil")")
+                AppLog.warn(.general, "⚠️ Unknown URL host: \(url.host ?? "nil")")
             }
         }
     }
 
     private func handleSiriIntent(_ userActivity: NSUserActivity) {
-        print("🎤 Received Siri intent: \(userActivity.activityType)")
+        AppLog.info(.general, "🎤 Received Siri intent: \(userActivity.activityType)")
         Task { @MainActor in
             await appCoordinator.handleSiriPlayIntent(userActivity: userActivity)
         }
@@ -379,7 +379,7 @@ struct QQPlayerApp: App {
 
     private func createiCloudContainerPlaceholder() async {
         guard let iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil) else {
-            print("❌ iCloud Drive not available")
+            AppLog.error(.general, "❌ iCloud Drive not available")
             return
         }
 
@@ -394,17 +394,17 @@ struct QQPlayerApp: App {
             if !FileManager.default.fileExists(atPath: placeholderURL.path) {
                 let placeholderText = "This folder contains music files for QQPlayer.\nPlace your FLAC files here to add them to your library."
                 try placeholderText.write(to: placeholderURL, atomically: true, encoding: .utf8)
-                print("✅ Created iCloud Drive placeholder file to ensure folder visibility")
+                AppLog.info(.general, "✅ Created iCloud Drive placeholder file to ensure folder visibility")
             }
         } catch {
-            print("❌ Failed to create iCloud Drive placeholder: \(error)")
+            AppLog.error(.general, "❌ Failed to create iCloud Drive placeholder: \(error)")
         }
     }
 
     // MARK: - SFBAudioEngine Background Optimization
 
     private func optimizeSFBAudioForBackground() async {
-        print("🔒 Optimizing SFBAudioEngine for background/lock screen")
+        AppLog.info(.general, "🔒 Optimizing SFBAudioEngine for background/lock screen")
 
         // Increase buffer size significantly for background stability.
         // Do NOT call setCategory here - changing category/options on a live
@@ -412,14 +412,14 @@ struct QQPlayerApp: App {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setPreferredIOBufferDuration(0.100) // 100ms buffer for lock screen
-            print("✅ Increased buffer to 100ms for lock screen stability")
+            AppLog.info(.general, "✅ Increased buffer to 100ms for lock screen stability")
         } catch {
-            print("⚠️ Failed to increase buffer for background: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to increase buffer for background: \(error)")
         }
     }
 
     private func optimizeSFBAudioForForeground() async {
-        print("🔓 Restoring SFBAudioEngine for foreground")
+        AppLog.info(.general, "🔓 Restoring SFBAudioEngine for foreground")
 
         // Restore normal buffer size.
         // Do NOT call setCategory here - changing category/options on a live
@@ -427,9 +427,9 @@ struct QQPlayerApp: App {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setPreferredIOBufferDuration(0.040) // Back to 40ms
-            print("✅ Restored buffer to 40ms for foreground")
+            AppLog.info(.general, "✅ Restored buffer to 40ms for foreground")
         } catch {
-            print("⚠️ Failed to restore buffer for foreground: \(error)")
+            AppLog.warn(.general, "⚠️ Failed to restore buffer for foreground: \(error)")
         }
     }
 }

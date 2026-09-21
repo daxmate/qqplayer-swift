@@ -68,6 +68,12 @@ private enum AppLogShapeContract {
     /// 当前 = 批 2（sync 5）+ 批 3（migration/DB 9）+ 批 4a/4b（播放引擎 12）+ 批 6（索引/扫描/清理 5）
     /// + 批 5（音频元数据·封面·歌词 12）+ 批 7（服务/协调/网络 18）+ 批 8（Views 24）
     /// + 口径收口批（批 6 遗留 2）= 87 文件。
+    /// + 批 9（Mac/Models/root/CarPlay/Helpers/ViewModels 21）= 108 文件。
+    ///   ⚠️ 批 9 原计划 22 个含 `QQPlayer/Models/WidgetData.swift`，但该文件同时编入
+    ///   `PlayerWidgetExtension`，而该 target 不含 `AppLog`
+    ///   （编译报 `Cannot find 'AppLog' in scope`）→ 归属决策待维护者定，
+    ///   故本批**不登记**它（其 30 处 print 仍在 print 基线内）；补丁见
+    ///   `/tmp/qqplayer-applog-batch9-widgetdata-setaside.patch`。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     ///
@@ -76,7 +82,27 @@ private enum AppLogShapeContract {
     /// `fileFingerprint(` / `FileFingerprint(` 这类标识符也算成 print 调用（残留 3 处 / 1 处）。
     /// 2026-09-21 口径已改**词边界**（`StructuralBudgetRule.callOccurrences`），两个文件随之登记。
     static let migratedChains: Set<String> = [
+        "QQPlayer/AppIntents/FoundationModels/MixGenerator.swift",
         "QQPlayer/AppIntents/SpotlightLibraryIndexer.swift",
+        "QQPlayer/CarPlay+PlayerPage.swift",
+        "QQPlayer/CarPlaySceneDelegate.swift",
+        "QQPlayer/ContentView.swift",
+        "QQPlayer/Helpers/EnvironmentLoader.swift",
+        "QQPlayer/Mac/MacAlbumArtistViews.swift",
+        "QQPlayer/Mac/MacEQSettingsView.swift",
+        "QQPlayer/Mac/MacLibraryView.swift",
+        "QQPlayer/Mac/MacLyricsResendAutoRunner.swift",
+        "QQPlayer/Mac/MacManualEQEditorView.swift",
+        "QQPlayer/Mac/MacOnlineSearchView.swift",
+        "QQPlayer/Mac/MacPlaylistDetailSheet.swift",
+        "QQPlayer/Mac/MacQuarkLoginView.swift",
+        "QQPlayer/Mac/MacSearchAnythingLayer.swift",
+        "QQPlayer/Mac/MacSearchView.swift",
+        "QQPlayer/Mac/MacSyncDataViewModel.swift",
+        "QQPlayer/Mac/MacTrackListView.swift",
+        "QQPlayer/Mac/SyncHostCenter.swift",
+        "QQPlayer/Models/SFBTrack.swift",
+        "QQPlayer/QQPlayerApp.swift",
         "QQPlayer/Services/AppCoordinator+ImportExport.swift",
         "QQPlayer/Services/AppCoordinator+iCloud.swift",
         "QQPlayer/Services/AppCoordinator.swift",
@@ -139,6 +165,7 @@ private enum AppLogShapeContract {
         "QQPlayer/Sync/SyncChangeLogPendingStore.swift",
         "QQPlayer/Sync/SyncFileReceiver.swift",
         "QQPlayer/Sync/SyncWiringSelfCheck.swift",
+        "QQPlayer/ViewModels/TutorialViewModel.swift",
         "QQPlayer/Views/Albums/AlbumViews.swift",
         "QQPlayer/Views/Artists/ArtistDetailScreen.swift",
         "QQPlayer/Views/Artists/ArtistRowViews.swift",
@@ -840,7 +867,11 @@ struct AppLogBehaviorTests {
         let flag = ExpensiveMessageFlag()
         AppLog.debug(.transfer, AppLogShapeContract.expensiveMessage(flag))
         #expect(!flag.evaluated, "被阈值滤掉的消息不许求值（@autoclosure 短路失效）")
-        #expect(!FileManager.default.fileExists(atPath: url.path))
+        // 不能断言「该文件一定不存在」：`logFileURLOverride` 是**进程级全局**，本测试设完
+        // override 后若被并行套件抢到执行时机，别的用例的 warn+ 记录会落进同一个 url
+        // （与上面已修的「正好等于」断言同机理）→ 前置硬断言偶发红。
+        // 改为防御式：先清掉可能的污染，让后续写入/读取从干净状态开始。
+        try? FileManager.default.removeItem(at: url)
 
         AppLog.warn(.db, "⚠️ 打开失败\nerror=disk full")
         let written = try String(contentsOf: url, encoding: .utf8)

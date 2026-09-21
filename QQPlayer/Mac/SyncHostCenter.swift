@@ -150,7 +150,7 @@ final class SyncHostCenter {
             // 「The operation couldn't be completed. (QQPlayer.SyncIdentityError error 0.)」
             // 这种技术文案 → 回到改造前页面用的本地化键（用户可读），
             // 原始 error 细节只进日志、不进 alert（与仓库既有 print 诊断惯例一致）。
-            print("❌ SyncHostCenter identity load failed: \(error)")
+            AppLog.error(.ui, "❌ SyncHostCenter identity load failed: \(error)")
             startError = "sync_identity_missing_error".localized
             return
         }
@@ -286,7 +286,7 @@ final class SyncHostCenter {
         do {
             try trustStore.updateDisplayName(peerID: peerID, name: name)
         } catch {
-            print("❌ SyncHostCenter updateDisplayName failed: \(error)")
+            AppLog.error(.ui, "❌ SyncHostCenter updateDisplayName failed: \(error)")
             return
         }
         connectedPeer?.displayName = displayName(forPeerID: peerID)
@@ -423,7 +423,7 @@ final class MacDataSyncAutoRunner {
             didAutoRunForCurrentConnection: didAutoRunForCurrentConnection
         ) else { return }
         guard IndexingGate.isReadyForChangeLogSync(LibraryIndexer.shared) else {
-            print("⏸️ MacDataSyncAutoRunner: 曲库索引未到终态，等终态后补跑自动同步")
+            AppLog.warn(.ui, "⏸️ MacDataSyncAutoRunner: 曲库索引未到终态，等终态后补跑自动同步")
             // 门控期不申报「装配缺口」（有意不跑 = 不适用，INV-26；与 iOS 侧同口径）。
             SyncWiringFactsStore.shared.record(.dataSyncEntry, attached: nil)
             observeIndexingReadiness()
@@ -437,17 +437,17 @@ final class MacDataSyncAutoRunner {
         do {
             let reconcile = try SyncChangeLogDanglingRepair().run()
             if reconcile.didChange {
-                print("ℹ️ MacDataSyncAutoRunner: 连接后自动对账本地真值" + reconcile.logText)
+                AppLog.info(.ui, "ℹ️ MacDataSyncAutoRunner: 连接后自动对账本地真值" + reconcile.logText)
             }
         } catch {
-            print("⚠️ MacDataSyncAutoRunner: 自动对账失败 \(error)")
+            AppLog.warn(.ui, "⚠️ MacDataSyncAutoRunner: 自动对账失败 \(error)")
         }
 
         // peerID 取对端 hello 的 Device ID（与手动路径同一口径）；空着就不跑，
         // 避免拿空串当游标键写脏数据。
         guard let peerID = session.peerHelloValue?.deviceID,
               !peerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("⚠️ MacDataSyncAutoRunner: 会话无对端 Device ID，跳过自动同步")
+            AppLog.warn(.ui, "⚠️ MacDataSyncAutoRunner: 会话无对端 Device ID，跳过自动同步")
             // 装配自检事实：声明了「同步数据入口」却装配不了（会话没有可用游标键）→ 面板可见。
             SyncWiringFactsStore.shared.record(.dataSyncEntry, attached: false)
             finish()
@@ -466,17 +466,17 @@ final class MacDataSyncAutoRunner {
             Task { @MainActor in
                 guard let self, phase == .finished else { return }
                 let report = coordinator.report
-                print(
-                    "ℹ️ MacDataSyncAutoRunner: 自动同步收尾"
-                        + "（发送=\(report.pushedEntries) 应用=\(report.appliedEntries)"
-                        + " 挂起=\(report.suspendedEntries) 未定位=\(report.unresolvedEntries)"
-                        + " 未支持=\(report.unsupportedEntries) 忽略删除=\(report.ignoredDeletes)"
-                        + " 失败=\(report.failureMessage ?? "无")）"
+                AppLog.info(.ui,
+                            "ℹ️ MacDataSyncAutoRunner: 自动同步收尾"
+                                + "（发送=\(report.pushedEntries) 应用=\(report.appliedEntries)"
+                                + " 挂起=\(report.suspendedEntries) 未定位=\(report.unresolvedEntries)"
+                                + " 未支持=\(report.unsupportedEntries) 忽略删除=\(report.ignoredDeletes)"
+                                + " 失败=\(report.failureMessage ?? "无")）"
                 )
                 self.finish()
             }
         }
-        print("ℹ️ MacDataSyncAutoRunner: 连接就绪 → 自动跑一轮同步数据")
+        AppLog.info(.ui, "ℹ️ MacDataSyncAutoRunner: 连接就绪 → 自动跑一轮同步数据")
         coordinator.start()
     }
 

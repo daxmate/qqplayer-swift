@@ -34,7 +34,7 @@ class TutorialViewModel {
     func completeTutorial() {
         // Save that tutorial has been completed
         UserDefaults.standard.set(true, forKey: "HasCompletedTutorial")
-        print("✅ Tutorial completed and saved to UserDefaults")
+        AppLog.info(.general, "✅ Tutorial completed and saved to UserDefaults")
     }
 
     nonisolated static func shouldShowTutorial() -> Bool {

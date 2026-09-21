@@ -163,7 +163,7 @@ struct MacSearchResultsView: View {
             selectedAlbum = album
             showAlbumSheet = true
         } catch {
-            print("❌ macOS search openAlbum failed: \(error)")
+            AppLog.error(.ui, "❌ macOS search openAlbum failed: \(error)")
         }
     }
 
@@ -173,7 +173,7 @@ struct MacSearchResultsView: View {
             selectedArtist = artist
             showArtistSheet = true
         } catch {
-            print("❌ macOS search openArtist failed: \(error)")
+            AppLog.error(.ui, "❌ macOS search openArtist failed: \(error)")
         }
     }
 }

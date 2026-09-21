@@ -195,7 +195,7 @@ struct MacQuarkLoginView: View {
                 startCountdown()
             } catch {
                 guard !Task.isCancelled else { return }
-                print("❌ [夸克扫码登录] 拉取二维码失败: \(error)")
+                AppLog.error(.ui, "❌ [夸克扫码登录] 拉取二维码失败: \(error)")
                 phase = .failed
             }
         }
@@ -220,7 +220,7 @@ struct MacQuarkLoginView: View {
                         phase = .expired
                         return
                     case .error:
-                        print("❌ [夸克扫码登录] 轮询异常: \(status.message ?? "")")
+                        AppLog.error(.ui, "❌ [夸克扫码登录] 轮询异常: \(status.message ?? "")")
                         cancelTimers()
                         phase = .failed
                         return
@@ -229,7 +229,7 @@ struct MacQuarkLoginView: View {
                     }
                 } catch {
                     guard !Task.isCancelled else { return }
-                    print("❌ [夸克扫码登录] 轮询请求失败: \(error)")
+                    AppLog.error(.ui, "❌ [夸克扫码登录] 轮询请求失败: \(error)")
                     cancelTimers()
                     phase = .failed
                     return

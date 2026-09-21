@@ -554,7 +554,7 @@ struct MacLibraryView: View {
                 loadError = nil
             case .failure(let error):
                 loadError = "load_library_failed".localized(with: error.localizedDescription)
-                print("❌ macOS reloadLibrary failed: \(error)")
+                AppLog.error(.ui, "❌ macOS reloadLibrary failed: \(error)")
             }
             reloadLikedTracks()
         }
@@ -573,7 +573,7 @@ struct MacLibraryView: View {
             let favoriteIds = try appCoordinator.getFavorites()
             likedTracks = tracks.filter { favoriteIds.contains($0.stableId) }
         } catch {
-            print("❌ macOS reloadLikedTracks failed: \(error)")
+            AppLog.error(.ui, "❌ macOS reloadLikedTracks failed: \(error)")
         }
     }
 
@@ -689,7 +689,7 @@ struct MacLibraryView: View {
                     albums = try LibraryReads.searchAlbums(query: normalizedQuery, limit: 30)
                     playlists = try LibraryReads.searchPlaylists(query: normalizedQuery, limit: 15)
                 } catch {
-                    print("❌ macOS search failed: \(error)")
+                    AppLog.error(.ui, "❌ macOS search failed: \(error)")
                 }
 
                 return MacSearchResults(songs: songs, artists: artists, albums: albums, playlists: playlists)
@@ -709,7 +709,7 @@ struct MacLibraryView: View {
         do {
             artistTracks = try LibraryReads.tracks(artistId: artistId)
         } catch {
-            print("❌ showArtist tracks failed: \(error)")
+            AppLog.error(.ui, "❌ showArtist tracks failed: \(error)")
         }
         selectedArtist = artists.first { $0.id == artistId }
         guard selectedArtist != nil else { return }
@@ -723,7 +723,7 @@ struct MacLibraryView: View {
         do {
             albumTracks = try LibraryReads.tracks(albumId: albumId)
         } catch {
-            print("❌ showAlbum tracks failed: \(error)")
+            AppLog.error(.ui, "❌ showAlbum tracks failed: \(error)")
         }
         selectedAlbum = albums.first { $0.id == albumId }
         guard selectedAlbum != nil else { return }
@@ -755,7 +755,7 @@ struct MacLibraryView: View {
                 await player.playTrack(first, queue: tracks)
             }
         } catch {
-            print("❌ openPlaylist failed: \(error)")
+            AppLog.error(.ui, "❌ openPlaylist failed: \(error)")
         }
     }
 

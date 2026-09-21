@@ -60,7 +60,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         ]
         let maxTabs = max(CPTabBarTemplate.maximumTabCount, 1)
         if tabTemplates.count > maxTabs {
-            print("⚠️ CarPlay TabBar 上限 \(maxTabs)：只挂载前 \(maxTabs) 个入口")
+            AppLog.warn(.ui, "⚠️ CarPlay TabBar 上限 \(maxTabs)：只挂载前 \(maxTabs) 个入口")
             tabTemplates = Array(tabTemplates.prefix(maxTabs))
         }
 
@@ -89,7 +89,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         playerPageController?.stop()
         playerPageController = nil
 
-        print("🚗 CarPlay disconnected")
+        AppLog.info(.ui, "🚗 CarPlay disconnected")
         // 通知主场景刷新布局：iOS 26 在 CarPlay 场景断开后可能不刷新主窗口
         // safe area，导致 safeAreaInset 内容（迷你播放条）残留在错误位置。
         NotificationCenter.default.post(name: .carPlaySceneDidDisconnect, object: nil)
@@ -104,7 +104,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     /// 走到重建说明场景时序异常（didConnect 重入 / 断开重连竞态），打一行日志便于真机排查。
     func playerPageControllerEnsuring() -> CarPlayPlayerPageController {
         if let playerPageController { return playerPageController }
-        print("⚠️ CarPlay 播放页控制器缺失 → 就地重建（场景时序异常？）")
+        AppLog.warn(.ui, "⚠️ CarPlay 播放页控制器缺失 → 就地重建（场景时序异常？）")
         let controller = CarPlayPlayerPageController()
         playerPageController = controller
         return controller

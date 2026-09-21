@@ -289,7 +289,7 @@ struct MacManualEQEditorView: View {
                     isLoading = false
                 }
             } catch {
-                print("❌ Failed to load bands: \(error)")
+                AppLog.error(.ui, "❌ Failed to load bands: \(error)")
                 await MainActor.run {
                     isLoading = false
                 }
@@ -321,7 +321,7 @@ struct MacManualEQEditorView: View {
                     dismiss()
                 }
             } catch {
-                print("❌ Failed to save changes: \(error)")
+                AppLog.error(.ui, "❌ Failed to save changes: \(error)")
                 await MainActor.run {
                     saveError = NSLocalizedString("failed_to_save", value: "Failed to save changes", comment: "") + ": \(error.localizedDescription)"
                 }

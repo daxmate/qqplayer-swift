@@ -146,7 +146,7 @@ struct MacManualPlaylistDetailView: View {
             currentTitle = title
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
-            print("❌ renamePlaylist failed: \(error)")
+            AppLog.error(.ui, "❌ renamePlaylist failed: \(error)")
         }
     }
 
@@ -156,7 +156,7 @@ struct MacManualPlaylistDetailView: View {
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
             onExit()
         } catch {
-            print("❌ deletePlaylist failed: \(error)")
+            AppLog.error(.ui, "❌ deletePlaylist failed: \(error)")
         }
     }
 
@@ -167,7 +167,7 @@ struct MacManualPlaylistDetailView: View {
             tracks = try LibraryReads.tracksPreservingOrder(stableIds: stableIds)
             isLoading = false
         } catch {
-            print("❌ MacManualPlaylistDetailView loadTracks failed: \(error)")
+            AppLog.error(.ui, "❌ MacManualPlaylistDetailView loadTracks failed: \(error)")
             isLoading = false
         }
     }

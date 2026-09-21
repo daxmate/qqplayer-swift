@@ -32,7 +32,7 @@ class EnvironmentLoader: @unchecked Sendable {
 
     private func loadFromFile(path: String) {
         guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            print("📄 EnvironmentLoader: Could not read .env file at \(path)")
+            AppLog.warn(.general, "📄 EnvironmentLoader: Could not read .env file at \(path)")
             return
         }
 
@@ -57,7 +57,7 @@ class EnvironmentLoader: @unchecked Sendable {
                     String(value.dropFirst().dropLast()) : value
 
                 environmentVariables[key] = cleanValue
-                print("🔑 EnvironmentLoader: Loaded \(key) from .env file")
+                AppLog.info(.general, "🔑 EnvironmentLoader: Loaded \(key) from .env file")
             }
         }
     }
@@ -67,7 +67,7 @@ class EnvironmentLoader: @unchecked Sendable {
         for (key, value) in ProcessInfo.processInfo.environment {
             if key.hasPrefix("SPOTIFY_") || key.hasPrefix("DISCOGS_") {
                 environmentVariables[key] = value
-                print("🌍 EnvironmentLoader: Loaded \(key) from system environment")
+                AppLog.info(.general, "🌍 EnvironmentLoader: Loaded \(key) from system environment")
             }
         }
     }

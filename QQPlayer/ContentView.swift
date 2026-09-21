@@ -80,12 +80,12 @@ struct ContentView: View {
             // CarPlay 连接时剔除不兼容格式：判据与名单的唯一实现在 CarPlayTrackFilter
             if CarPlayTrackFilter.isActive {
                 tracks = CarPlayTrackFilter.filtered(allTracks)
-                print("🚗 CarPlay: Filtered \(allTracks.count - tracks.count) incompatible tracks")
+                AppLog.info(.ui, "🚗 CarPlay: Filtered \(allTracks.count - tracks.count) incompatible tracks")
             } else {
                 tracks = allTracks
             }
         } catch {
-            print("Failed to refresh library: \(error)")
+            AppLog.error(.ui, "Failed to refresh library: \(error)")
         }
     }
 
@@ -95,7 +95,7 @@ struct ContentView: View {
 
         // 等索引跑完（IndexingGate = 唯一实现，无忙等；超时兜底不阻塞用户）
         if await IndexingGate.waitUntilIdle(libraryIndexer) == .timedOut {
-            print("⏱️ ContentView: indexing wait timed out — refreshing anyway")
+            AppLog.warn(.ui, "⏱️ ContentView: indexing wait timed out — refreshing anyway")
         }
 
         await refreshLibrary()
@@ -108,7 +108,7 @@ struct ContentView: View {
 
         // 等索引跑完（IndexingGate = 唯一实现，无忙等；超时兜底不阻塞用户）
         if await IndexingGate.waitUntilIdle(libraryIndexer) == .timedOut {
-            print("⏱️ ContentView: indexing wait timed out — refreshing anyway")
+            AppLog.warn(.ui, "⏱️ ContentView: indexing wait timed out — refreshing anyway")
         }
 
         await refreshLibrary()

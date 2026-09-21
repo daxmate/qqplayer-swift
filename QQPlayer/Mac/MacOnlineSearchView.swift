@@ -475,7 +475,7 @@ struct MacOnlineSearchView: View {
                 downloadedIDs.remove(rowID)
                 // 诊断：底层错误打日志（stdout.log 可读），并在红字里附上原因，
                 // 便于区分直链服务不可用 / HTTP 拒绝 / 落盘失败等不同环节。
-                print("❌ [在线下载] 失败《\(song.title)》id=\(song.id): \(error)")
+                AppLog.error(.ui, "❌ [在线下载] 失败《\(song.title)》id=\(song.id): \(error)")
                 // errorMessage 是 String?：先拼好非可选字符串再整体赋值（不能 +=）。
                 var message = "online_download_failed_prefix".localized(with: DisplayScriptNormalizer.display(song.title))
                 // noPlayURL 高频原因：VIP/版权受限歌曲 → 直链代理(200 空响应)与
@@ -537,7 +537,7 @@ struct MacOnlineSearchView: View {
                     name: .libraryFolderContentChanged,
                     object: nil
                 )
-                print("✅ [歌曲海下载] 成功《\(song.title)》id=\(song.id)")
+                AppLog.info(.ui, "✅ [歌曲海下载] 成功《\(song.title)》id=\(song.id)")
             } catch {
                 guard !Task.isCancelled else { return }
                 if Self.isLoginRequired(error), !isRetryAfterLogin {
@@ -545,11 +545,11 @@ struct MacOnlineSearchView: View {
                     pendingGequhaiDownload = song
                     showQuarkLogin = true
                     errorMessage = "quark_login_required_hint".localized
-                    print("❌ [歌曲海下载] 未登录《\(song.title)》id=\(song.id) → 弹扫码登录")
+                    AppLog.error(.ui, "❌ [歌曲海下载] 未登录《\(song.title)》id=\(song.id) → 弹扫码登录")
                 } else {
                     failedIDs.insert(rowID)
                     downloadedIDs.remove(rowID)
-                    print("❌ [歌曲海下载] 失败《\(song.title)》id=\(song.id): \(error)")
+                    AppLog.error(.ui, "❌ [歌曲海下载] 失败《\(song.title)》id=\(song.id): \(error)")
                     // 错误文案 = web 路由 error 原文（GequhaiDownloadError.errorDescription），
                     // 真实原因红字展示（无分享/分享失效/无音频/夸克侧失败等）
                     var message = "online_download_failed_prefix".localized(with: DisplayScriptNormalizer.display(song.title))

@@ -35,22 +35,22 @@ struct SFBTrack: Identifiable {
             self.frameLength = frameLength
             self.sampleRate = sampleRate
 
-            print("🔍 SFBTrack AudioFile properties: frameLength=\(frameLength), sampleRate=\(sampleRate), duration=\(durationProperty)")
+            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 SFBTrack AudioFile properties: frameLength=\(frameLength), sampleRate=\(sampleRate), duration=\(durationProperty)") }
 
             // For duration, prefer the direct duration property if available
             if durationProperty > 0 {
                 self.duration = durationProperty
-                print("🔍 SFBTrack using direct duration: \(self.duration) seconds")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 SFBTrack using direct duration: \(self.duration) seconds") }
             } else if frameLength > 0 && sampleRate > 0 {
                 self.duration = Double(frameLength) / sampleRate
-                print("🔍 SFBTrack calculated duration: \(self.duration) seconds")
+                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 SFBTrack calculated duration: \(self.duration) seconds") }
             } else {
                 self.duration = 0
-                print("⚠️ SFBTrack: Invalid frame length or sample rate")
+                AppLog.warn(.general, "⚠️ SFBTrack: Invalid frame length or sample rate")
             }
         } else {
             // Fallback values
-            print("⚠️ SFBTrack: Could not read AudioFile properties")
+            AppLog.warn(.general, "⚠️ SFBTrack: Could not read AudioFile properties")
             self.frameLength = 0
             self.sampleRate = 0
             self.duration = 0
@@ -68,28 +68,28 @@ struct SFBTrack: Identifiable {
             do {
                 dsdDecoder = try DSDDecoder(url: url)
             } catch {
-                print("❌ DSDDecoder creation failed for \(url.lastPathComponent): \(error)")
-                print("💡 This may be due to unsupported DSD sample rate - returning nil to fallback to native playback")
+                AppLog.error(.general, "❌ DSDDecoder creation failed for \(url.lastPathComponent): \(error)")
+                AppLog.info(.general, "💡 This may be due to unsupported DSD sample rate - returning nil to fallback to native playback")
                 return nil // This will cause SFBAudioEngine to return false from canHandle, falling back to native
             }
 
             if enableDoP {
                 // For external DACs, use DoP with proper error handling
-                print("🎵 Attempting DoP decoder for external DAC")
+                AppLog.info(.general, "🎵 Attempting DoP decoder for external DAC")
                 do {
                     let dopDecoder = try DoPDecoder(decoder: dsdDecoder)
-                    print("✅ DoP decoder created successfully for DAC")
+                    AppLog.info(.general, "✅ DoP decoder created successfully for DAC")
                     return dopDecoder
                 } catch {
-                    print("❌ DoP failed for DAC, this may cause noise issues: \(error)")
+                    AppLog.error(.general, "❌ DoP failed for DAC, this may cause noise issues: \(error)")
                     // For DACs that support DoP, failing back to PCM may cause noise
                     // Try to create PCM decoder but warn about potential issues
                     do {
                         let pcmDecoder = try DSDPCMDecoder(decoder: dsdDecoder)
-                        print("⚠️ Using PCM fallback - may cause noise on DoP-capable DAC")
+                        AppLog.warn(.general, "⚠️ Using PCM fallback - may cause noise on DoP-capable DAC")
                         return pcmDecoder
                     } catch {
-                        print("❌ Both DoP and PCM failed: \(error)")
+                        AppLog.error(.general, "❌ Both DoP and PCM failed: \(error)")
                         throw error
                     }
                 }
@@ -97,17 +97,17 @@ struct SFBTrack: Identifiable {
                 // For internal audio or non-DoP capable devices, prefer PCM
                 do {
                     let pcmDecoder = try DSDPCMDecoder(decoder: dsdDecoder)
-                    print("✅ DSD PCM decoder created for internal audio")
+                    AppLog.info(.general, "✅ DSD PCM decoder created for internal audio")
                     return pcmDecoder
                 } catch {
-                    print("⚠️ DSD PCM conversion failed, trying DoP as fallback: \(error)")
+                    AppLog.warn(.general, "⚠️ DSD PCM conversion failed, trying DoP as fallback: \(error)")
                     // Fallback to DoP if PCM fails (e.g., high DSD rates)
                     do {
                         let dopDecoder = try DoPDecoder(decoder: dsdDecoder)
-                        print("✅ DoP decoder created as PCM fallback")
+                        AppLog.info(.general, "✅ DoP decoder created as PCM fallback")
                         return dopDecoder
                     } catch {
-                        print("❌ Both PCM and DoP failed: \(error)")
+                        AppLog.error(.general, "❌ Both PCM and DoP failed: \(error)")
                         throw error
                     }
                 }

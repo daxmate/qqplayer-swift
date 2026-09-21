@@ -97,7 +97,7 @@ final class MacLyricsResendAutoRunner {
             didAutoRunForCurrentConnection: didAutoRunForCurrentConnection
         ) else { return }
         guard IndexingGate.isReadyForChangeLogSync(LibraryIndexer.shared) else {
-            print("⏸️ MacLyricsResendAutoRunner: 曲库索引未到终态，等终态后补跑歌词补发")
+            AppLog.warn(.ui, "⏸️ MacLyricsResendAutoRunner: 曲库索引未到终态，等终态后补跑歌词补发")
             observeIndexingTerminalState()
             return
         }
@@ -117,17 +117,17 @@ final class MacLyricsResendAutoRunner {
         self.controller = controller
         controller.onStateChange = { [weak self] state in
             guard case let .done(summary) = state else { return }
-            print("ℹ️ MacLyricsResendAutoRunner: 歌词补发收尾（\(summary.logLine)）")
+            AppLog.info(.ui, "ℹ️ MacLyricsResendAutoRunner: 歌词补发收尾（\(summary.logLine)）")
             Task { @MainActor in
                 MacLyricsResendFactsStore.shared.record(summary)
                 self?.controller = nil
             }
         }
-        print("ℹ️ MacLyricsResendAutoRunner: 连接就绪 → 自动跑一轮对齐歌词补发")
+        AppLog.info(.ui, "ℹ️ MacLyricsResendAutoRunner: 连接就绪 → 自动跑一轮对齐歌词补发")
         do {
             try controller.start()
         } catch {
-            print("⚠️ MacLyricsResendAutoRunner: 启动失败 \(error)")
+            AppLog.warn(.ui, "⚠️ MacLyricsResendAutoRunner: 启动失败 \(error)")
             self.controller = nil
         }
     }

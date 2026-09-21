@@ -81,7 +81,7 @@ struct MacSearchAnythingLayer: View {
             // 诊断（仅 Debug，落 ~/Library/Logs/QQPlayerMac/stdout.log）：面板出现这一刻的
             // 第一响应者 = 焦点问题的根因证据（真机取证用，验完可删）
             #if DEBUG
-                print("[SearchAnything] 面板出现 firstResponder=\(Self.describeFirstResponder())")
+                if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "[SearchAnything] 面板出现 firstResponder=\(Self.describeFirstResponder())") }
             #endif
             // 浮层有 0.12s 转场，等一次布局再设（单次 DispatchQueue.main.async 仍在转场中间，不可靠）
             try? await Task.sleep(nanoseconds: 80_000_000)
@@ -92,13 +92,13 @@ struct MacSearchAnythingLayer: View {
                 try? await Task.sleep(nanoseconds: 60_000_000)
                 if Self.isTextInputFocused {
                     #if DEBUG
-                        print("[SearchAnything] 设焦点后 firstResponder=\(Self.describeFirstResponder())（第 \(attempt) 次校验）")
+                        if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "[SearchAnything] 设焦点后 firstResponder=\(Self.describeFirstResponder())（第 \(attempt) 次校验）") }
                     #endif
                     return
                 }
                 let fixed = Self.makeSearchFieldFirstResponder()
                 #if DEBUG
-                    print("[SearchAnything] SwiftUI 焦点未落地 → AppKit 兜底 attempt=\(attempt) ok=\(fixed) firstResponder=\(Self.describeFirstResponder())")
+                    if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "[SearchAnything] SwiftUI 焦点未落地 → AppKit 兜底 attempt=\(attempt) ok=\(fixed) firstResponder=\(Self.describeFirstResponder())") }
                 #endif
                 if fixed { return }
             }
@@ -519,10 +519,10 @@ struct MacSearchAnythingLayer: View {
         }
         #if DEBUG
             let localMs = Double(DispatchTime.now().uptimeNanoseconds - localStarted) / 1_000_000
-            print(String(
+            if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, String(
                 format: "[SearchAnything] 本地检索 %.1fms（tracks=%d artists=%d albums=%d，防抖另计 250ms）",
                 localMs, localSongs.count, artists.count, albums.count
-            ))
+            )) }
         #endif
         guard seq == searchSeq else { return } // 已被更新的查询取代：本地结果不落
         isSearchPending = false // 本地已就绪 → 立即渲染（不再等在线）
@@ -601,7 +601,7 @@ struct MacSearchAnythingLayer: View {
             let candidates = editableFields(in: window.contentView).map {
                 "id=\($0.accessibilityIdentifier()) placeholder=\($0.placeholderString ?? "-")"
             }
-            print("[SearchAnything] 兜底定位失败，窗口内可编辑文本框：\(candidates)")
+            AppLog.error(.ui, "[SearchAnything] 兜底定位失败，窗口内可编辑文本框：\(candidates)")
         #endif
         return false
     }
@@ -708,7 +708,7 @@ private struct SearchAnythingEscapeMonitor: ViewModifier {
         // 组字中：放给输入法（第一次 Esc 只取消组字，不关浮层）
         let composing = isComposingMarkedText
         #if DEBUG
-            print("[SearchAnything] Esc：组字中=\(composing) → \(composing ? "放行给输入法" : "关浮层")")
+            if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "[SearchAnything] Esc：组字中=\(composing) → \(composing ? "放行给输入法" : "关浮层")") }
         #endif
         guard !composing else { return event }
         onEscape()
