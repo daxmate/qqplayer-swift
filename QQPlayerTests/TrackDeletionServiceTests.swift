@@ -22,6 +22,15 @@
 //  → iOS 默认 `.delete`（= 合流前 iOS 行为，**行为零变化**）；macOS 默认 `.trash`（可恢复）。
 //  差异只是**调用点传入的数据**（`Policy.ios(libraryOnly:)` / `Policy.mac()`），不是第二份实现。
 //
+//  2026-09-21 批 E-2（本文件同步更新的断言，逐条见批 E-2 报告）：
+//  「只从曲库移除」的落点变更——`libraryOnly == true` 且文件在**曲库根之内** → `fileAction = .reclaim`
+//  （移入应用回收区，不再留在曲库根里）；库外文件仍不碰磁盘。因此：
+//   · `Policy.ios(libraryOnly: true).fileAction` 由 `.delete` 改为 `.reclaim`；
+//   · `FileAction.allCases` 多一条腿 `.reclaim`；
+//   · 原「libraryOnly 不碰磁盘」拆成三条：库内移回收区 / 库外旧语义 / 非回收区动作不碰盘；
+//   · 假执行环境新增 `moveToReclaimArea` + `libraryRoot` 两个注入项（形状契约不查测试文件）。
+//  真实文件系统上的回收区行为（落点、命名、冲突、不进清单）见 `TrackDeletionReclaimAreaTests.swift`。
+//
 
 import Foundation
 import Testing
@@ -33,6 +42,8 @@ private final class FakeDeletionEnvironment: @unchecked Sendable {
     private let lock = NSLock()
     private var trashed: [String] = []
     private var removed: [String] = []
+    private var reclaimed: [String] = []
+    private var reclaimRoots: [URL] = []
     private var excluded: [String] = []
     private var deleted: [String] = []
     private var deleteAttempts: [String] = []
@@ -43,10 +54,14 @@ private final class FakeDeletionEnvironment: @unchecked Sendable {
     var trashErrorPaths: Set<String> = []
     /// 抛出错误的 path（永久删除动作）
     var removeErrorPaths: Set<String> = []
+    /// 抛出错误的 path（移入回收区动作，批 E-2）
+    var reclaimErrorPaths: Set<String> = []
     /// 抛出错误的 stableId（DB 删除阶段）
     var deleteErrorStableIds: Set<String> = []
     /// 文件系统中「存在」的 path（其余视为磁盘已丢）
     var existingPaths: Set<String> = []
+    /// 曲库根（回收区落点判据基准；默认 `/library`，与用例里 `/library/...` 的曲库路径一致）
+    var libraryRootURL = URL(fileURLWithPath: "/library")
     /// 返回第几次「逐首取消探测」后开始取消（nil = 从不）
     var cancelAfter: Int?
     private var cancelProbe = 0
@@ -74,6 +89,14 @@ private final class FakeDeletionEnvironment: @unchecked Sendable {
                 lock.unlock()
                 if shouldThrow { throw TestError.removeFailed(path) }
             },
+            moveToReclaimArea: { [self] path, destinationRoot in
+                lock.lock()
+                reclaimed.append(path)
+                reclaimRoots.append(destinationRoot)
+                let shouldThrow = reclaimErrorPaths.contains(path)
+                lock.unlock()
+                if shouldThrow { throw TestError.reclaimFailed(path) }
+            },
             excludeFromLibrary: { [self] stableId in
                 lock.lock()
                 excluded.append(stableId)
@@ -87,6 +110,7 @@ private final class FakeDeletionEnvironment: @unchecked Sendable {
                 lock.unlock()
                 if shouldThrow { throw TestError.deleteFailed(stableId) }
             },
+            libraryRoot: { [self] in self.libraryRootURL },
             log: { [self] message in
                 lock.lock()
                 logs.append(message)
@@ -104,6 +128,10 @@ private final class FakeDeletionEnvironment: @unchecked Sendable {
 
     var trashedPaths: [String] { lock.lock(); defer { lock.unlock() }; return trashed }
     var removedPaths: [String] { lock.lock(); defer { lock.unlock() }; return removed }
+    /// 被移入回收区的 path（批 E-2）
+    var reclaimedPaths: [String] { lock.lock(); defer { lock.unlock() }; return reclaimed }
+    /// 回收区落点（回收区目录 URL；应与 `DeleteReclaimArea.url(inLibraryRoot:)` 一致）
+    var reclaimedDestinationRoots: [URL] { lock.lock(); defer { lock.unlock() }; return reclaimRoots }
     var excludedIds: [String] { lock.lock(); defer { lock.unlock() }; return excluded }
     /// DB 删除**成功**的 stableId（iOS 用例看这个）
     var deletedStableIds: [String] { lock.lock(); defer { lock.unlock() }; return deleted }
@@ -115,6 +143,7 @@ private final class FakeDeletionEnvironment: @unchecked Sendable {
     enum TestError: Error {
         case trashFailed(String)
         case removeFailed(String)
+        case reclaimFailed(String)
         case deleteFailed(String)
     }
 }
@@ -139,6 +168,17 @@ private func iosItems(_ ids: [String]) -> [TrackDeletionService.Item] {
     ids.map { TrackDeletionService.Item(stableId: $0, path: "/tmp/\($0).flac") }
 }
 
+/// 曲库内 / 曲库外的显式 Item（批 E-2：回收区落点判据按「是否在曲库根内」分叉，不再靠路径巧合）。
+private let fakeLibraryRootURL = URL(fileURLWithPath: "/library")
+
+private func inRootItem(_ id: String) -> TrackDeletionService.Item {
+    TrackDeletionService.Item(stableId: id, path: "/library/\(id).flac")
+}
+
+private func outOfRootItem(_ id: String) -> TrackDeletionService.Item {
+    TrackDeletionService.Item(stableId: id, path: "/external/\(id).flac")
+}
+
 private func macItem(_ index: Int) -> TrackDeletionService.Item {
     TrackDeletionService.Item(
         stableId: "stable-\(index)",
@@ -155,7 +195,8 @@ struct TrackDeletionServiceTests {
     func platformDefaultsAreData() {
         // iOS：永久删除——实测 iOS 容器无废纸篓宗卷，默认 .trash 会让「关掉只从曲库移除」的删歌永远失败
         #expect(TrackDeletionService.Policy.ios(libraryOnly: false).fileAction == .delete)
-        #expect(TrackDeletionService.Policy.ios(libraryOnly: true).fileAction == .delete)
+        // 批 E-2：开启「只从曲库移除」→ 回收区落点（库内文件移入回收区；库外文件核心自动退回旧语义）
+        #expect(TrackDeletionService.Policy.ios(libraryOnly: true).fileAction == .reclaim)
         // libraryOnly 按设置透传（沿用既有开关语义）
         #expect(TrackDeletionService.Policy.ios(libraryOnly: true).libraryOnly)
         #expect(!TrackDeletionService.Policy.ios(libraryOnly: false).libraryOnly)
@@ -164,13 +205,64 @@ struct TrackDeletionServiceTests {
         #expect(TrackDeletionService.Policy.mac().fileAction == .trash)
         #expect(!TrackDeletionService.Policy.mac().libraryOnly)
 
-        // `.trash` 仍是合法策略（只是不是 iOS 默认）——两条腿都在
-        #expect(TrackDeletionService.FileAction.allCases == [.trash, .delete])
+        // 三条腿都在（`.trash` / `.delete` 仍是合法策略，只是不是 iOS 默认）
+        #expect(TrackDeletionService.FileAction.allCases == [.trash, .delete, .reclaim])
     }
 
-    @Test("libraryOnly：只加排除标记，不碰磁盘（连存在性都不查）")
-    func libraryOnlyExcludesWithoutTouchingDisk() {
+    @Test("libraryOnly + 库内文件（批 E-2 新语义）：移入回收区 + 加排除标记 + 删 DB 引用")
+    func libraryOnlyMovesFileInsideRootToReclaimArea() {
         let fake = FakeDeletionEnvironment()
+        fake.libraryRootURL = fakeLibraryRootURL
+        fake.existingPaths = ["/library/a.flac"]
+        let outcome = TrackDeletionService.delete(
+            items: [inRootItem("a")],
+            policy: TrackDeletionService.Policy(fileAction: .reclaim, libraryOnly: true),
+            environment: fake.environment()
+        )
+
+        #expect(outcome.deleted == 1)
+        #expect(outcome.excludedFromLibrary == 1)
+        #expect(outcome.movedToReclaim == 1)
+        #expect(outcome.failed == 0)
+        #expect(outcome.fileRemovalFailed == 0)
+        #expect(fake.trashedPaths.isEmpty)
+        #expect(fake.removedPaths.isEmpty)
+        #expect(fake.reclaimedPaths == ["/library/a.flac"])
+        #expect(
+            fake.reclaimedDestinationRoots == [DeleteReclaimArea.url(inLibraryRoot: fakeLibraryRootURL)],
+            "回收区落点必须由曲库根派生（唯一入口 DeleteReclaimArea.url(inLibraryRoot:)）"
+        )
+        #expect(fake.excludedIds == ["a"])
+        #expect(fake.deletedStableIds == ["a"])
+    }
+
+    @Test("libraryOnly + 库外文件：保持旧语义，不碰磁盘（连存在性都不查）")
+    func libraryOnlyKeepsLegacySemanticsOutsideLibraryRoot() {
+        let fake = FakeDeletionEnvironment()
+        fake.libraryRootURL = fakeLibraryRootURL
+        fake.existingPaths = ["/external/a.flac"]
+        let outcome = TrackDeletionService.delete(
+            items: [outOfRootItem("a")],
+            policy: TrackDeletionService.Policy(fileAction: .reclaim, libraryOnly: true),
+            environment: fake.environment()
+        )
+
+        #expect(outcome.deleted == 1)
+        #expect(outcome.excludedFromLibrary == 1)
+        #expect(outcome.movedToReclaim == 0)
+        #expect(outcome.failed == 0)
+        #expect(fake.reclaimedPaths.isEmpty, "库外文件是用户原件，绝不能移进回收区")
+        #expect(fake.trashedPaths.isEmpty)
+        #expect(fake.removedPaths.isEmpty)
+        #expect(fake.existenceCheckPaths.isEmpty, "库外文件不该连存在性都去查（旧语义逐字保留）")
+        #expect(fake.excludedIds == ["a"])
+        #expect(fake.deletedStableIds == ["a"])
+    }
+
+    @Test("libraryOnly + 非回收区动作（.trash/.delete）：不碰磁盘（合流期组合语义保留）")
+    func libraryOnlyWithOtherFileActionsDoesNotTouchDisk() {
+        let fake = FakeDeletionEnvironment()
+        fake.libraryRootURL = fakeLibraryRootURL
         let outcome = TrackDeletionService.delete(
             items: iosItems(["a", "b"]),
             policy: TrackDeletionService.Policy(fileAction: .trash, libraryOnly: true),
@@ -179,13 +271,54 @@ struct TrackDeletionServiceTests {
 
         #expect(outcome.deleted == 2)
         #expect(outcome.excludedFromLibrary == 2)
+        #expect(outcome.movedToReclaim == 0)
         #expect(outcome.failed == 0)
         #expect(outcome.fileRemovalFailed == 0)
         #expect(fake.trashedPaths.isEmpty)
         #expect(fake.removedPaths.isEmpty)
+        #expect(fake.reclaimedPaths.isEmpty)
         #expect(fake.existenceCheckPaths.isEmpty)
         #expect(fake.excludedIds == ["a", "b"])
         #expect(fake.deletedStableIds == ["a", "b"])
+    }
+
+    @Test("libraryOnly + 移入回收区失败：保留曲目（不加排除标记、不删 DB 引用），其余曲目继续")
+    func reclaimFailureKeepsTrack() {
+        let fake = FakeDeletionEnvironment()
+        fake.libraryRootURL = fakeLibraryRootURL
+        fake.existingPaths = ["/library/a.flac", "/library/b.flac", "/library/c.flac"]
+        fake.reclaimErrorPaths = ["/library/b.flac"]
+        let outcome = TrackDeletionService.delete(
+            items: [inRootItem("a"), inRootItem("b"), inRootItem("c")],
+            policy: TrackDeletionService.Policy(fileAction: .reclaim, libraryOnly: true),
+            environment: fake.environment()
+        )
+
+        #expect(outcome.deleted == 2)
+        #expect(outcome.excludedFromLibrary == 2)
+        #expect(outcome.movedToReclaim == 2)
+        #expect(outcome.failed == 1)
+        #expect(outcome.fileRemovalFailed == 1)
+        #expect(fake.excludedIds == ["a", "c"], "移不走的那首不得加排除标记（否则文件可见、曲目消失）")
+        #expect(fake.deletedStableIds == ["a", "c"], "移不走的那首不得删库引用（保留曲目）")
+    }
+
+    @Test("libraryOnly + 文件已不在磁盘（库内路径）：不当失败，照常清 DB 引用")
+    func reclaimWhenFileMissingStillClearsReference() {
+        let fake = FakeDeletionEnvironment()
+        fake.libraryRootURL = fakeLibraryRootURL
+        let outcome = TrackDeletionService.delete(
+            items: [inRootItem("a")],
+            policy: TrackDeletionService.Policy(fileAction: .reclaim, libraryOnly: true),
+            environment: fake.environment()
+        )
+
+        #expect(outcome.deleted == 1)
+        #expect(outcome.excludedFromLibrary == 1)
+        #expect(outcome.movedToReclaim == 0)
+        #expect(outcome.failed == 0)
+        #expect(fake.reclaimedPaths.isEmpty)
+        #expect(fake.deletedStableIds == ["a"])
     }
 
     @Test("默认分支（fileAction: .trash）：进废纸篓 + 删 DB 引用，顺序稳定")

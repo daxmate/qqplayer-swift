@@ -181,6 +181,7 @@
 		5429EE5D4BF74D469B659849 /* TrackIdentityFileMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12916B528D44204BF2E3DB9 /* TrackIdentityFileMigrationTests.swift */; };
 		66060DCB72B846BB9849CCC5 /* IntentPlaybackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88897E7BDD7043FDBBDFDC28 /* IntentPlaybackServiceTests.swift */; };
 		0FE1CA3B7E0B4340960A82EE /* SyncCollectionPlanLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDEE953F1A34458AA5A85DF /* SyncCollectionPlanLogTests.swift */; };
+		D2FE7DFF760D459C97CAF730 /* TrackDeletionReclaimAreaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5035E02F8F421BB2C16EB7 /* TrackDeletionReclaimAreaTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -411,6 +412,7 @@
 		D12916B528D44204BF2E3DB9 /* TrackIdentityFileMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackIdentityFileMigrationTests.swift; sourceTree = "<group>"; };
 		88897E7BDD7043FDBBDFDC28 /* IntentPlaybackServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentPlaybackServiceTests.swift; sourceTree = "<group>"; };
 		9CDEE953F1A34458AA5A85DF /* SyncCollectionPlanLogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCollectionPlanLogTests.swift; sourceTree = "<group>"; };
+		9C5035E02F8F421BB2C16EB7 /* TrackDeletionReclaimAreaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackDeletionReclaimAreaTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1164,6 +1166,7 @@
 				D12916B528D44204BF2E3DB9 /* TrackIdentityFileMigrationTests.swift */,
 				88897E7BDD7043FDBBDFDC28 /* IntentPlaybackServiceTests.swift */,
 				9CDEE953F1A34458AA5A85DF /* SyncCollectionPlanLogTests.swift */,
+				9C5035E02F8F421BB2C16EB7 /* TrackDeletionReclaimAreaTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1643,6 +1646,7 @@
 				5429EE5D4BF74D469B659849 /* TrackIdentityFileMigrationTests.swift in Sources */,
 				66060DCB72B846BB9849CCC5 /* IntentPlaybackServiceTests.swift in Sources */,
 				0FE1CA3B7E0B4340960A82EE /* SyncCollectionPlanLogTests.swift in Sources */,
+				D2FE7DFF760D459C97CAF730 /* TrackDeletionReclaimAreaTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

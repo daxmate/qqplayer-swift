@@ -12,10 +12,11 @@
 //   (a) `trashItem` 调用只允许出现在白名单文件（唯一入口）里；
 //   (b) 「删除一首歌」仪式（**同时**碰磁盘文件 + 删曲目库引用）只允许出现在白名单文件里；
 //   (c) 白名单里每条必须真实存在且确实命中模式（名单不许空转、不许腐烂）；
-//   (d) 唯一入口在位，且两条文件动作腿（进废纸篓 + 永久删除）都还在；
-//   (e) **平台默认值只是数据**：iOS 适配器传 `Policy.ios(...)`（.delete），Mac 适配器传
-//       `Policy.mac()`（.trash），且核心 `policy:` 与 `Policy.fileAction` 都**没有隐式默认**
-//       ——谁也不能默默拾到一个错的动作（2026-09-18 实测：iOS 无废纸篓宗卷，trash 必失败）。
+//   (d) 唯一入口在位，且三条文件动作腿（进废纸篓 + 永久删除 + 回收区落点）都还在；
+//   (e) **平台默认值只是数据**：iOS 适配器传 `Policy.ios(...)`（默认 .delete；开启「只从曲库移除」
+//       时 .reclaim，2026-09-21 批 E-2），Mac 适配器传 `Policy.mac()`（.trash），且核心 `policy:` 与
+//       `Policy.fileAction` 都**没有隐式默认**——谁也不能默默拾到一个错的动作
+//       （2026-09-18 实测：iOS 无废纸篓宗卷，trash 必失败）。
 //
 //  全部 fail-closed：目录读不到 / 白名单格式错 / 入口文件读不到 = 红，绝不静默通过。
 //  注释与字符串不算代码（扫描前先剥注释）——靠注释「提到」不算第二实现。
@@ -225,7 +226,7 @@ struct TrackDeletionShapeContractTests {
         }
     }
 
-    @Test("(d) 唯一入口在位：两条文件动作腿都在（.trash / .delete）")
+    @Test("(d) 唯一入口在位：三条文件动作腿都在（.trash / .delete / .reclaim）")
     func entryDeclaresBothFileActions() throws {
         let entryPath = "QQPlayer/Services/TrackDeletionService.swift"
         let url = DeleteShapeContract.repositoryRoot.appendingPathComponent(entryPath)
@@ -235,6 +236,10 @@ struct TrackDeletionShapeContractTests {
         #expect(code.contains("enum FileAction"), "唯一入口必须显式声明文件动作策略：\(entryPath)")
         #expect(code.contains("case trash"), "缺少 .trash（默认，可恢复）那条腿")
         #expect(code.contains("case delete"), "缺少 .delete（永久删除）那条腿")
+        #expect(
+            code.contains("case reclaim"),
+            "缺少 .reclaim（「只从曲库移除」库内文件的回收区落点，2026-09-21 批 E-2）那条腿"
+        )
         #expect(code.contains("trashItem"), "入口必须真的调用 FileManager.trashItem（不能只写注释）")
         #expect(code.contains("removeItem"), "入口必须真的保留永久删除那条腿")
         #expect(
@@ -262,7 +267,7 @@ struct TrackDeletionShapeContractTests {
         // ② 两个适配器各传自己的工厂（防「工厂写了但适配器不用」/两平台写反）
         #expect(
             code.contains("policy: .ios(libraryOnly: settings.deleteFromLibraryOnly)"),
-            "iOS 适配器必须传 Policy.ios(libraryOnly:)（.delete + 既有开关语义）"
+            "iOS 适配器必须传 Policy.ios(libraryOnly:)（默认 .delete + 开启时 .reclaim + 既有开关语义）"
         )
         #expect(
             code.contains("policy: .mac()"),
@@ -274,11 +279,15 @@ struct TrackDeletionShapeContractTests {
             DeleteShapeContract.occurrences(of: "Policy(fileAction:", in: code) == 2,
             "带字面量 fileAction 的 Policy 只应有两个工厂（ios/mac），别处不得再拼策略"
         )
-        #expect(code.contains("fileAction: .delete, libraryOnly: libraryOnly"))
+        #expect(code.contains("fileAction: libraryOnly ? .reclaim : .delete"))
         #expect(code.contains("fileAction: .trash, libraryOnly: false"))
 
         // ④ 工厂本身的行为（防止两个工厂被写反）
         #expect(TrackDeletionService.Policy.ios(libraryOnly: false).fileAction == .delete)
+        #expect(
+            TrackDeletionService.Policy.ios(libraryOnly: true).fileAction == .reclaim,
+            "iOS 开启「只从曲库移除」时必须走回收区落点（批 E-2 语义变更）"
+        )
         #expect(TrackDeletionService.Policy.mac().fileAction == .trash)
     }
 
