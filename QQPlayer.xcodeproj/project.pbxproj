@@ -621,6 +621,8 @@
 				Services/CloudFileAvailability.swift,
 				"Services/DatabaseManager+LibraryCRUD.swift",
 				"Services/DatabaseManager+LibraryMigrations.swift",
+				"Services/DatabaseManager+PlaylistFolderSync.swift",
+				"Services/DatabaseManager+PlaylistMaintenance.swift",
 				"Services/DatabaseManager+TracksMaintenance.swift",
 				"Services/DatabaseManager+TracksRead.swift",
 				Services/DatabaseManager.swift,
