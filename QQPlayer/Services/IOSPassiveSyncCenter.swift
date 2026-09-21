@@ -51,229 +51,6 @@
     import Network
     import Observation
 
-    // MARK: - 状态（契约 C3）
-
-    /// iOS 被动端连接状态（`IOSPassiveSyncCenter.state`）。
-    enum IOSPassiveSyncState: Equatable, Sendable {
-        /// 未运行 / 没有可连的主机
-        case idle
-        /// 浏览或连接中（hostName = nil 表示还在浏览）
-        case connecting(hostName: String?)
-        /// 已连接并接成被动端
-        case connected(hostName: String, peerID: String)
-        /// 失败（展示映射见 `IOSPassiveSyncPresenter`）
-        case failed(IOSPassiveSyncFailure)
-
-        var isConnected: Bool {
-            if case .connected = self { return true }
-            return false
-        }
-
-        var isConnecting: Bool {
-            if case .connecting = self { return true }
-            return false
-        }
-    }
-
-    /// 被动端失败模型：本端前置条件缺失，或复用扫码回连的 `SyncConnectFailure`。
-    enum IOSPassiveSyncFailure: Equatable, Sendable {
-        /// 本机没有已配对主机（设置页引导扫码添加）
-        case noPairedHost
-        /// 本端同步身份不可用（Keychain 异常）
-        case identityUnavailable
-        /// 连接/会话失败（分类复用 `SyncConnectLogic.failure(fromCloseReason:)`）
-        case connect(SyncConnectFailure)
-    }
-
-    // MARK: - 纯逻辑：候选目标 / 退避策略（可单测）
-
-    /// 一个候选连接目标：已配对主机（peerID = 握手 pinning 期望值）+ 浏览到的 endpoint。
-    struct IOSPassiveSyncTarget: Equatable, Sendable {
-        var peerID: String
-        var hostName: String
-        var endpoint: NWEndpoint
-    }
-
-    /// 被动端回连决策纯逻辑（无 IO / 无状态，可单测）。
-    enum IOSPassiveReconnectLogic {
-        /// 浏览结果 × 已配对主机 → 候选目标序列。
-        ///
-        /// 排序：名称 case-insensitive 相同者优先（**复用** `SyncConnectLogic.matches`
-        /// 口径，与扫码回连同源）；改名/重名场景下剩余 endpoint 仍按发现顺序兜底尝试
-        /// ——身份由握手 pinning（expectedPeerDeviceID）判定，广播名不作凭据，
-        /// 连错也只会以 `peerUntrusted` / `identityMismatch` 关闭。
-        static func targets(
-            discovered: [SyncDiscoveredHost],
-            pairedHosts: [PeerDevice]
-        ) -> [IOSPassiveSyncTarget] {
-            var matched: [IOSPassiveSyncTarget] = []
-            var claimed: Set<Int> = []
-            var unmatchedPeers: [PeerDevice] = []
-            for peer in pairedHosts {
-                let index = discovered.indices.first {
-                    !claimed.contains($0)
-                        && SyncConnectLogic.matches(hostName: discovered[$0].name, expected: peer.displayName)
-                }
-                if let index {
-                    claimed.insert(index)
-                    matched.append(IOSPassiveSyncTarget(
-                        peerID: peer.peerID,
-                        hostName: discovered[index].name,
-                        endpoint: discovered[index].endpoint
-                    ))
-                } else {
-                    unmatchedPeers.append(peer)
-                }
-            }
-            let leftovers = discovered.indices
-                .filter { !claimed.contains($0) }
-                .map { discovered[$0] }
-            let fallback = unmatchedPeers.flatMap { peer in
-                leftovers.map { host in
-                    IOSPassiveSyncTarget(peerID: peer.peerID, hostName: host.name, endpoint: host.endpoint)
-                }
-            }
-            return matched + fallback
-        }
-    }
-
-    /// 自动重连退避策略（**仅前台**使用；上限用尽 → 交手动「重连」）。
-    enum IOSPassiveReconnectPolicy {
-        /// 前台自动重连次数上限（此后只保留手动重连，避免无主机时无限耗电）
-        static let maxAutomaticAttempts = 5
-        /// 首次等待秒数（指数退避基数）
-        static let baseDelay: TimeInterval = 2
-        /// 单次等待封顶（避免长尾）
-        static let maxDelay: TimeInterval = 30
-
-        /// 第 n 次自动重连（1 起）前的等待秒数；超出上限返回 nil。
-        static func delayBeforeAttempt(_ attempt: Int) -> TimeInterval? {
-            guard attempt >= 1, attempt <= maxAutomaticAttempts else { return nil }
-            return min(baseDelay * pow(2, Double(attempt - 1)), maxDelay)
-        }
-    }
-
-    // MARK: - 纯逻辑：设置页展示映射（可单测）
-
-    /// 设置页「接收同步」区展示模型：只带本地化 key / 数字，文案值由 View 取。
-    struct IOSPassiveSyncPresentation: Equatable {
-        var symbol: String
-        var titleKey: String
-        var titleArg: String?
-        var detailKey: String?
-        var detailArg: String?
-        /// 已接收（已落位并交给入库入口）文件数
-        var receivedFiles: Int
-        /// 最近一批声明的条目数（0 = 尚无推送）
-        var lastBatchEntries: Int
-        /// 失败清单（View 截断展示）
-        var failures: [SyncPushFailure]
-        /// 是否展示「重连」按钮（连接中/已连接时不需要）
-        var canReconnect: Bool
-    }
-
-    /// 状态 + 账目 → 展示模型（纯函数）。
-    enum IOSPassiveSyncPresenter {
-        static func presentation(
-            state: IOSPassiveSyncState,
-            summary: SyncLibraryPassiveSummary,
-            hasPairedHost: Bool
-        ) -> IOSPassiveSyncPresentation {
-            let canReconnect = hasPairedHost && !state.isConnected && !state.isConnecting
-            func make(
-                _ symbol: String,
-                _ titleKey: String,
-                _ titleArg: String? = nil,
-                _ detailKey: String? = nil,
-                _ detailArg: String? = nil
-            ) -> IOSPassiveSyncPresentation {
-                IOSPassiveSyncPresentation(
-                    symbol: symbol,
-                    titleKey: titleKey,
-                    titleArg: titleArg,
-                    detailKey: detailKey,
-                    detailArg: detailArg,
-                    receivedFiles: summary.landed.count,
-                    lastBatchEntries: summary.announcedEntries,
-                    failures: summary.failed,
-                    canReconnect: canReconnect
-                )
-            }
-
-            switch state {
-            case .idle:
-                return make(
-                    hasPairedHost ? "wifi.slash" : "plus.circle",
-                    hasPairedHost ? "sync_passive_state_idle" : "sync_passive_state_unpaired"
-                )
-
-            case let .connecting(hostName):
-                guard let hostName else {
-                    return make("wifi", "sync_passive_state_searching")
-                }
-                return make("wifi", "sync_passive_state_connecting", hostName)
-
-            case let .connected(hostName, _):
-                return make("checkmark.circle.fill", "sync_passive_state_connected", hostName)
-
-            case let .failed(failure):
-                let copy = failureCopy(failure)
-                return make("exclamationmark.triangle", copy.titleKey, copy.titleArg, copy.detailKey, copy.detailArg)
-            }
-        }
-
-        /// 接收失败原因码 → 本地化 key（被动端只会出现接收/落位侧原因；
-        /// 发送侧原因码（`sendFailed` / `localFileUnavailable`）不会出现在本链路，
-        /// 兜底归入「其他」）。
-        static func reasonKey(_ reason: String) -> String {
-            if reason == SyncPushFailureReason.receiveFailed { return "sync_passive_reason_transfer" }
-            if reason == SyncPushFailureReason.invalidPath { return "sync_passive_reason_path" }
-            if reason == SyncPushFailureReason.landFailed { return "sync_passive_reason_save" }
-            return "sync_passive_reason_other"
-        }
-
-        private static func failureCopy(
-            _ failure: IOSPassiveSyncFailure
-        ) -> (titleKey: String, titleArg: String?, detailKey: String?, detailArg: String?) {
-            switch failure {
-            case .noPairedHost:
-                return ("sync_passive_state_unpaired", nil, nil, nil)
-            case .identityUnavailable:
-                return ("sync_passive_fail_identity", nil, nil, nil)
-            case let .connect(connectFailure):
-                switch connectFailure {
-                case let .hostNotFound(name):
-                    return name == nil
-                        ? ("sync_passive_fail_not_found_generic", nil, nil, nil)
-                        : ("sync_passive_fail_not_found", name, nil, nil)
-                case let .rejected(reason):
-                    return ("sync_passive_fail_rejected", nil, reason == nil ? nil : "sync_passive_detail", reason)
-                case .timedOut:
-                    return ("sync_passive_fail_timeout", nil, nil, nil)
-                case let .connectionFailed(detail):
-                    return ("sync_passive_fail_connection", nil, detail == nil ? nil : "sync_passive_detail", detail)
-                }
-            }
-        }
-    }
-
-    // MARK: - 纯逻辑：数据同步端装配决策（可单测）
-
-    /// 会话 ready 时数据同步端（帧 8/9 = `SyncChangeLogPeer`）的装配决策。
-    ///
-    /// 抽成纯函数是为了让 iOS 测试 target 能直接锁死这条决策：装配路径本身依赖网络
-    /// 发现（浏览 → 连接 → ready），无法直接单测。
-    enum IOSPassiveDataSyncLogic {
-        /// 对端 hello 里的 Device ID → 数据同步端游标键；nil / 空串 → 不装配。
-        ///
-        /// 口径与 `MacSyncCoordinatorFactory` 一致：peerID 是 `sync_cursor.peer_id`
-        /// 的键，空串会写出一条谁也匹配不到的脏游标行 → **宁可不接，不写脏数据**。
-        static func dataSyncPeerID(peerDeviceID: String?) -> String? {
-            guard let peerDeviceID, !peerDeviceID.isEmpty else { return nil }
-            return peerDeviceID
-        }
-    }
-
     // MARK: - 纯逻辑：数据同步（帧 8/9）账目（可单测，2026-09-15）
 
     /// 本机**被动侧最近一次数据同步**的账目。
@@ -369,23 +146,23 @@
         static let shared = IOSPassiveSyncCenter()
 
         /// 连接状态
-        private(set) var state: IOSPassiveSyncState = .idle
+        var state: IOSPassiveSyncState = .idle
         /// 接收账目（`onFileLanded` / `onBatchCompleted` 驱动）
         private(set) var summary = SyncLibraryPassiveSummary()
         /// **数据同步**（帧 8/9）账目：手机侧的“同步了什么 / 丢了多少”（矩阵四级空格，2026-09-15）
-        private(set) var dataSummary = IOSPassiveDataSyncSummary()
+        var dataSummary = IOSPassiveDataSyncSummary()
         /// 已配对主机数（设置页据此区分「未配对」与「未连接」）
-        private(set) var pairedHostCount = 0
+        var pairedHostCount = 0
 
-        private let identityStore: SyncIdentityStore
-        private let deviceStore: DeviceStore
-        private let libraryRoot: () -> URL
-        private let clientName: () -> String?
+        let identityStore: SyncIdentityStore
+        let deviceStore: DeviceStore
+        let libraryRoot: () -> URL
+        let clientName: () -> String?
         /// 同步库（生产 = `.shared`；测试注入内存库，避免碰真实 DB）
-        private let database: DatabaseManager
+        let database: DatabaseManager
         /// 曲库索引状态源（= changeLog 同步前置门的事实来源，`IndexingGate` 唯一判定；
         /// 生产 = `LibraryIndexer.shared`，测试注入假源）。
-        private let indexingState: IndexingStateProviding
+        let indexingState: IndexingStateProviding
 
         /// 默认本机名来源（握手 hello / 配对请求携带的展示名）：
         /// 用户命名（`LocalDeviceNameStore`）优先，未命名回落系统设备名。
@@ -394,17 +171,17 @@
             store.name
         }
 
-        private var browser: SyncBrowser?
-        private var session: SyncPeerSession?
-        private var passiveHost: SyncLibraryPassiveHost?
+        var browser: SyncBrowser?
+        var session: SyncPeerSession?
+        var passiveHost: SyncLibraryPassiveHost?
         /// 数据同步端（帧 8/9 处理器）= `SyncChangeLogPeer`；nil = 未装配
-        private var dataSyncPeer: SyncChangeLogPeer?
+        var dataSyncPeer: SyncChangeLogPeer?
         /// 数据同步端的对端游标键（`sync_cursor.peer_id`）；nil = 未装配
-        private(set) var dataSyncPeerID: String?
+        var dataSyncPeerID: String?
         /// 待装配数据同步端的会话（前置门挡住时留着，索引终态后补装；拆除时清）
-        private var dataSyncSession: SyncPeerSession?
+        var dataSyncSession: SyncPeerSession?
         /// 索引终态事实的订阅（start 挂、stop 摘）
-        private var indexingTerminalStateCancellable: AnyCancellable?
+        var indexingTerminalStateCancellable: AnyCancellable?
 
         /// 数据同步端是否已装配（可达性诊断 / 测试断言 / **运行时装配自检事实**）。
         var isDataSyncAttached: Bool {
@@ -412,19 +189,19 @@
         }
 
         /// 播放位置落点是否已注入（装配自检事实；**门控关 = nil = 不适用**，不计缺口，见 INV-26）。
-        private var playbackPositionSinkAttached: Bool?
-        private var pairedHosts: [PeerDevice] = []
-        private var currentTarget: IOSPassiveSyncTarget?
+        var playbackPositionSinkAttached: Bool?
+        var pairedHosts: [PeerDevice] = []
+        var currentTarget: IOSPassiveSyncTarget?
         /// 本轮已尝试过的目标（`peerID|hostName`），避免浏览回调反复重连同一目标
-        private var attemptedTargets: Set<String> = []
-        private var isRunning = false
-        private var isTearingDown = false
-        private var isWaitingBackoff = false
-        private var automaticAttempts = 0
+        var attemptedTargets: Set<String> = []
+        var isRunning = false
+        var isTearingDown = false
+        var isWaitingBackoff = false
+        var automaticAttempts = 0
         /// 每次尝试的令牌：旧会话/旧被动端回调据其失效
-        private var attemptToken = UUID()
-        private var discoveryWork: DispatchWorkItem?
-        private var reconnectWork: DispatchWorkItem?
+        var attemptToken = UUID()
+        var discoveryWork: DispatchWorkItem?
+        var reconnectWork: DispatchWorkItem?
 
         init(
             identityStore: SyncIdentityStore = SyncIdentityStore(),
@@ -459,26 +236,6 @@
             automaticAttempts = 0
             beginAttempt()
         }
-
-        /// 订阅「曲库索引终态」事实：终态一到，把此前被前置门挡住的数据同步端补上
-        /// （会话仍在时才动；判定只有一处 = `IndexingGate.isReadyForChangeLogSync`）。
-        private func observeIndexingTerminalState() {
-            guard indexingTerminalStateCancellable == nil else { return }
-            indexingTerminalStateCancellable = indexingState.indexingTerminalStatePublisher
-                .sink { [weak self] in
-                    Task { @MainActor in self?.refreshDataSyncAttachment() }
-                }
-        }
-
-        /// 索引终态事实变化 → 若会话已就绪，补装数据同步端（幂等：已装配就什么都不做）。
-        ///
-        /// internal（非 private）仅供 iOS 测试 target 驱动这条路径（与 `attachPassiveHost` 同口径）；
-        /// 生产只由 `observeIndexingTerminalState` 的订阅回调触发。
-        func refreshDataSyncAttachment() {
-            guard let session = dataSyncSession, session.isReady else { return }
-            attachDataSync(to: session)
-        }
-
         /// App 退到后台：拆接线 + 关会话 + 停浏览（幂等）。
         func stop() {
             isRunning = false
@@ -503,126 +260,6 @@
             automaticAttempts = 0
             attemptedTargets.removeAll()
             beginAttempt()
-        }
-
-        // MARK: 一次尝试
-
-        private func beginAttempt() {
-            cancelDiscovery()
-            cancelReconnect()
-            isWaitingBackoff = false
-            // ⚠️ 故意**不**清 `attemptedTargets`：DNS-SD 逐条投递，若一台非同步主机
-            // （如 Mac 上的 Python web 端，广播同一服务类型）先到，不清记忆就会每轮
-            // 都先撞它、真正的桌面端永远排不到（2026-09-17 真机踩过）。用户手动
-            // 「重连」时才重置（见 `reconnectNow`）。
-            currentTarget = nil
-            tearDownSession()
-            reloadPairedHosts()
-
-            guard !pairedHosts.isEmpty else {
-                // 无已配对主机：不起浏览（省电），交设置页引导扫码
-                state = .idle
-                return
-            }
-            guard let identity = try? identityStore.loadOrCreateIdentity() else {
-                state = .failed(.identityUnavailable)
-                return
-            }
-
-            let token = UUID()
-            attemptToken = token
-            browser?.stopBrowsing()
-            let browser = SyncBrowser(localIdentity: identity, trustStore: deviceStore)
-            browser.onResultsChanged = { [weak self] hosts in
-                Task { @MainActor in
-                    guard let self, self.attemptToken == token else { return }
-                    self.handleResults(hosts)
-                }
-            }
-            browser.onBrowseFailure = { [weak self] _ in
-                SyncConnectDiag.log("📡 浏览失败回调（按发现超时处理）")
-                Task { @MainActor in
-                    guard let self, self.attemptToken == token else { return }
-                    self.handleDiscoveryTimeout()
-                }
-            }
-            self.browser = browser
-            state = .connecting(hostName: nil)
-            browser.startBrowsing()
-            scheduleDiscoveryTimeout(token: token)
-        }
-
-        private func handleResults(_ hosts: [SyncDiscoveredHost]) {
-            guard isRunning, session == nil, !isWaitingBackoff, !state.isConnected else { return }
-            let candidates = IOSPassiveReconnectLogic.targets(discovered: hosts, pairedHosts: pairedHosts)
-            // 本轮候选全部试过 → 清空记忆重来（保证活性：对端换了名字/刚上线时仍能重试）
-            var unattempted = candidates.filter { !attemptedTargets.contains(Self.key($0)) }
-            if unattempted.isEmpty, !candidates.isEmpty {
-                attemptedTargets.removeAll()
-                unattempted = candidates
-            }
-            SyncConnectDiag.log(
-                "🔍 discovered=[\(hosts.map(\.name).joined(separator: " | "))] "
-                    + "candidates=[\(candidates.map(\.hostName).joined(separator: " | "))] "
-                    + "unattempted=[\(unattempted.map(\.hostName).joined(separator: " | "))]"
-            )
-            guard let candidate = unattempted.first else {
-                // 无候选：继续等 discoveryTimeout 判失败
-                return
-            }
-            attemptedTargets.insert(Self.key(candidate))
-            connect(to: candidate)
-        }
-
-        private func connect(to target: IOSPassiveSyncTarget) {
-            guard let browser else { return }
-            currentTarget = target
-            state = .connecting(hostName: target.hostName)
-            SyncConnectDiag.log(
-                "🔗 connect target=\(target.hostName) peer=\(target.peerID.prefix(8)) "
-                    + "endpoint=\(SyncConnectDiag.describe(target.endpoint))"
-            )
-
-            var config = SyncSessionConfiguration()
-            config.clientDisplayName = clientName()
-            let token = attemptToken
-            let session = browser.connect(
-                to: target.endpoint,
-                expectedPeerDeviceID: target.peerID,
-                candidate: nil, // 已配对重连：不带扫码候选 → 直通 ready（信任表 pinning 验证）
-                config: config
-            )
-            // 链式挂接（SyncBrowser.connect 已设 onStateChange 做 channel 清理，
-            // 绝不能覆盖）：存 prior → 先己后彼。
-            let priorState = session.onStateChange
-            session.onStateChange = { [weak self] phase in
-                Task { @MainActor in
-                    guard let self, self.attemptToken == token else { return }
-                    self.handlePhase(phase)
-                }
-                priorState?(phase)
-            }
-            let priorClosed = session.onClosed
-            session.onClosed = { [weak self] reason in
-                Task { @MainActor in
-                    guard let self, self.attemptToken == token else { return }
-                    self.handleClosed(reason)
-                }
-                priorClosed?(reason)
-            }
-            self.session = session
-        }
-
-        // MARK: 会话推进
-
-        private func handlePhase(_ phase: SyncSessionPhase) {
-            guard isRunning, !isTearingDown, phase == .ready, let session, let target = currentTarget else { return }
-            guard !state.isConnected else { return }
-            cancelDiscovery()
-            automaticAttempts = 0
-            attemptedTargets.removeAll()
-            attachPassiveHost(to: session)
-            state = .connected(hostName: target.hostName, peerID: target.peerID)
         }
 
         /// 会话 ready → 装配被动端（曲库根与既有扫描同源）**+ 数据同步端**（帧 8/9）。
@@ -676,306 +313,6 @@
             store.record(.playbackPositionSink, attached: playbackPositionSinkAttached)
         }
 
-        /// 被动端数据同步端的 applier：开关开（跨端续播）才注入落点；
-        /// 关 = 本端不接受播放位置（关着时行不落地也不计「已应用」，见 INV-20/INV-26）。
-        private static func makePassiveApplier(database: DatabaseManager) -> SyncChangeLogApplier {
-            var applier = SyncChangeLogApplier(database: database)
-            if applier.playbackPositionSyncEnabled {
-                applier.playbackPositionSink = { PlaybackPositionResumeSink.apply($0) }
-            }
-            return applier
-        }
-
-        /// 数据同步账目累加（主线程）。会话回调不在主线程 → 调用方负责 `Task { @MainActor in }`。
-        private func recordDataSync(_ mutate: (inout IOSPassiveDataSyncSummary) -> Void) {
-            var updated = dataSummary
-            mutate(&updated)
-            updated.hasSessionData = true
-            updated.updatedAt = Date()
-            dataSummary = updated
-        }
-
-        /// 会话 ready → 装配数据同步端（帧 8/9 = `SyncChangeLogPeer`，全仓帧 8/9 唯一处理器）。
-        ///
-        /// **前置门**（唯一判定 = `IndexingGate.isReadyForChangeLogSync`）：曲库索引未到终态时
-        /// 本端**整体不接**——不装配 peer（不发起、不应答帧 8/9）、不跑补发对账，等终态后
-        /// 由 `refreshDataSyncAttachment()` 补装。理由见 `IndexingGate` 内的取证注释。
-        ///
-        /// 装配顺序：本方法在 `SyncLibraryPassiveHost.attach` **之后**调用——
-        /// `SyncChangeLogPeer.init` 会把 handler 挂成链头并转发 prior，于是帧 8/9 由它处理、
-        /// 帧 15 继续到达被动端（见文件头「会话回调单槽 + 挂接顺序」）。
-        private func attachDataSync(to session: SyncPeerSession) {
-            guard dataSyncPeer == nil else { return }
-            guard IndexingGate.isReadyForChangeLogSync(indexingState) else {
-                AppLog.warn(.general, "⏸️ IOSPassiveSyncCenter: 曲库索引未到终态，不装配数据同步端（不发起/不应答/不补发对账，待终态后补装）")
-                return
-            }
-            guard let peerID = IOSPassiveDataSyncLogic.dataSyncPeerID(
-                peerDeviceID: session.peerHelloValue?.deviceID
-            ) else {
-                // 空游标键会往 sync_cursor 写脏行（与 MacSyncCoordinatorFactory 同口径）
-                AppLog.warn(.general, "⚠️ IOSPassiveSyncCenter: 会话无对端 Device ID，不装配数据同步端（避免空游标键写脏数据）")
-                return
-            }
-            // T15b（2026-09-14）：装配数据同步端**之前**先对账本端 outbox 的出站悬空引用
-            // （引用 stableId 在 track 表查无行的行——容器路径变化后旧 id 失效，业务表被
-            // TrackIdentityMigration 迁移过、outbox 没有 → 每轮推送这些行都拿不到指纹，
-            // 对端全部判「未定位」跳过）。本方法一次会话只走一次（dataSyncPeer == nil 守卫），
-            // 正好在首次推送之前把 outbox 修好/清干净。失败只打日志，不影响装配主流程。
-            do {
-                let repair = try SyncChangeLogDanglingRepair(database: database).run()
-                if repair.didChange {
-                    AppLog.info(.general, "ℹ️ IOSPassiveSyncCenter: 出站悬空引用修复 + 本地真值补发完成" + repair.logText)
-                }
-            } catch {
-                AppLog.warn(.general, "⚠️ IOSPassiveSyncCenter: 出站悬空引用对账失败 \(error)")
-            }
-            let applier = Self.makePassiveApplier(database: database)
-            // 自检事实：门控开 = 「落点真的注入了吗」，门控关 = 不适用（不报缺口，INV-26）。
-            playbackPositionSinkAttached = applier.playbackPositionSyncEnabled
-                ? (applier.playbackPositionSink != nil)
-                : nil
-            let peer = SyncChangeLogPeer(
-                session: session,
-                store: SyncChangeLogStore(database: database),
-                applier: applier,
-                peerID: peerID,
-                libraryRoot: libraryRoot()
-            )
-            // 诊断打点：只记计数 / 错误类别，不打印曲目内容（隐私）。
-            // 同一批数字同时交给 `dataSummary`（手机侧的账目面板，2026-09-15）——
-            // 会话回调不在主线程 → 统一 Task 跳主线程累加。
-            peer.onPullHandled = { [weak self] _, count in
-                AppLog.info(.general, "ℹ️ SyncChangeLogPeer: 已应答远端拉取（本批 outbox 行数=\(count)）")
-                Task { @MainActor in self?.recordDataSync { $0.tally.overwrite(.outbound, with: count) } }
-            }
-            peer.onPushApplied = { [weak self] count in
-                AppLog.info(.general, "ℹ️ SyncChangeLogPeer: 已应用远端播放数据（行数=\(count)）")
-                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.applied, count: count) } }
-            }
-            peer.onPushSuspended = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.suspended, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.info(.general, "ℹ️ SyncChangeLogPeer: 本地缺歌挂起（行数=\(total)，待歌到位重放）")
-            }
-            // 身份缺口披露（2026-09-14）：引用歌曲但拿不到指纹的行两端都跳/标。
-            peer.onPushUnresolved = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.unresolved, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 跳过未定位的远端行（行数=\(total)，缺身份键）")
-            }
-            // 身份歧义（2026-09-15）：第二身份相对路径命中多首本地曲目 → 不落库。
-            peer.onPushAmbiguous = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.ambiguousIdentity, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 跳过身份歧义的远端行（行数=\(total)，相对路径命中多首本地曲目）")
-            }
-            // 父行 / 被引用行不存在而跳过（矩阵三级 #8）：以前静默失败，现在计数可见。
-            peer.onPushSkippedMissingParent = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.skippedMissingParent, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.info(.general, "ℹ️ SyncChangeLogPeer: 跳过依赖尚未到达的远端行（行数=\(total)，歌单结构未到或歌无本机行）")
-            }
-            // 跨端续播关（默认）/ 落点未接：播放位置行不落地、也不计入「已应用」。
-            peer.onPushUnsupported = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.unsupported, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.info(.general, "ℹ️ SyncChangeLogPeer: 跳过未落地的播放位置行（行数=\(total)，跨端续播关或落点未接）")
-            }
-            // 应用失败（载荷解不开 / 落库抛错；歌单级失败在这里单独可见）
-            peer.onPushApplyFailed = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.applyFailed, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 应用失败的远端行（行数=\(total)，载荷非法或落库失败）")
-            }
-            peer.onPullMissingIdentity = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.missingIdentity, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 应答拉取时有 \(total) 行缺身份键（对端定位不了）")
-            }
-            peer.onIncrementMissingIdentity = { [weak self] groups in
-                Task { @MainActor in
-                    self?.recordDataSync { summary in
-                        for group in groups {
-                            summary.tally.accumulate(.missingIdentity, entity: group.entity, count: group.count)
-                        }
-                    }
-                }
-                let total = groups.reduce(0) { $0 + $1.count }
-                guard total > 0 else { return }
-                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 推送增量时有 \(total) 行缺身份键（对端定位不了）")
-            }
-            peer.onPushIgnoredDeletes = { [weak self] count in
-                Task { @MainActor in self?.recordDataSync { $0.tally.accumulate(.ignoredDelete, count: count) } }
-                guard count > 0 else { return }
-                AppLog.info(.general, "ℹ️ SyncChangeLogPeer: 忽略远端删除（行数=\(count)，删除不跨端传播）")
-            }
-            peer.onDecodeFailure = { error in
-                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 载荷解码失败 \(error)")
-            }
-            dataSyncPeer = peer
-            dataSyncPeerID = peerID
-            AppLog.info(.general, "ℹ️ IOSPassiveSyncCenter: 数据同步端已装配（帧 8/9）")
-        }
-
-        private func handleClosed(_ reason: SyncSessionCloseReason) {
-            guard !isTearingDown else { return }
-            SyncConnectDiag.log("🛑 session closed reason=\(reason) target=\(currentTarget?.hostName ?? "-")")
-            session = nil
-            passiveHost = nil
-            dataSyncPeer = nil
-            dataSyncPeerID = nil
-            dataSyncSession = nil
-            playbackPositionSinkAttached = nil
-            SyncWiringFactsStore.shared.clear()
-            currentTarget = nil
-            guard isRunning else { return }
-            if let failure = SyncConnectLogic.failure(fromCloseReason: reason) {
-                state = .failed(.connect(failure))
-            }
-            scheduleReconnect()
-        }
-
-        private func handleDiscoveryTimeout() {
-            guard isRunning, !isWaitingBackoff, !state.isConnected else { return }
-            guard !sessionHasPeer else { return }
-            SyncConnectDiag.log("⏳ discovery timeout target=\(currentTarget?.hostName ?? "-") paired=\(pairedHosts.count)")
-            cancelDiscovery()
-            state = .failed(.connect(.hostNotFound(hostName: currentTarget?.hostName ?? pairedHosts.first?.displayName)))
-            scheduleReconnect()
-        }
-
-        /// 是否已建立会话（浏览超时判定用：有会话就不算「没找到主机」）
-        private var sessionHasPeer: Bool {
-            session != nil
-        }
-
-        // MARK: 重连退避
-
-        private func scheduleReconnect() {
-            guard isRunning else { return }
-            automaticAttempts += 1
-            guard let delay = IOSPassiveReconnectPolicy.delayBeforeAttempt(automaticAttempts) else {
-                // 上限用尽：保持 failed，交设置页「重连」手动兜底
-                browser?.stopBrowsing()
-                browser = nil
-                return
-            }
-            isWaitingBackoff = true
-            cancelDiscovery()
-            let token = attemptToken
-            let work = DispatchWorkItem { [weak self] in
-                Task { @MainActor in
-                    guard let self, self.isRunning, self.attemptToken == token else { return }
-                    self.beginAttempt()
-                }
-            }
-            reconnectWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-        }
-
-        private func scheduleDiscoveryTimeout(token: UUID) {
-            cancelDiscovery()
-            let work = DispatchWorkItem { [weak self] in
-                Task { @MainActor in
-                    guard let self, self.attemptToken == token else { return }
-                    self.handleDiscoveryTimeout()
-                }
-            }
-            discoveryWork = work
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + SyncAutoConnectController.discoveryTimeout,
-                execute: work
-            )
-        }
-
-        private func cancelDiscovery() {
-            discoveryWork?.cancel()
-            discoveryWork = nil
-        }
-
-        private func cancelReconnect() {
-            reconnectWork?.cancel()
-            reconnectWork = nil
-            isWaitingBackoff = false
-        }
-
-        // MARK: 清理
-
-        private func tearDownSession() {
-            isTearingDown = true
-            passiveHost?.detach()
-            passiveHost = nil
-            dataSyncPeer = nil
-            dataSyncPeerID = nil
-            dataSyncSession = nil
-            playbackPositionSinkAttached = nil
-            // 会话拆除：自检事实归零（不是缺口——没有会话就谈不上装配）。
-            SyncWiringFactsStore.shared.clear()
-            session?.cancel(reason: .userCancelled)
-            session = nil
-            isTearingDown = false
-            attemptToken = UUID()
-        }
-
-        private func reloadPairedHosts() {
-            let devices = (try? deviceStore.all()) ?? []
-            pairedHosts = SyncDeviceList.hosts(in: devices)
-            pairedHostCount = pairedHosts.count
-        }
-
-        private static func key(_ target: IOSPassiveSyncTarget) -> String {
-            "\(target.peerID)|\(target.hostName)"
-        }
     }
 
 #endif
