@@ -84,6 +84,7 @@ extension MacSearchAnythingLayer {
         let marked = (responder as? NSTextView)?.hasMarkedText() ?? false
         return "\(type(of: responder))\(marked ? "（组字中）" : "")"
     }
+}
 
 // MARK: - Esc（唯一入口）
 
@@ -157,6 +158,5 @@ struct SearchAnythingEscapeMonitor: ViewModifier {
     private static var isComposingMarkedText: Bool {
         (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
     }
-}
 }
 
