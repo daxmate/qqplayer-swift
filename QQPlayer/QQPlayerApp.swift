@@ -145,7 +145,6 @@ struct QQPlayerApp: App {
                             SpotlightLibraryIndexer.shared.activate()
                         }
                     #endif
-                    await createiCloudContainerPlaceholder()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIScene.didEnterBackgroundNotification)) { _ in
                     handleDidEnterBackground()
@@ -374,30 +373,6 @@ struct QQPlayerApp: App {
         AppLog.info(.general, "🎤 Received Siri intent: \(userActivity.activityType)")
         Task { @MainActor in
             await appCoordinator.handleSiriPlayIntent(userActivity: userActivity)
-        }
-    }
-
-    private func createiCloudContainerPlaceholder() async {
-        guard let iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil) else {
-            AppLog.error(.general, "❌ iCloud Drive not available")
-            return
-        }
-
-        let documentsURL = iCloudURL.appendingPathComponent("Documents")
-        let placeholderURL = documentsURL.appendingPathComponent(".qqplayer_placeholder")
-
-        do {
-            // Create Documents directory if it doesn't exist
-            try FileManager.default.createDirectory(at: documentsURL, withIntermediateDirectories: true, attributes: nil)
-
-            // Create placeholder file if it doesn't exist
-            if !FileManager.default.fileExists(atPath: placeholderURL.path) {
-                let placeholderText = "This folder contains music files for QQPlayer.\nPlace your FLAC files here to add them to your library."
-                try placeholderText.write(to: placeholderURL, atomically: true, encoding: .utf8)
-                AppLog.info(.general, "✅ Created iCloud Drive placeholder file to ensure folder visibility")
-            }
-        } catch {
-            AppLog.error(.general, "❌ Failed to create iCloud Drive placeholder: \(error)")
         }
     }
 
