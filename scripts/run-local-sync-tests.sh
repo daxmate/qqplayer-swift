@@ -36,6 +36,8 @@ SOURCES=(
   QQPlayer/Sync/SyncSessionModels.swift
   QQPlayer/Sync/SyncPeerSession.swift
   QQPlayer/Sync/SyncPeerSession+Frames.swift
+  # E2（2026-09-21）：会话事件分发链拆出为独立文件（本清单里 4 个文件消费 SyncSessionAttachment）
+  QQPlayer/Sync/SyncEventHandlerChain.swift
   QQPlayer/Sync/SyncFileChecksum.swift
   QQPlayer/Sync/SyncFileTransferModels.swift
   QQPlayer/Sync/SyncFileSender.swift

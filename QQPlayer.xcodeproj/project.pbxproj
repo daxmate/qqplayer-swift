@@ -764,6 +764,7 @@
 				"Sync/SyncEntityRegistry+Assembly.swift",
 				"Sync/SyncEntityRegistry+Shape.swift",
 				Sync/SyncEntityRegistry.swift,
+				Sync/SyncEventHandlerChain.swift,
 				Sync/SyncFileChecksum.swift,
 				Sync/SyncFileReceiver.swift,
 				Sync/SyncFileSender.swift,

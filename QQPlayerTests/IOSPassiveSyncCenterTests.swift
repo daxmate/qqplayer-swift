@@ -514,10 +514,11 @@ struct IOSPassiveSyncCenterTests {
             "onApplicationFrame",
             "pairApprovalHandler",
         ],
-        "QQPlayer/Sync/SyncPeerSession+Frames.swift": [
+        "QQPlayer/Sync/SyncEventHandlerChain.swift": [
             "readCurrent",
             "install",
         ],
+        "QQPlayer/Sync/SyncPeerSession+Frames.swift": [],
         "QQPlayer/Sync/SyncListener.swift": [
             "onStateUpdate",
             "onReady",
@@ -638,8 +639,9 @@ struct IOSPassiveSyncCenterTests {
 
     /// 该文件里「存储型闭包属性」声明**总数**基线（有意为之的摩擦：新增/删除闭包属性必须过这一关）。
     private static let sendableCallbackCounts: [String: Int] = [
+        "QQPlayer/Sync/SyncEventHandlerChain.swift": 3,
         "QQPlayer/Sync/SyncPeerSession.swift": 4,
-        "QQPlayer/Sync/SyncPeerSession+Frames.swift": 3,
+        "QQPlayer/Sync/SyncPeerSession+Frames.swift": 0,
         "QQPlayer/Sync/SyncListener.swift": 6,
         "QQPlayer/Sync/SyncBrowser.swift": 2,
         "QQPlayer/Sync/SyncFileReceiver.swift": 5,
@@ -664,7 +666,7 @@ struct IOSPassiveSyncCenterTests {
 
     /// 经审计的豁免（逐条给理由；不许静默漏 —— 未登记也未豁免的闭包属性会直接报错）。
     private static let sendableCallbackExemptions: [String: [String: String]] = [
-        "QQPlayer/Sync/SyncPeerSession+Frames.swift": [
+        "QQPlayer/Sync/SyncEventHandlerChain.swift": [
             "removal": "内部管道：闭包捕获私有引用计数对象 Entry（非 Sendable），要标就得给 Entry 加 @unchecked Sendable = 本任务禁止的糊法；构造与调用都在本层非隔离调用栈内。",
         ],
         "QQPlayer/Sync/SyncLocalLibraryProvider.swift": [
