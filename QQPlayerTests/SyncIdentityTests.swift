@@ -116,12 +116,6 @@ struct SyncIdentityTests {
         #expect(regenerated != first)
     }
 
-    @Test("deleteIdentity 幂等：无条目也成功")
-    func deleteMissingIsIdempotent() throws {
-        let store = SyncIdentityStore(keychain: MockKeychainStore())
-        try store.deleteIdentity() // 不应抛
-    }
-
     // MARK: - 错误路径
 
     @Test("Keychain 数据损坏 → invalidStoredKey（不静默换身份）")

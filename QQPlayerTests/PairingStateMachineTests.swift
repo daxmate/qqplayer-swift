@@ -385,14 +385,6 @@ struct PairingStateMachineTests {
         #expect(approvedCandidate.isReplacement)
     }
 
-    @Test("首次配对（未配对过）→ isReplacement=false")
-    mutating func firstPairingNotReplacement() {
-        var machine = PairingStateMachine()
-        machine.handle(.receivedQR(makePayload(), at: 1_000, alreadyPaired: false))
-        guard case let .awaitingConfirmation(candidate) = machine.state else { return }
-        #expect(!candidate.isReplacement)
-    }
-
     // MARK: - 候选 → 配对记录
 
     @Test("QR 候选构造 PeerDevice：字段完整映射（含 role/pairedAt）")

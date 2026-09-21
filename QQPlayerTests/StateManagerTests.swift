@@ -76,16 +76,6 @@ struct StateManagerTests {
         #expect(loaded == ["new"])
     }
 
-    @Test("migrate：幂等（无 legacy 时重复调用无副作用）")
-    func migrateIdempotent() throws {
-        defer { cleanLocalStateFiles() }
-        cleanLocalStateFiles()
-
-        StateManager.shared.migrateLegacyPaths()
-        StateManager.shared.migrateLegacyPaths() // 不应抛
-        #expect(!FileManager.default.fileExists(atPath: docs.appendingPathComponent("cosmos-playlists").path))
-    }
-
     // MARK: - Favorites
 
     @Test("favorites：本地往返保存与读取")

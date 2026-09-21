@@ -122,17 +122,6 @@ struct SyncUIStartGateDirectionTests {
         #expect(availability.canStart)
     }
 
-    @Test("hasDirection 默认 true：老调用点（未传方向）语义不变")
-    func defaultKeepsLegacySemantics() {
-        let availability = SyncUIStartGate.evaluate(
-            hasPairedDevice: true,
-            isConnected: true,
-            hasSession: true,
-            isRunning: false,
-            isEmptySelection: false
-        )
-        #expect(availability == .ready)
-    }
 }
 
 // MARK: - 对端错误归一

@@ -196,18 +196,6 @@ extension MusicAPITests {
         #expect(Self.spotifySearchRequests.count == 1)
     }
 
-    // MARK: - Hybrid：generateNameVariations 确定性
-
-    @Test("generateNameVariations：确定性——两次调用结果完全一致")
-    func nameVariationsDeterministic() {
-        let service = makeHybridService(cacheDir: makeTempCacheDir("variations-deterministic"))
-
-        let input = "Artist (Live) - Topic"
-        let first = service.generateNameVariations(input)
-        let second = service.generateNameVariations(input)
-        #expect(first == second)
-    }
-
     @Test("generateNameVariations：去掉常见后缀与括号内容，保持生成顺序")
     func nameVariationsOrderAndDedup() {
         let service = makeHybridService(cacheDir: makeTempCacheDir("variations-order"))

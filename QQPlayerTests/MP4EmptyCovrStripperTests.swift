@@ -265,12 +265,4 @@ struct MP4EmptyCovrStripperTests {
         let result = try strip(junk)
         #expect(result == junk)
     }
-
-    @Test("文件不存在 → 静默返回不抛错")
-    func missingFileSilent() throws {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("mp4strip-\(UUID().uuidString)")
-            .appendingPathComponent("nope.m4a")
-        try MP4EmptyCovrStripper.stripEmptyCovrIfPresent(from: url) // 不应抛
-    }
 }

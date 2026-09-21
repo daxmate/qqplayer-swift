@@ -11,7 +11,7 @@
 //    ② 应答文件请求（回推内容一致）+ 越界拒读（绝对路径 / `..` / 软链逃逸）
 //    ③ 接收推送 → 落位 + 走既有入库入口 + **不传播删除** + 未声明传输不落位
 //    ④ 歌词推送：按 content_hash 映射落到本端 stableId；本端无歌 → 丢弃不写孤儿
-//    ⑤ 推送声明模型 / 认领表（纯逻辑）
+//    ⑤ 推送声明模型（纯逻辑）
 //    ⑥ 曲库根不存在 → 不接线（绝不回空 manifest）
 //
 //  fixture 复用 SyncPeerSessionTestSupport.swift（SessionFixture 双 ready 回环）。
@@ -360,10 +360,10 @@ struct SyncLibraryPassiveTests {
         #expect(leftovers.isEmpty)
     }
 
-    // MARK: ⑤ 声明模型 / 认领表
+    // MARK: ⑤ 声明模型
 
-    @Test("推送声明模型：路径拒绝逃逸/隐藏名，认领表按传输级身份认领（同名不错位）")
-    func pushModelsRejectUnsafePathsAndClaimByIdentity() throws {
+    @Test("推送声明模型：路径拒绝逃逸/隐藏名，重复条目去重（认领表身份语义见 SyncTransferIdentityTests）")
+    func pushModelsRejectUnsafePathsAndDedupe() throws {
         #expect(SyncPushEntry.make(relativePath: "../escape.flac", fileID: "h", sha256Hex: "h", size: 1) == nil)
         #expect(SyncPushEntry.make(relativePath: "/abs.flac", fileID: "h", sha256Hex: "h", size: 1) == nil)
         #expect(SyncPushEntry.make(relativePath: "Album/.hidden.flac", fileID: "h", sha256Hex: "h", size: 1) == nil)
@@ -380,14 +380,6 @@ struct SyncLibraryPassiveTests {
         )
         #expect(SyncLibraryPushAnnounce(entries: [dup, invalid, dup]).entries.map(\.relativePath) == ["Album/01.flac"])
         #expect(SyncLibraryPushAnnounce(entries: []).isEmpty)
-
-        let a = SyncPushEntry(relativePath: "A/dup.flac", transferName: "dup.flac", fileID: "a", sha256Hex: "a", size: 1)
-        let b = SyncPushEntry(relativePath: "B/dup.flac", transferName: "dup.flac", fileID: "b", sha256Hex: "b", size: 1)
-        var table = SyncPushClaimTable(entries: [a, b])
-        #expect(table.claim(fileID: "b", sha256Hex: "b", transferName: "dup.flac") == "B/dup.flac")
-        #expect(table.claim(fileID: "a", sha256Hex: "a", transferName: "dup.flac") == "A/dup.flac")
-        #expect(table.claim(fileID: "c", sha256Hex: "c", transferName: "dup.flac") == nil)
-        #expect(table.isEmpty)
 
         // 帧 14 新编号；既有帧值语义不动
         #expect(SyncFrameType.libraryPushAnnounce.rawValue == 14)

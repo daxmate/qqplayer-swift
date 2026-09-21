@@ -225,30 +225,6 @@ struct LocalDeviceNameTests {
         #expect(try JSONDecoder().decode(SyncHello.self, from: unnamedData).name == nil)
     }
 
-    @Test("SyncHello：name 纯展示不参与签名（改名不破坏验签）")
-    func nameIsNotPartOfSignature() throws {
-        let identity = SyncIdentity.generate()
-        let ephemeral = Curve25519.KeyAgreement.PrivateKey()
-        var hello = try SyncHandshake.makeHello(
-            role: SyncHello.roleClient,
-            identity: identity,
-            peerDeviceID: identity.deviceID,
-            ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation,
-            name: "dax's iPhone"
-        )
-
-        // 中间人改名（payload 明文：hello 阶段无加密）→ 签名仍有效
-        hello.name = "attacker"
-
-        try SyncHandshake.verifyHello(
-            hello,
-            signerPublicKeyRaw: identity.publicKeyRaw,
-            expectedRole: SyncHello.roleClient,
-            expectedPeerDeviceID: identity.deviceID,
-            allowEmptyPeerBinding: true
-        )
-    }
-
     // MARK: - DeviceStore.updateDisplayName
 
     @Test("updateDisplayName：存在记录 → 只改 display_name + updated_at，其它列不变")

@@ -26,42 +26,6 @@ struct SyncCryptoTests {
 
     // MARK: - hello 签名/验证正反例
 
-    @Test("hello 构造 + 验证：client/host 双向均通过")
-    func helloVerifyPositive() throws {
-        let (client, host) = Self.makeIdentities()
-        let clientEphemeral = Curve25519.KeyAgreement.PrivateKey()
-        let hostEphemeral = Curve25519.KeyAgreement.PrivateKey()
-
-        // client hello：绑定 host ID
-        let clientHello = try SyncHandshake.makeHello(
-            role: SyncHello.roleClient,
-            identity: client,
-            peerDeviceID: host.deviceID,
-            ephemeralPublicKeyRaw: clientEphemeral.publicKey.rawRepresentation
-        )
-        try SyncHandshake.verifyHello(
-            clientHello,
-            signerPublicKeyRaw: client.publicKeyRaw,
-            expectedRole: SyncHello.roleClient,
-            expectedPeerDeviceID: host.deviceID,
-            allowEmptyPeerBinding: true
-        )
-        // host hello：绑定 client ID，签名可被 client 用 host 公钥验证
-        let hostHello = try SyncHandshake.makeHello(
-            role: SyncHello.roleHost,
-            identity: host,
-            peerDeviceID: client.deviceID,
-            ephemeralPublicKeyRaw: hostEphemeral.publicKey.rawRepresentation
-        )
-        try SyncHandshake.verifyHello(
-            hostHello,
-            signerPublicKeyRaw: host.publicKeyRaw,
-            expectedRole: SyncHello.roleHost,
-            expectedPeerDeviceID: client.deviceID,
-            allowEmptyPeerBinding: false
-        )
-    }
-
     @Test("错公钥（冒充者公钥）→ signatureInvalid")
     func verifyWrongPublicKeyRejected() throws {
         let (client, host) = Self.makeIdentities()

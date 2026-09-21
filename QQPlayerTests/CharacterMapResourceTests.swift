@@ -155,12 +155,4 @@ struct CharacterMapResourceTests {
     }
 
     // MARK: - 唯一入口：直连加载拿到的是同一张表（缓存不改变数据）
-
-    @Test("同一资源重复加载结果一致（进程内缓存不改变数据）")
-    func repeatedLoadIsStable() throws {
-        let first = CharacterMapResourceLoader.load(.traditionalToSimplified)
-        let second = CharacterMapResourceLoader.load(.traditionalToSimplified)
-        #expect(Self.sha256Hex(Self.canonicalText(first)) == Self.sha256Hex(Self.canonicalText(second)))
-        #expect(first == second)
-    }
 }

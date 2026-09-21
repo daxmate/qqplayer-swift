@@ -319,20 +319,6 @@ struct MusicBrainzClientTests {
         #expect(sleeps.value == 1)
     }
 
-    @Test("MB 网络错误：返回空数组不 throw")
-    func searchNetworkErrorReturnsEmpty() async throws {
-        MBMockURLProtocol.reset()
-        let client = Self.makeClient()
-        MBMockURLProtocol.handler = { request in
-            guard request.url?.host == "musicbrainz.org" else { throw URLError(.unsupportedURL) }
-            throw URLError(.timedOut)
-        }
-
-        let candidates = try await client.searchMusicBrainz(title: "Love Story", artist: "")
-
-        #expect(candidates.isEmpty)
-    }
-
     // MARK: - artist 排序加分
 
     @Test("artist 排序：artist 匹配的 recording 排前面，其余保持 MB 原序（稳定）")

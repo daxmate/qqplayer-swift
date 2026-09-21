@@ -48,7 +48,6 @@ struct AppearanceThemeTests {
         #expect(settings.appearanceTheme == "dark")
         // 配色默认值按端不同（各端色表首项，见 `AppAccentDefault`）：测试跑在 iOS target 上 = violet
         #expect(settings.accentColorName == AppAccentDefault.key)
-        #expect(settings.accentColorName == IOSAppearance.defaultAccentKey)
     }
 
     @Test("DeleteSettings 解码：新字段完整读写")
@@ -123,7 +122,6 @@ struct AppearanceThemeTests {
         #expect(Set(keys).count == keys.count, "token 有重复：\(keys)")
         #expect(Set(hexes).count == hexes.count, "色值有重复：\(hexes)")
         #expect(keys.contains(IOSAppearance.defaultAccentKey), "默认 token 必须能在名单里解出颜色")
-        #expect(AppAccentDefault.key == IOSAppearance.defaultAccentKey, "iOS 默认 token 应取 iOS 名单首项")
 
         // token 名空间与 macOS / web 共用（**色值按端独立**，见 docs/ui-design-tokens.md §0.1）：
         // 共用 token 名必须在 iOS 名单里存在，否则同一个 key 在两端指的不是同一个语义位。

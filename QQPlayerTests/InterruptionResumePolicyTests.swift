@@ -114,20 +114,14 @@ struct InterruptionResumePolicyCorrectedResumeTests {
             lastKnown: 42.0, lastKnownAge: 0.1) == nil)
     }
 
-    @Test("边界值（5.0s 整、1.0s 整）行为与实现一致")
+    @Test("边界值（playbackTimeAge 恰 5.0 整 / 阈值内一侧）行为与实现一致")
     func boundaryAges() {
-        // lastKnownAge == 5.0 整：不算新鲜 → nil
-        #expect(InterruptionResumePolicy.correctedResumePosition(
-            playbackTime: 0.26, playbackTimeAge: 6.0,
-            lastKnown: 42.5, lastKnownAge: 5.0) == nil)
+        // lastKnownAge 恰 5.0 整那条在 staleLastKnownNotCorrected、lastKnown 恰 1.0 那条在
+        // smallLastKnownFallsBack，均已逐字覆盖，此处不再重复。
         // playbackTimeAge == 5.0 整：不算冻结 → nil
         #expect(InterruptionResumePolicy.correctedResumePosition(
             playbackTime: 0.26, playbackTimeAge: 5.0,
             lastKnown: 42.5, lastKnownAge: 0.1) == nil)
-        // lastKnown == 1.0 整：savedPosition 不算有效 → nil
-        #expect(InterruptionResumePolicy.savedPosition(
-            wasPlaying: true, livePosition: 0.26, sampleTimeValid: false,
-            lastKnown: 1.0, lastKnownAge: 0.1) == nil)
         // 恰在阈值内一侧：修正生效
         #expect(InterruptionResumePolicy.correctedResumePosition(
             playbackTime: 0.26, playbackTimeAge: 5.0001,

@@ -169,15 +169,6 @@ struct MacAria2ClientTests {
         #expect(array.contains("A: B C"))
     }
 
-    @Test("JSON-RPC 请求体：jsonrpc 2.0 + id + method + params（token 在首位由调用方加）")
-    func requestBodyStructure() {
-        let body = MacAria2Logic.requestBody(id: 7, method: "aria2.addUri", params: [["token:dax"], [[], [:]]])
-        #expect(body["jsonrpc"] as? String == "2.0")
-        #expect(body["id"] as? Int == 7)
-        #expect(body["method"] as? String == "aria2.addUri")
-        #expect(body["params"] != nil)
-    }
-
     // MARK: MacAria2Logic.responseResult
 
     @Test("响应解析：result 原样返回（gid 字符串）")

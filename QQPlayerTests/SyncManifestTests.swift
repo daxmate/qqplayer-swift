@@ -185,15 +185,13 @@ struct SyncManifestTests {
         #expect(filtered.map(\.relativePath) == ["a.flac", "c.flac"])
     }
 
-    @Test("集合 .playlists：取歌单成员并集；未知歌单 → 空集（宁少不误删）")
+    @Test("集合 .playlists：取歌单成员并集（空成员表 / 未知歌单语义见 SyncPlaylistMembersTests）")
     func collectionPlaylists() {
         let members = SyncCollectionMembers(stableIdsByPlaylist: ["mix": ["s-a", "s-b"], "live": ["s-c"]])
         #expect(
             SyncCollection.playlists(["mix", "live"]).filter(entries(), members: members)
                 .map(\.relativePath) == ["a.flac", "b.flac", "c.flac"]
         )
-        #expect(SyncCollection.playlists(["ghost"]).filter(entries(), members: members) == [])
-        #expect(SyncCollection.playlists(["mix"]).filter(entries()) == [])
     }
 
     @Test("集合空选择：.playlists([]) / .tracks([]) 与 .all 语义相反")

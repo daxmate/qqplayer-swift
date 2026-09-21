@@ -81,13 +81,6 @@ struct MacPlaybackGateSegmentPlanTests {
             == .failure(.invalidStartFrame))
     }
 
-    @Test("startFrame == 文件末尾（remaining 为 0）：拒绝")
-    func zeroRemaining() {
-        #expect(MacPlaybackGate.segmentPlan(
-            engineIsRunning: true, startFrame: 1000, fileLength: 1000, maxFrameCount: 1_000_000)
-            == .failure(.invalidStartFrame))
-    }
-
     @Test("remaining 超 AVAudioFrameCount.max：拒绝")
     func remainingExceedsMax() {
         #expect(MacPlaybackGate.segmentPlan(

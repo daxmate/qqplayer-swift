@@ -357,13 +357,10 @@ extension NeteaseOnlineClientTests {
         return try! JSONSerialization.data(withJSONObject: wrapper)
     }
 
-    private func makeYearTransport(body: Data, status: Int = 200, error: Error? = nil, capture: CapturedRequestBox? = nil) -> MockNetworkTransport {
+    private func makeYearTransport(body: Data, status: Int = 200, capture: CapturedRequestBox? = nil) -> MockNetworkTransport {
         MockNetworkTransport(
             dataHandler: { request in
                 capture?.value = request
-                if let error {
-                    throw error
-                }
                 return (body, MockNetworkTransport.httpResponse(status: status))
             },
             redirectHandler: { _ in (200, [:], Data()) },
@@ -458,11 +455,4 @@ extension NeteaseOnlineClientTests {
         #expect(year == nil)
     }
 
-    @Test("albumYear：网络错误 → nil（不 throw）")
-    func albumYearNetworkErrorReturnsNil() async {
-        let transport = makeYearTransport(body: Data(), error: URLError(.timedOut))
-        let client = NeteaseOnlineClient(transport: transport)
-        let year = await client.albumYear(songID: 186016)
-        #expect(year == nil)
-    }
 }

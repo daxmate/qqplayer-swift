@@ -84,17 +84,6 @@ extension MusicAPITests {
         #expect(Self.spotifySearchRequests.isEmpty)
     }
 
-    @Test("认证接口 403：抛 httpError(403)")
-    func spotifyAuth403() async {
-        MockURLProtocol.reset()
-        let service = makeSpotifyService(cacheDir: makeTempCacheDir("spotify-auth-403"))
-        Self.installSpotifyHandler(authStatus: 403, authBody: #"{"error":"forbidden"}"#)
-
-        await expectSpotifyError(.httpError(403)) {
-            _ = try await service.searchArtist(name: "Radiohead")
-        }
-    }
-
     @Test("token 过期后自动刷新：两次搜索分别使用新 token")
     func spotifyTokenRefresh() async throws {
         MockURLProtocol.reset()

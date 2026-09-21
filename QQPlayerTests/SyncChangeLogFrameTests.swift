@@ -3,7 +3,8 @@
 //  QQPlayerTests
 //
 //  S2 M4-1 changeLog 帧编解码 + 会话层往返测试：
-//  - SyncFrameType 新 case（changeLogPull=8 / changeLogPush=9）编解码 roundtrip
+//  - SyncFrameType 新 case（changeLogPull=8 / changeLogPush=9）编解码 roundtrip：全类型版
+//    见 SyncFrameTests.roundtripAllTypes（allCases 自动覆盖新帧）
 //  - SyncChangeLogPullRequest / SyncChangeLogPushPayload Codable roundtrip
 //  - 会话层往返（双 ready 会话 + 各自内存 DB + SyncChangeLogPeer）：
 //    host 业务写入 → client sendPull → host 自动应答 push → client 对账应用 →
@@ -28,20 +29,7 @@ private let testLibraryRoot = URL(fileURLWithPath: "/library")
 
 @MainActor
 struct SyncChangeLogFrameTests {
-    // MARK: - 帧类型 + 载荷 roundtrip
-
-    @Test("SyncFrameType 新 case：changeLogPull/changeLogPush 编解码 roundtrip")
-    func frameTypeRoundtrip() throws {
-        for type in [SyncFrameType.changeLogPull, SyncFrameType.changeLogPush] {
-            let payload = Data("payload-\(type.rawValue)".utf8)
-            let frame = SyncFrame(type: type, flags: [.encrypted], payload: payload)
-            let encoded = try frame.encode()
-            let (decoded, consumed) = try SyncFrame.decode(from: encoded)
-            #expect(decoded == frame)
-            #expect(consumed == encoded.count)
-            #expect(decoded.type == type)
-        }
-    }
+    // MARK: - 载荷 roundtrip
 
     @Test("SyncChangeLogPullRequest / SyncChangeLogPushPayload Codable roundtrip")
     func payloadRoundtrip() throws {
@@ -58,14 +46,12 @@ struct SyncChangeLogFrameTests {
         let pushJSON = try JSONEncoder().encode(push)
         let decoded = try JSONDecoder().decode(SyncChangeLogPushPayload.self, from: pushJSON)
         #expect(decoded == push)
-        #expect(decoded.entries[0].contentHash == nil) // M3-1 未合入，v1 恒 nil
     }
 
     // MARK: - v2 删除不传播策略
 
-    @Test("策略契约：op 常量与 SyncChangeOp 对齐；delete 不上线 / 一律忽略，upsert 不受影响")
+    @Test("策略契约：delete 不上线 / 一律忽略，upsert 不受影响（常量对齐见 SyncDeletionNonPropagationContractTests）")
     func deletionPolicyContract() {
-        #expect(SyncChangeLogDeletionPolicy.deleteOperation == SyncChangeOp.delete.rawValue)
         #expect(SyncChangeLogDeletionPolicy.isDelete(op: SyncChangeOp.delete.rawValue))
         #expect(!SyncChangeLogDeletionPolicy.isDelete(op: SyncChangeOp.upsert.rawValue))
         #expect(!SyncChangeLogDeletionPolicy.isTransmittable(op: SyncChangeOp.delete.rawValue))

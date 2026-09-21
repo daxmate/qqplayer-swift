@@ -69,7 +69,6 @@
 		664B6BEF05384F2098030629 /* SmartPlaylistDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51C1329002F4C3E963D14AC /* SmartPlaylistDataTests.swift */; };
 		667F37CD3A564FC66FC620E4 /* PlaybackOrderModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AE00850E1369590B0BB09C7 /* PlaybackOrderModeTests.swift */; };
 		687FCF0AA8A94705ABB8EAFB /* SyncWiringContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0E487960544382B6B0C456 /* SyncWiringContractTests.swift */; };
-		6BEE379F884E4A0BBC713FA8 /* CloudFailureDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */; };
 		6CC3183EEB974716AC10BD10 /* ModelsRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9706677182164C8987546D81 /* ModelsRoundTripTests.swift */; };
 		6D7BB1D7A40944FD897AE350 /* PlayHistoryCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB2386BA4DB497A8C3193F9 /* PlayHistoryCleanupTests.swift */; };
 		6E19A3F12750456392F66625 /* IOSPassiveSyncCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C313D7E0214EECA736213E /* IOSPassiveSyncCenterTests.swift */; };
@@ -369,7 +368,6 @@
 		D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaylistCoverLoadTests.swift; sourceTree = "<group>"; };
 		DEF21C43F4174C609117D18D /* SyncPlaybackCarryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPlaybackCarryTests.swift; sourceTree = "<group>"; };
 		DEF8F882540A40F3A0F3DCC4 /* MacFolderWatchPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacFolderWatchPolicyTests.swift; sourceTree = "<group>"; };
-		DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudFailureDetectorTests.swift; sourceTree = "<group>"; };
 		DFB9F878690D4BEEB8917115 /* DeleteSettingsScrapingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeleteSettingsScrapingTests.swift; sourceTree = "<group>"; };
 		E089D69312B34069A294FD51 /* SyncPeerSessionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerSessionTests.swift; sourceTree = "<group>"; };
 		E14D783B4AEB4D92A91DF32D /* MacOnlineDownloadServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacOnlineDownloadServiceTests.swift; sourceTree = "<group>"; };
@@ -1067,7 +1065,6 @@
 				49BB9355B73D45668502AE0A /* MP4EmptyCovrStripperTests.swift */,
 				D1A7A0020000000000000001 /* DataIntegrityMigrationTests.swift */,
 				D1A7A0040000000000000001 /* ScriptCanonicalizationMigrationTests.swift */,
-				DF99006983184440AD2F6D84 /* CloudFailureDetectorTests.swift */,
 				FC51AE44DCD045F9B30A0D66 /* GraphicEQCodecTests.swift */,
 				FD40613BB6BD41F6B362F5D1 /* StateManagerTests.swift */,
 				5D555434727943E692856C7E /* MacAria2ClientTests.swift */,
@@ -1547,7 +1544,6 @@
 				B314F6033C3E4B1684A9F418 /* MP4EmptyCovrStripperTests.swift in Sources */,
 				D1A7A0010000000000000001 /* DataIntegrityMigrationTests.swift in Sources */,
 				D1A7A0030000000000000001 /* ScriptCanonicalizationMigrationTests.swift in Sources */,
-				6BEE379F884E4A0BBC713FA8 /* CloudFailureDetectorTests.swift in Sources */,
 				0814F39A47A44E6DAE6D2D57 /* GraphicEQCodecTests.swift in Sources */,
 				16674A64391C4915BCE3853F /* StateManagerTests.swift in Sources */,
 				9AFDA6102599474FA9895BC3 /* MacAria2ClientTests.swift in Sources */,

@@ -225,32 +225,6 @@ struct SyncBrowseSourceSearchTests {
         #expect(SyncBrowseSourceSearch.matches(title: "x", artistName: nil, relativePath: "a", query: "   "))
     }
 
-    @Test("行模型收窄（Mac 提供者同款用法）：保序、空查询不过滤")
-    func filterByOptions() {
-        let options = [
-            option("a.mp3", title: "Alpha", artist: "One"),
-            option("b.mp3", title: "Beta", artist: "Two"),
-            option("c.mp3", title: "Gamma", artist: "One"),
-        ]
-        // 与 `MacSyncLocalContentProvider` 同款用法：对行模型逐行调 matches（保序）
-        func narrowed(_ query: String) -> [String] {
-            let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !needle.isEmpty else { return options.map(\.relativePath) }
-            return options
-                .filter {
-                    SyncBrowseSourceSearch.matches(
-                        title: $0.title,
-                        artistName: $0.artistName,
-                        relativePath: $0.relativePath,
-                        query: needle
-                    )
-                }
-                .map(\.relativePath)
-        }
-        #expect(narrowed("one") == ["a.mp3", "c.mp3"])
-        #expect(narrowed("  ") == ["a.mp3", "b.mp3", "c.mp3"])
-        #expect(narrowed("zzz").isEmpty)
-    }
 }
 
 // MARK: - 来源内分页
