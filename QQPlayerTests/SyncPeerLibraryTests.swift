@@ -47,6 +47,19 @@ private final class FrameBox: @unchecked Sendable {
 }
 
 struct SyncPeerLibraryTests {
+    /// 「附带超时」：只用来兜住真挂死，**不是被测语义**（被测语义由「抛出的错误类型 / 返回值」锁定）。
+    ///
+    /// 为什么是 300s（CI 实况，2026-09-21 取证 main `f1b61ff` 的 run 35541908374）：
+    ///   - attempt 1：端到端用例（原 `timeout: 3`）在回环会话上抛 `.timeout`（单用例 53.4s）；
+    ///   - attempt 2：失败路径用例（原 `timeout: 30`）被超时抢在 `cancel()` 之前，断言变成
+    ///     `.timeout == .cancelled`（单用例 86.3s）；
+    ///   - attempt 3：同 commit 原样重跑通过 → 这两次红是**时序假信号**（慢 runner 打穿附带上限），
+    ///     不是产品行为回归。
+    /// 取 300s：≥2× 最坏观测单用例耗时（~107s），慢机器打不穿；真挂死仍会收敛（不悬挂）。
+    /// ⚠️ **故意测超时**的用例不走本常量（如 `clientTimesOutWhenPeerSilent` 的 `timeout: 0.2`，
+    /// 断言 `.timeout` 恰为该路径 —— 改它就是删信号）。
+    private static let incidentalTimeout: TimeInterval = 300
+
     // MARK: - 夹具
 
     private func tempDirectory(_ tag: String) throws -> URL {
@@ -330,7 +343,8 @@ struct SyncPeerLibraryTests {
         #expect(fixture.clientSession.isReady, "垃圾载荷不得断会话")
 
         // 合法请求（非法 scope）→ 仍应答空清单
-        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: 3)
+        // 附带超时：被测语义是「非法 scope 回空清单」，3s 只是上限（CI 上 3s 会打穿）。
+        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: Self.incidentalTimeout)
         let response = try await client.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
         #expect(response.total == 1)
         #expect(response.trackItems.map(\.relativePath) == ["Jazz/a.flac"])
@@ -361,7 +375,9 @@ struct SyncPeerLibraryTests {
     func clientFailurePaths() async throws {
         // cancel()
         let cancelFixture = SessionFixture.pairedHandshake()
-        let cancelClient = SyncPeerLibraryClient(session: cancelFixture.hostSession, timeout: 30)
+        // 附带超时（不是被测语义：被测语义是「cancel() 必须先于超时收敛」）。
+        // CI run 35541908374 attempt 2 实测：30s 被打穿，超时抢在 cancel() 前抛出（假红）。
+        let cancelClient = SyncPeerLibraryClient(session: cancelFixture.hostSession, timeout: Self.incidentalTimeout)
         let cancelTask = Task {
             try await cancelClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
         }
@@ -376,7 +392,8 @@ struct SyncPeerLibraryTests {
 
         // 会话关闭
         let closedFixture = SessionFixture.pairedHandshake()
-        let closedClient = SyncPeerLibraryClient(session: closedFixture.hostSession, timeout: 30)
+        // 附带超时：同族（被测语义是「会话关闭必须先于超时收敛」）。
+        let closedClient = SyncPeerLibraryClient(session: closedFixture.hostSession, timeout: Self.incidentalTimeout)
         let closedTask = Task {
             try await closedClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
         }
@@ -391,7 +408,8 @@ struct SyncPeerLibraryTests {
 
         // 未 ready（未握手）
         let idleFixture = SessionFixture.make()
-        let idleClient = SyncPeerLibraryClient(session: idleFixture.hostSession, timeout: 5)
+        // 附带超时：未 ready 是**立即**抛 .sessionNotReady，5s 上限从不该参与判定。
+        let idleClient = SyncPeerLibraryClient(session: idleFixture.hostSession, timeout: Self.incidentalTimeout)
         await #expect(throws: SyncPeerLibraryClient.ClientError.sessionNotReady) {
             _ = try await idleClient.fetchTracks(playlistID: nil, query: nil, offset: 0, limit: 10)
         }
@@ -405,7 +423,7 @@ struct SyncPeerLibraryTests {
         )
         let responder = SyncPeerLibraryResponder(session: fixture.clientSession, catalogProvider: { catalogBox })
         let unexpectedBox = ValueListBox<UInt64>()
-        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: 3)
+        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: Self.incidentalTimeout)
         client.onUnexpectedResponse = { unexpectedBox.values.append($0.requestID) }
         _ = responder
 
@@ -448,7 +466,9 @@ struct SyncPeerLibraryTests {
         )
         #expect(deviceHost.attach(to: fixture.clientSession))
 
-        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: 3)
+        // 附带超时：被测语义是「真 DB 装配下清单/曲目页/摘要的取值」。
+        // CI run 35541908374 attempt 1 实测：这里原 `timeout: 3` 抛 .timeout（假红）。
+        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: Self.incidentalTimeout)
 
         let playlists = try await client.fetchPlaylists()
         #expect(playlists.map(\.id).contains(database.jazzSlug))
@@ -499,7 +519,7 @@ struct SyncPeerLibraryTests {
         #expect(host.attach(to: fixture.clientSession))
 
         // 发一个业务帧（未接线的清单请求）→ responder 应答（空清单）+ 既有 handler 收到
-        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: 3)
+        let client = SyncPeerLibraryClient(session: fixture.hostSession, timeout: Self.incidentalTimeout)
         let playlists = try await client.fetchPlaylists()
         #expect(playlists.isEmpty, "未接线的清单 provider → 空清单")
         #expect(!seen.received.isEmpty, "既有 handler 仍在链上收到业务帧")

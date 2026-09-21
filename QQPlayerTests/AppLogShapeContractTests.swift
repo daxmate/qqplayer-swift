@@ -690,6 +690,17 @@ struct AppLogShapeContractTests {
 
 //  `.serialized`：套件内多个用例共享全局状态（`AppLog.logFileURLOverride` / UserDefaults），
 //  并行会互相改写落点（swift-testing 默认并行）——串行是这里唯一安全的形状。
+//
+//  ⚠️ **依赖进程级全局覆盖：不得与并行写日志的套件共享路径**（机制，不是单点补丁）：
+//  `AppLog.logFileURLOverride` 是**进程级**静态量，`RotatingFileSink.write` 在**写入时**才调
+//  `AppLog.logFileURL()` 解析落点 → 本套件设了 override 的窗口内，本进程**任何**并行套件的
+//  warn+ 记录都会落进同一文件。CI run 35545944553 实测：本套件刚用唯一路径设好 override，
+//  文件就被别的套件写出来了（`app.log` 里混入非本用例的 `[db]` 行）。故本套件三条规定：
+//    ① 日志文件类用例只断言「期望行在文件里、且时间戳/级别/类别/消息形态都正确」，
+//       **不做**「文件内容全等 / 行数全等 / 文件是否存在」断言（后者只能由「文件中不含本用例
+//       期望的那一行」表达，见 `endToEndThresholdAndWrite`）；
+//    ② 每个用例走 `makeSyntheticDirectory()` 拿**唯一路径**，不得复用固定路径；
+//    ③ 设 override 前先断言它没被上个用例泄漏，退出时 defer 复位 override + 删目录。
 @Suite("AppLog 出口与 LogRotation 行为（批 1 地基）", .serialized)
 struct AppLogBehaviorTests {
     @Test("行格式：UTC ISO8601 + 级别 + 分类 + emoji；消息内换行折叠为 ⏎")
@@ -832,6 +843,8 @@ struct AppLogBehaviorTests {
         let directory = try AppLogShapeContract.makeSyntheticDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let override = directory.appendingPathComponent("custom/app.log")
+        // 3️⃣ 防御性清理：进程级全局 → 设之前先确认没被上个用例留在别的路径上。
+        #expect(AppLog.logFileURLOverride == nil, "上一个用例泄漏了 logFileURLOverride")
         AppLog.logFileURLOverride = override
         defer { AppLog.logFileURLOverride = nil }
         #expect(AppLog.logFileURL() == override)
@@ -855,6 +868,8 @@ struct AppLogBehaviorTests {
         let directory = try AppLogShapeContract.makeSyntheticDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("app.log")
+        // 3️⃣ 防御性清理：同上（唯一路径 + 无泄漏确认）。
+        #expect(AppLog.logFileURLOverride == nil, "上一个用例泄漏了 logFileURLOverride")
         AppLog.logFileURLOverride = url
         defer { AppLog.logFileURLOverride = nil }
         UserDefaults.standard.set("warn", forKey: AppLog.levelDefaultsKey)
