@@ -323,7 +323,9 @@ enum SyncEntityRegistry {
                     detail: "发起端：SyncLibraryPushController + SyncManifestGenerator（内容权威在 Mac）",
                     assertion: SyncEntityAssemblyAssertion(
                         id: "mac-library-push-attached",
-                        path: "QQPlayer/Sync/SyncCollectionSyncCoordinator.swift",
+                        // E1 拆分（2026-09-21）：装配点（beginPush 构 SyncLibraryPushController、
+                        // localManifest 用 SyncManifestGenerator）随「计划/推进」搬进 `+Execution.swift`。
+                        path: "QQPlayer/Sync/SyncCollectionSyncCoordinator+Execution.swift",
                         requiredMarkers: ["SyncLibraryPushController(", "SyncManifestGenerator.generate("],
                         alternativeMarkers: [],
                         guidance: """

@@ -752,6 +752,8 @@
 				Sync/SyncChangeLogStore.swift,
 				Sync/SyncCollection.swift,
 				Sync/SyncCollectionSelection.swift,
+				"Sync/SyncCollectionSyncCoordinator+Execution.swift",
+				"Sync/SyncCollectionSyncCoordinator+Models.swift",
 				Sync/SyncCollectionSyncCoordinator.swift,
 				Sync/SyncCrypto.swift,
 				Sync/SyncDataSnapshots.swift,

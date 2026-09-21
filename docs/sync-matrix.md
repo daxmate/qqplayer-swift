@@ -123,7 +123,7 @@
 
 | 列 | 结论 | 证据 |
 | --- | --- | --- |
-| ① | 不适用 | 不走 outbox，走**文件帧**：`SyncCollectionSyncCoordinator.swift:540` `descriptor.lyricsEntries()`；命名空间 `SyncLyricsNamespace` `QQPlayer/Sync/SyncAlignedLyrics.swift:35-79`。**方向决策（2026-09-15 用户拍板）**：对齐歌词**单向（桌面 → 移动）**——AI 对齐只在桌面端做，移动端不生成；功能本身尚未实现，所以「移动端没有补发通道」**不是待补空格，而是设计边界**（实现时按单向接，不做双向补发） |
+| ① | 不适用 | 不走 outbox，走**文件帧**：`SyncCollectionSyncCoordinator+Execution.swift:60` `descriptor.lyricsEntries()`；命名空间 `SyncLyricsNamespace` `QQPlayer/Sync/SyncAlignedLyrics.swift:35-79`。**方向决策（2026-09-15 用户拍板）**：对齐歌词**单向（桌面 → 移动）**——AI 对齐只在桌面端做，移动端不生成；功能本身尚未实现，所以「移动端没有补发通道」**不是待补空格，而是设计边界**（实现时按单向接，不做双向补发） |
 | ② | 有 | `SyncLyricsNamespace.wirePath(songContentHash:)` `SyncAlignedLyrics.swift:48`（`@lyrics/{歌曲 content_hash}.json`）；生产映射 `SyncLyricsContentMapping.live(database:)` `SyncChangeLogMapping.swift:134`（复用 M4-2a resolver，不新写 SQL） |
 | ③ | 有 | `SyncLyricsReceiver`（install / pending / discarded / failed 四态）；测试 `QQPlayerTests/AlignedLyricsSyncTests.swift:348` |
 | ④ | **✅ 有（2026-09-16）** | **会话内暂存**（同轮歌后到 → 收尾重试，`SyncLyricsReceiver.flushPending`）+ **丢弃记账**（`discardedLyrics` / `orphanLyricsSkipped`）+ **下一轮自动补发**：补发轮每轮重新对账「对端缺什么」（`SyncLyricsResendPlanner`），未送达的进 `pendingResend` 并上屏 → 歌一到位，下一次连接就补上 |
@@ -140,7 +140,7 @@
 | ② | 有 | content_hash 为跨端身份（`docs/lan-sync-design.md` §6.1）；`SyncManifestGenerator` / `SyncTransferIdentity`；`QQPlayerTests/SyncTransferIdentityTests.swift` |
 | ③ | 有 | `QQPlayer/Sync/SyncManifestReconciler.swift`、`SyncFileReceiver.swift`；`SyncManifestReconcileTests.swift:34-96` |
 | ④ | 有 | 断点续传 `.part`：`SyncFileTransferTests.swift:158`「断点续传」、`:235`「resume 不匹配」 |
-| ⑤ | 部分 | 无「本地真值补发」概念，靠**每次重算选择集 manifest**（`SyncCollectionSyncCoordinator.swift:540`）。已选歌但 manifest 缺条目时**无专门告警** |
+| ⑤ | 部分 | 无「本地真值补发」概念，靠**每次重算选择集 manifest**（`SyncCollectionSyncCoordinator+Execution.swift:60`）。已选歌但 manifest 缺条目时**无专门告警** |
 | ⑥ | 有 | `SyncUIReportSummary`（`SyncUIState.swift:449`）经 `MacSyncRunViewModel.swift:304` 上屏（含失败清单 `failedItems`） |
 | ⑦ | 有 | `SyncFileTransferTests`(7)、`SyncManifestReconcileTests`(11)、`SyncTransferIdentityTests`、`SyncLibrarySyncE2ETests`、`SyncLibraryPlanTests` |
 | ⑧ | △ | 无静态装配断言；有 `mac-playback-carry-attached`（`SyncWiringContractTests.swift:71`）间接覆盖跟歌走 |
