@@ -53,7 +53,8 @@ private func blendSemantic(
 /// 替代「字号瞬间跳变（SwiftUI 不插值 Font）+ 两条曲线不同步」的急促观感（2026-09-13 用户反馈）。
 /// 字重不可插值 → 按 emphasis 阈值切换（切换点前后字号/透明度正在连续变化，视觉上被掩盖）。
 /// 透明度/缩放/行距作用于整行（含译文行）→ 由下面的 static 方法供行容器调用。
-private struct LyricLineEmphasis: ViewModifier, Animatable {
+/// 分片：跨文件可见（原 private）
+struct LyricLineEmphasis: ViewModifier, Animatable {
     /// 0…1
     var emphasis: Double
     let accent: Color
@@ -144,7 +145,8 @@ private struct LyricLineEmphasis: ViewModifier, Animatable {
 /// 译文行强调：与主行同一套路（节点值照旧：当前 16 / 距离 1 14 / 更远 13；
 /// 跟唱 当前 16 / 其余 14），字号与颜色都按 emphasis 插值、字号 ×fontScale。
 /// 整行透明度/缩放仍由行容器统一施加。
-private struct LyricTranslationEmphasis: ViewModifier, Animatable {
+/// 分片：跨文件可见（原 private）
+struct LyricTranslationEmphasis: ViewModifier, Animatable {
     /// 次要行层级：译文（原档）/ 罗马音（同一套插值，比译文小一档）
     enum Tier {
         case translation
