@@ -739,6 +739,8 @@
 				Sync/SyncDataSyncModels.swift,
 				Sync/SyncDeadlineScheduler.swift,
 				Sync/SyncEntityOutcomeDisclosure.swift,
+				"Sync/SyncEntityRegistry+Assembly.swift",
+				"Sync/SyncEntityRegistry+Shape.swift",
 				Sync/SyncEntityRegistry.swift,
 				Sync/SyncFileChecksum.swift,
 				Sync/SyncFileReceiver.swift,
