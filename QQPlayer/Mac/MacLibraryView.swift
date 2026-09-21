@@ -12,67 +12,65 @@ import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum MacLibrarySection: String, CaseIterable, Identifiable {
-    case tracks = "songs"
-    case likedSongs = "liked_songs"
-    case albums = "albums"
-    case artists = "artists"
-    case playlists = "playlists"
-
-    var id: String { rawValue }
-
-    /// Localized sidebar title (rawValue is a localization key).
-    var title: String { rawValue.localized }
-
-    var icon: String {
-        switch self {
-        case .tracks: return "music.note.list"
-        case .likedSongs: return "heart.fill"
-        case .albums: return "square.stack"
-        case .artists: return "music.mic"
-        case .playlists: return "list.bullet.rectangle"
-        }
-    }
-}
-
 struct MacLibraryView: View {
-    @Environment(AppCoordinator.self) private var appCoordinator
+    /// 分片：跨文件可见（原 private）
+    @Environment(AppCoordinator.self) var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；替代已失效的私有 selector）。
-    @Environment(\.openSettings) private var openSettings
-    @Environment(PlayerEngine.self) private var player
-    @Environment(LibraryIndexer.self) private var indexer
+    /// 分片：跨文件可见（原 private）
+    @Environment(\.openSettings) var openSettings
+    /// 分片：跨文件可见（原 private）
+    @Environment(PlayerEngine.self) var player
+    /// 分片：跨文件可见（原 private）
+    @Environment(LibraryIndexer.self) var indexer
     /// search anything 开关（⌘K 命令；2026-09-19 批 3a 起由 Mac 组合根注入，读 `isOpen` 按属性追踪）
     @Environment(MacSearchAnythingState.self) private var searchAnythingState
     /// 曲库卡事实（批 3a：同上，由 Mac 组合根注入）
-    @Environment(MacLibraryFactsStore.self) private var libraryFacts
-    @Environment(AppServices.self) private var services
+    /// 分片：跨文件可见（原 private）
+    @Environment(MacLibraryFactsStore.self) var libraryFacts
+    /// 分片：跨文件可见（原 private）
+    @Environment(AppServices.self) var services
     /// 桌面浮窗管理器（批 5b：Mac 组合根注入；迷你模式入口按钮直调方法，不读属性）
     @Environment(DesktopWindowsManager.self) private var desktopWindows
 
-    @State private var section: MacLibrarySection = .tracks
-    @State private var tracks: [Track] = []
-    @State private var likedTracks: [Track] = []
+    /// 分片：跨文件可见（原 private）
+    @State var section: MacLibrarySection = .tracks
+    /// 分片：跨文件可见（原 private）
+    @State var tracks: [Track] = []
+    /// 分片：跨文件可见（原 private）
+    @State var likedTracks: [Track] = []
     /// 外观三态（工具栏月亮按钮循环切换，初值含旧 forceDarkMode 迁移推导）
-    @State private var theme: AppearanceTheme = AppearanceTheme.resolved(
+    /// 分片：跨文件可见（原 private）
+    @State var theme: AppearanceTheme = AppearanceTheme.resolved(
         raw: DeleteSettings.load().appearanceTheme,
         forceDarkMode: DeleteSettings.load().forceDarkMode
     )
     /// 设置（工具栏迷你按钮可见性 = showMiniWindowButton，设置改动即时刷新）
     @State private var deleteSettings = DeleteSettings.load()
-    @State private var albums: [Album] = []
-    @State private var artists: [Artist] = []
-    @State private var playlists: [Playlist] = []
-    @State private var loadError: String?
-    @State private var selectedAlbum: Album?
-    @State private var selectedArtist: Artist?
-    @State private var albumTracks: [Track] = []
-    @State private var artistTracks: [Track] = []
-    @State private var selectedTrackId: String?
+    /// 分片：跨文件可见（原 private）
+    @State var albums: [Album] = []
+    /// 分片：跨文件可见（原 private）
+    @State var artists: [Artist] = []
+    /// 分片：跨文件可见（原 private）
+    @State var playlists: [Playlist] = []
+    /// 分片：跨文件可见（原 private）
+    @State var loadError: String?
+    /// 分片：跨文件可见（原 private）
+    @State var selectedAlbum: Album?
+    /// 分片：跨文件可见（原 private）
+    @State var selectedArtist: Artist?
+    /// 分片：跨文件可见（原 private）
+    @State var albumTracks: [Track] = []
+    /// 分片：跨文件可见（原 private）
+    @State var artistTracks: [Track] = []
+    /// 分片：跨文件可见（原 private）
+    @State var selectedTrackId: String?
     /// 专辑/歌手详情 sheet 开关（上收自 MacAlbumGridView/MacArtistListView；支持歌曲右键「进专辑/进歌手」触发）
-    @State private var showAlbumSheet = false
-    @State private var showArtistSheet = false
+    /// 分片：跨文件可见（原 private）
+    @State var showAlbumSheet = false
+    /// 分片：跨文件可见（原 private）
+    @State var showArtistSheet = false
     /// 新功能通告（启动时版本变化弹一次，对齐 iOS ContentView 挂载）
     @State private var showWhatsNew = false
     /// 在线搜索下载面板（C 组①：web 版 /api/online/* 对齐，sheet 形态）
@@ -81,22 +79,28 @@ struct MacLibraryView: View {
     /// 同步面板（主窗口工具栏入口；同步只能由桌面端发起——用户 2026-09-11 拍板）
     @State private var showSyncPanel = false
     /// 曲库文件夹在扫描中变更 → 索引结束后自动补扫
-    @State private var rescanWhenIdle = false
+    /// 分片：跨文件可见（原 private）
+    @State var rescanWhenIdle = false
     /// 索引中增量刷新任务（防抖）
     @State private var libraryRefreshTask: Task<Void, Never>?
     /// 曲库全量重载任务句柄（审计 M2：四表读移出主线程，prev 同名任务作废）
-    @State private var libraryLoadTask: Task<Void, Never>?
+    /// 分片：跨文件可见（原 private）
+    @State var libraryLoadTask: Task<Void, Never>?
     /// 文件拖入导入（web 版拖拽对齐，B 组）：拖拽悬停高亮 + 完成后 toast
     @State private var isDropTargeted = false
     @State private var importToast: String?
     @State private var importToastTask: Task<Void, Never>?
 
     // Search state (sidebar search field + grouped results)
-    @State private var searchText = ""
-    @State private var debouncedSearchText = ""
-    @State private var searchResults = MacSearchResults()
+    /// 分片：跨文件可见（原 private）
+    @State var searchText = ""
+    /// 分片：跨文件可见（原 private）
+    @State var debouncedSearchText = ""
+    /// 分片：跨文件可见（原 private）
+    @State var searchResults = MacSearchResults()
     @State private var debounceTask: Task<Void, Never>?
-    @State private var searchTask: Task<Void, Never>?
+    /// 分片：跨文件可见（原 private）
+    @State var searchTask: Task<Void, Never>?
 
     var body: some View {
         NavigationSplitView {
@@ -347,29 +351,6 @@ struct MacLibraryView: View {
 
     // MARK: - 文件拖入导入（B 组）
 
-    /// 解析拖入的 fileURL providers → 导入曲库。窗口级兜底：
-    /// 拖到歌单行时行级 drop（MacPlaylistListView 行）先于本窗口级命中，
-    /// 此处只处理未被行消费的文件。
-    private func handleDroppedFiles(_ providers: [NSItemProvider]) {
-        guard !providers.isEmpty else { return }
-        Task {
-            var urls: [URL] = []
-            for provider in providers {
-                if let url = await provider.loadFileURL() {
-                    urls.append(url)
-                }
-            }
-            guard !urls.isEmpty else { return }
-            let result = await MacImportService.importFiles(urls)
-            if result.importedCount == 0, result.skippedCount > 0 {
-                // 全部被跳过（格式不支持/非文件 URL）：告知跳过数，而非笼统「未导入」
-                showImportToast(Localized.dragImportSkipped(count: result.skippedCount))
-            } else if result.importedCount == 0 {
-                showImportToast(Localized.dragImportNone)
-            }
-        }
-    }
-
     /// 拖拽悬停提示（web 版遮罩语义的轻量版）。
     private var dropTargetHint: some View {
         RoundedRectangle(cornerRadius: DesignTokens.radius12)
@@ -399,7 +380,8 @@ struct MacLibraryView: View {
             .transition(.opacity)
     }
 
-    private func showImportToast(_ message: String) {
+    /// 分片：跨文件可见（原 private）
+    func showImportToast(_ message: String) {
         importToastTask?.cancel()
         withAnimation { importToast = message }
         importToastTask = Task {
@@ -409,416 +391,4 @@ struct MacLibraryView: View {
         }
     }
 
-    // MARK: - Sidebar
-
-    private var sidebar: some View {
-        VStack(spacing: DesignTokens.space0) {
-            MacSearchField(text: $searchText)
-            List(MacLibrarySection.allCases, selection: $section) { item in
-                Label(item.title, systemImage: item.icon)
-                    .tag(item)
-            }
-            .listStyle(.sidebar)
-        }
-        .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .leading, spacing: DesignTokens.space6) {
-                if indexer.isIndexing {
-                    ProgressView(value: indexer.indexingProgress)
-                        .progressViewStyle(.linear)
-                        .frame(maxWidth: .infinity)
-                    Text(String(format: "indexing_progress".localized, indexer.tracksFound))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Button {
-                        // 手动刷新语义收紧（2026-09-03 复查 A4 反馈）：先立即用 DB
-                        // 真值重载列表，再排队/启动扫描。之前只 start()——扫描被占用
-                        // 或启动被吞时列表不重读 DB，用户观感"点刷新没反应"；若曲库
-                        // 数据已被其它路径改掉（删除/回收站/iCloud），点一下立刻对齐。
-                        reloadLibrary()
-                        // 2026-09-02 A4 修复：dataless 自动补扫在跑时 start() 会被
-                        // guard !isIndexing 静默吞掉 → 手动刷新"没反应"。改为排队：
-                        // 扫描结束后由 onReceive(isIndexing) 补一次重扫
-                        if indexer.isIndexing {
-                            MacScanLogger.log("手动刷新时正在扫描，标记排队（rescanWhenIdle）")
-                            rescanWhenIdle = true
-                        } else {
-                            indexer.start()
-                        }
-                    } label: {
-                        Label("refresh_library".localized, systemImage: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .font(.caption)
-                }
-            }
-            .padding(DesignTokens.space8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    // MARK: - Content
-
-    @ViewBuilder
-    private var contentList: some View {
-        if !debouncedSearchText.isEmpty {
-            MacSearchResultsView(
-                results: searchResults,
-                activeTrackId: player.currentTrack?.stableId,
-                isPlaying: player.isPlaying,
-                artistNameResolver: resolveArtistName,
-                onPlaySong: playSearchSongs,
-                onPlayAlbum: playAlbum,
-                onPlayArtist: playArtist,
-                onOpenPlaylist: openPlaylist
-            )
-        } else {
-            switch section {
-            case .tracks:
-                MacTrackListView(
-                    tracks: tracks,
-                    activeTrackId: player.currentTrack?.stableId,
-                    isPlaying: player.isPlaying,
-                    artistNameResolver: resolveArtistName,
-                    onPlay: playFromTrackList,
-                    onSelect: { selectedTrackId = $0.stableId },
-                    playlistId: nil,
-                    onPlayNext: { player.insertNext($0) },
-                    onShowArtist: showArtist(for:),
-                    onShowAlbum: showAlbum(for:)
-                )
-            case .likedSongs:
-                MacTrackListView(
-                    tracks: likedTracks,
-                    activeTrackId: player.currentTrack?.stableId,
-                    isPlaying: player.isPlaying,
-                    artistNameResolver: resolveArtistName,
-                    onPlay: playLikedTracks,
-                    onSelect: { selectedTrackId = $0.stableId },
-                    playlistId: nil,
-                    onPlayNext: { player.insertNext($0) },
-                    onShowArtist: showArtist(for:),
-                    onShowAlbum: showAlbum(for:)
-                )
-            case .albums:
-                MacAlbumGridView(
-                    albums: albums,
-                    selectedAlbum: $selectedAlbum,
-                    albumTracks: $albumTracks,
-                    artistNameResolver: resolveArtistName,
-                    onPlayAlbum: playAlbum,
-                    showAlbumSheet: $showAlbumSheet
-                )
-            case .artists:
-                MacArtistListView(
-                    artists: artists,
-                    selectedArtist: $selectedArtist,
-                    artistTracks: $artistTracks,
-                    artistNameResolver: resolveArtistName,
-                    onPlayArtist: playArtist,
-                    showArtistSheet: $showArtistSheet
-                )
-            case .playlists:
-                MacPlaylistListView(
-                    playlists: playlists,
-                    onPlay: openPlaylist
-                )
-            }
-        }
-    }
-
-    // MARK: - Data
-
-    /// 曲库加载：四表全量读在全局执行器上跑（审计 M2——以前同步跑在主线程、且由 7+ 处通知反复触发）。
-    /// 拿到快照后先预取卡片事实再落表，卡片渲染时计数已就位（不闪 0）。
-    private func reloadLibrary() {
-        libraryLoadTask?.cancel()
-        // 曲库数据可能已变：作废在途事实（旧值保留到预取完，不闪 0）
-        libraryFacts.invalidate()
-        libraryLoadTask = Task { @MainActor in
-            let loaded = await MacLibraryLoader.load()
-            guard !Task.isCancelled else { return }
-            switch loaded {
-            case .success(let snapshot):
-                await libraryFacts.preload(
-                    tracks: snapshot.tracks,
-                    albums: snapshot.albums,
-                    artists: snapshot.artists,
-                    playlists: snapshot.playlists
-                )
-                guard !Task.isCancelled else { return }
-                tracks = snapshot.tracks
-                albums = snapshot.albums
-                artists = snapshot.artists
-                playlists = snapshot.playlists
-                loadError = nil
-            case .failure(let error):
-                loadError = "load_library_failed".localized(with: error.localizedDescription)
-                AppLog.error(.ui, "❌ macOS reloadLibrary failed: \(error)")
-            }
-            reloadLikedTracks()
-        }
-    }
-
-    /// 加载失败弹窗开关（审计 M6）
-    private var libraryLoadErrorBinding: Binding<Bool> {
-        Binding(
-            get: { loadError != nil },
-            set: { if !$0 { loadError = nil } }
-        )
-    }
-
-    private func reloadLikedTracks() {
-        do {
-            let favoriteIds = try appCoordinator.getFavorites()
-            likedTracks = tracks.filter { favoriteIds.contains($0.stableId) }
-        } catch {
-            AppLog.error(.ui, "❌ macOS reloadLikedTracks failed: \(error)")
-        }
-    }
-
-    // MARK: - FSEvents 实时监控（web 版 watchdog 对齐，2026-09-03 B 组）
-
-    /// 启动/重启曲库文件夹实时监控。监控根 = 当前配置文件夹集合
-    /// （默认 ~/Music/QQPlayer + 设置页添加的外部文件夹，StateManager 归一）。
-    private func startFolderMonitoring() {
-        let folders = services.stateManager.getMusicFolderURLs()
-        let paths = MacFolderWatchPolicy.relevantFolders(folders).map(\.path)
-        MacScanLogger.log("FSEvents watch start, folders: \(paths)")
-        services.folderMonitor.start(paths: paths) {
-            // 已在主线程（MacFolderMonitor 去抖后 main 投递）。经通知转发，
-            // 与 LibraryFoldersChanged 共用「reload + start/排队」语义，避免
-            // 此处重复实现扫描中排队逻辑。
-            NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
-        }
-    }
-
-    /// 工具栏月亮按钮：三态循环 system → dark → light → system。
-    private func cycleTheme() {
-        let next: AppearanceTheme
-        switch theme {
-        case .system: next = .dark
-        case .dark: next = .light
-        case .light: next = .system
-        }
-        theme = next
-        var settings = DeleteSettings.load()
-        settings.appearanceTheme = next.rawValue
-        settings.forceDarkMode = next == .dark
-        settings.save()
-    }
-
-    private var themeIconName: String {
-        switch theme {
-        case .system: return "circle.lefthalf.filled"
-        case .dark: return "moon.fill"
-        case .light: return "sun.max.fill"
-        }
-    }
-
-    /// 全局外观：NSApp.appearance 控制所有窗口（主窗/设置窗/sheet）立即生效，
-    /// system = nil 跟随系统立即恢复。不用 .preferredColorScheme（只作用于
-    /// 挂载视图，且从 .dark 切回 nil 时系统不重新解析——2026-09-02 用户实测）。
-    private func applyMacAppearance() {
-        MacAppearance.apply(theme: theme)
-    }
-
-    private func resolveArtistName(for track: Track) -> String? {
-        try? LibraryReads.artistDisplayName(
-            forTrackStableId: track.stableId,
-            fallbackArtistId: track.artistId
-        )
-    }
-
-    private var currentArtistName: String? {
-        guard let track = player.currentTrack else { return nil }
-        return resolveArtistName(for: track)
-    }
-
-    // MARK: - Playback actions
-
-    private func playFromTrackList(_ track: Track, queue: [Track]) {
-        Task {
-            await player.playTrack(track, queue: queue)
-        }
-    }
-
-    private func playLikedTracks(_ track: Track, queue: [Track]) {
-        Task {
-            await player.playTrack(track, queue: queue)
-        }
-    }
-
-    /// search anything 设置行：打开设置窗口并定位到分类（有项时滚到该项 + 高亮）
-    private func openSettingsRow(_ match: MacSettingsCatalog.Match) {
-        // 先开窗再投递定位请求：窗口没建好时通知没有订阅者，由 MacSettingsRouter.pending 兜底
-        openSettings()
-        MacSettingsRouter.open(.init(category: match.category, itemID: match.itemID))
-    }
-
-    private func playSearchSongs(_ track: Track, queue: [Track]) {
-        Task {
-            await player.playTrack(track, queue: queue)
-        }
-    }
-
-    private func performSearch(query: String) {
-        searchTask?.cancel()
-
-        guard !query.isEmpty else {
-            searchResults = MacSearchResults()
-            return
-        }
-
-        searchTask = Task {
-            // Normalize query for better matching (same as iOS SearchView).
-            let normalizedQuery = query
-                .lowercased()
-                .folding(options: .diacriticInsensitive, locale: .current)
-
-            // Run database queries off the main thread.
-            let results = await Task.detached(priority: .userInitiated) {
-                var songs: [Track] = []
-                var artists: [Artist] = []
-                var albums: [Album] = []
-                var playlists: [Playlist] = []
-
-                do {
-                    songs = try LibraryReads.searchTracks(query: normalizedQuery, limit: 50)
-                    artists = try LibraryReads.searchArtists(query: normalizedQuery, limit: 20)
-                    albums = try LibraryReads.searchAlbums(query: normalizedQuery, limit: 30)
-                    playlists = try LibraryReads.searchPlaylists(query: normalizedQuery, limit: 15)
-                } catch {
-                    AppLog.error(.ui, "❌ macOS search failed: \(error)")
-                }
-
-                return MacSearchResults(songs: songs, artists: artists, albums: albums, playlists: playlists)
-            }.value
-
-            guard !Task.isCancelled else { return }
-
-            await MainActor.run {
-                self.searchResults = results
-            }
-        }
-    }
-
-    /// 歌曲右键「进歌手」：切到歌手分组并打开对应歌手详情
-    private func showArtist(for track: Track) {
-        guard let artistId = track.artistId else { return }
-        do {
-            artistTracks = try LibraryReads.tracks(artistId: artistId)
-        } catch {
-            AppLog.error(.ui, "❌ showArtist tracks failed: \(error)")
-        }
-        selectedArtist = artists.first { $0.id == artistId }
-        guard selectedArtist != nil else { return }
-        section = .artists
-        showArtistSheet = true
-    }
-
-    /// 歌曲右键「进专辑」：切到专辑分组并打开对应专辑详情
-    private func showAlbum(for track: Track) {
-        guard let albumId = track.albumId else { return }
-        do {
-            albumTracks = try LibraryReads.tracks(albumId: albumId)
-        } catch {
-            AppLog.error(.ui, "❌ showAlbum tracks failed: \(error)")
-        }
-        selectedAlbum = albums.first { $0.id == albumId }
-        guard selectedAlbum != nil else { return }
-        section = .albums
-        showAlbumSheet = true
-    }
-
-    private func playAlbum(_ album: Album, tracks albumTracks: [Track]) {
-        guard let first = albumTracks.first else { return }
-        Task {
-            await player.playTrack(first, queue: albumTracks)
-        }
-    }
-
-    private func playArtist(_ artist: Artist, tracks artistTracks: [Track]) {
-        guard let first = artistTracks.first else { return }
-        Task {
-            await player.playTrack(first, queue: artistTracks)
-        }
-    }
-
-    private func openPlaylist(_ playlist: Playlist) {
-        do {
-            let items = try LibraryReads.playlistItems(playlistId: playlist.id ?? 0)
-            let stableIds = items.map { $0.trackStableId }
-            let tracks = try LibraryReads.tracksPreservingOrder(stableIds: stableIds)
-            guard let first = tracks.first else { return }
-            Task {
-                await player.playTrack(first, queue: tracks)
-            }
-        } catch {
-            AppLog.error(.ui, "❌ openPlaylist failed: \(error)")
-        }
-    }
-
-    private func togglePlayPause() {
-        if player.isPlaying {
-            player.pause()
-        } else {
-            player.play()
-        }
-    }
-}
-
-// MARK: - 同步面板（主窗口工具栏入口）
-
-/// 主窗口工具栏弹出的同步面板。
-///
-/// 内容**完全复用**设置页同一个 `MacSyncCenterView`（M6 T11）——同步界面只允许一份
-/// 实现，避免「设置里一套、主界面一套」的行为漂移（封面解析散落多处的教训）：
-/// 配对批准卡 / 设备区 / 同步四区 / 本机身份与二维码 / 已配对设备，两处逐字一致。
-/// 同步只能由桌面端发起；方向与内容在面板内选择。
-///
-/// ⚠️ sheet 尺寸**必须受控**（2026-09-14 用户反馈「关掉面板后主界面整体下移」）：
-/// macOS 的 sheet 顶边锚在主窗顶边下方约 52pt（unified 工具栏）。只要 sheet 的底边
-/// 超出屏幕底边，系统在**每次关闭 sheet 后**会把主窗永久下移「超出量」那么多
-/// （实测 12pt/次、逐次累积，一度把主窗推到屏幕外）。最小复现 App 对照实验：
-///   - 铺满屏幕的主窗 + 内容撑高的 sheet（620×909，底边超屏 12pt）→ 每轮下移 12pt
-///   - 同窗口 + 高度受控的 sheet（620×700，底边在屏内）→ 零漂移
-///   - 未铺满屏幕的主窗（sheet 完整落在屏内）→ 零漂移
-/// 所以这里把高度钉在放得下的范围（内容由 `Form` 内部滚动承接），不让 sheet 超屏。
-private struct MacSyncPanel: View {
-    @Environment(\.dismiss) private var dismiss
-
-    /// 面板高度：屏幕可见高度 − 52（sheet 锚点偏移）− 24（底部余量），限 420…720。
-    private static var sheetHeight: CGFloat {
-        let screen = NSApp.keyWindow?.screen ?? NSScreen.main ?? NSScreen.screens.first
-        let visible = screen?.visibleFrame.height ?? 900
-        return max(420, min(720, visible - 52 - 24))
-    }
-
-    var body: some View {
-        VStack(spacing: DesignTokens.space0) {
-            header
-
-            Form {
-                MacSyncCenterView()
-            }
-            .formStyle(.grouped)
-        }
-        .frame(width: 620, height: Self.sheetHeight)
-    }
-
-    /// 与其它 Mac sheet 一致的标题栏：标题 + 关闭按钮（Esc 也可关）。
-    /// 原先只有 `navigationTitle`——用户从工具栏打开面板后**没有任何关闭途径**
-    /// （macOS 的 sheet 不会自动给关闭按钮，也没有默认 Esc 取消）。
-    private var header: some View {
-        HStack(spacing: DesignTokens.space12) {
-            Text("sync_run_panel_title".localized)
-                .font(.title2)
-                .fontWeight(.bold)
-            Spacer()
-            Button("close".localized) { dismiss() }
-                .keyboardShortcut(.cancelAction)
-        }
-        .padding()
-    }
 }
