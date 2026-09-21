@@ -583,6 +583,7 @@
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacQuarkLoginView.swift,
+				Mac/MacQueuePanelView.swift,
 				Mac/MacScanLogger.swift,
 				Mac/MacScrapeBatchProgressView.swift,
 				Mac/MacScrapeSettingsView.swift,
