@@ -49,6 +49,11 @@
 | 无 emoji + 其余状态事实 | `.info` |
 | 逐条/逐帧追踪（如逐文件 copied、逐块进度） | `.debug` + 必须 `if AppLog.isEnabled(...)` 短路 |
 
+> **两条条款冲突时以「逐条/逐帧追踪」优先**：emoji 只表示消息语气，**逐条 dump 类**
+> （如 `dictionaryRepresentation().keys`、逐文件 copied、逐块进度）一律 `.debug` + 必须短路 ——
+> 理由是**开销优先**，且全仓既有短路口径统一如此（截至 2026-09-21 全仓 133 处短路点，无一处用 `.info` 守卫）。
+> 先例：`Models/WidgetData.swift` 的 `dictionaryRepresentation().keys` 那处（原 `ℹ️`，按本条定 `.debug` + 短路）。
+
 > 禁止用「无 emoji ⇒ 删」当判据：无 emoji 的 108 行里 57 行（53%）带 `error/Failed`。
 
 ### 新增日志怎么写
