@@ -66,7 +66,8 @@ enum SyncEntityRegistry {
                     detail: "被动端：IOSPassiveSyncCenter.attachDataSync 构造 SyncChangeLogPeer",
                     assertion: SyncEntityAssemblyAssertion(
                         id: "ios-data-sync-peer-attached",
-                        path: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+                        // B2 拆分（2026-09-21）：装配簇（attachDataSync）随 DataSync 搬进 `+DataSync.swift`。
+                        path: "QQPlayer/Services/IOSPassiveSyncCenter+DataSync.swift",
                         requiredMarkers: ["SyncChangeLogPeer("],
                         alternativeMarkers: [["session.peerHelloValue?.deviceID", "IOSPassiveDataSyncLogic"]],
                         guidance: """
@@ -217,7 +218,8 @@ enum SyncEntityRegistry {
                     detail: "被动端：同 A；落点 = PlaybackPositionResumeSink（只改 playbackTime，绝不改 isPlaying）",
                     assertion: SyncEntityAssemblyAssertion(
                         id: "ios-playback-position-sink-attached",
-                        path: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+                        // B2 拆分（2026-09-21）：落点（makePassiveApplier）随 DataSync 搬进 `+DataSync.swift`。
+                        path: "QQPlayer/Services/IOSPassiveSyncCenter+DataSync.swift",
                         requiredMarkers: ["PlaybackPositionResumeSink.apply"],
                         alternativeMarkers: [],
                         guidance: """

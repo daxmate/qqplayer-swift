@@ -122,7 +122,8 @@ enum SyncWiringContract {
     static let originalRequirementSemantics: [(id: String, path: String, markers: [String])] = [
         (
             "ios-data-sync-peer-attached",
-            "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+            // B2 拆分（2026-09-21）：装配点随 `attachDataSync` 搬进 `+DataSync.swift`（标记仍是 `SyncChangeLogPeer(`）。
+            "QQPlayer/Services/IOSPassiveSyncCenter+DataSync.swift",
             ["SyncChangeLogPeer("]
         ),
         ("mac-data-sync-entry-attached", "QQPlayer/Mac", ["SyncDataSyncCoordinator("]),
