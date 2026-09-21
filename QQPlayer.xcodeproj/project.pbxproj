@@ -604,6 +604,8 @@
 				Services/ArtistNameGrouping.swift,
 				Services/ArtistNameNormalizer.swift,
 				Services/ArtworkCache.swift,
+				"Services/ArtworkExtraction+DSD.swift",
+				"Services/ArtworkExtraction+OpusVorbis.swift",
 				Services/ArtworkExtraction.swift,
 				Services/ArtworkManager.swift,
 				Services/AudioMetadataParser.swift,
