@@ -958,6 +958,7 @@
 "sync_run_result_failures_header" = "Éléments en échec (%d)";
 "sync_run_result_unresolved" = "%d morceaux sans empreinte : ignorés.";
 "sync_run_result_empty_selection" = "Aucune sélection : rien n'a été transféré.";
+"sync_run_result_peer_identical" = "Déjà identique sur l'autre appareil — rien à transférer (%d ignoré(s)) :";
 "sync_run_result_no_deletion" = "La synchronisation ne supprime jamais de morceaux, sur aucun appareil.";
 
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）

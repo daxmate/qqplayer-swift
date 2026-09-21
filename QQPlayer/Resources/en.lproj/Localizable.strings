@@ -960,6 +960,7 @@
 "sync_run_result_failures_header" = "Failed items (%d)";
 "sync_run_result_unresolved" = "%d songs aren't fingerprinted yet and were skipped.";
 "sync_run_result_empty_selection" = "Nothing was selected, so nothing was transferred.";
+"sync_run_result_peer_identical" = "Already identical on the other device — nothing to transfer (%d skipped):";
 "sync_run_result_no_deletion" = "Syncing never deletes songs on either device.";
 
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）

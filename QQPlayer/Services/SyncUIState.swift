@@ -453,6 +453,10 @@ struct SyncUIReportSummary: Equatable, Sendable {
     var pulledCount: Int = 0
     /// 两侧一致（零传输）数
     var skippedCount: Int = 0
+    /// 对端自报已一致（两侧同名同内容 → 本次零传输）的条目数
+    var peerAlreadyHasCount: Int = 0
+    /// 对端自报已一致的前 `peerAlreadyHasSampleLimit` 条路径（升序；超出的不截断地丢）
+    var peerAlreadyHasSample: [String] = []
     /// 失败数（= failedItems.count）
     var failedCount: Int = 0
     /// 失败清单（按路径升序；推送在前）
@@ -475,6 +479,16 @@ struct SyncUIReportSummary: Equatable, Sendable {
     /// 实际传输文件数。
     var transferredCount: Int { pushedCount + pulledCount }
 
+    /// 「对端已一致」例举条数上限（UI 只例举前 N 条，不刷屏）。
+    static let peerAlreadyHasSampleLimit = 3
+
+    /// 是否属于「对端已一致，无需传输」：计划里一条要传的都没有（零传输）、
+    /// 但对端确实已有内容，且本次无失败/无中止。
+    /// 为什么必须单独判：这套组合此前在结果区与「普通完成」长得一模一样。
+    var isEmptyPlanAlreadyIdentical: Bool {
+        isSuccess && transferredCount == 0 && peerAlreadyHasCount > 0
+    }
+
     /// 是否完全成功（无中止、无失败项）。
     var isSuccess: Bool { abortReason == nil && failedCount == 0 }
 
@@ -494,6 +508,9 @@ struct SyncUIReportSummary: Equatable, Sendable {
             pushedCount: report.pushed.count,
             pulledCount: report.pulled.count,
             skippedCount: report.skipped.count,
+            // 对端已一致：只从既有账目映射（`skipped` = 差集的 unchanged），UI 不补算。
+            peerAlreadyHasCount: report.skipped.count,
+            peerAlreadyHasSample: Array(report.skipped.prefix(peerAlreadyHasSampleLimit)),
             failedCount: sorted.count,
             failedItems: sorted,
             unresolvedCount: report.unresolvedCount,

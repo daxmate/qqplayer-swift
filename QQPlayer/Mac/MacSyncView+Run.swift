@@ -162,6 +162,26 @@ extension MacSyncRunSection {
                     }
                     .padding(.vertical, DesignTokens.space2)
 
+                    // E-1（2026-09-21）：「计划为空（对端已一致）」不得显示成普通完成。
+                    // 判定在 `SyncUIReportSummary.isEmptyPlanAlreadyIdentical`（纯逻辑），
+                    // 本视图只展示：计数 + 前 3 条路径（否则用户看到的是「秒报完成、零字节」）。
+                    if report.isEmptyPlanAlreadyIdentical {
+                        VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                            Text("sync_run_result_peer_identical".localized(with: report.peerAlreadyHasCount))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            ForEach(report.peerAlreadyHasSample, id: \.self) { path in
+                                Text(path)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                        .padding(.top, DesignTokens.space2)
+                    }
+
                     if report.unresolvedCount > 0 {
                         Text("sync_run_result_unresolved".localized(with: report.unresolvedCount))
                             .font(.caption)

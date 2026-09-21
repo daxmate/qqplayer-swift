@@ -1309,6 +1309,7 @@
 "sync_run_result_failures_header" = "失敗項目（%d）";
 "sync_run_result_unresolved" = "%d 首尚未建立指紋，本次略過。";
 "sync_run_result_empty_selection" = "沒有選取任何內容，因此沒有傳輸。";
+"sync_run_result_peer_identical" = "對端已一致，無需傳輸（跳過 %d 項）：";
 "sync_run_result_no_deletion" = "同步不會刪除任何一端的歌曲。";
 
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）

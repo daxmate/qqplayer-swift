@@ -113,6 +113,21 @@ extension SyncCollectionSyncCoordinator {
         peer?.onManifestReceived = nil
         peer?.onDecodeFailure = nil
 
+        // E-1（2026-09-21）：计划阶段**唯一**落点（diff 算完、开始传输之前）。
+        // 为什么必须在这里：此前整条链路零计划日志，「真的传完了」与「计划判为空
+        // （对端已一致 → 零字节）」在诊断日志上完全同形，真机只能靠猜。
+        // 纯观测：行内容由 `SyncCollectionPlanLog.lines` 唯一格式化，本处只交给
+        // `SyncConnectDiag.log`（日志唯一出口）落盘；**不改任何判断分支**。
+        for line in SyncCollectionPlanLog.lines(
+            direction: direction,
+            selectionCount: expected.count,
+            localCount: local.count,
+            peerCount: response.entries.count,
+            diff: diff
+        ) {
+            SyncConnectDiag.log(line)
+        }
+
         beginTransfers()
     }
 

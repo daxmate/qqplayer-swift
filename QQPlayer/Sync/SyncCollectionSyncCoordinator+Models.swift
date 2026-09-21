@@ -102,6 +102,68 @@ enum SyncCollectionDiffPlanner {
     }
 }
 
+// MARK: - 计划阶段日志（唯一格式化入口）
+
+/// 计划阶段诊断日志的**唯一**格式化入口（纯函数、零 IO、零状态）。
+///
+/// 为什么单独成类型而不写在协调器里：这些行是**断言对象**（`SyncCollectionPlanLogTests`
+/// 逐字段比对）。格式一旦散在调用点，就会出现第二份模板；把行收成纯函数后，
+/// 协调器只负责把返回的行交给 `SyncConnectDiag.log`（日志唯一出口），
+/// 测试也无需复制字符串模板——模板只此一份。
+///
+/// 背景（E-1，2026-09-21 实测）：计划阶段此前零日志，于是「真的传完了」与
+/// 「计划判为空（零字节）」在诊断日志上完全同形，只能靠猜。本类型补的就是这个『算了什么』。
+enum SyncCollectionPlanLog {
+    /// 空计划行的一致样本上限（超过只留前 `sampleLimit` 条，其余折成 `…(+n)`）。
+    static let sampleLimit = 3
+
+    /// 方向标签（日志用词与代码/协议同词，便于 grep）。
+    static func directionLabel(_ direction: SyncTransferDirection) -> String {
+        switch direction {
+        case .upload: return "upload"
+        case .download: return "download"
+        }
+    }
+
+    /// 一致样本后缀（升序前 `limit` 条；走空 = 空串；超出部分折成 `…(+n)`）。
+    static func sampleSuffix(_ paths: [String], limit: Int = SyncCollectionPlanLog.sampleLimit) -> String {
+        guard !paths.isEmpty else { return "" }
+        let head = paths.prefix(max(0, limit))
+        let overflow = paths.count - head.count
+        let joined = head.joined(separator: ", ")
+        return overflow > 0 ? " \(joined)…(+\(overflow))" : " \(joined)"
+    }
+
+    /// 计划阶段日志行（1 行；计划为空时 2 行）。
+    ///
+    /// 行 1（恒定）：`📋 同步计划 方向=… 选择=N 本端=M 对端=K 推送=P 拉取=L 一致=U 两侧无=X 对端多=Y`
+    /// 行 2（仅 `P == 0 且 L == 0`）：`⏭️ 计划为空 → 不传输（对端自报已一致 U 项）` + 一致样本。
+    ///
+    /// 字段口径：N=`selectionCount`（本次对账基准条目数）、M=`localCount`（本端全量清单）、
+    /// K=`peerCount`（对端自报清单）、P/L/U/X/Y 取 `diff` 对应字段。
+    static func lines(
+        direction: SyncTransferDirection,
+        selectionCount: Int,
+        localCount: Int,
+        peerCount: Int,
+        diff: SyncCollectionDiff
+    ) -> [String] {
+        var lines = [
+            "📋 同步计划 方向=\(directionLabel(direction))"
+                + " 选择=\(selectionCount) 本端=\(localCount) 对端=\(peerCount)"
+                + " 推送=\(diff.toPush.count) 拉取=\(diff.toPull.count) 一致=\(diff.unchanged.count)"
+                + " 两侧无=\(diff.missingBoth.count) 对端多=\(diff.remoteOnlyIgnored.count)",
+        ]
+        if diff.toPush.isEmpty, diff.toPull.isEmpty {
+            lines.append(
+                "⏭️ 计划为空 → 不传输（对端自报已一致 \(diff.unchanged.count) 项）"
+                    + sampleSuffix(diff.unchanged)
+            )
+        }
+        return lines
+    }
+}
+
 // MARK: - 配置 / 状态 / 账目
 
 /// 编排配置（选择集 + 方向之外的参数）。
