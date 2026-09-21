@@ -59,7 +59,6 @@ extension PlaylistDetailScreen {
         }
     }
 
-    /// 分片：跨文件可见（原 private）
     private func loadArtworks() async {
         var loadedArtworks: [UIImage] = []
         let tracksToLoad = Array(tracks.prefix(4))
