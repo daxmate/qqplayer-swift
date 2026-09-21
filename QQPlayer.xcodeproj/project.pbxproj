@@ -591,6 +591,7 @@
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
+				"Services/AppCoordinator+Siri.swift",
 				Services/AppLog.swift,
 				Services/AppServices.swift,
 				QQPlayerMacApp.swift,

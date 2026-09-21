@@ -107,6 +107,7 @@ private enum AppLogShapeContract {
         "QQPlayer/Models/WidgetData.swift",
         "QQPlayer/QQPlayerApp.swift",
         "QQPlayer/Services/AppCoordinator+ImportExport.swift",
+        "QQPlayer/Services/AppCoordinator+Siri.swift",
         "QQPlayer/Services/AppCoordinator+iCloud.swift",
         "QQPlayer/Services/AppCoordinator.swift",
         "QQPlayer/Services/ArtworkCache.swift",
