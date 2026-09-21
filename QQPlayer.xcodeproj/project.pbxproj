@@ -690,6 +690,7 @@
 				"Services/PlayerEngine+AudioEngineRecovery.swift",
 				"Services/PlayerEngine+AudioEngineSetup.swift",
 				"Services/PlayerEngine+AudioSessionEvents.swift",
+				"Services/PlayerEngine+NowPlaying+Artwork.swift",
 				"Services/PlayerEngine+NowPlaying+ArtworkID3.swift",
 				"Services/PlayerEngine+NowPlaying+Mac.swift",
 				"Services/PlayerEngine+PlaybackControl+Mac.swift",
