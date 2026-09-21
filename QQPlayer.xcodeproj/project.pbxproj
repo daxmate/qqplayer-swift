@@ -693,6 +693,7 @@
 				"Services/PlayerEngine+NowPlaying+Artwork.swift",
 				"Services/PlayerEngine+NowPlaying+ArtworkID3.swift",
 				"Services/PlayerEngine+NowPlaying+Mac.swift",
+				"Services/PlayerEngine+NowPlaying+Widget.swift",
 				"Services/PlayerEngine+PlaybackControl+Mac.swift",
 				"Services/PlayerEngine+PlaybackControl+Seek.swift",
 				"Services/PlayerEngine+PlaybackControl+Transport.swift",
