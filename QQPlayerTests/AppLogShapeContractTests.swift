@@ -204,6 +204,8 @@ private enum AppLogShapeContract {
         "QQPlayer/Sync/SyncFileReceiver.swift",
         "QQPlayer/Sync/SyncWiringSelfCheck.swift",
         "QQPlayer/ViewModels/TutorialViewModel.swift",
+        "QQPlayer/Views/Albums/AlbumViews+AlbumDetail.swift",
+        "QQPlayer/Views/Albums/AlbumViews+TrackRow.swift",
         "QQPlayer/Views/Albums/AlbumViews.swift",
         "QQPlayer/Views/Artists/ArtistDetailScreen.swift",
         "QQPlayer/Views/Artists/ArtistRowViews.swift",
