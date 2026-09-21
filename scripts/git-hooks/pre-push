@@ -44,10 +44,12 @@ while read -r _local_ref local_sha remote_ref remote_sha; do
 
   # ---- 收集改动/新增文件 ----
   if [ -n "${base:-}" ]; then
-    git diff --name-only "$base" "$local_sha" 2>/dev/null >>"$tmp_files"
+    # --diff-filter=d：排除「已删除」的文件——它们已不在工作树里，喂给
+    # swiftformat/swiftlint 会报 File not found 而误拦推送（2026-09-22 修）
+    git diff --name-only --diff-filter=d "$base" "$local_sha" 2>/dev/null >>"$tmp_files"
     git diff --name-only --diff-filter=A "$base" "$local_sha" 2>/dev/null >>"$tmp_added"
   else
-    git diff-tree --no-commit-id --name-only -r "$local_sha" 2>/dev/null >>"$tmp_files"
+    git diff-tree --no-commit-id --name-only -r --diff-filter=d "$local_sha" 2>/dev/null >>"$tmp_files"
   fi
 done
 
