@@ -135,6 +135,7 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/DatabaseManager.swift",
         "QQPlayer/Services/DatabaseSuspensionCoordinator.swift",
         "QQPlayer/Services/DiscogsAPI.swift",
+        "QQPlayer/Services/EQManager+Presets.swift",
         "QQPlayer/Services/EQManager.swift",
         "QQPlayer/Services/ExternalFileBookmarkStore.swift",
         "QQPlayer/Services/FileCleanupManager.swift",
