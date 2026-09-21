@@ -9,7 +9,7 @@
 //  **本文件只做分发，不做端到端接线**（M3-3b 负责：曲库根/manifest 生成器接入、
 //  收到响应后跑 SyncManifestReconciler、toFetch 走 SyncFileSender 拉取）。与
 //  SyncChangeLogPeer 同构：挂接会话 onApplicationFrame（先己后彼）——挂接与释放
-//  语义统一走 `SyncSessionAttachment`（会话事件分发链，见 SyncPeerSession+Frames.swift）：
+//  语义统一走 `SyncSessionAttachment`（会话事件分发链，见 SyncEventHandlerChain.swift）：
 //  本实例释放**不得**让链上更早的 handler 收不到帧（🟡F1）。
 //
 //  安全选择：本地 manifest 提供者缺省（未接线）时**不应答**——空 manifest 会被

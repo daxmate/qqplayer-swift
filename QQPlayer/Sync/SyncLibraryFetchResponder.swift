@@ -27,7 +27,7 @@
 //  内存回环测试下整条链是同步递归的（与 M2b 既有风格一致），真实网络下每步由
 //  ack 异步驱动。
 //
-//  会话槽位挂接统一走 `SyncSessionAttachment`（分发链，见 SyncPeerSession+Frames.swift）：
+//  会话槽位挂接统一走 `SyncSessionAttachment`（分发链，见 SyncEventHandlerChain.swift）：
 //  onApplicationFrame 收 sync_fetch_request，onClosed 清服务态；本实例释放只静默自己，
 //  **不牵连链上其它 handler**（🟡F1）。
 //

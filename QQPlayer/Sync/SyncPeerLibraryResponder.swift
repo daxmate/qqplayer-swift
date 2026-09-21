@@ -14,7 +14,7 @@
 //  - 摘要（曲目数/总大小）随每次响应返回（UI 顶部展示不依赖分页）。
 //
 //  线程：会话线程（NW 队列）同步驱动；无内部可变状态（已无锁）。
-//  会话槽位挂接统一走 `SyncSessionAttachment`（分发链，见 SyncPeerSession+Frames.swift）：
+//  会话槽位挂接统一走 `SyncSessionAttachment`（分发链，见 SyncEventHandlerChain.swift）：
 //  本实例释放只静默自己，**不牵连链上其它 handler**（🟡F1）。
 //
 
