@@ -122,14 +122,19 @@ xcrun devicectl device copy from --domain-type appDataContainer \
 
 ### 当前状态（截至 2026-09-21）
 
-- `print` → `AppLog` 迁移**已基本完成**：**1379 处 → 147 处**（剩 24 文件）。
-  其中 `Mac/MacScanLogger.swift`、`Services/SyncConnectDiag.swift` 各 **1 处**是**政策保留的落点本体**，
-  迁完即为终态（**剩余 = 2 处**，不是漏网）。
+- **小组件扩展已纳入日志栈**（2026-09-21 用户拍板方案 b）：`PlayerWidgetExtension` 的共享文件名单
+  现在含 `Services/AppLog.swift` + `Services/LogRotation.swift`（登记走
+  `scripts/pbxproj-membership.py --target widget-extension`）——因此 `Models/WidgetData.swift`
+  得以迁到 `AppLog`，**不留第 3 处政策例外**：扩展内日志与 App 走同一出口、同一轮转实现。
+- `print` → `AppLog` 迁移**已完成**：`Models/WidgetData.swift` 的 30 处是最后一块可迁的存量，
+  已随「小组件扩展接入批」迁完。
+  剩下 `Mac/MacScanLogger.swift`、`Services/SyncConnectDiag.swift` 各 **1 处**是**政策保留的落点本体**，
+  即终态（**剩余 = 2 处**，不是漏网）。
 - 批次推进（每批独立分支 + 门禁 + FF 合入 main）：
   批 1 地基（`AppLog` 出口 + `LogRotation` + 形状守卫）→ 批 2/3（sync、migration/DB）→
   批 4a/4b（播放引擎）→ 批 5（音频元数据/封面/歌词）→ 批 6（索引/扫描/清理）→
   批 7（服务/协调/网络）→ 批 8（Views）→ 收口批（计数口径/类别对齐/漏删/测试加固）→
-  批 9（Mac/Models/root，最后一批）
+  批 9（Mac/Models/root）→ 小组件扩展接入批（`Models/WidgetData.swift` + 扩展纳入日志栈）
 - **进度不要在本文件里手抄数字**：唯一权威是
   `QQPlayerTests/Fixtures/structural-budget-print-baseline.tsv` 的 `# TOTAL:` 与
   `QQPlayerTests/AppLogShapeContractTests.swift` 的守卫（两者由 CI 把关）。

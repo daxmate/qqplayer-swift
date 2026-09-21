@@ -69,11 +69,13 @@ private enum AppLogShapeContract {
     /// + 批 5（音频元数据·封面·歌词 12）+ 批 7（服务/协调/网络 18）+ 批 8（Views 24）
     /// + 口径收口批（批 6 遗留 2）= 87 文件。
     /// + 批 9（Mac/Models/root/CarPlay/Helpers/ViewModels 21）= 108 文件。
+    /// + 小组件扩展接入批（`QQPlayer/Models/WidgetData.swift`）= 109 文件。
     ///   ⚠️ 批 9 原计划 22 个含 `QQPlayer/Models/WidgetData.swift`，但该文件同时编入
     ///   `PlayerWidgetExtension`，而该 target 不含 `AppLog`
-    ///   （编译报 `Cannot find 'AppLog' in scope`）→ 归属决策待维护者定，
-    ///   故本批**不登记**它（其 30 处 print 仍在 print 基线内）；补丁见
-    ///   `/tmp/qqplayer-applog-batch9-widgetdata-setaside.patch`。
+    ///   （编译报 `Cannot find 'AppLog' in scope`）→ 归属决策待维护者定，故批 9 未登记它。
+    ///   2026-09-21 用户拍板（方案 b）：把 `Services/AppLog.swift` + `Services/LogRotation.swift`
+    ///   登记进 `PlayerWidgetExtension`（`scripts/pbxproj-membership.py --target widget-extension`），
+    ///   扩展与 App 共用同一日志出口，该文件随之迁完并登记（本批）。
     /// 批 2 起把迁移完成的文件逐个加进来：加进来的文件必须零裸 `print(` / 零 `NSLog(`。
     /// 清单只此一处——不在基线 TSV 里再维护一份（那是同一语义第二实现）。
     ///
@@ -102,6 +104,7 @@ private enum AppLogShapeContract {
         "QQPlayer/Mac/MacTrackListView.swift",
         "QQPlayer/Mac/SyncHostCenter.swift",
         "QQPlayer/Models/SFBTrack.swift",
+        "QQPlayer/Models/WidgetData.swift",
         "QQPlayer/QQPlayerApp.swift",
         "QQPlayer/Services/AppCoordinator+ImportExport.swift",
         "QQPlayer/Services/AppCoordinator+iCloud.swift",

@@ -43,7 +43,7 @@ final class WidgetDataManager: @unchecked Sendable {
 
     func saveCurrentTrack(_ data: WidgetTrackData, artworkData: Data? = nil) {
         guard let userDefaults = userDefaults else {
-            print("⚠️ Widget: Failed to access shared UserDefaults")
+            AppLog.warn(.general, "⚠️ Widget: Failed to access shared UserDefaults")
             return
         }
 
@@ -52,7 +52,7 @@ final class WidgetDataManager: @unchecked Sendable {
             let encoded = try JSONEncoder().encode(data)
             userDefaults.set(encoded, forKey: currentTrackKey)
             userDefaults.synchronize()
-            print("✅ Widget: Saved track data - \(data.title) (\(encoded.count) bytes)")
+            AppLog.info(.general, "✅ Widget: Saved track data - \(data.title) (\(encoded.count) bytes)")
 
             // Save artwork to shared file (can be > 4MB)
             if let artworkData = artworkData {
@@ -61,35 +61,37 @@ final class WidgetDataManager: @unchecked Sendable {
                 clearArtwork()
             }
         } catch {
-            print("❌ Widget: Failed to encode track data - \(error)")
+            AppLog.error(.general, "❌ Widget: Failed to encode track data - \(error)")
         }
     }
 
     func getCurrentTrack() -> WidgetTrackData? {
-        print("📱 Widget: Attempting to retrieve track data...")
-        print("📱 Widget: Using suite: group.com.daxmate.qqplayer.ios")
+        AppLog.info(.general, "📱 Widget: Attempting to retrieve track data...")
+        AppLog.info(.general, "📱 Widget: Using suite: group.com.daxmate.qqplayer.ios")
 
         guard let userDefaults = userDefaults else {
-            print("⚠️ Widget: Failed to access shared UserDefaults - userDefaults is nil")
+            AppLog.warn(.general, "⚠️ Widget: Failed to access shared UserDefaults - userDefaults is nil")
             return nil
         }
 
         guard let data = userDefaults.data(forKey: currentTrackKey) else {
-            print("ℹ️ Widget: No track data found in UserDefaults for key: \(currentTrackKey)")
-            print("ℹ️ Widget: Available keys: \(userDefaults.dictionaryRepresentation().keys)")
+            AppLog.info(.general, "ℹ️ Widget: No track data found in UserDefaults for key: \(currentTrackKey)")
+            if AppLog.isEnabled(.debug, .general) {
+                AppLog.debug(.general, "ℹ️ Widget: Available keys: \(userDefaults.dictionaryRepresentation().keys)")
+            }
             return nil
         }
 
-        print("📦 Widget: Found data, size: \(data.count) bytes")
+        AppLog.info(.general, "📦 Widget: Found data, size: \(data.count) bytes")
 
         do {
             let decoded = try JSONDecoder().decode(WidgetTrackData.self, from: data)
-            print("✅ Widget: Retrieved track data - \(decoded.title) by \(decoded.artist)")
-            print("✅ Widget: Playing: \(decoded.isPlaying), Color: \(decoded.backgroundColorHex)")
+            AppLog.info(.general, "✅ Widget: Retrieved track data - \(decoded.title) by \(decoded.artist)")
+            AppLog.info(.general, "✅ Widget: Playing: \(decoded.isPlaying), Color: \(decoded.backgroundColorHex)")
             return decoded
         } catch {
-            print("❌ Widget: Failed to decode track data - \(error)")
-            print("❌ Widget: Data: \(String(data: data, encoding: .utf8) ?? "unable to decode")")
+            AppLog.error(.general, "❌ Widget: Failed to decode track data - \(error)")
+            AppLog.error(.general, "❌ Widget: Data: \(String(data: data, encoding: .utf8) ?? "unable to decode")")
             return nil
         }
     }
@@ -98,7 +100,7 @@ final class WidgetDataManager: @unchecked Sendable {
         userDefaults?.removeObject(forKey: currentTrackKey)
         userDefaults?.synchronize()
         clearArtwork()
-        print("🗑️ Widget: Cleared track data")
+        AppLog.info(.general, "🗑️ Widget: Cleared track data")
     }
 
     // MARK: - Artwork File Storage (avoids 4MB UserDefaults limit)
@@ -109,7 +111,7 @@ final class WidgetDataManager: @unchecked Sendable {
 
     private func saveArtwork(_ data: Data) {
         guard let containerURL = getSharedContainerURL() else {
-            print("⚠️ Widget: Failed to get shared container URL")
+            AppLog.warn(.general, "⚠️ Widget: Failed to get shared container URL")
             return
         }
 
@@ -117,31 +119,31 @@ final class WidgetDataManager: @unchecked Sendable {
 
         do {
             try data.write(to: fileURL, options: .atomic)
-            print("✅ Widget: Saved artwork to file (\(data.count) bytes)")
+            AppLog.info(.general, "✅ Widget: Saved artwork to file (\(data.count) bytes)")
         } catch {
-            print("❌ Widget: Failed to save artwork - \(error)")
+            AppLog.error(.general, "❌ Widget: Failed to save artwork - \(error)")
         }
     }
 
     public func getArtwork() -> Data? {
         guard let containerURL = getSharedContainerURL() else {
-            print("⚠️ Widget: Failed to get shared container URL")
+            AppLog.warn(.general, "⚠️ Widget: Failed to get shared container URL")
             return nil
         }
 
         let fileURL = containerURL.appendingPathComponent(artworkFileName)
 
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("ℹ️ Widget: No artwork file found")
+            AppLog.info(.general, "ℹ️ Widget: No artwork file found")
             return nil
         }
 
         do {
             let data = try Data(contentsOf: fileURL)
-            print("✅ Widget: Loaded artwork from file (\(data.count) bytes)")
+            AppLog.info(.general, "✅ Widget: Loaded artwork from file (\(data.count) bytes)")
             return data
         } catch {
-            print("❌ Widget: Failed to load artwork - \(error)")
+            AppLog.error(.general, "❌ Widget: Failed to load artwork - \(error)")
             return nil
         }
     }
@@ -153,7 +155,7 @@ final class WidgetDataManager: @unchecked Sendable {
 
         if FileManager.default.fileExists(atPath: fileURL.path) {
             try? FileManager.default.removeItem(at: fileURL)
-            print("🗑️ Widget: Cleared artwork file")
+            AppLog.info(.general, "🗑️ Widget: Cleared artwork file")
         }
     }
 }
@@ -190,7 +192,7 @@ public final class PlaylistDataManager: @unchecked Sendable {
 
     public func savePlaylists(_ playlists: [WidgetPlaylistData]) {
         guard let userDefaults = userDefaults else {
-            print("⚠️ Widget: Failed to access shared UserDefaults for playlists")
+            AppLog.warn(.general, "⚠️ Widget: Failed to access shared UserDefaults for playlists")
             return
         }
 
@@ -198,29 +200,29 @@ public final class PlaylistDataManager: @unchecked Sendable {
             let encoded = try JSONEncoder().encode(playlists)
             userDefaults.set(encoded, forKey: playlistsKey)
             userDefaults.synchronize()
-            print("✅ Widget: Saved \(playlists.count) playlists")
+            AppLog.info(.general, "✅ Widget: Saved \(playlists.count) playlists")
         } catch {
-            print("❌ Widget: Failed to encode playlists - \(error)")
+            AppLog.error(.general, "❌ Widget: Failed to encode playlists - \(error)")
         }
     }
 
     public func getPlaylists() -> [WidgetPlaylistData] {
         guard let userDefaults = userDefaults else {
-            print("⚠️ Widget: Failed to access shared UserDefaults for playlists")
+            AppLog.warn(.general, "⚠️ Widget: Failed to access shared UserDefaults for playlists")
             return []
         }
 
         guard let data = userDefaults.data(forKey: playlistsKey) else {
-            print("ℹ️ Widget: No playlist data found")
+            AppLog.info(.general, "ℹ️ Widget: No playlist data found")
             return []
         }
 
         do {
             let decoded = try JSONDecoder().decode([WidgetPlaylistData].self, from: data)
-            print("✅ Widget: Retrieved \(decoded.count) playlists")
+            AppLog.info(.general, "✅ Widget: Retrieved \(decoded.count) playlists")
             return decoded
         } catch {
-            print("❌ Widget: Failed to decode playlists - \(error)")
+            AppLog.error(.general, "❌ Widget: Failed to decode playlists - \(error)")
             return []
         }
     }
@@ -228,6 +230,6 @@ public final class PlaylistDataManager: @unchecked Sendable {
     public func clearPlaylists() {
         userDefaults?.removeObject(forKey: playlistsKey)
         userDefaults?.synchronize()
-        print("🗑️ Widget: Cleared playlists")
+        AppLog.info(.general, "🗑️ Widget: Cleared playlists")
     }
 }

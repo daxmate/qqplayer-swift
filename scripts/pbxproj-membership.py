@@ -14,7 +14,8 @@ Mac-only 新文件两表（ios-exceptions + mac-whitelist）都加。
   python3 scripts/pbxproj-membership.py --target mac-whitelist FileA.swift
   python3 scripts/pbxproj-membership.py --target siri-extension FileC.swift
   # --target 映射：ios-exceptions = 2312D60B（iOS 例外表）、mac-whitelist = B1A…07、
-  #               siri-extension = 23C312D9（Siri 扩展的共享文件名单）
+  #               siri-extension = 23C312D9（Siri 扩展的共享文件名单）、
+  #               widget-extension = 239B247A（小组件扩展的共享文件名单）
   --dry-run / --pbxproj 可选（同 add-test-file.py 风格）
 
 安全设计（同 add-test-file.py）：
@@ -35,6 +36,9 @@ TARGET_BY_KEY = {
     "mac-whitelist": "B1A000000000000000000007",    # Exceptions for QQPlayer folder in QQPlayerMac target
     "siri-extension": "23C312D92E78015500342F7C",   # Exceptions for QQPlayer folder in SiriIntentsExtension target
     #   （共享 Services/ 文件被 Siri 扩展用到时也要登记这里：扩展只编这张名单里的共享文件）
+    "widget-extension": "239B247A2EE59BEC009F83F1",  # Exceptions for QQPlayer folder in PlayerWidgetExtension target
+    #   （共享 Services/ 文件被小组件扩展用到时也要登记这里：`Models/WidgetData.swift` 即在其中，
+    #     2026-09-21 AppLog 接进扩展时同款登记 `Services/AppLog.swift` + `Services/LogRotation.swift`）
 }
 
 

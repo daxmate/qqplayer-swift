@@ -8,6 +8,5 @@
 #
 # 重新生成：scripts/check-structural-budget.sh emit-prints
 QQPlayer/Mac/MacScanLogger.swift	1
-QQPlayer/Models/WidgetData.swift	30
 QQPlayer/Services/SyncConnectDiag.swift	1
-# TOTAL: 32
+# TOTAL: 2
