@@ -2,9 +2,8 @@
 //  DatabaseManager+LibraryMigrations.swift
 //  QQPlayer
 //
-//  存量修复迁移：库内归名（migrateCanonicalizeScriptForms）、合唱歌手拆分
-//  （migrateSplitCombinedArtistNames）、分裂专辑合并（migrateMergeSplitAlbums）、
-//  孤儿行清理（cleanupOrphanedLibraryEntries）。
+//  存量修复迁移：存量归名（简繁归一）、拆合唱歌手、合并分裂专辑、孤儿条目清理，
+//  以及迁移侧专辑分组键 albumMatchKey / normalizeAlbumTitle。
 //
 //  2026-09-21 从 DatabaseManager+Library.swift 原样搬出（纯搬家，无逻辑变更）。
 //
@@ -12,6 +11,37 @@ import Foundation
 @preconcurrency import GRDB
 
 extension DatabaseManager {
+    /// 专辑判据（含归名）的**唯一构造**：先写规范形（简体，与 UI 语言解耦），
+    /// 再去结构性后缀/空白。upsertAlbum 的全部比较点与 issue #81 的分组键都用它 ——
+    /// 少一层简繁归一，简繁分裂的同名专辑就永远分不到同一组（2026-09-18）。
+    /// 分片：跨文件可见（原 private）
+    func albumMatchKey(_ title: String) -> String {
+        normalizeAlbumTitle(DisplayScriptNormalizer.canonical(title))
+    }
+
+    private func normalizeAlbumTitle(_ title: String) -> String {
+        var normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove common variations that cause duplicates
+        let patternsToRemove = [
+            " (Deluxe Edition)",
+            " (Deluxe)",
+            " (Extended Version)",
+            " (Remastered)",
+            " [Explicit]",
+            " - EP",
+            " EP",
+        ]
+
+        for pattern in patternsToRemove where normalized.hasSuffix(pattern) {
+            normalized = String(normalized.dropLast(pattern.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Remove extra whitespace
+        normalized = normalized.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+
+        return normalized.isEmpty ? title : normalized
+    }
 
     /// 存量归名（库内简繁归一的第一步，必须在 #16 / #81 之前跑）：
     /// `artist.name` / `album.title` / `album.album_artist` / `track.title`

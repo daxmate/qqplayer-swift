@@ -2,9 +2,7 @@
 //  DatabaseManager+LibraryCRUD.swift
 //  QQPlayer
 //
-//  歌手 / 专辑写读与歌手显示名缓存：upsertArtist / upsertAlbum（含重名判据助手）、
-//  getAllArtists / getAllAlbums / getAlbum / getAlbumsByArtistId / setAlbumArtists /
-//  getArtist / getAllArtistNamesById / getArtistDisplayName(s) / invalidateArtistDisplayNameCache。
+//  歌手 / 专辑 CRUD 与歌手显示名缓存（Artist operations / Album operations）。
 //
 //  2026-09-21 从 DatabaseManager+Library.swift 原样搬出（纯搬家，无逻辑变更）。
 //
@@ -157,38 +155,6 @@ extension DatabaseManager {
         }
 
         return false
-    }
-
-    /// 专辑判据（含归名）的**唯一构造**：先写规范形（简体，与 UI 语言解耦），
-    /// 再去结构性后缀/空白。upsertAlbum 的全部比较点与 issue #81 的分组键都用它 ——
-    /// 少一层简繁归一，简繁分裂的同名专辑就永远分不到同一组（2026-09-18）。
-    /// 分片：跨文件可见（原 private）
-    func albumMatchKey(_ title: String) -> String {
-        normalizeAlbumTitle(DisplayScriptNormalizer.canonical(title))
-    }
-
-    private func normalizeAlbumTitle(_ title: String) -> String {
-        var normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Remove common variations that cause duplicates
-        let patternsToRemove = [
-            " (Deluxe Edition)",
-            " (Deluxe)",
-            " (Extended Version)",
-            " (Remastered)",
-            " [Explicit]",
-            " - EP",
-            " EP",
-        ]
-
-        for pattern in patternsToRemove where normalized.hasSuffix(pattern) {
-            normalized = String(normalized.dropLast(pattern.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        // Remove extra whitespace
-        normalized = normalized.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-
-        return normalized.isEmpty ? title : normalized
     }
 
     func getAllAlbums() throws -> [Album] {
@@ -379,4 +345,5 @@ extension DatabaseManager {
 
         return result
     }
+
 }

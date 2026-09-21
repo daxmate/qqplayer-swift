@@ -2,18 +2,17 @@
 //  DatabaseManager+Library.swift
 //  QQPlayer
 //
-//  曲库搜索：LIKE 通配符转义与变体 OR 构造（escapeLikePattern / likePattern / likeAny）、
-//  歌手 / 专辑 / 曲目 / 歌单搜索入口与曲目排名粗筛（rankedTrackSearch，Levenshtein 相似度）。
-//  尾部 `private extension String` 是搜索专用的归一 / 相似度实现。
+//  库搜索：LIKE 通配符转义与简繁字形变体召回、候选粗筛 + Levenshtein 相似度排序，
+//  以及曲名归一 / 相似度工具（private extension String，仅本片使用）。
 //
 //  2026-09-21 结构拆分（纯搬家，无逻辑变更）。同族文件：
-//    · DatabaseManager+LibraryCRUD.swift       — 歌手 / 专辑写读、歌手显示名缓存
-//    · DatabaseManager+LibraryMigrations.swift — 存量修复迁移（归名 / 合唱拆分 / 专辑合并 / 孤儿清理）
+//    · DatabaseManager+LibraryCRUD.swift       — 歌手 / 专辑 CRUD、显示名缓存
+//    · DatabaseManager+LibraryMigrations.swift — 存量修复迁移（归名 / 拆合唱 / 合并分裂专辑 / 孤儿清理）
 //
 import Foundation
 @preconcurrency import GRDB
-extension DatabaseManager {
 
+extension DatabaseManager {
     func searchArtists(query: String, limit: Int = 20) throws -> [Artist] {
         return try read { db in
             // 简繁归一：query 生成两种字形变体（当前方向转换 + 反向转换），
