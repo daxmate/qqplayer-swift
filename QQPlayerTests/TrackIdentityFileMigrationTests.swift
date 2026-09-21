@@ -145,7 +145,10 @@ struct TrackIdentityFileMigrationReportTests {
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
         let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        // 前置：目标已存在（D3 已锁「不覆盖、不删源」的文件语义，本用例只锁报告计数，
+        // 故这里仅备好场景，不再重复断言源/目标字节）。
         try FileMigrationFixture.writeLyrics(libraryRoot: libraryRoot, kind: .manual, stableId: FileMigrationFixture.oldId)
+        try FileMigrationFixture.writeLyrics(libraryRoot: libraryRoot, kind: .manual, stableId: FileMigrationFixture.newId)
 
         let report = TrackIdentityMigration.migrateFileReferences(
             from: FileMigrationFixture.oldId,
