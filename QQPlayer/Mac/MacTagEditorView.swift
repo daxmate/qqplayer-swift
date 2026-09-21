@@ -36,59 +36,87 @@ import AppKit
 import SwiftUI
 
 struct MacTagEditorView: View {
-    @Environment(PlayerEngine.self) private var playerEngine
-    @Environment(AppCoordinator.self) private var appCoordinator
+    /// 分片：跨文件可见（原 private）
+    @Environment(PlayerEngine.self) var playerEngine
+    /// 分片：跨文件可见（原 private）
+    @Environment(AppCoordinator.self) var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
-    @Environment(\.appAccentColor) private var appAccentColor
-    @Environment(\.dismiss) private var dismiss
-    @Environment(LibraryIndexer.self) private var libraryIndexer
+    /// 分片：跨文件可见（原 private）
+    @Environment(\.appAccentColor) var appAccentColor
+    /// 分片：跨文件可见（原 private）
+    @Environment(\.dismiss) var dismiss
+    /// 分片：跨文件可见（原 private）
+    @Environment(LibraryIndexer.self) var libraryIndexer
 
     /// 编辑目标（右键的那首歌；值拷贝，保存期间不依赖外部变化）
     let track: Track
 
     // MARK: 封面状态（keep = 不动文件现有封面）
-    private enum CoverState {
+    /// 分片：跨文件可见（原 private）
+    enum CoverState {
         case keep
         case replace(Data)
         case remove
     }
 
     // MARK: 表单（与文件标签现读值同步；空 = 不写该字段）
-    @State private var formTitle = ""
-    @State private var formArtist = ""
-    @State private var formAlbum = ""
-    @State private var formYear = ""
-    @State private var formGenre = ""
-    @State private var formTrack = ""
-    @State private var formAlbumArtist = ""
-    @State private var coverState: CoverState = .keep
+    /// 分片：跨文件可见（原 private）
+    @State var formTitle = ""
+    /// 分片：跨文件可见（原 private）
+    @State var formArtist = ""
+    /// 分片：跨文件可见（原 private）
+    @State var formAlbum = ""
+    /// 分片：跨文件可见（原 private）
+    @State var formYear = ""
+    /// 分片：跨文件可见（原 private）
+    @State var formGenre = ""
+    /// 分片：跨文件可见（原 private）
+    @State var formTrack = ""
+    /// 分片：跨文件可见（原 private）
+    @State var formAlbumArtist = ""
+    /// 分片：跨文件可见（原 private）
+    @State var coverState: CoverState = .keep
 
     // MARK: 刮削状态
-    @State private var scrapeState: ScrapeState = .idle
-    @State private var scrapeQuery = ""
-    @State private var neteaseCandidates: [ScrapeCandidate] = []
-    @State private var musicbrainzCandidates: [ScrapeCandidate] = []
+    /// 分片：跨文件可见（原 private）
+    @State var scrapeState: ScrapeState = .idle
+    /// 分片：跨文件可见（原 private）
+    @State var scrapeQuery = ""
+    /// 分片：跨文件可见（原 private）
+    @State var neteaseCandidates: [ScrapeCandidate] = []
+    /// 分片：跨文件可见（原 private）
+    @State var musicbrainzCandidates: [ScrapeCandidate] = []
     /// 当前点选候选的封面 URL（「使用候选封面」的下载源）
-    @State private var selectedCoverURL: URL?
+    /// 分片：跨文件可见（原 private）
+    @State var selectedCoverURL: URL?
 
     // MARK: 重命名（模板来自设置 scraping.renameTemplate；默认关——文件名
     // 与模板渲染结果一致时才默认开，避免打开弹窗误触发改名）
-    @State private var renameEnabled = false
-    @State private var renameTemplate = TagWriterService.defaultRenameTemplate
+    /// 分片：跨文件可见（原 private）
+    @State var renameEnabled = false
+    /// 分片：跨文件可见（原 private）
+    @State var renameTemplate = TagWriterService.defaultRenameTemplate
 
     // MARK: 保存
-    @State private var saving = false
-    @State private var savedFlash = false
-    @State private var saveError: String?
-    @State private var showUnsupportedAlert = false
-    @State private var renamePreviewText = ""
+    /// 分片：跨文件可见（原 private）
+    @State var saving = false
+    /// 分片：跨文件可见（原 private）
+    @State var savedFlash = false
+    /// 分片：跨文件可见（原 private）
+    @State var saveError: String?
+    /// 分片：跨文件可见（原 private）
+    @State var showUnsupportedAlert = false
+    /// 分片：跨文件可见（原 private）
+    @State var renamePreviewText = ""
 
     // MARK: 文件解析（初始表单值；避免反复重扫文件）
-    @State private var initialMetadata: AudioMetadata?
+    /// 分片：跨文件可见（原 private）
+    @State var initialMetadata: AudioMetadata?
     @State private var loadFailed = false
 
     /// 刮削状态机（idle → searching → done/failed）
-    private enum ScrapeState: Equatable {
+    /// 分片：跨文件可见（原 private）
+    enum ScrapeState: Equatable {
         case idle
         case searching
         case done
@@ -96,7 +124,8 @@ struct MacTagEditorView: View {
     }
 
     private let scrapeTaskKey = "scrape"
-    @State private var activeTasks: [String: Task<Void, Never>] = [:]
+    /// 分片：跨文件可见（原 private）
+    @State var activeTasks: [String: Task<Void, Never>] = [:]
 
     // MARK: - Body
 
@@ -190,276 +219,6 @@ struct MacTagEditorView: View {
         }
     }
 
-    // MARK: 封面列
-
-    private var coverColumn: some View {
-        VStack(spacing: DesignTokens.space8) {
-            coverPreview
-            Text("tag_editor_cover".localized)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            Button {
-                downloadCandidateCover()
-            } label: {
-                Label("tag_editor_use_candidate_cover".localized, systemImage: "photo.badge.arrow.down")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderless)
-            .disabled(selectedCoverURL == nil || saving)
-            .help("tag_editor_use_candidate_cover_help".localized)
-
-            Button(role: .destructive) {
-                coverState = .remove
-            } label: {
-                Label("tag_editor_remove_cover".localized, systemImage: "trash")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderless)
-            .disabled(saving)
-        }
-        .frame(width: 150)
-    }
-
-    @ViewBuilder
-    private var coverPreview: some View {
-        Group {
-            switch coverState {
-            case .keep:
-                MacArtworkThumbnail(track: track, size: 132, cornerRadius: DesignTokens.radius10)
-            case .replace(let data):
-                if let image = NSImage(data: data) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    placeholderCover
-                }
-            case .remove:
-                placeholderCover
-            }
-        }
-        .frame(width: 132, height: 132)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius10))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.radius10)
-                .strokeBorder(Color.gray.opacity(0.25), lineWidth: 1)
-        )
-    }
-
-    private var placeholderCover: some View {
-        RoundedRectangle(cornerRadius: DesignTokens.radius10)
-            .fill(Color.gray.opacity(0.15))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.system(size: DesignTokens.font40))
-                    .foregroundColor(.secondary)
-            }
-    }
-
-    // MARK: 表单列
-
-    private var formColumn: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space8) {
-            field("title".localized, text: $formTitle, disabled: saving)
-            field("artist".localized, text: $formArtist, disabled: saving)
-            field("album".localized, text: $formAlbum, disabled: saving)
-            HStack(spacing: DesignTokens.space10) {
-                field("tag_editor_field_year".localized, text: $formYear, disabled: saving)
-                field("tag_editor_field_genre".localized, text: $formGenre, disabled: saving)
-            }
-            HStack(spacing: DesignTokens.space10) {
-                field("tag_editor_field_track".localized, text: $formTrack, disabled: saving)
-                field("tag_editor_field_album_artist".localized, text: $formAlbumArtist, disabled: saving)
-            }
-        }
-    }
-
-    private func field(_ label: String, text: Binding<String>, disabled: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space4) {
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            TextField("", text: text)
-                .textFieldStyle(.roundedBorder)
-                .disabled(disabled)
-        }
-    }
-
-    // MARK: 刮削行
-
-    private var scrapeRow: some View {
-        HStack(spacing: DesignTokens.space8) {
-            switch scrapeState {
-            case .idle:
-                emptyRow
-            case .searching:
-                HStack(spacing: DesignTokens.space6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("tag_editor_scraping".localized)
-                        .foregroundColor(.secondary)
-                }
-            case .done:
-                HStack(spacing: DesignTokens.space6) {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(appAccentColor)
-                    if !scrapeQuery.isEmpty {
-                        Text(scrapeQuery)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    Spacer()
-                    Button("tag_editor_scrape_again".localized) {
-                        Task { await runScrape() }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(saving)
-                }
-            case .failed(let message):
-                HStack(spacing: DesignTokens.space6) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.red)
-                    Text(message)
-                        .foregroundColor(.red)
-                        .lineLimit(1)
-                    Spacer()
-                    Button("tag_editor_scrape_again".localized) {
-                        Task { await runScrape() }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(saving)
-                }
-            }
-            Spacer()
-        }
-        .font(.caption)
-        .padding(.vertical, DesignTokens.space2)
-    }
-
-    private var emptyRow: some View {
-        Text("tag_editor_scrape_again".localized)
-            .foregroundColor(.secondary)
-            .onTapGesture {
-                Task { await runScrape() }
-            }
-    }
-
-    // MARK: 候选区（netease / musicbrainz 两组，展示顺序跟随设置 scrapingSourceOrder）
-
-    @ViewBuilder
-    private var candidatesSection: some View {
-        if scrapeState != .idle && scrapeState != .searching {
-            if neteaseCandidates.isEmpty && musicbrainzCandidates.isEmpty {
-                VStack(spacing: DesignTokens.space6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: DesignTokens.font22))
-                        .foregroundColor(.secondary)
-                    Text("tag_editor_no_candidates".localized)
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, DesignTokens.space16)
-            } else {
-                VStack(alignment: .leading, spacing: DesignTokens.space10) {
-                    ForEach(orderedSources, id: \.self) { source in
-                        switch source {
-                        case "musicbrainz":
-                            candidateGroup(
-                                title: "source_musicbrainz".localized,
-                                icon: "brain.head.profile",
-                                candidates: musicbrainzCandidates,
-                                source: "musicbrainz"
-                            )
-                        default: // "netease"
-                            candidateGroup(
-                                title: "source_netease".localized,
-                                icon: "cloud",
-                                candidates: neteaseCandidates,
-                                source: "netease"
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// 源展示顺序 = 设置 scrapingSourceOrder（默认 netease 优先）；设置含未知源时过滤
-    private var orderedSources: [String] {
-        let known: Set<String> = ["netease", "musicbrainz"]
-        let order = DeleteSettings.load().scrapingSourceOrder
-        return order.filter { known.contains($0) }
-    }
-
-    private func candidateGroup(
-        title: String,
-        icon: String,
-        candidates: [ScrapeCandidate],
-        source: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space6) {
-            HStack(spacing: DesignTokens.space4) {
-                Image(systemName: icon)
-                    .font(.caption2)
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                Spacer()
-            }
-            .foregroundColor(appAccentColor)
-            if candidates.isEmpty {
-                Text("tag_editor_no_candidates".localized)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.vertical, DesignTokens.space4)
-            } else {
-                ForEach(Array(candidates.enumerated()), id: \.offset) { _, candidate in
-                    Button {
-                        pick(candidate, source: source)
-                    } label: {
-                        MacTagEditorCandidateRow(candidate: candidate)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: 重命名
-
-    private var renameSection: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space6) {
-            Toggle(isOn: $renameEnabled) {
-                Text("tag_editor_rename_files".localized)
-                    .font(.callout)
-            }
-            .disabled(saving)
-            .onChange(of: renameEnabled) { _, _ in
-                updateRenamePreview()
-            }
-            HStack(spacing: DesignTokens.space8) {
-                Text("scraping_rename_preview".localized)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(renamePreviewText.isEmpty ? "—" : renamePreviewText)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(renameEnabled ? appAccentColor : .secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-            }
-            .padding(.leading, DesignTokens.space2)
-        }
-        .onChange(of: formTitle) { _, _ in updateRenamePreview() }
-        .onChange(of: formArtist) { _, _ in updateRenamePreview() }
-        .onChange(of: formAlbum) { _, _ in updateRenamePreview() }
-        .onChange(of: formYear) { _, _ in updateRenamePreview() }
-        .onChange(of: formTrack) { _, _ in updateRenamePreview() }
-    }
-
     // MARK: - Footer
 
     private var footer: some View {
@@ -487,22 +246,6 @@ struct MacTagEditorView: View {
         }
         .padding(.horizontal, DesignTokens.space16)
         .padding(.vertical, DesignTokens.space10)
-    }
-
-    /// 无可保存内容（全空 + 封面未动）→ 禁用保存（web「至少一个非空」语义的
-    /// Mac 原生表达；封面操作/移除也算可保存）
-    private var canSave: Bool {
-        let textNonEmpty = [formTitle, formArtist, formAlbum, formGenre, formAlbumArtist]
-            .contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        let yearNonEmpty = !formYear.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let trackNonEmpty = !formTrack.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let coverChanged: Bool = {
-            switch coverState {
-            case .keep: return false
-            case .replace, .remove: return true
-            }
-        }()
-        return textNonEmpty || yearNonEmpty || trackNonEmpty || coverChanged
     }
 
     // MARK: - 初始加载 + 自动刮削
@@ -544,275 +287,5 @@ struct MacTagEditorView: View {
         renameTemplate = DeleteSettings.load().scrapingRenameTemplate
         renameEnabled = renderedTargetName() == URL(fileURLWithPath: track.path).lastPathComponent
         updateRenamePreview()
-    }
-
-    // MARK: - 刮削（web POST /api/tags/scrape 等价）
-
-    private func runScrape() async {
-        // query = 文件 title（解析失败回落文件名 stem）
-        let query = ScrapeLogic.searchQuery(
-            title: initialMetadata?.title,
-            fileName: track.path
-        )
-        scrapeQuery = query
-        scrapeState = .searching
-        neteaseCandidates = []
-        musicbrainzCandidates = []
-        let artist = initialMetadata?.artist ?? ""
-        let sources = await ScrapeBatchService.scrapeSources(query: query, artist: artist)
-        guard !Task.isCancelled else { return }
-        neteaseCandidates = sources.netease
-        musicbrainzCandidates = sources.musicbrainz
-        scrapeState = .done
-    }
-
-    /// 点选候选 → 填充表单（web pick 语义：候选有值才填，空值清空对应字段；
-    /// 封面记录到 selectedCoverURL，需用户显式「使用候选封面」才下载）
-    private func pick(_ candidate: ScrapeCandidate, source: String) {
-        formTitle = candidate.title ?? ""
-        formArtist = candidate.artist ?? ""
-        formAlbum = candidate.album ?? ""
-        if let year = candidate.year {
-            formYear = String(year)
-        } else {
-            formYear = ""
-        }
-        if let genre = candidate.genre, !genre.isEmpty {
-            formGenre = genre
-        } else {
-            formGenre = ""
-        }
-        if let track = candidate.track {
-            formTrack = String(track)
-        } else {
-            formTrack = ""
-        }
-        formAlbumArtist = candidate.albumArtist ?? ""
-        selectedCoverURL = candidate.coverURL
-        // 点选候选 = 自动采用候选封面（web 语义对齐：点选即记录并使用 cover_url，
-        // 不需要额外按钮）。先回到文件现状，有 coverURL → 自动下载暂存（成功替换
-        // 预览；失败留 keep 并在表单底部红字提示，可手动「使用候选封面」重试）；
-        // 无 coverURL → 保持文件现状。
-        coverState = .keep
-        if let coverURL = candidate.coverURL {
-            downloadCandidateCover(from: coverURL)
-        }
-        updateRenamePreview()
-
-        // 网易云候选且表单 year 空 → 静默补年份（POST /api/tags/album-year 等价；
-        // 异步 + 静默失败，不阻塞点选）
-        if source == "netease", let id = candidate.id, formYear.isEmpty {
-            activeTasks["albumYear"]?.cancel()
-            let songID = Int(id)
-            activeTasks["albumYear"] = Task {
-                let year = await NeteaseOnlineClient().albumYear(songID: songID ?? 0)
-                guard !Task.isCancelled else { return }
-                if let year, formYear.isEmpty {
-                    formYear = String(year)
-                    updateRenamePreview()
-                }
-            }
-        }
-    }
-
-    /// 下载候选封面 → Data 暂存（保存时才写入文件）。点选候选行自动调用；
-    /// 「使用候选封面」按钮作为失败后的手动重试。
-    private func downloadCandidateCover(from url: URL? = nil) {
-        guard let url = url ?? selectedCoverURL, !saving else { return }
-        let taskKey = "coverDownload"
-        activeTasks[taskKey]?.cancel()
-        activeTasks[taskKey] = Task {
-            let data = try? await Self.downloadCoverData(from: url)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                if let data {
-                    coverState = .replace(data)
-                    saveError = nil
-                } else {
-                    saveError = "tag_editor_cover_download_failed".localized
-                }
-            }
-        }
-    }
-
-    /// 封面下载（JPEG/PNG 校验，web tag_editor.fetch_cover 语义）
-    private static func downloadCoverData(from url: URL) async throws -> Data? {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.setValue("QQPlayer/1.0 (https://github.com/daxmate/qqplayer)", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode),
-              !data.isEmpty,
-              data.starts(with: [0xFF, 0xD8, 0xFF]) || data.starts(with: [0x89, 0x50, 0x4E, 0x47]) else {
-            return nil
-        }
-        return data
-    }
-
-    // MARK: - 重命名预览
-
-    /// 模板渲染目标文件名（含相对子目录路径）；渲染失败/空 → ""（不改名）
-    private func renderedTargetName() -> String {
-        let ext = URL(fileURLWithPath: track.path).pathExtension
-        return TagRenameLogic.renderFileName(
-            template: renameTemplate,
-            values: TagRenameLogic.Values(
-                artist: formArtist.isEmpty ? nil : formArtist,
-                title: formTitle.isEmpty ? nil : formTitle,
-                album: formAlbum.isEmpty ? nil : formAlbum,
-                track: Int(formTrack),
-                year: Int(formYear)
-            ),
-            ext: ext.isEmpty ? "" : "." + ext
-        ) ?? ""
-    }
-
-    private func updateRenamePreview() {
-        renamePreviewText = renderedTargetName()
-    }
-
-    // MARK: - 保存（web POST /api/tags 等价）
-
-    private func save() {
-        guard !saving, canSave else { return }
-        saving = true
-        saveError = nil
-        let originalPath = track.path
-        let request = buildRequest()
-        let oldStableId = track.stableId
-
-        // 写标签 + DB 迁移是阻塞 IO → 后台执行，完成后 hop 主线程
-        Task.detached(priority: .userInitiated) {
-            do {
-                let result = try TagWriterService.writeTags(
-                    to: URL(fileURLWithPath: originalPath),
-                    request: request
-                )
-                if result.renamed {
-                    // 改名 → moveTrack 迁移引用（幂等；文件已改名但迁移失败 → 提示重扫）
-                    // 写操作唯一入口是 @MainActor 的 AppCoordinator → 从后台 hop 回主线程执行
-                    try await MainActor.run {
-                        try appCoordinator.moveTrack(
-                            from: originalPath,
-                            to: result.finalURL.path
-                        )
-                    }
-                    let migrated = try LibraryReads.track(path: result.finalURL.path)
-                    await MainActor.run {
-                        finishSaveSuccess(renamed: true, oldStableId: oldStableId, migrated: migrated, finalPath: result.finalURL.path)
-                    }
-                } else {
-                    await MainActor.run {
-                        finishSaveSuccess(renamed: false, oldStableId: oldStableId, migrated: nil, finalPath: result.finalURL.path)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    finishSaveFailure(error)
-                }
-            }
-        }
-    }
-
-    /// 构造写标签请求：非空文本才进 request；coverData/removeCover 按用户显式选择
-    private func buildRequest() -> TagWriteRequest {
-        var request = TagWriteRequest()
-        request.title = trimmed(formTitle)
-        request.artist = trimmed(formArtist)
-        request.album = trimmed(formAlbum)
-        request.genre = trimmed(formGenre)
-        request.albumArtist = trimmed(formAlbumArtist)
-        request.year = Int(formYear)
-        request.trackNumber = Int(formTrack)
-        request.renameTemplate = renameEnabled ? renameTemplate : nil
-        switch coverState {
-        case .keep:
-            break
-        case .replace(let data):
-            request.coverData = data
-        case .remove:
-            request.removeCover = true
-        }
-        return request
-    }
-
-    private func trimmed(_ value: String) -> String? {
-        let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return v.isEmpty ? nil : v
-    }
-
-    private func finishSaveSuccess(renamed: Bool, oldStableId: String, migrated: Track?, finalPath: String) {
-        saving = false
-        if renamed, let migrated {
-            followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: migrated)
-        }
-        // 单文件入库同步：保存只改了文件，DB 里的标签与封面缓存仍是旧值 → 列表不刷新
-        // （旧实现只发 LibraryFolderContentChanged，要等整库重扫扫到这首歌才更新）。
-        // 这里直接对该文件跑一次 indexer 单文件处理：解析 → upsert DB →
-        // forceRefreshArtwork（封面缓存）→ 完成后内部 post LibraryNeedsRefresh，
-        // 所有列表容器（主库/歌单详情/自动歌单/专辑卡）立即重拉新值。
-        Task {
-            _ = await libraryIndexer.processExternalFile(URL(fileURLWithPath: finalPath))
-            // DB 已同步到最新标签 → 把播放上下文（当前曲目/队列）替换成 DB 新行，
-            // 未改名时播放页标题/歌手也立即跟随（改名场景已在上面用 migrated 处理，
-            // 此处按 oldStableId 匹配为幂等 no-op）
-            if let fresh = try? LibraryReads.track(path: finalPath) {
-                followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: fresh)
-            }
-            // 兜底补发（processExternalFile 提前返回/指纹未变时也保证列表刷新）
-            NotificationCenter.default.post(
-                name: .libraryNeedsRefresh,
-                object: nil
-            )
-        }
-        // 成功反馈：短暂 flash 后自动关闭（web toast + close 语义）
-        withAnimation { savedFlash = true }
-        activeTasks["savedFlash"] = Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                dismiss()
-            }
-        }
-    }
-
-    private func finishSaveFailure(_ error: Error) {
-        saving = false
-        if let tagError = error as? TagWriterError,
-           case .unsupportedFormat = tagError {
-            showUnsupportedAlert = true
-            return
-        }
-        // 写失败/迁移失败 → 红字真实原因
-        if case let TagWriterError.writeFailed(reason) = error {
-            saveError = "tag_editor_save_failed".localized + ": " + reason
-        } else if case TagWriterError.fileNotReadable = error {
-            saveError = "tag_editor_save_failed".localized + ": " + (error.localizedDescription)
-        } else {
-            // moveTrack 抛错等：文件可能已改名但 DB 未迁移 → 提示重扫
-            let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            saveError = "tag_editor_db_migrate_failed".localized(with: detail)
-        }
-    }
-
-    /// 播放队列路径跟随（web「改名后目标歌曲路径跟随，不打断播放」语义）：编辑对象若在播放队列/正在播放 → 用迁移后的新 Track 替换（含新 stableId），
-    /// 不调 loadTrack/playTrack —— 已加载的音频继续播，下次切到它用新路径加载。
-    @MainActor
-    private func followRenamedTrackInPlayback(oldStableId: String, newTrack: Track) {
-        let player = playerEngine
-        if player.currentTrack?.stableId == oldStableId {
-            player.currentTrack = newTrack
-        }
-        if player.playbackQueue.contains(where: { $0.stableId == oldStableId }) {
-            player.playbackQueue = player.playbackQueue.map {
-                $0.stableId == oldStableId ? newTrack : $0
-            }
-        }
-        if player.originalQueue.contains(oldStableId) {
-            player.originalQueue = player.originalQueue.map {
-                $0 == oldStableId ? newTrack.stableId : $0
-            }
-        }
-        player.normalizeIndexAndTrack()
     }
 }

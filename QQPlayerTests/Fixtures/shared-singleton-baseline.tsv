@@ -207,7 +207,7 @@
 #+	UIApplication	QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 #+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistCardView.swift	1
 #+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	2
-#+	URLSession	QQPlayer/Mac/MacTagEditorView.swift	1
+#+	URLSession	QQPlayer/Mac/MacTagEditorView+Scrape.swift	1
 #+	URLSession	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
 #+	NSWorkspace	QQPlayer/Mac/MacSettingsView.swift	1
 #+	NSWorkspace	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
@@ -251,7 +251,7 @@ QQPlayer/ContentView.swift	1
 QQPlayer/Mac/MacDesktopWindowsManager.swift	3
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSyncView.swift	1
-QQPlayer/Mac/MacTagEditorView.swift	1
+QQPlayer/Mac/MacTagEditorView+Scrape.swift	1
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1

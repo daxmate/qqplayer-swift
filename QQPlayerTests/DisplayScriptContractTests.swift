@@ -62,8 +62,8 @@ enum DisplayScriptContract {
         WhitelistEntry(fileSuffix: "QQPlayer/Views/Player/LyricsSearchView.swift", lineSnippet: "if !candidate.artist.isEmpty", reason: "候选行判空守卫（下一行才 display 渲染），不是显示值"),
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacLyricsSearchView.swift", lineSnippet: "if !candidate.artist.isEmpty", reason: "同上：macOS 候选行判空守卫"),
         // 表单值 / 落库值：标签编辑器里这些字符串会原样写回 DB，不能按显示字形改
-        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacTagEditorView.swift", lineSnippet: "formTitle = candidate.title", reason: "标签编辑器表单值（随后写回 DB，不能转字形）"),
-        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacTagEditorView.swift", lineSnippet: "formArtist = candidate.artist", reason: "标签编辑器表单值（随后写回 DB，不能转字形）"),
+        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacTagEditorView+Scrape.swift", lineSnippet: "formTitle = candidate.title", reason: "标签编辑器表单值（随后写回 DB，不能转字形）"),
+        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacTagEditorView+Scrape.swift", lineSnippet: "formArtist = candidate.artist", reason: "标签编辑器表单值（随后写回 DB，不能转字形）"),
         // 非界面文本：刮削/重命名模板的样本值（渲染成文件名，不是给用户读的界面文案）
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacScrapeSettingsView.swift", lineSnippet: "let title = track.title.trimmingCharacters", reason: "重命名模板/刮削样本值（文件名渲染输入，非界面文本）"),
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacScrapeSettingsView.swift", lineSnippet: "albumTitle = album.title", reason: "同上：重命名模板样本值"),
