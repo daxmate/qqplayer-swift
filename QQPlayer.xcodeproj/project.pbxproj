@@ -619,6 +619,8 @@
 				Services/CloudDownloadManager.swift,
 				Services/CloudFailureDetector.swift,
 				Services/CloudFileAvailability.swift,
+				"Services/DatabaseManager+LibraryCRUD.swift",
+				"Services/DatabaseManager+LibraryMigrations.swift",
 				"Services/DatabaseManager+TracksMaintenance.swift",
 				"Services/DatabaseManager+TracksRead.swift",
 				Services/DatabaseManager.swift,
