@@ -35,12 +35,15 @@ struct MacSearchAnythingLayer: View {
     let artistNameResolver: (Track) -> String?
 
     // 2026-09-18 批 1：@ObservedObject → 普通 let；2026-09-19 批 3a：直连 `.shared` → 组合根环境注入。
-    @Environment(MacSearchAnythingState.self) private var state
+    /// 分片：跨文件可见（原 private）
+    @Environment(MacSearchAnythingState.self) var state
     @Environment(AppServices.self) private var services
 
     @State private var query = ""
-    @State private var localSongs: [Track] = []
-    @State private var artists: [Artist] = []
+    /// 分片：跨文件可见（原 private）
+    @State var localSongs: [Track] = []
+    /// 分片：跨文件可见（原 private）
+    @State var artists: [Artist] = []
     @State private var albums: [Album] = []
     @State private var onlineSongs: [NeteaseOnlineSong] = []
     /// 防抖窗口 + 本地多路检索中（本地同步，通常一帧内结束）
@@ -49,12 +52,16 @@ struct MacSearchAnythingLayer: View {
     @State private var isOnlineSearching = false
     @State private var searchSeq = 0
     @State private var searchTask: Task<Void, Never>?
-    @State private var downloadingIDs: Set<Int> = []
-    @State private var downloadedIDs: Set<Int> = []
-    @State private var failedIDs: Set<Int> = []
+    /// 分片：跨文件可见（原 private）
+    @State var downloadingIDs: Set<Int> = []
+    /// 分片：跨文件可见（原 private）
+    @State var downloadedIDs: Set<Int> = []
+    /// 分片：跨文件可见（原 private）
+    @State var failedIDs: Set<Int> = []
     @State private var statusMessage: String?
     /// 在线行下载进度（song.id → 0-1 或 nil=不确定；B2 进度圆环）
-    @State private var downloadProgress: [Int: Double?] = [:]
+    /// 分片：跨文件可见（原 private）
+    @State var downloadProgress: [Int: Double?] = [:]
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -256,148 +263,6 @@ struct MacSearchAnythingLayer: View {
                 .padding(.bottom, DesignTokens.space2)
             content()
         }
-    }
-
-    // MARK: - 行
-
-    /// 歌手行的唯一分组入口（库里同形两行 → 一行；两边曲目合并播）。
-    private var groupedArtists: [ArtistNameNormalizer.NormalizedArtist] {
-        ArtistNameNormalizer.groupedArtists(artists)
-    }
-
-    private func songRow(_ track: Track) -> some View {
-        Button {
-            onPlayLocal(track, localSongs)
-            state.isOpen = false
-        } label: {
-            HStack(spacing: DesignTokens.space10) {
-                Image(systemName: "music.note")
-                    .foregroundColor(.secondary)
-                    .frame(width: 14)
-                Text(track.displayTitle).lineLimit(1)
-                if let artist = artistNameResolver(track) {
-                    Text(artist)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-            }
-            .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space12)
-            .padding(.vertical, DesignTokens.space4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func artistRow(_ group: ArtistNameNormalizer.NormalizedArtist) -> some View {
-        Button {
-            let tracks = group.artistIds.flatMap { (try? LibraryReads.tracks(artistId: $0)) ?? [] }
-            guard !tracks.isEmpty else { return }
-            onPlayArtist(group.primaryArtist, tracks)
-            state.isOpen = false
-        } label: {
-            HStack(spacing: DesignTokens.space10) {
-                Image(systemName: "music.mic")
-                    .foregroundColor(.secondary)
-                    .frame(width: 14)
-                Text(group.displayName).lineLimit(1)
-                Spacer()
-            }
-            .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space12)
-            .padding(.vertical, DesignTokens.space4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func albumRow(_ album: Album) -> some View {
-        Button {
-            let tracks = (try? LibraryReads.tracks(albumId: album.id ?? 0)) ?? []
-            guard !tracks.isEmpty else { return }
-            onPlayAlbum(album, tracks)
-            state.isOpen = false
-        } label: {
-            HStack(spacing: DesignTokens.space10) {
-                Image(systemName: "square.stack")
-                    .foregroundColor(.secondary)
-                    .frame(width: 14)
-                Text(album.displayTitle).lineLimit(1)
-                if let artist = album.albumArtist, !artist.isEmpty {
-                    Text(ArtistNameNormalizer.displayName(artist))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-            }
-            .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space12)
-            .padding(.vertical, DesignTokens.space4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func onlineRow(_ song: NeteaseOnlineSong) -> some View {
-        Button {
-            download(song)
-        } label: {
-            HStack(spacing: DesignTokens.space10) {
-                Group {
-                    if let coverURL = song.coverURL {
-                        AsyncImage(url: coverURL) { phase in
-                            if case .success(let image) = phase {
-                                image.resizable().scaledToFill()
-                            } else {
-                                placeholderCover
-                            }
-                        }
-                    } else {
-                        placeholderCover
-                    }
-                }
-                .frame(width: 28, height: 28)
-                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius4))
-
-                VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                    Text(DisplayScriptNormalizer.display(song.title)).lineLimit(1)
-                    Text(DisplayScriptNormalizer.display(onlineSubtitle(song)))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                downloadBadge(for: song)
-            }
-            .contentShape(Rectangle())
-            .padding(.horizontal, DesignTokens.space12)
-            .padding(.vertical, DesignTokens.space4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func downloadBadge(for song: NeteaseOnlineSong) -> some View {
-        Group {
-            if downloadedIDs.contains(song.id) {
-                Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-            } else if failedIDs.contains(song.id) {
-                Image(systemName: "exclamationmark.circle.fill").foregroundColor(.red)
-            } else if downloadingIDs.contains(song.id) {
-                // B2：确定进度/不确定转圈（替代系统 ProgressView）
-                DownloadProgressRing(progress: downloadProgress[song.id] ?? nil, size: 16)
-            } else {
-                Image(systemName: "icloud.and.arrow.down").foregroundColor(.secondary)
-            }
-        }
-        .frame(width: 18)
-    }
-
-    private var placeholderCover: some View {
-        RoundedRectangle(cornerRadius: DesignTokens.radius4)
-            .fill(Color.gray.opacity(0.18))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
     }
 
     /// 设置分组：目录（`MacSettingsCatalog`）按 query 过滤——分类名 + 项标题 + 别名。
@@ -639,17 +504,6 @@ struct MacSearchAnythingLayer: View {
         guard let responder = NSApp.keyWindow?.firstResponder else { return "nil（无 key window）" }
         let marked = (responder as? NSTextView)?.hasMarkedText() ?? false
         return "\(type(of: responder))\(marked ? "（组字中）" : "")"
-    }
-
-    private func onlineSubtitle(_ song: NeteaseOnlineSong) -> String {
-        var parts: [String] = [song.artist]
-        if let album = song.album, !album.isEmpty {
-            parts.append(album)
-        }
-        if let duration = song.durationDisplay {
-            parts.append(duration)
-        }
-        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
 }
