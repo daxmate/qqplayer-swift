@@ -643,6 +643,7 @@
 				Services/ExternalFileBookmarkStore.swift,
 				Services/FavoriteBatchLogic.swift,
 				Services/FileCleanupManager.swift,
+				"Services/GequhaiClient+Logic.swift",
 				Services/GequhaiClient.swift,
 				Services/GraphicEQCodec.swift,
 				Services/HintSystem.swift,
