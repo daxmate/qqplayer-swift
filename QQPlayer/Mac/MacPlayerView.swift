@@ -10,9 +10,11 @@ import AppKit
 import SwiftUI
 
 struct MacPlayerView: View {
-    @Environment(AppCoordinator.self) private var appCoordinator
+    /// 分片：跨文件可见（原 private）
+    @Environment(AppCoordinator.self) var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
-    @Environment(\.appAccentColor) private var appAccentColor
+    /// 分片：跨文件可见（原 private）
+    @Environment(\.appAccentColor) var appAccentColor
     @Environment(AppServices.self) private var services
     let track: Track?
     let artistName: String?
@@ -24,27 +26,39 @@ struct MacPlayerView: View {
     let onPrevious: () -> Void
     let onSeek: (TimeInterval) -> Void
 
-    @State private var artwork: ArtworkImage?
+    /// 分片：跨文件可见（原 private）
+    @State var artwork: ArtworkImage?
     @State private var artworkTrackId: String?
-    @State private var dragTime: TimeInterval?
-    @State private var isDragging = false
+    /// 分片：跨文件可见（原 private）
+    @State var dragTime: TimeInterval?
+    /// 分片：跨文件可见（原 private）
+    @State var isDragging = false
     @State private var lyrics: Lyrics?
     @State private var lyricsLoading = false
-    @State private var favoriteIds: Set<String> = []
-    @State private var sleepTimerEndDate: Date?
-    @State private var sleepTimerTask: Task<Void, Never>?
-    @Environment(KaraokeController.self) private var karaoke
-    @Environment(PlayerEngine.self) private var player
+    /// 分片：跨文件可见（原 private）
+    @State var favoriteIds: Set<String> = []
+    /// 分片：跨文件可见（原 private）
+    @State var sleepTimerEndDate: Date?
+    /// 分片：跨文件可见（原 private）
+    @State var sleepTimerTask: Task<Void, Never>?
+    /// 分片：跨文件可见（原 private）
+    @Environment(KaraokeController.self) var karaoke
+    /// 分片：跨文件可见（原 private）
+    @Environment(PlayerEngine.self) var player
 
     /// 播放控制按钮可见性（设置页开关，对齐 iOS 默认：睡眠定时器隐藏）
-    @State private var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
+    /// 分片：跨文件可见（原 private）
+    @State var showSleepTimerButton: Bool = DeleteSettings.load().showSleepTimerButton
     /// 播放页频谱（D4，web Visualizer 对齐；设置「播放」分类开关，默认开）
-    @State private var visualizerEnabled: Bool = DeleteSettings.load().visualizerEnabled
-    @Environment(MacSpectrumAnalyzer.self) private var spectrumAnalyzer
+    /// 分片：跨文件可见（原 private）
+    @State var visualizerEnabled: Bool = DeleteSettings.load().visualizerEnabled
+    /// 分片：跨文件可见（原 private）
+    @Environment(MacSpectrumAnalyzer.self) var spectrumAnalyzer
     /// 歌词搜索 sheet（手动指定歌词）
     @State private var showLyricsSearch = false
     /// 播放队列面板（B 组队列排序持久化：可拖排/删除/点行跳转，重排即持久化）
-    @State private var showQueuePanel = false
+    /// 分片：跨文件可见（原 private）
+    @State var showQueuePanel = false
 
     /// 歌词大画面（2026-09-06 用户拍板：双击=纯放大，不再绑定跟唱；跟唱经 🎤 按钮）
     @State private var lyricsExpanded = false
@@ -224,232 +238,20 @@ struct MacPlayerView: View {
             )
     }
 
-    // MARK: - Player section
-
-    private var playerSection: some View {
-        VStack(spacing: DesignTokens.space16) {
-            Spacer()
-
-            // Artwork
-            ZStack {
-                RoundedRectangle(cornerRadius: DesignTokens.radius16)
-                    .fill(Color.gray.opacity(0.15))
-                    .frame(width: 240, height: 240)
-                    .shadow(radius: 8, y: 4)
-
-                if let artwork {
-                    Image(nsImage: artwork)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 240, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius16))
-                } else {
-                    Image(systemName: "music.note")
-                        .font(.system(size: DesignTokens.font60))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(width: 240, height: 240)
-
-            // Track info
-            VStack(spacing: DesignTokens.space4) {
-                Text(track?.displayTitle ?? "not_playing".localized)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                Text(artistName ?? "")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            // Progress bar
-            VStack(spacing: DesignTokens.space4) {
-                Slider(
-                    value: Binding(
-                        get: { isDragging ? (dragTime ?? playbackTime) : playbackTime },
-                        set: { dragTime = $0 }
-                    ),
-                    in: 0 ... max(duration, 0.01),
-                    onEditingChanged: { editing in
-                        isDragging = editing
-                        if !editing, let dragTime {
-                            onSeek(dragTime)
-                            self.dragTime = nil
-                        }
-                    }
-                )
-                .disabled(track == nil || duration <= 0)
-
-                HStack {
-                    Text(MacTimeFormat.format(isDragging ? (dragTime ?? playbackTime) : playbackTime))
-                    Spacer()
-                    Text(MacTimeFormat.format(duration))
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .monospacedDigit()
-            }
-            .frame(maxWidth: 420)
-
-            // Controls
-            HStack(spacing: DesignTokens.space24) {
-                Button(action: onPrevious) {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: DesignTokens.font22))
-                }
-                .buttonStyle(.plain)
-                .disabled(track == nil)
-
-                Button(action: onPlayPause) {
-                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: DesignTokens.font44))
-                }
-                .buttonStyle(.plain)
-                .disabled(track == nil)
-
-                Button(action: onNext) {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: DesignTokens.font22))
-                }
-                .buttonStyle(.plain)
-                .disabled(track == nil)
-
-                Divider().frame(height: 24)
-
-                // 播放顺序四态：顺序 → 随机 → 循环列表 → 单曲循环
-                // （shuffle 分支必须走 toggleShuffle()：保存/恢复 originalQueue，测试锁定）
-                Button {
-                    player.cyclePlaybackOrderMode()
-                } label: {
-                    Image(systemName: playOrderIcon)
-                        .font(.system(size: DesignTokens.font16))
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(isPlayOrderActive ? appAccentColor : .secondary)
-                .help(playOrderTitle)
-
-                // 当前曲目收藏（红心）
-                Button {
-                    guard let track else { return }
-                    try? appCoordinator.toggleFavorite(trackStableId: track.stableId)
-                } label: {
-                    Image(systemName: currentTrackIsFavorite ? "heart.fill" : "heart")
-                        .font(.system(size: DesignTokens.font16))
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(currentTrackIsFavorite ? .pink : .secondary)
-                .disabled(track == nil)
-                .help(currentTrackIsFavorite ? "remove_from_liked_songs".localized : "add_to_liked_songs".localized)
-
-                // 睡眠定时器：15/30/45/60 分钟，激活后可取消（切歌不清除）
-                // 默认隐藏（对齐 iOS showSleepTimerButton=false），设置页可开启
-                if showSleepTimerButton {
-                    Menu {
-                        Button(Localized.sleepTimer15Minutes) { startSleepTimer(minutes: 15) }
-                        Button(Localized.sleepTimer30Minutes) { startSleepTimer(minutes: 30) }
-                        Button(Localized.sleepTimer45Minutes) { startSleepTimer(minutes: 45) }
-                        Button(Localized.sleepTimer60Minutes) { startSleepTimer(minutes: 60) }
-
-                        if sleepTimerEndDate != nil {
-                            Divider()
-                            Button(Localized.cancelSleepTimer, role: .destructive) { cancelSleepTimer() }
-                        }
-                    } label: {
-                        Image(systemName: sleepTimerEndDate == nil ? "timer" : "timer.circle.fill")
-                            .font(.system(size: DesignTokens.font16))
-                    }
-                    .menuStyle(.borderlessButton)
-                    .foregroundColor(sleepTimerEndDate == nil ? .secondary : appAccentColor)
-                    .help("sleep_timer".localized)
-                }
-
-                Divider().frame(height: 24)
-
-                // 播放队列（B 组队列排序持久化）：打开可拖排/删除/跳转的面板。
-                // 只有当前在播且非随机时队列面板才有意义——随机模式下播放顺序
-                // 由 shuffle 决定（isQueueReorderable=false，面板内提示）。
-                Button {
-                    showQueuePanel = true
-                } label: {
-                    Image(systemName: "list.number")
-                        .font(.system(size: DesignTokens.font16))
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .disabled(track == nil || player.playbackQueue.isEmpty)
-                .help("playing_queue".localized)
-
-                // 跟唱模式开关（双击歌词行的 iOS 语义在 Mac 上没有，给显式按钮）
-                Button {
-                    karaoke.toggleKaraokeMode()
-                } label: {
-                    Image(systemName: karaoke.isKaraokeOn ? "mic.fill" : "mic")
-                        .font(.system(size: DesignTokens.font16))
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : .secondary)
-                .disabled(track == nil)
-                .help("karaoke_mode_help".localized)
-
-            }
-
-            // 播放页频谱条（D4，web Visualizer 对齐——仅 native 引擎曲目有数据，
-            // SFB 曲目 Opus/OGG/DSD 无 tap 数据源，自动隐藏；跟唱大画面时本区隐藏）
-            if visualizerEnabled {
-                MacVisualizerView()
-                    .frame(width: 420, height: 44)
-                    .padding(.top, DesignTokens.space2)
-            }
-
-            Spacer()
-        }
-        .padding(.top, DesignTokens.space24)
-        .padding(.horizontal, DesignTokens.space32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: player.isPlaying) { _, _ in
-            updateSpectrumTap()
-        }
-        .onChange(of: track?.stableId) { _, _ in
-            updateSpectrumTap()
-        }
-        // 视图离场/回场收尾（2026-09-12 审计 L4）：修复前 tap 只由 isPlaying/切歌/
-        // 设置变更驱动——主窗进迷你模式或播放页长期不可见时，音频线程 FFT 与
-        // 30fps 主线程发布照旧跑。离场摘 tap（幂等），回场按当前状态重装。
-        .onAppear {
-            updateSpectrumTap()
-        }
-        .onDisappear {
-            spectrumAnalyzer.removeTap()
-        }
-    }
-
-    /// 频谱 tap 生命周期：播放中且 native 引擎 → 装 mainMixer tap；否则移除。
-    /// （SFB 曲目无 tap 数据源；暂停/切歌/关闭设置都走这里收尾）
-    private func updateSpectrumTap() {
-        guard visualizerEnabled else {
-            spectrumAnalyzer.removeTap()
-            return
-        }
-        if player.isPlaying, !player.usingSFBEngine {
-            spectrumAnalyzer.ensureTap(engine: player.audioEngine)
-        } else {
-            spectrumAnalyzer.removeTap()
-        }
-    }
-
     // MARK: - Playback order
 
     private var playOrderMode: PlaybackOrderMode {
         player.playbackOrderMode
     }
 
-    private var playOrderIcon: String {
+    /// 分片：跨文件可见（原 private）
+    var playOrderIcon: String {
         // 图标映射走 PlaybackOrderMode.systemImageName（与 iOS 播放页、CarPlay 页头同一入口）
         playOrderMode.systemImageName
     }
 
-    private var playOrderTitle: String {
+    /// 分片：跨文件可见（原 private）
+    var playOrderTitle: String {
         switch playOrderMode {
         case .sequential: return Localized.playOrderSequential
         case .shuffle: return Localized.playOrderShuffle
@@ -458,36 +260,9 @@ struct MacPlayerView: View {
         }
     }
 
-    private var isPlayOrderActive: Bool {
+    /// 分片：跨文件可见（原 private）
+    var isPlayOrderActive: Bool {
         playOrderMode != .sequential
     }
 
-    // MARK: - Favorite
-
-    private var currentTrackIsFavorite: Bool {
-        guard let track else { return false }
-        return favoriteIds.contains(track.stableId)
-    }
-
-    // MARK: - Sleep timer
-
-    private func startSleepTimer(minutes: Int) {
-        sleepTimerTask?.cancel()
-        let endDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
-        sleepTimerEndDate = endDate
-
-        sleepTimerTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(minutes) * 60_000_000_000)
-            guard !Task.isCancelled else { return }
-            player.pause()
-            sleepTimerEndDate = nil
-            sleepTimerTask = nil
-        }
-    }
-
-    private func cancelSleepTimer() {
-        sleepTimerTask?.cancel()
-        sleepTimerTask = nil
-        sleepTimerEndDate = nil
-    }
 }

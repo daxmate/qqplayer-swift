@@ -580,6 +580,7 @@
 				Mac/MacOnlineSearchView.swift,
 				Mac/MacOnlineSettingsView.swift,
 				Mac/MacPairApprovalCardView.swift,
+				"Mac/MacPlayerView+PlayerSection.swift",
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacQuarkLoginView.swift,
