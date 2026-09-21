@@ -699,6 +699,8 @@
 				"Services/PlayerEngine+Queue.swift",
 				"Services/PlayerEngine+SFB.swift",
 				Services/PlayHistoryRecorder.swift,
+				"Services/QuarkClient+CookieHTTP.swift",
+				"Services/QuarkClient+Share.swift",
 				Services/QuarkClient.swift,
 				Services/QuarkCookieStore.swift,
 				Services/QuarkLogic.swift,
