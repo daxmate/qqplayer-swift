@@ -152,6 +152,8 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/LyricsSearchProvider.swift",
         "QQPlayer/Services/MacAria2Client.swift",
         "QQPlayer/Services/MacOnlineDownloadService.swift",
+        "QQPlayer/Services/NeteaseOnlineClient+Logic.swift",
+        "QQPlayer/Services/NeteaseOnlineClient+Transport.swift",
         "QQPlayer/Services/NeteaseOnlineClient.swift",
         "QQPlayer/Services/PlayHistoryRecorder.swift",
         "QQPlayer/Services/PlayerEngine+AudioEngineRecovery.swift",

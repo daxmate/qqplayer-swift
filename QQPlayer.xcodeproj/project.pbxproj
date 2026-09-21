@@ -680,6 +680,8 @@
 				Services/MusicDirectoryScanner.swift,
 				Services/MusicFolderResolver.swift,
 				Services/NeteaseLyricsProvider.swift,
+				"Services/NeteaseOnlineClient+Logic.swift",
+				"Services/NeteaseOnlineClient+Transport.swift",
 				Services/NeteaseOnlineClient.swift,
 				Services/PlaybackModels.swift,
 				Services/PlaybackRouter.swift,
