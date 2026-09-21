@@ -180,7 +180,7 @@
 "home_sections" = "主页显示板块";
 "choose_visible_sections" = "自定义哪些板块将显示在你的主页上";
 "remove_from_library_only" = "仅从媒体库中移除";
-"remove_from_library_only_description" = "开启后，删除操作只会将曲目从媒体库中移除，你珍贵的无损原文件仍会安全保留在手机硬盘中。";
+"remove_from_library_only_description" = "开启后，删除操作只会将曲目从媒体库中移除；原文件不会永久删除，而是移入应用回收区（不再出现在曲库里）。";
 "player_controls" = "播放器控制";
 "show_sleep_timer_button" = "显示睡眠定时按钮";
 "show_sleep_timer_button_description" = "用睡眠定时按钮替换播放器中的歌词按钮。";

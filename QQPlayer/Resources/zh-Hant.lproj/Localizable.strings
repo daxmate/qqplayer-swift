@@ -270,7 +270,7 @@
 
 "remove_from_library_only" = "僅從媒體庫中移除";
 
-"remove_from_library_only_description" = "開啟後，刪除操作只會將曲目從媒體庫中移除，你珍貴的無損原檔案仍會安全保留在手機硬碟中。";
+"remove_from_library_only_description" = "開啟後，刪除操作只會將曲目從媒體庫中移除；原始檔案不會永久刪除，而是移入應用程式回收區（不再出現在曲庫裡）。";
 
 "player_controls" = "播放器控制";
 

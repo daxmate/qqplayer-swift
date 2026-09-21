@@ -168,7 +168,7 @@
 "home_sections" = "Sections de l'accueil";
 "choose_visible_sections" = "Choisissez quelles sections sont visibles sur l'écran d'accueil";
 "remove_from_library_only" = "Supprimer de la bibliothèque uniquement";
-"remove_from_library_only_description" = "Lorsque cette option est activée, la suppression d'une piste la retire uniquement de la bibliothèque. Le fichier restera sur le disque.";
+"remove_from_library_only_description" = "Lorsque cette option est activée, la suppression d'une piste la retire uniquement de la bibliothèque. Le fichier d'origine n'est pas supprimé définitivement : il est déplacé vers la zone de récupération de l'application et n'apparaît plus dans la bibliothèque.";
 "auto_folder_playlists" = "Créer automatiquement des playlists depuis les dossiers";
 "auto_folder_playlists_description" = "Lorsque cette option est activée, une playlist est créée automatiquement pour chaque dossier de fichiers musicaux et synchronisée avec son contenu.";
 "delete_folder_playlists_title" = "Supprimer les playlists de dossiers ?";

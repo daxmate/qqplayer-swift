@@ -180,7 +180,7 @@
 "home_sections" = "Home Sections";
 "choose_visible_sections" = "Choose which sections are visible on the home screen";
 "remove_from_library_only" = "Remove from library only";
-"remove_from_library_only_description" = "When enabled, deleting a track only removes it from the library. The file will remain on disk.";
+"remove_from_library_only_description" = "When enabled, deleting a track only removes it from the library. The original file is not permanently deleted: it is moved to the app's reclaim area and no longer appears in the library.";
 "auto_folder_playlists" = "Auto-create playlists from folders";
 "auto_folder_playlists_description" = "When enabled, a playlist is automatically created for each folder of music files and kept in sync with its contents.";
 "delete_folder_playlists_title" = "Delete folder playlists?";
