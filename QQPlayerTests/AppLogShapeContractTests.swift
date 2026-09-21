@@ -159,6 +159,8 @@ private enum AppLogShapeContract {
         "QQPlayer/Services/PlayerEngine+Queue.swift",
         "QQPlayer/Services/PlayerEngine.swift",
         "QQPlayer/Services/QuarkClient.swift",
+        "QQPlayer/Services/SFBAudioEngineManager+Decoder.swift",
+        "QQPlayer/Services/SFBAudioEngineManager+Mac.swift",
         "QQPlayer/Services/SFBAudioEngineManager+Playback.swift",
         "QQPlayer/Services/SFBAudioEngineManager+Queue.swift",
         "QQPlayer/Services/SFBAudioEngineManager.swift",

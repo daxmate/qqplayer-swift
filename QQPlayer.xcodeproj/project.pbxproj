@@ -695,6 +695,8 @@
 				Services/QuarkCookieStore.swift,
 				Services/QuarkLogic.swift,
 				Services/QuarkModels.swift,
+				"Services/SFBAudioEngineManager+Decoder.swift",
+				"Services/SFBAudioEngineManager+Mac.swift",
 				Services/ScrapeBatchService.swift,
 				Services/ScrapeLogic.swift,
 				Services/SFBAudioEngineManager.swift,
