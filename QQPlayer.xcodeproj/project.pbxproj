@@ -768,6 +768,7 @@
 				Sync/SyncEntityRegistry.swift,
 				Sync/SyncEventHandlerChain.swift,
 				Sync/SyncFileChecksum.swift,
+				"Sync/SyncFileReceiver+StateMachine.swift",
 				Sync/SyncFileReceiver.swift,
 				Sync/SyncFileSender.swift,
 				Sync/SyncFileTransferModels.swift,

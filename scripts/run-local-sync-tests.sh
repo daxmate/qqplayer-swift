@@ -41,6 +41,8 @@ SOURCES=(
   QQPlayer/Sync/SyncFileChecksum.swift
   QQPlayer/Sync/SyncFileTransferModels.swift
   QQPlayer/Sync/SyncFileSender.swift
+  # E5（2026-09-21）：锁内状态机拆出为独立文件（两片互相引用）
+  QQPlayer/Sync/SyncFileReceiver+StateMachine.swift
   QQPlayer/Sync/SyncFileReceiver.swift
   QQPlayer/Sync/SyncManifest.swift
   QQPlayer/Sync/SyncManifestGenerator.swift

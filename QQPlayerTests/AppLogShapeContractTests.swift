@@ -196,6 +196,7 @@ private enum AppLogShapeContract {
         "QQPlayer/Sync/SyncChangeLogMapping.swift",
         "QQPlayer/Sync/SyncChangeLogPeer.swift",
         "QQPlayer/Sync/SyncChangeLogPendingStore.swift",
+        "QQPlayer/Sync/SyncFileReceiver+StateMachine.swift",
         "QQPlayer/Sync/SyncFileReceiver.swift",
         "QQPlayer/Sync/SyncWiringSelfCheck.swift",
         "QQPlayer/ViewModels/TutorialViewModel.swift",
