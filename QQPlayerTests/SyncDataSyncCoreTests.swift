@@ -477,7 +477,10 @@ struct SyncDataSyncCoreTests {
         #expect(coordinator.report.pushedEntries == 1, "推送先跑完（推不需要对端应答）")
         #expect(coordinator.phase == .pulling, "发完帧 8 等应答")
 
-        let deadline = Date().addingTimeInterval(3)
+        // 附带等待（**不是被测语义**：被测语义是「没对端应答 → 注入的 0.2s 超时到点后收敛为
+        // finished + 给出可读原因」）。原 3s 只是「别挂死」的上限，CI 慢 runner 上会被线程饥饿
+        // 打穿（同族实证：run 35548871227 里 30s 解析守卫被饥饿打穿）→ 取 60s（≥300× 注入超时）。
+        let deadline = Date().addingTimeInterval(60)
         while !coordinator.report.isFinished, Date() < deadline {
             try await Task.sleep(nanoseconds: 20_000_000)
         }

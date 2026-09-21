@@ -426,7 +426,14 @@ struct IOSPassiveSyncCenterTests {
 
         // 主扫跑完 → 终态事实翻转 → 订阅回调补装
         source.hasReachedIndexingTerminalState = true
-        try await Task.sleep(nanoseconds: 100_000_000)
+        // 附带等待（**不是被测语义**：被测语义是「终态到达 → 同会话必须补装」）。
+        // 原为 100ms 盲睡：CI 慢机器上回调很可能还没轮到 → 假红。改为**有界轮询**
+        // （形状同 `SyncDataSyncCoreTests` 里已有的 deadline 轮询：不引入 sleep 猜测，
+        // 真不补装时也只是晚 10s 报错，断言信息量不变）。
+        let deadline = Date().addingTimeInterval(10)
+        while !center.isDataSyncAttached, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
 
         #expect(center.isDataSyncAttached, "终态到了却没补装 → 本次会话的播放数据同步永远不通")
         #expect(center.dataSyncPeerID == fixture.hostIdentity.deviceID)
