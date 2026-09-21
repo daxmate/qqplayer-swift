@@ -30,11 +30,23 @@ struct LibraryImportOutcomeTests {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
 
+    /// 「解析竞速守卫」的注入值：只用来兜住真挂死，**不是被测语义**
+    /// （被测语义由 `ExternalImportOutcome` 的返回值锁定）。
+    ///
+    /// CI 实况（2026-09-21 取证 main `fae6e1d` 的 run 35548871227）：本套件四个用例被
+    /// 生产默认 30s 守卫打穿 —— `◇ Suite …started` @00:57:35，四条
+    /// `⏰ Timeout parsing external audio file: outcome-*.mp3` 全压在 00:59:00，
+    /// 套件 91.585s 失败（`Test run with 1725 tests in 218 suites failed after 91.993 seconds`）；
+    /// 本机同套件亚秒级通过 → 典型线程饥饿假红。
+    /// 取 300s：≥2× 最坏观测单用例耗时（~107s），慢 runner 打不穿；真挂死仍会收敛。
+    /// ⚠️ 走的是 `LibraryIndexer.init(parseTimeout:)` 注入缝，**生产默认值（30s）零变化**。
+    static let incidentalParseTimeout: TimeInterval = 300
+
     /// 内存库 + 注入的 indexer（不碰 DatabaseManager.shared）。
     static func makeIndexer() throws -> (indexer: LibraryIndexer, manager: DatabaseManager) {
         let manager = DatabaseManager(dbWriter: try DatabaseQueue())
         try manager.createTables()
-        return (LibraryIndexer(databaseManager: manager), manager)
+        return (LibraryIndexer(databaseManager: manager, parseTimeout: Self.incidentalParseTimeout), manager)
     }
 
     /// 临时目录里的真实 mp3 fixture（0.3s 静音，可被解析器读）。

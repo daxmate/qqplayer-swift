@@ -98,6 +98,10 @@ extension LibraryIndexer {
         if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔍 Calling AudioMetadataParser for: \(url.lastPathComponent)") }
 
         // Add timeout to prevent hanging
+        // 守卫时长取自注入缝 `parseTimeout`（生产默认 30s = 历史值，行为零变化）；
+        // 测试可注入打不穿的值，避开 CI 线程饥饿造成的假红。
+        // 先取成局部值再进闭包：不捕获 `self`，也避开 Sendable 捕获语义问题。
+        let timeoutNanoseconds = UInt64(parseTimeout * 1_000_000_000)
         let metadata = try await withThrowingTaskGroup(of: AudioMetadata.self) { group in
             group.addTask {
                 return try await AudioMetadataParser.parseMetadata(from: url)
@@ -109,7 +113,7 @@ extension LibraryIndexer {
                 // on a fresh install, iCloud still materialising the data).
                 // 10s was tight enough that large files were being skipped
                 // outright; this only bounds a genuine hang.
-                try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds timeout
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
                 throw LibraryIndexerError.parseTimeout
             }
 

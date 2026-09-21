@@ -112,15 +112,16 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
         return (rows ?? 0) > 0
     }
 
-    /// 分片：跨文件可见（原 private）
     let databaseManager: DatabaseManager
-    /// 分片：跨文件可见（原 private）
     let stateManager = StateManager.shared
+    /// 解析守卫时长注入缝：默认 30 = 历史值，生产行为零变化；竞速守卫见 `LibraryIndexer+Parsing.swift`。
+    let parseTimeout: TimeInterval
 
     /// 依赖注入缝（测试用）：指向内存库，避免用例写进真机 app 库。
     /// 生产恒走默认值 `.shared`，与 `DatabaseManager.init(dbWriter:)` 同一套路。
-    init(databaseManager: DatabaseManager = .shared) {
+    init(databaseManager: DatabaseManager = .shared, parseTimeout: TimeInterval = 30) {
         self.databaseManager = databaseManager
+        self.parseTimeout = parseTimeout
         self.isIndexingSubject = CurrentValueSubject(false)
         self.terminalStateSubject = CurrentValueSubject(false)
         super.init()
