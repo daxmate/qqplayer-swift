@@ -210,6 +210,8 @@ private enum AppLogShapeContract {
         "QQPlayer/Views/Library/SearchResultsViews.swift",
         "QQPlayer/Views/Library/SearchView.swift",
         "QQPlayer/Views/Library/TrackListView.swift",
+        "QQPlayer/Views/Player/LyricsView+EmptyStates.swift",
+        "QQPlayer/Views/Player/LyricsView+LyricsContent.swift",
         "QQPlayer/Views/Player/PlayerView+Artwork.swift",
         "QQPlayer/Views/Player/PlayerView+PlaybackSupport.swift",
         "QQPlayer/Views/Player/PlayerView+TitleAndLyrics.swift",
