@@ -1,27 +1,21 @@
+//
+//  LibraryView.swift
+//  QQPlayer
+//
+//  音乐库主页面视图壳：stored property 装配 + `body` 分区装配 + 导入面板消费唯一入口
+//  （`importMusicFiles`——守卫 `LibraryImportOutcomeTests` 钉住 `processExternalFileOutcome(` 须留本文件）。
+//  2026-09-21 拆分（纯搬家，无逻辑变更），同族分片：
+//    LibraryView+ImportSupport / +SectionRendering / +SyncFeedback / +SectionRow / +ResponsiveFonts
+// target: ios-only（消费端全在 iOS；Mac 侧为 MacLibraryView）
+//
 import Combine
 import GRDB
 import SwiftUI
 
-// MARK: - Responsive Font Helper
-extension View {
-    func responsiveLibraryTitleFont() -> some View {
-        self.font(.title)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            .fontWeight(.bold)
-    }
-
-    func responsiveSectionTitleFont() -> some View {
-        self.font(.title2)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .fontWeight(.semibold)
-    }
-}
-
 struct LibraryView: View {
     /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
-    @Environment(\.appAccentColor) private var accentColor
+    /// 分片：跨文件可见（原 private）
+    @Environment(\.appAccentColor) var accentColor
     let tracks: [Track]
     @Binding var showTutorial: Bool
     @Binding var showPlaylistManagement: Bool
@@ -29,7 +23,8 @@ struct LibraryView: View {
     let onRefresh: () async -> (before: Int, after: Int)
     let onManualSync: (() async -> (before: Int, after: Int))?
     @Environment(AppCoordinator.self) private var appCoordinator
-    @Environment(LibraryIndexer.self) private var libraryIndexer
+    /// 分片：跨文件可见（原 private）
+    @Environment(LibraryIndexer.self) var libraryIndexer
     @State private var artistToNavigate: Artist?
     @State private var artistAllTracks: [Track] = []
     @State private var albumToNavigate: Album?
@@ -42,124 +37,21 @@ struct LibraryView: View {
     @State private var playlistToNavigate: Playlist?
     @State private var showSearch = false
     @State private var settings = DeleteSettings.load()
-    @State private var isRefreshing = false
-    @State private var showSyncToast = false
-    @State private var syncToastMessage = ""
-    @State private var syncToastIcon = "checkmark.circle.fill"
-    @State private var syncToastColor = Color.green
-    @State private var showMusicPicker = false
+    /// 分片：跨文件可见（原 private）
+    @State var isRefreshing = false
+    /// 分片：跨文件可见（原 private）
+    @State var showSyncToast = false
+    /// 分片：跨文件可见（原 private）
+    @State var syncToastMessage = ""
+    /// 分片：跨文件可见（原 private）
+    @State var syncToastIcon = "checkmark.circle.fill"
+    /// 分片：跨文件可见（原 private）
+    @State var syncToastColor = Color.green
+    /// 分片：跨文件可见（原 private）
+    @State var showMusicPicker = false
 
-    // Helper function to show sync feedback
-    private func showSyncFeedback(trackCountBefore: Int, trackCountAfter: Int) {
-        let trackDifference = trackCountAfter - trackCountBefore
-
-        // Set appropriate message and icon based on changes
-        if trackDifference > 0 {
-            // New tracks added
-            syncToastIcon = "plus.circle.fill"
-            syncToastColor = .green
-            if trackDifference == 1 {
-                syncToastMessage = NSLocalizedString("sync_one_new_track", value: "1 new song found", comment: "")
-            } else {
-                syncToastMessage = String(format: NSLocalizedString("sync_multiple_new_tracks", value: "%d new songs found", comment: ""), trackDifference)
-            }
-        } else if trackDifference < 0 {
-            // Tracks removed
-            let deletedCount = abs(trackDifference)
-            syncToastIcon = "minus.circle.fill"
-            syncToastColor = .orange
-            if deletedCount == 1 {
-                syncToastMessage = NSLocalizedString("sync_one_track_deleted", value: "1 song removed", comment: "")
-            } else {
-                syncToastMessage = String(format: NSLocalizedString("sync_multiple_tracks_deleted", value: "%d songs removed", comment: ""), deletedCount)
-            }
-        } else {
-            // No changes
-            syncToastIcon = "checkmark.circle.fill"
-            syncToastColor = .blue
-            syncToastMessage = NSLocalizedString("sync_no_changes", value: "Library is up to date", comment: "")
-        }
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showSyncToast = true
-        }
-
-        // Auto-hide toast after 3 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showSyncToast = false
-            }
-        }
-    }
-
-    /// 导入结果分桶：面板只把**唯一入口**（`LibraryIndexer.processExternalFileOutcome`）
-    /// 给出的结果分桶，不在这里重复判定（旧代码把 `false` 一律说成「already in library」）。
-    private struct ImportOutcomeTally {
-        var added = 0
-        var updated = 0
-        var alreadyPresent = 0
-        var excluded = 0
-        var failed = 0
-
-        mutating func record(_ outcome: ExternalImportOutcome) {
-            switch outcome {
-            case .imported: added += 1
-            case .updatedExisting: updated += 1
-            case .alreadyPresent: alreadyPresent += 1
-            case .excluded: excluded += 1
-            case .failed: failed += 1
-            }
-        }
-
-        /// 一个文件都没走过 → 不弹 toast。
-        var isEmpty: Bool {
-            added + updated + alreadyPresent + excluded + failed == 0
-        }
-
-        /// 曲库内容真的变了（决定要不要触发一次手动同步对齐）。
-        var changedLibrary: Bool { added > 0 || updated > 0 }
-
-        /// 只列非零桶；有失败必须说出来。
-        var summary: String {
-            var parts: [String] = []
-            if added > 0 {
-                parts.append(
-                    added == 1
-                        ? "import_result_added_one".localized
-                        : String(format: "import_result_added_many".localized, added)
-                )
-            }
-            if updated > 0 {
-                parts.append(String(format: "import_result_updated_many".localized, updated))
-            }
-            if alreadyPresent > 0 {
-                parts.append(String(format: "import_result_present_many".localized, alreadyPresent))
-            }
-            if excluded > 0 {
-                parts.append(String(format: "import_result_excluded_many".localized, excluded))
-            }
-            if failed > 0 {
-                parts.append(String(format: "import_result_failed_many".localized, failed))
-            }
-            return parts.joined(separator: "import_result_separator".localized)
-        }
-
-        /// 有失败 → 警示图标（用户才会去重试）。
-        var icon: String {
-            if failed > 0 { return "exclamationmark.triangle.fill" }
-            if added > 0 { return "plus.circle.fill" }
-            if updated > 0 { return "checkmark.circle.fill" }
-            return "info.circle.fill"
-        }
-
-        var color: Color {
-            if failed > 0 { return .orange }
-            if added > 0 || updated > 0 { return .green }
-            return .blue
-        }
-    }
-
-    private func importMusicFiles(_ urls: [URL]) {
+    /// 分片：跨文件可见（原 private）
+    func importMusicFiles(_ urls: [URL]) {
         Task {
             var tally = ImportOutcomeTally()
 
@@ -231,109 +123,6 @@ struct LibraryView: View {
             if tally.changedLibrary, let onManualSync = onManualSync {
                 _ = await onManualSync()
             }
-        }
-    }
-
-    private func storeBookmarkData(_ bookmarkData: Data, for url: URL) async {
-        // 书签唯一入口：原子写（此前是原地截断写，被杀即整份书签不可解析，见审计 🔴-2）
-        guard let store = ExternalFileBookmarkStore.default else {
-            AppLog.error(.ui, "Failed to resolve documents directory")
-            return
-        }
-
-        do {
-            // Generate stableId for this file
-            let stableId = try libraryIndexer.generateStableId(for: url)
-
-            // Store bookmark using stableId as key (survives file moves)
-            try store.upsert(bookmarkData, forStableId: stableId)
-
-            if AppLog.isEnabled(.debug, .ui) { AppLog.debug(.ui, "Stored bookmark for external file: \(url.lastPathComponent) with stableId: \(stableId)") }
-        } catch {
-            AppLog.error(.ui, "Failed to store bookmark data: \(error)")
-        }
-    }
-
-    @ViewBuilder
-    private func homeSectionView(for sectionId: HomeSectionId) -> some View {
-        switch sectionId {
-        case .allSongs:
-            NavigationLink {
-                AllSongsScreen(tracks: tracks)
-            } label: {
-                LibrarySectionRowView(
-                    title: Localized.allSongs,
-                    subtitle: Localized.songsCountOnly(tracks.count),
-                    icon: "music.note",
-                    color: accentColor
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-        case .likedSongs:
-            NavigationLink {
-                LikedSongsScreen(allTracks: tracks)
-            } label: {
-                LibrarySectionRowView(
-                    title: Localized.likedSongs,
-                    subtitle: Localized.yourFavorites,
-                    icon: "heart.fill",
-                    color: .red
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-        case .playlists:
-            NavigationLink {
-                PlaylistsScreen()
-            } label: {
-                LibrarySectionRowView(
-                    title: Localized.playlists,
-                    subtitle: Localized.yourPlaylists,
-                    icon: "music.note.list",
-                    color: .green
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-        case .artists:
-            NavigationLink {
-                ArtistsScreen(allTracks: tracks)
-            } label: {
-                LibrarySectionRowView(
-                    title: Localized.artists,
-                    subtitle: Localized.browseByArtist,
-                    icon: "person.2.fill",
-                    color: .purple
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-        case .albums:
-            NavigationLink {
-                AlbumsScreen(allTracks: tracks)
-            } label: {
-                LibrarySectionRowView(
-                    title: Localized.albums,
-                    subtitle: Localized.browseByAlbum,
-                    icon: "opticaldisc.fill",
-                    color: .orange
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-
-        case .addSongs:
-            Button(action: {
-                showMusicPicker = true
-            }) {
-                LibrarySectionRowView(
-                    title: Localized.addSongs,
-                    subtitle: Localized.importMusicFiles,
-                    icon: "plus.circle.fill",
-                    color: .blue
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
         }
     }
 
@@ -603,89 +392,4 @@ struct LibraryView: View {
         }
     }
 
-    /// 统一同步入口（按钮与下拉刷新共用）：isRefreshing 互斥 + 无忙等等待索引完成。
-    /// 等待索引走 IndexingGate（唯一实现，带超时兜底）：索引异常时不会再永久卡住同步按钮。
-    private func runSync() async {
-        let outcome = await IndexingGate.waitUntilIdle(libraryIndexer)
-        if outcome == .timedOut {
-            AppLog.warn(.ui, "⏱️ LibrarySync: indexing wait timed out — proceeding without waiting")
-        }
-
-        // For pull-to-refresh, use manual sync if available, otherwise just refresh
-        let result: (before: Int, after: Int)
-        if let onManualSync = onManualSync {
-            result = await onManualSync() // Full sync + refresh
-        } else {
-            result = await onRefresh()    // Just refresh
-        }
-
-        // Show feedback after sync/refresh is complete
-        await MainActor.run {
-            isRefreshing = false
-            showSyncFeedback(trackCountBefore: result.before, trackCountAfter: result.after)
-        }
-    }
-}
-
-struct LibrarySectionRowView: View {
-    /// App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
-    @Environment(\.appAccentColor) private var accentColor
-    let title: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-    @State private var settings = DeleteSettings.load()
-
-    var body: some View {
-        HStack(spacing: DesignTokens.space16) {
-            // Icon
-            if settings.minimalistIcons {
-                Image(systemName: icon)
-                    .font(.system(size: DesignTokens.font24, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: 60, height: 60)
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: DesignTokens.radius12)
-                        .fill(color.opacity(0.2))
-                        .frame(width: 60, height: 60)
-
-                    Image(systemName: icon)
-                        .font(.system(size: DesignTokens.font24, weight: .medium))
-                        .foregroundColor(color)
-                }
-            }
-
-            // Text content
-            VStack(alignment: .leading, spacing: DesignTokens.space4) {
-                Text(title)
-                    .responsiveSectionTitleFont()
-                    .foregroundColor(.primary)
-
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            // Chevron
-            Image(systemName: "chevron.right")
-                .font(.body)
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, DesignTokens.space20)
-        .padding(.vertical, DesignTokens.space16)
-        .background(
-            // Glassy background that reflects gradient
-            RoundedRectangle(cornerRadius: DesignTokens.radius12)
-                .fill(.ultraThinMaterial)
-                .opacity(0.8)
-        )
-        .cornerRadius(DesignTokens.radius12)
-        .shadow(color: accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
-        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
-            settings = DeleteSettings.load()
-        }
-    }
 }
