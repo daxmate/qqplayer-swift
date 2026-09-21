@@ -176,6 +176,10 @@
 		EDD34526F4B84A259D637FE9 /* SyncConnectDiagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1317BB92FEDE4560841BFEEF /* SyncConnectDiagTests.swift */; };
 		4A9E937D8D0D4A0FBC477EF9 /* ShuffleOrderModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C5EA9428BC54B9EA6ED3FE6 /* ShuffleOrderModeTests.swift */; };
 		8F5D8461D59A424F9ADAF508 /* AppLogShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E65F3325CF04B38991906B4 /* AppLogShapeContractTests.swift */; };
+		B080BA378FDE4C9FB73900B1 /* SyncListenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7476BF1BA6824D3EA03F4DB1 /* SyncListenerTests.swift */; };
+		76432A3082D84F9EACCBF98C /* FileCleanupManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 696A5ACF783344B79F8080B0 /* FileCleanupManagerTests.swift */; };
+		5429EE5D4BF74D469B659849 /* TrackIdentityFileMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12916B528D44204BF2E3DB9 /* TrackIdentityFileMigrationTests.swift */; };
+		66060DCB72B846BB9849CCC5 /* IntentPlaybackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88897E7BDD7043FDBBDFDC28 /* IntentPlaybackServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -401,6 +405,10 @@
 		1317BB92FEDE4560841BFEEF /* SyncConnectDiagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncConnectDiagTests.swift; sourceTree = "<group>"; };
 		3C5EA9428BC54B9EA6ED3FE6 /* ShuffleOrderModeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShuffleOrderModeTests.swift; sourceTree = "<group>"; };
 		6E65F3325CF04B38991906B4 /* AppLogShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppLogShapeContractTests.swift; sourceTree = "<group>"; };
+		7476BF1BA6824D3EA03F4DB1 /* SyncListenerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncListenerTests.swift; sourceTree = "<group>"; };
+		696A5ACF783344B79F8080B0 /* FileCleanupManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileCleanupManagerTests.swift; sourceTree = "<group>"; };
+		D12916B528D44204BF2E3DB9 /* TrackIdentityFileMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackIdentityFileMigrationTests.swift; sourceTree = "<group>"; };
+		88897E7BDD7043FDBBDFDC28 /* IntentPlaybackServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentPlaybackServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1085,6 +1093,10 @@
 				1317BB92FEDE4560841BFEEF /* SyncConnectDiagTests.swift */,
 				3C5EA9428BC54B9EA6ED3FE6 /* ShuffleOrderModeTests.swift */,
 				6E65F3325CF04B38991906B4 /* AppLogShapeContractTests.swift */,
+				7476BF1BA6824D3EA03F4DB1 /* SyncListenerTests.swift */,
+				696A5ACF783344B79F8080B0 /* FileCleanupManagerTests.swift */,
+				D12916B528D44204BF2E3DB9 /* TrackIdentityFileMigrationTests.swift */,
+				88897E7BDD7043FDBBDFDC28 /* IntentPlaybackServiceTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1559,6 +1571,10 @@
 				EDD34526F4B84A259D637FE9 /* SyncConnectDiagTests.swift in Sources */,
 				4A9E937D8D0D4A0FBC477EF9 /* ShuffleOrderModeTests.swift in Sources */,
 				8F5D8461D59A424F9ADAF508 /* AppLogShapeContractTests.swift in Sources */,
+				B080BA378FDE4C9FB73900B1 /* SyncListenerTests.swift in Sources */,
+				76432A3082D84F9EACCBF98C /* FileCleanupManagerTests.swift in Sources */,
+				5429EE5D4BF74D469B659849 /* TrackIdentityFileMigrationTests.swift in Sources */,
+				66060DCB72B846BB9849CCC5 /* IntentPlaybackServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
