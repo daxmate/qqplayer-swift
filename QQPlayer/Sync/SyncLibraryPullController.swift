@@ -295,6 +295,18 @@ final class SyncLibraryPullController: @unchecked Sendable {
     }
 
     private func handleManifest(_ response: SyncManifestResponse) {
+        // 终态守卫（2026-09-22）：轮次已终态 → 迟到帧一律丢弃（不改 `unchanged/requested`、
+        // 不重建 `claims`、不发 `syncFetchRequest`）。为什么必须有：`detachFrameHooks()`
+        // 是**调用方驱动**的（唯一调用方 = 补发轮 `SyncLyricsResendController`），常规单轮
+        // 编排（`SyncCollectionSyncCoordinator+Execution:beginPull`）从不摘钩 ⇒ 终态后
+        // `SyncManifestPeer` 仍在链上；迟到的 `manifest_response` 会按旧选择集重算计划、
+        // 重建认领表并可能再发一次拉取请求，覆写账目 ⇒ UI 上失败项顺序 / 数量跳动。
+        // 判据复用状态机单一事实源（禁止第二份实现）；读状态值在锁内（本类并发约定）。
+        lock.lock()
+        let terminal = SyncLibraryPullStateMachine.isTerminal(stateValue)
+        lock.unlock()
+        guard !terminal else { return }
+
         let plan = SyncLibraryPullPlanner.plan(
             remote: response,
             local: localEntries(),
@@ -418,6 +430,15 @@ final class SyncLibraryPullController: @unchecked Sendable {
     }
 
     private func handleFetchResult(_ frame: SyncFrame) {
+        // 终态守卫（2026-09-22）：轮次已终态 → 迟到结果帧丢弃，不覆写 `failed/reportedCompleted`。
+        // 合法到达时机 = `.fetching` 期间（本方法即本轮收尾入口）；**`handleTransfer` 绝不加守卫**
+        // ——接收端先回 ack 再回调落盘/入库，结果帧可能先于最后一个文件的回调到达，
+        // 挡了会把「非破坏性小瑕疵」变成真丢账（最后一文件的名目消失）。
+        lock.lock()
+        let terminal = SyncLibraryPullStateMachine.isTerminal(stateValue)
+        lock.unlock()
+        guard !terminal else { return }
+
         guard let result = try? SyncFetchCodec.decode(SyncFetchResult.self, from: frame.payload) else {
             transition(to: .failed("sync_fetch_result 解码失败"))
             return

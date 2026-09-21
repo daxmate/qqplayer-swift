@@ -292,6 +292,19 @@ final class SyncLibraryPushController: @unchecked Sendable {
     }
 
     private func handleManifest(_ response: SyncManifestResponse) {
+        // 终态守卫（2026-09-22）：轮次已终态 → 迟到帧一律丢弃（不改账目 / 不发声明 / 不入队）。
+        // 为什么必须有：`detachFrameHooks()` 是**调用方驱动**的（唯一调用方 = 补发轮
+        // `SyncLyricsResendController.releasePushController()`），常规单轮编排
+        // （`SyncCollectionSyncCoordinator+Execution:beginPush`）从不摘钩 ⇒ 轮次终态后
+        // `SyncManifestPeer` 仍挂在会话分发链上；迟到的 `manifest_response` 会按旧选择集
+        // 重算计划并覆写 `planned/skipped/failed`（`kept` 非空时还会再发一帧声明、覆写队列），
+        // 而协调器报告快照是「从当前 summary 现读」⇒ UI 上失败项顺序 / 数量跳动。
+        // 判据复用状态机单一事实源（禁止第二份实现）；读状态值在锁内（本类并发约定）。
+        lock.lock()
+        let terminal = SyncLibraryPushStateMachine.isTerminal(stateValue)
+        lock.unlock()
+        guard !terminal else { return }
+
         let local = localEntries()
         let plan = SyncLibraryPushPlanner.plan(local: local, remote: response.entries)
 
