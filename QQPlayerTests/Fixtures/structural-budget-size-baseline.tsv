@@ -16,8 +16,6 @@ QQPlayer/Mac/MacSearchAnythingLayer.swift	727
 QQPlayer/Mac/MacTagEditorView.swift	818
 QQPlayer/Services/AppCoordinator.swift	644
 QQPlayer/Services/EQManager.swift	618
-QQPlayer/Services/PlayerEngine+NowPlaying.swift	1111
-QQPlayer/Sync/SyncChangeLogMapping.swift	945
 QQPlayer/Sync/SyncCollectionSyncCoordinator.swift	874
 QQPlayer/Sync/SyncFileReceiver.swift	607
 QQPlayer/Sync/SyncPeerSession+Frames.swift	649
@@ -27,4 +25,4 @@ QQPlayer/Views/Library/SearchResultsViews.swift	746
 QQPlayer/Views/Player/LyricsView.swift	758
 QQPlayer/Views/Player/PlayerView.swift	984
 QQPlayer/Views/Playlists/PlaylistDetailScreen.swift	631
-# TOTAL: 14336
+# TOTAL: 12280
