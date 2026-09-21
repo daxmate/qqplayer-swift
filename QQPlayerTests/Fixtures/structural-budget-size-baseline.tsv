@@ -8,6 +8,5 @@
 #
 # 重新生成（口径由 StructuralBudgetRule 唯一实现，禁止手抄）：
 #   scripts/check-structural-budget.sh emit
-QQPlayer/Mac/MacLyricsView.swift	698
 QQPlayer/Mac/MacPlayerView.swift	617
-# TOTAL: 1315
+# TOTAL: 617
