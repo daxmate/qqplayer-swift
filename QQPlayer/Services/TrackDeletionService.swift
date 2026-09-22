@@ -405,7 +405,8 @@ enum TrackDeletionService {
 /// （进 `.Trash`），**对端差集这才看得见「本端没有这首」**；文件不永久删除（原件仍可恢复）。
 ///
 /// 唯一入口（禁第二实现）：
-///   · 目录名常量 `directoryName`——别处不得再写 `.Trash` 字面量；
+///   · 目录名常量 `directoryName`——取 `LibraryRoot.trashDirectoryName`（目录名唯一常量入口，
+///     本文件不再自带字面量；形状契约白名单随之为 `LibraryRoot.swift`）；
 ///   · 路径派生 `url(inLibraryRoot:)`——曲库根由调用方给（生产 = `MusicFolderResolver.syncLibraryRoot`）；
 ///   · 目标命名 `destinationURL(in:contentHash:pathExtension:isTaken:)`（同名冲突追加 `-1` / `-2` …）；
 ///   · 移动实现 `move(_:into:)`（唯一碰磁盘的回收区动作，由 `Environment.live` 注入）。
@@ -422,7 +423,8 @@ enum TrackDeletionService {
 /// 本批不做回收区查看 / 恢复 UI，也不清理历史遗留残留文件。
 enum DeleteReclaimArea {
     /// 回收区目录名（**唯一常量**；隐藏目录，见上方「隐藏语义」）。
-    static let directoryName = ".Trash"
+    /// 取自 `LibraryRoot`（目录名唯一入口）——全仓该字面量只在 `LibraryRoot.swift` 里存在一份。
+    static let directoryName = LibraryRoot.trashDirectoryName
 
     /// 同名后缀上限（防止病态输入下无界重试；实际不可达——同一个指纹 1000 份）。
     static let maximumConflictSuffix = 999

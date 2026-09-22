@@ -210,7 +210,7 @@ enum LibraryLayoutMigrationV2Rules {
         "qqplayer-assets": hiddenRelativePath([
             Destination.cache.directoryName, "qqplayer-assets",
         ]),
-        ".Trash": hiddenRelativePath([Destination.trash.directoryName]),
+        LibraryRoot.trashDirectoryName: hiddenRelativePath([Destination.trash.directoryName]),
     ]
 
     /// 根部日志归档名（`app.log.N`）→ 也归 `logs/`。

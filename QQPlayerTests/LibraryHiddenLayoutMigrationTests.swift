@@ -21,8 +21,12 @@
 //     ⇒ 迁移器必须**不碰**它们。
 //   · **封面映射表**：与缓存同目录但不是缓存，改路径后仍不得被当孤儿缓存删除。
 //
-//  全程用临时目录 + 内存库（`LibraryRoot.documentsRootOverride` 注入），不碰真机数据、
-//  不启模拟器交互；套件 `.serialized`（覆盖是进程级静态状态）。
+// ⚠️ 本文件是 `LibraryLayoutMigrationTests`（v1 文件里那个套件）的 **extension**，不是独立套件。
+//  两个文件的用例都要写**进程级静态** `LibraryRoot.documentsRootOverride`，而 Swift Testing 里
+//  **不同套件之间仍然并行**（`.serialized` 只约束同一套件内的用例；同结论见
+//  `MusicAPIMockSupport.swift` 顶部注释）。拆成两个套件 ⇒ 一边的用例把静态根改写到自己的
+//  临时根上，另一边的断言就落在「别人的根」上（2026-09-22 CI 实证：v1 与 v2 的用例在
+//  **同一毫秒**启动，双方都出现「没看见自己搭的文件」的断言失败）。
 //
 
 import Foundation
@@ -31,49 +35,19 @@ import Testing
 
 @testable import QQPlayer
 
-@Suite("隐藏布局 v2：路径解析 + 根条目迁移 + 同步/DB 例外", .serialized)
-struct LibraryHiddenLayoutMigrationTests {
-    // MARK: - Fixture
+extension LibraryLayoutMigrationTests {
+    // MARK: - Fixture（共享件在 v1 文件里：`withDocumentsRoot` / `makeManager` / `writeFile`）
 
-    /// 临时 Documents 根（真实文件系统），并在用例期间把它注入 `LibraryRoot`。
-    private func withDocumentsRoot(_ body: (URL) throws -> Void) throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("qqplayer-hidden-\(UUID().uuidString)", isDirectory: true)
-            .appendingPathComponent("Documents", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        LibraryRoot.documentsRootOverride = root
-        defer {
-            LibraryRoot.documentsRootOverride = nil
-            try? FileManager.default.removeItem(at: root.deletingLastPathComponent())
-        }
-        try body(root)
-    }
-
-    private func makeManager() throws -> DatabaseManager {
-        let dbQueue = try DatabaseQueue()
-        let manager = DatabaseManager(dbWriter: dbQueue)
-        try manager.createTables()
-        return manager
-    }
-
-    private func makeMigrator(database: DatabaseManager) -> LibraryLayoutMigrationV2Migrator {
+    /// v2 执行器工厂（v1 的同名工厂返回 v1 类型，同名会因仅返回类型不同而歧义 ⇒ 用独立名字）。
+    private func makeV2Migrator(database: DatabaseManager) -> LibraryLayoutMigrationV2Migrator {
         // UserDefaults 用独立 suite：不污染 App 的真实完成门。
         let defaults = UserDefaults(suiteName: "hidden-layout-tests-\(UUID().uuidString)") ?? .standard
         defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
         return LibraryLayoutMigrationV2Migrator(database: database, defaults: defaults)
     }
 
-    @discardableResult
-    private func writeFile(_ url: URL, bytes: Int = 8) throws -> URL {
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data(repeating: 0x41, count: bytes).write(to: url)
-        return url
-    }
-
-    private let hiddenRoot = LibraryRoot.hiddenRootDirectoryName
+    /// 隐藏根目录名（`LibraryRoot` 常量——extension 不能声明存储属性，故用计算属性）。
+    private var hiddenRoot: String { LibraryRoot.hiddenRootDirectoryName }
 
     // MARK: - 路径解析（唯一入口）
 
@@ -172,7 +146,7 @@ struct LibraryHiddenLayoutMigrationTests {
     func migratorMovesRootEntriesIntoHiddenRoot() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeV2Migrator(database: manager)
 
             try writeFile(documents.appendingPathComponent("qqplayer-favorites.json"))
             try writeFile(documents.appendingPathComponent("qqplayer-playlists/playlist-a.json"))
@@ -224,7 +198,7 @@ struct LibraryHiddenLayoutMigrationTests {
     }
 
     @Test("幂等：连跑两次结果一致，第二遍无待搬条目")
-    func migratorIsIdempotent() throws {
+    func hiddenMigratorIsIdempotent() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-idem-\(UUID().uuidString)") ?? .standard
@@ -255,7 +229,7 @@ struct LibraryHiddenLayoutMigrationTests {
     func conflictRenamesInsteadOfOverwriting() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeV2Migrator(database: manager)
 
             let source = try writeFile(
                 documents.appendingPathComponent("qqplayer-favorites.json"), bytes: 4
@@ -274,7 +248,8 @@ struct LibraryHiddenLayoutMigrationTests {
             let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
             #expect((attributes[.size] as? Int) == 16)
             // 旧文件已改名搬入：目标仍在、源已不在根、内容与原源一致（4 字节）。
-            let legacy = try #require(try legacySiblings(forPrefix: "qqplayer-favorites.json", in: documents))
+            // `legacySiblings` 返回非可选数组（`#require` 在此冗余，会触发编译器警告）——直接取。
+            let legacy = try legacySiblings(forPrefix: "qqplayer-favorites.json", in: documents)
             #expect(legacy.count == 1)
             let legacyAttributes = try FileManager.default.attributesOfItem(atPath: legacy[0].path)
             #expect((legacyAttributes[.size] as? Int) == 4)
@@ -285,7 +260,7 @@ struct LibraryHiddenLayoutMigrationTests {
     func directoryConflictIsMergedRecursively() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeV2Migrator(database: manager)
 
             // 目标目录已存在（模拟启动期 ArtworkManager 先建目录）——含同名子项。
             try writeFile(documents.appendingPathComponent("\(hiddenRoot)/artwork/keep.jpg"), bytes: 16)
@@ -306,7 +281,7 @@ struct LibraryHiddenLayoutMigrationTests {
             let keep = artwork.appendingPathComponent("keep.jpg")
             let keepAttributes = try FileManager.default.attributesOfItem(atPath: keep.path)
             #expect((keepAttributes[.size] as? Int) == 16)
-            let legacy = try #require(try legacySiblings(forPrefix: "keep.jpg", in: documents))
+            let legacy = try legacySiblings(forPrefix: "keep.jpg", in: documents)
             #expect(legacy.count == 1)
             let legacyAttributes = try FileManager.default.attributesOfItem(atPath: legacy[0].path)
             #expect((legacyAttributes[.size] as? Int) == 4)
@@ -327,22 +302,27 @@ struct LibraryHiddenLayoutMigrationTests {
             defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
             let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
 
-            // 进程最早期就写下的日志文件：根 `app.log` 与隐藏根里的新位置同名。
+            // 进程最早期就写下的日志文件：根 `app.log` 与隐藏根里的新位置同名
+            // （`app.log` 只用来锁「同名 ⇒ 改名搬入」这一事实）。
             let rootLog = try writeFile(documents.appendingPathComponent("app.log"), bytes: 4)
-            let hiddenLog = try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/app.log"), bytes: 16)
-            try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/db-debug.log"), bytes: 16)
-            let rootDbLog = try writeFile(documents.appendingPathComponent("db-debug.log"), bytes: 8)
+            try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/app.log"), bytes: 16)
+            // 「旧目标内容不被覆盖」的判据样本必须是**非活文件**：`logs/app.log` 是 `AppLog` 的
+            // 活文件（落点也经 `LibraryRoot`，本用例注入的根正在其中）⇒ 用例期间必然被追加，
+            // 字节数/内容都会漂移（2026-09-22 CI 实证：16 → 344）。拿它当「没被覆盖」的判据
+            // = 判据不隔离稳定；`eq-debug.log` 同属 `logs/` 口径，但**没有任何生产写入者**。
+            let rootEqLog = try writeFile(documents.appendingPathComponent("eq-debug.log"), bytes: 4)
+            let hiddenEqLog = try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/eq-debug.log"), bytes: 16)
 
             let summary = migrator.run()
 
             #expect(summary.failed.isEmpty)
             #expect(summary.renamedTotal == 2)
             #expect(!FileManager.default.fileExists(atPath: rootLog.path))
-            #expect(!FileManager.default.fileExists(atPath: rootDbLog.path))
-            let logAttributes = try FileManager.default.attributesOfItem(atPath: hiddenLog.path)
-            #expect((logAttributes[.size] as? Int) == 16, "日志旧目标不被覆盖")
+            #expect(!FileManager.default.fileExists(atPath: rootEqLog.path))
+            let logAttributes = try FileManager.default.attributesOfItem(atPath: hiddenEqLog.path)
+            #expect((logAttributes[.size] as? Int) == 16, "日志旧目标不被覆盖（取样目标为非活文件）")
             #expect(try legacySiblings(forPrefix: "app.log", in: documents).count == 1)
-            #expect(try legacySiblings(forPrefix: "db-debug.log", in: documents).count == 1)
+            #expect(try legacySiblings(forPrefix: "eq-debug.log", in: documents).count == 1)
             // 根已无可搬条目 ⇒ 置位（不再因冲突而永世不置位）。
             #expect(summary.residue.isEmpty)
             #expect(defaults.bool(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey))
@@ -453,7 +433,7 @@ struct LibraryHiddenLayoutMigrationTests {
     func failureDoesNotStopOthersAndKeepsOriginal() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeV2Migrator(database: manager)
 
             // 让 `cache/` 的父路径是一个**文件** ⇒ `SpotifyCache` 的父目录建不出来（失败）。
             try FileManager.default.createDirectory(
@@ -486,7 +466,7 @@ struct LibraryHiddenLayoutMigrationTests {
     func dryRunOnlyCounts() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeV2Migrator(database: manager)
 
             let source = try writeFile(documents.appendingPathComponent("qqplayer-favorites.json"))
             let summary = migrator.run(dryRun: true)
@@ -526,7 +506,7 @@ struct LibraryHiddenLayoutMigrationTests {
     func referencedEntriesAreNotMoved() throws {
         try withDocumentsRoot { documents in
             let manager = try makeManager()
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeV2Migrator(database: manager)
 
             let referenced = try writeFile(
                 documents.appendingPathComponent("qqplayer-assets/audio/clip.mp3")

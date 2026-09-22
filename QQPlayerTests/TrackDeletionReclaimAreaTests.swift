@@ -380,7 +380,12 @@ private enum ReclaimPathContract {
 
     static let scannedDirectory = "QQPlayer"
     /// 唯一允许出现回收区目录名字面量的文件（回收区路径的单一事实源）。
-    static let allowedPaths: Set<String> = ["QQPlayer/Services/TrackDeletionService.swift"]
+    ///
+    /// 定案（maintainer 2026-09-22）：目录名的**唯一常量入口是 `LibraryRoot`**
+    /// （`LibraryRoot.trashDirectoryName`，其文件头自写「目录名（唯一常量；别处不得再写字面量）」、
+    /// 只依赖 Foundation、在小组件共享名单里），`DeleteReclaimArea.directoryName` 亦是**引用**它。
+    /// 契约本意是「字面量只有一处」，不是「必须写在删除服务里」⇒ 白名单随之搬家。
+    static let allowedPaths: Set<String> = ["QQPlayer/Services/LibraryRoot.swift"]
     /// 目标字面量（**由常量拼出**，本测试文件自己不留字面量）。
     static let literal = "\"" + DeleteReclaimArea.directoryName + "\""
 
@@ -475,7 +480,7 @@ struct DeleteReclaimAreaShapeContractTests {
 
         // 白名单不空转：唯一入口必须真的是那个字面量的持有者（否则本契约在空跑）
         let entry = ReclaimPathContract.repositoryRoot
-            .appendingPathComponent("QQPlayer/Services/TrackDeletionService.swift")
+            .appendingPathComponent("QQPlayer/Services/LibraryRoot.swift")
         let entrySource = try String(contentsOf: entry, encoding: .utf8)
         #expect(
             ReclaimPathContract.strippingComments(entrySource).contains(ReclaimPathContract.literal),

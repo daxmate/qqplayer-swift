@@ -44,6 +44,10 @@ enum LibraryRoot {
     static let artworkDirectoryName = "Artwork"
     /// 日志目录名。
     static let logsDirectoryName = "Logs"
+    /// 回收区目录名（**曲库根内的隐藏目录**，不是 `Documents` 下的一级目录）：
+    /// 生产落点 = `<曲库根>/.Trash/<64位hex>.<ext>`（见 `DeleteReclaimArea`，差集语义要求
+    /// 文件移出曲库根才可见）；`Documents/.Trash` 是旧根残留（`trashDirectoryURL` 只解析它）。
+    static let trashDirectoryName = ".Trash"
 
     /// 封面映射表文件名（`Documents/Artwork/ArtworkMapping.plist`；改名前的旧位置是
     /// `Documents/ArtworkMapping.plist`，只做兼容读取）。
@@ -283,7 +287,7 @@ enum LibraryRoot {
     static func trashDirectoryURL(fileManager: FileManager = .default) -> URL? {
         scopedURL(
             hidden: [hiddenTrashDirectoryName],
-            macOS: [".Trash"], fileManager: fileManager
+            macOS: [trashDirectoryName], fileManager: fileManager
         )
     }
 

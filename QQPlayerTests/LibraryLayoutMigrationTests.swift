@@ -17,7 +17,14 @@
 //     「用户数据可能被搬丢」的防线。
 //
 //  全程用临时目录 + 内存库（`LibraryRoot.documentsRootOverride` 注入），不碰真机数据、
-//  不启模拟器交互；套件 `.serialized`（覆盖是进程级静态状态）。
+//  不启模拟器交互。
+//
+//  ⚠️ 本套件是**唯一**写 `LibraryRoot.documentsRootOverride` 的套件 —— v2 的用例（文件
+//  `LibraryHiddenLayoutMigrationTests.swift`）是它的 **extension**，不是另一个套件：
+//  Swift Testing 里 **不同套件之间仍然并行**（`.serialized` 只约束同一套件内的用例；
+//  同结论见 `MusicAPIMockSupport.swift` 顶部），拆成两个套件会互相把进程级静态根改写到
+//  对方根上（2026-09-22 CI 实证：v1 与 v2 的用例在**同一毫秒**启动，双方都出现
+//  「没看见自己搭的文件」的断言失败）。
 //
 
 import Foundation
@@ -26,12 +33,13 @@ import Testing
 
 @testable import QQPlayer
 
-@Suite("曲库文件夹化：路径形态 + 单层扫描 + 一次性迁移", .serialized)
+@Suite("曲库布局迁移（v1 文件夹化 + v2 隐藏布局）：路径解析 + 根条目迁移", .serialized)
 struct LibraryLayoutMigrationTests {
     // MARK: - Fixture
 
     /// 临时 Documents 根（真实文件系统），并在用例期间把它注入 `LibraryRoot`。
-    private func withDocumentsRoot(_ body: (URL) throws -> Void) throws {
+    /// 套件内所有用例（含 v2 的 extension）串行执行，静态根不会被并发改写。
+    func withDocumentsRoot(_ body: (URL) throws -> Void) throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("qqplayer-layout-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent("Documents", isDirectory: true)
@@ -45,7 +53,7 @@ struct LibraryLayoutMigrationTests {
     }
 
     /// 内存库 + `DatabaseManager`（同 `FileCleanupManagerTests` 的测试缝）。
-    private func makeManager() throws -> DatabaseManager {
+    func makeManager() throws -> DatabaseManager {
         let dbQueue = try DatabaseQueue()
         let manager = DatabaseManager(dbWriter: dbQueue)
         try manager.createTables()
@@ -60,7 +68,7 @@ struct LibraryLayoutMigrationTests {
     }
 
     @discardableResult
-    private func writeFile(_ url: URL, bytes: Int = 8) throws -> URL {
+    func writeFile(_ url: URL, bytes: Int = 8) throws -> URL {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
