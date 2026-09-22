@@ -325,7 +325,7 @@
             // route settles. Coalesce them so we never stop/start/schedule the
             // same player node concurrently.
             guard engineConfigurationRecoveryTask == nil else { return }
-            let recoveryLoadGeneration = loadGeneration
+            let recoveryLoadGeneration = loadGeneration.current
             let recoveryTrackID = currentTrack?.stableId
             engineConfigurationRecoveryTask = Task { @MainActor [weak self] in
                 defer { self?.engineConfigurationRecoveryTask = nil }
@@ -340,7 +340,7 @@
                       !self.isLoadingTrack,
                       !self.isAudioSessionInterrupted,
                       !self.usingSFBEngine,
-                      self.loadGeneration == recoveryLoadGeneration,
+                      self.loadGeneration.isCurrent(recoveryLoadGeneration),
                       self.currentTrack?.stableId == recoveryTrackID else { return }
 
                 let resumeTime = self.nowPlayingElapsedTime()

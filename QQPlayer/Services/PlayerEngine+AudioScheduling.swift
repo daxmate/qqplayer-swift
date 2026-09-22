@@ -38,7 +38,7 @@
                 return false
             }
 
-            let scheduledGeneration = scheduleGeneration
+            let scheduledGeneration = scheduleGeneration.current
             let scheduledTrackId = track?.stableId
             let scheduledIndex = trackIndex
 
@@ -78,12 +78,21 @@
         }
 
         private func canGaplesslySchedule(_ currentFile: AVAudioFile, with nextFile: AVAudioFile) -> Bool {
-            let currentFormat = currentFile.processingFormat
-            let nextFormat = nextFile.processingFormat
-            return abs(currentFormat.sampleRate - nextFormat.sampleRate) < 0.1
-                && currentFormat.channelCount == nextFormat.channelCount
-                && currentFormat.commonFormat == nextFormat.commonFormat
-                && currentFormat.isInterleaved == nextFormat.isInterleaved
+            // 判定上收纯函数（GaplessFormatCompatibility，有单测）：这里只做
+            // AVAudioFormat → 取值结构的映射，不再自己比格式。
+            GaplessFormatCompatibility.canSchedule(
+                current: Self.formatTraits(currentFile.processingFormat),
+                next: Self.formatTraits(nextFile.processingFormat)
+            )
+        }
+
+        private static func formatTraits(_ format: AVAudioFormat) -> GaplessFormatCompatibility.Traits {
+            GaplessFormatCompatibility.Traits(
+                sampleRate: format.sampleRate,
+                channelCount: format.channelCount,
+                commonFormatRawValue: format.commonFormat.rawValue,
+                isInterleaved: format.isInterleaved
+            )
         }
 
         func preloadAndScheduleNextIfNeeded() {
@@ -104,7 +113,7 @@
 
             clearPreloadedNext()
 
-            let preloadGeneration = loadGeneration
+            let preloadGeneration = loadGeneration.current
             isPreloadingNext = true
             preloadNextTask = Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -128,7 +137,7 @@
                     let file = try await self.openNativeAudioFile(at: url, qos: .utility)
                     try Task.checkCancellation()
 
-                    guard self.loadGeneration == preloadGeneration,
+                    guard self.loadGeneration.isCurrent(preloadGeneration),
                           self.playbackQueue.indices.contains(nextIndex),
                           self.playbackQueue[nextIndex].stableId == candidate.stableId else {
                         return
@@ -197,9 +206,9 @@
                 return
             }
 
-            let rescheduleGeneration = loadGeneration
+            let rescheduleGeneration = loadGeneration.current
             Task { @MainActor [weak self] in
-                guard let self, loadGeneration == rescheduleGeneration else { return }
+                guard let self, loadGeneration.isCurrent(rescheduleGeneration) else { return }
                 // 正在播就用**实时渲染位置**（playbackTime 由 UI timer 刷新，后台/锁屏会冻结）
                 let position = isPlaying ? nowPlayingElapsedTime() : playbackTime
                 await seek(to: position)
@@ -301,7 +310,7 @@
         }
 
         private func handleScheduledSegmentFinished(generation: UInt64, trackStableId: String?, trackIndex: Int?) async {
-            guard generation == scheduleGeneration,
+            guard scheduleGeneration.isCurrent(generation),
                   isPlaying,
                   !usingSFBEngine else {
                 return
@@ -461,7 +470,7 @@
                 return false
             }
 
-            let scheduledGeneration = scheduleGeneration
+            let scheduledGeneration = scheduleGeneration.current
             let scheduledTrackId = track?.stableId
 
             playerNode.scheduleSegment(
@@ -488,7 +497,7 @@
             // 非当前曲目 → 不触发。2026-09-01 修复：macOS seek 漏 cancel 导致误触发停播。
             guard MacPlaybackGate.shouldHandleSegmentFinished(
                 generation: generation,
-                scheduleGeneration: scheduleGeneration,
+                scheduleGeneration: scheduleGeneration.current,
                 isPlaying: isPlaying,
                 completionTrackId: trackStableId,
                 currentTrackId: currentTrack?.stableId

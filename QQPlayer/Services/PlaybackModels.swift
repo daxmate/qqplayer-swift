@@ -135,3 +135,91 @@ enum PlaybackFailureMessage {
         return "playback_error_generic"
     }
 }
+
+// MARK: - 载入/调度代数（2026-09-20 测试债批 ③ 抽自 PlayerEngine）
+
+/// 载入/调度代数（纯逻辑，可单测）。
+///
+/// 语义（**唯一定义处**）：任何「开始新的一次异步操作」（切歌载入 / seek 重排调度 / 取消在途
+/// 调度）都 `begin()` 取一个新代次；异步任务在写回前用 `canCommit(_:)` 校验 —— 代数已被后来者
+/// 顶掉（`isCurrent == false`）**或**任务已取消 → 丢弃结果。
+///
+/// 为什么上收：原先 `loadGeneration` / `scheduleGeneration` 在 5 个文件里各自 `&+= 1` + 裸比较
+/// （实测 15 处）。「切歌竞态写旧曲」（2026-09-12 审计 P4）就是漏了一处校验的形状：await 之前
+/// 捕获的代，await 之后没人比对。抽成类型后代数语义只有一处实现，调用点只做 begin / canCommit，
+/// 且形状契约（`PlaybackGenerationTests` 的扫描用例）禁止引擎里再出现裸自增 / 裸比较。
+struct PlaybackGeneration {
+    /// 当前代次（0 = 从未开始）。
+    private(set) var current: UInt64 = 0
+
+    /// 开始新代次并返回它（**唯一**递增入口）。
+    /// 保持原 `&+= 1` 的回绕语义 —— 回绕属既有行为，本批**刻意不改**。
+    @discardableResult
+    mutating func begin() -> UInt64 {
+        current &+= 1
+        return current
+    }
+
+    /// 该代次是否仍是当前代（= 期间没有更新的操作）。
+    func isCurrent(_ generation: UInt64) -> Bool {
+        generation == current
+    }
+
+    /// 异步结果能否写回：代数仍是当前 **且** 任务未取消。
+    /// - Parameter isCancelled: 默认取当前任务的取消态（调用点即 `Task.isCancelled`）；测试可注入。
+    func canCommit(_ generation: UInt64, isCancelled: Bool = Task.isCancelled) -> Bool {
+        isCurrent(generation) && !isCancelled
+    }
+}
+
+/// 队列归一：空队列 / 当前曲不在队列 / 下标越界时的收敛决策（纯函数，可单测）。
+///
+/// 2026-09-20 抽自 `PlayerEngine.normalizeIndexAndTrack`（测试债批 ③）：它有 **9 个调用点**
+/// （队列整体替换 / 重排 / 删除 / 恢复 / 清空 / 恢复原始队列 / Mac 两处），是本仓最热的
+/// 「队列被异步替换之后修索引」入口，却一条测试都没有。
+enum PlaybackQueueSelection {
+    /// 归一结果：`trackId == nil` 表示「清空当前曲」（仅空队列时会出现）。
+    struct Result: Equatable {
+        var index: Int
+        var trackId: String?
+    }
+
+    /// 规则（逐条对应原实现）：
+    /// - 空队列 → `(0, nil)`：索引归 0、当前曲清空
+    /// - 当前曲仍在队列里 → 取它**现在**的下标（队列被整体替换后原下标会陈旧）
+    /// - 当前曲不在队列里（或本来就没有当前曲）→ 下标夹到 `[0, count-1]`，并取该位置的曲目
+    static func normalized(queueTrackIds: [String], currentTrackId: String?, currentIndex: Int) -> Result {
+        guard !queueTrackIds.isEmpty else { return Result(index: 0, trackId: nil) }
+        if let currentTrackId, let index = queueTrackIds.firstIndex(of: currentTrackId) {
+            return Result(index: index, trackId: currentTrackId)
+        }
+        let clamped = max(0, min(currentIndex, queueTrackIds.count - 1))
+        return Result(index: clamped, trackId: queueTrackIds[clamped])
+    }
+}
+
+/// 无缝衔接的格式兼容判定（纯函数，可单测）。
+///
+/// 2026-09-20 抽自 `PlayerEngine+AudioScheduling.canGaplesslySchedule`（测试债批 ③）：原实现直接
+/// 比较 `AVAudioFile.processingFormat`，而 `AVAudioFormat` 要真实音频文件才能构造 ⇒「什么时候能
+/// 无缝、什么时候必须走普通预载」这条决策在测试里一点也碰不到。抽成「四个字段的取值结构」后判定
+/// 可单测，引擎只负责把 `AVAudioFormat` 映射成这个结构。
+enum GaplessFormatCompatibility {
+    /// 判定所需的格式取值（`commonFormatRawValue` = `AVAudioCommonFormat.rawValue`，
+    /// 避免本文件依赖 AVFoundation —— 映射在引擎侧）。
+    struct Traits: Equatable {
+        var sampleRate: Double
+        var channelCount: UInt32
+        var commonFormatRawValue: UInt
+        var isInterleaved: Bool
+    }
+
+    /// 无缝衔接要求（与原实现逐条一致）：
+    /// 采样率差 < 0.1、声道数 / 通用格式 / 交错布局全等。
+    static func canSchedule(current: Traits, next: Traits) -> Bool {
+        abs(current.sampleRate - next.sampleRate) < 0.1
+            && current.channelCount == next.channelCount
+            && current.commonFormatRawValue == next.commonFormatRawValue
+            && current.isInterleaved == next.isInterleaved
+    }
+}

@@ -56,19 +56,14 @@ extension PlayerEngine {
     // MARK: - Index Normalization Helper
 
     func normalizeIndexAndTrack() {
-        if playbackQueue.isEmpty {
-            currentIndex = 0
-            currentTrack = nil
-            return
-        }
-
-        if let ct = currentTrack,
-           let idx = playbackQueue.firstIndex(where: { $0.stableId == ct.stableId }) {
-            currentIndex = idx
-        } else {
-            currentIndex = max(0, min(currentIndex, playbackQueue.count - 1))
-            currentTrack = playbackQueue[currentIndex]
-        }
+        // 决策上收纯函数（PlaybackQueueSelection.normalized，有单测）：这里只把结果落到状态上。
+        let result = PlaybackQueueSelection.normalized(
+            queueTrackIds: playbackQueue.map(\.stableId),
+            currentTrackId: currentTrack?.stableId,
+            currentIndex: currentIndex
+        )
+        currentIndex = result.index
+        currentTrack = result.trackId.flatMap { id in playbackQueue.first { $0.stableId == id } }
     }
 
     // MARK: - Queue Management

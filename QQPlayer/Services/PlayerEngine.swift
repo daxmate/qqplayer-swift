@@ -96,7 +96,8 @@ class PlayerEngine: NSObject {
     @ObservationIgnored private let maxPersistedQueueSize = 2000
 
     // Generation token to prevent stale completion handlers from firing
-    @ObservationIgnored var scheduleGeneration: UInt64 = 0
+    /// 调度代（seek/play 前 `cancelPendingCompletions()` 递增；语义见 `PlaybackGeneration`）。
+    @ObservationIgnored var scheduleGeneration = PlaybackGeneration()
 
     @ObservationIgnored var seekTimeOffset: TimeInterval = 0
     @ObservationIgnored var lastSampleRate: Double = 0
@@ -134,7 +135,8 @@ class PlayerEngine: NSObject {
     @ObservationIgnored var currentLoadTask: Task<Bool, Never>?
     /// 失败提示的自动清除任务（重复上报时取消上一个，见 reportPlaybackFailure）
     @ObservationIgnored private var playbackErrorClearTask: Task<Void, Never>?
-    @ObservationIgnored var loadGeneration: UInt64 = 0
+    /// 载入代（切歌载入递增；语义见 `PlaybackGeneration`）。
+    @ObservationIgnored var loadGeneration = PlaybackGeneration()
     @ObservationIgnored var hasRestoredState = false
     @ObservationIgnored var hasSetupAudioEngine = false
     @ObservationIgnored var hasSetupAudioSession = false

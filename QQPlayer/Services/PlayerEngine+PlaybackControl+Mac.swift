@@ -29,8 +29,7 @@
 
         @discardableResult
         func loadTrack(_ track: Track, preservePlaybackTime: Bool = false) async -> Bool {
-            loadGeneration &+= 1
-            let generation = loadGeneration
+            let generation = loadGeneration.begin()
 
             currentLoadTask?.cancel()
             let task = Task { @MainActor [weak self] in
@@ -40,14 +39,14 @@
             currentLoadTask = task
 
             let loaded = await task.value
-            if loadGeneration == generation {
+            if loadGeneration.isCurrent(generation) {
                 currentLoadTask = nil
             }
             return loaded
         }
 
         private func isCurrentLoad(_ generation: UInt64) -> Bool {
-            loadGeneration == generation && !Task.isCancelled
+            loadGeneration.canCommit(generation)
         }
 
         private func performMacLoadTrack(_ track: Track, preservePlaybackTime: Bool, generation: UInt64) async -> Bool {
@@ -349,11 +348,11 @@
                     // RunLoop.current.run（Swift 6 并发检查标记不可用），改用 Task.sleep
                     // 轮询 + scheduleGeneration 防重入：await 期间新 seek 会递增 generation，
                     // 检测到变化即退出（让新 seek 赢，避免旧值覆盖播放位置）。
-                    let seekGeneration = scheduleGeneration
+                    let seekGeneration = scheduleGeneration.current
                     let deadline = Date().addingTimeInterval(1.0)
                     while !audioEngine.isRunning && Date() < deadline {
                         try? await Task.sleep(nanoseconds: 10_000_000)
-                        guard scheduleGeneration == seekGeneration else { return }
+                        guard scheduleGeneration.isCurrent(seekGeneration) else { return }
                     }
                 }
                 let startFrame = AVAudioFramePosition(clamped * audioFile.processingFormat.sampleRate)
@@ -370,7 +369,7 @@
         }
 
         func cancelPendingCompletions() {
-            scheduleGeneration &+= 1
+            _ = scheduleGeneration.begin()
         }
 
         // MARK: - macOS Engine Graph

@@ -298,7 +298,7 @@
 
         @inline(__always)
         func cancelPendingCompletions() {
-            scheduleGeneration &+= 1
+            _ = scheduleGeneration.begin()
             gaplessScheduled = false
             nextTimelineStartSampleTime = nil
         }

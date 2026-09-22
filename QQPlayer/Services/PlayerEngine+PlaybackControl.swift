@@ -36,8 +36,7 @@
             // recovery. Otherwise the 150 ms recovery for the old route can wake
             // after the new selection and reschedule the wrong playback state.
             cancelEngineConfigurationRecovery()
-            loadGeneration &+= 1
-            let generation = loadGeneration
+            let generation = loadGeneration.begin()
 
             currentLoadTask?.cancel()
             let task = Task { @MainActor [weak self] in
@@ -47,14 +46,14 @@
             currentLoadTask = task
 
             let loaded = await task.value
-            if loadGeneration == generation {
+            if loadGeneration.isCurrent(generation) {
                 currentLoadTask = nil
             }
             return loaded
         }
 
         private func isCurrentLoad(_ generation: UInt64) -> Bool {
-            loadGeneration == generation && !Task.isCancelled
+            loadGeneration.canCommit(generation)
         }
 
         private func performLoadTrack(_ track: Track, preservePlaybackTime: Bool, generation: UInt64) async -> Bool {
