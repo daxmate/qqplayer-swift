@@ -45,9 +45,33 @@ enum PlayerDismissGesture {
     }
 }
 
-/// 小歌词窗口的横向滑动手势判定（左滑开全屏歌词页 / 右滑开歌词搜索页）
-/// 阈值对称：位移 ±60pt，或快速回甩预测位移 ±120pt（与历史硬编码 -60/-120 一致）
-enum MiniLyricSwipeGesture {
+/// 播放页**整页手势**的判定（2026-09-22：作用范围从「封面 / 小歌词窗 / 控制区」扩到整页）：
+/// - 左右滑 → 全屏歌词页 / 歌词搜索页（封面横滑切歌、进度条横滑 seek 两处例外不走这里）
+/// - 上滑 → 展开「更多播放控制」；下滑 → 收起展开面板（面板未展开时则缩小主页，见 PlayerDismissGesture）
+/// 阈值与历史小歌词窗手势一致（位移 ±60pt / 快速回甩 ±120pt），只是消费点从「小歌词窗」
+/// 换成了整页——同一语义只留一份判定（旧 `MiniLyricSwipeGesture` 已删）。
+enum PlayerPageGesture {
+    /// 拖动方向（首个回调判定后锁定，横/纵互斥）
+    enum Axis {
+        case horizontal
+        case vertical
+    }
+
+    /// 方向锁定：|横向位移| > |纵向位移| 即横向
+    static func axis(translation: CGSize) -> Axis {
+        abs(translation.width) > abs(translation.height) ? .horizontal : .vertical
+    }
+
+    /// 上滑展开「更多播放控制」：上滑 ≥ 30pt
+    static func shouldExpandMoreControls(translationHeight: CGFloat) -> Bool {
+        translationHeight < -30
+    }
+
+    /// 下滑收起「更多播放控制」：下滑 ≥ 30pt
+    static func shouldCollapseMoreControls(translationHeight: CGFloat) -> Bool {
+        translationHeight > 30
+    }
+
     /// 左滑打开全屏歌词页（从右侧滑入）
     static func shouldOpenLyricsSheet(translation: CGFloat, predictedTranslation: CGFloat) -> Bool {
         translation < -60 || predictedTranslation < -120

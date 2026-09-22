@@ -5,10 +5,14 @@
 //  播放页**封面区**：封面轮播视图（当前 / 相邻）、封面拖拽手势（横滑切歌 / 下拉关闭播放页）、
 //  以及封面缓冲加载（当前 / 下一首 / 上一首，含队列邻居查询）。
 //
-//  2026-09-21 从 PlayerView.swift 原样搬出（纯搬家，无逻辑变更）。同族文件：
+//  2026-09-21 从 PlayerView.swift 原样搬出（纯搬家，无逻辑变更）。
+//  2026-09-22 整页手势上线：下拉跟手 / 收尾改用 `PlayerView+PageGestures` 的共用入口
+//  （`updatePull` / `endPull`）；面板展开时封面竖向让位给「收起面板」。
+//  同族文件：
 //    · Views/Player/PlayerView.swift                   — 视图壳：stored property + body 装配
 //    · Views/Player/PlayerView+TitleAndLyrics.swift    — 标题/歌手/收藏按钮、小歌词窗
 //    · Views/Player/PlayerView+PlaybackSupport.swift   — 睡眠定时、曲库加载、AirPlay
+//    · Views/Player/PlayerView+PageGestures.swift      — 整页手势 + 下拉跟手 / 打开歌词入口
 //
 // target: ios-only（PlayerView 分片：消费端全在 iOS；Mac 侧为 MacPlayerView）
 //
@@ -77,6 +81,12 @@ extension PlayerView {
         }
         .frame(height: min(360, UIScreen.main.bounds.width - 80))
         .clipped()
+        // 封面区 frame → 整页坐标系：整页手势据此把横滑（切歌）与下拉让给封面手势
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(PlayerPageCoordinateSpace.name))
+        } action: { frame in
+            artworkFrame = frame
+        }
     }
 
     private func currentArtworkView(size: CGFloat) -> some View {
@@ -137,14 +147,12 @@ extension PlayerView {
                         : value.translation.width * 0.16
                     let limit = pageDistance
                     dragOffset = max(-limit, min(limit, proposedOffset))
-                } else if value.translation.height > 0 {
-                    // 纵向下拉：直接驱动宿主 UIView 的 transform（UIKit 层，GPU 渲染，
-                    // 不触发 SwiftUI 状态重算/布局——避免大视图树每帧重算掉帧抖动）。
-                    // 死区过滤触摸噪声（±1-2pt）：差值小于死区不更新。
-                    let target = min(value.translation.height, pullMaxOffset)
-                    guard abs(target - lastPullY) >= 1 else { return }
-                    lastPullY = target
-                    pullHostView?.transform = CGAffineTransform(translationX: 0, y: target)
+                } else if value.translation.height > 0, !isControlsExpanded {
+                    // 纵向下拉：走整页共用的跟手通道（UIKit transform 直驱宿主 view，见 updatePull）。
+                    // 面板展开时下拉归「收起面板」（整页手势），封面不再跟手。
+                    // 死区过滤（±1pt）与限幅在 updatePull 里。
+                    isPullingPlayer = true
+                    updatePull(translationHeight: value.translation.height)
                 }
             }
             .onEnded { value in
@@ -183,47 +191,13 @@ extension PlayerView {
                     } else {
                         completeArtworkSwipe(.next, pageDistance: pageDistance)
                     }
-                } else {
+                } else if !isControlsExpanded {
                     // 纵向结束（无论最终位移方向）：达阈值/快速回甩 → 下滑滑出后关闭；否则回弹。
-                    // 全部用 UIKit 动画驱动宿主 view（与跟手同一通道，动画衔接顺滑）
-                    let shouldDismiss = PlayerDismissGesture.shouldDismissPlayer(
-                        pullOffset: value.translation.height,
+                    // 面板展开时竖向归「收起面板」（整页手势）。
+                    endPull(
+                        translationHeight: value.translation.height,
                         predictedHeight: value.predictedEndTranslation.height
                     )
-                    guard let hostView = pullHostView else { return }
-                    if shouldDismiss {
-                        // 跟手滑出屏幕后关闭（Apple Music 风格）。
-                        // completion 不复位 transform：视图即将被 dismiss 销毁，
-                        // 复位会在关闭前闪回原位（造成"动画出现两次"）
-                        UIView.animate(
-                            withDuration: 0.24,
-                            delay: 0,
-                            options: [.curveEaseIn],
-                            animations: {
-                                hostView.transform = CGAffineTransform(
-                                    translationX: 0,
-                                    y: UIScreen.main.bounds.height
-                                )
-                            },
-                            completion: { _ in
-                                NotificationCenter.default.post(
-                                    name: .minimizePlayer,
-                                    object: nil
-                                )
-                            }
-                        )
-                    } else {
-                        UIView.animate(
-                            withDuration: 0.35,
-                            delay: 0,
-                            usingSpringWithDamping: 0.82,
-                            initialSpringVelocity: 0.4,
-                            options: [.curveEaseOut]
-                        ) {
-                            hostView.transform = .identity
-                        }
-                    }
-                    lastPullY = 0
                 }
             }
     }

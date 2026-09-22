@@ -1,23 +1,26 @@
 import SwiftUI
 
 /// 播放页折叠控制容器：常驻进度条 + 三键（上一首/播放暂停/下一首），
-/// 上滑展开更多按钮（播放顺序 + 队列/定时/歌词/隔空播放），下滑收起。
+/// 上滑展开更多按钮（播放顺序 + 队列/定时/隔空播放），下滑收起。
 /// 三键行与展开工具行均为透明容器：按钮用 Spacer 均匀分布、与进度条同宽。
+///
+/// 2026-09-22：展开/收起手势改由**整页手势**驱动（展开状态提升为 `isExpanded` Binding，
+/// 见 `PlayerView+PageGestures`）——容器内原来那份 DragGesture 已删，避免两套阈值打架；
+/// 展开区的「歌词」按钮同时取消（左滑整页任意位置即开全屏歌词）。
 struct CollapsiblePlayerControls: View {
     @Environment(PlayerEngine.self) private var playerEngine
-    @State private var isExpanded = false
+    /// 展开状态由 PlayerView 持有（整页手势要读写）：上滑展开 / 下滑先收起 / 封面让位
+    @Binding var isExpanded: Bool
 
     let duration: TimeInterval
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
     let onSeek: (TimeInterval) -> Void
     let showSleepTimerButton: Bool
-    let isLoadingLyrics: Bool
     let sleepTimerEndDate: Date?
     let onStartSleepTimer: (Int) -> Void
     let onCancelSleepTimer: () -> Void
     let onShowQueue: () -> Void
-    let onShowLyrics: () -> Void
     let onShowAirPlay: () -> Void
 
     var body: some View {
@@ -37,27 +40,6 @@ struct CollapsiblePlayerControls: View {
                 chevronIndicator
             }
         }
-        // 全容器可滑动：contentShape 把命中区域扩展到整个容器（含按钮间空隙），
-        // simultaneousGesture 保证在按钮上拖动也能识别（轻点仍归按钮），
-        // 用户可特意挑空白处滑动避免误触。
-        .contentShape(Rectangle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 12)
-                .onEnded { value in
-                    // 进度条区域（顶部约 60pt：进度条 + 时间标签）的滑动归 seek 拖动独占，
-                    // 不参与展开/收起，避免拖进度条时手指微斜误触折叠。
-                    guard value.startLocation.y > 60 else { return }
-                    if value.translation.height < -30, !isExpanded {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isExpanded = true
-                        }
-                    } else if value.translation.height > 30, isExpanded {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isExpanded = false
-                        }
-                    }
-                }
-        )
     }
 
     // MARK: - 常驻三键行
@@ -148,17 +130,16 @@ struct CollapsiblePlayerControls: View {
         .padding(.vertical, DesignTokens.space8)
     }
 
-    /// 辅助行：定时（可开关）/ 歌词（歌词第一重要，恒显示）
-    private var accessoryRow: some View {
-        HStack(spacing: DesignTokens.space0) {
-            if showSleepTimerButton {
+    /// 辅助行：定时（可开关）。歌词按钮已于 2026-09-22 取消（左滑整页任意位置即开全屏歌词）
+    @ViewBuilder private var accessoryRow: some View {
+        if showSleepTimerButton {
+            HStack(spacing: DesignTokens.space0) {
                 sleepTimerButton
                 Spacer()
             }
-            lyricsButton
+            .padding(.horizontal, DesignTokens.space8)
+            .padding(.vertical, DesignTokens.space8)
         }
-        .padding(.horizontal, DesignTokens.space8)
-        .padding(.vertical, DesignTokens.space8)
     }
 
     // 播放顺序四态轮换按钮：顺序播放 → 随机播放 → 循环列表 → 单曲循环（仅图标，无文字）
@@ -223,27 +204,6 @@ struct CollapsiblePlayerControls: View {
                 .foregroundColor(.primary)
                 .frame(width: 56, height: 56)
                 .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
-    private var lyricsButton: some View {
-        Button(action: {
-            onShowLyrics()
-        }) {
-            ZStack {
-                Image(systemName: "quote.bubble")
-                    .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title2 : .title)
-                    .foregroundColor(.primary)
-
-                if isLoadingLyrics {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .offset(x: 15, y: -10)
-                }
-            }
-            .frame(width: 56, height: 56)
-            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }

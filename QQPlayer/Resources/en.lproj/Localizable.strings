@@ -428,9 +428,9 @@
 /* Contextual hints (first-use bubbles) */
 "hint_dismiss" = "Dismiss";
 "hint_playback_title" = "Player Page Gestures";
-"hint_playback_line1" = "Tap or swipe left on the mini lyrics to open full-screen lyrics";
-"hint_playback_line2" = "Swipe right on the mini lyrics to search / assign lyrics manually";
-"hint_playback_line3" = "Pull down on the artwork to close the player";
+"hint_playback_line1" = "Tap the mini lyrics or swipe left anywhere: full-screen lyrics";
+"hint_playback_line2" = "Swipe right anywhere: search / assign lyrics manually";
+"hint_playback_line3" = "Swipe up: more controls. Swipe down: hide them / close the player";
 "hint_full_lyrics_title" = "Full-Screen Lyrics";
 "hint_full_lyrics_line1" = "Double-tap anywhere to start karaoke (speed / AB loop / single-line loop)";
 "hint_full_lyrics_line2" = "Swipe right to return to the player";
