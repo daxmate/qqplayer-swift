@@ -588,11 +588,11 @@
 
 "hint_playback_title" = "播放頁手勢";
 
-"hint_playback_line1" = "單擊或左滑小歌詞窗：進入全屏歌詞";
+"hint_playback_line1" = "單擊小歌詞窗或左滑頁面：進入全屏歌詞";
 
-"hint_playback_line2" = "右滑小歌詞窗：搜尋 / 手動指定歌詞";
+"hint_playback_line2" = "右滑頁面：搜尋 / 手動指定歌詞";
 
-"hint_playback_line3" = "下拉封面：關閉播放頁";
+"hint_playback_line3" = "上滑頁面：更多播放控制；下滑：收起控制 / 縮回主頁";
 
 "hint_full_lyrics_title" = "全屏歌詞頁";
 

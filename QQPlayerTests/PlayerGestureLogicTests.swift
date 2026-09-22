@@ -4,7 +4,8 @@
 //
 //  播放页/歌词页手势判定与歌词时间轴纯逻辑测试：
 //  - LyricTiming.activeLineIndex：当前播放时间 → 当前歌词行
-//  - PlayerDismissGesture：歌词页右滑关闭 / 播放页下拉关闭阈值
+//  - PlayerDismissGesture：歌词页右滑关闭 / 歌词搜索页左滑关闭 / 播放页下拉关闭阈值
+//  - PlayerPageGesture：播放页整页手势（方向锁定、左右滑开歌词/搜索、上下滑展开/收起）
 //
 
 import Foundation
@@ -144,48 +145,90 @@ struct PlayerDismissGestureTests {
     }
 }
 
-struct MiniLyricSwipeGestureTests {
-    // ---- 左滑打开全屏歌词页（阈值与历史硬编码 -60/-120 一致） ----
+struct PlayerPageGestureTests {
+    // ---- 方向锁定 ----
+
+    @Test("方向锁定：|横向| > |纵向| 即横向")
+    func axisLock() {
+        #expect(PlayerPageGesture.axis(translation: CGSize(width: 80, height: 10)) == .horizontal)
+        #expect(PlayerPageGesture.axis(translation: CGSize(width: -80, height: 10)) == .horizontal)
+        #expect(PlayerPageGesture.axis(translation: CGSize(width: 10, height: 80)) == .vertical)
+        #expect(PlayerPageGesture.axis(translation: CGSize(width: 10, height: -80)) == .vertical)
+        // 相等时算纵向（与封面手势同口径：宁可不开歌词也不要误当成横滑）
+        #expect(PlayerPageGesture.axis(translation: CGSize(width: 50, height: 50)) == .vertical)
+    }
+
+    // ---- 上滑展开 / 下滑收起更多控制 ----
+
+    @Test("上滑 ≥30pt：展开更多控制")
+    func expandMoreControls() {
+        #expect(PlayerPageGesture.shouldExpandMoreControls(translationHeight: -31) == true)
+        #expect(PlayerPageGesture.shouldExpandMoreControls(translationHeight: -200) == true)
+    }
+
+    @Test("上滑未达 30pt：不展开")
+    func expandMoreControlsBelowThreshold() {
+        #expect(PlayerPageGesture.shouldExpandMoreControls(translationHeight: -30) == false)
+        #expect(PlayerPageGesture.shouldExpandMoreControls(translationHeight: 0) == false)
+        // 下滑不触发展开
+        #expect(PlayerPageGesture.shouldExpandMoreControls(translationHeight: 50) == false)
+    }
+
+    @Test("下滑 ≥30pt：收起更多控制")
+    func collapseMoreControls() {
+        #expect(PlayerPageGesture.shouldCollapseMoreControls(translationHeight: 31) == true)
+        #expect(PlayerPageGesture.shouldCollapseMoreControls(translationHeight: 200) == true)
+    }
+
+    @Test("下滑未达 30pt：不收面板")
+    func collapseMoreControlsBelowThreshold() {
+        #expect(PlayerPageGesture.shouldCollapseMoreControls(translationHeight: 30) == false)
+        #expect(PlayerPageGesture.shouldCollapseMoreControls(translationHeight: 0) == false)
+        // 上滑不触发收起
+        #expect(PlayerPageGesture.shouldCollapseMoreControls(translationHeight: -50) == false)
+    }
+
+    // ---- 左滑打开全屏歌词页（阈值与历史小歌词窗手势 -60/-120 一致） ----
 
     @Test("左滑位移超 60pt：打开歌词页")
     func openLyricsSheetLargeSwipe() {
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: -61, predictedTranslation: 0) == true)
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: -300, predictedTranslation: -50) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: -61, predictedTranslation: 0) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: -300, predictedTranslation: -50) == true)
     }
 
     @Test("左滑快速回甩（预测 < -120pt）：打开歌词页")
     func openLyricsSheetFlick() {
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: -20, predictedTranslation: -121) == true)
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: -59, predictedTranslation: -200) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: -20, predictedTranslation: -121) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: -59, predictedTranslation: -200) == true)
     }
 
     @Test("左滑未达阈值且非快速回甩：不打开")
     func openLyricsSheetSmallSwipe() {
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: -59, predictedTranslation: -100) == false)
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: -30, predictedTranslation: -119) == false)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: -59, predictedTranslation: -100) == false)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: -30, predictedTranslation: -119) == false)
         // 右滑（正位移）不触发
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSheet(translation: 100, predictedTranslation: 200) == false)
+        #expect(PlayerPageGesture.shouldOpenLyricsSheet(translation: 100, predictedTranslation: 200) == false)
     }
 
     // ---- 右滑打开歌词搜索页（与左滑阈值对称） ----
 
     @Test("右滑位移超 60pt：打开搜索页")
     func openLyricsSearchLargeSwipe() {
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: 61, predictedTranslation: 0) == true)
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: 300, predictedTranslation: 50) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: 61, predictedTranslation: 0) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: 300, predictedTranslation: 50) == true)
     }
 
     @Test("右滑快速回甩（预测 > 120pt）：打开搜索页")
     func openLyricsSearchFlick() {
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: 20, predictedTranslation: 121) == true)
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: 59, predictedTranslation: 200) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: 20, predictedTranslation: 121) == true)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: 59, predictedTranslation: 200) == true)
     }
 
     @Test("右滑未达阈值且非快速回甩：不打开")
     func openLyricsSearchSmallSwipe() {
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: 59, predictedTranslation: 100) == false)
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: 30, predictedTranslation: 119) == false)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: 59, predictedTranslation: 100) == false)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: 30, predictedTranslation: 119) == false)
         // 左滑（负位移）不触发
-        #expect(MiniLyricSwipeGesture.shouldOpenLyricsSearch(translation: -100, predictedTranslation: -200) == false)
+        #expect(PlayerPageGesture.shouldOpenLyricsSearch(translation: -100, predictedTranslation: -200) == false)
     }
 }

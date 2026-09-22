@@ -132,7 +132,8 @@ extension PlayerView {
     // MARK: - Mini Lyrics Section
 
     // 封面下方的小歌词窗口：三行（上一句/当前句/下一句），当前句放大 + 主题色
-    // 点击/左滑进入全屏歌词，右滑打开歌词搜索页（从左滑入）
+    // 点击/双击进全屏歌词；左右滑**不再挂在本视图上**（2026-09-22 整页手势接管：
+    // 全页任意位置左滑=全屏歌词 / 右滑=歌词搜索，详见 PlayerView+PageGestures）
     /// 分片：跨文件可见（原 private）
     var lyricMiniSection: some View {
         LyricMiniSection(
@@ -143,60 +144,21 @@ extension PlayerView {
         // 点击进全屏歌词页（普通视图 + onTapGesture：与 DragGesture 仲裁标准，
         // 不用 Button——Button 手势优先级高，快速右滑会误触发 tap 直接进歌词页）
         .onTapGesture {
-            withAnimation(.easeOut(duration: 0.26)) {
-                showLyricsSheet = true
-            }
-            if currentLyrics == nil && !isLoadingLyrics {
-                loadLyrics()
-            }
+            openLyricsSheet()
         }
-        // 左滑 → 全屏歌词页（从右侧滑入）；右滑 → 歌词搜索页（从左侧滑入）
-        .gesture(
-            DragGesture(minimumDistance: 12)
-                .onEnded { value in
-                    if MiniLyricSwipeGesture.shouldOpenLyricsSheet(
-                        translation: value.translation.width,
-                        predictedTranslation: value.predictedEndTranslation.width
-                    ) {
-                        withAnimation(.easeOut(duration: 0.26)) {
-                            showLyricsSheet = true
-                        }
-                        if currentLyrics == nil && !isLoadingLyrics {
-                            loadLyrics()
-                        }
-                    } else if MiniLyricSwipeGesture.shouldOpenLyricsSearch(
-                        translation: value.translation.width,
-                        predictedTranslation: value.predictedEndTranslation.width
-                    ) {
-                        withAnimation(.easeOut(duration: 0.26)) {
-                            showLyricsSearch = true
-                        }
-                    }
-                }
-        )
         // 双击：进全屏歌词页并开启跟唱（跟唱只发生在全屏歌词页，小窗口空间小不做控制条）。
         // 与单击（仅进全屏歌词页）共存：双击优先，单击等双击窗口判定失败后触发（~0.3s 延迟可接受）；
-        // 与左/右滑 DragGesture 也不冲突（双击无位移，拖动判失败后滑动手势接管）。
+        // 整页 DragGesture（simultaneous）不抢 tap：拖动无 tap，单击落在本视图上照旧。
         .highPriorityGesture(
             TapGesture(count: 2)
                 .onEnded {
                     karaoke.setKaraokeOn(true)
-                    withAnimation(.easeOut(duration: 0.26)) {
-                        showLyricsSheet = true
-                    }
-                    if currentLyrics == nil && !isLoadingLyrics {
-                        loadLyrics()
-                    }
+                    openLyricsSheet()
                 }
         )
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
-            withAnimation(.easeOut(duration: 0.26)) {
-                showLyricsSheet = true
-            }
-            if currentLyrics == nil && !isLoadingLyrics {
-                loadLyrics()
-            }
+            openLyricsSheet()
         }
     }
 

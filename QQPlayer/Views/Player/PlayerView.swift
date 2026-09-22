@@ -44,6 +44,17 @@ struct PlayerView: View {
     /// 下拉最后应用的位移（死区用）：UIKit 驱动下触摸噪声同样会导致 transform 微变
     /// 分片：跨文件可见（原 private）
     @State var lastPullY: CGFloat = 0
+    /// 「更多播放控制」是否展开（2026-09-22 从 CollapsiblePlayerControls 提升到壳）：
+    /// 整页手势要读写它（上滑展开 / 下滑先收起），封面手势要据此让位
+    @State var isControlsExpanded = false
+    /// 整页手势的方向锁定（与封面手势各持一份，互不干扰）
+    @State var pageDragAxis: Axis?
+    /// 封面区 frame（整页坐标系）：横滑切歌与下拉都归封面手势，整页手势按此排除
+    @State var artworkFrame: CGRect = .zero
+    /// 控制容器 frame（整页坐标系）：顶部 60pt = 进度条区（seek 独占）
+    @State var controlsFrame: CGRect = .zero
+    /// 是否正由「非封面」的下拉跟手驱动宿主 view（onEnded 据此回弹 / 缩回主页）
+    @State var isPullingPlayer = false
     /// 分片：跨文件可见（原 private）
     @State var isAnimating = false
     /// 分片：跨文件可见（原 private）
@@ -173,6 +184,8 @@ struct PlayerView: View {
                 .zIndex(10)
             }
         }
+        // 整页手势与区域 frame 回传共用的坐标空间（见 PlayerView+PageGestures）
+        .coordinateSpace(name: PlayerPageCoordinateSpace.name)
         // 封面下拉跟手：播放页整体下移（UIKit transform 驱动，见 artworkDragGesture）
         // 不用 .animation(value:) 修饰符：会泄漏隐式动画到手势跟手更新（iOS 17+
         // 事务变更后 withTransaction(.continuous) 不再可靠禁用），导致下拉抖动；
@@ -187,6 +200,10 @@ struct PlayerView: View {
             // （5% 屏宽，夹在 16…20pt 之间），不是「哪个档位」的选择，无法表达为刻度令牌。
             .padding(.horizontal, max(16, min(20, UIScreen.main.bounds.width * 0.05)))
             .padding(.vertical)
+            // 整页手势（2026-09-22）：整页可滑先要整页可命中（VStack 默认命中区不含间距空隙），
+            // 再挂 simultaneousGesture——按钮上的拖动也识别，轻点仍归按钮（同 ios-dev.md §10 的做法）
+            .contentShape(Rectangle())
+            .simultaneousGesture(pageDragGesture)
             .onChange(of: playerEngine.currentTrack) { _, _ in
                 // 切歌统一处理器（合并原三个独立 onChange：复位拖拽 / 查收藏 / 清歌词重载 +
                 // 标题/歌手元数据缓存）。执行顺序与原书写顺序一致，避免多个 onChange 依赖书写顺序埋雷。
@@ -285,6 +302,7 @@ struct PlayerView: View {
                 Spacer(minLength: UIScreen.main.scale < UIScreen.main.nativeScale ? 16 : 20)
 
                 CollapsiblePlayerControls(
+                    isExpanded: $isControlsExpanded,
                     duration: playerEngine.duration,
                     onSeek: { newTime in
                         Task {
@@ -292,7 +310,6 @@ struct PlayerView: View {
                         }
                     },
                     showSleepTimerButton: settings.showSleepTimerButton,
-                    isLoadingLyrics: isLoadingLyrics,
                     sleepTimerEndDate: sleepTimerEndDate,
                     onStartSleepTimer: { minutes in
                         startSleepTimer(minutes: minutes)
@@ -303,18 +320,16 @@ struct PlayerView: View {
                     onShowQueue: {
                         showQueueSheet = true
                     },
-                    onShowLyrics: {
-                        withAnimation(.easeOut(duration: 0.26)) {
-                            showLyricsSheet = true
-                        }
-                        if currentLyrics == nil && !isLoadingLyrics {
-                            loadLyrics()
-                        }
-                    },
                     onShowAirPlay: {
                         showAirPlayPicker()
                     }
                 )
+                // 控制容器 frame → 整页坐标系：顶部 60pt 是进度条区（横滑归 seek，不参与歌词滑动）
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: .named(PlayerPageCoordinateSpace.name))
+                } action: { frame in
+                    controlsFrame = frame
+                }
             } else {
                 Spacer()
                 emptyStateView

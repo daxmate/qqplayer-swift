@@ -386,9 +386,9 @@
 /* Contextual hints (首次提示气泡) */
 "hint_dismiss" = "关闭";
 "hint_playback_title" = "播放页手势";
-"hint_playback_line1" = "单击或左滑小歌词窗：进入全屏歌词";
-"hint_playback_line2" = "右滑小歌词窗：搜索 / 手动指定歌词";
-"hint_playback_line3" = "下拉封面：关闭播放页";
+"hint_playback_line1" = "单击小歌词窗或左滑页面：进入全屏歌词";
+"hint_playback_line2" = "右滑页面：搜索 / 手动指定歌词";
+"hint_playback_line3" = "上滑页面：更多播放控制；下滑：收起控制 / 缩回主页";
 "hint_full_lyrics_title" = "全屏歌词页";
 "hint_full_lyrics_line1" = "双击任意位置：开启跟唱（倍速 / AB / 单句循环）";
 "hint_full_lyrics_line2" = "向右滑：返回播放页";
