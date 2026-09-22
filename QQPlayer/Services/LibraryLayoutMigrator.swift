@@ -314,6 +314,14 @@ final class LibraryLayoutMigrator: @unchecked Sendable {
             }
 
             let name = entry.lastPathComponent
+            // 封面映射表**不是待搬文件**：它是元数据，由 `ArtworkManager`（映射读写唯一入口）
+            // 在启动时把「旧位置 ∪ 新位置」合并后写进新位置（`Documents/Artwork/`），每次启动都跑。
+            // 这里按普通文件搬会引入两条丢映射的路径（详见规则函数的注释）；旧位置**保持不动**
+            // 作为只读兼底（`ArtworkManager.loadMapping` 每次都读它）。
+            guard !LibraryLayoutMigrationRules.isArtworkMappingFileName(name) else {
+                AppLog.info(.migration, "📦 LibraryLayout: 封面映射表按元数据语义不搬（由 ArtworkManager 合并），旧位置保留：\(name)")
+                continue
+            }
             guard let category = LibraryLayoutMigrationRules.category(
                 rootFileName: name,
                 directoryName: nil,

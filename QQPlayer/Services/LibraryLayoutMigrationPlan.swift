@@ -55,6 +55,19 @@ enum LibraryLayoutMigrationRules {
         (LibraryRoot.artworkMappingFileName, .artwork),
     ]
 
+    /// 封面映射表是**元数据**，不是待搬文件 / 缓存文件。
+    ///
+    /// 映射表的读写唯一入口是 `ArtworkManager`（它持有内存副本 + 去抖写盘；
+    /// 背着它改 plist 会被下一次 `saveMapping()` 覆盖回去 —— 同 `TrackIdentityMigration` 口径）：
+    /// "旧位置 ∪ 新位置"的合并由它在启动时（`loadMapping`）完成并落到新位置，每次都跑。
+    ///
+    /// 一次性迁移器**不得**把它当普通文件搬：
+    ///   · 搬进 `Artwork/` 后会与「缓存清理把该目录当纯缓存」叠加 ⇒ 映射表被当孤儿删（2026-09-22 回归），
+    ///   · 目标已存在而整项跳过 ⇒ 旧位置成为**读不到的**死文件（`loadMapping` 以新位置优先）。
+    static func isArtworkMappingFileName(_ name: String) -> Bool {
+        name == LibraryRoot.artworkMappingFileName
+    }
+
     /// Documents 根下的日志文件名（固定名）。
     static let legacyLogFileNames: Set<String> = [
         "app.log",

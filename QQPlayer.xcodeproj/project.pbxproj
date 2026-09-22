@@ -184,6 +184,7 @@
 		EE39748271D74A668437ABFA /* PlaybackGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82BA8C26369946C594E6717C /* PlaybackGenerationTests.swift */; };
 		FE470FDE00714C7FB6A9F2A6 /* LibraryIndexerMetadataRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7509751D5D9F42D493C84F89 /* LibraryIndexerMetadataRefreshTests.swift */; };
 		103DC522D758495DB1EFB141 /* LibraryLayoutMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052F578659084255BD1A7675 /* LibraryLayoutMigrationTests.swift */; };
+		67617F08FF4142B4882365BC /* ArtworkCacheSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F148D93B8598473997240CEA /* ArtworkCacheSafetyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -417,6 +418,7 @@
 		82BA8C26369946C594E6717C /* PlaybackGenerationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackGenerationTests.swift; sourceTree = "<group>"; };
 		7509751D5D9F42D493C84F89 /* LibraryIndexerMetadataRefreshTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryIndexerMetadataRefreshTests.swift; sourceTree = "<group>"; };
 		052F578659084255BD1A7675 /* LibraryLayoutMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryLayoutMigrationTests.swift; sourceTree = "<group>"; };
+		F148D93B8598473997240CEA /* ArtworkCacheSafetyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkCacheSafetyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1179,6 +1181,7 @@
 				82BA8C26369946C594E6717C /* PlaybackGenerationTests.swift */,
 				7509751D5D9F42D493C84F89 /* LibraryIndexerMetadataRefreshTests.swift */,
 				052F578659084255BD1A7675 /* LibraryLayoutMigrationTests.swift */,
+				F148D93B8598473997240CEA /* ArtworkCacheSafetyTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1661,6 +1664,7 @@
 				EE39748271D74A668437ABFA /* PlaybackGenerationTests.swift in Sources */,
 				FE470FDE00714C7FB6A9F2A6 /* LibraryIndexerMetadataRefreshTests.swift in Sources */,
 				103DC522D758495DB1EFB141 /* LibraryLayoutMigrationTests.swift in Sources */,
+				67617F08FF4142B4882365BC /* ArtworkCacheSafetyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

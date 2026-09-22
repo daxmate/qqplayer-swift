@@ -51,6 +51,11 @@ class ArtworkManager {
     // In-memory mapping cache
     @ObservationIgnored var artworkMapping: [String: String] = [:]
 
+    /// 映射表某处**存在但读不出来**（解析失败）= 映射内容未知。
+    /// 只由 `loadMapping()`（`ArtworkCache.swift`，跨文件扩展）写入；
+    /// 清理路径据此 fail-safe（未知 ≠ 空，见 `shouldPruneArtworkCache`）。
+    @ObservationIgnored var mappingUnreadable = false
+
     @ObservationIgnored private let maxMemoryCacheItems = 250
     @ObservationIgnored private let maxMemoryCacheCost = 40 * 1024 * 1024
 
