@@ -146,6 +146,104 @@ struct PlayerDismissGestureTests {
 }
 
 struct PlayerPageGestureTests {
+    // ---- 起手区域分流（2026-09-22 复核 ① / ②） ----
+
+    /// 封面区 frame（整页坐标系示例）
+    private let artworkFrame = CGRect(x: 20, y: 100, width: 360, height: 360)
+    /// 进度条实测 frame（布局高 1pt）
+    private let progressBarFrame = CGRect(x: 24, y: 600, width: 345, height: 1)
+    private var progressFrame: CGRect {
+        PlayerPageGesture.progressTouchRegion(barFrame: progressBarFrame)
+    }
+
+    @Test("封面区 + 无可切换相邻曲目（队列 ≤1）：判定为 .page（左右滑仍开歌词 / 搜索）")
+    func regionArtworkWithoutAdjacentTrackFallsBackToPage() {
+        let inside = CGPoint(x: artworkFrame.midX, y: artworkFrame.midY)
+        #expect(PlayerPageGesture.region(
+            startLocation: inside,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame,
+            canSwitchTrack: false
+        ) == .page)
+    }
+
+    @Test("封面区 + 有相邻曲目（队列 >1）：仍为 .artwork（横滑切歌不受影响）")
+    func regionArtworkWithAdjacentTrackKeepsArtwork() {
+        let inside = CGPoint(x: artworkFrame.midX, y: artworkFrame.midY)
+        #expect(PlayerPageGesture.region(
+            startLocation: inside,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame,
+            canSwitchTrack: true
+        ) == .artwork)
+        // 队列 >1 与 ≤1 只差这一个事实，其余区域判定不变
+        #expect(PlayerPageGesture.region(
+            startLocation: inside,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame,
+            canSwitchTrack: false
+        ) == .page)
+    }
+
+    @Test("进度条区起手：横向归 .progress；纵向不入整页手势")
+    func regionProgressOwnsHorizontalAndVertical() {
+        let onBar = CGPoint(x: progressBarFrame.midX, y: progressBarFrame.midY)
+        #expect(PlayerPageGesture.region(
+            startLocation: onBar,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame,
+            canSwitchTrack: false
+        ) == .progress)
+        #expect(PlayerPageGesture.ownsVerticalPull(
+            startLocation: onBar,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame
+        ) == false)
+    }
+
+    @Test("封面区起手纵向：仍归封面手势（整页不下拉）")
+    func verticalPullExcludesArtwork() {
+        let inside = CGPoint(x: artworkFrame.midX, y: artworkFrame.midY)
+        #expect(PlayerPageGesture.ownsVerticalPull(
+            startLocation: inside,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame
+        ) == false)
+    }
+
+    @Test("其余整页区起手纵向：归整页手势（下拉缩回主页）")
+    func verticalPullOutsideExceptions() {
+        let middle = CGPoint(x: 200, y: 520)
+        #expect(PlayerPageGesture.ownsVerticalPull(
+            startLocation: middle,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame
+        ) == true)
+        #expect(PlayerPageGesture.region(
+            startLocation: middle,
+            artworkFrame: artworkFrame,
+            progressFrame: progressFrame,
+            canSwitchTrack: true
+        ) == .page)
+    }
+
+    @Test("进度条触摸区：实测 frame 上下各外扩 progressTouchSlop；未测量到 fram 时不排除任何点")
+    func progressTouchRegionShape() {
+        let slop = PlayerPageGesture.progressTouchSlop
+        let region = PlayerPageGesture.progressTouchRegion(barFrame: progressBarFrame)
+        #expect(region.height == progressBarFrame.height + 2 * slop)
+        #expect(region.width == progressBarFrame.width)
+        #expect(region.minX == progressBarFrame.minX)
+        #expect(region.contains(CGPoint(x: progressBarFrame.midX, y: progressBarFrame.minY - slop)))
+        #expect(region.contains(CGPoint(x: progressBarFrame.midX, y: progressBarFrame.maxY + slop - 0.5)))
+        // 超出外扩量即不再算进度条区（旧实现写死 60pt，会把时间标签行一并吃掉）
+        #expect(region.contains(CGPoint(x: progressBarFrame.midX, y: progressBarFrame.maxY + slop + 1)) == false)
+        // 外扩量远小于与时间标签行的间距（12/16pt），不抢标签行的横向手势
+        #expect(slop < 12)
+        // frame 未测量到（.zero）：不排除任何点
+        #expect(PlayerPageGesture.progressTouchRegion(barFrame: .zero) == .null)
+    }
+
     // ---- 方向锁定 ----
 
     @Test("方向锁定：|横向| > |纵向| 即横向")
