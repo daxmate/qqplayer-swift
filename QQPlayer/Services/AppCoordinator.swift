@@ -71,16 +71,19 @@ class AppCoordinator {
                 AppLog.info(.general, "📦 LibraryLayout: \(layoutSummary.logLine)")
             }
 
-            // 2026-09-22 隐藏布局（v2）：Documents 根部只留 `Music/` 可见，其余全部收进
-            // `Documents/.qqplayer/`。**顺序在 v1 之后、首次扫描之前**（v1 建的那几个
-            // 目录也在 v2 的搬迁范围内）；两道完成门独立。同样幂等 + 只搬不删 + 冲突不覆盖 +
-            // 失败下次重试；`--hidden-layout-dry-run` 启动参数可先看清单再放手。
+            // 2026-09-22 隐藏布局（v2.1）：Documents 根部只留 `Music/` 可见，其余全部收进
+            // `Documents/.qqplayer/`。**这里是收尾一轮**（顺序在 v1 之后、首次扫描之前：v1 会
+            // 无条件建出 `Documents/{Music,Lyrics,Artwork,Logs}`，必须等它建完/办完才能收尾）；
+            // 而「组件先建隐藏目录」的问题由 `AppDelegate.didFinishLaunching` 首句的
+            // `runStartupPrepass()`（早于任何组件构造，见迁移器文件头「启动时机不变量」）先抢一步。
+            // 两道完成门独立、且与 v1 门独立。幂等 + 只搬不删 + 冲突递归合并/改名（绝不覆盖）+
+            // 有残留不置门；`--hidden-layout-dry-run` 启动参数可先看清单再放手。
             // DB 三件套不归 v2，由 `DatabaseManager` 在打开连接之前搬（见其注释）。
             let hiddenSummary = await Self.runHiddenLayoutMigration()
             if hiddenSummary.alreadyCompleted {
-                AppLog.info(.general, "🫥 HiddenLayout v2: 已完成过（完成门置位，本轮跳过）")
+                AppLog.info(.general, "🫥 HiddenLayout v2.1: 已完成过（完成门置位，本轮跳过）")
             } else {
-                AppLog.info(.general, "🫥 HiddenLayout v2: \(hiddenSummary.logLine)")
+                AppLog.info(.general, "🫥 HiddenLayout v2.1（收尾一轮）: \(hiddenSummary.logLine)")
             }
         #endif
 
@@ -122,7 +125,7 @@ class AppCoordinator {
             }
         }
 
-        /// 跑一轮隐藏布局迁移（v2），等它跑完（动作本身在迁移器的后台串行队列上）。
+        /// 跑一轮隐藏布局收尾（v2.1），等它跑完（动作本身在迁移器的后台串行队列上）。
         private static func runHiddenLayoutMigration() async -> LibraryLayoutMigrationV2Migrator.Summary {
             await withCheckedContinuation { continuation in
                 LibraryLayoutMigrationV2Migrator.shared.runInBackground { summary in

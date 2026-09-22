@@ -27,11 +27,23 @@
 //  因此不存在 v1 那种「先搬文件后改 DB」的顺序问题。
 //
 //  —— 硬约束 ——
-//   · **只搬不删**：全程只有 move；搬不动的留在原处并记账。
-//   · **冲突不覆盖**：目标已存在 → 跳过、保留原件。
+//   · **只搬不删**：全程只有 move（含改名）；搬不动的留在原处并记账。
+//   · **冲突不覆盖**：目标已存在 → 见下（目录合并 / 文件改名），**绝不覆盖、绝不删除**。
 //   · **未规划条目不动**：不在映射表里的根条目一律保留（保守，记入 `kept`）。
 //   · **同步协议目录不动**：`.sync-incoming/` 属同步链路语义（曲库根内隐藏目录），
 //     保留原位（见 `keepInPlaceReasons`）。
+//
+//  —— v2.1 修正：冲突要「合并」，不是「整项跳过」——
+//  真机失败证据（2026-09-22，设备 `00dax's iPhone`，v2 `03f867e`）：启动期各组件
+//  （`ArtworkManager` / 各 API 缓存 / 状态与日志）**先**把隐藏目标目录建好，迁移**后**跑，
+//  于是 10 个根条目一律命中「目标已存在 ⇒ 整项跳过」而留在 `Documents/` 根上：
+//  `Artwork/ Logs/ Lyrics/ lyrics-cache/ qqplayer-playlists/ SpotifyCache/ DiscogsCache/`
+//  `HybridMusicCache/ app.log db-debug.log`。
+//  · 对**目录**：目标目录已存在 ⇒ **递归合并**（逐子项处理），子项同名 ⇒ **改名后缀**
+//    （`<name>.legacy-<yyyyMMdd-HHmmss>`）搬入；合并后源目录成空壳 ⇒ 空壳也**不删**，
+//    改名后缀搬进隐藏回收区 `trash/`。
+//  · 对**同名文件**（`app.log` / `db-debug.log` 与新位置同名）⇒ 同样改名后缀搬入。
+//  最终目标不变：**根上不留任何可搬条目**，且旧数据一个字节不丢。
 //
 
 import Foundation
@@ -87,6 +99,41 @@ enum LibraryLayoutMigrationV2Rules {
         "\(LibraryRoot.musicLibraryFileName)-shm",
         "\(LibraryRoot.musicLibraryFileName)-wal",
     ]
+
+    // MARK: - 冲突改名（v2.1：目标同名 ⇒ 改名后缀搬入，绝不覆盖）
+
+    /// 改名后缀前缀（`app.log` → `app.log.legacy-20260922-153000`）。
+    static let legacySuffixPrefix = ".legacy-"
+
+    /// 改名后缀的时间戳（`yyyyMMdd-HHmmss`，设备本地时区）—— 后缀的**唯一生成点**。
+    /// 一轮迁移只取一次（同一轮内所有改名共用同一个 ts，便于人工按批次识别）。
+    static func legacyTimestamp(_ date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: date)
+    }
+
+    /// 目标名 → 改名后的名字。**调用方负责确认落点可用**（本函数不探盘）。
+    static func legacyName(_ name: String, timestamp: String, attempt: Int = 1) -> String {
+        let base = "\(name)\(legacySuffixPrefix)\(timestamp)"
+        return attempt <= 1 ? base : "\(base)-\(attempt)"
+    }
+
+    /// 目标同名文件的改名落点（同父目录 + 后缀）。
+    static func legacySiblingPath(of destinationRelativePath: String, timestamp: String) -> String {
+        let components = destinationRelativePath.split(separator: "/").map(String.init)
+        guard let name = components.last else { return destinationRelativePath }
+        let renamed = legacyName(name, timestamp: timestamp)
+        return (components.dropLast() + [renamed]).joined(separator: "/")
+    }
+
+    /// 合并后空壳目录的落点：隐藏回收区 `trash/` 下的改名条目
+    /// （只搬不删 —— 空壳也不删，改名后移入回收区，根目录才干净）。
+    static func shellSweepDestination(sourceRelativePath: String, timestamp: String) -> String {
+        let name = sourceRelativePath.split(separator: "/").last.map(String.init) ?? sourceRelativePath
+        return hiddenRelativePath([Destination.trash.directoryName, legacyName(name, timestamp: timestamp)])
+    }
 
     // MARK: - 映射表
 
@@ -215,56 +262,98 @@ enum LibraryLayoutMigrationV2Rules {
 
 /// v2 迁移计划（纯值；执行器照它落地）。
 struct LibraryLayoutMigrationV2Plan: Equatable {
-    /// 一次搬迁（源 = 根条目名，目标 = 相对 Documents 根的目标路径）。
+    /// 一次搬迁（源 = 根条目名 / 合并后的子项相对路径，目标 = 相对 Documents 根）。
     struct Move: Equatable {
         let sourceRelativePath: String
         let destinationRelativePath: String
+        /// 目标同名已存在 ⇒ 用了改名后缀（`<name>.legacy-<ts>`）搬入，**绝不覆盖**。
+        let renamed: Bool
     }
 
     /// 跳过（原因进日志与干跑清单）。
     struct Skip: Equatable {
         let sourceRelativePath: String
-        /// `targetExists` / `referencedByStoredPath`
+        /// `referencedByStoredPath` / `unreadableSourceDirectory`
         let reason: String
+    }
+
+    /// 合并后剩下的**空壳目录**（内容已全部规划搬入）→ 改名后缀搬进隐藏回收区。
+    /// 只搬不删：空壳不删，搬走后根目录才干净，且一个字节没丢。
+    struct ShellSweep: Equatable {
+        let sourceRelativePath: String
+        let destinationRelativePath: String
     }
 
     var moves: [Move] = []
     var skips: [Skip] = []
     /// 保留原位的条目（`name(reason)`；含 Music / 隐藏根 / 同步目录 / 未规划项）。
     var kept: [String] = []
+    var shellSweeps: [ShellSweep] = []
 
-    var isEmpty: Bool { moves.isEmpty && skips.isEmpty }
+    var isEmpty: Bool { moves.isEmpty && skips.isEmpty && shellSweeps.isEmpty }
+    /// 其中「改名搬入」的件数（其余为原样搬入）。
+    var renamedCount: Int { moves.filter(\.renamed).count }
+    /// 干跑与真跑共用的一行计划账（口径只有这一份）。
+    var planLine: String {
+        "将要搬 \(moves.count)（其中改名搬入 \(renamedCount)）/ 跳过 \(skips.count) / 空壳清扫 \(shellSweeps.count)"
+    }
+
+    /// 本轮跑完后根上仍「该搬未搬」的条目（完成门判据；`referencedByStoredPath` 例外不计入）。
+    var residueSourceRelativePaths: [String] {
+        (moves.map(\.sourceRelativePath) + shellSweeps.map(\.sourceRelativePath)).sorted()
+    }
 }
 
-/// 计划生成器（纯函数；输入全部注入，无 IO）。
+/// 计划生成器（纯函数；目录 IO 经 `DirectoryView` 注入 ⇒ 本类型自身零 IO）。
 enum LibraryLayoutMigrationV2Planner {
-    /// 根目录下的一个条目事实。
+    /// 一个条目事实。
     struct RootEntry: Equatable {
         let name: String
         let isDirectory: Bool
     }
 
+    /// 目录树只读视图（IO 由调用方注入 ⇒ 规划器零 IO、可纯逻辑单测）。
+    struct DirectoryView {
+        /// 路径（相对 Documents 根，POSIX）是否存在（文件或目录均可）。
+        let exists: (String) -> Bool
+        /// 目录的直接子项；不存在 / 不是目录 / 读失败 → nil（**空目录 → `[]`**）。
+        let children: (String) -> [RootEntry]?
+    }
+
+    /// 规划输入。
+    struct Inputs {
+        /// Documents 根的一级条目（含隐藏条目）。
+        var rootEntries: [RootEntry]
+        /// 被 DB 绝对存储路径引用的根条目名 → **不搬**（保守，防引用悬空）。
+        var referencedSourceRelativePaths: Set<String> = []
+        /// 改名后缀的时间戳（同一轮内唯一）。
+        var timestamp: String = LibraryLayoutMigrationV2Rules.legacyTimestamp()
+        /// 源侧视图（Documents 根子树）。
+        var source: DirectoryView
+        /// 目标侧视图（隐藏根子树）。
+        var destination: DirectoryView
+    }
+
     /// 生成计划。
     ///
-    /// - `existingDestinationRelativePaths`：目标位置**已存在**的路径（文件或目录）→ 冲突则跳过、不覆盖。
-    /// - `referencedSourceRelativePaths`：被 DB 绝对存储路径引用的根条目名 → **不搬**（保守，防引用悬空）。
+    /// 冲突处理（v2.1）：目标已存在时 **不整项跳过**——
+    /// · 源与目标**都是目录** ⇒ 递归合并（逐子项）；同名子项 ⇒ 改名后缀搬入；
+    /// · 同名**文件** / 类型不匹配 ⇒ 改名后缀搬入。
+    /// 全程 **绝不覆盖、绝不删除**；合并后的空壳目录另列 `shellSweeps`（改名搬进 `trash/`）。
     ///
-    /// 顺序：按目标路径**层数升序**（浅的先搬）—— 保证「父目标由整目录搬迁自然产生」，
-    /// 避免先建出的父目录把后面整目录的搬迁误判成冲突。
-    static func makePlan(
-        rootEntries: [RootEntry],
-        existingDestinationRelativePaths: Set<String>,
-        referencedSourceRelativePaths: Set<String> = []
-    ) -> LibraryLayoutMigrationV2Plan {
+    /// 顺序：搬迁按目标路径**层数升序**（浅的先搬，父目标由整目录/子项搬迁自然产生）；
+    /// 空壳清扫按源路径**层数降序**（内层空壳先搬，外层才可能空）。
+    static func makePlan(_ inputs: Inputs) -> LibraryLayoutMigrationV2Plan {
         var plan = LibraryLayoutMigrationV2Plan()
-        var moves: [LibraryLayoutMigrationV2Plan.Move] = []
 
-        for entry in rootEntries {
-            switch LibraryLayoutMigrationV2Rules.classify(rootEntryName: entry.name, isDirectory: entry.isDirectory) {
+        for entry in inputs.rootEntries {
+            switch LibraryLayoutMigrationV2Rules.classify(
+                rootEntryName: entry.name, isDirectory: entry.isDirectory
+            ) {
             case let .keep(reason):
                 plan.kept.append("\(entry.name)(\(reason))")
             case let .move(destination):
-                if referencedSourceRelativePaths.contains(entry.name) {
+                if inputs.referencedSourceRelativePaths.contains(entry.name) {
                     plan.skips.append(
                         LibraryLayoutMigrationV2Plan.Skip(
                             sourceRelativePath: entry.name, reason: "referencedByStoredPath"
@@ -272,29 +361,83 @@ enum LibraryLayoutMigrationV2Planner {
                     )
                     continue
                 }
-                if existingDestinationRelativePaths.contains(destination) {
-                    plan.skips.append(
-                        LibraryLayoutMigrationV2Plan.Skip(
-                            sourceRelativePath: entry.name, reason: "targetExists"
-                        )
-                    )
-                    continue
-                }
-                moves.append(
-                    LibraryLayoutMigrationV2Plan.Move(
-                        sourceRelativePath: entry.name, destinationRelativePath: destination
-                    )
+                planEntry(
+                    entry,
+                    sourceRelativePath: entry.name,
+                    destinationRelativePath: destination,
+                    inputs: inputs,
+                    into: &plan
                 )
             }
         }
 
-        moves.sort { lhs, rhs in
+        plan.moves.sort { lhs, rhs in
             let lhsDepth = lhs.destinationRelativePath.split(separator: "/").count
             let rhsDepth = rhs.destinationRelativePath.split(separator: "/").count
             if lhsDepth != rhsDepth { return lhsDepth < rhsDepth }
             return lhs.sourceRelativePath < rhs.sourceRelativePath
         }
-        plan.moves = moves
+        plan.shellSweeps.sort { lhs, rhs in
+            let lhsDepth = lhs.sourceRelativePath.split(separator: "/").count
+            let rhsDepth = rhs.sourceRelativePath.split(separator: "/").count
+            if lhsDepth != rhsDepth { return lhsDepth > rhsDepth }
+            return lhs.sourceRelativePath < rhs.sourceRelativePath
+        }
         return plan
+    }
+
+    /// 规划单个条目（递归；合并路径下 `entry` 是**子项**，源/目标都是完整相对路径）。
+    private static func planEntry(
+        _ entry: RootEntry,
+        sourceRelativePath: String,
+        destinationRelativePath: String,
+        inputs: Inputs,
+        into plan: inout LibraryLayoutMigrationV2Plan
+    ) {
+        // 目标不存在 ⇒ 原样搬（目录 = 整目录一次 rename，保持原子）。
+        guard inputs.destination.exists(destinationRelativePath) else {
+            plan.moves.append(
+                LibraryLayoutMigrationV2Plan.Move(
+                    sourceRelativePath: sourceRelativePath,
+                    destinationRelativePath: destinationRelativePath,
+                    renamed: false
+                )
+            )
+            return
+        }
+        // 目标已存在且**双方都是目录** ⇒ 递归合并（整目录跳过是错的：会把内容留在根上）。
+        if entry.isDirectory,
+           inputs.destination.children(destinationRelativePath) != nil,
+           let children = inputs.source.children(sourceRelativePath) {
+            for child in children {
+                planEntry(
+                    child,
+                    sourceRelativePath: "\(sourceRelativePath)/\(child.name)",
+                    destinationRelativePath: "\(destinationRelativePath)/\(child.name)",
+                    inputs: inputs,
+                    into: &plan
+                )
+            }
+            // 内容全部规划搬入 ⇒ 源目录必成空壳；空壳不删，改名后缀搬进隐藏回收区。
+            plan.shellSweeps.append(
+                LibraryLayoutMigrationV2Plan.ShellSweep(
+                    sourceRelativePath: sourceRelativePath,
+                    destinationRelativePath: LibraryLayoutMigrationV2Rules.shellSweepDestination(
+                        sourceRelativePath: sourceRelativePath, timestamp: inputs.timestamp
+                    )
+                )
+            )
+            return
+        }
+        // 同名**文件**冲突 / 类型不匹配 ⇒ 改名后缀搬入（绝不覆盖，根目录仍被清空）。
+        plan.moves.append(
+            LibraryLayoutMigrationV2Plan.Move(
+                sourceRelativePath: sourceRelativePath,
+                destinationRelativePath: LibraryLayoutMigrationV2Rules.legacySiblingPath(
+                    of: destinationRelativePath, timestamp: inputs.timestamp
+                ),
+                renamed: true
+            )
+        )
     }
 }

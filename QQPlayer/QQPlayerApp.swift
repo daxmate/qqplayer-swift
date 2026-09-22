@@ -25,6 +25,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // 🫥 隐藏布局 v2.1「启动早期抢占一轮」——**必须是本函数首句**：
+        // 这是 App 最早的可执行点（早于 `AppCoordinator` / `AppServices` / 各视图 singleton 的
+        // 构造，也就早于 `ArtworkManager` 等组件建出 `.qqplayer/artwork` … 隐藏目标目录）。
+        // 同步调用是刻意的：异步会与紧随其后的组件构造竞争，「早于组件」就不再成立。
+        // 本轮**不置完成门**（启动未走完：v1 之后还会建 `Documents/{Music,Lyrics,Artwork,Logs}`），
+        // 收尾与置门在 `AppCoordinator.initialize()`。详见迁移器文件头「启动时机不变量」。
+        #if os(iOS)
+            _ = LibraryLayoutMigrationV2Migrator.shared.runStartupPrepass()
+        #endif
         // 先把本 App 解析出的 UI 语言写进 App Group（Siri 扩展的读点见
         // DisplayScriptLanguageOverride），再建 Siri 词表/上下文。
         recordResolvedDisplayLanguage()
