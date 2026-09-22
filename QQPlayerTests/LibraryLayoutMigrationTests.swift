@@ -344,7 +344,7 @@ struct LibraryLayoutMigrationTests {
             #expect(FileManager.default.fileExists(atPath: lyrics.appendingPathComponent("abc.json").path))
             #expect(FileManager.default.fileExists(atPath: artwork.appendingPathComponent("hash.jpg").path))
             // 封面映射表是**元数据**：不在搬迁清单里，旧位置保留作只读兜底
-            //（合并与落新位置由 `ArtworkManager.loadMapping` 每次启动做）。
+            // （合并与落新位置由 `ArtworkManager.loadMapping` 每次启动做）。
             // 也不能是「同名冲突跳过」——那会把「按元数据语义不搬」误读成冲突。
             #expect(FileManager.default.fileExists(
                 atPath: documents.appendingPathComponent(LibraryRoot.artworkMappingFileName).path

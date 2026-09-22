@@ -292,7 +292,7 @@ extension ArtworkManager {
         guard nsName.pathExtension == "jpg" else { return false }
         let stem = nsName.deletingPathExtension
         guard stem.count == 64 else { return false }
-        return stem.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
+        return stem.allSatisfy { ("0" ... "9").contains($0) || ("a" ... "f").contains($0) }
     }
 
     /// 目录里哪些文件**可以**作为「未被引用的缓存」删除。**纯函数**。
