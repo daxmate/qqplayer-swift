@@ -187,9 +187,25 @@ extension DatabaseManager {
     }
 
     func migrateTrackStableIdAndPath(oldStableId: String, newStableId: String, newPath: String) throws {
-        var didMigrate = false
+        // 只有 stableId **真变了**才需要搬文件侧引用（书签 / 歌词目录 / 封面映射）。
+        var didChangeStableId = false
         try write { db in
             guard var oldTrack = try Track.filter(Column("stable_id") == oldStableId).fetchOne(db) else {
+                return
+            }
+
+            // 不变量：`oldStableId == newStableId` = **同一条记录**（同一 stableId 只能有一行）。
+            // iOS 常态：stableId 派生自 Documents **相对**路径，重装换数据容器 UUID 不改它
+            // ⇒ 走的是本分支。此处**只回写 path，绝不删行**：下面的「合并到已存在新行」分支
+            // 在等号情形下取到的就是本行本身，先 update 再 deleteAll 会把这唯一一行删掉
+            // ——2026-09-22 那条「重装后曲库 221 行被清空」的根因（配 221 条
+            // 「Merged stale track ID X into existing resolved ID X」日志）。
+            // 引用（收藏 / 歌单 / 艺术家 / 历史）无需迁移：stable_id 没变，键就不变。
+            if oldStableId == newStableId {
+                let previousPath = oldTrack.path
+                oldTrack.path = newPath
+                try oldTrack.update(db)
+                AppLog.warn(.db, "🔁 Re-synced path for unchanged stable ID \(oldStableId)（old == new，只更新 path、不删行）: \(previousPath) -> \(newPath)")
                 return
             }
 
@@ -197,9 +213,10 @@ extension DatabaseManager {
                 existingNewTrack.path = newPath
                 try existingNewTrack.update(db)
                 try TrackIdentityMigration.migrateDatabaseReferences(db, from: oldStableId, to: newStableId)
-                try Track.filter(Column("stable_id") == oldStableId).deleteAll(db)
-                didMigrate = true
-                AppLog.info(.db, "🔁 Merged stale track ID \(oldStableId) into existing resolved ID \(newStableId)")
+                let removedOldRows = try Track.filter(Column("stable_id") == oldStableId).deleteAll(db)
+                didChangeStableId = true
+                AppLog.info(.db, "🔁 Merged stale track ID \(oldStableId) into existing resolved ID \(newStableId)"
+                    + "（path: \(newPath)，删除旧行 \(removedOldRows) 条）")
                 return
             }
 
@@ -207,11 +224,11 @@ extension DatabaseManager {
             oldTrack.path = newPath
             try oldTrack.update(db)
             try TrackIdentityMigration.migrateDatabaseReferences(db, from: oldStableId, to: newStableId)
-            didMigrate = true
+            didChangeStableId = true
             AppLog.info(.db, "🔁 Migrated track ID for moved file: \(oldStableId) -> \(newStableId)")
         }
         // D3：stableId 变更 = 六处引用一起搬（含此前完全没人迁的歌词与封面映射）
-        if didMigrate {
+        if didChangeStableId {
             TrackIdentityMigration.migrateFileReferences(from: oldStableId, to: newStableId)
         }
     }

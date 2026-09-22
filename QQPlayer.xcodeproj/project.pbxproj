@@ -182,6 +182,7 @@
 		0FE1CA3B7E0B4340960A82EE /* SyncCollectionPlanLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDEE953F1A34458AA5A85DF /* SyncCollectionPlanLogTests.swift */; };
 		D2FE7DFF760D459C97CAF730 /* TrackDeletionReclaimAreaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5035E02F8F421BB2C16EB7 /* TrackDeletionReclaimAreaTests.swift */; };
 		EE39748271D74A668437ABFA /* PlaybackGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82BA8C26369946C594E6717C /* PlaybackGenerationTests.swift */; };
+		FE470FDE00714C7FB6A9F2A6 /* LibraryIndexerMetadataRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7509751D5D9F42D493C84F89 /* LibraryIndexerMetadataRefreshTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -413,6 +414,7 @@
 		9CDEE953F1A34458AA5A85DF /* SyncCollectionPlanLogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncCollectionPlanLogTests.swift; sourceTree = "<group>"; };
 		9C5035E02F8F421BB2C16EB7 /* TrackDeletionReclaimAreaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackDeletionReclaimAreaTests.swift; sourceTree = "<group>"; };
 		82BA8C26369946C594E6717C /* PlaybackGenerationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackGenerationTests.swift; sourceTree = "<group>"; };
+		7509751D5D9F42D493C84F89 /* LibraryIndexerMetadataRefreshTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryIndexerMetadataRefreshTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1171,6 +1173,7 @@
 				9CDEE953F1A34458AA5A85DF /* SyncCollectionPlanLogTests.swift */,
 				9C5035E02F8F421BB2C16EB7 /* TrackDeletionReclaimAreaTests.swift */,
 				82BA8C26369946C594E6717C /* PlaybackGenerationTests.swift */,
+				7509751D5D9F42D493C84F89 /* LibraryIndexerMetadataRefreshTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1651,6 +1654,7 @@
 				0FE1CA3B7E0B4340960A82EE /* SyncCollectionPlanLogTests.swift in Sources */,
 				D2FE7DFF760D459C97CAF730 /* TrackDeletionReclaimAreaTests.swift in Sources */,
 				EE39748271D74A668437ABFA /* PlaybackGenerationTests.swift in Sources */,
+				FE470FDE00714C7FB6A9F2A6 /* LibraryIndexerMetadataRefreshTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

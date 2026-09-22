@@ -7,6 +7,10 @@
 //  copyFilesFromSharedContainer。纯搬家自 LibraryIndexer.swift（无行为变化；
 //  仅按分片放宽可见性）。
 //
+//  2026-09-22 新增：扫描 vs 指纹判定的 **path 维度**（`MetadataRefreshDecision` /
+//  `staleStoredPath`，P1 重装自愈）。逻辑放本分片是为了不动 `LibraryIndexer.swift`
+//  的行数预算（该文件恰好 600 行上限）；对外的唯一入口仍是 `needsMetadataRefresh`。
+//
 
 import AVFoundation
 import Combine
@@ -16,6 +20,53 @@ import GRDB
 import SFBAudioEngine
 
 extension LibraryIndexer {
+    // MARK: - 扫描 vs 指纹判定（唯一入口 = needsMetadataRefresh；本段是 path 维度的实现）
+
+    /// 一轮扫描对某一行要做什么。三态是**穷尽**的：
+    /// `current` 无事发生 / `resyncPathOnly` 只回写 path / `reparse` 重解析元数据。
+    enum MetadataRefreshDecision: Equatable {
+        /// 指纹与入库 path 都最新 → 本次扫描跳过该文件。
+        case current
+        /// 指纹未变，但入库 path 已失效（文件已在现容器路径下）→ 只回写 path，不重解析。
+        case resyncPathOnly
+        /// 指纹变了（或无指纹）→ 走既有重解析路径。
+        case reparse
+    }
+
+    /// 入库 path 与当前文件 path 不一致、**且旧 path 已不存在** → 返回旧 path；否则 nil。
+    ///
+    /// 纯字符串相同直接返回 nil（不 stat）：每文件每次扫描的额外存在性判断**至多一次**，
+    /// 且只在指纹未变、需要判断 path 时才发生（P1 代价控制）。
+    /// 不做 `migrateTrackForMovedFile` 之外的任何写库动作——修 path 的唯一入口链不变。
+    nonisolated func staleStoredPath(_ track: Track, currentPath: String) -> String? {
+        guard track.path != currentPath else { return nil }
+        guard !FileManager.default.fileExists(atPath: track.path) else { return nil }
+        return track.path
+    }
+
+    /// `needsMetadataRefresh` 的 **path 维度重载**：指纹判定之外，再管「入库 path 悬空」。
+    /// 重装后（数据容器 UUID 变化）整库 path 悬空而 mtime/size 不变 —— 旧实现一律返回
+    /// false ⇒ 主扫整批跳过、永不自愈（2026-09-22）。
+    nonisolated func needsMetadataRefresh(
+        _ track: Track,
+        fingerprint: FileFingerprint,
+        currentPath: String
+    ) -> Bool {
+        metadataRefreshDecision(track, fingerprint: fingerprint, currentPath: currentPath) != .current
+    }
+
+    /// 判定实现（唯一一份）：先指纹（无 IO），指纹未变才看 path（至多一次 stat）。
+    nonisolated func metadataRefreshDecision(
+        _ track: Track,
+        fingerprint: FileFingerprint,
+        currentPath: String
+    ) -> MetadataRefreshDecision {
+        if needsMetadataRefresh(track, fingerprint: fingerprint) {
+            return .reparse
+        }
+        return staleStoredPath(track, currentPath: currentPath) == nil ? .current : .resyncPathOnly
+    }
+
     /// 递归扫描目录下的音乐文件（共享实现 MusicDirectoryScanner，iOS/macOS 同一套
     /// 过滤/隐藏/常规文件规则）。文件类型设置（web 版 audioExts 对齐）：扫描只收录
     /// 启用格式；默认全 9 种 = 历史行为（2026-09-03 B 组）。A0-prep 前是 LibraryIndexer
@@ -56,12 +107,28 @@ extension LibraryIndexer {
             let fingerprint = try fileFingerprint(for: fileURL)
             let existingTrack = try existingTrack(stableId: stableId, path: fileURL.path)
 
-            if let existingTrack, !needsMetadataRefresh(existingTrack, fingerprint: fingerprint) {
-                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "⏭️ Track metadata is current: \(fileURL.lastPathComponent)") }
-                return
-            }
-            if existingTrack != nil {
-                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 File changed; reparsing metadata: \(fileURL.lastPathComponent)") }
+            if let existingTrack {
+                switch metadataRefreshDecision(existingTrack, fingerprint: fingerprint, currentPath: fileURL.path) {
+                case .current:
+                    if existingTrack.path != fileURL.path {
+                        // 旧 path 仍存在（同一文件的两份副本 / 尚未失效）→ 依旧跳过，
+                        // 但不再是静默 DEBUG：两条 path 一起打出来（D2 打点）。
+                        AppLog.warn(.general, "⚠️ Skip scan but DB path ≠ file path: db=\(existingTrack.path) · file=\(fileURL.path)")
+                    } else if AppLog.isEnabled(.debug, .general) {
+                        AppLog.debug(.general, "⏭️ Track metadata is current: \(fileURL.lastPathComponent)")
+                    }
+                    return
+                case .resyncPathOnly:
+                    // P1 自愈：指纹未变、库里 path 已悬空（iOS 重装换数据容器 UUID）
+                    // → 只回写 path，保留其余元数据；不重解析、不删行。
+                    // 修 path 仍走唯一入口链（FileCleanupManager → migrateTrackForMovedFile
+                    // → migrateTrackStableIdAndPath），不另开平行入口。
+                    AppLog.warn(.general, "⚠️ Path resync only（指纹未变、入库 path 已失效）: \(existingTrack.path) -> \(fileURL.path)")
+                    try databaseManager.migrateTrackForMovedFile(oldStableId: existingTrack.stableId, newPath: fileURL.path)
+                    return
+                case .reparse:
+                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 File changed; reparsing metadata: \(fileURL.lastPathComponent)") }
+                }
             }
 
             // Check if track was excluded (removed from library only)

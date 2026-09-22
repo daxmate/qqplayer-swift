@@ -136,6 +136,13 @@
                                                        ofItemAtPath: url.path)
 
                 guard FileManager.default.fileExists(atPath: url.path) else {
+                    // D3 打点：失败分支不再只有 fileNotFound —— 把库内 path 原文、当前
+                    // Documents 前缀与存在性结果一起落盘，重装类问题好一眼定位。
+                    let documentsPrefix = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? "(nil)"
+                    AppLog.error(.general, "❌ Playback file not found: track.path=\(track.path)"
+                        + " · resolved=\(url.path)"
+                        + " · documents=\(documentsPrefix)"
+                        + " · existsAtTrackPath=\(FileManager.default.fileExists(atPath: track.path))")
                     throw PlayerError.fileNotFound
                 }
 

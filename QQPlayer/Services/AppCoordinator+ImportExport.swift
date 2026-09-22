@@ -17,10 +17,19 @@ extension AppCoordinator {
 
     private func runPostIndexMaintenance() async {
         AppLog.info(.general, "🔄 AppCoordinator: Starting deferred post-index maintenance...")
+        // D4 打点：维护前后各记一次曲库行数——「重装后 221 → 0」这类静默清空
+        // 以前只能在维护完看结果，现在前后各一行可对账。
+        AppLog.info(.general, "📊 Post-index maintenance: 曲库行数 维护前 = \(trackCountForLog())")
         await verifyDatabaseRelationships()
         await fileCleanupManager.checkForOrphanedFiles()
         await pruneCachesForDeletedContent()
+        AppLog.info(.general, "📊 Post-index maintenance: 曲库行数 维护后 = \(trackCountForLog())")
         AppLog.info(.general, "✅ AppCoordinator: Deferred post-index maintenance completed")
+    }
+
+    /// 打点用的曲库行数（只读 COUNT，不抓全表）。失败返回 -1 而不是让维护流程中断。
+    private func trackCountForLog() -> Int {
+        (try? DatabaseManager.shared.getTrackCount()) ?? -1
     }
 
     /// Drops cached data belonging to content that no longer exists. Deleting a

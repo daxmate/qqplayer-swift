@@ -400,6 +400,123 @@ struct TrackIdentityMigrationDatabaseTests {
             #expect(artists == [expected])
         }
     }
+
+    // MARK: - P0 重装后曲库被清空（2026-09-22）
+
+    /// iOS 上 stableId 派生自 Documents **相对**路径：重装换数据容器 UUID 不影响它
+    /// ⇒ `migrateTrackStableIdAndPath` 走的是 `oldStableId == newStableId` 分支。
+    /// 修复前该分支先 update「已存在的新行」再 `deleteAll(oldStableId)`——而两行本是**同一行**，
+    /// 于是唯一一行被删掉（真机实测全库 `Tracks: 221 → 0`，配 221 条新旧同 id 的
+    /// 「Merged stale track ID X into existing resolved ID X」日志）。
+    @Test("P0：old == new stableId（重装换容器 UUID）→ 只回写 path，不删行、引用不动")
+    func equalStableIdOnlyResyncsPath() throws {
+        let (manager, dbQueue) = try DataIntegrityFixture.makeManager()
+        let oldPath = "/private/var/mobile/Containers/Data/Application/D1917C90-5506-4FD0-ACD9-636334DA54C1/Documents/ablum/song.flac"
+        let newPath = "/private/var/mobile/Containers/Data/Application/342470F4-7E34-49DF-A756-DE0F76486423/Documents/ablum/song.flac"
+        // 相对根取各自的 Documents：两侧 identityPath 都是 "ablum/song.flac" → id 相同
+        let oldDocuments = URL(fileURLWithPath: oldPath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let newDocuments = URL(fileURLWithPath: newPath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let stableId = DatabaseManager.generatePathStableId(forPath: oldPath, relativeRoot: oldDocuments)
+        // 前提自证：这正是 equal-id 情形（若这里不等，本用例的前提就不成立）
+        #expect(stableId == DatabaseManager.generatePathStableId(forPath: newPath, relativeRoot: newDocuments))
+
+        try dbQueue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO track (stable_id, title, duration_ms, file_size, modification_date, path)
+                    VALUES (?, 'Song', 213000, 4242, 1000, ?)
+                """,
+                arguments: [stableId, oldPath]
+            )
+            try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES (?)", arguments: [stableId])
+            try DataIntegrityFixture.insertPlaylist(db: db, id: 1, slug: "p1", title: "P1")
+            try db.execute(
+                sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 1, ?)",
+                arguments: [stableId]
+            )
+            try db.execute(sql: "INSERT INTO artist (id, name) VALUES (1, 'A')")
+            try db.execute(
+                sql: "INSERT INTO track_artist (track_stable_id, artist_id, position) VALUES (?, 1, 0)",
+                arguments: [stableId]
+            )
+        }
+
+        try manager.migrateTrackStableIdAndPath(oldStableId: stableId, newStableId: stableId, newPath: newPath)
+
+        try dbQueue.read { db in
+            let rows = try Track.fetchAll(db)
+            // 修复前这里是 0：唯一一行被 deleteAll 清掉
+            #expect(rows.count == 1)
+            let row = try #require(rows.first)
+            #expect(row.stableId == stableId)
+            #expect(row.path == newPath) // path 已回写到当前容器
+            #expect(row.title == "Song") // 其余元数据原样保留
+            #expect(row.durationMs == 213_000)
+            #expect(row.fileSize == 4242)
+            #expect(row.modificationDate == 1000)
+            // 引用面（stable_id 未变 → 键未变，一行不少）
+            let favorites = try DataIntegrityFixture.stableIds(db, table: "favorite")
+            let playlistItems = try DataIntegrityFixture.stableIds(db, table: "playlist_item")
+            let artists = try DataIntegrityFixture.stableIds(db, table: "track_artist")
+            #expect(favorites == [stableId])
+            #expect(playlistItems == [stableId])
+            #expect(artists == [stableId])
+        }
+    }
+
+    /// 同一修复走**唯一入口链**（`migrateTrackForMovedFile`，扫描自愈实际调用的那个）
+    /// 且幂等：重跑不产生新行、也不再删行。
+    @Test("P0/唯一入口：migrateTrackForMovedFile 在 id 不变时只回写 path，重跑幂等")
+    func migrateTrackForMovedFileResyncsPathWhenIdUnchanged() throws {
+        let (manager, dbQueue) = try DataIntegrityFixture.makeManager()
+        let oldPath = "/private/var/mobile/Containers/Data/Application/D1917C90-5506-4FD0-ACD9-636334DA54C1/Documents/song.flac"
+        let newPath = "/private/var/mobile/Containers/Data/Application/342470F4-7E34-49DF-A756-DE0F76486423/Documents/song.flac"
+        // 默认基准根（测试宿主 Documents）下两个假路径都不在根下 → 派生 id 回落绝对路径；
+        // 用「新 path 的派生 id」当入库 id，构造 iOS 上真实出现的 equal-id 情形。
+        let stableId = DatabaseManager.generatePathStableId(forPath: newPath)
+
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO track (stable_id, title, duration_ms, file_size, path) VALUES (?, 'S', 1000, 100, ?)",
+                arguments: [stableId, oldPath]
+            )
+            try db.execute(sql: "INSERT INTO favorite (track_stable_id) VALUES (?)", arguments: [stableId])
+            try DataIntegrityFixture.insertPlaylist(db: db, id: 1, slug: "p1", title: "P1")
+            try db.execute(
+                sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 1, ?)",
+                arguments: [stableId]
+            )
+            try db.execute(
+                sql: "INSERT INTO play_history (track_stable_id, played_at, play_duration_ms) VALUES (?, 7, 0)",
+                arguments: [stableId]
+            )
+        }
+
+        let returned = try manager.migrateTrackForMovedFile(oldStableId: stableId, newPath: newPath)
+        #expect(returned == stableId)
+
+        // 幂等：再跑一次仍是一行、引用仍齐全
+        try manager.migrateTrackForMovedFile(oldStableId: stableId, newPath: newPath)
+
+        let snapshots = try dbQueue.read { db -> (Int, String?, [String], [String], [String]) in
+            let count = try Track.fetchCount(db)
+            let row = try Track.filter(Column("stable_id") == stableId).fetchOne(db)
+            return (
+                count,
+                row?.path,
+                try DataIntegrityFixture.stableIds(db, table: "favorite"),
+                try DataIntegrityFixture.stableIds(db, table: "playlist_item"),
+                try DataIntegrityFixture.stableIds(db, table: "play_history")
+            )
+        }
+        #expect(snapshots.0 == 1)
+        #expect(snapshots.1 == newPath)
+        #expect(snapshots.2 == [stableId])
+        #expect(snapshots.3 == [stableId])
+        #expect(snapshots.4 == [stableId])
+    }
 }
 
 // MARK: - D7 格式取消收录
