@@ -53,13 +53,15 @@ class DatabaseManager: @unchecked Sendable {
     /// → 发送端查不到 track 行 → 整批变更拿不到身份键、对端全部判「未定位」。
     /// macOS 曲库路径稳定且支持多根，改相对只会在无收益的情况下打乱既有身份，故不动。
     /// 跨端身份恒为 `content_hash`，stableId 只是端内身份，两端各自演进没有兼容问题。
-    static var defaultStableIdRoot: URL? {
+    static var defaultStableIdRoot: URL? { defaultStableIdRoot(fileManager: .default) }
+
+    /// 可注入 Documents 根的版本（2026-09-22 CI 实证）：身份派生链在测试里必须能脱离真机容器。
+    /// 之前只有 `defaultStableIdRoot`（硬 `.default`）⇒ 迁移器即使注入了 FM，派生仍按真容器算，
+    /// 临时根里的曲目被判成「曲库外绝对路径」并重算 stableId ⇒ 行查不到（`LibraryLayoutMigrationTests` 3 条红）。
+    /// 生产调用点不传 ⇒ 走 `.default`，行为逐字节不变。
+    static func defaultStableIdRoot(fileManager: FileManager) -> URL? {
         #if os(iOS)
-            // 2026-09-22 曲库文件夹化：曲库根 = Documents/Music，stableId 的基准根随之下移。
-            // 对「原本直接躺在 Documents 根」的曲目，新旧身份路径**完全相同**
-            // （旧 = 相对 Documents = `A.flac`；新 = 相对 Music = `A.flac`）⇒ 迁移不改身份，
-            // 收藏 / 歌单 / 播放历史不会因搬家而失联。
-            return LibraryRoot.musicRootURL()
+            return LibraryRoot.musicRootURL(fileManager: fileManager)
         #else
             return nil
         #endif
@@ -88,6 +90,12 @@ class DatabaseManager: @unchecked Sendable {
 
     static func generatePathStableId(forPath path: String) -> String {
         generatePathStableId(forPath: path, relativeRoot: defaultStableIdRoot)
+    }
+
+    /// 可注入 **Documents 根**的版本（FM 缝；见 `migrateTrackForMovedFile` / `moveTrack`）。
+    /// 生产不传 FM ⇒ `defaultStableIdRoot(fileManager: .default)`，行为与上面完全一致。
+    static func generatePathStableId(forPath path: String, fileManager: FileManager) -> String {
+        generatePathStableId(forPath: path, relativeRoot: defaultStableIdRoot(fileManager: fileManager))
     }
 
     /// 可注入基准根的版本（迁移 / 测试用）。

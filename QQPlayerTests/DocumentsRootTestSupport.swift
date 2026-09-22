@@ -32,6 +32,14 @@ final class DocumentsRootFileManager: FileManager {
     /// 本实例解析出的 Documents 根（绝对路径）。
     let documentsRoot: URL
 
+    /// `.documentDirectory` 解析次数 —— **「注入 FM 是否真被走到」的判据**
+    /// （`DocumentsDerivedPathGuardTests` 用）。
+    ///
+    /// 为什么需要它：若生产链内部改用 `FileManager.default` 解析 Documents 根，
+    /// 结果会指向**真机容器**而不是注入根 —— 那种情况下本计数**不会增长**，
+    /// 守卫因此判红（2026-09-22 CI 事故：DB 身份派生链正是这样绕开了注入 FM）。
+    private(set) var documentDirectoryResolutionCount = 0
+
     init(documentsRoot: URL) {
         self.documentsRoot = documentsRoot
         super.init()
@@ -42,6 +50,7 @@ final class DocumentsRootFileManager: FileManager {
         in domainMask: FileManager.SearchPathDomainMask
     ) -> [URL] {
         if directory == .documentDirectory, domainMask.contains(.userDomainMask) {
+            documentDirectoryResolutionCount += 1
             return [documentsRoot]
         }
         return super.urls(for: directory, in: domainMask)

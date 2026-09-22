@@ -123,6 +123,7 @@ class StateManager: @unchecked Sendable {
         guard let localFavoritesURL = favoritesFileURL(fileManager: fileManager) else {
             throw ExternalFileBookmarkStore.StoreError.documentsDirectoryUnavailable
         }
+        try ensureParentDirectoryExists(for: localFavoritesURL, fileManager: fileManager)
         try saveJSONAtomically(favoritesState, to: localFavoritesURL)
         AppLog.info(.general, "📱 Favorites saved locally to: \(localFavoritesURL.path)")
     }
@@ -173,13 +174,8 @@ class StateManager: @unchecked Sendable {
             throw ExternalFileBookmarkStore.StoreError.documentsDirectoryUnavailable
         }
 
-        if !FileManager.default.fileExists(atPath: localPlaylistsFolder.path) {
-            try FileManager.default.createDirectory(at: localPlaylistsFolder,
-                                                    withIntermediateDirectories: true,
-                                                    attributes: nil)
-        }
-
         let localPlaylistURL = localPlaylistsFolder.appendingPathComponent("playlist-\(playlist.slug).json")
+        try ensureParentDirectoryExists(for: localPlaylistURL, fileManager: fileManager)
         try saveJSONAtomically(playlist, to: localPlaylistURL)
         AppLog.info(.general, "📱 Playlist saved locally to: \(localPlaylistURL.path)")
     }
@@ -290,6 +286,23 @@ class StateManager: @unchecked Sendable {
 
     // MARK: - Helper methods
 
+    /// 确保落点的**父目录**存在（保存类路径统一口径，2026-09-22）。
+    ///
+    /// 为什么必须有这一步：`Data.write(to:)` **不会**隐式建父目录，父目录不存在时直接抛
+    /// `NSCocoaErrorDomain Code=4`（底层 `NSPOSIXErrorDomain Code=2` = `ENOENT`），且错误文本指向 `…json.tmp`，
+    /// 极易被误读成「临时文件不存在」——**实际是 `.tmp` 的父目录不存在**
+    /// （隐藏布局下 = `Documents/.qqplayer/state/`）。
+    /// 触发场景是真实的生产场景：全新安装（容器里只有 `Documents/` 一层）、目录被系统/用户清掉、
+    /// v2 隐藏布局迁移尚未跑到。此时**状态保存不得失败**（收藏 / 播放位置会静默丢失）。
+    ///
+    /// 天然对照（2026-09-22 CI 实证）：歌单保存（`savePlaylistToLocalDocuments`）一直有这一步，
+    /// 故在同一环境下它是好的；收藏 / 播放状态没有 ⇒ 两条用例红。故两者统一走本函数。
+    private func ensureParentDirectoryExists(for url: URL, fileManager: FileManager) throws {
+        let parent = url.deletingLastPathComponent()
+        guard !fileManager.fileExists(atPath: parent.path) else { return }
+        try fileManager.createDirectory(at: parent, withIntermediateDirectories: true, attributes: nil)
+    }
+
     private func saveJSONAtomically<T: Codable>(_ object: T, to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -343,6 +356,7 @@ extension StateManager {
         guard let localPlayerStateURL = playerStateFileURL(fileManager: fileManager) else {
             throw ExternalFileBookmarkStore.StoreError.documentsDirectoryUnavailable
         }
+        try ensureParentDirectoryExists(for: localPlayerStateURL, fileManager: fileManager)
         try saveJSONAtomically(playerState, to: localPlayerStateURL)
         AppLog.info(.general, "📱 Player state saved locally to: \(localPlayerStateURL.path)")
     }

@@ -242,11 +242,21 @@ extension DatabaseManager {
     /// 全基于旧 id 追踪）。调用方只管说「这行搬到哪个新路径了」——入参**绝对或存储形态
     /// 都接受**（`LibraryRoot.storedPath` 幂等地归一化），存储形态仍写相对路径。
     ///
+    /// - Parameters:
+    ///   - fileManager: **Documents 根解析缝**（默认 `.default` ⇒ 生产行为逐字节不变）。
+    ///     测试注入一个 `.documentDirectory` 指向临时根的 FM 即可脱离真机容器。
+    ///     2026-09-22 CI 实证：本链内部此前硬走 `.default`（`storedPath` + `generatePathStableId`）
+    ///     ⇒ 临时根里的曲目被判「曲库外」并按真容器重算 stableId ⇒ 行查不到
+    ///     （`LibraryLayoutMigrationTests` 3 条红）。
     /// - Returns: 新 stableId；旧 id 不在库中时返回 nil（无事发生，幂等）。
     @discardableResult
-    func migrateTrackForMovedFile(oldStableId: String, newPath: String) throws -> String? {
-        let storedPath = LibraryRoot.storedPath(forAbsolutePath: newPath)
-        let newStableId = Self.generatePathStableId(forPath: storedPath)
+    func migrateTrackForMovedFile(
+        oldStableId: String,
+        newPath: String,
+        fileManager: FileManager = .default
+    ) throws -> String? {
+        let storedPath = LibraryRoot.storedPath(forAbsolutePath: newPath, fileManager: fileManager)
+        let newStableId = Self.generatePathStableId(forPath: storedPath, fileManager: fileManager)
         guard try getTrack(byStableId: oldStableId) != nil else { return nil }
         try migrateTrackStableIdAndPath(oldStableId: oldStableId, newStableId: newStableId, newPath: storedPath)
         return newStableId

@@ -233,14 +233,25 @@ extension DatabaseManager {
     ///   （对齐 upsertTrack 的 duplicates 语义）
     /// - 不改文件系统、不发通知（调用方职责：TagWriterService 已完成原子改名，
     ///   UI 层负责通知刷新）
-    func moveTrack(from oldPath: String, to newPath: String) throws {
+    /// - `fileManager` = **Documents 根解析缝**（默认 `.default` ⇒ 生产行为不变）：本函数内部
+    ///   也做「存储形态 + stableId」派生，与 `migrateTrackForMovedFile` 同属身份派生链
+    ///   （2026-09-22 审计表「DB identity/storedPath 派生链」）。
+    func moveTrack(
+        from oldPath: String,
+        to newPath: String,
+        fileManager: FileManager = .default
+    ) throws {
         // 入参可能是绝对路径（改名/搚削调用点）或存储形态；一律先归一化到存储形态。
-        let normalizedOld = Self.standardizedStoredPath(LibraryRoot.storedPath(forAbsolutePath: oldPath))
-        let normalizedNew = Self.standardizedStoredPath(LibraryRoot.storedPath(forAbsolutePath: newPath))
+        let normalizedOld = Self.standardizedStoredPath(
+            LibraryRoot.storedPath(forAbsolutePath: oldPath, fileManager: fileManager)
+        )
+        let normalizedNew = Self.standardizedStoredPath(
+            LibraryRoot.storedPath(forAbsolutePath: newPath, fileManager: fileManager)
+        )
         guard normalizedOld != normalizedNew else { return }
         guard let track = try getTrack(byPath: normalizedOld) else { return }
 
-        let newStableId = Self.generatePathStableId(forPath: normalizedNew)
+        let newStableId = Self.generatePathStableId(forPath: normalizedNew, fileManager: fileManager)
         // M3-1: 改名不改内容——已有 content_hash 原样保留（内容没变）；为 nil
         // （老库行）在写事务外顺手补算（文件刚改名必存在），避免改名后因惰性回填
         // 已跑过而永久 NULL。audit 纪律：文件 IO 不进写事务。合并分支会删掉本行，

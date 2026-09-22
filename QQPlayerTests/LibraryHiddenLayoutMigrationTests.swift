@@ -403,6 +403,11 @@ struct LibraryHiddenLayoutMigrationTests {
             let rootKeep = try writeFile(documents.appendingPathComponent("Artwork/keep.jpg"), bytes: 4)
             let rootOther = try writeFile(documents.appendingPathComponent("Artwork/other.jpg"), bytes: 8)
             let rootLog = try writeFile(documents.appendingPathComponent("app.log"), bytes: 4)
+            // 进程最早期就写下的日志：`AppLog` 在更早的钩子里已建 `.qqplayer/logs/app.log`
+            // ⇒ 根 `app.log` 与隐藏新位置**同名**。这是断言里「同名子项 + 同名文件都要预报为
+            // 改名搬入」的**第二个样本**（2026-09-22：夹具原先漏造这一条，`renamedTotal`
+            // 只能数到 1，`== 2` 的断言名存实亡；补上后断言恢复原义，语义未被放宽）。
+            try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/app.log"), bytes: 16)
 
             let summary = migrator.run(dryRun: true)
 

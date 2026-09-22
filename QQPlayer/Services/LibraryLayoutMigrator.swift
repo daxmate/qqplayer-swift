@@ -225,7 +225,8 @@ final class LibraryLayoutMigrator: @unchecked Sendable {
             do {
                 try database.migrateTrackForMovedFile(
                     oldStableId: row.stableId,
-                    newPath: destination.path
+                    newPath: destination.path,
+                    fileManager: fileManager
                 )
                 summary.rewrittenPaths += 1
                 if let rewrite = rewriteByStableId[row.stableId] {
