@@ -4,6 +4,9 @@
 #  ① main 上不得出现 merge 提交（历史必须线性；违反 = 「提交线又乱了」）
 #  ② swiftformat --lint + swiftlint（本次推送范围内改动的 .swift）
 #  ③ target 成员归属（QQPlayer 新增文件必须显式表态，纯 python，毫秒级）
+#  ④ 非 main 分支一律拦（2026-09-22 用户拍板）：只允许直推 main；
+#     推候选分支 = PR 流程的前置步骤，会绕过「本地自验 → 合入本地 main → 直推 main」的口径；
+#     确知要做候选分支时用 QQPLAYER_ALLOW_BRANCH_PUSH=1 显式放行。本项最前置、fail-fast。
 #
 # 为什么不跑编译/测试：那是 CI（.github/workflows/ci.yml 两个 job）的活，CI 仍在 main 上跑作最终兜底；
 # 本钩子只做「推送前必须拦的、秒级的」判断，避免 10 分钟级构建卡住每一次 push。
@@ -20,7 +23,21 @@ tmp_added="$tmp_files.added"
 trap 'rm -f "$tmp_files" "$tmp_added"' EXIT
 
 while read -r _local_ref local_sha remote_ref remote_sha; do
-  [ "$local_sha" = "$ZERO" ] && continue # 删除分支
+  [ "$local_sha" = "$ZERO" ] && continue # 删除分支（清理是正常运维，不拦）
+
+  # ---- ④ 分支推送需显式确认（最前置，fail-fast：早于 lint/成员检查）----
+  if [ "$remote_ref" != "refs/heads/main" ] && [ "${QQPLAYER_ALLOW_BRANCH_PUSH:-0}" != "1" ]; then
+    echo "❌ 拒绝推送非 main 分支：$remote_ref"
+    echo ""
+    echo "   口径依据：AGENTS.md「🚀 交付流程」（2026-09-20 用户原话：不要发 PR，这个仓库是我自己的）"
+    echo "   危害：推候选分支 = PR 流程的前置步骤，会绕过「本地自验 → 合入本地 main → 直推 main」的口径。"
+    echo ""
+    echo "   放行用法（只在你确知要做候选分支时才用）："
+    echo "     QQPLAYER_ALLOW_BRANCH_PUSH=1 git push <remote> <branch>"
+    echo ""
+    echo "   注意：直推 main 仍受 GitHub ruleset 限制，那条口径属「待用户拍板」项，钩子不代替用户决定。"
+    exit 1
+  fi
 
   # ---- 范围与基准 ----
   if [ "$remote_sha" = "$ZERO" ]; then
