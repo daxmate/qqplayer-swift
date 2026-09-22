@@ -162,7 +162,12 @@ class ArtworkManager {
         }
 
         // 3. Extract from audio file and cache (slow - should be rare after indexing)
-        if let extracted = await extractArtwork(from: URL(fileURLWithPath: track.path)) {
+        // 路径必须经 `LibraryRoot`（存储形态 → 绝对 URL 的唯一入口）：2026-09-22 曲库
+        // 文件夹化后 `track.path` 存的是**相对 Music 根**的相对路径，raw
+        // `URL(fileURLWithPath:)` 会按 cwd 拼成不存在的路径 ⇒ 解包必失败 ⇒ 磁盘缓存
+        // 永远写不进去（实测：日志只有 PlayerEngine 的回落解包，`Documents/Artwork/` 恒空）。
+        let fileURL = LibraryRoot.absoluteURL(forStoredPath: track.path)
+        if let extracted = await extractArtwork(from: fileURL) {
             let image = await Self.downsampledOffMain(extracted, maxPixelSize: Self.maxFullArtworkPixelSize)
             // Store in both caches
             cacheImage(image, for: track.stableId)
