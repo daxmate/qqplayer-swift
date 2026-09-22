@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# 自证测试：scripts/git-hooks/pre-push 的第 ④ 项「非 main 分支推送需显式确认」（2026-09-22 用户拍板）
+# 自证测试：scripts/git-hooks/pre-push 的第 ④ 项「非 main 分支一律拦（不可绕过）」（2026-09-22 用户拍板）
 #
-# 做法：在临时目录建本地仓库 + 本地 bare remote（全程不联网），装上被验钩子，断言四条：
-#   ① 推非 main 分支 → 被拦（退出码非 0，输出含 AGENTS.md 与 QQPLAYER_ALLOW_BRANCH_PUSH）
-#   ② 同一次推送带 QQPLAYER_ALLOW_BRANCH_PUSH=1 → 放行
+# 做法：在临时目录建本地仓库 + 本地 bare remote（全程不联网），装上被验钩子，断言五条：
+#   ① 推非 main 分支 → 被拦（退出码非 0，输出含 AGENTS.md 与 PROJECT_RULES/qqplayer-swift.md）
+#   ② 带 QQPLAYER_ALLOW_BRANCH_PUSH=1 → **仍被拦**（例外开关已拆，无放行路径）
+#   ②b 带 SKIP_PREPUSH=1 → **仍被拦**（本地检查开关不得放行分支推送）
 #   ③ 推 main → 不被本项拦（最小可控场景：单提交 / 无 merge / 无 .swift 改动）
 #   ④ 删除远端分支（git push origin --delete <branch>）→ 不被本项拦
 #
@@ -49,22 +50,33 @@ out1="$(cd "$repo" && git push origin feat/x 2>&1)"; rc1=$?
 echo "$out1"
 if [ "$rc1" -ne 0 ]; then ok "退出码非 0（=$rc1）"; else no "退出码应为非 0，实际 $rc1"; fi
 case "$out1" in *AGENTS.md*) ok "输出含 AGENTS.md" ;; *) no "输出缺 AGENTS.md" ;; esac
-case "$out1" in *QQPLAYER_ALLOW_BRANCH_PUSH*) ok "输出含 QQPLAYER_ALLOW_BRANCH_PUSH" ;; *) no "输出缺 QQPLAYER_ALLOW_BRANCH_PUSH" ;; esac
+case "$out1" in *PROJECT_RULES/qqplayer-swift.md*) ok "输出含 PROJECT_RULES/qqplayer-swift.md" ;; *) no "输出缺 PROJECT_RULES/qqplayer-swift.md" ;; esac
 if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
   no "远端不应出现 refs/heads/feat/x"
 else
   ok "远端未出现 refs/heads/feat/x（确实被拦）"
 fi
 
-# ---- 断言 ②：同一次推送带 QQPLAYER_ALLOW_BRANCH_PUSH=1 → 放行 ----
-echo "=== 断言 ②：QQPLAYER_ALLOW_BRANCH_PUSH=1 → 放行 ==="
+# ---- 断言 ②：带 QQPLAYER_ALLOW_BRANCH_PUSH=1 → 仍被拦（例外已拆，无放行路径）----
+echo "=== 断言 ②：QQPLAYER_ALLOW_BRANCH_PUSH=1 → 仍被拦 ==="
 out2="$(cd "$repo" && QQPLAYER_ALLOW_BRANCH_PUSH=1 git push origin feat/x 2>&1)"; rc2=$?
 echo "$out2"
-if [ "$rc2" -eq 0 ]; then ok "退出码为 0"; else no "退出码应为 0，实际 $rc2"; fi
+if [ "$rc2" -ne 0 ]; then ok "退出码非 0（=$rc2）"; else no "退出码应为非 0，实际 $rc2"; fi
 if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
-  ok "远端已出现 refs/heads/feat/x（确实放行）"
+  no "远端不应出现 refs/heads/feat/x（例外开关应已失效）"
 else
-  no "远端未出现 refs/heads/feat/x"
+  ok "远端未出现 refs/heads/feat/x（例外开关确实失效）"
+fi
+
+# ---- 断言 ②b：带 SKIP_PREPUSH=1 → 仍被拦（本地检查开关不放行分支推送）----
+echo "=== 断言 ②b：SKIP_PREPUSH=1 → 仍被拦 ==="
+out2b="$(cd "$repo" && SKIP_PREPUSH=1 git push origin feat/x 2>&1)"; rc2b=$?
+echo "$out2b"
+if [ "$rc2b" -ne 0 ]; then ok "退出码非 0（=$rc2b）"; else no "退出码应为非 0，实际 $rc2b"; fi
+if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
+  no "远端不应出现 refs/heads/feat/x（SKIP_PREPUSH 不得放行分支推送）"
+else
+  ok "远端未出现 refs/heads/feat/x（SKIP_PREPUSH 确实不放行分支）"
 fi
 
 # ---- 断言 ③：推 main → 不被本项拦 ----
@@ -80,6 +92,13 @@ fi
 
 # ---- 断言 ④：删除远端分支 → 不被本项拦 ----
 echo "=== 断言 ④：删除远端分支 → 不被本项拦 ==="
+# 前置：分支推送已被拦（断言 ①②），故用 --no-verify 先把远端分支建出来；本项验的是「删除」路径。
+git -C "$repo" push --no-verify -q origin feat/x >/dev/null 2>&1
+if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
+  ok "前置：远端已存在 refs/heads/feat/x（--no-verify 建出）"
+else
+  no "前置失败：远端未出现 refs/heads/feat/x"
+fi
 out4="$(cd "$repo" && git push origin --delete feat/x 2>&1)"; rc4=$?
 echo "$out4"
 if [ "$rc4" -eq 0 ]; then ok "退出码为 0（删分支未被第 ④ 项拦）"; else no "退出码应为 0，实际 $rc4"; fi
@@ -95,5 +114,5 @@ if [ "$fail" -ne 0 ]; then
   echo "❌ pre-push 第 ④ 项自证测试未通过"
   exit 1
 fi
-echo "✅ pre-push 第 ④ 项自证测试全部通过（① 拦截 ✓ ② 放行 ✓ ③ main 不被拦 ✓ ④ 删分支不被拦 ✓）"
+echo "✅ pre-push 第 ④ 项自证测试全部通过（① 拦截 ✓ ② 例外失效仍拦 ✓ ②b SKIP_PREPUSH 仍拦 ✓ ③ main 不被拦 ✓ ④ 删分支不被拦 ✓）"
 exit 0
