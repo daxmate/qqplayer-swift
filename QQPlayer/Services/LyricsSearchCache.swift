@@ -34,7 +34,10 @@ struct LyricsSearchCache: Sendable {
         if let override = Self.directoryOverride {
             return override
         }
-        return FileManager.default
+        // 2026-09-22 隐藏布局：搜索缓存落 `Documents/.qqplayer/lyrics/cache/search/`
+        // （macOS 仍 `Documents/lyrics-cache/search`）。
+        return LibraryRoot.lyricsSearchCacheDirectoryURL()
+            ?? FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("lyrics-cache/search", isDirectory: true)
     }

@@ -152,7 +152,8 @@ class SpotifyAPIService: ObservableObject, @unchecked Sendable {
         clientId: EnvironmentLoader.shared.spotifyClientId,
         clientSecret: EnvironmentLoader.shared.spotifyClientSecret,
         session: .shared,
-        cacheDirectory: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        cacheDirectory: LibraryRoot.namedCacheDirectoryURL("SpotifyCache")
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first!.appendingPathComponent("SpotifyCache")
     )
 

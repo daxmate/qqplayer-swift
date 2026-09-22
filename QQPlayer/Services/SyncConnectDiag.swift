@@ -78,7 +78,7 @@ enum SyncConnectDiag {
         static func logFileURL() -> URL? {
             if let logFileURLOverride { return logFileURLOverride }
             // 2026-09-22 曲库文件夹化：诊断日志统一落 `Documents/Logs/`。
-            return LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName)?
+            return LibraryRoot.logsDirectoryURL()?
                 .appendingPathComponent("sync-diag.log")
         }
 

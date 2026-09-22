@@ -45,16 +45,18 @@ struct ExternalFileBookmarkStore {
         self.fileURL = fileURL
     }
 
-    init(documentsURL: URL) {
-        self.init(fileURL: documentsURL.appendingPathComponent("ExternalFileBookmarks.plist"))
+    /// 以「所在目录」构造（目录 = 状态类落点；文件名是唯一常量）。
+    init(directory: URL) {
+        self.init(fileURL: directory.appendingPathComponent(LibraryRoot.externalBookmarksFileName))
     }
 
-    /// 生产默认实例（Documents/ExternalFileBookmarks.plist）。
+    /// 生产默认实例（iOS = `Documents/.qqplayer/state/ExternalFileBookmarks.plist`；
+    /// macOS 仍平铺在 Documents 根 —— 与改动前一致）。
     static var `default`: ExternalFileBookmarkStore? {
-        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+        guard let directory = LibraryRoot.stateDirectoryURL() else {
             return nil
         }
-        return ExternalFileBookmarkStore(documentsURL: documentsURL)
+        return ExternalFileBookmarkStore(directory: directory)
     }
 
     // MARK: - 读

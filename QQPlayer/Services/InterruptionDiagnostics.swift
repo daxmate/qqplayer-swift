@@ -36,7 +36,7 @@ enum InterruptionDiagnostics {
 
     private static var logURL: URL? {
         // 2026-09-22 曲库文件夹化：诊断日志统一落 `Documents/Logs/`。
-        LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName)?
+        LibraryRoot.logsDirectoryURL()?
             .appendingPathComponent("intr-debug.log")
     }
 

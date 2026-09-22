@@ -285,10 +285,11 @@ extension LyricsManager {
         if let override = Self.lyricsCacheDirectoryOverride {
             return override
         }
-        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+        // 2026-09-22 隐藏布局：逐曲歌词缓存落 `Documents/.qqplayer/lyrics/cache/tracks/`
+        // （macOS 仍 `Documents/lyrics-cache/tracks`）。
+        guard let cacheDir = LibraryRoot.lyricsCacheTracksDirectoryURL(fileManager: fileManager) else {
             return nil
         }
-        let cacheDir = documentsURL.appendingPathComponent("lyrics-cache/tracks", isDirectory: true)
 
         // Create directory if it doesn't exist
         if !fileManager.fileExists(atPath: cacheDir.path) {
@@ -296,6 +297,20 @@ extension LyricsManager {
         }
 
         return cacheDir
+    }
+
+    /// 旧位置（`Documents/lyrics-cache/tracks/`）——**只读兼容**（缓存可重建，但已缓存的歌词
+    /// 不必等重建）。写入一律落新位置。
+    private func legacyLyricsCacheFileURL(trackId: String) -> URL? {
+        guard Self.lyricsCacheDirectoryOverride == nil else { return nil }
+        #if os(iOS)
+            guard let documents = LibraryRoot.documentsRootURL(fileManager: fileManager) else { return nil }
+            return documents
+                .appendingPathComponent("lyrics-cache/tracks", isDirectory: true)
+                .appendingPathComponent("\(trackId).json")
+        #else
+            return nil
+        #endif
     }
 
     private func getLyricsFileURL(trackId: String) -> URL? {
@@ -316,8 +331,10 @@ extension LyricsManager {
     }
 
     func loadLyricsFromDisk(trackId: String) async -> Lyrics? {
-        guard let fileURL = getLyricsFileURL(trackId: trackId),
-              fileManager.fileExists(atPath: fileURL.path) else {
+        // 新位置优先；未命中再看旧位置（只读兼容，命中后仍以新位置为准）。
+        let candidates = [getLyricsFileURL(trackId: trackId), legacyLyricsCacheFileURL(trackId: trackId)]
+            .compactMap { $0 }
+        guard let fileURL = candidates.first(where: { fileManager.fileExists(atPath: $0.path) }) else {
             return nil // 未命中磁盘缓存是正常路径，不打日志（此前每首歌都打一条 ⚠️）
         }
 

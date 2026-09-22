@@ -70,6 +70,18 @@ class AppCoordinator {
             } else {
                 AppLog.info(.general, "📦 LibraryLayout: \(layoutSummary.logLine)")
             }
+
+            // 2026-09-22 隐藏布局（v2）：Documents 根部只留 `Music/` 可见，其余全部收进
+            // `Documents/.qqplayer/`。**顺序在 v1 之后、首次扫描之前**（v1 建的那几个
+            // 目录也在 v2 的搬迁范围内）；两道完成门独立。同样幂等 + 只搬不删 + 冲突不覆盖 +
+            // 失败下次重试；`--hidden-layout-dry-run` 启动参数可先看清单再放手。
+            // DB 三件套不归 v2，由 `DatabaseManager` 在打开连接之前搬（见其注释）。
+            let hiddenSummary = await Self.runHiddenLayoutMigration()
+            if hiddenSummary.alreadyCompleted {
+                AppLog.info(.general, "🫥 HiddenLayout v2: 已完成过（完成门置位，本轮跳过）")
+            } else {
+                AppLog.info(.general, "🫥 HiddenLayout v2: \(hiddenSummary.logLine)")
+            }
         #endif
 
         // Check if we should auto-scan based on last scan date
@@ -105,6 +117,15 @@ class AppCoordinator {
         private static func runLibraryLayoutMigration() async -> LibraryLayoutMigrator.Summary {
             await withCheckedContinuation { continuation in
                 LibraryLayoutMigrator.shared.runInBackground { summary in
+                    continuation.resume(returning: summary)
+                }
+            }
+        }
+
+        /// 跑一轮隐藏布局迁移（v2），等它跑完（动作本身在迁移器的后台串行队列上）。
+        private static func runHiddenLayoutMigration() async -> LibraryLayoutMigrationV2Migrator.Summary {
+            await withCheckedContinuation { continuation in
+                LibraryLayoutMigrationV2Migrator.shared.runInBackground { summary in
                     continuation.resume(returning: summary)
                 }
             }

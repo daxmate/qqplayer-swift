@@ -111,12 +111,23 @@ final class AlignedLyricsStore: @unchecked Sendable {
 
     // MARK: 目录
 
-    /// 默认库目录（Documents/lyrics-aligned，不存在则创建）。
+    /// 默认库目录（iOS = `Documents/.qqplayer/lyrics/aligned`；macOS = `Documents/lyrics-aligned`，
+    /// 与改动前一致；不存在则创建）。
     static func defaultDirectory(fileManager: FileManager = .default) -> URL? {
-        guard let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        return documents.appendingPathComponent(LyricsStoreKind.aligned.directoryName, isDirectory: true)
+        LibraryRoot.alignedLyricsDirectoryURL(fileManager: fileManager)
+    }
+
+    /// 旧位置（v2 之前的 `Documents/lyrics-aligned/`）——**只读兼容**。
+    /// v2 迁移未跑到 / 搬迁失败时，已有对齐歌词不能因此看不见（写入仍只落新位置）。
+    /// macOS 下新位置就是旧位置，兼容列表为空（避免重复枚举）。
+    var legacyDirectories: [URL] {
+        guard explicitDirectory == nil, Self.directoryOverride == nil else { return [] }
+        guard let documents = LibraryRoot.documentsRootURL(fileManager: fileManager) else { return [] }
+        #if os(iOS)
+            return [documents.appendingPathComponent("lyrics-aligned", isDirectory: true)]
+        #else
+            return []
+        #endif
     }
 
     /// 库目录（懒建；解析失败 = nil）。
@@ -162,8 +173,10 @@ final class AlignedLyricsStore: @unchecked Sendable {
         guard let url = fileURL(forStableId: stableId) else {
             throw Self.isValidStableId(stableId) ? StoreError.directoryUnavailable(stableId) : StoreError.invalidStableId
         }
-        guard fileManager.fileExists(atPath: url.path) else { return nil }
-        let data = try Data(contentsOf: url)
+        // 新位置优先；未命中再看旧位置（只读兼容）。
+        let candidates = [url] + legacyDirectories.map { $0.appendingPathComponent("\(stableId).json") }
+        guard let hit = candidates.first(where: { fileManager.fileExists(atPath: $0.path) }) else { return nil }
+        let data = try Data(contentsOf: hit)
         do {
             return try decoder.decode(Lyrics.self, from: data)
         } catch {
@@ -184,26 +197,39 @@ final class AlignedLyricsStore: @unchecked Sendable {
         }
     }
 
-    /// 库内是否已有该歌的 aligned 歌词。
+    /// 库内是否已有该歌的 aligned 歌词（新位置优先，旧位置兼容）。
     func contains(forStableId stableId: String) -> Bool {
         guard let url = fileURL(forStableId: stableId) else { return false }
-        return fileManager.fileExists(atPath: url.path)
+        if fileManager.fileExists(atPath: url.path) { return true }
+        return legacyDirectories.contains {
+            fileManager.fileExists(atPath: $0.appendingPathComponent("\(stableId).json").path)
+        }
     }
 
     // MARK: 枚举
 
     /// 全库条目（按 stableId 升序，确定性；非 `.json` / 非法文件名跳过）。
+    /// 含旧位置（只读兼容）；同一 stableId 新位置权威。
     func entries() -> [AlignedLyricsEntry] {
-        guard let directory,
-              let urls = try? fileManager.contentsOfDirectory(
-                  at: directory,
-                  includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]
-              )
-        else { return [] }
+        var byStableId: [String: AlignedLyricsEntry] = [:]
+        for directory in [directory].compactMap({ $0 }) + legacyDirectories {
+            for entry in Self.entries(in: directory, fileManager: fileManager) where byStableId[entry.stableId] == nil {
+                byStableId[entry.stableId] = entry
+            }
+        }
+        return byStableId.values.sorted { $0.stableId < $1.stableId }
+    }
+
+    /// 单目录枚举（新/旧位置共用；零依赖，可单测）。
+    static func entries(in directory: URL, fileManager: FileManager) -> [AlignedLyricsEntry] {
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]
+        ) else { return [] }
         var result: [AlignedLyricsEntry] = []
         for url in urls where url.pathExtension == "json" {
             let stableId = url.deletingPathExtension().lastPathComponent
-            guard Self.isValidStableId(stableId) else { continue }
+            guard isValidStableId(stableId) else { continue }
             let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey])
             guard values?.isRegularFile != false else { continue }
             result.append(

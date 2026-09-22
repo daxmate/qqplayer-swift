@@ -206,7 +206,7 @@ enum AppLog {
                 .appendingPathComponent("Library/Logs/QQPlayerMac", isDirectory: true)
                 .appendingPathComponent("app.log", isDirectory: false)
         #else
-            return LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName, fileManager: fileManager)?
+            return LibraryRoot.logsDirectoryURL(fileManager: fileManager)?
                 .appendingPathComponent("app.log", isDirectory: false)
         #endif
     }

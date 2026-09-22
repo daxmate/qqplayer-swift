@@ -35,7 +35,7 @@ struct DatabasePathResolverTests {
         let container = URL(fileURLWithPath: "/group/container")
         let docs = URL(fileURLWithPath: "/docs")
         let url = DatabasePathResolver.iosDatabaseURL(
-            appGroupContainer: container, documentsDirectory: docs)
+            appGroupContainer: container, fallbackDirectory: docs)
         #expect(url.path == "/group/container/qqplayer.db")
     }
 
@@ -43,7 +43,10 @@ struct DatabasePathResolverTests {
     func iosFallsBackToDocuments() {
         let docs = URL(fileURLWithPath: "/docs")
         let url = DatabasePathResolver.iosDatabaseURL(
-            appGroupContainer: nil, documentsDirectory: docs)
+            appGroupContainer: nil, fallbackDirectory: docs)
+        // 2026-09-22 隐藏布局：参数语义从「Documents 根」改成「回退目录」
+        // （生产 = `LibraryRoot.databaseDirectoryURL()`，即 `<Documents>/.qqplayer/db`）；
+        // 本用例传什么目录就落在什么目录，断言不变。
         #expect(url.path == "/docs/MusicLibrary.sqlite")
     }
 }

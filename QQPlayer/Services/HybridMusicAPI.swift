@@ -127,7 +127,8 @@ class HybridMusicAPIService: ObservableObject, @unchecked Sendable {
     @MainActor static let shared = HybridMusicAPIService(
         discogsAPI: .shared,
         spotifyAPI: .shared,
-        cacheDirectory: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        cacheDirectory: LibraryRoot.namedCacheDirectoryURL("HybridMusicCache")
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first!.appendingPathComponent("HybridMusicCache")
     )
 

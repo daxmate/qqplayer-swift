@@ -54,6 +54,239 @@ enum LibraryRoot {
         musicDirectoryName, lyricsDirectoryName, artworkDirectoryName, logsDirectoryName,
     ]
 
+    // MARK: - 隐藏布局（iOS）常量
+
+    /// 隐藏根目录名（iOS）。**macOS 不启用**隐藏根 —— `LibraryRoot` 对 macOS 逐字节保持
+    /// 改动前行为（见 `scopedURL`）。
+    static let hiddenRootDirectoryName = ".qqplayer"
+
+    /// 隐藏根下的子目录名（iOS 唯一常量，别处不得再写字面量）。
+    static let hiddenDatabaseDirectoryName = "db"
+    static let hiddenStateDirectoryName = "state"
+    static let hiddenArtworkDirectoryName = "artwork"
+    static let hiddenLyricsDirectoryName = "lyrics"
+    static let hiddenLogsDirectoryName = "logs"
+    static let hiddenMetaDirectoryName = "meta"
+    static let hiddenCacheDirectoryName = "cache"
+    static let hiddenTrashDirectoryName = "trash"
+
+    /// 隐藏布局下 `state/` 的一级子目录名（歌单；别处不写字面量）。
+    static let hiddenPlaylistsDirectoryName = "playlists"
+    /// 隐藏布局下 `lyrics/` 的一级子目录名（三类歌词互不重叠，禁混放）。
+    static let hiddenManualLyricsDirectoryName = "manual"
+    static let hiddenAlignedLyricsDirectoryName = "aligned"
+    static let hiddenLyricsCacheDirectoryName = "cache"
+    static let hiddenLegacyManualLyricsDirectoryName = "legacy-manual"
+
+    // MARK: - 文件名常量（唯一事实源；别处不写字面量）
+
+    /// iOS 数据库文件名（App Group 容器 / 隐藏 db 目录共用）。
+    static let musicLibraryFileName = "MusicLibrary.sqlite"
+    static let favoritesFileName = "qqplayer-favorites.json"
+    static let playerStateFileName = "qqplayer-player-state.json"
+    static let pairingFileName = "pairing.json"
+    static let externalBookmarksFileName = "ExternalFileBookmarks.plist"
+    static let appLogFileName = "app.log"
+    static let dbDebugLogFileName = "db-debug.log"
+    static let interruptionDebugLogFileName = "intr-debug.log"
+    static let syncDiagnosticsLogFileName = "sync-diag.log"
+
+    // MARK: - 隐藏布局解析（iOS 隐藏根 / macOS 现状，逐字节透传）
+
+    /// 隐藏根 URL（iOS = `<Documents>/.qqplayer`；macOS = `<Documents>` 本身，不引入隐藏层）。
+    static func hiddenRootURL(fileManager: FileManager = .default) -> URL? {
+        guard let documents = documentsRootURL(fileManager: fileManager) else { return nil }
+        #if os(iOS)
+            return documents.appendingPathComponent(hiddenRootDirectoryName, isDirectory: true)
+        #else
+            return documents
+        #endif
+    }
+
+    /// 「iOS 隐藏布局 / macOS 现状布局」的**唯一换算**（路径解析只此一处，禁散落拼接）：
+    /// · iOS  → `<Documents>/.qqplayer/<hidden…>`
+    /// · macOS → `<Documents>/<macOS…>`（逐字节等于改动前 ⇒ Mac 行为零变化）
+    ///
+    /// - Parameters:
+    ///   - hidden: iOS 隐藏根下的相对组件
+    ///   - macOS: macOS 下的现状相对组件
+    ///   - isFile: 末组件是文件（false = 目录）
+    static func scopedURL(
+        hidden: [String],
+        macOS: [String],
+        isFile: Bool = false,
+        fileManager: FileManager = .default
+    ) -> URL? {
+        #if os(iOS)
+            let components = [hiddenRootDirectoryName] + hidden
+        #else
+            let components = macOS
+        #endif
+        guard let documents = documentsRootURL(fileManager: fileManager) else { return nil }
+        // macOS 下部分类目（state / cache）现状就是 **Documents 根本身**（components 为空）
+        // ⇒ 空列表要原样返回 Documents，不能当解析失败。
+        guard !components.isEmpty else { return documents }
+        var url = documents
+        for (index, component) in components.enumerated() {
+            let isLast = index == components.count - 1
+            url.appendPathComponent(component, isDirectory: !(isLast && isFile))
+        }
+        return url
+    }
+
+    // MARK: - 各存储类目 → URL（唯一入口）
+
+    /// iOS 数据库目录（隐藏）；macOS 不走本函数（DB 落 Application Support）。
+    static func databaseDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(hidden: [hiddenDatabaseDirectoryName], macOS: [], fileManager: fileManager)
+    }
+
+    /// 状态类目录（iOS = `.qqplayer/state`；macOS = Documents 根 —— 状态文件现状即平铺在根）。
+    static func stateDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(hidden: [hiddenStateDirectoryName], macOS: [], fileManager: fileManager)
+    }
+
+    static func favoritesFileURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenStateDirectoryName, favoritesFileName],
+            macOS: [favoritesFileName], isFile: true, fileManager: fileManager
+        )
+    }
+
+    static func playlistsDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenStateDirectoryName, hiddenPlaylistsDirectoryName],
+            macOS: ["qqplayer-playlists"], fileManager: fileManager
+        )
+    }
+
+    static func playerStateFileURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenStateDirectoryName, playerStateFileName],
+            macOS: [playerStateFileName], isFile: true, fileManager: fileManager
+        )
+    }
+
+    static func pairingFileURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenStateDirectoryName, pairingFileName],
+            macOS: [pairingFileName], isFile: true, fileManager: fileManager
+        )
+    }
+
+    static func externalBookmarksFileURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenStateDirectoryName, externalBookmarksFileName],
+            macOS: [externalBookmarksFileName], isFile: true, fileManager: fileManager
+        )
+    }
+
+    /// 封面缓存目录（iOS = `.qqplayer/artwork`；macOS = `Documents/Artwork`，现状）。
+    static func artworkDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenArtworkDirectoryName],
+            macOS: [artworkDirectoryName], fileManager: fileManager
+        )
+    }
+
+    /// 封面映射表（**元数据**，与缓存同目录但不属于缓存）。
+    static func artworkMappingFileURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenArtworkDirectoryName, artworkMappingFileName],
+            macOS: [artworkDirectoryName, artworkMappingFileName],
+            isFile: true, fileManager: fileManager
+        )
+    }
+
+    /// 封面映射表的**旧位置**（只读兼容；顺序 = 优先级，新位置仍高于全部旧位置）。
+    /// · iOS：① v1 位置 `Documents/Artwork/ArtworkMapping.plist`
+    ///         ② 改名前的旧位置 `Documents/ArtworkMapping.plist`
+    /// · macOS：②（现状，与改动前一致）
+    /// 映射内容由 `ArtworkManager.loadMapping` 合并（新位置优先），合并结果只写新位置。
+    static func legacyArtworkMappingFileURLs(fileManager: FileManager = .default) -> [URL] {
+        guard let documents = documentsRootURL(fileManager: fileManager) else { return [] }
+        var urls: [URL] = []
+        #if os(iOS)
+            urls.append(
+                documents
+                    .appendingPathComponent(artworkDirectoryName, isDirectory: true)
+                    .appendingPathComponent(artworkMappingFileName)
+            )
+        #endif
+        urls.append(documents.appendingPathComponent(artworkMappingFileName))
+        return urls
+    }
+
+    /// 手工歌词目录（iOS = `.qqplayer/lyrics/manual`；macOS = `Documents/Lyrics`，现状）。
+    static func manualLyricsDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenLyricsDirectoryName, hiddenManualLyricsDirectoryName],
+            macOS: [lyricsDirectoryName], fileManager: fileManager
+        )
+    }
+
+    /// 对齐歌词目录（iOS = `.qqplayer/lyrics/aligned`；macOS = `Documents/lyrics-aligned`）。
+    static func alignedLyricsDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenLyricsDirectoryName, hiddenAlignedLyricsDirectoryName],
+            macOS: ["lyrics-aligned"], fileManager: fileManager
+        )
+    }
+
+    /// 逐曲歌词缓存目录（iOS = `.qqplayer/lyrics/cache/tracks`；macOS = `Documents/lyrics-cache/tracks`）。
+    static func lyricsCacheTracksDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenLyricsDirectoryName, hiddenLyricsCacheDirectoryName, "tracks"],
+            macOS: ["lyrics-cache", "tracks"], fileManager: fileManager
+        )
+    }
+
+    /// 歌词搜索缓存目录（iOS = `.qqplayer/lyrics/cache/search`；macOS = `Documents/lyrics-cache/search`）。
+    static func lyricsSearchCacheDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenLyricsDirectoryName, hiddenLyricsCacheDirectoryName, "search"],
+            macOS: ["lyrics-cache", "search"], fileManager: fileManager
+        )
+    }
+
+    /// 日志目录（iOS = `.qqplayer/logs`；macOS = `Documents/Logs`，现状；macOS 的 AppLog
+    /// 主日志另有 `~/Library/Logs/QQPlayerMac`，见 `AppLog`）。
+    static func logsDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenLogsDirectoryName],
+            macOS: [logsDirectoryName], fileManager: fileManager
+        )
+    }
+
+    /// 元数据目录（iOS = `.qqplayer/meta`；macOS = `Documents/meta`）。
+    static func metaDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenMetaDirectoryName],
+            macOS: ["meta"], fileManager: fileManager
+        )
+    }
+
+    /// 各类缓存根（iOS = `.qqplayer/cache`；macOS = Documents 根 —— 现状缓存目录即平铺在根）。
+    static func cacheDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(hidden: [hiddenCacheDirectoryName], macOS: [], fileManager: fileManager)
+    }
+
+    /// 具名网络缓存目录（`SpotifyCache` / `DiscogsCache` / `HybridMusicCache`）。
+    /// iOS = `.qqplayer/cache/<name>`；macOS = `Documents/<name>`（现状）。
+    static func namedCacheDirectoryURL(_ name: String, fileManager: FileManager = .default) -> URL? {
+        scopedURL(hidden: [hiddenCacheDirectoryName, name], macOS: [name], fileManager: fileManager)
+    }
+
+    /// 回收区目录（iOS = `.qqplayer/trash`；macOS = `Documents/.Trash`，现状）。
+    /// ⚠️ 生产回收区**不在这里**：删除落点必须是「曲库根内」的隐藏目录（见 `DeleteReclaimArea`，
+    /// 差集语义要求文件移出曲库根才可见）。本函数只解析**旧根残留**的回收区。
+    static func trashDirectoryURL(fileManager: FileManager = .default) -> URL? {
+        scopedURL(
+            hidden: [hiddenTrashDirectoryName],
+            macOS: [".Trash"], fileManager: fileManager
+        )
+    }
+
     // MARK: - 根
 
     /// 测试注入：覆盖 Documents 根（nil = 真实沙盒 Documents）。

@@ -33,7 +33,7 @@
 //  本文件从 a0e5faf（分支 test/coverage-gaps-p1）适配到 main @ 50f8a9b：
 //  `TrackIdentityMigration.migrateFileReferences(from:to:documentsURL:)` /
 //  `(remapping:documentsURL:)`、`TrackIdentityFileMigrationReport`、
-//  `ExternalFileBookmarkStore(documentsURL:)` + `upsert(_:forStableId:)` /
+//  `ExternalFileBookmarkStore(directory:)` + `upsert(_:forStableId:)` /
 //  `loadedBookmarksOrEmpty()` / `fileURL`、`LyricsStoreKind.directoryName/allCases`
 //  逐个核对一致（skipped 字符串格式 `manual:targetExists` / `manual:renameFailed` /
 //  `bookmarks:readFailed` 亦一致）。
@@ -102,7 +102,7 @@ struct TrackIdentityFileMigrationReportTests {
         let libraryRoot = try FileMigrationFixture.makeLibraryRoot()
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
         try store.upsert(Data("bookmark".utf8), forStableId: FileMigrationFixture.oldId)
         for kind in LyricsStoreKind.allCases {
             try FileMigrationFixture.writeLyrics(
@@ -144,7 +144,7 @@ struct TrackIdentityFileMigrationReportTests {
         let libraryRoot = try FileMigrationFixture.makeLibraryRoot()
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
         // 前置：目标已存在（D3 已锁「不覆盖、不删源」的文件语义，本用例只锁报告计数，
         // 故这里仅备好场景，不再重复断言源/目标字节）。
         try FileMigrationFixture.writeLyrics(libraryRoot: libraryRoot, kind: .manual, stableId: FileMigrationFixture.oldId)
@@ -181,7 +181,7 @@ struct TrackIdentityFileMigrationReportTests {
             try? FileManager.default.removeItem(at: libraryRoot)
         }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
         try store.upsert(Data("bookmark".utf8), forStableId: FileMigrationFixture.oldId)
         try FileMigrationFixture.writeLyrics(libraryRoot: libraryRoot, kind: .aligned, stableId: FileMigrationFixture.oldId)
         try FileMigrationFixture.writeLyrics(libraryRoot: libraryRoot, kind: .manual, stableId: FileMigrationFixture.oldId)
@@ -234,7 +234,7 @@ struct TrackIdentityFileMigrationReportTests {
         let libraryRoot = try FileMigrationFixture.makeLibraryRoot()
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
         let garbage = Data("this is not a plist".utf8)
         try garbage.write(to: store.fileURL)
         for kind in LyricsStoreKind.allCases {
@@ -264,7 +264,7 @@ struct TrackIdentityFileMigrationReportTests {
         let libraryRoot = try FileMigrationFixture.makeLibraryRoot()
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
         try store.upsert(Data("bookmark".utf8), forStableId: FileMigrationFixture.oldId)
         for kind in LyricsStoreKind.allCases {
             try FileMigrationFixture.writeLyrics(
@@ -355,7 +355,7 @@ struct TrackIdentityFileMigrationReportTests {
         let libraryRoot = try FileMigrationFixture.makeLibraryRoot()
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
         try store.upsert(Data("bookmark-a1".utf8), forStableId: "a1")
         try store.upsert(Data("bookmark-a2".utf8), forStableId: "a2")
         for kind in LyricsStoreKind.allCases {
@@ -401,7 +401,7 @@ struct TrackIdentityFileMigrationReportTests {
         let libraryRoot = try FileMigrationFixture.makeLibraryRoot()
         defer { try? FileManager.default.removeItem(at: libraryRoot) }
 
-        let store = ExternalFileBookmarkStore(documentsURL: libraryRoot)
+        let store = ExternalFileBookmarkStore(directory: libraryRoot)
 
         // (a) 空映射：早退，报告就是初始值
         let empty = TrackIdentityMigration.migrateFileReferences(remapping: [:], documentsURL: libraryRoot)

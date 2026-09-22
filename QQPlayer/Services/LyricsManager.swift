@@ -249,32 +249,34 @@ actor LyricsManager {
         AppLog.info(.general, "📝 Manual lyrics cleared for: \(track.title)")
     }
 
-    // MARK: - 手动歌词磁盘存储（Documents/lyrics-manual/{stableId}.json，与自动缓存目录分离）
+    // MARK: - 手动歌词磁盘存储（iOS 隐藏布局 `.qqplayer/lyrics/manual/{stableId}.json`）
 
     private func getManualLyricsDirectory() -> URL? {
         if let override = Self.manualLyricsDirectoryOverride {
             return override
         }
-        // 2026-09-22 曲库文件夹化：手工歌词落 `Documents/Lyrics/`。
-        guard let documentsURL = LibraryRoot.documentsRootURL(fileManager: fileManager) else {
+        // 2026-09-22 隐藏布局：手工歌词落 `Documents/.qqplayer/lyrics/manual/`（macOS 仍 `Documents/Lyrics`）。
+        guard let dir = LibraryRoot.manualLyricsDirectoryURL(fileManager: fileManager) else {
             return nil
         }
-        let dir = documentsURL.appendingPathComponent(LibraryRoot.lyricsDirectoryName, isDirectory: true)
         if !fileManager.fileExists(atPath: dir.path) {
             try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         return dir
     }
 
-    /// 改名前的旧位置（`Documents/lyrics-manual/`）——**只读兼容**：迁移器未跑到 /
-    /// 搬迁失败时，用户的手工歌词不能因此看不见（写入一律落新位置）。
-    private func getLegacyManualLyricsDirectory() -> URL? {
+    /// 旧位置（`Documents/Lyrics/`（v1）与改名前的 `Documents/lyrics-manual/`）——**只读兼容**：
+    /// 迁移器未跑到 / 搬迁失败时，用户的手工歌词不能因此看不见（写入一律落新位置）。
+    private func legacyManualLyricsDirectories() -> [URL] {
         // 测试注入目录时不参与兼容读取（注入 = 只认注入目录，与改动前行为一致）。
-        guard Self.manualLyricsDirectoryOverride == nil else { return nil }
+        guard Self.manualLyricsDirectoryOverride == nil else { return [] }
         guard let documentsURL = LibraryRoot.documentsRootURL(fileManager: fileManager) else {
-            return nil
+            return []
         }
-        return documentsURL.appendingPathComponent("lyrics-manual", isDirectory: true)
+        return [
+            documentsURL.appendingPathComponent(LibraryRoot.lyricsDirectoryName, isDirectory: true),
+            documentsURL.appendingPathComponent("lyrics-manual", isDirectory: true),
+        ]
     }
 
     private func getManualLyricsFileURL(trackId: String) -> URL? {
@@ -282,9 +284,8 @@ actor LyricsManager {
         return dir.appendingPathComponent("\(trackId).json")
     }
 
-    private func getLegacyManualLyricsFileURL(trackId: String) -> URL? {
-        guard let dir = getLegacyManualLyricsDirectory() else { return nil }
-        return dir.appendingPathComponent("\(trackId).json")
+    private func getLegacyManualLyricsFileURLs(trackId: String) -> [URL] {
+        legacyManualLyricsDirectories().map { $0.appendingPathComponent("\(trackId).json") }
     }
 
     private func saveManualLyricsToDisk(lyrics: Lyrics, trackId: String) async {
@@ -305,16 +306,17 @@ actor LyricsManager {
         if let fileURL = getManualLyricsFileURL(trackId: trackId) {
             try? fileManager.removeItem(at: fileURL)
         }
-        if let legacyURL = getLegacyManualLyricsFileURL(trackId: trackId),
-           fileManager.fileExists(atPath: legacyURL.path) {
+        for legacyURL in getLegacyManualLyricsFileURLs(trackId: trackId)
+            where fileManager.fileExists(atPath: legacyURL.path) {
             try? fileManager.removeItem(at: legacyURL)
         }
     }
 
     private func loadManualOverridesFromDisk() async {
-        // 新位置（`Documents/Lyrics/`）优先；旧位置（`Documents/lyrics-manual/`）兜底，
-        // 且不覆盖新位置里已读到的同 id（新位置是权威）。
-        for dir in [getManualLyricsDirectory(), getLegacyManualLyricsDirectory()].compactMap({ $0 }) {
+        // 新位置（`.qqplayer/lyrics/manual/`）优先；旧位置（`Documents/Lyrics/`、`Documents/lyrics-manual/`）
+        // 兜底，且不覆盖新位置里已读到的同 id（新位置是权威）。
+        let directories = [getManualLyricsDirectory()].compactMap { $0 } + legacyManualLyricsDirectories()
+        for dir in directories {
             guard let files = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
                 continue
             }

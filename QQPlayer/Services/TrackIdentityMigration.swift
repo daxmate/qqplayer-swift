@@ -229,7 +229,7 @@ enum TrackIdentityMigration {
 
     private static func bookmarkStore(documentsURL: URL?) -> ExternalFileBookmarkStore? {
         if let documentsURL {
-            return ExternalFileBookmarkStore(documentsURL: documentsURL)
+            return ExternalFileBookmarkStore(directory: documentsURL)
         }
         return .default
     }

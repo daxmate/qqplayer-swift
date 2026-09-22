@@ -94,7 +94,7 @@ struct ExternalFileBookmarkStoreTests {
     func upsertAndRemoveRoundTrip() throws {
         let documents = try DataIntegrityFixture.makeTemporaryDocuments()
         defer { try? FileManager.default.removeItem(at: documents) }
-        let store = ExternalFileBookmarkStore(documentsURL: documents)
+        let store = ExternalFileBookmarkStore(directory: documents)
         let fileURL = documents.appendingPathComponent("ExternalFileBookmarks.plist")
 
         try store.upsert(Data("a".utf8), forStableId: "id-a")
@@ -112,7 +112,7 @@ struct ExternalFileBookmarkStoreTests {
     func unreadableFileIsNeverOverwritten() throws {
         let documents = try DataIntegrityFixture.makeTemporaryDocuments()
         defer { try? FileManager.default.removeItem(at: documents) }
-        let store = ExternalFileBookmarkStore(documentsURL: documents)
+        let store = ExternalFileBookmarkStore(directory: documents)
         let fileURL = documents.appendingPathComponent("ExternalFileBookmarks.plist")
         let garbage = Data("not a plist".utf8)
         try garbage.write(to: fileURL)
@@ -139,7 +139,7 @@ struct ExternalFileBookmarkStoreTests {
     func renameKeysIsConservativeAndIdempotent() throws {
         let documents = try DataIntegrityFixture.makeTemporaryDocuments()
         defer { try? FileManager.default.removeItem(at: documents) }
-        let store = ExternalFileBookmarkStore(documentsURL: documents)
+        let store = ExternalFileBookmarkStore(directory: documents)
 
         try store.upsert(Data("old".utf8), forStableId: "old-id")
         try store.upsert(Data("kept".utf8), forStableId: "new-id")
@@ -165,7 +165,7 @@ struct TrackIdentityFileMigrationTests {
     func fileReferencesFollowStableId() throws {
         let documents = try DataIntegrityFixture.makeTemporaryDocuments()
         defer { try? FileManager.default.removeItem(at: documents) }
-        let store = ExternalFileBookmarkStore(documentsURL: documents)
+        let store = ExternalFileBookmarkStore(directory: documents)
 
         for kind in LyricsStoreKind.allCases {
             let directory = documents.appendingPathComponent(kind.directoryName, isDirectory: true)

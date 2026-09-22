@@ -18,15 +18,17 @@ enum DatabasePathResolver {
         return dir.appendingPathComponent("qqplayer.db")
     }
 
-    /// iOS 数据库路径：优先 App Group 容器（与 Siri 扩展共享），否则 Documents 兜底。
+    /// iOS 数据库路径：优先 App Group 容器（与 Siri 扩展共享），否则隐藏根 `db/` 兜底。
+    /// - fallbackDirectory：无 App Group 容器时的回退目录（生产 = `LibraryRoot.databaseDirectoryURL()`，
+    ///   即 `<Documents>/.qqplayer/db`；2026-09-22 隐藏布局改造前是 Documents 根）
     static func iosDatabaseURL(
         appGroupContainer: URL?,
-        documentsDirectory: URL
+        fallbackDirectory: URL
     ) -> URL {
         if let appGroupContainer {
             return appGroupContainer.appendingPathComponent("qqplayer.db")
         } else {
-            return documentsDirectory.appendingPathComponent("MusicLibrary.sqlite")
+            return fallbackDirectory.appendingPathComponent(LibraryRoot.musicLibraryFileName)
         }
     }
 }

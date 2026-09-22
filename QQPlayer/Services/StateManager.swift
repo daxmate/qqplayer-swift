@@ -25,24 +25,27 @@ class StateManager: @unchecked Sendable {
         let fm = FileManager.default
         let documentsURL = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
-        let migrations: [(from: String, to: String)] = [
-            ("cosmos-playlists", "qqplayer-playlists"),
-            ("cosmos-favorites.json", "qqplayer-favorites.json"),
-            ("cosmos-player-state.json", "qqplayer-player-state.json"),
+        // 旧 Cosmos 名一律在 Documents 根；新的 QQPlayer 名落到隐藏布局的落点
+        // （2026-09-22 隐藏布局：iOS = `.qqplayer/state/…`；macOS 仍平铺在 Documents）。
+        let migrations: [(from: String, to: URL?)] = [
+            ("cosmos-playlists", LibraryRoot.playlistsDirectoryURL()),
+            ("cosmos-favorites.json", LibraryRoot.favoritesFileURL()),
+            ("cosmos-player-state.json", LibraryRoot.playerStateFileURL()),
         ]
 
         for m in migrations {
             let from = documentsURL.appendingPathComponent(m.from)
-            let to = documentsURL.appendingPathComponent(m.to)
+            guard let to = m.to else { continue }
             guard fm.fileExists(atPath: from.path) else { continue }
             if fm.fileExists(atPath: to.path) {
                 // New location already in use; the legacy copy is just residue.
                 try? fm.removeItem(at: from)
-                AppLog.info(.general, "🧹 Removed legacy \(m.from) (new \(m.to) already exists)")
+                AppLog.info(.general, "🧹 Removed legacy \(m.from) (new \(to.lastPathComponent) already exists)")
             } else {
                 do {
+                    try fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try fm.moveItem(at: from, to: to)
-                    AppLog.info(.general, "✅ Migrated \(m.from) → \(m.to)")
+                    AppLog.info(.general, "✅ Migrated \(m.from) → \(to.path)")
                 } catch {
                     AppLog.warn(.general, "⚠️ Failed to migrate \(m.from): \(error)")
                 }
@@ -68,6 +71,29 @@ class StateManager: @unchecked Sendable {
     // M3-2：退役 iCloud 容器——getAppFolderURL/createAppFolderIfNeeded 为
     // ubiquity 容器目录创建逻辑，已随 iCloud 存储退役删除（音乐存沙盒 Documents）。
 
+    // MARK: - 落点（隐藏布局唯一入口 + 旧位置只读兼容）
+
+    /// 收藏文件落点（iOS = `.qqplayer/state/qqplayer-favorites.json`；macOS 现状平铺）。
+    private var favoritesFileURL: URL? { LibraryRoot.favoritesFileURL() }
+    /// 旧位置（`Documents/qqplayer-favorites.json`）—— v2 迁移未跑到时的只读兜底。
+    private var legacyFavoritesFileURL: URL? {
+        LibraryRoot.documentsRootURL()?.appendingPathComponent(LibraryRoot.favoritesFileName)
+    }
+
+    /// 歌单目录落点（iOS = `.qqplayer/state/playlists`；macOS = `Documents/qqplayer-playlists`）。
+    private var playlistsDirectoryURL: URL? { LibraryRoot.playlistsDirectoryURL() }
+    /// 旧位置（`Documents/qqplayer-playlists`）—— 只读兜底。
+    private var legacyPlaylistsDirectoryURL: URL? {
+        LibraryRoot.documentsRootURL()?.appendingPathComponent("qqplayer-playlists", isDirectory: true)
+    }
+
+    /// 播放状态文件落点（iOS = `.qqplayer/state/qqplayer-player-state.json`）。
+    private var playerStateFileURL: URL? { LibraryRoot.playerStateFileURL() }
+    /// 旧位置（`Documents/qqplayer-player-state.json`）—— 只读兜底。
+    private var legacyPlayerStateFileURL: URL? {
+        LibraryRoot.documentsRootURL()?.appendingPathComponent(LibraryRoot.playerStateFileName)
+    }
+
     // MARK: - Favorites
 
     func saveFavorites(_ favorites: [String]) throws {
@@ -79,8 +105,9 @@ class StateManager: @unchecked Sendable {
     }
 
     private func saveToLocalDocuments(_ favoritesState: FavoritesState) throws {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localFavoritesURL = documentsURL.appendingPathComponent("qqplayer-favorites.json")
+        guard let localFavoritesURL = favoritesFileURL else {
+            throw ExternalFileBookmarkStore.StoreError.documentsDirectoryUnavailable
+        }
         try saveJSONAtomically(favoritesState, to: localFavoritesURL)
         AppLog.info(.general, "📱 Favorites saved locally to: \(localFavoritesURL.path)")
     }
@@ -89,15 +116,16 @@ class StateManager: @unchecked Sendable {
         AppLog.info(.general, "📂 StateManager: Loading favorites...")
 
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud fallback）
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localFavoritesURL = documentsURL.appendingPathComponent("qqplayer-favorites.json")
-
-        AppLog.info(.general, "📂 StateManager: Checking local file at: \(localFavoritesURL.path)")
-
-        guard FileManager.default.fileExists(atPath: localFavoritesURL.path) else {
+        // 隐藏布局：新位置优先，旧位置只读兜底（v2 迁移未跑到时用户数据不能隐身）。
+        guard let localFavoritesURL = [favoritesFileURL, legacyFavoritesFileURL]
+            .compactMap({ $0 })
+            .first(where: { FileManager.default.fileExists(atPath: $0.path) })
+        else {
             AppLog.info(.general, "📂 StateManager: Local file does not exist")
             return []
         }
+
+        AppLog.info(.general, "📂 StateManager: Checking local file at: \(localFavoritesURL.path)")
 
         do {
             let data = try Data(contentsOf: localFavoritesURL)
@@ -120,8 +148,9 @@ class StateManager: @unchecked Sendable {
     }
 
     private func savePlaylistToLocalDocuments(_ playlist: PlaylistState) throws {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localPlaylistsFolder = documentsURL.appendingPathComponent("qqplayer-playlists", isDirectory: true)
+        guard let localPlaylistsFolder = playlistsDirectoryURL else {
+            throw ExternalFileBookmarkStore.StoreError.documentsDirectoryUnavailable
+        }
 
         if !FileManager.default.fileExists(atPath: localPlaylistsFolder.path) {
             try FileManager.default.createDirectory(at: localPlaylistsFolder,
@@ -145,37 +174,42 @@ class StateManager: @unchecked Sendable {
         return nil
     }
 
-    /// 读取本地 Documents 全部歌单（M3-2：本地是唯一位置，退役 iCloud 补充段）
+    /// 读取本地 Documents 全部歌单（M3-2：本地是唯一位置，退役 iCloud 补充段）。
+    /// 隐藏布局：新位置优先，旧位置只读兜底（同一 slug 新位置权威，不覆盖）。
     private func loadAllPlaylistsFromLocalDocuments() throws -> [PlaylistState] {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localPlaylistsFolder = documentsURL.appendingPathComponent("qqplayer-playlists", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: localPlaylistsFolder.path) else {
-            return []
-        }
-
-        let playlistFiles = try FileManager.default.contentsOfDirectory(at: localPlaylistsFolder,
-                                                                        includingPropertiesForKeys: nil)
-        var playlists: [PlaylistState] = []
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        var bySlug: [String: PlaylistState] = [:]
 
-        for fileURL in playlistFiles where fileURL.pathExtension == "json" {
-            if let data = try? Data(contentsOf: fileURL),
-               let playlist = try? decoder.decode(PlaylistState.self, from: data) {
-                playlists.append(playlist)
+        for folder in [playlistsDirectoryURL, legacyPlaylistsDirectoryURL].compactMap({ $0 }) {
+            guard FileManager.default.fileExists(atPath: folder.path),
+                  let playlistFiles = try? FileManager.default.contentsOfDirectory(
+                      at: folder, includingPropertiesForKeys: nil
+                  )
+            else { continue }
+
+            for fileURL in playlistFiles where fileURL.pathExtension == "json" {
+                guard let data = try? Data(contentsOf: fileURL),
+                      let playlist = try? decoder.decode(PlaylistState.self, from: data),
+                      bySlug[playlist.slug] == nil else { continue }
+                bySlug[playlist.slug] = playlist
             }
         }
-        return playlists
+        return Array(bySlug.values)
     }
 
     private func loadPlaylistFromLocalDocuments(slug: String) throws -> PlaylistState? {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localPlaylistsFolder = documentsURL.appendingPathComponent("qqplayer-playlists", isDirectory: true)
-        let localPlaylistURL = localPlaylistsFolder.appendingPathComponent("playlist-\(slug).json")
-
-        guard FileManager.default.fileExists(atPath: localPlaylistURL.path) else {
+        guard let folder = [playlistsDirectoryURL, legacyPlaylistsDirectoryURL]
+            .compactMap({ $0 })
+            .first(where: {
+                FileManager.default.fileExists(
+                    atPath: $0.appendingPathComponent("playlist-\(slug).json").path
+                )
+            })
+        else {
             return nil
         }
+        let localPlaylistURL = folder.appendingPathComponent("playlist-\(slug).json")
 
         let data = try Data(contentsOf: localPlaylistURL)
         let decoder = JSONDecoder()
@@ -211,13 +245,13 @@ class StateManager: @unchecked Sendable {
     }
 
     private func deletePlaylistFromLocalDocuments(slug: String) throws {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localPlaylistsFolder = documentsURL.appendingPathComponent("qqplayer-playlists", isDirectory: true)
-        let localPlaylistURL = localPlaylistsFolder.appendingPathComponent("playlist-\(slug).json")
-
-        if FileManager.default.fileExists(atPath: localPlaylistURL.path) {
-            try FileManager.default.removeItem(at: localPlaylistURL)
-            AppLog.info(.general, "📱 Playlist deleted locally: \(localPlaylistURL.path)")
+        // 新旧两个位置都删：旧位置的残留不能让「删歌单」变成表面成功。
+        for folder in [playlistsDirectoryURL, legacyPlaylistsDirectoryURL].compactMap({ $0 }) {
+            let localPlaylistURL = folder.appendingPathComponent("playlist-\(slug).json")
+            if FileManager.default.fileExists(atPath: localPlaylistURL.path) {
+                try FileManager.default.removeItem(at: localPlaylistURL)
+                AppLog.info(.general, "📱 Playlist deleted locally: \(localPlaylistURL.path)")
+            }
         }
     }
 
@@ -270,8 +304,9 @@ extension StateManager {
     }
 
     private func savePlayerStateToLocalDocuments(_ playerState: PlayerState) throws {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localPlayerStateURL = documentsURL.appendingPathComponent("qqplayer-player-state.json")
+        guard let localPlayerStateURL = playerStateFileURL else {
+            throw ExternalFileBookmarkStore.StoreError.documentsDirectoryUnavailable
+        }
         try saveJSONAtomically(playerState, to: localPlayerStateURL)
         AppLog.info(.general, "📱 Player state saved locally to: \(localPlayerStateURL.path)")
     }
@@ -280,15 +315,16 @@ extension StateManager {
         AppLog.info(.general, "📂 StateManager: Loading player state...")
 
         // M3-2：本地 Documents 是唯一持久化位置（退役 iCloud fallback）
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let localPlayerStateURL = documentsURL.appendingPathComponent("qqplayer-player-state.json")
-
-        AppLog.info(.general, "📂 StateManager: Checking local player state at: \(localPlayerStateURL.path)")
-
-        guard FileManager.default.fileExists(atPath: localPlayerStateURL.path) else {
+        // 隐藏布局：新位置优先，旧位置只读兜底。
+        guard let localPlayerStateURL = [playerStateFileURL, legacyPlayerStateFileURL]
+            .compactMap({ $0 })
+            .first(where: { FileManager.default.fileExists(atPath: $0.path) })
+        else {
             AppLog.info(.general, "📂 StateManager: Local player state file does not exist")
             return nil
         }
+
+        AppLog.info(.general, "📂 StateManager: Checking local player state at: \(localPlayerStateURL.path)")
 
         do {
             let data = try Data(contentsOf: localPlayerStateURL)

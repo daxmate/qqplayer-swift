@@ -417,7 +417,7 @@ class DatabaseManager: @unchecked Sendable {
     /// 只在启动期决策点写（每次启动 ≤ 6 行），不进任何热路径；诊断自身失败绝不影响启动。
     private func dbDiag(_ message: String) {
         #if os(iOS)
-            guard let url = LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName)?
+            guard let url = LibraryRoot.logsDirectoryURL()?
                 .appendingPathComponent("db-debug.log") else { return }
             let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
             do {
@@ -493,15 +493,21 @@ class DatabaseManager: @unchecked Sendable {
             )
             return url
         #else
+            // 隐藏布局（2026-09-22）：旧 DB 必须在**打开连接之前**搬进 `.qqplayer/db/`
+            // （移动打开中的 WAL/SHM 有一致性风险，故不能交给启动后的迁移器）。
+            Self.relocateLegacyDatabaseForHiddenLayout()
             // Try to use app group container first for sharing with Siri extension
             // 决策上收：DatabasePathResolver.iosDatabaseURL（有单测锁定）。
             let containerURL = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: "group.com.daxmate.qqplayer.ios")
             let documentsPath = FileManager.default.urls(for: .documentDirectory,
                                                          in: .userDomainMask).first!
+            // 2026-09-22 隐藏布局：DB 与其余非曲库内容一并收进 `Documents/.qqplayer/`。
+            let fallbackDirectory = LibraryRoot.databaseDirectoryURL()
+                ?? documentsPath.appendingPathComponent(LibraryRoot.hiddenRootDirectoryName, isDirectory: true)
             let resolved = DatabasePathResolver.iosDatabaseURL(
                 appGroupContainer: containerURL,
-                documentsDirectory: documentsPath)
+                fallbackDirectory: fallbackDirectory)
             dbDiag("🔎 resolve appGroup=\(containerURL == nil ? "nil" : containerURL!.path) "
                 + "documents=\(documentsPath.path) → chosen=\(resolved.path) "
                 + "exists=\(FileManager.default.fileExists(atPath: resolved.path))")

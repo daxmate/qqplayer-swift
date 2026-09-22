@@ -52,19 +52,30 @@ extension ArtworkManager {
         // 本函数只在 `init` 里调一次，而所有清理（post-index maintenance / 磁盘缓存清理）
         // 都晚于 `init` ⇒ 合并结果先于清理进入内存映射（清理判据 `artworkMapping` 因此可信）。
         let current = Self.readMapping(at: mappingFileURL)
-        let legacy = Self.readMapping(at: legacyMappingFileURL)
+        let legacyReads = legacyMappingFileURLs.map { Self.readMapping(at: $0) }
 
         // 任一位置「存在但读不出来」⇒ 映射内容未知，清理必须据此 fail-safe（未知 ≠ 空）。
         mappingUnreadable = Self.mappingFileExistsUnreadable(mappingFileURL, parsed: current)
-            || Self.mappingFileExistsUnreadable(legacyMappingFileURL, parsed: legacy)
+            || zip(legacyMappingFileURLs, legacyReads).contains {
+                Self.mappingFileExistsUnreadable($0, parsed: $1)
+            }
 
-        guard current != nil || legacy != nil else { return }
-        artworkMapping = Self.mergedMapping(current: current, legacy: legacy)
+        // 合并：新位置 > 旧位置（多个旧位置之间，先列出的贡献优先）。
+        var merged = current
+        var legacyContributed = false
+        for legacy in legacyReads {
+            guard let legacy else { continue }
+            legacyContributed = true
+            merged = Self.mergedMapping(current: merged, legacy: legacy)
+        }
+
+        guard let merged else { return }
+        artworkMapping = merged
         AppLog.info(.general, "📊 Loaded artwork mapping: \(artworkMapping.count) entries")
 
         // 旧位置贡献了新位置没有的条目 ⇒ 立刻把**合并结果**落到新位置（写入仍只经本类的
         // `saveMapping`）。否则映射表可能只存在于旧位置，而旧位置恰是清理/迁移的作用域。
-        if legacy != nil, (current ?? [:]) != artworkMapping {
+        if legacyContributed, (current ?? [:]) != artworkMapping {
             saveMapping()
         }
     }
