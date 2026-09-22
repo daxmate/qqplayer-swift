@@ -293,15 +293,16 @@ enum LibraryRoot {
 
     // MARK: - 根
 
-    /// 测试注入：覆盖 Documents 根（nil = 真实沙盒 Documents）。
-    /// 与 `LyricsManager.manualLyricsDirectoryOverride` / `AlignedLyricsStore.directoryOverride`
-    /// 同款：**只由测试在用例内写入**（串行用例 + 结束即复原），生产只读。
-    /// 有了它，路径语义（相对/绝对、换容器、扫描根）才能脱离真机容器确定性验证。
-    nonisolated(unsafe) static var documentsRootOverride: URL?
-
     /// 容器 Documents（唯一出口）。
+    ///
+    /// **测试注入一律经 `fileManager` 缝**（2026-09-22 起不再有进程级全局静态覆盖）：
+    /// 用例传一个把 `.documentDirectory` 解析重定向到临时根的 `FileManager`
+    /// （见 `QQPlayerTests/DocumentsRootTestSupport.swift`），全部落点即可脱离真机容器
+    /// 确定性验证。**为什么不用进程级静态**：CI 实证（run `35704744895`）—— Swift Testing
+    /// 的**不同套件之间仍然并行**，共享的可变静态根会被并行套件互相改写/复位，被测用例
+    /// 随即「看不见自己搭的文件」（`LibraryLayoutMigrationTests` / `StateManagerTests` 7 条红）。
     static func documentsRootURL(fileManager: FileManager = .default) -> URL? {
-        documentsRootOverride ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
+        fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
     }
 
     /// 曲库根 = `<Documents>/Music` —— **路径解析的唯一基准**。

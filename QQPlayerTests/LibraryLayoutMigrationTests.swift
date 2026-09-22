@@ -16,14 +16,14 @@
 //   · **一次性迁移器**：幂等、失败不删原件、冲突不覆盖、干跑只统计 —— 每一条都是
 //     「用户数据可能被搬丢」的防线。
 //
-//  全程用临时目录 + 内存库（`LibraryRoot.documentsRootOverride` 注入），不碰真机数据、
-//  不启模拟器交互。
+//  全程用临时目录 + 内存库（**按用例注入** `.documentDirectory` 指向临时根的 `FileManager`，
+//  取代已删除的进程级静态 `LibraryRoot.documentsRootOverride`；见 `DocumentsRootTestSupport.swift`），
+//  不碰真机数据、不启模拟器交互。
 //
-//  ⚠️ 本套件是**唯一**写 `LibraryRoot.documentsRootOverride` 的套件 —— v2 的用例（文件
-//  `LibraryHiddenLayoutMigrationTests.swift`）是它的 **extension**，不是另一个套件：
-//  Swift Testing 里 **不同套件之间仍然并行**（`.serialized` 只约束同一套件内的用例；
-//  同结论见 `MusicAPIMockSupport.swift` 顶部），拆成两个套件会互相把进程级静态根改写到
-//  对方根上（2026-09-22 CI 实证：v1 与 v2 的用例在**同一毫秒**启动，双方都出现
+//  ⚠️ 与 v2（`LibraryHiddenLayoutMigrationTests.swift`）是**两个独立套件**：Swift Testing 里
+//  **不同套件之间仍然并行**（`.serialized` 只约束同一套件内的用例）。两者不再共享任何可变状态 ——
+//  各自的临时根经**按用例注入的 `FileManager`** 生效，跨套件并发无法互相污染
+//  （2026-09-22 CI 实证：此前共享的进程级静态根被并行套件互相改写 ⇒ 双方都出现
 //  「没看见自己搭的文件」的断言失败）。
 //
 
@@ -33,42 +33,38 @@ import Testing
 
 @testable import QQPlayer
 
-@Suite("曲库布局迁移（v1 文件夹化 + v2 隐藏布局）：路径解析 + 根条目迁移", .serialized)
+@Suite("曲库布局迁移（文件夹化 v1）：路径解析 + 根条目迁移", .serialized)
 struct LibraryLayoutMigrationTests {
     // MARK: - Fixture
 
-    /// 临时 Documents 根（真实文件系统），并在用例期间把它注入 `LibraryRoot`。
-    /// 套件内所有用例（含 v2 的 extension）串行执行，静态根不会被并发改写。
-    func withDocumentsRoot(_ body: (URL) throws -> Void) throws {
+    /// 临时 Documents 根（真实文件系统） + 指向它的注入式 `FileManager`（按用例，进程内无共享静态）。
+    /// 用例把 `fileManager` 传进生产的注入缝（迁移器 / `LibraryRoot.*(fileManager:)`）。
+    private func withDocumentsRoot(_ body: (URL, FileManager) throws -> Void) throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("qqplayer-layout-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent("Documents", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        LibraryRoot.documentsRootOverride = root
-        defer {
-            LibraryRoot.documentsRootOverride = nil
-            try? FileManager.default.removeItem(at: root.deletingLastPathComponent())
-        }
-        try body(root)
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        try body(root, DocumentsRootFileManager(documentsRoot: root))
     }
 
     /// 内存库 + `DatabaseManager`（同 `FileCleanupManagerTests` 的测试缝）。
-    func makeManager() throws -> DatabaseManager {
+    private func makeManager() throws -> DatabaseManager {
         let dbQueue = try DatabaseQueue()
         let manager = DatabaseManager(dbWriter: dbQueue)
         try manager.createTables()
         return manager
     }
 
-    private func makeMigrator(database: DatabaseManager) -> LibraryLayoutMigrator {
+    private func makeMigrator(database: DatabaseManager, fileManager: FileManager) -> LibraryLayoutMigrator {
         // UserDefaults 用独立 suite：不污染 App 的真实完成门。
         let defaults = UserDefaults(suiteName: "library-layout-tests-\(UUID().uuidString)") ?? .standard
         defaults.removeObject(forKey: LibraryLayoutMigrator.completionDefaultsKey)
-        return LibraryLayoutMigrator(database: database, defaults: defaults)
+        return LibraryLayoutMigrator(database: database, defaults: defaults, fileManager: fileManager)
     }
 
     @discardableResult
-    func writeFile(_ url: URL, bytes: Int = 8) throws -> URL {
+    private func writeFile(_ url: URL, bytes: Int = 8) throws -> URL {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -98,40 +94,40 @@ struct LibraryLayoutMigrationTests {
 
     @Test("曲库根下文件存相对路径，曲库外文件仍存绝对路径")
     func storesRelativeInsideMusicRootAndAbsoluteOutside() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let insideURL = documents
                 .appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
                 .appendingPathComponent("song.flac")
             let outsideURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("qqplayer-outside-\(UUID().uuidString).flac")
 
-            let insideStored = LibraryRoot.storedPath(for: insideURL)
-            let outsideStored = LibraryRoot.storedPath(for: outsideURL)
+            let insideStored = LibraryRoot.storedPath(for: insideURL, fileManager: fileManager)
+            let outsideStored = LibraryRoot.storedPath(for: outsideURL, fileManager: fileManager)
 
             #expect(insideStored == "song.flac")
             #expect(outsideStored == outsideURL.standardizedFileURL.path)
             // 存储形态幂等：再归一化一次结果不变（所有写入点因此可以无脑调用）。
-            #expect(LibraryRoot.storedPath(forAbsolutePath: insideStored) == insideStored)
+            #expect(LibraryRoot.storedPath(forAbsolutePath: insideStored, fileManager: fileManager) == insideStored)
             // 解析回绝对 URL 必须与源一致。
-            #expect(LibraryRoot.absoluteURL(forStoredPath: insideStored).path == insideURL.standardizedFileURL.path)
+            #expect(LibraryRoot.absoluteURL(forStoredPath: insideStored, fileManager: fileManager).path == insideURL.standardizedFileURL.path)
             // 曲库内 / 曲库外判定。
-            #expect(LibraryRoot.isExternalPath(insideStored) == false)
-            #expect(LibraryRoot.isExternalPath(outsideStored))
+            #expect(LibraryRoot.isExternalPath(insideStored, fileManager: fileManager) == false)
+            #expect(LibraryRoot.isExternalPath(outsideStored, fileManager: fileManager))
         }
     }
 
     @Test("换容器：同一相对路径在不同 Documents 根下解析到各自的新根")
     func relativePathResolvesAgainstCurrentRoot() throws {
-        try withDocumentsRoot { firstRoot in
+        try withDocumentsRoot { firstRoot, fileManager in
             let stored = "song.flac"
-            let firstResolved = LibraryRoot.absoluteURL(forStoredPath: stored)
+            let firstResolved = LibraryRoot.absoluteURL(forStoredPath: stored, fileManager: fileManager)
             #expect(firstResolved.path == firstRoot
                 .appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
                 .appendingPathComponent("song.flac").path)
 
             // 模拟「重装换数据容器」：换一个 Documents 根，同一相对路径必须落到新根。
-            try withDocumentsRoot { secondRoot in
-                let secondResolved = LibraryRoot.absoluteURL(forStoredPath: stored)
+            try withDocumentsRoot { secondRoot, fileManager in
+                let secondResolved = LibraryRoot.absoluteURL(forStoredPath: stored, fileManager: fileManager)
                 #expect(secondRoot.path != firstRoot.path)
                 #expect(secondResolved.path == secondRoot
                     .appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
@@ -142,35 +138,35 @@ struct LibraryLayoutMigrationTests {
 
     @Test("旧数据容器前缀归一化：换 UUID 的旧路径解回现容器")
     func rebasesLegacyContainerPrefix() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let legacy = "/private/var/mobile/Containers/Data/Application/"
                 + "D1917C90-5506-4FD0-ACD9-636334DA54C1/Documents/Music/song.flac"
-            let stored = LibraryRoot.storedPath(forAbsolutePath: legacy)
+            let stored = LibraryRoot.storedPath(forAbsolutePath: legacy, fileManager: fileManager)
             #expect(stored == "song.flac")
-            #expect(LibraryRoot.absoluteURL(forStoredPath: stored).path
+            #expect(LibraryRoot.absoluteURL(forStoredPath: stored, fileManager: fileManager).path
                 == documents
                 .appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
                 .appendingPathComponent("song.flac").path)
 
             // 非容器绝对路径（外置盘 / iCloud）原样保留，绝不被误当沙盒内文件。
             let external = "/Volumes/Ext/Music/song.flac"
-            #expect(LibraryRoot.rebasedFromLegacyContainer(external) == external)
+            #expect(LibraryRoot.rebasedFromLegacyContainer(external, fileManager: fileManager) == external)
 
             // 反例（2026-09-22 CI 修正）：只有「容器 ID 后面**紧跟** `Documents`」才算旧数据
             // 容器。临时目录与 App Group 共享容器都含 `/Containers/`，一旦被改写就会指向
             // 不存在的文件 ⇒ 全库行被误判「悬空」。两类路径必须原样返回。
             let tempLike = "/private/var/mobile/Containers/Data/Application/"
                 + "342470F4-7E34-49DF-A756-DE0F76486423/tmp/staging/Documents/song.flac"
-            #expect(LibraryRoot.rebasedFromLegacyContainer(tempLike) == tempLike)
+            #expect(LibraryRoot.rebasedFromLegacyContainer(tempLike, fileManager: fileManager) == tempLike)
             let appGroup = "/private/var/mobile/Containers/Shared/AppGroup/"
                 + "8B1F2C34-1111-2222-3333-444455556666/Documents/song.flac"
-            #expect(LibraryRoot.rebasedFromLegacyContainer(appGroup) == appGroup)
+            #expect(LibraryRoot.rebasedFromLegacyContainer(appGroup, fileManager: fileManager) == appGroup)
         }
     }
 
     @Test("stableId 迁移中立：旧基准根（Documents）与新基准根（Music）派生同一身份")
     func stableIdIsNeutralAcrossMusicFolderMove() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let beforeMove = documents.appendingPathComponent("song.flac").path
             let afterMove = documents
                 .appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
@@ -185,14 +181,14 @@ struct LibraryLayoutMigrationTests {
             #expect(
                 DatabaseManager.identityPath(
                     forPath: afterMove,
-                    relativeRoot: LibraryRoot.musicRootURL()
+                    relativeRoot: LibraryRoot.musicRootURL(fileManager: fileManager)
                 ) == "song.flac"
             )
             #expect(
                 DatabaseManager.generatePathStableId(forPath: beforeMove, relativeRoot: documents)
                     == DatabaseManager.generatePathStableId(
                         forPath: afterMove,
-                        relativeRoot: LibraryRoot.musicRootURL()
+                        relativeRoot: LibraryRoot.musicRootURL(fileManager: fileManager)
                     )
             )
         }
@@ -202,7 +198,7 @@ struct LibraryLayoutMigrationTests {
 
     @Test("扫描单层：Music 一层收录，Music 子目录不收录（递归模式仍收录）")
     func singleLevelScanExcludesSubdirectories() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, _ in
             let musicRoot = documents.appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
             try writeFile(musicRoot.appendingPathComponent("a.flac"))
             try writeFile(musicRoot.appendingPathComponent("sub/b.flac"))
@@ -302,7 +298,7 @@ struct LibraryLayoutMigrationTests {
 
     @Test("迁移：Documents 根音频搬进 Music，DB 行改写成相对路径（身份不变）")
     func migratorMovesAudioAndRewritesPath() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let sourceURL = documents.appendingPathComponent("song.flac")
             try writeFile(sourceURL)
@@ -315,7 +311,7 @@ struct LibraryLayoutMigrationTests {
             )
             try insertTrackRow(manager, stableId: stableId, path: sourceURL.path)
 
-            let summary = makeMigrator(database: manager).run()
+            let summary = makeMigrator(database: manager, fileManager: fileManager).run()
 
             #expect(summary.didComplete)
             #expect(summary.movedByCategory[LibraryLayoutMigrationRules.Category.music.rawValue] == 1)
@@ -335,7 +331,7 @@ struct LibraryLayoutMigrationTests {
 
     @Test("迁移：规划目录建立 + 旧目录内容搬进对应目录（歌词/封面/日志）")
     func migratorMovesLegacyDirectoriesAndLogs() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             try writeFile(documents.appendingPathComponent("lyrics-manual/abc.json"))
             try writeFile(documents.appendingPathComponent("ArtworkCache/hash.jpg"))
@@ -343,7 +339,7 @@ struct LibraryLayoutMigrationTests {
             try writeFile(documents.appendingPathComponent("app.log"))
             try writeFile(documents.appendingPathComponent("db-debug.log"))
 
-            let summary = makeMigrator(database: manager).run()
+            let summary = makeMigrator(database: manager, fileManager: fileManager).run()
             #expect(summary.didComplete)
 
             let lyrics = documents.appendingPathComponent(LibraryRoot.lyricsDirectoryName, isDirectory: true)
@@ -375,13 +371,13 @@ struct LibraryLayoutMigrationTests {
 
     @Test("迁移幂等：清完成门后重跑结果一致、不重复搬")
     func migratorIsIdempotent() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let sourceURL = documents.appendingPathComponent("song.flac")
             try writeFile(sourceURL)
             try insertTrackRow(manager, stableId: "sid", path: sourceURL.path)
 
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
             let first = migrator.run()
             #expect(first.didComplete)
 
@@ -406,7 +402,7 @@ struct LibraryLayoutMigrationTests {
 
     @Test("冲突：目标同名不覆盖、原件仍在、计入跳过")
     func migratorSkipsTargetConflict() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let sourceURL = documents.appendingPathComponent("song.flac")
             try writeFile(sourceURL, bytes: 8)
@@ -416,7 +412,7 @@ struct LibraryLayoutMigrationTests {
             try writeFile(existingURL, bytes: 3)
             try insertTrackRow(manager, stableId: "sid", path: sourceURL.path)
 
-            let summary = makeMigrator(database: manager).run()
+            let summary = makeMigrator(database: manager, fileManager: fileManager).run()
 
             #expect(summary.skipped.count == 1)
             #expect(summary.movedTotal == 0)
@@ -430,7 +426,7 @@ struct LibraryLayoutMigrationTests {
 
     @Test("失败路径：单项失败不中断整体、不删原件、完成门不置位")
     func migratorKeepsGoingAfterItemFailure() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let audioURL = documents.appendingPathComponent("song.flac")
             try writeFile(audioURL)
@@ -443,7 +439,7 @@ struct LibraryLayoutMigrationTests {
             // 建 Music 目录失败 + 往 Music/ 里搬必然失败，而 Logs 那一项照常成功。
             try writeFile(documents.appendingPathComponent(LibraryRoot.musicDirectoryName))
 
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
             let summary = migrator.run()
 
             #expect(summary.didComplete == false)
@@ -465,13 +461,13 @@ struct LibraryLayoutMigrationTests {
 
     @Test("干跑：只统计不搬（文件与 DB 都不动）")
     func dryRunOnlyReports() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let sourceURL = documents.appendingPathComponent("song.flac")
             try writeFile(sourceURL)
             try insertTrackRow(manager, stableId: "sid", path: sourceURL.path)
 
-            let migrator = makeMigrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
             let summary = migrator.run(dryRun: true)
 
             #expect(summary.isDryRun)
@@ -491,7 +487,7 @@ struct LibraryLayoutMigrationTests {
 
     @Test("未规划文件与 Music 历史子目录：一律不动、不递归、不搬平")
     func migratorLeavesUnplannedFilesAlone() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             try writeFile(documents.appendingPathComponent("qqplayer-favorites.json"))
             try writeFile(documents.appendingPathComponent("lyrics-cache/search/x.json"))
@@ -502,7 +498,7 @@ struct LibraryLayoutMigrationTests {
                     .appendingPathComponent("sub/old.flac")
             )
 
-            let summary = makeMigrator(database: manager).run()
+            let summary = makeMigrator(database: manager, fileManager: fileManager).run()
 
             #expect(summary.movedTotal == 0)
             #expect(FileManager.default.fileExists(atPath: documents.appendingPathComponent("qqplayer-favorites.json").path))

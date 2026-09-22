@@ -21,12 +21,11 @@
 //     ⇒ 迁移器必须**不碰**它们。
 //   · **封面映射表**：与缓存同目录但不是缓存，改路径后仍不得被当孤儿缓存删除。
 //
-// ⚠️ 本文件是 `LibraryLayoutMigrationTests`（v1 文件里那个套件）的 **extension**，不是独立套件。
-//  两个文件的用例都要写**进程级静态** `LibraryRoot.documentsRootOverride`，而 Swift Testing 里
-//  **不同套件之间仍然并行**（`.serialized` 只约束同一套件内的用例；同结论见
-//  `MusicAPIMockSupport.swift` 顶部注释）。拆成两个套件 ⇒ 一边的用例把静态根改写到自己的
-//  临时根上，另一边的断言就落在「别人的根」上（2026-09-22 CI 实证：v1 与 v2 的用例在
-//  **同一毫秒**启动，双方都出现「没看见自己搭的文件」的断言失败）。
+// ⚠️ 本套件与 v1（`LibraryLayoutMigrationTests.swift`）是**两个独立套件**：Swift Testing 里
+//  **不同套件之间仍然并行**（`.serialized` 只约束同一套件内的用例）。两者**不共享任何可变状态** ——
+//  各自的临时根经**按用例注入的 `FileManager`** 生效（见 `DocumentsRootTestSupport.swift`），
+//  取代了已被删除的进程级静态 `LibraryRoot.documentsRootOverride`（2026-09-22 CI 实证：那个静态
+//  被并行套件互相改写/复位，双方都出现「没看见自己搭的文件」的断言失败）。
 //
 
 import Foundation
@@ -35,26 +34,56 @@ import Testing
 
 @testable import QQPlayer
 
-extension LibraryLayoutMigrationTests {
-    // MARK: - Fixture（共享件在 v1 文件里：`withDocumentsRoot` / `makeManager` / `writeFile`）
+@Suite("隐藏布局（v2 / v2.1）：落点解析 + 根条目迁移", .serialized)
+struct LibraryHiddenLayoutMigrationTests {
+    // MARK: - Fixture（本套件自足；不与 v1 共享任何夹具或静态）
 
-    /// v2 执行器工厂（v1 的同名工厂返回 v1 类型，同名会因仅返回类型不同而歧义 ⇒ 用独立名字）。
-    private func makeV2Migrator(database: DatabaseManager) -> LibraryLayoutMigrationV2Migrator {
+    /// 临时 Documents 根（真实文件系统） + 指向它的注入式 `FileManager`（按用例，进程内无共享静态）。
+    /// 用例把 `fileManager` 传进生产的注入缝（迁移器 / `LibraryRoot.*(fileManager:)`）。
+    private func withDocumentsRoot(_ body: (URL, FileManager) throws -> Void) throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("qqplayer-layout-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("Documents", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        try body(root, DocumentsRootFileManager(documentsRoot: root))
+    }
+
+    /// 内存库 + `DatabaseManager`（同 `FileCleanupManagerTests` 的测试缝）。
+    private func makeManager() throws -> DatabaseManager {
+        let dbQueue = try DatabaseQueue()
+        let manager = DatabaseManager(dbWriter: dbQueue)
+        try manager.createTables()
+        return manager
+    }
+
+    @discardableResult
+    private func writeFile(_ url: URL, bytes: Int = 8) throws -> URL {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 0x41, count: bytes).write(to: url)
+        return url
+    }
+
+    /// v2 执行器工厂。
+    private func makeMigrator(database: DatabaseManager, fileManager: FileManager) -> LibraryLayoutMigrationV2Migrator {
         // UserDefaults 用独立 suite：不污染 App 的真实完成门。
         let defaults = UserDefaults(suiteName: "hidden-layout-tests-\(UUID().uuidString)") ?? .standard
         defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
-        return LibraryLayoutMigrationV2Migrator(database: database, defaults: defaults)
+        return LibraryLayoutMigrationV2Migrator(database: database, defaults: defaults, fileManager: fileManager)
     }
 
-    /// 隐藏根目录名（`LibraryRoot` 常量——extension 不能声明存储属性，故用计算属性）。
+    /// 隐藏根目录名（`LibraryRoot` 唯一常量；此处只是用例内的简写）。
     private var hiddenRoot: String { LibraryRoot.hiddenRootDirectoryName }
 
     // MARK: - 路径解析（唯一入口）
 
     @Test("类目落点全部在隐藏根下；曲库根仍是 Documents/Music（唯一可见）")
     func hiddenLayoutPathsAreUnderHiddenRoot() throws {
-        try withDocumentsRoot { documents in
-            let music = LibraryRoot.musicRootURL()
+        try withDocumentsRoot { documents, fileManager in
+            let music = LibraryRoot.musicRootURL(fileManager: fileManager)
             #expect(music == documents.appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true))
 
             func expectHidden(_ url: URL?, _ components: [String], isFile: Bool = false) {
@@ -68,37 +97,37 @@ extension LibraryLayoutMigrationTests {
                 #expect(url.standardizedFileURL.path == expected.standardizedFileURL.path)
             }
 
-            expectHidden(LibraryRoot.databaseDirectoryURL(), ["db"])
-            expectHidden(LibraryRoot.stateDirectoryURL(), ["state"])
-            expectHidden(LibraryRoot.favoritesFileURL(), ["state", "qqplayer-favorites.json"], isFile: true)
-            expectHidden(LibraryRoot.playlistsDirectoryURL(), ["state", "playlists"])
-            expectHidden(LibraryRoot.playerStateFileURL(), ["state", "qqplayer-player-state.json"], isFile: true)
-            expectHidden(LibraryRoot.externalBookmarksFileURL(), ["state", "ExternalFileBookmarks.plist"], isFile: true)
-            expectHidden(LibraryRoot.artworkDirectoryURL(), ["artwork"])
-            expectHidden(LibraryRoot.artworkMappingFileURL(), ["artwork", "ArtworkMapping.plist"], isFile: true)
-            expectHidden(LibraryRoot.manualLyricsDirectoryURL(), ["lyrics", "manual"])
-            expectHidden(LibraryRoot.alignedLyricsDirectoryURL(), ["lyrics", "aligned"])
-            expectHidden(LibraryRoot.lyricsCacheTracksDirectoryURL(), ["lyrics", "cache", "tracks"])
-            expectHidden(LibraryRoot.lyricsSearchCacheDirectoryURL(), ["lyrics", "cache", "search"])
-            expectHidden(LibraryRoot.logsDirectoryURL(), ["logs"])
-            expectHidden(LibraryRoot.metaDirectoryURL(), ["meta"])
-            expectHidden(LibraryRoot.cacheDirectoryURL(), ["cache"])
-            expectHidden(LibraryRoot.namedCacheDirectoryURL("SpotifyCache"), ["cache", "SpotifyCache"])
-            expectHidden(LibraryRoot.trashDirectoryURL(), ["trash"])
+            expectHidden(LibraryRoot.databaseDirectoryURL(fileManager: fileManager), ["db"])
+            expectHidden(LibraryRoot.stateDirectoryURL(fileManager: fileManager), ["state"])
+            expectHidden(LibraryRoot.favoritesFileURL(fileManager: fileManager), ["state", "qqplayer-favorites.json"], isFile: true)
+            expectHidden(LibraryRoot.playlistsDirectoryURL(fileManager: fileManager), ["state", "playlists"])
+            expectHidden(LibraryRoot.playerStateFileURL(fileManager: fileManager), ["state", "qqplayer-player-state.json"], isFile: true)
+            expectHidden(LibraryRoot.externalBookmarksFileURL(fileManager: fileManager), ["state", "ExternalFileBookmarks.plist"], isFile: true)
+            expectHidden(LibraryRoot.artworkDirectoryURL(fileManager: fileManager), ["artwork"])
+            expectHidden(LibraryRoot.artworkMappingFileURL(fileManager: fileManager), ["artwork", "ArtworkMapping.plist"], isFile: true)
+            expectHidden(LibraryRoot.manualLyricsDirectoryURL(fileManager: fileManager), ["lyrics", "manual"])
+            expectHidden(LibraryRoot.alignedLyricsDirectoryURL(fileManager: fileManager), ["lyrics", "aligned"])
+            expectHidden(LibraryRoot.lyricsCacheTracksDirectoryURL(fileManager: fileManager), ["lyrics", "cache", "tracks"])
+            expectHidden(LibraryRoot.lyricsSearchCacheDirectoryURL(fileManager: fileManager), ["lyrics", "cache", "search"])
+            expectHidden(LibraryRoot.logsDirectoryURL(fileManager: fileManager), ["logs"])
+            expectHidden(LibraryRoot.metaDirectoryURL(fileManager: fileManager), ["meta"])
+            expectHidden(LibraryRoot.cacheDirectoryURL(fileManager: fileManager), ["cache"])
+            expectHidden(LibraryRoot.namedCacheDirectoryURL("SpotifyCache", fileManager: fileManager), ["cache", "SpotifyCache"])
+            expectHidden(LibraryRoot.trashDirectoryURL(fileManager: fileManager), ["trash"])
 
             // 任何落点都不得等于 Documents 根本身（那就是「裸露在外面」）。
-            #expect(LibraryRoot.stateDirectoryURL() != documents)
-            #expect(LibraryRoot.cacheDirectoryURL() != documents)
+            #expect(LibraryRoot.stateDirectoryURL(fileManager: fileManager) != documents)
+            #expect(LibraryRoot.cacheDirectoryURL(fileManager: fileManager) != documents)
         }
     }
 
     @Test("track.path 相对语义不变：相对路径仍解到 Documents/Music 之下")
     func storedPathSemanticsUnchanged() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let stored = LibraryRoot.storedPath(forAbsolutePath: documents
-                .appendingPathComponent("Music").appendingPathComponent("song.flac").path)
+                .appendingPathComponent("Music").appendingPathComponent("song.flac").path, fileManager: fileManager)
             #expect(stored == "song.flac")
-            #expect(LibraryRoot.absoluteURL(forStoredPath: stored) == documents
+            #expect(LibraryRoot.absoluteURL(forStoredPath: stored, fileManager: fileManager) == documents
                 .appendingPathComponent("Music").appendingPathComponent("song.flac"))
             // 隐藏根下的文件不是曲库内文件（相对语义不被隐藏根影响）。
             #expect(LibraryRoot.isRelativeStoredPath(stored))
@@ -107,7 +136,7 @@ extension LibraryLayoutMigrationTests {
 
     @Test("封面映射表永不被当缓存；映射为空/读失败 ⇒ 不清理（改路径后契约仍成立）")
     func artworkMappingContractSurvivesHiddenLayout() throws {
-        try withDocumentsRoot { _ in
+        try withDocumentsRoot { _, _ in
             // 形状/命名保护：映射表名不是 `<64 位 hex>.jpg`。
             #expect(ArtworkManager.isArtworkCacheFileName(LibraryRoot.artworkMappingFileName) == false)
             #expect(ArtworkManager.deletableArtworkCacheFileNames(
@@ -144,9 +173,9 @@ extension LibraryLayoutMigrationTests {
 
     @Test("把根条目搬进隐藏根：目标 1:1 落地，源消失，根只剩 Music（+ 保留项）")
     func migratorMovesRootEntriesIntoHiddenRoot() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
-            let migrator = makeV2Migrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
 
             try writeFile(documents.appendingPathComponent("qqplayer-favorites.json"))
             try writeFile(documents.appendingPathComponent("qqplayer-playlists/playlist-a.json"))
@@ -199,10 +228,10 @@ extension LibraryLayoutMigrationTests {
 
     @Test("幂等：连跑两次结果一致，第二遍无待搬条目")
     func hiddenMigratorIsIdempotent() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-idem-\(UUID().uuidString)") ?? .standard
-            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
+            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults, fileManager: fileManager)
 
             try writeFile(documents.appendingPathComponent("qqplayer-favorites.json"))
             try writeFile(documents.appendingPathComponent("meta/assets.json"))
@@ -227,9 +256,9 @@ extension LibraryLayoutMigrationTests {
 
     @Test("冲突不覆盖（v2.1）：同名文件 ⇒ 改名后缀搬入；旧目标内容一字节不变，根上不再留该文件")
     func conflictRenamesInsteadOfOverwriting() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
-            let migrator = makeV2Migrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
 
             let source = try writeFile(
                 documents.appendingPathComponent("qqplayer-favorites.json"), bytes: 4
@@ -258,9 +287,9 @@ extension LibraryLayoutMigrationTests {
 
     @Test("目录冲突递归合并：同名子项改名搬入、其余原样合并、空壳搬进回收区（只搬不删）")
     func directoryConflictIsMergedRecursively() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
-            let migrator = makeV2Migrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
 
             // 目标目录已存在（模拟启动期 ArtworkManager 先建目录）——含同名子项。
             try writeFile(documents.appendingPathComponent("\(hiddenRoot)/artwork/keep.jpg"), bytes: 16)
@@ -296,20 +325,21 @@ extension LibraryLayoutMigrationTests {
 
     @Test("同名日志文件（启动期已建）⇒ 改名搬入，完成门仍能置位（根已干净）")
     func sameNamedLogFileIsRenamedAndGateSet() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-log-rename-\(UUID().uuidString)") ?? .standard
             defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
-            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
+            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults, fileManager: fileManager)
 
             // 进程最早期就写下的日志文件：根 `app.log` 与隐藏根里的新位置同名
             // （`app.log` 只用来锁「同名 ⇒ 改名搬入」这一事实）。
             let rootLog = try writeFile(documents.appendingPathComponent("app.log"), bytes: 4)
             try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/app.log"), bytes: 16)
-            // 「旧目标内容不被覆盖」的判据样本必须是**非活文件**：`logs/app.log` 是 `AppLog` 的
-            // 活文件（落点也经 `LibraryRoot`，本用例注入的根正在其中）⇒ 用例期间必然被追加，
-            // 字节数/内容都会漂移（2026-09-22 CI 实证：16 → 344）。拿它当「没被覆盖」的判据
-            // = 判据不隔离稳定；`eq-debug.log` 同属 `logs/` 口径，但**没有任何生产写入者**。
+            // 「旧目标内容不被覆盖」的判据样本取**非活文件**：`app.log` 是 `AppLog` 的活文件
+            // （落点经 `LibraryRoot.logsDirectoryURL`；本用例注入的根不在其中，但**判据不该靠这一点**
+            // ——一旦 AppLog 的落点接入同一注入缝，样本就会被追加、字节数漂移，
+            // 2026-09-22 CI 曾实证 16 → 344）。`eq-debug.log` 同属 `logs/` 口径，
+            // 但**没有任何生产写入者** ⇒ 作为「没被覆盖」的判据稳定。
             let rootEqLog = try writeFile(documents.appendingPathComponent("eq-debug.log"), bytes: 4)
             let hiddenEqLog = try writeFile(documents.appendingPathComponent("\(hiddenRoot)/logs/eq-debug.log"), bytes: 16)
 
@@ -331,11 +361,11 @@ extension LibraryLayoutMigrationTests {
 
     @Test("完成门语义（v2.1）：有残留不置位（下次启动重试）；无残留才置位")
     func completionGateRequiresNoResidue() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-residue-\(UUID().uuidString)") ?? .standard
             defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
-            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
+            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults, fileManager: fileManager)
 
             // 让 `cache/` 的父路径是一个**文件** ⇒ 该项搬不动 ⇒ 根上留残留。
             try FileManager.default.createDirectory(
@@ -363,11 +393,11 @@ extension LibraryLayoutMigrationTests {
 
     @Test("干跑：能看出哪些会“改名搬入”（含目录合并场景），且不碰磁盘、不置完成门")
     func dryRunShowsRenames() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-dry-rename-\(UUID().uuidString)") ?? .standard
             defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
-            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
+            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults, fileManager: fileManager)
 
             try writeFile(documents.appendingPathComponent("\(hiddenRoot)/artwork/keep.jpg"), bytes: 16)
             let rootKeep = try writeFile(documents.appendingPathComponent("Artwork/keep.jpg"), bytes: 4)
@@ -393,11 +423,11 @@ extension LibraryLayoutMigrationTests {
 
     @Test("合并后幂等：清门重跑无待搬、不产生第二个改名副本")
     func mergeIsIdempotent() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-merge-idem-\(UUID().uuidString)") ?? .standard
             defaults.removeObject(forKey: LibraryLayoutMigrationV2Migrator.completionDefaultsKey)
-            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
+            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults, fileManager: fileManager)
 
             try writeFile(documents.appendingPathComponent("\(hiddenRoot)/artwork/keep.jpg"), bytes: 16)
             try writeFile(documents.appendingPathComponent("Artwork/keep.jpg"), bytes: 4)
@@ -431,9 +461,9 @@ extension LibraryLayoutMigrationTests {
 
     @Test("失败不中断：单项搬不动 → 该条失败，其余照搬，原件全部保留")
     func failureDoesNotStopOthersAndKeepsOriginal() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
-            let migrator = makeV2Migrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
 
             // 让 `cache/` 的父路径是一个**文件** ⇒ `SpotifyCache` 的父目录建不出来（失败）。
             try FileManager.default.createDirectory(
@@ -464,9 +494,9 @@ extension LibraryLayoutMigrationTests {
 
     @Test("干跑：只统计、不动磁盘、不置完成门")
     func dryRunOnlyCounts() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
-            let migrator = makeV2Migrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
 
             let source = try writeFile(documents.appendingPathComponent("qqplayer-favorites.json"))
             let summary = migrator.run(dryRun: true)
@@ -486,10 +516,10 @@ extension LibraryLayoutMigrationTests {
 
     @Test("完成门：成功才置位；置位后直接跳过")
     func completionGateOnlyAfterSuccess() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
             let defaults = UserDefaults(suiteName: "hidden-layout-gate-\(UUID().uuidString)") ?? .standard
-            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults)
+            let migrator = LibraryLayoutMigrationV2Migrator(database: manager, defaults: defaults, fileManager: fileManager)
 
             try writeFile(documents.appendingPathComponent("meta/assets.json"))
             let summary = migrator.run()
@@ -504,9 +534,9 @@ extension LibraryLayoutMigrationTests {
 
     @Test("被 DB 绝对路径引用的根条目：跳过不搬（引用不悬空）+ 记入跳过")
     func referencedEntriesAreNotMoved() throws {
-        try withDocumentsRoot { documents in
+        try withDocumentsRoot { documents, fileManager in
             let manager = try makeManager()
-            let migrator = makeV2Migrator(database: manager)
+            let migrator = makeMigrator(database: manager, fileManager: fileManager)
 
             let referenced = try writeFile(
                 documents.appendingPathComponent("qqplayer-assets/audio/clip.mp3")
