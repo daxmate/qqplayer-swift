@@ -22,11 +22,14 @@ struct CollapsiblePlayerControls: View {
     let onCancelSleepTimer: () -> Void
     let onShowQueue: () -> Void
     let onShowAirPlay: () -> Void
+    /// 进度条实测 frame 回传（整页坐标系）：整页手势据此把起手在进度条上的手势让给 seek
+    let onProgressBarFrameChange: (CGRect) -> Void
 
     var body: some View {
         VStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 12 : 16) {
             PlayerProgressSection(
                 duration: duration,
+                onProgressBarFrameChange: onProgressBarFrameChange,
                 onSeek: onSeek
             )
 

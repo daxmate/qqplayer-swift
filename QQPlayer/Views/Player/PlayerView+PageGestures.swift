@@ -7,9 +7,10 @@
 //    · 下滑：展开面板时先收起「更多播放控制」，否则缩回主页（跟手移动整页，UIKit transform 驱动）
 //    · 上滑：展开「更多播放控制」
 //    · 左滑：全屏歌词页；右滑：歌词搜索页
-//  两处**例外按起手位置排除**（只排除那一个区域，不排除整个方向）：
-//    · 封面区横滑 = 切歌（封面自己的手势，轮播动画归它，见 PlayerView+Artwork）
-//    · 进度条区横滑 = seek（进度条自己的手势，拖进度条不会误开歌词页）
+//  例外按起手位置排除（只排除那一个区域，不排除整个方向）：
+//    · 封面区横滑 = 切歌（封面自己的手势，轮播动画归它，见 PlayerView+Artwork）；
+//      **队列 ≤1（无可切相邻曲目）时改按整页处理**——左右滑仍开歌词 / 搜索（复核 ①）
+//    · 进度条区（**实测 frame**，不再是写死的 60pt）横滑 = seek，竖向也不再下移整页（复核 ②）
 //  「下拉跟手」「打开歌词页 / 搜索页」都是唯一入口，封面手势与小歌词窗点击共用。
 //
 //  同族文件：
@@ -28,38 +29,39 @@ enum PlayerPageCoordinateSpace {
     static let name = "playerPage"
 }
 
-/// 整页手势按**起手位置**划分的区域（例外手势按区域排除）
-enum PlayerPageRegion: Hashable {
-    /// 封面区：横滑切歌 + 下拉缩回主页（封面自己的手势）
-    case artwork
-    /// 进度条 + 时间标签区：横滑归 seek 独占
-    case progress
-    /// 其余整页区：左右滑开歌词 / 搜索，上下滑展开 / 收起 / 缩回主页
-    case page
-}
-
 extension PlayerView {
     // MARK: - 坐标与区域分流
 
-    /// 起手位置 → 区域（区块未测量到或不在其中 = 整页区）
-    func pageRegion(for location: CGPoint) -> PlayerPageRegion {
-        if artworkFrame.contains(location) {
-            return .artwork
-        }
-        if progressRegionFrame.contains(location) {
-            return .progress
-        }
-        return .page
+    /// 封面区是否有可切换的相邻曲目（队列 >1）：
+    /// 纵向例外与「无歌可切时封面区横滑让给整页」共用同一口径
+    var canSwitchAdjacentTrack: Bool {
+        playerEngine.playbackQueue.count > 1
     }
 
-    /// 进度条区 = 控制容器顶部 60pt（进度条 + 时间标签）。
-    /// 与旧折叠手势的 `startLocation.y > 60` 同一口径，只是换到整页坐标系。
+    /// 起手位置 → 区域（判定全部在 `PlayerPageGesture.region` 纯逻辑里，可单测）：
+    /// 封面区在无可切曲目时按 .page（左右滑开歌词 / 搜索，2026-09-22 复核 ①）
+    func pageRegion(for location: CGPoint) -> PlayerPageRegion {
+        PlayerPageGesture.region(
+            startLocation: location,
+            artworkFrame: artworkFrame,
+            progressFrame: progressRegionFrame,
+            canSwitchTrack: canSwitchAdjacentTrack
+        )
+    }
+
+    /// 进度条触摸区 = 进度条**实测 frame** 上下外扩 `PlayerPageGesture.progressTouchSlop`。
+    /// 旧实现写死「控制容器顶部 60pt」，把时间标签行与其下空白也当成了进度条区（2026-09-22 复核 ②）：
+    /// 那块区域左右滑无响应、竖向还被页手势接管。frame 由 `PlayerProgressSection` 回传。
     var progressRegionFrame: CGRect {
-        CGRect(
-            x: controlsFrame.minX,
-            y: controlsFrame.minY,
-            width: controlsFrame.width,
-            height: min(60, controlsFrame.height)
+        PlayerPageGesture.progressTouchRegion(barFrame: progressBarFrame)
+    }
+
+    /// 纵向下拉是否归整页手势：封面区（封面手势独占竖向）与进度条区（seek 独占）除外
+    func ownsVerticalPull(at location: CGPoint) -> Bool {
+        PlayerPageGesture.ownsVerticalPull(
+            startLocation: location,
+            artworkFrame: artworkFrame,
+            progressFrame: progressRegionFrame
         )
     }
 
@@ -79,11 +81,12 @@ extension PlayerView {
                 pageDragAxis = axis == .horizontal ? .horizontal : .vertical
             }
 
-            // 跟手只服务「非封面 + 面板未展开」的下拉：封面下拉归封面手势（同一 UIKit 通道）
+            // 跟手只服务「非封面 + 非进度条 + 面板未展开」的下拉：封面下拉归封面手势（同一 UIKit 通道），
+            // 进度条上下拉归 seek（避免一次下拉既 seek 又下移整页）
             guard pageDragAxis == .vertical,
                   !isControlsExpanded,
                   value.translation.height > 0,
-                  pageRegion(for: value.startLocation) != .artwork
+                  ownsVerticalPull(at: value.startLocation)
             else { return }
 
             isPullingPlayer = true
@@ -158,8 +161,8 @@ extension PlayerView {
             return
         }
 
-        // 封面下拉由封面手势收尾（同一通道，不重复驱动）
-        guard pageRegion(for: value.startLocation) != .artwork else { return }
+        // 封面下拉由封面手势收尾（同一通道，不重复驱动）；进度条上下拉归 seek
+        guard ownsVerticalPull(at: value.startLocation) else { return }
         endPull(
             translationHeight: height,
             predictedHeight: value.predictedEndTranslation.height
@@ -175,6 +178,14 @@ extension PlayerView {
         guard abs(target - lastPullY) >= 1 else { return }
         lastPullY = target
         pullHostView?.transform = CGAffineTransform(translationX: 0, y: target)
+    }
+
+    /// 中断复位（2026-09-22 复核 ③）：某次下拉没收到 `onEnded`（来电 / 切后台 / 系统手势）时
+    /// `lastPullY` / `isPullingPlayer` / 宿主 transform 会停在偏移位，页面永久拉偏；
+    /// 回前台 / 切歌时补一次收尾——复位走唯一入口 `endPull`（translation 0 = 未达阈值 → 回弹原位）
+    func resetInterruptedPull() {
+        guard isPullingPlayer || lastPullY != 0 else { return }
+        endPull(translationHeight: 0, predictedHeight: 0)
     }
 
     /// 收尾：达阈值 / 快速回甩 → 滑出屏幕后缩回主页，否则回弹。全走 UIKit 动画（与跟手同通道）

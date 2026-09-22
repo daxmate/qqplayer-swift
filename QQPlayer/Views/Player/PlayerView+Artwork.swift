@@ -32,7 +32,8 @@ extension PlayerView {
             let pageDistance = geometry.size.width / 2 + artworkSize / 2 + 12
             let swipeProgress = min(abs(dragOffset) / pageDistance, 1)
             let signedProgress = max(-1, min(1, dragOffset / pageDistance))
-            let canNavigate = playerEngine.playbackQueue.count > 1
+            // 封面区竖/横分流的统一口径（队列 ≤1 无可切曲目：横滑让给整页手势）
+            let canNavigate = canSwitchAdjacentTrack
 
             ZStack {
                 if canNavigate {
@@ -141,12 +142,10 @@ extension PlayerView {
 
                 if gestureAxis == .horizontal {
                     // 横向：切歌跟手（直接赋值，无隐式动画——与歌词页右滑 dragX 同款）
-                    let canNavigate = playerEngine.playbackQueue.count > 1
-                    let proposedOffset = canNavigate
-                        ? value.translation.width
-                        : value.translation.width * 0.16
+                    // 队列 ≤1 没有可切曲目：不做橡皮筋回弹，横滑让给整页手势（开歌词 / 搜索，复核 ①）
+                    guard canSwitchAdjacentTrack else { return }
                     let limit = pageDistance
-                    dragOffset = max(-limit, min(limit, proposedOffset))
+                    dragOffset = max(-limit, min(limit, value.translation.width))
                 } else if value.translation.height > 0, !isControlsExpanded {
                     // 纵向下拉：走整页共用的跟手通道（UIKit transform 直驱宿主 view，见 updatePull）。
                     // 面板展开时下拉归「收起面板」（整页手势），封面不再跟手。
@@ -165,10 +164,8 @@ extension PlayerView {
                 gestureAxis = nil // 手势结束，释放方向锁定
 
                 if isHorizontal {
-                    guard playerEngine.playbackQueue.count > 1 else {
-                        resetArtworkDrag()
-                        return
-                    }
+                    // 无可切曲目：横滑归整页手势（dragOffset 未动过，无需复位也不该复位）
+                    guard canSwitchAdjacentTrack else { return }
 
                     let translation = value.translation.width
                     let projectedTranslation = value.predictedEndTranslation.width

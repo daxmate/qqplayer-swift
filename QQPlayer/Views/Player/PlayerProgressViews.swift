@@ -53,6 +53,9 @@ struct EqualizerBarsExact: View {
 struct PlayerProgressSection: View {
     @Environment(PlayerEngine.self) private var playerEngine
     let duration: TimeInterval
+    /// 进度条实测 frame 回传（整页坐标系）：整页手势靠它把「起手在进度条上」的横/纵手势让给 seek
+    /// （旧实现写死控制容器顶部 60pt，过宽，见 `PlayerView+PageGestures` / 复核 ②）
+    let onProgressBarFrameChange: (CGRect) -> Void
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
     let onSeek: (TimeInterval) -> Void
@@ -71,6 +74,11 @@ struct PlayerProgressSection: View {
                 onSeek: { onSeek($0 * duration) }
             )
             .frame(height: 1)
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .named(PlayerPageCoordinateSpace.name))
+            } action: { frame in
+                onProgressBarFrameChange(frame)
+            }
 
             HStack {
                 Text(formatTime(playerEngine.progress.playbackTime))

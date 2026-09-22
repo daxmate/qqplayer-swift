@@ -51,8 +51,11 @@ struct PlayerView: View {
     @State var pageDragAxis: Axis?
     /// 封面区 frame（整页坐标系）：横滑切歌与下拉都归封面手势，整页手势按此排除
     @State var artworkFrame: CGRect = .zero
-    /// 控制容器 frame（整页坐标系）：顶部 60pt = 进度条区（seek 独占）
+    /// 控制容器 frame（整页坐标系）：上滑展开 / 下滑收起的参照（旧进度条排除带同源，已于 2026-09-22 改为实测进度条 frame）
     @State var controlsFrame: CGRect = .zero
+    /// 进度条实测 frame（整页坐标系，由 `PlayerProgressSection` 回传）：
+    /// 整页手势把「起手在进度条上」的横/纵手势让给 seek（复核 ②）
+    @State var progressBarFrame: CGRect = .zero
     /// 是否正由「非封面」的下拉跟手驱动宿主 view（onEnded 据此回弹 / 缩回主页）
     @State var isPullingPlayer = false
     /// 分片：跨文件可见（原 private）
@@ -219,6 +222,9 @@ struct PlayerView: View {
                 }
                 checkFavoriteStatus()
 
+                // 下拉被中断（来电 / 切后台 / 系统手势）时切歌可能没收到 onEnded：补一次复位（复核 ③）
+                resetInterruptedPull()
+
                 // Clear current lyrics
                 currentLyrics = nil
 
@@ -262,6 +268,11 @@ struct PlayerView: View {
                 // App 到后台：退出跟唱模式（用户 2026-08-29 拍板）
                 if phase == .background {
                     karaoke.setKaraokeOn(false)
+                }
+                // 回前台兜底复位：下拉被中间打断（来电 / 切后台 / 系统手势）时宿主 transform
+                // 会停在偏移位（页面永久拉偏），这里走唯一入口 endPull 补一次收尾（复核 ③）
+                if phase == .active {
+                    resetInterruptedPull()
                 }
             }
     }
@@ -322,9 +333,12 @@ struct PlayerView: View {
                     },
                     onShowAirPlay: {
                         showAirPlayPicker()
+                    },
+                    onProgressBarFrameChange: { frame in
+                        progressBarFrame = frame
                     }
                 )
-                // 控制容器 frame → 整页坐标系：顶部 60pt 是进度条区（横滑归 seek，不参与歌词滑动）
+                // 控制容器 frame → 整页坐标系
                 .onGeometryChange(for: CGRect.self) { proxy in
                     proxy.frame(in: .named(PlayerPageCoordinateSpace.name))
                 } action: { frame in
