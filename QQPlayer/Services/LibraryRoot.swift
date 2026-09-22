@@ -210,28 +210,40 @@ enum LibraryRoot {
 
     // MARK: - 旧数据容器前缀归一化
 
-    /// 旧数据容器前缀 → 现容器：`…/Containers/…/Documents/<rest>` → `<现 Documents>/<rest>`。
+    /// 旧数据容器前缀 → 现容器：`…/Containers/Data/Application/<容器 ID>/Documents/<rest>`
+    /// → `<现 Documents>/<rest>`。
     ///
-    /// 保守判据（防误伤）：只在**含 `/Containers/`** 且**不在现 Documents 之下**时动手。
-    /// 非容器绝对路径一律原样返回 —— 否则 iCloud / 外置盘里恰含 `/Documents/` 的路径
-    /// 会被误认成沙盒内文件（曲库内/外的判定随之外错）。
+    /// 保守判据（防误伤，2026-09-22 CI 修正）：必须同时满足
+    /// ① 含 `/Containers/Data/Application/`（App 的**数据容器**形态）；
+    /// ② 紧跟容器 ID 的那一层**就是** `Documents`；
+    /// ③ 不在现 Documents 之下。
+    ///
+    /// 为什么不能只看 `contains("/Containers/")` + 取**最后一个** `/Documents/`（旧实现）：
+    /// 那样会把下列两类路径误改到现 Documents 下，`track.path` 随即指向不存在的文件
+    /// ⇒ 全库行被误判「悬空」（P1 三态判定反过来误触发 resync）：
+    ///   · `<容器>/tmp/xxx/Documents/song.flac`（临时目录里的路径）；
+    ///   · `…/Containers/Shared/AppGroup/<id>/…`（App Group 共享容器）。
+    /// 非数据容器绝对路径一律原样返回。
     static func rebasedFromLegacyContainer(
         _ absolutePath: String,
         fileManager: FileManager = .default
     ) -> String {
-        guard absolutePath.hasPrefix("/"), absolutePath.contains("/Containers/") else {
+        guard absolutePath.hasPrefix("/"),
+              !isInsideDocuments(absolutePath, fileManager: fileManager) else {
             return absolutePath
         }
-        guard !isInsideDocuments(absolutePath, fileManager: fileManager) else { return absolutePath }
+        let marker = "/Containers/Data/Application/"
+        guard let range = absolutePath.range(of: marker, options: .backwards) else {
+            return absolutePath
+        }
+        // 容器 ID 后必须**紧跟** `Documents` 才算「旧数据容器的 Documents 目录」。
+        let components = absolutePath[range.upperBound...]
+            .split(separator: "/", omittingEmptySubsequences: true)
+        guard components.count >= 2, components[1] == "Documents" else { return absolutePath }
         guard let documents = documentsRootURL(fileManager: fileManager)?.standardizedFileURL.path else {
             return absolutePath
         }
-        let marker = "/Documents/"
-        guard let range = absolutePath.range(of: marker, options: .backwards) else {
-            // 恰好停在 `…/Documents`（无尾斜杠）
-            return absolutePath.hasSuffix("/Documents") ? documents : absolutePath
-        }
-        let rest = String(absolutePath[range.upperBound...])
-        return rest.isEmpty ? documents : documents + "/" + rest
+        let rest = components.dropFirst(2).map(String.init)
+        return rest.isEmpty ? documents : documents + "/" + rest.joined(separator: "/")
     }
 }

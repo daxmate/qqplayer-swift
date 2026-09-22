@@ -39,8 +39,9 @@ extension LibraryIndexer {
     /// 且只在指纹未变、需要判断 path 时才发生（P1 代价控制）。
     /// 不做 `migrateTrackForMovedFile` 之外的任何写库动作——修 path 的唯一入口链不变。
     ///
-    /// 2026-09-22 曲库文件夹化：比较的 `currentPath` 是**存储形态**（相对曲库根），
-    /// 与 `track.path` 同形态；`track.path` 的实际存在性走 `LibraryRoot` 解回绝对 URL
+    /// 2026-09-22 曲库文件夹化：`currentPath` 是调用方给的**绝对路径**（扫描到的文件），
+    /// 比较前先经 `LibraryRoot.storedPath` 换算成与 `track.path` 同形态（相对曲库根）；
+    /// `track.path` 的实际存在性走 `LibraryRoot` 解回绝对 URL
     /// （相对串直接 `fileExists` 会以 cwd 为基准，永远为假 = 全库误判「悬空」）。
     nonisolated func staleStoredPath(_ track: Track, currentPath: String) -> String? {
         let storedCurrent = LibraryRoot.storedPath(forAbsolutePath: currentPath)

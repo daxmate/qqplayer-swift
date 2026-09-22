@@ -63,14 +63,18 @@ struct SyncConnectDiagTests {
         #expect(SyncConnectDiag.logFileURL() == url)
     }
 
-    @Test("落点默认：未设 override 时落在 App 容器 Documents/sync-diag.log")
+    @Test("落点默认：未设 override 时落在 App 容器 Documents/Logs/sync-diag.log")
     func defaultLogFileURLIsAppContainerDocuments() {
         SyncConnectDiag.logFileURLOverride = nil
 
         let resolved = SyncConnectDiag.logFileURL()
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
 
-        #expect(resolved == documents?.appendingPathComponent("sync-diag.log"))
+        // 2026-09-22 曲库文件夹化：日志统一收进 `Documents/Logs/`（口径变了，断言跟着走）。
+        // 落点经 `LibraryRoot` 常量拼出——不在测试里写死字面量，目录名只有一份事实源。
+        #expect(resolved == documents?
+            .appendingPathComponent(LibraryRoot.logsDirectoryName, isDirectory: true)
+            .appendingPathComponent("sync-diag.log"))
         // 反例对照：默认落点**不是**临时目录（防止"缝"把生产落点也改了）
         #expect(resolved?.path.hasPrefix(FileManager.default.temporaryDirectory.path) == false)
     }

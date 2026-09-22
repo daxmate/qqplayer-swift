@@ -471,10 +471,18 @@ struct TrackIdentityMigrationDatabaseTests {
     @Test("P0/唯一入口：migrateTrackForMovedFile 在 id 不变时只回写 path，重跑幂等")
     func migrateTrackForMovedFileResyncsPathWhenIdUnchanged() throws {
         let (manager, dbQueue) = try DataIntegrityFixture.makeManager()
-        let oldPath = "/private/var/mobile/Containers/Data/Application/D1917C90-5506-4FD0-ACD9-636334DA54C1/Documents/song.flac"
-        let newPath = "/private/var/mobile/Containers/Data/Application/342470F4-7E34-49DF-A756-DE0F76486423/Documents/song.flac"
-        // 默认基准根（测试宿主 Documents）下两个假路径都不在根下 → 派生 id 回落绝对路径；
-        // 用「新 path 的派生 id」当入库 id，构造 iOS 上真实出现的 equal-id 情形。
+        // 2026-09-22 曲库文件夹化：`track.path` 存「相对 Music 根」的**存储形态**，
+        // 身份路径随之从「相对 Documents」下移到「相对 Documents/Music」。
+        // 场景：行是**旧数据容器**留下的绝对路径（换容器 UUID 后失效），文件现在在
+        // **现容器**的曲库根下 —— 两边派生出的身份路径都是 `song.flac` ⇒ id 不变
+        // （这就是 iOS 重装后真实出现的 equal-id 情形）。
+        let documents = try #require(
+            FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        )
+        let oldPath = "/private/var/mobile/Containers/Data/Application/D1917C90-5506-4FD0-ACD9-636334DA54C1/Documents/Music/song.flac"
+        let newPath = documents
+            .appendingPathComponent(LibraryRoot.musicDirectoryName, isDirectory: true)
+            .appendingPathComponent("song.flac").path
         let stableId = DatabaseManager.generatePathStableId(forPath: newPath)
 
         try dbQueue.write { db in
@@ -512,7 +520,9 @@ struct TrackIdentityMigrationDatabaseTests {
             )
         }
         #expect(snapshots.0 == 1)
-        #expect(snapshots.1 == newPath)
+        // 回写的是**存储形态**（相对 Music 根）——旧断言写的是入参绝对路径，
+        // 口径已改成相对路径（本批③）；「只回写 path、行与引用都在」的事实不变。
+        #expect(snapshots.1 == "song.flac")
         #expect(snapshots.2 == [stableId])
         #expect(snapshots.3 == [stableId])
         #expect(snapshots.4 == [stableId])
