@@ -51,10 +51,9 @@ struct PlayerView: View {
     @State var pageDragAxis: Axis?
     /// 封面区 frame（整页坐标系）：横滑切歌与下拉都归封面手势，整页手势按此排除
     @State var artworkFrame: CGRect = .zero
-    /// 控制容器 frame（整页坐标系）：上滑展开 / 下滑收起的参照（旧进度条排除带同源，已于 2026-09-22 改为实测进度条 frame）
-    @State var controlsFrame: CGRect = .zero
     /// 进度条实测 frame（整页坐标系，由 `PlayerProgressSection` 回传）：
-    /// 整页手势把「起手在进度条上」的横/纵手势让给 seek（复核 ②）
+    /// 整页手势把「起手在进度条上」的横/纵手势让给 seek（复核 ②；旧实现用控制容器 frame + 写死 60pt，
+    /// 随 ② 一并删除，见 PlayerView+PageGestures）
     @State var progressBarFrame: CGRect = .zero
     /// 是否正由「非封面」的下拉跟手驱动宿主 view（onEnded 据此回弹 / 缩回主页）
     @State var isPullingPlayer = false
@@ -338,12 +337,6 @@ struct PlayerView: View {
                         progressBarFrame = frame
                     }
                 )
-                // 控制容器 frame → 整页坐标系
-                .onGeometryChange(for: CGRect.self) { proxy in
-                    proxy.frame(in: .named(PlayerPageCoordinateSpace.name))
-                } action: { frame in
-                    controlsFrame = frame
-                }
             } else {
                 Spacer()
                 emptyStateView
