@@ -155,3 +155,45 @@ struct ArtworkCacheSafetyTests {
         #expect(ArtworkManager.shouldPruneArtworkCache(mapping: [:], mappingUnreadable: true) == false)
     }
 }
+
+// MARK: - 形状契约：封面路径解析不得绕过 LibraryRoot
+
+/// 2026-09-22 回归的第二半（「磁盘缓存恒空」）的形状锁。
+///
+/// `track.path` 是**存储形态**（曲库内 = 相对 Music 根），必须经
+/// `LibraryRoot.absoluteURL(forStoredPath:)` 解回绝对 URL；裸 `URL(fileURLWithPath:)`
+/// 会按 cwd 拼成 `file:///<相对串>` ⇒ 解包必失败 ⇒ 封面永远落不了盘。
+///
+/// 真机实证：修复前每次启动 1-12 条 `Failed to load MP3 metadata`
+/// （AVURLAsset -11800/-17913，NSURL 形如 `file:///周华健 - 孤枕难眠 (Live).mp3`）；修复后为 0。
+/// fail-closed：读不到源码 = 红，绝不静默通过。
+@Suite("封面路径解析契约（存储形态唯一入口）")
+struct ArtworkPathResolutionContractTests {
+    private static let repositoryRoot: URL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    /// 封面缓存/清理的唯一两个文件（映射与磁盘缓存的实现只应在这里）。
+    private static let scannedFiles = [
+        "QQPlayer/Services/ArtworkManager.swift",
+        "QQPlayer/Services/ArtworkCache.swift",
+    ]
+
+    @Test("封面代码不得用裸 URL(fileURLWithPath: track.path) 解析曲库路径")
+    func artworkNeverResolvesStoredPathDirectly() throws {
+        for relativePath in Self.scannedFiles {
+            let url = Self.repositoryRoot.appendingPathComponent(relativePath)
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                Issue.record("读不到源码（fail-closed）：\(relativePath)")
+                return
+            }
+            // 只算代码行：`//` 之后剥离，避免文档注释里的字面量误伤（与既有棘轮同口径）。
+            let codeLines = source
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map { $0.components(separatedBy: "//").first ?? "" }
+
+            #expect(codeLines.contains { $0.contains("fileURLWithPath: track.path") } == false,
+                    "\(relativePath) 用裸 URL(fileURLWithPath: track.path) 解析了存储形态路径——必须走 LibraryRoot.absoluteURL(forStoredPath:)")
+        }
+    }
+}
