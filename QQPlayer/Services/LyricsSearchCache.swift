@@ -36,10 +36,8 @@ struct LyricsSearchCache: Sendable {
         }
         // 2026-09-22 隐藏布局：搜索缓存落 `Documents/.qqplayer/lyrics/cache/search/`
         // （macOS 仍 `Documents/lyrics-cache/search`）。
-        return LibraryRoot.lyricsSearchCacheDirectoryURL()
-            ?? FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("lyrics-cache/search", isDirectory: true)
+        // 写入点走 scratch 版：**Documents 不可解析时也绝不回落旧可见位置**。
+        return LibraryRoot.scratchLyricsSearchCacheDirectoryURL()
     }
 
     /// 读取缓存：命中且未过期返回候选；过期/损坏删除并返回 nil（下次搜索重新走网络）

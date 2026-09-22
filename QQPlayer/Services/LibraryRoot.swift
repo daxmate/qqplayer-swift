@@ -253,6 +253,12 @@ enum LibraryRoot {
         )
     }
 
+    /// 歌词搜索缓存目录的**永不回落旧位置**版本（写入点用；同 `scratchCacheDirectoryURL` 口径）。
+    static func scratchLyricsSearchCacheDirectoryURL(fileManager: FileManager = .default) -> URL {
+        lyricsSearchCacheDirectoryURL(fileManager: fileManager)
+            ?? scratchDirectoryURL(hiddenLyricsCacheDirectoryName)
+    }
+
     /// 日志目录（iOS = `.qqplayer/logs`；macOS = `Documents/Logs`，现状；macOS 的 AppLog
     /// 主日志另有 `~/Library/Logs/QQPlayerMac`，见 `AppLog`）。
     static func logsDirectoryURL(fileManager: FileManager = .default) -> URL? {
@@ -279,6 +285,28 @@ enum LibraryRoot {
     /// iOS = `.qqplayer/cache/<name>`；macOS = `Documents/<name>`（现状）。
     static func namedCacheDirectoryURL(_ name: String, fileManager: FileManager = .default) -> URL? {
         scopedURL(hidden: [hiddenCacheDirectoryName, name], macOS: [name], fileManager: fileManager)
+    }
+
+    /// 临时 scratch 目录（`<tmp>/qqplayer-scratch/<name>`）。
+    ///
+    /// **用途唯一**：给「缓存类落点」当 Documents 不可解析时的兜底 —— 见 `scratchCacheDirectoryURL`。
+    static func scratchDirectoryURL(_ name: String) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("qqplayer-scratch", isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
+    }
+
+    /// 具名缓存目录的**永不回落旧位置**版本（写入点用）。
+    ///
+    /// 为什么需要它（2026-09-22 真机形态）：缓存类写入点此前写成
+    /// `LibraryRoot.namedCacheDirectoryURL(name) ?? <Documents>/<name>` —— 兜底分支解析的是
+    /// **同一个** Documents 根（不可解析时 `.first!` 还会崩），既拿不到有效路径，又在字面上
+    /// 保留了「旧可见位置」这个写入目标。缓存丢失可重建，**解析失败时宁可落临时目录，
+    /// 也绝不把数据写进 `Documents/<旧名>`**（那正是「根上又冒出旧目录」的形态）。
+    ///
+    /// macOS 下 `namedCacheDirectoryURL` 只要 Documents 可解析就非 nil ⇒ 本兜底不改变现状行为。
+    static func scratchCacheDirectoryURL(_ name: String, fileManager: FileManager = .default) -> URL {
+        namedCacheDirectoryURL(name, fileManager: fileManager) ?? scratchDirectoryURL(name)
     }
 
     /// 回收区目录（iOS = `.qqplayer/trash`；macOS = `Documents/.Trash`，现状）。

@@ -206,6 +206,7 @@
 		69F47FCCE24E407288D79719 /* ReclaimAreaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */; };
 		2634A84446A54518AE96B774 /* ReclaimAreaShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */; };
 		0275B8C3406B4571B8BAB66E /* MacTrackListViewPlaylistMenuContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FBEE759F4E4AF395749873 /* MacTrackListViewPlaylistMenuContractTests.swift */; };
+		6221BE0E35F5463C9B4F33CB /* LegacyWritePathGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116BBEEC896F40DCA6D457F5 /* LegacyWritePathGuardTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -461,6 +462,7 @@
 		59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReclaimAreaTests.swift; sourceTree = "<group>"; };
 		DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReclaimAreaShapeContractTests.swift; sourceTree = "<group>"; };
 		91FBEE759F4E4AF395749873 /* MacTrackListViewPlaylistMenuContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackListViewPlaylistMenuContractTests.swift; sourceTree = "<group>"; };
+		116BBEEC896F40DCA6D457F5 /* LegacyWritePathGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LegacyWritePathGuardTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1266,6 +1268,7 @@
 				59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */,
 				DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */,
 				91FBEE759F4E4AF395749873 /* MacTrackListViewPlaylistMenuContractTests.swift */,
+				116BBEEC896F40DCA6D457F5 /* LegacyWritePathGuardTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1770,6 +1773,7 @@
 				69F47FCCE24E407288D79719 /* ReclaimAreaTests.swift in Sources */,
 				2634A84446A54518AE96B774 /* ReclaimAreaShapeContractTests.swift in Sources */,
 				0275B8C3406B4571B8BAB66E /* MacTrackListViewPlaylistMenuContractTests.swift in Sources */,
+				6221BE0E35F5463C9B4F33CB /* LegacyWritePathGuardTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

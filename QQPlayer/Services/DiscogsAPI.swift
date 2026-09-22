@@ -142,9 +142,7 @@ class DiscogsAPIService: ObservableObject, @unchecked Sendable {
         consumerKey: EnvironmentLoader.shared.discogsConsumerKey,
         consumerSecret: EnvironmentLoader.shared.discogsConsumerSecret,
         session: .shared,
-        cacheDirectory: LibraryRoot.namedCacheDirectoryURL("DiscogsCache")
-            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-            .first!.appendingPathComponent("DiscogsCache")
+        cacheDirectory: LibraryRoot.scratchCacheDirectoryURL("DiscogsCache")
     )
 
     private let consumerKey: String?
