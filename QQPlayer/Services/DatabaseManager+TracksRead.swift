@@ -44,7 +44,7 @@ extension DatabaseManager {
 
         let excludedFormats = Set(excludingFormats.map { $0.lowercased() })
         return orderedTracks.filter { track in
-            let ext = URL(fileURLWithPath: track.path).pathExtension.lowercased()
+            let ext = LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension.lowercased()
             return !excludedFormats.contains(ext)
         }
     }

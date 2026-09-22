@@ -50,7 +50,7 @@ extension CarPlaySceneDelegate {
     }
 
     func isCompatible(track: Track) -> Bool {
-        let ext = URL(fileURLWithPath: track.path).pathExtension.lowercased()
+        let ext = LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension.lowercased()
         return !incompatibleFormats.contains(ext)
     }
 

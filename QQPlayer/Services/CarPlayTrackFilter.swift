@@ -35,7 +35,7 @@ enum CarPlayTrackFilter {
 
     /// 单个曲目在 CarPlay 环境下是否可用。
     static func isCompatible(_ track: Track) -> Bool {
-        !incompatibleFormats.contains(URL(fileURLWithPath: track.path).pathExtension.lowercased())
+        !incompatibleFormats.contains(LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension.lowercased())
     }
 
     /// CarPlay 连接时剔除不可用格式；未连接时原样返回（顺序不变）。

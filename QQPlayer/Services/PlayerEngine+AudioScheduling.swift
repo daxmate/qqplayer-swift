@@ -117,7 +117,7 @@
             isPreloadingNext = true
             preloadNextTask = Task { @MainActor [weak self] in
                 guard let self else { return }
-                let url = URL(fileURLWithPath: candidate.path)
+                let url = LibraryRoot.absoluteURL(forStoredPath: candidate.path)
 
                 guard !SFBAudioEngineManager.canHandle(url: url) else {
                     self.isPreloadingNext = false

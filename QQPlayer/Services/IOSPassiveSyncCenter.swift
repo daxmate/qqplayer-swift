@@ -206,7 +206,7 @@
         init(
             identityStore: SyncIdentityStore = SyncIdentityStore(),
             deviceStore: DeviceStore = DeviceStore(),
-            libraryRoot: @escaping () -> URL = { MusicFolderResolver.iosDocumentsDirectoryURL() },
+            libraryRoot: @escaping () -> URL = { MusicFolderResolver.iosMusicLibraryDirectoryURL() },
             clientName: @escaping () -> String? = { IOSPassiveSyncCenter.defaultClientName() },
             database: DatabaseManager = .shared,
             indexingState: IndexingStateProviding = LibraryIndexer.shared

@@ -255,18 +255,35 @@ actor LyricsManager {
         if let override = Self.manualLyricsDirectoryOverride {
             return override
         }
-        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+        // 2026-09-22 曲库文件夹化：手工歌词落 `Documents/Lyrics/`。
+        guard let documentsURL = LibraryRoot.documentsRootURL(fileManager: fileManager) else {
             return nil
         }
-        let dir = documentsURL.appendingPathComponent("lyrics-manual", isDirectory: true)
+        let dir = documentsURL.appendingPathComponent(LibraryRoot.lyricsDirectoryName, isDirectory: true)
         if !fileManager.fileExists(atPath: dir.path) {
             try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         return dir
     }
 
+    /// 改名前的旧位置（`Documents/lyrics-manual/`）——**只读兼容**：迁移器未跑到 /
+    /// 搬迁失败时，用户的手工歌词不能因此看不见（写入一律落新位置）。
+    private func getLegacyManualLyricsDirectory() -> URL? {
+        // 测试注入目录时不参与兼容读取（注入 = 只认注入目录，与改动前行为一致）。
+        guard Self.manualLyricsDirectoryOverride == nil else { return nil }
+        guard let documentsURL = LibraryRoot.documentsRootURL(fileManager: fileManager) else {
+            return nil
+        }
+        return documentsURL.appendingPathComponent("lyrics-manual", isDirectory: true)
+    }
+
     private func getManualLyricsFileURL(trackId: String) -> URL? {
         guard let dir = getManualLyricsDirectory() else { return nil }
+        return dir.appendingPathComponent("\(trackId).json")
+    }
+
+    private func getLegacyManualLyricsFileURL(trackId: String) -> URL? {
+        guard let dir = getLegacyManualLyricsDirectory() else { return nil }
         return dir.appendingPathComponent("\(trackId).json")
     }
 
@@ -284,30 +301,40 @@ actor LyricsManager {
     }
 
     private func removeManualLyricsFromDisk(trackId: String) async {
-        guard let fileURL = getManualLyricsFileURL(trackId: trackId) else { return }
-        try? fileManager.removeItem(at: fileURL)
+        // 新旧两个位置都删：旧位置的残留不能让「清除手工歌词」变成表面成功。
+        if let fileURL = getManualLyricsFileURL(trackId: trackId) {
+            try? fileManager.removeItem(at: fileURL)
+        }
+        if let legacyURL = getLegacyManualLyricsFileURL(trackId: trackId),
+           fileManager.fileExists(atPath: legacyURL.path) {
+            try? fileManager.removeItem(at: legacyURL)
+        }
     }
 
     private func loadManualOverridesFromDisk() async {
-        guard let dir = getManualLyricsDirectory() else { return }
-        guard let files = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
-            return
-        }
-        for fileURL in files where fileURL.pathExtension == "json" {
-            let trackId = fileURL.deletingPathExtension().lastPathComponent
-            guard let data = try? Data(contentsOf: fileURL),
-                  let lyrics = try? decoder.decode(Lyrics.self, from: data) else {
+        // 新位置（`Documents/Lyrics/`）优先；旧位置（`Documents/lyrics-manual/`）兜底，
+        // 且不覆盖新位置里已读到的同 id（新位置是权威）。
+        for dir in [getManualLyricsDirectory(), getLegacyManualLyricsDirectory()].compactMap({ $0 }) {
+            guard let files = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
                 continue
             }
-            manualOverrides[trackId] = lyrics
-            cacheLyrics(lyrics, for: trackId)
+            for fileURL in files where fileURL.pathExtension == "json" {
+                let trackId = fileURL.deletingPathExtension().lastPathComponent
+                guard manualOverrides[trackId] == nil,
+                      let data = try? Data(contentsOf: fileURL),
+                      let lyrics = try? decoder.decode(Lyrics.self, from: data) else {
+                    continue
+                }
+                manualOverrides[trackId] = lyrics
+                cacheLyrics(lyrics, for: trackId)
+            }
         }
     }
 
     // MARK: - Embedded Lyrics
 
     private func getEmbeddedLyrics(for track: Track) async -> Lyrics? {
-        let url = URL(fileURLWithPath: track.path)
+        let url = LibraryRoot.absoluteURL(forStoredPath: track.path)
         let ext = url.pathExtension.lowercased()
 
         switch ext {

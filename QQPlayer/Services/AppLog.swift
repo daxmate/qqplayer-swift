@@ -197,7 +197,8 @@ enum AppLog {
     /// 同款：只由测试在用例内写入（串行用例 + 结束即复原），生产只读。
     nonisolated(unsafe) static var logFileURLOverride: URL?
 
-    /// 落点（唯一出口）：macOS `~/Library/Logs/QQPlayerMac/app.log`；iOS 容器 `Documents/app.log`。
+    /// 落点（唯一出口）：macOS `~/Library/Logs/QQPlayerMac/app.log`；iOS 容器 `Documents/Logs/app.log`
+    /// （2026-09-22 曲库文件夹化：日志收进 `Logs/` 子目录）。
     static func logFileURL(fileManager: FileManager = .default) -> URL? {
         if let logFileURLOverride { return logFileURLOverride }
         #if os(macOS)
@@ -205,8 +206,7 @@ enum AppLog {
                 .appendingPathComponent("Library/Logs/QQPlayerMac", isDirectory: true)
                 .appendingPathComponent("app.log", isDirectory: false)
         #else
-            return fileManager.urls(for: .documentDirectory, in: .userDomainMask)
-                .first?
+            return LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName, fileManager: fileManager)?
                 .appendingPathComponent("app.log", isDirectory: false)
         #endif
     }

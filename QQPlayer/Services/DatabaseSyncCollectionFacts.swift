@@ -50,7 +50,8 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
     }
 
     /// 缺省曲库根：macOS = `~/Music/QQPlayer`（与 `MacSyncLibraryHost` 同源）；
-    /// iOS = 沙盒 Documents（M3-2 起 iOS 唯一音乐位置）。
+    /// iOS = 沙盒 `Documents/Music`（2026-09-22 曲库文件夹化起：曲库根不再是容器 Documents，
+    /// 而是其下的 Music 子目录）。
     /// 本类型是共享 Core（iOS 单测 target 也要编它），所以默认值必须分平台——
     /// `FileManager.homeDirectoryForCurrentUser` 在 iOS 上是 unavailable API。
     static var defaultLibraryRoot: URL {
@@ -59,7 +60,7 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
                 homeDirectory: FileManager.default.homeDirectoryForCurrentUser
             )
         #else
-            MusicFolderResolver.iosDocumentsDirectoryURL()
+            MusicFolderResolver.iosMusicLibraryDirectoryURL()
         #endif
     }
 
@@ -114,8 +115,8 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
         guard let normalized = SyncManifestGenerator.normalizeRelativePath(relativePath) else {
             return nil
         }
-        // track.path 存绝对路径；按曲库根相对化后的绝对路径精确查（curated 路径与
-        // track.path 同源 = `SyncLocalLibraryScanner` 采集口径）。
+        // `track.path` 存存储形态（相对 Music 根的相对路径；外部/旧行为绝对路径）；
+        // 查曲目走 `getTrack(byPath:)` 单一入口（它内部做存储形态归一化，本处不再自行拼接）。
         let absolutePath = libraryRoot.appendingPathComponent(normalized).path
         guard let track = (try? database.getTrack(byPath: absolutePath)) ?? nil else { return nil }
         return fact(forTrack: track)
@@ -141,8 +142,8 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
         SyncCollectionTrackFact(
             stableId: track.stableId,
             relativePath: SyncManifestGenerator.relativePath(
-                of: URL(fileURLWithPath: track.path),
-                baseDirectory: libraryRoot
+                ofStoredTrackPath: track.path,
+                libraryRoot: libraryRoot
             ),
             contentHash: contentHash(forTrackStableId: track.stableId)
         )

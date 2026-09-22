@@ -12,8 +12,16 @@ import Foundation
 
 enum MusicFolderResolver {
     /// iOS 音乐位置（M3-2 起：唯一位置 = 本地沙盒 Documents；iCloud ubiquity 容器已退役）。
+    /// 注：这是**容器 Documents**，不是曲库根——曲库根见 `iosMusicLibraryDirectoryURL()`。
     static func iosDocumentsDirectoryURL() -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+
+    /// iOS 曲库根（2026-09-22 曲库文件夹化）：`Documents/Music`。
+    /// 扫描只认它（单层不递归），`track.path` 存相对它的相对路径。
+    /// 唯一事实源仍是 `LibraryRoot.musicRootURL()`——这里只做平台命名的转接。
+    static func iosMusicLibraryDirectoryURL() -> URL {
+        LibraryRoot.musicRootURL()
     }
 
     /// macOS 默认曲库目录：~/Music/QQPlayer（用户拍板 2026-08-30：本地文件夹扫描）。
@@ -35,7 +43,7 @@ enum MusicFolderResolver {
         #if os(macOS)
             macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
         #else
-            iosDocumentsDirectoryURL()
+            iosMusicLibraryDirectoryURL()
         #endif
     }
 

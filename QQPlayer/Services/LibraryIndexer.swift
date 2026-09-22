@@ -231,23 +231,6 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
     }
 
     /// 分片：跨文件可见（原 private）
-    nonisolated func existingTrack(stableId: String, path: String) throws -> Track? {
-        if let existing = try databaseManager.getTrack(byStableId: stableId) {
-            return existing
-        }
-
-        guard var existing = try databaseManager.getTrack(byPath: path) else {
-            return nil
-        }
-
-        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔁 Track already exists by path with old stable ID: \(existing.stableId)") }
-        try databaseManager.migrateTrackForMovedFile(oldStableId: existing.stableId, newPath: path)
-        existing.stableId = stableId
-        existing.path = path
-        return existing
-    }
-
-    /// 分片：跨文件可见（原 private）
     nonisolated func saveParsedFile(
         _ parsedFile: ParsedAudioFile,
         replacing existingTrack: Track?,
@@ -579,7 +562,7 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
             // 此前只改 path 不改 stable_id → 行内身份与实际路径错位，改名迁移/去重/
             // 内容指纹对账全部基于旧 id 追踪。改走完整迁移入口：stable_id + 四表引用
             // + 文件侧引用（书签键/歌词/封面）一次搬完。
-            if track.path != resolvedURL.path {
+            if track.path != LibraryRoot.storedPath(for: resolvedURL) {
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 Playback: File moved detected! Old: \(track.path)") }
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📍 Playback: File moved detected! New: \(resolvedURL.path)") }
 

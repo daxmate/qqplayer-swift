@@ -39,16 +39,17 @@ struct SmartPlaylistSourceResolver {
     /// 曲库根（相对路径基准；与 `MacSyncLibraryHost` / `SyncLibraryPassiveHost` 装配同源）。
     let libraryRoot: URL
 
-    /// 缺省曲库根：macOS = `~/Music/QQPlayer`；iOS = 沙盒 Documents（M3-2 起 iOS
-    /// 唯一音乐位置）。本类型是共享 Core（iOS 单测 target 也要编它），所以默认值
-    /// 必须分平台——`FileManager.homeDirectoryForCurrentUser` 在 iOS 上是 unavailable API。
+    /// 缺省曲库根：macOS = `~/Music/QQPlayer`；iOS = 沙盒 `Documents/Music`（2026-09-22
+    /// 曲库文件夹化起，曲库根不再是容器 Documents）。本类型是共享 Core（iOS 单测 target
+    /// 也要编它），所以默认值必须分平台——`FileManager.homeDirectoryForCurrentUser`
+    /// 在 iOS 上是 unavailable API。
     static var defaultLibraryRoot: URL {
         #if os(macOS)
             MusicFolderResolver.macDefaultFolderURL(
                 homeDirectory: FileManager.default.homeDirectoryForCurrentUser
             )
         #else
-            MusicFolderResolver.iosDocumentsDirectoryURL()
+            MusicFolderResolver.iosMusicLibraryDirectoryURL()
         #endif
     }
 
@@ -151,9 +152,6 @@ struct SmartPlaylistSourceResolver {
 
     /// 一条曲目行 → 曲库内相对路径（不在根内 / 路径非法 → nil = 跳过该条）。
     private func relativePath(of track: Track) -> String? {
-        SyncManifestGenerator.relativePath(
-            of: URL(fileURLWithPath: track.path),
-            baseDirectory: libraryRoot
-        )
+        SyncManifestGenerator.relativePath(ofStoredTrackPath: track.path, libraryRoot: libraryRoot)
     }
 }

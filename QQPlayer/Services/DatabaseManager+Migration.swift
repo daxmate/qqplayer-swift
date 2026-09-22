@@ -147,7 +147,8 @@ extension DatabaseManager {
                 do {
                     let allTracks = try Track.fetchAll(db)
                     let groupedByPath = Dictionary(grouping: allTracks, by: { track in
-                        URL(fileURLWithPath: track.path).standardizedFileURL.path
+                        // 存储形态标准化（相对路径不得走 fileURL 标准化）。
+                        Self.standardizedStoredPath(track.path)
                     })
 
                     for (path, duplicates) in groupedByPath where duplicates.count > 1 {

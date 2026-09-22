@@ -21,7 +21,7 @@ enum MusicDirectoryScanner {
             : settings.audioExtensions
     }
 
-    /// 递归扫描单根目录，返回匹配启用扩展名的音频文件 URL。
+    /// 扫描单根目录，返回匹配启用扩展名的音频文件 URL。
     /// - 隐藏文件/目录：跳过（.skipsHiddenFiles）
     /// - 仅收录常规文件（isRegularFile）
     /// - 扩展名：小写比较，命中 enabledExtensions
@@ -29,12 +29,44 @@ enum MusicDirectoryScanner {
     ///   遍历中 resourceValues 读取失败 → 抛出终止
     /// 同步版扫描（目录枚举与 resourceValues 读取本身就是同步 API）：供「必须在
     /// 当前调用栈里立刻拿到结果」的场景用（如会话线程上的 manifest 提供者）。
-    /// 规则与 audioFiles(in:enabledExtensions:) 逐条一致——后者只是本函数的
+    /// 规则与 audioFiles(in:enabledExtensions:recursive:) 逐条一致——后者只是本函数的
     /// 后台队列包装（错误语义同旧实现：enumerator 创建失败 → 空数组；遍历中
     /// resourceValues 读取失败 → 抛出）。
-    static func audioFilesSync(in root: URL, enabledExtensions: [String]) throws -> [URL] {
+    ///
+    /// - Parameter recursive: `true`（缺省，行为与改动前逐字一致）= 递归枚举（macOS 多层
+    ///   音乐文件夹）；`false` = **只收根下第一层**（iOS 曲库根 `Documents/Music` 的用户口径
+    ///   是「单层」，子目录一律不收录）。
+    static func audioFilesSync(
+        in root: URL,
+        enabledExtensions: [String],
+        recursive: Bool = true
+    ) throws -> [URL] {
         var musicFiles: [URL] = []
         let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .nameKey]
+
+        guard recursive else {
+            // 单层：只列根下条目（隐藏项跳过），不做目录下降。
+            // 根不存在 / 无权限 → 空数组（与 enumerator 创建失败的语义一致）。
+            let entries: [URL]
+            do {
+                entries = try FileManager.default.contentsOfDirectory(
+                    at: root,
+                    includingPropertiesForKeys: resourceKeys,
+                    options: [.skipsHiddenFiles]
+                )
+            } catch {
+                return musicFiles
+            }
+            for fileURL in entries {
+                let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
+                guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else { continue }
+                if enabledExtensions.contains(fileURL.pathExtension.lowercased()) {
+                    musicFiles.append(fileURL)
+                }
+            }
+            return musicFiles
+        }
+
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: resourceKeys,
@@ -52,12 +84,20 @@ enum MusicDirectoryScanner {
         return musicFiles
     }
 
-    static func audioFiles(in root: URL, enabledExtensions: [String]) async throws -> [URL] {
+    static func audioFiles(
+        in root: URL,
+        enabledExtensions: [String],
+        recursive: Bool = true
+    ) async throws -> [URL] {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 do {
                     continuation.resume(
-                        returning: try audioFilesSync(in: root, enabledExtensions: enabledExtensions)
+                        returning: try audioFilesSync(
+                            in: root,
+                            enabledExtensions: enabledExtensions,
+                            recursive: recursive
+                        )
                     )
                 } catch {
                     continuation.resume(throwing: error)

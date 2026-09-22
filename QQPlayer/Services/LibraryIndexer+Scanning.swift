@@ -29,12 +29,12 @@ extension LibraryIndexer {
             let parentFolder = fileURL.deletingLastPathComponent()
             let folderPath = parentFolder.path
 
-            // Skip if it's directly in the music root（Documents / macOS 曲库根）
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.path
+            // Skip if it's directly in the music root（Documents/Music / macOS 曲库根）
+            let documentsPath = LibraryRoot.documentsRootURL()?.path
             #if os(macOS)
                 let musicRootPath = stateManager.getMusicFolderURL()?.path
             #else
-                let musicRootPath = documentsPath
+                let musicRootPath = MusicFolderResolver.iosMusicLibraryDirectoryURL().path
             #endif
 
             if folderPath == documentsPath || folderPath == musicRootPath {
@@ -103,19 +103,23 @@ extension LibraryIndexer {
         }
     }
 
-    /// iOS 主扫/offline 统一入口（M3-2 起 = 唯一主扫）：FileManager 扫沙盒
-    /// Documents。带 generation guard，与 macOS scanMusicFolder 同一套取消语义。
+    /// iOS 主扫/offline 统一入口（M3-2 起 = 唯一主扫；2026-09-22 起曲库根 = `Documents/Music`）。
+    /// 带 generation guard，与 macOS scanMusicFolder 同一套取消语义。
     /// 分片：跨文件可见（原 private）
+    ///
+    /// 扫描口径（用户 2026-09-22 拍板）：
+    /// · 只认 `Documents/Music`；· **单层不递归** —— `Music/<子目录>/*.flac` **不收录**
+    ///   （历史子目录本批不递归也不搬平）；· 根不存在时**不 reconcile**（扫不到 ≠ 空库，
+    ///   否则会把库里全部行删掉）。
     func scanLocalDocuments(generation: Int) async {
-        // M3-2：iOS 音乐唯一位置 = 沙盒 Documents，无 iCloud 次位置。
-        let documentsDirectory = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
+        let musicDirectory = MusicFolderResolver.iosMusicLibraryDirectoryURL()
+        // 根不存在（首启迁移器还没跑）= 本轮无扫描根 → reconcile 收到空 roots，一条不删。
+        let rootExists = FileManager.default.fileExists(atPath: musicDirectory.path)
 
         guard generation == indexingGeneration else { return }
 
         do {
-            let musicFiles = try await findMusicFiles(in: documentsDirectory)
+            let musicFiles = try await findMusicFiles(in: musicDirectory, recursive: false)
 
             let totalFiles = musicFiles.count
 
@@ -154,7 +158,7 @@ extension LibraryIndexer {
 
             // Only a current scan may finalize.
             guard generation == indexingGeneration else { return }
-            await FileCleanupManager.shared.reconcileMissingFiles(in: [documentsDirectory])
+            await FileCleanupManager.shared.reconcileMissingFiles(in: rootExists ? [musicDirectory] : [])
             postPendingLibraryRefresh()
 
             await MainActor.run {
@@ -173,7 +177,6 @@ extension LibraryIndexer {
             }
         }
     }
-
     #if os(macOS)
         /// macOS 数据源：FileManager 目录扫描音乐文件夹（默认 ~/Music/QQPlayer）。
         /// 复用 iOS 的 findMusicFiles/indexFile/processFolderPlaylists 逻辑，

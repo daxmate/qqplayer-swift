@@ -189,10 +189,7 @@ struct DatabaseSyncPeerLibraryFacts {
 
     /// 一条 track 行 → 曲库内相对路径（不在根内 / 路径非法 → nil = 跳过该条）。
     private func relativePath(of track: Track) -> String? {
-        SyncManifestGenerator.relativePath(
-            of: URL(fileURLWithPath: track.path),
-            baseDirectory: libraryRoot
-        )
+        SyncManifestGenerator.relativePath(ofStoredTrackPath: track.path, libraryRoot: libraryRoot)
     }
 
     /// 空指纹归一为 nil（线上「未指纹」是 nil，不是空串——与 manifest 同口径）。

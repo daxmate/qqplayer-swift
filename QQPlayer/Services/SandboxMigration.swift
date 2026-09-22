@@ -267,7 +267,8 @@ enum CloudCopyArchiver {
         private func tracksUnder(_ cloudRoot: URL) -> [Track] {
             let rootPath = cloudRoot.standardizedFileURL.path
             return (try? databaseManager.getAllTracks())?.filter { track in
-                URL(fileURLWithPath: track.path).standardizedFileURL.path.hasPrefix(rootPath + "/")
+                // 存储形态先解回绝对路径（相对形态的曲库内行不属于任何 iCloud 容器）。
+                LibraryRoot.absolutePath(forStoredPath: track.path).hasPrefix(rootPath + "/")
             } ?? []
         }
 

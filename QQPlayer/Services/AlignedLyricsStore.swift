@@ -21,7 +21,9 @@
 //
 //  目录布局（Documents 下，三者互不重叠）：
 //    aligned → Documents/lyrics-aligned/{stableId}.json   （本文件）
-//    manual  → Documents/lyrics-manual/{stableId}.json    （LyricsManager，未改动）
+//    manual  → Documents/Lyrics/{stableId}.json          （LyricsManager；2026-09-22
+//              曲库文件夹化后从 `Documents/lyrics-manual/` 改到 `Documents/Lyrics/`，
+//              旧目录只做兼容读取，由 `LibraryLayoutMigrator` 搬迁）
 //    network → Documents/lyrics-cache/tracks/{stableId}.json（LyricsSearch，未改动）
 //
 //  线程：仅文件 IO，无共享可变状态，`@unchecked Sendable` 安全。
@@ -35,7 +37,8 @@ import Foundation
 enum LyricsStoreKind: String, CaseIterable, Sendable {
     /// 对齐产物（桌面版 AI 对齐）——唯一参与随歌同步的歌词。
     case aligned
-    /// 用户手动指定（搜索页选择；LyricsManager 所有，M4-2b 未改动）。
+    /// 用户手动指定（搜索页选择；LyricsManager 所有）。目录名取 `LibraryRoot` 常量
+    /// （2026-09-22 曲库文件夹化：`Documents/Lyrics/`）。
     case manual
     /// 在线源缓存（lrclib / 网易云；LyricsSearch 所有，两端各自下载）。
     case network
@@ -44,7 +47,7 @@ enum LyricsStoreKind: String, CaseIterable, Sendable {
     var directoryName: String {
         switch self {
         case .aligned: return "lyrics-aligned"
-        case .manual: return "lyrics-manual"
+        case .manual: return LibraryRoot.lyricsDirectoryName
         case .network: return "lyrics-cache/tracks"
         }
     }

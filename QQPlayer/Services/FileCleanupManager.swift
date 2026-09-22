@@ -47,7 +47,8 @@ class FileCleanupManager: ObservableObject {
             // 两类移除原因分开：文件真没了 → 全量删除；仅格式不收录 → 只移除曲目行
             // （D7：文件与用户数据都保留，勾回格式重扫即恢复）
             let removals: [(track: Track, fileMissing: Bool)] = tracks.compactMap { track in
-                let trackURL = URL(fileURLWithPath: track.path).standardizedFileURL
+                // 存储形态 → 绝对 URL（唯一入口；相对路径必须解回曲库根下）。
+                let trackURL = LibraryRoot.absoluteURL(forStoredPath: track.path).standardizedFileURL
                 let belongsToScannedRoot = roots.contains { isURL(trackURL, inside: $0) }
                 guard belongsToScannedRoot else { return nil }
                 let fileExists = FileManager.default.fileExists(atPath: trackURL.path)
@@ -99,7 +100,8 @@ class FileCleanupManager: ObservableObject {
 
         // M3-2：退役 iCloud 容器——内部文件 = 本地 Documents（沙盒）内的文件；
         // 外部文件 = share/document picker 引入的安全域文件（走书签校验）。
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        // 2026-09-22 曲库文件夹化：曲库根 = `Documents/Music`，内部文件的解析不再靠
+        // 「在 Documents 根找同名文件」那种启发式（H3 洞：同名不同歌会误改 path）。
 
         do {
             // Get all tracks from database
@@ -109,12 +111,12 @@ class FileCleanupManager: ObservableObject {
             var nonExistentTracks: [Track] = []
 
             for track in allTracks {
-                let trackURL = URL(fileURLWithPath: track.path)
+                // 存储形态 → 绝对 URL（唯一入口）。相对路径直解曲库根下 = 不再靠猜同名。
+                let trackURL = LibraryRoot.absoluteURL(forStoredPath: track.path)
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Checking track: \(trackURL.lastPathComponent)") }
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Path: \(trackURL.path)") }
 
-                let isInternalFile = isURL(trackURL, inside: documentsURL) ||
-                    trackURL.path.contains("/Documents/")
+                let isInternalFile = !LibraryRoot.isExternalPath(track.path)
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Is internal file: \(isInternalFile)") }
 
                 if isInternalFile {
@@ -125,39 +127,9 @@ class FileCleanupManager: ObservableObject {
                     if fileExists {
                         if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 ✅ Internal file exists (keeping): \(trackURL.lastPathComponent)") }
                     } else {
-                        // Check if this is a local Documents file with a moved path
-                        if trackURL.path.contains("/Documents/") {
-                            // Try to find the file in the current Documents directory
-                            let filename = trackURL.lastPathComponent
-                            let newURL = documentsURL.appendingPathComponent(filename)
-
-                            if FileManager.default.fileExists(atPath: newURL.path) {
-                                if AppLog.isEnabled(.debug, .general) {
-                                    AppLog.debug(.general, "🧹   Found file in current Documents folder, updating path..."
-                                        + "\n🧹   Old path: \(trackURL.path)"
-                                        + "\n🧹   New path: \(newURL.path)")
-                                }
-
-                                // Update the track's path in the database
-                                do {
-                                    // 路径变更 = stableId 重算，走同一迁移入口（D5）
-                                    try databaseManager.migrateTrackForMovedFile(
-                                        oldStableId: track.stableId,
-                                        newPath: newURL.path
-                                    )
-                                    if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 ✅ Updated path for: \(filename)") }
-                                } catch {
-                                    AppLog.error(.general, "🧹 ❌ Failed to update path: \(error)")
-                                    nonExistentTracks.append(track)
-                                }
-                            } else {
-                                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Internal file doesn't exist - will auto-clean from database") }
-                                nonExistentTracks.append(track)
-                            }
-                        } else {
-                            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Internal file doesn't exist - will auto-clean from database") }
-                            nonExistentTracks.append(track)
-                        }
+                        // 内部文件（曲库内 / Documents 内）不存在 → 不猜、不改 path，等重扫自愈；
+                        // 真删的由 reconcileMissingFiles 按扫描根处理。
+                        nonExistentTracks.append(track)
                     }
                 } else {
                     // For external files (from share/document picker), check if still accessible
@@ -179,7 +151,7 @@ class FileCleanupManager: ObservableObject {
 
                 for track in nonExistentTracks {
                     do {
-                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Auto-cleaning database entry for non-existent file: \(URL(fileURLWithPath: track.path).lastPathComponent)") }
+                        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Auto-cleaning database entry for non-existent file: \(LibraryRoot.absoluteURL(forStoredPath: track.path).lastPathComponent)") }
                         if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Auto-removing track from database: \(track.title)") }
                         // Use the ID stored with the row. Re-hashing the
                         // filename was incompatible with path-based IDs and

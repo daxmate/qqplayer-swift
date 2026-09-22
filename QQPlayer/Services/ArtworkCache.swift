@@ -17,12 +17,15 @@ import ImageIO
 
 extension ArtworkManager {
     func loadMapping() {
-        guard FileManager.default.fileExists(atPath: mappingFileURL.path) else {
-            return
-        }
+        // 主位置优先；迁移器未跑到时回落旧位置（`Documents/ArtworkMapping.plist`）——
+        // 只读兼容，不把旧文件当写入目标。
+        let readable = [mappingFileURL, legacyMappingFileURL]
+            .compactMap { $0 }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+        guard let url = readable else { return }
 
         do {
-            let data = try Data(contentsOf: mappingFileURL)
+            let data = try Data(contentsOf: url)
             if let mapping = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: String] {
                 artworkMapping = mapping
                 AppLog.info(.general, "📊 Loaded artwork mapping: \(artworkMapping.count) entries")

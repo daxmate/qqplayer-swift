@@ -20,12 +20,14 @@ extension DatabaseManager {
     /// iCloud dataless（云端未下载）文件同样返回 nil 并**不读取内容**——流式读取会
     /// 触发云端下载并长时间阻塞（实测 20+ 分钟不返回），是启动主线程卡死的根因。
     /// 可用性判定注入以便单测；默认走唯一判定 CloudFileAvailability。
+    /// 入参接受**绝对路径或存储形态**（`track.path` 两种形态都算）：
+    /// 相对形态先经 `LibraryRoot` 解回绝对 URL 再读文件内容。
     static func contentHashIfFilePresent(
         atPath path: String,
         isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
     ) -> String? {
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
-        let url = URL(fileURLWithPath: path)
+        let url = LibraryRoot.absoluteURL(forStoredPath: path)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         guard isLocallyAvailable(url) else { return nil }
         return try? SyncFileChecksum.sha256Hex(ofFile: url)
     }
@@ -117,14 +119,15 @@ extension DatabaseManager {
         for track in candidates {
             guard let id = track.id else { continue }
             // 文件真不存在：本次跳过（不计入云端跳过数），下次启动再试。
-            guard FileManager.default.fileExists(atPath: track.path) else { continue }
+            let absoluteURL = LibraryRoot.absoluteURL(forStoredPath: track.path)
+            guard FileManager.default.fileExists(atPath: absoluteURL.path) else { continue }
             // 云端未下载：不读内容（会阻塞），计入跳过数，下次重试。
-            guard isLocallyAvailable(URL(fileURLWithPath: track.path)) else {
+            guard isLocallyAvailable(absoluteURL) else {
                 skippedCloudOnly += 1
                 continue
             }
             guard let hash = Self.contentHashIfFilePresent(
-                atPath: track.path,
+                atPath: absoluteURL.path,
                 isLocallyAvailable: isLocallyAvailable
             ) else { continue }
             pending.append(PendingFill(id: id, hash: hash))

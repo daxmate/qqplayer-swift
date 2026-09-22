@@ -234,8 +234,9 @@ extension DatabaseManager {
     /// - 不改文件系统、不发通知（调用方职责：TagWriterService 已完成原子改名，
     ///   UI 层负责通知刷新）
     func moveTrack(from oldPath: String, to newPath: String) throws {
-        let normalizedOld = Self.standardizedPath(oldPath)
-        let normalizedNew = Self.standardizedPath(newPath)
+        // 入参可能是绝对路径（改名/搚削调用点）或存储形态；一律先归一化到存储形态。
+        let normalizedOld = Self.standardizedStoredPath(LibraryRoot.storedPath(forAbsolutePath: oldPath))
+        let normalizedNew = Self.standardizedStoredPath(LibraryRoot.storedPath(forAbsolutePath: newPath))
         guard normalizedOld != normalizedNew else { return }
         guard let track = try getTrack(byPath: normalizedOld) else { return }
 

@@ -165,9 +165,15 @@ extension LibraryIndexer {
 
     /// 分片：跨文件可见（原 private）
     func processLegacySharedFiles(from sharedContainer: URL) async {
-        let sharedMusicURL = sharedContainer.appendingPathComponent("Documents").appendingPathComponent("Music")
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let localMusicURL = documentsURL.appendingPathComponent("Music")
+        // 共享容器（App Group）自己的 Documents/Music 布局——与曲库根无关，名字取同一常量。
+        let sharedMusicURL = sharedContainer
+            .appendingPathComponent("Documents")
+            .appendingPathComponent(LibraryRoot.musicDirectoryName)
+        // 目标 = 曲库根（`Documents/Music`），经 LibraryRoot 单一入口派生。
+        guard let localMusicURL = LibraryRoot.plannedDirectoryURL(LibraryRoot.musicDirectoryName) else {
+            AppLog.error(.general, "❌ Failed to resolve local Music directory (Documents unavailable)")
+            return
+        }
 
         // Create local Music directory if it doesn't exist
         do {

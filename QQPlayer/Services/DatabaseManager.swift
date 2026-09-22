@@ -55,7 +55,11 @@ class DatabaseManager: @unchecked Sendable {
     /// 跨端身份恒为 `content_hash`，stableId 只是端内身份，两端各自演进没有兼容问题。
     static var defaultStableIdRoot: URL? {
         #if os(iOS)
-            return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            // 2026-09-22 曲库文件夹化：曲库根 = Documents/Music，stableId 的基准根随之下移。
+            // 对「原本直接躺在 Documents 根」的曲目，新旧身份路径**完全相同**
+            // （旧 = 相对 Documents = `A.flac`；新 = 相对 Music = `A.flac`）⇒ 迁移不改身份，
+            // 收藏 / 歌单 / 播放历史不会因搬家而失联。
+            return LibraryRoot.musicRootURL()
         #else
             return nil
         #endif
@@ -64,7 +68,15 @@ class DatabaseManager: @unchecked Sendable {
     /// stableId 的唯一输入：标准化路径在基准根之下时改写成**相对路径**（跨容器前缀
     /// 变化稳定）；不在根下 / 无基准根 → 回落绝对路径（保守，不误改）。
     /// 纯函数（基准根可注入），迁移与测试共用同一事实源，避免两处派生漂移。
+    ///
+    /// 2026-09-22：`track.path` 已改成「相对曲库根」（`LibraryRoot` 的存储形态）——
+    /// 相对形态本身**就是**身份路径，直接返回（不再二次相对化，也绝不对相对串走
+    /// `URL(fileURLWithPath:)` —— 那会按 cwd 拼出垃圾绝对路径）。
     static func identityPath(forPath path: String, relativeRoot: URL?) -> String {
+        if relativeRoot != nil, LibraryRoot.isRelativeStoredPath(path),
+           let relative = LibraryRoot.normalizedRelativePath(path) {
+            return relative
+        }
         let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
         guard let rootPath = relativeRoot?.standardizedFileURL.path, !rootPath.isEmpty else {
             return normalized
@@ -87,6 +99,15 @@ class DatabaseManager: @unchecked Sendable {
 
     static func standardizedPath(_ path: String) -> String {
         URL(fileURLWithPath: path).standardizedFileURL.path
+    }
+
+    /// **存储形态**（`track.path`）的标准化：相对路径不做 fileURL 标准化——
+    /// 那会按 cwd 把 `A.flac` 拼成 `<cwd>/A.flac` 这种垃圾绝对路径。
+    /// 凡拿 `track.path` 当键比对（查重 / 查曲目 / 迁移）都走本函数。
+    static func standardizedStoredPath(_ path: String) -> String {
+        LibraryRoot.isRelativeStoredPath(path)
+            ? (LibraryRoot.normalizedRelativePath(path) ?? path)
+            : standardizedPath(path)
     }
 
     // MARK: - stableId 相对化迁移（iOS 一次性；含 sync_outbox）
@@ -387,7 +408,8 @@ class DatabaseManager: @unchecked Sendable {
     // MARK: - DB 打开诊断（2026-09-15）
 
     /// 把「选了哪条路径 → 拿到没拿到 App Group 容器 → 打开结果 → 降级原因」追加写入
-    /// 容器内 `Documents/db-debug.log`（环形：超 256KB 留尾部 64KB）。
+    /// 容器内 `Documents/Logs/db-debug.log`（环形：超 256KB 留尾部 64KB）。
+    /// （2026-09-22 曲库文件夹化：日志统一收进 `Logs/` 子目录。）
     ///
     /// 为什么落盘：iOS 的 `print` 只进 stdout，真机拿不到（`devicectl process launch
     /// --console` 实测报 CoreDeviceError 10002）。而「静默降级成一局空库」我们已经栽过两次
@@ -395,8 +417,8 @@ class DatabaseManager: @unchecked Sendable {
     /// 只在启动期决策点写（每次启动 ≤ 6 行），不进任何热路径；诊断自身失败绝不影响启动。
     private func dbDiag(_ message: String) {
         #if os(iOS)
-            guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-                .first?.appendingPathComponent("db-debug.log") else { return }
+            guard let url = LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName)?
+                .appendingPathComponent("db-debug.log") else { return }
             let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
             do {
                 if FileManager.default.fileExists(atPath: url.path),

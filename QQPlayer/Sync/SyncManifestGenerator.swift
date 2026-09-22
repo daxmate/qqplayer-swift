@@ -74,33 +74,30 @@ enum SyncManifestGenerator {
 
     /// 相对路径基准计算：文件 URL 相对曲库根的路径（POSIX 分隔）。
     /// 不在根内 / 等于根 / 空路径 → nil（调用方跳过，不入 manifest）。
+    /// **转发**到 `LibraryRoot.relativePath(of:baseDirectory:)`（规则只有一份；
+    /// 实现落在 `LibraryRoot` 是因为那个文件必须对同步层零依赖，见它的文件头）。
     static func relativePath(of url: URL, baseDirectory: URL) -> String? {
-        let base = baseDirectory.standardizedFileURL.pathComponents
-        let target = url.standardizedFileURL.pathComponents
-        guard target.count > base.count, Array(target.prefix(base.count)) == base else {
-            return nil
-        }
-        return normalizeRelativePath(target.dropFirst(base.count).joined(separator: "/"))
+        LibraryRoot.relativePath(of: url, baseDirectory: baseDirectory)
+    }
+
+    /// **存储形态（`track.path`）** → 曲库根相对路径（第二身份 / 集合事实 / 同步清单的
+    /// 统一换算，唯一实现）。
+    ///
+    /// 2026-09-22 曲库文件夹化后 `track.path` 有两种形态：相对路径 = 曲库内文件（相对
+    /// Music 根，**本身已经是**要的相对路径，直接规范化返回）；绝对路径 = 曲库外文件
+    /// 或旧行（走 `relativePath(of:baseDirectory:)`，基准根由调用方给）。
+    /// 对相对形态绝不能走 `URL(fileURLWithPath:)` —— 那会按 cwd 拼出垃圾绝对路径。
+    static func relativePath(ofStoredTrackPath path: String, libraryRoot: URL) -> String? {
+        guard !path.isEmpty else { return nil }
+        if !path.hasPrefix("/") { return normalizeRelativePath(path) }
+        return relativePath(of: URL(fileURLWithPath: path), baseDirectory: libraryRoot)
     }
 
     /// 路径规范化（对账键的单一事实源）：拒绝绝对路径与 `..` 逃逸，统一分隔符。
     /// 返回 nil = 非法（调用方丢弃，绝不"顺手修正"成可疑路径）。
+    /// **转发**到 `LibraryRoot.normalizedRelativePath`（规则只有一份；实现落在
+    /// `LibraryRoot` 的原因见该文件头「对同步层零依赖」）。
     static func normalizeRelativePath(_ raw: String) -> String? {
-        var path = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !path.isEmpty, !path.hasPrefix("/") else { return nil }
-        path = path.replacingOccurrences(of: "\\", with: "/")
-        var components: [String] = []
-        for component in path.split(separator: "/", omittingEmptySubsequences: true) {
-            switch component {
-            case ".":
-                continue
-            case "..":
-                return nil
-            default:
-                components.append(String(component))
-            }
-        }
-        guard !components.isEmpty else { return nil }
-        return components.joined(separator: "/")
+        LibraryRoot.normalizedRelativePath(raw)
     }
 }

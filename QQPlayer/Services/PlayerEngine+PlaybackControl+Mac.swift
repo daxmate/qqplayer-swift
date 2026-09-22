@@ -50,7 +50,7 @@
         }
 
         private func performMacLoadTrack(_ track: Track, preservePlaybackTime: Bool, generation: UInt64) async -> Bool {
-            let url = URL(fileURLWithPath: track.path)
+            let url = LibraryRoot.absoluteURL(forStoredPath: track.path)
             AppLog.info(.general, "📀 macOS loadTrack: \(track.title) (\(url.lastPathComponent))")
 
             // 切歌：清 AB 行号（保留跟唱模式/速度/单句循环；对齐 iOS performLoadTrack）
@@ -81,7 +81,7 @@
                 isLoadingTrack = false
                 // 用户可见错误（2026-09-12 审计 P8）：macOS 失败同样不再静默
                 reportPlaybackFailure(
-                    PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                    PlaybackFailureMessage.messageKey(pathExtension: LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension).localized
                 )
                 return false
             }
@@ -113,7 +113,7 @@
                         // 用户可见错误（2026-09-12 审计 P8）：Opus/DSD 失败以前只 print，
                         // 用户侧表现是“点了完全无反应”（macOS 没有 iOS 那样的 native 回退）。
                         reportPlaybackFailure(
-                            PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                            PlaybackFailureMessage.messageKey(pathExtension: LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension).localized
                         )
                     }
                     return false
@@ -138,7 +138,7 @@
                     isLoadingTrack = false
                     audioFile = nil
                     reportPlaybackFailure(
-                        PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                        PlaybackFailureMessage.messageKey(pathExtension: LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension).localized
                     )
                 }
                 return false

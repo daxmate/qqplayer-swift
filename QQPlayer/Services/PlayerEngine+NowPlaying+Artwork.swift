@@ -35,7 +35,7 @@
             }
 
             do {
-                let url = URL(fileURLWithPath: track.path)
+                let url = LibraryRoot.absoluteURL(forStoredPath: track.path)
 
                 let artwork: MPMediaItemArtwork? = try await withCheckedThrowingContinuation { continuation in
                     DispatchQueue.global(qos: .utility).async {

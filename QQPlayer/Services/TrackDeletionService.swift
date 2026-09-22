@@ -296,19 +296,23 @@ enum TrackDeletionService {
 
             environment.log("开始处理: \(item.logLabel) | path=\(item.path)")
 
+            // 存储形态 → 绝对路径（唯一入口）：磁盘动作只认真实路径；相对形态（曲库内文件）
+            // 在这里解回曲库根下，Mac 的绝对路径原样透传。
+            let absolutePath = LibraryRoot.absolutePath(forStoredPath: item.path)
+
             if policy.libraryOnly {
                 // 「只从曲库移除」的文件落点（2026-09-21 批 E-2）：
                 //  · 库内文件 → 移入回收区（不再留在曲库根里，对端差集才看得见这首没了）；
                 //  · 库外文件 → 旧语义逐字保留：不碰磁盘（保护用户原件/外部文件夹）。
                 let libraryRoot = environment.libraryRoot()
                 let isInLibraryRoot = DeleteReclaimArea.isInsideLibraryRoot(
-                    item.path,
+                    absolutePath,
                     libraryRoot: libraryRoot
                 )
                 if policy.fileAction == .reclaim, isInLibraryRoot {
-                    if environment.fileExists(item.path) {
+                    if environment.fileExists(absolutePath) {
                         do {
-                            try performFileAction(.reclaim, path: item.path, environment: environment)
+                            try performFileAction(.reclaim, path: absolutePath, environment: environment)
                             outcome.movedToReclaim += 1
                             environment.log("\(FileAction.reclaim.logLabel) 成功: \(item.logLabel)")
                         } catch {
@@ -324,16 +328,16 @@ enum TrackDeletionService {
                             continue
                         }
                     } else {
-                        environment.log("文件不存在(磁盘已丢): \(item.path)")
+                        environment.log("文件不存在(磁盘已丢): \(absolutePath)")
                     }
                 } else if policy.fileAction == .reclaim {
-                    environment.log("文件在曲库根之外，保持旧语义(不碰磁盘): \(item.path)")
+                    environment.log("文件在曲库根之外，保持旧语义(不碰磁盘): \(absolutePath)")
                 }
                 environment.excludeFromLibrary(item.stableId)
                 outcome.excludedFromLibrary += 1
-            } else if environment.fileExists(item.path) {
+            } else if environment.fileExists(absolutePath) {
                 do {
-                    try performFileAction(policy.fileAction, path: item.path, environment: environment)
+                    try performFileAction(policy.fileAction, path: absolutePath, environment: environment)
                     environment.log("\(policy.fileAction.logLabel) 成功: \(item.logLabel)")
                 } catch {
                     // 文件动作失败 → **曲目留在库里**（旧 iOS 实现会继续删库引用，导致曲目
@@ -348,7 +352,7 @@ enum TrackDeletionService {
                     continue
                 }
             } else {
-                environment.log("文件不存在(磁盘已丢): \(item.path)")
+                environment.log("文件不存在(磁盘已丢): \(absolutePath)")
             }
             // 走到这里：文件动作已完成 / 文件本来就不在磁盘 / 只从曲库移除 → 清 DB 引用
 
@@ -428,13 +432,14 @@ enum DeleteReclaimArea {
         root.appendingPathComponent(directoryName, isDirectory: true)
     }
 
-    /// 文件是否位于曲库根之内。判据复用清单口径 `SyncManifestGenerator.relativePath(of:baseDirectory:)`
-    /// （同一份「是否在根内 / 相对路径」实现，禁另写一份路径前缀比较）。
+    /// 文件是否位于曲库根之内。判据复用清单口径 `SyncManifestGenerator.relativePath`
+    /// （同一份「是否在根内 / 相对路径」实现，禁另写一份路径前缀比较）；
+    /// 入参接受**绝对路径或存储形态相对路径**（相对形态直接就是曲库内）。
     /// 根外（外部文件夹 / 用户原件）→ false ⇒ 调用方保持旧语义（不碰磁盘）。
     static func isInsideLibraryRoot(_ path: String, libraryRoot: URL) -> Bool {
         SyncManifestGenerator.relativePath(
-            of: URL(fileURLWithPath: path),
-            baseDirectory: libraryRoot
+            ofStoredTrackPath: path,
+            libraryRoot: libraryRoot
         ) != nil
     }
 

@@ -40,6 +40,14 @@ class ArtworkManager {
     // Mapping file URL (maps track.stableId -> artwork hash)
     @ObservationIgnored let mappingFileURL: URL
 
+    /// 改名前的旧位置（`Documents/ArtworkMapping.plist`）——**只读兼容**：
+    /// 一次性迁移器还没跑到时（或搬迁失败时）仍能读到用户既有的映射表，
+    /// 写入一律落新位置。
+    @ObservationIgnored let legacyMappingFileURL: URL?
+
+    /// 映射表文件名（唯一常量在 `LibraryRoot.artworkMappingFileName`，别处不写字面量）。
+    static let mappingFileName = LibraryRoot.artworkMappingFileName
+
     // In-memory mapping cache
     @ObservationIgnored var artworkMapping: [String: String] = [:]
 
@@ -48,9 +56,13 @@ class ArtworkManager {
 
     private init() {
         // Create artwork cache directory
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        diskCacheURL = documentsURL.appendingPathComponent("ArtworkCache", isDirectory: true)
-        mappingFileURL = documentsURL.appendingPathComponent("ArtworkMapping.plist")
+        // 2026-09-22 曲库文件夹化：封面缓存与映射索引统一收进 `Documents/Artwork/`。
+        let artworkURL = LibraryRoot.plannedDirectoryURL(LibraryRoot.artworkDirectoryName)
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(LibraryRoot.artworkDirectoryName, isDirectory: true)
+        diskCacheURL = artworkURL
+        mappingFileURL = artworkURL.appendingPathComponent(Self.mappingFileName)
+        legacyMappingFileURL = LibraryRoot.documentsRootURL()?.appendingPathComponent(Self.mappingFileName)
 
         memoryCache.countLimit = maxMemoryCacheItems
         memoryCache.totalCostLimit = maxMemoryCacheCost

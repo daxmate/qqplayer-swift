@@ -107,7 +107,8 @@ struct SyncContentHashResolver {
         )
     }
 
-    /// 路径 → 身份（`track.path` 键形态 = 绝对路径）：先精确匹配，再退标准形态。
+    /// 路径 → 身份（入参 = 曲库内绝对路径，`track.path` 的**旧**键形态）：
+    /// 按候选键依次精确匹配（存储形态优先，兼容旧行）。
     /// **不做** `getTrack(byPath:)` 的全表回落——同步线程（NW 队列）上不容忍 O(库) 扫描；
     /// 曲库清单里的路径与 `track.path` 同源（`SyncLocalLibraryScanner`），精确匹配即命中。
     func trackIdentity(atAbsolutePath path: String) throws -> (stableId: String, contentHash: String?)? {
@@ -121,10 +122,32 @@ struct SyncContentHashResolver {
         _ db: Database,
         atAbsolutePath path: String
     ) throws -> (stableId: String, contentHash: String?)? {
-        if let row = try pathIdentityRow(db, atAbsolutePath: path) { return row }
-        let standardized = DatabaseManager.standardizedPath(path)
-        if standardized != path, let row = try pathIdentityRow(db, atAbsolutePath: standardized) { return row }
+        for candidate in pathKeyCandidates(path) {
+            if let row = try pathIdentityRow(db, atAbsolutePath: candidate) { return row }
+        }
         return nil
+    }
+
+    /// 路径键候选（顺序即优先级）：**存储形态优先**，再原始入参、标准形态。
+    ///
+    /// 为什么要候选（2026-09-22 曲库文件夹化）：`track.path` 的存储形态已改成
+    /// 「相对 Music 根的相对路径」，而同步侧的输入键一直是「曲库内绝对路径」
+    /// （清单采集 / 相对路径换算而来）。同一首歌的两种拼法必须都命中，否则第一身份
+    /// 与第二身份（相对路径兜底）都会静默失配。旧行（仍是绝对路径）也照常命中。
+    private static func pathKeyCandidates(_ absolutePath: String) -> [String] {
+        var candidates: [String] = []
+        func append(_ value: String) {
+            guard !value.isEmpty, !candidates.contains(value) else { return }
+            candidates.append(value)
+        }
+        let stored = LibraryRoot.storedPath(forAbsolutePath: absolutePath)
+        append(stored)
+        append(DatabaseManager.standardizedStoredPath(stored))
+        if stored != absolutePath {
+            append(absolutePath)
+            append(DatabaseManager.standardizedPath(absolutePath))
+        }
+        return candidates
     }
 
     /// 单条路径键查询（精确匹配；标准形态回落由调用方决定，见上）。
@@ -182,10 +205,10 @@ struct SyncContentHashResolver {
     }
 
     static func distinctStableIds(_ db: Database, atAbsolutePath path: String) throws -> [String] {
-        if let ids = try distinctStableIdsRow(db, atAbsolutePath: path), !ids.isEmpty { return ids }
-        let standardized = DatabaseManager.standardizedPath(path)
-        if standardized != path, let ids = try distinctStableIdsRow(db, atAbsolutePath: standardized) {
-            return ids
+        for candidate in pathKeyCandidates(path) {
+            if let ids = try distinctStableIdsRow(db, atAbsolutePath: candidate), !ids.isEmpty {
+                return ids
+            }
         }
         return []
     }
@@ -231,14 +254,10 @@ struct SyncContentHashResolver {
         )
     }
 
-    /// 盘上绝对路径 → 曲库相对路径。换算一律走 `SyncManifestGenerator`（路径换算的
-    /// 单一事实源）——本文件不得手写路径切片。
+    /// 盘上存储路径（`track.path`）→ 曲库相对路径。换算一律走 `SyncManifestGenerator`
+    /// （路径换算的单一事实源）——本文件不得手写路径切片。
     static func relativePath(ofAbsoluteTrackPath path: String, libraryRoot: URL) -> String? {
-        guard !path.isEmpty else { return nil }
-        return SyncManifestGenerator.relativePath(
-            of: URL(fileURLWithPath: path),
-            baseDirectory: libraryRoot
-        )
+        SyncManifestGenerator.relativePath(ofStoredTrackPath: path, libraryRoot: libraryRoot)
     }
 
     // MARK: 发送侧诊断用的三态查询

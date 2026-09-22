@@ -38,9 +38,16 @@ extension LibraryIndexer {
     /// 纯字符串相同直接返回 nil（不 stat）：每文件每次扫描的额外存在性判断**至多一次**，
     /// 且只在指纹未变、需要判断 path 时才发生（P1 代价控制）。
     /// 不做 `migrateTrackForMovedFile` 之外的任何写库动作——修 path 的唯一入口链不变。
+    ///
+    /// 2026-09-22 曲库文件夹化：比较的 `currentPath` 是**存储形态**（相对曲库根），
+    /// 与 `track.path` 同形态；`track.path` 的实际存在性走 `LibraryRoot` 解回绝对 URL
+    /// （相对串直接 `fileExists` 会以 cwd 为基准，永远为假 = 全库误判「悬空」）。
     nonisolated func staleStoredPath(_ track: Track, currentPath: String) -> String? {
-        guard track.path != currentPath else { return nil }
-        guard !FileManager.default.fileExists(atPath: track.path) else { return nil }
+        let storedCurrent = LibraryRoot.storedPath(forAbsolutePath: currentPath)
+        guard track.path != storedCurrent else { return nil }
+        guard !FileManager.default.fileExists(
+            atPath: LibraryRoot.absolutePath(forStoredPath: track.path)
+        ) else { return nil }
         return track.path
     }
 
@@ -67,17 +74,20 @@ extension LibraryIndexer {
         return staleStoredPath(track, currentPath: currentPath) == nil ? .current : .resyncPathOnly
     }
 
-    /// 递归扫描目录下的音乐文件（共享实现 MusicDirectoryScanner，iOS/macOS 同一套
+    /// 扫描目录下的音乐文件（共享实现 MusicDirectoryScanner，iOS/macOS 同一套
     /// 过滤/隐藏/常规文件规则）。文件类型设置（web 版 audioExts 对齐）：扫描只收录
     /// 启用格式；默认全 9 种 = 历史行为（2026-09-03 B 组）。A0-prep 前是 LibraryIndexer
     /// 私有实现，抽取共享后行为逐条一致（含 enumerator 失败返回空、遍历错误抛出）。
     /// 分片：跨文件可见（原 private）
-    func findMusicFiles(in directory: URL) async throws -> [URL] {
+    ///
+    /// - Parameter recursive: `true`（缺省）= 递归；`false` = 单层（iOS 曲库根口径）。
+    func findMusicFiles(in directory: URL, recursive: Bool = true) async throws -> [URL] {
         let settings = DeleteSettings.load()
         let enabledExtensions = MusicDirectoryScanner.enabledExtensions(from: settings)
         return try await MusicDirectoryScanner.audioFiles(
             in: directory,
-            enabledExtensions: enabledExtensions
+            enabledExtensions: enabledExtensions,
+            recursive: recursive
         )
     }
 
@@ -110,10 +120,10 @@ extension LibraryIndexer {
             if let existingTrack {
                 switch metadataRefreshDecision(existingTrack, fingerprint: fingerprint, currentPath: fileURL.path) {
                 case .current:
-                    if existingTrack.path != fileURL.path {
+                    if existingTrack.path != LibraryRoot.storedPath(for: fileURL) {
                         // 旧 path 仍存在（同一文件的两份副本 / 尚未失效）→ 依旧跳过，
                         // 但不再是静默 DEBUG：两条 path 一起打出来（D2 打点）。
-                        AppLog.warn(.general, "⚠️ Skip scan but DB path ≠ file path: db=\(existingTrack.path) · file=\(fileURL.path)")
+                        AppLog.warn(.general, "⚠️ Skip scan but DB path ≠ file path: db=\(existingTrack.path) · file=\(LibraryRoot.storedPath(for: fileURL))")
                     } else if AppLog.isEnabled(.debug, .general) {
                         AppLog.debug(.general, "⏭️ Track metadata is current: \(fileURL.lastPathComponent)")
                     }
@@ -123,7 +133,10 @@ extension LibraryIndexer {
                     // → 只回写 path，保留其余元数据；不重解析、不删行。
                     // 修 path 仍走唯一入口链（FileCleanupManager → migrateTrackForMovedFile
                     // → migrateTrackStableIdAndPath），不另开平行入口。
-                    AppLog.warn(.general, "⚠️ Path resync only（指纹未变、入库 path 已失效）: \(existingTrack.path) -> \(fileURL.path)")
+                    // E 打点：打相对路径（整条绝对路径会刷屏，且容器前缀每台机器都不同）。
+                    AppLog.warn(.general, "⚠️ Path resync only（指纹未变、入库 path 已失效）: "
+                        + "\(LibraryRoot.relativePath(forStoredPath: existingTrack.path) ?? existingTrack.path)"
+                        + " -> \(LibraryRoot.storedPath(for: fileURL))")
                     try databaseManager.migrateTrackForMovedFile(oldStableId: existingTrack.stableId, newPath: fileURL.path)
                     return
                 case .reparse:
@@ -158,6 +171,30 @@ extension LibraryIndexer {
 
     nonisolated func generateStableId(for url: URL) throws -> String {
         DatabaseManager.generatePathStableId(forPath: url.path)
+    }
+
+    /// 按 stableId 或存储形态路径回查已入库行（扫描/导入的既有行查询）。
+    ///
+    /// 2026-09-22 曲库文件夹化：从 `LibraryIndexer.swift` 搬到这里（那个文件卡在 600 行
+    /// 预算上——路径语义相关的改动一律放本分片）。语义与搬迁前逐字一致。
+    /// `path` 入参是**绝对路径**（调用点给的 URL），比较/回写一律用**存储形态**。
+    /// 分片：跨文件可见（原 private）
+    nonisolated func existingTrack(stableId: String, path: String) throws -> Track? {
+        if let existing = try databaseManager.getTrack(byStableId: stableId) {
+            return existing
+        }
+
+        guard var existing = try databaseManager.getTrack(byPath: path) else {
+            return nil
+        }
+
+        // 存储形态（相对曲库根）与入参（绝对路径）不同形态：比较/回写一律用存储形态。
+        let storedPath = LibraryRoot.storedPath(forAbsolutePath: path)
+        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔁 Track already exists by path with old stable ID: \(existing.stableId)") }
+        try databaseManager.migrateTrackForMovedFile(oldStableId: existing.stableId, newPath: storedPath)
+        existing.stableId = stableId
+        existing.path = storedPath
+        return existing
     }
 
     /// 分片：跨文件可见（原 private）
@@ -235,7 +272,7 @@ extension LibraryIndexer {
             sampleRate: metadata.sampleRate,
             bitDepth: metadata.bitDepth,
             channels: metadata.channels,
-            path: url.path,
+            path: LibraryRoot.storedPath(for: url),
             fileSize: Int64(resourceValues.fileSize ?? 0),
             modificationDate: Self.modificationTimestamp(resourceValues.contentModificationDate),
             replaygainTrackGain: metadata.replaygainTrackGain,

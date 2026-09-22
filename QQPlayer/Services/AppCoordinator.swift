@@ -53,6 +53,25 @@ class AppCoordinator {
             _ = await SandboxMusicMigrator.shared.runIfNeeded()
         #endif
 
+        // 2026-09-22 曲库文件夹化：Documents 根下的规划类文件搬进
+        // `Music/` `Lyrics/` `Artwork/` `Logs/`，并把 DB 里仍是绝对路径的曲目行改写成
+        // 「相对 Music 根」的相对路径。**顺序在 SandboxMusicMigrator 之后、首次扫描之前**：
+        // 前者可能往 Documents 根落文件，先跑完再搬才能一并收进 Music；扫描根已是
+        // `Documents/Music`，所以必须搬完再扫（否则首启扫到空目录）。
+        // 迁移器内部在后台串行队列上做文件/DB 动作（不阻塞主线程），幂等 + 完成门 +
+        // 失败不删原件；`--library-layout-dry-run` 启动参数可先看清单再放手。
+        // **仅 iOS**：这是 iOS 沙盒语义（曲库根 = `<Documents>/Music`）；macOS 曲库在
+        // `~/Music/QQPlayer`，跑迁移器只会去动用户的 `~/Documents` ⇒ 迁移器与计划器
+        // 都是 iOS-only（`// target: ios-only`），这里同样按平台收口。
+        #if os(iOS)
+            let layoutSummary = await Self.runLibraryLayoutMigration()
+            if layoutSummary.alreadyCompleted {
+                AppLog.info(.general, "📦 LibraryLayout: 已完成过（完成门置位，本轮跳过）")
+            } else {
+                AppLog.info(.general, "📦 LibraryLayout: \(layoutSummary.logLine)")
+            }
+        #endif
+
         // Check if we should auto-scan based on last scan date
         var settings = DeleteSettings.load()
         AppLog.info(.general, "📅 Current lastLibraryScanDate: \(settings.lastLibraryScanDate?.description ?? "nil")")
@@ -79,6 +98,18 @@ class AppCoordinator {
 
         isInitialized = true
     }
+
+    #if os(iOS)
+        /// 跑一轮曲库文件夹化迁移，等它跑完（动作本身在迁移器的后台串行队列上）。
+        /// iOS-only：见 `initialize()` 里那段注释。
+        private static func runLibraryLayoutMigration() async -> LibraryLayoutMigrator.Summary {
+            await withCheckedContinuation { continuation in
+                LibraryLayoutMigrator.shared.runInBackground { summary in
+                    continuation.resume(returning: summary)
+                }
+            }
+        }
+    #endif
 
     private func shouldPerformAutoScan(lastScanDate: Date?) -> Bool {
         // If never scanned before, definitely scan

@@ -58,7 +58,8 @@
 
         private func performLoadTrack(_ track: Track, preservePlaybackTime: Bool, generation: UInt64) async -> Bool {
             // Determine actual format from file extension
-            let url = URL(fileURLWithPath: track.path)
+            // 路径解析唯一入口：track.path 存存储形态（相对 Music 根），此处解回绝对 URL。
+            let url = LibraryRoot.absoluteURL(forStoredPath: track.path)
             let formatInfo = PlaybackRouter.getFormatInfo(for: url)
             AppLog.info(.general, "📀 loadTrack called for: \(track.title) (format: \(formatInfo.format))")
 
@@ -125,8 +126,8 @@
                     currentSecurityScopedURL = url
                     AppLog.info(.general, "🔐 Started accessing security-scoped resource for external file")
                 } else {
-                    // No bookmark - use path from database
-                    url = URL(fileURLWithPath: track.path)
+                    // No bookmark - use path from database（存储形态 → 绝对 URL，唯一入口）
+                    url = LibraryRoot.absoluteURL(forStoredPath: track.path)
                 }
 
                 guard isCurrentLoad(generation) else { return false }
@@ -138,11 +139,16 @@
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     // D3 打点：失败分支不再只有 fileNotFound —— 把库内 path 原文、当前
                     // Documents 前缀与存在性结果一起落盘，重装类问题好一眼定位。
-                    let documentsPrefix = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? "(nil)"
+                    // 2026-09-22 曲库文件夹化：打点补全**绝对 URL + 相对路径 + 曲库根**
+                    // 三者（只有一条绝对路径时看不出问题是「换容器」还是「相对路径解错」）。
+                    let musicRoot = LibraryRoot.musicRootURL().path
+                    let relative = LibraryRoot.relativePath(forStoredPath: track.path) ?? "(曲库根外)"
                     AppLog.error(.general, "❌ Playback file not found: track.path=\(track.path)"
+                        + " · relative=\(relative)"
+                        + " · absolute=\(url.path)"
+                        + " · libraryRoot=\(musicRoot)"
                         + " · resolved=\(url.path)"
-                        + " · documents=\(documentsPrefix)"
-                        + " · existsAtTrackPath=\(FileManager.default.fileExists(atPath: track.path))")
+                        + " · existsAtTrackPath=\(FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path)))")
                     throw PlayerError.fileNotFound
                 }
 
@@ -292,7 +298,7 @@
                     // 用户可见错误（2026-09-12 审计 P8）：原来只 print，playTrack 拿到 false
                     // 直接 return → 用户侧只有“点了不播”。
                     reportPlaybackFailure(
-                        PlaybackFailureMessage.messageKey(pathExtension: URL(fileURLWithPath: track.path).pathExtension).localized
+                        PlaybackFailureMessage.messageKey(pathExtension: LibraryRoot.absoluteURL(forStoredPath: track.path).pathExtension).localized
                     )
                 }
                 return false

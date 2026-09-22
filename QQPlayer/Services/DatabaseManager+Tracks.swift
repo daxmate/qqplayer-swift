@@ -51,7 +51,9 @@ extension DatabaseManager {
             // Compare on the standardized path, matching getTrack(byPath:)'s
             // normalized fallback so iCloud container UUID changes cannot
             // hide duplicates (audit: inconsistent path spelling).
-            let normalizedPath = Self.standardizedPath(trackToSave.path)
+            // 2026-09-22：track.path 已成「存储形态」（iOS = 相对 Music 根）——
+            // 标准化走 standardizedStoredPath（相对路径不得走 fileURL 标准化）。
+            let normalizedPath = Self.standardizedStoredPath(trackToSave.path)
             let duplicates = try Track.filter(Column("path") == normalizedPath && Column("stable_id") != trackToSave.stableId).fetchAll(db)
             if !duplicates.isEmpty {
                 AppLog.warn(.db, "⚠️ Found \(duplicates.count) duplicate(s) for path: \(normalizedPath)")
@@ -131,7 +133,7 @@ extension DatabaseManager {
     ///   3. short write transaction: merge references + delete confirmed stales
     private func cleanupStaleUnplayableDuplicates(matching newTrack: Track) throws {
         guard hasReliableDuplicateMetadata(newTrack),
-              FileManager.default.fileExists(atPath: newTrack.path) else {
+              FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: newTrack.path)) else {
             return
         }
 
@@ -150,8 +152,8 @@ extension DatabaseManager {
         // Phase 2: file-existence + metadata checks, no database handle held.
         let staleCandidates = candidates.compactMap { stale -> (stableId: String, title: String)? in
             guard stale.stableId != newTrack.stableId,
-                  !FileManager.default.fileExists(atPath: stale.path),
-                  FileManager.default.fileExists(atPath: newTrack.path),
+                  !FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: stale.path)),
+                  FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: newTrack.path)),
                   hasReliableDuplicateMetadata(stale),
                   hasReliableDuplicateMetadata(newTrack),
                   stale.artistId == newTrack.artistId,
@@ -160,8 +162,8 @@ extension DatabaseManager {
                 return nil
             }
 
-            let staleFilename = URL(fileURLWithPath: stale.path).lastPathComponent.lowercased()
-            let keeperFilename = URL(fileURLWithPath: newTrack.path).lastPathComponent.lowercased()
+            let staleFilename = LibraryRoot.absoluteURL(forStoredPath: stale.path).lastPathComponent.lowercased()
+            let keeperFilename = LibraryRoot.absoluteURL(forStoredPath: newTrack.path).lastPathComponent.lowercased()
             guard staleFilename == keeperFilename,
                   normalizedDuplicateTitle(stale.title) == normalizedDuplicateTitle(newTrack.title) else {
                 return nil
@@ -235,35 +237,47 @@ extension DatabaseManager {
 
     /// 文件移动（路径变更）后的身份迁移——**唯一入口**（审计 D5）。
     ///
-    /// `stable_id == SHA256(标准化 path)` 是不变量：凡路径变更，stableId 必须由新路径
+    /// `stable_id == SHA256(存储形态身份路径)` 是不变量：凡路径变更，stableId 必须由新路径
     /// 重算并走同一迁移入口（否则行内身份与实际路径错位，改名迁移/去重/内容指纹对账
-    /// 全基于旧 id 追踪）。调用方只管说「这行搬到哪个新路径了」。
+    /// 全基于旧 id 追踪）。调用方只管说「这行搬到哪个新路径了」——入参**绝对或存储形态
+    /// 都接受**（`LibraryRoot.storedPath` 幂等地归一化），存储形态仍写相对路径。
     ///
     /// - Returns: 新 stableId；旧 id 不在库中时返回 nil（无事发生，幂等）。
     @discardableResult
     func migrateTrackForMovedFile(oldStableId: String, newPath: String) throws -> String? {
-        let newStableId = Self.generatePathStableId(forPath: newPath)
+        let storedPath = LibraryRoot.storedPath(forAbsolutePath: newPath)
+        let newStableId = Self.generatePathStableId(forPath: storedPath)
         guard try getTrack(byStableId: oldStableId) != nil else { return nil }
-        try migrateTrackStableIdAndPath(oldStableId: oldStableId, newStableId: newStableId, newPath: newPath)
+        try migrateTrackStableIdAndPath(oldStableId: oldStableId, newStableId: newStableId, newPath: storedPath)
         return newStableId
     }
 
     func getTrack(byPath path: String) throws -> Track? {
-        let standardizedPath = Self.standardizedPath(path)
+        // 入参可能是绝对路径（扫描 / 调用方给的 URL）或存储形态；一律先归一化到存储形态。
+        let stored = LibraryRoot.storedPath(forAbsolutePath: path)
+        let normalizedStored = Self.standardizedStoredPath(stored)
         return try read { db in
-            if let exact = try Track.filter(Column("path") == path).fetchOne(db) {
+            if let exact = try Track.filter(Column("path") == stored).fetchOne(db) {
                 return exact
             }
 
-            if standardizedPath != path,
-               let standardized = try Track.filter(Column("path") == standardizedPath).fetchOne(db) {
+            if normalizedStored != stored,
+               let standardized = try Track.filter(Column("path") == normalizedStored).fetchOne(db) {
                 return standardized
+            }
+
+            // 兼容：旧行仍是绝对路径（或入参本就与库内拼法不同）→ 原样再试一次。
+            if stored != path, let legacy = try Track.filter(Column("path") == path).fetchOne(db) {
+                return legacy
             }
 
             // Preserve compatibility for older rows whose stored URL spelling
             // differs from Foundation's standardized path representation.
+            // （旧行比对也先归一化存储形态：重装换容器 UUID 的那批行靠这一步命中。）
             let tracks = try Track.fetchAll(db)
-            return tracks.first { Self.standardizedPath($0.path) == standardizedPath }
+            return tracks.first {
+                Self.standardizedStoredPath(LibraryRoot.storedPath(forAbsolutePath: $0.path)) == normalizedStored
+            }
         }
     }
 

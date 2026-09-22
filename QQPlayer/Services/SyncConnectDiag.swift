@@ -77,8 +77,9 @@ enum SyncConnectDiag {
         /// 落点解析（唯一出口）。
         static func logFileURL() -> URL? {
             if let logFileURLOverride { return logFileURLOverride }
-            return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-                .first?.appendingPathComponent("sync-diag.log")
+            // 2026-09-22 曲库文件夹化：诊断日志统一落 `Documents/Logs/`。
+            return LibraryRoot.plannedDirectoryURL(LibraryRoot.logsDirectoryName)?
+                .appendingPathComponent("sync-diag.log")
         }
 
         /// 环形截断 + 追加（同步实现：`log()` 在诊断队列上调用它）。
