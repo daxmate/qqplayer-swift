@@ -416,9 +416,9 @@
 /* Astuces contextuelles (bulles de première utilisation) */
 "hint_dismiss" = "Fermer";
 "hint_playback_title" = "Gestes de la page de lecture";
-"hint_playback_line1" = "Touchez ou balayez vers la gauche les mini-paroles pour ouvrir les paroles plein écran";
-"hint_playback_line2" = "Balayez vers la droite les mini-paroles pour rechercher / définir les paroles manuellement";
-"hint_playback_line3" = "Tirez vers le bas sur la pochette pour fermer le lecteur";
+"hint_playback_line1" = "Touchez les mini-paroles ou balayez vers la gauche n'importe où : paroles en plein écran";
+"hint_playback_line2" = "Balayez vers la droite n'importe où : rechercher / définir les paroles manuellement";
+"hint_playback_line3" = "Balayez vers le haut : plus de commandes. Vers le bas : les masquer / fermer le lecteur";
 "hint_full_lyrics_title" = "Paroles plein écran";
 "hint_full_lyrics_line1" = "Double-touchez n'importe où pour lancer le karaoké (vitesse / boucle AB / boucle sur une ligne)";
 "hint_full_lyrics_line2" = "Balayez vers la droite pour revenir au lecteur";
