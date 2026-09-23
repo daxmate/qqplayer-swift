@@ -90,7 +90,16 @@ class AppCoordinator {
         // Check if we should auto-scan based on last scan date
         var settings = DeleteSettings.load()
         AppLog.info(.general, "📅 Current lastLibraryScanDate: \(settings.lastLibraryScanDate?.description ?? "nil")")
-        let shouldAutoScan = shouldPerformAutoScan(lastScanDate: settings.lastLibraryScanDate)
+        // 2026-09-23（Task D）：决策收口到 `LibraryScanGate`（纯函数 + 单测锁定），并加上
+        // 「**曲库为空 ⇒ 无条件扫**」——重装/重编译后 `lastLibraryScanDate` 仍落在 1 小时节流窗口内
+        // （它存在数据容器 Preferences，覆盖安装不会清），而库可能已经是空的 ⇒ 打开一直 0 首。
+        let scanDecision = LibraryScanGate.decision(
+            lastScanDate: settings.lastLibraryScanDate,
+            trackCount: libraryTrackCountForScanDecision(),
+            now: Date()
+        )
+        logScanDecision(scanDecision)
+        let shouldAutoScan = scanDecision.shouldScan
 
         if shouldAutoScan {
             AppLog.info(.general, "🔄 App launched after long time - starting automatic library scan")
@@ -135,25 +144,16 @@ class AppCoordinator {
         }
     #endif
 
-    private func shouldPerformAutoScan(lastScanDate: Date?) -> Bool {
-        // If never scanned before, definitely scan
-        guard let lastScanDate = lastScanDate else {
-            AppLog.info(.general, "🆕 Never scanned before - will perform scan")
-            return true
-        }
+    /// 曲库行数（`track` 计数）——**决策输入的唯一取数点**。
+    /// 读失败返回 `LibraryScanGate.unknownTrackCount`（哨兵）而**不是** `0`：把「读不到」
+    /// 当「空库」会让决策退化成每次启动/回前台强制全量扫（口径见 `LibraryScanGate` 文件头）。
+    private func libraryTrackCountForScanDecision() -> Int {
+        (try? databaseManager.getTrackCount()) ?? LibraryScanGate.unknownTrackCount
+    }
 
-        // Check if it's been more than 1 hour since last scan
-        // This prevents scanning when app was just backgrounded/resumed
-        let hoursSinceLastScan = Date().timeIntervalSince(lastScanDate) / 3600
-        let shouldScan = hoursSinceLastScan >= 1.0
-
-        if shouldScan {
-            AppLog.info(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - will scan")
-        } else {
-            AppLog.warn(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - skipping")
-        }
-
-        return shouldScan
+    /// 决策文案落日志（文案/级别来自 `LibraryScanGate`，本函数不另写条件）。
+    private func logScanDecision(_ decision: LibraryScanGate.Decision) {
+        LibraryScanGate.log(decision)
     }
 
     private func startLibraryIndexing() async {

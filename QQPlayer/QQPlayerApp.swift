@@ -267,9 +267,17 @@ struct QQPlayerApp: App {
             await LibraryIndexer.shared.copyFilesFromSharedContainer()
 
             // Only auto-scan if it's been a long time since last scan
+            // 2026-09-23（Task D）：决策收口到 `LibraryScanGate`（与 `AppCoordinator.initialize`
+            // 同一实现、同一文案）——「曲库为空 ⇒ 无条件扫」在这里同样生效（回前台也补扫）。
             if !LibraryIndexer.shared.isIndexing {
                 let settings = DeleteSettings.load()
-                if shouldPerformAutoScan(lastScanDate: settings.lastLibraryScanDate) {
+                let decision = LibraryScanGate.decision(
+                    lastScanDate: settings.lastLibraryScanDate,
+                    trackCount: libraryTrackCountForScanDecision(),
+                    now: Date()
+                )
+                LibraryScanGate.log(decision)
+                if decision.shouldScan {
                     AppLog.info(.general, "🔄 Foreground: Starting library scan (been a while since last scan)")
                     LibraryIndexer.shared.start()
                 } else {
@@ -279,24 +287,10 @@ struct QQPlayerApp: App {
         }
     }
 
-    private func shouldPerformAutoScan(lastScanDate: Date?) -> Bool {
-        // If never scanned before, definitely scan
-        guard let lastScanDate = lastScanDate else {
-            AppLog.info(.general, "🆕 Never scanned before - will perform scan")
-            return true
-        }
-
-        // Check if it's been more than 1 hour since last scan
-        let hoursSinceLastScan = Date().timeIntervalSince(lastScanDate) / 3600
-        let shouldScan = hoursSinceLastScan >= 1.0
-
-        if shouldScan {
-            AppLog.info(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - will scan")
-        } else {
-            AppLog.warn(.general, "⏰ Last scan was \(String(format: "%.1f", hoursSinceLastScan)) hours ago - skipping")
-        }
-
-        return shouldScan
+    /// 曲库行数（`track` 计数）——决策输入的唯一取数点；读失败返回哨兵
+    /// `LibraryScanGate.unknownTrackCount`（**不**折成 0，避免把「读不到」当「空库」）。
+    private func libraryTrackCountForScanDecision() -> Int {
+        (try? DatabaseManager.shared.getTrackCount()) ?? LibraryScanGate.unknownTrackCount
     }
 
     private func handleWillResignActive() {
