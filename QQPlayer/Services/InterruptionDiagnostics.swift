@@ -2,15 +2,21 @@ import Foundation
 
 /// 中断恢复诊断日志（2026-08-30 加，定位"跑步中断后从头播放"间歇 bug）。
 ///
-/// 把中断决策链路的关键状态追加写入 `Documents/intr-debug.log`（环形：
-/// 超过上限截断保留尾部），下次真机复现后直接读沙盒文件即可拿到完整
-/// 证据链，不需要实时抓 console。
+/// 把中断决策链路的关键状态追加写入环形文件 `intr-debug.log`（超 200KB 截断
+/// 保留尾部 50KB），下次真机复现后直接读沙盒文件即可拿到完整证据链，不需要
+/// 实时抓 console。落点 = `LibraryRoot.logsDirectoryURL()`（iOS 容器
+/// `.qqplayer/logs/`；macOS `Documents/Logs/`；2026-09-22 曲库文件夹化后收进
+/// `Logs/` 子目录）。
 ///
-/// ⚙️ 默认**不写盘**（2026-09-12 审计 P6）：它曾经在 5 处生产路径同步写盘
-/// （中断 began/ended、恢复快照、PLAY FROM BEGINNING、currentTime fallback），
-/// 即主线程同步 IO + 把播放位置落盘到用户可见沙盒目录。诊断能力不丢：
-///   - 调用点的 `print()` 一直保留（控制台可见，真机抓 console 即可）；
-///   - 需要落盘时用环境变量打开（Xcode Scheme → Run → Arguments →
+/// ⚙️ 默认**不写盘**（2026-09-12 审计 P6）：写盘 = 主线程同步 IO + 把播放位置
+/// 落进沙盒目录，故 `isEnabled` 为 false 时 5 处调用点完全不做文件 IO
+/// （`PlayerEngine+AudioSessionEvents` 的 .began / .ended decision / resume 快照、
+/// `PlayerEngine+AudioScheduling` 的 currentTime fallback、
+/// `PlayerEngine+PlaybackControl+Transport` 的 PLAY FROM BEGINNING）。诊断能力不丢：
+///   - 同一行诊断在调用点同时走 `AppLog`（`.general`，info/warn）——AppLog 是
+///     本仓唯一结构化日志出口（os.Logger + 轮转文件 `app.log`），真机取证用它，
+///     **调用点已无 `print()`**（2026-09-20 日志治理批把播放链路 print 全量迁到 AppLog）；
+///   - 需要 `intr-debug.log` 落盘时用环境变量打开（Xcode Scheme → Run → Arguments →
 ///     Environment Variables 加 `QQPLAYER_INTERRUPTION_DIAGNOSTICS=1`）。
 enum InterruptionDiagnostics {
     /// 写盘开关的环境变量名（值必须为 "1"）。
