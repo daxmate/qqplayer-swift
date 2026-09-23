@@ -75,7 +75,7 @@
 | v1（文件夹化） | 把 Documents 根**规划类**文件搬进 `Documents/{Music,Lyrics,Artwork,Logs}`，并改写 `track.path` 为相对 Music 根 | `QQPlayer/Services/LibraryLayoutMigrationPlan.swift`（规则）、`QQPlayer/Services/LibraryLayoutMigrator.swift:138-142`（建规划目录） | `LibraryLayoutMigrationTests.swift:199`（扫描单层）、`:299`（根音频搬进 Music + DB 行改相对）、`:332`（规划目录 + 旧目录内容搬入）、`:372`（幂等）、`:403`（同名不覆盖）、`:427`（失败不中断） |
 | v2/v2.1（只留 `Music/` 可见） | `Documents/` 下除 `Music/` 以外的一切收进 `.qqplayer/`；**只搬不删**、冲突**不覆盖**（目录递归合并、同名项改名后缀 `<name>.legacy-<yyyyMMdd-HHmmss>` 搬入、空壳目录搬进 `trash/`）；**不改 `track.path`** | 纯逻辑 `QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift`（映射表 + 冲突改名规则）、执行器 `QQPlayer/Services/LibraryLayoutMigrationV2Migrator.swift` | `LibraryHiddenLayoutMigrationTests.swift:153`（Music/隐藏根/`.sync-incoming` 保留原位）、`:174`（搬进隐藏根、根只剩 Music）、`:229`（幂等）、`:257`（冲突不覆盖：同名文件改名搬入）、`:288`（目录冲突递归合并、空壳搬进回收区）、`:326`（启动期已建同名日志文件 ⇒ 改名搬入）、`:467`（失败不中断）、`:540`（被 DB 绝对路径引用的根条目跳过不搬） |
 | 完成门 | v2.1 门 key `library.layoutMigrationV2_1Completed.v1`；**仅当「根上已无可搬条目且失败 = 0」才置位**，否则下次启动重试；旧门 key `…V2Completed.v1` **刻意不再读取** | `LibraryLayoutMigrationV2Migrator.swift:75-95`（门 key 常量 + 语义注释）、下同 | `LibraryHiddenLayoutMigrationTests.swift:362`（有残留不置位 / 无残留才置位）、`:522`（成功才置位；置位后跳过） |
-| 启动时机 | 生产顺序写死两轮：① `runStartupPrepass()`（`LibraryLayoutMigrationV2Migrator.swift:143`）在 `QQPlayerApp.didFinishLaunching` **首句、同步**跑（`QQPlayer/QQPlayerApp.swift:35`，不置门）② `runInBackground()`（`AppCoordinator.swift:138-140`，v1 之后）收尾并置门 | `LibraryLayoutMigrationV2Migrator.swift:36-45`（不变量注释） | ✗ 无守护（顺序靠注释固化） |
+| 启动时机 | 生产顺序写死两轮：① `runStartupPrepass()`（`LibraryLayoutMigrationV2Migrator.swift:143`）在 `QQPlayerApp.didFinishLaunching` **首句、同步**跑（`QQPlayer/QQPlayerApp.swift:35`，不置门）② `runInBackground()`（`AppCoordinator.swift:138-140`，v1 之后）收尾并置门 | `LibraryLayoutMigrationV2Migrator.swift:36-45`（不变量注释） | `QQPlayerTests/StartupOrderContractTests.swift:296`（套件）→ `:298`「不变量①：`didFinishLaunching` 首条可执行语句 = `runStartupPrepass()`」、`:315`「不变量②：v2 收尾在 v1 之后」；自证（坏序必须红）`:332`、`:375`、`:392` |
 | 干跑 | `run(dryRun: true)` 或启动参数 `--hidden-layout-dry-run`：只统计不搬、不置门 | `LibraryLayoutMigrationV2Migrator.swift:80-86` | `LibraryHiddenLayoutMigrationTests.swift:394`、`:500` |
 | DB 引用保守例外 | DB 绝对存储路径指向某待搬根条目 ⇒ **跳过该条目不搬**（宁可留根上也不让引用悬空）；不计入残留、不阻塞置门 | `LibraryLayoutMigrationV2Migrator.swift:24-27` | `LibraryHiddenLayoutMigrationTests.swift:540` |
 
@@ -130,18 +130,26 @@
 | 项 | 内容 |
 | --- | --- |
 | 规则 | 删行**唯一授权点** = `FileCleanupManager.reconcileMissingFiles(in:)`，两条前提缺一不可：① 该行解析出的绝对 URL 落在**本轮成功枚举过的根**内（根不可用 ≠ 空库）；② 时机在**主扫之后**（那时主扫已按 stableId 修好重装后的悬空 path，剩下的「不存在」才是真删除）。`roots` 为空 ⇒ 早退，一条不删 |
-| 源文件 | `QQPlayer/Services/FileCleanupManager.swift:36-50`（授权点口径 + `guard !roots.isEmpty else { return }`）、`:51-90`（两类移除：文件真没了 → 全量删除；格式被取消收录 → 只移除曲目行、文件与用户数据保留）；调用点 `LibraryIndexer+Scanning.swift:161`（iOS）、`:309`（macOS） |
+| 源文件 | `QQPlayer/Services/FileCleanupManager.swift:44-61`（授权点口径 + `guard !roots.isEmpty else { return }`）、`:62-113`（两类移除：文件真没了 → 全量删除；格式被取消收录 → 只移除曲目行、文件与用户数据保留）；调用点 `LibraryIndexer+Scanning.swift:161`（iOS）、`:309`（macOS） |
 | 守护 | `QQPlayerTests/FileCleanupManagerTests.swift:156`（套件）→ `:161`「空 successfullyScannedRoots → 直接返回，一条不删」、`:177`「文件不存在 → deleteTrack（含收藏/歌单/历史）」、`:203`「文件在但扩展名未收录 → 只移除曲目行」、`:232`「根枚举失败但库里有该根曲目 → 不删」、`:253`「混合：恰删 1、移除 1、保留 1」 |
 
 ### 3.5 后置孤儿清扫「不得删曲库内行」+ 重装自愈（回归契约）
 
 | 规则 | 源文件 | 守护 |
 | --- | --- | --- |
-| **曲库内行**删不删只由 3.4 判；后置维护（`FileCleanupManager.checkForOrphanedFiles`，`FileCleanupManager.swift:127`）**没有扫描上下文**，**不得**因「入库 path 解出来不存在」删曲库内行 | 触发链 `QQPlayer/Services/AppCoordinator+iCloud.swift:15`（`onIndexingCompleted`，由 `isIndexingPublisher` sink 触发，`CurrentValueSubject` **订阅即送 false** ⇒ 跳过主扫的启动 15s 后照样跑；形态见 `ReinstallLibraryPurgeTests.swift:11-25`） | `QQPlayerTests/ReinstallLibraryPurgeTests.swift:365`「后置孤儿清扫：曲库内行不得被判删除」→ `:370`「B-1：跳过主扫的启动里，后置清扫不得删任何曲库内行（含引用四表）」、`:419`「B-2：曲库外文件不可达仍清」 |
-| 重装（数据容器 UUID 变化）后**修 path、不删行**：走唯一入口链（`LibraryIndexer` 判定 → `migrateTrackForMovedFile` → `migrateTrackStableIdAndPath`），不新开平行入口 | `DocumentsDerivedPathGuardTests.swift:160`（该链的注入根闭合）；旧容器前缀归一化 `LibraryRoot.swift:449-486` | `ReinstallLibraryPurgeTests.swift:210`「重装后悬空 path：修 path 不删行」→ `:215`「A-1」、`:258`「A-2：旧容器 Documents 根形态 ⇒ 判定 resyncPathOnly 并按 stableId 修 path（不删行）」、`:322`「A-3：主扫入口 indexFile 对悬空行只修 path、不删行（端到端）」 |
-| 扫描尾部调和**只**删「本轮枚举过的根」里真的没了的行；根外/其它根的悬空行原样保留；主扫自愈之后才判「文件不存在」 | 同上（3.4） | `ReinstallLibraryPurgeTests.swift:447`「扫描尾部调和：只删「本轮枚举过的根」里真的没了的行」→ `:451`「C-1」、`:496`「C-2：主扫自愈之后才判」、`:538`「C-3：roots 为空 → 早退，一条不删」 |
+| **曲库内行**删不删只由 3.4 判；后置维护（`FileCleanupManager.checkForOrphanedFiles`，`FileCleanupManager.swift:139`）**没有扫描上下文**，**不得**因「入库 path 解出来不存在」删曲库内行 | 触发链 `QQPlayer/Services/AppCoordinator+iCloud.swift:15`（`onIndexingCompleted`，由 `isIndexingPublisher` sink 触发，`CurrentValueSubject` **订阅即送 false** ⇒ 跳过主扫的启动 15s 后照样跑；形态见 `ReinstallLibraryPurgeTests.swift:11-25`） | `QQPlayerTests/ReinstallLibraryPurgeTests.swift:400`「后置孤儿清扫：曲库内行不得被判删除」→ `:407`「B-1：跳过主扫的启动里，后置清扫不得删任何曲库内行（含引用四表）」、`:456`「B-2：曲库外文件不可达仍清」、`:484`「B-3：改名后行保留且 path 不写回」、`:530`「B-4：书签读不出来 ⇒ 保守保留」（B-3/B-4 语义见 §3.6） |
+| 重装（数据容器 UUID 变化）后**修 path、不删行**：走唯一入口链（`LibraryIndexer` 判定 → `migrateTrackForMovedFile` → `migrateTrackStableIdAndPath`），不新开平行入口 | `DocumentsDerivedPathGuardTests.swift:160`（该链的注入根闭合）；旧容器前缀归一化 `LibraryRoot.swift:449-486` | `ReinstallLibraryPurgeTests.swift:247`「重装后悬空 path：修 path 不删行」→ `:252`「A-1」、`:295`「A-2：旧容器 Documents 根形态 ⇒ 判定 resyncPathOnly 并按 stableId 修 path（不删行）」、`:359`「A-3：主扫入口 indexFile 对悬空行只修 path、不删行（端到端）」 |
+| 扫描尾部调和**只**删「本轮枚举过的根」里真的没了的行；根外/其它根的悬空行原样保留；主扫自愈之后才判「文件不存在」 | 同上（3.4） | `ReinstallLibraryPurgeTests.swift:569`「扫描尾部调和：只删「本轮枚举过的根」里真的没了的行」→ `:573`「C-1」、`:618`「C-2：主扫自愈之后才判」、`:660`「C-3：roots 为空 → 早退，一条不删」 |
 
 **真机事故档案**（本节的来源）：2026-09-23 00:43Z 一次启动，App Group 容器里 `qqplayer.db` 的 `track` 225 → 0、`play_history` 882 → 2、`favorite` 1 → 0、`playlist_item` 443 → 0。两条成因形态都在 `ReinstallLibraryPurgeTests.swift:9-31` 里钉死（① 已修 `6dcab50`；② 本节的 `checkForOrphanedFiles` 洞）。
+
+### 3.6 曲库外文件的可达性判据（2026-09-23 定稿）
+
+| 项 | 内容 |
+| --- | --- |
+| 规则 | 曲库外行（`track.path` 为绝对路径、`LibraryRoot.isExternalPath == true`）的**存活判据** = ① 存储 path 解析出的绝对地址可访问（存在 + 属性可读），**或** ② 书签可解析（`resolveDocumentPickerBookmark`）且解析出的新位置探测可访问（security-scoped 打开成功 + 能读到 ≥1 字节）。命中任一条 ⇒ **行保留**。<br>**改名（原 path 不可达、书签指向新位置且可访问）⇒ 行保留，且存储 path 保持旧值、不写回**——本入口没有扫描上下文，不做自愈；path 修写的唯一入口链是 `migrateTrackForMovedFile`（§3.5）。<br>书签**缺失**（无书签文件 / plist 里没有该 stableId 条目）⇒ **删行**（既有语义；macOS 曲库 = `~/Music/QQPlayer` 判为曲库外，同样适用）；书签**读不出来**（plist 在但解析失败 = `unreadable`）⇒ **保守保留**（D2：`unknown` ≠ `missing`，未知一律不删）。 |
+| 源文件 | `QQPlayer/Services/FileCleanupManager.swift:139`（`checkForOrphanedFiles`，后置清扫入口）、`:227`（`checkExternalFileAccessibility`：先原 path、再书签）、`:248-253`（`BookmarkResolution` 三态 `resolved` / `missing` / `unknown`）、`:254`（`checkBookmarkAccessibility`：`unknown` ⇒ 返回可访问 = 保留）、`:286`（`resolveDocumentPickerBookmark`；书签唯一入口 `ExternalFileBookmarkStore`）、`:326`（`testFileAccessibility`：security-scoped 探测 + 读 1KB）；曲库内/外判据 `LibraryRoot.swift:429-447`（`isExternalPath`）；书签链的测试注入缝 `FileCleanupManager.swift:23`/`:28`（`bookmarkStore`，默认 `nil` ⇒ 生产 `ExternalFileBookmarkStore.default`，行为逐字节不变） |
+| 守护 | `QQPlayerTests/ReinstallLibraryPurgeTests.swift:484`「B-3：曲库外文件改名后书签解析到新位置且可访问 ⇒ 行保留、存储 path 逐字不变」、`:530`「B-4：书签读不出来（unreadable）⇒ 曲库外行保守保留（D2）」；「无书签/不可达 ⇒ 删行」由 `:456`「B-2」守护，**不另建第二实现** |
 
 ---
 
@@ -176,7 +184,7 @@
 | --- | --- |
 | 规则 | `…/Containers/Data/Application/<容器 ID>/Documents/<rest>` → `<现 Documents>/<rest>`；**保守判据**（防误伤）三条件同时满足才归一化：① 含 `/Containers/Data/Application/`；② 紧跟容器 ID 的那一层**就是** `Documents`；③ 不在现 Documents 之下。非数据容器绝对路径原样返回（**不**动 `/tmp/xxx/Documents/…`、也不动 App Group 共享容器） |
 | 源文件 | `LibraryRoot.swift:449-486`（`rebasedFromLegacyContainer`，含误伤两类的说明） |
-| 守护 | `LibraryLayoutMigrationTests.swift:139`「旧数据容器前缀归一化：换 UUID 的旧路径解回现容器」；`ReinstallLibraryPurgeTests.swift:258`（A-2 端到端用它） |
+| 守护 | `LibraryLayoutMigrationTests.swift:139`「旧数据容器前缀归一化：换 UUID 的旧路径解回现容器」；`ReinstallLibraryPurgeTests.swift:295`（A-2 端到端用它） |
 
 ---
 
@@ -191,6 +199,7 @@
 | 扫描决策（新增一态 / 改节流 / 改平台边界） | `LibraryScanGate.Decision`（穷尽五态）+ `logEntry` 文案 + `shouldScan`；两处调用点只调 `decision`/`log` | `LibraryScanGateTests.swift:196`（穷尽五态）、`:214`（新文案）、`:239`（平台边界） |
 | 调和语义（`roots` 判据 / 删除授权） | `FileCleanupManager.reconcileMissingFiles` 的两条前提；后置清扫不得获得曲库内删除权 | `FileCleanupManagerTests.swift:161`、`:232`；`ReinstallLibraryPurgeTests.swift:370`、`:538` |
 | 删除落点 / 回收区路径 | `DeleteReclaimArea` 仍是唯一持有 `".Trash"` 字面量的生产文件（白名单） | `TrackDeletionReclaimAreaTests.swift:470`、`:491` |
+| 启动顺序（v2 预处理必须早于组件建目录 / v1 → v2 次序） | `QQPlayerApp.didFinishLaunchingWithOptions` 的首条可执行语句、`AppCoordinator.initialize()` 里 v1 → v2 调用次序；同时改本契约 §1.6「启动时机」行 | `StartupOrderContractTests.swift:298`、`:315`（红了 = 顺序被改） |
 | 迁移规则（冲突处理 / 改名后缀 / 完成门 key） | `LibraryLayoutMigrationV2Plan` 的规则函数 + 执行器账目（`Summary`） | `LibraryHiddenLayoutMigrationTests.swift:257`、`:288`、`:362`、`:467` |
 | 新增 `.swift` 文件 / 新测试文件 | 仓库门禁：`scripts/check-target-membership.py`（target 全量成员）、`scripts/add-test-file.py`（登记测试 target）、`scripts/check-structural-budget.sh`（结构预算） | 见 §7 验证命令（本地自跑；CI 同样跑） |
 
@@ -200,8 +209,8 @@
 
 1. **在途分支的「旧位置写入」改动不算契约**：`fix/legacy-write-paths`（`7ffe1ad`）尚未入库。本文件 §4 只描述 `origin/main` 现状；该分支若合入，§4 必须重写。
 2. **macOS 布局无专属契约**：本文件对 macOS 只写「透传 + 现状」（`LibraryRoot.swift:28-29`、`:100-108`、`:143`、`:110-139`）。macOS 曲库根 = `~/Music/QQPlayer`（`MusicFolderResolver.macDefaultFolderURL`）+ 用户添加的外部文件夹 ⇒ 与 iOS 隐藏布局不同构，**不承诺跨平台同构**。
-3. **v2 迁移的启动顺序不变量的守护**：`runStartupPrepass()` 必须早于组件建目录——目前只活在 `LibraryLayoutMigrationV2Migrator.swift:38-63` 注释里，**无守护**（改启动顺序不会被任何用例抓住）。
-4. **后置孤儿清扫对「曲库外文件」的删除口径**：`ReinstallLibraryPurgeTests.swift:419`（B-2）只覆盖了「曲库外不可达仍清」，**未**定义「曲库外文件可达但已改名」的语义。
+3. **v2 迁移的启动顺序不变量的守护**：**2026-09-23 已定稿**（原「无守护 / 只活在注释里」作废）——两条不变量各有形状契约守护，见 §1.6「启动时机」行的守护列与 `QQPlayerTests/StartupOrderContractTests.swift`。
+4. **后置孤儿清扫对「曲库外文件」的删除口径**：**2026-09-23 已定稿**——见 §3.6「曲库外文件的可达性判据」（改名 ⇒ 行保留且 path 不写回；书签读不出来 ⇒ 保守保留；书签缺失 ⇒ 删行）。
 5. **`.sync-incoming/`**：属同步链路语义（曲库根内隐藏目录），v2 迁移保留原位（`LibraryLayoutMigrationV2Plan.swift` 的 `keepInPlaceReasons`）；其生命周期**不在本契约范围**（见 `docs/lan-sync-design.md`）。
 6. **Siri / Widget 扩展的 DB 可见性**：iOS DB 优先落 App Group 容器（`DatabasePathResolver.swift:21-33`），Widget 扩展的落点解析（`AppLog` → `LibraryRoot`）只依赖常量、不依赖 DB——跨进程一致性**未定义**。
 
@@ -211,4 +220,4 @@
 
 | 日期 | 变更 | 依据 |
 | --- | --- | --- |
-| 2026-09-23 | 首次落仓：布局与根（§1）、派生路径守卫（§2）、扫描决策与调和（§3）、旧位置只读兼容（§4）、变更规则（§5）、未定义清单（§6） | 基线 `origin/main` @ `38cfb35`；逐条取证 `LibraryRoot` / `LibraryScanGate` / `FileCleanupManager` / `LibraryLayoutMigration*` / `LibraryHiddenLayoutMigrationTests` 等 |
+| 2026-09-23 | 契约守护批（基线 `origin/main` @ `06ddfd2`）：① 新增 §3.6「曲库外文件的可达性判据」（改名 ⇒ 行保留且 **path 不写回**；书签读不出来 ⇒ 保守保留；书签缺失 ⇒ 删行）；② §6 第 3/4 条由「未定义」升为**已定稿**（启动顺序不变量、曲库外改名口径）；③ §1.6「启动时机」守护列由「✗ 无守护」改为指向 `QQPlayerTests/StartupOrderContractTests.swift`；④ §5 新增「启动顺序」变更行；⑤ §3.4 / §3.5 / §4.3 的行号随 `FileCleanupManager.swift` / `ReinstallLibraryPurgeTests.swift` 本批改动同步刷新 | 守护：`QQPlayerTests/StartupOrderContractTests.swift`（B1）、`QQPlayerTests/ReinstallLibraryPurgeTests.swift:484`/`:530`（B2） |
