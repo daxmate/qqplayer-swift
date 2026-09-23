@@ -43,11 +43,19 @@ extension LibraryIndexer {
     /// 比较前先经 `LibraryRoot.storedPath` 换算成与 `track.path` 同形态（相对曲库根）；
     /// `track.path` 的实际存在性走 `LibraryRoot` 解回绝对 URL
     /// （相对串直接 `fileExists` 会以 cwd 为基准，永远为假 = 全库误判「悬空」）。
-    nonisolated func staleStoredPath(_ track: Track, currentPath: String) -> String? {
-        let storedCurrent = LibraryRoot.storedPath(forAbsolutePath: currentPath)
+    ///
+    /// - Parameter fileManager: **Documents 根解析缝**（默认 `.default` ⇒ 生产调用点行为
+    ///   逐字节不变）。本函数里的存在性判定是一条 Documents 派生解析链，注入临时根 FM
+    ///   即可在测试里脱离真机容器驱动（见 `ReinstallLibraryPurgeTests`）。
+    nonisolated func staleStoredPath(
+        _ track: Track,
+        currentPath: String,
+        fileManager: FileManager = .default
+    ) -> String? {
+        let storedCurrent = LibraryRoot.storedPath(forAbsolutePath: currentPath, fileManager: fileManager)
         guard track.path != storedCurrent else { return nil }
-        guard !FileManager.default.fileExists(
-            atPath: LibraryRoot.absolutePath(forStoredPath: track.path)
+        guard !fileManager.fileExists(
+            atPath: LibraryRoot.absolutePath(forStoredPath: track.path, fileManager: fileManager)
         ) else { return nil }
         return track.path
     }
@@ -64,15 +72,19 @@ extension LibraryIndexer {
     }
 
     /// 判定实现（唯一一份）：先指纹（无 IO），指纹未变才看 path（至多一次 stat）。
+    ///
+    /// - Parameter fileManager: `staleStoredPath` 的 Documents 根解析缝（默认 `.default`）。
     nonisolated func metadataRefreshDecision(
         _ track: Track,
         fingerprint: FileFingerprint,
-        currentPath: String
+        currentPath: String,
+        fileManager: FileManager = .default
     ) -> MetadataRefreshDecision {
         if needsMetadataRefresh(track, fingerprint: fingerprint) {
             return .reparse
         }
-        return staleStoredPath(track, currentPath: currentPath) == nil ? .current : .resyncPathOnly
+        return staleStoredPath(track, currentPath: currentPath, fileManager: fileManager) == nil
+            ? .current : .resyncPathOnly
     }
 
     /// 扫描目录下的音乐文件（共享实现 MusicDirectoryScanner，iOS/macOS 同一套

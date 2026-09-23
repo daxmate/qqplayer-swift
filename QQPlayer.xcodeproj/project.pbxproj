@@ -188,6 +188,7 @@
 		103DC522D758495DB1EFB141 /* LibraryLayoutMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052F578659084255BD1A7675 /* LibraryLayoutMigrationTests.swift */; };
 		67617F08FF4142B4882365BC /* ArtworkCacheSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F148D93B8598473997240CEA /* ArtworkCacheSafetyTests.swift */; };
 		76AE86EB63654DF8AFDE422F /* LibraryHiddenLayoutMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F235B53990423FBE0DFD0A /* LibraryHiddenLayoutMigrationTests.swift */; };
+		09CEBFC34E294DFF82470BB7 /* ReinstallLibraryPurgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B215D67DE62C43D6A4DF6F94 /* ReinstallLibraryPurgeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -425,6 +426,7 @@
 		052F578659084255BD1A7675 /* LibraryLayoutMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryLayoutMigrationTests.swift; sourceTree = "<group>"; };
 		F148D93B8598473997240CEA /* ArtworkCacheSafetyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkCacheSafetyTests.swift; sourceTree = "<group>"; };
 		33F235B53990423FBE0DFD0A /* LibraryHiddenLayoutMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryHiddenLayoutMigrationTests.swift; sourceTree = "<group>"; };
+		B215D67DE62C43D6A4DF6F94 /* ReinstallLibraryPurgeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReinstallLibraryPurgeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1191,6 +1193,7 @@
 				052F578659084255BD1A7675 /* LibraryLayoutMigrationTests.swift */,
 				F148D93B8598473997240CEA /* ArtworkCacheSafetyTests.swift */,
 				33F235B53990423FBE0DFD0A /* LibraryHiddenLayoutMigrationTests.swift */,
+				B215D67DE62C43D6A4DF6F94 /* ReinstallLibraryPurgeTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1677,6 +1680,7 @@
 				103DC522D758495DB1EFB141 /* LibraryLayoutMigrationTests.swift in Sources */,
 				67617F08FF4142B4882365BC /* ArtworkCacheSafetyTests.swift in Sources */,
 				76AE86EB63654DF8AFDE422F /* LibraryHiddenLayoutMigrationTests.swift in Sources */,
+				09CEBFC34E294DFF82470BB7 /* ReinstallLibraryPurgeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

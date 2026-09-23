@@ -32,7 +32,19 @@ class FileCleanupManager: ObservableObject {
     /// 2. 文件仍在磁盘、但扩展名已不在当前收录设置内（用户取消了该格式——
     ///    web 版取消勾选后重扫即从曲库消失、文件保留；勾回重扫自动恢复。
     ///    iOS 无此设置 UI，audioExtensions 恒为全量 → 本条永不触发）
-    func reconcileMissingFiles(in successfullyScannedRoots: [URL]) async {
+    ///
+    /// 本入口 = 「文件真没了 → 删行」的**唯一**授权点，前提有两条（缺一不可）：
+    /// ① 该行解析出的绝对 URL 落在**本轮成功枚举过的根**内（根不可用 ≠ 空库）；
+    /// ② 调用时机在**主扫之后**（`scanLocalDocuments` 尾部）——那时主扫已按 stableId
+    ///    把重装后的悬空 path 修好，剩下的「不存在」才是真删除。
+    ///
+    /// - Parameter fileManager: **Documents 根解析缝**（默认 `.default` ⇒ 生产行为逐字节
+    ///   不变）。测试注入一个 `.documentDirectory` 指向临时根的 FM，即可脱离真机容器
+    ///   驱动本入口（照 `DocumentsRootTestSupport.swift` 的既有做法）。
+    func reconcileMissingFiles(
+        in successfullyScannedRoots: [URL],
+        fileManager: FileManager = .default
+    ) async {
         let roots = successfullyScannedRoots.map(\.standardizedFileURL)
         guard !roots.isEmpty else { return }
 
@@ -48,10 +60,11 @@ class FileCleanupManager: ObservableObject {
             // （D7：文件与用户数据都保留，勾回格式重扫即恢复）
             let removals: [(track: Track, fileMissing: Bool)] = tracks.compactMap { track in
                 // 存储形态 → 绝对 URL（唯一入口；相对路径必须解回曲库根下）。
-                let trackURL = LibraryRoot.absoluteURL(forStoredPath: track.path).standardizedFileURL
+                let trackURL = LibraryRoot.absoluteURL(forStoredPath: track.path, fileManager: fileManager)
+                    .standardizedFileURL
                 let belongsToScannedRoot = roots.contains { isURL(trackURL, inside: $0) }
                 guard belongsToScannedRoot else { return nil }
-                let fileExists = FileManager.default.fileExists(atPath: trackURL.path)
+                let fileExists = fileManager.fileExists(atPath: trackURL.path)
                 if !fileExists {
                     return (track, true) // 磁盘已删除
                 }
@@ -95,7 +108,23 @@ class FileCleanupManager: ObservableObject {
         }
     }
 
-    func checkForOrphanedFiles() async {
+    /// 孤儿清扫：**只清曲库外（书签类）文件**。曲库内（Documents/Music）行一律不在此删。
+    ///
+    /// 为什么曲库内不在这里删（2026-09-23 真机事故根因）：本函数**没有扫描上下文**——
+    /// 它由后置维护 `AppCoordinator+ImportExport.runPostIndexMaintenance` 调用，而后置维护
+    /// 挂在 `onIndexingCompleted` 上（`AppCoordinator+iCloud.swift`），后者由
+    /// `isIndexingPublisher` 的 sink 触发，`CurrentValueSubject` **订阅即送当前值 false**
+    /// ⇒ 即使本次启动「跳过自动扫描」（`AppCoordinator.swift` 的
+    /// `⏭️ Recent app launch - skipping automatic scan`），15s 后本函数照样跑。
+    /// 重装换数据容器 UUID 后整库 path 悬空（曲线形态见 `LibraryRoot.rebasedFromLegacyContainer`
+    /// 覆盖不到的那批），主扫没跑 ⇒ 没有任何自愈，而这里按「入库 path 不存在」判死
+    /// ⇒ `deleteTrack` 连收藏 / 歌单成员 / 播放历史一起清（事故：225 行 → 0）。
+    /// 判「文件真没了」的授权点在 `reconcileMissingFiles`（要求「本轮枚举过它的根」+
+    /// 「主扫之后」），本入口不重复那条判定。
+    ///
+    /// - Parameter fileManager: **Documents 根解析缝**（默认 `.default` ⇒ 生产行为逐字节
+    ///   不变）。测试注入临时根 FM 即可驱动（见 `ReinstallLibraryPurgeTests`）。
+    func checkForOrphanedFiles(fileManager: FileManager = .default) async {
         AppLog.info(.general, "🧹 Checking for library files that no longer exist...")
 
         // M3-2：退役 iCloud 容器——内部文件 = 本地 Documents（沙盒）内的文件；
@@ -112,24 +141,27 @@ class FileCleanupManager: ObservableObject {
 
             for track in allTracks {
                 // 存储形态 → 绝对 URL（唯一入口）。相对路径直解曲库根下 = 不再靠猜同名。
-                let trackURL = LibraryRoot.absoluteURL(forStoredPath: track.path)
+                let trackURL = LibraryRoot.absoluteURL(forStoredPath: track.path, fileManager: fileManager)
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 Checking track: \(trackURL.lastPathComponent)") }
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Path: \(trackURL.path)") }
 
-                let isInternalFile = !LibraryRoot.isExternalPath(track.path)
+                let isInternalFile = !LibraryRoot.isExternalPath(track.path, fileManager: fileManager)
                 if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Is internal file: \(isInternalFile)") }
 
                 if isInternalFile {
                     // For internal files, simple existence check
-                    let fileExists = FileManager.default.fileExists(atPath: trackURL.path)
+                    let fileExists = fileManager.fileExists(atPath: trackURL.path)
                     if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹   Internal file exists: \(fileExists)") }
 
                     if fileExists {
                         if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹 ✅ Internal file exists (keeping): \(trackURL.lastPathComponent)") }
                     } else {
-                        // 内部文件（曲库内 / Documents 内）不存在 → 不猜、不改 path，等重扫自愈；
-                        // 真删的由 reconcileMissingFiles 按扫描根处理。
-                        nonExistentTracks.append(track)
+                        // 曲库内行在**入库 path** 上不存在 → **保留、不删、不改 path**（本入口无扫描
+                        // 上下文，判「文件真没了」的授权点在 reconcileMissingFiles；详见函数头注释）。
+                        // 打 WARN 而不是 DEBUG：这是「库内行与磁盘脱节」的现场证据，真机上翻日志就靠它。
+                        AppLog.warn(.general, "🧹 ⚠️ Internal track path missing on disk - keeping row"
+                            + " (deferring to scan reconciliation): \(trackURL.lastPathComponent)"
+                            + " · db=\(LibraryRoot.relativePath(forStoredPath: track.path, fileManager: fileManager) ?? track.path)")
                     }
                 } else {
                     // For external files (from share/document picker), check if still accessible
@@ -145,7 +177,8 @@ class FileCleanupManager: ObservableObject {
                 }
             }
 
-            // Auto-clean files that don't exist anywhere
+            // Auto-clean files that don't exist anywhere（**只剩曲库外 / 书签类文件**：
+            // 曲库内行已在上面保留，删除授权在 reconcileMissingFiles）。
             if !nonExistentTracks.isEmpty {
                 AppLog.info(.general, "🧹 Auto-cleaning \(nonExistentTracks.count) files that don't exist anywhere")
 
