@@ -127,14 +127,21 @@ private enum ReinstallFixture {
     }
 
     /// 歌单成员资格（普通歌单一条成员行；同 `FileCleanupManagerTests` 口径）。
+    /// 幂等：多条曲目共用同一个普通歌单（`id = 1`），同一用例连插多条时不得撞
+    /// `playlist.id` / `playlist.slug` 的唯一约束（`INSERT OR IGNORE`）；成员行的
+    /// 位置按歌单内当前最大位置 +1 递增，避免撞 `playlist_item` 的
+    /// `(playlist_id, position)` 主键。单次调用仍是 position = 1，与原夹具一致。
     static func insertPlaylistMembership(_ manager: DatabaseManager, stableId: String) throws {
         try manager.write { db in
             try db.execute(sql: """
-                INSERT INTO playlist (id, slug, title, created_at, updated_at, is_folder_synced)
+                INSERT OR IGNORE INTO playlist (id, slug, title, created_at, updated_at, is_folder_synced)
                 VALUES (1, 'p1', 'P1', 0, 0, 0)
             """)
             try db.execute(
-                sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 1, ?)",
+                sql: """
+                    INSERT INTO playlist_item (playlist_id, position, track_stable_id)
+                    VALUES (1, (SELECT COALESCE(MAX(position), 0) + 1 FROM playlist_item WHERE playlist_id = 1), ?)
+                """,
                 arguments: [stableId]
             )
         }
