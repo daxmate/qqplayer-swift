@@ -15,12 +15,24 @@ class FileCleanupManager: ObservableObject {
     private let databaseManager: DatabaseManager
     private let stateManager: StateManager
 
+    /// 曲库外书签链的**注入缝**：`nil`（默认）⇒ 走 `ExternalFileBookmarkStore.default`，
+    /// 即生产落点 `Documents/.qqplayer/state/ExternalFileBookmarks.plist` ⇒ **生产行为逐字节不变**。
+    /// 只给测试用来驱动「书签能解析到改名后的新位置」「书签读不出来」这两类曲库外形态
+    /// （见 `ReinstallLibraryPurgeTests` 的 B 组）——书签落点是「每用例独立临时目录」时才需要注入；
+    /// 本缝**不改** `ExternalFileBookmarkStore.default` 的语义，也**不引入**进程级全局静态覆盖。
+    private let bookmarkStore: ExternalFileBookmarkStore?
+
     /// 构造注入（默认值 = 生产单例，行为与改动前的硬编码 `.shared` 完全相同）。
     /// 测试注入内存库即可覆盖 `reconcileMissingFiles` 的选择逻辑，
     /// 照 `IOSPassiveSyncCenter(identityStore:deviceStore:libraryRoot:database:)` 既有做法。
-    init(databaseManager: DatabaseManager = .shared, stateManager: StateManager = .shared) {
+    init(
+        databaseManager: DatabaseManager = .shared,
+        stateManager: StateManager = .shared,
+        bookmarkStore: ExternalFileBookmarkStore? = nil
+    ) {
         self.databaseManager = databaseManager
         self.stateManager = stateManager
+        self.bookmarkStore = bookmarkStore
     }
 
     /// Reconciles only roots that the indexer successfully enumerated during
@@ -272,7 +284,8 @@ class FileCleanupManager: ObservableObject {
     }
 
     private func resolveDocumentPickerBookmark(for stableId: String) async -> BookmarkResolution {
-        guard let store = ExternalFileBookmarkStore.default else {
+        // `bookmarkStore` 为 nil（生产默认）时等价于改动前的硬编码 `.default`。
+        guard let store = bookmarkStore ?? ExternalFileBookmarkStore.default else {
             if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🧹     No document picker bookmarks file found") }
             return .missing
         }

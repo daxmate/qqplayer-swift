@@ -99,6 +99,43 @@ private enum ReinstallFixture {
         return url
     }
 
+    // MARK: 曲库外（书签类）三件套
+
+    /// 临时「曲库外」目录（书签 plist + 被改名文件都在这，每用例独立，结束即删）。
+    @MainActor
+    static func withExternalDirectory(
+        _ body: @MainActor (URL) async throws -> Void
+    ) async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("qqplayer-external-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try await body(directory)
+    }
+
+    /// 在曲库外目录里落一个真实文件（内容非空——可访问性探测会真的读 1KB）。
+    @discardableResult
+    static func makeExternalFile(in directory: URL, named name: String) throws -> URL {
+        let url = directory.appendingPathComponent(name)
+        try Data(repeating: 0x51, count: 64).write(to: url)
+        return url
+    }
+
+    /// 书签 plist 的唯一入口实例，落点 = 给定临时目录（不碰真机 `.qqplayer/state`）。
+    static func makeBookmarkStore(in directory: URL) -> ExternalFileBookmarkStore {
+        ExternalFileBookmarkStore(directory: directory)
+    }
+
+    /// 把「解析得到 `url`」的书签写进 store（键 = stableId）。
+    static func writeBookmark(
+        for url: URL,
+        stableId: String,
+        store: ExternalFileBookmarkStore
+    ) throws {
+        let data = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        try store.save([stableId: data])
+    }
+
     // MARK: 行写入（raw SQL：不改 path / 不触发 upsert 的指纹与去重逻辑）
 
     static func insertTrack(
@@ -438,6 +475,91 @@ struct PostIndexSweepMustNotPurgeLibraryTests {
             let favorites = try ReinstallFixture.favoriteIds(manager)
             #expect(ids.isEmpty, "曲库外不可达文件仍按既有语义清理")
             #expect(favorites.isEmpty, "deleteTrack 语义 = 引用一起清")
+        }
+    }
+
+    /// 口径定稿（`docs/library-storage-contract.md` §3.6）：曲库外文件**改名后**原 path 不可达，
+    /// 但书签能解析到新位置且探测可访问 ⇒ **行保留**；且存储 path **保持旧值、不写回**
+    /// （本入口无扫描上下文，不做自愈；path 修写的唯一入口链是 `migrateTrackForMovedFile`）。
+    @Test("B-3：曲库外文件改名后书签解析到新位置且可访问 ⇒ 行保留、存储 path 逐字不变")
+    func externalFileRenamedKeepsRowAndStoredPath() async throws {
+        try await ReinstallFixture.withDocumentsRoot { _, fileManager in
+            try await ReinstallFixture.withExternalDirectory { externalDirectory in
+                let manager = try ReinstallFixture.makeManager()
+                let store = ReinstallFixture.makeBookmarkStore(in: externalDirectory)
+                // 改名后的**新位置**：真实文件 + 指向它的书签（书签只记录新位置）。
+                let newLocation = try ReinstallFixture.makeExternalFile(
+                    in: externalDirectory,
+                    named: "renamed.mp3"
+                )
+                try ReinstallFixture.writeBookmark(
+                    for: newLocation,
+                    stableId: "external-renamed",
+                    store: store
+                )
+                // 入库 path = **旧位置**（改名前的绝对路径），磁盘上已不存在。
+                let oldLocation = externalDirectory.appendingPathComponent("original.mp3").path
+                try ReinstallFixture.insertCompleteTrack(
+                    manager,
+                    stableId: "external-renamed",
+                    title: "Renamed",
+                    path: oldLocation
+                )
+                let oldLocationMissing = !fileManager.fileExists(atPath: oldLocation)
+                let pointsElsewhere = newLocation.path != oldLocation
+                #expect(oldLocationMissing, "前提：旧位置确实不存在（否则走的是原 path 可访问分支，测不到书签链）")
+                #expect(pointsElsewhere, "前提：书签指向的确实是另一个位置")
+
+                let cleanup = FileCleanupManager(databaseManager: manager, bookmarkStore: store)
+                await cleanup.checkForOrphanedFiles(fileManager: fileManager)
+
+                let ids = try ReinstallFixture.trackIds(manager)
+                let favorites = try ReinstallFixture.favoriteIds(manager)
+                #expect(ids == ["external-renamed"], "书签解析到新位置且可访问 ⇒ 不得删行")
+                #expect(favorites == ["external-renamed"], "保留行的收藏不得被清")
+
+                let row = try manager.getTrack(byStableId: "external-renamed")
+                let storedRow = try #require(row, "行必须还在")
+                #expect(storedRow.path == oldLocation, "存储 path 必须逐字保持旧值：改名不自愈写回")
+            }
+        }
+    }
+
+    /// 口径定稿（`docs/library-storage-contract.md` §3.6）：书签 plist **读不出来**（unreadable）
+    /// 是「未知」而不是「没有书签」⇒ 清理路径必须保守保留（D2 原则，同 `BookmarkResolution.unknown`）。
+    @Test("B-4：书签读不出来（unreadable）⇒ 曲库外行保守保留（D2）")
+    func externalFileWithUnreadableBookmarkKeepsRow() async throws {
+        try await ReinstallFixture.withDocumentsRoot { _, fileManager in
+            try await ReinstallFixture.withExternalDirectory { externalDirectory in
+                let manager = try ReinstallFixture.makeManager()
+                let store = ReinstallFixture.makeBookmarkStore(in: externalDirectory)
+                // 非原子写被截断的形态：plist 在磁盘上、但解析不出来。
+                try Data("bookmarks:truncated".utf8).write(to: store.fileURL)
+                let outcome = store.load()
+                let isUnreadable: Bool
+                switch outcome {
+                case .unreadable: isUnreadable = true
+                case .loaded: isUnreadable = false
+                }
+                #expect(isUnreadable, "前提：书签必须处于 unreadable 形态")
+
+                let missing = externalDirectory.appendingPathComponent("gone.mp3").path
+                try ReinstallFixture.insertCompleteTrack(
+                    manager,
+                    stableId: "external-unreadable",
+                    title: "Unreadable",
+                    path: missing
+                )
+                #expect(!fileManager.fileExists(atPath: missing), "前提：曲库外文件确实不存在")
+
+                let cleanup = FileCleanupManager(databaseManager: manager, bookmarkStore: store)
+                await cleanup.checkForOrphanedFiles(fileManager: fileManager)
+
+                let ids = try ReinstallFixture.trackIds(manager)
+                let favorites = try ReinstallFixture.favoriteIds(manager)
+                #expect(ids == ["external-unreadable"], "书签读不出来 = 未知 ⇒ 保守保留")
+                #expect(favorites == ["external-unreadable"], "保留行的收藏不得被清")
+            }
         }
     }
 }
