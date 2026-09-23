@@ -8,6 +8,17 @@
 //
 import Foundation
 
+/// 收齐收尾（`completePartLocked`）的文件级入参打包。
+/// 这 5 个值在两条收尾路径（meta 续传已收齐 / chunk 收齐）里语义相同、总是一起传，
+/// 打包后收尾函数只剩「上下文 + 进度」两个参数（清 swiftlint `function_parameter_count`）。
+private struct PartCompletionContext {
+    let fileID: String
+    let totalSize: Int64
+    let sha256Hex: String
+    let partURL: URL
+    let finalURL: URL
+}
+
 extension SyncFileReceiver {
     // MARK: 锁内状态机
 
@@ -105,8 +116,11 @@ extension SyncFileReceiver {
 
             // 续传起点已含全部字节（上一轮收齐但未及改名）→ 直接整文件校验收尾
             if meta.startOffset > 0, alignedPart == meta.totalSize {
-                return completePartLocked(fileID: meta.fileID, totalSize: meta.totalSize,
-                                          sha256Hex: meta.sha256Hex, partURL: partURL, finalURL: finalURL,
+                return completePartLocked(PartCompletionContext(fileID: meta.fileID,
+                                                                totalSize: meta.totalSize,
+                                                                sha256Hex: meta.sha256Hex,
+                                                                partURL: partURL,
+                                                                finalURL: finalURL),
                                           progress: Progress(startedAt: Date(), chunks: 0,
                                                              chunkSize: meta.chunkSize,
                                                              startOffset: meta.startOffset))
@@ -179,9 +193,11 @@ extension SyncFileReceiver {
             // 收齐：关文件 → 整文件 SHA-256 → 匹配改名 / 不匹配删 .part
             closeHandle(advanced)
             active = nil
-            return completePartLocked(fileID: advanced.fileID, totalSize: advanced.totalSize,
-                                      sha256Hex: advanced.sha256Hex, partURL: advanced.partURL,
-                                      finalURL: advanced.finalURL,
+            return completePartLocked(PartCompletionContext(fileID: advanced.fileID,
+                                                            totalSize: advanced.totalSize,
+                                                            sha256Hex: advanced.sha256Hex,
+                                                            partURL: advanced.partURL,
+                                                            finalURL: advanced.finalURL),
                                       progress: Progress(startedAt: advanced.startedAt,
                                                          chunks: advanced.chunksReceived,
                                                          chunkSize: advanced.chunkSize,
@@ -192,8 +208,12 @@ extension SyncFileReceiver {
 
     /// 收齐收尾（锁内）：算 SHA-256，匹配 → 原子改名去 .part + ack(done)；
     /// 不匹配 → 删 .part + ack(checksumMismatch)。IO 失败 → ioError 中止（.part 保留）。
-    private func completePartLocked(fileID: String, totalSize: Int64, sha256Hex: String,
-                                    partURL: URL, finalURL: URL, progress: Progress) -> [Action] {
+    private func completePartLocked(_ context: PartCompletionContext, progress: Progress) -> [Action] {
+        let fileID = context.fileID
+        let totalSize = context.totalSize
+        let sha256Hex = context.sha256Hex
+        let partURL = context.partURL
+        let finalURL = context.finalURL
         let sha: String
         do {
             sha = try SyncFileChecksum.sha256Hex(ofFile: partURL).lowercased()
