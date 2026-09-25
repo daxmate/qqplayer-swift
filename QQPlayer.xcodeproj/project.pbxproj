@@ -191,6 +191,7 @@
 		09CEBFC34E294DFF82470BB7 /* ReinstallLibraryPurgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B215D67DE62C43D6A4DF6F94 /* ReinstallLibraryPurgeTests.swift */; };
 		59BFE724CD3D43DCAB821B40 /* LibraryScanGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B66CB4F9CA44428226120B /* LibraryScanGateTests.swift */; };
 		58051FB1C90C4D83B8D66E77 /* StartupOrderContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FEB59319B03401C841012CC /* StartupOrderContractTests.swift */; };
+		31A7AB7341E8439FAF3A625E /* MacLibraryFactsReadPathContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91F411797C46088A5BC4B6 /* MacLibraryFactsReadPathContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -431,6 +432,7 @@
 		B215D67DE62C43D6A4DF6F94 /* ReinstallLibraryPurgeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReinstallLibraryPurgeTests.swift; sourceTree = "<group>"; };
 		B4B66CB4F9CA44428226120B /* LibraryScanGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryScanGateTests.swift; sourceTree = "<group>"; };
 		0FEB59319B03401C841012CC /* StartupOrderContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StartupOrderContractTests.swift; sourceTree = "<group>"; };
+		FA91F411797C46088A5BC4B6 /* MacLibraryFactsReadPathContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryFactsReadPathContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1201,6 +1203,7 @@
 				B215D67DE62C43D6A4DF6F94 /* ReinstallLibraryPurgeTests.swift */,
 				B4B66CB4F9CA44428226120B /* LibraryScanGateTests.swift */,
 				0FEB59319B03401C841012CC /* StartupOrderContractTests.swift */,
+				FA91F411797C46088A5BC4B6 /* MacLibraryFactsReadPathContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1690,6 +1693,7 @@
 				09CEBFC34E294DFF82470BB7 /* ReinstallLibraryPurgeTests.swift in Sources */,
 				59BFE724CD3D43DCAB821B40 /* LibraryScanGateTests.swift in Sources */,
 				58051FB1C90C4D83B8D66E77 /* StartupOrderContractTests.swift in Sources */,
+				31A7AB7341E8439FAF3A625E /* MacLibraryFactsReadPathContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

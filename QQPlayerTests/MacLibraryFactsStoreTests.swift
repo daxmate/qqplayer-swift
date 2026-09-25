@@ -3,20 +3,25 @@
 //  QQPlayerTests
 //
 //  曲库卡片事实缓存（MacLibraryFactsStore）语义回归用例
-//  —— 2026-09-12 审计批次 B4 · M2。
+//  —— 2026-09-12 审计批次 B4 · M2；2026-09-25 渲染期写入死循环修复后重写。
 //
 //  修复前视图 body 里直接同步调 DatabaseManager（专辑网格每卡每帧 2 次整表查询、
 //  歌手/歌单行每行每帧 1–3 次、歌曲 Table 每可见行每帧 1 次）——这些调用直连 DB
 //  单例、没有任何缝，只能靠读代码。本文件用注入的假取数器锁定新契约：
-//  1) body 侧读只查缓存，未命中不再同步打 DB，而是回默认值 + 异步补齐；
-//  2) 同一 id 并发读只调度一次取数；
-//  3) 补齐完成后读到真值，且二次读不再取数；
-//  4) `invalidate()` 保留已发布旧值（重载期间不闪 0），但作废在途结果
-//     （代号不匹配 → 过期补齐不得写入缓存）。
-//  修复前这些断言连编译都过不了（MacLibraryFactsStore 符号不存在）。
+//  1) **读路径严格只读**：未命中回默认值，**零取数、零可观察状态写**
+//     （旧实现的读路径会 `schedule…` → 同步写被观察的 `inFlight`，落在表格行更新里
+//     就变成「失效 → 重排 update → 再读 → 再写」的主线程自旋死循环）；
+//  2) 补齐只走显式非渲染期入口（`ensureFacts(…)` / `preload(…)`），已命中的 id 不重取；
+//  3) `invalidate()` 保留已发布旧值（重载期间不闪 0），但作废在途的过期补齐；
+//  4) 失效之后**一定**有一轮补齐能落地（`invalidate` 的唯一调用点 `reloadLibrary`
+//     在同一函数里紧接着发起新的 `preload`）——「缓存永远补不上」的活锁已消。
+//
+//  形状（读路径不得出现 schedule / begin( / 写 inFlight·generation）另由
+//  `MacLibraryFactsReadPathContractTests.swift` 静态守护。
 //
 
 import Foundation
+import Observation
 import Testing
 
 @testable import QQPlayer
@@ -111,6 +116,57 @@ private final class FakeFactsLoader {
     }
 }
 
+// MARK: - 测试数据构造（模型字段多，集中在这里）
+
+private func makeAlbum(_ id: Int64, title: String = "专辑") -> Album {
+    Album(id: id, artistId: nil, title: title, year: nil, albumArtist: nil)
+}
+
+private func makeArtist(_ id: Int64, name: String = "歌手") -> Artist {
+    Artist(id: id, name: name)
+}
+
+private func makePlaylist(_ id: Int64, title: String = "歌单") -> Playlist {
+    Playlist(
+        id: id,
+        slug: "p-\(id)",
+        title: title,
+        createdAt: 0,
+        updatedAt: 0,
+        lastPlayedAt: 0,
+        folderPath: nil,
+        isFolderSynced: false,
+        lastFolderSync: nil,
+        customCoverImagePath: nil
+    )
+}
+
+private func makeTrack(_ stableId: String, albumId: Int64?, artistId: Int64? = nil) -> Track {
+    Track(
+        id: nil,
+        stableId: stableId,
+        albumId: albumId,
+        artistId: artistId,
+        title: "曲目 \(stableId)",
+        genre: nil,
+        trackNo: nil,
+        discNo: nil,
+        durationMs: nil,
+        sampleRate: nil,
+        bitDepth: nil,
+        channels: nil,
+        path: "/tmp/\(stableId).mp3",
+        fileSize: nil,
+        modificationDate: nil,
+        contentHash: nil,
+        replaygainTrackGain: nil,
+        replaygainAlbumGain: nil,
+        replaygainTrackPeak: nil,
+        replaygainAlbumPeak: nil,
+        hasEmbeddedArt: false
+    )
+}
+
 /// 让主 actor 上的补齐任务跑完（Task.yield 若干轮；给足轮次防 CI 抖动）。
 @MainActor
 private func settle(_ rounds: Int = 50) async {
@@ -139,70 +195,115 @@ private func waitUntil(
 
 @MainActor
 struct MacLibraryFactsStoreTests {
-    @Test("缓存未命中：body 侧读回默认值且不阻塞，补齐后读到真值")
-    func lazyFillOnCacheMiss() async {
+    @Test("★ 读路径严格只读：未命中连读多次 → 零取数 + 零可观察状态写")
+    func readPathHasNoSideEffectsOnCacheMiss() async {
         let fake = FakeFactsLoader()
+        fake.setAlbumFacts(MacLibraryFactsStore.AlbumFacts(title: "Album X", trackCount: 12), for: 5)
         fake.setArtistCount(42, for: 7)
+        fake.setPlaylistFacts(MacLibraryFactsStore.PlaylistFacts(itemCount: 4), for: 2)
         let store = MacLibraryFactsStore(loader: fake.loader())
+        let track = makeTrack("t1", albumId: 5)
 
-        // 首次读：同步返回默认 0（修复前这里是同步 DB 查询），不阻塞主线程
-        #expect(store.artistTrackCount(forArtistId: 7) == 0)
-
-        // 补齐跑在后续的 Task 上（同 actor 的同步断言点必然还没执行取数，
-        // 修复前这里断言「立即已取数」是错的——CI 上必然失败）→ 等补齐完成再断言
-        let filled = await waitUntil { fake.artistCalls == [7] }
-        #expect(filled)
-        #expect(store.artistTrackCount(forArtistId: 7) == 42)
-        // 二次读命中缓存：不再取数
-        #expect(fake.artistCalls == [7])
-    }
-
-    @Test("同一 id 连续多次读只调度一次取数")
-    func coalescesConcurrentReads() async {
-        let fake = FakeFactsLoader()
-        fake.setArtistCount(9, for: 3)
-        let store = MacLibraryFactsStore(loader: fake.loader())
-
-        for _ in 0 ..< 5 {
-            _ = store.artistTrackCount(forArtistId: 3)
+        // 旧实现的读路径会写 `inFlight`（@Observable 存储属性）→ 在表格行更新期间
+        // 就是「观察者失效 → 重排 update → 再读 → 再写」的燃料。此处必须一次都不写。
+        var observableMutations = 0
+        withObservationTracking {
+            for _ in 0 ..< 5 {
+                _ = store.albumFacts(forAlbumId: 5)
+                _ = store.artistTrackCount(forArtistId: 7)
+                _ = store.playlistFacts(forPlaylistId: 2)
+                _ = store.albumTitle(forTrack: track)
+                _ = store.albumFacts(for: makeAlbum(5))
+                _ = store.artistTrackCount(for: makeArtist(7))
+                _ = store.playlistFacts(for: makePlaylist(2))
+            }
+        } onChange: {
+            observableMutations += 1
         }
+        #expect(observableMutations == 0, "读路径写了被观察状态（渲染期写入 = 重排 update 的源头）")
 
-        #expect(await waitUntil { fake.artistCalls == [3] })
-        #expect(store.artistTrackCount(forArtistId: 3) == 9)
-        // 5 次读只调度一次取数（inFlight 去重）
-        #expect(fake.artistCalls == [3])
-    }
+        // 也不许「回默认值 + 后台补一轮取数」（旧实现未命中会 schedule → 异步打 DB）
+        await settle()
+        #expect(fake.albumCalls.isEmpty, "读路径不得触发取数")
+        #expect(fake.artistCalls.isEmpty, "读路径不得触发取数")
+        #expect(fake.playlistCalls.isEmpty, "读路径不得触发取数")
 
-    @Test("专辑事实：标题/曲目数同次取数填充")
-    func albumFactsFilled() async {
-        let fake = FakeFactsLoader()
-        var facts = MacLibraryFactsStore.AlbumFacts()
-        facts.title = "Album X"
-        facts.trackCount = 12
-        fake.setAlbumFacts(facts, for: 5)
-        let store = MacLibraryFactsStore(loader: fake.loader())
-
+        // 未命中 → 默认值（不闪真值、不写状态）
         #expect(store.albumFacts(forAlbumId: 5) == MacLibraryFactsStore.AlbumFacts())
-        await settle()
-
-        let loaded = store.albumFacts(forAlbumId: 5)
-        #expect(loaded.title == "Album X")
-        #expect(loaded.trackCount == 12)
-        #expect(fake.albumCalls == [5])
+        #expect(store.albumFacts(forAlbumId: 5).title.isEmpty)
+        #expect(store.artistTrackCount(forArtistId: 7) == 0)
+        #expect(store.playlistFacts(forPlaylistId: 2) == MacLibraryFactsStore.PlaylistFacts())
+        #expect(store.albumTitle(forTrack: track).isEmpty)
+        #expect(store.albumFacts(for: makeAlbum(5, title: "忽略模型字段")).title.isEmpty)
     }
 
-    @Test("歌单事实：条目数填充")
-    func playlistFactsFilled() async {
+    @Test("显式补齐（ensureFacts）：取数一次 → 再读命中 → 已命中 id 不重取")
+    func ensureFactsFillsOnceThenReadsHitCache() async {
         let fake = FakeFactsLoader()
-        var facts = MacLibraryFactsStore.PlaylistFacts()
-        facts.itemCount = 4
-        fake.setPlaylistFacts(facts, for: 2)
+        fake.setAlbumFacts(MacLibraryFactsStore.AlbumFacts(title: "Album X", trackCount: 12), for: 5)
+        fake.setArtistCount(42, for: 7)
+        fake.setPlaylistFacts(MacLibraryFactsStore.PlaylistFacts(itemCount: 4), for: 2)
         let store = MacLibraryFactsStore(loader: fake.loader())
 
-        #expect(store.playlistFacts(forPlaylistId: 2).itemCount == 0)
-        await settle()
-        #expect(store.playlistFacts(forPlaylistId: 2).itemCount == 4)
+        await store.ensureFacts(albumIds: [5], artistIds: [7], playlistIds: [2])
+
+        #expect(fake.albumCalls == [5])
+        #expect(fake.artistCalls == [7])
         #expect(fake.playlistCalls == [2])
+
+        // 补齐后读到真值
+        #expect(store.albumFacts(forAlbumId: 5).title == "Album X")
+        #expect(store.albumFacts(forAlbumId: 5).trackCount == 12)
+        #expect(store.albumTitle(forTrack: makeTrack("t1", albumId: 5)) == "Album X")
+        #expect(store.artistTrackCount(forArtistId: 7) == 42)
+        #expect(store.playlistFacts(forPlaylistId: 2).itemCount == 4)
+
+        // 再读 + 重复补齐：命中缓存，零额外取数
+        _ = store.albumFacts(forAlbumId: 5)
+        _ = store.artistTrackCount(forArtistId: 7)
+        await store.ensureFacts(albumIds: [5], artistIds: [7], playlistIds: [2])
+        #expect(fake.albumCalls == [5])
+        #expect(fake.artistCalls == [7])
+        #expect(fake.playlistCalls == [2])
+    }
+
+    @Test("preload：曲库快照整批补齐（含 track.albumId），重载后整批刷新旧值")
+    func preloadFillsSnapshotAndRefreshesValues() async {
+        let fake = FakeFactsLoader()
+        fake.setAlbumFacts(MacLibraryFactsStore.AlbumFacts(title: "旧标题", trackCount: 1), for: 5)
+        fake.setAlbumFacts(MacLibraryFactsStore.AlbumFacts(title: "悬空专辑", trackCount: 1), for: 9)
+        fake.setArtistCount(3, for: 7)
+        fake.setPlaylistFacts(MacLibraryFactsStore.PlaylistFacts(itemCount: 2), for: 2)
+        let store = MacLibraryFactsStore(loader: fake.loader())
+
+        // 曲库快照：专辑 5（表里有）、曲目挂在专辑 9 上（表里没有 → 也要补）
+        await store.preload(
+            tracks: [makeTrack("t1", albumId: 5), makeTrack("t2", albumId: 9)],
+            albums: [makeAlbum(5)],
+            artists: [makeArtist(7)],
+            playlists: [makePlaylist(2)]
+        )
+
+        #expect(fake.albumCalls == [5, 9])
+        #expect(fake.artistCalls == [7])
+        #expect(fake.playlistCalls == [2])
+        #expect(store.albumFacts(forAlbumId: 5).title == "旧标题")
+        #expect(store.albumFacts(forAlbumId: 9).title == "悬空专辑")
+        #expect(store.artistTrackCount(forArtistId: 7) == 3)
+        #expect(store.playlistFacts(forPlaylistId: 2).itemCount == 2)
+
+        // 曲库变了：invalidate + preload 重载 → 旧值被整批刷新（不闪 0 的旧值→新值）
+        fake.setAlbumFacts(MacLibraryFactsStore.AlbumFacts(title: "新标题", trackCount: 8), for: 5)
+        store.invalidate()
+        #expect(store.albumFacts(forAlbumId: 5).title == "旧标题") // 重载期间沿用旧值
+        await store.preload(
+            tracks: [makeTrack("t1", albumId: 5)],
+            albums: [makeAlbum(5)],
+            artists: [makeArtist(7)],
+            playlists: [makePlaylist(2)]
+        )
+        #expect(store.albumFacts(forAlbumId: 5).title == "新标题")
+        #expect(store.albumFacts(forAlbumId: 5).trackCount == 8)
     }
 
     @Test("invalidate 保留已发布旧值（重载期间不闪 0）")
@@ -211,8 +312,7 @@ struct MacLibraryFactsStoreTests {
         fake.setArtistCount(5, for: 11)
         let store = MacLibraryFactsStore(loader: fake.loader())
 
-        _ = store.artistTrackCount(forArtistId: 11)
-        await settle()
+        await store.ensureFacts(artistIds: [11])
         #expect(store.artistTrackCount(forArtistId: 11) == 5)
 
         store.invalidate()
@@ -220,23 +320,29 @@ struct MacLibraryFactsStoreTests {
         #expect(store.artistTrackCount(forArtistId: 11) == 5)
     }
 
-    @Test("invalidate 作废在途结果：过期补齐不得写入缓存")
-    func invalidateDropsInFlightResult() async {
+    @Test("★ 活锁已消：失效作废在途过期补齐，而失效后的新一轮补齐一定落地")
+    func latestExplicitFillAlwaysLands() async {
         let fake = FakeFactsLoader()
-        var facts = MacLibraryFactsStore.AlbumFacts()
-        facts.title = "过期结果"
-        fake.setAlbumFacts(facts, for: 5)
+        fake.setArtistCount(5, for: 11)
         fake.setGateOpen(true)
         let store = MacLibraryFactsStore(loader: fake.loader())
 
-        _ = store.albumFacts(forAlbumId: 5) // 命中未缓存 → 调度（取数挂在门上）
-        #expect(await waitUntil { fake.albumCalls == [5] }) // 已进入取数并在门上挂起
+        // 第一轮补齐挂在门上（模拟慢取数）
+        let firstFill = Task { await store.ensureFacts(artistIds: [11]) }
+        #expect(await waitUntil { fake.artistCalls == [11] })
 
         store.invalidate() // 期间曲库已变
         fake.openGate() // 放行过期取数
+        await firstFill.value
         await settle()
 
-        // 代号不匹配 → 过期结果被丢弃（仍是默认值，等新一轮预取填充）
-        #expect(store.albumFacts(forAlbumId: 5).title.isEmpty)
+        // 过期结果被丢弃（不污染新代号；旧值/默认值继续被读，不闪 0）
+        #expect(store.artistTrackCount(forArtistId: 11) == 0)
+
+        // `invalidate()` 的唯一调用点 `MacLibraryView.reloadLibrary` 在同一函数里
+        // 紧接着发起新一轮补齐 → 一定落地（这正是活锁被消的地方）
+        await store.ensureFacts(artistIds: [11])
+        #expect(store.artistTrackCount(forArtistId: 11) == 5)
+        #expect(fake.artistCalls == [11, 11])
     }
 }

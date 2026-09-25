@@ -147,6 +147,17 @@ extension MacLibraryView {
 
             guard !Task.isCancelled else { return }
 
+            // 渲染期只读（MacSearchAlbumRow / MacArtistRow / MacPlaylistRow 的 body 只查缓存）
+            // → 快照覆盖不到的 id 在**结果产出后**（非渲染期）显式补齐，补齐后再发布结果，不闪 0。
+            // 2026-09-25：旧的「缓存未命中就同步写被观察状态」已删除（渲染期写入 → 表格重入更新死循环）。
+            let facts = libraryFacts
+            await facts.ensureFacts(
+                albumIds: results.albums.compactMap(\.id),
+                artistIds: results.artists.compactMap(\.id),
+                playlistIds: results.playlists.compactMap(\.id)
+            )
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
                 self.searchResults = results
             }
