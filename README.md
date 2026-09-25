@@ -285,6 +285,7 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 - 无模拟器 harness：`scripts/run-local-sync-tests.sh` 用 `swiftc` 直编生产源码（Sync 纯逻辑 + 扫描器）真跑断言，覆盖帧编解码 / 路径解析 / 应答器计划 / 控制器状态机 / 端到端场景
 - CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（最近实测 1115 用例）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step；这两个 job 同时是 `main` 的**合入门禁**（ruleset 强制，见下方「参与贡献」的分支流程）
 - 本地提交钩子（`scripts/git-hooks/pre-commit`）同样拦截增量编译警告，不等 CI
+- ⚠️ 钩子要**每个克隆装一次**（仓库不把 hooks 放在默认路径，未设置时 `scripts/git-hooks/{pre-commit,pre-push}` 静默不生效）：`git config core.hooksPath scripts/git-hooks`（相对路径；仓根 / 子目录 / worktree 均实测可解析）
 
 ---
 
