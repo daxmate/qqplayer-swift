@@ -167,6 +167,25 @@ private func makeTrack(_ stableId: String, albumId: Int64?, artistId: Int64? = n
     )
 }
 
+/// 可观察状态变更计数器（`withObservationTracking` 的 onChange 是 `@Sendable`，
+/// 不能捕获并写局部 `var` → 用带锁的引用盒子）。
+private final class MutationCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func increment() {
+        lock.lock()
+        value += 1
+        lock.unlock()
+    }
+
+    var isEmpty: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value == 0
+    }
+}
+
 /// 让主 actor 上的补齐任务跑完（Task.yield 若干轮；给足轮次防 CI 抖动）。
 @MainActor
 private func settle(_ rounds: Int = 50) async {
@@ -206,21 +225,29 @@ struct MacLibraryFactsStoreTests {
 
         // 旧实现的读路径会写 `inFlight`（@Observable 存储属性）→ 在表格行更新期间
         // 就是「观察者失效 → 重排 update → 再读 → 再写」的燃料。此处必须一次都不写。
-        var observableMutations = 0
+        //
+        // 口径说明：`withObservationTracking` 的 onChange **不会**在 apply 闭包执行期间触发
+        // （实测：注入读路径写入后本断言仍绿 = 假阴性）→ 必须先建追踪、**再**执行读：
+        // 第一次读建起追踪（真实 SwiftUI 的 body 求值），随后的读若写被观察状态则 onChange 必触发。
+        let observableMutations = MutationCounter()
         withObservationTracking {
-            for _ in 0 ..< 5 {
-                _ = store.albumFacts(forAlbumId: 5)
-                _ = store.artistTrackCount(forArtistId: 7)
-                _ = store.playlistFacts(forPlaylistId: 2)
-                _ = store.albumTitle(forTrack: track)
-                _ = store.albumFacts(for: makeAlbum(5))
-                _ = store.artistTrackCount(for: makeArtist(7))
-                _ = store.playlistFacts(for: makePlaylist(2))
-            }
+            _ = store.albumFacts(forAlbumId: 5)
+            _ = store.artistTrackCount(forArtistId: 7)
+            _ = store.playlistFacts(forPlaylistId: 2)
+            _ = store.albumTitle(forTrack: track)
         } onChange: {
-            observableMutations += 1
+            observableMutations.increment()
         }
-        #expect(observableMutations == 0, "读路径写了被观察状态（渲染期写入 = 重排 update 的源头）")
+        for _ in 0 ..< 5 {
+            _ = store.albumFacts(forAlbumId: 5)
+            _ = store.artistTrackCount(forArtistId: 7)
+            _ = store.playlistFacts(forPlaylistId: 2)
+            _ = store.albumTitle(forTrack: track)
+            _ = store.albumFacts(for: makeAlbum(5))
+            _ = store.artistTrackCount(for: makeArtist(7))
+            _ = store.playlistFacts(for: makePlaylist(2))
+        }
+        #expect(observableMutations.isEmpty, "读路径写了被观察状态（渲染期写入 = 重排 update 的源头）")
 
         // 也不许「回默认值 + 后台补一轮取数」（旧实现未命中会 schedule → 异步打 DB）
         await settle()
