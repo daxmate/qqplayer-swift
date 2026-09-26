@@ -121,6 +121,80 @@ struct SyncUIStartGateTests {
     }
 }
 
+// MARK: - 目标闸门（批 B2：选中设备 = 唯一合法同步目标）
+
+struct SyncUIStartGateTargetTests {
+    private func targetRow(_ id: String, online: Bool) -> SyncDeviceTargetRow {
+        SyncDeviceTargetRow(peerID: id, displayName: id, shortCode: id, isOnline: online)
+    }
+
+    /// 目标状态：选中的离线 + 另一台在线（= 「连上的 ≠ 所选」）。
+    private var mismatchedStatus: SyncDeviceTargetStatus {
+        SyncDeviceTargetSelection(peerID: "A").status(in: [targetRow("A", online: false), targetRow("B", online: true)])
+    }
+
+    @Test("目标离线：即使已连接/有会话/有方向/有选择也不可开始（等待 <名字> 上线）")
+    func targetOfflineBlocksStart() {
+        let availability = SyncUIStartGate.evaluate(
+            hasPairedDevice: true,
+            isConnected: true,
+            hasSession: true,
+            isRunning: false,
+            isEmptySelection: false,
+            targetStatus: mismatchedStatus
+        )
+        #expect(availability == .targetOffline)
+        #expect(!availability.canStart)
+        #expect(mismatchedStatus.waitingName == "A")
+    }
+
+    @Test("目标离线优先于「未连接」：用户选过谁就直说在等谁")
+    func targetOfflineBeatsNotConnected() {
+        let offlineStatus = SyncDeviceTargetSelection(peerID: "A").status(in: [targetRow("A", online: false)])
+        #expect(
+            SyncUIStartGate.evaluate(
+                hasPairedDevice: true,
+                isConnected: false,
+                hasSession: false,
+                isRunning: false,
+                isEmptySelection: false,
+                targetStatus: offlineStatus
+            ) == .targetOffline
+        )
+    }
+
+    @Test("目标在线：闸门不介入，沿用既有判定（可开始）")
+    func onlineTargetKeepsReady() {
+        let onlineStatus = SyncDeviceTargetSelection(peerID: "A").status(in: [targetRow("A", online: true)])
+        #expect(
+            SyncUIStartGate.evaluate(
+                hasPairedDevice: true,
+                isConnected: true,
+                hasSession: true,
+                isRunning: false,
+                isEmptySelection: false,
+                targetStatus: onlineStatus
+            ) == .ready
+        )
+    }
+
+    @Test("未选目标：闸门不介入（未配对/未连接由既有分支回答）")
+    func noTargetDoesNotBlock() {
+        let none = SyncDeviceTargetStatus.none
+        #expect(SyncUIStartGate.targetBlock(none) == nil)
+        #expect(
+            SyncUIStartGate.evaluate(
+                hasPairedDevice: false,
+                isConnected: false,
+                hasSession: false,
+                isRunning: false,
+                isEmptySelection: true,
+                targetStatus: none
+            ) == .notPaired
+        )
+    }
+}
+
 // MARK: - 阶段映射
 
 struct SyncUIPhaseTests {

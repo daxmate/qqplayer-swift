@@ -38,6 +38,8 @@ enum SyncUIStartAvailability: Equatable, Sendable {
     case noDirection
     /// 选择集为空（空选择 = 不推不拉）
     case emptySelection
+    /// 批 B2：**期望的同步目标**当前不在线（「等待 <名字> 上线」；名字在目标状态里）
+    case targetOffline
 
     /// 能否开始。
     var canStart: Bool { self == .ready }
@@ -45,19 +47,32 @@ enum SyncUIStartAvailability: Equatable, Sendable {
 
 /// 可用性判定（无副作用）。
 enum SyncUIStartGate {
-    /// 判定顺序（先到先返回）：未配对 → 未连接 → 会话不可用 → 同步中 → 未选方向 →
-    /// 空选择 → 可开始。
-    /// 为什么要这个顺序：连接类原因优先——它们对用户来说是「先解决这个」的前置条件，
+    /// 目标闸门（批 B2，**唯一实现**，两个同步入口共用）：选了设备却不在线
+    /// → `.targetOffline`（「等待 <名字> 上线」）；未选目标 = 不介入（nil，沿用连接类判定）。
+    /// 为什么优先于连接类原因：用户**明确选过**谁 → 直说在等谁，比泛泛「未连接」有用。
+    static func targetBlock(_ targetStatus: SyncDeviceTargetStatus?) -> SyncUIStartAvailability? {
+        guard let targetStatus, targetStatus.target != nil, !targetStatus.isTargetOnline else {
+            return nil
+        }
+        return .targetOffline
+    }
+
+    /// 判定顺序（先到先返回）：目标闸门 → 未配对 → 未连接 → 会话不可用 → 同步中 →
+    /// 未选方向 → 空选择 → 可开始。
+    /// 为什么要这个顺序：连接类原因优先（先解决这个）——它们对用户来说是前置条件，
     /// 未连接时空选择没有意义（提示先连线）；方向（T10）排在选择集之前——
     /// 方向决定内容源，选方向前「选了什么」根本还没意义。
+    /// `targetStatus` 缺省 nil = 不启用目标闸门（既有调用语义逐字不变）。
     static func evaluate(
         hasPairedDevice: Bool,
         isConnected: Bool,
         hasSession: Bool,
         isRunning: Bool,
         hasDirection: Bool = true,
-        isEmptySelection: Bool
+        isEmptySelection: Bool,
+        targetStatus: SyncDeviceTargetStatus? = nil
     ) -> SyncUIStartAvailability {
+        if let blocked = targetBlock(targetStatus) { return blocked }
         if !isConnected {
             return hasPairedDevice ? .notConnected : .notPaired
         }

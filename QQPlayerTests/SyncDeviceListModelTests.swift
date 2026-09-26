@@ -153,4 +153,142 @@ struct SyncDeviceListModelTests {
         // 空展示名回落占位文案（非空），不显示空白行
         #expect(bogus.first?.displayName.isEmpty == false)
     }
+
+    // MARK: - 批 B2：目标选择（期望目标 + 闸门）
+
+    @Test("目标状态：选中且在线 → 可同步；展示名与行一致")
+    func targetStatusOnline() {
+        let aID = Self.makeID(20)
+        let rows = SyncDeviceListModel.rows(
+            in: [Self.device(peerID: aID, displayName: "iPhone A")],
+            onlinePeerID: aID
+        )
+
+        let status = SyncDeviceTargetSelection(peerID: aID).status(in: rows)
+        #expect(status.target == SyncDeviceTarget(peerID: aID, displayName: "iPhone A"))
+        #expect(status.isTargetOnline)
+        #expect(status.canSync)
+        #expect(status.waitingName == nil)
+        #expect(status.mismatch == nil)
+    }
+
+    @Test("目标状态：选中但离线 → 不可同步，并给出「等待 <名字> 上线」所需的名字")
+    func targetStatusOffline() {
+        let aID = Self.makeID(21)
+        let bID = Self.makeID(22)
+        // 在线的是 B，用户选的是 A（A 离线）
+        let rows = SyncDeviceListModel.rows(
+            in: [Self.device(peerID: aID, displayName: "iPhone A"), Self.device(peerID: bID, displayName: "iPhone B")],
+            onlinePeerID: bID
+        )
+
+        let status = SyncDeviceTargetSelection(peerID: aID).status(in: rows)
+        #expect(!status.isTargetOnline)
+        #expect(!status.canSync)
+        #expect(status.waitingName == "iPhone A")
+    }
+
+    @Test("目标状态：连上的 ≠ 所选 → 结构化错配（两边都带展示名，供「一键改用」）")
+    func targetStatusMismatch() {
+        let aID = Self.makeID(23)
+        let bID = Self.makeID(24)
+        let rows = SyncDeviceListModel.rows(
+            in: [Self.device(peerID: aID, displayName: "iPhone A"), Self.device(peerID: bID, displayName: "iPhone B")],
+            onlinePeerID: bID
+        )
+
+        let status = SyncDeviceTargetSelection(peerID: aID).status(in: rows)
+        #expect(
+            status.mismatch
+                == SyncDeviceTargetMismatch(
+                    selected: SyncDeviceTarget(peerID: aID, displayName: "iPhone A"),
+                    connected: SyncDeviceTarget(peerID: bID, displayName: "iPhone B")
+                )
+        )
+
+        // 选中就是连上的那台 → 无错配
+        #expect(SyncDeviceTargetSelection(peerID: bID).status(in: rows).mismatch == nil)
+        // 一台都没在线 → 无从谈起（不报错配）
+        let offlineRows = SyncDeviceListModel.rows(in: [Self.device(peerID: aID)], onlinePeerID: nil)
+        #expect(SyncDeviceTargetSelection(peerID: aID).status(in: offlineRows).mismatch == nil)
+    }
+
+    @Test("目标选择：未选 / 空串一律归一成「未选」；未选时目标状态为空态")
+    func targetSelectionNormalizesEmpty() {
+        let aID = Self.makeID(25)
+        let rows = SyncDeviceListModel.rows(in: [Self.device(peerID: aID)], onlinePeerID: aID)
+
+        #expect(SyncDeviceTargetSelection(peerID: nil) == .none)
+        #expect(SyncDeviceTargetSelection(peerID: "") == .none)
+        #expect(!SyncDeviceTargetSelection(peerID: "").isSelected)
+
+        let status = SyncDeviceTargetSelection.none.status(in: rows)
+        #expect(status.target == nil)
+        #expect(!status.canSync)
+        #expect(status.waitingName == nil)
+        // 未选 ≠ 错配：没选时不断言「你要同步的是谁」
+        #expect(status.mismatch == nil)
+    }
+
+    @Test("目标选择：所选设备已撤销配对 → 回落默认（在线那台）且可写回")
+    func targetSelectionReconciles() {
+        let aID = Self.makeID(26)
+        let bID = Self.makeID(27)
+        let goneID = Self.makeID(28)
+        let rows = SyncDeviceListModel.rows(
+            in: [Self.device(peerID: aID), Self.device(peerID: bID)],
+            onlinePeerID: bID
+        )
+
+        #expect(SyncDeviceTargetSelection(peerID: aID).reconciled(in: rows).peerID == aID)
+        #expect(SyncDeviceTargetSelection(peerID: goneID).reconciled(in: rows).peerID == bID)
+        #expect(SyncDeviceTargetSelection.none.reconciled(in: rows).peerID == bID)
+    }
+
+    @Test("一键改用：把选择改成当前连上的那台；没连线时保持原选择")
+    func adoptingConnectedPeer() {
+        let aID = Self.makeID(29)
+        let bID = Self.makeID(30)
+        let rows = SyncDeviceListModel.rows(
+            in: [Self.device(peerID: aID), Self.device(peerID: bID)],
+            onlinePeerID: bID
+        )
+
+        #expect(SyncDeviceTargetSelection(peerID: aID).adoptingConnectedPeer(in: rows).peerID == bID)
+        // 已选中连上的那台 → 幂等
+        #expect(SyncDeviceTargetSelection(peerID: bID).adoptingConnectedPeer(in: rows).peerID == bID)
+
+        let offlineRows = SyncDeviceListModel.rows(in: [Self.device(peerID: aID)], onlinePeerID: nil)
+        #expect(SyncDeviceTargetSelection(peerID: aID).adoptingConnectedPeer(in: offlineRows).peerID == aID)
+        #expect(SyncDeviceTargetSelection.none.adoptingConnectedPeer(in: offlineRows) == .none)
+    }
+
+    @Test("同步数据闸门：目标离线不可开始；目标在线/未选则沿用连接类判定")
+    func dataSyncAvailability() {
+        let aID = Self.makeID(31)
+        let bID = Self.makeID(32)
+        let rows = SyncDeviceListModel.rows(
+            in: [Self.device(peerID: aID, displayName: "iPhone A"), Self.device(peerID: bID, displayName: "iPhone B")],
+            onlinePeerID: bID
+        )
+
+        // 选了离线的 A（连上的却是 B）→ 「同步数据」也不可开始（不能默默打到 B）
+        let mismatched = SyncDeviceTargetSelection(peerID: aID).status(in: rows)
+        #expect(
+            mismatched.dataSyncAvailability(isConnected: true, hasSession: true, isRunning: false)
+                == .targetOffline
+        )
+        // 目标在线 + 连接 + 会话 → 可开始；运行中 → alreadyRunning
+        let online = SyncDeviceTargetSelection(peerID: bID).status(in: rows)
+        #expect(online.dataSyncAvailability(isConnected: true, hasSession: true, isRunning: false) == .ready)
+        #expect(
+            online.dataSyncAvailability(isConnected: true, hasSession: true, isRunning: true)
+                == .alreadyRunning
+        )
+        // 未连接/无会话 → 沿用既有「未连接」文案分支
+        #expect(
+            online.dataSyncAvailability(isConnected: false, hasSession: false, isRunning: false)
+                == .notConnected
+        )
+    }
 }
