@@ -9,7 +9,7 @@
 //  覆盖不到（是「同一语义有两处/零处表达」），只能静态钉形状（AGENTS.md 2026-09-15：
 //  共享语义防第二实现必须靠形状测试，不能靠人记得）。
 //
-//  四条断言（全部 fail-closed：读不到文件 / 解析不出条目 = 红，绝不静默通过）：
+//  五条断言（全部 fail-closed：读不到文件 / 解析不出条目 = 红，绝不静默通过）：
 //   (a) 目录每条 titleKey（含分类）在**全部** lproj 的 Localizable.strings 里真实存在
 //       ——防止目录引用一个不存在的 key（搜索行标题显示成裸 key）。
 //   (b) 目录每条锚点在设置页源码里真实出现（标记式扫描 `.settingsAnchor(MacSettingsCatalog.<常量>)`）
@@ -19,6 +19,11 @@
 //   (d) ⌘K 浮层不得再有写死的分类名单（必须走 `MacSettingsCatalog.matches(for:)`），
 //       且全仓不许再出现字符串型私有 selector（`Selector((`）——本次修的第二个 bug
 //       （`showSettingsWindow:` 实测无效导致「点设置打不开」）。
+//   (e) 五个 lproj（en / fr / ru / zh-Hans / zh-Hant）的 Localizable.strings **key 集合两两完全相等**
+//       ——防止新增/删除 key 时漏补某一语：某一语缺 key 会在 UI 上显示成裸 key（或回退到
+//       developmentLanguage），多 key 是死文案。这是「全表对账」而非点名清单（点名清单见
+//       `SyncWiringContractTests.SyncEntityDisclosureContract.disclosureKeys`）。
+//       以 en 为基准逐语比对，差异**指名**（`zh-Hant 缺 [x, y]` / `fr 多 [z]`），便于直接排故。
 //
 //  **注释不算代码**（踩过坑：文档注释里出现反例写法会误伤）：扫描前剥注释，但**保留字符串
 //  字面量**（(c) 要看清 `.id("…")` 这种写法）；字符串里的 `//`（如 URL）不会被误当注释。
@@ -249,6 +254,25 @@ enum MacSettingsSearchContract {
         return result
     }
 
+    /// 纯函数：以 `base` 语为基准比对全部语，返回**点名**差异（合成自证用，不碰文件系统）。
+    /// - `zh-Hant 缺 [x, y]`：该语缺了基准里有的 key（UI 上会显示成裸 key / 回退开发语言）
+    /// - `fr 多 [z]`：该语多出基准里没有的 key（死文案）
+    /// 以某一语为基准（而非并集）才能同时报出「缺」与「多」：并集作基准时「多」恒为空集。
+    static func keySetMismatches(byLocale: [String: Set<String>], base: String) -> [String] {
+        guard let reference = byLocale[base] else {
+            return ["基准语 \(base) 不在扫描结果里（fail-closed）"]
+        }
+        var rows: [String] = []
+        for locale in byLocale.keys.sorted() where locale != base {
+            let keys = byLocale[locale] ?? []
+            let missing = reference.subtracting(keys).sorted()
+            let extra = keys.subtracting(reference).sorted()
+            if !missing.isEmpty { rows.append("\(locale) 缺 \(missing)") }
+            if !extra.isEmpty { rows.append("\(locale) 多 \(extra)") }
+        }
+        return rows
+    }
+
     /// 全仓（QQPlayer/ + Share/ + 测试）Swift 源码
     static func allSwiftSources() throws -> [(path: String, code: String)] {
         var files: [(String, String)] = []
@@ -312,6 +336,38 @@ struct MacSettingsSearchContractTests {
         }
         #expect(missing.isEmpty, "目录引用了不存在的本地化 key：\(missing)")
         #expect(keysByLocale.count >= 5, "lproj 数量疑似被削（当前 \(keysByLocale.keys.sorted())）")
+    }
+
+    @Test("(e) 五语 Localizable.strings 的 key 集合完全相等（防新增/删除 key 忘同步其它语）")
+    func localizationKeySetsAreIdenticalAcrossLocales() throws {
+        let keysByLocale = try MacSettingsSearchContract.localizationKeysByLocale()
+
+        // fail-closed ①：lproj 数量不足 → 红（防止扫到的语种被削后契约空转）
+        #expect(
+            keysByLocale.count >= 5,
+            "key 一致性契约要求至少 5 个 lproj，实际 \(keysByLocale.count) 个：\(keysByLocale.keys.sorted())"
+        )
+        // fail-closed ②：任一语解析出 0 个 key → 红（防「两边都空所以相等」的假绿）
+        let emptyLocales = keysByLocale.filter { $0.value.isEmpty }.keys.sorted()
+        #expect(emptyLocales.isEmpty, "下列语种解析出 0 个 key（资源读空或被改坏，fail-closed）：\(emptyLocales)")
+
+        // 基准 = en（开发/回退语言）：以它为基准才能同时报出「缺」与「多」
+        // （用并集作基准时「多」恒为空集，“新增 key 忘补其它语”只能报成别语「缺」）。
+        let baseLocale = "en"
+        let reference = keysByLocale[baseLocale] ?? []
+        // fail-closed ③：基准为空 → 红（全表解析失败 / 基准语缺失不能算「相等」）
+        #expect(!reference.isEmpty, "基准语 \(baseLocale) 的 key 集合为空——本地化资源整体解析失败，契约必须红（fail-closed）")
+
+        // 差异必须指名：`zh-Hant 缺 [x, y]` / `fr 多 [z]`
+        let mismatches = MacSettingsSearchContract.keySetMismatches(byLocale: keysByLocale, base: baseLocale)
+        #expect(
+            mismatches.isEmpty,
+            """
+            五语 Localizable.strings 的 key 集合不一致（新增/删除 key 时漏补其它语）：
+            \(mismatches.joined(separator: "\n"))
+            基准 \(baseLocale) 共 \(reference.count) 个 key；各语数量：\(keysByLocale.mapValues(\.count).sorted { $0.key < $1.key })
+            """
+        )
     }
 
     @Test("(b)(c) 每条锚点在设置页真实出现；设置页不得手写锚点 id")
@@ -430,5 +486,27 @@ struct MacSettingsSearchContractTests {
         #expect(parsed?.count == 1)
         #expect(parsed?.first?.aliases == ["刮削", "批量", "batch"])
         #expect(parsed?.first?.category == "scraping")
+
+        // 五语 key 对账：缺 / 多都必须点名（合成自证，不碰文件系统）
+        let mismatches = MacSettingsSearchContract.keySetMismatches(
+            byLocale: [
+                "en": ["a", "b", "c"],
+                "zh-Hant": ["a", "b"],
+                "fr": ["a", "b", "c", "d"],
+            ],
+            base: "en"
+        )
+        #expect(mismatches.count == 2, "缺 / 多应各报一条，实际 \(mismatches)")
+        #expect(mismatches.contains("zh-Hant 缺 [\"c\"]"), "缺 key 必须指名语种 + key，实际 \(mismatches)")
+        #expect(mismatches.contains("fr 多 [\"d\"]"), "多 key 必须指名语种 + key，实际 \(mismatches)")
+        #expect(
+            MacSettingsSearchContract.keySetMismatches(byLocale: ["en": ["a"], "fr": ["a"]], base: "en").isEmpty,
+            "key 集合相同不应误报"
+        )
+        #expect(
+            MacSettingsSearchContract.keySetMismatches(byLocale: ["fr": ["a"]], base: "en")
+                == ["基准语 en 不在扫描结果里（fail-closed）"],
+            "基准语缺失必须 fail-closed"
+        )
     }
 }
