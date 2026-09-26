@@ -194,6 +194,7 @@
 		31A7AB7341E8439FAF3A625E /* MacLibraryFactsReadPathContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA91F411797C46088A5BC4B6 /* MacLibraryFactsReadPathContractTests.swift */; };
 		E24B4CFA87204D229B3F6BD4 /* ObservationTrackingTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155AAF09276B402CAA2AEA18 /* ObservationTrackingTestSupport.swift */; };
 		3384729FD1C74CFC9E6167C8 /* ObservationTrackingShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */; };
+		A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -437,6 +438,7 @@
 		FA91F411797C46088A5BC4B6 /* MacLibraryFactsReadPathContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryFactsReadPathContractTests.swift; sourceTree = "<group>"; };
 		155AAF09276B402CAA2AEA18 /* ObservationTrackingTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationTrackingTestSupport.swift; sourceTree = "<group>"; };
 		2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationTrackingShapeContractTests.swift; sourceTree = "<group>"; };
+		B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncResultConclusionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1210,6 +1212,7 @@
 				FA91F411797C46088A5BC4B6 /* MacLibraryFactsReadPathContractTests.swift */,
 				155AAF09276B402CAA2AEA18 /* ObservationTrackingTestSupport.swift */,
 				2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */,
+				B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1702,6 +1705,7 @@
 				31A7AB7341E8439FAF3A625E /* MacLibraryFactsReadPathContractTests.swift in Sources */,
 				E24B4CFA87204D229B3F6BD4 /* ObservationTrackingTestSupport.swift in Sources */,
 				3384729FD1C74CFC9E6167C8 /* ObservationTrackingShapeContractTests.swift in Sources */,
+				A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

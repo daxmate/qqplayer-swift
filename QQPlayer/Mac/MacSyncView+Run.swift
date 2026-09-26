@@ -2,9 +2,10 @@
 //  MacSyncView+Run.swift
 //  QQPlayer
 //
-//  `MacSyncRunSection` 的 D 执行区 / E 结果区 / E2 对齐歌词补发区 / F 数据同步区
-//  （2026-09-19 从 `MacSyncView.swift` 纯搬家，零行为/UI 变化）：
-//  开始与阶段/进度上屏、失败清单披露、最近一次结果、F2 歌词补发事实、
+//  `MacSyncRunSection` 的 D 执行区 / E 结果区 / F 数据同步区
+//  （2026-09-19 从 `MacSyncView.swift` 纯搬家，零行为/UI 变化；
+//   2026-09-25 结果区改「默认只显示结论行 + 详情折叠」，E2 对齐歌词补发区并入 E 的详情）：
+//  开始与阶段/进度上屏、最近一次结果（结论行 + 折叠详情）、
 //  播放数据（收藏/播放历史/歌单结构）同步动作与账目上屏。
 //
 //  纪律不变：本文件只做展示——阶段/进度/结果全来自 `MacSyncRunViewModel` +
@@ -138,94 +139,29 @@ extension MacSyncRunSection {
         }
     }
 
-    // MARK: - E 结果区
+    // MARK: - E 结果区（2026-09-25：默认只显示结论行；明细折叠）
 
     @ViewBuilder
     var resultSection: some View {
+        let report = model.reportSummary
+        let resend = lyricsFacts.lastSummary
+        let conclusion = report.map { SyncEntityOutcomeDisclosure.fileConclusion($0, lyricsResend: resend) }
         Section {
-            if let report = model.reportSummary {
-                if report.isEmptySelection {
-                    Text("sync_run_result_empty_selection".localized)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                } else {
-                    HStack(alignment: .top, spacing: DesignTokens.space24) {
-                        metric("sync_run_result_pushed".localized, report.pushedCount, .primary)
-                        metric("sync_run_result_pulled".localized, report.pulledCount, .primary)
-                        metric("sync_run_result_skipped".localized, report.skippedCount, .secondary)
-                        metric(
-                            "sync_run_result_failed".localized,
-                            report.failedCount,
-                            report.failedCount > 0 ? .red : .secondary
-                        )
-                        Spacer()
-                    }
-                    .padding(.vertical, DesignTokens.space2)
-
-                    // E-1（2026-09-21）：「计划为空（对端已一致）」不得显示成普通完成。
-                    // 判定在 `SyncUIReportSummary.isEmptyPlanAlreadyIdentical`（纯逻辑），
-                    // 本视图只展示：计数 + 前 3 条路径（否则用户看到的是「秒报完成、零字节」）。
-                    if report.isEmptyPlanAlreadyIdentical {
-                        VStack(alignment: .leading, spacing: DesignTokens.space4) {
-                            Text("sync_run_result_peer_identical".localized(with: report.peerAlreadyHasCount))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            ForEach(report.peerAlreadyHasSample, id: \.self) { path in
-                                Text(path)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        }
-                        .padding(.top, DesignTokens.space2)
-                    }
-
-                    if report.unresolvedCount > 0 {
-                        Text("sync_run_result_unresolved".localized(with: report.unresolvedCount))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if !report.unknownPlaylistIDs.isEmpty {
-                        Text("sync_run_unknown_playlists".localized(with: report.unknownPlaylistIDs.count))
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                    if report.failedCount > 0 {
-                        failureDisclosure(report)
-                    }
-                    // F2 对齐歌词（2026-09-16）：丢弃 / 保留本端 必须计数上屏。
-                    // 行与文案 key 全部来自唯一投影（UI 不自算、不拼 key）。
-                    let lyricsRows = SyncEntityOutcomeDisclosure.lyricsRows(
-                        discarded: report.lyricsDiscarded.count,
-                        pendingResend: 0,
-                        keptLocal: report.lyricsKeptLocal.count
-                    )
-                    if !lyricsRows.isEmpty {
-                        Text(SyncEntityOutcomeDisclosure.lyricsSectionTitleKey.localized)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        ForEach(Array(lyricsRows.enumerated()), id: \.offset) { _, row in
-                            VStack(alignment: .leading, spacing: DesignTokens.space4) {
-                                LabeledContent(row.labelKey.localized(with: row.count)) {
-                                    Text("\(row.count)")
-                                        .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
-                                }
-                                if let hintKey = row.hintKey {
-                                    Text(hintKey.localized(with: row.count))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                    }
-                }
+            if let conclusion {
+                conclusionLine(conclusion)
             } else {
                 Text("sync_run_result_none".localized)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            }
+
+            if let report, let conclusion, conclusion.hasDetail {
+                DisclosureGroup(isExpanded: $showFileResultDetail) {
+                    fileResultDetail(report, resend: resend)
+                } label: {
+                    Text(SyncEntityOutcomeDisclosure.detailLabelKey.localized)
+                        .font(.callout)
+                }
             }
 
             Text("sync_run_result_no_deletion".localized)
@@ -236,69 +172,99 @@ extension MacSyncRunSection {
         }
     }
 
-    // MARK: - E2 对齐歌词补发区（F2，2026-09-16）
-
-    /// 连接就绪自动跑的那一轮**对齐歌词补发**的结果。
-    ///
-    /// 数字来自账目（`MacLyricsResendFactsStore.lastSummary`），行与文案 key 来自唯一投影
-    /// `SyncEntityOutcomeDisclosure.lyricsRows`——本视图不自己算、不自己拼 key。
-    /// 整区只在**本次连接跑过一轮**时出现（nil = 还没跑 / 已随会话清空）。
-    ///
-    /// 这一轮**只推不拉**（对齐歌词单向：桌面 → 移动）：所以「丢弃 / 保留本端」两个数字
-    /// 在本区恒为 0（那是**接收侧**的事实，见 iOS「接收同步」区与 E 结果区），
-    /// 本区如实披露的是「已送达 / 待补发 / 两侧都有」。
+    /// 结论行：只显示投影给出的段（哪些指标出现 / 文案 key / 严重度全在
+    /// `SyncEntityOutcomeDisclosure` 里定，本视图不写判断，只负责拼接与上色）。
     @ViewBuilder
-    var lyricsResendSection: some View {
-        if let summary = lyricsFacts.lastSummary {
-            let rows = SyncEntityOutcomeDisclosure.lyricsRows(
-                discarded: 0,
-                pendingResend: summary.pendingResend.count,
-                keptLocal: 0
-            )
-            Section {
-                HStack(alignment: .top, spacing: DesignTokens.space24) {
-                    metric("sync_run_result_pushed".localized, summary.pushed.count, .primary)
-                    metric("sync_run_result_skipped".localized, summary.presentCount, .secondary)
-                    Spacer()
-                }
-                .padding(.vertical, DesignTokens.space2)
-
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    VStack(alignment: .leading, spacing: DesignTokens.space4) {
-                        LabeledContent(row.labelKey.localized(with: row.count)) {
-                            Text("\(row.count)")
-                                .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
-                        }
-                        if let hintKey = row.hintKey {
-                            Text(hintKey.localized(with: row.count))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+    private func conclusionLine(_ line: SyncResultConclusionLine) -> some View {
+        if let messageKey = line.messageKey {
+            Text(messageKey.localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space12) {
+                ForEach(Array(line.segments.enumerated()), id: \.offset) { _, segment in
+                    HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space4) {
+                        Text(segment.labelKey.localized)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text("\(segment.count)")
+                            .font(.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(conclusionColor(segment.severity))
                     }
                 }
-            } header: {
-                Text(SyncEntityOutcomeDisclosure.lyricsSectionTitleKey.localized)
+                Spacer(minLength: DesignTokens.space0)
             }
         }
     }
 
-    private func metric(_ label: String, _ value: Int, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space2) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("\(value)")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(color)
+    /// 严重度 → 颜色（颜色属界面层；“缺口 / 失败”的判断在投影里）。
+    private func conclusionColor(_ severity: SyncResultConclusionSegment.Severity) -> Color {
+        switch severity {
+        case .normal: .primary
+        case .gap: .orange
+        case .failure: .red
         }
     }
 
-    private func failureDisclosure(_ report: SyncUIReportSummary) -> some View {
-        DisclosureGroup(
-            isExpanded: $showFailures,
-            content: {
+    /// E 结果区**详情**（默认折叠）：指标墙 / 提示行 / 「对端已一致」例举 / 失败路径清单 /
+    /// 对齐歌词（E2 补发轮事实**并入此处**——它与 E 的歌词行同一投影，不再单开一区）。
+    @ViewBuilder
+    private func fileResultDetail(
+        _ report: SyncUIReportSummary,
+        resend: SyncLyricsResendSummary?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.space8) {
+            if !report.isEmptySelection {
+                HStack(alignment: .top, spacing: DesignTokens.space24) {
+                    metric("sync_run_result_pushed".localized, report.pushedCount, .primary)
+                    metric("sync_run_result_pulled".localized, report.pulledCount, .primary)
+                    metric("sync_run_result_skipped".localized, report.skippedCount, .secondary)
+                    metric(
+                        "sync_run_result_failed".localized,
+                        report.failedCount,
+                        report.failedCount > 0 ? .red : .secondary
+                    )
+                    Spacer()
+                }
+                .padding(.vertical, DesignTokens.space2)
+            }
+
+            // E-1（2026-09-21）：「计划为空（对端已一致）」不得显示成普通完成。
+            // 判定在 `SyncUIReportSummary.isEmptyPlanAlreadyIdentical`（纯逻辑），
+            // 本视图只展示：计数 + 前 3 条路径（否则用户看到的是「秒报完成、零字节」）。
+            if report.isEmptyPlanAlreadyIdentical {
+                VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                    Text("sync_run_result_peer_identical".localized(with: report.peerAlreadyHasCount))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(report.peerAlreadyHasSample, id: \.self) { path in
+                        Text(path)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .padding(.top, DesignTokens.space2)
+            }
+
+            if report.unresolvedCount > 0 {
+                Text("sync_run_result_unresolved".localized(with: report.unresolvedCount))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !report.unknownPlaylistIDs.isEmpty {
+                Text("sync_run_unknown_playlists".localized(with: report.unknownPlaylistIDs.count))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            // 失败永不折叠进沉默：计数已在结论行，「详情」展开即见路径清单。
+            if report.failedCount > 0 {
+                Text("sync_run_result_failures_header".localized(with: report.failedCount))
+                    .font(.callout)
                 VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     ForEach(report.failedItems) { item in
                         HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space8) {
@@ -316,12 +282,70 @@ extension MacSyncRunSection {
                     }
                 }
                 .padding(.top, DesignTokens.space4)
-            },
-            label: {
-                Text("sync_run_result_failures_header".localized(with: report.failedCount))
-                    .font(.callout)
             }
-        )
+
+            // 对齐歌词（唯一投影**一次成型**）：接收侧事实（E）+ 本轮补发事实（原 E2）。
+            // 补发那一轮只推不拉（桌面 → 移动）；三个数字全来自账目、行与 key 全来自
+            // `SyncEntityOutcomeDisclosure.lyricsRows`，本视图不自己算、不自己拼 key。
+            let lyricsRows = SyncEntityOutcomeDisclosure.lyricsRows(
+                discarded: report.lyricsDiscarded.count,
+                pendingResend: resend?.pendingResend.count ?? 0,
+                keptLocal: report.lyricsKeptLocal.count
+            )
+            if resend != nil || !lyricsRows.isEmpty {
+                VStack(alignment: .leading, spacing: DesignTokens.space6) {
+                    Text(SyncEntityOutcomeDisclosure.lyricsSectionTitleKey.localized)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let resend {
+                        HStack(alignment: .top, spacing: DesignTokens.space24) {
+                            metric("sync_run_result_pushed".localized, resend.pushed.count, .primary)
+                            metric("sync_run_result_skipped".localized, resend.presentCount, .secondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, DesignTokens.space2)
+                    }
+                    ForEach(Array(lyricsRows.enumerated()), id: \.offset) { _, row in
+                        VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                            LabeledContent(row.labelKey.localized(with: row.count)) {
+                                Text("\(row.count)")
+                                    .foregroundStyle(row.isGap ? Color.orange : Color.secondary)
+                            }
+                            if let hintKey = row.hintKey {
+                                Text(hintKey.localized(with: row.count))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, DesignTokens.space2)
+            }
+        }
+    }
+
+    /// 缺口解释行（计数 > 0 才出现；文案 key 由调用方点名，触发条件与折叠前逐字一致）。
+    @ViewBuilder
+    private func hintText(_ key: String, _ count: Int) -> some View {
+        if count > 0 {
+            Text(key.localized(with: count))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func metric(_ label: String, _ value: Int, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.space2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(value)")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundStyle(color)
+        }
     }
 
     // MARK: - F 数据同步区（S2-T12：与文件传输解耦的「同步数据」）
@@ -436,139 +460,113 @@ extension MacSyncRunSection {
         }
     }
 
-    /// 账目：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 身份歧义 / 未支持（播放位置未落地）
-    /// / 缺指纹（本端发出）/ 忽略删除 + 各自解释。
+    /// 账目结论行（2026-09-25）：默认只显示「发送 / 应用 / 缺口」的非零项——判定与文案 key 全来自
+    /// 唯一投影 `SyncEntityOutcomeDisclosure.dataConclusion(_:)`，本视图不写判断；
+    /// 指标墙 / 各缺口解释 / 按实体披露全在「详情」里（默认折叠）。
     @ViewBuilder
     private var dataResult: some View {
         let report = dataModel.report
         if dataModel.phase == .finished {
-            HStack(alignment: .top, spacing: DesignTokens.space20) {
-                metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
-                metric("sync_run_data_result_applied".localized, report.appliedEntries, .primary)
-                metric(
-                    "sync_run_data_result_pending".localized,
-                    report.suspendedEntries,
-                    report.suspendedEntries > 0 ? .orange : .secondary
-                )
-                metric(
-                    "sync_run_data_result_unresolved".localized,
-                    report.unresolvedEntries,
-                    report.unresolvedEntries > 0 ? .orange : .secondary
-                )
-                metric(
-                    "sync_run_data_unsupported".localized,
-                    report.unsupportedEntries,
-                    report.unsupportedEntries > 0 ? .orange : .secondary
-                )
-                metric(
-                    "sync_run_data_skipped_parent".localized,
-                    report.skippedMissingParentEntries,
-                    report.skippedMissingParentEntries > 0 ? .orange : .secondary
-                )
-                metric(
-                    "sync_run_data_result_missing_identity".localized,
-                    report.pushedMissingIdentityEntries,
-                    report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
-                )
-                // 身份歧义（2026-09-15）：**仅当 N > 0 才显示**（无歧义时不留一个恒 0 的噪音格）。
-                if report.ambiguousIdentityEntries > 0 {
-                    metric(
-                        "sync_run_data_ambiguous_identity".localized,
-                        report.ambiguousIdentityEntries,
-                        .orange
-                    )
+            let conclusion = SyncEntityOutcomeDisclosure.dataConclusion(report)
+            conclusionLine(conclusion)
+            if conclusion.hasDetail {
+                DisclosureGroup(isExpanded: $showDataResultDetail) {
+                    dataResultDetail(report)
+                } label: {
+                    Text(SyncEntityOutcomeDisclosure.detailLabelKey.localized)
+                        .font(.callout)
                 }
-                // 应用失败（2026-09-15）：同样仅 N > 0 才显示；口径与 iOS 面板的缺口行一致（INV-29）。
-                if report.applyFailedEntries > 0 {
-                    metric(
-                        "sync_run_data_apply_failed".localized,
-                        report.applyFailedEntries,
-                        .orange
-                    )
-                }
-                metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
-                Spacer()
-            }
-            .padding(.vertical, DesignTokens.space2)
-
-            if report.suspendedEntries > 0 {
-                Text("sync_run_data_pending_hint".localized(with: report.suspendedEntries))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if report.unresolvedEntries > 0 {
-                Text("sync_run_data_unresolved_hint".localized(with: report.unresolvedEntries))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if report.ambiguousIdentityEntries > 0 {
-                Text("sync_run_data_ambiguous_identity_hint".localized(with: report.ambiguousIdentityEntries))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if report.unsupportedEntries > 0 {
-                Text("sync_run_data_unsupported_hint".localized(with: report.unsupportedEntries))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if report.skippedMissingParentEntries > 0 {
-                Text("sync_run_data_skipped_parent_hint".localized(with: report.skippedMissingParentEntries))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if report.applyFailedEntries > 0 {
-                Text("sync_run_data_apply_failed_hint".localized(with: report.applyFailedEntries))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if report.pushedMissingIdentityEntries > 0 {
-                Text(
-                    "sync_run_data_missing_identity_hint"
-                        .localized(with: report.pushedMissingIdentityEntries)
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-
-            // 按实体披露（INV-18 后半句）：只出计数 > 0 的 (结果, 实体) 行——正常实体不占行。
-            // 数字与顺序全部来自唯一投影 `SyncEntityOutcomeDisclosure`（UI 不自算、不枚举实体）。
-            let entityRows = SyncEntityOutcomeDisclosure.rows(report.tally)
-            if !entityRows.isEmpty {
-                VStack(alignment: .leading, spacing: DesignTokens.space4) {
-                    Text(SyncEntityOutcomeDisclosure.breakdownTitleKey.localized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    ForEach(Array(entityRows.enumerated()), id: \.offset) { _, row in
-                        HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space6) {
-                            Text(SyncEntityOutcomeDisclosure.rowLabel(row))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(row.count)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.orange)
-                        }
-                    }
-                }
-                .padding(.top, DesignTokens.space2)
             }
         } else if !dataModel.isRunning {
             Text("sync_run_data_result_none".localized)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 账目**详情**（默认折叠）：发送 / 应用 / 挂起（本地缺歌）/ 未定位（缺身份键）/ 身份歧义
+    /// / 未支持（播放位置未落地）/ 缺指纹（本端发出）/ 忽略删除 + 各自解释。
+    @ViewBuilder
+    private func dataResultDetail(_ report: SyncDataSyncReport) -> some View {
+        HStack(alignment: .top, spacing: DesignTokens.space20) {
+            metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
+            metric("sync_run_data_result_applied".localized, report.appliedEntries, .primary)
+            metric(
+                "sync_run_data_result_pending".localized,
+                report.suspendedEntries,
+                report.suspendedEntries > 0 ? .orange : .secondary
+            )
+            metric(
+                "sync_run_data_result_unresolved".localized,
+                report.unresolvedEntries,
+                report.unresolvedEntries > 0 ? .orange : .secondary
+            )
+            metric(
+                "sync_run_data_unsupported".localized,
+                report.unsupportedEntries,
+                report.unsupportedEntries > 0 ? .orange : .secondary
+            )
+            metric(
+                "sync_run_data_skipped_parent".localized,
+                report.skippedMissingParentEntries,
+                report.skippedMissingParentEntries > 0 ? .orange : .secondary
+            )
+            metric(
+                "sync_run_data_result_missing_identity".localized,
+                report.pushedMissingIdentityEntries,
+                report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
+            )
+            // 身份歧义（2026-09-15）：**仅当 N > 0 才显示**（无歧义时不留一个恒 0 的噪音格）。
+            if report.ambiguousIdentityEntries > 0 {
+                metric(
+                    "sync_run_data_ambiguous_identity".localized,
+                    report.ambiguousIdentityEntries,
+                    .orange
+                )
+            }
+            // 应用失败（2026-09-15）：同样仅 N > 0 才显示；口径与 iOS 面板的缺口行一致（INV-29）。
+            if report.applyFailedEntries > 0 {
+                metric(
+                    "sync_run_data_apply_failed".localized,
+                    report.applyFailedEntries,
+                    .orange
+                )
+            }
+            metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
+            Spacer()
+        }
+        .padding(.vertical, DesignTokens.space2)
+
+        // 缺口解释（计数 > 0 才出；key / 计数逐条对应既有口径，未改任何触发条件）。
+        hintText("sync_run_data_pending_hint", report.suspendedEntries)
+        hintText("sync_run_data_unresolved_hint", report.unresolvedEntries)
+        hintText("sync_run_data_ambiguous_identity_hint", report.ambiguousIdentityEntries)
+        hintText("sync_run_data_unsupported_hint", report.unsupportedEntries)
+        hintText("sync_run_data_skipped_parent_hint", report.skippedMissingParentEntries)
+        hintText("sync_run_data_apply_failed_hint", report.applyFailedEntries)
+        hintText("sync_run_data_missing_identity_hint", report.pushedMissingIdentityEntries)
+
+        // 按实体披露（INV-18 后半句）：只出计数 > 0 的 (结果, 实体) 行——正常实体不占行。
+        // 数字与顺序全部来自唯一投影 `SyncEntityOutcomeDisclosure`（UI 不自算、不枚举实体）。
+        let entityRows = SyncEntityOutcomeDisclosure.rows(report.tally)
+        if !entityRows.isEmpty {
+            VStack(alignment: .leading, spacing: DesignTokens.space4) {
+                Text(SyncEntityOutcomeDisclosure.breakdownTitleKey.localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(Array(entityRows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space6) {
+                        Text(SyncEntityOutcomeDisclosure.rowLabel(row))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(row.count)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+            .padding(.top, DesignTokens.space2)
         }
     }
 }

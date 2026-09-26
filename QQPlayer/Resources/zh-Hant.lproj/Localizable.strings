@@ -1312,6 +1312,10 @@
 "sync_run_result_peer_identical" = "對端已一致，無需傳輸（跳過 %d 項）：";
 "sync_run_result_no_deletion" = "同步不會刪除任何一端的歌曲。";
 
+// 2026-09-25 結果區預設折疊：結論行 + 「詳情」DisclosureGroup
+"sync_result_detail" = "詳情";
+"sync_result_nothing_new" = "沒有需要同步的改動";
+
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
 "sync_run_data_section" = "播放資料";
 "sync_run_data_description" = "獨立於檔案傳輸，只同步收藏 / 播放紀錄 / 播放列表，不傳歌曲。";

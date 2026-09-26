@@ -60,8 +60,10 @@ struct MacSyncRunSection: View {
     @State var showResetCursorsConfirm = false
     /// 二次确认文案里的规模（弹框时现算）。
     @State var libraryWidePreview: SyncUISelectionSummary = .empty
-    /// 失败清单展开态。
-    @State var showFailures = false
+    /// E 结果区「详情」展开态（默认折叠；视图本地态，不持久化）。
+    @State var showFileResultDetail = false
+    /// F 数据同步结果「详情」展开态（同上）。
+    @State var showDataResultDetail = false
     /// 本页设置读写（跨端续播开关；与 MacSettingsView 同做法：load → 改 → save）。
     @State var deleteSettings = DeleteSettings.load()
     /// 单曲搜索防抖任务。
@@ -91,7 +93,6 @@ struct MacSyncRunSection: View {
             selectionSection
             runSection
             resultSection
-            lyricsResendSection
             dataSection
         }
         .onAppear {

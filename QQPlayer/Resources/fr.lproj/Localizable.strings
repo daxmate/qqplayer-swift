@@ -961,6 +961,10 @@
 "sync_run_result_peer_identical" = "Déjà identique sur l'autre appareil — rien à transférer (%d ignoré(s)) :";
 "sync_run_result_no_deletion" = "La synchronisation ne supprime jamais de morceaux, sur aucun appareil.";
 
+// 2026-09-25 结果区默认折叠：结论行 + 「详情」DisclosureGroup
+"sync_result_detail" = "Détails";
+"sync_result_nothing_new" = "Rien à synchroniser";
+
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
 "sync_run_data_section" = "Données de lecture";
 "sync_run_data_description" = "Synchronise les favoris, l'historique et les playlists indépendamment des fichiers — aucune chanson n'est transférée.";

@@ -34,6 +34,37 @@ enum SyncOutcomePlacement: Equatable {
     case count(labelKey: String)
 }
 
+/// 结论行的一段：文案 key + 计数 + 严重度（颜色属界面层，界面据严重度上色）。
+struct SyncResultConclusionSegment: Equatable, Sendable {
+    /// 严重度：`normal` = 正常结果；`gap` = 缺口（有东西没落本地）；`failure` = 失败。
+    enum Severity: Equatable, Sendable {
+        case normal
+        case gap
+        case failure
+    }
+
+    /// 行文案 key（**复用既有行文案**，不新增汇总文案）。
+    var labelKey: String
+    var count: Int
+    var severity: Severity
+}
+
+/// 结果区的**结论行**（2026-09-25「结果区默认折叠」）：折叠态下**唯一常显**的内容。
+///
+/// 明细（指标墙 / 提示 / 按实体披露 / 失败清单 / 歌词行）全进「详情」DisclosureGroup 且默认
+/// 折叠，但**失败与缺口不进沉默** —— 它们的计数就在这一行里（`severity` 供界面标红/标橙）。
+///
+/// 纯逻辑（零 IO、零 SwiftUI）：哪些段出现、文案 key 是什么、什么严重度，全在这里决定；
+/// 界面只负责拼接展示（与 `rows(_:)` 同一纪律）。
+struct SyncResultConclusionLine: Equatable, Sendable {
+    /// 计数段（**只含计数 > 0 的项** —— 恒 0 指标不上屏 = 消噪音）。
+    var segments: [SyncResultConclusionSegment] = []
+    /// 整句兜底文案 key（空选择 / 没有需要同步的改动）；非 nil 时界面只显示它。
+    var messageKey: String?
+    /// 详情块是否有内容（false = 不渲染「详情」）。
+    var hasDetail: Bool = false
+}
+
 /// 账目 → 面板行的**唯一投影**（两端面板共用；纯逻辑、零 IO、可单测）。
 enum SyncEntityOutcomeDisclosure {
     // MARK: - 一行的形状
@@ -257,6 +288,100 @@ enum SyncEntityOutcomeDisclosure {
             isGap: true,
             count: unavailable
         )]
+    }
+
+    // MARK: - 结论行（2026-09-25：结果区**默认折叠**后唯一常显的一行）
+
+    /// 「详情」DisclosureGroup 的标签 key（文件同步 / 数据同步两处共用）。
+    static let detailLabelKey = "sync_result_detail"
+
+    /// 所有计数都为 0 时的兜底文案 key（不留空白结论行）。
+    static let nothingNewKey = "sync_result_nothing_new"
+
+    /// 数据同步结论行的展示顺序（**只出计数 > 0 的项**）。
+    ///
+    /// 顺序 = 正常结果（发送 → 应用）→ 缺口（复用 `gapOrder` 的严重度顺序）→ 挂起 →
+    /// 忽略删除（删除不跨端传播 = 设计行为，不是缺口）。
+    /// ⚠️ 必须**恰好覆盖** `SyncRowOutcome.allCases`（有用例钉住：新增类别漏表态即红）。
+    static let conclusionOrder: [SyncRowOutcome] = [.outbound, .applied]
+        + gapOrder + [.suspended, .ignoredDelete]
+
+    /// 一类结果在结论行里的**严重度**（缺口 = 「有东西没落本地」，与 `disclosesByEntity`
+    /// 同一判据 —— 有用例钉住两者集合一致）。挂起是唯一例外口径：它在指标墙里是「恒出现的
+    /// 计数行」，但对用户仍是缺口（有数据还没落本地）。
+    ///
+    /// `switch` **无 `default`**：新增 `SyncRowOutcome` 类别时这里编译不过，不会静默漏色。
+    static func conclusionSeverity(_ outcome: SyncRowOutcome) -> SyncResultConclusionSegment.Severity {
+        switch outcome {
+        case .unresolved, .applyFailed, .ambiguousIdentity, .skippedMissingParent,
+             .unsupported, .missingIdentity, .suspended:
+            return .gap
+        case .applied, .outbound, .ignoredDelete:
+            return .normal
+        }
+    }
+
+    /// 文件同步（Mac E 结果区）结论行。
+    ///
+    /// `lyricsResend` = 本次连接那轮**对齐歌词补发**的账目（nil = 还没跑过）；它只影响
+    /// 「详情里有没有内容」（补发轮事实已并入 E 的详情），不影响文件同步本身的结论。
+    static func fileConclusion(
+        _ report: SyncUIReportSummary,
+        lyricsResend: SyncLyricsResendSummary?
+    ) -> SyncResultConclusionLine {
+        var line = SyncResultConclusionLine()
+        guard !report.isEmptySelection else {
+            // 空选择：既不成功也不失败 —— 照既有语义明说「没有传输」
+            // （`isEmptyPlanAlreadyIdentical` 的判定与展示不变，仍在详情块里）。
+            line.messageKey = "sync_run_result_empty_selection"
+            line.hasDetail = lyricsResend != nil
+            return line
+        }
+        // 非空选择：详情里恒有指标墙（四格）→ 必有可展开的明细。
+        line.hasDetail = true
+        let counts: [(key: String, value: Int)] = [
+            ("sync_run_result_pushed", report.pushedCount),
+            ("sync_run_result_pulled", report.pulledCount),
+            ("sync_run_result_skipped", report.skippedCount),
+        ]
+        line.segments = counts.compactMap { item in
+            item.value > 0
+                ? SyncResultConclusionSegment(labelKey: item.key, count: item.value, severity: .normal)
+                : nil
+        }
+        if report.failedCount > 0 {
+            // 失败永不折叠进沉默：摘要行直写「失败 N」，路径清单在详情里。
+            line.segments.append(SyncResultConclusionSegment(
+                labelKey: "sync_run_result_failed",
+                count: report.failedCount,
+                severity: .failure
+            ))
+        }
+        if line.segments.isEmpty {
+            line.messageKey = nothingNewKey
+        }
+        return line
+    }
+
+    /// 数据同步（Mac F 结果区）结论行。
+    static func dataConclusion(_ report: SyncDataSyncReport) -> SyncResultConclusionLine {
+        var line = SyncResultConclusionLine()
+        // 未收尾 = 没有结论（界面显示「还没有同步过播放数据」）。
+        guard report.isFinished else { return line }
+        line.hasDetail = true
+        line.segments = conclusionOrder.compactMap { outcome in
+            let count = report.tally.count(for: outcome)
+            guard count > 0 else { return nil }
+            return SyncResultConclusionSegment(
+                labelKey: outcomeLabelKey(outcome),
+                count: count,
+                severity: conclusionSeverity(outcome)
+            )
+        }
+        if line.segments.isEmpty {
+            line.messageKey = nothingNewKey
+        }
+        return line
     }
 
     /// 歌词账目 → 披露行（**只出计数 > 0 的行**；顺序 = 丢弃 → 待补 → 保留本端）。
