@@ -3,9 +3,9 @@
 #
 # 为什么存在：iOS 单测走 xcodebuild + 模拟器（CI 兜底），而"不许启模拟器"的纪律下
 # 本地无法真跑 QQPlayerTests。本脚本用 swiftc 直编**生产源码**（QQPlayer/Sync/* 纯
-# 逻辑 + MusicDirectoryScanner + aligned 歌词库）+ scripts/sync-harness 的夹具，真跑与
-# 测试套件同构的断言（帧编解码/路径解析/应答器计划/控制器状态机与对账/三条端到端场景：
-# 拉取一致、远端已删不传播、越界拒绝 + M4-2b 歌词库与随歌同步）。
+# 逻辑 + 自动补入的 Services/Models 依赖 + aligned 歌词库）+ scripts/sync-harness 的
+# 夹具，真跑与测试套件同构的断言（帧编解码/路径解析/应答器计划/控制器状态机与对账/
+# 四条端到端场景：拉取一致、远端已删不传播、越界拒绝 + M4-2b 歌词库与随歌同步）。
 #
 # R1b-2 起：发起方恒为 Mac（SyncLibraryPushController / SyncLibraryPullController），
 # 旧 iOS 主动拉取控制器（SyncLibrarySyncController）已退役。
@@ -13,80 +13,42 @@
 # 覆盖不到的（由 CI 的 xcodebuild test 兜底）：Swift Testing 套件本体、iOS/Mac
 # target 的特有代码路径（LibraryIndexer 真实现、MacSyncLibraryHost 装配）。
 #
+# ★ 编译集是「自动发现 + 自动补闭包」，不再手工枚举（2026-09-26）：
+#   手工清单必然逐批腐烂（2026-09-21 E 拆分批后只收 Sync/ 的 42/68 个文件 ⇒ harness
+#   在基线上就编不过，而它又不在 CI 里，红了没人知道）。现在：
+#     起点 = QQPlayer/Sync/*.swift 全收（减黑名单）+ 三个夹具
+#     迭代 = swiftc 报 cannot find '<X>' in scope → 在 QQPlayer/{Sync,Services,Models}
+#            定位 X 的声明文件 → 全部候选一起加入（同名不猜）→ 重编 → 直到编译通过
+#     终点 = 无解即 exit 1 点名（绝不静默降级 / 绝不悄悄漏文件）
+#   实现在 scripts/sync-harness/closure_resolver.py（按内容哈希缓存，--refresh 重算）；
+#   黑名单 scripts/sync-harness/blacklist.txt 只放「确实编不进命令行」的文件，
+#   且自带两道守卫（路径存在 / 声明的符号仍被黑名单外的生产代码引用）。
+#
 # T12（2026-09-14）：`SyncBrowseSource.swift` 依赖的 `SmartPlaylistKind` 走 harness 同形桩
 # （生产宿主 SmartPlaylistStore 是 GRDB-SQL 重依赖，无法命令行直编）——编译前先跑桩/生产
 # 声明一致性守卫，防「生产新增 case」这类编译期看不见的漂移。
 #
-# 用法：scripts/run-local-sync-tests.sh [--verbose]
+# 用法：scripts/run-local-sync-tests.sh [--verbose] [--refresh]
+#   --verbose  打印闭包解析每轮细节
+#   --refresh  忽略闭包缓存，强制重算编译集
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 
+VERBOSE=0
+REFRESH=0
+for arg in "$@"; do
+  case "$arg" in
+    --verbose|-v) VERBOSE=1 ;;
+    --refresh) REFRESH=1 ;;
+    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    *) echo "❌ 未知参数：$arg（仅支持 --verbose / --refresh）"; exit 2 ;;
+  esac
+done
+
 OUT_DIR="${TMPDIR:-/tmp}/qqp-sync-harness-build"
 mkdir -p "$OUT_DIR"
 BIN="$OUT_DIR/sync-harness"
-
-SOURCES=(
-  QQPlayer/Sync/SyncFrame.swift
-  QQPlayer/Sync/SyncCrypto.swift
-  QQPlayer/Sync/SyncIdentity.swift
-  QQPlayer/Sync/DeviceID.swift
-  QQPlayer/Sync/PairingModels.swift
-  QQPlayer/Sync/PairingStateMachine.swift
-  QQPlayer/Sync/SyncSessionModels.swift
-  QQPlayer/Sync/SyncPeerSession.swift
-  QQPlayer/Sync/SyncPeerSession+Frames.swift
-  # E2（2026-09-21）：会话事件分发链拆出为独立文件（本清单里 4 个文件消费 SyncSessionAttachment）
-  QQPlayer/Sync/SyncEventHandlerChain.swift
-  QQPlayer/Sync/SyncFileChecksum.swift
-  QQPlayer/Sync/SyncFileTransferModels.swift
-  QQPlayer/Sync/SyncFileSender.swift
-  # E5（2026-09-21）：锁内状态机拆出为独立文件（两片互相引用）
-  QQPlayer/Sync/SyncFileReceiver+StateMachine.swift
-  QQPlayer/Sync/SyncFileReceiver.swift
-  QQPlayer/Sync/SyncManifest.swift
-  QQPlayer/Sync/SyncManifestGenerator.swift
-  QQPlayer/Sync/SyncManifestReconciler.swift
-  QQPlayer/Sync/SyncManifestPeer.swift
-  # T9「对端内容清单」（帧 15/16）：载荷 + 纯逻辑清单/分页 + 应答端 + 客户端（Mac）
-  QQPlayer/Sync/SyncPeerLibraryModels.swift
-  QQPlayer/Sync/SyncPeerLibraryCatalog.swift
-  # 同步内容来源标识命名空间（纯逻辑，零依赖；`SyncPeerLibraryCatalog` 的 `@smart:*`
-  # 条目装配依赖它，故必须一起编入 harness）
-  QQPlayer/Sync/SyncBrowseSource.swift
-  QQPlayer/Sync/SyncPeerLibraryResponder.swift
-  QQPlayer/Sync/SyncPeerLibraryClient.swift
-  QQPlayer/Sync/SyncCollection.swift
-  QQPlayer/Sync/SyncCollectionSelection.swift
-  QQPlayer/Sync/SyncCollectionSyncCoordinator.swift
-  # R3b「跟歌走」计划器：纯逻辑（不依赖 GRDB），随编排一起真跑。
-  QQPlayer/Sync/SyncPlaybackCarryPlan.swift
-  QQPlayer/Sync/SyncLibrarySyncModels.swift
-  QQPlayer/Sync/SyncLibraryFetchResponder.swift
-  QQPlayer/Sync/SyncLocalLibraryProvider.swift
-  QQPlayer/Sync/SyncLibraryPushModels.swift
-  QQPlayer/Sync/SyncLibrarySink.swift
-  QQPlayer/Sync/SyncLibraryPushController.swift
-  QQPlayer/Sync/SyncLibraryPullController.swift
-  QQPlayer/Sync/SyncLyricsReceiver.swift
-  # F2 对齐歌词补发（2026-09-16）：计划/账目纯逻辑 + 一轮编排（复用推/拉两个控制器）
-  QQPlayer/Sync/SyncLyricsResend.swift
-  QQPlayer/Sync/SyncLyricsResendController.swift
-  QQPlayer/Sync/SyncLibraryPassiveHost.swift
-  QQPlayer/Sync/SyncLocalLibraryScanner.swift
-  QQPlayer/Sync/SyncAlignedLyrics.swift
-  QQPlayer/Services/LyricsModels.swift
-  QQPlayer/Services/AlignedLyricsStore.swift
-  # 同步诊断唯一出口（2026-09-18：文件传输计时走它；两端都编，macOS 分支 = print）
-  QQPlayer/Services/SyncConnectDiag.swift
-  # v2 §12b-7「删除不跨端传播」单一事实源：纯 op 字符串判定，无 GRDB 依赖，
-  # 可直接进无模拟器 harness（真跑断言）。
-  QQPlayer/Sync/SyncChangeLogDeletionPolicy.swift
-  QQPlayer/Services/MusicDirectoryScanner.swift
-  scripts/sync-harness/Stubs.swift
-  scripts/sync-harness/HarnessSupport.swift
-  scripts/sync-harness/main.swift
-)
 
 # ── 漂移守卫：SmartPlaylistKind（生产 vs harness 桩）──────────────────────────
 # `SyncBrowseSource.swift`（T11「来源挑歌」）依赖 `SmartPlaylistKind`，而它的生产宿主
@@ -124,7 +86,31 @@ if [ "$shim_status" -ne 0 ]; then
   exit 1
 fi
 
-echo "▶︎ swiftc 编译 harness（生产源码 $((${#SOURCES[@]} - 3)) 个 + 夹具 3 个）"
+# ── 编译集：自动发现 + 依赖闭包（不再手工枚举）───────────────────────────────
+echo "▶︎ 解析编译闭包（自动发现 QQPlayer/Sync/*.swift + 依赖闭包 − 黑名单）"
+CLOSURE_ARGS=(--root . --build-dir "$OUT_DIR" --blacklist scripts/sync-harness/blacklist.txt)
+[ "$VERBOSE" -eq 1 ] && CLOSURE_ARGS+=(--verbose)
+[ "$REFRESH" -eq 1 ] && CLOSURE_ARGS+=(--refresh)
+SOURCES_FILE="$OUT_DIR/sources.txt"
+if ! python3 scripts/sync-harness/closure_resolver.py "${CLOSURE_ARGS[@]}" > "$SOURCES_FILE"; then
+  echo "❌ 编译闭包解析失败（见上方点名信息；编译集 = 自动发现，禁止手工改回清单）"
+  exit 1
+fi
+SOURCES=()
+while IFS= read -r line; do
+  [ -n "$line" ] && SOURCES+=("$line")
+done < "$SOURCES_FILE"
+if [ "${#SOURCES[@]}" -eq 0 ]; then
+  echo "❌ 闭包解析返回空编译集（$SOURCES_FILE）"
+  exit 1
+fi
+FIXTURE_COUNT=0
+for file in "${SOURCES[@]}"; do
+  case "$file" in scripts/sync-harness/*) FIXTURE_COUNT=$((FIXTURE_COUNT + 1)) ;; esac
+done
+PROD_COUNT=$((${#SOURCES[@]} - FIXTURE_COUNT))
+
+echo "▶︎ swiftc 编译 harness（生产源码 $PROD_COUNT 个 + 夹具 $FIXTURE_COUNT 个）"
 swiftc -swift-version 5 -I "$OUT_DIR" -L "$OUT_DIR" -lGRDB -o "$BIN" "${SOURCES[@]}" 2>&1 | tee "$OUT_DIR/compile.log"
 compile_status="${PIPESTATUS[0]}"
 if [ "$compile_status" -ne 0 ]; then

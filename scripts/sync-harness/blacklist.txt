@@ -1,0 +1,62 @@
+# 本地 harness 编译集黑名单（scripts/run-local-sync-tests.sh 消费）
+#
+# 为什么要黑名单：harness 的编译集是「自动发现」的（QQPlayer/Sync/*.swift 全收
+# + 依赖闭包自动补 Services/Models/Helpers），不再手工枚举。少数生产文件**确实
+# 编不进命令行**（需要真 GRDB 的 Database/Column/fetchAll/read 等 API，而 harness
+# 的 GRDB 模块桩（scripts/sync-harness/GRDBShim.swift）只有两个 Record 协议），
+# 只能显式排除；它们的符号若被编译集消费，由 scripts/sync-harness/Stubs.swift
+# 提供同形替身。**不许靠静默剔除**（那等于覆盖缩水 = 假绿）。
+#
+# ⚠️ 黑名单自带两道守卫（由 closure_resolver.py 每次运行强制执行，违反即 exit 1
+#    并点名，绝不静默降级）：
+#   ① 路径必须存在（否则就是写错/文件已改名/文件被删）
+#   ② 该文件的顶层声明必须仍在**其他生产文件**里被引用
+#      （否则说明这个文件已没人用、或已被别处取代 ⇒ 黑名单本身在腐烂，
+#        该删掉这一行，而不是让它留在这里当挡箭牌）
+#
+# 判据：只放「确实编不进去」的文件。能编进去的文件一律不进这里（进了 = 覆盖缩水）。
+# 本清单由 `closure_resolver.py --refresh` 逐轮点名得出（证据见各条注释）。
+
+# ── A. harness 真跑需要的文件（桩替代生产）────────────────────────────────────
+# DeviceStore：GRDB 真表（DatabaseManager.read/write + Column）。harness 的
+# Stubs.swift 有同形内存桩 DeviceStore；`extension DeviceStore: SyncTrustStore`
+# 仍被编译（SyncSessionModels.swift），故桩签名漂移会在 harness 编译期暴露。
+QQPlayer/Sync/DeviceStore.swift
+
+# ── B. 真 GRDB 依赖，harness 不覆盖的落库/游标层 ──────────────────────────────
+# SyncChangeLogApplier：按 op 落库（Playlist/PlaylistItem/PlayHistoryEntry/Favorite
+# 的 GRDB 查询 + Database/Column）。需要真 GRDB + Models/DatabaseModels.swift，
+# 而后者与 harness 桩 `Track` 同名不能同时编入。
+QQPlayer/Sync/SyncChangeLogApplier.swift
+
+# SyncChangeLogMapper：走 `DatabaseManager.read { db in … }`（Stubs 的内存桩
+# DatabaseManager 没有 read/write，事务体是 GRDB 真 API）。
+QQPlayer/Sync/SyncChangeLogMapper.swift
+
+# SyncChangeLogMapping：content_hash/stableId 身份解析（`Database` + `String.fetchOne`
+# + `Track.fetchOne`）。harness 已有等价签名空桩（Stubs.swift 的
+# SyncLyricsContentMapping.live / SyncContentHashResolver），需要身份解析的断言由
+# 夹具显式注入映射（main.swift 的 mapping(of:)）。
+QQPlayer/Sync/SyncChangeLogMapping.swift
+
+# SyncChangeLogPendingStore：`Column` + `.fetchAll(db)` 真查询。
+QQPlayer/Sync/SyncChangeLogPendingStore.swift
+
+# SyncChangeLogStore：游标/outbox 真表（`Column` + `.fetchOne(db)` + `setCursor(_ db:)`）。
+QQPlayer/Sync/SyncChangeLogStore.swift
+
+# SyncPlaybackCarryPeer：跟歌走的 DB 侧实现（`Column` + `.fetchAll(db)`）；
+# 纯逻辑计划器 SyncPlaybackCarryPlan.swift 仍编入（harness 真跑它的断言）。
+QQPlayer/Sync/SyncPlaybackCarryPeer.swift
+
+# ── C. 级联：只依赖上面这些文件的会话层（排除后无残留引用，闭包自洽）──────────
+# SyncChangeLogPeer：changeLog 帧会话层处理器，直接依赖 Applier / Mapper /
+# PendingStore / Store（上面全部黑名单）。
+QQPlayer/Sync/SyncChangeLogPeer.swift
+
+# SyncDataSyncCoordinator：Mac 数据同步编排，依赖 Applier / Peer / Store。
+QQPlayer/Sync/SyncDataSyncCoordinator.swift
+
+# SyncEntityOutcomeDisclosure：披露文案判定，`SyncDataSyncReport` 声明在
+# SyncDataSyncCoordinator.swift（上面已排除）⇒ 本文件也编不进命令行。
+QQPlayer/Sync/SyncEntityOutcomeDisclosure.swift

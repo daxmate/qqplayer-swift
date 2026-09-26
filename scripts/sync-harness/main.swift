@@ -13,6 +13,19 @@
 
 import Foundation
 
+// MARK: - 真实用户目录隔离（2026-09-26）
+//
+// 若干宿主的 `lyricsStore` 默认 = `.shared`（`SyncLibraryPassiveHost.init` /
+// `SyncLocalLibraryProvider.live`）⇒ 其 `directory` 落到**真实** `~/Documents/lyrics-aligned`。
+// 本 harness 是「无模拟器本地通道」，不该读/写用户真实资料；而且真实 `~/Documents`
+// 的目录枚举可能阻塞在 open()（File Provider 卡住时，本机 2026-09-26 实测 `ls ~/Documents`
+// 直接挂死）⇒ 不隔离则整个 harness 挂死，断言一条都跑不到。
+// 用生产自带的测试注入缝（`AlignedLyricsStore.directoryOverride`，与
+// `LyricsManager.manualLyricsDirectoryOverride` 同风格，`legacyDirectories` 也会随之短路）
+// 把 **所有** 默认回落的歌词库目录改到临时目录。
+AlignedLyricsStore.directoryOverride = FileManager.default.temporaryDirectory
+    .appendingPathComponent("qqp-sync-harness-shared-lyrics-\(UUID().uuidString)", isDirectory: true)
+
 // MARK: - 迷你断言
 
 var checks = 0
