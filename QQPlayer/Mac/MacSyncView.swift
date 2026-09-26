@@ -334,8 +334,9 @@ struct MacSyncRunSection: View {
             deleteSettings.save()
         }
         let status = reconciled.status(in: rows)
+        // 批 B2 收尾：目标状态不再镜像到两个 ViewModel —— 传歌侧经 `updateSyncTarget` 落进其私有
+        // 镜像并刷新闸门；数据侧的派生/动作点由视图直接传 `syncTargetStatus`（见 `SyncDataPane`）。
         model.updateSyncTarget(status)
-        dataModel.updateSyncTarget(status)
     }
 
     func unpair(_ device: PeerDevice) {

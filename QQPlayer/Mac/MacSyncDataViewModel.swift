@@ -62,9 +62,6 @@ final class MacSyncDataViewModel: ObservableObject {
     @Published private(set) var didDisconnectWhileRunning = false
     /// 「重新对账」结果提示（nil = 本次没有可说的；成功 / 失败 / 未连接）。
     @Published private(set) var resetResultMessage: String?
-    /// 本次同步**目标**状态（批 B2；视图层从 `SyncDeviceListModel` 推入，`.none` = 未选）。
-    /// 数据同步与「重新对账」都以它为准（选中设备 = 唯一合法目标）。
-    @Published private(set) var syncTargetStatus: SyncDeviceTargetStatus = .none
 
     // MARK: 内部状态
 
@@ -120,31 +117,30 @@ final class MacSyncDataViewModel: ObservableObject {
 
     /// 可用性（批 B2，唯一实现 = 目标状态上的 `dataSyncAvailability`）：
     /// 连接 / 会话 / 未在跑 / **目标在线** 四件事的合成判定；本视图模型不自算。
-    var dataAvailability: SyncUIStartAvailability {
-        syncTargetStatus.dataSyncAvailability(
+    /// ⚠️ 目标状态由调用方（视图层唯一真值 `SyncDevicePane.syncTargetStatus`）**显式传入**：
+    /// 本类型不存镜像、也不发布它（棘轮要求本文件计数 ≤ 基线，见
+    /// `ObservationMigrationContractTests`）；判定仍全在 `SyncDeviceTargetStatus` 纯逻辑里。
+    func dataAvailability(for targetStatus: SyncDeviceTargetStatus) -> SyncUIStartAvailability {
+        targetStatus.dataSyncAvailability(
             isConnected: isConnected,
             hasSession: hasActiveSession,
             isRunning: isRunning
         )
     }
 
-    /// 「同步数据」可用性。
-    var canStart: Bool { dataAvailability.canStart }
+    /// 「同步数据」可用性（目标状态由调用方传入，见上）。
+    func canStart(for targetStatus: SyncDeviceTargetStatus) -> Bool {
+        dataAvailability(for: targetStatus).canStart
+    }
 
     /// 不能开始的原因（可开始 / 运行中 = nil）。目标离线时返回 nil —— 「等待 <名字> 上线」
     /// 需要设备名，由视图层的目标状态行（唯一渲染）给出，不在这里拼字符串。
-    var unavailableReason: String? {
-        switch dataAvailability {
+    func unavailableReason(for targetStatus: SyncDeviceTargetStatus) -> String? {
+        switch dataAvailability(for: targetStatus) {
         case .ready, .targetOffline: return nil
         case .alreadyRunning: return "sync_run_data_reason_already_running".localized
         default: return "sync_run_data_reason_not_connected".localized
         }
-    }
-
-    /// 目标选择变化（视图层唯一喂入口；值未变不重复发布）。
-    func updateSyncTarget(_ status: SyncDeviceTargetStatus) {
-        guard status != syncTargetStatus else { return }
-        syncTargetStatus = status
     }
 
     /// 只是用户取消 / 掉线中断（UI 用次要色，不当错误红字）。
@@ -160,9 +156,11 @@ final class MacSyncDataViewModel: ObservableObject {
     }
     // MARK: - 同步执行
 
-    /// 跑一次「同步数据」（未连接 / 已在跑 = no-op）。
-    func start() {
-        guard canStart, let session = hostCenter.activeSession else { return }
+    /// 跑一次「同步数据」（未连接 / 已在跑 / 目标不可同步 = no-op）。
+    /// ⚠️ 目标状态在**动作点**显式传入（第二道闸门，防「View 没拦」）：与按钮 `disabled`
+    /// 用的是同一个 `canStart(for:)` 判定，闸门没有挪进 View。
+    func start(for targetStatus: SyncDeviceTargetStatus) {
+        guard canStart(for: targetStatus), let session = hostCenter.activeSession else { return }
         // 与「连接后自动」共用同一个在飞门：同一会话只允许一轮（手动 / 自动互斥），
         // 取不到门 = 直接放弃本轮（不排队）。
         guard SyncDataRunGate.shared.acquire() else {
@@ -208,7 +206,9 @@ final class MacSyncDataViewModel: ObservableObject {
 
     /// 是否可用「重新对账」（批 B2：盯**所选设备**，不再看「谁连上了」——
     /// 游标是本端记录，选中了哪台就重置哪台；没选设备时无可重置。
-    var canResetCursors: Bool { syncTargetStatus.target != nil }
+    func canResetCursors(for targetStatus: SyncDeviceTargetStatus) -> Bool {
+        targetStatus.target != nil
+    }
 
     /// 把与**指定对端**的推/拉游标清零（UI 二次确认后调用）：身份修复后必须能重拉，
     /// 否则已被游标越过的行永不重来。同步进行中也可以重置（下一轮生效）。

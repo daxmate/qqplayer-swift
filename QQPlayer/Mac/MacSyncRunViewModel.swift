@@ -71,7 +71,13 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 本次同步**目标**状态（期望目标 / 在线态 / 连上的与所选是否不符）。
     /// 决策全在 `SyncDeviceListModel`（纯逻辑）；本类只接收视图层推来的事实，
     /// 用于把闸门交给 `SyncUIStartGate`（同样是纯逻辑），不在这里另判。
-    @Published private(set) var syncTargetStatus: SyncDeviceTargetStatus = .none
+    /// ⚠️ **非 `@Published`**（批 B2 收尾）：目标状态不进本类型的发布面 —— 棘轮要求本文件
+    /// 计数 ≤ 基线（见 `ObservationMigrationContractTests`）。变化经唯一喂入口
+    /// `updateSyncTarget(_:)` 落进本镜像并触发 `refreshAvailability()`；重绘由 `startAvailability`
+    /// 的发布驱动（它在基线里，保持不变）。为什么不用「注入读视图层真值的 provider 闭包」：
+    /// 那要在视图构造/出现时安装并捕获 `View`（值类型）副本，生命周期与新鲜度都要另管；
+    /// 私有镜像 + 唯一喂入口是零新增所有权概念的等价形状。
+    private var syncTargetStatus: SyncDeviceTargetStatus = .none
 
     // MARK: 内部状态
 

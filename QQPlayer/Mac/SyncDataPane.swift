@@ -58,11 +58,12 @@ extension MacSyncRunSection {
                     }
                 } else {
                     // 批 B2：禁用条件 = 数据同步闸门（连接 / 会话 / 未在跑 / **目标在线**，
-                    // 唯一实现 = `SyncUIStartGate.dataSyncAvailability`）
+                    // 唯一实现 = `SyncUIStartGate.dataSyncAvailability`）；目标状态由
+                    // 视图层唯一真值 `syncTargetStatus` 显式传入（本批收尾：VM 不再存镜像）。
                     Button("sync_run_data_button".localized) {
-                        dataModel.start()
+                        dataModel.start(for: syncTargetStatus)
                     }
-                    .disabled(!dataModel.canStart)
+                    .disabled(!dataModel.canStart(for: syncTargetStatus))
                     .help("sync_run_data_help".localized)
 
                     // 次要动作：重置与**所选设备**的推/拉游标（身份修复后必须能重拉，否则已被
@@ -70,7 +71,7 @@ extension MacSyncRunSection {
                     Button("sync_run_data_reset_button".localized) {
                         showResetCursorsConfirm = true
                     }
-                    .disabled(!dataModel.canResetCursors)
+                    .disabled(!dataModel.canResetCursors(for: syncTargetStatus))
                     .help("sync_run_data_reset_help".localized)
                 }
 
@@ -96,7 +97,7 @@ extension MacSyncRunSection {
                     .font(.callout)
                     .foregroundStyle(dataModel.isInterrupted ? Color.secondary : Color.red)
                     .fixedSize(horizontal: false, vertical: true)
-            } else if !dataModel.isRunning, let reason = dataModel.unavailableReason {
+            } else if !dataModel.isRunning, let reason = dataModel.unavailableReason(for: syncTargetStatus) {
                 // 禁用按钮永远有解释（与执行区同一纪律）。
                 Text(reason)
                     .font(.caption)
