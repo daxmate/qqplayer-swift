@@ -310,13 +310,7 @@
 "about_graphiceq_format" = "关于 GraphicEQ 格式说明";
 "import_graphiceq_format_description" = "请导入符合以下格式的 GraphicEQ .txt 配置文件：";
 "frequency_gain_pair_description" = "每对参数代表：频率 (Hz) 和 增益 (dB)";
-"delete" = "删除";
 "export" = "导出";
-"edit" = "编辑";
-"cancel" = "取消";
-"done" = "完成";
-"save" = "保存";
-"create" = "创建";
 "preset_info" = "预设信息";
 "eq_copied" = "已复制";
 "eq_delete_confirm_message" = "确定要删除「%@」吗？此操作无法撤销。";

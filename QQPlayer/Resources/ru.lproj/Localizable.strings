@@ -304,13 +304,7 @@
 "about_graphiceq_format" = "О формате GraphicEQ";
 "import_graphiceq_format_description" = "Импортируйте файлы GraphicEQ .txt в формате:";
 "frequency_gain_pair_description" = "Каждая пара представляет частоту (Гц) и усиление (дБ)";
-"delete" = "Удалить";
 "export" = "Экспорт";
-"edit" = "Изменить";
-"cancel" = "Отмена";
-"done" = "Готово";
-"save" = "Сохранить";
-"create" = "Создать";
 "preset_info" = "Информация о пресете";
 "eq_copied" = "Скопировано";
 "eq_delete_confirm_message" = "Вы уверены, что хотите удалить «%@»? Это действие нельзя отменить.";

@@ -316,13 +316,7 @@
 "about_graphiceq_format" = "About GraphicEQ Format";
 "import_graphiceq_format_description" = "Import GraphicEQ .txt files with the format:";
 "frequency_gain_pair_description" = "Each pair represents frequency (Hz) and gain (dB)";
-"delete" = "Delete";
 "export" = "Export";
-"edit" = "Edit";
-"cancel" = "Cancel";
-"done" = "Done";
-"save" = "Save";
-"create" = "Create";
 "preset_info" = "Preset Info";
 "eq_copied" = "Copied";
 "eq_delete_confirm_message" = "Are you sure you want to delete '%@'? This action cannot be undone.";
