@@ -18,12 +18,13 @@
 //   · `SyncDataPane.swift`  → 播放数据流（= 原 F 数据同步区）
 //  原分区文件（`+Connection` / `+Content` / `+Run`）继续承载各分区本体（A 并入设备页）。
 //
-//  ⚠️ 为什么 Pane 是「本类型的 extension」而不是独立 struct：三个 ViewModel 仍是
-//  `ObservableObject`（`@Observable` 迁移尚未覆盖它们），子视图要拿到**活的**重绘就必须写
-//  `@ObservedObject` / `@StateObject`——而 `ObservationMigrationContractTests` 是**按
-//  (文件, 标记) 的棘轮**（新增 (文件, 标记) 即红，方向只许减不许增）。把 Pane 写成
-//  extension 是唯一「零新增标记、零行为改变」的拆法（也正合 R1：唯一实现保在模型层，
-//  唯一的是**状态**、不是视图）。
+//  ⚠️ 批 D（2026-09-26）三块 Pane 已从「本类型的 extension」改为**独立 struct**
+//  （`SyncDevicePane` / `SyncTracksPane` + `SyncPage` / `SyncDataPane`），本文件只做装配。
+//  做法 = **父 = 唯一观察者**：三个 ViewModel 仍是 `ObservableObject`（`@Observable` 迁移尚未
+//  覆盖），子视图不得写 `@ObservedObject` / `@StateObject`（`ObservationMigrationContractTests`
+//  是按 (文件, 标记) 的棘轮：新增即红）⇒ 子 struct 只收**值输入 + 回调 / 绑定**，父 body
+//  重算 ⇒ 子拿到新值即重绘。四区本体**仍留在分区文件**（`+Connection` / `+Content` / `+Run`），
+//  由父读值构建后作为内容输入交给 `SyncTracksPane` 组合（不复制任何分区实现）。
 //
 //  ⚠️ 状态归属：两页的**全部 `@State` / `@StateObject` 都留在本文件**（唯一观察者），
 //  页切换只切渲染内容、不卸载本类型 ⇒ ViewModel 生命周期与拆分前逐字一致
@@ -257,6 +258,64 @@ struct MacSyncRunSection: View {
         .labelsHidden()
     }
 
+    // MARK: - 三块 Pane（批 D：独立 struct；父只做「值输入 + 回调」装配）
+
+    /// 「设备」页（`SyncDevicePane`）。
+    var devicePane: some View {
+        SyncDevicePane(
+            hostCenter: hostCenter,
+            model: model,
+            identity: identity,
+            qrImage: qrImage,
+            hostName: hostName,
+            accentColor: accentColor,
+            devices: devices,
+            deviceRows: deviceRows,
+            syncTargetStatus: syncTargetStatus,
+            targetDeviceID: targetDeviceID,
+            identityError: $identityError,
+            devicesError: $devicesError,
+            pendingUnpair: $pendingUnpair,
+            onReloadDevices: { reloadDevices() },
+            onRefreshQR: { refreshQR() },
+            onSelectTarget: { selectTargetDevice($0) },
+            onAdoptConnected: { adoptConnectedTarget() },
+            onUnpair: { unpair($0) }
+        )
+    }
+
+    /// 「同步」页（`SyncPage`：分段切传歌 / 播放数据）。
+    var syncPage: some View {
+        SyncPage(
+            flow: $flow,
+            tracksPane: tracksPane,
+            dataPane: dataPane
+        )
+    }
+
+    /// 传歌流（`SyncTracksPane`）——四区本体仍由分区文件构建，本处只做组合。
+    var tracksPane: some View {
+        SyncTracksPane(
+            directionSection: directionSection,
+            selectionSection: selectionSection,
+            runSection: runSection,
+            resultSection: resultSection
+        )
+    }
+
+    /// 播放数据流（`SyncDataPane`）。
+    var dataPane: some View {
+        SyncDataPane(
+            dataModel: dataModel,
+            wiringFacts: wiringFacts,
+            syncTargetStatus: syncTargetStatus,
+            onAdoptConnected: { adoptConnectedTarget() },
+            deleteSettings: $deleteSettings,
+            showResetCursorsConfirm: $showResetCursorsConfirm,
+            showDataResultDetail: $showDataResultDetail
+        )
+    }
+
     // MARK: - 设备页数据（原 `MacSyncCenterView`，2026-09-26 批 B1 随状态一并迁来）
 
     func loadIdentityIfNeeded() {
@@ -303,6 +362,20 @@ struct MacSyncRunSection: View {
     /// （重启后仍记得所选设备；空串 = 未选）。判定一律走 `SyncDeviceListModel`（纯逻辑）。
     var targetDeviceID: String? {
         deleteSettings.syncTargetDeviceID.isEmpty ? nil : deleteSettings.syncTargetDeviceID
+    }
+
+    /// 目标行模型（过滤 + 在线态 + 短码，决策全在 `SyncDeviceListModel`）。
+    /// 批 D：由「设备」Pane 文件迁回本文件（父是唯一真值持有者：装配与对账都读它）。
+    var deviceRows: [SyncDeviceTargetRow] {
+        SyncDeviceListModel.rows(
+            in: devices,
+            onlinePeerID: hostCenter.connectedPeer?.peerID
+        )
+    }
+
+    /// 本次同步目标状态（唯一决策 `SyncDeviceListModel` 的结论；View 只渲染）。
+    var syncTargetStatus: SyncDeviceTargetStatus {
+        SyncDeviceTargetSelection(peerID: targetDeviceID).status(in: deviceRows)
     }
 
     /// 选中一台设备（**唯一写入口**）：归一 → 写持久化 → 推进闸门。

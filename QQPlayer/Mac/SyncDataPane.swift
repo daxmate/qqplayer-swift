@@ -2,7 +2,7 @@
 //  SyncDataPane.swift
 //  QQPlayer
 //
-//  播放数据流（2026-09-26 批 B1「拆 Pane + 顶层两页」；QQPlayerMac target only）——
+//  播放数据流（2026-09-26 批 B1「拆 Pane + 顶层两页」；批 D 改为独立 `struct`；QQPlayerMac target only）——
 //  原 `MacSyncView+Run.swift` 的 **F 数据同步区**整体迁到本文件（内容零改动，只换文件）。
 //
 //  为什么单列一 Pane：「同步」页顶部分段切换「传歌 / 播放数据」，两流**永不共用一屏**
@@ -18,25 +18,45 @@
 //  「重新对账」把所选设备 ID 显式传给 `MacSyncDataViewModel.resetCursorsForPeer(_:)`。
 //  两者都不是本视图的判断（决策在共享 Core 的纯逻辑里）。
 //
-//  ⚠️ 为什么本 Pane 是 `MacSyncRunSection` 的 extension 而不是独立 struct：三个 ViewModel
-//  仍是 `ObservableObject`（`@Observable` 迁移未覆盖），子视图要拿活的重绘就得写
-//  `@ObservedObject`/`@StateObject` → 命中 `ObservationMigrationContractTests` 的
-//  「新增 (文件, 标记) 即红」棘轮。extension 是唯一零新增标记、零行为改变的拆法
-//  （详见 `MacSyncView.swift` 文件头）。
+//  ⚠️ 批 D（2026-09-26）为什么 Pane 是**独立 struct**：三个 ViewModel 仍是
+//  `ObservableObject`（`@Observable` 迁移尚未覆盖），子视图**不得**写
+//  `@ObservedObject` / `@StateObject`（`ObservationMigrationContractTests` 是「新增
+//  (文件, 标记) 即红」的棘轮）。做法 = **父 = 唯一观察者**：状态与 ViewModel 生命周期
+//  **全在 `MacSyncRunSection`**；本 struct 只收「值输入 + 回调 / 绑定」，父 body 重算 ⇒
+//  子拿到新值即重绘（需要写回的 `@State` 以 `@Binding` 下传，状态不搬家）。
+//  本文件内**零** `@ObservedObject` / `@StateObject` / `@EnvironmentObject`。
 //
-//  可见性：`dataPane` 为 internal（被 `SyncTracksPane.swift` 的 `syncPage` 引用）；
-//  本文件独占的辅助成员仍为 `private`。
+//  可见性：`SyncDataPane` 为 internal（被 `MacSyncView.swift` 装配进「同步」页）；
+//  仅本文件使用的辅助成员保持 `private`。
 //
 
 import SwiftUI
 
-extension MacSyncRunSection {
+/// 播放数据流（收藏 / 播放历史 / 歌单结构）。输入全部来自 `MacSyncRunSection`（唯一观察者）。
+struct SyncDataPane: View {
+    /// 数据同步侧（阶段 / 进度 / 账目 / 闸门）。
+    let dataModel: MacSyncDataViewModel
+    /// 运行时装配自检事实（L5：缺口 > 0 才出一行）。
+    let wiringFacts: SyncWiringFactsStore
+    /// 本次同步目标状态（闸门与「等待上线」行的唯一依据）。
+    let syncTargetStatus: SyncDeviceTargetStatus
+    /// 「一键改用当前连上的设备」（目标状态行内的动作；落在父上）。
+    let onAdoptConnected: () -> Void
+
+    // 父持有的本地态：本 struct 只以绑定读写（状态不搬家，生命周期仍在父）。
+    /// 本页设置（跨端续播开关）。
+    @Binding var deleteSettings: DeleteSettings
+    /// 「重新对账」二次确认（父持有弹框态）。
+    @Binding var showResetCursorsConfirm: Bool
+    /// F 数据同步结果「详情」展开态。
+    @Binding var showDataResultDetail: Bool
+
     // MARK: - F 数据同步区（S2-T12：与文件传输解耦的「同步数据」）
 
     /// 播放数据（收藏 / 播放历史 / 歌单结构）的独立动作区：不选方向、不选歌，
     /// 一次动作 = 推本端增量 + 拉对端增量（阶段 / 账目全来自 `MacSyncDataViewModel`）。
     @ViewBuilder
-    var dataPane: some View {
+    var body: some View {
         Section {
             Text("sync_run_data_description".localized)
                 .font(.callout)
@@ -85,7 +105,7 @@ extension MacSyncRunSection {
             }
 
             // 批 B2：目标状态行（与传歌流同一渲染；离线时上面的按钮已被闸门禁用）。
-            syncTargetStatusBanner
+            SyncTargetStatusBanner(status: syncTargetStatus, onAdoptConnected: onAdoptConnected)
 
             if dataModel.isRunning {
                 ProgressView()
@@ -157,7 +177,7 @@ extension MacSyncRunSection {
         let report = dataModel.report
         if dataModel.phase == .finished {
             let conclusion = SyncEntityOutcomeDisclosure.dataConclusion(report)
-            conclusionLine(conclusion)
+            SyncConclusionLine(line: conclusion)
             if conclusion.hasDetail {
                 DisclosureGroup(isExpanded: $showDataResultDetail) {
                     dataResultDetail(report)
@@ -178,50 +198,54 @@ extension MacSyncRunSection {
     @ViewBuilder
     private func dataResultDetail(_ report: SyncDataSyncReport) -> some View {
         HStack(alignment: .top, spacing: DesignTokens.space20) {
-            metric("sync_run_data_result_sent".localized, report.pushedEntries, .primary)
-            metric("sync_run_data_result_applied".localized, report.appliedEntries, .primary)
-            metric(
-                "sync_run_data_result_pending".localized,
-                report.suspendedEntries,
-                report.suspendedEntries > 0 ? .orange : .secondary
+            SyncMetric(label: "sync_run_data_result_sent".localized, value: report.pushedEntries, color: .primary)
+            SyncMetric(label: "sync_run_data_result_applied".localized, value: report.appliedEntries, color: .primary)
+            SyncMetric(
+                label: "sync_run_data_result_pending".localized,
+                value: report.suspendedEntries,
+                color: report.suspendedEntries > 0 ? .orange : .secondary
             )
-            metric(
-                "sync_run_data_result_unresolved".localized,
-                report.unresolvedEntries,
-                report.unresolvedEntries > 0 ? .orange : .secondary
+            SyncMetric(
+                label: "sync_run_data_result_unresolved".localized,
+                value: report.unresolvedEntries,
+                color: report.unresolvedEntries > 0 ? .orange : .secondary
             )
-            metric(
-                "sync_run_data_unsupported".localized,
-                report.unsupportedEntries,
-                report.unsupportedEntries > 0 ? .orange : .secondary
+            SyncMetric(
+                label: "sync_run_data_unsupported".localized,
+                value: report.unsupportedEntries,
+                color: report.unsupportedEntries > 0 ? .orange : .secondary
             )
-            metric(
-                "sync_run_data_skipped_parent".localized,
-                report.skippedMissingParentEntries,
-                report.skippedMissingParentEntries > 0 ? .orange : .secondary
+            SyncMetric(
+                label: "sync_run_data_skipped_parent".localized,
+                value: report.skippedMissingParentEntries,
+                color: report.skippedMissingParentEntries > 0 ? .orange : .secondary
             )
-            metric(
-                "sync_run_data_result_missing_identity".localized,
-                report.pushedMissingIdentityEntries,
-                report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
+            SyncMetric(
+                label: "sync_run_data_result_missing_identity".localized,
+                value: report.pushedMissingIdentityEntries,
+                color: report.pushedMissingIdentityEntries > 0 ? .orange : .secondary
             )
             // 身份歧义（2026-09-15）：**仅当 N > 0 才显示**（无歧义时不留一个恒 0 的噪音格）。
             if report.ambiguousIdentityEntries > 0 {
-                metric(
-                    "sync_run_data_ambiguous_identity".localized,
-                    report.ambiguousIdentityEntries,
-                    .orange
+                SyncMetric(
+                    label: "sync_run_data_ambiguous_identity".localized,
+                    value: report.ambiguousIdentityEntries,
+                    color: .orange
                 )
             }
             // 应用失败（2026-09-15）：同样仅 N > 0 才显示；口径与 iOS 面板的缺口行一致（INV-29）。
             if report.applyFailedEntries > 0 {
-                metric(
-                    "sync_run_data_apply_failed".localized,
-                    report.applyFailedEntries,
-                    .orange
+                SyncMetric(
+                    label: "sync_run_data_apply_failed".localized,
+                    value: report.applyFailedEntries,
+                    color: .orange
                 )
             }
-            metric("sync_run_data_result_skipped".localized, report.ignoredDeletes, .secondary)
+            SyncMetric(
+                label: "sync_run_data_result_skipped".localized,
+                value: report.ignoredDeletes,
+                color: .secondary
+            )
             Spacer()
         }
         .padding(.vertical, DesignTokens.space2)

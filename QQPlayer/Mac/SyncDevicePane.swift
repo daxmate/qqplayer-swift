@@ -2,7 +2,7 @@
 //  SyncDevicePane.swift
 //  QQPlayer
 //
-//  「设备」页（2026-09-26 批 B1「拆 Pane + 顶层两页」；QQPlayerMac target only）。
+//  「设备」页（2026-09-26 批 B1「拆 Pane + 顶层两页」；批 D 改为独立 `struct`；QQPlayerMac target only）。
 //
 //  页面内容（用户 2026-09-26 拍板，低频/配置面）：
 //   · 待批准请求（`pairingApprovalSection`，有请求时置顶）
@@ -19,22 +19,57 @@
 //  选择语义 = **期望目标 + 闸门**（目标离线 → 不可同步 + 「等待 <名字> 上线」；
 //  连上的 ≠ 所选 → 明说 + 一键改用），判定全在 `SyncDeviceListModel` / `SyncUIStartGate`。
 //
-//  ⚠️ 为什么本 Pane 是 `MacSyncRunSection` 的 extension 而不是独立 struct：三个
-//  ViewModel 仍是 `ObservableObject`（`@Observable` 迁移未覆盖），子视图要拿活的重绘就得写
-//  `@ObservedObject`/`@StateObject` → 命中 `ObservationMigrationContractTests` 的
-// 「新增 (文件, 标记) 即红」棘轮。extension 是唯一零新增标记、零行为改变的拆法
-//  （详见 `MacSyncView.swift` 文件头）。
+//  ⚠️ 批 D（2026-09-26）为什么 Pane 是**独立 struct**：三个 ViewModel 仍是
+//  `ObservableObject`（`@Observable` 迁移尚未覆盖它们），子视图**不得**写
+//  `@ObservedObject` / `@StateObject`（`ObservationMigrationContractTests` 是「新增
+//  (文件, 标记) 即红」的棘轮）。做法 = **父 = 唯一观察者**：状态与 ViewModel 生命周期
+//  **全在 `MacSyncRunSection`**；本 struct 只收「值输入 + 回调 / 绑定」，父 body 重算 ⇒
+//  子拿到新值即重绘（需要写回的 `@State` 以 `@Binding` 下传，状态不搬家）。
+//  本文件内**零** `@ObservedObject` / `@StateObject` / `@EnvironmentObject`。
 //
-//  可见性：只在本文件使用的成员仍保持 `private`；被 `body`（`MacSyncView.swift`）引用的
-//  `devicePane` 为 internal。
+//  可见性：`SyncDevicePane` 与共用目标状态行 `SyncTargetStatusBanner` 为 internal
+//  （后者被 `MacSyncView+Run.swift` 的 D 执行区与 `SyncDataPane.swift` 复用）；
+//  仅本文件使用的辅助成员保持 `private`。
 //
 
 import SwiftUI
 
-extension MacSyncRunSection {
-    // MARK: - 「设备」页
+/// 「设备」页（顶层页之一）。输入全部来自 `MacSyncRunSection`（唯一观察者）。
+struct SyncDevicePane: View {
+    /// 同步中心（待批准请求 / 启动错误 / 「允许局域网连接」开关；生命周期不归本视图）。
+    let hostCenter: SyncHostCenter
+    /// 执行侧（连接到的对端 / 监听态 / 已连时长 / 启动可用性）。
+    let model: MacSyncRunViewModel
+    /// 本机身份（nil = 尚未载入）。
+    let identity: SyncIdentity?
+    /// 本机二维码（identity 就绪才生成）。
+    let qrImage: NSImage?
+    /// 本机展示名（Bonjour 友好名优先，回落进程主机名）。
+    let hostName: String
+    /// App 强调色（读环境值）。
+    let accentColor: Color
+    /// 已配对设备列表。
+    let devices: [PeerDevice]
+    /// 目标行模型（过滤 + 在线态 + 短码；决策全在 `SyncDeviceListModel`）。
+    let deviceRows: [SyncDeviceTargetRow]
+    /// 本次同步目标状态（决策全在 `SyncDeviceListModel`；View 只渲染）。
+    let syncTargetStatus: SyncDeviceTargetStatus
+    /// 本次同步目标设备 ID（nil = 未选）。
+    let targetDeviceID: String?
 
-    var devicePane: some View {
+    // 父持有的本地态：本 struct 只以绑定读写（状态不搬家，生命周期仍在父）。
+    @Binding var identityError: String?
+    @Binding var devicesError: String?
+    @Binding var pendingUnpair: PeerDevice?
+
+    // 回调动词：全部落在父上，语义与拆分前逐字一致。
+    let onReloadDevices: () -> Void
+    let onRefreshQR: () -> Void
+    let onSelectTarget: (String?) -> Void
+    let onAdoptConnected: () -> Void
+    let onUnpair: (PeerDevice) -> Void
+
+    var body: some View {
         Group {
             pairingApprovalSection
             identitySection
@@ -65,11 +100,11 @@ extension MacSyncRunSection {
                     candidate: pending.makePeerCandidate(receivedAt: Date().timeIntervalSince1970),
                     onApprove: {
                         hostCenter.approvePending()
-                        reloadDevices()
+                        onReloadDevices()
                     },
                     onReject: {
                         hostCenter.rejectPending()
-                        reloadDevices()
+                        onReloadDevices()
                     }
                 )
                 .padding(.vertical, DesignTokens.space4)
@@ -121,7 +156,7 @@ extension MacSyncRunSection {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Button {
-                            refreshQR()
+                            onRefreshQR()
                         } label: {
                             Label("sync_refresh_qr".localized, systemImage: "arrow.clockwise")
                         }
@@ -141,7 +176,7 @@ extension MacSyncRunSection {
     // MARK: - c 连接状态区（原 `MacSyncView+Connection.swift` 的 A 区，随设备语义迁到本页）
 
     @ViewBuilder
-    var connectionSection: some View {
+    private var connectionSection: some View {
         // 2026-09-20 批 6-8：中心迁 `@Observable` 后视图改环境注入，`$hostCenter.…` 不再可用
         // （计算属性不可投影）⇒ 局部 `@Bindable`（与 MacEQSettingsView 同款既有写法），双向写回保留。
         @Bindable var center = hostCenter
@@ -286,56 +321,6 @@ extension MacSyncRunSection {
 
     // MARK: - d 本次同步目标（批 B2：真控件 + 期望目标/闸门语义）
 
-    /// 行模型（过滤 + 在线态 + 短码，决策全在 `SyncDeviceListModel`）。
-    /// 非 private（批 B2）：顶层选中对账 / 目标状态也要用它（同一份行模型）。
-    var deviceRows: [SyncDeviceTargetRow] {
-        SyncDeviceListModel.rows(
-            in: devices,
-            onlinePeerID: hostCenter.connectedPeer?.peerID
-        )
-    }
-
-    /// 本次同步目标状态（唯一决策 `SyncDeviceListModel` 的结论；View 只渲染）。
-    var syncTargetStatus: SyncDeviceTargetStatus {
-        SyncDeviceTargetSelection(peerID: targetDeviceID).status(in: deviceRows)
-    }
-
-    /// 目标状态行（**唯一渲染实现**，三处共用：设备页目标区 / 传歌执行区 / 播放数据动作区）：
-    ///  · 「连上的 ≠ 所选」→ 明说 + 一键改用（不为静默改选）
-    ///  · 选了设备但不在线 → 「等待 <名字> 上线」（直接回答「为什么不能同步」）
-    /// 判定全在 `SyncDeviceTargetStatus`（纯逻辑），文案/配色属于本层。
-    @ViewBuilder
-    var syncTargetStatusBanner: some View {
-        let status = syncTargetStatus
-        if let mismatch = status.mismatch {
-            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space8) {
-                Label(
-                    "sync_target_mismatch_format".localized(
-                        with: mismatch.connected.displayName,
-                        mismatch.selected.displayName
-                    ),
-                    systemImage: "exclamationmark.triangle"
-                )
-                .font(.callout)
-                .foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-
-                Button("sync_target_switch".localized(with: mismatch.connected.displayName)) {
-                    adoptConnectedTarget()
-                }
-                .font(.callout)
-                .fixedSize()
-            }
-            .padding(.vertical, DesignTokens.space2)
-        } else if let waitingName = status.waitingName {
-            Label("sync_target_waiting".localized(with: waitingName), systemImage: "clock")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.vertical, DesignTokens.space2)
-        }
-    }
-
     @ViewBuilder
     private var deviceTargetSection: some View {
         Section {
@@ -346,7 +331,7 @@ extension MacSyncRunSection {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, DesignTokens.space6)
             } else {
-                syncTargetStatusBanner
+                SyncTargetStatusBanner(status: syncTargetStatus, onAdoptConnected: onAdoptConnected)
                 ForEach(rows) { row in
                     deviceTargetRow(row)
                 }
@@ -365,7 +350,7 @@ extension MacSyncRunSection {
     private func deviceTargetRow(_ row: SyncDeviceTargetRow) -> some View {
         let selected = targetDeviceID == row.peerID
         return Button {
-            selectTargetDevice(row.peerID)
+            onSelectTarget(row.peerID)
         } label: {
             HStack(alignment: .top, spacing: DesignTokens.space10) {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
@@ -417,5 +402,47 @@ extension MacSyncRunSection {
                 (row.isOnline ? Color.green : Color.secondary).opacity(0.14),
                 in: Capsule()
             )
+    }
+}
+
+/// 目标状态行（**唯一渲染实现**，三处共用：设备页目标区 / 传歌执行区 / 播放数据动作区）：
+///  · 「连上的 ≠ 所选」→ 明说 + 一键改用（不为静默改选）
+///  · 选了设备但不在线 → 「等待 <名字> 上线」（直接回答「为什么不能同步」）
+/// 判定全在 `SyncDeviceTargetStatus`（纯逻辑），文案/配色属于本层；
+/// `onAdoptConnected` 是父的动作（唯一写入口仍在下层）。
+struct SyncTargetStatusBanner: View {
+    /// 目标状态（决策来自 `SyncDeviceListModel`）。
+    let status: SyncDeviceTargetStatus
+    /// 「一键改用当前连上的设备」动作（落在父上）。
+    let onAdoptConnected: () -> Void
+
+    var body: some View {
+        if let mismatch = status.mismatch {
+            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space8) {
+                Label(
+                    "sync_target_mismatch_format".localized(
+                        with: mismatch.connected.displayName,
+                        mismatch.selected.displayName
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Button("sync_target_switch".localized(with: mismatch.connected.displayName)) {
+                    onAdoptConnected()
+                }
+                .font(.callout)
+                .fixedSize()
+            }
+            .padding(.vertical, DesignTokens.space2)
+        } else if let waitingName = status.waitingName {
+            Label("sync_target_waiting".localized(with: waitingName), systemImage: "clock")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, DesignTokens.space2)
+        }
     }
 }

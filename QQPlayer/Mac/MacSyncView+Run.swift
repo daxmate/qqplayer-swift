@@ -8,8 +8,11 @@
 //   2026-09-26 批 B1 把 F 数据同步区整体迁到 `SyncDataPane.swift`——本文件只剩 D / E）：
 //  开始与阶段/进度上屏、最近一次结果（结论行 + 折叠详情）。
 //
-//  ⚠️ 可见性变化（批 B1）：`conclusionLine` / `metric` 由 `private` 放开为 internal ——
-//  播放数据流（`SyncDataPane.swift`）复用同一套结论行与指标墙渲染，禁第二份实现。
+//  ⚠️ 可见性 / 结构变化（批 B1 → 批 D）：`conclusionLine` / `metric`（现为
+//  `SyncConclusionLine` / `SyncMetric`）与目标状态行（`SyncTargetStatusBanner`，见
+//  `SyncDevicePane.swift`）是**跨 Pane 共用的唯一渲染实现**（禁第二份）。批 D 把三块 Pane
+//  改为独立 struct 后，这些成员不能再靠 `MacSyncRunSection` 的 extension 共享 ⇒
+//  改为**独立 struct**，由各 Pane 以值输入调用（渲染逐字未变）。
 //
 //  纪律不变：本文件只做展示——阶段/进度/结果全来自 `MacSyncRunViewModel` +
 //  `MacSyncDataViewModel` + `MacLyricsResendFactsStore` / `SyncEntityOutcomeDisclosure`
@@ -77,7 +80,7 @@ extension MacSyncRunSection {
 
             // 批 B2：目标状态行（「等待 <名字> 上线」/「当前连着 B，你要同步的是 A」+ 一键改用）。
             // 离线时开始键已被 `SyncUIStartGate.targetBlock` 禁用，这里是它的解释（带设备名）。
-            syncTargetStatusBanner
+            SyncTargetStatusBanner(status: syncTargetStatus, onAdoptConnected: adoptConnectedTarget)
         } header: {
             Text("sync_run_execute_section".localized)
         }
@@ -144,7 +147,7 @@ extension MacSyncRunSection {
         case .emptySelection:
             return "sync_run_reason_empty_selection".localized
         case .targetOffline:
-            // 批 B2：文案需要设备名（「等待 <名字> 上线」）→ 由 `syncTargetStatusBanner`
+            // 批 B2：文案需要设备名（「等待 <名字> 上线」）→ 由 `SyncTargetStatusBanner`
             // （唯一渲染处，就在按钮下方）解释；这里不再输出第二句。
             return nil
         }
@@ -159,7 +162,7 @@ extension MacSyncRunSection {
         let conclusion = report.map { SyncEntityOutcomeDisclosure.fileConclusion($0, lyricsResend: resend) }
         Section {
             if let conclusion {
-                conclusionLine(conclusion)
+                SyncConclusionLine(line: conclusion)
             } else {
                 Text("sync_run_result_none".localized)
                     .font(.callout)
@@ -185,39 +188,7 @@ extension MacSyncRunSection {
 
     /// 结论行：只显示投影给出的段（哪些指标出现 / 文案 key / 严重度全在
     /// `SyncEntityOutcomeDisclosure` 里定，本视图不写判断，只负责拼接与上色）。
-    @ViewBuilder
-    func conclusionLine(_ line: SyncResultConclusionLine) -> some View {
-        if let messageKey = line.messageKey {
-            Text(messageKey.localized)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space12) {
-                ForEach(Array(line.segments.enumerated()), id: \.offset) { _, segment in
-                    HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space4) {
-                        Text(segment.labelKey.localized)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        Text("\(segment.count)")
-                            .font(.callout)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(conclusionColor(segment.severity))
-                    }
-                }
-                Spacer(minLength: DesignTokens.space0)
-            }
-        }
-    }
-
-    /// 严重度 → 颜色（颜色属界面层；“缺口 / 失败”的判断在投影里）。
-    private func conclusionColor(_ severity: SyncResultConclusionSegment.Severity) -> Color {
-        switch severity {
-        case .normal: .primary
-        case .gap: .orange
-        case .failure: .red
-        }
-    }
+    /// （批 D：实现已抽为 `SyncConclusionLine`。）
 
     /// E 结果区**详情**（默认折叠）：指标墙 / 提示行 / 「对端已一致」例举 / 失败路径清单 /
     /// 对齐歌词（E2 补发轮事实**并入此处**——它与 E 的歌词行同一投影，不再单开一区）。
@@ -229,13 +200,13 @@ extension MacSyncRunSection {
         VStack(alignment: .leading, spacing: DesignTokens.space8) {
             if !report.isEmptySelection {
                 HStack(alignment: .top, spacing: DesignTokens.space24) {
-                    metric("sync_run_result_pushed".localized, report.pushedCount, .primary)
-                    metric("sync_run_result_pulled".localized, report.pulledCount, .primary)
-                    metric("sync_run_result_skipped".localized, report.skippedCount, .secondary)
-                    metric(
-                        "sync_run_result_failed".localized,
-                        report.failedCount,
-                        report.failedCount > 0 ? .red : .secondary
+                    SyncMetric(label: "sync_run_result_pushed".localized, value: report.pushedCount, color: .primary)
+                    SyncMetric(label: "sync_run_result_pulled".localized, value: report.pulledCount, color: .primary)
+                    SyncMetric(label: "sync_run_result_skipped".localized, value: report.skippedCount, color: .secondary)
+                    SyncMetric(
+                        label: "sync_run_result_failed".localized,
+                        value: report.failedCount,
+                        color: report.failedCount > 0 ? .red : .secondary
                     )
                     Spacer()
                 }
@@ -310,8 +281,8 @@ extension MacSyncRunSection {
                         .foregroundStyle(.secondary)
                     if let resend {
                         HStack(alignment: .top, spacing: DesignTokens.space24) {
-                            metric("sync_run_result_pushed".localized, resend.pushed.count, .primary)
-                            metric("sync_run_result_skipped".localized, resend.presentCount, .secondary)
+                            SyncMetric(label: "sync_run_result_pushed".localized, value: resend.pushed.count, color: .primary)
+                            SyncMetric(label: "sync_run_result_skipped".localized, value: resend.presentCount, color: .secondary)
                             Spacer()
                         }
                         .padding(.vertical, DesignTokens.space2)
@@ -336,7 +307,56 @@ extension MacSyncRunSection {
         }
     }
 
-    func metric(_ label: String, _ value: Int, _ color: Color) -> some View {
+}
+
+/// 结论行（跨 Pane 唯一实现：E 结果区 + F 数据结果区共用）：只显示投影给出的段
+/// （哪些指标出现 / 文案 key / 严重度全在 `SyncEntityOutcomeDisclosure` 里定，视图不写判断，
+/// 只负责拼接与上色）。
+struct SyncConclusionLine: View {
+    /// 投影给出的结论行（决策来自 `SyncEntityOutcomeDisclosure`）。
+    let line: SyncResultConclusionLine
+
+    var body: some View {
+        if let messageKey = line.messageKey {
+            Text(messageKey.localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space12) {
+                ForEach(Array(line.segments.enumerated()), id: \.offset) { _, segment in
+                    HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space4) {
+                        Text(segment.labelKey.localized)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text("\(segment.count)")
+                            .font(.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(conclusionColor(segment.severity))
+                    }
+                }
+                Spacer(minLength: DesignTokens.space0)
+            }
+        }
+    }
+
+    /// 严重度 → 颜色（颜色属界面层；“缺口 / 失败”的判断在投影里）。
+    private func conclusionColor(_ severity: SyncResultConclusionSegment.Severity) -> Color {
+        switch severity {
+        case .normal: .primary
+        case .gap: .orange
+        case .failure: .red
+        }
+    }
+}
+
+/// 指标格（跨 Pane 唯一实现：E 结果区详情 + F 数据结果详情共用）。
+struct SyncMetric: View {
+    let label: String
+    let value: Int
+    let color: Color
+
+    var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.space2) {
             Text(label)
                 .font(.caption)
@@ -347,5 +367,4 @@ extension MacSyncRunSection {
                 .foregroundStyle(color)
         }
     }
-
 }
