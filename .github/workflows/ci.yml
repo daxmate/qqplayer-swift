@@ -181,6 +181,26 @@ jobs:
           fi
           echo "✅ 无源码/工程级编译警告"
 
+  # 本地同步 harness（无模拟器 · swiftc 直编）
+  #
+  # 为什么进 CI：scripts/run-local-sync-tests.sh 是「本地禁起模拟器」下的真跑通道，
+  # 但它的编译集曾是**手工白名单**（只收 QQPlayer/Sync/ 的 42/68），引用了清单外类型
+  # ⇒ 在基线上就编不过；而它当时不在 CI 里，红了没人知道 ⇒ 逐批腐烂。
+  # 现在编译集是「自动发现 + 依赖闭包 + 显式黑名单」（scripts/sync-harness/closure_resolver.py），
+  # 本 job 让同类腐烂**当批暴露**。
+  #
+  # 无需 SPM 缓存 / DerivedData：本 harness 是 swiftc 直编生产源码（GRDB 只有两个 Record
+  # 协议桩）⇒ 不拉依赖、不起模拟器，冷跑约 45s（实测：闭包解析 9 轮 + 编译 66 文件 + 500 断言）。
+  local-harness:
+    name: Local sync harness (swiftc, no simulator)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run local sync harness (closure + assertions)
+        run: bash scripts/run-local-sync-tests.sh
+
   macos:
     name: macOS (build QQPlayerMac + 资源产物断言)
     # macOS 原生版（QQPlayerMac target）编译级验证。
