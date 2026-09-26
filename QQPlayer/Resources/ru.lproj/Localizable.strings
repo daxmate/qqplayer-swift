@@ -808,6 +808,9 @@
 "sync_device_status_online" = "В сети";
 "sync_device_status_offline" = "Не в сети";
 "sync_device_offline_hint" = "Откройте QQPlayer на этом устройстве → Настройки → Синхронизация.";
+"sync_target_waiting" = "Ожидание подключения %@.";
+"sync_target_mismatch_format" = "Подключено к %@, цель синхронизации — %@.";
+"sync_target_switch" = "Переключиться на %@";
 "sync_scan_qr" = "Сканировать QR-код";
 "sync_manual_input" = "Ввести ID вручную";
 "sync_scan_hint" = "Наведите камеру на QR-код в разделе «Синхронизация» на Mac.";

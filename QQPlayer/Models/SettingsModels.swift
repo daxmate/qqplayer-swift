@@ -278,6 +278,13 @@ struct DeleteSettings: Codable {
     /// 跨端续播（播放位置）开关；默认关（2026-09-14 用户拍板）。关 = 本端既不上报也不接受 playback_position
     var syncPlaybackPositionEnabled: Bool = false
 
+    // MARK: - 同步目标设备（批 B2，2026-09-26）
+
+    /// macOS「同步」页选中的设备 Device ID（= 本次同步的**唯一合法目标**；重启后仍记得）。
+    /// 空串 = 未选。**复用既有偏好入口**（`DeleteSettings` 的 UserDefaults 存）：
+    /// 不新造第二套存储，与 `syncPlaybackPositionEnabled` 同住一个设置 namespace。
+    var syncTargetDeviceID: String = ""
+
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
 
@@ -343,6 +350,8 @@ struct DeleteSettings: Codable {
         syncPlaybackPositionEnabled = try container.decodeIfPresent(
             Bool.self, forKey: .syncPlaybackPositionEnabled
         ) ?? false
+        // 同步目标设备（批 B2）：旧设置文件（无此 key）必须是「未选」——同上兜底。
+        syncTargetDeviceID = try container.decodeIfPresent(String.self, forKey: .syncTargetDeviceID) ?? ""
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

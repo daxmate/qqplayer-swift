@@ -66,6 +66,13 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 用户选定的同步方向（T10：面板第一屏；未选 = nil → 不能开始）。
     @Published private(set) var direction: SyncTransferDirection?
 
+    // MARK: 同步目标（批 B2）
+
+    /// 本次同步**目标**状态（期望目标 / 在线态 / 连上的与所选是否不符）。
+    /// 决策全在 `SyncDeviceListModel`（纯逻辑）；本类只接收视图层推来的事实，
+    /// 用于把闸门交给 `SyncUIStartGate`（同样是纯逻辑），不在这里另判。
+    @Published private(set) var syncTargetStatus: SyncDeviceTargetStatus = .none
+
     // MARK: 内部状态
 
     private var coordinator: SyncCollectionSyncCoordinator?
@@ -174,6 +181,14 @@ final class MacSyncRunViewModel: ObservableObject {
     }
 
     // MARK: - 同步执行
+
+    /// 目标选择变化（视图层唯一喂入口；从 `SyncDeviceListModel` 拿到的结论原样传入）。
+    /// 值未变不重复刷新（每次连接/列表变化都会调）。
+    func updateSyncTarget(_ status: SyncDeviceTargetStatus) {
+        guard status != syncTargetStatus else { return }
+        syncTargetStatus = status
+        refreshAvailability()
+    }
 
     /// 按当前方向开始同步（View 的唯一入口；未选方向 = 什么都不做）。
     func startSync() {
@@ -288,7 +303,8 @@ final class MacSyncRunViewModel: ObservableObject {
             hasSession: hostCenter.activeSession != nil,
             isRunning: running,
             hasDirection: direction != nil,
-            isEmptySelection: content.selection.isEmptySelection
+            isEmptySelection: content.selection.isEmptySelection,
+            targetStatus: syncTargetStatus
         )
     }
 

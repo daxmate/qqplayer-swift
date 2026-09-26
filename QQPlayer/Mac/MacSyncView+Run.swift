@@ -74,6 +74,10 @@ extension MacSyncRunSection {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            // 批 B2：目标状态行（「等待 <名字> 上线」/「当前连着 B，你要同步的是 A」+ 一键改用）。
+            // 离线时开始键已被 `SyncUIStartGate.targetBlock` 禁用，这里是它的解释（带设备名）。
+            syncTargetStatusBanner
         } header: {
             Text("sync_run_execute_section".localized)
         }
@@ -139,6 +143,10 @@ extension MacSyncRunSection {
             return "sync_run_reason_no_direction".localized
         case .emptySelection:
             return "sync_run_reason_empty_selection".localized
+        case .targetOffline:
+            // 批 B2：文案需要设备名（「等待 <名字> 上线」）→ 由 `syncTargetStatusBanner`
+            // （唯一渲染处，就在按钮下方）解释；这里不再输出第二句。
+            return nil
         }
     }
 

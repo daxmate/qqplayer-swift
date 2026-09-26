@@ -813,6 +813,9 @@
 "sync_device_status_online" = "Online";
 "sync_device_status_offline" = "Offline";
 "sync_device_offline_hint" = "Open QQPlayer on that device → Settings → Sync.";
+"sync_target_waiting" = "Waiting for %@ to come online.";
+"sync_target_mismatch_format" = "Connected to %@, but your sync target is %@.";
+"sync_target_switch" = "Switch to %@";
 "sync_scan_qr" = "Scan QR Code";
 "sync_manual_input" = "Enter ID Manually";
 "sync_scan_hint" = "Point the camera at the QR code shown in Sync on your Mac.";

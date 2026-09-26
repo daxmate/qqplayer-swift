@@ -9,14 +9,15 @@
 //   · 本机身份与二维码（`identitySection`：本机名字 + Device ID + 二维码 + 刷新）
 //   · 连接状态（`connectionSection`：已连对端行的状态/时长 + 「允许局域网连接」开关 + 监听提示）
 //   · 已配对设备（`pairedDevicesSection`：在线态 / 最后在线 / 撤销配对）
-//   · 本次同步目标（`deviceTargetSection`：单选；**本批仍是假控件**，真化属批 B2）
+//   · 本次同步目标（`deviceTargetSection`：单选真控件 + 目标状态行）
 //
 //  ⚠️ R3「设备只讲一次」：设备信息与配对操作**只出现在本页**，「同步」页不重复
 //  （拆分前 A 连接状态区在同步四区之首，本批随设备语义整体迁到本页）。
 //
-//  ⚠️ R2「本批不修假控件」：`deviceTargetRow` 的 `onTapGesture { targetDeviceID = row.peerID }`
-//  **逐字保留**（只写本地选中态，不驱动任何 model 调用）——本批只把它**搬进**本文件，
-//  真化留批 B2。
+//  ⚠️ 批 B2（2026-09-26）「设备选择真化」：`deviceTargetRow` 已从**假控件**
+//  （裸 `onTapGesture` 只写本地态）改成**真控件**（Button + `.isSelected` 无障碍 trait）；
+//  选择语义 = **期望目标 + 闸门**（目标离线 → 不可同步 + 「等待 <名字> 上线」；
+//  连上的 ≠ 所选 → 明说 + 一键改用），判定全在 `SyncDeviceListModel` / `SyncUIStartGate`。
 //
 //  ⚠️ 为什么本 Pane 是 `MacSyncRunSection` 的 extension 而不是独立 struct：三个
 //  ViewModel 仍是 `ObservableObject`（`@Observable` 迁移未覆盖），子视图要拿活的重绘就得写
@@ -283,14 +284,56 @@ extension MacSyncRunSection {
         return "sync_last_seen_format".localized(with: lastSeen.formatted(.relative(presentation: .named)))
     }
 
-    // MARK: - d 本次同步目标（批 B2 真化前：假控件，逐字保留现有行为）
+    // MARK: - d 本次同步目标（批 B2：真控件 + 期望目标/闸门语义）
 
     /// 行模型（过滤 + 在线态 + 短码，决策全在 `SyncDeviceListModel`）。
-    private var deviceRows: [SyncDeviceTargetRow] {
+    /// 非 private（批 B2）：顶层选中对账 / 目标状态也要用它（同一份行模型）。
+    var deviceRows: [SyncDeviceTargetRow] {
         SyncDeviceListModel.rows(
             in: devices,
             onlinePeerID: hostCenter.connectedPeer?.peerID
         )
+    }
+
+    /// 本次同步目标状态（唯一决策 `SyncDeviceListModel` 的结论；View 只渲染）。
+    var syncTargetStatus: SyncDeviceTargetStatus {
+        SyncDeviceTargetSelection(peerID: targetDeviceID).status(in: deviceRows)
+    }
+
+    /// 目标状态行（**唯一渲染实现**，三处共用：设备页目标区 / 传歌执行区 / 播放数据动作区）：
+    ///  · 「连上的 ≠ 所选」→ 明说 + 一键改用（不为静默改选）
+    ///  · 选了设备但不在线 → 「等待 <名字> 上线」（直接回答「为什么不能同步」）
+    /// 判定全在 `SyncDeviceTargetStatus`（纯逻辑），文案/配色属于本层。
+    @ViewBuilder
+    var syncTargetStatusBanner: some View {
+        let status = syncTargetStatus
+        if let mismatch = status.mismatch {
+            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.space8) {
+                Label(
+                    "sync_target_mismatch_format".localized(
+                        with: mismatch.connected.displayName,
+                        mismatch.selected.displayName
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Button("sync_target_switch".localized(with: mismatch.connected.displayName)) {
+                    adoptConnectedTarget()
+                }
+                .font(.callout)
+                .fixedSize()
+            }
+            .padding(.vertical, DesignTokens.space2)
+        } else if let waitingName = status.waitingName {
+            Label("sync_target_waiting".localized(with: waitingName), systemImage: "clock")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, DesignTokens.space2)
+        }
     }
 
     @ViewBuilder
@@ -303,6 +346,7 @@ extension MacSyncRunSection {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, DesignTokens.space6)
             } else {
+                syncTargetStatusBanner
                 ForEach(rows) { row in
                     deviceTargetRow(row)
                 }
@@ -315,45 +359,53 @@ extension MacSyncRunSection {
         }
     }
 
-    /// 设备行：单选（勾 + 底色，与方向区/全曲库行同一视觉语言）。
+    /// 设备行：**真控件**（批 B2）——选中语义由控件（Button + `.isSelected` 无障碍 trait）
+    /// 表达，可键盘焦点/激活；不再用裸 `onTapGesture`（那个既无控件语义也无无障碍语义）。
     /// 离线行常显「怎么把它弄上线」提示——直接回答「为什么不能同步」。
     private func deviceTargetRow(_ row: SyncDeviceTargetRow) -> some View {
         let selected = targetDeviceID == row.peerID
-        return HStack(alignment: .top, spacing: DesignTokens.space10) {
-            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(selected ? accentColor : Color.secondary)
+        return Button {
+            selectTargetDevice(row.peerID)
+        } label: {
+            HStack(alignment: .top, spacing: DesignTokens.space10) {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? accentColor : Color.secondary)
 
-            VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                HStack(spacing: DesignTokens.space6) {
-                    Text(row.displayName)
-                        .fontWeight(selected ? .medium : .regular)
-                    statusBadge(row)
-                    if selected {
-                        Text("sync_devices_target_badge".localized)
-                            .font(.caption2)
-                            .foregroundStyle(accentColor)
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
+                    HStack(spacing: DesignTokens.space6) {
+                        Text(row.displayName)
+                            .fontWeight(selected ? .medium : .regular)
+                        statusBadge(row)
+                        if selected {
+                            Text("sync_devices_target_badge".localized)
+                                .font(.caption2)
+                                .foregroundStyle(accentColor)
+                        }
+                    }
+                    Text(row.shortCode)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    if !row.isOnline {
+                        Text("sync_device_offline_hint".localized)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
                 }
-                Text(row.shortCode)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                if !row.isOnline {
-                    Text("sync_device_offline_hint".localized)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
 
-            Spacer(minLength: DesignTokens.space0)
+                Spacer(minLength: DesignTokens.space0)
+            }
+            .padding(.vertical, DesignTokens.space4)
+            .padding(.horizontal, DesignTokens.space6)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.radius6)
+                    .fill(selected ? accentColor.opacity(0.12) : Color.clear)
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, DesignTokens.space4)
-        .padding(.horizontal, DesignTokens.space6)
-        .background(
-            RoundedRectangle(cornerRadius: DesignTokens.radius6)
-                .fill(selected ? accentColor.opacity(0.12) : Color.clear)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture { targetDeviceID = row.peerID }
+        .buttonStyle(.plain)
+        // 选中语义交给无障碍：VoiceOver 读得出「这一行是选中的目标」（行内文字已含在线态/
+        // 离线提示，不再重复加 hint 避免双重朗读）。
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private func statusBadge(_ row: SyncDeviceTargetRow) -> some View {

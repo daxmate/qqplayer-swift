@@ -13,6 +13,11 @@
 //  R6「长期开关归设置」：跨端续播开关（`sync_run_playback_position_toggle`）留在本流内。
 //  R4「不得回退批 A 的折叠行为」：数据同步结果「结论行常显 + 明细进「详情」」逐字保留。
 //
+//  ⚠️ 批 B2（2026-09-26）：本流的两个动作都盯**所选设备**（选中设备 = 唯一合法同步目标）——
+//  「同步数据」按钮过 `SyncUIStartGate.dataSyncAvailability`（目标离线即禁用）；
+//  「重新对账」把所选设备 ID 显式传给 `MacSyncDataViewModel.resetCursorsForPeer(_:)`。
+//  两者都不是本视图的判断（决策在共享 Core 的纯逻辑里）。
+//
 //  ⚠️ 为什么本 Pane 是 `MacSyncRunSection` 的 extension 而不是独立 struct：三个 ViewModel
 //  仍是 `ObservableObject`（`@Observable` 迁移未覆盖），子视图要拿活的重绘就得写
 //  `@ObservedObject`/`@StateObject` → 命中 `ObservationMigrationContractTests` 的
@@ -52,13 +57,15 @@ extension MacSyncRunSection {
                         dataModel.cancel()
                     }
                 } else {
+                    // 批 B2：禁用条件 = 数据同步闸门（连接 / 会话 / 未在跑 / **目标在线**，
+                    // 唯一实现 = `SyncUIStartGate.dataSyncAvailability`）
                     Button("sync_run_data_button".localized) {
                         dataModel.start()
                     }
                     .disabled(!dataModel.canStart)
                     .help("sync_run_data_help".localized)
 
-                    // 次要动作：重置与该对端的推/拉游标（身份修复后必须能重拉，否则已被
+                    // 次要动作：重置与**所选设备**的推/拉游标（身份修复后必须能重拉，否则已被
                     // 游标越过的行永不重来）。二次确认后执行，与主按钮同步进行态无关。
                     Button("sync_run_data_reset_button".localized) {
                         showResetCursorsConfirm = true
@@ -75,6 +82,9 @@ extension MacSyncRunSection {
 
                 Spacer()
             }
+
+            // 批 B2：目标状态行（与传歌流同一渲染；离线时上面的按钮已被闸门禁用）。
+            syncTargetStatusBanner
 
             if dataModel.isRunning {
                 ProgressView()

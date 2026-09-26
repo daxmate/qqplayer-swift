@@ -1162,6 +1162,9 @@
 "sync_device_status_online" = "線上";
 "sync_device_status_offline" = "離線";
 "sync_device_offline_hint" = "在該裝置上開啟 QQPlayer → 設定 → 同步。";
+"sync_target_waiting" = "等待 %@ 上線。";
+"sync_target_mismatch_format" = "目前連著 %@，你要同步的是 %@。";
+"sync_target_switch" = "改用 %@";
 "sync_scan_qr" = "掃碼配對";
 "sync_manual_input" = "手動輸入 ID";
 "sync_scan_hint" = "將相機對準 Mac「同步」中顯示的二維碼。";

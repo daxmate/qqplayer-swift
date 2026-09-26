@@ -811,6 +811,9 @@
 "sync_device_status_online" = "En ligne";
 "sync_device_status_offline" = "Hors ligne";
 "sync_device_offline_hint" = "Ouvrez QQPlayer sur cet appareil → Réglages → Synchronisation.";
+"sync_target_waiting" = "En attente de la connexion de %@.";
+"sync_target_mismatch_format" = "Connecté à %@, mais votre cible de synchronisation est %@.";
+"sync_target_switch" = "Utiliser %@";
 "sync_scan_qr" = "Scanner le code QR";
 "sync_manual_input" = "Saisir l'ID manuellement";
 "sync_scan_hint" = "Visez le code QR affiché dans Synchronisation sur votre Mac.";

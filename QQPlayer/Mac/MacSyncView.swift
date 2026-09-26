@@ -95,8 +95,10 @@ struct MacSyncRunSection: View {
     @State var devicesError: String?
     /// 待撤销配对的设备（nil = 无待确认删除）
     @State var pendingUnpair: PeerDevice?
-    /// 设备区选中项（= 本次同步目标；存 peerID，选中决策见 `SyncDeviceListModel`）
-    @State var targetDeviceID: String?
+
+    /// 设备区选中项（= 本次同步目标；**读**：唯一来源是持久化的 `DeleteSettings.syncTargetDeviceID`）。
+    /// 批 B2：选择**持久化**（重启后仍记得）；写入一律走 `selectTargetDevice(_:)`
+    /// （唯一写入口：归一 → 持久化 → 推进闸门）。
 
     /// 设备存储（设备页读写；与拆分前同款：视图层持有）。
     let deviceStore = DeviceStore()
@@ -220,7 +222,8 @@ struct MacSyncRunSection: View {
             titleVisibility: .visible
         ) {
             Button("sync_run_data_reset_confirm_action".localized) {
-                dataModel.resetCursorsForPeer()
+                // 批 B2：显式传「所选设备」（不再由 `MacSyncDataViewModel` 自己读 connectedPeer）
+                dataModel.resetCursorsForPeer(targetDeviceID ?? "")
             }
             Button(Localized.cancel, role: .cancel) {}
         } message: {
@@ -296,12 +299,43 @@ struct MacSyncRunSection: View {
         syncTargetSelection()
     }
 
-    /// 设备列表 / 连接状态变化后重算选中（在线优先、原选中仍在则保持）。
+    /// 设备区选中项（= 本次同步目标）。批 B2：持久化在既有偏好入口 `DeleteSettings` 里
+    /// （重启后仍记得所选设备；空串 = 未选）。判定一律走 `SyncDeviceListModel`（纯逻辑）。
+    var targetDeviceID: String? {
+        deleteSettings.syncTargetDeviceID.isEmpty ? nil : deleteSettings.syncTargetDeviceID
+    }
+
+    /// 选中一台设备（**唯一写入口**）：归一 → 写持久化 → 推进闸门。
+    /// 传 nil 清空选择（不删任何记录，只是「没选目标」）。
+    func selectTargetDevice(_ peerID: String?) {
+        let normalized = SyncDeviceTargetSelection(peerID: peerID).peerID
+        if normalized != targetDeviceID {
+            deleteSettings.syncTargetDeviceID = normalized ?? ""
+            deleteSettings.save()
+        }
+        syncTargetSelection()
+    }
+
+    /// 「连上的 ≠ 所选」提示里的**一键改用**：把选择改成当前连上的那台。
+    /// 选择从哪来仍是决策层的事（`SyncDeviceListModel.adoptingConnectedPeer`）。
+    func adoptConnectedTarget() {
+        let adopted = SyncDeviceTargetSelection(peerID: targetDeviceID).adoptingConnectedPeer(in: deviceRows)
+        selectTargetDevice(adopted.peerID)
+    }
+
+    /// 设备列表 / 连接状态 / 选择变化后重算选中（在线优先、原选中仍在则保持），
+    /// 并把「唯一决策」的结果推给两个执行侧（传歌 / 数据）—— 连同目标在线态构成同步闸门。
     func syncTargetSelection() {
-        targetDeviceID = SyncDeviceListModel.reconciledSelection(
-            targetDeviceID,
-            in: SyncDeviceListModel.rows(in: devices, onlinePeerID: hostCenter.connectedPeer?.peerID)
-        )
+        let rows = deviceRows
+        let reconciled = SyncDeviceTargetSelection(peerID: targetDeviceID).reconciled(in: rows)
+        if reconciled.peerID != targetDeviceID {
+            // 原选中已撤销配对（或从未选过）→ 回落到默认（在线那台 / 未选）并持久化
+            deleteSettings.syncTargetDeviceID = reconciled.peerID ?? ""
+            deleteSettings.save()
+        }
+        let status = reconciled.status(in: rows)
+        model.updateSyncTarget(status)
+        dataModel.updateSyncTarget(status)
     }
 
     func unpair(_ device: PeerDevice) {
