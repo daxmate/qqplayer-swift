@@ -968,6 +968,8 @@
 "sync_result_nothing_new" = "Nothing to sync";
 
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+// Batch B1 (2026-09-26): top-level two pages + segmented flows (songs / playback data)
+"sync_flow_tracks" = "Song Transfer";
 "sync_run_data_section" = "Playback Data";
 "sync_run_data_description" = "Syncs favorites, play history and playlists on their own — no songs are transferred.";
 // Cross-device resume switch (2026-09-14): off by default; turning it on only allows exchange for now

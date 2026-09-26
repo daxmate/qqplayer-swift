@@ -966,6 +966,8 @@
 "sync_result_nothing_new" = "Rien à synchroniser";
 
 // S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+// Lot B1 (2026-09-26) : deux pages principales + segments (chansons / données de lecture)
+"sync_flow_tracks" = "Transfert de chansons";
 "sync_run_data_section" = "Données de lecture";
 "sync_run_data_description" = "Synchronise les favoris, l'historique et les playlists indépendamment des fichiers — aucune chanson n'est transférée.";
 // Interrupteur de reprise entre appareils (2026-09-14) : désactivé par défaut

@@ -519,7 +519,10 @@
 				Mac/MacTagEditorView.swift,
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
+				Mac/SyncDataPane.swift,
+				Mac/SyncDevicePane.swift,
 				Mac/SyncHostCenter.swift,
+				Mac/SyncTracksPane.swift,
 				QQPlayerMacApp.swift,
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
@@ -649,7 +652,10 @@
 				Mac/MacTagEditorView.swift,
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
+				Mac/SyncDataPane.swift,
+				Mac/SyncDevicePane.swift,
 				Mac/SyncHostCenter.swift,
+				Mac/SyncTracksPane.swift,
 				Models/AppearanceTheme.swift,
 				Models/AppNotifications.swift,
 				Models/DatabaseModels.swift,
