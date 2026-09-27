@@ -13,6 +13,8 @@
 //  - 落盘口径（空选择 / 用户取消不落盘）
 //  - 投影一致性（report 直投 == 快照回读）
 //  - 相对时间文案（注入 now / locale，含回落绝对文案）
+//  - 方向记忆（2026-09-27 批 remember-sync-direction）：按设备分桶 + 「最近一次」回退的
+//    读写口径、恢复顺序（含反向验证点：解析顺序 / 回退分支被抽掉必须变红）、损坏回落
 //
 
 import Foundation
@@ -311,6 +313,120 @@ struct SyncLastResultProjectionTests {
         let restored = SyncUIReportSummary.make(snapshot: snapshot)
         #expect(restored.lyricsDiscarded.count == 2)
         #expect(restored.lyricsKeptLocal.count == 1)
+    }
+}
+
+// MARK: - 方向记忆（批 remember-sync-direction）
+
+struct SyncDirectionMemoryTests {
+    @Test("选择即记 + 同设备命中该设备桶（值 = directionString 产出的字符串）")
+    func rememberAndResolveSamePeer() {
+        let defaults = makeSyncDefaults()
+
+        // 未连接也没有历史 → 无方向
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: nil, defaults: defaults) == nil)
+
+        SyncDirectionMemory.remember(.upload, peerID: "peer-A", defaults: defaults)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: defaults) == .upload)
+        // 桶里的值就是既有 directionString 口径（不是另写的字面量）
+        #expect(SyncDirectionMemory.byPeer(defaults: defaults)["peer-A"] == SyncLastResultSnapshot.directionString(.upload))
+        // 回退值同步更新（「最近一次」= 最近一次选择）
+        #expect(SyncDirectionMemory.fallback(defaults: defaults) == .upload)
+    }
+
+    @Test("按设备分桶：两台设备互不串；未连接 / 未知设备 → 「最近一次」回退值")
+    func perPeerBucketsAndFallback() {
+        let defaults = makeSyncDefaults()
+        SyncDirectionMemory.remember(.upload, peerID: "peer-A", defaults: defaults)
+        SyncDirectionMemory.remember(.download, peerID: "peer-B", defaults: defaults)
+
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: defaults) == .upload)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-B", defaults: defaults) == .download)
+        // 连着没有记录的设备 → 回退值（= 最近一次 = peer-B 的 download）
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-C", defaults: defaults) == .download)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: nil, defaults: defaults) == .download)
+    }
+
+    @Test("恢复顺序守卫：该设备桶必须**优先于**回退值（顺序写反即红）")
+    func bucketBeatsFallback() {
+        let defaults = makeSyncDefaults()
+        // 回退值 = download（先记的），该设备桶 = upload（后记的，同一台，回退值也是 upload）
+        // → 必须显式构造「两者不同」的现场：先给 peer-A 记 upload，再用未连接写 download
+        SyncDirectionMemory.remember(.upload, peerID: "peer-A", defaults: defaults)
+        SyncDirectionMemory.remember(.download, peerID: nil, defaults: defaults)
+
+        #expect(SyncDirectionMemory.fallback(defaults: defaults) == .download)
+        #expect(SyncDirectionMemory.byPeer(defaults: defaults)["peer-A"] == SyncLastResultSnapshot.directionString(.upload))
+        // 若实现先读回退值 / 把顺序写反 → 这里会得到 .download（红）
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: defaults) == .upload)
+    }
+
+    @Test("回退分支守卫：无该设备桶时必须落到「最近一次」（抽掉回退分支即红）")
+    func fallsBackWhenBucketMissing() {
+        let defaults = makeSyncDefaults()
+        SyncDirectionMemory.remember(.download, peerID: nil, defaults: defaults)
+
+        #expect(SyncDirectionMemory.byPeer(defaults: defaults).isEmpty)
+        // 若实现只查桶、不回退 → nil（红）
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: defaults) == .download)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: nil, defaults: defaults) == .download)
+    }
+
+    @Test("未连接只写回退值：不产生设备桶（空串 peerID 同 nil）")
+    func disconnectedWritesFallbackOnly() {
+        let defaults = makeSyncDefaults()
+        SyncDirectionMemory.remember(.upload, peerID: nil, defaults: defaults)
+        SyncDirectionMemory.remember(.download, peerID: "", defaults: defaults)
+
+        #expect(SyncDirectionMemory.byPeer(defaults: defaults).isEmpty)
+        #expect(SyncDirectionMemory.fallback(defaults: defaults) == .download)
+        // 空串不作为分桶 key，也不砸掉回退
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "", defaults: defaults) == .download)
+    }
+
+    @Test("损坏回落：非 JSON / 未知 direction 字符串 → 逐层跳过，最终 nil；不崩")
+    func corruptionFallsBack() {
+        // 桶 JSON 损坏 → 视为无桶 → 落到回退值
+        let corruptBuckets = makeSyncDefaults()
+        corruptBuckets.set(Data([0x00, 0x01, 0xFF]), forKey: SyncDirectionMemory.byPeerKey)
+        SyncDirectionMemory.remember(.download, peerID: nil, defaults: corruptBuckets)
+        #expect(SyncDirectionMemory.byPeer(defaults: corruptBuckets).isEmpty)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: corruptBuckets) == .download)
+
+        // 桶里是未知 direction 字符串 → 不采信该桶 → 落到回退值
+        let unknownInBucket = makeSyncDefaults()
+        unknownInBucket.set(Data(#"{"peer-A":"sideways"}"#.utf8), forKey: SyncDirectionMemory.byPeerKey)
+        SyncDirectionMemory.remember(.upload, peerID: nil, defaults: unknownInBucket)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: unknownInBucket) == .upload)
+
+        // 回退值本身就是未知字符串 / 无 key → nil（绝不猜一个方向）
+        let unknownFallback = makeSyncDefaults()
+        unknownFallback.set("sideways", forKey: SyncDirectionMemory.fallbackKey)
+        #expect(SyncDirectionMemory.fallback(defaults: unknownFallback) == nil)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: unknownFallback) == nil)
+
+        let empty = makeSyncDefaults()
+        #expect(SyncDirectionMemory.fallback(defaults: empty) == nil)
+    }
+
+    @Test("同设备重复选择：桶被覆盖为最新值")
+    func rememberOverwritesBucket() {
+        let defaults = makeSyncDefaults()
+        SyncDirectionMemory.remember(.upload, peerID: "peer-A", defaults: defaults)
+        SyncDirectionMemory.remember(.download, peerID: "peer-A", defaults: defaults)
+
+        #expect(SyncDirectionMemory.byPeer(defaults: defaults).count == 1)
+        #expect(SyncDirectionMemory.resolve(connectedPeerID: "peer-A", defaults: defaults) == .download)
+    }
+
+    @Test("反向验证点自动自证：directionString/fromString 往返（未知 → nil）")
+    func directionStringRoundTrip() {
+        for direction in [SyncTransferDirection.upload, .download] {
+            let raw = SyncLastResultSnapshot.directionString(direction)
+            #expect(SyncLastResultSnapshot.direction(fromString: raw) == direction)
+        }
+        #expect(SyncLastResultSnapshot.direction(fromString: "") == nil)
+        #expect(SyncLastResultSnapshot.direction(fromString: "UPLOAD") == nil)
     }
 }
 

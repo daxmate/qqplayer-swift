@@ -133,6 +133,7 @@ final class MacSyncRunViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         restoreLastResult()
+        restoreLastDirection()
     }
 
     /// 上次运行事实（nil = 本次运行 / 尚无历史）；View 传给
@@ -200,8 +201,11 @@ final class MacSyncRunViewModel: ObservableObject {
     // MARK: - 方向（面板第一屏）
 
     /// 选定同步方向：内容源整体切换（内容侧负责清空/重建选择集），并刷新可用性。
+    /// 选择即落盘（唯一入口 `SyncDirectionMemory`）：已连接 → 写该设备桶 + 「最近一次」；
+    /// 未连接 → 只写「最近一次」（没有设备可归属）。
     func selectDirection(_ direction: SyncTransferDirection) {
         self.direction = direction
+        SyncDirectionMemory.remember(direction, peerID: hostCenter.connectedPeer?.peerID)
         content.switchDirection(to: direction)
         refreshAvailability()
     }
@@ -370,6 +374,20 @@ final class MacSyncRunViewModel: ObservableObject {
             // 唯一写入时机：账目已定稿（终态后 800ms）之后落盘一次。
             self.persistLastResultIfNeeded()
         }
+    }
+
+    /// 启动 / 重建时恢复「记住的最后同步方向」（口径实现 = `SyncDirectionMemory.resolve`：
+    /// 该设备桶 → 「最近一次」回退值 → nil）。
+    ///
+    /// 只回填方向：**不**自动开始同步、**不**改按钮闸门（`SyncUIStartGate` 的判断一条不动）。
+    /// 与 `selectDirection` 同一配对要求：设置 `direction` 的同时必须 `content.switchDirection(to:)`，
+    /// 否则内容源与方向不匹配（内容区显示的会是另一端）。无记录 = 保持 nil（与今天行为一致）。
+    private func restoreLastDirection() {
+        guard let remembered = SyncDirectionMemory.resolve(
+            connectedPeerID: hostCenter.connectedPeer?.peerID
+        ) else { return }
+        direction = remembered
+        content.switchDirection(to: remembered)
     }
 
     /// 启动 / 重建时恢复「最近一次结果」（口径 1 的实现在 `SyncLastResultRestore`：

@@ -7,6 +7,10 @@
 //  为什么需要：Mac 同步面板的「最近一次结果」区块此前只活在 `MacSyncRunViewModel.reportSummary`
 //  里 —— 离开同步页 / 重启 App 必回「还没有同步记录。」，用户看不到上次跑到哪、有没有失败。
 //
+//  同日批 remember-sync-direction 追加：**同步方向记忆**（选择即记；按设备分桶 + 「最近一次」回退）
+//  —— 与结果持久化同处一个文件 / 同一口径家族（值一律复用 `directionString(_:)`），
+//  入口 = `SyncDirectionMemory`（禁止别处另开第二套 UserDefaults key）。
+//
 //  收口（本文件 = 该语义的**唯一**持久化入口 + **唯一**投影入口）：
 //  - 存储形状照抄 `MacSearchHistoryStore`（UserDefaults + JSON Codable + 版本化 key +
 //    损坏回落不抛），但**可注入 defaults**（照 `SyncHostCenter.init(defaults:trustStore:)`），
@@ -232,6 +236,75 @@ enum SyncLastResultPersistRule {
         guard !summary.isEmptySelection else { return false }
         guard interruption != .cancelled else { return false }
         return true
+    }
+}
+
+// MARK: - 方向记忆（选择即记；按设备分桶 + 「最近一次」回退；唯一入口）
+
+/// 同步方向的持久化入口（口径：用户 2026-09-27 拍板「按设备分桶」）。
+///
+/// - **选择即记**（不等同步跑完）：有 peerID → 写该设备桶**并**更新「最近一次」回退值；
+///   无 peerID（未连接）→ 只写回退值（没有设备可归属）。
+///   为什么有 peerID 时也写回退值：回退值的语义就是「最近一次选择」——面板多在未连接时打开
+///   （Mac 侧等 iPhone 连上来），若只在未连接时才写，常见路径下回退值将永远是空的。
+/// - **恢复顺序**：该设备桶 → 「最近一次」回退值 → `nil`（无方向，面板保持原状）。
+/// - **健壮**：未知 direction 字符串 / JSON 损坏 / key 缺失 → 该层视为「无记录」继续向下回退，
+///   一律不崩、不猜方向（复用 `SyncLastResultSnapshot.direction(fromString:)` 的 nil 口径）。
+/// - **只记方向**：不记内容勾选；不触发同步、不动按钮闸门（由调用方职责界定）。
+enum SyncDirectionMemory {
+    /// 「最近一次」回退值（全局单值；未连接时读写）。
+    static let fallbackKey = "sync.direction.last.v1"
+    /// 按设备分桶（值 = JSON `[peerID: String]`，方向字符串由 `directionString(_:)` 产出）。
+    static let byPeerKey = "sync.direction.byPeer.v1"
+
+    /// 空串与 nil 等价：`SyncHostCenter` 拿不到对端 hello 时 peerID = `""` → 不作为分桶 key。
+    static func normalizedPeerID(_ peerID: String?) -> String? {
+        guard let peerID, !peerID.isEmpty else { return nil }
+        return peerID
+    }
+
+    /// 选择即记（`peerID` = 当前连接的对端 Device ID；nil / 空串 = 未连接）。
+    static func remember(
+        _ direction: SyncTransferDirection,
+        peerID: String?,
+        defaults: UserDefaults = .standard
+    ) {
+        let raw = SyncLastResultSnapshot.directionString(direction)
+        defaults.set(raw, forKey: fallbackKey)
+        guard let peerID = normalizedPeerID(peerID) else { return }
+        var all = byPeer(defaults: defaults)
+        all[peerID] = raw
+        guard let data = try? JSONEncoder().encode(all) else { return }
+        defaults.set(data, forKey: byPeerKey)
+    }
+
+    /// 恢复（面板出现 / VM 初始化）：该设备桶 → 「最近一次」回退值 → nil。
+    static func resolve(
+        connectedPeerID: String?,
+        defaults: UserDefaults = .standard
+    ) -> SyncTransferDirection? {
+        if let peerID = normalizedPeerID(connectedPeerID),
+           let raw = byPeer(defaults: defaults)[peerID],
+           let direction = SyncLastResultSnapshot.direction(fromString: raw) {
+            return direction
+        }
+        return fallback(defaults: defaults)
+    }
+
+    /// 「最近一次」回退值（key 缺失 / 未知字符串 → nil）。
+    static func fallback(defaults: UserDefaults = .standard) -> SyncTransferDirection? {
+        guard let raw = defaults.string(forKey: fallbackKey) else { return nil }
+        return SyncLastResultSnapshot.direction(fromString: raw)
+    }
+
+    /// 全部设备桶（缺数据 / JSON 损坏 → 空字典，不抛）。
+    static func byPeer(defaults: UserDefaults = .standard) -> [String: String] {
+        guard let data = defaults.data(forKey: byPeerKey),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
+            return [:]
+        }
+        return decoded
     }
 }
 
