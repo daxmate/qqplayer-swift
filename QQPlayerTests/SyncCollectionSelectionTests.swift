@@ -43,6 +43,10 @@ private struct MemoryFacts: SyncCollectionFactsProviding {
 
 private let hashA = String(repeating: "a", count: 64)
 private let hashB = String(repeating: "b", count: 64)
+/// 夹具自查（2026-09-28）：`uploadDirections` 原先把 `push.flac` 与 `same.flac` 写成同一个
+/// `hashA` —— 那是**两个不同的歌**被误当成同一内容身份（跨路径判定的活值），改用独立指纹
+/// 恢复 fixture 原意（断言文本不变）。
+private let hashPush = String(repeating: "c", count: 64)
 
 // MARK: - ① 选择集规范化 / 空集合语义
 
@@ -287,7 +291,8 @@ struct SyncCollectionDiffPlannerTests {
     @Test("upload：对端缺 → 推；本端缺 → 不拉（仅记账）；两侧一致 → 跳过")
     func uploadDirections() {
         // local 只持有 push + same；pull 只在远端（upload 方向**不许拉**）。
-        let local = manifest([("Album/push.flac", hashA), ("Album/same.flac", hashA)])
+        // push.flac 与 same.flac 是**两首不同的歌**（独立指纹，勿共用）。
+        let local = manifest([("Album/push.flac", hashPush), ("Album/same.flac", hashA)])
         let remote = manifest([("Album/same.flac", hashA), ("Album/pull.flac", hashB)])
         let expected = ["Album/pull.flac", "Album/push.flac", "Album/same.flac"]
 
@@ -409,5 +414,133 @@ struct SyncCollectionDiffPlannerTests {
             direction: .upload
         )
         #expect(diff.toPush == ["Album/a.flac", "Album/b.flac", "Album/c.flac"])
+    }
+
+    // MARK: 跨路径内容身份（2026-09-28）——锁「对端/本端已持有同内容 → 不计入待传输」
+
+    @Test("★内容身份（upload）：对端已持有同内容（路径不同）→ 不进 toPush、计 alreadyPresent")
+    func uploadSkipsContentAlreadyHeldByPeer() {
+        // 实况形态：同一首歌两端命名顺序不同（`歌手 - 标题` vs `标题-歌手`），内容逐字节相同。
+        let local = manifest([("歌手 - 标题.mp3", hashA)])
+        let remote = manifest([("标题-歌手.mp3", hashA)])
+
+        let diff = SyncCollectionDiffPlanner.plan(
+            expected: ["歌手 - 标题.mp3"], local: local, remote: remote, direction: .upload
+        )
+
+        #expect(diff.toPush.isEmpty, "对端已有同内容 → 不推（否则『本轮要传 N 首』虚高）")
+        #expect(diff.alreadyPresent == ["歌手 - 标题.mp3"], "独立桶，且不并入 unchanged")
+        #expect(diff.unchanged.isEmpty, "unchanged 语义不变（同路径同内容）")
+        #expect(diff.transferCount == 0)
+    }
+
+    @Test("★内容身份（download）对称：本端已持有同内容（路径不同）→ 不进 toPull、计 alreadyPresent")
+    func downloadSkipsContentAlreadyHeldLocally() {
+        let local = manifest([("标题-歌手.mp3", hashA)])
+        let remote = manifest([("歌手 - 标题.mp3", hashA)])
+
+        let diff = SyncCollectionDiffPlanner.plan(
+            expected: ["歌手 - 标题.mp3"], local: local, remote: remote, direction: .download
+        )
+
+        #expect(diff.toPull.isEmpty, "本端已有同内容 → 不拉（不重复落盘）")
+        #expect(diff.alreadyPresent == ["歌手 - 标题.mp3"])
+        #expect(diff.unchanged.isEmpty)
+        #expect(diff.transferCount == 0)
+    }
+
+    @Test("★计划计数不虚高：待传输数 == 实际需要传的条目数（已持有/一致都不计）")
+    func plannedTransferCountMatchesActual() {
+        // 三首本端曲目：a 对端已有同内容（另一路径）、b 对端确实缺、c 两侧同路径同内容。
+        let local = manifest([("Album/a.flac", hashA), ("Album/b.flac", hashB), ("Album/c.flac", hashPush)])
+        let remote = manifest([("Other/a-别名.flac", hashA), ("Album/c.flac", hashPush)])
+        let expected = ["Album/a.flac", "Album/b.flac", "Album/c.flac"]
+
+        let diff = SyncCollectionDiffPlanner.plan(
+            expected: expected, local: local, remote: remote, direction: .upload
+        )
+
+        #expect(diff.toPush == ["Album/b.flac"])
+        #expect(diff.alreadyPresent == ["Album/a.flac"])
+        #expect(diff.unchanged == ["Album/c.flac"])
+        #expect(diff.remoteOnlyIgnored == ["Other/a-别名.flac"])
+        #expect(diff.transferCount == 1, "实际待传输 = 1（不是选择集 3）→ 上屏总数不再虚高")
+        #expect(diff.toPush.count + diff.toPull.count == diff.transferCount, "计划数 = 待传输数")
+        #expect(
+            diff.toPush.count + diff.toPull.count + diff.alreadyPresent.count
+                + diff.unchanged.count + diff.missingBoth.count
+                + diff.peerOnlySkipped.count + diff.localOnlySkipped.count
+                + diff.conflictingKept.count == expected.count,
+            "账目守恒：每条期望项恰好落一个桶"
+        )
+    }
+
+    @Test("保守侧：指纹 nil / 空串不参与内容身份判定 → 照旧进待传输集（不静默不传）")
+    func conservativeWhenFingerprintMissingOrEmpty() {
+        // upload：本端未指纹 → 不得判「对端已有」→ 照推
+        #expect(
+            SyncCollectionDiffPlanner
+                .plan(
+                    expected: ["Album/new.flac"],
+                    local: manifest([("Album/new.flac", nil)]),
+                    remote: manifest([("Album/other.flac", hashA)]),
+                    direction: .upload
+                )
+                .toPush == ["Album/new.flac"]
+        )
+        // upload：对端空串指纹不入索引 → 照推
+        let uploadEmptyPeer = SyncCollectionDiffPlanner.plan(
+            expected: ["Album/new.flac"],
+            local: manifest([("Album/new.flac", hashA)]),
+            remote: manifest([("Album/other.flac", "")]),
+            direction: .upload
+        )
+        #expect(uploadEmptyPeer.toPush == ["Album/new.flac"])
+        #expect(uploadEmptyPeer.alreadyPresent.isEmpty)
+
+        // download：本端未指纹 → 不得判「本端已有」→ 照拉
+        let downloadUnknownLocal = SyncCollectionDiffPlanner.plan(
+            expected: ["Album/new.flac"],
+            local: manifest([("Album/other.flac", nil)]),
+            remote: manifest([("Album/new.flac", hashA)]),
+            direction: .download
+        )
+        #expect(downloadUnknownLocal.toPull == ["Album/new.flac"])
+        #expect(downloadUnknownLocal.alreadyPresent.isEmpty)
+        // download：本端空串指纹不入索引 → 照拉
+        let downloadEmptyLocal = SyncCollectionDiffPlanner.plan(
+            expected: ["Album/new.flac"],
+            local: manifest([("Album/other.flac", "")]),
+            remote: manifest([("Album/new.flac", hashA)]),
+            direction: .download
+        )
+        #expect(downloadEmptyLocal.toPull == ["Album/new.flac"])
+        #expect(downloadEmptyLocal.alreadyPresent.isEmpty)
+    }
+
+    @Test("歌词命名空间不参与跨路径内容身份（同字节不同 wire 路径 → 照传，否则丢歌词）")
+    func lyricsNamespaceNotCrossPathMatched() {
+        let localLyrics = manifest([("@lyrics/\(hashA).json", hashPush)])
+        let remoteLyrics = manifest([("@lyrics/\(hashB).json", hashPush)])
+
+        // download：本端已有另一 wire 路径的同字节歌词 → 不得判「已有」→ 照拉
+        let download = SyncCollectionDiffPlanner.plan(
+            expected: ["@lyrics/\(hashB).json"],
+            local: localLyrics,
+            remote: remoteLyrics,
+            direction: .download
+        )
+        #expect(download.toPull == ["@lyrics/\(hashB).json"])
+        #expect(download.alreadyPresent.isEmpty)
+
+        // upload 对称：对端已有另一 wire 路径的同字节歌词 → 照推
+        let upload = SyncCollectionDiffPlanner.plan(
+            expected: ["@lyrics/\(hashA).json"],
+            local: localLyrics,
+            remote: remoteLyrics,
+            direction: .upload
+        )
+        #expect(upload.toPush == ["@lyrics/\(hashA).json"])
+        #expect(upload.alreadyPresent.isEmpty)
     }
 }

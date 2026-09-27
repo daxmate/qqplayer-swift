@@ -100,6 +100,7 @@ extension SyncCollectionSyncCoordinator {
         reportValue.plannedPush = diff.toPush
         reportValue.plannedPull = diff.toPull
         reportValue.skipped = diff.unchanged
+        reportValue.alreadyPresent = diff.alreadyPresent
         reportValue.missingBoth = diff.missingBoth
         reportValue.remoteOnlyIgnored = diff.remoteOnlyIgnored
         reportValue.conflictingKept = diff.conflictingKept

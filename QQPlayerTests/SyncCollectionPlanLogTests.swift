@@ -67,7 +67,7 @@ private func planLineProblems(_ line: String, direction: String, counts: [String
     if !line.hasPrefix("📋 同步计划 ") {
         problems.append("缺少计划行前缀：\(line)")
     }
-    let countKeys: Set<String> = ["选择", "本端", "对端", "推送", "拉取", "一致", "两侧无", "对端多"]
+    let countKeys: Set<String> = ["选择", "本端", "对端", "推送", "拉取", "一致", "已存在", "两侧无", "对端多"]
     if Set(counts.keys) != countKeys {
         problems.append("断言自身漏项（用例必须给全计数字段）：\(counts.keys.sorted())")
     }
@@ -104,7 +104,7 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "upload",
-            counts: ["选择": 1, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 1, "两侧无": 0, "对端多": 0]
+            counts: ["选择": 1, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 1, "已存在": 0, "两侧无": 0, "对端多": 0]
         )
         #expect(problems.isEmpty, "\(problems)")
         #expect(
@@ -132,7 +132,7 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "upload",
-            counts: ["选择": 2, "本端": 2, "对端": 1, "推送": 1, "拉取": 0, "一致": 1, "两侧无": 0, "对端多": 0]
+            counts: ["选择": 2, "本端": 2, "对端": 1, "推送": 1, "拉取": 0, "一致": 1, "已存在": 0, "两侧无": 0, "对端多": 0]
         )
         #expect(problems.isEmpty, "\(problems)")
         #expect(!lines.contains { $0.hasPrefix("⏭️") }, "有推送时不得落空计划行：\(lines)")
@@ -156,7 +156,7 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "download",
-            counts: ["选择": 2, "本端": 1, "对端": 2, "推送": 0, "拉取": 1, "一致": 1, "两侧无": 0, "对端多": 0]
+            counts: ["选择": 2, "本端": 1, "对端": 2, "推送": 0, "拉取": 1, "一致": 1, "已存在": 0, "两侧无": 0, "对端多": 0]
         )
         #expect(problems.isEmpty, "\(problems)")
     }
@@ -181,7 +181,7 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "download",
-            counts: ["选择": 2, "本端": 2, "对端": 1, "推送": 0, "拉取": 0, "一致": 1, "两侧无": 0, "对端多": 0]
+            counts: ["选择": 2, "本端": 2, "对端": 1, "推送": 0, "拉取": 0, "一致": 1, "已存在": 0, "两侧无": 0, "对端多": 0]
         )
         #expect(problems.isEmpty, "\(problems)")
         #expect(lines[1].hasPrefix("⏭️ 计划为空 → 不传输（对端自报已一致 1 项）"), "\(lines[1])")
@@ -204,7 +204,7 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "upload",
-            counts: ["选择": 1, "本端": 1, "对端": 2, "推送": 0, "拉取": 0, "一致": 1, "两侧无": 0, "对端多": 1]
+            counts: ["选择": 1, "本端": 1, "对端": 2, "推送": 0, "拉取": 0, "一致": 1, "已存在": 0, "两侧无": 0, "对端多": 1]
         )
         #expect(problems.isEmpty, "\(problems)")
         #expect(lines.count == 2, "零传输仍是空计划：\(lines)")
@@ -228,7 +228,7 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "upload",
-            counts: ["选择": 2, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 1, "两侧无": 1, "对端多": 0]
+            counts: ["选择": 2, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 1, "已存在": 0, "两侧无": 1, "对端多": 0]
         )
         #expect(problems.isEmpty, "\(problems)")
     }
@@ -272,6 +272,35 @@ struct SyncCollectionPlanLogTests {
         #expect(!lines[1].contains("Album/s4.flac"), "第 4 条不该出现（只留前 3）：\(lines[1])")
         #expect(!lines[1].contains("Album/s5.flac"), "第 5 条不该出现（只留前 3）：\(lines[1])")
         #expect(lines[1].contains("…(+2)"), "超出部分必须折叠成 …(+n)：\(lines[1])")
+    }
+
+    @Test("按内容身份跳过：字段 已存在=S 如实计入；空计划时第二行明说「按内容身份已持有」")
+    func contentIdentitySkipsAreLogged() {
+        // 本端一首、对端**同内容但另一路径** → 计划为空，但原因不是「两侧一致」（同路径）。
+        let local = [manifestEntry("歌手 - 标题.mp3", hash: "h-same")]
+        let remote = [manifestEntry("标题-歌手.mp3", hash: "h-same")]
+        let diff = plan(expected: ["歌手 - 标题.mp3"], local: local, remote: remote, direction: .upload)
+        let lines = SyncCollectionPlanLog.lines(
+            direction: .upload,
+            selectionCount: 1,
+            localCount: local.count,
+            peerCount: remote.count,
+            diff: diff
+        )
+
+        #expect(diff.alreadyPresent == ["歌手 - 标题.mp3"], "前置事实：按内容身份判「对端已有」")
+        #expect(diff.unchanged.isEmpty, "不是同路径一致（unchanged 语义不变）")
+        let problems = planLineProblems(
+            lines[0],
+            direction: "upload",
+            counts: ["选择": 1, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 0, "已存在": 1, "两侧无": 0, "对端多": 0]
+        )
+        #expect(problems.isEmpty, "\(problems)")
+        #expect(lines.count == 2, "\(lines)")
+        #expect(
+            lines[1].hasPrefix("⏭️ 计划为空 → 不传输（对端自报已一致 0 项；另有 1 项按内容身份已持有）"),
+            "空计划行必须说明「按内容身份已持有」这一跳过原因：\(lines[1])"
+        )
     }
 
     @Test("方向标签与既有代码/协议同词（upload / download），便于 grep 诊断")

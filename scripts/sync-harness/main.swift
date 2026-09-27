@@ -1882,6 +1882,68 @@ do {
     checkEqual(push.toPush, [], "推送：对端已持有同内容 → 不推")
     checkEqual(push.alreadyPresent.map(\.relativePath), ["歌手 - 标题.mp3"], "推送：进 alreadyPresent")
 
+    // 计划阶段差集（SyncCollectionDiffPlanner）：与拉取/推送同口径，计划数不得虚高。
+    let diffUpload = SyncCollectionDiffPlanner.plan(
+        expected: ["歌手 - 标题.mp3"],
+        local: localArtistFirst,
+        remote: remoteTitleFirst,
+        direction: .upload
+    )
+    checkEqual(diffUpload.toPush, [], "差集 upload：对端已有同内容 → 不推（计数不虚高）")
+    checkEqual(diffUpload.alreadyPresent, ["歌手 - 标题.mp3"], "差集 upload：进 alreadyPresent")
+    checkEqual(diffUpload.unchanged, [], "差集 upload：unchanged 语义不变（同路径同内容）")
+
+    let diffDownload = SyncCollectionDiffPlanner.plan(
+        expected: ["标题-歌手.mp3"],
+        local: localArtistFirst,
+        remote: remoteTitleFirst,
+        direction: .download
+    )
+    checkEqual(diffDownload.toPull, [], "差集 download：本端已有同内容 → 不拉")
+    checkEqual(diffDownload.alreadyPresent, ["标题-歌手.mp3"], "差集 download：进 alreadyPresent")
+
+    // 计划数 == 实际待传输数（本批核心验收：已持有/一致都不计入）
+    let mixedLocal = [
+        entry("Album/a.flac", hash: "h-a"),
+        entry("Album/b.flac", hash: "h-b"),
+        entry("Album/c.flac", hash: "h-c"),
+    ]
+    let mixedRemote = [entry("Other/a-aliased.flac", hash: "h-a"), entry("Album/c.flac", hash: "h-c")]
+    let mixed = SyncCollectionDiffPlanner.plan(
+        expected: ["Album/a.flac", "Album/b.flac", "Album/c.flac"],
+        local: mixedLocal,
+        remote: mixedRemote,
+        direction: .upload
+    )
+    checkEqual(mixed.toPush, ["Album/b.flac"], "只有对端真缺的那首计入推送")
+    checkEqual(mixed.alreadyPresent, ["Album/a.flac"], "对端已有同内容 → 计入已持有")
+    checkEqual(mixed.unchanged, ["Album/c.flac"], "同路径同内容 → unchanged")
+    checkEqual(
+        mixed.toPush.count + mixed.toPull.count,
+        mixed.transferCount,
+        "计划数 == 实际待传输数（不虚高）"
+    )
+
+    // 差集保守侧：本端未指纹 → 不得判「对端已有」→ 照推
+    let conservativeDiff = SyncCollectionDiffPlanner.plan(
+        expected: ["Album/new.flac"],
+        local: [entry("Album/new.flac", hash: nil)],
+        remote: [entry("Album/other.flac", hash: "h-x")],
+        direction: .upload
+    )
+    checkEqual(conservativeDiff.toPush, ["Album/new.flac"], "未指纹 → 照推（保守）")
+    checkEqual(conservativeDiff.alreadyPresent, [], "未指纹不参与内容身份 → 不得判已持有")
+
+    // 差集歌词命名空间：同字节不同 wire 路径 → 不得互判已持有
+    let lyricsDiff = SyncCollectionDiffPlanner.plan(
+        expected: ["@lyrics/songB.json"],
+        local: [entry("@lyrics/songA.json", hash: "same-bytes")],
+        remote: [entry("@lyrics/songB.json", hash: "same-bytes")],
+        direction: .download
+    )
+    checkEqual(lyricsDiff.toPull, ["@lyrics/songB.json"], "歌词必须照传（不按内容跳）")
+    checkEqual(lyricsDiff.alreadyPresent, [], "歌词不进 alreadyPresent")
+
     // 保守侧：任一侧未指纹 / 空串 → 退回按路径判定（不得静默不传）
     let unknownRemote = SyncManifestReconciler.reconcile(
         remote: [entry("new.flac", hash: nil)],

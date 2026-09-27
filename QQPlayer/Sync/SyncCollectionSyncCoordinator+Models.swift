@@ -21,6 +21,11 @@ struct SyncCollectionDiff: Equatable, Sendable {
     var toPull: [String] = []
     /// 两侧都有且内容一致 → 零传输（升序）
     var unchanged: [String] = []
+    /// 对端 / 本端**已持有同内容**（content_hash 相同、**路径不同**）→ 零传输（升序）。
+    /// **语义与 `unchanged` 不同**：`unchanged` = 同路径同内容（两侧都在对账键上）；
+    /// `alreadyPresent` = 内容身份判同曲（两台机器命名顺序不同：`歌手 - 标题` vs
+    /// `标题-歌手`）⇒ 不传输不落盘。判定复用 `SyncManifestReconciler` 唯一入口。
+    var alreadyPresent: [String] = []
     /// 期望里有、但**两侧都没有实体**的路径（什么都不做；诊断用）
     var missingBoth: [String] = []
     /// 对端多出来的条目（不在选中集合内）→ **什么都不做**（决策 7；仅记账）
@@ -44,16 +49,21 @@ enum SyncCollectionDiffPlanner {
     ///
     /// upload（只推，**不产生 toPull**）：
     /// - 两侧都有：一致 → `unchanged`；不同 → `toPush`（**本端权威**）
-    /// - 只有本端有 → `toPush`（对端缺 → 补齐）
+    /// - 只有本端有 → 对端**已持有同内容**（任意路径）→ `alreadyPresent`；否则 `toPush`
     /// - 只有对端有 → `peerOnlySkipped`（上传方向不往回拉，仅记账）
     ///
     /// download（只拉，**不产生 toPush**）：
     /// - 两侧都有：一致 → `unchanged`；不同 → `conflictingKept`（**不覆盖本端**）
-    /// - 只有对端有 → `toPull`（本端缺 → 补齐）
+    /// - 只有对端有 → 本端**已持有同内容**（任意路径）→ `alreadyPresent`；否则 `toPull`
     /// - 只有本端有 → `localOnlySkipped`（下载方向不推也不删，仅记账）
     ///
     /// 两方向共通：两侧都没有 → `missingBoth`（不伪造、不动手）；
     /// 对端多出的条目 → `remoteOnlyIgnored`（**不传播删除**）。
+    ///
+    /// 跨路径内容身份（2026-09-28）：与**实际传输**同口径——对端已持有同内容就不推、
+    /// 本端已持有同内容就不拉（否则「本轮要传 N 首」虚高，UI 进度出现「30/41」再跳完成）。
+    /// 判定只走 `SyncManifestReconciler.contentHashIndex` + `contentAlreadyHeld` 唯一入口；
+    /// 与同路径判定的分界（本端/对端缺该路径时才按内容身份再判一次）与两个控制器逐字一致。
     static func plan(
         expected: [String],
         local: [ManifestEntry],
@@ -64,6 +74,9 @@ enum SyncCollectionDiffPlanner {
         for entry in local { localByPath[entry.relativePath] = entry } // later wins（最终快照）
         var remoteByPath: [String: ManifestEntry] = [:]
         for entry in remote { remoteByPath[entry.relativePath] = entry }
+        // 内容身份索引（复用唯一入口；nil / 空串 / 歌词条目不参与——语义见 reconciler）
+        let localContentHashes = SyncManifestReconciler.contentHashIndex(local)
+        let remoteContentHashes = SyncManifestReconciler.contentHashIndex(remote)
 
         var diff = SyncCollectionDiff()
         let wanted = Set(expected)
@@ -79,15 +92,27 @@ enum SyncCollectionDiffPlanner {
                 } else {
                     diff.conflictingKept.append(path)
                 }
-            case (_?, nil):
+            case let (localEntry?, nil):
                 if direction == .upload {
-                    diff.toPush.append(path)
+                    if SyncManifestReconciler.contentAlreadyHeld(
+                        entry: localEntry,
+                        otherContentHashes: remoteContentHashes
+                    ) {
+                        diff.alreadyPresent.append(path)
+                    } else {
+                        diff.toPush.append(path)
+                    }
                 } else {
                     diff.localOnlySkipped.append(path)
                 }
-            case (nil, _?):
+            case let (nil, remoteEntry?):
                 if direction == .upload {
                     diff.peerOnlySkipped.append(path)
+                } else if SyncManifestReconciler.contentAlreadyHeld(
+                    entry: remoteEntry,
+                    otherContentHashes: localContentHashes
+                ) {
+                    diff.alreadyPresent.append(path)
                 } else {
                     diff.toPull.append(path)
                 }
@@ -136,11 +161,12 @@ enum SyncCollectionPlanLog {
 
     /// 计划阶段日志行（1 行；计划为空时 2 行）。
     ///
-    /// 行 1（恒定）：`📋 同步计划 方向=… 选择=N 本端=M 对端=K 推送=P 拉取=L 一致=U 两侧无=X 对端多=Y`
+    /// 行 1（恒定）：`📋 同步计划 方向=… 选择=N 本端=M 对端=K 推送=P 拉取=L 一致=U 已存在=S 两侧无=X 对端多=Y`
     /// 行 2（仅 `P == 0 且 L == 0`）：`⏭️ 计划为空 → 不传输（对端自报已一致 U 项）` + 一致样本。
     ///
     /// 字段口径：N=`selectionCount`（本次对账基准条目数）、M=`localCount`（本端全量清单）、
-    /// K=`peerCount`（对端自报清单）、P/L/U/X/Y 取 `diff` 对应字段。
+    /// K=`peerCount`（对端自报清单）、P/L/U/S/X/Y 取 `diff` 对应字段；其中 S=`alreadyPresent`
+    /// （按内容身份判已持有 ⇒ 本轮按内容跳过的项数，见 `SyncCollectionDiffPlanner`）。
     static func lines(
         direction: SyncTransferDirection,
         selectionCount: Int,
@@ -152,13 +178,17 @@ enum SyncCollectionPlanLog {
             "📋 同步计划 方向=\(directionLabel(direction))"
                 + " 选择=\(selectionCount) 本端=\(localCount) 对端=\(peerCount)"
                 + " 推送=\(diff.toPush.count) 拉取=\(diff.toPull.count) 一致=\(diff.unchanged.count)"
+                + " 已存在=\(diff.alreadyPresent.count)"
                 + " 两侧无=\(diff.missingBoth.count) 对端多=\(diff.remoteOnlyIgnored.count)",
         ]
         if diff.toPush.isEmpty, diff.toPull.isEmpty {
-            lines.append(
-                "⏭️ 计划为空 → 不传输（对端自报已一致 \(diff.unchanged.count) 项）"
-                    + sampleSuffix(diff.unchanged)
-            )
+            var emptyLine = "⏭️ 计划为空 → 不传输（对端自报已一致 \(diff.unchanged.count) 项"
+            // 计划为空可能不是「两侧一致」，而是**内容身份判已持有**（路径不同）⇒ 明说跳过原因。
+            if !diff.alreadyPresent.isEmpty {
+                emptyLine += "；另有 \(diff.alreadyPresent.count) 项按内容身份已持有"
+            }
+            emptyLine += "）" + sampleSuffix(diff.unchanged)
+            lines.append(emptyLine)
         }
         return lines
     }
@@ -211,6 +241,9 @@ struct SyncCollectionSyncReport: Equatable, Sendable {
     var plannedPull: [String] = []
     /// 两侧一致、零传输（升序）
     var skipped: [String] = []
+    /// 按**内容身份**判已持有、零传输（升序）：upload = 对端已有同内容（路径不同）；
+    /// download = 本端已有同内容（路径不同）。**与 `skipped` 分开记账**（后者 = 同路径同内容）。
+    var alreadyPresent: [String] = []
     /// 期望里两侧都没有实体的路径（升序；什么都不做）
     var missingBoth: [String] = []
     /// 对端多出的条目（升序；**不传播删除**，仅记账）
