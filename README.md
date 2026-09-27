@@ -319,6 +319,7 @@ cd qqplayer-swift
 1. 打开 `QQPlayer.xcodeproj`，选择 **QQPlayerMac** scheme，直接 Run（无需开发者账号；应用非沙盒，直接读取本地文件夹）
 2. 默认扫描 `~/Music/QQPlayer`（首次启动自动创建），把音乐放进去即自动入曲库；也可以在 **设置 → 音乐库** 添加外部文件夹，或直接把文件**拖入窗口 / 歌单行**导入
 3. 在线下载：工具栏云下载按钮（网易云 / 歌曲海；夸克源首次需扫码登录）；标签刮削：曲库列表右键「编辑标签 / 刮削」
+4. 命令行一键安装（免开 Xcode）：`./build.sh mac` 只做 macOS（构建 → 覆盖安装到 `/Applications/QQPlayerMac.app` → 启动）；`./build.sh install` 做 iOS + macOS 双端。注意 `./build.sh --install` 仍是 **iOS-only**；无 iPhone 时 `install` 跳过 iOS 分支（打印排查提示）并让整体退出码非零，macOS 分支照常跑完。
 
 > **命令行构建（推荐统一入口）**：`scripts/xcbuild.sh` 已固化共享 SPM 缓存（`-clonedSourcePackagesDirPath`）与按工作区隔离的 DerivedData（`/tmp/dd-<工作区名>`，可用 `QQPLAYER_DD` 覆盖），避免每次新路径重新 clone 全部依赖：
 >
@@ -394,7 +395,7 @@ scripts/                      # 工程工具（xcbuild.sh 统一构建入口 / a
                               #   pbxproj-membership.py / run-local-sync-tests.sh / siri-tests-guard.py / sync-harness / git-hooks）
 #   （add-grdb-to-tests.py 遗留一次性工具，目的已达成，等 maintainer 清理，见文件头说明）
 .env.template                 # 可选 API Key 模板（复制为 .env）
-build.sh                      # iOS 一键构建 / 真机安装脚本
+build.sh                      # 一键构建 / 安装脚本（无参=模拟器 / --install=iOS 真机 / mac=macOS / install=双端）
 .github/workflows/ci.yml      # CI：lint/format + iOS 单测 + macOS 构建与资源断言（含编译警告零容忍）
 LICENSE / NOTICE.md / PRIVACY.md
 ```
