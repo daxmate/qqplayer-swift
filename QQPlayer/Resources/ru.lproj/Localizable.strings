@@ -1023,10 +1023,10 @@
 
 // T10（2026-09-12）направление сначала · источник содержимого зависит от направления
 "sync_run_direction_section" = "Направление синхронизации";
-"sync_run_direction_upload" = "Загрузить на iPhone";
-"sync_run_direction_upload_detail" = "Отправить песни с этого Mac на iPhone.";
-"sync_run_direction_download" = "Скачать с iPhone";
-"sync_run_direction_download_detail" = "Перенести песни с iPhone на этот Mac.";
+"sync_run_direction_upload" = "Отправить на %@";
+"sync_run_direction_upload_detail" = "Отправить песни с этого Mac на %@.";
+"sync_run_direction_download" = "Получить с %@";
+"sync_run_direction_download_detail" = "Перенести песни с %@ на этот Mac.";
 "sync_run_direction_footer" = "Сначала выберите направление — список ниже покажет содержимое выбранного устройства.";
 "sync_run_direction_hint" = "Выберите направление синхронизации выше, чтобы увидеть, что можно синхронизировать.";
 "sync_run_direction_download_target" = "iPhone";

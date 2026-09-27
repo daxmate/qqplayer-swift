@@ -1033,10 +1033,10 @@
 
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "同步方向";
-"sync_run_direction_upload" = "从本地上传到 iPhone";
-"sync_run_direction_upload_detail" = "把 Mac 上的歌曲传到 iPhone。";
-"sync_run_direction_download" = "从 iPhone 下载到本地";
-"sync_run_direction_download_detail" = "把 iPhone 上的歌曲拉到 Mac。";
+"sync_run_direction_upload" = "送到 %@";
+"sync_run_direction_upload_detail" = "把 Mac 上的歌曲送到 %@。";
+"sync_run_direction_download" = "从 %@ 拿";
+"sync_run_direction_download_detail" = "把 %@ 上的歌曲拿到 Mac。";
 "sync_run_direction_footer" = "先选方向——下面的列表会显示那一端的内容。";
 "sync_run_direction_hint" = "请先在上面选择同步方向，再选择要同步的内容。";
 "sync_run_direction_download_target" = "iPhone";

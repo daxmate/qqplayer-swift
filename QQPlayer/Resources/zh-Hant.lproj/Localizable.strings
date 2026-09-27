@@ -1371,10 +1371,10 @@
 
 // T10（2026-09-12）方向優先 · 內容來源隨方向切換
 "sync_run_direction_section" = "同步方向";
-"sync_run_direction_upload" = "從本機上傳到 iPhone";
-"sync_run_direction_upload_detail" = "把 Mac 上的歌曲傳到 iPhone。";
-"sync_run_direction_download" = "從 iPhone 下載到本機";
-"sync_run_direction_download_detail" = "把 iPhone 上的歌曲拉到 Mac。";
+"sync_run_direction_upload" = "送到 %@";
+"sync_run_direction_upload_detail" = "把 Mac 上的歌曲送到 %@。";
+"sync_run_direction_download" = "從 %@ 拿";
+"sync_run_direction_download_detail" = "把 %@ 上的歌曲拿到 Mac。";
 "sync_run_direction_footer" = "先選方向——下面的清單會顯示那一端的內容。";
 "sync_run_direction_hint" = "請先在上面選擇同步方向，再選擇要同步的內容。";
 "sync_run_direction_download_target" = "iPhone";

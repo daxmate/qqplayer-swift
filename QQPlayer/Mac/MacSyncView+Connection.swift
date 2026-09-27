@@ -24,13 +24,13 @@ extension MacSyncRunSection {
         Section {
             directionRow(
                 .upload,
-                title: "sync_run_direction_upload".localized,
-                detail: "sync_run_direction_upload_detail".localized
+                title: "sync_run_direction_upload".localized(with: targetDeviceName),
+                detail: "sync_run_direction_upload_detail".localized(with: targetDeviceName)
             )
             directionRow(
                 .download,
-                title: "sync_run_direction_download".localized,
-                detail: "sync_run_direction_download_detail".localized
+                title: "sync_run_direction_download".localized(with: targetDeviceName),
+                detail: "sync_run_direction_download_detail".localized(with: targetDeviceName)
             )
         } header: {
             Text("sync_run_direction_section".localized)
@@ -39,33 +39,54 @@ extension MacSyncRunSection {
         }
     }
 
+    /// 方向文案的**设备锚点** = 所选目标设备的展示名。
+    /// 名字来自唯一决策层 `SyncDeviceTargetSelection` 的结论（`syncTargetStatus.target`）——
+    /// 这里不重算「哪一行是目标」，也不新造第二套兜底：没选目标（或目标已不在列表里）时
+    /// 沿用既有兜底 key（空名已由 `SyncDeviceList.displayName` 回落到占位文案）。
+    private var targetDeviceName: String {
+        guard let name = syncTargetStatus.target?.displayName,
+              !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return "sync_run_direction_download_target".localized
+        }
+        return name
+    }
+
     /// 方向行（单选；选中态用勾 + 底色，与内容区的「全曲库」行同一视觉语言）。
+    /// 批 C：外壳从裸 `onTapGesture` 改为**真控件**（`Button` + `.isSelected` 无障碍 trait，
+    /// 可键盘焦点/激活），范式与批 B2 `SyncDevicePane.deviceTargetRow` 一致；视觉逐字不变。
     private func directionRow(
         _ direction: SyncTransferDirection,
         title: String,
         detail: String
     ) -> some View {
         let selected = model.direction == direction
-        return HStack(alignment: .top, spacing: DesignTokens.space10) {
-            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(selected ? accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                Text(title)
-                    .fontWeight(selected ? .medium : .regular)
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        return Button {
+            model.selectDirection(direction)
+        } label: {
+            HStack(alignment: .top, spacing: DesignTokens.space10) {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? accentColor : Color.secondary)
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
+                    Text(title)
+                        .fontWeight(selected ? .medium : .regular)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: DesignTokens.space0)
             }
-            Spacer(minLength: DesignTokens.space0)
+            .padding(.vertical, DesignTokens.space4)
+            .padding(.horizontal, DesignTokens.space6)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.radius6)
+                    .fill(selected ? accentColor.opacity(0.12) : Color.clear)
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, DesignTokens.space4)
-        .padding(.horizontal, DesignTokens.space6)
-        .background(
-            RoundedRectangle(cornerRadius: DesignTokens.radius6)
-                .fill(selected ? accentColor.opacity(0.12) : Color.clear)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture { model.selectDirection(direction) }
+        .buttonStyle(.plain)
+        // 行内文字已含标题/说明 → 不再重复加 `.accessibilityHint`（避免双重朗读）。
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
 }

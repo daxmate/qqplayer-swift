@@ -1026,10 +1026,10 @@
 
 // T10 (2026-09-12) sens d'abord · la source de contenu suit le sens
 "sync_run_direction_section" = "Sens de synchronisation";
-"sync_run_direction_upload" = "Envoyer vers l'iPhone";
-"sync_run_direction_upload_detail" = "Envoyer les morceaux de ce Mac vers votre iPhone.";
-"sync_run_direction_download" = "Télécharger depuis l'iPhone";
-"sync_run_direction_download_detail" = "Rapatrier les morceaux de votre iPhone vers ce Mac.";
+"sync_run_direction_upload" = "Envoyer vers %@";
+"sync_run_direction_upload_detail" = "Envoyer les morceaux de ce Mac vers %@.";
+"sync_run_direction_download" = "Récupérer depuis %@";
+"sync_run_direction_download_detail" = "Rapatrier les morceaux de %@ vers ce Mac.";
 "sync_run_direction_footer" = "Choisissez d'abord un sens : la liste ci-dessous affiche alors le contenu de cet appareil.";
 "sync_run_direction_hint" = "Choisissez un sens de synchronisation ci-dessus pour voir ce qui peut être synchronisé.";
 "sync_run_direction_download_target" = "iPhone";

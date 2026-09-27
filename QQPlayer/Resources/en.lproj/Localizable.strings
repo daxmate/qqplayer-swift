@@ -1028,10 +1028,10 @@
 
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "Sync Direction";
-"sync_run_direction_upload" = "Upload to iPhone";
-"sync_run_direction_upload_detail" = "Send songs from this Mac to your iPhone.";
-"sync_run_direction_download" = "Download from iPhone";
-"sync_run_direction_download_detail" = "Bring songs from your iPhone to this Mac.";
+"sync_run_direction_upload" = "Send to %@";
+"sync_run_direction_upload_detail" = "Send songs from this Mac to %@.";
+"sync_run_direction_download" = "Get from %@";
+"sync_run_direction_download_detail" = "Bring songs from %@ to this Mac.";
 "sync_run_direction_footer" = "Pick a direction first — the list below then shows that device's content.";
 "sync_run_direction_hint" = "Choose a sync direction above to see what can be synced.";
 "sync_run_direction_download_target" = "iPhone";
