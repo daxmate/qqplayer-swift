@@ -17,6 +17,11 @@ import Testing
 
 private let hashA = String(repeating: "a", count: 64)
 private let hashB = String(repeating: "b", count: 64)
+/// 夹具自查（2026-09-28，CI run 36358602086）：`localManifest` 原先把 `local-only.flac` 与
+/// `same.flac` 写成同一个 `hashA` —— 那是**两个不同的歌**被当成同一内容身份，于是新语义下
+/// 「对端已持有该内容（同一 hashA 的 same.flac）」→ `local-only` 不再被推。改用独立指纹
+/// 恢复 fixture 原意（对端确实没有 local-only 这首），**断言文本不变**。
+private let hashLocal = String(repeating: "d", count: 64)
 
 private func entry(_ path: String, hash: String? = nil) -> ManifestEntry {
     ManifestEntry(relativePath: path, size: 10, mtimeMs: 0, contentHash: hash)
@@ -59,7 +64,9 @@ struct SyncRemoteRequestCollectionTests {
 
 @Suite("T7 期望集合按方向取")
 struct SyncExpectedPlannerTests {
-    private let localManifest = [entry("Album/local-only.flac", hash: hashA), entry("Album/same.flac", hash: hashA)]
+    private let localManifest = [
+        entry("Album/local-only.flac", hash: hashLocal), entry("Album/same.flac", hash: hashA),
+    ]
     private let remoteManifest = [entry("Album/same.flac", hash: hashA), entry("Album/peer-only.flac", hash: hashB)]
 
     @Test("来源映射：upload×.all=本端全量；upload×选择集=本端展开；download×.all/.playlists=对端清单；download×路径=选择集本身")

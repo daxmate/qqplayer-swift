@@ -293,7 +293,10 @@ struct SyncCollectionPlanLogTests {
         let problems = planLineProblems(
             lines[0],
             direction: "upload",
-            counts: ["选择": 1, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 0, "已存在": 1, "两侧无": 0, "对端多": 0]
+            // 对端多=1：对端清单里的 `标题-歌手.mp3` 不在选择集（expected）内 ⇒ 按
+            // `SyncCollectionDiffPlanner.remoteOnlyIgnored` 的判定（remote 路径集 - wanted）就该计入，
+            // 与本用例的「按内容身份已持有」是**两个独立账目**。（本批新增用例的期望值笔误。）
+            counts: ["选择": 1, "本端": 1, "对端": 1, "推送": 0, "拉取": 0, "一致": 0, "已存在": 1, "两侧无": 0, "对端多": 1]
         )
         #expect(problems.isEmpty, "\(problems)")
         #expect(lines.count == 2, "\(lines)")

@@ -47,6 +47,11 @@ private let hashB = String(repeating: "b", count: 64)
 /// `hashA` —— 那是**两个不同的歌**被误当成同一内容身份（跨路径判定的活值），改用独立指纹
 /// 恢复 fixture 原意（断言文本不变）。
 private let hashPush = String(repeating: "c", count: 64)
+/// 夹具自查（2026-09-28，全仓同类别名扫描）：`downloadDirections` 的 `local` 同样把
+/// `local-only.flac` 与 `same.flac` 写成同一个 `hashA`（与已修的 `uploadDirections` 同源笔误，
+/// 只是 download 方向的 `localOnlySkipped` 分支不查内容身份故未暴露）。改用独立指纹，
+/// 恢复「对端确实没有 local-only」的 fixture 原意（**断言文本不变**）。
+private let hashLocal = String(repeating: "d", count: 64)
 
 // MARK: - ① 选择集规范化 / 空集合语义
 
@@ -310,7 +315,7 @@ struct SyncCollectionDiffPlannerTests {
 
     @Test("download：对端独有 → 拉；本端独有 → 不推不删（仅记账）")
     func downloadDirections() {
-        let local = manifest([("Album/local-only.flac", hashA), ("Album/same.flac", hashA)])
+        let local = manifest([("Album/local-only.flac", hashLocal), ("Album/same.flac", hashA)])
         let remote = manifest([("Album/same.flac", hashA), ("Album/peer-only.flac", hashB)])
         let expected = ["Album/peer-only.flac", "Album/local-only.flac", "Album/same.flac"]
 
@@ -406,7 +411,9 @@ struct SyncCollectionDiffPlannerTests {
 
     @Test("差集输出升序（确定性，便于比对与日志）")
     func deterministicOrder() {
-        let local = manifest([("Album/c.flac", hashA), ("Album/a.flac", hashA), ("Album/b.flac", hashA)])
+        // 夹具自查（2026-09-28）：三首不同的歌原先共用 `hashA`（含跨路径内容身份的活值）；
+        // 改用三个独立指纹（本用例只锁升序，断言文本不变）。
+        let local = manifest([("Album/c.flac", hashPush), ("Album/a.flac", hashA), ("Album/b.flac", hashB)])
         let diff = SyncCollectionDiffPlanner.plan(
             expected: ["Album/c.flac", "Album/a.flac", "Album/b.flac"],
             local: local,
