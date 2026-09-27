@@ -1861,6 +1861,50 @@ do {
     checkEqual(conflict.toPull, [], "download 内容不同 → 不拉")
 }
 
+// MARK: - ㉘b 跨路径内容身份（2026-09-27 重复落库 bug）
+
+section("㉘b 计划阶段按 content_hash 判「本端已有」→ 不传输不落盘（拉取/推送/差集同口径）")
+do {
+    // 实况形态：同一首歌两端命名顺序不同（`歌手 - 标题` vs `标题-歌手`），内容逐字节相同
+    let remoteTitleFirst = [entry("标题-歌手.mp3", hash: "h-same")]
+    let localArtistFirst = [entry("歌手 - 标题.mp3", hash: "h-same")]
+
+    let pull = SyncLibraryPullPlanner.plan(
+        remote: SyncManifestResponse(entries: remoteTitleFirst),
+        local: localArtistFirst,
+        selection: .all
+    )
+    checkEqual(pull.relativePaths, [], "拉取：内容同一（路径不同）→ 不请求传输")
+    checkEqual(pull.alreadyPresent.map(\.relativePath), ["标题-歌手.mp3"], "拉取：进 alreadyPresent")
+    checkEqual(pull.unchanged, [], "拉取：unchanged 语义不变（同路径同内容）")
+
+    let push = SyncLibraryPushPlanner.plan(local: localArtistFirst, remote: remoteTitleFirst)
+    checkEqual(push.toPush, [], "推送：对端已持有同内容 → 不推")
+    checkEqual(push.alreadyPresent.map(\.relativePath), ["歌手 - 标题.mp3"], "推送：进 alreadyPresent")
+
+    // 保守侧：任一侧未指纹 / 空串 → 退回按路径判定（不得静默不传）
+    let unknownRemote = SyncManifestReconciler.reconcile(
+        remote: [entry("new.flac", hash: nil)],
+        local: [entry("old.flac", hash: "h-any")]
+    )
+    checkEqual(unknownRemote.toFetch.map(\.relativePath), ["new.flac"], "远端未指纹 → 仍拉（保守）")
+    checkEqual(unknownRemote.alreadyPresent, [], "远端未指纹 → 不得判「已有」")
+
+    let emptyHashes = SyncManifestReconciler.reconcile(
+        remote: [entry("a.flac", hash: "")],
+        local: [entry("b.flac", hash: "")]
+    )
+    checkEqual(emptyHashes.toFetch.map(\.relativePath), ["a.flac"], "空串指纹不是身份 → 仍拉")
+
+    // 歌词命名空间不参与跨路径内容身份（同字节不同 wire 路径 → 否则丢歌词）
+    let lyrics = SyncManifestReconciler.reconcile(
+        remote: [entry("@lyrics/songB.json", hash: "same-bytes")],
+        local: [entry("@lyrics/songA.json", hash: "same-bytes")]
+    )
+    checkEqual(lyrics.toFetch.map(\.relativePath), ["@lyrics/songB.json"], "歌词必须照传（不按内容跳）")
+    checkEqual(lyrics.alreadyPresent, [], "歌词不进 alreadyPresent")
+}
+
 // MARK: - ㉙ R3b：跟歌走计划器（纯逻辑，三条硬规则）
 
 section("㉙ R3b：跟歌走计划器（只带传输过的歌 / 两端共有才带 / 不传删除）")
