@@ -195,6 +195,7 @@
 		E24B4CFA87204D229B3F6BD4 /* ObservationTrackingTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155AAF09276B402CAA2AEA18 /* ObservationTrackingTestSupport.swift */; };
 		3384729FD1C74CFC9E6167C8 /* ObservationTrackingShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */; };
 		A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */; };
+		3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -439,6 +440,7 @@
 		155AAF09276B402CAA2AEA18 /* ObservationTrackingTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationTrackingTestSupport.swift; sourceTree = "<group>"; };
 		2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationTrackingShapeContractTests.swift; sourceTree = "<group>"; };
 		B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncResultConclusionTests.swift; sourceTree = "<group>"; };
+		9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLastResultStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -805,6 +807,7 @@
 				Services/SyncConnectDiag.swift,
 				Services/SyncDeviceListModel.swift,
 				Services/SyncHostGate.swift,
+				Services/SyncLastResultStore.swift,
 				Services/SyncSelectionStore.swift,
 				Services/SyncUIDirectionContent.swift,
 				Services/SyncUIState.swift,
@@ -1219,6 +1222,7 @@
 				155AAF09276B402CAA2AEA18 /* ObservationTrackingTestSupport.swift */,
 				2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */,
 				B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */,
+				9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1712,6 +1716,7 @@
 				E24B4CFA87204D229B3F6BD4 /* ObservationTrackingTestSupport.swift in Sources */,
 				3384729FD1C74CFC9E6167C8 /* ObservationTrackingShapeContractTests.swift in Sources */,
 				A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */,
+				3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -88,6 +88,18 @@ final class MacSyncRunViewModel: ObservableObject {
     private var tickTask: Task<Void, Never>?
     private var reportRefreshTask: Task<Void, Never>?
 
+    // MARK: 最近一次结果的持久化（2026-09-27 批 persist-last-sync-result）
+
+    /// 上次运行的恢复事实（nil = 本次运行 / 尚无历史）。
+    /// ⚠️ **非 `@Published`**（棘轮：本文件 `@Published` 基线 = 8，只减不增）—— 变化由
+    /// `reportSummary` 的发布驱动重绘。
+    private var restoredLastRun: SyncLastResultRestore.Resolved?
+    /// 本次运行的落盘事实（peerID / 设备名 / 方向）：在 `start(direction:)` 快照，
+    /// 因为落盘发生在终态后 800ms，彼时可能已断线拿不到分桶 key。
+    private var runPeerID: String?
+    private var runPeerName: String?
+    private var runDirection: SyncTransferDirection?
+
     init(
         hostCenter: SyncHostCenter? = nil,
         content: MacSyncContentModel,
@@ -120,7 +132,15 @@ final class MacSyncRunViewModel: ObservableObject {
                 Task { @MainActor in self?.refreshAvailability() }
             }
             .store(in: &cancellables)
+        restoreLastResult()
     }
+
+    /// 上次运行事实（nil = 本次运行 / 尚无历史）；View 传给
+    /// `SyncEntityOutcomeDisclosure.fileConclusion(_:lyricsResend:lastRun:)`。
+    var reportSummaryLastRun: SyncLastResultRestore.Resolved? { restoredLastRun }
+
+    /// 上次运行的完成时刻（nil = 本次运行 / 尚无历史）。
+    var reportSummaryRunAt: Date? { restoredLastRun?.snapshot.finishedAt }
 
     // MARK: - 派生（View 只读）
 
@@ -224,6 +244,12 @@ final class MacSyncRunViewModel: ObservableObject {
         transferredCount = 0
         currentPath = nil
         reportSummary = nil
+        // 本次运行开始 → 已有结果不再是「上次的」（前缀行随之消失）。
+        restoredLastRun = nil
+        // 快照落盘事实（此刻 session 活着，避免跑完才断线拿不到分桶 key）。
+        runPeerID = hostCenter.connectedPeer?.peerID
+        runPeerName = hostCenter.connectedPeer?.displayName
+        runDirection = direction
         errorMessage = nil
 
         let assembly = makeCoordinator(session, content.selection)
@@ -341,7 +367,38 @@ final class MacSyncRunViewModel: ObservableObject {
             guard let self else { return }
             guard self.coordinator === source, SyncCollectionSyncState.isTerminal(source.state) else { return }
             self.refreshReportSummary(for: source)
+            // 唯一写入时机：账目已定稿（终态后 800ms）之后落盘一次。
+            self.persistLastResultIfNeeded()
         }
+    }
+
+    /// 启动 / 重建时恢复「最近一次结果」（口径 1 的实现在 `SyncLastResultRestore`：
+    /// 连上某设备只回显该设备分桶；未连接回显跨设备最近一次）。无历史 = 保持 nil。
+    private func restoreLastResult() {
+        let connected = hostCenter.connectedPeer
+        guard let resolved = SyncLastResultRestore.resolve(
+            connectedPeerID: connected?.peerID,
+            connectedPeerName: connected?.displayName,
+            buckets: SyncLastResultStore.buckets()
+        ) else { return }
+        reportSummary = SyncUIReportSummary.make(snapshot: resolved.snapshot)
+        restoredLastRun = resolved
+    }
+
+    /// 落盘「最近一次结果」（口径 3 的实现在 `SyncLastResultPersistRule`）。
+    private func persistLastResultIfNeeded() {
+        guard let summary = reportSummary,
+              let peerID = runPeerID,
+              let direction = runDirection else { return }
+        guard SyncLastResultPersistRule.shouldPersist(summary: summary, interruption: interruption) else { return }
+        let snapshot = SyncLastResultSnapshot(
+            summary: summary,
+            finishedAt: Date(),
+            peerID: peerID,
+            peerDisplayName: runPeerName ?? "",
+            direction: direction
+        )
+        SyncLastResultStore.save(snapshot)
     }
 
     private func stopReportRefresh() {

@@ -957,6 +957,8 @@
 "sync_run_result_empty_selection" = "Aucune sélection : rien n'a été transféré.";
 "sync_run_result_peer_identical" = "Déjà identique sur l'autre appareil — rien à transférer (%d ignoré(s)) :";
 "sync_run_result_no_deletion" = "La synchronisation ne supprime jamais de morceaux, sur aucun appareil.";
+"sync_run_result_last_run_prefix" = "Dernière synchro : %@";
+"sync_run_result_last_run_device" = "Appareil : %@";
 
 // 2026-09-25 结果区默认折叠：结论行 + 「详情」DisclosureGroup
 "sync_result_detail" = "Détails";

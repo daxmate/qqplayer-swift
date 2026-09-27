@@ -959,6 +959,8 @@
 "sync_run_result_empty_selection" = "Nothing was selected, so nothing was transferred.";
 "sync_run_result_peer_identical" = "Already identical on the other device — nothing to transfer (%d skipped):";
 "sync_run_result_no_deletion" = "Syncing never deletes songs on either device.";
+"sync_run_result_last_run_prefix" = "Last sync: %@";
+"sync_run_result_last_run_device" = "Device: %@";
 
 // 2026-09-25 结果区默认折叠：结论行 + 「详情」DisclosureGroup
 "sync_result_detail" = "Details";

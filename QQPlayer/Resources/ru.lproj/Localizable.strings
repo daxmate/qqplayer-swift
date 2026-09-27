@@ -954,6 +954,8 @@
 "sync_run_result_empty_selection" = "Ничего не выбрано, передача не выполнялась.";
 "sync_run_result_peer_identical" = "На другом устройстве уже всё совпадает — передавать нечего (пропущено: %d):";
 "sync_run_result_no_deletion" = "Синхронизация никогда не удаляет песни ни на одном устройстве.";
+"sync_run_result_last_run_prefix" = "Последняя синхронизация: %@";
+"sync_run_result_last_run_device" = "Устройство: %@";
 
 // 2026-09-25 结果区默认折叠：结论行 + 「详情」DisclosureGroup
 "sync_result_detail" = "Подробнее";

@@ -159,9 +159,17 @@ extension MacSyncRunSection {
     var resultSection: some View {
         let report = model.reportSummary
         let resend = lyricsFacts.lastSummary
-        let conclusion = report.map { SyncEntityOutcomeDisclosure.fileConclusion($0, lyricsResend: resend) }
+        let lastRun = model.reportSummaryLastRun
+        let conclusion = report.map {
+            SyncEntityOutcomeDisclosure.fileConclusion($0, lyricsResend: resend, lastRun: lastRun)
+        }
         Section {
             if let conclusion {
+                // 「上次同步」前缀行（本次运行不显示）：结论与设备名两个事实都来自投影
+                // 给出的 `line` 字段，本视图只拼 key + 上色（不写判断）。
+                if let lastRunAt = conclusion.lastRunAt {
+                    lastRunPrefixLine(lastRunAt: lastRunAt, peerName: conclusion.lastRunPeerName)
+                }
                 SyncConclusionLine(line: conclusion)
             } else {
                 Text("sync_run_result_none".localized)
@@ -184,6 +192,24 @@ extension MacSyncRunSection {
         } header: {
             Text("sync_run_result_section".localized)
         }
+    }
+
+    /// 「上次同步」前缀行（结论行上方；跨设备回显时同排附设备名）。
+    @ViewBuilder
+    private func lastRunPrefixLine(lastRunAt: Date, peerName: String?) -> some View {
+        HStack(spacing: DesignTokens.space8) {
+            Text(
+                "sync_run_result_last_run_prefix".localized(
+                    with: SyncUIRelativeTimeText.short(from: lastRunAt, now: Date(), locale: .current)
+                )
+            )
+            if let peerName {
+                Text("sync_run_result_last_run_device".localized(with: peerName))
+            }
+            Spacer(minLength: DesignTokens.space0)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     /// 结论行：只显示投影给出的段（哪些指标出现 / 文案 key / 严重度全在

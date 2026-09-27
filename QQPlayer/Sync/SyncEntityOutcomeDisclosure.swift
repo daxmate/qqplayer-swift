@@ -63,6 +63,11 @@ struct SyncResultConclusionLine: Equatable, Sendable {
     var messageKey: String?
     /// 详情块是否有内容（false = 不渲染「详情」）。
     var hasDetail: Bool = false
+    /// 非 nil = 该结论来自**持久层**（上次运行）：View 在结论行上方加「上次同步」前缀。
+    /// nil = 本次运行（刚跑完）。
+    var lastRunAt: Date?
+    /// 跨设备回显时的设备名（同设备分桶 / 本次运行 = nil）。
+    var lastRunPeerName: String?
 }
 
 /// 账目 → 面板行的**唯一投影**（两端面板共用；纯逻辑、零 IO、可单测）。
@@ -325,11 +330,16 @@ enum SyncEntityOutcomeDisclosure {
     ///
     /// `lyricsResend` = 本次连接那轮**对齐歌词补发**的账目（nil = 还没跑过）；它只影响
     /// 「详情里有没有内容」（补发轮事实已并入 E 的详情），不影响文件同步本身的结论。
+    /// `lastRun` = 持久层恢复的「上次运行」事实（nil = 本次运行）。**要不要显示设备名**
+    /// （仅跨设备回显时显示）在这里判，View 只取 `lastRunAt` / `lastRunPeerName` 两个字段。
     static func fileConclusion(
         _ report: SyncUIReportSummary,
-        lyricsResend: SyncLyricsResendSummary?
+        lyricsResend: SyncLyricsResendSummary?,
+        lastRun: SyncLastResultRestore.Resolved? = nil
     ) -> SyncResultConclusionLine {
         var line = SyncResultConclusionLine()
+        line.lastRunAt = lastRun?.snapshot.finishedAt
+        line.lastRunPeerName = (lastRun?.isCrossDevice ?? false) ? lastRun?.snapshot.peerDisplayName : nil
         guard !report.isEmptySelection else {
             // 空选择：既不成功也不失败 —— 照既有语义明说「没有传输」
             // （`isEmptyPlanAlreadyIdentical` 的判定与展示不变，仍在详情块里）。
