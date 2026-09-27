@@ -34,8 +34,9 @@ struct MacLibraryView: View {
     /// 桌面浮窗管理器（批 5b：Mac 组合根注入；迷你模式入口按钮直调方法，不读属性）
     @Environment(DesktopWindowsManager.self) private var desktopWindows
 
+    /// 侧栏选中项（分区 / 自动歌单 / 用户歌单）；语义与回退口径见 `MacLibrarySelection`
     /// 分片：跨文件可见（原 private）
-    @State var section: MacLibrarySection = .tracks
+    @State var selection: MacLibrarySelection = .section(.tracks)
     /// 分片：跨文件可见（原 private）
     @State var tracks: [Track] = []
     /// 分片：跨文件可见（原 private）
@@ -78,6 +79,12 @@ struct MacLibraryView: View {
 
     /// 同步面板（主窗口工具栏入口；同步只能由桌面端发起——用户 2026-09-11 拍板）
     @State private var showSyncPanel = false
+    /// 侧栏「+ 新建」歌单：命名弹窗开关与输入（复用 `AppCoordinator.createPlaylist`）
+    @State var showNewPlaylistAlert = false
+    /// 分片：跨文件可见（原 private）
+    @State var newPlaylistName = ""
+    /// 新建歌单失败提示（与 MacPlaylistListView 同款）
+    @State var sidebarCreateError: String?
     /// 曲库文件夹在扫描中变更 → 索引结束后自动补扫
     /// 分片：跨文件可见（原 private）
     @State var rescanWhenIdle = false

@@ -196,6 +196,7 @@
 		3384729FD1C74CFC9E6167C8 /* ObservationTrackingShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */; };
 		A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */; };
 		3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */; };
+		8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -441,6 +442,7 @@
 		2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationTrackingShapeContractTests.swift; sourceTree = "<group>"; };
 		B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncResultConclusionTests.swift; sourceTree = "<group>"; };
 		9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLastResultStoreTests.swift; sourceTree = "<group>"; };
+		99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibrarySelectionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -751,6 +753,7 @@
 				Services/MacImportNaming.swift,
 				Services/MacIndexingGate.swift,
 				Services/MacLibraryFactsStore.swift,
+				Services/MacLibrarySelection.swift,
 				Services/MacOnlineDownloadService.swift,
 				Services/MacPlaybackGate.swift,
 				Services/MacShortcutLogic.swift,
@@ -1223,6 +1226,7 @@
 				2C92226B74664F5CA0E2A41E /* ObservationTrackingShapeContractTests.swift */,
 				B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */,
 				9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */,
+				99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1717,6 +1721,7 @@
 				3384729FD1C74CFC9E6167C8 /* ObservationTrackingShapeContractTests.swift in Sources */,
 				A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */,
 				3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */,
+				8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

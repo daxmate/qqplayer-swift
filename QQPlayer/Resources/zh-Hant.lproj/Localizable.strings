@@ -74,6 +74,10 @@
 
 "smart_load_failed" = "載入失敗，請重試";
 
+"mac_sidebar_smart_playlists" = "智慧列表";
+
+"mac_sidebar_my_playlists" = "我的列表";
+
 /* General UI strings */
 "all_songs" = "所有歌曲";
 

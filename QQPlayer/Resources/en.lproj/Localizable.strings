@@ -40,6 +40,10 @@
 "smart_empty_decade" = "No songs from this decade";
 "smart_load_failed" = "Couldn't load this playlist";
 
+"mac_sidebar_smart_playlists" = "Smart Playlists";
+
+"mac_sidebar_my_playlists" = "My Playlists";
+
 /* General UI strings */
 "all_songs" = "All Songs";
 "liked_songs" = "Liked Songs";

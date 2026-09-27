@@ -60,6 +60,11 @@ extension MacLibraryView {
                 albums = snapshot.albums
                 artists = snapshot.artists
                 playlists = snapshot.playlists
+                // 选中的用户歌单可能已被删除 → 纯函数口径优雅回退（不崩、不留空白）
+                selection = MacLibrarySelection.resolved(
+                    selection,
+                    availableUserPlaylistIds: Set(snapshot.playlists.compactMap(\.id))
+                )
                 loadError = nil
             case .failure(let error):
                 loadError = "load_library_failed".localized(with: error.localizedDescription)

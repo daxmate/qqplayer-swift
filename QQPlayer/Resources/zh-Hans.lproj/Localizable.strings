@@ -40,6 +40,10 @@
 "smart_empty_decade" = "该年代暂无歌曲";
 "smart_load_failed" = "加载失败，请重试";
 
+"mac_sidebar_smart_playlists" = "智能列表";
+
+"mac_sidebar_my_playlists" = "我的列表";
+
 /* General UI strings */
 "all_songs" = "所有歌曲";
 "liked_songs" = "我喜欢的音乐";

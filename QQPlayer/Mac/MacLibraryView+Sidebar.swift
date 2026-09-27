@@ -2,35 +2,15 @@
 //  MacLibraryView+Sidebar.swift
 //  QQPlayer
 //
-//  `MacLibraryView` 的侧栏分区（2026-09-21 从 `MacLibraryView.swift` 纯搬家，零行为/UI 变化）：
-//  `MacLibrarySection` 侧栏分区模型 + 侧栏列表本体（分区选择、侧栏搜索框、曲库卡统计行）。
+//  `MacLibraryView` 的侧栏（2026-09-21 从 `MacLibraryView.swift` 纯搬家）：
+//  分区/歌单选择、侧栏搜索框、曲库卡统计行。
+//
+//  2026-09-27：侧栏在「艺术家」下方直接列出自动歌单（`SmartPlaylistKind` 单一事实源）
+//  与用户自建歌单（`Playlist` 表）；选择语义见 `QQPlayer/Services/MacLibrarySelection.swift`。
 //
 //  ⚠️ 可见性：被 `body` 或其它分区文件引用的成员为 internal（原 `private`）。
 //
 import SwiftUI
-
-enum MacLibrarySection: String, CaseIterable, Identifiable {
-    case tracks = "songs"
-    case likedSongs = "liked_songs"
-    case albums = "albums"
-    case artists = "artists"
-    case playlists = "playlists"
-
-    var id: String { rawValue }
-
-    /// Localized sidebar title (rawValue is a localization key).
-    var title: String { rawValue.localized }
-
-    var icon: String {
-        switch self {
-        case .tracks: return "music.note.list"
-        case .likedSongs: return "heart.fill"
-        case .albums: return "square.stack"
-        case .artists: return "music.mic"
-        case .playlists: return "list.bullet.rectangle"
-        }
-    }
-}
 
 extension MacLibraryView {
     // MARK: - Sidebar
@@ -39,9 +19,47 @@ extension MacLibraryView {
     var sidebar: some View {
         VStack(spacing: DesignTokens.space0) {
             MacSearchField(text: $searchText)
-            List(MacLibrarySection.allCases, selection: $section) { item in
-                Label(item.title, systemImage: item.icon)
-                    .tag(item)
+            List(selection: $selection) {
+                // 一级分区（歌曲 / 我喜欢 / 专辑 / 艺术家）
+                ForEach(MacLibrarySection.allCases) { item in
+                    Label(item.title, systemImage: item.icon)
+                        .tag(MacLibrarySelection.section(item))
+                }
+                // 智能列表（自动歌单）：条目与顺序全部来自 `SmartPlaylistKind` 单一事实源
+                Section {
+                    ForEach(SmartPlaylistKind.allCases) { kind in
+                        Label(
+                            Localized.smartPlaylistTitle(kind),
+                            systemImage: MacSmartPlaylistUILogic.iconName(for: kind)
+                        )
+                        .tag(MacLibrarySelection.smartPlaylist(kind))
+                    }
+                } header: {
+                    Text("mac_sidebar_smart_playlists".localized)
+                }
+                // 我的列表（用户自建歌单）：标题行带「+ 新建」
+                Section {
+                    ForEach(playlists, id: \.id) { playlist in
+                        if let id = playlist.id {
+                            Label(playlist.title, systemImage: "list.bullet.rectangle")
+                                .tag(MacLibrarySelection.userPlaylist(id))
+                        }
+                    }
+                } header: {
+                    HStack(spacing: DesignTokens.space4) {
+                        Text("mac_sidebar_my_playlists".localized)
+                        Spacer()
+                        Button {
+                            newPlaylistName = ""
+                            showNewPlaylistAlert = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(Localized.createNewPlaylist)
+                        .accessibilityLabel(Localized.createNewPlaylist)
+                    }
+                }
             }
             .listStyle(.sidebar)
         }
@@ -80,5 +98,43 @@ extension MacLibraryView {
             .padding(DesignTokens.space8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .alert("create_new_playlist".localized, isPresented: $showNewPlaylistAlert) {
+            TextField("playlist_name_placeholder".localized, text: $newPlaylistName)
+            Button("create".localized) { createPlaylistFromSidebar() }
+            Button("cancel".localized, role: .cancel) {}
+        }
+        .alert("error".localized, isPresented: sidebarCreateErrorBinding) {
+            Button(Localized.ok, role: .cancel) { sidebarCreateError = nil }
+        } message: {
+            Text(sidebarCreateError ?? "")
+        }
+    }
+
+    // MARK: - 新建歌单（复用既有创建流程与唯一写入口）
+
+    /// 侧栏「+ 新建」：唯一写入口仍是 `AppCoordinator.createPlaylist`
+    /// （与 MacPlaylistListView / MacTrackListView / iOS 侧同一条路径，不另起一套）。
+    private func createPlaylistFromSidebar() {
+        let title = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        do {
+            let playlist = try appCoordinator.createPlaylist(title: title)
+            NotificationCenter.default.post(name: .playlistsChanged, object: nil)
+            // 新建后直接选中它（playlists 由 .playlistsChanged → reloadLibrary 刷新）
+            if let id = playlist.id {
+                selection = .userPlaylist(id)
+            }
+        } catch {
+            sidebarCreateError = "playlist_create_failed".localized(with: error.localizedDescription)
+            AppLog.error(.ui, "❌ MacLibraryView sidebar createPlaylist failed: \(error)")
+        }
+    }
+
+    /// 新建失败弹窗开关（与 MacPlaylistListView 同款：不再静默关闭）
+    private var sidebarCreateErrorBinding: Binding<Bool> {
+        Binding(
+            get: { sidebarCreateError != nil },
+            set: { if !$0 { sidebarCreateError = nil } }
+        )
     }
 }

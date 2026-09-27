@@ -604,6 +604,10 @@
 "smart_empty_decade" = "Aucune chanson de cette décennie";
 "smart_load_failed" = "Impossible de charger cette playlist";
 
+"mac_sidebar_smart_playlists" = "Listes intelligentes";
+
+"mac_sidebar_my_playlists" = "Mes playlists";
+
 // MARK: - Playlist management (macOS)
 "playlist_manage_play_all" = "Tout lire";
 "playlist_manage_rename" = "Renommer";

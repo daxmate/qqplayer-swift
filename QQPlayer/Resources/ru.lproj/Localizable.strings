@@ -601,6 +601,10 @@
 "smart_empty_decade" = "В этом десятилетии нет песен";
 "smart_load_failed" = "Не удалось загрузить плейлист";
 
+"mac_sidebar_smart_playlists" = "Умные плейлисты";
+
+"mac_sidebar_my_playlists" = "Мои плейлисты";
+
 // MARK: - Playlist management (macOS)
 "playlist_manage_play_all" = "Играть все";
 "playlist_manage_rename" = "Переименовать";

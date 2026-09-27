@@ -28,57 +28,78 @@ extension MacLibraryView {
                 onOpenPlaylist: openPlaylist
             )
         } else {
-            switch section {
-            case .tracks:
-                MacTrackListView(
-                    tracks: tracks,
-                    activeTrackId: player.currentTrack?.stableId,
-                    isPlaying: player.isPlaying,
-                    artistNameResolver: resolveArtistName,
-                    onPlay: playFromTrackList,
-                    onSelect: { selectedTrackId = $0.stableId },
-                    playlistId: nil,
-                    onPlayNext: { player.insertNext($0) },
-                    onShowArtist: showArtist(for:),
-                    onShowAlbum: showAlbum(for:)
-                )
-            case .likedSongs:
-                MacTrackListView(
-                    tracks: likedTracks,
-                    activeTrackId: player.currentTrack?.stableId,
-                    isPlaying: player.isPlaying,
-                    artistNameResolver: resolveArtistName,
-                    onPlay: playLikedTracks,
-                    onSelect: { selectedTrackId = $0.stableId },
-                    playlistId: nil,
-                    onPlayNext: { player.insertNext($0) },
-                    onShowArtist: showArtist(for:),
-                    onShowAlbum: showAlbum(for:)
-                )
-            case .albums:
-                MacAlbumGridView(
-                    albums: albums,
-                    selectedAlbum: $selectedAlbum,
-                    albumTracks: $albumTracks,
-                    artistNameResolver: resolveArtistName,
-                    onPlayAlbum: playAlbum,
-                    showAlbumSheet: $showAlbumSheet
-                )
-            case .artists:
-                MacArtistListView(
-                    artists: artists,
-                    selectedArtist: $selectedArtist,
-                    artistTracks: $artistTracks,
-                    artistNameResolver: resolveArtistName,
-                    onPlayArtist: playArtist,
-                    showArtistSheet: $showArtistSheet
-                )
-            case .playlists:
-                MacPlaylistListView(
-                    playlists: playlists,
-                    onPlay: openPlaylist
-                )
+            switch selection {
+            case let .section(section):
+                sectionContent(section)
+            case let .smartPlaylist(kind):
+                // 自动歌单详情：复用既有 `MacSmartPlaylistDetailView`（不另立第二份实现）
+                MacSmartPlaylistDetailView(kind: kind) {
+                    selection = .section(.tracks)
+                }
+            case let .userPlaylist(id):
+                // 用户歌单详情：复用既有 `MacManualPlaylistDetailView`；
+                // 快照里找不到该 id（删除瞬间）时给出空态，不崩、不留白
+                if let playlist = playlists.first(where: { $0.id == id }) {
+                    MacManualPlaylistDetailView(
+                        playlist: playlist,
+                        onPlayAll: { openPlaylist(playlist) },
+                        onExit: { selection = .section(.tracks) }
+                    )
+                } else {
+                    MacSmartPlaylistEmptyView(message: "playlist_manage_empty".localized, retry: nil)
+                }
             }
+        }
+    }
+
+    /// 一级分区内容（原五态去掉 playlists：该入口已从侧栏移除）
+    @ViewBuilder
+    private func sectionContent(_ section: MacLibrarySection) -> some View {
+        switch section {
+        case .tracks:
+            MacTrackListView(
+                tracks: tracks,
+                activeTrackId: player.currentTrack?.stableId,
+                isPlaying: player.isPlaying,
+                artistNameResolver: resolveArtistName,
+                onPlay: playFromTrackList,
+                onSelect: { selectedTrackId = $0.stableId },
+                playlistId: nil,
+                onPlayNext: { player.insertNext($0) },
+                onShowArtist: showArtist(for:),
+                onShowAlbum: showAlbum(for:)
+            )
+        case .likedSongs:
+            MacTrackListView(
+                tracks: likedTracks,
+                activeTrackId: player.currentTrack?.stableId,
+                isPlaying: player.isPlaying,
+                artistNameResolver: resolveArtistName,
+                onPlay: playLikedTracks,
+                onSelect: { selectedTrackId = $0.stableId },
+                playlistId: nil,
+                onPlayNext: { player.insertNext($0) },
+                onShowArtist: showArtist(for:),
+                onShowAlbum: showAlbum(for:)
+            )
+        case .albums:
+            MacAlbumGridView(
+                albums: albums,
+                selectedAlbum: $selectedAlbum,
+                albumTracks: $albumTracks,
+                artistNameResolver: resolveArtistName,
+                onPlayAlbum: playAlbum,
+                showAlbumSheet: $showAlbumSheet
+            )
+        case .artists:
+            MacArtistListView(
+                artists: artists,
+                selectedArtist: $selectedArtist,
+                artistTracks: $artistTracks,
+                artistNameResolver: resolveArtistName,
+                onPlayArtist: playArtist,
+                showArtistSheet: $showArtistSheet
+            )
         }
     }
 
@@ -174,7 +195,7 @@ extension MacLibraryView {
         }
         selectedArtist = artists.first { $0.id == artistId }
         guard selectedArtist != nil else { return }
-        section = .artists
+        selection = .section(.artists)
         showArtistSheet = true
     }
 
@@ -188,7 +209,7 @@ extension MacLibraryView {
         }
         selectedAlbum = albums.first { $0.id == albumId }
         guard selectedAlbum != nil else { return }
-        section = .albums
+        selection = .section(.albums)
         showAlbumSheet = true
     }
 
