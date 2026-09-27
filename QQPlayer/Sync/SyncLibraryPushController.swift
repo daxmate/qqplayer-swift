@@ -89,6 +89,10 @@ struct SyncLibraryPushSummary: Equatable, Sendable {
     var planned: [String] = []
     /// 对端已一致（同路径 + content_hash 相同）→ 跳过的相对路径（升序）
     var skipped: [String] = []
+    /// 对端**已持有同内容**（content_hash 相同、路径不同）→ 不推送的本端条目
+    /// （升序；内容身份判同曲，见 `SyncManifestReconciler.contentAlreadyHeld`）。
+    /// ⚠️ 与 `skipped` 语义不同：`skipped` = 同路径同内容。
+    var skippedAlreadyPresent: [String] = []
     /// 已确认送达（对端 fileAck done）的相对路径（推送序）
     var completed: [String] = []
     /// 失败记录（本地不可读 / 传输终态失败 / 声明被丢弃）
@@ -131,11 +135,15 @@ struct SyncLibraryPushPlan: Equatable, Sendable {
     var toPush: [ManifestEntry] = []
     /// 对端已一致（同路径 + content_hash 相同）→ 跳过（升序）
     var unchanged: [ManifestEntry] = []
+    /// 对端已有同内容（content_hash 相同、路径不同）→ 跳过推送（升序）
+    var alreadyPresent: [ManifestEntry] = []
 }
 
 enum SyncLibraryPushPlanner {
     /// 推送方向对账（纯函数）：**以本端选择集为准**。
-    /// - 对端缺该相对路径 → 推送
+    /// - 对端缺该相对路径且对端**无同内容** → 推送
+    /// - 对端缺该相对路径但**已持有同内容（任意路径）** → `alreadyPresent`（不推；
+    ///   内容身份 = content_hash，两台机器命名顺序不同时不重复传）
     /// - 同路径 contentHash 相同（非 nil）→ 跳过
     /// - 任一侧 contentHash 为 nil（尚未指纹）→ 保守判为需推送
     /// - **对端多出来的条目 → 什么都不做（不传播删除）**
@@ -144,11 +152,20 @@ enum SyncLibraryPushPlanner {
         for entry in remote {
             remoteByPath[entry.relativePath] = entry // later wins（调用方给最终快照）
         }
+        let remoteContentHashes = SyncManifestReconciler.contentHashIndex(remote)
         var toPush: [ManifestEntry] = []
         var unchanged: [ManifestEntry] = []
+        var alreadyPresent: [ManifestEntry] = []
         for entry in local {
             guard let remoteEntry = remoteByPath[entry.relativePath] else {
-                toPush.append(entry)
+                if SyncManifestReconciler.contentAlreadyHeld(
+                    entry: entry,
+                    otherContentHashes: remoteContentHashes
+                ) {
+                    alreadyPresent.append(entry)
+                } else {
+                    toPush.append(entry)
+                }
                 continue
             }
             if SyncManifestReconciler.contentMatches(local: entry, remote: remoteEntry) {
@@ -159,7 +176,8 @@ enum SyncLibraryPushPlanner {
         }
         return SyncLibraryPushPlan(
             toPush: toPush.sorted { $0.relativePath < $1.relativePath },
-            unchanged: unchanged.sorted { $0.relativePath < $1.relativePath }
+            unchanged: unchanged.sorted { $0.relativePath < $1.relativePath },
+            alreadyPresent: alreadyPresent.sorted { $0.relativePath < $1.relativePath }
         )
     }
 }
@@ -341,8 +359,15 @@ final class SyncLibraryPushController: @unchecked Sendable {
         lock.lock()
         summaryValue.planned = announce.entries.map(\.relativePath)
         summaryValue.skipped = plan.unchanged.map(\.relativePath)
+        summaryValue.skippedAlreadyPresent = plan.alreadyPresent.map(\.relativePath)
         summaryValue.failed = failures
         lock.unlock()
+        if !plan.alreadyPresent.isEmpty {
+            AppLog.info(
+                .sync,
+                "ℹ️ 同步推送：对端已有同内容（content_hash 相同、路径不同）→ 跳过 \(plan.alreadyPresent.count) 项（不传输）"
+            )
+        }
 
         guard !kept.isEmpty else {
             // 无待推送条目（全部已一致 / 无可发送内容）：不发声明

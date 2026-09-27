@@ -111,6 +111,117 @@ struct SyncManifestReconcileTests {
         #expect(!SyncManifestReconciler.contentMatches(local: entry("a", hash: nil), remote: entry("a", hash: nil)))
     }
 
+    // MARK: - 跨路径内容身份（2026-09-27 重复落库 bug；锁「本端已有同内容」语义）
+
+    @Test("★内容身份：远端路径本端没有、但同 contentHash 已在另一路径 → 不进 toFetch、进 alreadyPresent")
+    func reconcileContentAlreadyPresentAtOtherPath() {
+        // 实况形态：同一首歌两端命名顺序不同（`歌手 - 标题` vs `标题-歌手`）
+        let remote = [entry("突然的自我-伍佰 & China Blue.mp3", hash: "h-same")]
+        let local = [entry("伍佰 & China Blue - 突然的自我.mp3", hash: "h-same")]
+        let result = SyncManifestReconciler.reconcile(remote: remote, local: local)
+        #expect(result.toFetch.isEmpty, "内容同一（路径不同）→ 不得重复拉取/落盘")
+        #expect(result.unchanged.isEmpty, "语义不同：unchanged = 同路径同内容")
+        #expect(result.alreadyPresent.map(\.relativePath) == ["突然的自我-伍佰 & China Blue.mp3"])
+        #expect(result.isEmpty, "无传输动作")
+    }
+
+    @Test("★内容身份保守侧：远端未指纹（nil）→ 仍进 toFetch（不得因本端有指纹就跳过）")
+    func reconcileUnknownRemoteHashStillFetches() {
+        let result = SyncManifestReconciler.reconcile(
+            remote: [entry("new.flac", hash: nil)],
+            local: [entry("old.flac", hash: "h-any")]
+        )
+        #expect(result.toFetch.map(\.relativePath) == ["new.flac"])
+        #expect(result.alreadyPresent.isEmpty)
+    }
+
+    @Test("★内容身份保守侧：本端未指纹（nil）→ 不参与判定，仍进 toFetch")
+    func reconcileUnknownLocalHashStillFetches() {
+        let result = SyncManifestReconciler.reconcile(
+            remote: [entry("new.flac", hash: "h-any")],
+            local: [entry("old.flac", hash: nil)]
+        )
+        #expect(result.toFetch.map(\.relativePath) == ["new.flac"])
+        #expect(result.alreadyPresent.isEmpty)
+    }
+
+    @Test("★内容身份保守侧：空串指纹视为未指纹（两条未指纹条目不得互判同内容 → 否则永不传输）")
+    func reconcileEmptyHashIsNotIdentity() {
+        let result = SyncManifestReconciler.reconcile(
+            remote: [entry("a.flac", hash: "")],
+            local: [entry("b.flac", hash: "")]
+        )
+        #expect(result.toFetch.map(\.relativePath) == ["a.flac"], "空串不是身份，必须照传")
+        #expect(result.alreadyPresent.isEmpty)
+    }
+
+    @Test("内容身份不动同路径判定：同路径内容不同 → 仍 toFetch（更新；即使同内容已在另一路径）")
+    func reconcileSamePathDifferentContentStillFetches() {
+        let remote = [entry("a.flac", hash: "h-new")]
+        let local = [entry("a.flac", hash: "h-old"), entry("b.flac", hash: "h-new")]
+        let result = SyncManifestReconciler.reconcile(remote: remote, local: local)
+        #expect(result.toFetch.map(\.relativePath) == ["a.flac"])
+        #expect(result.alreadyPresent.isEmpty)
+    }
+
+    @Test("内容身份回归：同路径同内容 → unchanged（不是 alreadyPresent）")
+    func reconcileSamePathSameContentUnchanged() {
+        let result = SyncManifestReconciler.reconcile(
+            remote: [entry("a.flac", hash: "h")],
+            local: [entry("a.flac", hash: "h")]
+        )
+        #expect(result.unchanged.map(\.relativePath) == ["a.flac"])
+        #expect(result.alreadyPresent.isEmpty)
+        #expect(result.toFetch.isEmpty)
+    }
+
+    @Test("★歌词命名空间不参与跨路径内容身份：同字节不同 wire 路径 → 仍 toFetch（否则丢歌词）")
+    func reconcileLyricsNamespaceExcludedFromContentIdentity() {
+        // 两份不同歌曲的歌词文件字节可以完全相同（例如都没有对齐结果）
+        let result = SyncManifestReconciler.reconcile(
+            remote: [entry("@lyrics/songB.json", hash: "same-bytes")],
+            local: [entry("@lyrics/songA.json", hash: "same-bytes")]
+        )
+        #expect(result.toFetch.map(\.relativePath) == ["@lyrics/songB.json"], "歌词必须照传")
+        #expect(result.alreadyPresent.isEmpty)
+    }
+
+    @Test("helper 单点可测：contentHashIndex 排除空串 / nil / 歌词；contentAlreadyHeld 只认同内容")
+    func contentIdentityHelpers() {
+        let index = SyncManifestReconciler.contentHashIndex([
+            entry("a.flac", hash: "h-a"),
+            entry("b.flac", hash: nil),
+            entry("c.flac", hash: ""),
+            entry("@lyrics/d.json", hash: "h-d"),
+        ])
+        #expect(index == ["h-a"], "只有非空且非歌词的指纹入索引：\(index)")
+        #expect(
+            SyncManifestReconciler.contentAlreadyHeld(
+                entry: entry("x.flac", hash: "h-a"), otherContentHashes: index
+            )
+        )
+        #expect(
+            !SyncManifestReconciler.contentAlreadyHeld(
+                entry: entry("x.flac", hash: "h-d"), otherContentHashes: index
+            )
+        )
+        #expect(
+            !SyncManifestReconciler.contentAlreadyHeld(
+                entry: entry("x.flac", hash: nil), otherContentHashes: index
+            )
+        )
+        #expect(
+            !SyncManifestReconciler.contentAlreadyHeld(
+                entry: entry("x.flac", hash: ""), otherContentHashes: index
+            )
+        )
+        #expect(
+            !SyncManifestReconciler.contentAlreadyHeld(
+                entry: entry("@lyrics/x.json", hash: "h-a"), otherContentHashes: index
+            )
+        )
+    }
+
     // MARK: - 会话往返（分发钩子）
 
     /// 双 ready 会话 + 双端 SyncManifestPeer。⚠️ peer 必须强持有：SyncManifestPeer

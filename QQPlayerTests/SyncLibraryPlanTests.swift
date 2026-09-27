@@ -135,6 +135,28 @@ struct SyncLibraryPlanTests {
         #expect(plan.relativePaths == ["other.flac"])
     }
 
+    @Test("★拉取对账：远端路径本端没有但同 contentHash 已在另一路径 → 不拉取、进 alreadyPresent")
+    func pullPlannerSkipsContentAlreadyPresent() {
+        // 实况形态：同一首歌两端命名顺序不同（`歌手 - 标题` vs `标题-歌手`）
+        let remote = SyncManifestResponse(entries: [entry("标题-歌手.mp3", hash: "h-same")])
+        let local = [entry("歌手 - 标题.mp3", hash: "h-same")]
+        let plan = SyncLibraryPullPlanner.plan(remote: remote, local: local, selection: .all)
+        #expect(plan.relativePaths.isEmpty, "内容同一 → requested 不得含它（不传输不落盘）")
+        #expect(plan.alreadyPresent.map(\.relativePath) == ["标题-歌手.mp3"])
+        #expect(plan.unchanged.isEmpty, "语义不同：unchanged = 同路径同内容")
+    }
+
+    @Test("★拉取对账保守侧：两端未指纹（nil）→ 路径不同也照拉（不得因「都是 nil」判同内容）")
+    func pullPlannerConservativeWhenUnfingerprinted() {
+        let plan = SyncLibraryPullPlanner.plan(
+            remote: SyncManifestResponse(entries: [entry("new.flac", hash: nil)]),
+            local: [entry("old.flac", hash: nil)],
+            selection: .all
+        )
+        #expect(plan.relativePaths == ["new.flac"])
+        #expect(plan.alreadyPresent.isEmpty)
+    }
+
     // MARK: - 推送方向对账（harness ⑳）
 
     @Test("推送对账：对端缺或内容不同 → 推；同路径同指纹 → 跳过；对端独有 → 什么都不做")
@@ -160,6 +182,25 @@ struct SyncLibraryPlanTests {
         // 对端多出来的条目：既不推也不删（绝不跨端删除）
         #expect(!plan.toPush.contains { $0.relativePath == "Album/device-only.flac" })
         #expect(!plan.unchanged.contains { $0.relativePath == "Album/device-only.flac" })
+    }
+
+    @Test("★推送对账：对端已持有同内容（任意路径）→ 不推送、进 alreadyPresent")
+    func pushPlannerSkipsContentAlreadyHeld() {
+        let local = [entry("歌手 - 标题.mp3", hash: "h-same")]
+        let remote = [entry("标题-歌手.mp3", hash: "h-same")]
+        let plan = SyncLibraryPushPlanner.plan(local: local, remote: remote)
+        #expect(plan.toPush.isEmpty, "对端已有同内容 → 不重复推送")
+        #expect(plan.alreadyPresent.map(\.relativePath) == ["歌手 - 标题.mp3"])
+        #expect(plan.unchanged.isEmpty)
+    }
+
+    @Test("★推送对账：歌词条目不参与跨路径内容身份（同字节不同 wire 路径仍推）")
+    func pushPlannerLyricsNotDedupedByContent() {
+        let local = [entry("@lyrics/songB.json", hash: "same-bytes")]
+        let remote = [entry("@lyrics/songA.json", hash: "same-bytes")]
+        let plan = SyncLibraryPushPlanner.plan(local: local, remote: remote)
+        #expect(plan.toPush.map(\.relativePath) == ["@lyrics/songB.json"])
+        #expect(plan.alreadyPresent.isEmpty)
     }
 
     @Test("推送对账：任一侧指纹缺失 → 保守判为需推送（绝不误判一致）")

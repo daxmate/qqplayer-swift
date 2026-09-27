@@ -163,6 +163,32 @@ struct SyncLibrarySyncE2ETests {
         #expect(summary.requested == ["Album/01 Song.flac"])
     }
 
+    // MARK: ①b 跨路径内容身份 → 不拉取（2026-09-27 重复落库 bug）
+
+    @Test("★端到端：设备同内容不同名（命名顺序不同）→ 不拉取、不落位、skippedAlreadyPresent 记账")
+    func skipsPullWhenContentAlreadyPresentAtOtherPath() throws {
+        let payload = silentData(0x9C, count: 200_000)
+        let harness = try makeHarness(
+            sourceFiles: [("突然的自我-伍佰 & China Blue.mp3", payload)],
+            targetFiles: [("伍佰 & China Blue - 突然的自我.mp3", payload)]
+        )
+
+        guard case let .done(summary) = harness.controller.state else {
+            Issue.record("期望 done，实际 \(harness.controller.state)")
+            return
+        }
+        #expect(summary.requested.isEmpty, "内容同一（路径不同）→ 不请求传输（不传不落盘）")
+        #expect(summary.completed.isEmpty, "不得落盘")
+        #expect(summary.skippedAlreadyPresent == ["突然的自我-伍佰 & China Blue.mp3"])
+        #expect(summary.unchanged.isEmpty, "语义不同：unchanged = 同路径同内容")
+        #expect(harness.sink.indexed.isEmpty, "不得入库")
+        #expect(harness.deviceHost.summary.landed.isEmpty, "设备未接到拉取请求")
+        // 目标目录没有多出第二个（重复）文件
+        let targetNames = try FileManager.default.contentsOfDirectory(atPath: harness.targetRoot.path)
+        #expect(!targetNames.contains("突然的自我-伍佰 & China Blue.mp3"), "不得出现重复文件：\(targetNames)")
+        #expect(targetNames.contains("伍佰 & China Blue - 突然的自我.mp3"), "原有文件必须保留")
+    }
+
     // MARK: ② 远端已删 → 本端不删（不传播删除）
 
     @Test("★端到端：远端已删 → 本端一条都不删（受管路径与导入路径全部保留）")
@@ -364,6 +390,28 @@ struct SyncLibrarySyncE2ETests {
         #expect(harness.controller.summary.skipped.isEmpty)
         #expect(harness.controller.state == .done(before), "终态后状态不得变")
         #expect(harness.recorder.count(of: .libraryPushAnnounce) == 1, "终态后不得再发推送声明")
+    }
+
+    @Test("★端到端（推送）：对端已持有同内容（命名不同）→ 不推送、不落位、skippedAlreadyPresent 记账")
+    func skipsPushWhenPeerAlreadyHoldsContent() throws {
+        let payload = silentData(0x8D, count: 200_000)
+        let harness = try makePushHarness(
+            macFiles: [("伍佰 & China Blue - 突然的自我.mp3", payload)],
+            deviceFiles: [("突然的自我-伍佰 & China Blue.mp3", payload)]
+        )
+
+        guard case let .done(summary) = harness.controller.state else {
+            Issue.record("期望 done，实际 \(harness.controller.state)")
+            return
+        }
+        #expect(summary.planned.isEmpty, "对端已有同内容 → 不进推送计划")
+        #expect(summary.completed.isEmpty, "不得推送")
+        #expect(summary.skippedAlreadyPresent == ["伍佰 & China Blue - 突然的自我.mp3"])
+        #expect(summary.skipped.isEmpty, "语义不同：skipped = 同路径同内容")
+        #expect(harness.recorder.count(of: .libraryPushAnnounce) == 0, "无待推送条目 → 不该发声明")
+        let deviceNames = try FileManager.default.contentsOfDirectory(atPath: harness.deviceRoot.path)
+        #expect(!deviceNames.contains("伍佰 & China Blue - 突然的自我.mp3"), "设备不得出现重复文件：\(deviceNames)")
+        #expect(deviceNames.contains("突然的自我-伍佰 & China Blue.mp3"), "对端原有文件必须保留")
     }
 
     // MARK: ⑤ 轮内合法时序不回归（§3 陷阱：handleTransfer 不得加守卫）

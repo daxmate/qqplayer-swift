@@ -55,6 +55,10 @@ struct SyncLibraryPullSummary: Equatable, Sendable {
     var reportedCompleted: [String] = []
     /// 收到但本端无对应歌曲、未落库的 aligned 歌词（丢弃；下次同步自愈，审计用）
     var orphanLyricsSkipped: [String] = []
+    /// 本端**已有同内容**（content_hash 相同、路径不同）→ 不拉取不落盘的远端条目
+    /// （升序；内容身份判同曲，见 `SyncManifestReconciler.contentAlreadyHeld`）。
+    /// ⚠️ 与 `unchanged` 语义不同：`unchanged` = 同路径同内容。
+    var skippedAlreadyPresent: [String] = []
     /// 本端**已有**对齐歌词、按 F2「只补不覆盖」保留本端的 wire 路径（升序；审计/上屏用）
     var keptLocalLyrics: [String] = []
 
@@ -132,6 +136,8 @@ struct SyncLibraryPullPlan: Equatable, Sendable {
     var relativePaths: [String] = []
     /// 内容一致的对端条目（升序）
     var unchanged: [ManifestEntry] = []
+    /// 本端已有同内容（content_hash 相同、路径不同）的对端条目（升序）→ 不拉取
+    var alreadyPresent: [ManifestEntry] = []
 }
 
 enum SyncLibraryPullPlanner {
@@ -148,7 +154,8 @@ enum SyncLibraryPullPlanner {
         let reconciliation = SyncManifestReconciler.reconcile(remote: scoped, local: local)
         return SyncLibraryPullPlan(
             relativePaths: SyncFetchRequest.normalize(reconciliation.toFetch.map(\.relativePath)),
-            unchanged: reconciliation.unchanged
+            unchanged: reconciliation.unchanged,
+            alreadyPresent: reconciliation.alreadyPresent
         )
     }
 }
@@ -316,6 +323,16 @@ final class SyncLibraryPullController: @unchecked Sendable {
 
         lock.lock()
         summaryValue.unchanged = plan.unchanged.map(\.relativePath)
+        summaryValue.skippedAlreadyPresent = plan.alreadyPresent.map(\.relativePath)
+        lock.unlock()
+        if !plan.alreadyPresent.isEmpty {
+            AppLog.info(
+                .sync,
+                "ℹ️ 同步拉取：本端已有同内容（content_hash 相同、路径不同）→ 跳过 \(plan.alreadyPresent.count) 项（不传输不落盘）"
+            )
+        }
+
+        lock.lock()
         if !plan.relativePaths.isEmpty {
             summaryValue.requested = plan.relativePaths
             // 认领键 = 请求路径 + 对端 manifest 身份（应答端 fileID 就是同一个 content_hash）；

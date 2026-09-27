@@ -16,17 +16,27 @@
 //  内容判定策略：双侧 contentHash 均非空且相等 = 一致；任一侧为 nil（尚未指纹）
 //  = 内容未知 = 保守判为"需拉取"（宁可多传一次，不可漏传导致两端内容不一致）。
 //
+//  跨路径内容身份（2026-09-27 去重 bug 修复）：本端**任意路径**已有同 contentHash
+//  ⇒ 同一首歌（两台机器命名顺序不同：`歌手 - 标题` vs `标题-歌手`）⇒ 进 `alreadyPresent`，
+//  不传输、不落盘（契约：`docs/sync-contract.md`「身份键 = `content_hash`（跨端，优先）」）。
+//  判定只此一处——`contentHashIndex(_:)`（建索引）+ `contentAlreadyHeld(entry:otherContentHashes:)`
+//  （判同曲）是同一条语义的两半，拉取/推送两端一律复用，不得另写第二份。
+//  歌词命名空间不参与跨路径判定（理由见 `contentHashIndex` 文档）。
+//
 
 import Foundation
 
 /// 一次对账的结果（全部按 relativePath 升序，确定性）。
 struct SyncManifestReconciliation: Equatable, Sendable {
-    /// 需拉取的远端条目（本地缺失 / 内容不同）。
+    /// 需拉取的远端条目（本地缺该路径且本端无同内容 / 同路径内容不同）。
     var toFetch: [ManifestEntry]
     /// 已一致的远端条目（路径 + content_hash 相同）。
     var unchanged: [ManifestEntry]
+    /// 本端**已有同内容**（content_hash 相同、**路径不同**）的远端条目——内容身份判同曲，
+    /// 不传输不落盘。**语义与 `unchanged` 不同**：`unchanged` = 同路径同内容。
+    var alreadyPresent: [ManifestEntry] = []
 
-    /// 无动作可做（幂等重跑判据）：远端条目全部已一致。
+    /// 无动作可做（幂等重跑判据）：没有需拉取的远端条目（全部已一致 / 本端已有同内容）。
     var isEmpty: Bool {
         toFetch.isEmpty
     }
@@ -43,12 +53,20 @@ enum SyncManifestReconciler {
     ) -> SyncManifestReconciliation {
         let remoteByPath = indexByPath(remote)
         let localByPath = indexByPath(local)
+        let localContentHashes = contentHashIndex(local)
 
         var toFetch: [ManifestEntry] = []
         var unchanged: [ManifestEntry] = []
+        var alreadyPresent: [ManifestEntry] = []
         for entry in remoteByPath.values {
             guard let localEntry = localByPath[entry.relativePath] else {
-                toFetch.append(entry)
+                // 本端没有该**路径**：再按**内容身份**判一次——本端任意路径已有同
+                // contentHash 就是同一首歌（命名顺序不同），不重复传输、不重复落盘。
+                if contentAlreadyHeld(entry: entry, otherContentHashes: localContentHashes) {
+                    alreadyPresent.append(entry)
+                } else {
+                    toFetch.append(entry)
+                }
                 continue
             }
             if contentMatches(local: localEntry, remote: entry) {
@@ -61,7 +79,8 @@ enum SyncManifestReconciler {
         // 远端没有而本地有的条目：不传播删除 —— 本端保留，不进任何待处理列表。
         return SyncManifestReconciliation(
             toFetch: sorted(toFetch),
-            unchanged: sorted(unchanged)
+            unchanged: sorted(unchanged),
+            alreadyPresent: sorted(alreadyPresent)
         )
     }
 
@@ -72,6 +91,34 @@ enum SyncManifestReconciler {
             return false
         }
         return localHash == remoteHash
+    }
+
+    // MARK: - 跨路径内容身份（「对方已有同内容」唯一入口）
+
+    /// 参与内容身份判定的指纹索引（索引侧；判定侧 = `contentAlreadyHeld`）。
+    ///
+    /// 收录条件：`contentHash` **非空**（nil / 空串 = 尚未指纹，不得参与判定）——
+    /// 未指纹条目若入索引，两个不同文件都会被判成「同内容」⇒ 文件永不传输（静默丢数据）。
+    ///
+    /// 歌词条目**不入索引/不参与判定**：歌词的线上身份是**所属歌曲**指纹（wire 路径
+    /// `@lyrics/{歌曲 content_hash}.json`），条目自身的 `contentHash` 是歌词文件字节哈希；
+    /// 两份不同歌曲的歌词文件字节可以完全相同（例如都没有对齐结果），跨路径按字节判同曲
+    /// 会漏传歌词（F2「只补不覆盖」按 wire 路径判有无）⇒ 歌词链路行为保持逐字不变。
+    static func contentHashIndex(_ entries: [ManifestEntry]) -> Set<String> {
+        Set(entries.compactMap { entry -> String? in
+            guard !SyncLyricsNamespace.isLyricsPath(entry.relativePath) else { return nil }
+            guard let hash = entry.contentHash, !hash.isEmpty else { return nil }
+            return hash
+        })
+    }
+
+    /// 「对方已有同内容」的**唯一**判定入口（跨端同曲，路径无关）。
+    /// - 判据：条目 `contentHash` 非空、且命中 `otherContentHashes`（= `contentHashIndex` 产出）。
+    /// - 未指纹（nil / 空串）、或歌词条目 → `false`（保守 = 退回既有按路径判定）。
+    static func contentAlreadyHeld(entry: ManifestEntry, otherContentHashes: Set<String>) -> Bool {
+        guard !SyncLyricsNamespace.isLyricsPath(entry.relativePath) else { return false }
+        guard let hash = entry.contentHash, !hash.isEmpty else { return false }
+        return otherContentHashes.contains(hash)
     }
 
     // MARK: - 内部
