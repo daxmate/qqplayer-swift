@@ -202,6 +202,7 @@
 		00008AF71D804FFFB5BEEE8B /* MacTrackListViewLocateScrollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */; };
 		70AC03A647234C58A30572F2 /* LibraryFileNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */; };
 		81D5A6EF275B4799B3F816A3 /* TrackFileRenameServiceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */; };
+		0282D9AC4E424352BCDEE3B5 /* SyncContentHashFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -453,6 +454,7 @@
 		20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackListViewLocateScrollTests.swift; sourceTree = "<group>"; };
 		0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryFileNamingTests.swift; sourceTree = "<group>"; };
 		16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackFileRenameServiceContractTests.swift; sourceTree = "<group>"; };
+		7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncContentHashFallbackTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1252,6 +1254,7 @@
 				20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */,
 				0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */,
 				16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */,
+				7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1752,6 +1755,7 @@
 				00008AF71D804FFFB5BEEE8B /* MacTrackListViewLocateScrollTests.swift in Sources */,
 				70AC03A647234C58A30572F2 /* LibraryFileNamingTests.swift in Sources */,
 				81D5A6EF275B4799B3F816A3 /* TrackFileRenameServiceContractTests.swift in Sources */,
+				0282D9AC4E424352BCDEE3B5 /* SyncContentHashFallbackTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
