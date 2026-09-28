@@ -37,12 +37,11 @@ enum SyncLocalLibraryScanner {
                 return nil
             }
             let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-            let track = try? database.getTrack(byPath: url.path)
+            let track = (try? database.getTrack(byPath: url.path)) ?? nil
             let size = Int64(values?.fileSize ?? 0)
             let mtimeMs = Int64((values?.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000)
-            let contentHash = track?.contentHash?.isEmpty == false
-                ? track?.contentHash
-                : DatabaseManager.contentHashIfFilePresent(atPath: url.path)
+            // 身份键统一走兜底入口（列为空 → 现算 + 回填），不再就地读裸列 / 就地现算。
+            let contentHash = database.resolvedContentHash(forTrack: track, atPath: url.path)
             return SyncManifestSourceFile(
                 relativePath: relative,
                 size: size,

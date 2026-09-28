@@ -133,8 +133,6 @@ extension SyncLocalLibraryDescriptor {
         members: (() -> SyncCollectionMembers)? = nil
     ) -> SyncLocalLibraryDescriptor {
         let mapping = lyricsMapping ?? SyncLyricsContentMapping.live(database: database, libraryRoot: libraryRoot)
-        // 唯一身份入口的生产实例（本装配点建一次，描述符内部所有身份解析都走它）。
-        let identity = SyncContentHashResolver(database: database, libraryRoot: libraryRoot)
         return SyncLocalLibraryDescriptor(
             libraryRoot: libraryRoot,
             rootName: rootName ?? libraryRoot.lastPathComponent,
@@ -151,14 +149,10 @@ extension SyncLocalLibraryDescriptor {
             },
             contentHash: { [libraryRoot] relativePath in
                 let url = libraryRoot.appendingPathComponent(relativePath)
-                // 内容指纹解析走唯一身份入口（先按路径定位曲目行，再取跨端身份键）；
-                // 无此歌 / 指纹为空 → 回落「文件在盘上现算」（既有语义不变）。
-                if let track = (try? database.getTrack(byPath: url.path)) ?? nil,
-                   let stored = (try? identity.contentHash(forTrackStableId: track.stableId)) ?? nil,
-                   !stored.isEmpty {
-                    return stored
-                }
-                return DatabaseManager.contentHashIfFilePresent(atPath: url.path)
+                // 内容指纹（发送 fileID 用）统一走兜底入口：列为空 → 现场计算 + 回填
+                // （不再就地读裸列、不再自己拆两次查）。
+                let track = (try? database.getTrack(byPath: url.path)) ?? nil
+                return database.resolvedContentHash(forTrack: track, atPath: url.path)
             },
             lyricsFileName: { wirePath in
                 guard let songHash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath),

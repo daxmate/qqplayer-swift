@@ -32,6 +32,64 @@ extension DatabaseManager {
         return try? SyncFileChecksum.sha256Hex(ofFile: url)
     }
 
+    /// **清单 / 对账取「跨端身份键」的唯一兜底入口**（2026-09-28 批 B）。
+    ///
+    /// 为什么必须收口到一处（缺陷形状）：清单 / 对账链路上取 `content_hash` 的地方此前
+    /// 各自处理「列为空」——`SyncLocalLibraryScanner` / `SyncLocalLibraryDescriptor.contentHash`
+    /// 原地现算（复用 `contentHashIfFilePresent`）但**不写回**（每轮重算、且各写一遍同一语义）；
+    /// 而「对端内容清单」（`DatabaseSyncPeerLibraryFacts`）**直接读裸列**，`content_hash` 为
+    /// NULL 时永远拿不到身份键 ⇒ 同一首歌在两端命名不同（`歌手 - 标题` vs `标题-歌手`）时
+    /// 判不出「对端已有同内容」⇒ 重复推送 / 重复落盘。
+    ///
+    /// 本入口统一口径：列为空且文件本地存在 → 现场计算（**复用** `contentHashIfFilePresent`
+    /// 这一唯一哈希实现，不裸调 `SyncFileChecksum.sha256Hex`）**并回填 DB**（避免每轮重算）。
+    /// 回填失败只告警、仍返回本轮现算值（取数是只读语义，不因写库失败而丢身份键）。
+    ///
+    /// - Parameters:
+    ///   - track: 该路径的曲目行（查不到传 nil = 无行可回填，只现算）。
+    ///   - path: 曲库路径（绝对路径或 `track.path` 存储形态；空串时回落 `track.path`）。
+    ///   - isLocallyAvailable: 本地可读性判定（避免读取 dataless iCloud 文件）。
+    /// - Returns: 身份键；列为空且文件不可读 / 不存在 → nil（调用方按「未指纹」处理）。
+    @discardableResult
+    func resolvedContentHash(
+        forTrack track: Track?,
+        atPath path: String,
+        isLocallyAvailable: (URL) -> Bool = CloudFileAvailability.isLocallyAvailable
+    ) -> String? {
+        if let stored = track?.contentHash, !stored.isEmpty { return stored }
+        var candidates: [String] = []
+        for candidate in [path, track?.path] {
+            guard let candidate, !candidate.isEmpty, !candidates.contains(candidate) else { continue }
+            candidates.append(candidate)
+        }
+        for candidate in candidates {
+            guard let computed = Self.contentHashIfFilePresent(
+                atPath: candidate,
+                isLocallyAvailable: isLocallyAvailable
+            ) else { continue }
+            if let id = track?.id {
+                writeBackContentHash(computed, trackID: id)
+            }
+            return computed
+        }
+        return nil
+    }
+
+    /// 兜底回填单行（只填空值，不覆盖并发写入的新值）；失败只告警。
+    private func writeBackContentHash(_ hash: String, trackID: Int64) {
+        do {
+            try write { db in
+                try db.execute(
+                    sql: "UPDATE track SET content_hash = ? WHERE id = ?"
+                        + " AND (content_hash IS NULL OR content_hash = '')",
+                    arguments: [hash, trackID]
+                )
+            }
+        } catch {
+            AppLog.warn(.db, "⚠️ Database: content_hash 兜底回填失败（本轮仍用现算值，下轮重试）：\(error)")
+        }
+    }
+
     /// content_hash 存量自愈回填（**无一次性门**，每次启动在后台队列跑一遍）。
     ///
     /// 取舍：旧实现用一次性完成门 database.contentHashBackfillCompleted.v1 挡重复扫描，

@@ -99,7 +99,7 @@ struct DatabaseSyncPeerLibraryFacts {
                     title: track.title.isEmpty ? nil : track.title,
                     artistName: artistNames[track.stableId],
                     sizeBytes: max(0, track.fileSize ?? 0),
-                    contentHash: normalizedHash(track.contentHash)
+                    contentHash: normalizedHash(database.resolvedContentHash(forTrack: track, atPath: track.path))
                 )
             )
             if pathByStableId[track.stableId] == nil {
