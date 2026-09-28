@@ -163,7 +163,10 @@ struct LibraryFileNamingTests {
     func unicodeNormalizedComparison() {
         let composed = "Café - Song"
         let decomposed = composed.decomposedStringWithCanonicalMapping
-        #expect(composed != decomposed) // 字节层面确实不同（否则本用例无效）
+        // 字节层面确实不同（否则本用例无效）。注意：Swift 的 `!=` 走 Unicode 规范等价，
+        // NFC/NFD 会判「相等」，必须比 UTF-8 字节（2026-09-28 批 A″ 修正：原断言
+        // `composed != decomposed` 恒为 false，是批 A′ 残留的红用例）。
+        #expect(Array(composed.utf8) != Array(decomposed.utf8))
         #expect(LibraryFileNaming.isSameName(composed, decomposed))
 
         #expect(LibraryFileNaming.isSameName("周华健 - 爱相随", "周华健 - 爱相随"))
@@ -298,25 +301,31 @@ struct LibraryFileNamingTests {
 
     @Test("幂等：已是规范名 → unchanged；NFC/NFD 形态也不改名")
     func idempotent() throws {
-        let library = try makeLibrary()
-        let manager = try makeManager()
+        // NFC / NFD 各用**独立曲库**：APFS 对文件名做 Unicode 归一，同一目录下两种形态会
+        // 命中同一个文件（同 normalized path ⇒ 同 stableId）。批 A′ 原写法在同一目录里插两行，
+        // 稳定报 `UNIQUE constraint failed: track.stable_id`（批 A″ 修正），本用例重新拆分。
         let canonical = "Café - Song"
-        let composed = try write(canonical + ".mp3", bytes: [7], in: library)
-        let track = try insertTrack(manager, path: composed.path)
+        let composedLibrary = try makeLibrary()
+        let composedManager = try makeManager()
+        let composed = try write(canonical + ".mp3", bytes: [7], in: composedLibrary)
+        let composedTrack = try insertTrack(composedManager, path: composed.path)
 
         let first = try TrackFileRenameService.rename(
-            track: track, artist: "Café", title: "Song",
-            libraryRoot: library, databaseManager: manager
+            track: composedTrack, artist: "Café", title: "Song",
+            libraryRoot: composedLibrary, databaseManager: composedManager
         )
         #expect(first == .unchanged)
+        #expect(FileManager.default.fileExists(atPath: composed.path))
 
         // NFD 形态的同名文件同样判 unchanged（防反复改名）
+        let decomposedLibrary = try makeLibrary()
+        let decomposedManager = try makeManager()
         let decomposedName = canonical.decomposedStringWithCanonicalMapping + ".mp3"
-        let decomposed = try write(decomposedName, bytes: [8], in: library)
-        let track2 = try insertTrack(manager, path: decomposed.path)
+        let decomposed = try write(decomposedName, bytes: [8], in: decomposedLibrary)
+        let decomposedTrack = try insertTrack(decomposedManager, path: decomposed.path)
         let second = try TrackFileRenameService.rename(
-            track: track2, artist: "Café", title: "Song",
-            libraryRoot: library, databaseManager: manager
+            track: decomposedTrack, artist: "Café", title: "Song",
+            libraryRoot: decomposedLibrary, databaseManager: decomposedManager
         )
         #expect(second == .unchanged)
         #expect(FileManager.default.fileExists(atPath: decomposed.path))
@@ -335,6 +344,78 @@ struct LibraryFileNamingTests {
         )
         #expect(outcome == .notRenameable(reason: "emptyArtistAndTitle"))
         #expect(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    // MARK: - 批 A″ 护栏：仅大小写差异（同一文件）不得走 dedupe
+
+    @Test("批 A″：仅大小写差异 → renamed（不是 deduped），唯一副本未被归档")
+    func caseOnlyDifferenceRenamesWithoutDedupe() throws {
+        let library = try makeLibrary()
+        let manager = try makeManager()
+        // 大小写不敏感卷（macOS 默认 APFS）上，目标名与源名命中同一个文件。
+        let source = try write("Count On Me.mp3", bytes: [4, 2], in: library)
+        let track = try insertTrack(manager, path: source.path)
+
+        let outcome = try TrackFileRenameService.rename(
+            track: track, artist: nil, title: "Count on Me",
+            libraryRoot: library, databaseManager: manager
+        )
+
+        let target = library.appendingPathComponent("Count on Me.mp3")
+
+        // 1. 结果 = renamed（两段式改名，大小写真的改变）
+        #expect(outcome == .renamed(from: source.path, to: target.path))
+
+        // 2. 回归钉住：绝不得走 dedupe（唯一副本不得被归档）
+        if case .deduped = outcome {
+            Issue.record("仅大小写差异误落 dedupe：唯一副本被归档、库行迁到不存在的目标 ⇒ 曲目悬空")
+        }
+
+        // 3. 目录里恰好一个条目，且与目标大小写一致（大小写不敏感卷上 fileExists(源)
+        //    也为真，故只能用目录清单作判据——不能依赖 fileExists 否定）
+        let entries = try FileManager.default.contentsOfDirectory(atPath: library.path)
+        #expect(entries == ["Count on Me.mp3"])
+
+        // 4. 字节原样（文件没被搬走/改写）
+        #expect(try Data(contentsOf: target) == Data([4, 2]))
+
+        // 5. 备份根为空（未归档任何文件；台账不是归档物）
+        let backupRoot = TrackFileRenameService.backupRoot(forLibraryRoot: library)
+        let archived = (try? FileManager.default.contentsOfDirectory(atPath: backupRoot.path)) ?? []
+        #expect(!archived.contains { $0 != LibraryFileNaming.renameLogFileName })
+
+        // 6. 库行已迁到新路径（旧 stableId 消失、新 stableId 在且路径为规范名）
+        let newStableId = DatabaseManager.generatePathStableId(forPath: target.path)
+        let migrated = try manager.getTrack(byStableId: newStableId)
+        #expect(migrated != nil)
+        #expect(migrated?.path == target.standardizedFileURL.path)
+        #expect(try manager.getTrack(byStableId: track.stableId) == nil)
+    }
+
+    @Test("批 A″：isSameFile —— 仅大小写差异 = 同一文件；内容相同但确是两文件 ≠ 同一文件")
+    func sameFileDetection() throws {
+        let library = try makeLibrary()
+        let fm = FileManager.default
+        let a = try write("Count On Me.mp3", bytes: [1], in: library)
+        let b = try write("Other.mp3", bytes: [1], in: library)
+        let caseVariant = library.appendingPathComponent("Count on Me.mp3")
+
+        // 卷是否大小写不敏感用**事实**判定（`fileExists` 能否命中大小写变体），
+        // 不用 `volumeSupportsCaseSensitiveNames`：模拟器 app 容器实测该键报 false，
+        // 而 `fileExists(大小写变体)` 也是 false（容器实际按大小写敏感解析，
+        // 2026-09-28 批 A″ 探针实测）→ 以事实为准。
+        if fm.fileExists(atPath: caseVariant.path) {
+            // 大小写不敏感卷（macOS 默认 APFS / 用户机器）：仅大小写差异 = 同一文件
+            #expect(TrackFileRenameService.isSameFile(a, caseVariant, fileManager: fm))
+        } else {
+            // 大小写敏感卷（iOS 模拟器 app 容器实测）：不存在「同一文件」这回事
+            #expect(!TrackFileRenameService.isSameFile(a, caseVariant, fileManager: fm))
+        }
+
+        // 控制组：内容完全相同但为两个文件 ⇒ 不是同一文件（不误判真去重场景）
+        #expect(!TrackFileRenameService.isSameFile(a, b, fileManager: fm))
+        // 自身 ⇒ 同一文件
+        #expect(TrackFileRenameService.isSameFile(a, a, fileManager: fm))
     }
 
     // MARK: - 落库口径 · 回归钉住 / 结构性差异（service 级）

@@ -19,9 +19,17 @@
 //  行为（严格按序，见 `rename(track:artist:title:libraryRoot:...)`）：
 //  1. 渲染规范名；空值 → `.notRenameable`
 //  2. 同名（NFC / 去扩展名）→ `.unchanged`（幂等）
-//  3. 目标不存在 → 纯 `moveItem` + `moveTrack` 迁引用 → `.renamed`
-//  4. 目标存在：两侧 `content_hash` 相同 → 去重（归档源文件 + 引用并入目标 + 删源行）
+//  3. **源与目标是同一个文件**（仅大小写差异；大小写不敏感卷上 `fileExists` 会命中源
+//     文件本身）→ **两段式改名** `source → 同目录临时名 → target`，**绝不进 dedupe**
+//     → `.renamed`（唯一副本不得被归档；见 `isSameFile`）
+//  4. 目标不存在 → 纯 `moveItem` + `moveTrack` 迁引用 → `.renamed`
+//  5. 目标存在：两侧 `content_hash` 相同 → 去重（归档源文件 + 引用并入目标 + 删源行）
 //     → `.deduped`；否则 `.skippedTargetConflict`（不改、不覆盖、**不加 `(2)`**）
+//
+//  ⚠️ 步骤 3 是 2026-09-28 批 A″ 补的护栏。缺它的后果（批 A′ 上报、maintainer 核实）：
+//  macOS 默认 APFS **大小写不敏感**，`Connie Talbot - Count On Me.mp3` 想改成规范名
+//  `… - Count on Me.mp3` 时 `fileExists(target)` 为真（实为同一文件）⇒ 落步骤 5 ⇒ 两侧
+//  hash 相等 ⇒ **把唯一副本归档、库行迁到不存在的目标路径** ⇒ 曲目悬空、曲库少一首。
 //
 //  改名台账：`<backupRoot>/rename-log.tsv`（可回退），每次 `.renamed` / `.deduped`
 //  追加一行 `ISO8601\t旧相对路径\t新相对路径\tstableId`。
@@ -106,7 +114,23 @@ enum TrackFileRenameService {
         let directory = sourceURL.deletingLastPathComponent()
         let targetURL = directory.appendingPathComponent(canonicalName, isDirectory: false)
 
-        // 3. 目标不存在 → 纯文件系统搬迁 + 引用迁移（唯一入口 moveTrack）
+        // 3. 源与目标是**同一个文件**（大小写不敏感卷上的仅大小写差异）：
+        //    绝不进 dedupe（唯一副本不得被归档）→ 两段式改名。
+        if isSameFile(sourceURL, targetURL, fileManager: fileManager) {
+            return try renameCaseOnlySameFile(
+                CaseOnlyRenameRequest(
+                    stableId: track.stableId,
+                    sourceURL: sourceURL,
+                    targetURL: targetURL,
+                    libraryRoot: libraryRoot,
+                    databaseManager: databaseManager,
+                    fileManager: fileManager,
+                    timestamp: timestamp
+                )
+            )
+        }
+
+        // 4. 目标不存在 → 纯文件系统搬迁 + 引用迁移（唯一入口 moveTrack）
         if !fileManager.fileExists(atPath: targetURL.path) {
             try fileManager.moveItem(at: sourceURL, to: targetURL)
             try databaseManager.moveTrack(
@@ -129,7 +153,7 @@ enum TrackFileRenameService {
             return .renamed(from: sourceURL.path, to: targetURL.path)
         }
 
-        // 4. 目标存在 → 判定内容是否同一首歌
+        // 5. 目标存在 → 判定内容是否同一首歌
         let sourceHash = track.contentHash ?? DatabaseManager.contentHashIfFilePresent(atPath: sourceURL.path)
         let targetHash = DatabaseManager.contentHashIfFilePresent(atPath: targetURL.path)
         if let sourceHash, let targetHash, sourceHash == targetHash {
@@ -165,6 +189,142 @@ enum TrackFileRenameService {
         // 内容不同 / 缺 hash → 保守跳过（不改、不覆盖、不加 `(2)`）
         AppLog.info(.general, "📛 skip-conflict: \(currentName) 目标已存在且内容不同（保留两侧）")
         return .skippedTargetConflict(existingPath: targetURL.path)
+    }
+
+    // MARK: - 同一文件（仅大小写差异）
+
+    /// 源与目标是否指向**同一个文件**。
+    ///
+    /// 判据（2026-09-28 实测，macOS 26.6 / APFS 默认大小写不敏感卷）：
+    /// 1. 首选 `URLResourceValues.fileResourceIdentifier` 相等 —— 实测 `Count On Me.mp3`
+    ///    与 `Count on Me.mp3` 返回**同一**标识；而内容完全相同但确为两个文件的对照样本返回
+    ///    **不同**标识（不会把真去重场景误判成同一文件）。
+    /// 2. 回落 `FileManager.attributesOfItem` 的 `.systemNumber`（st_dev）+ `.systemFileNumber`
+    ///    （st_ino）同时相等（inode 级同一）。
+    ///
+    /// 目标路径**不存在** → 直接 `false`：大小写敏感卷上仅大小写差异是两个不同文件，
+    /// 走普通改名（行为与批 A 一致）。
+    static func isSameFile(_ a: URL, _ b: URL, fileManager: FileManager = .default) -> Bool {
+        guard fileManager.fileExists(atPath: b.path) else { return false }
+        let identifiers = [a, b].map {
+            (try? $0.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier
+        }
+        if let first = identifiers[0] as? NSObject, let second = identifiers[1] as? NSObject {
+            return first.isEqual(second)
+        }
+        guard let attributesA = try? fileManager.attributesOfItem(atPath: a.path),
+              let attributesB = try? fileManager.attributesOfItem(atPath: b.path),
+              let deviceA = attributesA[.systemNumber] as? NSNumber,
+              let deviceB = attributesB[.systemNumber] as? NSNumber,
+              let inodeA = attributesA[.systemFileNumber] as? NSNumber,
+              let inodeB = attributesB[.systemFileNumber] as? NSNumber
+        else {
+            return false
+        }
+        return deviceA == deviceB && inodeA == inodeB
+    }
+
+    /// 同目录临时名（隐藏 + UUID）：不会被扫描器收录（`.skipsHiddenFiles`），也不撞已有文件。
+    private static func temporaryRenameURL(in directory: URL, sourceName: String) -> URL {
+        let ext = (sourceName as NSString).pathExtension
+        let token = UUID().uuidString
+        let name = ext.isEmpty ? ".rename-tmp-\(token)" : ".rename-tmp-\(token).\(ext)"
+        return directory.appendingPathComponent(name, isDirectory: false)
+    }
+
+    /// 仅大小写差异改名（同一文件）的参数束（收束参数，避免超长参数列表）。
+    private struct CaseOnlyRenameRequest {
+        var stableId: String
+        var sourceURL: URL
+        var targetURL: URL
+        var libraryRoot: URL
+        var databaseManager: DatabaseManager
+        var fileManager: FileManager
+        var timestamp: Date
+    }
+
+    /// **同一文件的两段式改名** `source → 同目录临时名 → target`（保证大小写真的改变，
+    /// 在任何卷上都安全——直接 `moveItem(source, target)` 在大小写不敏感卷上会因目标
+    /// 「已存在」（实为同一文件）而失败）。**绝不归档、绝不进 dedupe。**
+    ///
+    /// 失败处理（**不得留下「库行指向不存在文件」**）：
+    /// - 第一段失败 → 源文件未动，直接抛出（库行仍有效）。
+    /// - 第二段失败 → 尽力把文件还原到 `source`；还原也失败（文件停在临时名）时把库行
+    ///   迁到临时名，保持「行 ↔ 文件」一致；随后抛出。
+    /// - 引用迁移失败 → 两段式改回原名，保持「行 ↔ 文件」一致；随后抛出。
+    private static func renameCaseOnlySameFile(
+        _ request: CaseOnlyRenameRequest
+    ) throws -> TrackFileRenameOutcome {
+        let sourceURL = request.sourceURL
+        let targetURL = request.targetURL
+        let fileManager = request.fileManager
+        let databaseManager = request.databaseManager
+        let temporaryURL = temporaryRenameURL(
+            in: sourceURL.deletingLastPathComponent(),
+            sourceName: sourceURL.lastPathComponent
+        )
+
+        // 第一段：source → 临时名
+        do {
+            try fileManager.moveItem(at: sourceURL, to: temporaryURL)
+        } catch {
+            AppLog.warn(.general, "⚠️ rename(case-only): 移入临时名失败，源文件未动：\(error)")
+            throw error
+        }
+
+        // 第二段：临时名 → target
+        do {
+            try fileManager.moveItem(at: temporaryURL, to: targetURL)
+        } catch {
+            let moveError = error
+            do {
+                try fileManager.moveItem(at: temporaryURL, to: sourceURL)
+            } catch {
+                AppLog.warn(
+                    .general,
+                    "⚠️ rename(case-only): 还原到原名失败，文件停在 \(temporaryURL.lastPathComponent)：\(error)"
+                )
+                try? databaseManager.moveTrack(
+                    from: sourceURL.path,
+                    to: temporaryURL.path,
+                    fileManager: fileManager
+                )
+            }
+            AppLog.warn(.general, "⚠️ rename(case-only): 落到目标失败：\(moveError)")
+            throw moveError
+        }
+
+        // 引用迁移（唯一入口）。失败 → 两段式改回原名，保持「行 ↔ 文件」一致。
+        do {
+            try databaseManager.moveTrack(from: sourceURL.path, to: targetURL.path, fileManager: fileManager)
+        } catch {
+            let migrationError = error
+            do {
+                try fileManager.moveItem(at: targetURL, to: temporaryURL)
+                try fileManager.moveItem(at: temporaryURL, to: sourceURL)
+            } catch {
+                AppLog.warn(.general, "⚠️ rename(case-only): 引用迁移失败且回退改名失败：\(error)")
+            }
+            AppLog.warn(.general, "⚠️ rename(case-only): 引用迁移失败，已尽力回退文件名：\(migrationError)")
+            throw migrationError
+        }
+
+        appendLog(
+            RenameLogEntry(
+                event: "renamed",
+                sourceURL: sourceURL,
+                targetURL: targetURL,
+                libraryRoot: request.libraryRoot,
+                stableId: request.stableId,
+                timestamp: request.timestamp
+            ),
+            fileManager: fileManager
+        )
+        AppLog.info(
+            .general,
+            "📛 rename(case-only): \(sourceURL.lastPathComponent) → \(targetURL.lastPathComponent)"
+        )
+        return .renamed(from: sourceURL.path, to: targetURL.path)
     }
 
     // MARK: - 内部
