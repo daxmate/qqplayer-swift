@@ -4,7 +4,7 @@
 //
 //  歌单维护：手动歌单去重 / 孤儿条目清理（自 DatabaseManager+Playlists.swift 拆出）。
 //  同族：DatabaseManager+Playlists.swift（歌单 CRUD）、
-//        DatabaseManager+PlaylistFolderSync.swift（文件夹歌单同步 / 时间戳 / 自定义封面）。
+//        DatabaseManager+PlaylistMetadata.swift（访问/播放时间戳 / 自定义封面）。
 //
 import Foundation
 @preconcurrency import GRDB

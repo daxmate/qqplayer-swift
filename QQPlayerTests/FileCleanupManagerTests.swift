@@ -108,8 +108,8 @@ private enum CleanupFixture {
         try db.write { db in
             try db.execute(
                 sql: """
-                    INSERT INTO playlist (id, slug, title, created_at, updated_at, is_folder_synced)
-                    VALUES (1, 'p1', 'P1', 0, 0, 0)
+                    INSERT INTO playlist (id, slug, title, created_at, updated_at)
+                    VALUES (1, 'p1', 'P1', 0, 0)
                 """
             )
             try db.execute(

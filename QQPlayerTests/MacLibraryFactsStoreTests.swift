@@ -133,9 +133,6 @@ private func makePlaylist(_ id: Int64, title: String = "歌单") -> Playlist {
         createdAt: 0,
         updatedAt: 0,
         lastPlayedAt: 0,
-        folderPath: nil,
-        isFolderSynced: false,
-        lastFolderSync: nil,
         customCoverImagePath: nil
     )
 }

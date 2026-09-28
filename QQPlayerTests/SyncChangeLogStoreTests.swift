@@ -234,36 +234,6 @@ struct SyncChangeLogStoreTests {
         }
     }
 
-    @Test("folder-synced 歌单不入 outbox（本地扫描派生语义）")
-    func folderPlaylistNotCaptured() throws {
-        let (manager, dbQueue) = try Self.makeManager()
-        // 手动建 folder 歌单（folder_path + is_folder_synced）——createFolderPlaylist
-        // 需要 folder 存在，直接绕过用 createTables 已有的 folder 语义手动插入
-        try dbQueue.write { db in
-            let now = Int64(Date().timeIntervalSince1970)
-            try db.execute(
-                sql: """
-                INSERT INTO playlist (slug, title, created_at, updated_at, last_played_at,
-                                      folder_path, is_folder_synced)
-                VALUES ('folder-1', 'Folder', ?, ?, 0, '/m/folder', 1)
-                """,
-                arguments: [now, now]
-            )
-        }
-        let folderId = try manager.read { db in
-            try Playlist.filter(Column("slug") == "folder-1").fetchOne(db)?.id
-        }
-        // 加歌（folder 歌单内容由扫描器驱动 → 不应触发 outbox）
-        try dbQueue.write { db in
-            try Self.insertTrack(db: db, stableId: "f-1")
-        }
-        try manager.addToPlaylist(playlistId: try #require(folderId), trackStableId: "f-1")
-        try dbQueue.read { db in
-            let rows = try Self.outboxRows(db)
-            #expect(rows.isEmpty)
-        }
-    }
-
     // MARK: - 游标与增量
 
     @Test("游标默认 0；setCursor upsert；entries(after:) 增量；maxOutboxID")

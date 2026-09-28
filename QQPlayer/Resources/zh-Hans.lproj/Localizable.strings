@@ -462,14 +462,6 @@
 "play_order_repeat_all" = "循环列表";
 "play_order_repeat_one" = "单曲循环";
 
-/* Folder playlists */
-"auto_folder_playlists" = "根据文件夹自动创建播放列表";
-"auto_folder_playlists_description" = "启用后，将为每个音乐文件夹自动创建播放列表，并与其内容保持同步。";
-"delete_folder_playlists_title" = "删除文件夹播放列表？";
-"delete_folder_playlists_message" = "自动创建已关闭。是否删除已经创建的文件夹播放列表？你的音乐文件不会受到影响。";
-"delete_folder_playlists_confirm" = "删除播放列表";
-"keep_folder_playlists" = "保留播放列表";
-
 /* 跟唱模式（Karaoke） */
 "karaoke_ab_end_hint" = "点歌词设置 AB 终点";
 "karaoke_previous_line" = "上一句";

@@ -98,7 +98,7 @@ extension AppCoordinator {
                     // Scoping it to "the whole library is missing" keeps the
                     // corruption protection while letting a genuinely emptied
                     // playlist clear its cloud copy.
-                    if !playlist.isFolderSynced && stateItems.isEmpty && libraryLooksUnreadable {
+                    if stateItems.isEmpty && libraryLooksUnreadable {
                         if let existingCloudPlaylist = try? stateManager.loadPlaylist(slug: playlist.slug),
                            !existingCloudPlaylist.items.isEmpty {
                             AppLog.warn(.general, "⚠️ Skipping sync for '\(playlist.title)' - library is empty but cloud has \(existingCloudPlaylist.items.count) tracks\n🛡️ This prevents accidental data loss. The cloud version is preserved.")

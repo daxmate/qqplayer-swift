@@ -95,7 +95,7 @@ extension DatabaseManager {
             let playlistSlugs = try String.fetchAll(db, sql: """
             SELECT playlist.slug FROM playlist_item
             JOIN playlist ON playlist.id = playlist_item.playlist_id
-            WHERE playlist_item.track_stable_id = ? AND playlist.is_folder_synced = 0
+            WHERE playlist_item.track_stable_id = ?
             """, arguments: [stableId])
             let playedAts = try Int64.fetchAll(
                 db,

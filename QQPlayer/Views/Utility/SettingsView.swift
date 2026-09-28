@@ -7,21 +7,6 @@ struct SettingsView: View {
     /// 歌词延迟校准（按输出路由存；车里最常用）
     /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
     @Environment(LyricOffsetStore.self) private var lyricOffsetStore
-    @State private var showDeleteFolderPlaylistsPrompt = false
-
-    private func deleteExistingFolderPlaylists() {
-        do {
-            let folderPlaylists = try LibraryReads.folderPlaylists()
-            for playlist in folderPlaylists {
-                if let id = playlist.id {
-                    try appCoordinator.deletePlaylist(playlistId: id)
-                }
-            }
-            AppLog.info(.ui, "🗑️ Deleted \(folderPlaylists.count) folder playlist(s) after disabling auto-creation")
-        } catch {
-            AppLog.error(.ui, "❌ Failed to delete folder playlists: \(error)")
-        }
-    }
 
     var body: some View {
         NavigationView {
@@ -195,30 +180,6 @@ struct SettingsView: View {
                     Text(Localized.removeFromLibraryOnlyDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
-
-                    Toggle(Localized.autoFolderPlaylists, isOn: $deleteSettings.autoCreateFolderPlaylists)
-                        .onChange(of: deleteSettings.autoCreateFolderPlaylists) { _, newValue in
-                            deleteSettings.save()
-                            if newValue {
-                                // Re-enabled: clear tombstones so folder playlists
-                                // can be recreated on the next scan
-                                try? appCoordinator.clearDeletedFolderPlaylistTombstones()
-                            } else {
-                                showDeleteFolderPlaylistsPrompt = true
-                            }
-                        }
-
-                    Text(Localized.autoFolderPlaylistsDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .alert(Localized.deleteFolderPlaylistsTitle, isPresented: $showDeleteFolderPlaylistsPrompt) {
-                    Button(Localized.deleteFolderPlaylistsConfirm, role: .destructive) {
-                        deleteExistingFolderPlaylists()
-                    }
-                    Button(Localized.keepFolderPlaylists, role: .cancel) {}
-                } message: {
-                    Text(Localized.deleteFolderPlaylistsMessage)
                 }
 
                 Section(Localized.playerControls) {

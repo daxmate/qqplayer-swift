@@ -63,9 +63,6 @@ struct SyncPlaylistSnapshot: Codable, Equatable, Sendable {
     var createdAt: Int64
     var updatedAt: Int64
     var lastPlayedAt: Int64
-    var folderPath: String?
-    var isFolderSynced: Bool
-    var lastFolderSync: Int64?
     var customCoverImagePath: String?
 
     enum CodingKeys: String, CodingKey {
@@ -73,9 +70,6 @@ struct SyncPlaylistSnapshot: Codable, Equatable, Sendable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case lastPlayedAt = "last_played_at"
-        case folderPath = "folder_path"
-        case isFolderSynced = "is_folder_synced"
-        case lastFolderSync = "last_folder_sync"
         case customCoverImagePath = "custom_cover_image_path"
     }
 

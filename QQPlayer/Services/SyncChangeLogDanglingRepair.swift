@@ -246,10 +246,7 @@ struct SyncChangeLogDanglingRepair {
 
         // 歌单结构（row_key = slug）。**不引用歌曲** → 不做身份判定（见 emit 的
         // `requiresTrackIdentity`），载荷与写入侧 `createPlaylist` 逐字同形。
-        // folder-synced 歌单内容由本地扫描派生（folder_path 是设备本地路径），
-        // 不入跨端同步——与写入侧同一口径。
         let playlists = try Playlist
-            .filter(Column("is_folder_synced") == false)
             .order(Column("slug"))
             .fetchAll(db)
         for playlist in playlists where !playlist.slug.isEmpty {
@@ -259,9 +256,6 @@ struct SyncChangeLogDanglingRepair {
                 createdAt: playlist.createdAt,
                 updatedAt: playlist.updatedAt,
                 lastPlayedAt: playlist.lastPlayedAt,
-                folderPath: playlist.folderPath,
-                isFolderSynced: playlist.isFolderSynced,
-                lastFolderSync: playlist.lastFolderSync,
                 customCoverImagePath: playlist.customCoverImagePath
             )
             try emit(
@@ -286,13 +280,11 @@ struct SyncChangeLogDanglingRepair {
             )
         }
 
-        // 歌单成员（row_key = slug|track_stable_id）。folder-synced 歌单内容由本地扫描
-        // 派生（folder_path 是设备本地路径），不入跨端同步——与写入侧同一口径。
+        // 歌单成员（row_key = slug|track_stable_id）。
         let items = try Row.fetchAll(db, sql: """
         SELECT p.slug AS slug, pi.position AS position, pi.track_stable_id AS stable_id
         FROM playlist_item pi
         JOIN playlist p ON p.id = pi.playlist_id
-        WHERE p.is_folder_synced = 0
         ORDER BY p.slug, pi.position
         """)
         for item in items {

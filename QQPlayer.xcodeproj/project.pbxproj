@@ -197,6 +197,7 @@
 		A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */; };
 		3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */; };
 		8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */; };
+		FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -443,6 +444,7 @@
 		B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncResultConclusionTests.swift; sourceTree = "<group>"; };
 		9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLastResultStoreTests.swift; sourceTree = "<group>"; };
 		99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibrarySelectionTests.swift; sourceTree = "<group>"; };
+		7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FolderPlaylistRemovalTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -699,7 +701,7 @@
 				Services/CloudFileAvailability.swift,
 				"Services/DatabaseManager+LibraryCRUD.swift",
 				"Services/DatabaseManager+LibraryMigrations.swift",
-				"Services/DatabaseManager+PlaylistFolderSync.swift",
+				"Services/DatabaseManager+PlaylistMetadata.swift",
 				"Services/DatabaseManager+PlaylistMaintenance.swift",
 				"Services/DatabaseManager+TracksMaintenance.swift",
 				"Services/DatabaseManager+TracksRead.swift",
@@ -1227,6 +1229,7 @@
 				B685A557C4094D9194D27FAE /* SyncResultConclusionTests.swift */,
 				9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */,
 				99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */,
+				7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1722,6 +1725,7 @@
 				A2C8FEFDFFBE4DF28D06621F /* SyncResultConclusionTests.swift in Sources */,
 				3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */,
 				8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */,
+				FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

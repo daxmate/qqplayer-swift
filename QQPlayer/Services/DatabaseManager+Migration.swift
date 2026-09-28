@@ -28,30 +28,10 @@ extension DatabaseManager {
         var stableIdMigrationSucceeded = false
 
         try write { db in
-            // Migration: Add folder sync columns to playlist table
-            do {
-                try db.execute(sql: "ALTER TABLE playlist ADD COLUMN folder_path TEXT")
-                AppLog.info(.db, "✅ Database: Added folder_path column to playlist table")
-            } catch {
-                // Column may already exist, which is fine
-                AppLog.info(.db, "ℹ️ Database migration: folder_path column already exists or migration failed: \(error)")
-            }
-
-            do {
-                try db.execute(sql: "ALTER TABLE playlist ADD COLUMN is_folder_synced BOOLEAN DEFAULT 0")
-                AppLog.info(.db, "✅ Database: Added is_folder_synced column to playlist table")
-            } catch {
-                // Column may already exist, which is fine
-                AppLog.info(.db, "ℹ️ Database migration: is_folder_synced column already exists or migration failed: \(error)")
-            }
-
-            do {
-                try db.execute(sql: "ALTER TABLE playlist ADD COLUMN last_folder_sync INTEGER")
-                AppLog.info(.db, "✅ Database: Added last_folder_sync column to playlist table")
-            } catch {
-                // Column may already exist, which is fine
-                AppLog.info(.db, "ℹ️ Database migration: last_folder_sync column already exists or migration failed: \(error)")
-            }
+            // 一次性清理（幂等）：删除「子文件夹当作歌单」的存量数据 + 墓碑表 + playlist 三列。
+            // 顺序：先删数据 → 删墓碑表 → 再删列；每步独立 try/catch，
+            // 新库（无列）/ 已迁移库（无列）/ 老库（有列+存量行）三种都不中断启动。
+            try Self.purgeLegacySubfolderDerivedPlaylists(db)
 
             // Additive and nullable for compatibility with every existing
             // library. NULL means "not fingerprinted yet" and causes a
@@ -82,19 +62,6 @@ extension DatabaseManager {
             } catch {
                 // Column may already exist, which is fine
                 AppLog.info(.db, "ℹ️ Database migration: custom_cover_image_path column already exists or migration failed: \(error)")
-            }
-
-            // Migration: Create deleted_folder_playlist table to prevent recreation of deleted folder playlists
-            do {
-                try db.execute(sql: """
-                    CREATE TABLE IF NOT EXISTS deleted_folder_playlist (
-                        folder_path TEXT PRIMARY KEY,
-                        deleted_at INTEGER NOT NULL
-                    )
-                """)
-                AppLog.info(.db, "✅ Database: Created deleted_folder_playlist table")
-            } catch {
-                AppLog.info(.db, "ℹ️ Database migration: deleted_folder_playlist table already exists or migration failed: \(error)")
             }
 
             do {
@@ -271,6 +238,57 @@ extension DatabaseManager {
             stableIdMigrationSucceeded: stableIdMigrationSucceeded
         ) {
             LegacyTrackMigrationGate.markCompleted()
+        }
+    }
+
+    /// 一次性清理「子文件夹当作歌单」遗留 schema（幂等）。步骤与顺序：
+    /// ① 先删存量 folder-synced 歌单行（先删其 `playlist_item`，不依赖外键级联是否生效）
+    /// ② `DROP TABLE IF EXISTS deleted_folder_playlist`（墓碑表）
+    /// ③ 再删 `playlist` 三列 `folder_path / is_folder_synced / last_folder_sync`（列存在才删）
+    ///
+    /// 每步各自独立 try/catch：**全新库**（无列无表）、**已迁移库**（无列无表）、
+    /// **老库**（有列 + 存量行）三种都不能报错中断启动。删列要求 SQLite 3.35+
+    /// （实测 3.51.0；不支持时该步 fail-soft 记警告、列保留——功能已不再引用它）。
+    ///
+    /// 独立成 internal static：生产迁移（`migrateDatabaseIfNeeded`）与
+    /// `FolderPlaylistRemovalMigrationTests` 的老库迁移测试共用同一实现，避免两处漂移。
+    static func purgeLegacySubfolderDerivedPlaylists(_ db: Database) throws {
+        // `playlist` 表在调用点必然已由 createTables 建出；仍容错缺表（新库早退不报错）。
+        let playlistColumns = ((try? db.columns(in: "playlist")) ?? []).map(\.name)
+
+        // ① 存量 folder 歌单行（含成员）。
+        if playlistColumns.contains("is_folder_synced") {
+            do {
+                try db.execute(sql: """
+                    DELETE FROM playlist_item WHERE playlist_id IN (
+                        SELECT id FROM playlist WHERE is_folder_synced = 1
+                    )
+                """)
+                try db.execute(sql: "DELETE FROM playlist WHERE is_folder_synced = 1")
+                let removed = db.changesCount
+                if removed > 0 {
+                    AppLog.info(.db, "🧹 Database: Removed \(removed) legacy folder-synced playlist(s)")
+                }
+            } catch {
+                AppLog.warn(.db, "⚠️ Database migration: legacy folder playlist cleanup failed: \(error)")
+            }
+        }
+
+        // ② 墓碑表。
+        do {
+            try db.execute(sql: "DROP TABLE IF EXISTS deleted_folder_playlist")
+        } catch {
+            AppLog.warn(.db, "⚠️ Database migration: dropping deleted_folder_playlist failed: \(error)")
+        }
+
+        // ③ 删列（列存在才删）。
+        for column in ["folder_path", "is_folder_synced", "last_folder_sync"] where playlistColumns.contains(column) {
+            do {
+                try db.execute(sql: "ALTER TABLE playlist DROP COLUMN \(column)")
+                AppLog.info(.db, "🧹 Database: Dropped legacy playlist column \(column)")
+            } catch {
+                AppLog.warn(.db, "⚠️ Database migration: dropping playlist column \(column) failed: \(error)")
+            }
         }
     }
 }

@@ -284,8 +284,7 @@ struct SyncChangeLogFrameTests {
 
         let now: Int64 = 1000
         let playlistSnap = SyncPlaylistSnapshot(
-            slug: "mix", title: "Mix", createdAt: now, updatedAt: now, lastPlayedAt: 0,
-            folderPath: nil, isFolderSynced: false, lastFolderSync: nil, customCoverImagePath: nil
+            slug: "mix", title: "Mix", createdAt: now, updatedAt: now, lastPlayedAt: 0
         )
         let itemSnap = SyncPlaylistItemSnapshot(playlistSlug: "mix", position: 1, trackStableId: "host-t1")
         try harness.hostQueue.write { db in
@@ -322,8 +321,8 @@ struct SyncChangeLogFrameTests {
         try harness.clientQueue.write { db in
             try db.execute(
                 sql: """
-                INSERT INTO playlist (slug, title, created_at, updated_at, last_played_at, is_folder_synced)
-                VALUES ('mix', 'Client Newer', 100, ?, 0, 0)
+                INSERT INTO playlist (slug, title, created_at, updated_at, last_played_at)
+                VALUES ('mix', 'Client Newer', 100, ?, 0)
                 """,
                 arguments: [clientNow]
             )
@@ -332,8 +331,7 @@ struct SyncChangeLogFrameTests {
                 db, entity: .playlist, rowKey: "mix", op: .upsert,
                 payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
                     slug: "mix", title: "Client Newer", createdAt: 100, updatedAt: clientNow,
-                    lastPlayedAt: 0, folderPath: nil, isFolderSynced: false,
-                    lastFolderSync: nil, customCoverImagePath: nil
+                    lastPlayedAt: 0, customCoverImagePath: nil
                 )),
                 updatedAtMs: clientNow
             )
@@ -345,8 +343,7 @@ struct SyncChangeLogFrameTests {
                 db, entity: .playlist, rowKey: "mix", op: .upsert,
                 payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
                     slug: "mix", title: "Host Old", createdAt: 100, updatedAt: 1000,
-                    lastPlayedAt: 0, folderPath: nil, isFolderSynced: false,
-                    lastFolderSync: nil, customCoverImagePath: nil
+                    lastPlayedAt: 0, customCoverImagePath: nil
                 )),
                 updatedAtMs: 1000
             )

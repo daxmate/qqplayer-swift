@@ -134,21 +134,6 @@ extension AppCoordinator {
         return playlist
     }
 
-    func createFolderPlaylist(title: String, folderPath: String) throws -> Playlist {
-        let playlist = try databaseManager.createFolderPlaylist(title: title, folderPath: folderPath)
-        syncPlaylistsToCloud()
-        return playlist
-    }
-
-    func syncPlaylistWithFolder(playlistId: Int64, trackStableIds: [String]) throws {
-        try databaseManager.syncPlaylistWithFolder(playlistId: playlistId, trackStableIds: trackStableIds)
-        syncPlaylistsToCloud()
-    }
-
-    func getFolderSyncedPlaylists() throws -> [Playlist] {
-        return try databaseManager.getFolderSyncedPlaylists()
-    }
-
     func isTrackInPlaylist(playlistId: Int64, trackStableId: String) throws -> Bool {
         return try databaseManager.isTrackInPlaylist(playlistId: playlistId, trackStableId: trackStableId)
     }
@@ -197,11 +182,6 @@ extension AppCoordinator {
     /// 同步只会重写同一份 JSON（白写 IO）。
     func updatePlaylistCustomCover(playlistId: Int64, imagePath: String?) throws {
         try databaseManager.updatePlaylistCustomCover(playlistId: playlistId, imagePath: imagePath)
-    }
-
-    /// 清空「文件夹歌单不再重建」墓碑（重新打开自动创建时用）。纯本地表，无镜像/无同步。
-    func clearDeletedFolderPlaylistTombstones() throws {
-        try databaseManager.clearDeletedFolderPlaylistTombstones()
     }
 
     /// 曲目换路径后迁移库内引用（改名场景）。纯 DB 动作：

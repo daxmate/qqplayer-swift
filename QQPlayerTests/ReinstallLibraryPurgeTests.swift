@@ -171,8 +171,8 @@ private enum ReinstallFixture {
     static func insertPlaylistMembership(_ manager: DatabaseManager, stableId: String) throws {
         try manager.write { db in
             try db.execute(sql: """
-                INSERT OR IGNORE INTO playlist (id, slug, title, created_at, updated_at, is_folder_synced)
-                VALUES (1, 'p1', 'P1', 0, 0, 0)
+                INSERT OR IGNORE INTO playlist (id, slug, title, created_at, updated_at)
+                VALUES (1, 'p1', 'P1', 0, 0)
             """)
             try db.execute(
                 sql: """

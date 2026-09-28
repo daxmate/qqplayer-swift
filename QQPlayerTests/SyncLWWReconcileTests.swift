@@ -231,8 +231,7 @@ struct SyncLWWReconcileTests {
 
         let now: Int64 = 1000
         let snapshot = SyncPlaylistSnapshot(
-            slug: "mix", title: "Mix", createdAt: now, updatedAt: now, lastPlayedAt: 0,
-            folderPath: nil, isFolderSynced: false, lastFolderSync: nil, customCoverImagePath: nil
+            slug: "mix", title: "Mix", createdAt: now, updatedAt: now, lastPlayedAt: 0
         )
         let upsert = SyncChangeLogRow(
             entity: .playlist, rowKey: "mix", op: .upsert, updatedAtMs: now,
@@ -287,9 +286,6 @@ struct SyncLWWReconcileTests {
             createdAt: 1,
             updatedAt: 1,
             lastPlayedAt: 0,
-            folderPath: nil,
-            isFolderSynced: false,
-            lastFolderSync: nil,
             customCoverImagePath: "/peer-device/Container/Documents/cover.png"
         )
         #expect(try applier.apply([Self.playlistRow(created, updatedAtMs: 1)]) == 1)
@@ -310,9 +306,6 @@ struct SyncLWWReconcileTests {
                 createdAt: 1,
                 updatedAt: 1,
                 lastPlayedAt: 0,
-                folderPath: nil,
-                isFolderSynced: false,
-                lastFolderSync: nil,
                 customCoverImagePath: "local-cover.png"
             ).insert(db)
         }
@@ -322,9 +315,6 @@ struct SyncLWWReconcileTests {
             createdAt: 1,
             updatedAt: 5,
             lastPlayedAt: 0,
-            folderPath: nil,
-            isFolderSynced: false,
-            lastFolderSync: nil,
             customCoverImagePath: "/peer-device/Container/Documents/other.png"
         )
         #expect(try applier.apply([Self.playlistRow(remoteUpdate, updatedAtMs: 5)]) == 1)
@@ -394,8 +384,7 @@ struct SyncLWWReconcileTests {
         let playlist = SyncChangeLogRow(
             entity: .playlist, rowKey: "mix", op: .upsert, updatedAtMs: 1,
             payloadJSON: try SyncSnapshotCodec.encode(SyncPlaylistSnapshot(
-                slug: "mix", title: "Mix", createdAt: 1, updatedAt: 1, lastPlayedAt: 0,
-                folderPath: nil, isFolderSynced: false, lastFolderSync: nil, customCoverImagePath: nil
+                slug: "mix", title: "Mix", createdAt: 1, updatedAt: 1, lastPlayedAt: 0
             ))
         )
         let item = SyncChangeLogRow(

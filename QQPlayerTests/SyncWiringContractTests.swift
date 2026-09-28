@@ -2174,8 +2174,7 @@ struct SyncCoverValueContractTests {
             try Playlist(
                 id: nil, slug: snapshot.slug, title: snapshot.title,
                 createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt,
-                lastPlayedAt: snapshot.lastPlayedAt, folderPath: snapshot.folderPath,
-                isFolderSynced: snapshot.isFolderSynced, lastFolderSync: snapshot.lastFolderSync,
+                lastPlayedAt: snapshot.lastPlayedAt,
                 customCoverImagePath: snapshot.customCoverImagePath
             ).insert(db)
         """
@@ -2191,8 +2190,7 @@ struct SyncCoverValueContractTests {
             _ = Playlist(
                 id: nil, slug: snapshot.slug, title: snapshot.title,
                 createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt,
-                lastPlayedAt: snapshot.lastPlayedAt, folderPath: snapshot.folderPath,
-                isFolderSynced: snapshot.isFolderSynced, lastFolderSync: snapshot.lastFolderSync,
+                lastPlayedAt: snapshot.lastPlayedAt,
                 customCoverImagePath: nil
             ).insert(db)
         """

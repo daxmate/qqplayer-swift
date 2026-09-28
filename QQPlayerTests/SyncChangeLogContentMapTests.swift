@@ -774,9 +774,6 @@ struct SyncChangeLogContentMapTests {
                 createdAt: 1,
                 updatedAt: 1,
                 lastPlayedAt: 0,
-                folderPath: nil,
-                isFolderSynced: false,
-                lastFolderSync: nil,
                 customCoverImagePath: nil
             ).insert(db)
             let playlistID = try Playlist.filter(Column("slug") == "pl").fetchOne(db)?.id ?? 0
@@ -816,12 +813,10 @@ struct SyncChangeLogContentMapTests {
 
     // MARK: - T15b-2 本地真值 → outbox 对账补发
 
-    /// 造一个歌单（返回 id）；`folderSynced` = true 模拟 folder-synced 歌单。
-    /// 其余字段可显式指定（“载荷与业务行逐字一致”断言用）。
+    /// 造一个歌单（返回 id）。字段可显式指定（“载荷与业务行逐字一致”断言用）。
     private static func insertPlaylist(
         _ db: Database,
         slug: String,
-        folderSynced: Bool = false,
         title: String? = nil,
         createdAt: Int64 = 1,
         updatedAt: Int64 = 1,
@@ -835,9 +830,6 @@ struct SyncChangeLogContentMapTests {
             createdAt: createdAt,
             updatedAt: updatedAt,
             lastPlayedAt: lastPlayedAt,
-            folderPath: folderSynced ? "/local/folder" : nil,
-            isFolderSynced: folderSynced,
-            lastFolderSync: nil,
             customCoverImagePath: customCoverImagePath
         ).insert(db)
         return try Playlist.filter(Column("slug") == slug).fetchOne(db)?.id ?? 0
@@ -848,7 +840,6 @@ struct SyncChangeLogContentMapTests {
         try queue.read { db in
             try Playlist.order(Column("slug")).fetchAll(db).map {
                 "\($0.slug)|\($0.title)|\($0.createdAt)|\($0.updatedAt)|\($0.lastPlayedAt)"
-                    + "|\($0.folderPath ?? "-")|\($0.isFolderSynced)|\($0.lastFolderSync ?? -1)"
                     + "|\($0.customCoverImagePath ?? "-")"
             }
         }
@@ -955,20 +946,6 @@ struct SyncChangeLogContentMapTests {
         #expect(try Self.outboxKeys(queue) == ["favorite|s-live"])
     }
 
-    @Test("T15b-2 补发：folder-synced 歌单成员不入跨端同步（与写入侧同一口径）")
-    func reconcileSkipsFolderSyncedPlaylistItems() throws {
-        let (manager, queue) = try Self.makeManager()
-        try queue.write { db in
-            try Self.insertTrack(db, stableId: "s-live", contentHash: "hash-live")
-            let folderPlaylistID = try Self.insertPlaylist(db, slug: "folder-pl", folderSynced: true)
-            try PlaylistItem(playlistId: folderPlaylistID, position: 0, trackStableId: "s-live").insert(db)
-        }
-
-        let report = try SyncChangeLogDanglingRepair(database: manager).run()
-        #expect(report.emitted == 0)
-        #expect(try Self.outboxKeys(queue).isEmpty)
-    }
-
     @Test("T15b-2 补发：手动歌单结构行补进 outbox——行键 = slug、载荷可解码且与业务行逐字一致")
     func reconcileEmitsPlaylistStructure() throws {
         let (manager, queue) = try Self.makeManager()
@@ -1009,9 +986,6 @@ struct SyncChangeLogContentMapTests {
         #expect(payload.createdAt == business.createdAt)
         #expect(payload.updatedAt == business.updatedAt)
         #expect(payload.lastPlayedAt == business.lastPlayedAt)
-        #expect(payload.folderPath == business.folderPath)
-        #expect(payload.isFolderSynced == business.isFolderSynced)
-        #expect(payload.lastFolderSync == business.lastFolderSync)
         #expect(payload.customCoverImagePath == business.customCoverImagePath)
 
         // 线上不发身份键噪音（歌单行不引用歌曲 → contentHash nil，但不是「缺身份键」）
@@ -1041,19 +1015,6 @@ struct SyncChangeLogContentMapTests {
         #expect(afterSecond == afterFirst)
         // 只动 sync_outbox：业务行零改动
         #expect(try Self.playlistSnapshot(queue) == businessBefore)
-    }
-
-    @Test("T15b-2 补发：folder-synced 歌单结构行不入跨端同步（与写入侧同一口径）")
-    func reconcileSkipsFolderSyncedPlaylists() throws {
-        let (manager, queue) = try Self.makeManager()
-        try queue.write { db in
-            _ = try Self.insertPlaylist(db, slug: "folder-pl", folderSynced: true)
-        }
-
-        let report = try SyncChangeLogDanglingRepair(database: manager).run()
-        #expect(report.emitted == 0)
-        #expect(report == SyncChangeLogDanglingRepair.Report())
-        #expect(try Self.outboxKeys(queue).isEmpty)
     }
 
     // MARK: - 矩阵守护（静态契约 + 行为，2026-09-15）

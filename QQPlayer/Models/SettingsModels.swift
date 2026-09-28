@@ -207,7 +207,6 @@ struct DeleteSettings: Codable {
     var dsdPlaybackMode: DSDPlaybackMode = .pcm
     var deleteFromLibraryOnly: Bool = true
     var lastLibraryScanDate: Date?
-    var autoCreateFolderPlaylists: Bool = true
     /// macOS 曲库文件夹列表（用户添加的外部歌曲文件夹；空 = 默认 ~/Music/QQPlayer）
     var libraryFolders: [String] = []
     /// 曲库收录的音频扩展名（小写不带点，web 版「文件类型」chips 对齐）。
@@ -313,7 +312,6 @@ struct DeleteSettings: Codable {
         // should always be an explicit opt-in
         deleteFromLibraryOnly = try container.decodeIfPresent(Bool.self, forKey: .deleteFromLibraryOnly) ?? true
         lastLibraryScanDate = try container.decodeIfPresent(Date.self, forKey: .lastLibraryScanDate)
-        autoCreateFolderPlaylists = try container.decodeIfPresent(Bool.self, forKey: .autoCreateFolderPlaylists) ?? true
         libraryFolders = try container.decodeIfPresent([String].self, forKey: .libraryFolders) ?? []
         // 兼容旧数据/未配置：decode 失败或为空列表时回落默认全集
         // （空列表在旧格式里可能表示「未设置」，与「用户显式清空」区分——

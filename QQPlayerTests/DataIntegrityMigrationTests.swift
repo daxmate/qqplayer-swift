@@ -41,13 +41,13 @@ private enum DataIntegrityFixture {
         return url
     }
 
-    static func insertPlaylist(db: Database, id: Int64, slug: String, title: String, folderSynced: Bool = false) throws {
+    static func insertPlaylist(db: Database, id: Int64, slug: String, title: String) throws {
         try db.execute(
             sql: """
-                INSERT INTO playlist (id, slug, title, created_at, updated_at, is_folder_synced)
-                VALUES (?, ?, ?, 0, 0, ?)
+                INSERT INTO playlist (id, slug, title, created_at, updated_at)
+                VALUES (?, ?, ?, 0, 0)
             """,
-            arguments: [id, slug, title, folderSynced]
+            arguments: [id, slug, title]
         )
     }
 
@@ -244,9 +244,6 @@ struct DeleteTrackOutboxTests {
             try DataIntegrityFixture.insertPlaylist(db: db, id: 1, slug: "p1", title: "P1")
             try db.execute(sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (1, 1, 't1')")
             try db.execute(sql: "INSERT INTO play_history (track_stable_id, played_at, play_duration_ms) VALUES ('t1', 111, 0)")
-            // folder-synced 歌单内容由本地扫描派生：不入跨端同步
-            try DataIntegrityFixture.insertPlaylist(db: db, id: 2, slug: "folder", title: "F", folderSynced: true)
-            try db.execute(sql: "INSERT INTO playlist_item (playlist_id, position, track_stable_id) VALUES (2, 1, 't1')")
             // 删除前本端刚加过收藏（这条 upsert 尚未发送 → 必须被删除抑制）
             try db.execute(sql: """
                 INSERT INTO sync_outbox (entity, row_key, op, updated_at, payload_json)
@@ -267,8 +264,6 @@ struct DeleteTrackOutboxTests {
                 "playlist_item|p1|t1",
                 "play_history|t1|111",
             ]))
-            // folder-synced 歌单不产生 outbox
-            #expect(!deleteRows.contains { $0.rowKey.contains("folder") })
 
             // 契约：v2 删除不上线，但 delete 行必须把同键 pending upsert 压掉
             // （否则对端会落地一条永远无法纠正的幽灵收藏）

@@ -2,7 +2,7 @@
 //  LibraryIndexer+Scanning.swift
 //  QQPlayer
 //
-//  扫描与调度：文件夹歌单生成、本地 Documents 扫描（iOS）、macOS 音乐文件夹
+//  扫描与调度：本地 Documents 扫描（iOS）、macOS 音乐文件夹
 //  扫描/自动补扫、dataless 分区。纯搬家自 LibraryIndexer.swift（无行为变化；
 //  仅按分片放宽可见性）。
 //
@@ -15,94 +15,6 @@ import GRDB
 import SFBAudioEngine
 
 extension LibraryIndexer {
-    private func processFolderPlaylists(allMusicFiles: [URL]) async {
-        guard DeleteSettings.load().autoCreateFolderPlaylists else {
-            AppLog.warn(.general, "📁 Folder playlist auto-creation disabled in settings - skipping")
-            return
-        }
-        AppLog.info(.general, "📁 Processing folder playlists...")
-
-        // Group music files by their parent directory
-        var folderGroups: [String: [URL]] = [:]
-
-        for fileURL in allMusicFiles {
-            let parentFolder = fileURL.deletingLastPathComponent()
-            let folderPath = parentFolder.path
-
-            // Skip if it's directly in the music root（Documents/Music / macOS 曲库根）
-            let documentsPath = LibraryRoot.documentsRootURL()?.path
-            #if os(macOS)
-                let musicRootPath = stateManager.getMusicFolderURL()?.path
-            #else
-                let musicRootPath = MusicFolderResolver.iosMusicLibraryDirectoryURL().path
-            #endif
-
-            if folderPath == documentsPath || folderPath == musicRootPath {
-                continue
-            }
-
-            if folderGroups[folderPath] == nil {
-                folderGroups[folderPath] = []
-            }
-            folderGroups[folderPath]?.append(fileURL)
-        }
-
-        AppLog.info(.general, "📁 Found \(folderGroups.count) folders with music files")
-
-        for (folderPath, musicFiles) in folderGroups {
-            await processFolderPlaylist(folderPath: folderPath, musicFiles: musicFiles)
-        }
-
-        AppLog.info(.general, "✅ Folder playlist processing completed")
-    }
-
-    private func processFolderPlaylist(folderPath: String, musicFiles: [URL]) async {
-        let folderURL = URL(fileURLWithPath: folderPath)
-        let folderName = folderURL.lastPathComponent
-
-        if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "📂 Processing folder playlist for: \(folderName)") }
-
-        do {
-            // Generate stable IDs for all music files in this folder
-            var trackStableIds: [String] = []
-
-            for musicFile in musicFiles {
-                let stableId = try generateStableId(for: musicFile)
-                trackStableIds.append(stableId)
-            }
-
-            if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🎵 Found \(trackStableIds.count) tracks in folder: \(folderName)") }
-
-            // Check if a folder playlist already exists for this path
-            if let existingPlaylist = try databaseManager.getFolderPlaylist(forPath: folderPath) {
-                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "🔄 Syncing existing folder playlist: \(existingPlaylist.title)") }
-
-                // The DB primary key should never be nil here, but a nil row
-                // must not crash the folder-sync hot path (audit: force unwrap)
-                guard let playlistId = existingPlaylist.id else {
-                    AppLog.error(.general, "❌ Skipping folder playlist sync - existing playlist has no id: \(existingPlaylist.title)")
-                    return
-                }
-                try databaseManager.syncPlaylistWithFolder(playlistId: playlistId, trackStableIds: trackStableIds)
-                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Synced playlist '\(existingPlaylist.title)' with folder contents") }
-            } else {
-                // Create new folder playlist
-                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "➕ Creating new folder playlist: \(folderName)") }
-
-                let playlist = try databaseManager.createFolderPlaylist(title: folderName, folderPath: folderPath)
-                guard let playlistId = playlist.id else {
-                    AppLog.error(.general, "❌ Skipping folder playlist sync - created playlist has no id: \(playlist.title)")
-                    return
-                }
-                try databaseManager.syncPlaylistWithFolder(playlistId: playlistId, trackStableIds: trackStableIds)
-                if AppLog.isEnabled(.debug, .general) { AppLog.debug(.general, "✅ Created folder playlist '\(playlist.title)' with \(trackStableIds.count) tracks") }
-            }
-
-        } catch {
-            AppLog.error(.general, "❌ Failed to process folder playlist for \(folderName): \(error)")
-        }
-    }
-
     /// iOS 主扫/offline 统一入口（M3-2 起 = 唯一主扫；2026-09-22 起曲库根 = `Documents/Music`）。
     /// 带 generation guard，与 macOS scanMusicFolder 同一套取消语义。
     /// 分片：跨文件可见（原 private）
@@ -168,8 +80,6 @@ extension LibraryIndexer {
                 AppLog.info(.general, "✅ iOS library scan completed. Found \(tracksFound) tracks.")
             }
 
-            // Process folder playlists after scan completion
-            await processFolderPlaylists(allMusicFiles: musicFiles)
         } catch {
             await MainActor.run {
                 markScanEnded()
@@ -179,7 +89,7 @@ extension LibraryIndexer {
     }
     #if os(macOS)
         /// macOS 数据源：FileManager 目录扫描音乐文件夹（默认 ~/Music/QQPlayer）。
-        /// 复用 iOS 的 findMusicFiles/indexFile/processFolderPlaylists 逻辑，
+        /// 复用 iOS 的 findMusicFiles/indexFile 逻辑，
         /// 仅替换数据源（NSMetadataQuery → 目录枚举）。MVP 为启动全扫，
         /// FSEvents 实时监控后补（调研报告 §3.5 风险 2）。
         /// 分片：跨文件可见（原 private）
@@ -317,8 +227,6 @@ extension LibraryIndexer {
 
                 // 云端文件下载完成后自动补扫入列（60s 后重扫，最多 5 轮）
                 autoscheduleRescan(skippedDataless: skippedDataless)
-
-                await processFolderPlaylists(allMusicFiles: musicFiles)
             } catch {
                 AppLog.error(.general, "❌ macOS scan failed: \(error)")
                 MacScanLogger.log("scan failed: \(error)")

@@ -224,9 +224,6 @@ struct SyncChangeLogApplier {
                     createdAt: snapshot.createdAt,
                     updatedAt: snapshot.updatedAt,
                     lastPlayedAt: snapshot.lastPlayedAt,
-                    folderPath: snapshot.folderPath,
-                    isFolderSynced: snapshot.isFolderSynced,
-                    lastFolderSync: snapshot.lastFolderSync,
                     customCoverImagePath: nil
                 ).insert(db)
             }

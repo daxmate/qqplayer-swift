@@ -707,9 +707,6 @@ struct SyncDataSyncCoreTests {
                 createdAt: 1,
                 updatedAt: 1,
                 lastPlayedAt: 0,
-                folderPath: nil,
-                isFolderSynced: false,
-                lastFolderSync: nil,
                 customCoverImagePath: "/local/mine.jpg"
             ).insert(db)
         }
@@ -719,9 +716,6 @@ struct SyncDataSyncCoreTests {
             createdAt: 1,
             updatedAt: 9,
             lastPlayedAt: 0,
-            folderPath: nil,
-            isFolderSynced: false,
-            lastFolderSync: nil,
             customCoverImagePath: "/peer/device/cover.jpg"
         )
         let applied = try applier.apply([

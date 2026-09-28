@@ -130,12 +130,6 @@ struct Localized {
     static let chooseVisibleSections = "choose_visible_sections".localized
     static let removeFromLibraryOnly = "remove_from_library_only".localized
     static let removeFromLibraryOnlyDescription = "remove_from_library_only_description".localized
-    static let autoFolderPlaylists = "auto_folder_playlists".localized
-    static let autoFolderPlaylistsDescription = "auto_folder_playlists_description".localized
-    static let deleteFolderPlaylistsTitle = "delete_folder_playlists_title".localized
-    static let deleteFolderPlaylistsMessage = "delete_folder_playlists_message".localized
-    static let deleteFolderPlaylistsConfirm = "delete_folder_playlists_confirm".localized
-    static let keepFolderPlaylists = "keep_folder_playlists".localized
     static let playerControls = "player_controls".localized
     static let showSleepTimerButton = "show_sleep_timer_button".localized
     static let showSleepTimerButtonDescription = "show_sleep_timer_button_description".localized

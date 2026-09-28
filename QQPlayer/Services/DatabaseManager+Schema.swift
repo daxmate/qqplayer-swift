@@ -102,9 +102,6 @@ extension DatabaseManager {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
                     last_played_at INTEGER DEFAULT 0,
-                    folder_path TEXT,
-                    is_folder_synced BOOLEAN DEFAULT 0,
-                    last_folder_sync INTEGER,
                     custom_cover_image_path TEXT
                 )
             """)
@@ -115,13 +112,6 @@ extension DatabaseManager {
                     position INTEGER NOT NULL,
                     track_stable_id TEXT NOT NULL,
                     PRIMARY KEY (playlist_id, position)
-                )
-            """)
-
-            try db.execute(sql: """
-                CREATE TABLE IF NOT EXISTS deleted_folder_playlist (
-                    folder_path TEXT PRIMARY KEY,
-                    deleted_at INTEGER NOT NULL
                 )
             """)
 

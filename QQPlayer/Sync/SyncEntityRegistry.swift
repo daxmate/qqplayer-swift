@@ -120,7 +120,7 @@ enum SyncEntityRegistry {
             localTruth: SyncEntityLocalTruth(
                 table: "playlist",
                 rowKeyShape: "slug（本地创建时派生、rename 不改 ⇒ 跨端稳定）",
-                carrierNote: "folder-synced 歌单由本地扫描派生（folder_path 是设备本地路径），不入跨端同步（补发与写入侧同一口径）"
+                carrierNote: "歌单结构由本地 CRUD 写入；补发与写入侧同一口径（载荷与 createPlaylist / renamePlaylist 同形）"
             ),
             // 不引用歌曲：不得被判「未定位」（INV-6），走 passThrough；因此也没有可悬空的引用。
             referencesTrack: false,

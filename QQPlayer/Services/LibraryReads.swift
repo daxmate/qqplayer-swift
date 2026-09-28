@@ -113,10 +113,6 @@ enum LibraryReads {
         try DatabaseManager.shared.getAllPlaylists()
     }
 
-    static func folderPlaylists() throws -> [Playlist] {
-        try DatabaseManager.shared.getAllFolderPlaylists()
-    }
-
     static func playlistItems(playlistId: Int64) throws -> [PlaylistItem] {
         try DatabaseManager.shared.getPlaylistItems(playlistId: playlistId)
     }

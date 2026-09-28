@@ -47,15 +47,13 @@ struct ModelsRoundTripTests {
         let model = Playlist(
             id: 4, slug: "my-list", title: "我的歌单",
             createdAt: 1_700_000_000, updatedAt: 1_700_000_100,
-            lastPlayedAt: 0, folderPath: "/Music/Folder", isFolderSynced: true,
-            lastFolderSync: 1_700_000_050, customCoverImagePath: nil
+            lastPlayedAt: 7, customCoverImagePath: "/covers/my-list.png"
         )
         let data = try JSONEncoder().encode(model)
         let decoded = try JSONDecoder().decode(Playlist.self, from: data)
         #expect(decoded.slug == "my-list")
-        #expect(decoded.isFolderSynced == true)
-        #expect(decoded.folderPath == "/Music/Folder")
-        #expect(decoded.lastFolderSync == 1_700_000_050)
+        #expect(decoded.lastPlayedAt == 7)
+        #expect(decoded.customCoverImagePath == "/covers/my-list.png")
     }
 
     @Test("EQPreset JSON round-trip（preset_type 枚举 + snake_case）")

@@ -718,19 +718,6 @@
 
 "play_order_repeat_one" = "單曲循環";
 
-/* Folder playlists */
-"auto_folder_playlists" = "根據資料夾自動建立播放列表";
-
-"auto_folder_playlists_description" = "啟用後，將為每個音樂資料夾自動建立播放列表，並與其內容保持同步。";
-
-"delete_folder_playlists_title" = "刪除資料夾播放列表？";
-
-"delete_folder_playlists_message" = "自動建立已關閉。是否刪除已經建立的資料夾播放列表？你的音樂檔案不會受到影響。";
-
-"delete_folder_playlists_confirm" = "刪除播放列表";
-
-"keep_folder_playlists" = "保留播放列表";
-
 /* 跟唱模式（Karaoke） */
 "karaoke_ab_end_hint" = "點歌詞設定 AB 終點";
 
