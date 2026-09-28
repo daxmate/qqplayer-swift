@@ -54,22 +54,45 @@ enum MusicFolderResolver {
         let defaultURL = macDefaultFolderURL(homeDirectory: homeDirectory)
         var folders = [defaultURL]
         let defaultPath = defaultURL.standardizedFileURL.path
-        let homePath = homeDirectory.standardizedFileURL.path
         for path in extraFolderPaths {
             // ~ 展开基于注入的 homeDirectory（而非系统真实 home），保证可注入可测
-            let expanded: String
-            if path == "~" {
-                expanded = homePath
-            } else if path.hasPrefix("~/") {
-                expanded = homePath + "/" + String(path.dropFirst(2))
-            } else {
-                expanded = path
-            }
+            let expanded = expandedPath(path, homeDirectory: homeDirectory)
             let url = URL(fileURLWithPath: expanded)
             if url.standardizedFileURL.path != defaultPath {
                 folders.append(url)
             }
         }
         return folders
+    }
+
+    /// macOS 曲库根（**唯一地址**）的纯逻辑：指定路径存在 → 用它；否则回退默认。
+    ///
+    /// 用户拍板口径（2026-09-28）：「曲库只能有一个地址」——要么默认 `~/Music/QQPlayer`，
+    /// 要么用户指定；**不接受「多根 + 谁排第一」**。用户指定的目录**不存在时静默回退默认**
+    /// （不报错、也不去创建那个指定目录）。
+    ///
+    /// 本函数**不做任何 IO**（文件头契约：纯逻辑、可单测）：目录是否存在由调用方以
+    /// `directoryExists` 闭包注入（照 `macFolderURLs` 的注入风格）。对本根做 `fileExists` /
+    /// `createDirectory` 的**唯一** IO 入口是 `QQPlayer/Mac/MacLibraryRoot.swift`。
+    static func macLibraryRootURL(
+        homeDirectory: URL,
+        specifiedPath: String?,
+        directoryExists: (URL) -> Bool
+    ) -> URL {
+        if let specifiedPath, !specifiedPath.isEmpty {
+            let expanded = expandedPath(specifiedPath, homeDirectory: homeDirectory)
+            let url = URL(fileURLWithPath: expanded)
+            if directoryExists(url) { return url }
+        }
+        return macDefaultFolderURL(homeDirectory: homeDirectory)
+    }
+
+    /// `~` / `~/…` 展开（基准 = 注入的 `homeDirectory`，保证可注入可测）。
+    /// **唯一实现**：`macFolderURLs` 与 `macLibraryRootURL` 共用，避免两处各写一套展开规则。
+    static func expandedPath(_ path: String, homeDirectory: URL) -> String {
+        let homePath = homeDirectory.standardizedFileURL.path
+        if path == "~" { return homePath }
+        if path.hasPrefix("~/") { return homePath + "/" + String(path.dropFirst(2)) }
+        return path
     }
 }

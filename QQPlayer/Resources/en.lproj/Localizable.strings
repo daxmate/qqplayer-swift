@@ -1047,6 +1047,7 @@
 "sync_peer_summary_unknown" = "%@ library size unavailable.";
 "sync_peer_retry" = "Try Again";
 "sync_peer_error_not_connected" = "Not connected to your iPhone.";
+"sync_peer_error_library_unavailable" = "This Mac's music folder isn't available.";
 "sync_peer_error_session" = "The connection ended. Reconnect and try again.";
 "sync_peer_error_timeout" = "Your iPhone didn't respond in time.";
 "sync_peer_error_cancelled" = "Request cancelled.";

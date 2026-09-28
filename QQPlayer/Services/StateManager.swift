@@ -321,20 +321,16 @@ class StateManager: @unchecked Sendable {
         /// 音乐库默认目录（macOS 仅本地文件夹语义）。M3-2 起 iOS 无此入口——
         /// iOS 音乐位置 = 沙盒 Documents（LibraryIndexer 直接使用），不再有
         /// ubiquity 容器 URL 可返回。
+        /// 2026-09-28 单根收口：返回**曲库唯一地址**（默认 `~/Music/QQPlayer` 或用户指定）。
         func getMusicFolderURL() -> URL? {
-            return MusicFolderResolver.macDefaultFolderURL(
-                homeDirectory: FileManager.default.homeDirectoryForCurrentUser
-            )
+            MacLibraryRoot.resolvedRootURL
         }
 
-        /// macOS 曲库文件夹列表：默认 ~/Music/QQPlayer 始终在列，加上设置页
-        /// 「音乐库」添加的外部文件夹（多根共存，去重）。对齐用户期望：添加
-        /// 新路径不冲掉默认目录。决策上收 MusicFolderResolver（A0-prep：行为不变）。
+        /// macOS 曲库文件夹列表：**唯一地址单根**（2026-09-28 用户拍板「曲库只能有一个
+        /// 地址」，不接受多根）。返回单元素数组以保住既有调用方（扫描 / FSEvents 监控 /
+        /// 导入落点）的数组形态；解析与 IO 的唯一入口是 `MacLibraryRoot`。
         func getMusicFolderURLs() -> [URL] {
-            MusicFolderResolver.macFolderURLs(
-                homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
-                extraFolderPaths: DeleteSettings.load().libraryFolders
-            )
+            [MacLibraryRoot.resolvedRootURL]
         }
     #endif
 }

@@ -6,7 +6,7 @@
 //  通用直链下载入口；B1 批：下载引擎分发（aria2 RPC，不可用自动降级内置 HTTP）+
 //  进度回调（UI 进度圆环打基础））。落盘语义逐条对齐 web backend/app/routers/stream.py +
 //  services/download.py：
-//  - 目标目录 = 设置 onlineDownloadDirectory（空 → 曲库默认目录恒在列的首个）
+//  - 目标目录 = 设置 onlineDownloadDirectory（空 → 曲库唯一地址，MacLibraryRoot）
 //  - 文件名 = 网易云 {title}-{artist}.{ext}（清洗后空回落 id，见 NeteaseOnlineLogic）；
 //    直链下载 downloadDirect 用调用方建议文件名（同样做非法字符清洗）
 //  - 重名加序号 (1)、(2)…
@@ -55,18 +55,16 @@ enum MacOnlineDownloadService {
         return URL(fileURLWithPath: first, isDirectory: true)
     }
 
-    /// 曲库目录列表（跨平台：默认 ~/Music/QQPlayer 恒在列首位 + 设置附加目录，
-    /// macOS 语义与扫描一致；避免依赖 macOS-only 的 StateManager API）
+    /// 曲库目录列表：2026-09-28 单根收口 = **曲库唯一地址**（默认 `~/Music/QQPlayer`，
+    /// 或用户指定；指定目录不存在则回退默认）。解析 / IO 判定只在 `MacLibraryRoot`，
+    /// 本处不再自拼路径（旧实现：默认路径恒插首位 + 设置附加目录 = 多根）。
     static func libraryDirectoryPaths() -> [String] {
-        let settings = DeleteSettings.load()
-        var paths = settings.libraryFolders
-        // NSHomeDirectory() 跨平台：macOS = ~（真实用户目录）；iOS = 沙盒目录（该
-        // 服务仅 Mac 运行时使用，iOS 编译兜底测试用，落盘路径语义以 macOS 为准）
-        let defaultPath = NSHomeDirectory() + "/Music/QQPlayer"
-        if !paths.contains(defaultPath) {
-            paths.insert(defaultPath, at: 0)
-        }
-        return paths
+        #if os(macOS)
+            return [MacLibraryRoot.resolvedRootURL.path]
+        #else
+            // 该服务仅 macOS 运行时使用；iOS 仅为编译/测试兜底（落盘语义以 macOS 为准）。
+            return [NSHomeDirectory() + "/Music/QQPlayer"]
+        #endif
     }
 
     /// 最终落盘路径：目录内重名自动加序号（name (1).ext…）。

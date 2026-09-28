@@ -103,9 +103,7 @@ final class MacSyncContentModel: ObservableObject {
         self.hostCenter = center
         self.selectionStore = selectionStore
         self.database = database
-        let root = libraryRoot ?? MusicFolderResolver.macDefaultFolderURL(
-            homeDirectory: FileManager.default.homeDirectoryForCurrentUser
-        )
+        let root = libraryRoot ?? MacLibraryRoot.resolvedRootURL
         self.libraryRoot = root
         self.local = MacSyncLocalContentProvider(database: database, libraryRoot: root)
         // 连接断开 → 对端内容失效（清掉对端清单，避免把上一台设备的内容留在屏上）。
@@ -354,7 +352,7 @@ final class MacSyncContentModel: ObservableObject {
             reloadLocalTracks(reset: true)
         case .peer:
             guard ensurePeerProvider() else {
-                markPeerUnavailable(.notConnected)
+                markPeerUnavailable(peerContentUnavailableError())
                 return
             }
             reloadPeerPlaylists()
@@ -394,7 +392,7 @@ final class MacSyncContentModel: ObservableObject {
         guard hostCenter.connectedPeer != nil, let session = hostCenter.activeSession else {
             // 对端掉线：在途请求作废，清单清空（避免展示上一台设备的内容）。
             resetContentState()
-            markPeerUnavailable(.notConnected)
+            markPeerUnavailable(peerContentUnavailableError())
             return
         }
         // 同一会话（开关 / 时长等无关变化）→ 不动内容，避免无谓重载。
@@ -413,6 +411,16 @@ final class MacSyncContentModel: ObservableObject {
         peer?.cancelInFlight()
         peer = MacSyncPeerContentProvider(session: session)
         return true
+    }
+
+    /// 「对端清单不可用」的成因：已连上移动端但本机曲库不可用（无 `activeSession`，
+    /// 曲库根不存在 → `SyncHostCenter` 未接线）→ `.libraryUnavailable`；否则（没连上）
+    /// → `.notConnected`。两件事事实源不同（前者事实是「连上了」，后者是「没连上」），
+    /// 合并会把「库不可用」误报成「没连上」（2026-09-28 用户报告的形状）。
+    private func peerContentUnavailableError() -> SyncUIPeerContentError {
+        hostCenter.connectedPeer != nil && hostCenter.activeSession == nil
+            ? .libraryUnavailable
+            : .notConnected
     }
 
     /// 对端不可用（未连接 / 会话未就绪）：三处状态统一进失败态（UI 显示一条原因 + 重试）。
@@ -454,7 +462,7 @@ final class MacSyncContentModel: ObservableObject {
 
     private func reloadPeerPlaylists() {
         guard let peer else {
-            markPeerUnavailable(.notConnected)
+            markPeerUnavailable(peerContentUnavailableError())
             return
         }
         let generation = self.generation
@@ -501,7 +509,7 @@ final class MacSyncContentModel: ObservableObject {
 
     private func reloadPeerTracks(reset: Bool) {
         guard let peer else {
-            markPeerUnavailable(.notConnected)
+            markPeerUnavailable(peerContentUnavailableError())
             return
         }
         if reset { trackOffset = 0 }

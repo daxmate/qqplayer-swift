@@ -41,6 +41,14 @@ struct QQPlayerMacApp: App {
         MacKeyboardShortcuts.install()
         // E3 桌面浮窗：监听设置变化并恢复上次显隐状态（默认关不弹；开启过则重启恢复）。
         DesktopWindowsManager.shared.start()
+        // 曲库唯一地址（用户 2026-09-28 拍板）：启动时先确保曲库根存在。**必须早于
+        // `SyncHostCenter.start()`** —— 监听一开就可能接会话，晚了的第一条连接会走
+        // `handleSessionPhase(.ready)` → `MacSyncLibraryHost.attach` →
+        // `SyncLocalLibraryProvider.attach` 首行 `fileExists(libraryRoot)` 判假 ⇒ 不接线
+        // ⇒ `activeSession` 恒 nil ⇒ UI「设备在线，但同步面板报尚未连接」。
+        // 放在这里（App init）而不是 `AppCoordinator.initialize()`：后者是 async、晚于本处，
+        // 赶不上启动即监听的首条连接。
+        MacLibraryRoot.ensureRootExists()
         // M6 T1：局域网同步 Host 常驻监听——App 启动即开始（设置页只做控制面，
         // 生命周期归 SyncHostCenter）。“允许局域网设备连接”关掉时不启动。
         MainActor.assumeIsolated {

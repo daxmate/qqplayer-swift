@@ -82,7 +82,11 @@ struct SyncDeviceTargetStatus: Equatable, Sendable {
 
     /// 「同步数据」入口的可用性（批 B2）：与传歌**同一个目标语义** —— 选中设备在线才能动；
     /// 连上的不是所选时不能在 UI 上装作没事地同步到别人。
-    /// 判定顺序：目标闸门（`SyncUIStartGate.targetBlock`，唯一实现）→ 连接/会话 → 运行中 → 可开始。
+    /// 判定顺序：目标闸门（`SyncUIStartGate.targetBlock`，唯一实现）→ 未连接 →
+    /// 会话不可用（曲库不可用）→ 运行中 → 可开始。
+    /// 为什么拆开「未连接」与「会话不可用」：两者事实源不同（前者读 `connectedPeer`，
+    /// 后者要 `activeSession`）。合并会让「连上了但本机曲库不可用」被误报为「未连接」
+    /// （2026-09-28 用户报告的「设备行在线、同步面板却报尚未连接」就是这个形状）。
     /// 为什么放在这里而不是 `SyncUIState.swift`：那是「传歌开始闸门」的地盘，
     /// 本文件是批 B2（设备选择）的唯一决策层；两者共用同一个目标闸门函数。
     func dataSyncAvailability(
@@ -91,7 +95,8 @@ struct SyncDeviceTargetStatus: Equatable, Sendable {
         isRunning: Bool
     ) -> SyncUIStartAvailability {
         if let blocked = SyncUIStartGate.targetBlock(self) { return blocked }
-        if !isConnected || !hasSession { return .notConnected }
+        if !isConnected { return .notConnected }
+        guard hasSession else { return .libraryUnavailable }
         if isRunning { return .alreadyRunning }
         return .ready
     }

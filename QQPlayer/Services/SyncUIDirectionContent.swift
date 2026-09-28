@@ -69,6 +69,9 @@ enum SyncUIContentSourceResolver {
 enum SyncUIPeerContentError: Equatable, Sendable {
     /// 还没有连接（无活跃会话）→ 提示先连接 iPhone
     case notConnected
+    /// 已连上移动端，但本机曲库根不可用（库根不存在 → `SyncHostCenter` 未接线）
+    /// → **不是**「没连上」，如实告知是曲库不可用（见 `SyncHostCenter.handleSessionPhase`）。
+    case libraryUnavailable
     /// 会话存在但未就绪（重建中 / 已关闭）
     case sessionNotReady
     /// 对端在超时内没回（对端未接线 / 网络卡住）
@@ -104,6 +107,7 @@ enum SyncUIPeerContentError: Equatable, Sendable {
     var messageKey: String {
         switch self {
         case .notConnected: return "sync_peer_error_not_connected"
+        case .libraryUnavailable: return "sync_peer_error_library_unavailable"
         case .sessionNotReady, .sessionClosed: return "sync_peer_error_session"
         case .timeout: return "sync_peer_error_timeout"
         case .cancelled: return "sync_peer_error_cancelled"

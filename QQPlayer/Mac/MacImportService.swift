@@ -37,19 +37,16 @@ enum MacImportService {
         var result = ImportResult()
         let fileManager = FileManager.default
 
-        // 目标目录：默认取曲库首个目录（StateManager 保证默认 ~/Music/QQPlayer 恒在列）
+        // 目标目录：显式 `importFolder` 优先；否则 **曲库唯一地址**（`MacLibraryRoot`
+        // 会幂等确保它存在——默认 ~/Music/QQPlayer 可能尚未创建）。
         let destinationDirectory: URL
         if let importFolder {
             destinationDirectory = importFolder
-        } else if let first = StateManager.shared.getMusicFolderURLs().first {
-            destinationDirectory = first
+            // 确保目录存在（显式目标可能是尚未创建的路径）
+            try? fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
         } else {
-            MacScanLogger.log("import: no destination folder")
-            return result
+            destinationDirectory = MacLibraryRoot.ensureRootExists()
         }
-
-        // 确保目录存在（默认目录可能尚未创建）
-        try? fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
 
         var copiedPaths: [String] = []
 

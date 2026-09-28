@@ -1383,6 +1383,7 @@
 "sync_peer_summary_unknown" = "%@ 曲庫大小暫不可用。";
 "sync_peer_retry" = "重試";
 "sync_peer_error_not_connected" = "尚未連接 iPhone。";
+"sync_peer_error_library_unavailable" = "這台 Mac 的媒體庫資料夾無法使用。";
 "sync_peer_error_session" = "連線已中斷，請重新連接後再試。";
 "sync_peer_error_timeout" = "iPhone 沒有及時回應。";
 "sync_peer_error_cancelled" = "請求已取消。";

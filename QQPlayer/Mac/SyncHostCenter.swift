@@ -106,9 +106,9 @@ final class SyncHostCenter {
     /// 每个 ready 会话一份；会话关闭 / 服务停止时拆除。
     @ObservationIgnored private var libraryHost: MacSyncLibraryHost?
 
-    /// 曲库根（注入便于测试/多根演进；默认 ~/Music/QQPlayer，与 macOS 扫描默认一致）。
+    /// 曲库根（注入便于测试；默认 = 曲库唯一地址，见 `MacLibraryRoot`）。
     @ObservationIgnored var libraryRootProvider: () -> URL = {
-        MusicFolderResolver.macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+        MacLibraryRoot.resolvedRootURL
     }
 
     /// 本机身份加载（Keychain；失败 → 记 startError 且不启动，绝不静默换 ID）。

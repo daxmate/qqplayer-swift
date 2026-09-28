@@ -1042,6 +1042,7 @@
 "sync_peer_summary_unknown" = "Размер медиатеки %@ недоступен.";
 "sync_peer_retry" = "Повторить";
 "sync_peer_error_not_connected" = "Нет подключения к iPhone.";
+"sync_peer_error_library_unavailable" = "Папка музыки на этом Mac недоступна.";
 "sync_peer_error_session" = "Соединение прервано. Подключитесь снова и повторите.";
 "sync_peer_error_timeout" = "iPhone не ответил вовремя.";
 "sync_peer_error_cancelled" = "Запрос отменён.";

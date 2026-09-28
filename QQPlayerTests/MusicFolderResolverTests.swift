@@ -86,4 +86,68 @@ struct MusicFolderResolverTests {
             #expect(folders.contains(MusicFolderResolver.macDefaultFolderURL(homeDirectory: home)))
         }
     }
+
+    // MARK: - macOS 曲库根（**唯一地址**）纯逻辑（2026-09-28）
+
+    // 用户拍板口径：曲库只能有一个地址——要么默认 ~/Music/QQPlayer，要么用户指定；
+    // 指定目录不存在 → 静默回退默认（不报错、不建指定目录）。is 本函数零 IO：
+    // 目录存在性由注入闭包给（可注入可测）。
+
+    @Test("macOS 曲库根：未指定 → 默认目录")
+    func macLibraryRootUnspecifiedFallsBackToDefault() {
+        let home = URL(fileURLWithPath: "/Users/test")
+        let url = MusicFolderResolver.macLibraryRootURL(
+            homeDirectory: home,
+            specifiedPath: nil,
+            directoryExists: { _ in true }
+        )
+        #expect(url.path == "/Users/test/Music/QQPlayer")
+    }
+
+    @Test("macOS 曲库根：指定且存在 → 用指定")
+    func macLibraryRootSpecifiedExistingWins() {
+        let home = URL(fileURLWithPath: "/Users/test")
+        let url = MusicFolderResolver.macLibraryRootURL(
+            homeDirectory: home,
+            specifiedPath: "~/Music/Vinyl",
+            directoryExists: { $0.path == "/Users/test/Music/Vinyl" }
+        )
+        #expect(url.path == "/Users/test/Music/Vinyl")
+    }
+
+    @Test("macOS 曲库根：指定但目录不存在 → 回退默认（不报错、不建指定目录）")
+    func macLibraryRootSpecifiedMissingFallsBackToDefault() {
+        let home = URL(fileURLWithPath: "/Users/test")
+        let url = MusicFolderResolver.macLibraryRootURL(
+            homeDirectory: home,
+            specifiedPath: "/Volumes/Gone/Music",
+            directoryExists: { _ in false }
+        )
+        #expect(url.path == "/Users/test/Music/QQPlayer")
+    }
+
+    @Test("macOS 曲库根：空串视为未指定 → 默认")
+    func macLibraryRootEmptySpecifiedFallsBackToDefault() {
+        let home = URL(fileURLWithPath: "/Users/test")
+        let url = MusicFolderResolver.macLibraryRootURL(
+            homeDirectory: home,
+            specifiedPath: "",
+            directoryExists: { _ in true }
+        )
+        #expect(url.path == "/Users/test/Music/QQPlayer")
+    }
+
+    @Test("macOS 曲库根：~ 展开基于注入的 homeDirectory（非系统真实 home）")
+    func macLibraryRootTildeExpandsAgainstInjectedHome() {
+        let home = URL(fileURLWithPath: "/Users/injected")
+        var probedPath: String?
+        let url = MusicFolderResolver.macLibraryRootURL(
+            homeDirectory: home,
+            specifiedPath: "~/Music/Specified",
+            directoryExists: { probedPath = $0.path; return true }
+        )
+        // 传给 directoryExists 的必须是展开后的注入 home 路径（不是真实 ~）
+        #expect(probedPath == "/Users/injected/Music/Specified")
+        #expect(url.path == "/Users/injected/Music/Specified")
+    }
 }

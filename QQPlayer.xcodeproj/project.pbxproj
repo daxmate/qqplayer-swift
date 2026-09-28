@@ -198,6 +198,7 @@
 		3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */; };
 		8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */; };
 		FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */; };
+		9752DED0CD054BB0A521127C /* MacLibraryRootSingleSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -445,6 +446,7 @@
 		9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncLastResultStoreTests.swift; sourceTree = "<group>"; };
 		99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibrarySelectionTests.swift; sourceTree = "<group>"; };
 		7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FolderPlaylistRemovalTests.swift; sourceTree = "<group>"; };
+		5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryRootSingleSourceContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -467,6 +469,7 @@
 				Mac/MacImportService.swift,
 				Mac/MacKaraokeControlBar.swift,
 				Mac/MacKeyboardShortcuts.swift,
+				Mac/MacLibraryRoot.swift,
 				"Mac/MacLibraryView+Content.swift",
 				"Mac/MacLibraryView+Data.swift",
 				"Mac/MacLibraryView+Sidebar.swift",
@@ -600,6 +603,7 @@
 				Mac/MacImportService.swift,
 				Mac/MacKaraokeControlBar.swift,
 				Mac/MacKeyboardShortcuts.swift,
+				Mac/MacLibraryRoot.swift,
 				"Mac/MacLibraryView+Content.swift",
 				"Mac/MacLibraryView+Data.swift",
 				"Mac/MacLibraryView+Sidebar.swift",
@@ -1230,6 +1234,7 @@
 				9BD5A76C6B90485E8143813D /* SyncLastResultStoreTests.swift */,
 				99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */,
 				7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */,
+				5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1726,6 +1731,7 @@
 				3D29DE293ED04F7FB817D28C /* SyncLastResultStoreTests.swift in Sources */,
 				8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */,
 				FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */,
+				9752DED0CD054BB0A521127C /* MacLibraryRootSingleSourceContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

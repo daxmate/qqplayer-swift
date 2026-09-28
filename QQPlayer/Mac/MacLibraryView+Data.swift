@@ -95,8 +95,8 @@ extension MacLibraryView {
 
     // MARK: - FSEvents 实时监控（web 版 watchdog 对齐，2026-09-03 B 组）
 
-    /// 启动/重启曲库文件夹实时监控。监控根 = 当前配置文件夹集合
-    /// （默认 ~/Music/QQPlayer + 设置页添加的外部文件夹，StateManager 归一）。
+    /// 启动/重启曲库文件夹实时监控。监控根 = 曲库**唯一地址**（2026-09-28 单根收口；
+    /// `StateManager.getMusicFolderURLs()` 已返回单元素，本处自动跟随）。
     /// 分片：跨文件可见（原 private）
     func startFolderMonitoring() {
         let folders = services.stateManager.getMusicFolderURLs()

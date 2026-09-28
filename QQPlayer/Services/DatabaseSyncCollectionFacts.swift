@@ -49,16 +49,14 @@ struct DatabaseSyncCollectionFacts: SyncCollectionFactsProviding {
         SyncContentHashResolver(database: database, libraryRoot: libraryRoot)
     }
 
-    /// 缺省曲库根：macOS = `~/Music/QQPlayer`（与 `MacSyncLibraryHost` 同源）；
+    /// 缺省曲库根：macOS = 曲库唯一地址（`MacLibraryRoot`：默认 ~/Music/QQPlayer 或用户指定）；
     /// iOS = 沙盒 `Documents/Music`（2026-09-22 曲库文件夹化起：曲库根不再是容器 Documents，
     /// 而是其下的 Music 子目录）。
     /// 本类型是共享 Core（iOS 单测 target 也要编它），所以默认值必须分平台——
     /// `FileManager.homeDirectoryForCurrentUser` 在 iOS 上是 unavailable API。
     static var defaultLibraryRoot: URL {
         #if os(macOS)
-            MusicFolderResolver.macDefaultFolderURL(
-                homeDirectory: FileManager.default.homeDirectoryForCurrentUser
-            )
+            MacLibraryRoot.resolvedRootURL
         #else
             MusicFolderResolver.iosMusicLibraryDirectoryURL()
         #endif

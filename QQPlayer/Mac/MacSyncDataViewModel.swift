@@ -135,10 +135,13 @@ final class MacSyncDataViewModel: ObservableObject {
 
     /// 不能开始的原因（可开始 / 运行中 = nil）。目标离线时返回 nil —— 「等待 <名字> 上线」
     /// 需要设备名，由视图层的目标状态行（唯一渲染）给出，不在这里拼字符串。
+    /// ⚠️ `.libraryUnavailable`（连上了但本机曲库不可用）单独成档：不能说成「请先连接 iPhone」。
     func unavailableReason(for targetStatus: SyncDeviceTargetStatus) -> String? {
         switch dataAvailability(for: targetStatus) {
         case .ready, .targetOffline: return nil
         case .alreadyRunning: return "sync_run_data_reason_already_running".localized
+        // 连上了但本机曲库不可用 ≠ 没连上：不能再说「请先连接 iPhone」。
+        case .libraryUnavailable: return "sync_run_reason_library_unavailable".localized
         default: return "sync_run_data_reason_not_connected".localized
         }
     }

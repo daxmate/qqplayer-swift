@@ -1050,6 +1050,7 @@
 "sync_peer_summary_unknown" = "%@ 曲库大小暂不可用。";
 "sync_peer_retry" = "重试";
 "sync_peer_error_not_connected" = "尚未连接 iPhone。";
+"sync_peer_error_library_unavailable" = "这台 Mac 的曲库目录不可用。";
 "sync_peer_error_session" = "连接已断开，请重新连接后再试。";
 "sync_peer_error_timeout" = "iPhone 没有及时响应。";
 "sync_peer_error_cancelled" = "请求已取消。";

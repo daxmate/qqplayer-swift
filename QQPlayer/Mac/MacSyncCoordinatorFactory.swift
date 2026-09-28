@@ -8,8 +8,8 @@
 //  `SyncCollectionSyncCoordinator`（R3a 编排引擎，本身不含任何装配知识）。
 //
 //  ⚠️ 曲库根**只允许一个事实源**（封面解析散落 5 处的教训）：本文件统一走
-//  `MusicFolderResolver.macDefaultFolderURL(homeDirectory:)`（与 `MacSyncLibraryHost`
-//  的默认曲库根同源），绝不在这里另写一份路径拼装。
+//  `MacLibraryRoot.resolvedRootURL`（曲库唯一地址；与 `MacSyncLibraryHost` 的默认根同源），
+//  绝不在这里另写一份路径拼装。
 //
 //  装配口径与 `MacSyncLibraryHost.init` 完全一致：
 //  - descriptor：`SyncLocalLibraryDescriptor.live(libraryRoot:)`（默认 database /
@@ -56,9 +56,7 @@ enum MacSyncCoordinatorFactory {
         make(
             session: session,
             selection: selection,
-            libraryRoot: MusicFolderResolver.macDefaultFolderURL(
-                homeDirectory: FileManager.default.homeDirectoryForCurrentUser
-            )
+            libraryRoot: MacLibraryRoot.resolvedRootURL
         )
     }
 
