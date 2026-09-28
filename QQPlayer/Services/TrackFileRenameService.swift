@@ -112,12 +112,14 @@ enum TrackFileRenameService {
                 fileManager: fileManager
             )
             appendLog(
-                event: "renamed",
-                sourceURL: sourceURL,
-                targetURL: targetURL,
-                libraryRoot: libraryRoot,
-                stableId: track.stableId,
-                timestamp: timestamp,
+                RenameLogEntry(
+                    event: "renamed",
+                    sourceURL: sourceURL,
+                    targetURL: targetURL,
+                    libraryRoot: libraryRoot,
+                    stableId: track.stableId,
+                    timestamp: timestamp
+                ),
                 fileManager: fileManager
             )
             AppLog.info(.general, "📛 rename: \(currentName) → \(canonicalName)")
@@ -143,12 +145,14 @@ enum TrackFileRenameService {
                 fileManager: fileManager
             )
             appendLog(
-                event: "deduped",
-                sourceURL: sourceURL,
-                targetURL: targetURL,
-                libraryRoot: libraryRoot,
-                stableId: track.stableId,
-                timestamp: timestamp,
+                RenameLogEntry(
+                    event: "deduped",
+                    sourceURL: sourceURL,
+                    targetURL: targetURL,
+                    libraryRoot: libraryRoot,
+                    stableId: track.stableId,
+                    timestamp: timestamp
+                ),
                 fileManager: fileManager
             )
             AppLog.info(.general, "📛 dedupe: \(currentName) 与 \(canonicalName) 内容一致，源文件已归档至备份")
@@ -196,25 +200,27 @@ enum TrackFileRenameService {
         return formatter.string(from: date)
     }
 
+    /// 台账条目（收束参数，避免超长参数列表）。
+    private struct RenameLogEntry {
+        var event: String
+        var sourceURL: URL
+        var targetURL: URL
+        var libraryRoot: URL
+        var stableId: String
+        var timestamp: Date
+    }
+
     /// 追加一行改名台账（ISO8601 时间 + 旧/新相对路径 + stableId）。台账写入失败只告警，不抛出
     /// （文件已改名，日志失败不该把成功动作变成异常）。
-    private static func appendLog(
-        event: String,
-        sourceURL: URL,
-        targetURL: URL,
-        libraryRoot: URL,
-        stableId: String,
-        timestamp: Date,
-        fileManager: FileManager
-    ) {
-        let logURL = renameLogURL(forLibraryRoot: libraryRoot)
-        let stamp = ISO8601DateFormatter().string(from: timestamp)
+    private static func appendLog(_ entry: RenameLogEntry, fileManager: FileManager) {
+        let logURL = renameLogURL(forLibraryRoot: entry.libraryRoot)
+        let stamp = ISO8601DateFormatter().string(from: entry.timestamp)
         let line = [
             stamp,
-            "\(event)",
-            relativePath(of: sourceURL, libraryRoot: libraryRoot),
-            relativePath(of: targetURL, libraryRoot: libraryRoot),
-            stableId,
+            entry.event,
+            relativePath(of: entry.sourceURL, libraryRoot: entry.libraryRoot),
+            relativePath(of: entry.targetURL, libraryRoot: entry.libraryRoot),
+            entry.stableId,
         ].joined(separator: "\t") + "\n"
         do {
             try fileManager.createDirectory(
