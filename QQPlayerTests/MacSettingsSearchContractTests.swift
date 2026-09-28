@@ -46,6 +46,7 @@ enum MacSettingsSearchContract {
     /// 设置页源码 = 契约扫描范围（锚点标记只能出现在这些文件里）
     static let settingsPageFiles: [String] = [
         "QQPlayer/Mac/MacSettingsView.swift",
+        "QQPlayer/Mac/MacLibrarySettingsView.swift",
         "QQPlayer/Mac/MacScrapeSettingsView.swift",
         "QQPlayer/Mac/MacDesktopWindowsSettingsView.swift",
         "QQPlayer/Mac/MacOnlineSettingsView.swift",
