@@ -58,6 +58,7 @@ enum MusicDirectoryScanner {
                 return musicFiles
             }
             for fileURL in entries {
+                if LibraryFileNaming.isRenameBackupPathComponent(fileURL.lastPathComponent) { continue }
                 let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
                 guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else { continue }
                 if enabledExtensions.contains(fileURL.pathExtension.lowercased()) {
@@ -75,6 +76,12 @@ enum MusicDirectoryScanner {
             return musicFiles
         }
         for case let fileURL as URL in enumerator {
+            // 改名备份目录（`.qqplayer-rename-backup` / `*-rename-backup`）一律排除，
+            // 不下降、不收录：否则备份里的音频会被当曲目重新收录。
+            if LibraryFileNaming.isRenameBackupPathComponent(fileURL.lastPathComponent) {
+                enumerator.skipDescendants()
+                continue
+            }
             let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
             guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else { continue }
             if enabledExtensions.contains(fileURL.pathExtension.lowercased()) {

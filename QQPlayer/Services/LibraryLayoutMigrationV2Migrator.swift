@@ -373,8 +373,10 @@ final class LibraryLayoutMigrationV2Migrator: @unchecked Sendable {
                 ) else {
                     return nil
                 }
-                return entries.map { entry in
-                    LibraryLayoutMigrationV2Planner.RootEntry(
+                return entries.compactMap { entry in
+                    // 改名备份目录不参与布局迁移（备份根 = 曲库根同级；见 LibraryFileNaming）。
+                    guard !LibraryFileNaming.isRenameBackupPathComponent(entry.lastPathComponent) else { return nil }
+                    return LibraryLayoutMigrationV2Planner.RootEntry(
                         name: entry.lastPathComponent,
                         isDirectory: (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
                     )
@@ -403,7 +405,10 @@ final class LibraryLayoutMigrationV2Migrator: @unchecked Sendable {
         ) else {
             return []
         }
-        return entries.map { entry in
+        return entries.compactMap { entry in
+            // 改名备份根（`.qqplayer-rename-backup`）不是待搬条目：本枚举含隐藏项，
+            // 不排除的话备份会被布局迁移搬进 `.qqplayer/`（备份外移 + 丢失可回退性）。
+            guard !LibraryFileNaming.isRenameBackupPathComponent(entry.lastPathComponent) else { return nil }
             let isDirectory = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             return LibraryLayoutMigrationV2Planner.RootEntry(
                 name: entry.lastPathComponent, isDirectory: isDirectory

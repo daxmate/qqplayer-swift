@@ -200,6 +200,8 @@
 		FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */; };
 		9752DED0CD054BB0A521127C /* MacLibraryRootSingleSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */; };
 		00008AF71D804FFFB5BEEE8B /* MacTrackListViewLocateScrollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */; };
+		70AC03A647234C58A30572F2 /* LibraryFileNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */; };
+		81D5A6EF275B4799B3F816A3 /* TrackFileRenameServiceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -449,6 +451,8 @@
 		7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FolderPlaylistRemovalTests.swift; sourceTree = "<group>"; };
 		5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryRootSingleSourceContractTests.swift; sourceTree = "<group>"; };
 		20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackListViewLocateScrollTests.swift; sourceTree = "<group>"; };
+		0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryFileNamingTests.swift; sourceTree = "<group>"; };
+		16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackFileRenameServiceContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -744,6 +748,8 @@
 				Services/IndexingGate.swift,
 				Services/InterruptionDiagnostics.swift,
 				Services/KaraokeController.swift,
+				Services/LibraryFileNaming.swift,
+				"Services/LibraryIndexer+RenameNormalize.swift",
 				Services/LibraryIndexer.swift,
 				"Services/LibraryIndexer+Parsing.swift",
 				"Services/LibraryIndexer+Scanning.swift",
@@ -830,6 +836,7 @@
 				Services/TagRenameLogic.swift,
 				Services/TagWriterService.swift,
 				Services/TrackDeletionService.swift,
+				Services/TrackFileRenameService.swift,
 				Services/TrackIdentityMigration.swift,
 				Services/TraditionalToSimplifiedMap.swift,
 				Services/WhatsNew.swift,
@@ -1243,6 +1250,8 @@
 				7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */,
 				5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */,
 				20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */,
+				0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */,
+				16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1741,6 +1750,8 @@
 				FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */,
 				9752DED0CD054BB0A521127C /* MacLibraryRootSingleSourceContractTests.swift in Sources */,
 				00008AF71D804FFFB5BEEE8B /* MacTrackListViewLocateScrollTests.swift in Sources */,
+				70AC03A647234C58A30572F2 /* LibraryFileNamingTests.swift in Sources */,
+				81D5A6EF275B4799B3F816A3 /* TrackFileRenameServiceContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

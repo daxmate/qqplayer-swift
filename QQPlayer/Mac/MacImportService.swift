@@ -72,9 +72,12 @@ enum MacImportService {
             }
 
             do {
+                // 导入落盘名 = 源文件自身标签渲染的曲库规范名（复用 LibraryFileNaming =
+                // TagRenameLogic 唯一渲染实现）；不可渲染 → 回落源文件名（MacImportNaming 语义）。
+                let preferredName = await canonicalImportName(for: url) ?? url.lastPathComponent
                 let destination = MacImportNaming.uniqueDestinationURL(
                     in: destinationDirectory,
-                    sourceName: url.lastPathComponent
+                    sourceName: preferredName
                 )
                 try fileManager.copyItem(at: url, to: destination)
                 MacScanLogger.log("import: copied \(url.lastPathComponent) → \(destination.path)")
@@ -113,5 +116,20 @@ enum MacImportService {
         NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
 
         return result
+    }
+
+    /// 导入落盘首选名：用**源文件自身标签**渲染曲库规范名（复用 `LibraryFileNaming`，
+    /// 其内部即 `TagRenameLogic` 唯一渲染实现）。不可渲染（无扩展名 / 空 artist+title /
+    /// 标签解析失败）→ 返回 nil，调用方回落源文件名（既有 `MacImportNaming` 语义）。
+    /// 目标被占时的 `(2)` 避让由 `MacImportNaming.uniqueDestinationURL` 统一处理（不新增第二实现）。
+    private static func canonicalImportName(for url: URL) async -> String? {
+        let ext = url.pathExtension
+        guard !ext.isEmpty else { return nil }
+        guard let metadata = try? await AudioMetadataParser.parseMetadata(from: url) else { return nil }
+        return LibraryFileNaming.canonicalFileName(
+            artist: metadata.artist,
+            title: metadata.title,
+            ext: "." + ext.lowercased()
+        )
     }
 }

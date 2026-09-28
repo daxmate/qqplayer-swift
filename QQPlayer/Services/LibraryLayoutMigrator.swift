@@ -283,6 +283,9 @@ final class LibraryLayoutMigrator: @unchecked Sendable {
         }
 
         for entry in entries {
+            // 改名备份目录（`.qqplayer-rename-backup`）不是待搬曲目/旧文件 → 不参与布局迁移
+            // （LibraryFileNaming 是排除口径的单一事实源；备份里是归档副本，搬动等于丢失可回退性）。
+            guard !LibraryFileNaming.isRenameBackupPathComponent(entry.lastPathComponent) else { continue }
             let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
             let size = Int64(values?.fileSize ?? 0)
             if values?.isDirectory == true {

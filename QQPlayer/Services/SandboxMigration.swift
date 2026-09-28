@@ -284,9 +284,19 @@ enum CloudCopyArchiver {
             ) else { return [] }
 
             var urls: [URL] = []
-            for case let url as URL in enumerator
-                where LibraryAudioFormats.allSupported.contains(url.pathExtension.lowercased()) {
-                urls.append(url)
+            for case let url as URL in enumerator {
+                // 备份目录一律排除（不下降、不收录）：
+                //  · `_migrated-backup/` = 本迁移器自己归档的 iCloud 副本（旧坑：未排除 → 备份会被重新收录）
+                //  · `*-rename-backup` = 改名服务的备份根（LibraryFileNaming 的单一事实源）
+                let component = url.lastPathComponent
+                if component == CloudCopyArchiver.backupDirectoryName
+                    || LibraryFileNaming.isRenameBackupPathComponent(component) {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                if LibraryAudioFormats.allSupported.contains(url.pathExtension.lowercased()) {
+                    urls.append(url)
+                }
             }
             return urls
         }

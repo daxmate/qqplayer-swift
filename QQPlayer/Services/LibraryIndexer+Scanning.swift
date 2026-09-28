@@ -73,6 +73,15 @@ extension LibraryIndexer {
             await FileCleanupManager.shared.reconcileMissingFiles(in: rootExists ? [musicDirectory] : [])
             postPendingLibraryRefresh()
 
+            // 索引自愈：按文件自身标签规范化文件名（与 macOS 端同一实现）。
+            // 备份/台账目录在扫描与索引侧均已排除（见 MusicDirectoryScanner / LibraryFileNaming）。
+            let renameReport = await runRenameNormalizationSweep(libraryRoot: musicDirectory)
+            if renameReport.didChangeAnything {
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
+                }
+            }
+
             await MainActor.run {
                 markScanEnded()
                 // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
@@ -218,6 +227,15 @@ extension LibraryIndexer {
                 guard generation == indexingGeneration else { return }
                 await FileCleanupManager.shared.reconcileMissingFiles(in: folders)
                 postPendingLibraryRefresh()
+
+                // 索引自愈：按文件自身标签规范化文件名（与 iOS 端同一实现）。
+                // 曲库根取 Mac 唯一入口 `MacLibraryRoot.resolvedRootURL`（备份根 = 其父目录）。
+                let renameReport = await runRenameNormalizationSweep(
+                    libraryRoot: MacLibraryRoot.resolvedRootURL
+                )
+                if renameReport.didChangeAnything {
+                    NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
+                }
 
                 markScanEnded()
                 // 主扫跑到这里 = 曲库行已建立（空库也算终态）→ 开 changeLog 同步前置门。
