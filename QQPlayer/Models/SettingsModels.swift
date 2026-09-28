@@ -190,6 +190,8 @@ struct HomeSectionItem: Codable, Identifiable, Equatable {
 /// `backgroundColorChoice`（防字段复活 = 防第二份配色语义）。
 private enum LegacyCodingKeys: String, CodingKey {
     case backgroundColorChoice
+    /// 曲库多根列表（M2 退役；**只读兼容**：非空时取首项迁移到 `libraryRoot`）。
+    case libraryFolders
 }
 
 struct DeleteSettings: Codable {
@@ -207,8 +209,11 @@ struct DeleteSettings: Codable {
     var dsdPlaybackMode: DSDPlaybackMode = .pcm
     var deleteFromLibraryOnly: Bool = true
     var lastLibraryScanDate: Date?
-    /// macOS 曲库文件夹列表（用户添加的外部歌曲文件夹；空 = 默认 ~/Music/QQPlayer）
-    var libraryFolders: [String] = []
+    /// 曲库唯一地址（macOS）：空串 = 默认 `~/Music/QQPlayer`；非空 = 用户指定的曲库目录。
+    /// 这是「曲库只能有一个地址」的设置落点（用户 2026-09-28 拍板：**不接受多根**）。
+    /// 解析时指定的目录**不存在 → 回退默认**（判定与 IO 唯一入口 = `MacLibraryRoot`）。
+    /// M2 起替代旧的多根 `libraryFolders`（已退役，只保留解码兼容，**不再写入**）。
+    var libraryRoot: String = ""
     /// 曲库收录的音频扩展名（小写不带点，web 版「文件类型」chips 对齐）。
     /// 默认全部支持格式；取消某格式后重扫会从曲库移除该格式曲目
     /// （文件保留在磁盘，勾回重扫即恢复——web 版扫描缓存语义对齐）。
@@ -312,7 +317,14 @@ struct DeleteSettings: Codable {
         // should always be an explicit opt-in
         deleteFromLibraryOnly = try container.decodeIfPresent(Bool.self, forKey: .deleteFromLibraryOnly) ?? true
         lastLibraryScanDate = try container.decodeIfPresent(Date.self, forKey: .lastLibraryScanDate)
-        libraryFolders = try container.decodeIfPresent([String].self, forKey: .libraryFolders) ?? []
+        // 曲库唯一地址（M2 单值化）：新字段缺省而旧多根 `libraryFolders` 非空 → 取**首项**迁移
+        // （旧值多于一项目时其余丢弃——用户拍板「不接受多根」）。旧字段不再写回（只读兼容）。
+        if let storedLibraryRoot = try container.decodeIfPresent(String.self, forKey: .libraryRoot) {
+            libraryRoot = storedLibraryRoot
+        } else {
+            let legacyFolders = try legacyContainer.decodeIfPresent([String].self, forKey: .libraryFolders) ?? []
+            libraryRoot = legacyFolders.first ?? ""
+        }
         // 兼容旧数据/未配置：decode 失败或为空列表时回落默认全集
         // （空列表在旧格式里可能表示「未设置」，与「用户显式清空」区分——
         // 保存路径保证至少保留一种，见 MacSettingsView 文件类型 chips）
