@@ -19,9 +19,13 @@
 //  行为（严格按序，见 `rename(track:artist:title:libraryRoot:...)`）：
 //  1. 渲染规范名；空值 → `.notRenameable`
 //  2. 同名（NFC / 去扩展名）→ `.unchanged`（幂等）
-//  3. **源与目标是同一个文件**（仅大小写差异；大小写不敏感卷上 `fileExists` 会命中源
-//     文件本身）→ **两段式改名** `source → 同目录临时名 → target`，**绝不进 dedupe**
-//     → `.renamed`（唯一副本不得被归档；见 `isSameFile`）
+//  3. **源与目标是同一个文件**：
+//     - 两名**只差大小写**（大小写不敏感卷上的同一目录项）→ **两段式改名**
+//       `source → 同目录临时名 → target`，**绝不进 dedupe** → `.renamed`
+//       （唯一副本不得被归档；见 `isSameFile`）
+//     - 同 inode 但名字**差异不止大小写**（**硬链接**：两个目录项、同一数据）→
+//       `.skippedTargetConflict`（保守跳过 + 日志；**不得归档、不得抛出**）
+//       ——2026-09-28 批 B 收窄
 //  4. 目标不存在 → 纯 `moveItem` + `moveTrack` 迁引用 → `.renamed`
 //  5. 目标存在：两侧 `content_hash` 相同 → 去重（归档源文件 + 引用并入目标 + 删源行）
 //     → `.deduped`；否则 `.skippedTargetConflict`（不改、不覆盖、**不加 `(2)`**）
@@ -114,9 +118,21 @@ enum TrackFileRenameService {
         let directory = sourceURL.deletingLastPathComponent()
         let targetURL = directory.appendingPathComponent(canonicalName, isDirectory: false)
 
-        // 3. 源与目标是**同一个文件**（大小写不敏感卷上的仅大小写差异）：
-        //    绝不进 dedupe（唯一副本不得被归档）→ 两段式改名。
+        // 3. 源与目标是**同一个文件**：分两种情形（批 A″ + 批 B 收窄）——
+        //    - 两名只差大小写（大小写不敏感卷上的同一目录项）→ **两段式改名**；
+        //    - 同 inode 但名字差异不止大小写（**硬链接**：两个目录项、同一数据）→
+        //      **保守跳过** `.skippedTargetConflict`：不得归档（归档会杀掉一个目录项，
+        //      而 dedupe 的语义是「同内容两份文件」），也不得抛出（两段式第二段必然
+        //      失败：目标目录项真的存在）。
         if isSameFile(sourceURL, targetURL, fileManager: fileManager) {
+            guard LibraryFileNaming.isSameNameIgnoringCase(canonicalName, currentName) else {
+                AppLog.info(
+                    .general,
+                    "📛 skip-conflict: \(currentName) 与 \(canonicalName) 是同一文件（硬链接），"
+                        + "但名字差异不止大小写（保留两侧目录项）"
+                )
+                return .skippedTargetConflict(existingPath: targetURL.path)
+            }
             return try renameCaseOnlySameFile(
                 CaseOnlyRenameRequest(
                     stableId: track.stableId,

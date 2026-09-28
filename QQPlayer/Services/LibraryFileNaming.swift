@@ -71,6 +71,17 @@ enum LibraryFileNaming {
         return isSameName(baseA, baseB)
     }
 
+    /// 仅大小写差异判定（Unicode 归一后**大小写不敏感**比较）。
+    ///
+    /// 用途（2026-09-28 批 B）：大小写不敏感卷上，「源与目标是同一个文件」并不等于
+    /// 「两者只差大小写」——**硬链接**（同 inode、两个目录项）也满足「同一文件」，
+    /// 但名字差异可以远超大小写。两个名字只差大小写时才允许走**两段式改名**
+    /// （那是唯一能让大小写真的改变的路径）；否则只能保守跳过（跳过、不得归档）。
+    static func isSameNameIgnoringCase(_ a: String, _ b: String) -> Bool {
+        a.precomposedStringWithCanonicalMapping.lowercased()
+            == b.precomposedStringWithCanonicalMapping.lowercased()
+    }
+
     // MARK: - 改名备份（扫描/索引必须排除）
 
     /// 改名备份根目录名。落在**曲库根同级**（`<libraryRoot>/../`）= 曲库之外、App 沙盒内。

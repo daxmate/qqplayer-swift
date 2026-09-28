@@ -418,6 +418,65 @@ struct LibraryFileNamingTests {
         #expect(TrackFileRenameService.isSameFile(a, a, fileManager: fm))
     }
 
+    // MARK: - 批 B 护栏：硬链接（同 inode、名字差异不止大小写）不得走 dedupe
+
+    @Test("批 B：硬链接（同 inode、名字差异不止大小写）→ skippedTargetConflict（不得 deduped、不得抛出）")
+    func hardLinkWithDifferentNamesSkipsInsteadOfDedupe() throws {
+        let library = try makeLibrary()
+        let manager = try makeManager()
+        // 硬链接：两个目录项、同一 inode（数据一份）。大小写敏感 / 不敏感卷上都成立。
+        let source = try write("Track.mp3", bytes: [7, 7, 7], in: library)
+        let target = library.appendingPathComponent("Artist - Track.mp3")
+        try FileManager.default.linkItem(at: source, to: target)
+        let track = try insertTrack(manager, path: source.path)
+
+        // 前置断言：确实是「同一文件」（否则本用例没测到要测的分支）
+        #expect(
+            TrackFileRenameService.isSameFile(source, target),
+            "硬链接必须被 isSameFile 判为同一文件（否则测试没覆盖目标分支）"
+        )
+        #expect(
+            !LibraryFileNaming.isSameNameIgnoringCase("Artist - Track.mp3", "Track.mp3"),
+            "硬链接的两个名字差异不止大小写"
+        )
+
+        let outcome = try TrackFileRenameService.rename(
+            track: track, artist: "Artist", title: "Track",
+            libraryRoot: library, databaseManager: manager
+        )
+
+        // 1. 保守跳过（不得抛出：两段式第二段必然失败——目标目录项真的存在）
+        #expect(outcome == .skippedTargetConflict(existingPath: target.path))
+
+        // 2. 回归钉住：绝不得走 dedupe（归档会杀掉同 inode 的另一个目录项）
+        if case .deduped = outcome {
+            Issue.record("硬链接被误判为「同内容两份文件」⇒ 归档杀掉了同 inode 的另一个目录项")
+        }
+
+        // 3. 两个目录项均完好、字节零改动
+        let entries = try FileManager.default.contentsOfDirectory(atPath: library.path).sorted()
+        #expect(entries == ["Artist - Track.mp3", "Track.mp3"])
+        #expect(try Data(contentsOf: source) == Data([7, 7, 7]))
+        #expect(try Data(contentsOf: target) == Data([7, 7, 7]))
+
+        // 4. 库行仍在原路径（未被迁移到不存在的目标）
+        #expect(try manager.getTrack(byStableId: track.stableId)?.path == source.standardizedFileURL.path)
+
+        // 5. 备份根为空（未归档任何文件；台账不是归档物）
+        let backupRoot = TrackFileRenameService.backupRoot(forLibraryRoot: library)
+        let archived = (try? FileManager.default.contentsOfDirectory(atPath: backupRoot.path)) ?? []
+        #expect(!archived.contains { $0 != LibraryFileNaming.renameLogFileName })
+    }
+
+    @Test("批 B：仅大小写差异判据（isSameNameIgnoringCase，Unicode 归一 + 大小写不敏感）")
+    func sameNameIgnoringCasePredicate() {
+        #expect(LibraryFileNaming.isSameNameIgnoringCase("Count on Me.mp3", "Count On Me.mp3"))
+        #expect(!LibraryFileNaming.isSameNameIgnoringCase("Artist - Track.mp3", "Track.mp3"))
+        #expect(!LibraryFileNaming.isSameNameIgnoringCase("a.mp3", "a.flac"))
+        // NFC / NFD 等价（与本类型其它判据同口径）
+        #expect(LibraryFileNaming.isSameNameIgnoringCase("Café.mp3", "Cafe\u{0301}.mp3"))
+    }
+
     // MARK: - 落库口径 · 回归钉住 / 结构性差异（service 级）
 
     @Test("回归钉住：磁盘简体名 + 繁体标签 → unchanged（不得把简体改成繁体）")
