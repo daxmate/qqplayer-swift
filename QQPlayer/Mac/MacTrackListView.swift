@@ -269,8 +269,11 @@ struct MacTrackListView: View {
                 play(row.track)
             }
         }
+        // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
+        // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
+        .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false))
         .onChange(of: locateRequestID) { _, _ in
-            // 定位当前播放：选中当前行（Table 无公开 scrollTo，选中高亮定位）
+            // 定位当前播放：选中当前行（滚动由上面的 MacTableLocateScroller 随后触发）
             if let activeTrackId {
                 selectedRows = [activeTrackId]
             }
@@ -279,6 +282,13 @@ struct MacTrackListView: View {
 
     /// 定位请求信号：按钮点击自增触发 onChange
     @State private var locateRequestID = 0
+
+    /// 「定位当前播放」的滚动目标行（**显示行序**，因 Table 显示的是排序后的 displayedRows）；
+    /// nil = 当前播放曲不在本列表（被过滤/切了列表）→ 不滚，静默 no-op。
+    private var locateRow: Int? {
+        guard let activeTrackId else { return nil }
+        return displayedRows.firstIndex { $0.id == activeTrackId }
+    }
 
     private func locateActiveTrack() {
         locateRequestID += 1

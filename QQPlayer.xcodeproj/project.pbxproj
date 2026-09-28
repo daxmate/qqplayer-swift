@@ -199,6 +199,7 @@
 		8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */; };
 		FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */; };
 		9752DED0CD054BB0A521127C /* MacLibraryRootSingleSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */; };
+		00008AF71D804FFFB5BEEE8B /* MacTrackListViewLocateScrollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -447,6 +448,7 @@
 		99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibrarySelectionTests.swift; sourceTree = "<group>"; };
 		7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FolderPlaylistRemovalTests.swift; sourceTree = "<group>"; };
 		5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacLibraryRootSingleSourceContractTests.swift; sourceTree = "<group>"; };
+		20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackListViewLocateScrollTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -527,6 +529,7 @@
 				"Mac/MacTagEditorView+RenameSave.swift",
 				"Mac/MacTagEditorView+Scrape.swift",
 				Mac/MacTagEditorView.swift,
+				"Mac/MacTrackListView+LocateScroll.swift",
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
 				Mac/SyncDataPane.swift,
@@ -662,6 +665,7 @@
 				"Mac/MacTagEditorView+RenameSave.swift",
 				"Mac/MacTagEditorView+Scrape.swift",
 				Mac/MacTagEditorView.swift,
+				"Mac/MacTrackListView+LocateScroll.swift",
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
 				Mac/SyncDataPane.swift,
@@ -768,6 +772,7 @@
 				Services/MacSpectrumDSP.swift,
 				Services/MacSyncClientPoolPolicy.swift,
 				Services/MP4EmptyCovrStripper.swift,
+				Services/MacTableScrollGeometry.swift,
 				Services/MusicBrainzClient.swift,
 				Services/MusicDirectoryScanner.swift,
 				Services/MusicFolderResolver.swift,
@@ -1237,6 +1242,7 @@
 				99A2FCFDA9AE4F0193DBEF57 /* MacLibrarySelectionTests.swift */,
 				7D5F55C6752344748C0D7222 /* FolderPlaylistRemovalTests.swift */,
 				5170806B814B4575B710E851 /* MacLibraryRootSingleSourceContractTests.swift */,
+				20A95700ACDB4BBEBC3D5406 /* MacTrackListViewLocateScrollTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1734,6 +1740,7 @@
 				8ACE3357187142EAB01BC3AB /* MacLibrarySelectionTests.swift in Sources */,
 				FF821A9485D942F5919D1FA6 /* FolderPlaylistRemovalTests.swift in Sources */,
 				9752DED0CD054BB0A521127C /* MacLibraryRootSingleSourceContractTests.swift in Sources */,
+				00008AF71D804FFFB5BEEE8B /* MacTrackListViewLocateScrollTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
