@@ -191,6 +191,19 @@
 "remove_folder" = "移除資料夾";
 "add_folder_prompt" = "選擇包含音樂檔案的資料夾";
 "library_folder_default_hint" = "預設曲庫：~/Music/QQPlayer（未加入資料夾時掃描此目錄）";
+"library_root" = "曲庫位置";
+"library_root_default_suffix" = "（預設）";
+"library_root_change" = "更換…";
+"library_root_change_prompt" = "選擇用來存放音樂曲庫的資料夾";
+"library_root_reset" = "恢復預設";
+"library_root_changed" = "曲庫位置已更新";
+"library_root_unavailable_hint" = "指定的曲庫位置無法使用，已恢復為預設。";
+"library_root_copy_title" = "拷貝曲庫內容？";
+"library_root_copy_message" = "是否將舊曲庫（%@）中的歌曲與設定拷貝到新位置（%@）？舊檔案會保留。";
+"library_root_copy_confirm" = "拷貝";
+"library_root_copy_decline" = "不拷貝";
+"library_root_copy_progress" = "正在拷貝… %d/%d";
+"library_root_copy_result" = "已拷貝 %d 個，跳過 %d 個，失敗 %d 個";
 "library_file_types" = "檔案類型";
 "library_file_types_footer" = "僅掃描選取的格式。取消某格式後，下次掃描會從曲庫移除該格式曲目（檔案保留在磁碟，重新勾選即恢復）。至少需保留一種格式。";
 

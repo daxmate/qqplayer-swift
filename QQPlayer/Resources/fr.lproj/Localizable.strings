@@ -101,6 +101,19 @@
 "remove_folder" = "Retirer le dossier";
 "add_folder_prompt" = "Sélectionnez les dossiers contenant de la musique";
 "library_folder_default_hint" = "Bibliothèque par défaut : ~/Music/QQPlayer (scannée si aucun dossier ajouté)";
+"library_root" = "Emplacement de la bibliothèque";
+"library_root_default_suffix" = " (par défaut)";
+"library_root_change" = "Changer…";
+"library_root_change_prompt" = "Sélectionnez le dossier qui contiendra votre bibliothèque musicale";
+"library_root_reset" = "Rétablir par défaut";
+"library_root_changed" = "Emplacement de la bibliothèque mis à jour";
+"library_root_unavailable_hint" = "L'emplacement de bibliothèque spécifié est indisponible ; rétabli sur celui par défaut.";
+"library_root_copy_title" = "Copier le contenu de la bibliothèque ?";
+"library_root_copy_message" = "Copier les morceaux et les réglages de l'ancienne bibliothèque (%@) vers le nouvel emplacement (%@) ? Les anciens fichiers sont conservés.";
+"library_root_copy_confirm" = "Copier";
+"library_root_copy_decline" = "Ne pas copier";
+"library_root_copy_progress" = "Copie… %d/%d";
+"library_root_copy_result" = "%d copiés, %d ignorés, %d échecs";
 "library_file_types" = "Types de fichiers";
 "library_file_types_footer" = "Seuls les formats sélectionnés sont scannés. Désactiver un format retire ses morceaux de la bibliothèque au prochain scan (les fichiers restent sur le disque et reviennent si réactivés). Au moins un format doit rester activé.";
 
