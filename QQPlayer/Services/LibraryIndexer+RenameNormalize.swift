@@ -9,9 +9,12 @@
 //  调 `TrackFileRenameService`（唯一改名入口）。两端同一实现是本批的核心约束
 //  —— 防止「iOS 有一份、Mac 又写一份」的第二实现。
 //
-//  为什么必须解析**文件自身标签**而不是用 DB 的 artist/title：DB 显示名做过繁简
-//  字形归一（`DatabaseManager+LibraryMigrations` 的 Script canonicalization），与
-//  文件标签可能不同（实测 53 条）——用显示名渲染会误改那批文件。
+//  取数口径（2026-09-28 22:1x 用户拍板「落库全部用简体」）：**读文件自身标签**拿到
+//  原始 artist / title（存量 53 条是「磁盘简体 + 标签繁体」，标签才是事实来源），
+//  再经 `LibraryFileNaming` 施加**落库口径规范化**（`DisplayScriptNormalizer.canonical`
+//  ——入库写入的同一入口，固定简体）后渲染——不得用随 UI 方向变的显示名
+//  （`ArtistNameNormalizer.displayName`），也不得照标签原文渲染（会把磁盘简体名
+//  改成繁体，与落库口径相反）。
 //
 //  计数与日志：每个动作由 `TrackFileRenameService` 打点（`rename:` / `dedupe:` /
 //  `skip-conflict:`），本函数再打一行汇总计数。

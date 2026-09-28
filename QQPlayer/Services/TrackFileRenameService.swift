@@ -12,8 +12,9 @@
 //  - 引用迁移**必须**走唯一入口 `DatabaseManager.moveTrack`（内部经
 //    `TrackIdentityMigration`：favorite / playlist_item / track_artist / play_history
 //    四表 + 书签 plist + 三个歌词目录 + `ArtworkMapping.plist`）。
-//  - 命名渲染**必须**走 `LibraryFileNaming.canonicalFileName`（= `TagRenameLogic`），
-//    本文件不重写模板/清洗/去重逻辑（禁第二实现）。
+//  - 命名渲染**必须**走 `LibraryFileNaming.canonicalFileName`（内部先施加落库口径
+//    规范化 `DisplayScriptNormalizer.canonical`，再交 `TagRenameLogic` 渲染）；
+//    本文件不重写繁简映射/模板/清洗/去重逻辑（禁第二实现）。
 //
 //  行为（严格按序，见 `rename(track:artist:title:libraryRoot:...)`）：
 //  1. 渲染规范名；空值 → `.notRenameable`
@@ -63,8 +64,10 @@ enum TrackFileRenameService {
     /// 按标签规范化某个曲目的文件名。**只改文件名，绝不触碰音频字节。**
     /// - Parameters:
     ///   - track: 曲库行（`path` 接受存储形态或绝对路径）
-    ///   - artist: 文件**自身标签**的 artist（不是 DB 显示名——显示名做过繁简归一，会误判）
-    ///   - title: 文件自身标签的 title
+    ///   - artist: 曲目**文件自身标签**的 artist（原始标签值；本服务内部经
+    ///     `LibraryFileNaming` 施加落库口径规范化——**不得**传入 `ArtistNameNormalizer.displayName`
+    ///     那种随 UI 方向变的显示名）
+    ///   - title: 文件自身标签的 title（同上；落库口径规范化的唯一入口在 `LibraryFileNaming`）
     ///   - libraryRoot: 曲库根（备份根 = 其父目录下的 `.qqplayer-rename-backup`）
     ///   - databaseManager: 库（引用迁移走 `moveTrack` 唯一入口）
     ///   - fileManager: Documents 根解析缝（默认 `.default` ⇒ 生产行为不变）
@@ -84,7 +87,7 @@ enum TrackFileRenameService {
         let ext = sourceURL.pathExtension
         guard !ext.isEmpty else { return .notRenameable(reason: "noExtension") }
 
-        // 1. 渲染规范名（唯一实现 = TagRenameLogic，经 LibraryFileNaming 转发）
+        // 1. 渲染规范名（落库口径归一 + 唯一渲染实现 TagRenameLogic，均经 LibraryFileNaming）
         guard let canonicalName = LibraryFileNaming.canonicalFileName(
             artist: artist,
             title: title,

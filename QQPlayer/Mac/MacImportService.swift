@@ -72,8 +72,9 @@ enum MacImportService {
             }
 
             do {
-                // 导入落盘名 = 源文件自身标签渲染的曲库规范名（复用 LibraryFileNaming =
-                // TagRenameLogic 唯一渲染实现）；不可渲染 → 回落源文件名（MacImportNaming 语义）。
+                // 导入落盘名 = 源文件标签的**落库口径规范名**（复用 LibraryFileNaming，
+                // 内部 = DisplayScriptNormalizer.canonical 归一 + TagRenameLogic 唯一渲染实现）；
+                // 不可渲染 → 回落源文件名（MacImportNaming 语义）。
                 let preferredName = await canonicalImportName(for: url) ?? url.lastPathComponent
                 let destination = MacImportNaming.uniqueDestinationURL(
                     in: destinationDirectory,
@@ -119,8 +120,10 @@ enum MacImportService {
     }
 
     /// 导入落盘首选名：用**源文件自身标签**渲染曲库规范名（复用 `LibraryFileNaming`，
-    /// 其内部即 `TagRenameLogic` 唯一渲染实现）。不可渲染（无扩展名 / 空 artist+title /
-    /// 标签解析失败）→ 返回 nil，调用方回落源文件名（既有 `MacImportNaming` 语义）。
+    /// 其内部先施加落库口径规范化 `DisplayScriptNormalizer.canonical`（固定简体、
+    /// 与 UI 语言无关），再走 `TagRenameLogic` 唯一渲染实现）。不可渲染（无扩展名 /
+    /// 空 artist+title / 标签解析失败）→ 返回 nil，调用方回落源文件名（既有
+    /// `MacImportNaming` 语义）。
     /// 目标被占时的 `(2)` 避让由 `MacImportNaming.uniqueDestinationURL` 统一处理（不新增第二实现）。
     private static func canonicalImportName(for url: URL) async -> String? {
         let ext = url.pathExtension
