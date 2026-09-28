@@ -445,7 +445,8 @@ struct MacTrackListView: View {
                 items: items,
                 environment: .live(
                     log: { MacTrashLogger.log($0) },
-                    isCancelled: { Task.isCancelled }
+                    isCancelled: { Task.isCancelled },
+                    libraryRoot: MacLibraryRoot.resolvedRootURL
                 ),
                 onProgress: { done, total in
                     DispatchQueue.main.async {

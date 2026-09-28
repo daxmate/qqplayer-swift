@@ -50,7 +50,7 @@
 //  `QQPlayerTests/TrackDeletionShapeContractTests.swift` 静态守护（白名单只留本文件）。
 //
 //  回收区（`DeleteReclaimArea`，本文件末尾）：目录名常量 / 路径派生 / 目标命名 / 移动实现**只此一份**
-//  （禁在别处再写 `.Trash` 字面量）；曲库根由调用方传（生产 = `MusicFolderResolver.syncLibraryRoot`，
+//  （禁在别处再写 `.Trash` 字面量）；曲库根由调用方传（生产 = `DatabaseSyncCollectionFacts.defaultLibraryRoot`，
 //  禁手拼 Documents 路径）；文件名里的指纹复用既有入口（`DatabaseManager.contentHashIfFilePresent`，
 //  禁新写哈希实现）——口径与复现见 `QQPlayerTests/TrackDeletionReclaimAreaTests.swift`。
 //
@@ -190,7 +190,9 @@ enum TrackDeletionService {
         /// 清 DB 引用。
         var deleteReference: @Sendable (String) throws -> Void
         /// 曲库根（回收区落点判据的基准：文件是否在根内）。
-        /// 生产 = `MusicFolderResolver.syncLibraryRoot`（iOS 侧唯一根访问器）；注入只为可测。
+        /// 生产 = `DatabaseSyncCollectionFacts.defaultLibraryRoot`（iOS = 沙盒 `Documents/Music`，
+        /// macOS = 曲库唯一地址）；Mac 生产调用点显式注入 `MacLibraryRoot.resolvedRootURL`。
+        /// 注入只为可测。
         var libraryRoot: @Sendable () -> URL
         /// 过程日志出口（Mac 写 trash.log；iOS 现状无日志出口 → 传空实现，失败仍 `print`）。
         var log: @Sendable (String) -> Void
@@ -203,7 +205,7 @@ enum TrackDeletionService {
         static func live(
             log: @escaping @Sendable (String) -> Void,
             isCancelled: @escaping @Sendable () -> Bool = { false },
-            libraryRoot: URL = MusicFolderResolver.syncLibraryRoot
+            libraryRoot: URL = DatabaseSyncCollectionFacts.defaultLibraryRoot
         ) -> Environment {
             Environment(
                 fileExists: { FileManager.default.fileExists(atPath: $0) },
@@ -407,7 +409,7 @@ enum TrackDeletionService {
 /// 唯一入口（禁第二实现）：
 ///   · 目录名常量 `directoryName`——取 `LibraryRoot.trashDirectoryName`（目录名唯一常量入口，
 ///     本文件不再自带字面量；形状契约白名单随之为 `LibraryRoot.swift`）；
-///   · 路径派生 `url(inLibraryRoot:)`——曲库根由调用方给（生产 = `MusicFolderResolver.syncLibraryRoot`）；
+///   · 路径派生 `url(inLibraryRoot:)`——曲库根由调用方给（生产 = `DatabaseSyncCollectionFacts.defaultLibraryRoot`）；
 ///   · 目标命名 `destinationURL(in:contentHash:pathExtension:isTaken:)`（同名冲突追加 `-1` / `-2` …）；
 ///   · 移动实现 `move(_:into:)`（唯一碰磁盘的回收区动作，由 `Environment.live` 注入）。
 ///

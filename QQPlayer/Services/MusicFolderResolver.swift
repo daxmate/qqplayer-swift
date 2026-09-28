@@ -31,7 +31,13 @@ enum MusicFolderResolver {
             .appendingPathComponent("QQPlayer", isDirectory: true)
     }
 
-    /// **同步子系统的曲库根（缺省值）**：与各装配点注入的根同源。
+    /// **同步子系统的曲库根（缺省值语义）**：与各装配点注入的根同源。
+    ///
+    /// ⚠️ macOS（M2，2026-09-28）：本访问器在 macOS 返回的是**默认根**
+    /// （`macDefaultFolderURL`，不含用户指定）——它已**不再是 macOS 的生产取值点**：
+    /// macOS 消费者一律走 `MacLibraryRoot.resolvedRootURL`（唯一入口），或共享 Core 里
+    /// 的分平台缺省 `DatabaseSyncCollectionFacts.defaultLibraryRoot`。
+    /// 保留它只为「默认值语义」与 iOS 分支（iOS = 沙盒 `Documents/Music`）。
     ///
     /// 为什么要有这个访问器：同步装配点（Mac 工厂 / iOS 被动中心 / 曲库 host）都在
     /// 构造时显式注入根（测试可注入）；但**入库路径**（`DatabaseManager.upsertTrack`）

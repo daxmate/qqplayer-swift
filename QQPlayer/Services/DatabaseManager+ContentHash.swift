@@ -67,7 +67,7 @@ extension DatabaseManager {
                 let replayed = try SyncChangeLogReplay.replay(
                     pendingKey: SyncPendingKey.contentHash(hash),
                     database: self,
-                    libraryRoot: MusicFolderResolver.syncLibraryRoot
+                    libraryRoot: DatabaseSyncCollectionFacts.defaultLibraryRoot
                 )
                 if replayed > 0 {
                     if AppLog.isEnabled(.debug, .db) { AppLog.debug(.db, "🔁 Sync: 回填指纹后重放挂起变更 \(replayed) 条（hash=\(hash.prefix(12))…）") }

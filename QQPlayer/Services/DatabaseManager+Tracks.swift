@@ -98,7 +98,7 @@ extension DatabaseManager {
                     contentHash: savedTrack.contentHash,
                     absolutePath: savedTrack.path,
                     database: self,
-                    libraryRoot: MusicFolderResolver.syncLibraryRoot
+                    libraryRoot: DatabaseSyncCollectionFacts.defaultLibraryRoot
                 )
                 if replayed > 0 {
                     AppLog.info(.db, "🔁 Sync: 重放挂起变更 \(replayed) 条")
