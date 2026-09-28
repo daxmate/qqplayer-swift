@@ -187,11 +187,14 @@ enum MacSettingsCatalog {
         aliases: ["桌面歌词字号", "字号", "字体", "font", "size"]
     )
 
-    static let libraryFolders = Item(
-        id: "settings.library.folders",
+    static let libraryLocation = Item(
+        id: "settings.library.location",
         category: .library,
-        titleKey: "library_folders",
-        aliases: ["曲库文件夹", "文件夹", "目录", "扫描目录", "folder", "library folder"]
+        titleKey: "library_root",
+        aliases: [
+            "曲库位置", "曲库文件夹", "曲库目录", "曲库地址", "位置", "搬迁", "拷贝",
+            "location", "library location", "library folder",
+        ]
     )
 
     static let libraryFileTypes = Item(
@@ -297,7 +300,7 @@ enum MacSettingsCatalog {
         desktopWindowsMiniWindowButton,
         desktopWindowsMiniLyrics,
         desktopWindowsLyricFontSize,
-        libraryFolders,
+        libraryLocation,
         libraryFileTypes,
         downloadQuality,
         downloadQuarkQuality,
