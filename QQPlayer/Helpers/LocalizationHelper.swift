@@ -180,13 +180,6 @@ struct Localized {
     // MARK: - Visualizer（播放页频谱，D4 web 版 visualizerEnabled 对齐）
     static let visualizerEnabled = "visualizer_enabled".localized
 
-    // MARK: - Music Library（曲库文件夹）
-    static let libraryFolders = "library_folders".localized
-    static let addFolder = "add_folder".localized
-    static let removeFolder = "remove_folder".localized
-    static let addFolderPrompt = "add_folder_prompt".localized
-    static let libraryFolderDefaultHint = "library_folder_default_hint".localized
-
     // MARK: - Music Library File Types（文件类型，web 版 audioExts 对齐）
     static let libraryFileTypes = "library_file_types".localized
     static let libraryFileTypesFooter = "library_file_types_footer".localized
