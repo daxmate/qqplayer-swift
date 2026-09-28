@@ -272,10 +272,16 @@ def main() -> int:
                 continue
             non_symbol.append((src, msg))
 
-        # 自动补入的文件若自己也编不动 → 回退（不静默留在集合里当假绿来源）
+        # 自动补入的文件若自己也编不动 → 回退（不静默留在集合里当假绿来源）。
+        # 但「编不动」只看**无法靠补闭包解决**的错误：若该文件同时报了 cannot find
+        # / has no member 这类可解析缺口（need_origins），说明它只是「还缺提供者」，
+        # 应继续向上补闭包，而不是回退——回退会让缺口永久失解：下一轮缺口又回到
+        # 「提供者已被回退」，而该缺口已被 tried 标记 ⇒ 死锁（血例：LibraryFileNaming
+        # 报 cannot find 'TagRenameLogic' + 由它派生的泛型推断噪声，被整份回退）。
+        need_origins = {src for srcs in needs.values() for src in srcs}
         retracted: list[str] = []
         for src, _ in non_symbol:
-            if src in auto_added and src not in dead_ends:
+            if src in auto_added and src not in dead_ends and src not in need_origins:
                 dead_ends[src] = [m for s, m in entries if s == src]
                 retracted.append(src)
         if retracted:
