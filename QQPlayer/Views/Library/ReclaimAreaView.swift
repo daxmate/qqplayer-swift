@@ -13,7 +13,7 @@
 //   · 恢复 = `ReclaimRestoreService`（收录 + 清排除走 `LibraryIndexer` 唯一入口）；
 //   · 彻底删除 / 清空 = `ReclaimPurgeService`。
 //
-//  target: ios-only（macOS 侧对应 `QQPlayer/Mac/MacReclaimAreaView.swift`，共享同一套 Services）。
+// target: ios-only（macOS 侧对应 `QQPlayer/Mac/MacReclaimAreaView.swift`，共享同一套 Services）。
 //
 
 import SwiftUI
