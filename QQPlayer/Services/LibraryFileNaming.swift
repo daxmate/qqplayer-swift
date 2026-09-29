@@ -88,8 +88,15 @@ enum LibraryFileNaming {
     /// 前导点 ⇒ 目录被 `.skipsHiddenFiles` 天然忽略；显式排除见 `isRenameBackupPathComponent`。
     static let renameBackupDirectoryName = ".qqplayer-rename-backup"
 
-    /// 改名台账文件名（在备份根下；每行 `ISO8601\t旧相对路径\t新相对路径\tstableId`）。
+    /// 改名台账文件名（在备份根下；每行 `ISO8601\t事件\t旧相对路径\t新相对路径\tstableId`）。
     static let renameLogFileName = "rename-log.tsv"
+
+    /// 回收区恢复台账文件名（与改名台账**同目录、同口径**；每行
+    /// `ISO8601\trestored\t回收区源路径\t恢复后的曲库相对路径`）。
+    /// 2026-09-29 回收区管理批：恢复 = 文件从回收区搬回曲库根，属同一类「曲库文件移动」，
+    /// 故台账沿用改名台账的落点与行格式（同一备份根、可回退审计），文件名单列以避免两个
+    /// 写者并发追加同一文件。
+    static let reclaimRestoreLogFileName = "reclaim-restore-log.tsv"
 
     /// 该路径组件是否为「改名备份」目录（`...rename-backup` / `...-rename-backup`）。
     /// 扫描、目录枚举、迁移器一律据此排除——否则备份文件会被重新收录

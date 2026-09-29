@@ -1072,3 +1072,22 @@
 "sync_cover_unavailable" = "%d pochettes personnalisées illisibles";
 "sync_cover_unavailable_hint" = "Les fichiers de pochette personnalisée de ces playlists sont illisibles sur cet appareil (fichier supprimé ou chemin invalide) ; une pochette composée automatiquement est affichée.";
 "playlist_cover_unavailable" = "Fichier de pochette personnalisée illisible — pochette composée automatiquement affichée.";
+
+/* ── Corbeille de l'app (2026-09-29) ── */
+"reclaim_area" = "Corbeille de l'app";
+"reclaim_area_description" = "Les morceaux supprimés avec l'option « Retirer de la médiathèque uniquement » sont déplacés vers la corbeille de l'app (ils n'apparaissent plus dans la médiathèque). Restaurez-les ici ou supprimez-les définitivement.";
+"reclaim_area_empty" = "La corbeille de l'app est vide";
+"reclaim_area_summary" = "%d élément(s) · %@";
+"reclaim_restore" = "Restaurer";
+"reclaim_restore_selected" = "Restaurer la sélection (%d)";
+"reclaim_delete_selected" = "Supprimer définitivement la sélection (%d)";
+"reclaim_purge_all" = "Vider la corbeille";
+"reclaim_purge_confirm_title" = "Supprimer définitivement ?";
+"reclaim_purge_confirm_message" = "%d élément(s) (%@) seront supprimés définitivement. Cette action est irréversible.";
+"reclaim_purge_all_confirm_message" = "Les %d élément(s) de la corbeille (%@) seront supprimés définitivement. Cette action est irréversible.";
+"reclaim_restore_result" = "%d restauré(s), %d ignoré(s)";
+"reclaim_purge_result" = "%d supprimé(s) définitivement, %@ libérés";
+"reclaim_operation_failed" = "%d échec(s)";
+"reclaim_select_all" = "Tout sélectionner";
+"reclaim_deselect_all" = "Tout désélectionner";
+"reclaim_not_restorable" = "Non restaurable";

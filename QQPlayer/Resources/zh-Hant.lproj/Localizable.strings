@@ -1410,3 +1410,22 @@
 "sync_cover_unavailable" = "%d 個歌單的自訂封面讀不到";
 "sync_cover_unavailable_hint" = "這些歌單的封面檔案在本機讀不到（檔案已刪除或路徑失效），已改回自動合成封面。";
 "playlist_cover_unavailable" = "自訂封面檔案讀不到，已顯示自動合成封面。";
+
+/* ── 回收區（2026-09-29 回收區管理批） ── */
+"reclaim_area" = "回收區";
+"reclaim_area_description" = "「僅從媒體庫中移除」刪除的曲目會移到回收區（不再出現在媒體庫裡）。這裡可以恢復它們，或徹底刪除。";
+"reclaim_area_empty" = "回收區是空的";
+"reclaim_area_summary" = "%d 項 · %@";
+"reclaim_restore" = "恢復";
+"reclaim_restore_selected" = "恢復選中（%d）";
+"reclaim_delete_selected" = "徹底刪除選中（%d）";
+"reclaim_purge_all" = "清空回收區";
+"reclaim_purge_confirm_title" = "徹底刪除？";
+"reclaim_purge_confirm_message" = "將徹底刪除 %d 項（%@），此操作無法復原。";
+"reclaim_purge_all_confirm_message" = "將徹底刪除回收區全部 %d 項（%@），此操作無法復原。";
+"reclaim_restore_result" = "已恢復 %d 項，跳過 %d 項";
+"reclaim_purge_result" = "已徹底刪除 %d 項，釋放 %@";
+"reclaim_operation_failed" = "%d 項失敗";
+"reclaim_select_all" = "全選";
+"reclaim_deselect_all" = "取消全選";
+"reclaim_not_restorable" = "無法恢復";

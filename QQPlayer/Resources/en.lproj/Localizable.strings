@@ -1074,3 +1074,22 @@
 "sync_cover_unavailable" = "%d playlist covers can't be read";
 "sync_cover_unavailable_hint" = "These playlists' custom cover files can't be read on this device (file deleted or path no longer valid), so an auto-composed cover is shown instead.";
 "playlist_cover_unavailable" = "Custom cover file can't be read — showing the auto-composed cover.";
+
+/* ── Reclaim area (2026-09-29) ── */
+"reclaim_area" = "Reclaim Area";
+"reclaim_area_description" = "Tracks deleted with the 'Remove from library only' option are moved to the reclaim area (they no longer appear in the library). Restore them here, or delete them permanently.";
+"reclaim_area_empty" = "The reclaim area is empty";
+"reclaim_area_summary" = "%d item(s) · %@";
+"reclaim_restore" = "Restore";
+"reclaim_restore_selected" = "Restore selected (%d)";
+"reclaim_delete_selected" = "Delete selected permanently (%d)";
+"reclaim_purge_all" = "Empty reclaim area";
+"reclaim_purge_confirm_title" = "Delete permanently?";
+"reclaim_purge_confirm_message" = "This will permanently delete %d item(s) (%@). This cannot be undone.";
+"reclaim_purge_all_confirm_message" = "This will permanently delete all %d item(s) in the reclaim area (%@). This cannot be undone.";
+"reclaim_restore_result" = "Restored %d, skipped %d";
+"reclaim_purge_result" = "Permanently deleted %d item(s), freed %@";
+"reclaim_operation_failed" = "%d failed";
+"reclaim_select_all" = "Select all";
+"reclaim_deselect_all" = "Deselect all";
+"reclaim_not_restorable" = "Not restorable";
