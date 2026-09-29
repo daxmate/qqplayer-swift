@@ -182,6 +182,23 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
 
+                // 回收区（2026-09-29 回收区管理批）：查看 / 恢复 / 彻底删除
+                // （生产回收区 `<曲库根>/.Trash`；业务逻辑全在 Services，本页只做入口）。
+                Section {
+                    NavigationLink(destination: ReclaimAreaView()) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.blue)
+                                .font(.system(size: DesignTokens.font20))
+                            Text("reclaim_area".localized)
+                        }
+                    }
+                } footer: {
+                    Text("reclaim_area_description".localized)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
                 Section(Localized.playerControls) {
                     Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
                         .onChange(of: deleteSettings.showSleepTimerButton) { _, _ in

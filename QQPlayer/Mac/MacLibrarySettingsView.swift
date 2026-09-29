@@ -25,6 +25,8 @@ struct MacLibrarySettingsView: View {
     @State private var copyProgress: MacLibraryRootCopy.Progress?
     /// 最近一次动作的结果文案（拷贝完成 / 已更换 / 已恢复默认）。
     @State private var resultMessage: String?
+    /// 回收区管理弹窗（2026-09-29 回收区管理批）。
+    @State private var showReclaimArea = false
 
     var body: some View {
         Form {
@@ -89,8 +91,27 @@ struct MacLibrarySettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
+            // 回收区（2026-09-29 回收区管理批）：查看 / 恢复 / 彻底删除
+            // （生产回收区 `<曲库根>/.Trash`；业务逻辑全在 Services，本页只做入口）。
+            Section {
+                Button {
+                    showReclaimArea = true
+                } label: {
+                    Label("reclaim_area".localized, systemImage: "trash")
+                }
+            } header: {
+                Text("reclaim_area".localized)
+            } footer: {
+                Text("reclaim_area_description".localized)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showReclaimArea) {
+            MacReclaimAreaView()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
