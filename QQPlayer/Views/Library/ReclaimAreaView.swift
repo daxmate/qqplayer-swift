@@ -193,7 +193,7 @@ struct ReclaimAreaView: View {
 
     private var summaryText: String {
         "reclaim_area_summary".localized(
-            entries.count,
+            with: entries.count,
             ReclaimAreaCatalog.formattedSize(ReclaimAreaCatalog.totalByteSize(of: entries))
         )
     }
@@ -209,9 +209,9 @@ struct ReclaimAreaView: View {
         let size = ReclaimAreaCatalog.formattedSize(ReclaimAreaCatalog.totalByteSize(of: items))
         switch request {
         case .selected:
-            return "reclaim_purge_confirm_message".localized(items.count, size)
+            return "reclaim_purge_confirm_message".localized(with: items.count, size)
         case .all:
-            return "reclaim_purge_all_confirm_message".localized(items.count, size)
+            return "reclaim_purge_all_confirm_message".localized(with: items.count, size)
         }
     }
 
@@ -260,9 +260,9 @@ struct ReclaimAreaView: View {
     }
 
     private func restoreResultMessage(restored: Int, skipped: Int, failed: Int) -> String {
-        var text = "reclaim_restore_result".localized(restored, skipped)
+        var text = "reclaim_restore_result".localized(with: restored, skipped)
         if failed > 0 {
-            text += " · " + "reclaim_operation_failed".localized(failed)
+            text += " · " + "reclaim_operation_failed".localized(with: failed)
         }
         return text
     }
@@ -274,11 +274,11 @@ struct ReclaimAreaView: View {
         Task { @MainActor in
             let summary = await Task.detached { ReclaimPurgeService.purge(items) }.value
             var text = "reclaim_purge_result".localized(
-                summary.deleted,
+                with: summary.deleted,
                 ReclaimAreaCatalog.formattedSize(summary.freedBytes)
             )
             if summary.failedCount > 0 {
-                text += " · " + "reclaim_operation_failed".localized(summary.failedCount)
+                text += " · " + "reclaim_operation_failed".localized(with: summary.failedCount)
             }
             resultMessage = text
             isWorking = false

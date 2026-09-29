@@ -1,0 +1,13 @@
+# 回收区管理形状契约白名单（QQPlayerTests/ReclaimAreaShapeContractTests.swift 守护）
+#
+# 格式：路径<TAB>模式（多模式用逗号分隔）
+# 语义：源码（剥注释/字符串后）里同时出现 `ReclaimAreaEntry` 与
+#       · `moveItem(`   → 模式 `reclaim-restore`（搬运回收区条目 = 恢复）
+#       · `removeItem(` → 模式 `reclaim-purge`（删除回收区条目 = 彻底删除/清空）
+#   的文件必须登记在这里；未登记的新增即红（防「第二份恢复/清空实现」）。
+#
+# 唯一入口：
+#   恢复   → QQPlayer/Services/ReclaimRestoreService.swift
+#   清空   → QQPlayer/Services/ReclaimPurgeService.swift
+QQPlayer/Services/ReclaimRestoreService.swift	reclaim-restore
+QQPlayer/Services/ReclaimPurgeService.swift	reclaim-purge

@@ -203,6 +203,8 @@
 		70AC03A647234C58A30572F2 /* LibraryFileNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */; };
 		81D5A6EF275B4799B3F816A3 /* TrackFileRenameServiceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */; };
 		0282D9AC4E424352BCDEE3B5 /* SyncContentHashFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */; };
+		69F47FCCE24E407288D79719 /* ReclaimAreaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */; };
+		2634A84446A54518AE96B774 /* ReclaimAreaShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -455,6 +457,8 @@
 		0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryFileNamingTests.swift; sourceTree = "<group>"; };
 		16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackFileRenameServiceContractTests.swift; sourceTree = "<group>"; };
 		7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncContentHashFallbackTests.swift; sourceTree = "<group>"; };
+		59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReclaimAreaTests.swift; sourceTree = "<group>"; };
+		DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReclaimAreaShapeContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -502,6 +506,7 @@
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacQuarkLoginView.swift,
 				Mac/MacQueuePanelView.swift,
+				Mac/MacReclaimAreaView.swift,
 				Mac/MacScanLogger.swift,
 				Mac/MacScrapeBatchProgressView.swift,
 				Mac/MacScrapeSettingsView.swift,
@@ -638,6 +643,7 @@
 				Mac/MacPlaylistDetailSheet.swift,
 				Mac/MacQuarkLoginView.swift,
 				Mac/MacQueuePanelView.swift,
+				Mac/MacReclaimAreaView.swift,
 				Mac/MacScanLogger.swift,
 				Mac/MacScrapeBatchProgressView.swift,
 				Mac/MacScrapeSettingsView.swift,
@@ -814,6 +820,9 @@
 				Services/QuarkCookieStore.swift,
 				Services/QuarkLogic.swift,
 				Services/QuarkModels.swift,
+				Services/ReclaimAreaCatalog.swift,
+				Services/ReclaimPurgeService.swift,
+				Services/ReclaimRestoreService.swift,
 				"Services/SFBAudioEngineManager+Decoder.swift",
 				"Services/SFBAudioEngineManager+Mac.swift",
 				Services/ScrapeBatchService.swift,
@@ -1255,6 +1264,8 @@
 				0F19C2BA81BB4965906FDB99 /* LibraryFileNamingTests.swift */,
 				16F3C050C01C4C25A15DF8F4 /* TrackFileRenameServiceContractTests.swift */,
 				7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */,
+				59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */,
+				DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1756,6 +1767,8 @@
 				70AC03A647234C58A30572F2 /* LibraryFileNamingTests.swift in Sources */,
 				81D5A6EF275B4799B3F816A3 /* TrackFileRenameServiceContractTests.swift in Sources */,
 				0282D9AC4E424352BCDEE3B5 /* SyncContentHashFallbackTests.swift in Sources */,
+				69F47FCCE24E407288D79719 /* ReclaimAreaTests.swift in Sources */,
+				2634A84446A54518AE96B774 /* ReclaimAreaShapeContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
