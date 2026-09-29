@@ -31,8 +31,40 @@ private enum TrackFileRenameContract {
 
     static let scannedDirectory = "QQPlayer"
 
-    /// 文件系统改名/搬迁调用的标记（代码域内匹配）。
+    /// 文件系统改名/搬迁调用的标记（代码域内匹配，**按标识符边界判定，不是裸子串**）。
+    ///
+    /// ⚠️ 判据**不得**退化成 `contains(marker)`：`removeItem(` 含子串 `moveItem(`
+    /// ⇒ 会把「删除」误报成「改名/搬迁」（2026-09-29 CI 假阳性：`ReclaimPurgeService`）。
     static let renameCallMarkers = ["moveItem(", "renameItem(", ".rename("]
+
+    /// 判据**唯一入口**：代码域内是否出现改名/搬迁调用。
+    ///
+    /// · `moveItem(` / `renameItem(` 是**裸标识符**形式 ⇒ 前一个字符不得是标识符字符
+    ///   （字母 / 数字 / `_`），否则是更长标识符的尾巴（`removeItem(` / `xmoveItem(`）；
+    /// · `.rename(` 自带前导点——成员访问本身就是边界 ⇒ 直接子串匹配即可。
+    static func hasRenameCall(in code: String) -> Bool {
+        renameCallMarkers.contains { marker in
+            marker.hasPrefix(".")
+                ? code.contains(marker)
+                : containsIdentifierBoundary(marker, in: code)
+        }
+    }
+
+    /// `marker` 是否以**标识符起始边界**出现在 `code` 里（前一个是行首或非标识符字符）。
+    private static func containsIdentifierBoundary(_ marker: String, in code: String) -> Bool {
+        var searchStart = code.startIndex
+        while let found = code.range(of: marker, range: searchStart ..< code.endIndex) {
+            if found.lowerBound == code.startIndex {
+                return true
+            }
+            let previous = code[code.index(before: found.lowerBound)]
+            if !(previous.isLetter || previous.isNumber || previous == "_") {
+                return true
+            }
+            searchStart = code.index(after: found.lowerBound)
+        }
+        return false
+    }
 
     /// 冻结基线（2026-09-28）：当前全仓 `moveItem(` / `renameItem(` / `.rename(`
     /// 调用点的**全量**登记。唯一「按标签规范化改名」入口 = `TrackFileRenameService.swift`；
@@ -148,8 +180,7 @@ private enum TrackFileRenameContract {
             let relative = url.path.replacingOccurrences(of: prefix, with: "")
             guard let source = try? String(contentsOf: url, encoding: .utf8) else { continue }
             let code = codeOnly(source)
-            let hasCall = renameCallMarkers.contains { code.contains($0) }
-            if hasCall, !baselineWhitelist.contains(relative) {
+            if hasRenameCall(in: code), !baselineWhitelist.contains(relative) {
                 offenders.append(relative)
             }
         }
@@ -238,14 +269,31 @@ struct TrackFileRenameServiceContractTests {
 
     // MARK: - 自证：扫描器剥注释/字符串
 
-    @Test("扫描器自证：代码里的调用检出；注释/字符串里的不算")
+    @Test("扫描器自证：代码里的调用检出；注释/字符串里的不算；removeItem 不得误判")
     func scannerSelfProof() {
         let codeOnly = TrackFileRenameContract.codeOnly
-        #expect(codeOnly("let x = fm.moveItem(at: a, to: b)").contains("moveItem("))
-        #expect(!codeOnly("// fm.moveItem(at: a, to: b) 旧写法").contains("moveItem("))
-        #expect(!codeOnly("/* fm.moveItem(at: a, to: b) */").contains("moveItem("))
-        #expect(!codeOnly("let s = \"moveItem(at:to:)\"").contains("moveItem("))
+        let hasCall = { TrackFileRenameContract.hasRenameCall(in: codeOnly($0)) }
+
+        // 正例：代码域内的真调用（含既有剥注释/字符串断言的等价改写）
+        #expect(hasCall("let x = fm.moveItem(at: a, to: b)"))
+        #expect(hasCall("fm.renameItem(at: a, to: b)"))
+        #expect(hasCall("try item.rename(\"new-name\")"))
+        #expect(hasCall("moveItem(at: a, to: b)"), "行首（无前导字符）也算命中")
+        #expect(hasCall("let s = \"a\\\"b\"; fm.moveItem(at: a, to: b)"), "字符串后的真调用仍要命中")
+
+        // 负例：注释（行 / 块）与字符串字面量里的调用不算
+        #expect(!hasCall("// fm.moveItem(at: a, to: b) 旧写法"))
+        #expect(!hasCall("/* fm.moveItem(at: a, to: b) */"))
+        #expect(!hasCall("let s = \"moveItem(at:to:)\""))
+        #expect(!hasCall("// item.rename(\"x\")"))
+        #expect(!hasCall("let s = \".rename(\""))
         #expect(!codeOnly("// TagWriterService 不该出现").contains(TrackFileRenameContract.forbiddenMarker))
-        #expect(codeOnly("let s = \"a\\\"b\"; fm.moveItem(at: a, to: b)").contains("moveItem("))
+
+        // ★ 回归（2026-09-29 CI 假阳性）：`removeItem(` 含子串 `moveItem(`，按标识符边界不得命中
+        #expect(!hasCall("let x = fm.removeItem(at: a)"))
+        #expect(!hasCall("try FileManager.default.removeItem(at: a)"))
+        // 负例：更长标识符的尾巴（标识符起始边界判据本身要有判别力）
+        #expect(!hasCall("let x = xmoveItem(at: a)"))
+        #expect(!hasCall("let x = my_renameItem(at: a)"))
     }
 }

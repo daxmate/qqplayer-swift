@@ -275,9 +275,18 @@ struct ReclaimAreaTests {
         try writeFile("a.mp3", in: area, bytes: 10)
         try writeFile("b.flac", in: area, bytes: 20)
 
+        // byteSize 口径 = **已分配大小（块对齐）**（见 `ReclaimAreaCatalog.entries`：
+        // `totalFileAllocatedSize` 优先，回落逻辑大小）⇒ 不写死字节字面量：
+        // 夹具只有 10/20 逻辑字节，块对齐后必然不是 30。期望值取 **purge 之前**
+        // 由目录自己算出的总量（既有唯一入口 `ReclaimAreaCatalog`）。
+        let expectedFreed = ReclaimAreaCatalog.totalByteSize(
+            of: ReclaimAreaCatalog.entries(libraryRoot: library)
+        )
+        #expect(expectedFreed > 0, "夹具未就位 → 下面的相等断言会失去判别力")
+
         let summary = ReclaimPurgeService.purgeAll(libraryRoot: library)
         #expect(summary.deleted == 2)
-        #expect(summary.freedBytes == 30)
+        #expect(summary.freedBytes == expectedFreed)
         #expect(ReclaimAreaCatalog.entries(libraryRoot: library).isEmpty)
     }
 
