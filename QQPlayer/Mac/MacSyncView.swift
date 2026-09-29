@@ -150,11 +150,11 @@ struct MacSyncRunSection: View {
     }
 
     var body: some View {
-        // 2026-09-29：`Form` 壳由 `MacSyncCenterView` 下移到这里，顶层分段控件才能固定
+        // 2026-09-29：`Form` 壳由 `MacSyncCenterView` 下移到这里，分段控件才能固定
         // 在内容区顶部（`VStack` 内先放置顶行、再放独立滚动的 `Form`）。全部 `@State`
         // 仍留在本类型（唯一观察者），页切换不卸载观察者。
         VStack(spacing: DesignTokens.space0) {
-            pinnedPagePicker
+            pinnedHeader
             Form {
                 Group {
                     switch page {
@@ -266,15 +266,23 @@ struct MacSyncRunSection: View {
         .labelsHidden()
     }
 
-    /// 置顶行：顶层页分段控件固定在内容区顶部，不随下方 `Form` 滚动
+    /// 置顶行：顶层页分段固定在内容区顶部，不随下方 `Form` 滚动
     /// （用户 2026-09-29：「最上面的 tab 需要永远置顶，不滚动」）。
-    /// 只置顶这一行；「歌曲 / 数据」流分段仍留在滚动内容里（`SyncPage.flowPicker`）。
+    /// 同日追加：「歌曲 / 数据」这一行也要一起置顶 ⇒ 顶层页分段 + （仅「同步」页的）
+    /// `SyncFlowPicker` 流分段两行都固定在顶部；「设备」页只显示顶层页分段（流分段是「同步」页专属，
+    /// 不常显）。picker 唯一实现见 `SyncFlowPicker`（`SyncTracksPane.swift`）。
     /// 背景 + 分隔线对齐 macOS 原生分组外观（`.bar` 随明暗外观自适应）。
-    private var pinnedPagePicker: some View {
+    private var pinnedHeader: some View {
         VStack(spacing: DesignTokens.space0) {
             pagePicker
                 .padding(.horizontal, DesignTokens.space20)
                 .padding(.vertical, DesignTokens.space12)
+            if page == .sync {
+                Divider()
+                SyncFlowPicker(flow: $flow)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.vertical, DesignTokens.space12)
+            }
             Divider()
         }
         .background(.bar)
@@ -306,10 +314,10 @@ struct MacSyncRunSection: View {
         )
     }
 
-    /// 「同步」页（`SyncPage`：分段切传歌 / 播放数据）。
+    /// 「同步」页（`SyncPage`：内容 switch 切传歌 / 播放数据；分段控件已上移置顶）。
     var syncPage: some View {
         SyncPage(
-            flow: $flow,
+            flow: flow,
             tracksPane: tracksPane,
             dataPane: dataPane
         )
