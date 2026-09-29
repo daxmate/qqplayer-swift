@@ -11,6 +11,11 @@ import Foundation
 // MARK: - Track / DatabaseManager（生产为 GRDB Record）
 
 struct Track {
+    /// 生产 = GRDB `Record` 的自增主键（`QQPlayer/Models/DatabaseModels.swift` 的 `var id: Int64?`）。
+    /// harness 的行一律无 id（= 「只有路径、查不到行」形态）：`DatabaseManager+ContentHash.swift`
+    /// 的兜底回填只在有 id（= 真有行）时触发，故 harness 里回填分支恒不触发——与生产
+    /// 「查不到行 → 只现算、不回填」同义。
+    var id: Int64?
     var path: String
     var stableId: String
     var contentHash: String?
@@ -22,6 +27,22 @@ final class DatabaseManager: @unchecked Sendable {
     private let lock = NSLock()
 
     func createTables() throws {}
+
+    // ── 事务 API 面替身（生产 = GRDB `dbWriter.read/write`）──────────────────────
+    //
+    // `DatabaseManager+ContentHash.swift`（批 B 的唯一指纹兜底入口）在 harness **真跑**的
+    // 路径上（`SyncLocalLibraryScanner.sourceFiles` → `resolvedContentHash`），不能黑名单化
+    // ⇒ 必须真编；它除纯逻辑外还用 `read`/`write` 两处真 GRDB 事务 API。生产 `DatabaseManager`
+    // （真 GRDB）编不进命令行，故这里给出**类型面**替身：签名与生产逐字同形
+    // （`func read<T>(_ operation: @escaping (Database) throws -> T) throws -> T`），
+    // 语义 = 直接把替身句柄交给闭包（harness 不覆盖落库/游标层，与既有空桩口径一致）。
+    func read<T>(_ operation: @escaping (Database) throws -> T) throws -> T {
+        try operation(Database())
+    }
+
+    func write<T>(_ operation: @escaping (Database) throws -> T) throws -> T {
+        try operation(Database())
+    }
 
     func getTrack(byPath path: String) throws -> Track? {
         lock.lock()
@@ -45,6 +66,31 @@ final class DatabaseManager: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: path) else { return nil }
         return try? SyncFileChecksum.sha256Hex(ofFile: URL(fileURLWithPath: path))
     }
+}
+
+// MARK: - GRDB 事务/查询 API 面替身（同上：让 `DatabaseManager+ContentHash.swift` 真编进 harness）
+//
+// 生产 = GRDB `Database`（`read`/`write` 闭包的参数类型）与 `QueryInterfaceRequest<Track>`
+// （`Track.filter(sql:)` 的返回）。本 harness 的 GRDB 模块桩（GRDBShim.swift）只有两个
+// Record 协议，故这两个类型在夹具里给出：**只保证类型面**，语义空转（harness 不覆盖
+// 游标/落库层）。**不许**在这里实现 SQL 语义。
+
+/// 生产 = GRDB `Database`。
+final class Database {
+    /// 生产同形 `func execute(sql: String, arguments: StatementArguments = …)`。
+    func execute(sql: String, arguments: [Any?] = []) throws {}
+}
+
+/// 生产 = GRDB `QueryInterfaceRequest<Track>`。
+struct TrackQuery {
+    /// 生产同形 `fetchAll(_ db: Database) throws -> [Track]`；harness 空库 ⇒ 恒空集
+    /// （= 「表里没有 `content_hash IS NULL` 的行」，回填路径因此不写库）。
+    func fetchAll(_ db: Database) throws -> [Track] { [] }
+}
+
+extension Track {
+    /// 生产 = GRDB `FetchableRecord` 的 `static func filter(sql:arguments:)`。
+    static func filter(sql: String) -> TrackQuery { TrackQuery() }
 }
 
 // MARK: - DeviceStore（生产走 GRDB；harness 只用内存信任表 MemoryTrustStore）
@@ -119,6 +165,15 @@ enum DatabaseSyncCollectionFacts {
     static func liveMembersProvider(database: DatabaseManager) -> () -> SyncCollectionMembers {
         { SyncCollectionMembers() }
     }
+
+    /// 生产 = 分平台缺省曲库根（macOS `MacLibraryRoot.resolvedRootURL` / iOS 沙盒
+    /// `Documents/Music`，见 `Services/DatabaseSyncCollectionFacts.swift`）——那个文件
+    /// 依赖 macOS-only 的 `MacLibraryRoot`（`QQPlayer/Mac/**`，不在候选池）与真 GRDB 的
+    /// `DatabaseManager.getAllPlaylists()`，编不进命令行，故由本同形桩替代
+    ///（`static var defaultLibraryRoot: URL`）。harness 不跑启动回填路径，故取值不参与断言。
+    static var defaultLibraryRoot: URL {
+        FileManager.default.temporaryDirectory
+    }
 }
 
 // MARK: - DatabaseSyncPeerLibraryFacts（生产在 Services/，未被 harness 编入）
@@ -135,6 +190,21 @@ enum DatabaseSyncPeerLibraryFacts {
         favoritesName: String? = nil
     ) -> () -> SyncPeerLibraryCatalog {
         { SyncPeerLibraryCatalog() }
+    }
+}
+
+// MARK: - SyncChangeLogReplay（生产在 QQPlayer/Sync/SyncChangeLogPendingStore.swift）
+//
+// 生产文件已在黑名单（`Column` + `.fetchAll(db)` 真 GRDB 查询），故其重放入口由本桩替代：
+// 签名与生产逐字同形（`replay(pendingKey:database:libraryRoot:) throws -> Int`）。
+// harness 只消费它的**签名**（`DatabaseManager+ContentHash.swift` 的启动回填路径调用它），
+// 而 harness 不跑启动回填 ⇒ 同形替身恒回 0（不重放任何挂起变更）。
+// 需要重放断言的场景由夹具显式注入（同 `SyncContentHashResolver` / `SyncLyricsContentMapping` 口径）。
+
+enum SyncChangeLogReplay {
+    @discardableResult
+    static func replay(pendingKey: String, database: DatabaseManager, libraryRoot: URL) throws -> Int {
+        0
     }
 }
 
