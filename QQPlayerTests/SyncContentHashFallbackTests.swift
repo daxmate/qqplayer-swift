@@ -281,7 +281,11 @@ struct SyncContentHashFallbackBehaviorTests {
             contentHash: nil
         )
         try fixture.manager.upsertTrack(track)
-        return track
+        // 交出**入库后的行**（= 生产调用方 `getTrack(byPath:)` / `getAllTracks()` 的形态）：
+        // 兜底入口只在「有行 id」时回填 DB（`if let id = track?.id`），而 `Track` 是 struct，
+        // upsert 不会把自增 id 回写到调用方手里的字面值 ⇒ 拿入库前的值调用时 id 恒为 nil、
+        // 回填会静默跳过（CI 实证：`storedHash(..., "s1")` 仍为 nil）。
+        return try fixture.manager.getTrack(byPath: track.path) ?? track
     }
 
     private func storedHash(_ manager: DatabaseManager, stableId: String) throws -> String? {
