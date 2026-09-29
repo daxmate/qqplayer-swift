@@ -3,7 +3,7 @@
 //  QQPlayer
 //
 //  局域网同步（S2/M6；2026-09-26 批 B1「拆 Pane + 顶层两页」）macOS **同步中心主体**
-//  （QQPlayerMac target only）：`MacSyncCenterView` 的 `Form` 内渲染的全部内容。
+//  （QQPlayerMac target only）：同步中心内容区主体（自带 `Form` 壳 + 置顶的顶层页分段控件）。
 //
 //  顶层两页（用户 2026-09-26 拍板；分段控件切换，**同一时刻只渲染一页**）：
 //   · 「设备」（低频/配置）：待批准请求 · 本机身份与二维码 · 连接状态（含「允许局域网连接」开关）·
@@ -59,7 +59,7 @@ enum MacSyncFlow: Hashable {
     case data
 }
 
-/// 同步中心主体（在 `MacSyncCenterView` 的 `Form` 内渲染）。
+/// 同步中心主体（自带 `Form` 壳；顶层页分段控件置顶、不随内容滚动）。
 struct MacSyncRunSection: View {
     /// 2026-09-20 批 6-8：中心迁 `@Observable` ⇒ 视图侧改**组合根环境注入**（读属性即按需重绘）。
     /// 两个入口（设置页 `MacSyncSettingsView` / 工具栏面板 `MacSyncCenterView`）共用本视图。
@@ -150,14 +150,22 @@ struct MacSyncRunSection: View {
     }
 
     var body: some View {
-        Group {
-            pagePicker
-            switch page {
-            case .device:
-                devicePane
-            case .sync:
-                syncPage
+        // 2026-09-29：`Form` 壳由 `MacSyncCenterView` 下移到这里，顶层分段控件才能固定
+        // 在内容区顶部（`VStack` 内先放置顶行、再放独立滚动的 `Form`）。全部 `@State`
+        // 仍留在本类型（唯一观察者），页切换不卸载观察者。
+        VStack(spacing: DesignTokens.space0) {
+            pinnedPagePicker
+            Form {
+                Group {
+                    switch page {
+                    case .device:
+                        devicePane
+                    case .sync:
+                        syncPage
+                    }
+                }
             }
+            .formStyle(.grouped)
         }
         .onAppear {
             model.onAppear()
@@ -256,6 +264,20 @@ struct MacSyncRunSection: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+    }
+
+    /// 置顶行：顶层页分段控件固定在内容区顶部，不随下方 `Form` 滚动
+    /// （用户 2026-09-29：「最上面的 tab 需要永远置顶，不滚动」）。
+    /// 只置顶这一行；「歌曲 / 数据」流分段仍留在滚动内容里（`SyncPage.flowPicker`）。
+    /// 背景 + 分隔线对齐 macOS 原生分组外观（`.bar` 随明暗外观自适应）。
+    private var pinnedPagePicker: some View {
+        VStack(spacing: DesignTokens.space0) {
+            pagePicker
+                .padding(.horizontal, DesignTokens.space20)
+                .padding(.vertical, DesignTokens.space12)
+            Divider()
+        }
+        .background(.bar)
     }
 
     // MARK: - 三块 Pane（批 D：独立 struct；父只做「值输入 + 回调」装配）

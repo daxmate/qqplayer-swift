@@ -47,8 +47,8 @@ struct MacSyncPanel: View {
         VStack(spacing: DesignTokens.space0) {
             header
 
-            // 2026-09-26 批 B1：`MacSyncCenterView` 自带 `Form`（壳）⇒ 这里不再包一层 Form
-            // （嵌套 Form 会打乱分组布局）。
+            // 2026-09-29：`Form` 壳在 `MacSyncRunSection` 内（`MacSyncCenterView` 不再自带 Form）
+            // ⇒ 这里同样不包 Form（嵌套 Form 会打乱分组布局）。
             MacSyncCenterView(initialPage: .sync)
         }
         .frame(width: 620, height: Self.sheetHeight)

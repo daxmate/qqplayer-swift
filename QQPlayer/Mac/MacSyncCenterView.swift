@@ -9,7 +9,9 @@
 //  （「设置里一套、主界面一套」的行为漂移是封面解析散落多处的老教训）。
 //
 //  2026-09-26 批 B1「拆 Pane + 顶层两页」后本文件只剩三件事：
-//   ① `Form` 壳（`.formStyle(.grouped)`）；② 默认页（`initialPage`）；③ `SyncQRImageFactory`。
+//   ① 默认页（`initialPage`）；② `SyncQRImageFactory`；③ 装配 `MacSyncRunSection`。
+//  2026-09-29：`Form` 壳**下移**进 `MacSyncRunSection`（顶层分段控件置顶、不随内容滚动，
+//   见 `MacSyncView.swift`）⇒ 本壳不再自带 `Form`。
 //  内容（顶层两页 + 三块 Pane + 全部状态）都在 `MacSyncRunSection`（`MacSyncView.swift`
 //  及其分区文件）里 —— 装配点唯一，两个入口只是**默认页不同**：
 //   · 设置页 = 「设备 + 同步」两页，默认「设备」
@@ -38,10 +40,8 @@ struct MacSyncCenterView: View {
     @Environment(SyncHostCenter.self) private var hostCenter
 
     var body: some View {
-        Form {
-            MacSyncRunSection(hostCenter: hostCenter, initialPage: initialPage)
-        }
-        .formStyle(.grouped)
+        // 2026-09-29：`Form` 壳在 `MacSyncRunSection` 里（置顶行 + 滚动内容）⇒ 本壳只做装配。
+        MacSyncRunSection(hostCenter: hostCenter, initialPage: initialPage)
     }
 }
 
