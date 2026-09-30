@@ -205,6 +205,7 @@
 		0282D9AC4E424352BCDEE3B5 /* SyncContentHashFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */; };
 		69F47FCCE24E407288D79719 /* ReclaimAreaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */; };
 		2634A84446A54518AE96B774 /* ReclaimAreaShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */; };
+		0275B8C3406B4571B8BAB66E /* MacTrackListViewPlaylistMenuContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FBEE759F4E4AF395749873 /* MacTrackListViewPlaylistMenuContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -459,6 +460,7 @@
 		7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncContentHashFallbackTests.swift; sourceTree = "<group>"; };
 		59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReclaimAreaTests.swift; sourceTree = "<group>"; };
 		DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReclaimAreaShapeContractTests.swift; sourceTree = "<group>"; };
+		91FBEE759F4E4AF395749873 /* MacTrackListViewPlaylistMenuContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackListViewPlaylistMenuContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1266,6 +1268,7 @@
 				7AA21CA086C34CD9BB7F7344 /* SyncContentHashFallbackTests.swift */,
 				59CD6A5C90E74C93A9764ADE /* ReclaimAreaTests.swift */,
 				DFC9974D5EBB492BB2C3DFCA /* ReclaimAreaShapeContractTests.swift */,
+				91FBEE759F4E4AF395749873 /* MacTrackListViewPlaylistMenuContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1769,6 +1772,7 @@
 				0282D9AC4E424352BCDEE3B5 /* SyncContentHashFallbackTests.swift in Sources */,
 				69F47FCCE24E407288D79719 /* ReclaimAreaTests.swift in Sources */,
 				2634A84446A54518AE96B774 /* ReclaimAreaShapeContractTests.swift in Sources */,
+				0275B8C3406B4571B8BAB66E /* MacTrackListViewPlaylistMenuContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

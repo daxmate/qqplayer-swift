@@ -74,7 +74,7 @@ struct MacTrackListView: View {
     @State private var playlists: [Playlist] = []
     @State private var showNewPlaylistAlert = false
     @State private var newPlaylistName = ""
-    @State private var pendingTrack: Track?
+    @State private var pendingTracks: [Track] = []
     /// 单曲编辑/刮削（右键菜单第 8 项）——.sheet(item:) 直接驱动，见文件头注释
     @State private var tagEditorTrack: Track?
     /// 批量刮削（右键多选 >1）——.sheet(item:) 直接驱动，见文件头注释
@@ -250,6 +250,7 @@ struct MacTrackListView: View {
                     } label: {
                         Label("context_batch_scrape".localized, systemImage: "tag")
                     }
+                    Menu(Localized.addToPlaylist) { addToPlaylistMenu(for: tracks) }
                     Divider()
                     Button(role: .destructive) {
                         presentAfterMenuDismisses {
@@ -354,22 +355,7 @@ struct MacTrackListView: View {
         }
 
         Divider()
-        Menu("add_to_playlist".localized) {
-            ForEach(playlists, id: \.id) { playlist in
-                Button(playlist.title) {
-                    try? appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
-                    NotificationCenter.default.post(name: .playlistsChanged, object: nil)
-                }
-            }
-            Divider()
-            Button("create_new_playlist".localized) {
-                presentAfterMenuDismisses {
-                    pendingTrack = track
-                    newPlaylistName = ""
-                    showNewPlaylistAlert = true
-                }
-            }
-        }
+        Menu(Localized.addToPlaylist) { addToPlaylistMenu(for: [track]) }
 
         if let onShowArtist {
             Divider()
@@ -406,6 +392,29 @@ struct MacTrackListView: View {
             }
         } label: {
             Label(Localized.moveToTrash, systemImage: "trash")
+        }
+    }
+
+    // MARK: - 添加到歌单（歌单选择菜单唯一实现：单选 / 多选共用）
+
+    /// 菜单内容（唯一实现由 MacTrackListViewPlaylistMenuContractTests 守护）：
+    /// 列歌单（整批逐首添加，循环后统一 post 一次）+ 新建歌单。
+    @ViewBuilder
+    private func addToPlaylistMenu(for tracks: [Track]) -> some View {
+        ForEach(playlists, id: \.id) { playlist in
+            Button(playlist.title) {
+                // 整批逐首加入（addToPlaylist 自带「已在歌单 → 跳过」判据）
+                tracks.forEach { try? appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: $0.stableId) }
+                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
+            }
+        }
+        Divider()
+        Button("create_new_playlist".localized) {
+            presentAfterMenuDismisses {
+                pendingTracks = tracks
+                newPlaylistName = ""
+                showNewPlaylistAlert = true
+            }
         }
     }
 
@@ -555,10 +564,13 @@ struct MacTrackListView: View {
 
     private func createPlaylistAndAdd() {
         let title = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, let track = pendingTrack else { return }
+        guard !title.isEmpty, !pendingTracks.isEmpty else { return }
         do {
             let playlist = try appCoordinator.createPlaylist(title: title)
-            try appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: track.stableId)
+            let playlistId = playlist.id ?? 0
+            for track in pendingTracks {
+                try appCoordinator.addToPlaylist(playlistId: playlistId, trackStableId: track.stableId)
+            }
             NotificationCenter.default.post(name: .playlistsChanged, object: nil)
         } catch {
             AppLog.error(.ui, "❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
