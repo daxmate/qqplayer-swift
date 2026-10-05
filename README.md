@@ -393,7 +393,6 @@ QQPlayerTests/                # Swift Testing 单测（104 测试文件 + Fixtur
 QQPlayerSiriTests/            # Siri 集成测试（需 Xcode 27 SDK，CI 已豁免）
 scripts/                      # 工程工具（xcbuild.sh 统一构建入口 / add-test-file.py / gen-zh-hant.py /
                               #   pbxproj-membership.py / run-local-sync-tests.sh / siri-tests-guard.py / sync-harness / git-hooks）
-#   （add-grdb-to-tests.py 遗留一次性工具，目的已达成，等 maintainer 清理，见文件头说明）
 .env.template                 # 可选 API Key 模板（复制为 .env）
 build.sh                      # 一键构建 / 安装脚本（无参=模拟器 / --install=iOS 真机 / mac=macOS / install=双端）
 .github/workflows/ci.yml      # CI：lint/format + iOS 单测 + macOS 构建与资源断言（含编译警告零容忍）

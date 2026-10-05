@@ -9,7 +9,7 @@
 //    容器文件清单、沙盒现状、DB 曲目（content_hash），产出每个文件的动作决策与
 //    DB 路径切换候选。防"双位置重复"判据 = 同 content_hash 判同（§8.5）。
 //  - SandboxMusicMigrator：执行器（iOS only）——最小 ubiquity 读取能力（列容器 +
-//    dataless 实体化等待，不依赖 CloudDownloadManager 的 NSMetadataQuery 监控），
+//    dataless 实体化等待，不用 NSMetadataQuery 监控），
 //    按 planner 决策分批复制、校验、切 DB 路径、归档 iCloud 副本（移到
 //    _migrated-backup/，不删除，审计 🔵-10 后改为可恢复）。幂等可断点：
 //    "沙盒目标已存在且 content_hash 一致" = 已完成，重跑自动跳过（不重复不丢）。
