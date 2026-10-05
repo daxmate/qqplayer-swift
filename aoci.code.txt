@@ -1,1 +1,52 @@
 #AOCI-CODE-VOLUME: 1
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/===
+.env.template[FC4T]: F:Spotify 与 Discogs 第三方 API 凭据的占位模板，供复制为 .env 后填入真实密钥 | R:- | A:- | S:真实 .env 由 .gitignore 排除，禁止提交填入真实密钥的文件
+.gitattributes[FV3T]: F:仓库级 Git 文本属性，* text=auto 统一按 LF 归一化文本文件 | R:- | A:- | S:-
+.gitignore[FV4S]: F:Git 忽略清单：Xcode/SwiftPM 产物、密钥文件、.worktrees/、docs/、__pycache__ | R:- | A:- | S:.worktrees/ 忽略嵌套 worktree 仓库，docs/ 忽略本地产物，二者均不入库
+.swiftformat[FQ4T]: F:SwiftFormat 配置，--disable all 白名单模式只启用格式类规则（缩进、import 排序、尾逗号等），不碰结构与逻辑 | R:code:.swiftlint.yml | A:- | S:Swift 6.0、indent 4；trailingCommas 与 .swiftlint.yml 的 trailing_comma 规则冲突，故 lint 侧禁用该规则
+.swiftlint.yml[FQ5T]: F:SwiftLint 配置，保守口径：禁用结构性/命名/强制解包类规则，只保留纯质量问题检查 | R:code:.swiftformat | A:- | S:刻意保留既有短变量风格；Discogs API 契约字段（masterID/masterUrl）导致 inclusive_language 被禁用
+AGENTS.md[SG4S]: F:项目给 Coding Agent 的常驻指令：工作区、记忆、红线与交付纪律，含 AOCI 索引说明区块 | R:- | A:- | S:<!-- aoci:begin -->…<!-- aoci:end --> 区块由 AOCI 工具生成与维护，禁止手工编辑其内容
+ANALYSIS.md[SD5S]: F:2026-08-29 只读架构分析：技术栈、轻 MVVM 架构、15 个 Service 职责、数据模型与歌词/播放引擎要点 | R:- | A:- | S:快照式分析（基于当时单 commit），统计与结论会随代码演进而过期，引用前须复核现状
+LICENSE[SG3L]: F:GNU GPL-3.0 许可证全文，本仓库整体遵循该许可 | R:code:NOTICE.md | A:- | S:-
+NOTICE.md[SG6T]: F:来源声明：QQPlayer 是 Cosmos Music Player 的 GPL-3.0 衍生作品，列明上游作者与本地修改范围 | R:code:LICENSE | A:- | S:上游已就 GPLv3 §7 书面同意（2026-09-14）允许经 App Store 分发，但不免除源码公开义务
+PRIVACY.md[SG6S]: F:中英双语隐私政策：不收集个人数据；音乐文件仅本地/iCloud；歌词请求会向第三方发送曲名与艺术家 | R:- | A:- | S:歌词功能联网向网易云音乐与 LRCLIB 发送歌曲标题与歌手名（政策已披露），新增联网或数据功能须同步更新本政策
+PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 entitlements，App Group group.com.daxmate.qqplayer.ios | R:code:PlayerWidget/PlayerWidget.entitlements | A:- | S:App Group 必须与主 App 一致，否则 Widget 扩展无法访问共享容器
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/.github/workflows/===
+ci.yml[OQ8M]: F:CI 三个 job——iOS swiftlint/swiftformat/xcodebuild 单测、swiftc 直编的本地同步 harness、macOS QQPlayerMac 构建与资源产物断言 | R:- | A:- | S:QQPlayerSiriTests 不参与且本地不可编译（Xcode 26.6 SDK 无 AppIntentsTesting），改由 scripts/siri-tests-guard.py 结构守护，测试文件禁删禁降级；源码与工程级编译警告零容忍，Debug 增量会掩盖存量警告
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/===
+AppIntent.swift[FU3T]: F:Widget 配置意图示例 ConfigurationAppIntent（含 Favorite Emoji 参数），模板残留、未接入实际功能 | R:- | A:ConfigurationAppIntent | S:-
+Info.plist[FV4T]: F:Widget 扩展 Info.plist，声明 NSExtensionPointIdentifier 为 com.apple.widgetkit-extension | R:- | A:- | S:-
+PlayerWidget.entitlements[FI4T]: F:Widget target 的 entitlements，声明 App Group group.com.daxmate.qqplayer.ios | R:code:PlayerWidgetExtension.entitlements | A:- | S:主 App 与 Widget 必须共用同一 App Group，Widget 才能读取共享容器中的封面文件
+PlayerWidget.swift[AU7M]: F:正在播放中尺寸 Widget：时间线播放中每 15s、空闲每 60s 刷新，展示封面+曲名+播放状态，仅支持 systemMedium | R:- | A:PlayerWidgetProvider,PlayerWidget | S:封面从 App Group 共享容器按文件读取，刻意规避 UserDefaults 4MB 上限
+PlayerWidgetBundle.swift[AU4T]: F:WidgetBundle 入口，@main 注册 PlayerWidget 与 PlaylistWidget（Control Center / Live Activity 版本已注释） | R:code:PlayerWidget/PlayerWidget.swift,code:PlayerWidget/PlaylistWidget.swift | A:PlayerWidgetBundle | S:注释中预留的 Control Center 与 Live Activity Widget 尚未实现
+PlaylistWidget.swift[AU7M]: F:我的歌单中尺寸 Widget：最多展示 3 个歌单卡片，封面用自定义图或 2x2 拼图，点击经 URL scheme 跳转 | R:code:PlayerWidget/PlayerWidget.swift | A:PlaylistWidgetProvider,PlaylistWidget | S:Widget 不支持滚动，故采用固定 3 卡横向布局；封面从 App Group 容器按文件名读取；卡片以 qqplayer://playlist/<id> 跳转
+WidgetIntents.swift[FU2T]: F:Widget 意图预留文件，当前无任何活跃 intent，Widget 导航改用 URL scheme | R:- | A:- | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/Assets.xcassets/AccentColor.colorset/===
+Contents.json[FU2T]: F:Widget 资源目录的 AccentColor 颜色集声明（universal，无显式色值） | R:- | A:- | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/Assets.xcassets/AppIcon.appiconset/===
+Contents.json[FU3T]: F:Widget 应用图标集声明，含 iOS 1024x1024 及 dark/tinted 外观变体 | R:- | A:- | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/Assets.xcassets/===
+Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声明 | R:- | A:- | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/Assets.xcassets/WidgetBackground.colorset/===
+Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
+project.pbxproj[FV9L]: F:Xcode 工程文件（objectVersion 77），定义 7 个 target 与构建配置：iOS 主 App/PlayerWidget/Share/Siri 扩展/两个测试 target、macOS QQPlayerMac | R:code:QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | A:- | S:采用 Xcode 16+ folder-synchronized groups（fileSystemSynchronizedGroups），新文件按目录自动纳入 target，通常无需手改本文件；QQPlayerSiriTests 部署目标 27.0，高于其余 iOS target 的 18.5
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
+contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/===
+Package.resolved[LV6S]: F:SPM 依赖锁定：21 个 sbooth 音频包（SFBAudioEngine 0.13.0 等）与 GRDB.swift 6.29.3 的精确 revision | R:code:QQPlayer.xcodeproj/project.pbxproj | A:- | S:CI 缓存 key 绑定本文件内容；仓库改名会使缓存内 XCFramework 绝对路径失效，故缓存 key 带 v2 前缀
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/xcshareddata/xcschemes/===
+QQPlayer.xcscheme[FV6T]: F:主 App scheme：构建 QQPlayer.app，唯一 Testable 为 QQPlayerTests，测试配置为 Debug、自动生成 test plan | R:- | A:- | S:QQPlayerSiriTests 不在 Testables 中（工具链缺 AppIntentsTesting，无法编译）
+Share.xcscheme[FV6T]: F:Share 扩展 scheme：构建 Share.appex 及其宿主 QQPlayer.app，无 Testable | R:- | A:- | S:-
+SiriIntentsExtension.xcscheme[FV6T]: F:Siri 扩展 scheme：构建 SiriIntentsExtension.appex 与宿主，LaunchAction 含真机 RemoteRunnable | R:- | A:- | S:-
