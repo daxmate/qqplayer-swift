@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-10-05T07:14:57Z",
+  "updated_at": "2026-10-05T08:08:44Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -119,9 +119,9 @@
     },
     "PlayerWidget/PlayerWidgetBundle.swift": {
       "role": "index",
-      "sha256": "fa7efe3a48ded457a82814a7f179a20b0e836d3ebb981d65518a2e42dbee3c46",
-      "size": 393,
-      "normalized_sha256": "fa7efe3a48ded457a82814a7f179a20b0e836d3ebb981d65518a2e42dbee3c46"
+      "sha256": "4dc5c715426380295229a3e588d8f41cf744083e63d592a416f6c340e4d3f50e",
+      "size": 255,
+      "normalized_sha256": "4dc5c715426380295229a3e588d8f41cf744083e63d592a416f6c340e4d3f50e"
     },
     "PlayerWidget/PlaylistWidget.swift": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "35c770ce31e2cda036dde3290a997b1e7d76d8e81a00eccfd0139eaac61e0551",
-      "size": 162906,
-      "normalized_sha256": "35c770ce31e2cda036dde3290a997b1e7d76d8e81a00eccfd0139eaac61e0551"
+      "sha256": "79f8aa7d23055030801243048ee5cb5460fd229e9560a0dac400b302efb0e5b1",
+      "size": 162785,
+      "normalized_sha256": "79f8aa7d23055030801243048ee5cb5460fd229e9560a0dac400b302efb0e5b1"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -2096,9 +2096,9 @@
     },
     "QQPlayer/Services/SandboxMigration.swift": {
       "role": "index",
-      "sha256": "4f9c6f7c1a635a3a0cb41c19484c2e875b47fe853e07eb0c68e4d1a264a11e58",
-      "size": 20667,
-      "normalized_sha256": "4f9c6f7c1a635a3a0cb41c19484c2e875b47fe853e07eb0c68e4d1a264a11e58"
+      "sha256": "377aa4b6534caaa7b4e733745b0db6aa8176e59c0823f6bb46f390ae9b64abf5",
+      "size": 20639,
+      "normalized_sha256": "377aa4b6534caaa7b4e733745b0db6aa8176e59c0823f6bb46f390ae9b64abf5"
     },
     "QQPlayer/Services/ScrapeBatchService.swift": {
       "role": "index",
@@ -4280,9 +4280,9 @@
     },
     "README.md": {
       "role": "index",
-      "sha256": "8db389edd80afea73c390305adb6ad56f7d62ee70680eb770f3718f440ff6840",
-      "size": 38025,
-      "normalized_sha256": "8db389edd80afea73c390305adb6ad56f7d62ee70680eb770f3718f440ff6840"
+      "sha256": "1592f41a229454e7011903a4f98688ccb04738bd91fba5ed675fda50f5e43a3d",
+      "size": 37909,
+      "normalized_sha256": "1592f41a229454e7011903a4f98688ccb04738bd91fba5ed675fda50f5e43a3d"
     },
     "Share/Base.lproj/MainInterface.storyboard": {
       "role": "index",
@@ -4328,9 +4328,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "af408864eec446cabc3563ddc38a16bb990846f1067baf048ab532a96fd38f1a",
-      "size": 304801,
-      "normalized_sha256": "af408864eec446cabc3563ddc38a16bb990846f1067baf048ab532a96fd38f1a"
+      "sha256": "6f4361450a5e4f0c51d159dcfc8bc7d973ec634b3d94e5456d154897ae935cc8",
+      "size": 303857,
+      "normalized_sha256": "6f4361450a5e4f0c51d159dcfc8bc7d973ec634b3d94e5456d154897ae935cc8"
     },
     "aoci.meta.txt": {
       "role": "index",

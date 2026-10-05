@@ -20,13 +20,11 @@ build.sh[XV6S]: F:一键构建与安装：模拟器构建、iOS 真机签名安�
 ci.yml[OQ8M]: F:CI 三个 job——iOS swiftlint/swiftformat/xcodebuild 单测、swiftc 直编的本地同步 harness、macOS QQPlayerMac 构建与资源产物断言 | R:- | A:- | S:QQPlayerSiriTests 不参与且本地不可编译（Xcode 26.6 SDK 无 AppIntentsTesting），改由 scripts/siri-tests-guard.py 结构守护，测试文件禁删禁降级；源码与工程级编译警告零容忍，Debug 增量会掩盖存量警告
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/===
-AppIntent.swift[FU3T]: F:Widget 配置意图示例 ConfigurationAppIntent（含 Favorite Emoji 参数），模板残留、未接入实际功能 | R:- | A:ConfigurationAppIntent | S:-
 Info.plist[FV4T]: F:Widget 扩展 Info.plist，声明 NSExtensionPointIdentifier 为 com.apple.widgetkit-extension | R:- | A:- | S:-
 PlayerWidget.entitlements[FI4T]: F:Widget target 的 entitlements，声明 App Group group.com.daxmate.qqplayer.ios | R:code:PlayerWidgetExtension.entitlements | A:- | S:主 App 与 Widget 必须共用同一 App Group，Widget 才能读取共享容器中的封面文件
 PlayerWidget.swift[AU7M]: F:正在播放中尺寸 Widget：时间线播放中每 15s、空闲每 60s 刷新，展示封面+曲名+播放状态，仅支持 systemMedium | R:- | A:PlayerWidgetProvider,PlayerWidget | S:封面从 App Group 共享容器按文件读取，刻意规避 UserDefaults 4MB 上限
-PlayerWidgetBundle.swift[AU4T]: F:WidgetBundle 入口，@main 注册 PlayerWidget 与 PlaylistWidget（Control Center / Live Activity 版本已注释） | R:code:PlayerWidget/PlayerWidget.swift,code:PlayerWidget/PlaylistWidget.swift | A:PlayerWidgetBundle | S:注释中预留的 Control Center 与 Live Activity Widget 尚未实现
+PlayerWidgetBundle.swift[AU4T]: F:WidgetBundle 入口，@main 注册 PlayerWidget 与 PlaylistWidget 两个主屏幕小组件 | R:code:PlayerWidget/PlayerWidget.swift,code:PlayerWidget/PlaylistWidget.swift | A:PlayerWidgetBundle | S:-
 PlaylistWidget.swift[AU7M]: F:我的歌单中尺寸 Widget：最多展示 3 个歌单卡片，封面用自定义图或 2x2 拼图，点击经 URL scheme 跳转 | R:code:PlayerWidget/PlayerWidget.swift | A:PlaylistWidgetProvider,PlaylistWidget | S:Widget 不支持滚动，故采用固定 3 卡横向布局；封面从 App Group 容器按文件名读取；卡片以 qqplayer://playlist/<id> 跳转
-WidgetIntents.swift[FU2T]: F:Widget 意图预留文件，当前无任何活跃 intent，Widget 导航改用 URL scheme | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/Assets.xcassets/AccentColor.colorset/===
 Contents.json[FU2T]: F:Widget 资源目录的 AccentColor 颜色集声明（universal，无显式色值） | R:- | A:- | S:-
@@ -41,7 +39,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV9L]: F:Xcode 工程文件（objectVersion 77），定义 7 个 target 与构建配置：iOS 主 App/PlayerWidget/Share/Siri 扩展/两个测试 target、macOS QQPlayerMac | R:code:QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | A:- | S:采用 Xcode 16+ folder-synchronized groups（fileSystemSynchronizedGroups），新文件按目录自动纳入 target，通常无需手改本文件；QQPlayerSiriTests 部署目标 27.0，高于其余 iOS target 的 18.5
+project.pbxproj[FV9L]: F:Xcode 工程文件（objectVersion 77），定义 7 个 target：iOS 主 App QQPlayer、PlayerWidgetExtension、Share、SiriIntentsExtension、QQPlayerTests、QQPlayerSiriTests、macOS QQPlayerMac | R:code:QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | A:- | S:采用 Xcode 16+ folder-synchronized groups（fileSystemSynchronizedGroups）按目录自动纳入 target，通常无需手改本文件；QQPlayerMac 与各扩展 target 通过 membershipExceptions 白名单挑选文件；QQPlayerSiriTests/SiriIntentsExtension 部署目标 27.0，高于其余 iOS target 的 18.5
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
@@ -282,9 +280,6 @@ AudioMetadataParser.swift[DB6S]: F:音频元数据解析入口与按扩展名分
 BuiltinEQPresets.swift[FB4T]: F:10 段图形 EQ 内置预设（数值照搬桌面端 useEq.ts） | R:- | A:bands10 固定频点；customKey="custom" 走持久化增益 | S:频点/增益与桌面端逐字一致，勿改
 CarPlayTrackFilter.swift[DH5T]: F:CarPlay 连接时曲目可用性判据的唯一入口（剔除 ogg/opus/dsf/dff） | R:code:QQPlayer/Models/DatabaseModels.swift,code:QQPlayer/Services/LibraryRoot.swift | A:isActive/isCompatible/filtered；未连接时原样返回不改顺序 | S:-
 CharacterMapResourceLoader.swift[CL6S]: F:简繁单字映射表唯一读盘入口（资源 + 懒加载 + 进程内缓存） | R:code:QQPlayer/Services/ArtistNameNormalizer.swift,code:QQPlayer/Services/SimplifiedTraditionalMap.swift,code:QQPlayer/Services/TraditionalToSimplifiedMap.swift | A:fail-closed：读不到/解码失败/行格式错 → fatalError，绝不返回空表 | S:只有本文件可读这两张表；空表会静默降级字形归一（2026-09-16 事故）
-CloudDownloadError.swift[IN2T]: F:iCloud 下载错误类型（M3-2 已退役：无引用，待物理删除） | R:code:QQPlayer/Services/CloudDownloadManager.swift | A:- | S:-
-CloudDownloadManager.swift[IN2T]: F:iCloud ubiquity 下载管理（M3-2 已退役：无引用，待物理删除） | R:code:QQPlayer/Services/CloudDownloadError.swift,code:QQPlayer/Services/CloudFailureDetector.swift | A:- | S:-
-CloudFailureDetector.swift[IN2T]: F:iCloud 下载失败判定（M3-2 已退役：无引用，待物理删除） | R:code:QQPlayer/Services/CloudDownloadManager.swift | A:- | S:-
 CloudFileAvailability.swift[CD7T]: F:iCloud 文件「本地可用性」唯一判定（纯函数 + URL 元数据包装），收敛 dataless 跳过语义 | R:code:QQPlayer/Services/DatabaseManager+ContentHash.swift,code:QQPlayer/Services/LibraryIndexer.swift,code:QQPlayer/Services/LibraryRoot.swift | A:CloudFileAvailability.isLocallyAvailable(isUbiquitousItem:downloadingStatus:),isLocallyAvailable(URL) | S:读不到元数据 / isUbiquitousItem != true → 可用（保守）；非 .downloaded/.current（含 nil）不可用；dataless 内容绝不可读（触发云端下载、阻塞主线程）
 DatabaseHiddenLayoutRelocation.swift[PR6T]: F:隐藏布局下 DB 三件套在打开连接之前从 Documents 根搬进 .qqplayer/db/（幂等、只搬不删） | R:code:QQPlayer/Services/DatabaseManager.swift,code:QQPlayer/Services/LibraryRoot.swift,code:QQPlayer/Services/DatabasePathResolver.swift | A:DatabaseManager.relocateLegacyDatabaseForHiddenLayout(fileManager:) | S:只在 getDatabaseURL() 打开连接前调用（移动打开中的 -wal/-shm 有一致性风险）；新位置已在 / 旧位置不存在即跳过；失败保留原件下次重试
 DatabaseManager+ContentHash.swift[PD7M]: F:content_hash（跨端歌曲身份键）的流式 SHA-256 计算、清单取用兜底与存量自愈回填、补后重放挂起变更 | R:code:QQPlayer/Services/DatabaseManager.swift,code:QQPlayer/Services/CloudFileAvailability.swift,code:QQPlayer/Services/DatabaseMigrationSupport.swift,code:QQPlayer/Sync/SyncFileChecksum.swift,code:QQPlayer/Sync/SyncChangeLogReplay.swift | A:contentHashIfFilePresent,resolvedContentHash(forTrack:atPath:),backfillTrackContentHashesIfNeeded,backfillMissingContentHashesDetailed | S:文件 IO 不进写事务；dataless 返回 nil 不读内容；已退役一次性完成门、每启动自愈回填；取数兜底现算并回填，写库失败仍返回现算值
@@ -408,7 +403,7 @@ SFBAudioEngineManager+Mac.swift[IB5S]: F:macOS 侧 SFB 播放链（loadAndPlay/p
 SFBAudioEngineManager+Playback.swift[IB6M]: F:iOS SFB 播放控制：loadAndPlay、play/pause/stop（含中断停止）、seek、计时与 EQ 应用 | R:code:QQPlayer/Services/SFBAudioEngineManager.swift,code:QQPlayer/Services/SFBAudioEngineManager+Decoder.swift,code:QQPlayer/Services/SFBAudioEngineManager+Mac.swift | A:loadAndPlay,play,pause,stopEngineForInterruption,seek | S:CarPlay 环境不使用 SFBAudioEngine（loadAndPlay 拒绝并回退）
 SFBAudioEngineManager+Queue.swift[IB5T]: F:SFB 播放进度读取（已渲染帧/解码采样率，免计时器漂移）与格式兼容判定 canHandle | R:code:QQPlayer/Services/SFBAudioEngineManager.swift | A:updatePlaybackPosition,canHandle | S:进度须用播放器真实位置（帧/采样率），不得用计时器累加 0.1s（会漂移到秒级）
 SFBAudioEngineManager.swift[IB7L]: F:SFBAudioEngine 播放管理核心（Opus/Vorbis/DSD）：player 生命周期、EQ 节点挂载与应用、CarPlay 状态 | R:code:QQPlayer/Services/SFBAudioEngineManager+Playback.swift,code:QQPlayer/Services/SFBAudioEngineManager+Queue.swift,code:QQPlayer/Services/SFBAudioEngineManager+Decoder.swift,code:QQPlayer/Services/PlayerEngine.swift | A:SFBAudioEngineManager,setupAudioPlayer,resetAudioPlayer,attachEqualizerToEngine,applySFBEQSettings | S:EQ 节点须按解码格式 attach 并支持重试（格式不匹配会挂载失败）；EQ 状态变化统一走 applySFBEQSettings
-SandboxMigration.swift[PD6L]: F:iCloud ubiquity 容器→本地沙盒 Documents 存量迁移：纯逻辑 planner（按 content_hash 判同去重）+ iOS 执行器（复制/校验/切 DB 路径/归档不删），幂等可断点 | R:- | A:SandboxMigrationPlanner,SandboxMusicMigrator,CloudCopyArchiver,makePlan,runIfNeeded | S:一次性前置迁移，真机行为 CI 不可验；归档到 _migrated-backup 不删除（可恢复）；按 content_hash 判同防双位置重复
+SandboxMigration.swift[PD6L]: F:iCloud ubiquity 容器→本地沙盒 Documents 存量迁移：纯逻辑 planner（按 content_hash 判同去重）+ iOS 执行器（复制/校验/切 DB 路径/归档不删），幂等可断点 | R:code:QQPlayer/Services/DatabaseManager.swift,code:QQPlayer/Services/LibraryRoot.swift,code:QQPlayer/Services/LibraryFileNaming.swift | A:SandboxMigrationPlanner,SandboxMusicMigrator,CloudCopyArchiver,makePlan,runIfNeeded | S:一次性前置迁移，真机行为 CI 不可验；归档到 _migrated-backup 不删除（可恢复）；按 content_hash 判同防双位置重复
 ScrapeBatchService.swift[AA6L]: F:批量刮削编排服务（web tags.py scrape-batch 移植）：paths/library 两模式、单批≤100、逐首限流、单文件三态结果不中断整批 | R:code:QQPlayer/Services/ScrapeLogic.swift | A:ScrapeBatchService,runBatch,decideWrite,scrapeSources,ScrapeBatchResult | S:batchEnabled 关时服务直接拒绝（UI 双保险）；paths 覆盖现有值但不写封面/track/album_artist；library 只补空 year/genre
 ScrapeLogic.swift[DA5T]: F:刮削编排纯逻辑（可单测无网络）：候选按 source_order 合并、高置信度判定、搜索 query 构造、批量字段集常数 | R:code:QQPlayer/Services/ScrapeBatchService.swift | A:ScrapeLogic,mergedCandidates,isHighConfidence,searchQuery | S:高置信度=候选数 1 或文件 artist 为空，否则首候选与文件 artist 归一化匹配
 SimplifiedTraditionalMap.swift[FL4T]: F:简→繁单字映射声明（全局懒加载 let；数据在 Resources/SimplifiedToTraditional.tsv，OpenCC + 台/台特例） | R:- | A:simplifiedToTraditionalMap | S:本文件只剩声明；读盘/解析/缓存唯一入口是 CharacterMapResourceLoader，未收录字原样保留
@@ -822,7 +817,6 @@ sync-matrix.md[SN6M]: F:局域网同步能力矩阵（实体乘协议/实现/装
 ui-design-tokens.md[SU6M]: F:macOS/iOS UI 设计令牌 L0 契约表（强调色/几何/排版唯一入口） | R:- | A:- | S:跨端色值不做对拍；两端共享字段 DeleteSettings.accentColorName 但色表各自解析
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/===
-add-grdb-to-tests.py[XV3S]: F:一次性工具：把 GRDB 链接进 QQPlayerTests target（已废弃） | R:- | A:- | S:已废弃且幂等空操作请勿执行，按守则只登记待 maintainer 删除
 add-test-file.py[XV5M]: F:把新测试文件注册进 QQPlayerTests target 的 pbxproj（4 处插入） | R:- | A:- | S:任何定位锚点找不到即报错退出绝不写坏文件；写回前必须 plutil -lint 否则回滚
 check-structural-budget.sh[XQ5T]: F:结构预算棘轮本地校验/生成入口（check/selftest/emit/emit-prints） | R:code:scripts/structural-budget-tool.swift,code:QQPlayerTests/StructuralBudgetRule.swift | A:- | S:不复制计数逻辑，口径在 StructuralBudgetRule.swift，仓库根由其 #filePath 推出
 check-target-membership.py[XQ6S]: F:Xcode 工程文件到 target 成员一致性守卫（名单完整性/Mac 自有文件/归属决策门） | R:- | A:- | S:混合目录新文件必须三选一表态否则红；可在文件头 40 行内加 // target: ios-only
