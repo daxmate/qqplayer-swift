@@ -493,3 +493,37 @@ SyncPeerLibraryClient.swift[IN6M]: F:对端内容清单发起端客户端（Mac�
 SyncPeerLibraryModels.swift[DN6M]: F:对端内容清单协议载荷（帧15/16）+ JSON 编解码：请求/响应、scope、歌单/曲目条目 | R:code:QQPlayer/Sync/SyncPeerLibraryCatalog.swift, code:QQPlayer/Sync/SyncFrame.swift | A:SyncPeerLibraryRequestPayload, SyncPeerLibraryResponsePayload, SyncPeerLibraryScope, SyncPeerPlaylistItem, SyncPeerTrackItem | S:构造期排序去重保证线上字节确定；limit/offset 由应答侧强制钳制（1...500 / >=0），请求侧只按共识取值
 SyncPeerLibraryResponder.swift[MN6T]: F:对端内容清单应答端：收 peer_library_request→读本端曲库事实→回 peer_library_response | R:code:QQPlayer/Sync/SyncPeerLibraryCatalog.swift, code:QQPlayer/Sync/SyncLibraryPassiveHost.swift | A:SyncPeerLibraryResponder | S:全程不抛（解码/事实/编码失败只记账不炸会话）；钳制在应答侧（不可信输入的最后一道闸）
 SyncPeerSession+Frames.swift[MN8M]: F:会话收帧分发与各阶段处理器：锁内纯状态迁移 + 产出效果队列 Effect，锁外由核心 flush 执行 | R:code:QQPlayer/Sync/SyncCrypto.swift, code:QQPlayer/Sync/SyncListener.swift | A:Effect, SyncPeerSession.processFrameLocked | S:处理器内可直接读写会话内部状态（核心已持锁），不再取锁；ready 后业务帧必须加密，ping 忽略、bye 优雅关闭、file_* 解密后转 onApplicationFrame
+SyncPeerSession.swift[DN8M]: F:单连接同步会话状态机，驱动握手、配对批准、业务帧解密分发与关闭，按 host/client 角色运转 | R:code:QQPlayer/Sync/SyncSessionModels.swift,code:QQPlayer/Sync/SyncQRCodec.swift | A:SyncPeerSession,onStateChange,onClosed,onApplicationFrame,pairApprovalHandler,approvePairing | S:channel 强持有 session，session 仅弱引用通道，避免循环持有
+SyncPlaybackCarryPeer.swift[PD7M]: F:播放数据跟歌走的生产装配，从 track 表与 sync_outbox 取数并接入推送/拉取阶段收尾 | R:code:QQPlayer/Sync/SyncPlaybackCarryPlan.swift | A:SyncPlaybackCarryDatabaseFacts,SyncPlaybackCarryPeer,trackFact,playbackRows | S:取数失败一律按查不到返回、绝不抛错，单条跳过不炸整车
+SyncPlaybackCarryPlan.swift[DB7M]: F:播放数据携带的平台无关领域模型与规划器，含方向、行、范围、条目、歌曲与计划，不依赖 GRDB | R:code:QQPlayer/Sync/SyncPlaybackCarryPeer.swift | A:SyncPlaybackCarryDirection,SyncPlaybackCarryRow,SyncPlaybackCarryEntry,SyncPlaybackCarrySong,SyncPlaybackCarryPlanner,SyncPlaybackCarryFactsProviding | S:-
+SyncQRCodec.swift[IS6T]: F:配对 QR 载荷的 JSON 编解码、一次性会话 nonce 生成与 Host 添加设备载荷工厂 | R:code:QQPlayer/Sync/SyncSessionModels.swift | A:SyncQRCodec,SyncQRCodecError,SyncSessionNonce,PairQRPayloadFactory | S:编解码只做结构校验，协议与指纹语义校验归 PairingStateMachine
+SyncSessionModels.swift[DN7M]: F:同步会话共享模型与端口，含信任表协议及 DeviceStore 适配、Host nonce 池、阶段/关闭原因、会话配置与传输协议 | R:code:QQPlayer/Sync/SyncPeerSession.swift | A:SyncTrustStore,SyncPairingNonceRegistry,SyncSessionPhase,SyncPeerTransport,PendingPairRequest | S:Host nonce 有有效期，过期即作废并惰性清理，用于防重放
+SyncWiringSelfCheck.swift[OO6M]: F:运行时装配自检，含探针枚举、自检项与缺口模型、检查逻辑、展示器与事实存储 | R:code:QQPlayer/Sync/SyncPeerSession.swift | A:SyncWiringProbe,SyncWiringSelfCheckItem,SyncWiringGap,SyncWiringSelfCheck,SyncWiringSelfCheckPresenter | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/ViewModels/===
+TutorialViewModel.swift[AU4T]: F:引导流程视图模型，维护当前步骤并提供前进/后退/完成动作（步骤计数当前恒为 0） | R:- | A:TutorialViewModel,currentStep,nextStep,previousStep,completeTutorial | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Views/Albums/===
+AlbumViews+AlbumDetail.swift[AU6M]: F:专辑详情页，多碟分组曲目列表、多选模式与收藏/删除操作，含封面与艺术家名加载 | R:code:QQPlayer/Views/Albums/AlbumViews+TrackRow.swift | A:AlbumDetailScreen,filteredAlbumTracks,groupedByDisc,hasMultipleDiscs,beginSelection,loadAlbumTracks | S:-
+AlbumViews+TrackRow.swift[AU5M]: F:专辑曲目行视图（长按菜单进多选）与艺术家详情包装视图 | R:code:QQPlayer/Views/Albums/AlbumViews+AlbumDetail.swift | A:AlbumTrackRowView,ArtistDetailScreenWrapper,checkFavoriteStatus,formatDuration,deleteFile | S:行根为 Button 时长按不可靠，多选入口以 Menu 为准
+AlbumViews.swift[AU5S]: F:专辑页，按 albumId 预取曲目索引的卡片列表与空态视图，替代逐卡片线性过滤 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:AlbumsScreen,rebuildAlbumTrackIndex,albumTracks,loadAlbums,EmptyAlbumsView,AlbumCardView | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Views/Artists/===
+ArtistDetailScreen.swift[AU6L]: F:艺术家详情页，归一歌手曲目/专辑缓存、多选模式、丰富版与简版布局及头部信息 | R:code:QQPlayer/Views/Artists/ArtistRowViews.swift | A:ArtistDetailScreen,loadArtistTracks,loadArtistAlbums,richArtistView,simpleView,headerSection | S:artistTracks/artistAlbums 缓存，LibraryNeedsRefresh 时刷新，避免 body 反复查库
+ArtistRowViews.swift[AU5M]: F:艺术家曲目行与专辑卡片视图，含收藏状态、封面加载与时长格式化 | R:code:QQPlayer/Views/Artists/ArtistDetailScreen.swift | A:ArtistTrackRowView,ArtistAlbumCardView,checkFavoriteStatus,loadArtwork,formatDuration,deleteFile | S:-
+ArtistsScreen.swift[AU5S]: F:艺术家列表页，加载并展示归一后的艺术家，进入详情 | R:code:QQPlayer/Views/Artists/ArtistDetailScreen.swift | A:ArtistsScreen,body,loadArtists | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Views/Library/===
+BulkPlaylistSelectionView.swift[AU5S]: F:批量加入歌单视图，选歌单、新建歌单并把所选曲目批量加入 | R:- | A:BulkPlaylistSelectionView,loadPlaylists,createPlaylist,addToPlaylist | S:-
+LibraryScreens.swift[AU6S]: F:曲库全曲与喜爱歌曲页，含曲目排序选项枚举 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:AllSongsScreen,LikedSongsScreen,TrackSortOption,shuffleAllSongs,shuffleLikedSongs,loadLikedTracks | S:-
+LibraryView+ImportSupport.swift[AU5S]: F:曲库导入支持分片，导入结果分桶计数与摘要图标颜色展示 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:ImportOutcomeTally,isEmpty,changedLibrary,summary,icon,color | S:分桶只信唯一入口 processExternalFileOutcome 的结果，不在此重复判定
+LibraryView+ResponsiveFonts.swift[AU4T]: F:曲库响应式字号分片，标题与分区标题的自适应字体修饰符 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:responsiveLibraryTitleFont,responsiveSectionTitleFont | S:-
+LibraryView+SectionRendering.swift[AU5S]: F:曲库首页分区渲染分片，按 HomeSectionId 产出对应分区视图 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:homeSectionView | S:-
+LibraryView+SectionRow.swift[AU5T]: F:曲库分区行视图，展示分区标题、图标与导航入口 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:LibrarySectionRowView,body | S:-
+LibraryView+SyncFeedback.swift[AU5T]: F:曲库同步反馈分片，同步结果提示与统一同步入口（互斥刷新并等待索引完成） | R:code:QQPlayer/Views/Library/LibraryView.swift | A:showSyncFeedback,runSync | S:等待索引走带超时的 IndexingGate，索引异常时同步按钮不会永久卡住
+LibraryView.swift[AU6M]: F:曲库根视图，导入曲目、分区组织与全局曲库交互编排 | R:code:QQPlayer/Views/Library/LibraryView+SyncFeedback.swift,code:QQPlayer/Views/Library/LibraryView+ImportSupport.swift | A:LibraryView,importMusicFiles,body | S:-
+MusicFilePicker.swift[IU4T]: F:音乐文件选择器（UIViewControllerRepresentable），封装文档选择控制器与其协调器回调 | R:code:QQPlayer/Views/Library/LibraryView.swift | A:MusicFilePicker,makeUIViewController,Coordinator,didPickDocumentsAt | S:-
+ReclaimAreaView.swift[AU6M]: F:回收区视图，列出待处理条目并支持选择、恢复（含冲突/失败统计）与二次确认后彻底删除 | R:- | A:ReclaimAreaView,selectedEntries,restore,restoreResultMessage,purge,reload | S:彻底删除需二次确认后才执行
+SearchResultsViews+AlbumRow.swift[AU5S]: F:搜索结果专辑行视图，加载专辑数据并展示 | R:- | A:SearchAlbumRowView,loadAlbumData | S:-
+SearchResultsViews+ArtistRows.swift[AU5S]: F:搜索结果艺术家行与艺术家专辑行视图，含专辑卡片与封面加载 | R:- | A:SearchArtistRowView,SearchArtistAlbumsRow,loadArtistData,SearchArtistAlbumCard | S:-
+SearchResultsViews+PlaylistRow.swift[AU4T]: F:搜索结果歌单行视图 | R:- | A:SearchPlaylistRowView,body | S:-
