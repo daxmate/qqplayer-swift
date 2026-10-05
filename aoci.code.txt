@@ -616,3 +616,31 @@ DataIntegrityMigrationTests.swift[TD8L]: F:数据层完整性回归（D1–D8）
 DatabasePathResolverTests.swift[TP5T]: F:数据库路径决策防回归：macOS 落 Application Support/QQPlayerMac、iOS 走 App Group 容器否则 Documents 兜底 | R:code:QQPlayer/Services/DatabasePathResolver.swift | A:DatabasePathResolverTests,macPathUsesApplicationSupport | S:2026-08-31 macOS 误用 App Group 路径致 GRDB 打不开、库永远为空
 DatabaseSyncCollectionFactsTests.swift[TN6M]: F:同步集合曲库事实生产实现测试（契约 C2）：歌单 slug 匹配、@favorites 口径、相对路径与指纹同源、歌词命名空间、失败路径一律查不到 | R:code:QQPlayer/Services/DatabaseSyncCollectionFacts.swift,code:QQPlayer/Sync/SyncManifestGenerator.swift | A:DatabaseSyncCollectionFactsTests,tracksInPlaylistBySlug,expanderIntegration | S:相对路径与指纹必须与 manifest 侧同源，禁自拼
 DeleteSettingsScrapingTests.swift[TC4S]: F:DeleteSettings 刮削三字段与曲库根字段 decode 兜底防回归：旧数据缺 key 回落默认、显式值往返、旧字段不再写回 | R:code:QQPlayer/Models/SettingsModels.swift | A:DeleteSettingsScrapingTests,DeleteSettingsLibraryRootTests,emptyJSONAppliesDefaults | S:-
+DesktopWindowModeStateTests.swift[TU5S]: F:桌面窗口迷你态/歌词可见性状态机测试：enterMini 与 showMainWindow 幂等、歌词可见⟹迷你激活不变量 | R:code:QQPlayer/Services/DesktopWindowModeState.swift | A:DesktopWindowModeStateTests,invariantLyricImpliesMini,reconcileNoChangeReturnsFalse | S:-
+DeviceIDTests.swift[TI5S]: F:设备 ID 测试：RFC4648 base32 编解码与非法拒绝、公钥→52 字符 ID 确定性、显示形态归一 | R:code:QQPlayer/Sync/DeviceID.swift | A:DeviceIDBase32Tests,DeviceIDGenerationTests,DeviceIDNormalizationTests | S:-
+DeviceStoreTests.swift[TD5S]: F:DeviceStore 测试：upsert 整体替换与多主机互不干扰、remove 幂等、all 按 displayName 排序、PeerRole 与列契约 | R:code:QQPlayer/Sync/SyncSessionModels.swift | A:DeviceStoreTests,upsertReplaces,columnContract | S:-
+DiscogsAPITests.swift[TN5M]: F:Discogs 客户端测试（MusicAPITests 扩展）：搜索+详情、未配置直接 nil、HTTP 错误传播、解码失败、findBestMatch 与缓存命中/过期 | R:code:QQPlayer/Services/DiscogsAPI.swift | A:DiscogsAPITests,discogsSearchAndDetails,discogsCacheExpiredDeleted | S:-
+DisplayScriptContractTests.swift[TL7L]: F:显示层简繁归一形状契约（静态扫描）：渲染路径访问须经显示层包裹、反向重写/内联映射/非资源表声明/资源加载路径守卫 | R:code:QQPlayer/Services/DisplayScriptNormalizer.swift | A:DisplayScriptContractTests,DisplayScriptContract | S:渲染路径不得直读原始字段，必须走显示层归一包裹；守卫 fail-closed
+DisplayScriptLanguageOverrideTests.swift[TL5S]: F:显示字形语言覆盖测试：存储语言有效则覆盖系统，非法/空/缺失回落系统，且与两个归一器口径一致 | R:code:QQPlayer/Services/DisplayScriptLanguageOverride.swift,code:QQPlayer/Services/DisplayScriptNormalizer.swift | A:DisplayScriptLanguageOverrideTests,storedSimplifiedChineseOverridesTraditionalSystem | S:-
+DisplayScriptNormalizerTests.swift[TL6M]: F:简繁归一器核心逻辑测试：方向判定、双向转换、次选字形归并、多简对一繁取常用字、词级保护（里/发/后/复/干） | R:code:QQPlayer/Services/DisplayScriptNormalizer.swift | A:DisplayScriptNormalizerTests,collisionCharsPickCommonSimplified,wordCorrectionGan | S:繁→简表值域必须在 BMP 内，非 BMP 字形无系统字形会显示豆腐块
+DocumentsDerivedPathGuardTests.swift[TD7M]: F:Documents 派生路径守卫测试：注入 FileManager 下各落点、存储形态换算、身份基准、迁移与 StateManager 保存链均闭合在注入根内 | R:code:QQPlayer/Services/DatabaseManager.swift | A:DocumentsDerivedPathGuardTests,everyLibraryRootCategoryConfinedToInjectedRoot | S:注入 FM 下不得经 FileManager.default 解析 Documents 路径
+DocumentsRootTestSupport.swift[TQ4T]: F:测试支撑：DocumentsRootFileManager（FileManager 子类）覆写 urls，把 Documents 根重定向到注入的临时目录 | R:code:QQPlayerTests/DocumentsDerivedPathGuardTests.swift | A:DocumentsRootFileManager | S:-
+EQFrequencyTests.swift[TB4T]: F:EQ 频点纯逻辑测试：bandCount 非正返回空、单 band 为 1000Hz、超 16 裁剪、单调递增、20Hz–20kHz 边界 | R:- | A:EQFrequencyTests,singleBand,clampTo16 | S:-
+EnvironmentInjectionContractTests.swift[TG8L]: F:组合根装配契约：视图消费 @Environment(T.self) ⟹ 对应平台组合根必须装配该类型的静态守卫 | R:- | A:EnvironmentInjectionContractTests,EnvironmentInjectionContract | S:-
+FavoriteBatchLogicTests.swift[TB5S]: F:批量收藏/取消收藏纯逻辑测试：目标态推导、混合选择不取反已喜欢、幂等空操作、去重保序、每 id 只查一次 | R:code:QQPlayer/Services/FavoriteBatchLogic.swift | A:FavoriteBatchLogicTests,mixedSelectionKeepsAlreadyLiked,deduplicatesAndKeepsOrder | S:-
+FileCleanupManagerTests.swift[TP6M]: F:曲库调和清理测试：空根一条不删、文件缺失走全量删除、格式未收录保留收藏/歌单/历史、根枚举失败不删 | R:code:QQPlayer/Services/FileCleanupManager.swift | A:FileCleanupManagerTests,emptyRootsDeleteNothing,formatDisabledFileKeepsUserData | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayerTests/Fixtures/===
+README.md[TQ3T]: F:测试夹具目录说明：棘轮基线只减不增、已清理无 target 归属的音频夹具 | R:- | A:- | S:音频夹具唯一来源是 TestAudioFixtures.swift（内嵌 base64）
+character-maps.baseline.sha256[TQ4T]: F:简繁映射表基线哈希（两个 baseline.tsv 的 sha256），由 CharacterMapResourceTests 守住 | R:code:QQPlayerTests/CharacterMapResourceTests.swift | A:- | S:哈希 = 改造前字面量 dump；由 gen-character-maps.sh --ref HEAD 生成
+dangerous-operators-baseline.tsv[TQ5T]: F:「一崩了之」操作存量清单（try!/as!/fatalError(）棘轮基线 | R:code:QQPlayerTests/DangerousOperatorContractTests.swift | A:- | S:只减不增；新增写法或计数回涨即红
+observation-migration-baseline.tsv[TQ5T]: F:@Observable 迁移棘轮基线（2026-09-18 批 1 立） | R:code:QQPlayerTests/ObservationMigrationContractTests.swift | A:- | S:只减不增；整改到更少必须同步删/改小本行
+reclaim-area-shape.tsv[TQ4T]: F:回收区管理形状契约白名单（路径+模式） | R:code:QQPlayerTests/ReclaimAreaShapeContractTests.swift | A:- | S:白名单外出现移动/删除回收区条目的组合即红
+shared-singleton-baseline.tsv[TQ5M]: F:视图层直连单例（<Type>.shared）存量棘轮基线 | R:code:QQPlayerTests/ViewSharedSingletonContractTests.swift | A:- | S:只减不增；新增视图文件直连或计数回涨即红
+shared-singleton-budget-plan.md[TQ5L]: F:视图层单例收口下降预算账本+分批计划（只描述计划与账目，非执行者） | R:code:QQPlayerTests/ViewSharedSingletonContractTests.swift | A:- | S:计划迁了但基线没降算未完成，由「名单不腐烂」契约守护
+simplified-to-traditional.baseline.tsv[TQ5L]: F:简→繁映射表逐键基线（码点升序，键与值 TSV），下沉改造前 dump | R:code:QQPlayerTests/CharacterMapResourceTests.swift | A:- | S:字节不可改；运行期表与 bundle 资源都须与此基线一致
+structural-budget-print-baseline.tsv[TQ4T]: F:裸 print( 存量棘轮基线 | R:code:QQPlayerTests/StructuralBudgetContractTests.swift | A:- | S:只减不增；口径见 StructuralBudgetRule.swift
+structural-budget-size-baseline.tsv[TQ4T]: F:超长文件（>600 行）存量棘轮基线 | R:code:QQPlayerTests/StructuralBudgetContractTests.swift | A:- | S:只减不增；新增未登记的超长文件即红
+track-deletion-shape.tsv[TQ4T]: F:曲目删除语义文件动作调用点白名单（trashItem / track-file-deletion） | R:code:QQPlayerTests/TrackDeletionShapeContractTests.swift | A:- | S:白名单外 trashItem 或 removeItem+deleteTrack( 同现即红
+traditional-to-simplified.baseline.tsv[TQ5L]: F:繁→简映射表逐键基线（码点升序，键与值 TSV），下沉改造前 dump | R:code:QQPlayerTests/CharacterMapResourceTests.swift | A:- | S:字节不可改；运行期表与 bundle 资源都须与此基线一致
+view-data-access-baseline.tsv[TQ4T]: F:视图层 DatabaseManager 直连存量棘轮基线 | R:code:QQPlayerTests/ViewDataAccessContractTests.swift | A:- | S:只减不增；整改到 0 或文件消失必须删本行
