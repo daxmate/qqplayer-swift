@@ -835,6 +835,7 @@ pbxproj-membership.py[XV5S]: F:把新文件登记进 QQPlayer.xcodeproj folder-s
 run-local-sync-tests.sh[TN5S]: F:M3-3b 无模拟器本地 harness：swiftc 直编生产源码跑同构断言 | R:code:scripts/sync-harness/main.swift,code:scripts/sync-harness/closure_resolver.py | A:- | S:编译集自动发现加补闭包，无解即 exit 1 点名绝不静默降级；R1b-2 起发起方恒为 Mac
 siri-tests-guard.py[TQ5S]: F:QQPlayerSiriTests 防烂掉守护（工具链无 AppIntentsTesting 无法编译） | R:- | A:- | S:该 target 不在任何 scheme Testables 也无法编译，只做编译级结构级验证；豁免不得永久静默
 structural-budget-tool.swift[XQ5S]: F:结构预算棘轮本地工具（check/selftest/emit/emit-prints） | R:code:QQPlayerTests/StructuralBudgetRule.swift | A:- | S:直接编译口径实现不重写计数逻辑；重新生成基线只允许收紧不得顺手登记新违规
+xcbuild.sh[XV6T]: F:QQPlayer 统一构建入口（固定共享 SPM 缓存 + 按 worktree 隔离 DerivedData） | R:- | A:- | S:所有 worktree 与子代理一律走本脚本禁止裸 xcodebuild；用目录锁全局串行化构建防并发清空共享 clone 缓存
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/git-hooks/===
 pre-commit[XQ6S]: F:提交前钩子：swiftformat/swiftlint 加编译警告零容忍加 target 成员检查 | R:code:scripts/git-hooks/pre-push | A:- | S:构建一律走 scripts/xcbuild.sh 禁裸 xcodebuild；环境问题可 SKIP_WARNING_CHECK=1 绕过 CI 兜底
