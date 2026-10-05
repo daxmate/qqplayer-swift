@@ -527,3 +527,32 @@ ReclaimAreaView.swift[AU6M]: F:回收区视图，列出待处理条目并支持�
 SearchResultsViews+AlbumRow.swift[AU5S]: F:搜索结果专辑行视图，加载专辑数据并展示 | R:- | A:SearchAlbumRowView,loadAlbumData | S:-
 SearchResultsViews+ArtistRows.swift[AU5S]: F:搜索结果艺术家行与艺术家专辑行视图，含专辑卡片与封面加载 | R:- | A:SearchArtistRowView,SearchArtistAlbumsRow,loadArtistData,SearchArtistAlbumCard | S:-
 SearchResultsViews+PlaylistRow.swift[AU4T]: F:搜索结果歌单行视图 | R:- | A:SearchPlaylistRowView,body | S:-
+SearchResultsViews+SongRow.swift[AU5M]: F:搜索结果歌曲行：播放态高亮、收藏状态、封面加载与删除操作 | R:code:QQPlayer/Views/Player/TrackRowView.swift | A:SearchSongRowView,isCurrentlyPlaying,checkFavoriteStatus,loadArtwork,deleteFile | S:-
+SearchResultsViews.swift[AU5M]: F:搜索分类枚举、结果模型与搜索结果视图，按分类展示歌曲/艺术家/专辑/歌单行 | R:code:QQPlayer/Views/Library/SearchResultsViews+SongRow.swift | A:SearchCategory,SearchResults,SearchResultsView,loadArtistCache | S:dismiss() 无已收起回调，需要真等待处改用状态驱动导航
+SearchView.swift[AU5M]: F:搜索页，执行查询并并行拉取歌曲/艺术家/专辑/歌单结果后展示结果列表 | R:code:QQPlayer/Views/Library/SearchResultsViews.swift | A:SearchView,performSearch,body | S:-
+TrackBulkSelection.swift[AU6S]: F:可复用的多选工具栏修饰符，含全选、批量收藏、批量加入歌单与删除确认，以及行选中勾选指示器 | R:code:QQPlayer/Views/Library/TrackListView.swift | A:TrackBulkActionsModifier,trackBulkActions,bulkSetLiked,orderedSelection,bulkDelete,TrackSelectionIndicator | S:bulkSetLiked 为幂等设置（文案即目标状态），不做逐曲取反
+TrackListView.swift[AU6L]: F:曲库曲目列表，含排序、多选批量操作、歌手名缓存与列表内容渲染 | R:code:QQPlayer/Views/Library/TrackBulkSelection.swift | A:TrackListView,sortedTracks,selectedTracksInListOrder,loadSortPreference,TrackListContentView | S:批量收藏幂等（加入喜欢=全设已喜欢）；选中按列表顺序，不依赖 Set 顺序
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Views/Player/===
+CollapsiblePlayerControls.swift[AU6M]: F:播放页折叠控制容器，常驻进度条、上一首/播放暂停/下一首三键与上滑展开的工具行 | R:code:QQPlayer/Views/Player/PlayerView+PageGestures.swift | A:CollapsiblePlayerControls,threeButtonRow,playPauseButton,expandedSection,mainToolRow | S:展开/收起由整页手势驱动，容器内不得再挂 DragGesture，避免两套阈值冲突
+KaraokeControlBar.swift[AU5M]: F:跟唱模式控制条，句级播放控制、倍速菜单、单句循环与 AB 循环切换 | R:- | A:KaraokeControlBar,currentLineIndex,isWaitingABEnd,abLabel,speedButton | S:状态全部读自 KaraokeController，本组件只消费不做决策；AB 用单击切换而非长按
+LyricsSearchView.swift[AU5L]: F:歌词搜索页，含搜索栏、结果列表、来源着色与选中候选应用或恢复自动 | R:- | A:LyricsSearchView,doSearch,apply,resultRow,sourceColor | S:-
+LyricsView+EmptyStates.swift[AU4M]: F:歌词页空态分片，纯音乐/无歌词/加载中三种占位视图 | R:code:QQPlayer/Views/Player/LyricsView.swift | A:instrumentalView,noLyricsView,loadingView | S:-
+LyricsView+LyricsContent.swift[AU5M]: F:歌词内容分片，同步歌词逐行渲染（译文/罗马音字号颜色阶梯）、纯文本歌词与活动行滚动 | R:code:QQPlayer/Views/Player/LyricsView.swift | A:syncedLyricsView,lyricLineView,plainLyricsView,updateActiveLineAndScroll | S:-
+LyricsView.swift[AU6S]: F:全屏歌词视图，组合内容/空态分片并按播放进度滚动活动行 | R:code:QQPlayer/Views/Player/LyricsView+LyricsContent.swift,code:QQPlayer/Views/Player/LyricsView+EmptyStates.swift | A:LyricsView,body | S:仅 activeIndex 变化时才 scrollTo，避免每 tick 全量遍历与无效滚动
+PlayerGestureLogic.swift[KU6S]: F:播放页纯逻辑，含歌词时间轴行定位、各页滑动手势关闭判定与整页手势起手区域划分 | R:code:QQPlayer/Views/Player/PlayerView+PageGestures.swift | A:LyricTiming,PlayerDismissGesture,PlayerPageRegion | S:-
+PlayerOverlays.swift[AU6M]: F:播放页浮层，含封面下小歌词窗、LiveLyricsSheet、迷你播放器与渲染型进度叶 | R:code:QQPlayer/Views/Player/PlayerView.swift | A:LyricMiniSection,LiveLyricsSheet,MiniPlayerView | S:歌词与进度以独立 struct 观察，避免整个 PlayerView 每秒多次重绘
+PlayerProgressViews.swift[AU5S]: F:进度相关子视图，含均衡器条、进度段落与可交互进度条 | R:code:QQPlayer/Views/Player/PlayerView+PageGestures.swift | A:EqualizerBarsExact,PlayerProgressSection,InteractiveProgressBar | S:快速变化的进度观察下沉到本子视图，避免整个 PlayerView 每秒重算四次
+PlayerUtilityViews.swift[IU4T]: F:播放页 UIKit 桥接，含 AVRoutePickerView 宿主与宿主 UIViewController.view 访问器 | R:code:QQPlayer/Views/Player/PlayerView.swift | A:RoutePickerHost,HostingViewAccessor | S:RoutePickerHost 必须常驻视图层级，离屏创建会因 subviews 为空致 AirPlay 弹窗静默失效
+PlayerView+Artwork.swift[AU6M]: F:播放页封面分片，封面区渲染、相邻封面预载、横滑切歌手势与封面加载 | R:code:QQPlayer/Views/Player/PlayerView.swift | A:artworkSection,artworkDragGesture,completeArtworkSwipe,loadAllArtworks | S:-
+PlayerView+PageGestures.swift[AU6M]: F:播放页整页手势分片，起手区域判定、横滑开歌词/搜索、上滑展开与下滑收起或缩回 | R:code:QQPlayer/Views/Player/PlayerGestureLogic.swift,code:QQPlayer/Views/Player/PlayerProgressViews.swift | A:PlayerPageCoordinateSpace,pageRegion,progressRegionFrame,pageDragGesture,openPageForHorizontalSwipe | S:进度条触摸区取实测 frame 外扩 slop，不得写死固定高度
+PlayerView+PlaybackSupport.swift[AU5T]: F:播放页支持分片，含睡眠定时器、曲目加载、收藏状态检查与 AirPlay 选择器触发 | R:code:QQPlayer/Views/Player/PlayerUtilityViews.swift | A:startSleepTimer,cancelSleepTimer,loadTracks,showAirPlayPicker | S:AirPlay 依赖常驻 RoutePickerHost，系统版本变化时递归查找按钮可能失败并打日志降级
+PlayerView+TitleAndLyrics.swift[AU5M]: F:播放页标题/歌词分片，含标题歌手按钮、收藏与加入歌单按钮、小歌词窗、空态与歌词加载 | R:code:QQPlayer/Views/Player/PlayerView.swift | A:titleAndArtistSection,loadTrackMetadata,lyricMiniSection,emptyStateView,loadLyrics | S:-
+PlayerView.swift[AU7M]: F:全屏播放器根视图，组合封面/标题/控制/进度并驱动整页手势与下拉缩回 | R:code:QQPlayer/Views/Player/PlayerView+Artwork.swift,code:QQPlayer/Views/Player/PlayerView+PageGestures.swift | A:PlayerView,ArtworkSwipeDirection | S:封面下拉方向首次判定后锁定，防指尖微斜致横/纵分支翻转抖动
+QueueManagementView.swift[AU6M]: F:播放队列管理，含曲目重排、删除、跳转与队列行渲染 | R:code:QQPlayer/Views/Player/TrackRowView.swift | A:QueueManagementView,moveItems,deleteItems,jumpToTrack,QueueTrackRow | S:artistName 取用顺序为缓存优先、DB 兜底，不得先查库再用缓存
+TrackRowView.swift[AU6M]: F:通用曲目行视图，含播放态、归一歌手名、收藏、封面、删除与移出歌单 | R:- | A:TrackRowView,isCurrentlyPlaying,resolvedArtistName,loadArtwork,deleteFile | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Views/Playlists/===
+PlaylistCardView.swift[AU6M]: F:歌单卡片视图，含封面拼图、自定义封面读取与保存及 Widget 刷新 | R:- | A:PlaylistCardView,artworkView,loadArtworks,loadCustomCover,saveCustomCover | S:自定义封面读取失败必须登记（INV-22），读不到不得静默
+PlaylistDetailScreen+CustomCover.swift[AU5S]: F:歌单详情自定义封面分片，含封面渲染、失败读取态与加载/保存/移除自定义封面 | R:code:QQPlayer/Views/Playlists/PlaylistCardView.swift | A:artworkView,customCoverFailure,loadCustomCover,saveCustomCover,removeCustomCover | S:customCoverFailure 为 nil 表示未配封面或读取成功，非 nil 才是读取失败
+PlaylistDetailScreen+DataLoading.swift[AU5T]: F:歌单详情数据分片，含曲目加载、歌手名缓存与封面批量加载 | R:- | A:buildArtistCache,loadPlaylistTracks,loadArtworks,loadArtistNameCache | S:-
