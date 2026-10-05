@@ -808,3 +808,42 @@ ShareViewController.swift[EU5M]: F:分享扩展控制器：接收音频文件与
 Info.plist[FU5T]: F:Siri 意图扩展清单：intents-service 扩展点、支持 INPlayMediaIntent 与 INAddMediaIntent、媒体类别限音乐、principal class IntentHandler | R:code:SiriIntentsExtension/IntentHandler.swift | A:NSExtension,IntentsSupported | S:仅支持播放与添加媒体意图，且媒体类别限音乐
 IntentHandler.swift[EU6L]: F:Siri 意图处理：播放与添加媒体意图、模糊搜索排序（levenshtein 相似度与 siriSearchScore）、扩展内数据库访问、诊断日志 | R:- | A:IntentHandler,ExtensionDatabaseAccess,levenshteinDistance,siriSearchScore,RankedSimpleTrack | S:扩展须自建数据库访问，不得依赖主 App 进程
 SiriIntentsExtension.entitlements[FS5T]: F:Siri 意图扩展授权：只声明 App Group group.com.daxmate.qqplayer.ios | R:- | A:com.apple.security.application-groups | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/docs/compliance/===
+upstream-permission.md[SS7T]: F:GPLv3 §7 附加许可凭据，授权 QQPlayer 经 Apple App Store 分发（授权人 Raphael Boullay Le Fur / clquwu） | R:- | A:- | S:引文原文禁止删除或修改，授权仅覆盖与 GPL-3.0 冲突的平台条款
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/docs/===
+lan-sync-design.md[SN7M]: F:iOS↔macOS 局域网配对与同步 v1 设计（Ed25519 TOFU + QR 扫码，Host-Client 模型） | R:code:docs/sync-contract.md,code:docs/sync-invariants.md,code:docs/sync-matrix.md | A:- | S:移动端为瘦客户端，无下载/刮削 UI；协议层平台无关，为 Windows/Android/web(NAS) 预留插槽
+library-storage-contract.md[SD7M]: F:iOS 曲库存储/扫描决策文字契约（布局、曲库判定、扫描时机、真删除、旧位置） | R:code:docs/sync-contract.md,code:docs/sync-invariants.md,code:docs/logging.md | A:- | S:每条规则附唯一实现处加行号与守护测试；docs/ 在 .gitignore 需 git add -f 强制入库
+logging.md[SO6S]: F:统一结构化日志出口 AppLog 的契约与轮转策略 | R:- | A:- | S:AppLog 是唯一出口禁止裸 print；阈值优先级 QQPLAYER_LOG_LEVEL 高于 UserDefaults 高于构建默认（Debug=debug, Release=info）
+sync-contract.md[SN7S]: F:局域网同步 L0 需求真相（逐实体六列承诺：权威端/删除/触发/失败披露/身份键） | R:code:docs/lan-sync-design.md,code:docs/sync-matrix.md,code:docs/sync-invariants.md | A:- | S:「不承诺」也须写明且不得实现；改本文件须用户确认后才可动代码
+sync-invariants.md[SN7M]: F:局域网同步不变量清单（每条附现有守护与建议守护形式） | R:code:docs/sync-matrix.md | A:- | S:标「无守护」的不变量目前只活在文档或注释里，是事故高发类
+sync-matrix.md[SN6M]: F:局域网同步能力矩阵（实体乘协议/实现/装配/测试/披露五列） | R:code:docs/sync-invariants.md | A:- | S:五件事不是一回事，装配与披露是最常见缺口
+ui-design-tokens.md[SU6M]: F:macOS/iOS UI 设计令牌 L0 契约表（强调色/几何/排版唯一入口） | R:- | A:- | S:跨端色值不做对拍；两端共享字段 DeleteSettings.accentColorName 但色表各自解析
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/===
+add-grdb-to-tests.py[XV3S]: F:一次性工具：把 GRDB 链接进 QQPlayerTests target（已废弃） | R:- | A:- | S:已废弃且幂等空操作请勿执行，按守则只登记待 maintainer 删除
+add-test-file.py[XV5M]: F:把新测试文件注册进 QQPlayerTests target 的 pbxproj（4 处插入） | R:- | A:- | S:任何定位锚点找不到即报错退出绝不写坏文件；写回前必须 plutil -lint 否则回滚
+check-structural-budget.sh[XQ5T]: F:结构预算棘轮本地校验/生成入口（check/selftest/emit/emit-prints） | R:code:scripts/structural-budget-tool.swift,code:QQPlayerTests/StructuralBudgetRule.swift | A:- | S:不复制计数逻辑，口径在 StructuralBudgetRule.swift，仓库根由其 #filePath 推出
+check-target-membership.py[XQ6S]: F:Xcode 工程文件到 target 成员一致性守卫（名单完整性/Mac 自有文件/归属决策门） | R:- | A:- | S:混合目录新文件必须三选一表态否则红；可在文件头 40 行内加 // target: ios-only
+detect-device-test.py[TH4S]: F:detect-device.py 选择判据的自测（纯 stdlib 无需真机） | R:code:scripts/detect-device.py | A:- | S:fixture 取自 2026-09-20 真机实测字段形状（iPhone 16 Pro tunnel disconnected 是旧判据误报点）
+detect-device.py[XH5T]: F:从 devicectl list 输出挑出可用于构建/安装的 iOS 真机 | R:- | A:- | S:不能只认 tunnelState 等于 connected（按需建立会误报）；字段缺失一律放行仅已知坏值才拒
+gen-character-maps.sh[XL5S]: F:由 Swift 字面量映射表 dump 出简繁 TSV 资源与基线夹具的唯一生成器 | R:- | A:- | S:--ref 必须是还没下沉的版本；资源与夹具同一次 dump 写出保证字节一致；键值须单一 Unicode 标量
+gen-traditional-to-simplified.py[XL5S]: F:由 OpenCC TSCharacters.txt 生成繁到简单字映射 Swift 源 | R:code:QQPlayer/Services/TraditionalToSimplifiedMap.swift | A:- | S:必须用 OpenCC 权威繁到简数据，禁止由简到繁表反转（反转会因哈希序产生豆腐块）
+gen-zh-hant.py[XL5M]: F:由 zh-Hans Localizable.strings 生成台湾繁体 zh-Hant（简到繁单字映射） | R:code:QQPlayer/Services/CharacterMapResourceLoader.swift | A:- | S:单字表无法处理词组级差异，脚本输出台湾用词校对候选需人工过一遍再提交
+pbxproj-membership.py[XV5S]: F:把新文件登记进 QQPlayer.xcodeproj folder-sync 例外表 | R:- | A:- | S:只改指定 target 的 membershipExceptions 块；字母序插入已存在幂等跳过写回前 plutil -lint 失败回滚
+run-local-sync-tests.sh[TN5S]: F:M3-3b 无模拟器本地 harness：swiftc 直编生产源码跑同构断言 | R:code:scripts/sync-harness/main.swift,code:scripts/sync-harness/closure_resolver.py | A:- | S:编译集自动发现加补闭包，无解即 exit 1 点名绝不静默降级；R1b-2 起发起方恒为 Mac
+siri-tests-guard.py[TQ5S]: F:QQPlayerSiriTests 防烂掉守护（工具链无 AppIntentsTesting 无法编译） | R:- | A:- | S:该 target 不在任何 scheme Testables 也无法编译，只做编译级结构级验证；豁免不得永久静默
+structural-budget-tool.swift[XQ5S]: F:结构预算棘轮本地工具（check/selftest/emit/emit-prints） | R:code:QQPlayerTests/StructuralBudgetRule.swift | A:- | S:直接编译口径实现不重写计数逻辑；重新生成基线只允许收紧不得顺手登记新违规
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/git-hooks/===
+pre-commit[XQ6S]: F:提交前钩子：swiftformat/swiftlint 加编译警告零容忍加 target 成员检查 | R:code:scripts/git-hooks/pre-push | A:- | S:构建一律走 scripts/xcbuild.sh 禁裸 xcodebuild；环境问题可 SKIP_WARNING_CHECK=1 绕过 CI 兜底
+pre-push[XQ6S]: F:推送前门禁：main 禁 merge 提交加 swiftformat/swiftlint 加成员归属加非 main 分支拦截 | R:code:scripts/git-hooks/pre-commit | A:- | S:只允许直推 main 推候选分支不可绕过（QQPLAYER_ALLOW_BRANCH_PUSH 例外已拆）；不跑编译测试
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/sync-harness/===
+GRDBShim.swift[TN4T]: F:harness 专用最小 GRDB 模块桩（两个 Record 协议）不参与 App target | R:- | A:- | S:只给出同名空协议即可编译未改动的生产源码；单独编为 module GRDB 后 link
+HarnessSupport.swift[TN4M]: F:本地 harness 夹具：内存信任表加回环通道加双 ready 会话 | R:- | A:- | S:去掉 @testable import QQPlayer 以便 swiftc 直编；不参与 App target 编译
+Stubs.swift[TN4M]: F:本地 harness 专用桩：Track/DatabaseManager/DeviceStore 等最小替身 | R:- | A:- | S:被测逻辑全部是真实源码文件；harness 行一律无 id 故内容哈希兜底回填分支恒不触发
+blacklist.txt[TN4T]: F:本地 harness 编译集黑名单（只放确实编不进命令行的生产文件） | R:code:scripts/sync-harness/closure_resolver.py | A:- | S:自带两道守卫（路径须存在、声明仍被生产代码引用）违反即 exit 1；不许静默剔除
+closure_resolver.py[TN5M]: F:本地 harness 编译集依赖闭包解析器（自动发现加补闭包加缓存） | R:code:scripts/sync-harness/blacklist.txt,code:scripts/run-local-sync-tests.sh | A:- | S:四条硬约束：不静默降级不悄悄漏文件桩优先黑名单自带守卫；按内容哈希缓存
+main.swift[TN5L]: F:M3-3b 无模拟器本地 harness 主体：帧编解码/路径解析/控制器状态机/端到端场景 | R:code:scripts/run-local-sync-tests.sh,code:scripts/sync-harness/HarnessSupport.swift | A:- | S:启动时用 directoryOverride 把歌词库默认目录改到临时目录，避免读写用户真实 ~/Documents 挂死
