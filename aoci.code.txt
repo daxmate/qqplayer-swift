@@ -13,6 +13,8 @@ NOTICE.md[SG6T]: F:来源声明：QQPlayer 是 Cosmos Music Player 的 GPL-3.0 �
 PRIVACY.md[SG6S]: F:中英双语隐私政策：不收集个人数据；音乐文件仅本地/iCloud；歌词请求会向第三方发送曲名与艺术家 | R:- | A:- | S:歌词功能联网向网易云音乐与 LRCLIB 发送歌曲标题与歌手名（政策已披露），新增联网或数据功能须同步更新本政策
 PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 entitlements，App Group group.com.daxmate.qqplayer.ios | R:code:PlayerWidget/PlayerWidget.entitlements | A:- | S:App Group 必须与主 App 一致，否则 Widget 扩展无法访问共享容器
 QQPlayerMac-Info.plist[FN5T]: F:macOS target 的 Info.plist 补充片段：用显式 plist 承载数组型键 NSBonjourServices（_qqplayer-sync._tcp） | R:code:QQPlayer/Info.plist,code:QQPlayer/Sync/SyncListener.swift,code:QQPlayer/Sync/SyncBrowser.swift | A:NSBonjourServices | S:INFOPLIST_KEY_NSBonjourServices 不被 Xcode 支持，须显式 plist 合并；服务类型三处必须一致
+README.md[SG6L]: F:项目总览：fork 声明与 GPL-3.0、iOS 与 macOS 双平台矩阵与系统要求、功能清单（播放/歌词/同步/生态）、构建与仓库信息 | R:- | A:README | S:整体以 GPL-3.0 发布，须保留 fork 与上游署名声明
+build.sh[XV6S]: F:一键构建与安装：模拟器构建、iOS 真机签名安装与启动、macOS 构建与覆盖安装、双端；设备探测与共享 SPM 缓存注入 | R:code:scripts/xcbuild.sh | A:build_sim,build_install_ios,build_install_mac,detect_udid | S:必须清空 CC 与 CXX 防劫持，构建一律走 scripts/xcbuild.sh，禁裸 xcodebuild
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/.github/workflows/===
 ci.yml[OQ8M]: F:CI 三个 job——iOS swiftlint/swiftformat/xcodebuild 单测、swiftc 直编的本地同步 harness、macOS QQPlayerMac 构建与资源产物断言 | R:- | A:- | S:QQPlayerSiriTests 不参与且本地不可编译（Xcode 26.6 SDK 无 AppIntentsTesting），改由 scripts/siri-tests-guard.py 结构守护，测试文件禁删禁降级；源码与工程级编译警告零容忍，Debug 增量会掩盖存量警告
@@ -760,6 +762,24 @@ SyncResultConclusionTests.swift[TU5M]: F:同步结论文案：文件同步成功
 SyncSelectionStoreTests.swift[TD5S]: F:同步选择集持久化：全类型 roundtrip、丢弃非法歌单 ID 与路径、损坏或错形状或未知 kind 与 version 回落、加载后再规范化、不触碰标准 defaults | R:code:QQPlayer/Services/SyncSelectionStore.swift | A:SyncSelectionStoreTests,roundTripAllKinds,saveDropsInvalidPlaylistIDs,corruptedJSONFallsBack | S:读写须限定自有 key，不得污染 UserDefaults.standard
 SyncTransferDirectionTests.swift[TD5M]: F:同步方向与期望计划：上传请求全量、下载映射、空歌单保持空；源映射、上传计划用本地清单、下载计划用对端清单、相对路径用选择集、结果确定 | R:code:QQPlayer/Sync/SyncCollectionSelection.swift | A:SyncTransferDirectionTests,uploadRequestsAll,downloadMapping,expectedDeterministic | S:下载方向以对端清单为准，上传方向以本地清单为准
 SyncTransferIdentityTests.swift[TN7L]: F:传歌身份端到端：经 peer 传输后内容哈希映射回稳定 ID、接收落盘触发索引、断点续传保持身份、越根请求拒绝 | R:code:QQPlayer/Sync/SyncChangeLogPeer.swift | A:SyncTransferIdentityTests,TransferSinkSpy | S:传歌落地后须按内容哈希重新定位稳定 ID，不得依赖原路径
+SyncUIDirectionContentTests.swift[TU6L]: F:同步页方向驱动内容源与开始门：无方向或上传取本端或下载取对端；方向压过空选择、连接态与运行态优先；对端内容错误映射 | R:code:QQPlayer/Services/SyncUIDirectionContent.swift,code:QQPlayer/Services/SyncUIState.swift | A:SyncUIContentSourceResolverTests,SyncUIStartGateDirectionTests,SyncUIPeerContentErrorTests | S:-
+SyncUIStateTests.swift[TU6L]: F:同步开始门纯逻辑：未配对或已配对未连接或已连接无会话或运行中压过空选择或空选择或就绪，仅就绪可开始；目标离线阻断开始 | R:code:QQPlayer/Services/SyncUIState.swift | A:SyncUIStartGateTests,SyncUIStartGateTargetTests,canStartOnlyWhenReady,targetOfflineBlocksStart | S:-
+SyncWiringContractTests.swift[TQ7L]: F:同步装配契约：声明能力清单与组装点、扫描源码查缺标记、基线差异（缺失与多余）、按仓库路径收集 swift 源与逐项自检 | R:code:QQPlayer/Sync/SyncEntityRegistry.swift,code:QQPlayer/Sync/SyncEntityRegistry+Assembly.swift | A:SyncWiringContract,requirement,baselineDiff,missingMarkers,swiftSources | S:基线差异须同时报缺失与多余，防止能力静默掉线
+SyncWiringSelfCheckTests.swift[TQ6M]: F:装配自检报告：无缺口或单缺口或多缺口保序、不适用不算缺口、条目来自注册声明、每探针只声明一次、presenter 文案覆盖五语言 | R:code:QQPlayer/Sync/SyncWiringSelfCheck.swift,code:QQPlayer/Sync/SyncEntityRegistry.swift | A:SyncWiringSelfCheckTests,noGapsWhenEverythingAttached,singleGapIsReported,wiringStringsCoverFiveLanguages | S:presenter 文案须覆盖五语言，缺一即视为缺口
+TagRenameLogicTests.swift[TD6S]: F:标签改名模板渲染：默认艺人-标题或仅标题或仅艺人或全空或空白或非法字符或去空白；自定义模板字段替换 | R:code:QQPlayer/Services/TagRenameLogic.swift | A:TagRenameLogicTests,defaultArtistTitle,defaultInvalidChars,customTrack | S:非法文件名字符须替换，全空输入仍产出合法名
+TagWriterTests.swift[TD6M]: F:标签写回：MP3 与 FLAC 与 M4A roundtrip、封面写入与移除、genres 经 SFB 写入、不支持格式保持原文件、部分写入保留其余字段、随改名的文件移动 | R:code:QQPlayer/Services/TagWriterService.swift | A:TagWriterTests,mp3RoundTrip,flacRoundTrip,coverWriteAndRemove,unsupportedFormatLeavesFileIntact | S:不支持的格式须保持原文件不动，不得半写
+TestAudioFixtures.swift[TQ4M]: F:测试音频夹具：从内嵌 base64 写指定扩展名的音频文件，供标签与解码类测试使用 | R:- | A:TestAudioFixtures,writeFixture | S:-
+TrackContentHashTests.swift[TD7L]: F:content_hash 列：旧 schema 迁移加列、upsert 为现有文件现算、缺失文件留 nil、回填补有跳过缺失保留已有、跳过无数据云曲目、云下载后回填 | R:code:QQPlayer/Services/DatabaseManager+ContentHash.swift | A:TrackContentHashTests,legacySchemaMigrationAddsContentHashColumn,backfillFillsExistingSkipsMissingKeepsExistingHash,backfillSkipsDatalessCloudTracks | S:回填须保留已有哈希、跳过无数据云曲目，不得覆盖为 nil
+TrackDeletionReclaimAreaTests.swift[TD6L]: F:删除回收区：回收区由曲库根派生、目标名用内容哈希与扩展名、冲突追加后缀；含纯逻辑与账目夹具 | R:code:QQPlayer/Services/TrackDeletionService.swift | A:DeleteReclaimAreaPureTests,reclaimAreaDerivesFromLibraryRoot,destinationUsesContentHashAndExtension,destinationAppendsSuffixOnConflict | S:回收区目标名须含内容哈希，冲突追加后缀而非覆盖
+TrackDeletionServiceTests.swift[TD7L]: F:曲目删除服务：平台默认项为数据、库内文件移入回收区、越根拒绝、进度回报、账目错误路径 | R:code:QQPlayer/Services/TrackDeletionService.swift | A:TrackDeletionServiceTests,platformDefaultsAreData,libraryOnlyMovesFileInsideRootToReclaimArea | S:仅库内文件可移动，越根一律拒绝
+TrackDeletionShapeContractTests.swift[TD6M]: F:删除形状契约：文件动作调用只准出现在单一入口、白名单真实且不过期，基于源码扫描 | R:code:QQPlayer/Services/TrackDeletionService.swift | A:DeleteShapeContract,TrackDeletionShapeContractTests,fileActionCallsAreConfinedToTheSingleEntry,whitelistIsRealAndNotStale | S:文件删除动作只准出现在单一入口，白名单须非空且不过期
+TrackFileRenameServiceContractTests.swift[TD6M]: F:文件改名契约：改名调用唯一入口、命名入口不得引用 TagWriter、备份目录排除扫描、扫描器自证 | R:code:QQPlayer/Services/TrackFileRenameService.swift | A:TrackFileRenameContract,TrackFileRenameServiceContractTests,renameCallHasSingleEntry,namingEntryDoesNotReferenceTagWriter | S:改名与命名入口必须分离，命名不得引用 TagWriter
+TrackIdentityFileMigrationTests.swift[TD7L]: F:身份文件迁移：五类歌词文件全成功且计数精确、已存在目标跳过且保留源、不可写目录失败但不回滚已成功项 | R:code:QQPlayer/Services/TrackIdentityMigration.swift | A:TrackIdentityFileMigrationReportTests,allFiveTargetsSucceedWithExactCounts,unwritableLyricsDirectoryFailsWithoutRollingBackSuccesses | S:已存在目标须跳过并保留源，失败不回滚已成功项
+TrackIdentityTableContractTests.swift[TD7L]: F:identity 表契约：迁移源码扫描、含 identity 列的 schema 表集合、字符串字面量与注释剥离、声明与 SQL 双向核对 | R:code:QQPlayer/Services/DatabaseManager+Schema.swift,code:QQPlayer/Services/DatabaseManager+Migration.swift | A:IdentityTableContract,IdentityTableContractTests,MigrationSqlScan | S:扫描须剥离字面量与注释，避免误命中假引用
+UIAccentContractTests.swift[TU6L]: F:UI 主题色与几何与间距契约：扫描源码按规则找硬编码色与不一致 token、几何 token 自洽、间距 token 校验，含白名单 | R:- | A:UIAccentContract,UIGeometryContract,UISpacingContract,selfInconsistent | S:主题色须走 token，白名单外硬编码色一律视为违规
+ViewDataAccessContractTests.swift[TU6M]: F:视图层数据访问契约：识别视图层文件、统计直接数据库引用、对比基线、禁止新增直连与陈旧基线项 | R:- | A:ViewDataAccessContractTests,noNewDirectDatabaseAccess,baselineHasNoStaleEntries | S:视图层不得新增直接数据库访问，基线不得有过期项
+ViewSharedSingletonContractTests.swift[TU6L]: F:视图共享单例契约：按类别登记总量、解析登记条目、视图声明识别与出现计数、跨类别基线核对 | R:- | A:ViewSharedSingletonContract,ViewSharedSingletonContractTests,RegistrationCategory,parseRegistrationEntry | S:-
+WhatsNewTests.swift[TU4T]: F:版本新功能提示：未见或版本不同才展示、同版本不展示、标记已见可持久化 | R:code:QQPlayer/Services/WhatsNew.swift | A:WhatsNewTests,lastSeenNotCurrentShows,seenSameVersionDoesNotShow,markSeenPersists | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayerTests/Fixtures/===
 README.md[TQ3T]: F:测试夹具目录说明：棘轮基线只减不增、已清理无 target 归属的音频夹具 | R:- | A:- | S:音频夹具唯一来源是 TestAudioFixtures.swift（内嵌 base64）
@@ -775,3 +795,16 @@ structural-budget-size-baseline.tsv[TQ4T]: F:超长文件（>600 行）存量棘
 track-deletion-shape.tsv[TQ4T]: F:曲目删除语义文件动作调用点白名单（trashItem / track-file-deletion） | R:code:QQPlayerTests/TrackDeletionShapeContractTests.swift | A:- | S:白名单外 trashItem 或 removeItem+deleteTrack( 同现即红
 traditional-to-simplified.baseline.tsv[TQ5L]: F:繁→简映射表逐键基线（码点升序，键与值 TSV），下沉改造前 dump | R:code:QQPlayerTests/CharacterMapResourceTests.swift | A:- | S:字节不可改；运行期表与 bundle 资源都须与此基线一致
 view-data-access-baseline.tsv[TQ4T]: F:视图层 DatabaseManager 直连存量棘轮基线 | R:code:QQPlayerTests/ViewDataAccessContractTests.swift | A:- | S:只减不增；整改到 0 或文件消失必须删本行
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/Share/Base.lproj/===
+MainInterface.storyboard[FU5T]: F:分享扩展 UI 定义：承载 SLComposeServiceViewController 的 storyboard，作为 Share 扩展入口界面 | R:code:Share/ShareViewController.swift | A:MainInterface | S:-
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/Share/===
+Info.plist[FU5T]: F:分享扩展清单：share-services 扩展点、激活规则（最多 100 文件，不支持文本/URL/图片）、指定 MainInterface storyboard | R:code:Share/ShareViewController.swift | A:NSExtension | S:激活规则只收文件（上限 100），不收文本/URL/图片
+Share.entitlements[FS5T]: F:分享扩展授权：只声明 App Group group.com.daxmate.qqplayer.ios | R:- | A:com.apple.security.application-groups | S:-
+ShareViewController.swift[EU5M]: F:分享扩展控制器：接收音频文件与文件夹、复制到共享容器、记录共享 URL（App Group）、完成并唤起主 App | R:code:Share/Info.plist | A:ShareViewController,processAudioFiles,copyFileToSharedContainer,storeSharedURL | S:只处理音频文件，跨进程经 App Group 共享容器传递
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/SiriIntentsExtension/===
+Info.plist[FU5T]: F:Siri 意图扩展清单：intents-service 扩展点、支持 INPlayMediaIntent 与 INAddMediaIntent、媒体类别限音乐、principal class IntentHandler | R:code:SiriIntentsExtension/IntentHandler.swift | A:NSExtension,IntentsSupported | S:仅支持播放与添加媒体意图，且媒体类别限音乐
+IntentHandler.swift[EU6L]: F:Siri 意图处理：播放与添加媒体意图、模糊搜索排序（levenshtein 相似度与 siriSearchScore）、扩展内数据库访问、诊断日志 | R:- | A:IntentHandler,ExtensionDatabaseAccess,levenshteinDistance,siriSearchScore,RankedSimpleTrack | S:扩展须自建数据库访问，不得依赖主 App 进程
+SiriIntentsExtension.entitlements[FS5T]: F:Siri 意图扩展授权：只声明 App Group group.com.daxmate.qqplayer.ios | R:- | A:com.apple.security.application-groups | S:-
