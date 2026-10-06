@@ -283,7 +283,7 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 ### 测试与 CI
 - QQPlayerTests：覆盖共享 Core 与双平台决策逻辑的 Swift Testing 套件（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析、局域网同步全链等）；含 Fixtures / Mock 辅助文件并全部注册进 target，用例与 suite 数以 CI 最新日志为准
 - 无模拟器 harness：`scripts/run-local-sync-tests.sh` 用 `swiftc` 直编生产源码（Sync 纯逻辑 + 扫描器）真跑断言，覆盖帧编解码 / 路径解析 / 应答器计划 / 控制器状态机 / 端到端场景
-- CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（用例数以最新日志为准）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step；CI 在推送到 `main` 后运行，是**事后门禁**而非合入前置（见下方「参与贡献」的分支流程）
+- CI（GitHub Actions）三个 job：`Swift (swiftlint + swiftformat + xcodebuild test)`、`Local sync harness (swiftc, no simulator)`、`macOS (build QQPlayerMac + 资源产物断言)`；`Swift` 与 `macOS` 两个 job 均带**编译警告零容忍**检测 step；CI 在推送到 `main` 后运行，是**事后门禁**而非合入前置（见下方「参与贡献」的分支流程）
 - 本地提交钩子（`scripts/git-hooks/pre-commit`）同样拦截增量编译警告，不等 CI
 - ⚠️ 钩子要**每个克隆装一次**（仓库不把 hooks 放在默认路径，未设置时 `scripts/git-hooks/{pre-commit,pre-push}` 静默不生效）：`git config core.hooksPath scripts/git-hooks`（相对路径；仓根 / 子目录 / worktree 均实测可解析）
 
@@ -292,7 +292,7 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 ## 安装与构建 🚀
 
 ### 环境要求
-- **Xcode** 16+（推荐 Xcode 26+；项目使用 folder-synchronized groups 与 Swift 6 严格并发，日常开发与 CI 均基于 Xcode 26）
+- **Xcode** 16+（推荐 Xcode 26+；项目使用 folder-synchronized groups 与 Swift 6 严格并发）。CI 不锁定 Xcode 版本——`ci.yml` 跑 `macos-latest` runner 的默认 Xcode（当前 26.x）。
 - **Git**
 - iOS 端：有效的 Apple 开发者账号（CarPlay / Siri 能力签名）与真机
 - 依赖已锁定：`QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` 已入库，SPM 版本可复现构建
