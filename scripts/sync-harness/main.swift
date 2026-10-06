@@ -334,43 +334,39 @@ check(SyncLibraryPushStateMachine.canTransition(from: .pushing, to: .done(SyncLi
 check(!SyncLibraryPushStateMachine.canTransition(from: .idle, to: .pushing), "推送：idle → pushing 拒绝（越级）")
 check(!SyncLibraryPushStateMachine.canTransition(from: .done(SyncLibraryPushSummary()), to: .failed("x")), "推送：终态后迁移拒绝")
 
-do {
-    let remote = SyncManifestResponse(entries: [
-        entry("changed.flac", hash: "new"),
-        entry("missing.flac", hash: "h3"),
-        entry("same.flac", hash: "h1"),
-    ])
-    let local = [entry("same.flac", hash: "h1"), entry("changed.flac", hash: "old")]
-    let plan = SyncLibraryPullPlanner.plan(
-        remote: remote,
-        local: local,
-        selection: .all
-    )
-    checkEqual(plan.relativePaths, ["changed.flac", "missing.flac"], "本地缺失/内容不同 → 拉取列表")
-    checkEqual(plan.unchanged.map(\.relativePath), ["same.flac"], "内容一致 → unchanged")
+let remote = SyncManifestResponse(entries: [
+    entry("changed.flac", hash: "new"),
+    entry("missing.flac", hash: "h3"),
+    entry("same.flac", hash: "h1"),
+])
+let local = [entry("same.flac", hash: "h1"), entry("changed.flac", hash: "old")]
+let plan = SyncLibraryPullPlanner.plan(
+    remote: remote,
+    local: local,
+    selection: .all
+)
+checkEqual(plan.relativePaths, ["changed.flac", "missing.flac"], "本地缺失/内容不同 → 拉取列表")
+checkEqual(plan.unchanged.map(\.relativePath), ["same.flac"], "内容一致 → unchanged")
 
-    // 不传播删除：远端已消失的本地条目（含导入区）不进任何待处理列表
-    let noDeletePlan = SyncLibraryPullPlanner.plan(
-        remote: SyncManifestResponse(entries: []),
-        local: [entry("Album/synced.flac", hash: "h1"), entry("Imported/private.flac", hash: "h2")],
-        selection: .all
-    )
-    checkEqual(noDeletePlan.relativePaths, [], "远端已删 → 无待拉取动作（本端保留）")
-    checkEqual(noDeletePlan.unchanged, [], "远端已删 → unchanged 为空")
+// 不传播删除：远端已消失的本地条目（含导入区）不进任何待处理列表
+let noDeletePlan = SyncLibraryPullPlanner.plan(
+    remote: SyncManifestResponse(entries: []),
+    local: [entry("Album/synced.flac", hash: "h1"), entry("Imported/private.flac", hash: "h2")],
+    selection: .all
+)
+checkEqual(noDeletePlan.relativePaths, [], "远端已删 → 无待拉取动作（本端保留）")
+checkEqual(noDeletePlan.unchanged, [], "远端已删 → unchanged 为空")
 
-    // 集合选择不影响本端存留
-    let scopedPlan = SyncLibraryPullPlanner.plan(
-        remote: SyncManifestResponse(entries: [
-            entry("selected.flac", hash: "h1", stableId: "s1"),
-            entry("other.flac", hash: "h2", stableId: "s2"),
-        ]),
-        local: [],
-        selection: .relativePaths(["other.flac"])
-    )
-    checkEqual(scopedPlan.relativePaths, ["other.flac"], "显式选择集只拉入选路径（不产生删除）")
-} catch {
-    check(false, "对账计划抛错：\(error)")
-}
+// 集合选择不影响本端存留
+let scopedPlan = SyncLibraryPullPlanner.plan(
+    remote: SyncManifestResponse(entries: [
+        entry("selected.flac", hash: "h1", stableId: "s1"),
+        entry("other.flac", hash: "h2", stableId: "s2"),
+    ]),
+    local: [],
+    selection: .relativePaths(["other.flac"])
+)
+checkEqual(scopedPlan.relativePaths, ["other.flac"], "显式选择集只拉入选路径（不产生删除）")
 
 // MARK: - ④ 端到端① 拉取一致性
 
@@ -441,10 +437,10 @@ do {
     let secret = try writeFile("outside.flac", in: outsideRoot, data: silentData(0x77, count: 128))
     let hostResponder = SyncLibraryFetchResponder(session: fixture.hostSession, libraryRoot: sourceRoot)
 
-    var received: SyncFetchResult?
+    let received = LockedBox<SyncFetchResult?>(nil)
     fixture.clientSession.onApplicationFrame = { frame in
         if frame.type == .syncFetchResult {
-            received = try? SyncFetchCodec.decode(SyncFetchResult.self, from: frame.payload)
+            received.mutate { $0 = try? SyncFetchCodec.decode(SyncFetchResult.self, from: frame.payload) }
         }
     }
 
@@ -458,7 +454,7 @@ do {
         payload: try SyncFetchCodec.encode(request)
     )
 
-    if let result = received {
+    if let result = received.value {
         check(result.completed.isEmpty, "越界请求 completed 为空")
         checkEqual(result.failed.count, 3, "三条越界请求全部计入 failed")
         check(result.failed.allSatisfy { $0.reason == SyncFetchFailureReason.invalidPath }, "原因均为 invalidPath")
@@ -595,7 +591,7 @@ do {
     )
     let roots = SyncFetchRoots(libraryRoot: try tempRoot("lyr-lib"), lyricsRoot: lyricsRoot)
 
-    func provider(_ wirePath: String) -> String? {
+    let provider: @Sendable (String) -> String? = { wirePath in
         guard let hash = SyncLyricsNamespace.songContentHash(fromWirePath: wirePath) else { return nil }
         switch hash {
         case "s1": return "s1.json"
@@ -1008,11 +1004,11 @@ do {
 
     // ① Mac 请求 manifest → 本端应答（曲库 + 歌词命名空间，升序）
     let macPeer = SyncManifestPeer(session: fixture.hostSession)
-    var manifestResponse: SyncManifestResponse?
-    macPeer.onManifestReceived = { manifestResponse = $0 }
+    let manifestResponse = LockedBox<SyncManifestResponse?>(nil)
+    macPeer.onManifestReceived = { response in manifestResponse.mutate { $0 = response } }
     try macPeer.requestManifest()
     checkEqual(
-        manifestResponse?.entries.map(\.relativePath) ?? [],
+        manifestResponse.value?.entries.map(\.relativePath) ?? [],
         ["@lyrics/\(songHash).json", "Album/01 Song.flac", "Imported/device-only.flac"],
         "manifest 应答 = 本端曲库 + aligned 歌词（升序）"
     )
@@ -1020,8 +1016,8 @@ do {
     // ② Mac 请求文件（从设备下载）→ 本端回推内容 + 越界一律拒
     let macIncoming = try tempRoot("mac-incoming")
     let macReceiver = SyncFileReceiver(session: fixture.hostSession, directory: macIncoming)
-    var macReceived: [SyncFileReceiver.Outcome] = []
-    macReceiver.onCompletion = { macReceived.append($0) }
+    let macReceived = LockedBox<[SyncFileReceiver.Outcome]>([])
+    macReceiver.onCompletion = { outcome in macReceived.mutate { $0.append(outcome) } }
     let resultTap = ResultTap(session: fixture.hostSession)
     let request = SyncFetchRequest(
         collection: .all,
@@ -1041,7 +1037,7 @@ do {
     checkEqual(reasons["Album/missing.flac"], SyncFetchFailureReason.notFound, "不存在 → notFound")
     let downloaded = macIncoming.appendingPathComponent("01 Song.flac")
     checkEqual(try SyncFileChecksum.sha256Hex(ofFile: downloaded), songHash, "回推内容 SHA-256 与源一致")
-    checkEqual(macReceived.count, 1, "Mac 侧收到 1 个文件")
+    checkEqual(macReceived.value.count, 1, "Mac 侧收到 1 个文件")
 
     check(!FileManager.default.fileExists(atPath: deviceRoot.appendingPathComponent("Imported/device-only.flac").path) == false, "本端文件未被应答流程改动")
     host.detach()
@@ -1083,8 +1079,8 @@ do {
     check(host.attach(to: fixture.clientSession), "被动端接线成功")
 
     let sender = SyncFileSender(session: fixture.hostSession)
-    var sendOutcomes: [SyncFileSender.Outcome] = []
-    sender.onCompletion = { sendOutcomes.append($0) }
+    let sendOutcomes = LockedBox<[SyncFileSender.Outcome]>([])
+    sender.onCompletion = { outcome in sendOutcomes.mutate { $0.append(outcome) } }
 
     // 声明 → 串行推送两个文件（新歌 + 同路径更新）
     try fixture.hostSession.sendApplicationFrame(
@@ -1111,7 +1107,7 @@ do {
         [pushedLanded.path, deviceRoot.appendingPathComponent("Album/tobe-updated.flac").path].sorted(),
         "落位文件均走既有入库入口"
     )
-    checkEqual(sendOutcomes.count, 2, "两次推送均完成")
+    checkEqual(sendOutcomes.value.count, 2, "两次推送均完成")
     let summary = host.summary
     checkEqual(summary.landed.sorted(), ["Album/tobe-updated.flac", "Pushed/new.flac"], "账目 landed")
     checkEqual(summary.undeclaredTransfers, [], "无未声明传输")
@@ -1230,13 +1226,13 @@ do {
     check(!host.isAttached, "接线态为 false")
 
     let macPeer = SyncManifestPeer(session: fixture.hostSession)
-    var manifestResponse: SyncManifestResponse?
-    var unavailable = false
-    macPeer.onManifestReceived = { manifestResponse = $0 }
-    macPeer.onProviderUnavailable = { unavailable = true }
+    let manifestResponse = LockedBox<SyncManifestResponse?>(nil)
+    let unavailable = LockedBox<Bool>(false)
+    macPeer.onManifestReceived = { response in manifestResponse.mutate { $0 = response } }
+    macPeer.onProviderUnavailable = { unavailable.mutate { $0 = true } }
     try macPeer.requestManifest()
-    checkEqual(manifestResponse?.entries.count ?? -1, -1, "未接线 → 不应答 manifest（不回空表）")
-    _ = unavailable
+    checkEqual(manifestResponse.value?.entries.count ?? -1, -1, "未接线 → 不应答 manifest（不回空表）")
+    _ = unavailable.value
 } catch {
     check(false, "⑲ 抛错：\(error)")
 }
@@ -3108,27 +3104,27 @@ do {
     let metaDir = try tempRoot("w2-meta")
     let metaFixture = SessionFixture.pairedHandshake()
     let metaReceiver = SyncFileReceiver(session: metaFixture.clientSession, directory: metaDir)
-    var metaAcks: [FileAckPayload] = []
-    metaReceiver.onAckSent = { metaAcks.append($0) }
+    let metaAcks = LockedBox<[FileAckPayload]>([])
+    metaReceiver.onAckSent = { ack in metaAcks.mutate { $0.append(ack) } }
     try metaFixture.hostSession.sendApplicationFrame(
         type: .fileMeta,
         payload: Data(#"{"fileID":"abc","name":123,"totalSize":"x"}"#.utf8)
     )
-    checkEqual(metaAcks.last?.fileID, "abc", "🟡T4 解码失败仍能取出 fileID")
-    checkEqual(metaAcks.last?.error, FileTransferErrorCode.protocolError, "🟡T4 回 protocolError（旧实现静默）")
+    checkEqual(metaAcks.value.last?.fileID, "abc", "🟡T4 解码失败仍能取出 fileID")
+    checkEqual(metaAcks.value.last?.error, FileTransferErrorCode.protocolError, "🟡T4 回 protocolError（旧实现静默）")
     check(!metaReceiver.isActive, "🟡T4 状态清空")
 
     // ⑧ 发送端 ack 超时 → 失败并清状态
     let timeoutFixture = SessionFixture.pairedHandshake()
     let timeoutURL = try writeFile("src.bin", in: try tempRoot("w2-timeout"), data: silentData(0x5A, count: 1_024))
     let timeoutSender = SyncFileSender(session: timeoutFixture.hostSession, ackTimeout: 0.2)
-    var timeoutOutcome: SyncFileSender.Outcome?
-    timeoutSender.onCompletion = { timeoutOutcome = $0 }
+    let timeoutOutcome = LockedBox<SyncFileSender.Outcome?>(nil)
+    timeoutSender.onCompletion = { outcome in timeoutOutcome.mutate { $0 = outcome } }
     try timeoutSender.send(fileURL: timeoutURL, fileID: "w2-timeout", name: "src.bin")
     check(timeoutSender.isActive, "🟡T4 已发 meta 等 ack")
     Thread.sleep(forTimeInterval: 0.9)
     var timedOut = false
-    if case let .failed(.protocolError(fileID, reason))? = timeoutOutcome {
+    if case let .failed(.protocolError(fileID, reason))? = timeoutOutcome.value {
         timedOut = fileID == "w2-timeout" && reason.contains("超时")
     }
     check(timedOut, "🟡T4 无 ack → 超时失败")
@@ -3141,14 +3137,14 @@ do {
     try Data(repeating: 0x33, count: 100).write(to: partURL)
     let realignFixture = SessionFixture.pairedHandshake()
     let realignReceiver = SyncFileReceiver(session: realignFixture.clientSession, directory: realignDir)
-    var realignAcks: [FileAckPayload] = []
-    realignReceiver.onAckSent = { realignAcks.append($0) }
-    var realignOutcome: SyncFileReceiver.Outcome?
-    realignReceiver.onCompletion = { realignOutcome = $0 }
+    let realignAcks = LockedBox<[FileAckPayload]>([])
+    realignReceiver.onAckSent = { ack in realignAcks.mutate { $0.append(ack) } }
+    let realignOutcome = LockedBox<SyncFileReceiver.Outcome?>(nil)
+    realignReceiver.onCompletion = { outcome in realignOutcome.mutate { $0 = outcome } }
     realignReceiver.partAlignmentHook = { _, _ in
         throw SyncFileTransferError.ioError("注入的对齐失败")
     }
-    realignReceiver.handleInboundFrame(try SyncFrame(
+    realignReceiver.handleInboundFrame(SyncFrame(
         type: .fileMeta,
         payload: try SyncFilePayloadCodec.encode(FileMetaPayload(
             fileID: "w2-realign",
@@ -3159,9 +3155,9 @@ do {
             startOffset: 64
         ))
     ))
-    checkEqual(realignAcks.last?.error, FileTransferErrorCode.ioError, "🟡T5 对齐失败 → ioError ack（旧实现回 progress）")
-    checkEqual(realignAcks.last?.receivedBytes, 0, "🟡T5 不谎报已收字节")
-    checkEqual(realignOutcome, .failed(.ioError("w2-realign")), "🟡T5 终态为失败")
+    checkEqual(realignAcks.value.last?.error, FileTransferErrorCode.ioError, "🟡T5 对齐失败 → ioError ack（旧实现回 progress）")
+    checkEqual(realignAcks.value.last?.receivedBytes, 0, "🟡T5 不谎报已收字节")
+    checkEqual(realignOutcome.value, .failed(.ioError("w2-realign")), "🟡T5 终态为失败")
     check(FileManager.default.fileExists(atPath: partURL.path), "🟡T5 .part 保留（可重试）")
 } catch {
     check(false, "㊹ W2 抛错：\(error)")

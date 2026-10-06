@@ -162,7 +162,10 @@ struct SyncContentHashResolver: SyncIdentityResolving {
 // 的空成员表——harness 断言不覆盖 `.playlists` 收口径（该路径由 QQPlayerTests 的
 // `SyncPlaylistMembersTests` 真跑 GRDB 覆盖），行为与 T7b 之前一致（空表）。
 enum DatabaseSyncCollectionFacts {
-    static func liveMembersProvider(database: DatabaseManager) -> () -> SyncCollectionMembers {
+    // 返回类型与生产逐字同形：生产 `DatabaseSyncCollectionFacts.liveMembersProvider` 返回
+    // `@Sendable () -> SyncCollectionMembers`（闭包在会话线程触发），桩必须同形，否则
+    // 赋给 `@Sendable` 属性时触发「converting non-Sendable function value」告警。
+    static func liveMembersProvider(database: DatabaseManager) -> @Sendable () -> SyncCollectionMembers {
         { SyncCollectionMembers() }
     }
 
@@ -188,7 +191,7 @@ enum DatabaseSyncPeerLibraryFacts {
         database: DatabaseManager,
         libraryRoot: URL,
         favoritesName: String? = nil
-    ) -> () -> SyncPeerLibraryCatalog {
+    ) -> @Sendable () -> SyncPeerLibraryCatalog {
         { SyncPeerLibraryCatalog() }
     }
 }
@@ -216,9 +219,9 @@ final class LibraryIndexer: @unchecked Sendable {
     private(set) var processedPaths: [String] = []
 
     func processExternalFile(_ fileURL: URL) async -> Bool {
-        lock.lock()
-        processedPaths.append(fileURL.path)
-        lock.unlock()
+        // `NSLock.lock()/unlock()` 在 async 上下文不可用（Swift 6 起为 error）；
+        // 临界区无 await，改用同步作用域锁。
+        lock.withLock { processedPaths.append(fileURL.path) }
         return true
     }
 }

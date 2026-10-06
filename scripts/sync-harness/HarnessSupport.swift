@@ -8,6 +8,33 @@
 import Foundation
 import Security
 
+// MARK: - 锁保护的可变盒子
+
+/// 供 `@Sendable` 回调闭包捕获并回写结果的**锁保护**盒子。
+///
+/// harness 顶层是同步代码：闭包在会话线程被回调，之后主流程再读回结果。若直接改
+/// 捕获的局部 `var`，会被判为「concurrently-executing code 改捕获变量」
+/// （Swift 6 起为 error）。把可变状态放进本盒子，读写都在同一把锁内完成。
+final class LockedBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: T
+
+    init(_ value: T) { storage = value }
+
+    /// 原子读。
+    var value: T {
+        lock.lock(); defer { lock.unlock() }
+        return storage
+    }
+
+    /// 原子读-改-写（`body` 在锁内执行）。
+    @discardableResult
+    func mutate<R>(_ body: (inout T) -> R) -> R {
+        lock.lock(); defer { lock.unlock() }
+        return body(&storage)
+    }
+}
+
 // MARK: - 内存信任表
 
 final class MemoryTrustStore: SyncTrustStore, @unchecked Sendable {
