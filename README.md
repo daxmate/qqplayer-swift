@@ -47,8 +47,8 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 - 中文体验：歌手简繁归一（日文假名免疫）、繁体中文本地化
 
 **工程**
-- 共享 Core 层：**132 个服务 / 模型文件直接共享给双平台**（`Services` / `Models` / `Helpers` / `Sync` 共 136 个，其中 132 个进 macOS 构建：117 个无平台分支 + 15 个含 `#if os(iOS)` 隔离段），4 个 iOS 专属 Core 文件（沙盒迁移执行器、中断恢复策略、iOS 同步浏览 / 被动应答）不进 macOS 构建
-- **自动化测试**（Swift Testing）：**104 个测试文件**（口径：`ls QQPlayerTests/*.swift | wc -l`，含 Fixtures/Mock 等辅助文件；104/104 全部注册进 QQPlayerTests target 的 Sources phase）。用例/suite 数以 CI 实测为准——最近一次实测 **1115 个用例 / 130 个 suite** 全过（run 34687194257），计数口径为 Swift Testing 日志行 `Test run with N tests in M suites passed`（XCTest 汇总行 `Executed 0 tests` 是空壳统计，不代表覆盖）+ GitHub Actions CI（lint/format + iOS 单测 + macOS 构建与资源断言 + 编译警告零容忍）
+- 共享 Core 层：`Services` / `Models` / `Helpers` / `Sync` 由双平台共享（少量 iOS 专属 Core 文件——沙盒迁移执行器、中断恢复策略、iOS 同步浏览 / 被动应答——不进 macOS 构建；共享文件内的平台分支以 `#if os(iOS)` 隔离）
+- **自动化测试**（Swift Testing）：覆盖双平台核心逻辑的 Swift Testing 测试套件（含 Fixtures / Mock 等辅助文件，全部注册进 QQPlayerTests target 的 Sources phase）。用例与 suite 数以 CI 最新日志为准；CI 为 GitHub Actions（lint/format + iOS 单测 + macOS 构建与资源断言 + 编译警告零容忍）
 - 5 语言本地化：简体中文 / 繁体中文 / English / Français / Русский
 
 ---
@@ -229,10 +229,10 @@ macOS QQPlayer（主机 / 内容源）        iOS QQPlayer（移动端）
 QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
         │                                  │
         └──────────► 共享 Core ◄───────────┘
-   （Services / Models / Sync / Helpers，132 文件直接共享：117 无分支 + 15 #if os(iOS)）
+   （Services / Models / Sync / Helpers：双平台共享，少量 iOS 专属段以 #if os(iOS) 隔离）
         │
         ├── iOS 专属：Views/（SwiftUI）、CarPlaySceneDelegate、PlayerWidget / Share / SiriIntentsExtension
-        └── macOS 专属：Mac/（41 个视图与窗口文件，经 target 白名单编译）
+        └── macOS 专属：Mac/（视图与窗口文件，经 target 白名单编译）
 ```
 
 ### 双入口
@@ -278,12 +278,12 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 
 ### 平台隔离约定
 - iOS 专属能力（AVAudioSession、UIKit、CarPlay、WidgetKit、AppIntents）以 `#if os(iOS)` 收敛在共享文件内或独立文件中；iCloud 相关链路已退役（仅保留一次性存量迁移读取）
-- macOS target 通过显式文件白名单（membershipExceptions，去重后 178 个文件条目）只编译 Mac/ + 共享 Core，iOS 视图不进入 macOS 构建
+- macOS target 通过显式文件白名单（membershipExceptions）只编译 Mac/ + 共享 Core，iOS 视图不进入 macOS 构建
 
 ### 测试与 CI
-- QQPlayerTests：**104 个测试文件**（口径：`ls QQPlayerTests/*.swift | wc -l`，含 Fixtures/Mock 辅助文件；注册完整性 104/104），用例与 suite 数以 CI 日志为准（最近实测 **1115 个用例 / 130 个 suite**，run 34687194257），覆盖共享 Core 与双平台决策逻辑（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析、局域网同步全链等）
+- QQPlayerTests：覆盖共享 Core 与双平台决策逻辑的 Swift Testing 套件（数据库、歌词、跟唱、EQ、刮削、在线客户端、迷你模式状态机、快捷键决策、格式解析、局域网同步全链等）；含 Fixtures / Mock 辅助文件并全部注册进 target，用例与 suite 数以 CI 最新日志为准
 - 无模拟器 harness：`scripts/run-local-sync-tests.sh` 用 `swiftc` 直编生产源码（Sync 纯逻辑 + 扫描器）真跑断言，覆盖帧编解码 / 路径解析 / 应答器计划 / 控制器状态机 / 端到端场景
-- CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（最近实测 1115 用例）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step；这两个 job 同时是 `main` 的**合入门禁**（ruleset 强制，见下方「参与贡献」的分支流程）
+- CI（GitHub Actions）三个环节：① swiftlint + swiftformat（版本锁定，见 ci.yml）② iOS 模拟器 `xcodebuild test`（用例数以最新日志为准）③ macOS `QQPlayerMac` 构建 + 产物资源断言；两个 job 均带**编译警告零容忍**检测 step；CI 在推送到 `main` 后运行，是**事后门禁**而非合入前置（见下方「参与贡献」的分支流程）
 - 本地提交钩子（`scripts/git-hooks/pre-commit`）同样拦截增量编译警告，不等 CI
 - ⚠️ 钩子要**每个克隆装一次**（仓库不把 hooks 放在默认路径，未设置时 `scripts/git-hooks/{pre-commit,pre-push}` 静默不生效）：`git config core.hooksPath scripts/git-hooks`（相对路径；仓根 / 子目录 / worktree 均实测可解析）
 
@@ -376,9 +376,9 @@ QQPlayer/
 ├── QQPlayerMacApp.swift      # macOS 入口（Settings scene）
 ├── CarPlaySceneDelegate.swift / CarPlay+Playback.swift / CarPlay+Lyrics.swift
 ├── ContentView.swift
-├── Mac/                      # macOS UI（三栏、播放页、迷你模式、在线搜索、刮削编辑器、同步中心等 41 文件）
-├── Services/                 # 共享 Core：播放引擎 / 歌词 / 跟唱 / EQ / 索引 / 在线客户端 / 刮削 / aria2 等 80 文件
-├── Sync/                     # 局域网配对与同步协议层（48 文件：帧 / 加密 / 配对 / manifest / 文件传输 / 变更日志 / 歌词）
+├── Mac/                      # macOS UI（三栏、播放页、迷你模式、在线搜索、刮削编辑器、同步中心等）
+├── Services/                 # 共享 Core：播放引擎 / 歌词 / 跟唱 / EQ / 索引 / 在线客户端 / 刮削 / aria2 等
+├── Sync/                     # 局域网配对与同步协议层（帧 / 加密 / 配对 / manifest / 文件传输 / 变更日志 / 歌词）
 ├── Models/                   # 共享数据模型（Database / Settings / State / SFB）
 ├── Views/                    # iOS SwiftUI 视图（Library / Player / Playlists / Artists / Albums / Utility）
 ├── ViewModels/               # TutorialViewModel 等
@@ -389,7 +389,7 @@ QQPlayer/
 PlayerWidget/                 # iOS 主屏幕小组件
 Share/                        # iOS 分享扩展
 SiriIntentsExtension/         # iOS Siri 意图扩展
-QQPlayerTests/                # Swift Testing 单测（104 测试文件 + Fixtures/Mock；用例数口径见「测试与 CI」）
+QQPlayerTests/                # Swift Testing 单测（含 Fixtures/Mock 辅助文件；用例数口径见「测试与 CI」）
 QQPlayerSiriTests/            # Siri 集成测试（需 Xcode 27 SDK，CI 已豁免）
 scripts/                      # 工程工具（xcbuild.sh 统一构建入口 / add-test-file.py / gen-zh-hant.py /
                               #   pbxproj-membership.py / run-local-sync-tests.sh / siri-tests-guard.py / sync-harness / git-hooks）
@@ -405,30 +405,17 @@ LICENSE / NOTICE.md / PRIVACY.md
 
 欢迎贡献代码、翻译与 issue 反馈！
 
-- **分支流程（ruleset 已强制，2026-09-19 起）**：`main` 受仓库 ruleset「main: CI 门禁（两个 job 绿 + 禁强推/禁删除，无绕过）」保护，**直推 `main` 会被 GitHub 拒绝**（实测 `GH013: Repository rule violations found`），必须走 PR：
-
-  ```bash
-  git switch -c fix/xxx            # 从最新 main 建分支
-  git commit -m "fix(scope): 描述" && git push -u origin fix/xxx
-  gh pr create --fill              # CI 由 pull_request 事件自动触发
-  gh pr checks --watch             # 等两个 job 变绿
-  gh pr merge --merge --delete-branch   # 保持与历史一致的 merge commit 风格
-  ```
-
-  门禁细节：
-  - **必须通过的 check 名 = `.github/workflows/ci.yml` 的两个 job 名**（改 job 名必须同步改 ruleset，否则合入会被卡住）：
-    `Swift (swiftlint + swiftformat + xcodebuild test)`、`macOS (build QQPlayerMac + 资源产物断言)`
-  - 同时禁止强推（non-fast-forward）与删除 `main`
-  - **没有 admin 绕过**：CI 红时任何人都不能合入 `main`（包括维护者本人）——这是有意的。此前 `main` 曾两次「先合入、后变红」（CI run 35334674871 / 35315228532），CI 只是事后通知；现在它是合入前的真门禁
-  - **不要求 PR 分支先更新到最新 main**（ruleset 的 strict 关闭）：单人维护、PR 分支通常只领先 main，避免每次 rebase 白跑一遍 40 分钟 CI
-  - **紧急例外只允许临时开**：若 CI 自身坏掉必须直推修复，临时在 ruleset 加 bypass（或把 enforcement 设为 `disabled`），修完立刻恢复原状——**不要常驻 bypass**，否则门禁即失效
+- **分支流程**：`main` 受仓库 ruleset「main: 禁强推/禁删除（CI 改为事后门禁）」（id `23670641`，`enforcement=active`）保护，规则体仅 `deletion` + `non_fast_forward`，`bypass_actors` 为空，**无 required status checks、无 pull_request 规则**：
+  - `main` **仅禁止强推与删除**；**直推 `main` 可行，不会被 GitHub 拒绝**。
+  - **CI 是事后门禁**：在推送 `main` 之后运行，不再是合入前置。
+  - 协作口径：协作者本地自验（见下「本地验证」）后合入 `main` 并直推；外部贡献走 **fork + PR**（ruleset 不强制 PR，CI 照常运行）。
 - **提交信息**：conventional commits——`feat(scope): 描述` / `fix(scope): 描述` / `docs` / `refactor` / `test` / `chore`（scope 如 `mac`、`ios`、`lyrics`、`carplay`）
 - **代码风格**：提交前跑 `swiftlint lint` 与 `swiftformat --lint .`（双 target 都须通过）
 - **测试**：共享逻辑与双平台决策逻辑必须配 Swift Testing 单测；新测试文件用 `python3 scripts/add-test-file.py <文件>` 注册进 QQPlayerTests target；涉及共享 Services 新文件时同步登记 QQPlayerMac target 文件白名单（pbxproj membershipExceptions）与 iOS 侧（synchronized folder 自动包含）
 - **改动范围**：macOS 新 UI 文件放 `QQPlayer/Mac/`；iOS 专属放 `Views/` 或扩展 target；共享逻辑放 `Services/`；局域网同步协议层放 `Sync/`（双平台共享，注意线上帧类型 10–13 已冻结、新增从 14 起）
 - **本地验证**：构建统一走 `scripts/xcbuild.sh`（共享 SPM 缓存 + 隔离 DerivedData）；同步纯逻辑改动可先跑 `scripts/run-local-sync-tests.sh` 无模拟器真跑断言
 - **本地化**：新 UI 文案补全 5 语言 key（zh-Hans / zh-Hant / en / fr / ru）
-- 注意：GitHub Actions 的 iOS 单测在模拟器运行；涉及局域网同步 / CarPlay / 真机行为请在真机验证并在 PR 描述注明
+- 注意：GitHub Actions 的 iOS 单测在模拟器运行；涉及局域网同步 / CarPlay / 真机行为请在真机验证，并在 PR 描述注明（若有 PR）
 
 ---
 
