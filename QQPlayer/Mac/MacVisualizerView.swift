@@ -9,7 +9,7 @@
 
 import SwiftUI
 
-/// 播放页频谱条（数据源 MacSpectrumAnalyzer.shared；无数据/未激活时不绘制）。
+/// 播放页频谱条（数据源 MacSpectrumAnalyzer.shared；未激活且无冻结帧时不绘制；暂停 = 冻结最后一帧）。
 /// 颜色跟随设置强调色（web 版强调色语义）：`Color.accentColor` 在 macOS 上跟随
 /// 系统强调色而非 App tint，故读 `MacAppearance.currentAccentColor`（唯一读取入口；
 /// 2026-09-05 改为直读 MacAppearance，2026-09-15 M2 收口为 currentAccentColor，
@@ -23,7 +23,7 @@ import SwiftUI
 /// 现改回**数据驱动重绘**：body 读 `analyzer.isActive` / `analyzer.levels`（`@Observable`
 /// 按属性追踪，`levels` 由 tap 回调 ~30fps 节流发布）作为绘制输入，数据一变即重绘。
 /// 本视图是叶子节点，body 只有 Group + Canvas，逐帧重算负担可忽略。
-/// 保留 2026-09-08 的合理部分：不活跃时整体不绘制（不空转 Canvas）。
+/// 保留 2026-09-08 的合理部分：未激活且无冻结帧时整体不绘制（不空转 Canvas）。
 ///
 /// 2026-09-20 批 6-1：`@Published` 订阅（`.onReceive(…$levels)`）→ 组合根注入的
 /// `@Environment(MacSpectrumAnalyzer.self)`。⚠️ `levels` 必须在 **body 求值期**读
@@ -38,7 +38,7 @@ struct MacVisualizerView: View {
 
     var body: some View {
         Group {
-            if analyzer.isActive {
+            if analyzer.isActive || analyzer.isFrozen {
                 let levels = analyzer.levels
                 Canvas { context, size in
                     drawBars(levels: levels, in: &context, size: size)

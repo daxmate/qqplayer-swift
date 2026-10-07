@@ -36,6 +36,9 @@ final class MacSpectrumAnalyzer {
     private(set) var levels: [Float] = []
     /// 是否有实时数据（播放中且 tap 已装；false = 视觉化应隐藏/静止）
     private(set) var isActive = false
+    /// 暂停冻结（2026-10-07 spectrum-pause-freeze）：tap 已摘但保留最后一帧 levels，
+    /// 视图继续绘制（`isActive || isFrozen` 决定是否绘制）。
+    private(set) var isFrozen = false
 
     /// DSP 核（无隔离；音频线程只碰它）
     @ObservationIgnored private let dsp = MacSpectrumDSP()
@@ -68,14 +71,29 @@ final class MacSpectrumAnalyzer {
             }
         }
         isActive = true
+        isFrozen = false
     }
 
-    /// 移除 tap（暂停/切到 SFB 曲目/引擎停止时调用）。
-    func removeTap() {
+    /// 暂停冻结：摘掉 tap（省 CPU），但**保留最后一帧 levels**，视图继续绘制。
+    /// 无可摘 tap（如已冻结）→ 保持现状，已有冻结帧继续保留。
+    func freeze() {
         guard let engine = installedEngine else { return }
         engine.mainMixerNode.removeTap(onBus: 0)
         installedEngine = nil
         isActive = false
+        dsp.reset()
+        isFrozen = true
+    }
+
+    /// 完全清空并隐藏（切歌/关闭频谱/SFB 曲目时调用）：即使当前处于冻结态
+    /// （无已装 tap）也要清掉 levels 与 isFrozen，避免挂旧频谱。
+    func removeTap() {
+        if let engine = installedEngine {
+            engine.mainMixerNode.removeTap(onBus: 0)
+            installedEngine = nil
+        }
+        isActive = false
+        isFrozen = false
         dsp.reset()
         levels = Array(repeating: 0, count: MacSpectrumDSP.binCount)
     }

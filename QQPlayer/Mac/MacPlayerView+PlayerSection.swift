@@ -201,7 +201,8 @@ extension MacPlayerView {
             updateSpectrumTap()
         }
         .onChange(of: track?.stableId) { _, _ in
-            updateSpectrumTap()
+            // 切歌：新曲目无数据 → 清空，避免挂上一首的旧频谱
+            updateSpectrumTap(preservingFrozenFrame: false)
         }
         // 视图离场/回场收尾（2026-09-12 审计 L4）：修复前 tap 只由 isPlaying/切歌/
         // 设置变更驱动——主窗进迷你模式或播放页长期不可见时，音频线程 FFT 与
@@ -210,20 +211,26 @@ extension MacPlayerView {
             updateSpectrumTap()
         }
         .onDisappear {
-            spectrumAnalyzer.removeTap()
+            // 离场摘 tap（幂等）省 CPU，但保留最后一帧（冻结）
+            spectrumAnalyzer.freeze()
         }
     }
 
-    /// 频谱 tap 生命周期：播放中且 native 引擎 → 装 mainMixer tap；否则移除。
+    /// 频谱 tap 生命周期：播放中且 native 引擎 → 装 mainMixer tap；否则按
+    /// `preservingFrozenFrame` 决定冻结最后一帧还是清空。
     /// （SFB 曲目无 tap 数据源；暂停/切歌/关闭设置都走这里收尾）
     /// 分片：跨文件可见（原 private）
-    func updateSpectrumTap() {
+    /// - Parameter preservingFrozenFrame: 非播放态时是否保留最后一帧（true=冻结，false=清空）。
+    ///   暂停事件 / 离场回场传 true；切歌传 false（新曲目无数据，避免挂旧频谱）。
+    func updateSpectrumTap(preservingFrozenFrame: Bool = true) {
         guard visualizerEnabled else {
             spectrumAnalyzer.removeTap()
             return
         }
         if player.isPlaying, !player.usingSFBEngine {
             spectrumAnalyzer.ensureTap(engine: player.audioEngine)
+        } else if preservingFrozenFrame, !player.usingSFBEngine {
+            spectrumAnalyzer.freeze()
         } else {
             spectrumAnalyzer.removeTap()
         }
