@@ -126,6 +126,17 @@
         "created_by": "aoci-init",
         "order": 106,
         "enabled": true
+      },
+      {
+        "rule_id": "coco-worktrees-exclude",
+        "action": "exclude",
+        "pattern": ".worktrees/**",
+        "pattern_kind": "glob",
+        "reason": "temporary git worktrees are machine-local scaffolding, not repo source",
+        "source": "user",
+        "created_by": "coco",
+        "order": 0,
+        "enabled": true
       }
     ]
   },
