@@ -186,20 +186,24 @@ struct LegacyWritePathGuardTests {
         ],
         "SpotifyCache": [
             "QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift",
+            "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
             "QQPlayer/Services/SpotifyAPI.swift",
         ],
         "DiscogsCache": [
             "QQPlayer/Services/DiscogsAPI.swift",
             "QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift",
+            "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
         ],
         "HybridMusicCache": [
             "QQPlayer/Services/HybridMusicAPI.swift",
             "QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift",
+            "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
         ],
         "lyrics-aligned": [
             "QQPlayer/Services/AlignedLyricsStore.swift",
             "QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift",
             "QQPlayer/Services/LibraryRoot.swift",
+            "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
         ],
         "lyrics-manual": [
             "QQPlayer/Services/LibraryLayoutMigrationPlan.swift",
@@ -211,10 +215,12 @@ struct LegacyWritePathGuardTests {
             "QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift",
             "QQPlayer/Services/LibraryRoot.swift",
             "QQPlayer/Services/LyricsSearch.swift",
+            "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
         ],
         "qqplayer-playlists": [
             "QQPlayer/Services/LibraryLayoutMigrationV2Plan.swift",
             "QQPlayer/Services/LibraryRoot.swift",
+            "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
             "QQPlayer/Services/StateManager.swift",
         ],
     ]

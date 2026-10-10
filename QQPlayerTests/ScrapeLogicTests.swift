@@ -167,4 +167,26 @@ struct ScrapeLogicTests {
         #expect(ScrapeLogic.searchQuery(title: nil, fileName: "noext") == "noext")
         #expect(ScrapeLogic.searchQuery(title: nil, fileName: "archive.tar.gz") == "archive.tar")
     }
+
+    // MARK: - validateCoverData（封面格式唯一判据；B1 2026-10-10）
+
+    @Test("validateCoverData：合法 JPEG / PNG 通过")
+    func validateCoverAcceptsJPEGAndPNG() {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46])
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        #expect(ScrapeLogic.validateCoverData(jpeg))
+        #expect(ScrapeLogic.validateCoverData(png))
+    }
+
+    @Test("validateCoverData：空 / GIF / 文本 / 截断一律拒")
+    func validateCoverRejectsInvalid() {
+        #expect(!ScrapeLogic.validateCoverData(Data()))
+        // GIF（87a / 89a）
+        #expect(!ScrapeLogic.validateCoverData(Data([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])))
+        // 普通文本
+        #expect(!ScrapeLogic.validateCoverData(Data("not an image".utf8)))
+        // 截断：只有前两字节（JPEG 需 3 字节魔数、PNG 需 4 字节）
+        #expect(!ScrapeLogic.validateCoverData(Data([0xFF, 0xD8])))
+        #expect(!ScrapeLogic.validateCoverData(Data([0x89, 0x50])))
+    }
 }

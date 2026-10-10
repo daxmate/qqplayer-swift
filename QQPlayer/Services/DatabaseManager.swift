@@ -492,8 +492,11 @@ class DatabaseManager: @unchecked Sendable {
             // 导致 in-memory fallback，扫描全部白跑）。用 Application Support
             // 独立目录，与桌面版（~/Library/Application Support/qqplayer/）区分。
             // 路径决策上收：DatabasePathResolver.macDatabaseURL（有单测锁定）。
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
-                                                      in: .userDomainMask).first!
+            // 2026-10-10 收敛：Application Support 根解析只在 `LibraryRoot`
+            // （此前本处与 `LibraryRoot` 各解析一次 = 两份事实源）。
+            let appSupport = LibraryRoot.macApplicationSupportDirectoryURL()
+                ?? FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support", isDirectory: true)
             let url = DatabasePathResolver.macDatabaseURL(appSupportRoot: appSupport)
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),

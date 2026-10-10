@@ -25,6 +25,14 @@ struct QQPlayerMacApp: App {
         // 运行时报错/业务日志可离线读取（~/Library/Logs/QQPlayerMac/{stdout,stderr}.log）
         MacScanLogger.redirectStderr()
         MacScanLogger.redirectStdout()
+        // 2026-10-10：macOS App 数据一次性迁出 ~/Documents → Application Support/QQPlayerMac。
+        // **必须早于任何按旧 Documents 位置初始化的数据层**（ArtworkManager / StateManager /
+        // 歌词缓存等；此刻各视图 singleton / AppServices 尚未构造）。
+        // 只搬不删、冲突不覆盖、失败保留源下次重试；完成门置位后幂等跳过。
+        // 放在 init 里「redirect 之后的第一件事」，早于本 init 里其余所有初始化。
+        MacDocumentsStorageRelocation.run(
+            dryRun: MacDocumentsStorageRelocation.dryRunRequested()
+        )
         // 退出兑底保存：播放状态周期 30s 落盘一次，⌘Q 距上次保存不足 30s 会丢
         // 断点进度（web 版"页面关闭兑底"对齐，D 组恢复播放）——willTerminate 同步存一次。
         NotificationCenter.default.addObserver(

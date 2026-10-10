@@ -117,17 +117,14 @@ final class AlignedLyricsStore: @unchecked Sendable {
         LibraryRoot.alignedLyricsDirectoryURL(fileManager: fileManager)
     }
 
-    /// 旧位置（v2 之前的 `Documents/lyrics-aligned/`）——**只读兼容**。
-    /// v2 迁移未跑到 / 搬迁失败时，已有对齐歌词不能因此看不见（写入仍只落新位置）。
-    /// macOS 下新位置就是旧位置，兼容列表为空（避免重复枚举）。
+    /// 旧位置（`Documents/lyrics-aligned/`；iOS = v2 之前，macOS = 本批迁出 ~/Documents 之前）
+    /// ——**只读兼容**。迁移未跑到 / 搬迁失败时，已有对齐歌词不能因此看不见（写入仍只落新位置）。
+    /// 本批（2026-10-10）起 macOS 新位置 = `<App Support>/QQPlayerMac/lyrics-aligned`，
+    /// 与旧位置不再相同，故 macOS 也要返回旧位置（此前「新位置就是旧位置」的短路失效）。
     var legacyDirectories: [URL] {
         guard explicitDirectory == nil, Self.directoryOverride == nil else { return [] }
         guard let documents = LibraryRoot.documentsRootURL(fileManager: fileManager) else { return [] }
-        #if os(iOS)
-            return [documents.appendingPathComponent("lyrics-aligned", isDirectory: true)]
-        #else
-            return []
-        #endif
+        return [documents.appendingPathComponent("lyrics-aligned", isDirectory: true)]
     }
 
     /// 库目录（懒建；解析失败 = nil）。

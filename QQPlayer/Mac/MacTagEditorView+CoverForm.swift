@@ -29,6 +29,8 @@ extension MacTagEditorView {
             .disabled(selectedCoverURL == nil || saving)
             .help("tag_editor_use_candidate_cover_help".localized)
 
+            localCoverButton
+
             Button(role: .destructive) {
                 coverState = .remove
             } label: {

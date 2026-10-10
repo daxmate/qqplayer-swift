@@ -64,6 +64,18 @@ enum ScrapeLogic {
         return MusicBrainzClient.artistMatches(candidates[0].artist ?? "", artist)
     }
 
+    /// 封面图片格式判据（**唯一入口**）：只接受 JPEG / PNG（魔数）。
+    ///
+    /// 供两处共用，**禁止**在别处再写第二份魔数判断：
+    ///  · 「候选封面下载」`MacTagEditorView+Scrape.downloadCoverData`（web tag_editor.fetch_cover 语义）；
+    ///  · 「从本地选择图片…」`MacTagEditorView+Scrape.chooseLocalCoverImage`（B1，2026-10-10）。
+    /// 空数据 / 其它格式（GIF / 文本 / 截断）一律拒。
+    static func validateCoverData(_ data: Data) -> Bool {
+        guard !data.isEmpty else { return false }
+        return data.starts(with: [0xFF, 0xD8, 0xFF])
+            || data.starts(with: [0x89, 0x50, 0x4E, 0x47])
+    }
+
     /// query 构造：title 非空 → title；空 → 文件名去扩展名取末段（web query = title or f.stem）
     static func searchQuery(title: String?, fileName: String) -> String {
         if let title, !title.isEmpty {

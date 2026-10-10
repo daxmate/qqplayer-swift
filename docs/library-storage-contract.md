@@ -10,7 +10,7 @@
 
 1. 每条规则三段式：**规则（一句话）/ 源文件（唯一实现处 + 行号）/ 守护（测试名）**。没有守护的显式标 `✗ 无守护`。
 2. 改任何一条语义前先读 §5「变更规则」：那里写了改哪一类必须同步更新哪些守护测试。
-3. 平台分栏：iOS = 隐藏布局（本文主体）；macOS = 现状布局，本契约对它**逐字节透传**（不做跨平台统一）。
+3. 平台分栏：iOS = 隐藏布局（本文主体）；macOS = **App Support 布局**（2026-10-10 起：App 数据从 `~/Documents` 迁到 `<Application Support>/QQPlayerMac/`，见 §1.7）。
 4. **只写 `origin/main` 里查得到的**。在途分支上的改动不算契约（见 §6）。
 
 ---
@@ -38,19 +38,19 @@
 
 ### 1.3 隐藏根 `Documents/.qqplayer/`（iOS）——派生内容落点
 
-| 类目 | 落点（iOS） | 源文件 | macOS 现状（透传） |
+| 类目 | 落点（iOS） | 源文件 | macOS（2026-10-10 起 = `<App Support>/QQPlayerMac/…`） |
 | --- | --- | --- | --- |
 | 隐藏根 | `<Documents>/.qqplayer` | `LibraryRoot.swift:65`、`:100-108`（`hiddenRootURL`） | `<Documents>` 本身（不引入隐藏层） |
 | DB | `.qqplayer/db/` | `:68`、`:143-146`（`databaseDirectoryURL`） | `Application Support/QQPlayerMac/qqplayer.db`（见 1.4） |
-| 状态（favorites / player-state / pairing / 书签 / 歌单） | `.qqplayer/state/…` | `:69`、`:148-186`（`stateDirectoryURL` / `favoritesFileURL` / `playlistsDirectoryURL` / `playerStateFileURL` / `pairingFileURL` / `externalBookmarksFileURL`）、`:77-78`（`playlists`） | `Documents/` 根平铺（`qqplayer-favorites.json` / `qqplayer-playlists` / `qqplayer-player-state.json` …） |
-| 封面缓存 + 映射表 | `.qqplayer/artwork/` | `:70`、`:188-203` | `Documents/Artwork/` |
-| 歌词（手工 / 对齐 / 逐曲缓存 / 搜索缓存） | `.qqplayer/lyrics/{manual,aligned,cache/{tracks,search}}` | `:71`、`:79-83`、`:224-254` | `Documents/Lyrics` / `Documents/lyrics-aligned` / `Documents/lyrics-cache/{tracks,search}` |
-| 日志 | `.qqplayer/logs/` | `:72`、`:256-263` | `Documents/Logs/`（AppLog 主日志另有 `~/Library/Logs/QQPlayerMac/app.log`） |
-| 元数据 | `.qqplayer/meta/` | `:73`、`:265-271` | `Documents/meta` |
-| 各类网络缓存 | `.qqplayer/cache/<name>` | `:74`、`:273-282`（`cacheDirectoryURL` / `namedCacheDirectoryURL`） | `Documents/<name>`（平铺） |
-| 回收区（**旧根残留**） | `.qqplayer/trash/` | `:75`、`:284-292`（`trashDirectoryURL`）；⚠️ **生产删除落点不在这里**（见 1.5） | `Documents/.Trash` |
+| 状态（favorites / player-state / pairing / 书签 / 歌单） | `.qqplayer/state/…` | `:69`、`:148-186`（`stateDirectoryURL` / `favoritesFileURL` / `playlistsDirectoryURL` / `playerStateFileURL` / `pairingFileURL` / `externalBookmarksFileURL`）、`:77-78`（`playlists`） | 根平铺（`qqplayer-favorites.json` / `qqplayer-playlists` / `qqplayer-player-state.json` / `pairing.json` / `ExternalFileBookmarks.plist`）——**旧 `Documents/` 根已迁移、只读兼容** |
+| 封面缓存 + 映射表 | `.qqplayer/artwork/` | `:70`、`:188-203` | `Artwork/`（旧 `Documents/Artwork/` 与 `Documents/ArtworkMapping.plist` 已迁移、只读兼容） |
+| 歌词（手工 / 对齐 / 逐曲缓存 / 搜索缓存） | `.qqplayer/lyrics/{manual,aligned,cache/{tracks,search}}` | `:71`、`:79-83`、`:224-254` | `Lyrics` / `lyrics-aligned` / `lyrics-cache/{tracks,search}`（旧 `Documents/…` 已迁移、只读兼容） |
+| 日志 | `.qqplayer/logs/` | `:72`、`:256-263` | `Logs/`（AppLog 主日志另有 `~/Library/Logs/QQPlayerMac/app.log`，不受本批影响） |
+| 元数据 | `.qqplayer/meta/` | `:73`、`:265-271` | `meta`（旧 `Documents/meta` 已迁移） |
+| 各类网络缓存 | `.qqplayer/cache/<name>` | `:74`、`:273-282`（`cacheDirectoryURL` / `namedCacheDirectoryURL`） | `<name>`（平铺在 `<App Support>/QQPlayerMac/` 根；旧 `Documents/<name>` 已迁移） |
+| 回收区（**旧根残留**） | `.qqplayer/trash/` | `:75`、`:284-292`（`trashDirectoryURL`）；⚠️ **生产删除落点不在这里**（见 1.5） | `.Trash`（macOS 解析基准随 `scopedURL` 改到 App 数据根；旧 `Documents/.Trash` 残留**不迁**、不动，见 §1.7） |
 
-**换算唯一实现** = `LibraryRoot.scopedURL(hidden:macOS:isFile:)`（`LibraryRoot.swift:110-139`）：iOS 拼 `.qqplayer/<hidden…>`、macOS 拼 `<macOS…>`（空列表 = Documents 根本身，`:130-132`）。
+**换算唯一实现** = `LibraryRoot.scopedURL(hidden:macOS:isFile:)`（`LibraryRoot.swift`）：iOS 拼 `<Documents>/.qqplayer/<hidden…>`、macOS 拼 `<App Support>/QQPlayerMac/<macOS…>`（空列表 = App 数据根本身）。iOS 分支逐字节未变；macOS 基准 2026-10-10 从 `<Documents>` 改为 App Support（见 §1.7）。
 
 ### 1.4 数据库落点
 
@@ -64,7 +64,7 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 规则 | 生产删除落点 = **曲库根内**的隐藏目录 `<曲库根>/.Trash/<64位hex>.<ext>`（差集语义要求文件移出曲库根才对扫描不可见）；`Documents/.Trash` 是**旧根残留**，`trashDirectoryURL` 只解析它 |
+| 规则 | 生产删除落点 = **曲库根内**的隐藏目录 `<曲库根>/.Trash/<64位hex>.<ext>`（差集语义要求文件移出曲库根才对扫描不可见）；`trashDirectoryURL` 解析的只是**旧根残留**的回收区（iOS = `<Documents>/.qqplayer/trash`；macOS = `<App Support>/QQPlayerMac/.Trash`，2026-10-10 起——旧 `Documents/.Trash` 残留不迁） |
 | 源文件 | `LibraryRoot.swift:47-50`（`trashDirectoryName` 注释）、`:284-292`；实现 = `DeleteReclaimArea` |
 | 守护 | `QQPlayerTests/TrackDeletionReclaimAreaTests.swift:468`「应用回收区 · 路径唯一入口（形状契约）」→ `:470`「回收区目录名字面量只准出现在唯一入口文件；白名单不许空转」、`:491`「自证：剥注释后字面量仍被抓住，注释里的提及不算数」 |
 
@@ -78,6 +78,15 @@
 | 启动时机 | 生产顺序写死两轮：① `runStartupPrepass()`（`LibraryLayoutMigrationV2Migrator.swift:143`）在 `QQPlayerApp.didFinishLaunching` **首句、同步**跑（`QQPlayer/QQPlayerApp.swift:35`，不置门）② `runInBackground()`（`AppCoordinator.swift:138-140`，v1 之后）收尾并置门 | `LibraryLayoutMigrationV2Migrator.swift:36-45`（不变量注释） | `QQPlayerTests/StartupOrderContractTests.swift:296`（套件）→ `:298`「不变量①：`didFinishLaunching` 首条可执行语句 = `runStartupPrepass()`」、`:315`「不变量②：v2 收尾在 v1 之后」；自证（坏序必须红）`:332`、`:375`、`:392` |
 | 干跑 | `run(dryRun: true)` 或启动参数 `--hidden-layout-dry-run`：只统计不搬、不置门 | `LibraryLayoutMigrationV2Migrator.swift:80-86` | `LibraryHiddenLayoutMigrationTests.swift:394`、`:500` |
 | DB 引用保守例外 | DB 绝对存储路径指向某待搬根条目 ⇒ **跳过该条目不搬**（宁可留根上也不让引用悬空）；不计入残留、不阻塞置门 | `LibraryLayoutMigrationV2Migrator.swift:24-27` | `LibraryHiddenLayoutMigrationTests.swift:540` |
+
+### 1.7 macOS App 数据迁出 `~/Documents` → `<App Support>/QQPlayerMac/`（2026-10-10）
+
+| 项 | 内容 |
+| --- | --- |
+| 规则 | macOS App 数据（封面 / 歌词 / 缓存 / 状态 / 日志 / 元数据）落点基准 = `<Application Support>/QQPlayerMac/`（用户开了 iCloud「桌面与文稿文件夹」后 `~/Documents` 即云盘，App 数据不该落那里）。**iOS 零变化**；**曲库根仍是 `~/Music/QQPlayer`**（`MacLibraryRoot`，不受本批影响） |
+| 旧位置 | `~/Documents` 下同名旧落点（`Artwork/` · `Lyrics/` · `lyrics-aligned/` · `lyrics-cache/` · `SpotifyCache/` · `DiscogsCache/` · `HybridMusicCache/` · `meta/` · `Logs/` · `qqplayer-playlists/` · `qqplayer-favorites.json` · `qqplayer-player-state.json` · `pairing.json` · `ExternalFileBookmarks.plist` · `ArtworkMapping.plist`）—— **已迁移 / 只读兼容**。`Documents/.Trash`（旧回收区残留）**不迁、不动** |
+| 源文件 | 基准解析 = `QQPlayer/Services/LibraryRoot.swift`（`macAppSupportRootURL` / `macApplicationSupportDirectoryURL` / `macAppSupportDirectoryName`；`scopedURL` 的 macOS 分支）。一次性迁移器 = `QQPlayer/Services/MacDocumentsStorageRelocation.swift`（**只搬不删** / **冲突不覆盖** / 完成门 `mac.documentsStorageRelocationCompleted.v1` / 干跑参数 `--mac-documents-relocation-dry-run`）。启动装配 = `QQPlayer/QQPlayerMacApp.swift`（`init` 里 redirect 之后最早处，**早于任何按旧位置初始化的数据层**）。DB 根解析收敛 = `LibraryRoot`（`DatabasePathResolver.macDatabaseURL` 只做「App Support 根 + QQPlayerMac + qqplayer.db」拼接，目录名常量唯一） |
+| 守护 | `QQPlayerTests/MacDocumentsStorageRelocationTests.swift`（合成旧布局 → 迁移 → ① 新位置内容一致 ② 旧位置已清空 ③ 二次运行全跳过（幂等） ④ 冲突不覆盖 ⑤ 失败不中断） |
 
 ---
 

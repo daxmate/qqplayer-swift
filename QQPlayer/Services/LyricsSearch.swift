@@ -303,14 +303,12 @@ extension LyricsManager {
     /// 不必等重建）。写入一律落新位置。
     private func legacyLyricsCacheFileURL(trackId: String) -> URL? {
         guard Self.lyricsCacheDirectoryOverride == nil else { return nil }
-        #if os(iOS)
-            guard let documents = LibraryRoot.documentsRootURL(fileManager: fileManager) else { return nil }
-            return documents
-                .appendingPathComponent("lyrics-cache/tracks", isDirectory: true)
-                .appendingPathComponent("\(trackId).json")
-        #else
-            return nil
-        #endif
+        // 旧位置 `Documents/lyrics-cache/tracks/`（iOS = v2 之前，macOS = 本批迁出前）——只读兼容；
+        // 写入一律落新位置（LibraryRoot.lyricsCacheTracksDirectoryURL）。
+        guard let documents = LibraryRoot.documentsRootURL(fileManager: fileManager) else { return nil }
+        return documents
+            .appendingPathComponent("lyrics-cache/tracks", isDirectory: true)
+            .appendingPathComponent("\(trackId).json")
     }
 
     private func getLyricsFileURL(trackId: String) -> URL? {

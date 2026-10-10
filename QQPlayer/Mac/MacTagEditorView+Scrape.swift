@@ -8,6 +8,7 @@
 //
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 extension MacTagEditorView {
     // MARK: 刮削行
@@ -245,17 +246,56 @@ extension MacTagEditorView {
         }
     }
 
-    /// 封面下载（JPEG/PNG 校验，web tag_editor.fetch_cover 语义）
+    /// 封面下载（JPEG/PNG 校验，web tag_editor.fetch_cover 语义）。
+    /// 格式判据复用唯一入口 `ScrapeLogic.validateCoverData`（与「从本地选择图片」共用）。
     private static func downloadCoverData(from url: URL) async throws -> Data? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue("QQPlayer/1.0 (https://github.com/daxmate/qqplayer)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode),
-              !data.isEmpty,
-              data.starts(with: [0xFF, 0xD8, 0xFF]) || data.starts(with: [0x89, 0x50, 0x4E, 0x47]) else {
+              ScrapeLogic.validateCoverData(data) else {
             return nil
         }
         return data
+    }
+
+    // MARK: - 本地指定封面（单曲；B1，2026-10-10）
+
+    /// 「从本地选择图片…」按钮（封面列引用；UI 排在「使用候选封面」与「移除封面」之间）。
+    var localCoverButton: some View {
+        Button {
+            chooseLocalCoverImage()
+        } label: {
+            Label("tag_editor_choose_local_cover".localized, systemImage: "photo.on.rectangle.angled")
+                .font(.caption)
+        }
+        .buttonStyle(.borderless)
+        .disabled(saving)
+        .help("tag_editor_choose_local_cover_help".localized)
+    }
+
+    /// 选择本地图片 → 校验 → 暂存为封面（与刮削候选封面**同一内存通道**：`coverState = .replace(data)`）。
+    ///
+    /// 保存时随既有流程嵌入音频文件（`MacTagEditorView+RenameSave`）。
+    /// 取消 = 保持现状、不报错；校验失败 = 红字提示（复用 `saveError` 通道）。
+    /// 格式判据复用唯一入口 `ScrapeLogic.validateCoverData`（不得在本处再写魔数判断）。
+    func chooseLocalCoverImage() {
+        guard !saving else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.jpeg, .png]
+        panel.message = "tag_editor_choose_local_cover".localized
+        panel.prompt = Localized.ok
+        // 取消（.cancel / 无 URL）→ 保持现状、不报错。
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let data = try? Data(contentsOf: url), ScrapeLogic.validateCoverData(data) else {
+            saveError = "tag_editor_local_cover_invalid".localized
+            return
+        }
+        coverState = .replace(data)
+        saveError = nil
     }
 }

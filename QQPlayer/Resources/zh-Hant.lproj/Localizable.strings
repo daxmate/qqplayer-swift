@@ -1057,6 +1057,9 @@
 "tag_editor_use_candidate_cover_help" = "下載並寫入所選候選的封面";
 "tag_editor_cover_download_failed" = "封面下載失敗";
 "tag_editor_remove_cover" = "移除封面";
+"tag_editor_choose_local_cover" = "從本地選擇圖片…";
+"tag_editor_choose_local_cover_help" = "從本機選擇一個 JPEG 或 PNG 檔案";
+"tag_editor_local_cover_invalid" = "不是有效的 JPEG 或 PNG 圖片";
 "tag_editor_rename_files" = "儲存後依範本重新命名";
 "tag_editor_field_year" = "年份";
 "tag_editor_field_genre" = "流派";

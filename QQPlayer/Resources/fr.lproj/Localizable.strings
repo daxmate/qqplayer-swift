@@ -719,6 +719,9 @@
 "tag_editor_use_candidate_cover_help" = "Télécharger et intégrer la pochette du candidat sélectionné";
 "tag_editor_cover_download_failed" = "Échec du téléchargement de la pochette";
 "tag_editor_remove_cover" = "Supprimer la pochette";
+"tag_editor_choose_local_cover" = "Choisir une image…";
+"tag_editor_choose_local_cover_help" = "Choisissez un fichier JPEG ou PNG sur ce Mac";
+"tag_editor_local_cover_invalid" = "Ce n'est pas une image JPEG ou PNG valide";
 "tag_editor_rename_files" = "Renommer le fichier après l'enregistrement";
 "tag_editor_field_year" = "Année";
 "tag_editor_field_genre" = "Genre";

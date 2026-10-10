@@ -13,8 +13,13 @@ import Foundation
 enum DatabasePathResolver {
     /// macOS 数据库目录：Application Support/QQPlayerMac（与桌面版 qqplayer/ 区分）。
     /// - appSupportRoot：FileManager 的 applicationSupportDirectory（注入便于测试）
+    ///
+    /// 目录名 `QQPlayerMac` 的唯一事实源在 `LibraryRoot.macAppSupportDirectoryName`
+    /// （本批 2026-10-10 收敛：App Support 根解析只在 `LibraryRoot`，本函数只做「根 + 文件名」拼接）。
     static func macDatabaseURL(appSupportRoot: URL) -> URL {
-        let dir = appSupportRoot.appendingPathComponent("QQPlayerMac", isDirectory: true)
+        let dir = appSupportRoot.appendingPathComponent(
+            LibraryRoot.macAppSupportDirectoryName, isDirectory: true
+        )
         return dir.appendingPathComponent("qqplayer.db")
     }
 
