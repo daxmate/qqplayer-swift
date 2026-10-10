@@ -89,6 +89,7 @@ private enum TrackFileRenameContract {
         "QQPlayer/Services/LyricsManager.swift",
         "QQPlayer/Services/LyricsSearch.swift",
         "QQPlayer/Services/LyricsSearchCache.swift",
+        "QQPlayer/Services/MacDocumentsStorageRelocation.swift",
         "QQPlayer/Services/MacOnlineDownloadService.swift",
         "QQPlayer/Services/NeteaseOnlineClient+Transport.swift",
         "QQPlayer/Services/QuarkCookieStore.swift",
