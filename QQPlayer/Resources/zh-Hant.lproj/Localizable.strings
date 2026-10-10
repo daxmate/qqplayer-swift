@@ -1087,6 +1087,8 @@
 "shortcut_speed_down" = "倍速降檔";
 "shortcut_speed_up" = "倍速升檔";
 "shortcut_toggle_karaoke" = "跟唱模式";
+"shortcut_prev_line" = "上一句";
+"shortcut_next_line" = "下一句";
 "shortcut_ab_toggle" = "AB 循環";
 "shortcut_ab_end" = "設定 AB 終點";
 "shortcuts_record" = "錄製";

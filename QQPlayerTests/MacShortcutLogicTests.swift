@@ -163,9 +163,9 @@ struct MacShortcutBindingTests {
 /// `toggleFavorite` 来回写库、`cyclePlayMode` 直接轮转一圈。决策上收 MacShortcutLogic
 /// （无 AppKit 可单测）；`MacKeyboardShortcuts.handle` 只转调。
 struct MacShortcutRepeatPolicyTests {
-    @Test("只有 seek 类允许长按连发")
-    func repeatableIdsAreSeeksOnly() {
-        #expect(MacShortcutLogic.repeatableShortcutIds == ["seekBack", "seekForward"])
+    @Test("只有 seek 类与跟唱跳句类允许长按连发")
+    func repeatableIdsAreSeeksAndKaraokeLines() {
+        #expect(MacShortcutLogic.repeatableShortcutIds == ["seekBack", "seekForward", "prevLine", "nextLine"])
     }
 
     @Test("非重复事件一律执行（与修复前行为一致）")
@@ -188,5 +188,63 @@ struct MacShortcutRepeatPolicyTests {
                    "abToggle", "abEnd", "nextTrack", "previousTrack"] {
             #expect(!MacShortcutLogic.shouldRunAction(id: id, isARepeat: true))
         }
+    }
+}
+
+// MARK: - 跟唱内跳句快捷键（2026-10-10）
+
+/// 用户 2026-10-10 拍板：macOS 跟唱内 ↑/↓ 跳上一句/下一句，且**只在跟唱模式内生效**
+/// （跟唱外 ↑/↓ 必须放行，否则列表/歌词滚动的方向键导航被 App 级监听吃掉）。
+/// 默认组合 / 条件生效 / 冲突 / repeatable 决策全在 MacShortcutLogic（无 AppKit，可单测）。
+struct MacShortcutKaraokeLineTests {
+    /// 新 def 默认组合：引用 shipped 常量（allDefs 与单测共用同一处定义，防两处手写漂移）
+    @Test("prevLine / nextLine 默认组合：↑ = 126 / ↓ = 125，无修饰键，display ↑/↓")
+    func karaokeLineDefaultCombos() {
+        let prev = MacShortcutLogic.prevLineDefaultCombo
+        let next = MacShortcutLogic.nextLineDefaultCombo
+        #expect(prev == combo(126))
+        #expect(prev.flags == 0)
+        #expect(prev.display == "↑")
+        #expect(next == combo(125))
+        #expect(next.flags == 0)
+        #expect(next.display == "↓")
+        // keyName() 已支持这两个方向键（展示文本与默认 display 一致）
+        #expect(MacShortcutLogic.displayText(keyCode: 126, flags: 0) == "↑")
+        #expect(MacShortcutLogic.displayText(keyCode: 125, flags: 0) == "↓")
+    }
+
+    /// 新 def 参与既有冲突检测：别的快捷键录成 ↑/↓ 应与 prevLine/nextLine 相撞
+    @Test("findConflict：新 def 默认组合参与冲突检测")
+    func karaokeLineConflict() {
+        let defs: [(id: String, defaultCombo: ShortcutCombo)] = [
+            ("playPause", combo(49)),
+            ("prevLine", MacShortcutLogic.prevLineDefaultCombo),
+            ("nextLine", MacShortcutLogic.nextLineDefaultCombo),
+        ]
+        #expect(MacShortcutLogic.findConflict(id: "playPause", combo: combo(126), defs: defs, overrides: [:]) == "prevLine")
+        #expect(MacShortcutLogic.findConflict(id: "playPause", combo: combo(125), defs: defs, overrides: [:]) == "nextLine")
+        // 自己与自己默认不算冲突
+        #expect(MacShortcutLogic.findConflict(id: "prevLine", combo: combo(126), defs: defs, overrides: [:]) == nil)
+    }
+
+    /// 条件生效：requiresKaraoke 的快捷键仅在跟唱模式内消费；跟唱外必须放行
+    /// （否则列表/歌词滚动的方向键导航被 App 级监听吃掉）。
+    @Test("条件生效：跟唱关 → 放行；跟唱开 → 消费")
+    func conditionalActivation() {
+        // 跟唱内快捷键：关 → 不消费（放行）；开 → 消费
+        #expect(!MacShortcutLogic.isActive(requiresKaraoke: true, karaokeOn: false))
+        #expect(MacShortcutLogic.isActive(requiresKaraoke: true, karaokeOn: true))
+        // 普通快捷键：与跟唱开关无关，恒生效
+        #expect(MacShortcutLogic.isActive(requiresKaraoke: false, karaokeOn: false))
+        #expect(MacShortcutLogic.isActive(requiresKaraoke: false, karaokeOn: true))
+    }
+
+    /// 新 def 属 repeatable（跟唱内按住 ↑/↓ 连续跳句，与 seek 同类）
+    @Test("repeatable：prevLine / nextLine 属长按连发集合")
+    func karaokeLineRepeatable() {
+        #expect(MacShortcutLogic.repeatableShortcutIds.contains("prevLine"))
+        #expect(MacShortcutLogic.repeatableShortcutIds.contains("nextLine"))
+        #expect(MacShortcutLogic.shouldRunAction(id: "prevLine", isARepeat: true))
+        #expect(MacShortcutLogic.shouldRunAction(id: "nextLine", isARepeat: true))
     }
 }

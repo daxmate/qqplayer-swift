@@ -749,6 +749,8 @@
 "shortcut_speed_down" = "Ralentir la vitesse";
 "shortcut_speed_up" = "Accélérer la vitesse";
 "shortcut_toggle_karaoke" = "Mode karaoké";
+"shortcut_prev_line" = "Ligne précédente";
+"shortcut_next_line" = "Ligne suivante";
 "shortcut_ab_toggle" = "Boucle AB";
 "shortcut_ab_end" = "Définir la fin AB";
 "shortcuts_record" = "Enregistrer";

@@ -34,7 +34,24 @@ struct MacShortcutDef {
     let id: String
     let labelKey: String
     let defaultCombo: ShortcutCombo
+    /// 条件生效：true = 仅跟唱模式内消费（缺省 false = App 级恒生效）。
+    /// 判定下沉 MacShortcutLogic.isActive（纯逻辑可单测）。
+    let requiresKaraoke: Bool
     let action: @MainActor () -> Void
+
+    init(
+        id: String,
+        labelKey: String,
+        defaultCombo: ShortcutCombo,
+        requiresKaraoke: Bool = false,
+        action: @escaping @MainActor () -> Void
+    ) {
+        self.id = id
+        self.labelKey = labelKey
+        self.defaultCombo = defaultCombo
+        self.requiresKaraoke = requiresKaraoke
+        self.action = action
+    }
 }
 
 /// 全局键盘快捷键监听（QQPlayerMac target only，@MainActor 单例式 enum）。
@@ -124,6 +141,24 @@ enum MacKeyboardShortcuts {
             defaultCombo: ShortcutCombo(keyCode: 5, flags: 0, display: "G")
         ) {
             KaraokeController.shared.toggleKaraokeMode()
+        },
+        // 跟唱内跳句（用户 2026-10-10 拍板）：↑/↓ 与 MacKaraokeControlBar 的
+        // chevron.up/down 按钮逐字同语义（delta -1/+1，currentTime = 播放时间）。
+        // requiresKaraoke：只在跟唱模式内消费——跟唱外 ↑/↓ 放行，否则列表/歌词
+        // 滚动等方向键导航会被 App 级监听吃掉。
+        MacShortcutDef(
+            id: "prevLine", labelKey: "shortcut_prev_line",
+            defaultCombo: MacShortcutLogic.prevLineDefaultCombo,
+            requiresKaraoke: true
+        ) {
+            KaraokeController.shared.stepLine(delta: -1, currentTime: PlayerEngine.shared.playbackTime)
+        },
+        MacShortcutDef(
+            id: "nextLine", labelKey: "shortcut_next_line",
+            defaultCombo: MacShortcutLogic.nextLineDefaultCombo,
+            requiresKaraoke: true
+        ) {
+            KaraokeController.shared.stepLine(delta: 1, currentTime: PlayerEngine.shared.playbackTime)
         },
         MacShortcutDef(
             id: "abToggle", labelKey: "shortcut_ab_toggle",
@@ -249,6 +284,12 @@ enum MacKeyboardShortcuts {
             let combo = effectiveCombo(for: def)
             return combo.keyCode == Int(event.keyCode) && combo.flags == flags
         }) else {
+            return event
+        }
+        // 条件生效（用户 2026-10-10）：跟唱内快捷键（prevLine/nextLine）仅在跟唱模式
+        // 消费；未开跟唱 → 放行（return event），否则 App 级监听会吃掉跟唱外场景的
+        // 方向键（列表/歌词滚动导航）。判定下沉 MacShortcutLogic.isActive（纯逻辑可单测）。
+        guard MacShortcutLogic.isActive(requiresKaraoke: def.requiresKaraoke, karaokeOn: KaraokeController.shared.isKaraokeOn) else {
             return event
         }
         // 长按过滤（审计 M1）：非 seek 类忽略键盘自动重复（否则播放/暂停、收藏、

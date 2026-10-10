@@ -751,6 +751,8 @@
 "shortcut_speed_down" = "Speed Down";
 "shortcut_speed_up" = "Speed Up";
 "shortcut_toggle_karaoke" = "Karaoke Mode";
+"shortcut_prev_line" = "Previous Line";
+"shortcut_next_line" = "Next Line";
 "shortcut_ab_toggle" = "AB Loop";
 "shortcut_ab_end" = "Set AB End Point";
 "shortcuts_record" = "Record";

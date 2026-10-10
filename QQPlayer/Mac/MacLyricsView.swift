@@ -30,6 +30,13 @@ struct MacLyricsView: View {
     /// 分片：跨文件可见（原 private）
     @Environment(KaraokeController.self) var karaoke
 
+    /// 跟唱歌词区焦点（用户 2026-10-10）：进入跟唱时把焦点交给歌词区，使窗口
+    /// firstResponder 离开任何文本输入框——否则 MacKeyboardShortcuts.handle 的
+    /// 「文本焦点放行」守卫会挡掉录成字母键（j/k…）的跟唱快捷键。
+    /// 决策在此（@FocusState = 谁该有焦点）；AppKit 兜底见 resignTextInputFocusIfNeeded
+    /// （同 MacSearchAnythingLayer 先例）。
+    @FocusState private var lyricsFocused: Bool
+
     /// 歌词设置（D3，web 版 lyric 设置对齐）：字号/译文行/整体延迟校准。
     /// 启动与 qqplayerSettingsDidChange 时从 DeleteSettings 刷新；offset 同时
     /// 注入 KaraokeController（跟唱 tick/跳句共用同一歌词时间轴）。
@@ -60,6 +67,9 @@ struct MacLyricsView: View {
             header
             Divider()
             content
+                // 仅跟唱模式下歌词区可聚焦（普通态键盘/焦点行为不变）
+                .focusable(karaoke.isKaraokeOn)
+                .focused($lyricsFocused)
             // 对齐 iOS LyricsView：跟唱控制条常驻底部，无论歌词状态（加载中/纯文本/无歌词）都显示
             if karaoke.isKaraokeOn {
                 Divider()
@@ -73,6 +83,10 @@ struct MacLyricsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             applyLyricSettings()
+        }
+        // 进 / 出跟唱 → 歌词区焦点（用户 2026-10-10；只在进入这一刻发生一次）
+        .onChange(of: karaoke.isKaraokeOn) { _, isOn in
+            applyKaraokeFocus(isOn)
         }
         // 页面级双击：纯放大/缩回切换（2026-09-06 用户拍板：双击 ≠ 跟唱，跟唱经 mic 按钮）。
         // highPriority 双击优先，行单击等双击判定失败后才触发；快速双击不触发行跳转。
@@ -108,6 +122,39 @@ struct MacLyricsView: View {
         showRoman = settings.lyricShowRoman
         lyricOffset = settings.lyricOffset
         karaoke.lyricOffset = settings.lyricOffset
+    }
+
+    // MARK: - 跟唱焦点（用户 2026-10-10）
+
+    /// 进 / 出跟唱 → 歌词区焦点。
+    /// 进入：把焦点交给歌词区（@FocusState 决策），并做一次 AppKit 校验兜底——
+    /// 若文本输入框仍持 AppKit first responder，则交权（让 MacKeyboardShortcuts.handle
+    /// 的「文本焦点放行」守卫放行录成字母键的跟唱快捷键）。
+    /// 退出：清歌词区焦点（普通态键盘行为不变）。只在进入这一刻发生一次，不持续抢焦点。
+    private func applyKaraokeFocus(_ isOn: Bool) {
+        guard isOn else {
+            lyricsFocused = false
+            return
+        }
+        lyricsFocused = true
+        // 等一帧让 SwiftUI 焦点生效，再校验 AppKit 第一响应者是否需要交权。
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            _ = Self.resignTextInputFocusIfNeeded()
+        }
+    }
+
+    /// AppKit 兜底（执行层）：若窗口第一响应者仍是文本输入框，则交权给窗口本身
+    /// （`makeFirstResponder(nil)`），使 MacKeyboardShortcuts 的文本守卫不再挡快捷键。
+    /// 决策仍在 @FocusState，本方法只在它没落地时执行「交权」这一动作（同 SearchAnything 先例）。
+    /// 返回 true = 已不在输入框（无需交权 / 交权成功）。
+    @MainActor
+    static func resignTextInputFocusIfNeeded() -> Bool {
+        guard let window = NSApp.keyWindow else { return false }
+        guard let responder = window.firstResponder else { return true }
+        let isTextInput = (responder as? NSTextView)?.isEditable == true || responder is NSTextField
+        guard isTextInput else { return true }
+        return window.makeFirstResponder(nil)
     }
 
     // MARK: - Header

@@ -746,6 +746,8 @@
 "shortcut_speed_down" = "Замедлить темп";
 "shortcut_speed_up" = "Ускорить темп";
 "shortcut_toggle_karaoke" = "Режим караоке";
+"shortcut_prev_line" = "Предыдущая строка";
+"shortcut_next_line" = "Следующая строка";
 "shortcut_ab_toggle" = "Цикл AB";
 "shortcut_ab_end" = "Задать конец AB";
 "shortcuts_record" = "Записать";
