@@ -3,7 +3,8 @@
 //  QQPlayer
 //
 //  音乐库主页面视图壳：stored property 装配 + `body` 分区装配 + 导入面板消费唯一入口
-//  （`importMusicFiles`——守卫 `LibraryImportOutcomeTests` 钉住 `processExternalFileOutcome(` 须留本文件）。
+//  （`importMusicFiles`——守卫 `LibraryImportOutcomeTests` 钉住 `processExternalFileOutcome(` 须留本文件）
+//  + 桌面端连接状态指示（头部常驻小圆点，无点击交互；状态源 = IOSPassiveSyncCenter）。
 //  2026-09-21 拆分（纯搬家，无逻辑变更），同族分片：
 //    LibraryView+ImportSupport / +SectionRendering / +SyncFeedback / +SectionRow / +ResponsiveFonts
 // target: ios-only（消费端全在 iOS；Mac 侧为 MacLibraryView）
@@ -23,6 +24,10 @@ struct LibraryView: View {
     let onRefresh: () async -> (before: Int, after: Int)
     let onManualSync: (() async -> (before: Int, after: Int))?
     @Environment(AppCoordinator.self) private var appCoordinator
+    /// App 级被动同步中心（唯一连接状态源）：头部圆点读连接状态、下拉刷新走它握手。
+    /// 组合根注入见 QQPlayerApp（`.environment(IOSPassiveSyncCenter.shared)`）。
+    /// 分片：跨文件可见（+SyncFeedback 的下拉入口也消费）
+    @Environment(IOSPassiveSyncCenter.self) var passiveSync
     /// 分片：跨文件可见（原 private）
     @Environment(LibraryIndexer.self) var libraryIndexer
     @State private var artistToNavigate: Artist?
@@ -171,40 +176,23 @@ struct LibraryView: View {
                                 Spacer()
 
                                 HStack(spacing: DesignTokens.space20) {
-                                    // Sync button (if available)
-                                    if onManualSync != nil {
-                                        Button(action: {
-                                            guard !isRefreshing else { return }
-
-                                            // Provide immediate haptic feedback
-                                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                            impactFeedback.impactOccurred()
-
-                                            withAnimation(.easeInOut(duration: 0.1)) {
-                                                isRefreshing = true
-                                            }
-
-                                            Task {
-                                                await runSync()
-                                            }
-                                        }) {
-                                            ZStack {
-                                                if isRefreshing {
-                                                    ProgressView()
-                                                        .scaleEffect(0.8)
-                                                        .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
-                                                } else {
-                                                    Image(systemName: "arrow.clockwise")
-                                                        .font(.system(size: DesignTokens.font26, weight: .medium))
-                                                        .foregroundColor(accentColor)
-                                                }
-                                            }
-                                            .padding(.bottom, DesignTokens.space4)
-                                            .scaleEffect(isRefreshing ? 0.9 : 1.0)
-                                            .animation(.easeInOut(duration: 0.2), value: isRefreshing)
+                                    // 桌面端连接状态指示（常驻；无点击交互）
+                                    // 亮绿 = 已连接；转圈 = 连接中；灰 = 未连接。
+                                    // 取色口径与 SyncSettingsView 一致（isConnected ? .green : .secondary）；
+                                    // 状态→文案映射的唯一实现是 IOSPassiveSyncPresenter（此处不落文案）。
+                                    Group {
+                                        if passiveSync.state.isConnecting {
+                                            ProgressView()
+                                                .scaleEffect(0.7)
+                                                .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
+                                        } else {
+                                            Circle()
+                                                .fill(passiveSync.state.isConnected ? Color.green : Color.secondary)
+                                                .frame(width: 10, height: 10)
                                         }
-                                        .disabled(isRefreshing)
                                     }
+                                    .frame(width: DesignTokens.font26, height: DesignTokens.font26)
+                                    .padding(.bottom, DesignTokens.space4)
 
                                     // Search button (center)
                                     Button(action: {
@@ -238,9 +226,7 @@ struct LibraryView: View {
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.large)
                 .refreshable {
-                    // Prevent multiple concurrent refreshes (pull-to-refresh also
-                    // takes the isRefreshing mutex so it cannot double-run with
-                    // the sync button)
+                    // 并发互斥：进行中的刷新 / 握手未结束前不重入。
                     guard !isRefreshing else { return }
 
                     // Provide haptic feedback for pull-to-refresh
@@ -248,7 +234,7 @@ struct LibraryView: View {
                     impactFeedback.impactOccurred()
 
                     isRefreshing = true
-                    await runSync()
+                    await runPullToRefresh()
                 }
 
             }

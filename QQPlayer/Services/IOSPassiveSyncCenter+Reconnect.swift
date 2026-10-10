@@ -37,6 +37,7 @@
             }
             guard let identity = try? identityStore.loadOrCreateIdentity() else {
                 state = .failed(.identityUnavailable)
+                notifyConnectionWaitersTerminal()
                 return
             }
 
@@ -134,6 +135,7 @@
             attemptedTargets.removeAll()
             attachPassiveHost(to: session)
             state = .connected(hostName: target.hostName, peerID: target.peerID)
+            notifyConnectionWaitersTerminal()
         }
 
         private func handleClosed(_ reason: SyncSessionCloseReason) {
@@ -151,6 +153,7 @@
             if let failure = SyncConnectLogic.failure(fromCloseReason: reason) {
                 state = .failed(.connect(failure))
             }
+            notifyConnectionWaitersTerminal()
             scheduleReconnect()
         }
 
@@ -160,6 +163,7 @@
             SyncConnectDiag.log("⏳ discovery timeout target=\(currentTarget?.hostName ?? "-") paired=\(pairedHosts.count)")
             cancelDiscovery()
             state = .failed(.connect(.hostNotFound(hostName: currentTarget?.hostName ?? pairedHosts.first?.displayName)))
+            notifyConnectionWaitersTerminal()
             scheduleReconnect()
         }
 
@@ -240,6 +244,54 @@
             let devices = (try? deviceStore.all()) ?? []
             pairedHosts = SyncDeviceList.hosts(in: devices)
             pairedHostCount = pairedHosts.count
+        }
+
+        // MARK: - 连接并等待结果（下拉刷新专用）
+
+        /// 触发一次手动重连并等待**首个终态**（已连接 / 失败）或有界超时。
+        ///
+        /// - 已连接：直接返回当前状态，**不打断**既有会话。
+        /// - 未在连接中：`reconnectNow()` 重置退避后重连；已在连接中则只等（不重触发）。
+        /// - 超时：到点返回当时状态（有界；视图层不轮询 `state`）。
+        /// - 不改动自动回连行为：只在既有终态点额外唤醒等待者。
+        func connectAndWait(timeout: TimeInterval) async -> IOSPassiveSyncState {
+            if state.isConnected { return state }
+
+            let id = UUID()
+            return await withCheckedContinuation { (continuation: CheckedContinuation<IOSPassiveSyncState, Never>) in
+                connectionWaiters[id] = continuation
+                if !state.isConnecting {
+                    reconnectNow()
+                }
+                // 兜底：注册这一刻若已是终态（如身份不可用），立即唤醒。
+                notifyConnectionWaitersTerminal()
+                DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+                    Task { @MainActor in self?.finishConnectionWaiter(id) }
+                }
+            }
+        }
+
+        /// 状态进入终态（已连接 / 失败）→ 唤醒全部挂起者（一次性）。
+        /// 非终态不动；无挂起者时零开销。
+        func notifyConnectionWaitersTerminal() {
+            guard !connectionWaiters.isEmpty else { return }
+            switch state {
+            case .connected, .failed:
+                break
+            case .idle, .connecting:
+                return
+            }
+            let waiters = connectionWaiters
+            connectionWaiters.removeAll()
+            for (_, continuation) in waiters {
+                continuation.resume(returning: state)
+            }
+        }
+
+        /// 超时兜底：按当时状态唤醒单个挂起者（已被终态唤醒则 no-op）。
+        private func finishConnectionWaiter(_ id: UUID) {
+            guard let continuation = connectionWaiters.removeValue(forKey: id) else { return }
+            continuation.resume(returning: state)
         }
 
         private static func key(_ target: IOSPassiveSyncTarget) -> String {

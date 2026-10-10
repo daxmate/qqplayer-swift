@@ -262,6 +262,7 @@
 "sync_one_track_deleted" = "已移除 1 首歌曲";
 "sync_multiple_tracks_deleted" = "已移除 %d 首歌曲";
 "sync_no_changes" = "媒体库已是最新状态";
+"sync_pull_no_paired_desktop" = "未配对桌面端 —— 已刷新本机曲库";
 
 /* Equalizer strings */
 "equalizer" = "专业均衡器 (EQ)";

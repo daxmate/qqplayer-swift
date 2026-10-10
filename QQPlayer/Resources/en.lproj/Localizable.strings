@@ -262,6 +262,7 @@
 "sync_one_track_deleted" = "1 song removed";
 "sync_multiple_tracks_deleted" = "%d songs removed";
 "sync_no_changes" = "Library is up to date";
+"sync_pull_no_paired_desktop" = "No paired desktop — refreshed this device's library";
 
 /* Equalizer strings */
 "equalizer" = "Equalizer";

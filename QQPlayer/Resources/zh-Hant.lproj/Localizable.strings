@@ -396,6 +396,7 @@
 "sync_multiple_tracks_deleted" = "已移除 %d 首歌曲";
 
 "sync_no_changes" = "媒體庫已是最新狀態";
+"sync_pull_no_paired_desktop" = "未配對桌面端 —— 已重新整理本機曲庫";
 
 /* Equalizer strings */
 "equalizer" = "專業等化器 (EQ)";

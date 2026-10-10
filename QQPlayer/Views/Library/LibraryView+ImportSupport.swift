@@ -10,7 +10,7 @@
 //    · Views/Library/LibraryView.swift                     — 视图壳：stored property + `body` + 导入入口
 //    · Views/Library/LibraryView+ImportSupport.swift       — 导入结果分桶 + 书签落库
 //    · Views/Library/LibraryView+SectionRendering.swift    — 首页分区视图（homeSectionView）
-//    · Views/Library/LibraryView+SyncFeedback.swift        — 同步反馈 toast + runSync
+//    · Views/Library/LibraryView+SyncFeedback.swift        — 同步反馈 toast + 下拉刷新入口
 //    · Views/Library/LibraryView+SectionRow.swift          — 首页分区行（LibrarySectionRowView）
 //    · Views/Library/LibraryView+ResponsiveFonts.swift     — View 响应式字号 helper
 //

@@ -246,6 +246,7 @@
 "sync_one_track_deleted" = "Удалена 1 песня";
 "sync_multiple_tracks_deleted" = "Удалено %d песен";
 "sync_no_changes" = "Медиатека актуальна";
+"sync_pull_no_paired_desktop" = "Нет сопряжённого компьютера — медиатека этого устройства обновлена";
 
 /* Equalizer strings */
 "equalizer" = "Эквалайзер";

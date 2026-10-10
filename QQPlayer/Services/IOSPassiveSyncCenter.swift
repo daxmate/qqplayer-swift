@@ -202,6 +202,8 @@
         var attemptToken = UUID()
         var discoveryWork: DispatchWorkItem?
         var reconnectWork: DispatchWorkItem?
+        /// 下拉刷新「连接并等待结果」的挂起者（一次性）：终态或超时必 resume（`connectAndWait`）。
+        var connectionWaiters: [UUID: CheckedContinuation<IOSPassiveSyncState, Never>] = [:]
 
         init(
             identityStore: SyncIdentityStore = SyncIdentityStore(),

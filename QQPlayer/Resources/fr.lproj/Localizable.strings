@@ -246,6 +246,7 @@
 "sync_one_track_deleted" = "1 musique supprimée";
 "sync_multiple_tracks_deleted" = "%d musiques supprimées";
 "sync_no_changes" = "Bibliothèque à jour";
+"sync_pull_no_paired_desktop" = "Aucun ordinateur de bureau appairé — bibliothèque de cet appareil actualisée";
 
 /* Equalizer strings */
 "equalizer" = "Égaliseur";
