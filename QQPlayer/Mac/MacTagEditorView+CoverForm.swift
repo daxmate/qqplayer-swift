@@ -19,16 +19,6 @@ extension MacTagEditorView {
             Text("tag_editor_cover".localized)
                 .font(.caption2)
                 .foregroundColor(.secondary)
-            Button {
-                downloadCandidateCover()
-            } label: {
-                Label("tag_editor_use_candidate_cover".localized, systemImage: "photo.badge.arrow.down")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderless)
-            .disabled(selectedCoverURL == nil || saving)
-            .help("tag_editor_use_candidate_cover_help".localized)
-
             localCoverButton
 
             Button(role: .destructive) {

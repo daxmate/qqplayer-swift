@@ -86,9 +86,6 @@ struct MacTagEditorView: View {
     @State var neteaseCandidates: [ScrapeCandidate] = []
     /// 分片：跨文件可见（原 private）
     @State var musicbrainzCandidates: [ScrapeCandidate] = []
-    /// 当前点选候选的封面 URL（「使用候选封面」的下载源）
-    /// 分片：跨文件可见（原 private）
-    @State var selectedCoverURL: URL?
 
     // MARK: 重命名（模板来自设置 scraping.renameTemplate；默认关——文件名
     // 与模板渲染结果一致时才默认开，避免打开弹窗误触发改名）

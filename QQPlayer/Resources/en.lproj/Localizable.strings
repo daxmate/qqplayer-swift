@@ -717,8 +717,6 @@
 "tag_editor_scrape_again" = "Scrape Again";
 "tag_editor_no_candidates" = "No candidates found";
 "tag_editor_cover" = "Cover";
-"tag_editor_use_candidate_cover" = "Use Candidate Cover";
-"tag_editor_use_candidate_cover_help" = "Download and embed the cover of the selected candidate";
 "tag_editor_cover_download_failed" = "Failed to download cover";
 "tag_editor_remove_cover" = "Remove Cover";
 "tag_editor_choose_local_cover" = "Choose Image…";

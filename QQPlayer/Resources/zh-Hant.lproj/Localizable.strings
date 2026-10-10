@@ -1053,8 +1053,6 @@
 "tag_editor_scrape_again" = "重新刮削";
 "tag_editor_no_candidates" = "找不到候選";
 "tag_editor_cover" = "封面";
-"tag_editor_use_candidate_cover" = "使用候選封面";
-"tag_editor_use_candidate_cover_help" = "下載並寫入所選候選的封面";
 "tag_editor_cover_download_failed" = "封面下載失敗";
 "tag_editor_remove_cover" = "移除封面";
 "tag_editor_choose_local_cover" = "從本地選擇圖片…";

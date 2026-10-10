@@ -715,8 +715,6 @@
 "tag_editor_scrape_again" = "Relancer le scraping";
 "tag_editor_no_candidates" = "Aucun candidat trouvé";
 "tag_editor_cover" = "Pochette";
-"tag_editor_use_candidate_cover" = "Utiliser la pochette du candidat";
-"tag_editor_use_candidate_cover_help" = "Télécharger et intégrer la pochette du candidat sélectionné";
 "tag_editor_cover_download_failed" = "Échec du téléchargement de la pochette";
 "tag_editor_remove_cover" = "Supprimer la pochette";
 "tag_editor_choose_local_cover" = "Choisir une image…";

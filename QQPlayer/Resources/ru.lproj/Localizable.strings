@@ -712,8 +712,6 @@
 "tag_editor_scrape_again" = "Повторить скрапинг";
 "tag_editor_no_candidates" = "Кандидаты не найдены";
 "tag_editor_cover" = "Обложка";
-"tag_editor_use_candidate_cover" = "Использовать обложку кандидата";
-"tag_editor_use_candidate_cover_help" = "Скачать и встроить обложку выбранного кандидата";
 "tag_editor_cover_download_failed" = "Не удалось скачать обложку";
 "tag_editor_remove_cover" = "Удалить обложку";
 "tag_editor_choose_local_cover" = "Выбрать изображение…";

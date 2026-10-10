@@ -177,7 +177,7 @@ extension MacTagEditorView {
     }
 
     /// 点选候选 → 填充表单（web pick 语义：候选有值才填，空值清空对应字段；
-    /// 封面记录到 selectedCoverURL，需用户显式「使用候选封面」才下载）
+    /// 有 coverURL 时点选即自动下载并暂存为封面）
     private func pick(_ candidate: ScrapeCandidate, source: String) {
         formTitle = candidate.title ?? ""
         formArtist = candidate.artist ?? ""
@@ -198,10 +198,9 @@ extension MacTagEditorView {
             formTrack = ""
         }
         formAlbumArtist = candidate.albumArtist ?? ""
-        selectedCoverURL = candidate.coverURL
         // 点选候选 = 自动采用候选封面（web 语义对齐：点选即记录并使用 cover_url，
         // 不需要额外按钮）。先回到文件现状，有 coverURL → 自动下载暂存（成功替换
-        // 预览；失败留 keep 并在表单底部红字提示，可手动「使用候选封面」重试）；
+        // 预览；失败留 keep 并在表单底部红字提示）；
         // 无 coverURL → 保持文件现状。
         coverState = .keep
         if let coverURL = candidate.coverURL {
@@ -225,11 +224,10 @@ extension MacTagEditorView {
         }
     }
 
-    /// 下载候选封面 → Data 暂存（保存时才写入文件）。点选候选行自动调用；
-    /// 「使用候选封面」按钮作为失败后的手动重试。
+    /// 下载候选封面 → Data 暂存（保存时才写入文件）。点选候选行自动调用。
     /// 分片：跨文件可见（原 private）
-    func downloadCandidateCover(from url: URL? = nil) {
-        guard let url = url ?? selectedCoverURL, !saving else { return }
+    func downloadCandidateCover(from url: URL) {
+        guard !saving else { return }
         let taskKey = "coverDownload"
         activeTasks[taskKey]?.cancel()
         activeTasks[taskKey] = Task {
