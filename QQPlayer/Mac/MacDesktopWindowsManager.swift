@@ -213,6 +213,12 @@ final class DesktopWindowsManager {
                 // 播放引擎（批 6-6）：浮窗视图读 `@Environment(PlayerEngine.self)`，
                 // 手工 hosting 不继承场景环境 ⇒ 必须在此显式注入。
                 .environment(PlayerEngine.shared)
+                // App 级无状态入口容器（2026-10-10 修复）：迷你窗封面 `MacArtworkThumbnail`
+                // 读 `@Environment(AppServices.self)`（批 6-5 起），它由 `MacMiniPlayerView`
+                // 承载 ⇒ 手工 hosting 不继承场景环境、子视图的依赖同样到不了这里，必须显式注入，
+                // 否则点迷你按钮即 EXC_BREAKPOINT（运行时致命错，编译与单测都发现不了）。
+                // 装配写法与主窗/Settings 场景根一致（`QQPlayerMacApp.swift`）。
+                .environment(AppServices.live)
                 .tint(accent)
         case .lyric:
             MacDesktopLyricView()

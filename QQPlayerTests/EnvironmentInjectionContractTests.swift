@@ -226,17 +226,73 @@ private enum EnvironmentInjectionContract {
     }
 
     /// 单文件判定：hosting 了哪些内容视图、缺哪些装配（契约与自证共用同一口径）。
+    ///
+    /// 2026-10-10 加严：required 由「被承载视图**自身**直接读的 @Environment(T.self)」扩展为
+    /// **传递闭包**（被承载视图 → 它引用的子视图 → … → 并集）。手工 hosting 只注入被承载视图
+    /// 自身读的类型是不够的：子视图（如迷你窗里的 `MacArtworkThumbnail` 读 `AppServices`）
+    /// 同样不继承场景环境、同样要在此装配 —— 这正是本次 EXC_BREAKPOINT 的盲区。
+    /// `references`（视图类型 → 它引用的其它视图类型）不传时退化为只看直接读（历史口径）。
     static func hostingGaps(
         in source: String,
-        consumedByViewType: [String: Set<String>]
+        consumedByViewType: [String: Set<String>],
+        references: [String: Set<String>] = [:]
     ) -> (hosted: [String], missing: [String]) {
         guard buildsManualHostingRoot(source) else { return ([], []) }
         let hosted = hostedViewTypes(in: source, known: consumedByViewType)
         var required: Set<String> = []
         for type in hosted {
-            required.formUnion(consumedByViewType[type] ?? [])
+            required.formUnion(
+                transitiveConsumedTypes(from: type, consumed: consumedByViewType, references: references)
+            )
         }
         return (hosted, required.filter { !injects($0, in: source) }.sorted())
+    }
+
+    /// 从 `viewType` 出发沿 `references` 边遍历引用到的子视图（含自身），
+    /// 求闭包内每个视图读的 `@Environment(T.self)` 并集。
+    /// 纯函数（契约与自证共用）；visited 防环（视图互相引用不死循环）。
+    static func transitiveConsumedTypes(
+        from viewType: String,
+        consumed: [String: Set<String>],
+        references: [String: Set<String>]
+    ) -> Set<String> {
+        var required: Set<String> = []
+        var visited: Set<String> = []
+        var pending = [viewType]
+        while let current = pending.popLast() {
+            guard visited.insert(current).inserted else { continue }
+            required.formUnion(consumed[current] ?? [])
+            pending.append(contentsOf: references[current] ?? [])
+        }
+        return required
+    }
+
+    /// 单文件：视图类型 → 它在 body 里引用的**其它视图类型**（子视图依赖边）。
+    /// 复用 `viewTypeBlocks` 切块 + `hostedViewTypes` 按类型名匹配（内部已剥注释）——
+    /// 不另写扫描器/类型名单（守 §4「不得新增第二实现」）。
+    static func viewReferences(
+        in source: String,
+        known: [String: Set<String>]
+    ) -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for block in viewTypeBlocks(in: source) {
+            result[block.name] = Set(hostedViewTypes(in: block.body, known: known))
+                .subtracting([block.name])
+        }
+        return result
+    }
+
+    /// 全仓视图依赖图（跨文件合并）：视图类型 → 它引用的其它视图类型。
+    static func viewReferencesByViewType() throws -> [String: Set<String>] {
+        let known = try consumedTypesByViewType()
+        var result: [String: Set<String>] = [:]
+        for url in try swiftFiles() {
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for (name, refs) in viewReferences(in: source, known: known) {
+                result[name, default: []].formUnion(refs)
+            }
+        }
+        return result
     }
 
     /// 视图类型 → 该类型（按类型声明行切块，不是按整文件）读的 `@Environment(T.self)` 类型集合。
@@ -346,9 +402,12 @@ struct EnvironmentInjectionContractTests {
 
 @Suite("手工 hosting 根装配契约（NSHostingView 承载的视图 ⟹ 构造方必须自己装配环境）")
 struct ManualHostingEnvironmentContractTests {
-    @Test("(a) 手工 hosting 根必须装配内容视图读的 App 级对象（场景环境到不了这里）")
+    @Test("(a) 手工 hosting 根必须装配内容视图传递闭包（含子视图）里读的 App 级对象")
     func manualHostingRootsInjectConsumedObjects() throws {
         let consumedByViewType = try EnvironmentInjectionContract.consumedTypesByViewType()
+        // 2026-10-10：内容视图引用的**子视图**同样不继承场景环境 ⇒ 依赖边也要进闭包
+        // （批 6-5 给 MacArtworkThumbnail 加 @Environment(AppServices.self) 后迷你窗崩溃即此盲区）。
+        let references = try EnvironmentInjectionContract.viewReferencesByViewType()
         let prefix = EnvironmentInjectionContract.repositoryRoot.path + "/"
         var scanned = 0
         var missing: [String] = []
@@ -360,7 +419,8 @@ struct ManualHostingEnvironmentContractTests {
             let relative = url.path.replacingOccurrences(of: prefix, with: "")
             let gaps = EnvironmentInjectionContract.hostingGaps(
                 in: source,
-                consumedByViewType: consumedByViewType
+                consumedByViewType: consumedByViewType,
+                references: references
             )
             for type in gaps.missing {
                 missing.append(
@@ -445,6 +505,80 @@ struct ManualHostingEnvironmentContractTests {
         let byType = EnvironmentInjectionContract.viewConsumedTypes(in: twoViews)
         #expect(byType["MiniPlayer"] == ["Windows"])
         #expect(byType["Lyrics"] == Set<String>())
+    }
+
+    @Test("(c) 传递闭包自证：父视图不读、子视图读 → 报红；父自读 → 绿；注释里的子视图引用不算")
+    func transitiveClosureSelfTest() {
+        // 合成：Parent 引用了读 Services 的 Child，Parent 自身不读（本次崩溃的形状）
+        let consumed: [String: Set<String>] = ["Parent": [], "Child": ["Services"]]
+        let references: [String: Set<String>] = ["Parent": ["Child"], "Child": []]
+
+        func missing(_ source: String) -> [String] {
+            EnvironmentInjectionContract.hostingGaps(
+                in: source,
+                consumedByViewType: consumed,
+                references: references
+            ).missing
+        }
+
+        // 父不读子读、宿主图自身不读任何对象 → 必须报 Services（加严前只查直接读会假绿）
+        #expect(missing("final class W { let h = NSHostingView(rootView: Parent()) }") == ["Services"])
+        // 装配了闭包内消费的 Services → 绿
+        #expect(missing("final class W { let h = NSHostingView(rootView: Parent().environment(Services.live)) }") == [])
+
+        // 父视图自读、无子视图依赖 → 按自身读判（历史直接口径不回归）
+        func missingSelfReading(_ source: String) -> [String] {
+            EnvironmentInjectionContract.hostingGaps(
+                in: source,
+                consumedByViewType: ["Parent": ["Services"]],
+                references: [:]
+            ).missing
+        }
+        #expect(missingSelfReading("let h = NSHostingView(rootView: Parent())") == ["Services"])
+        #expect(missingSelfReading("let h = NSHostingView(rootView: Parent().environment(Services.live))") == [])
+
+        // 依赖边识别：注释里提到的子视图不算（viewReferences 复用建块 + 剥注释匹配）
+        let referenceSource = """
+        struct Parent: View {
+            // Child() 只在注释里提一下，不构成依赖边
+            var body: some View { EmptyView() }
+        }
+        struct Child: View {
+            @Environment(Services.self) private var services
+            var body: some View { EmptyView() }
+        }
+        """
+        let refs = EnvironmentInjectionContract.viewReferences(
+            in: referenceSource,
+            known: ["Parent": [], "Child": ["Services"]]
+        )
+        #expect(refs["Parent"]?.isEmpty == true)
+        #expect(refs["Child"]?.isEmpty == true)
+
+        // 依赖边识别：真实引用（代码里出现类型名）算，且不含自身
+        let realReferenceSource = """
+        struct Parent: View {
+            var body: some View { Child() }
+        }
+        struct Child: View {
+            @Environment(Services.self) private var services
+            var body: some View { EmptyView() }
+        }
+        """
+        let realRefs = EnvironmentInjectionContract.viewReferences(
+            in: realReferenceSource,
+            known: ["Parent": [], "Child": ["Services"]]
+        )
+        #expect(realRefs["Parent"] == ["Child"])
+        #expect(realRefs["Child"]?.isEmpty == true)
+
+        // 环：互相引用不死循环（visited 防环）
+        let cycle = EnvironmentInjectionContract.transitiveConsumedTypes(
+            from: "A",
+            consumed: ["A": [], "B": ["Services"]],
+            references: ["A": ["B"], "B": ["A"]]
+        )
+        #expect(cycle == ["Services"])
     }
 }
 
