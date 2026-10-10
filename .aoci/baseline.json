@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-10-10T09:45:59Z",
+  "updated_at": "2026-10-10T09:55:25Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -69,12 +69,6 @@
       "size": 4012,
       "normalized_sha256": "1401d310f039045dbed2262101b3b4d34eb3aba85770ad9445fec9745a8c74bd"
     },
-    "PlayerWidget/AppIntent.swift": {
-      "role": "index",
-      "sha256": "1e51f51435111f06893cbd6ddb5a8cb59a3b1b2eb55e0837e03ee6a4f9870762",
-      "size": 453,
-      "normalized_sha256": "1e51f51435111f06893cbd6ddb5a8cb59a3b1b2eb55e0837e03ee6a4f9870762"
-    },
     "PlayerWidget/Assets.xcassets/AccentColor.colorset/Contents.json": {
       "role": "index",
       "sha256": "9af65086fa30b49252fae1a1225731691de794f7775af74d71befeb507d12b7c",
@@ -129,12 +123,6 @@
       "size": 10288,
       "normalized_sha256": "636da5cf611e36e260bdc240f3d1bcd8f27b102f9ee07e4970768857ccad6c31"
     },
-    "PlayerWidget/WidgetIntents.swift": {
-      "role": "index",
-      "sha256": "f2298875b72a4003fd523a9a98e2534773b7a4d260d35a3c1140a241d60286c5",
-      "size": 206,
-      "normalized_sha256": "f2298875b72a4003fd523a9a98e2534773b7a4d260d35a3c1140a241d60286c5"
-    },
     "PlayerWidgetExtension.entitlements": {
       "role": "index",
       "sha256": "ce6bf4b83e6df67b4aa4ac29726bbcd7617b3e62d7c7b0dfad6a9d2c8430ba28",
@@ -158,12 +146,6 @@
       "sha256": "5e8d7ffa2e52536f26da8375fb0ab63ebc319d97f9dfaacee8c3263a4f99e8c6",
       "size": 5971,
       "normalized_sha256": "5e8d7ffa2e52536f26da8375fb0ab63ebc319d97f9dfaacee8c3263a4f99e8c6"
-    },
-    "QQPlayer.xcodeproj/xcshareddata/xcodecloud/manifest.json": {
-      "role": "index",
-      "sha256": "65856a06f5b498c139b1ca94645b94e145dd69983e0dc6037a586b1d2f63667e",
-      "size": 163,
-      "normalized_sha256": "65856a06f5b498c139b1ca94645b94e145dd69983e0dc6037a586b1d2f63667e"
     },
     "QQPlayer.xcodeproj/xcshareddata/xcschemes/QQPlayer.xcscheme": {
       "role": "index",
@@ -1343,24 +1325,6 @@
       "sha256": "3162b748286e6c46d9cad91a6aecb5b346b6c2c695922bbd76883e749bfe8364",
       "size": 8107,
       "normalized_sha256": "3162b748286e6c46d9cad91a6aecb5b346b6c2c695922bbd76883e749bfe8364"
-    },
-    "QQPlayer/Services/CloudDownloadError.swift": {
-      "role": "index",
-      "sha256": "68f1b5dfbc6ce84bdc1a2ae4fbaa7df3b518d4d91a05b8e184078ddf94b897ca",
-      "size": 461,
-      "normalized_sha256": "68f1b5dfbc6ce84bdc1a2ae4fbaa7df3b518d4d91a05b8e184078ddf94b897ca"
-    },
-    "QQPlayer/Services/CloudDownloadManager.swift": {
-      "role": "index",
-      "sha256": "62af0c75df3d029151532d0e6537628b6a2eb422adfec310cfddb03cd8c5f916",
-      "size": 549,
-      "normalized_sha256": "62af0c75df3d029151532d0e6537628b6a2eb422adfec310cfddb03cd8c5f916"
-    },
-    "QQPlayer/Services/CloudFailureDetector.swift": {
-      "role": "index",
-      "sha256": "8f46ad40ef193cc2bec0d7a3763a105657e098f67957510aeeee8068259a4e2a",
-      "size": 463,
-      "normalized_sha256": "8f46ad40ef193cc2bec0d7a3763a105657e098f67957510aeeee8068259a4e2a"
     },
     "QQPlayer/Services/CloudFileAvailability.swift": {
       "role": "index",
@@ -4422,12 +4386,6 @@
       "size": 43494,
       "normalized_sha256": "66aa52e5e78b39c74bf372f81fa148c76ed144931cd667595c1ee1749a96ddef"
     },
-    "scripts/add-grdb-to-tests.py": {
-      "role": "index",
-      "sha256": "462c66504e835d764de14956962517e58939f72c2c879f84a8ecc03ec88b4118",
-      "size": 4820,
-      "normalized_sha256": "462c66504e835d764de14956962517e58939f72c2c879f84a8ecc03ec88b4118"
-    },
     "scripts/add-test-file.py": {
       "role": "index",
       "sha256": "a3e3fa0257060005537ab30cea08a03bc2f2fc3a585bae41bccdf80a7845f038",
@@ -4563,7 +4521,7 @@
   },
   "managed_scope": {
     "version": "managed-scope-baseline/v1",
-    "policy_identity": "c81414aa1ad20edc6cdd8c9d904678ca476240ca1a991b5d31759dcae114efd1",
+    "policy_identity": "94aa1204d3666726fd3f4e10576acedd17b5963a2acfe66d63e4c123593a2621",
     "observe_change_policy": "review_required",
     "budget_policy_identity": "15e9b37a6c57e9bf03c9df3d0d049eb5b9a7f5540f9d34960408114e2538a32d",
     "budget_policy": {
