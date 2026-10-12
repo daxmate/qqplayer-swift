@@ -228,5 +228,9 @@ struct SearchView: View {
                 searchTask?.cancel()
             }
         }
+        // 搜索页在 LibraryView 里是 `.sheet` 呈现 —— 页面 sheet 会盖住 iOS 根 overlay，
+        // 故在**本页可视根**再挂一次**同一个** `.actionFeedbackToast()`（复用同一实现，
+        // 非第二份）；环境（ActionFeedbackCenter）经 `.sheet` 继承，无需再注入。
+        .actionFeedbackToast()
     }
 }
