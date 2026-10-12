@@ -39,6 +39,15 @@ private final class FakeIndexingState: IndexingStateProviding {
     }
 }
 
+/// 假路径监视器：测试注入，不真的监听网络（生产唯一实现 = IOSPassivePathMonitor）。
+private final class FakePathMonitor: IOSPassivePathMonitoring, @unchecked Sendable {
+    var onPathChange: (@Sendable (Bool) -> Void)?
+    private(set) var started = false
+
+    func start() { started = true }
+    func stop() { started = false }
+}
+
 struct IOSPassiveSyncCenterTests {
     // MARK: - 夹具
 
@@ -108,12 +117,15 @@ struct IOSPassiveSyncCenterTests {
         root: URL,
         indexingState: IndexingStateProviding = FakeIndexingState()
     ) -> IOSPassiveSyncCenter {
-        IOSPassiveSyncCenter(
+        let center = IOSPassiveSyncCenter(
             deviceStore: DeviceStore(database: manager),
             libraryRoot: { root },
             database: manager,
             indexingState: indexingState
         )
+        // 注入假路径监视器：start() 会挂真实 NWPathMonitor，测试里不该真监听网络。
+        center.makePathMonitor = { FakePathMonitor() }
+        return center
     }
 
     // MARK: - 候选目标
@@ -185,16 +197,172 @@ struct IOSPassiveSyncCenterTests {
 
     // MARK: - 重连退避
 
-    @Test("退避：2/4/8/16/30（封顶 30），超过上限返回 nil")
+    @Test("退避：突发 2/4/8/16/30，用尽后转 60s 稳态（不再返回 nil 停死）")
     func reconnectBackoffSequence() {
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(1) == 2)
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(2) == 4)
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(3) == 8)
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(4) == 16)
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(5) == IOSPassiveReconnectPolicy.maxDelay)
-        #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(6) == nil)
+        // 突发用尽（第 6 次起）→ 恒定稳态间隔，不再 nil（旧行为会停死重连）
+        #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(6) == IOSPassiveReconnectPolicy.steadyInterval)
+        #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(7) == IOSPassiveReconnectPolicy.steadyInterval)
+        #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(999) == IOSPassiveReconnectPolicy.steadyInterval)
+        #expect(IOSPassiveReconnectPolicy.steadyInterval == 60)
+        #expect(IOSPassiveReconnectPolicy.maxBurstAttempts == 5)
+        // 非法输入（<1）：无对应「第 n 次」，返回 nil
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(0) == nil)
         #expect(IOSPassiveReconnectPolicy.delayBeforeAttempt(-1) == nil)
+    }
+
+    // MARK: - 回前台 gate（C）
+
+    @Test("前台 gate：首帧 .active 视作回前台 → retryNow（launch 不丢连接）")
+    func foregroundGateFirstActiveRetries() {
+        var gate = IOSPassiveForegroundGate()
+        #expect(gate.handle(.active) == .retryNow)
+    }
+
+    @Test("前台 gate：真·后台→前台 → retryNow（立即补试一次）")
+    func foregroundGateBackgroundToActiveRetries() {
+        var gate = IOSPassiveForegroundGate()
+        _ = gate.handle(.active)
+        #expect(gate.handle(.background) == .none)
+        #expect(gate.handle(.active) == .retryNow)
+    }
+
+    @Test("前台 gate：inactive→active → debounced；去抖窗口内再 inactive 作废")
+    func foregroundGateInactiveToActiveDebounces() {
+        var gate = IOSPassiveForegroundGate()
+        _ = gate.handle(.active)
+        #expect(gate.handle(.inactive) == .none)
+        #expect(gate.handle(.active) == .debounced)
+        #expect(gate.shouldRetryAfterDebounce(), "去抖窗口结束、期间无新阶段 → 补试")
+
+        var jitter = IOSPassiveForegroundGate()
+        _ = jitter.handle(.active)
+        _ = jitter.handle(.inactive)
+        _ = jitter.handle(.active)
+        _ = jitter.handle(.inactive) // 去抖窗口内再次中断 → 作废
+        #expect(jitter.shouldRetryAfterDebounce() == false)
+    }
+
+    // MARK: - 回前台：保留退避计数（C）
+
+    @MainActor
+    @Test("回前台不清零退避计数：stop()/start() 后 automaticAttempts 保留；手动 reconnectNow 才重置")
+    func foregroundKeepsAttemptCount() throws {
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("keepcount"))
+        center.start()
+        center.automaticAttempts = 3
+
+        center.stop()
+        #expect(center.automaticAttempts == 3, "退后台不再清零退避计数（场景 A 根因）")
+        center.start()
+        #expect(center.automaticAttempts == 3, "回前台不再清零退避计数")
+
+        center.reconnectNow()
+        #expect(center.automaticAttempts == 0, "手动「重连」才重置计数")
+    }
+
+    // MARK: - 路径门控（A/F）
+
+    @MainActor
+    @Test("路径：unsatisfied → 立即拆会话回「未连接」（绿点灭）")
+    func pathUnsatisfiedTearsDown() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("pathlost"))
+        center.start()
+        center.session = fixture.clientSession
+        center.state = .connected(hostName: "MacBook", peerID: "PEER-A")
+        center.pathIsSatisfied = true
+
+        center.handlePathChange(satisfied: false)
+
+        #expect(center.state.isConnected == false, "路径不可用必须回退未连接（绿点灭）")
+        #expect(center.session == nil, "僵尸会话必须被拆掉")
+        #expect(center.pathIsSatisfied == false)
+    }
+
+    @MainActor
+    @Test("路径：unsatisfied → satisfied → 重置退避计数并立即补试一次")
+    func pathRecoveredResetsAndImmediatelyAttempts() throws {
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("pathrecover"))
+        center.start()
+        center.automaticAttempts = 4
+        center.pathIsSatisfied = false
+        let tokenBefore = center.attemptToken
+
+        center.handlePathChange(satisfied: true)
+
+        #expect(center.pathIsSatisfied == true)
+        #expect(center.automaticAttempts == 0, "路径恢复应重置退避计数")
+        #expect(center.attemptToken != tokenBefore, "路径恢复应立即补试一次（新 attempt token）")
+    }
+
+    @MainActor
+    @Test("路径：首帧 satisfied（非恢复）不触发补试——只在真正迁移上动作")
+    func pathFirstSatisfiedIsNotRecovery() throws {
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("pathfirst"))
+        center.start()
+        center.automaticAttempts = 4
+        let tokenBefore = center.attemptToken
+
+        center.handlePathChange(satisfied: true) // pathIsSatisfied 此前为 nil
+
+        #expect(center.automaticAttempts == 4)
+        #expect(center.attemptToken == tokenBefore)
+    }
+
+    @MainActor
+    @Test("路径监听：start() 挂、stop() 摘")
+    func pathMonitorLifecycle() throws {
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("monitor"))
+        let monitor = FakePathMonitor()
+        center.makePathMonitor = { monitor }
+
+        center.start()
+        #expect(center.pathMonitor != nil)
+        #expect(monitor.started)
+
+        center.stop()
+        #expect(center.pathMonitor == nil)
+    }
+
+    // MARK: - connectAndWait 活性判定（E）
+
+    @MainActor
+    @Test("活性判定：无会话不活；ready 会话 + 路径可用才活；路径断开判不活")
+    func connectionLivenessDecision() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("liveness"))
+        #expect(center.isCurrentConnectionLive == false, "无会话 → 不活")
+
+        center.session = fixture.clientSession
+        #expect(fixture.clientSession.isReady)
+        #expect(center.isCurrentConnectionLive, "ready 会话 + 路径可用（nil 乐观可用）→ 活")
+
+        center.pathIsSatisfied = false
+        #expect(center.isCurrentConnectionLive == false, "路径明确断开 → 不复用（僵尸）")
+    }
+
+    @MainActor
+    @Test("connectAndWait：僵尸连接（显示已连接但会话不活）不复用 → 不立刻回僵尸状态")
+    func connectAndWaitDoesNotReuseZombie() async throws {
+        let manager = try makeManager()
+        let center = makeCenter(manager, root: try makeTempRoot("zombie"))
+        center.state = .connected(hostName: "MacBook", peerID: "PEER-A")
+        #expect(center.isCurrentConnectionLive == false)
+
+        let result = await center.connectAndWait(timeout: 0.2)
+
+        #expect(result.isConnected == false, "旧行为会立刻返回僵尸 .connected；新行为必须重连")
     }
 
     // MARK: - 展示映射

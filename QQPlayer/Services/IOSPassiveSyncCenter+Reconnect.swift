@@ -177,12 +177,12 @@
         private func scheduleReconnect() {
             guard isRunning else { return }
             automaticAttempts += 1
-            guard let delay = IOSPassiveReconnectPolicy.delayBeforeAttempt(automaticAttempts) else {
-                // 上限用尽：保持 failed，交设置页「重连」手动兜底
-                browser?.stopBrowsing()
-                browser = nil
-                return
-            }
+            // 路径明确不可用（无可用网络）→ 不空转重试：等 `handlePathRecovered`（路径恢复）
+            // 立即补试一次（省电，也少一堆注定失败的尝试）。
+            guard pathIsSatisfied != false else { return }
+            // 突发用尽后仍走低频稳态（`steadyInterval` 60s），**不再**停死；
+            // `delayBeforeAttempt` 除非法 attempt<1 外恒返回非 nil，此 guard 只为穷尽安全。
+            guard let delay = IOSPassiveReconnectPolicy.delayBeforeAttempt(automaticAttempts) else { return }
             isWaitingBackoff = true
             cancelDiscovery()
             let token = attemptToken
@@ -255,7 +255,9 @@
         /// - 超时：到点返回当时状态（有界；视图层不轮询 `state`）。
         /// - 不改动自动回连行为：只在既有终态点额外唤醒等待者。
         func connectAndWait(timeout: TimeInterval) async -> IOSPassiveSyncState {
-            if state.isConnected { return state }
+            // 已连接**且活性判定通过**才复用；僵尸（显示已连接、底层已失活）不复用 →
+            // 落到下面的真实重连（`reconnectNow` 先拆旧会话再起新一轮）。
+            if state.isConnected, isCurrentConnectionLive { return state }
 
             let id = UUID()
             return await withCheckedContinuation { (continuation: CheckedContinuation<IOSPassiveSyncState, Never>) in

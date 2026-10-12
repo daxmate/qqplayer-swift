@@ -91,19 +91,79 @@
         }
     }
 
-    /// 自动重连退避策略（**仅前台**使用；上限用尽 → 交手动「重连」）。
+    /// 自动重连退避策略（**仅前台**使用；突发用尽 → 转低频稳态重试，**不放弃**）。
     enum IOSPassiveReconnectPolicy {
-        /// 前台自动重连次数上限（此后只保留手动重连，避免无主机时无限耗电）
-        static let maxAutomaticAttempts = 5
+        /// 前台**突发**重连次数：此内指数退避（2/4/8/16/30），用尽后转低频稳态。
+        static let maxBurstAttempts = 5
+        /// 稳态（突发用尽后）重试间隔秒数——保持低频、不放弃：断网 / 对端离线时
+        /// 网络一恢复 / 对端一上线即自动接上，不必等用户手动「重连」。
+        static let steadyInterval: TimeInterval = 60
         /// 首次等待秒数（指数退避基数）
         static let baseDelay: TimeInterval = 2
         /// 单次等待封顶（避免长尾）
         static let maxDelay: TimeInterval = 30
 
-        /// 第 n 次自动重连（1 起）前的等待秒数；超出上限返回 nil。
+        /// 第 n 次自动重连（1 起）前的等待秒数。
+        ///
+        /// 1..`maxBurstAttempts` → 2/4/8/16/30；≥`maxBurstAttempts`+1 → 恒定
+        /// `steadyInterval`(60)。历史（2026-09-11 起）此函数在上限用尽后返回 nil →
+        /// 上层停死重连、只留设置页手动兜底；「看起来一直在试 / 僵尸绿点」两个坏体验后
+        /// 改为**低频不放弃**（进后台 / 路径不可用仍由上层停，见 `scheduleReconnect`）。
+        /// attempt < 1（非法输入）返回 nil：上层 `automaticAttempts` 恒 ≥1，此分支不可达。
         static func delayBeforeAttempt(_ attempt: Int) -> TimeInterval? {
-            guard attempt >= 1, attempt <= maxAutomaticAttempts else { return nil }
+            guard attempt >= 1 else { return nil }
+            guard attempt <= maxBurstAttempts else { return steadyInterval }
             return min(baseDelay * pow(2, Double(attempt - 1)), maxDelay)
+        }
+    }
+
+    // MARK: - 纯逻辑：回前台动作决策（可单测）
+
+    /// App 回前台时的连接补试决策（纯逻辑，无 SwiftUI / 无 IO）。
+    ///
+    /// 背景（场景 A「看起来一直在试」）：此前 `scenePhase` 每次 `.active` 都直接
+    /// `start()` —— 真·后台→前台、与 inactive→active（控制中心 / 来电横幅的瞬时
+    /// 中断）都会各开一轮，行为上看不出区别，退避计数也被反复清零。
+    ///
+    /// 本类型把两种 `.active` 区分开：
+    ///   - `.background` → `.active`：真回前台 → `retryNow`（立即补试一次；计数**不清零**）
+    ///   - `.inactive` → `.active`：抖动嫌疑 → `debounced`（等 `inactiveDebounce`，
+    ///     期间再次 `.inactive` 则作废）
+    struct IOSPassiveForegroundGate {
+        enum Phase: Equatable { case active, inactive, background }
+
+        /// inactive→active 去抖窗口（秒）：期间若又回 inactive 即判为瞬时中断，不补试。
+        static let inactiveDebounce: TimeInterval = 1.5
+
+        enum Action: Equatable {
+            /// 真·后台→前台：立即补试一次
+            case retryNow
+            /// 需去抖判定（调用方等 `inactiveDebounce` 后查 `shouldRetryAfterDebounce()`）
+            case debounced
+            /// 不动作
+            case none
+        }
+
+        /// 上一次观察到的阶段（nil = 尚未收到任何阶段；首帧 `.active` 视作「回前台」）
+        private(set) var lastPhase: Phase?
+
+        /// 处理一次阶段变化，返回**立即动作**（去抖的落地交给调用方调度）。
+        mutating func handle(_ phase: Phase) -> Action {
+            defer { lastPhase = phase }
+            guard phase == .active else { return .none }
+            switch lastPhase {
+            case .background?, nil:
+                return .retryNow
+            case .inactive?:
+                return .debounced
+            case .active?:
+                return .none
+            }
+        }
+
+        /// 去抖窗口结束时的判定：期间没有新的阶段变化（仍停在 `.active`）才补试。
+        func shouldRetryAfterDebounce() -> Bool {
+            lastPhase == .active
         }
     }
 

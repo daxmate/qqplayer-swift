@@ -205,6 +205,20 @@
         /// 下拉刷新「连接并等待结果」的挂起者（一次性）：终态或超时必 resume（`connectAndWait`）。
         var connectionWaiters: [UUID: CheckedContinuation<IOSPassiveSyncState, Never>] = [:]
 
+        // MARK: 活性门控（A/C：网络路径 + 回前台去抖；逻辑见 +Reachability.swift）
+
+        /// 网络路径监听（A：无可用路径立即拆线 / 回灰；路径恢复立即补试一次）。
+        /// 生产在 `start()` 挂、`stop()` 摘。
+        var pathMonitor: (any IOSPassivePathMonitoring)?
+        /// 路径监听的构造入口（测试注入假监视器；生产 = `IOSPassivePathMonitor`）。
+        var makePathMonitor: () -> any IOSPassivePathMonitoring = { IOSPassivePathMonitor() }
+        /// 当前路径可用性（`nil` = 尚未收到系统回调 → 乐观视作可用，不误伤首次连接）。
+        var pathIsSatisfied: Bool?
+        /// 回前台动作决策（bg→fg 立即补试 / inactive→fg 去抖；纯逻辑见 +Models.swift）。
+        var foregroundGate = IOSPassiveForegroundGate()
+        /// inactive→active 去抖窗口的调度句柄（新阶段到来即取消）。
+        var foregroundDebounceWork: DispatchWorkItem?
+
         init(
             identityStore: SyncIdentityStore = SyncIdentityStore(),
             deviceStore: DeviceStore = DeviceStore(),
@@ -228,6 +242,7 @@
         /// 已在跑但此前因「无已配对主机」闲置时，本调用会重新检查主机并立即开始。
         func start() {
             observeIndexingTerminalState()
+            startPathMonitor()
             if isRunning {
                 reloadPairedHosts()
                 guard !state.isConnected, !state.isConnecting, !isWaitingBackoff, !pairedHosts.isEmpty else { return }
@@ -235,16 +250,15 @@
                 return
             }
             isRunning = true
-            automaticAttempts = 0
             beginAttempt()
         }
         /// App 退到后台：拆接线 + 关会话 + 停浏览（幂等）。
         func stop() {
             isRunning = false
+            stopPathMonitor()
             indexingTerminalStateCancellable?.cancel()
             indexingTerminalStateCancellable = nil
             dataSyncSession = nil
-            automaticAttempts = 0
             isWaitingBackoff = false
             cancelDiscovery()
             cancelReconnect()

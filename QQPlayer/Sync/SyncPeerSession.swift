@@ -190,6 +190,20 @@ final class SyncPeerSession: @unchecked Sendable {
         flush(effects)
     }
 
+    /// 通道进入不可用（`NWConnection` `.waiting`，如断网 / 对端离线）但未显式关闭。
+    /// 仅当会话**已 ready**（曾连上、现失活）才按远端断开收尾——这是「僵尸绿点」的
+    /// 修复点；连接建立前的瞬时 `.waiting` 不动（交既有超时 / 失败路径），避免误伤
+    /// 正在建立中的握手。
+    func handleTransportInactive() {
+        lock.lock()
+        var effects: [Effect] = []
+        if phaseValue == .ready {
+            effects.append(contentsOf: closeEffectsLocked(.remoteClosed))
+        }
+        lock.unlock()
+        flush(effects)
+    }
+
     /// 本端主动关闭（UI 取消/清理）。
     func cancel(reason: SyncSessionCloseReason = .userCancelled) {
         lock.lock()

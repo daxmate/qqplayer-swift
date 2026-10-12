@@ -34,6 +34,15 @@ enum SyncTCPParameters {
     static func make() -> NWParameters {
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
+        // TCP keepalive（2026-10-12 活性修复）：断 Wi-Fi / 对端消失时，没有 keepalive
+        // 的连接可能长时间停在 `.waiting` 而内核不判死 → 会话永远「看似连着」（僵尸）。
+        // 取值理由：idle 15s 起探（太短浪费电量/流量，太长则失活发现慢），间隔 5s、
+        // 连续 3 次无响应判死 → 最迟约 15 + 3×5 = 30s 进入失败/等待，交上层
+        // `NWPeerChannel`/会话收尾并重连。两端共用本入口（listener 与连接侧）。
+        tcp.enableKeepalive = true
+        tcp.keepaliveIdle = 15
+        tcp.keepaliveInterval = 5
+        tcp.keepaliveCount = 3
         return NWParameters(tls: nil, tcp: tcp)
     }
 }
@@ -73,6 +82,11 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
                     self.startReceiveLoopIfNeeded()
                 case .failed, .cancelled:
                     self.notifyChannelClosed()
+                case .waiting:
+                    // 连接失活（无路由 / 对端离线）：会话已 ready 时按「远端断开」收尾，
+                    // 交上层拆会话 / 回退（修「僵尸绿点」）；建立前的瞬时 `.waiting` 不动，
+                    // 仍交既有握手超时 / 失败路径。
+                    self.session?.handleTransportInactive()
                 default:
                     break
                 }

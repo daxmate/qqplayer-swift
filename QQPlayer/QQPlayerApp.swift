@@ -218,16 +218,20 @@ struct QQPlayerApp: App {
     /// 局域网同步被动端跟随 App 前后台：前台回连、后台断开（唯一生命周期入口，
     /// 不依赖扫码流程）。
     private func handleScenePhase(_ phase: ScenePhase) {
+        // 映射到被动同步中心的回前台决策（bg→fg 立即补试 / inactive→fg 去抖；
+        // 逻辑抽在 IOSPassiveForegroundGate，不塞在这一层）。
+        let gatePhase: IOSPassiveForegroundGate.Phase
         switch phase {
         case .active:
-            IOSPassiveSyncCenter.shared.start()
+            gatePhase = .active
         case .background:
-            IOSPassiveSyncCenter.shared.stop()
+            gatePhase = .background
         case .inactive:
-            break // 瞬时中断（控制中心/来电横幅）不拆会话
+            gatePhase = .inactive
         @unknown default:
-            break
+            return
         }
+        IOSPassiveSyncCenter.shared.handleScenePhase(gatePhase)
     }
 
     private func handleDidEnterBackground() {

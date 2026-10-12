@@ -80,6 +80,18 @@ struct SyncTCPParametersTests {
         let withTLS = NWParameters(tls: NWProtocolTLS.Options(), tcp: NWProtocolTCP.Options())
         #expect(hasTLS(withTLS) == true)
     }
+
+    @Test("keepalive：开关打开且探测参数为正（断网/对端消失可判死，修僵尸）")
+    func keepaliveEnabledAndConfigured() throws {
+        let tcp = try #require(tcpOptions(of: SyncTCPParameters.make()))
+        #expect(tcp.enableKeepalive == true)
+        #expect(tcp.keepaliveIdle > 0)
+        #expect(tcp.keepaliveInterval > 0)
+        #expect(tcp.keepaliveCount > 0)
+        // 系统默认关闭 keepalive → 本断言确实在测「有没有设」，而非默认值恰好如此。
+        let systemDefault = try #require(tcpOptions(of: NWParameters.tcp))
+        #expect(systemDefault.enableKeepalive == false)
+    }
 }
 
 // MARK: - endpoint 描述
