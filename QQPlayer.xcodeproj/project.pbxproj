@@ -209,6 +209,7 @@
 		6221BE0E35F5463C9B4F33CB /* LegacyWritePathGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116BBEEC896F40DCA6D457F5 /* LegacyWritePathGuardTests.swift */; };
 		E083853744144C36A542D4A7 /* MacDocumentsStorageRelocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C7649531C54CE0BA446B6F /* MacDocumentsStorageRelocationTests.swift */; };
 		7EC11D14E34540869661DE7A /* LibraryPullToRefreshPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BAC5C961D541B3B1C60735 /* LibraryPullToRefreshPlanTests.swift */; };
+		A2F99FAA7DAC41B586A2A1CB /* LyricsFollowPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99644E1363BD4F75B4C326A1 /* LyricsFollowPolicyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -467,6 +468,7 @@
 		116BBEEC896F40DCA6D457F5 /* LegacyWritePathGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LegacyWritePathGuardTests.swift; sourceTree = "<group>"; };
 		68C7649531C54CE0BA446B6F /* MacDocumentsStorageRelocationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDocumentsStorageRelocationTests.swift; sourceTree = "<group>"; };
 		13BAC5C961D541B3B1C60735 /* LibraryPullToRefreshPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryPullToRefreshPlanTests.swift; sourceTree = "<group>"; };
+		99644E1363BD4F75B4C326A1 /* LyricsFollowPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsFollowPolicyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1276,6 +1278,7 @@
 				116BBEEC896F40DCA6D457F5 /* LegacyWritePathGuardTests.swift */,
 				68C7649531C54CE0BA446B6F /* MacDocumentsStorageRelocationTests.swift */,
 				13BAC5C961D541B3B1C60735 /* LibraryPullToRefreshPlanTests.swift */,
+				99644E1363BD4F75B4C326A1 /* LyricsFollowPolicyTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1783,6 +1786,7 @@
 				6221BE0E35F5463C9B4F33CB /* LegacyWritePathGuardTests.swift in Sources */,
 				E083853744144C36A542D4A7 /* MacDocumentsStorageRelocationTests.swift in Sources */,
 				7EC11D14E34540869661DE7A /* LibraryPullToRefreshPlanTests.swift in Sources */,
+				A2F99FAA7DAC41B586A2A1CB /* LyricsFollowPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
