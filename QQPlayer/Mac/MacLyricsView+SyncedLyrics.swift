@@ -234,7 +234,7 @@ extension MacLyricsView {
 /// `willStartLiveScrollNotification` —— 该通知只在**用户发起**的实时滚动
 /// （触控板 / 滚轮 / 滚动条）时发出，程序化 `ScrollViewProxy.scrollTo` / `clipView.scroll`
 /// 不触发 ⇒ 自动滚动不会被误判成手动（这正是 iOS 端 onScrollPhaseChange 的等价保证）。
-/// 与 MacTableLocateScroller 同款「沿视图树找宿主 + 延后一拍」桥接先例。
+/// 与「唯一 AppKit 滚动入口」文件里的代表桥同款「延后一拍」装配先例。
 struct MacLyricsScrollObserver: NSViewRepresentable {
     /// 用户手动滚动开始回调（主线程调用）
     let onUserScroll: () -> Void
@@ -263,7 +263,7 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
             guard scrollView == nil else { return }
             Task { @MainActor [weak self, weak view] in
                 guard let self, let view,
-                      let sv = Self.enclosingScrollView(of: view),
+                      let sv = MacHostScrollView.enclosing(of: view),
                       self.scrollView !== sv else { return }
                 if let token = self.token { NotificationCenter.default.removeObserver(token) }
                 self.scrollView = sv
@@ -275,17 +275,6 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
                     self?.onUserScroll()
                 }
             }
-        }
-
-        /// 沿 superview 向上找最近的 NSScrollView（representable 挂在滚动内容里 ⇒ 有祖先 NSScrollView）
-        @MainActor
-        static func enclosingScrollView(of view: NSView) -> NSScrollView? {
-            var node: NSView? = view
-            while let current = node {
-                if let sv = current as? NSScrollView { return sv }
-                node = current.superview
-            }
-            return nil
         }
     }
 }

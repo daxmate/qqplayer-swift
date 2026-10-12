@@ -102,6 +102,25 @@ enum MacTableScroll {
     }
 }
 
+/// 通用：从某视图沿 superview 向上找最近的宿主 `NSScrollView`（Mac 专属）。
+///
+/// 与 `MacTableScroll` 同处「唯一 AppKit 滚动入口」文件：凡「沿视图树找滚动容器」这类
+/// 滚动特征只允许出现在这里，别处（视图/其它桥）不得再写一份——形状契约
+/// `LocateScrollShapeContractTests` 会在 CI 扫全仓拦截第二实现。
+enum MacHostScrollView {
+    /// 沿 superview 向上找最近的 `NSScrollView`；找不到返回 nil。
+    /// 用途：representable 挂在滚动内容里 ⇒ 有祖先滚动容器。
+    @MainActor
+    static func enclosing(of view: NSView) -> NSScrollView? {
+        var node: NSView? = view
+        while let current = node {
+            if let sv = current as? NSScrollView { return sv }
+            node = current.superview
+        }
+        return nil
+    }
+}
+
 /// 定位滚动信号桥：`request` 变化且 `row != nil` 时，把该行滚到可视区垂直居中。
 /// 由 `MacTrackListView` 以 `.background(...)` + `allowsHitTesting(false)` 挂进视图树。
 struct MacTableLocateScroller: NSViewRepresentable {
