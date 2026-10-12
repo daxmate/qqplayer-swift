@@ -372,7 +372,18 @@ final class KaraokeController {
         pendingJumpLine = line
         pendingJumpDeadline = Date().addingTimeInterval(Self.pendingJumpTimeout)
         jumpQuietUntil = Date().addingTimeInterval(0.3)
-        // 目标行句首在音频轴 = 歌词时间 + offset（web audioTime 语义：校准后跳到歌词对应的声音位置）
+        dispatchSeek(line: line, play: play)
+    }
+
+    /// 唯一 seek 派发点：「歌词行 → seek(+播放)」的实现只此一处
+    /// （跟唱跳句 jumpTo 与普通模式点行 seekToLyricLine 共用；视图层禁止另写一份）。
+    /// 目标行句首在音频轴 = 歌词时间 + offset（web audioTime 语义：校准后跳到歌词对应的声音位置）。
+    /// play=true 走 seekAndPlay 桥（含暂停态自动播放）；false 走 seekAndPause 桥（句末自动停）。
+    private func dispatchSeek(line: Int, play: Bool) {
+        guard currentLines.indices.contains(line),
+              let ts = currentLines[line].timestamp else {
+            return
+        }
         let target = ts + lyricOffset
         Task { @MainActor in
             if play {
@@ -381,6 +392,14 @@ final class KaraokeController {
                 await actions?.seekAndPause(to: target)
             }
         }
+    }
+
+    /// 普通（非跟唱）模式歌词行点击：跳到该行句首并开始播放（暂停态也开播）。
+    /// 复用与跟唱完全相同的 seek 桥与 offset 语义（见 dispatchSeek），
+    /// **不要求** isKaraokeOn，也不改动 AB / 单句循环 / 倍速 / 跟唱缓存行等状态。
+    /// 跟唱模式仍走 clickLine（其 AB / 循环决策语义不变）。
+    func seekToLyricLine(_ index: Int) {
+        dispatchSeek(line: index, play: true)
     }
 
     /// 清理待完成跳转（模式开关/切歌/歌词变化时调用）

@@ -475,6 +475,8 @@ struct Localized {
     static let hintFullLyricsTitle = "hint_full_lyrics_title".localized
     static let hintFullLyricsLine1 = "hint_full_lyrics_line1".localized
     static let hintFullLyricsLine2 = "hint_full_lyrics_line2".localized
+    /// 普通模式手动滚动歌词后浮出的「回到当前行」按钮
+    static let backToCurrentLine = "back_to_current_line".localized
     static let hintSearchTitle = "hint_search_title".localized
     static let hintSearchLine1 = "hint_search_line1".localized
     /// macOS 歌词搜索页提示（iOS 的 line1 是滑动手势，Mac sheet 无此交互）

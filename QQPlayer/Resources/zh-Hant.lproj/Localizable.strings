@@ -601,6 +601,8 @@
 
 "hint_full_lyrics_line2" = "向右滑：返回播放頁";
 
+"back_to_current_line" = "回到當前行";
+
 "hint_search_title" = "歌詞搜尋頁";
 
 "hint_search_line1" = "向左滑：返回播放頁";

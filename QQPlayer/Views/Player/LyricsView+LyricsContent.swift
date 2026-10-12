@@ -50,8 +50,19 @@ extension LyricsView {
                                 .frame(height: geometry.size.height / 2 - 40)
                         }
                     }
-                    // 非跟唱：禁用交互（纯自动滚动）；跟唱：可交互（单击行跳转 / 手动滚动）
-                    .disabled(!karaoke.isKaraokeOn)
+                    // 手动滚动检测：普通模式手动滚动 → 暂停自动跟随（画面不再被自动拉回）。
+                    // 用 onScrollPhaseChange（iOS 18+）：tracking / interacting / decelerating 仅由
+                    // 用户发起；程序化 proxy.scrollTo 是 .animating —— 故自动滚动不会误判成手动。
+                    // 跟唱模式不介入本状态（行为不变，见需求 4）。
+                    .onScrollPhaseChange { _, newPhase in
+                        guard !karaoke.isKaraokeOn else { return }
+                        switch newPhase {
+                        case .tracking, .interacting, .decelerating:
+                            if isFollowing { isFollowing = false }
+                        default:
+                            break
+                        }
+                    }
 
                     // Fade gradients at top and bottom（贴近系统底色，歌词边缘柔和融入背景）
                     VStack(spacing: DesignTokens.space0) {
@@ -83,8 +94,25 @@ extension LyricsView {
                     }
                     .allowsHitTesting(false)
                 }
+                // 手动滚动暂停跟随后浮出的「回到当前行」按钮（仅普通模式）：
+                // 点它恢复自动跟随并立刻把当前行滚回中央
+                .overlay(alignment: .bottom) {
+                    if !karaoke.isKaraokeOn, !isFollowing {
+                        backToCurrentLineButton(lines: lines, proxy: proxy)
+                            .padding(.bottom, DesignTokens.space32)
+                            .transition(.opacity)
+                    }
+                }
                 .onChange(of: currentTime) { _, _ in
                     updateActiveLineAndScroll(for: lines, in: proxy)
+                }
+                // 切歌 / 歌词变化：恢复自动跟随（需求 3）
+                .onChange(of: lines) { _, _ in
+                    isFollowing = true
+                }
+                // 进入 / 退出跟唱：恢复自动跟随（退出后普通模式继续跟随；进入后跟唱语义不变）
+                .onChange(of: karaoke.isKaraokeOn) { _, _ in
+                    isFollowing = true
                 }
                 .onAppear {
                     updateActiveLineAndScroll(for: lines, in: proxy)
@@ -143,12 +171,18 @@ extension LyricsView {
             ),
             value: isActive
         )
-        // 跟唱模式：单击行 = 跳转 / 等选终点 = 设 B（决策在 KaraokeController.clickLine）。
-        // 仅在跟唱模式挂载：非跟唱时行不响应点击，页面双击手势无竞争（双击更可靠）
+        // 单击行：跟唱模式 = 跳转 / 等选终点 = 设 B（决策在 KaraokeController.clickLine）；
+        // 普通模式 = 跳到该行播放（KaraokeController.seekToLyricLine）并恢复自动跟随。
+        // 页面级双击（进跟唱）是 highPriorityGesture，仍优先——单击等双击判定失败后才触发。
         .contentShape(Rectangle())
         .onTapGesture {
-            guard karaoke.isKaraokeOn else { return }
-            karaoke.clickLine(index: index)
+            if karaoke.isKaraokeOn {
+                karaoke.clickLine(index: index)
+            } else {
+                isFollowing = true
+                lastScrolledIndex = nil // 强制下一次 tick 重新滚到当前行（含点当前行的情况）
+                karaoke.seekToLyricLine(index)
+            }
         }
         // 加分项：AB 激活时端点行加 accentColor 小圆点（桌面 AB 区间高亮的 iOS 简化）
         .overlay(alignment: .trailing) {
@@ -280,11 +314,14 @@ extension LyricsView {
 
     // MARK: - Helper Methods
 
-    private func updateActiveLineAndScroll(for lines: [LyricsLine], in proxy: ScrollViewProxy) {
+    private func updateActiveLineAndScroll(for lines: [LyricsLine], in proxy: ScrollViewProxy, force: Bool = false) {
         // AB 等选终点（b == nil）：关闭自动滚动，让用户手动滚动找 B 句（用户拍板 2026-08-29）
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
+        // 普通模式手动滚动后暂停跟随：不自动拉回（用户拍板 2026-10-12）。
+        // force=true（「回到当前行」按钮）绕过该暂停，重新跟随并滚回当前行。
+        if !karaoke.isKaraokeOn, !isFollowing, !force { return }
         guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines),
-              activeIndex != lastScrolledIndex else { return }
+              force || activeIndex != lastScrolledIndex else { return }
         lastScrolledIndex = activeIndex
         withAnimation(
             .interpolatingSpring(
@@ -296,5 +333,25 @@ extension LyricsView {
         ) {
             proxy.scrollTo(activeIndex, anchor: .center)
         }
+    }
+
+    /// 「回到当前行」按钮：恢复自动跟随并立刻把当前行滚回中央（普通模式手动滚动后浮出）
+    private func backToCurrentLineButton(lines: [LyricsLine], proxy: ScrollViewProxy) -> some View {
+        Button {
+            isFollowing = true
+            updateActiveLineAndScroll(for: lines, in: proxy, force: true)
+        } label: {
+            HStack(spacing: DesignTokens.space4) {
+                Image(systemName: "arrow.down.to.line.compact")
+                Text(Localized.backToCurrentLine)
+            }
+            .font(.system(size: DesignTokens.font13, weight: .semibold))
+            .padding(.horizontal, DesignTokens.space16)
+            .padding(.vertical, DesignTokens.space8)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(Capsule().stroke(accentColor.opacity(0.35), lineWidth: 1))
+            .foregroundColor(accentColor)
+        }
+        .buttonStyle(.plain)
     }
 }

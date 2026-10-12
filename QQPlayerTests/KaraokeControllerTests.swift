@@ -566,4 +566,68 @@ struct KaraokeControllerTests {
 
         expectSingleSeek(fake, time: 5.0, play: false)
     }
+
+    // MARK: - 普通模式点行：seekToLyricLine（2026-10-12 手动滚动/点行跳转）
+
+    @Test("普通模式点行：跳到该行句首并播放（不要求跟唱模式）")
+    func seekToLyricLinePlaysWithoutKaraoke() async {
+        let fake = await makeFake(expireJumpQuiet: false)
+        let kc = KaraokeController.shared
+        #expect(!kc.isKaraokeOn) // 普通模式
+        kc.setLyrics(makeLines(0, 5, 9))
+
+        kc.seekToLyricLine(2)
+        await drainMainActor()
+
+        // 目标时间 = 第 2 行时间戳 9.0；play = true（暂停态也开播）
+        expectSingleSeek(fake, time: 9.0, play: true)
+    }
+
+    @Test("普通模式点行：seek 目标沿用同一 lyricOffset 语义（歌词时间 + offset）")
+    func seekToLyricLineRespectsLyricOffset() async {
+        let fake = await makeFake(expireJumpQuiet: false)
+        let kc = KaraokeController.shared
+        kc.setLyrics(makeLines(0, 5, 9))
+        kc.lyricOffset = 0.5 // 音频轴 = 歌词时间 + offset
+
+        kc.seekToLyricLine(1) // 第 1 行时间戳 5.0 → 目标 5.5
+        await drainMainActor()
+
+        expectSingleSeek(fake, time: 5.5, play: true)
+        kc.lyricOffset = 0 // 还原，避免串扰（套件串行、共享单例）
+    }
+
+    @Test("普通模式点行：索引越界 / 行无时间戳 → 不动作")
+    func seekToLyricLineInvalidIndexNoop() async {
+        let fake = await makeFake(expireJumpQuiet: false)
+        let kc = KaraokeController.shared
+        kc.setLyrics([LyricsLine(timestamp: 0, text: "行0"), LyricsLine(timestamp: nil, text: "无时间戳")])
+
+        kc.seekToLyricLine(9) // 越界
+        kc.seekToLyricLine(1) // 行无时间戳
+        await drainMainActor()
+
+        #expect(fake.seeks.isEmpty)
+    }
+
+    @Test("普通模式点行：不改动 AB / 单句循环 / 倍速等跟唱状态")
+    func seekToLyricLineDoesNotTouchKaraokeState() async {
+        let fake = await makeFake(expireJumpQuiet: false)
+        let kc = KaraokeController.shared
+        kc.setKaraokeOn(true)
+        kc.setLyrics(makeLines(0, 5, 9))
+        kc.enterABLoop(currentLine: 0)
+        kc.clickLine(index: 1) // 等选终点 → 设 B：AB {0, 1}（不跳句）
+        kc.setSpeed(0.7)
+        fake.seeks = []
+
+        kc.seekToLyricLine(2) // 该入口只 seek，不碰状态
+        await drainMainActor()
+
+        expectSingleSeek(fake, time: 9.0, play: true)
+        #expect(kc.abLoop == ABLoopState(a: 0, b: 1))
+        #expect(kc.speed == 0.7)
+        #expect(!kc.isSingleLineLoop)
+        #expect(kc.isKaraokeOn) // 也不改模式开关
+    }
 }

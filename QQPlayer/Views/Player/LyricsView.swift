@@ -26,6 +26,12 @@ struct LyricsView: View {
     /// 上次自动滚动的行号：仅 activeIndex 变化才 scrollTo（替代每 tick 全量遍历 + 对未变行也发起滚动）
     /// 分片：跨文件可见（原 private）
     @State var lastScrolledIndex: Int?
+    /// 「手动滚动 → 暂停自动跟随」状态（用户拍板 2026-10-12）：
+    /// true = 自动滚动跟随当前行；普通模式用户手动滚动后置 false（画面不再被自动拉回），
+    /// 点「回到当前行」/ 点任意歌词行 / 切歌（歌词变化）/ 切换跟唱模式 → 恢复 true。
+    /// 跟唱模式的自动滚动语义不受本状态影响（见 updateActiveLineAndScroll）。
+    /// 分片：跨文件可见（原 private）
+    @State var isFollowing = true
     /// 分片：跨文件可见（原 private）
     @Environment(KaraokeController.self) var karaoke
 
@@ -78,8 +84,9 @@ struct LyricsView: View {
             settings = DeleteSettings.load()
         }
         // 右滑关闭：跟手位移，达阈值/快速回甩滑出（Apple Music 风格）。
-        // simultaneousGesture：跟唱模式 ScrollView 可交互（pan 手势）时，pan 与关闭拖动
-        // 互不取消——纵向滚动正常、右滑关闭仍可用；非跟唱 ScrollView 禁用，行为与原来一致。
+        // simultaneousGesture：ScrollView 可交互（pan 手势）时，pan 与关闭拖动互不取消——
+        // 纵向滚动正常、右滑关闭仍可用。2026-10-12 起普通模式 ScrollView 也解禁可滚
+        // （原仅跟唱模式可交互），两种模式共用同一 simultaneous 仲裁，行为一致。
         .offset(x: dragX)
         .simultaneousGesture(
             DragGesture(minimumDistance: 8)

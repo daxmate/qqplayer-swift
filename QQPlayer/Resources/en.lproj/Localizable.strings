@@ -435,6 +435,8 @@
 "hint_full_lyrics_title" = "Full-Screen Lyrics";
 "hint_full_lyrics_line1" = "Double-tap anywhere to start karaoke (speed / AB loop / single-line loop)";
 "hint_full_lyrics_line2" = "Swipe right to return to the player";
+
+"back_to_current_line" = "Back to Current Line";
 "hint_search_title" = "Lyrics Search";
 "hint_search_line1" = "Swipe left to return to the player";
 "hint_search_mac_line1" = "Click a result to apply it as the lyrics";

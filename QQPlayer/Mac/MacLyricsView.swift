@@ -49,6 +49,12 @@ struct MacLyricsView: View {
     /// 分片：跨文件可见（原 private）
     @State var lyricOffset: Double = 0
 
+    /// 「手动滚动 → 暂停自动跟随」状态（用户拍板 2026-10-12）：普通模式用户手动滚动面板后置
+    /// false（画面不再被自动拉回），点「回到当前行」/ 点任意歌词行 / 切歌 / 切换跟唱 → 恢复 true。
+    /// 跟唱模式的自动滚动语义不受本状态影响。
+    /// 分片：跨文件可见（原 private）
+    @State var isFollowing = true
+
     /// 面板底色（对齐 iOS 的 systemBackground）
     /// 分片：跨文件可见（原 private）
     var baseColor: Color { Color(nsColor: .windowBackgroundColor) }
@@ -87,6 +93,7 @@ struct MacLyricsView: View {
         // 进 / 出跟唱 → 歌词区焦点（用户 2026-10-10；只在进入这一刻发生一次）
         .onChange(of: karaoke.isKaraokeOn) { _, isOn in
             applyKaraokeFocus(isOn)
+            isFollowing = true // 模式切换：恢复自动跟随（跟唱自动滚动语义本身不变）
         }
         // 页面级双击：纯放大/缩回切换（2026-09-06 用户拍板：双击 ≠ 跟唱，跟唱经 mic 按钮）。
         // highPriority 双击优先，行单击等双击判定失败后才触发；快速双击不触发行跳转。

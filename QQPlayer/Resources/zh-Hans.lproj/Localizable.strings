@@ -399,6 +399,8 @@
 "hint_full_lyrics_title" = "全屏歌词页";
 "hint_full_lyrics_line1" = "双击任意位置：开启跟唱（倍速 / AB / 单句循环）";
 "hint_full_lyrics_line2" = "向右滑：返回播放页";
+
+"back_to_current_line" = "回到当前行";
 "hint_search_title" = "歌词搜索页";
 "hint_search_line1" = "向左滑：返回播放页";
 "hint_search_mac_line1" = "点击结果即可应用为歌词";

@@ -419,6 +419,8 @@
 "hint_full_lyrics_title" = "Paroles plein écran";
 "hint_full_lyrics_line1" = "Double-touchez n'importe où pour lancer le karaoké (vitesse / boucle AB / boucle sur une ligne)";
 "hint_full_lyrics_line2" = "Balayez vers la droite pour revenir au lecteur";
+
+"back_to_current_line" = "Revenir à la ligne actuelle";
 "hint_search_title" = "Recherche de paroles";
 "hint_search_line1" = "Balayez vers la gauche pour revenir au lecteur";
 "hint_search_mac_line1" = "Cliquez sur un résultat pour l'appliquer comme paroles";
