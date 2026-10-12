@@ -1,14 +1,18 @@
 #!/bin/bash
 # QQPlayer 一键构建 / 安装（iOS + macOS）
+#
 # 用法:
-#   ./build.sh              模拟器构建（免签名，iPhone 17 Pro）
-#   ./build.sh --install    仅 iOS：真机签名构建 + devicectl 安装 + 启动（需连接 iPhone，team B6FA37AYT5）
-#   ./build.sh mac          仅 macOS：构建 + 覆盖安装到 /Applications/QQPlayerMac.app + 启动
-#   ./build.sh install      iOS + macOS 双端：各构建 + 安装 + 启动（无 iPhone 时 iOS 跳过、退出码非零）
+#   ./build.sh              编译 iOS（模拟器）+ macOS（不安装、不启动）
+#   ./build.sh ios          仅编译 iOS（模拟器）
+#   ./build.sh mac          仅编译 macOS
+#   ./build.sh install      构建 + 安装 iOS（真机）+ macOS（+ 启动）
+#   ./build.sh install ios  仅安装 iOS（真机签名构建 + devicectl 安装 + 启动，team B6FA37AYT5）
+#   ./build.sh install mac  仅安装 macOS（构建 + 覆盖安装到 /Applications/QQPlayerMac.app + 启动）
+#   ./build.sh --install    install ios 的别名（旧用法兼容）
 #
 # 环境变量（可选）:
 #   QQPLAYER_MAC_INSTALL_DIR  macOS 安装目录（默认 /Applications；便于自验指向 /tmp）
-#   QQPLAYER_SKIP_LAUNCH=1    跳过 macOS 启动（仅影响 mac / install 的 macOS 分支）
+#   QQPLAYER_SKIP_LAUNCH=1    跳过 macOS 启动（仅影响 macOS 安装分支）
 #   QQPLAYER_DD               DerivedData 路径（默认 <仓库>/build/DerivedData）
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -30,6 +34,29 @@ MAC_INSTALL_DIR="${QQPLAYER_MAC_INSTALL_DIR:-/Applications}"
 SIM_DEST='platform=iOS Simulator,name=iPhone 17 Pro'
 IOS_BUNDLE_ID="com.daxmate.qqplayer.ios"
 
+# 用法说明（参数校验失败时打到 stderr，退出码 2）
+usage() {
+  cat >&2 <<'USAGE_EOF'
+用法: ./build.sh [子命令] [对象]
+
+编译（不安装、不启动）:
+  ./build.sh              编译 iOS（模拟器）+ macOS
+  ./build.sh ios          仅编译 iOS（模拟器）
+  ./build.sh mac          仅编译 macOS
+
+构建 + 安装 + 启动:
+  ./build.sh install      安装 iOS（真机）+ macOS
+  ./build.sh install ios  仅安装 iOS（真机）
+  ./build.sh install mac  仅安装 macOS
+  ./build.sh --install    等价 ./build.sh install ios（旧用法兼容）
+
+环境变量:
+  QQPLAYER_MAC_INSTALL_DIR  macOS 安装目录（默认 /Applications）
+  QQPLAYER_SKIP_LAUNCH=1    跳过 macOS 启动
+  QQPLAYER_DD               DerivedData 路径
+USAGE_EOF
+}
+
 # 探测可用真机（devicectl JSON → scripts/detect-device.py 选设备；判据与理由见该脚本注释）。
 # 注意：**不要**只认 tunnelState=connected —— 隧道是按需建立的，可达设备也会报 disconnected，
 # 那样会误报「未发现真机」（2026-09-20 事故）。选择逻辑有自测：scripts/detect-device-test.py
@@ -46,13 +73,14 @@ device_hint() {
   echo "         ③ 同一 Wi-Fi 下也可用（无需数据线），但设备不能关机"
 }
 
+# iOS 编译：模拟器构建（免签名、不需要真机、不启动模拟器）
 build_sim() {
   echo "=== 模拟器构建 ==="
   scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "${IOS_SCHEME}" \
     -destination "${SIM_DEST}" || { echo "❌ 模拟器构建失败"; return 1; }
 }
 
-# iOS 真机：签名构建 + devicectl 安装 + 启动。可选传入已探测到的 UDID。
+# iOS 安装：真机签名构建 + devicectl 安装 + 启动。可选传入已探测到的 UDID。
 build_install_ios() {
   local UDID="${1:-}"
   if [ -z "${UDID}" ]; then
@@ -76,11 +104,16 @@ build_install_ios() {
     || { echo "❌ 启动失败"; return 1; }
 }
 
-# macOS：构建 + 覆盖安装到 ${MAC_INSTALL_DIR} + 启动
-build_install_mac() {
+# macOS 编译：构建（scheme QQPlayerMac），不安装、不启动
+build_mac() {
   echo "=== macOS 构建（scheme ${MAC_SCHEME}） ==="
   scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "${MAC_SCHEME}" \
     -destination 'platform=macOS' || { echo "❌ macOS 构建失败"; return 1; }
+}
+
+# macOS 安装：构建 + 覆盖安装到 ${MAC_INSTALL_DIR} + 启动
+build_install_mac() {
+  build_mac || return 1
 
   local APP="${DERIVED}/Build/Products/Debug/${MAC_APP_NAME}.app"
   if [ ! -d "${APP}" ]; then
@@ -121,7 +154,15 @@ install_mac_app() {
   fi
 }
 
-# 双端：两端互不阻断（一端失败另一端仍跑完），最后汇总退出码
+# 编译双端（互不阻断，最后汇总退出码）
+run_compile_both() {
+  local FAIL=0
+  build_sim || FAIL=1
+  build_mac || FAIL=1
+  return "${FAIL}"
+}
+
+# 安装双端：两端互不阻断（一端失败另一端仍跑完），最后汇总退出码
 run_dual() {
   local FAIL=0
   local UDID=""
@@ -137,12 +178,49 @@ run_dual() {
   return "${FAIL}"
 }
 
+# ---- 子命令分发 ----
+CMD="${1:-}"
+ARG2="${2:-}"
+ARG3="${3:-}"
+
+# 多余参数（第 3 个及以后）一律拒绝
+if [ -n "${ARG3}" ]; then
+  echo "❌ 参数过多：$*" >&2
+  usage
+  exit 2
+fi
+
 EXIT=0
-case "${1:-}" in
-  --install) build_install_ios || EXIT=$? ;;
-  mac)       build_install_mac || EXIT=$? ;;
-  install)   run_dual || EXIT=$? ;;
-  *)         build_sim || EXIT=$? ;;
+case "${CMD}" in
+  "")
+    [ -z "${ARG2}" ] || { echo "❌ 不接受参数：${ARG2}" >&2; usage; exit 2; }
+    run_compile_both || EXIT=$?
+    ;;
+  ios)
+    [ -z "${ARG2}" ] || { echo "❌ ios 不接受参数：${ARG2}" >&2; usage; exit 2; }
+    build_sim || EXIT=$?
+    ;;
+  mac)
+    [ -z "${ARG2}" ] || { echo "❌ mac 不接受参数：${ARG2}" >&2; usage; exit 2; }
+    build_mac || EXIT=$?
+    ;;
+  install)
+    case "${ARG2}" in
+      "")   run_dual || EXIT=$? ;;
+      ios)  build_install_ios || EXIT=$? ;;
+      mac)  build_install_mac || EXIT=$? ;;
+      *)    echo "❌ 未知安装对象：${ARG2}" >&2; usage; exit 2 ;;
+    esac
+    ;;
+  --install)
+    [ -z "${ARG2}" ] || { echo "❌ --install 不接受参数（等价 ./build.sh install ios）" >&2; usage; exit 2; }
+    build_install_ios || EXIT=$?
+    ;;
+  *)
+    echo "❌ 未知子命令：${CMD}" >&2
+    usage
+    exit 2
+    ;;
 esac
 
 if [ "${EXIT}" -ne 0 ]; then
