@@ -383,6 +383,10 @@
 "play_next" = "下一首播放";
 "add_to_queue" = "添加到播放队列";
 
+/* Track action feedback toast */
+"toast_play_next" = "已设为下一首";
+"toast_added_to_queue" = "已加入播放队列";
+
 /* Sleep Timer */
 "sleep_timer" = "睡眠定时";
 "sleep_timer_off" = "睡眠定时已关闭";

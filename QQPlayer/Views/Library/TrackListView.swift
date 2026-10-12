@@ -252,6 +252,8 @@ struct TrackListContentView: View {
     // Only THIS view updates when the song progresses
     @Environment(PlayerEngine.self) private var playerEngine
     @Environment(AppCoordinator.self) private var appCoordinator
+    /// 曲目行滑动操作的即时反馈（轻震 + 顶部提示条；唯一入口见 Views/Shared/ActionFeedback.swift）
+    @Environment(ActionFeedbackCenter.self) private var actionFeedback
     @State private var settings = DeleteSettings.load()
     @State private var displayLimit = 50
     @State private var artistNameCache: [Int64: String] = [:]
@@ -386,6 +388,7 @@ struct TrackListContentView: View {
                             Button {
                                 playerEngine.insertNext(track)
                                 markAsActed(track.stableId)
+                                actionFeedback.didPlayNext()
                             } label: { Label(Localized.playNext, systemImage: "text.line.first.and.arrowtriangle.forward") }
                                 .tint(accentColor)
                         }
@@ -395,6 +398,7 @@ struct TrackListContentView: View {
                             Button {
                                 playerEngine.addToQueue(track)
                                 markAsActed(track.stableId)
+                                actionFeedback.didAddToQueue()
                             } label: { Label(Localized.addToQueue, systemImage: "text.append") }
                                 .tint(.blue)
                         }

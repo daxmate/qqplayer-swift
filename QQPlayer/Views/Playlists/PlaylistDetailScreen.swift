@@ -20,6 +20,8 @@ struct PlaylistDetailScreen: View {
     let playlist: Playlist
     /// 分片：跨文件可见（原 private）
     @Environment(AppCoordinator.self) var appCoordinator
+    /// 曲目行滑动操作的即时反馈（轻震 + 顶部提示条；唯一入口见 Views/Shared/ActionFeedback.swift）
+    @Environment(ActionFeedbackCenter.self) private var actionFeedback
     /// 分片：跨文件可见（原 private）
     @State var tracks: [Track] = []
     @State private var isEditMode: Bool = false
@@ -230,6 +232,7 @@ struct PlaylistDetailScreen: View {
                                     Button {
                                         playerEngine.insertNext(track)
                                         markAsActed(track.stableId)
+                                        actionFeedback.didPlayNext()
                                     } label: {
                                         Label(Localized.playNext, systemImage: "text.line.first.and.arrowtriangle.forward")
                                     }
@@ -241,6 +244,7 @@ struct PlaylistDetailScreen: View {
                                     Button {
                                         playerEngine.addToQueue(track)
                                         markAsActed(track.stableId)
+                                        actionFeedback.didAddToQueue()
                                     } label: {
                                         Label(Localized.addToQueue, systemImage: "text.append")
                                     }

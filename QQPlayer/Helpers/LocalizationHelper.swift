@@ -459,6 +459,10 @@ struct Localized {
     static let playNext = "play_next".localized
     static let addToQueue = "add_to_queue".localized
 
+    // MARK: - Track Action Feedback (toast)
+    static let toastPlayNext = "toast_play_next".localized
+    static let toastAddedToQueue = "toast_added_to_queue".localized
+
     // MARK: - Sleep Timer
     static let sleepTimer = "sleep_timer".localized
     static let sleepTimerOff = "sleep_timer_off".localized

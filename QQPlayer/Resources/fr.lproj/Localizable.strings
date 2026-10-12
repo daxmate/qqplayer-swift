@@ -366,6 +366,10 @@
 /* Queue Actions */
 "play_next" = "Lire ensuite";
 "add_to_queue" = "Ajouter à la file";
+
+/* Track action feedback toast */
+"toast_play_next" = "Sera lu ensuite";
+"toast_added_to_queue" = "Ajouté à la file";
 /* Guide des fonctions */
 "feature_guide" = "Fonctions et gestes";
 "feature_guide_section_player" = "Page de lecture";

@@ -23,6 +23,8 @@ struct SearchSongRowView: View {
     let onDismiss: () -> Void
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(PlayerEngine.self) private var playerEngine
+    /// 曲目行滑动操作的即时反馈（轻震 + 顶部提示条；唯一入口见 Views/Shared/ActionFeedback.swift）
+    @Environment(ActionFeedbackCenter.self) private var actionFeedback
     @State private var settings = DeleteSettings.load()
     @State private var artworkImage: UIImage?
     @State private var swipeOffset: CGFloat = 0
@@ -160,8 +162,10 @@ struct SearchSongRowView: View {
                             switch swipeAction {
                             case .playNext:
                                 playerEngine.insertNext(track)
+                                actionFeedback.didPlayNext()
                             case .addToQueue:
                                 playerEngine.addToQueue(track)
+                                actionFeedback.didAddToQueue()
                             case .none:
                                 break
                             }

@@ -572,6 +572,12 @@
 
 "add_to_queue" = "添加到播放佇列";
 
+/* Track action feedback toast */
+
+"toast_play_next" = "已設為下一首";
+
+"toast_added_to_queue" = "已加入播放佇列";
+
 /* Sleep Timer */
 "sleep_timer" = "睡眠定時";
 

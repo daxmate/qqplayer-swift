@@ -366,6 +366,10 @@
 /* Queue Actions */
 "play_next" = "Воспроизвести следующим";
 "add_to_queue" = "Добавить в очередь";
+
+/* Track action feedback toast */
+"toast_play_next" = "Будет следующим";
+"toast_added_to_queue" = "Добавлено в очередь";
 /* Справочник функций */
 "feature_guide" = "Функции и жесты";
 "feature_guide_section_player" = "Страница плеера";

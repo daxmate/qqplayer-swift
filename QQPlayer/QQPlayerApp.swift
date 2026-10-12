@@ -146,6 +146,11 @@ struct QQPlayerApp: App {
                 .environment(PlayerEngine.shared)
                 // 跟唱控制器（批 6-7）：歌词页 / 控制条按属性追踪跟唱态与速度
                 .environment(KaraokeController.shared)
+                // 曲目行滑动操作反馈中心（2026-10-12）：轻震 + 顶部提示条的唯一入口。
+                // 顶部提示条的**唯一呈现点**在根挂一次（actionFeedbackToast()），
+                // 三处滑动消费点只调 didPlayNext() / didAddToQueue()。
+                .environment(ActionFeedbackCenter.shared)
+                .actionFeedbackToast()
                 .task {
                     DatabaseSuspensionCoordinator.shared.start()
                     await appCoordinator.initialize()
