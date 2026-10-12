@@ -829,7 +829,7 @@ struct IOSPassiveSyncCenterTests {
         "QQPlayer/Sync/SyncDataSyncCoordinator.swift": 1,
         "QQPlayer/Sync/SyncSessionModels.swift": 1,
         "QQPlayer/Mac/MacSyncLibraryHost.swift": 3,
-        "QQPlayer/Services/IOSPassiveSyncCenter.swift": 2,
+        "QQPlayer/Services/IOSPassiveSyncCenter.swift": 3,
     ]
 
     /// 经审计的豁免（逐条给理由；不许静默漏 —— 未登记也未豁免的闭包属性会直接报错）。
@@ -845,6 +845,7 @@ struct IOSPassiveSyncCenterTests {
             "members": "同上（描述符字段，构造点在非隔离 live() 工厂）。",
         ],
         "QQPlayer/Services/IOSPassiveSyncCenter.swift": [
+            "makePathMonitor": "DI seam：测试注入路径监视器，调用点在主线程（@MainActor 类内部）装配，不出会话/网络队列。",
             "libraryRoot": "DI seam：调用点全在主线程（@MainActor 类内部装配），不出会话队列。",
             "clientName": "DI seam：调用点全在主线程（@MainActor 类内部装配），不出会话队列。",
         ],
