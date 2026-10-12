@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 播放页折叠控制容器：常驻进度条 + 三键（上一首/播放暂停/下一首），
-/// 上滑展开更多按钮（播放顺序 + 队列/定时/隔空播放/删除当前歌曲），下滑收起。
+/// 上滑展开更多按钮：主工具行（播放顺序/歌单/输出源/删除）+ 辅助行（定时），下滑收起。
 /// 三键行与展开工具行均为透明容器：按钮用 Spacer 均匀分布、与进度条同宽。
 ///
 /// 2026-09-22：展开/收起手势改由**整页手势**驱动（展开状态提升为 `isExpanded` Binding，
@@ -9,7 +9,7 @@ import SwiftUI
 /// 展开区的「歌词」按钮同时取消（左滑整页任意位置即开全屏歌词）。
 ///
 /// 2026-10-12：删掉底部切换箭头（展开/收起已由整页手势驱动，箭头冗余）；
-/// 展开辅助行行尾新增「删除当前歌曲」（二次确认后走 `TrackDeletionService` 唯一入口）。
+/// 「删除当前歌曲」按钮并入主工具行（播放顺序/歌单/输出源/删除 四项均分），二次确认后走 `TrackDeletionService` 唯一入口。
 struct CollapsiblePlayerControls: View {
     @Environment(PlayerEngine.self) private var playerEngine
     /// 展开状态由 PlayerView 持有（整页手势要读写）：上滑展开 / 下滑先收起 / 封面让位
@@ -123,7 +123,7 @@ struct CollapsiblePlayerControls: View {
         .padding(.top, DesignTokens.space2)
     }
 
-    /// 主工具行：播放顺序 / 歌单 / 输出源 三键同一容器，摆放方式及底色同三键行（Spacer 均分 + 透明 + 与进度条同宽）
+    /// 主工具行：播放顺序 / 歌单 / 输出源 / 删除 四键同一容器，摆放方式及底色同三键行（Spacer 均分 + 透明 + 与进度条同宽）
     private var mainToolRow: some View {
         HStack(spacing: DesignTokens.space0) {
             playOrderButton
@@ -131,23 +131,24 @@ struct CollapsiblePlayerControls: View {
             queueButton
             Spacer()
             airPlayButton
-        }
-        .padding(.horizontal, DesignTokens.space8)
-        .padding(.vertical, DesignTokens.space8)
-    }
-
-    /// 辅助行：定时（可开关，靠左；歌词按钮已于 2026-09-22 取消）+ 删除当前歌曲（行尾）。
-    /// 该行**始终渲染**——即使定时按钮关闭，删除按钮也要出现；删除与主工具行分开。
-    @ViewBuilder private var accessoryRow: some View {
-        HStack(spacing: DesignTokens.space0) {
-            if showSleepTimerButton {
-                sleepTimerButton
-            }
             Spacer()
             deleteTrackButton
         }
         .padding(.horizontal, DesignTokens.space8)
         .padding(.vertical, DesignTokens.space8)
+    }
+
+    /// 辅助行：定时（可开关，靠左；歌词按钮已于 2026-09-22 取消）。
+    /// 仅当定时按钮开启才渲染；删除按钮已并入主工具行（2026-10-12）。
+    @ViewBuilder private var accessoryRow: some View {
+        if showSleepTimerButton {
+            HStack(spacing: DesignTokens.space0) {
+                sleepTimerButton
+                Spacer()
+            }
+            .padding(.horizontal, DesignTokens.space8)
+            .padding(.vertical, DesignTokens.space8)
+        }
     }
 
     // 播放顺序四态轮换按钮：顺序播放 → 随机播放 → 循环列表 → 单曲循环（仅图标，无文字）
@@ -249,7 +250,7 @@ struct CollapsiblePlayerControls: View {
         .accessibilityLabel(Localized.sleepTimer)
     }
 
-    /// 删除当前歌曲（行尾）。无当前曲目时禁用；点按先弹二次确认，确认后才执行删除。
+    /// 删除当前歌曲（主工具行行尾）。无当前曲目时禁用；点按先弹二次确认，确认后才执行删除。
     private var deleteTrackButton: some View {
         Button(action: {
             guard playerEngine.currentTrack != nil else { return }
