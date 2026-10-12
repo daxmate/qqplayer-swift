@@ -27,6 +27,31 @@ enum LyricTiming {
     }
 }
 
+/// 歌词页「阅读态 → 恢复自动跟随（回中）」判据（iOS / Mac 唯一事实源，2026-10-12 立）。
+///
+/// 需求（用户拍板 2026-10-12）：普通播放模式的歌词页，用户手动滚动后进入「阅读态」
+/// （关距离分级灰度 + 正常字号）；**停止滚动后不立即回中**，要到**下一句**才自动回中
+/// 并恢复距离分级（回中后 reading 结束）。
+///
+/// 语义：`!isKaraoke && !isFollowing && !isScrollActive && activeIndexChanged → true`，其余 false。
+///   - `isKaraoke`：跟唱模式的自动滚动语义自成一套，恒不介入（guard 隔离，需求 4）
+///   - `isFollowing`：已恢复跟随时无需再恢复
+///   - `isScrollActive`：仍在手动滚动中不算「停止滚动后」
+///   - `activeIndexChanged`：当前行未变（未换句）不算「到下一句」
+///
+/// 调用方约束（防第二实现，形状契约测试守护）：iOS `updateActiveLineAndScroll`、
+/// Mac `.onChange(of: activeIndex)` 两处回中判定都必须调用本函数，禁各写一份布尔表达式。
+enum LyricsFollowPolicy {
+    static func shouldResumeFollow(
+        isKaraoke: Bool,
+        isFollowing: Bool,
+        isScrollActive: Bool,
+        activeIndexChanged: Bool
+    ) -> Bool {
+        !isKaraoke && !isFollowing && !isScrollActive && activeIndexChanged
+    }
+}
+
 /// 播放页/歌词页的滑动手势关闭判定（阈值 + 快速回甩）
 enum PlayerDismissGesture {
     /// 歌词页右滑关闭：位移超过 120pt，或位移过半（>40pt）且快速回甩（预测 >260pt）

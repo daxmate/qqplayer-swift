@@ -60,6 +60,9 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
     let accent: Color
     let fontScale: CGFloat
     let karaoke: Bool
+    /// 阅读态（用户拍板 2026-10-12）：普通模式用户手动滚动后为 true → 关距离分级灰度 + 正常字号；
+    /// 跟唱模式恒 false（不受影响）。
+    let reading: Bool
 
     /// 关键：让 emphasis 可插值 → body 逐帧重算 → 字号连续变化
     var animatableData: Double {
@@ -77,7 +80,8 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
     // MARK: 行级度量（透明度/缩放/行距作用于整行，含译文行）
 
     /// 整行透明度（节点值 = 改前的 mainOpacity；跟唱 1.0 / 0.8）
-    static func lineOpacity(_ emphasis: Double, karaoke: Bool) -> Double {
+    static func lineOpacity(_ emphasis: Double, karaoke: Bool, reading: Bool) -> Double {
+        if reading { return 1.0 } // 阅读态：整行全亮（关灰度）
         if karaoke {
             return lyricLerp(emphasis, [(1.0, 1.0), (0.66, 0.8)])
         }
@@ -88,7 +92,8 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
     }
 
     /// 整行缩放（节点值 = 改前的 lineScale；跟唱不缩放）
-    static func lineScale(_ emphasis: Double, karaoke: Bool) -> CGFloat {
+    static func lineScale(_ emphasis: Double, karaoke: Bool, reading: Bool) -> CGFloat {
+        if reading { return 1.0 } // 阅读态：不缩放（用户定）
         guard !karaoke else { return 1.0 }
         return CGFloat(lyricLerp(emphasis, [(1.0, 1.02), (0.66, 0.97), (0.40, 0.94)]))
     }
@@ -103,6 +108,8 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
 
     /// 字号（×fontScale）：1.0 → 26、0.66 → 19、0.40 及更远 → 16（跟唱 22 / 19）
     private var mainSize: CGFloat {
+        // 阅读态：正常大小 = 高亮行下一行那档（19），不随距离分级
+        if reading { return 19 * fontScale }
         let size = karaoke
             ? lyricLerp(emphasis, [(1.0, 22), (0.66, 19)])
             : lyricLerp(emphasis, [(1.0, 26), (0.66, 19), (0.40, 16)])
@@ -110,6 +117,8 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
     }
 
     private var mainWeight: Font.Weight {
+        // 阅读态：当前行加粗保留、其余统一 semibold（正常大小那一档；emphasis 1.0 = 当前行）
+        if reading { return emphasis > 0.85 ? .bold : .semibold }
         if karaoke { return emphasis > 0.85 ? .bold : .regular }
         if emphasis > 0.85 { return .bold }
         if emphasis > 0.45 { return .semibold }
@@ -118,6 +127,8 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
 
     /// 颜色：≤0.66 只插值 primary 的 alpha（0.75 / 0.40 / 0.18），>0.66 才由 primary 混向 accent
     private var mainColor: Color {
+        // 阅读态：全亮、不分级（当前行 accent + 加粗高亮，其余 primary）
+        if reading { return emphasis > 0.85 ? accent : .primary }
         let fraction = lyricEmphasisProgress(emphasis)
         if karaoke {
             guard fraction > 0 else { return .primary.opacity(0.8) }
@@ -157,6 +168,8 @@ struct LyricTranslationEmphasis: ViewModifier, Animatable {
     let accent: Color
     let fontScale: CGFloat
     let karaoke: Bool
+    /// 阅读态（同 LyricLineEmphasis 口径）
+    let reading: Bool
     var tier: Tier = .translation
 
     var animatableData: Double {
@@ -172,6 +185,8 @@ struct LyricTranslationEmphasis: ViewModifier, Animatable {
 
     /// 字号阶梯：译文与罗马音共用这一张表（罗马音整体小一档）
     private var size: CGFloat {
+        // 阅读态：译文 14 / 罗马音 12（正常大小那一档），不随距离分级
+        if reading { return (tier == .roman ? 12 : 14) * fontScale }
         let table: [(Double, Double)]
         switch (karaoke, tier) {
         case (true, .translation): table = [(1.0, 16), (0.66, 14)]
@@ -183,6 +198,7 @@ struct LyricTranslationEmphasis: ViewModifier, Animatable {
     }
 
     private var color: Color {
+        if reading { return .secondary } // 阅读态：译文/罗马音全亮，不再叠加 opacity
         let fraction = lyricEmphasisProgress(emphasis)
         if karaoke {
             guard fraction > 0 else { return .secondary.opacity(0.7) }

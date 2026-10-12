@@ -32,6 +32,11 @@ struct LyricsView: View {
     /// 跟唱模式的自动滚动语义不受本状态影响（见 updateActiveLineAndScroll）。
     /// 分片：跨文件可见（原 private）
     @State var isFollowing = true
+    /// 「用户正在手动滚动」状态（用户拍板 2026-10-12）：普通模式用户开始滚动置 true、
+    /// 滚动停止（.idle）置 false；配合 isFollowing 决定是否满足「停止滚动后到下一句才回中」
+    /// （判据唯一事实源 LyricsFollowPolicy）。跟唱模式不介入本状态。
+    /// 分片：跨文件可见（原 private）
+    @State var isScrollActive = false
     /// 分片：跨文件可见（原 private）
     @Environment(KaraokeController.self) var karaoke
 

@@ -55,6 +55,16 @@ struct MacLyricsView: View {
     /// 分片：跨文件可见（原 private）
     @State var isFollowing = true
 
+    /// 「用户正在手动滚动」状态（用户拍板 2026-10-12）：普通模式用户开始滚动置 true、
+    /// 滚动停止（didEndLiveScrollNotification）置 false；配合 isFollowing 决定
+    /// 「停止滚动后到下一句才回中」（判据唯一事实源 LyricsFollowPolicy）。跟唱模式不介入。
+    /// 分片：跨文件可见（原 private）
+    @State var isScrollActive = false
+    /// 「已跟到行号基线」：滚动停止时同步为当时当前行，此后仅当再换句才回中（严格口径，
+    /// 见 LyricsFollowPolicy）。iOS 端等价物为 lastScrolledIndex。
+    /// 分片：跨文件可见（原 private）
+    @State var lastFollowedIndex: Int?
+
     /// 面板底色（对齐 iOS 的 systemBackground）
     /// 分片：跨文件可见（原 private）
     var baseColor: Color { Color(nsColor: .windowBackgroundColor) }

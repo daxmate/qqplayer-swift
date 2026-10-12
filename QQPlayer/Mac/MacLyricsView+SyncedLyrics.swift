@@ -24,10 +24,22 @@ extension MacLyricsView {
                         VStack(spacing: DesignTokens.space0) {
                             // 用户手动滚动检测桥（AppKit；见文件末 MacLyricsScrollObserver）：
                             // 零尺寸占位，只当「找宿主 NSScrollView」的起点
-                            MacLyricsScrollObserver {
-                                guard !karaoke.isKaraokeOn else { return }
-                                if isFollowing { isFollowing = false }
-                            }
+                            MacLyricsScrollObserver(
+                                onUserScroll: {
+                                    guard !karaoke.isKaraokeOn else { return }
+                                    if isFollowing { isFollowing = false }
+                                    if !isScrollActive { isScrollActive = true }
+                                },
+                                onUserScrollEnd: {
+                                    guard !karaoke.isKaraokeOn else { return }
+                                    // 停止滚动：把「已跟到行号基线」同步为当时当前行（严格口径，
+                                    // 见 LyricsFollowPolicy）—— 此后仅当再换句（activeIndexChanged）才回中
+                                    if isScrollActive {
+                                        isScrollActive = false
+                                        lastFollowedIndex = LyricTiming.activeLineIndex(time: currentTime - lyricOffset, in: lines)
+                                    }
+                                }
+                            )
                             .frame(width: 0, height: 0)
                             .allowsHitTesting(false)
 
@@ -79,11 +91,22 @@ extension MacLyricsView {
                     // 等选 AB 终点（b == nil）时暂停自动滚动：让用户手动滚动找 B 句
                     // （对齐 iOS updateActiveLineAndScroll，用户拍板 2026-08-29）
                     if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
+                    // 「阅读态 → 回中」判据（唯一事实源：LyricsFollowPolicy）：停止手动滚动后到
+                    // 「下一句」才恢复自动跟随（用户拍板 2026-10-12）。不在此自写布尔表达式。
+                    if LyricsFollowPolicy.shouldResumeFollow(
+                        isKaraoke: karaoke.isKaraokeOn,
+                        isFollowing: isFollowing,
+                        isScrollActive: isScrollActive,
+                        activeIndexChanged: newIndex != lastFollowedIndex
+                    ) {
+                        isFollowing = true
+                    }
                     // 普通模式手动滚动后暂停跟随：不自动拉回（用户拍板 2026-10-12）
                     if !karaoke.isKaraokeOn, !isFollowing { return }
                     withAnimation(Self.lyricAnimation) {
                         proxy.scrollTo(newIndex, anchor: .center)
                     }
+                    lastFollowedIndex = newIndex
                 }
                 // 切歌 / 歌词变化：恢复自动跟随（需求 3）
                 .onChange(of: lines) { _, _ in
@@ -91,6 +114,7 @@ extension MacLyricsView {
                 }
                 .onAppear {
                     guard let activeIndex else { return }
+                    lastFollowedIndex = activeIndex
                     proxy.scrollTo(activeIndex, anchor: .center)
                 }
             }
@@ -123,6 +147,9 @@ extension MacLyricsView {
     private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
         let emphasis = emphasisValue(isActive: isActive, distance: distance)
         let isKaraoke = karaoke.isKaraokeOn
+        // 阅读态（用户拍板 2026-10-12）：普通模式用户手动滚动后，整页关距离分级「灰度」+ 正常字号，
+        // 直到回中（isFollowing 恢复 true）。跟唱模式不受影响（reading 恒 false）。
+        let reading = !isKaraoke && !isFollowing
         return VStack(spacing: DesignTokens.space4) {
             Text(line.displayText)
                 .lineLimit(3)
@@ -133,7 +160,8 @@ extension MacLyricsView {
                         emphasis: emphasis,
                         accent: appAccentColor,
                         fontScale: fontScale,
-                        karaoke: isKaraoke
+                        karaoke: isKaraoke,
+                        reading: reading
                     )
                 )
 
@@ -148,6 +176,7 @@ extension MacLyricsView {
                             accent: appAccentColor,
                             fontScale: fontScale,
                             karaoke: isKaraoke,
+                            reading: reading,
                             tier: .roman
                         )
                     )
@@ -163,7 +192,8 @@ extension MacLyricsView {
                             emphasis: emphasis,
                             accent: appAccentColor,
                             fontScale: fontScale,
-                            karaoke: isKaraoke
+                            karaoke: isKaraoke,
+                            reading: reading
                         )
                     )
             }
@@ -172,8 +202,8 @@ extension MacLyricsView {
         .padding(.horizontal, DesignTokens.space32)
         .padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))
         .id(index)
-        .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke), anchor: .center)
-        .opacity(LyricLineEmphasis.lineOpacity(emphasis, karaoke: isKaraoke))
+        .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke, reading: reading), anchor: .center)
+        .opacity(LyricLineEmphasis.lineOpacity(emphasis, karaoke: isKaraoke, reading: reading))
         // 行强调由播放 tick 驱动的 body 重算得出（不是用户事件）→ 靠 .animation(value:) 触发，
         // 与滚屏共用同一条曲线（不要再套 withAnimation）
         .animation(Self.lyricAnimation, value: emphasis)
@@ -230,22 +260,28 @@ extension MacLyricsView {
 /// 歌词面板「用户手动滚动」检测桥（Mac 专属）。
 ///
 /// 选型说明：SwiftUI 的 `onScrollPhaseChange` 需 macOS 15，而本仓 Mac 部署目标为 14.0，
-/// 故走 AppKit：沿视图树找到承载歌词滚动内容的 `NSScrollView`，监听其
-/// `willStartLiveScrollNotification` —— 该通知只在**用户发起**的实时滚动
-/// （触控板 / 滚轮 / 滚动条）时发出，程序化 `ScrollViewProxy.scrollTo` / `clipView.scroll`
-/// 不触发 ⇒ 自动滚动不会被误判成手动（这正是 iOS 端 onScrollPhaseChange 的等价保证）。
+/// 故走 AppKit：沿视图树找到承载歌词滚动内容的 `NSScrollView`，监听
+/// `willStartLiveScrollNotification`（**用户发起**的实时滚动开始：触控板 / 滚轮 / 滚动条）
+/// 与 `didEndLiveScrollNotification`（用户实时滚动结束）—— 二者都只在**用户发起**的
+/// 实时滚动时发出，程序化 `ScrollViewProxy.scrollTo` / `clipView.scroll` 不触发 ⇒
+/// 自动滚动不会被误判成手动（这正是 iOS 端 onScrollPhaseChange 的等价保证）。
 /// 与「唯一 AppKit 滚动入口」文件里的代表桥同款「延后一拍」装配先例。
 struct MacLyricsScrollObserver: NSViewRepresentable {
     /// 用户手动滚动开始回调（主线程调用）
     let onUserScroll: () -> Void
+    /// 用户手动滚动结束回调（主线程调用；didEndLiveScrollNotification）
+    let onUserScrollEnd: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onUserScroll: onUserScroll) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onUserScroll: onUserScroll, onUserScrollEnd: onUserScrollEnd)
+    }
 
     /// 零尺寸占位视图：只当「沿视图树找宿主 NSScrollView」的起点，不绘制、不响应事件
     func makeNSView(context: Context) -> NSView { NSView(frame: .zero) }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.onUserScroll = onUserScroll
+        context.coordinator.onUserScrollEnd = onUserScrollEnd
         context.coordinator.attachIfNeeded(from: nsView)
     }
 
@@ -253,10 +289,15 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
     /// live-scroll 通知也投递到 .main 队列），故可安全被 @Sendable 通知闭包捕获。
     final class Coordinator: @unchecked Sendable {
         var onUserScroll: () -> Void
+        var onUserScrollEnd: () -> Void
         private weak var scrollView: NSScrollView?
-        private var token: NSObjectProtocol?
-        init(onUserScroll: @escaping () -> Void) { self.onUserScroll = onUserScroll }
-        deinit { if let token { NotificationCenter.default.removeObserver(token) } }
+        private var startToken: NSObjectProtocol?
+        private var endToken: NSObjectProtocol?
+        init(onUserScroll: @escaping () -> Void, onUserScrollEnd: @escaping () -> Void) {
+            self.onUserScroll = onUserScroll
+            self.onUserScrollEnd = onUserScrollEnd
+        }
+        deinit { detach() }
 
         /// 找到宿主 NSScrollView 并挂一次 live-scroll 监听（幂等；视图未入树时延后一拍重试）
         func attachIfNeeded(from view: NSView) {
@@ -265,16 +306,33 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
                 guard let self, let view,
                       let sv = MacHostScrollView.enclosing(of: view),
                       self.scrollView !== sv else { return }
-                if let token = self.token { NotificationCenter.default.removeObserver(token) }
+                self.detach()
                 self.scrollView = sv
-                self.token = NotificationCenter.default.addObserver(
+                let center = NotificationCenter.default
+                self.startToken = center.addObserver(
                     forName: NSScrollView.willStartLiveScrollNotification,
                     object: sv,
                     queue: .main
                 ) { [weak self] _ in
                     self?.onUserScroll()
                 }
+                self.endToken = center.addObserver(
+                    forName: NSScrollView.didEndLiveScrollNotification,
+                    object: sv,
+                    queue: .main
+                ) { [weak self] _ in
+                    self?.onUserScrollEnd()
+                }
             }
+        }
+
+        /// 摘掉已挂的通知（重新定位宿主 / 析构时调用；幂等）
+        private func detach() {
+            let center = NotificationCenter.default
+            if let startToken { center.removeObserver(startToken) }
+            if let endToken { center.removeObserver(endToken) }
+            startToken = nil
+            endToken = nil
         }
     }
 }

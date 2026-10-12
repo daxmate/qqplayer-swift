@@ -59,6 +59,15 @@ extension LyricsView {
                         switch newPhase {
                         case .tracking, .interacting, .decelerating:
                             if isFollowing { isFollowing = false }
+                            if !isScrollActive { isScrollActive = true }
+                        case .idle:
+                            // 停止滚动：把「已跟到行号基线」同步为当时当前行 —— 此后仅当再换句
+                            // （activeIndexChanged）才回中（严格口径，见 LyricsFollowPolicy）。
+                            // 仅当此前确实在手滚中（true→false）才同步，程序化 scrollTo 的 .idle 不误触。
+                            if isScrollActive {
+                                isScrollActive = false
+                                lastScrolledIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines)
+                            }
                         default:
                             break
                         }
@@ -122,13 +131,16 @@ extension LyricsView {
     }
 
     private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
-        VStack(spacing: DesignTokens.space4) {
+        // 阅读态（用户拍板 2026-10-12）：普通模式用户手动滚动后，整页关距离分级「灰度」+ 正常字号，
+        // 直到回中（isFollowing 恢复 true）。跟唱模式不受影响（reading 恒 false）。
+        let reading = !karaoke.isKaraokeOn && !isFollowing
+        return VStack(spacing: DesignTokens.space4) {
             Text(line.displayText)
-                .font(fontForLine(isActive: isActive, distance: distance))
+                .font(fontForLine(isActive: isActive, distance: distance, reading: reading))
                 .fontWeight(isActive ? .bold : .semibold)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
-                .foregroundColor(lineColor(distance: distance, isActive: isActive))
+                .foregroundColor(lineColor(distance: distance, isActive: isActive, reading: reading))
                 .multilineTextAlignment(.center)
                 .shadow(
                     color: isActive ? accentColor.opacity(0.5) : .clear,
@@ -140,19 +152,19 @@ extension LyricsView {
             // 罗马音（网易云 romalrc；仅日语等有数据的曲目非空）—— 原文下、译文上，比译文小一档
             if settings.lyricShowRoman, let roman = line.displayRoman, !roman.isEmpty {
                 Text(roman)
-                    .font(.system(size: romanFontSize(isActive: isActive, distance: distance), weight: .regular))
+                    .font(.system(size: romanFontSize(isActive: isActive, distance: distance, reading: reading), weight: .regular))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .foregroundColor(romanColor(distance: distance, isActive: isActive))
+                    .foregroundColor(romanColor(distance: distance, isActive: isActive, reading: reading))
                     .multilineTextAlignment(.center)
             }
 
             if let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)
-                    .font(.system(size: translationFontSize(isActive: isActive, distance: distance), weight: .regular))
+                    .font(.system(size: translationFontSize(isActive: isActive, distance: distance, reading: reading), weight: .regular))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .foregroundColor(translationColor(distance: distance, isActive: isActive))
+                    .foregroundColor(translationColor(distance: distance, isActive: isActive, reading: reading))
                     .multilineTextAlignment(.center)
             }
         }
@@ -160,8 +172,9 @@ extension LyricsView {
         .padding(.horizontal, DesignTokens.space32)
         .padding(.vertical, karaoke.isKaraokeOn ? DesignTokens.space16 : (isActive ? DesignTokens.space24 : DesignTokens.space16))
         .id(index)
-        .scaleEffect(karaoke.isKaraokeOn ? 1.0 : (isActive ? 1.02 : (distance <= 1 ? 0.97 : 0.94)), anchor: .center)
-        .opacity(lineOpacity(distance: distance, isActive: isActive))
+        // 阅读态 scaleEffect 1.0（用户定）：关距离分级的同时不再缩放。
+        .scaleEffect(karaoke.isKaraokeOn || reading ? 1.0 : (isActive ? 1.02 : (distance <= 1 ? 0.97 : 0.94)), anchor: .center)
+        .opacity(lineOpacity(distance: distance, isActive: isActive, reading: reading))
         .animation(
             .interpolatingSpring(
                 mass: 0.5,
@@ -196,9 +209,12 @@ extension LyricsView {
         }
     }
 
-    private func translationFontSize(isActive: Bool, distance: Int) -> CGFloat {
+    private func translationFontSize(isActive: Bool, distance: Int, reading: Bool) -> CGFloat {
         if karaoke.isKaraokeOn {
             return isActive ? 16 : 14 // 跟唱：全部可见，当前句翻译略大
+        }
+        if reading {
+            return 14 // 阅读态：正常大小 = 高亮行下一行那档（14）
         }
         if isActive {
             return 16
@@ -209,9 +225,12 @@ extension LyricsView {
         }
     }
 
-    private func translationColor(distance: Int, isActive: Bool) -> Color {
+    private func translationColor(distance: Int, isActive: Bool, reading: Bool) -> Color {
         if karaoke.isKaraokeOn {
             return isActive ? accentColor.opacity(0.95) : .secondary.opacity(0.7)
+        }
+        if reading {
+            return .secondary // 阅读态：译文全亮，不再叠加 opacity（关灰度）
         }
         if isActive {
             return accentColor.opacity(0.95)
@@ -225,19 +244,24 @@ extension LyricsView {
     }
 
     /// 罗马音字号：复用译文那套阶梯（同一实现），整体小一档
-    private func romanFontSize(isActive: Bool, distance: Int) -> CGFloat {
-        max(11, translationFontSize(isActive: isActive, distance: distance) - 2)
+    private func romanFontSize(isActive: Bool, distance: Int, reading: Bool) -> CGFloat {
+        max(11, translationFontSize(isActive: isActive, distance: distance, reading: reading) - 2)
     }
 
-    /// 罗马音颜色：复用译文那套颜色，再淡一档
-    private func romanColor(distance: Int, isActive: Bool) -> Color {
-        translationColor(distance: distance, isActive: isActive).opacity(0.85)
+    /// 罗马音颜色：复用译文那套颜色，再淡一档（阅读态同样全亮，不再叠加 opacity）
+    private func romanColor(distance: Int, isActive: Bool, reading: Bool) -> Color {
+        if reading { return .secondary }
+        return translationColor(distance: distance, isActive: isActive, reading: false).opacity(0.85)
     }
 
-    private func fontForLine(isActive: Bool, distance: Int) -> Font {
+    private func fontForLine(isActive: Bool, distance: Int, reading: Bool) -> Font {
         if karaoke.isKaraokeOn {
             // 跟唱：整屏歌词等大可见（当前句略大加粗），不聚焦淡出
             return .system(size: isActive ? DesignTokens.font22 : DesignTokens.font19, weight: isActive ? .bold : .regular)
+        }
+        if reading {
+            // 阅读态：正常大小 = 高亮行下一行那档（主行 19），当前行加粗保留
+            return .system(size: DesignTokens.font19, weight: isActive ? .bold : .semibold)
         }
         if isActive {
             return .system(size: DesignTokens.font26, weight: .bold)
@@ -248,10 +272,14 @@ extension LyricsView {
         }
     }
 
-    private func lineColor(distance: Int, isActive: Bool) -> Color {
+    private func lineColor(distance: Int, isActive: Bool, reading: Bool) -> Color {
         if karaoke.isKaraokeOn {
             // 跟唱：当前句主题色，其余正常可见
             return isActive ? accentColor : .primary.opacity(0.8)
+        }
+        if reading {
+            // 阅读态：全亮、不分级（当前行 accent + 加粗高亮，其余 primary）
+            return isActive ? accentColor : .primary
         }
         if isActive {
             // 当前句用设置中的主题色
@@ -265,9 +293,12 @@ extension LyricsView {
         }
     }
 
-    private func lineOpacity(distance: Int, isActive: Bool) -> Double {
+    private func lineOpacity(distance: Int, isActive: Bool, reading: Bool) -> Double {
         if karaoke.isKaraokeOn {
             return isActive ? 1.0 : 0.8 // 跟唱：整屏可见，不强淡出
+        }
+        if reading {
+            return 1.0 // 阅读态：整行全亮（关灰度）
         }
         if isActive {
             return 1.0
@@ -317,11 +348,21 @@ extension LyricsView {
     private func updateActiveLineAndScroll(for lines: [LyricsLine], in proxy: ScrollViewProxy, force: Bool = false) {
         // AB 等选终点（b == nil）：关闭自动滚动，让用户手动滚动找 B 句（用户拍板 2026-08-29）
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
+        guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines) else { return }
+        // 「阅读态 → 回中」判据（唯一事实源：LyricsFollowPolicy）：停止手动滚动后到「下一句」才恢复
+        // 自动跟随（用户拍板 2026-10-12）。不在此自写布尔表达式（形状契约测试防第二实现）。
+        if LyricsFollowPolicy.shouldResumeFollow(
+            isKaraoke: karaoke.isKaraokeOn,
+            isFollowing: isFollowing,
+            isScrollActive: isScrollActive,
+            activeIndexChanged: activeIndex != lastScrolledIndex
+        ) {
+            isFollowing = true
+        }
         // 普通模式手动滚动后暂停跟随：不自动拉回（用户拍板 2026-10-12）。
         // force=true（「回到当前行」按钮）绕过该暂停，重新跟随并滚回当前行。
         if !karaoke.isKaraokeOn, !isFollowing, !force { return }
-        guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines),
-              force || activeIndex != lastScrolledIndex else { return }
+        guard force || activeIndex != lastScrolledIndex else { return }
         lastScrolledIndex = activeIndex
         withAnimation(
             .interpolatingSpring(
