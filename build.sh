@@ -2,8 +2,8 @@
 # QQPlayer 一键构建 / 安装（iOS + macOS）
 #
 # 用法:
-#   ./build.sh              编译 iOS（模拟器）+ macOS（不安装、不启动）
-#   ./build.sh ios          仅编译 iOS（模拟器）
+#   ./build.sh              编译 iOS（generic 模拟器，免签名）+ macOS（不安装、不启动）
+#   ./build.sh ios          仅编译 iOS（generic 模拟器，免签名）
 #   ./build.sh mac          仅编译 macOS
 #   ./build.sh install      构建 + 安装 iOS（真机）+ macOS（+ 启动）
 #   ./build.sh install ios  仅安装 iOS（真机签名构建 + devicectl 安装 + 启动，team B6FA37AYT5）
@@ -31,7 +31,7 @@ MAC_SCHEME="QQPlayerMac"       # macOS scheme
 APP_NAME="QQPlayer"            # iOS 可执行/产物名
 MAC_APP_NAME="QQPlayerMac"     # macOS 可执行/产物名
 MAC_INSTALL_DIR="${QQPLAYER_MAC_INSTALL_DIR:-/Applications}"
-SIM_DEST='platform=iOS Simulator,name=iPhone 17 Pro'
+SIM_DEST='generic/platform=iOS Simulator'   # generic 模拟器目标（免签名，不依赖任何模拟器实例）
 IOS_BUNDLE_ID="com.daxmate.qqplayer.ios"
 
 # 用法说明（参数校验失败时打到 stderr，退出码 2）
@@ -40,8 +40,8 @@ usage() {
 用法: ./build.sh [子命令] [对象]
 
 编译（不安装、不启动）:
-  ./build.sh              编译 iOS（模拟器）+ macOS
-  ./build.sh ios          仅编译 iOS（模拟器）
+  ./build.sh              编译 iOS（generic 模拟器，免签名）+ macOS
+  ./build.sh ios          仅编译 iOS（generic 模拟器，免签名）
   ./build.sh mac          仅编译 macOS
 
 构建 + 安装 + 启动:
@@ -73,11 +73,11 @@ device_hint() {
   echo "         ③ 同一 Wi-Fi 下也可用（无需数据线），但设备不能关机"
 }
 
-# iOS 编译：模拟器构建（免签名、不需要真机、不启动模拟器）
+# iOS 编译：generic 模拟器构建（免签名、不需要真机/模拟器实例、不启动模拟器）
 build_sim() {
-  echo "=== 模拟器构建 ==="
+  echo "=== 模拟器构建（generic 目标） ==="
   scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "${IOS_SCHEME}" \
-    -destination "${SIM_DEST}" || { echo "❌ 模拟器构建失败"; return 1; }
+    -destination "${SIM_DEST}" CODE_SIGNING_ALLOWED=NO || { echo "❌ 模拟器构建失败"; return 1; }
 }
 
 # iOS 安装：真机签名构建 + devicectl 安装 + 启动。可选传入已探测到的 UDID。
