@@ -110,6 +110,7 @@ struct Localized {
     // MARK: - Context Menu Actions
     static let showArtistPage = "show_artist_page".localized
     static let addToPlaylistEllipsis = "add_to_playlist_ellipsis".localized
+    static let removeFromPlaylist = "playlist_manage_remove_from_playlist".localized
     static let deleteFile = "delete_file".localized
 
     // MARK: - Settings

@@ -132,6 +132,15 @@ struct PlaylistTrackRowView: View {
                         Label(Localized.addToPlaylistEllipsis, systemImage: "rectangle.stack.badge.plus")
                     }
 
+                    if playlist != nil {
+                        Button(role: .destructive, action: {
+                            removeFromPlaylist()
+                        }) {
+                            Label(Localized.removeFromPlaylist, systemImage: "rectangle.stack.badge.minus")
+                        }
+                        .foregroundColor(.red)
+                    }
+
                     Button(action: {
                         showDeleteConfirmation = true
                     }) {
