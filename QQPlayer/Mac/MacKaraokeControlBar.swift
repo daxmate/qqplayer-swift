@@ -156,6 +156,8 @@ struct MacKaraokeControlBar: View {
         }
         .accessibilityLabel(String(format: NSLocalizedString("karaoke_speed_label", value: "Speed %.1f", comment: ""), karaoke.speed))
         .help(String(format: NSLocalizedString("karaoke_speed_label", value: "Speed %.1f", comment: ""), karaoke.speed) + " ([ / ])")
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
     }
 
     // MARK: - 单句循环
