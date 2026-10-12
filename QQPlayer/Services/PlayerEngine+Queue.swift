@@ -279,6 +279,19 @@ extension PlayerEngine {
         savePlayerState()
     }
 
+    /// 停止播放并清空整个播放队列（唯一入口，2026-10-12；删除队列中「仅剩的当前项」收尾用）。
+    /// 存在理由：当前播放项被 `QueueReorderMath.validRemovalIndices` 明确排除（保持旧语义），
+    /// 故队列只剩这一首时 `removeQueueItem(stableId:)` 是无操作，视图侧**没有第二入口**。
+    /// 清空复用唯一移除实现 `applyQueueRemoval`（传全部下标）；`normalizeIndexAndTrack` 已把
+    /// 空队列收敛为「索引 0 + 当前曲 nil」（纯函数 `PlaybackQueueSelection`，有单测）。
+    /// 先 `stop()` 收尾播放（结算播放历史 / 停 timer / 更新 Now Playing）。
+    #if os(iOS)
+        func stopAndClearQueue() {
+            stop()
+            applyQueueRemoval(Array(playbackQueue.indices))
+        }
+    #endif
+
     /// 跳到队列指定项播放（队列面板点行）。等价 iOS QueueManagementView.jumpToTrack。
     func jumpToQueueIndex(_ index: Int) async {
         guard index >= 0, index < playbackQueue.count else { return }
