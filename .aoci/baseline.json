@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-10-12T06:55:29Z",
+  "updated_at": "2026-10-12T11:37:55Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -131,9 +131,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "e0ac76e570ee2cd590a6d0f176e554a6647e84cf97646cb6fc59951b984e0d8a",
-      "size": 164533,
-      "normalized_sha256": "e0ac76e570ee2cd590a6d0f176e554a6647e84cf97646cb6fc59951b984e0d8a"
+      "sha256": "3d6102c3754468314024fd981847406a7badb7b64c3ee5dd125299d75d490a2a",
+      "size": 165061,
+      "normalized_sha256": "3d6102c3754468314024fd981847406a7badb7b64c3ee5dd125299d75d490a2a"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -644,9 +644,9 @@
     },
     "QQPlayer/Mac/MacLyricsView+Emphasis.swift": {
       "role": "index",
-      "sha256": "78454247aa94423594d4d9a1386fa47040fae0a7eedf4d4594c52563e057f0d4",
-      "size": 8245,
-      "normalized_sha256": "78454247aa94423594d4d9a1386fa47040fae0a7eedf4d4594c52563e057f0d4"
+      "sha256": "23e3893197f7058c09804bee05d4510ebc6a360ec12fbb780953811aa7c46f1b",
+      "size": 9463,
+      "normalized_sha256": "23e3893197f7058c09804bee05d4510ebc6a360ec12fbb780953811aa7c46f1b"
     },
     "QQPlayer/Mac/MacLyricsView+EmptyStates.swift": {
       "role": "index",
@@ -656,15 +656,15 @@
     },
     "QQPlayer/Mac/MacLyricsView+SyncedLyrics.swift": {
       "role": "index",
-      "sha256": "30a535ffbcdb139afbf6e413d5a2440b80799ee039993156b81a68cb0a98ae79",
-      "size": 13518,
-      "normalized_sha256": "30a535ffbcdb139afbf6e413d5a2440b80799ee039993156b81a68cb0a98ae79"
+      "sha256": "7f825164cf416d6a1c66555175c00850d6de32bfd3df475cfc0e91c6ecc661e9",
+      "size": 16715,
+      "normalized_sha256": "7f825164cf416d6a1c66555175c00850d6de32bfd3df475cfc0e91c6ecc661e9"
     },
     "QQPlayer/Mac/MacLyricsView.swift": {
       "role": "index",
-      "sha256": "50b70267670a9018c46789b2dba3028556f645f5e0af028c50409861a075e9d1",
-      "size": 10965,
-      "normalized_sha256": "50b70267670a9018c46789b2dba3028556f645f5e0af028c50409861a075e9d1"
+      "sha256": "1035de3bc2546d045cee4ac00b962be9f8bf58d22542a8659c98554416d3aa34",
+      "size": 11683,
+      "normalized_sha256": "1035de3bc2546d045cee4ac00b962be9f8bf58d22542a8659c98554416d3aa34"
     },
     "QQPlayer/Mac/MacManualEQEditorView.swift": {
       "role": "index",
@@ -2810,21 +2810,21 @@
     },
     "QQPlayer/Views/Player/LyricsView+LyricsContent.swift": {
       "role": "index",
-      "sha256": "af820fbf115133baeced2d535410d6aa51543e5276b6bf0ab0451e1464e68a32",
-      "size": 16346,
-      "normalized_sha256": "af820fbf115133baeced2d535410d6aa51543e5276b6bf0ab0451e1464e68a32"
+      "sha256": "cb686c9c35a7d5d8993b366b3046ea2baaf467052c4bf6753b68584c73c8c8df",
+      "size": 19178,
+      "normalized_sha256": "cb686c9c35a7d5d8993b366b3046ea2baaf467052c4bf6753b68584c73c8c8df"
     },
     "QQPlayer/Views/Player/LyricsView.swift": {
       "role": "index",
-      "sha256": "3085e58b56989a7dba69187b448cdd6b81675da8d2c79195426b4890a821cec6",
-      "size": 7194,
-      "normalized_sha256": "3085e58b56989a7dba69187b448cdd6b81675da8d2c79195426b4890a821cec6"
+      "sha256": "5cdce6b70fa5858e1b93baa648efe1d9b8929d25297622fbb2469d61c8aa89b4",
+      "size": 7614,
+      "normalized_sha256": "5cdce6b70fa5858e1b93baa648efe1d9b8929d25297622fbb2469d61c8aa89b4"
     },
     "QQPlayer/Views/Player/PlayerGestureLogic.swift": {
       "role": "index",
-      "sha256": "15371a2ae0dbcf16169fb4fd5953722b49afa29e59cee944d834f6998b8db5c1",
-      "size": 6477,
-      "normalized_sha256": "15371a2ae0dbcf16169fb4fd5953722b49afa29e59cee944d834f6998b8db5c1"
+      "sha256": "7e90eb34c35edabcf3b42910de218a53472529e2d9f178ea1b46e0d7f9ce66e9",
+      "size": 7849,
+      "normalized_sha256": "7e90eb34c35edabcf3b42910de218a53472529e2d9f178ea1b46e0d7f9ce66e9"
     },
     "QQPlayer/Views/Player/PlayerOverlays.swift": {
       "role": "index",
@@ -3521,6 +3521,12 @@
       "sha256": "2a4205efc14096857984bd4e52a79f93ff1e5a92a4f1b013c759364df8763f5d",
       "size": 3318,
       "normalized_sha256": "2a4205efc14096857984bd4e52a79f93ff1e5a92a4f1b013c759364df8763f5d"
+    },
+    "QQPlayerTests/LyricsFollowPolicyTests.swift": {
+      "role": "index",
+      "sha256": "0e87cc148e153f810c604f7e714f9cd449d3d79f0a1068c16221331f0be1834d",
+      "size": 9235,
+      "normalized_sha256": "0e87cc148e153f810c604f7e714f9cd449d3d79f0a1068c16221331f0be1834d"
     },
     "QQPlayerTests/LyricsLRCLibFallbackTests.swift": {
       "role": "index",
@@ -4334,9 +4340,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "48fc9f8dff5688feecbe9570b1ff838f01d7a6298b8f7d7a92c94b8d3722b67b",
-      "size": 314251,
-      "normalized_sha256": "48fc9f8dff5688feecbe9570b1ff838f01d7a6298b8f7d7a92c94b8d3722b67b"
+      "sha256": "2efcdd921574d8674c68b05c98cb172cad9b07ee4634b3dfcebda5475689882d",
+      "size": 315346,
+      "normalized_sha256": "2efcdd921574d8674c68b05c98cb172cad9b07ee4634b3dfcebda5475689882d"
     },
     "aoci.meta.txt": {
       "role": "index",
