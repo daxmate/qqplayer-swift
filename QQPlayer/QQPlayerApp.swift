@@ -149,8 +149,12 @@ struct QQPlayerApp: App {
                 // 曲目行滑动操作反馈中心（2026-10-12）：轻震 + 顶部提示条的唯一入口。
                 // 顶部提示条的**唯一呈现点**在根挂一次（actionFeedbackToast()），
                 // 三处滑动消费点只调 didPlayNext() / didAddToQueue()。
-                .environment(ActionFeedbackCenter.shared)
+                // ⚠️ 顺序不变量：actionFeedbackToast() 的修饰器消费 @Environment(ActionFeedbackCenter.self)，
+                // 必须排在该 .environment **之内**（链条更早）—— SwiftUI 里外层 modifier 读不到内层 .environment
+                // （.environment(X) 只对更早 apply 的内层视图生效），排到外面会在 App 启动时致命错
+                // （No Observable object of type ActionFeedbackCenter found）。勿再调回（2026-10-12 CI 启动崩溃根因）。
                 .actionFeedbackToast()
+                .environment(ActionFeedbackCenter.shared)
                 .task {
                     DatabaseSuspensionCoordinator.shared.start()
                     await appCoordinator.initialize()

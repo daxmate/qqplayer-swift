@@ -40,6 +40,27 @@ private enum EnvironmentInjectionContract {
         ("macOS", "QQPlayer/QQPlayerMacApp.swift"),
     ]
 
+    /// 根级 overlay modifier 顺序契约（2026-10-12 启动崩溃后立）：
+    /// 消费 @Environment(T.self) 的根级自定义 modifier，其调用必须排在该平台组合根提供的
+    /// .environment(T…) **之内**（链条更早）——SwiftUI 里 .environment(X) 只对更早 apply 的
+    /// 内层视图生效，外层 modifier 的 @Environment 读不到 X ⇒ 运行时会致命错。
+    /// 新增一条这类根 overlay modifier 时，请在此登记一行。
+    struct RootOverlayOrderRequirement {
+        let platform: String
+        let rootPath: String
+        let modifierCall: String    // 例如 .actionFeedbackToast()
+        let environmentType: String // 例如 ActionFeedbackCenter（该根须有对应 .environment 装配）
+    }
+
+    static let rootOverlayOrderRequirements: [RootOverlayOrderRequirement] = [
+        .init(
+            platform: "iOS",
+            rootPath: "QQPlayer/QQPlayerApp.swift",
+            modifierCall: ".actionFeedbackToast()",
+            environmentType: "ActionFeedbackCenter"
+        ),
+    ]
+
     enum ContractError: Error, CustomStringConvertible {
         case directoryUnreadable(String)
         case rootUnreadable(String)
@@ -95,6 +116,51 @@ private enum EnvironmentInjectionContract {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return false }
         let range = NSRange(code.startIndex ..< code.endIndex, in: code)
         return regex.firstMatch(in: code, range: range) != nil
+    }
+
+    /// （剥注释后）首个满足条件的代码行行号（逐行按 // 剥离并 trim；找不到返回 nil）。
+    static func firstCodeLineIndex(in source: String, where matches: (String) -> Bool) -> Int? {
+        for (index, rawLine) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let code = stripped(String(rawLine)).trimmingCharacters(in: .whitespaces)
+            if matches(code) { return index }
+        }
+        return nil
+    }
+
+    /// 纯函数：modifierCall 是否排在其 .environment(environmentType…) **之内**（链条更早）。
+    /// 返回 nil = 合规；否则返回违例说明（fail-closed：找不到 modifier 调用也算违例）。
+    /// 装配本身缺失的情形由契约 (a) 覆盖，此处只在装配存在时校验顺序。
+    static func overlayOrderViolation(
+        source: String,
+        modifierCall: String,
+        environmentType: String
+    ) -> String? {
+        guard let modifierIndex = firstCodeLineIndex(in: source, where: { $0 == modifierCall }) else {
+            return "找不到 " + modifierCall + " 调用（fail-closed：判据入口失效）"
+        }
+        let environmentPrefix = ".environment(" + environmentType
+        guard let environmentIndex = firstCodeLineIndex(
+            in: source, where: { $0.hasPrefix(environmentPrefix) }
+        ) else {
+            return nil
+        }
+        guard modifierIndex < environmentIndex else {
+            return modifierCall + " 必须排在 .environment(" + environmentType + "…) 之内（链条更早），"
+                + "否则外层 modifier 读不到该环境，运行时报 No Observable object of type "
+                + environmentType + " found"
+        }
+        return nil
+    }
+
+    /// 单个根的顺序契约判定（读真实根文件；装配缺失交由契约 (a)）。
+    static func rootOverlayOrderViolation(_ requirement: RootOverlayOrderRequirement) throws -> String? {
+        let source = try rootSource(requirement.rootPath)
+        guard let reason = overlayOrderViolation(
+            source: source,
+            modifierCall: requirement.modifierCall,
+            environmentType: requirement.environmentType
+        ) else { return nil }
+        return requirement.platform + "：" + requirement.rootPath + " —— " + reason
     }
 
     static func swiftFiles() throws -> [URL] {
@@ -397,6 +463,44 @@ struct EnvironmentInjectionContractTests {
                 in: "// 漏了这一行的后果：视图 `@Environment(AppServices.self)` 会运行时致命错"
             ) == false
         )
+    }
+
+    @Test("(c) 根级 overlay modifier 必须排在其 .environment(T…) 之内（顺序契约，fail-closed）")
+    func rootOverlayModifiersAreInsideTheirEnvironment() throws {
+        var violations: [String] = []
+        for requirement in EnvironmentInjectionContract.rootOverlayOrderRequirements {
+            if let violation = try EnvironmentInjectionContract.rootOverlayOrderViolation(requirement) {
+                violations.append(violation)
+            }
+        }
+        #expect(
+            violations.isEmpty,
+            """
+            根级 modifier 环境顺序违例（消费 @Environment(T.self) 的 modifier 排到了它的 .environment 之外 → 启动会致命错）：
+            \(violations.joined(separator: "\n"))
+            """
+        )
+    }
+
+    @Test("(d) 顺序判据自证：内层(早)通过 / 外层(晚)必报 / 注释不算 / fail-closed（反向验证）")
+    func rootOverlayOrderScannerSelfTest() {
+        let environmentLine = ".environment(ActionFeedbackCenter.shared)"
+        let toastLine = ".actionFeedbackToast()"
+        func violation(_ source: String) -> String? {
+            EnvironmentInjectionContract.overlayOrderViolation(
+                source: source,
+                modifierCall: toastLine,
+                environmentType: "ActionFeedbackCenter"
+            )
+        }
+        // 正确：modifier 在环境注入之前（内层，链条更早）→ 合规
+        #expect(violation("ContentView()\n" + toastLine + "\n" + environmentLine + "\n") == nil)
+        // 错误：modifier 在环境注入之后（外层）→ 必须报（本次启动崩溃的形状）
+        #expect(violation("ContentView()\n" + environmentLine + "\n" + toastLine + "\n") != nil)
+        // 注释里提到的调用不算真实调用 → fail-closed 报「找不到」
+        #expect(violation("ContentView()\n// " + toastLine + "\n" + environmentLine + "\n") != nil)
+        // 装配整行缺失 → 顺序契约不管（由契约 (a) 负责）
+        #expect(violation("ContentView()\n" + toastLine + "\n") == nil)
     }
 }
 
