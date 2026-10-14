@@ -40,37 +40,40 @@ struct ScrapeLogicTests {
         )
     }
 
-    // MARK: - mergedCandidates
+    // MARK: - mergedCandidates（枚举键版）
 
-    @Test("mergedCandidates：按 source_order 保序合并两源候选")
+    @Test("mergedCandidates：按 sourceOrder 保序合并三源候选（含 itunes）")
     func mergedCandidatesKeepsSourceOrder() {
-        let netease = [
-            Self.candidate(source: "netease", id: "n1"),
-            Self.candidate(source: "netease", id: "n2"),
+        let sources: [ScrapeSource: [ScrapeCandidate]] = [
+            .netease: [
+                Self.candidate(source: "netease", id: "n1"),
+                Self.candidate(source: "netease", id: "n2"),
+            ],
+            .itunes: [Self.candidate(source: "itunes", id: "i1")],
+            .musicbrainz: [Self.candidate(source: "musicbrainz", id: "m1")],
         ]
-        let musicbrainz = [Self.candidate(source: "musicbrainz", id: "m1")]
 
         let merged = ScrapeLogic.mergedCandidates(
-            netease: netease,
-            musicbrainz: musicbrainz,
-            sourceOrder: ["netease", "musicbrainz"]
+            sources: sources,
+            sourceOrder: [.netease, .itunes, .musicbrainz]
         )
 
-        #expect(merged.map { $0.id } == ["n1", "n2", "m1"])
+        #expect(merged.map { $0.id } == ["n1", "n2", "i1", "m1"])
     }
 
-    @Test("mergedCandidates：source_order 倒序时结果倒序；候选对象原样透传")
+    @Test("mergedCandidates：sourceOrder 倒序时结果倒序；候选对象原样透传")
     func mergedCandidatesRespectsCustomOrder() {
-        let netease = [Self.candidate(source: "netease", id: "n1")]
-        let musicbrainz = [
-            Self.candidate(source: "musicbrainz", id: "m1", artist: "MB Artist", year: 2001),
-            Self.candidate(source: "musicbrainz", id: "m2", genre: "rock"),
+        let sources: [ScrapeSource: [ScrapeCandidate]] = [
+            .netease: [Self.candidate(source: "netease", id: "n1")],
+            .musicbrainz: [
+                Self.candidate(source: "musicbrainz", id: "m1", artist: "MB Artist", year: 2001),
+                Self.candidate(source: "musicbrainz", id: "m2", genre: "rock"),
+            ],
         ]
 
         let merged = ScrapeLogic.mergedCandidates(
-            netease: netease,
-            musicbrainz: musicbrainz,
-            sourceOrder: ["musicbrainz", "netease"]
+            sources: sources,
+            sourceOrder: [.musicbrainz, .netease]
         )
 
         #expect(merged.map { $0.id } == ["m1", "m2", "n1"])
@@ -79,29 +82,46 @@ struct ScrapeLogicTests {
         #expect(merged[1].genre == "rock")
     }
 
-    @Test("mergedCandidates：空源跳过；未知源忽略")
-    func mergedCandidatesSkipsEmptyAndUnknownSources() {
-        let musicbrainz = [Self.candidate(source: "musicbrainz", id: "m1")]
+    @Test("mergedCandidates：空源/缺失键跳过（该源候选为空）")
+    func mergedCandidatesSkipsEmptySources() {
+        let sources: [ScrapeSource: [ScrapeCandidate]] = [
+            .musicbrainz: [Self.candidate(source: "musicbrainz", id: "m1")],
+        ]
 
-        // netease 空 → 跳过；source_order 带未知源 "qqmusic" → 忽略
+        // netease / itunes 未出现 → 跳过
         let merged = ScrapeLogic.mergedCandidates(
-            netease: [],
-            musicbrainz: musicbrainz,
-            sourceOrder: ["netease", "qqmusic", "musicbrainz"]
+            sources: sources,
+            sourceOrder: [.netease, .itunes, .musicbrainz]
         )
 
         #expect(merged.map { $0.id } == ["m1"])
         #expect(merged.map { $0.source } == ["musicbrainz"])
     }
 
-    @Test("mergedCandidates：两源皆空 → 空数组")
+    @Test("mergedCandidates：全部源缺失/空 → 空数组")
     func mergedCandidatesAllEmpty() {
         let merged = ScrapeLogic.mergedCandidates(
-            netease: [],
-            musicbrainz: [],
-            sourceOrder: ["netease", "musicbrainz"]
+            sources: [:],
+            sourceOrder: [.netease, .itunes, .musicbrainz]
         )
         #expect(merged.isEmpty)
+    }
+
+    // MARK: - ScrapeSource 注册表（唯一事实源）
+
+    @Test("ScrapeSource：defaultOrder 含全部 case 且顺序 netease → itunes → musicbrainz")
+    func scrapeSourceDefaultOrderCoversAllCases() {
+        #expect(ScrapeSource.defaultOrder == [.netease, .itunes, .musicbrainz])
+        #expect(Set(ScrapeSource.defaultOrder) == Set(ScrapeSource.allCases))
+        // 本地化键派生自 rawValue
+        #expect(ScrapeSource.itunes.localizationKey == "source_itunes")
+    }
+
+    @Test("ScrapeSource.resolvedOrder：过滤未知源 + 补齐缺失源（旧值无 itunes → 追加末尾）")
+    func scrapeSourceResolvedOrderCompletesAndFilters() {
+        #expect(ScrapeSource.resolvedOrder(from: ["netease", "musicbrainz"]) == [.netease, .musicbrainz, .itunes])
+        #expect(ScrapeSource.resolvedOrder(from: ["musicbrainz", "qqmusic", "netease"]) == [.musicbrainz, .netease, .itunes])
+        #expect(ScrapeSource.resolvedOrder(from: []) == [.netease, .itunes, .musicbrainz])
     }
 
     // MARK: - isHighConfidence

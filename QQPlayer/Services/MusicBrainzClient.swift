@@ -31,7 +31,7 @@ import Foundation
 
 /// MB/iTunes 刮削候选（宽松视图，字段缺省回落）
 struct ScrapeCandidate: Sendable {
-    var source: String          // "netease" | "musicbrainz"
+    var source: String          // ScrapeSource.rawValue（netease | itunes | musicbrainz）
     var id: String?             // 网易云歌曲 id / MB recording id（mbid）
     var title: String?
     var artist: String?
@@ -144,7 +144,7 @@ struct MusicBrainzClient {
             }
             let credit = (recording["artist-credit"] as? [Any]) ?? []
             results.append(ScrapeCandidate(
-                source: "musicbrainz",
+                source: ScrapeSource.musicbrainz.rawValue,
                 id: mbid,
                 title: titleValue,
                 artist: Self.joinArtistCredit(credit),

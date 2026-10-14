@@ -4,7 +4,8 @@
 //
 //  DeleteSettings 刮削三字段（E1-S4）decode 兜底防回归：
 //  - 旧数据（JSON 缺新 key）→ 默认值：scrapingRenameTemplate = "{artist} - {title}"、
-//    scrapingSourceOrder = [netease, musicbrainz]、scrapingBatchEnabled = false
+//    scrapingSourceOrder = ScrapeSource.defaultOrder = [netease, itunes, musicbrainz]、
+//    scrapingBatchEnabled = false
 //  - 显式值 round-trip（encode → decode 不丢）
 //
 
@@ -22,7 +23,8 @@ struct DeleteSettingsScrapingTests {
     func emptyJSONAppliesDefaults() throws {
         let settings = try decoder.decode(DeleteSettings.self, from: Data("{}".utf8))
         #expect(settings.scrapingRenameTemplate == TagWriterService.defaultRenameTemplate)
-        #expect(settings.scrapingSourceOrder == ["netease", "musicbrainz"])
+        #expect(settings.scrapingSourceOrder == ScrapeSource.defaultOrder.map(\.rawValue))
+        #expect(settings.scrapingSourceOrder == ["netease", "itunes", "musicbrainz"])
         #expect(settings.scrapingBatchEnabled == false)
     }
 
@@ -48,7 +50,7 @@ struct DeleteSettingsScrapingTests {
         """
         let settings = try decoder.decode(DeleteSettings.self, from: Data(json.utf8))
         #expect(settings.scrapingRenameTemplate == "{album}/{artist} - {title}")
-        #expect(settings.scrapingSourceOrder == ["netease", "musicbrainz"])
+        #expect(settings.scrapingSourceOrder == ScrapeSource.defaultOrder.map(\.rawValue))
         #expect(settings.scrapingBatchEnabled == false)
     }
 }

@@ -210,7 +210,8 @@ enum ScrapeBatchService {
         let targetFiles = Array(files.prefix(ScrapeLogic.batchLimit))
 
         let settings = DeleteSettings.load()
-        let sourceOrder = settings.scrapingSourceOrder
+        // 源顺序取自设置，并补齐缺失的源（旧设置无 itunes → 追加到末尾，保证新源参与合并）
+        let sourceOrder = ScrapeSource.resolvedOrder(from: settings.scrapingSourceOrder)
 
         var results: [ScrapeBatchResult] = []
         for (index, path) in targetFiles.enumerated() {
@@ -236,22 +237,86 @@ enum ScrapeBatchService {
         return (results, truncated)
     }
 
-    // MARK: - 双源刮削（runBatch 与 MacTagEditorView 共享的唯一入口）
+    // MARK: - 刮削源取数（runBatch 与 MacTagEditorView 共享的唯一入口）
 
-    /// 双源刮削候选（web tag_scraper.scrape 语义：netease + musicbrainz 两源独立）。
+    /// 单源取候选函数（生产实现见 liveSearch；测试注入 fake 用于形状断言）。
+    typealias ScrapeSourceSearch = @Sendable (ScrapeSource, String, String) async -> [ScrapeCandidate]
+
+    /// 三源刮削候选（web tag_scraper.scrape 语义：各源独立）。
     /// 单源失败返回空数组，绝不 throw（web「任何外部源挂掉都不影响其他源」）。
+    /// 返回 [源: 候选]；源集合恒为 ScrapeSource.allCases（防漏源）。
     /// MacTagEditorView 自动刮削与 runBatch 单文件处理共用本入口（行为单一事实源）。
     static func scrapeSources(
         query: String,
         artist: String
-    ) async -> (netease: [ScrapeCandidate], musicbrainz: [ScrapeCandidate]) {
-        async let neteaseTask = scrapeNetease(query: query)
-        async let mbTask = scrapeMusicBrainz(query: query, artist: artist)
-        return await (neteaseTask, mbTask)
+    ) async -> [ScrapeSource: [ScrapeCandidate]] {
+        await scrapeSources(query: query, artist: artist, search: liveSearch)
     }
 
-    /// 网易云搜索 → ScrapeCandidate（source="netease"；id/title/artist/album/coverURL/
-    /// durationMs 直填；year/genre/track/albumArtist 缺省 nil——cloudsearch 不返回）
+    /// 测试 seam：注入检索实现（生产调用点不传，走 liveSearch）。
+    static func scrapeSources(
+        query: String,
+        artist: String,
+        search: @escaping ScrapeSourceSearch
+    ) async -> [ScrapeSource: [ScrapeCandidate]] {
+        await withTaskGroup(of: (ScrapeSource, [ScrapeCandidate]).self) { group in
+            for source in ScrapeSource.allCases {
+                group.addTask { (source, await search(source, query, artist)) }
+            }
+            var result: [ScrapeSource: [ScrapeCandidate]] = [:]
+            for await (source, candidates) in group {
+                result[source] = candidates
+            }
+            return result
+        }
+    }
+
+    /// 每源完成回调（**在 MainActor 上调用**；@MainActor @Sendable 便于跨并发域传递）。
+    typealias ScrapeSourceCallback = @MainActor @Sendable (ScrapeSource, [ScrapeCandidate]) -> Void
+
+    /// 三源流式刮削：各源并发跑，**每源完成即按完成顺序回调一次**（不攒到最后）。
+    /// 回调切到 MainActor。批量（runBatch）不用——批量仍等全部源合并后判定高置信度。
+    static func scrapeSourcesStreaming(
+        query: String,
+        artist: String,
+        onSource: @escaping ScrapeSourceCallback
+    ) async {
+        await scrapeSourcesStreaming(query: query, artist: artist, search: liveSearch, onSource: onSource)
+    }
+
+    /// 测试 seam 版本（注入检索实现）。
+    static func scrapeSourcesStreaming(
+        query: String,
+        artist: String,
+        search: @escaping ScrapeSourceSearch,
+        onSource: @escaping ScrapeSourceCallback
+    ) async {
+        await withTaskGroup(of: (ScrapeSource, [ScrapeCandidate]).self) { group in
+            for source in ScrapeSource.allCases {
+                group.addTask { (source, await search(source, query, artist)) }
+            }
+            for await (source, candidates) in group {
+                // onSource 为 @MainActor 闭包 → await 即 hop 到 MainActor
+                await onSource(source, candidates)
+            }
+        }
+    }
+
+    /// 单源取候选的生产实现（唯一分发点）。@Sendable 闭包常量（直接作 seam 值，
+    /// 避免把非 Sendable 的函数值转成 @Sendable 闭包的告警）。
+    static let liveSearch: ScrapeSourceSearch = { source, query, artist in
+        switch source {
+        case .netease:
+            return await scrapeNetease(query: query)
+        case .itunes:
+            return await ITunesScrapeClient().candidates(query: query)
+        case .musicbrainz:
+            return await scrapeMusicBrainz(query: query, artist: artist)
+        }
+    }
+
+    /// 网易云搜索 → ScrapeCandidate（source=ScrapeSource.netease；id/title/artist/album/
+    /// coverURL/durationMs 直填；year/genre/track/albumArtist 缺省 nil——cloudsearch 不返回）
     private static func scrapeNetease(query: String) async -> [ScrapeCandidate] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let songs: [NeteaseOnlineSong]
@@ -262,7 +327,7 @@ enum ScrapeBatchService {
         }
         return songs.map { song in
             ScrapeCandidate(
-                source: "netease",
+                source: ScrapeSource.netease.rawValue,
                 id: String(song.id),
                 title: song.title,
                 artist: song.artist,
@@ -295,7 +360,7 @@ enum ScrapeBatchService {
     private static func processFile(
         path: String,
         libraryMode: Bool,
-        sourceOrder: [String]
+        sourceOrder: [ScrapeSource]
     ) async -> ScrapeBatchResult {
         let url = URL(fileURLWithPath: path)
         let fileName = url.lastPathComponent
@@ -323,14 +388,11 @@ enum ScrapeBatchService {
         }
         let query = ScrapeLogic.searchQuery(title: fileTitle, fileName: fileName)
 
-        // 双源搜索（单源失败返回空，绝不 throw；MB 内部含取消都吞 → 外层检查点兜底）
+        // 三源搜索（单源失败返回空，绝不 throw；MB 内部含取消都吞 → 外层检查点兜底）
         let sources = await scrapeSources(query: query, artist: fileArtist ?? "")
-        let neteaseCandidates = sources.netease
-        let musicbrainzCandidates = sources.musicbrainz
 
         let candidates = ScrapeLogic.mergedCandidates(
-            netease: neteaseCandidates,
-            musicbrainz: musicbrainzCandidates,
+            sources: sources,
             sourceOrder: sourceOrder
         )
 

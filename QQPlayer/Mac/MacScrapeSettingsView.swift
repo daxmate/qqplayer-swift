@@ -186,12 +186,9 @@ struct MacScrapeSettingsView: View {
         )
     }
 
+    /// 源展示名（唯一注册表派生；未知名回退原字符串）
     private func sourceDisplayName(_ source: String) -> String {
-        switch source {
-        case "netease": return "source_netease".localized
-        case "musicbrainz": return "source_musicbrainz".localized
-        default: return source
-        }
+        ScrapeSource(rawValue: source)?.localizationKey.localized ?? source
     }
 
     private func moveButton(source: String, index: Int, offset: Int, systemImage: String) -> some View {

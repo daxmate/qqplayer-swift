@@ -712,6 +712,7 @@
 "batch_mode_paths" = "Скрапит выбранные треки (только с высокой уверенностью)";
 "batch_cancel_help" = "Остановить пакет; обработанные треки сохраняются";
 "source_netease" = "NetEase";
+"source_itunes" = "Apple Music";
 "source_gequhai" = "SongSea";
 "source_musicbrainz" = "MusicBrainz";
 "tag_editor_title" = "Изменить теги / Скрапинг";

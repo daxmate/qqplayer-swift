@@ -83,7 +83,7 @@ struct MacTagEditorCandidateRow: View {
     /// 来源 badge（MB 候选带 genre/track/album_artist 尽力值时，title 前缀不加——
     /// 尽力值已在 subtitle 的 genre 段体现；badge 只标来源）
     private var sourceBadge: some View {
-        Text(candidate.source == "netease" ? "source_netease".localized : "source_musicbrainz".localized)
+        Text(ScrapeSource(rawValue: candidate.source)?.localizationKey.localized ?? candidate.source)
             .font(.system(size: DesignTokens.font9))
             .foregroundColor(.secondary)
             .padding(.horizontal, DesignTokens.space4)

@@ -9,7 +9,7 @@
 //  - scrape 请求构造：query = 文件 title，title 空 → 文件名 stem（不含扩展名）；
 //    artist 单独传（只用于排序加分，不作硬条件）
 //  - 候选合并（web _merge_candidates）：按 source_order 顺序合并各源候选
-//    （source_order 如 ["netease", "musicbrainz"]），空源跳过
+//    （sourceOrder 为 [ScrapeSource]，如 [.netease, .itunes]），空源跳过
 //  - 高置信度判定（web _is_high_confidence，批量 paths 模式自动写入用）：
 //    候选数 == 1 → true；文件 artist 为空 → true（取首候选）；否则
 //    首候选 artist 与文件 artist 归一化匹配（MusicBrainzClient.artistMatches）→ true
@@ -29,17 +29,13 @@ enum ScrapeLogic {
     /// paths 模式批量可写字段（web BATCH_WRITABLE_FIELDS）
     static let batchWritableFields: Set<String> = ["title", "artist", "album", "year", "genre"]
 
-    /// 候选合并：按 source_order 保序合并各源候选（web _merge_candidates）。
-    /// source_order 里出现的源按序取该源全部候选；空源/未知源跳过。
+    /// 候选合并：按 sourceOrder 保序合并各源候选（web _merge_candidates）。
+    /// sourceOrder 里出现的源按序取该源全部候选；空源跳过。
+    /// 源枚举见 ScrapeSource（唯一注册表）；本函数不再持有任何源字符串列表。
     static func mergedCandidates(
-        netease: [ScrapeCandidate],
-        musicbrainz: [ScrapeCandidate],
-        sourceOrder: [String]
+        sources: [ScrapeSource: [ScrapeCandidate]],
+        sourceOrder: [ScrapeSource]
     ) -> [ScrapeCandidate] {
-        let sources: [String: [ScrapeCandidate]] = [
-            "netease": netease,
-            "musicbrainz": musicbrainz,
-        ]
         var merged: [ScrapeCandidate] = []
         for source in sourceOrder {
             merged.append(contentsOf: sources[source] ?? [])

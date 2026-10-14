@@ -77,8 +77,21 @@ extension MacTagEditorView {
     @ViewBuilder
     /// 分片：跨文件可见（原 private）
     var candidatesSection: some View {
-        if scrapeState != .idle && scrapeState != .searching {
-            if neteaseCandidates.isEmpty && musicbrainzCandidates.isEmpty {
+        if scrapeState != .idle {
+            if hasAnyCandidates {
+                // 流式：每源到达即更新对应候选组；已到达的组先显示（不攒到最后）
+                VStack(alignment: .leading, spacing: DesignTokens.space10) {
+                    ForEach(orderedSources, id: \.self) { source in
+                        candidateGroup(
+                            title: source.localizationKey.localized,
+                            icon: source.iconName,
+                            candidates: candidates(for: source),
+                            source: source
+                        )
+                    }
+                }
+            } else if scrapeState != .searching {
+                // 全部源都无候选（检索中先不显示「无候选」）
                 VStack(spacing: DesignTokens.space6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: DesignTokens.font22))
@@ -89,43 +102,35 @@ extension MacTagEditorView {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DesignTokens.space16)
-            } else {
-                VStack(alignment: .leading, spacing: DesignTokens.space10) {
-                    ForEach(orderedSources, id: \.self) { source in
-                        switch source {
-                        case "musicbrainz":
-                            candidateGroup(
-                                title: "source_musicbrainz".localized,
-                                icon: "brain.head.profile",
-                                candidates: musicbrainzCandidates,
-                                source: "musicbrainz"
-                            )
-                        default: // "netease"
-                            candidateGroup(
-                                title: "source_netease".localized,
-                                icon: "cloud",
-                                candidates: neteaseCandidates,
-                                source: "netease"
-                            )
-                        }
-                    }
-                }
             }
         }
     }
 
-    /// 源展示顺序 = 设置 scrapingSourceOrder（默认 netease 优先）；设置含未知源时过滤
-    private var orderedSources: [String] {
-        let known: Set<String> = ["netease", "musicbrainz"]
-        let order = DeleteSettings.load().scrapingSourceOrder
-        return order.filter { known.contains($0) }
+    /// 三组候选是否全空
+    private var hasAnyCandidates: Bool {
+        !(neteaseCandidates.isEmpty && itunesCandidates.isEmpty && musicbrainzCandidates.isEmpty)
+    }
+
+    /// 按源取对应候选组
+    private func candidates(for source: ScrapeSource) -> [ScrapeCandidate] {
+        switch source {
+        case .netease: return neteaseCandidates
+        case .itunes: return itunesCandidates
+        case .musicbrainz: return musicbrainzCandidates
+        }
+    }
+
+    /// 源展示顺序 = 设置 scrapingSourceOrder（补齐缺失的源，保证新源可见）；未知源过滤。
+    /// 已知集合与默认顺序均派生自 ScrapeSource（唯一注册表）。
+    private var orderedSources: [ScrapeSource] {
+        ScrapeSource.resolvedOrder(from: DeleteSettings.load().scrapingSourceOrder)
     }
 
     private func candidateGroup(
         title: String,
         icon: String,
         candidates: [ScrapeCandidate],
-        source: String
+        source: ScrapeSource
     ) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.space6) {
             HStack(spacing: DesignTokens.space4) {
@@ -164,21 +169,35 @@ extension MacTagEditorView {
             title: initialMetadata?.title,
             fileName: track.path
         )
+        // 会话守卫：每次刮削开一条新会话，晚到的源结果按 id 丢弃（防重搜回灌/晚到覆盖）
+        let sessionID = UUID()
+        scrapeSessionID = sessionID
         scrapeQuery = query
         scrapeState = .searching
         neteaseCandidates = []
+        itunesCandidates = []
         musicbrainzCandidates = []
         let artist = initialMetadata?.artist ?? ""
-        let sources = await ScrapeBatchService.scrapeSources(query: query, artist: artist)
-        guard !Task.isCancelled else { return }
-        neteaseCandidates = sources.netease
-        musicbrainzCandidates = sources.musicbrainz
+        // 流式：每源完成即回调一次（回调已切 MainActor），到达即更新对应候选组
+        await ScrapeBatchService.scrapeSourcesStreaming(query: query, artist: artist) { source, candidates in
+            // 会话守卫：只接受当前会话的结果，晚到的旧结果丢弃（防重搜回灌/晚到覆盖）
+            guard sessionID == scrapeSessionID else { return }
+            switch source {
+            case .netease:
+                neteaseCandidates = candidates
+            case .itunes:
+                itunesCandidates = candidates
+            case .musicbrainz:
+                musicbrainzCandidates = candidates
+            }
+        }
+        guard !Task.isCancelled, sessionID == scrapeSessionID else { return }
         scrapeState = .done
     }
 
     /// 点选候选 → 填充表单（web pick 语义：候选有值才填，空值清空对应字段；
     /// 有 coverURL 时点选即自动下载并暂存为封面）
-    private func pick(_ candidate: ScrapeCandidate, source: String) {
+    private func pick(_ candidate: ScrapeCandidate, source: ScrapeSource) {
         formTitle = candidate.title ?? ""
         formArtist = candidate.artist ?? ""
         formAlbum = candidate.album ?? ""
@@ -210,7 +229,7 @@ extension MacTagEditorView {
 
         // 网易云候选且表单 year 空 → 静默补年份（POST /api/tags/album-year 等价；
         // 异步 + 静默失败，不阻塞点选）
-        if source == "netease", let id = candidate.id, formYear.isEmpty {
+        if source == .netease, let id = candidate.id, formYear.isEmpty {
             activeTasks["albumYear"]?.cancel()
             let songID = Int(id)
             activeTasks["albumYear"] = Task {

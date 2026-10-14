@@ -1055,6 +1055,7 @@
 "batch_mode_paths" = "為選中的曲目刮削（僅高可信度匹配）";
 "batch_cancel_help" = "停止批次刮削；已完成的曲目保留";
 "source_netease" = "網易雲";
+"source_itunes" = "Apple Music";
 "source_gequhai" = "歌曲海";
 "source_musicbrainz" = "MusicBrainz";
 "tag_editor_title" = "編輯標籤/刮削";

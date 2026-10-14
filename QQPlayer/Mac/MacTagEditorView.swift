@@ -86,6 +86,12 @@ struct MacTagEditorView: View {
     @State var neteaseCandidates: [ScrapeCandidate] = []
     /// 分片：跨文件可见（原 private）
     @State var musicbrainzCandidates: [ScrapeCandidate] = []
+    /// iTunes(Apple Music) 候选（E2 2026-10「iTunes 备用源」）
+    /// 分片：跨文件可见（原 private）
+    @State var itunesCandidates: [ScrapeCandidate] = []
+    /// 当前刮削会话 ID（会话守卫：晚到的源结果按 id 丢弃，防重搜回灌/晚到覆盖）
+    /// 分片：跨文件可见（原 private）
+    @State var scrapeSessionID = UUID()
 
     // MARK: 重命名（模板来自设置 scraping.renameTemplate；默认关——文件名
     // 与模板渲染结果一致时才默认开，避免打开弹窗误触发改名）
