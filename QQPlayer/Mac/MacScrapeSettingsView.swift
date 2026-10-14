@@ -52,11 +52,11 @@ struct MacScrapeSettingsView: View {
                     .settingsAnchor(MacSettingsCatalog.scrapingRenameTemplate)
             }
 
-            // 源优先级（web「源优先级」组：netease/musicbrainz 上下移）
+            // 源优先级（web「源优先级」组：三源上下移；已知集合/默认顺序派生自 ScrapeSource）
             Section {
-                ForEach(Array(deleteSettings.scrapingSourceOrder.enumerated()), id: \.element) { index, source in
+                ForEach(Array(orderedSources.enumerated()), id: \.element) { index, source in
                     HStack(spacing: DesignTokens.space10) {
-                        Text(sourceDisplayName(source))
+                        Text(source.localizationKey.localized)
                             .font(.callout)
                         Spacer()
                         Text("\(index + 1)")
@@ -187,13 +187,15 @@ struct MacScrapeSettingsView: View {
     }
 
     /// 源展示名（唯一注册表派生；未知名回退原字符串）
-    private func sourceDisplayName(_ source: String) -> String {
-        ScrapeSource(rawValue: source)?.localizationKey.localized ?? source
+    /// 源优先级展示/排序列表：过滤未知源 + 补齐缺失源（旧设置无 itunes → 追加末尾），
+    /// 保证既有安装的设置页也能看到并调整三源（与 tag 编辑器 / 批量同一 ScrapeSource 派生）。
+    private var orderedSources: [ScrapeSource] {
+        ScrapeSource.resolvedOrder(from: deleteSettings.scrapingSourceOrder)
     }
 
-    private func moveButton(source: String, index: Int, offset: Int, systemImage: String) -> some View {
+    private func moveButton(source: ScrapeSource, index: Int, offset: Int, systemImage: String) -> some View {
         let target = index + offset
-        let order = deleteSettings.scrapingSourceOrder
+        let order = orderedSources
         return Button {
             moveSource(at: index, by: offset)
         } label: {
@@ -203,14 +205,14 @@ struct MacScrapeSettingsView: View {
         .disabled(target < 0 || target >= order.count || order[target] == source)
     }
 
+    /// 上下移：对 resolved 列表操作，并把结果整体持久化（第一次移动即把 itunes 写进设置）。
     private func moveSource(at index: Int, by offset: Int) {
         let target = index + offset
-        guard deleteSettings.scrapingSourceOrder.indices.contains(index),
-              deleteSettings.scrapingSourceOrder.indices.contains(target) else { return }
-        var order = deleteSettings.scrapingSourceOrder
+        var order = orderedSources
+        guard order.indices.contains(index), order.indices.contains(target) else { return }
         order.swapAt(index, target)
         var settings = deleteSettings
-        settings.scrapingSourceOrder = order
+        settings.scrapingSourceOrder = order.map(\.rawValue)
         settings.save()
         deleteSettings = settings
     }
