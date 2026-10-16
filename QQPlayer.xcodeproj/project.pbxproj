@@ -212,6 +212,7 @@
 		A2F99FAA7DAC41B586A2A1CB /* LyricsFollowPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99644E1363BD4F75B4C326A1 /* LyricsFollowPolicyTests.swift */; };
 		4086512B4B504337B2EB9287 /* ScrapeSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECF6164507C4822BA303737 /* ScrapeSourceContractTests.swift */; };
 		87495ABF98894A8786E258CB /* ITunesScrapeClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FDD23284644F729FB57013 /* ITunesScrapeClientTests.swift */; };
+		EE588BF6136F4785ADA33B36 /* SyncFileOverwriteJudgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6980499664C462C8EB60371 /* SyncFileOverwriteJudgeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -473,6 +474,7 @@
 		99644E1363BD4F75B4C326A1 /* LyricsFollowPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsFollowPolicyTests.swift; sourceTree = "<group>"; };
 		8ECF6164507C4822BA303737 /* ScrapeSourceContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScrapeSourceContractTests.swift; sourceTree = "<group>"; };
 		07FDD23284644F729FB57013 /* ITunesScrapeClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ITunesScrapeClientTests.swift; sourceTree = "<group>"; };
+		E6980499664C462C8EB60371 /* SyncFileOverwriteJudgeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileOverwriteJudgeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -894,6 +896,7 @@
 				Sync/SyncEntityRegistry.swift,
 				Sync/SyncEventHandlerChain.swift,
 				Sync/SyncFileChecksum.swift,
+				Sync/SyncFileOverwriteJudge.swift,
 				"Sync/SyncFileReceiver+StateMachine.swift",
 				Sync/SyncFileReceiver.swift,
 				Sync/SyncFileSender.swift,
@@ -1287,6 +1290,7 @@
 				99644E1363BD4F75B4C326A1 /* LyricsFollowPolicyTests.swift */,
 				8ECF6164507C4822BA303737 /* ScrapeSourceContractTests.swift */,
 				07FDD23284644F729FB57013 /* ITunesScrapeClientTests.swift */,
+				E6980499664C462C8EB60371 /* SyncFileOverwriteJudgeTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1797,6 +1801,7 @@
 				A2F99FAA7DAC41B586A2A1CB /* LyricsFollowPolicyTests.swift in Sources */,
 				4086512B4B504337B2EB9287 /* ScrapeSourceContractTests.swift in Sources */,
 				87495ABF98894A8786E258CB /* ITunesScrapeClientTests.swift in Sources */,
+				EE588BF6136F4785ADA33B36 /* SyncFileOverwriteJudgeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

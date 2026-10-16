@@ -3290,6 +3290,209 @@ check(
     "F2 自动轮：一次连接只跑一次"
 )
 
+// MARK: - ㊼ 批 1：文件覆盖判定（`SyncFileOverwriteJudge`，§6.1 判定 7 条）
+
+section("㊼ 批 1：文件覆盖判定（判定 7 条 + 排除 @lyrics/* + 边界）")
+
+do {
+    func judgeEntry(_ path: String, hash: String?, mtime: Int64 = 0) -> ManifestEntry {
+        ManifestEntry(relativePath: path, size: 10, mtimeMs: mtime, contentHash: hash)
+    }
+
+    func judgeRow(
+        _ path: String,
+        hash: String,
+        state: PeerFileStateRow.State,
+        approvedLocalHash: String? = nil
+    ) -> PeerFileStateRow {
+        PeerFileStateRow(
+            peerId: "peer-1",
+            relativePath: path,
+            contentHash: hash,
+            state: state,
+            approvedLocalHash: approvedLocalHash
+        )
+    }
+
+    func judge(
+        toPush: [String],
+        local: [ManifestEntry] = [],
+        remote: [ManifestEntry] = [],
+        ledger: [PeerFileStateRow] = [],
+        toleranceMs: Int64 = SyncFileOverwriteJudge.defaultToleranceMs
+    ) -> SyncFileOverwriteDecision {
+        SyncFileOverwriteJudge.judge(
+            toPush: toPush,
+            local: local,
+            remote: remote,
+            ledger: ledger,
+            nowMs: 1_700_000_000_000,
+            toleranceMs: toleranceMs
+        )
+    }
+
+    // 规则 1 contentEqual（防御式）
+    let rule1 = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H1")],
+        remote: [judgeEntry("A.flac", hash: "H1")]
+    )
+    checkEqual(rule1.allowed, ["A.flac"], "规则 1 contentEqual：两侧指纹一致 → 放行")
+
+    // 规则 2 userApproved
+    let rule2 = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, approvedLocalHash: "H2")]
+    )
+    checkEqual(rule2.allowed, ["A.flac"], "规则 2 userApproved：确认后本端未再变 → 放行")
+
+    // 边界 A1：approved 但本端已再变（对端未动 / 对端也变）
+    let a1a = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, approvedLocalHash: "H1")]
+    )
+    checkEqual(a1a.allowed, [], "边界 A1：approved 但本端已再变（对端未动）→ 不放行")
+    checkEqual(a1a.conflicts.map(\.reason), [.undecidable], "边界 A1：原因 = undecidable（保守）")
+
+    let a1b = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P2")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, approvedLocalHash: "H1")]
+    )
+    checkEqual(a1b.conflicts.map(\.reason), [.peerChanged], "边界 A1：对端也变了 → 原因取 peerChanged")
+
+    // 规则 3 peerUntouched / 规则 4 peerChanged（对照：只改台账指纹的对端可比性）
+    let rule3 = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .agreed)]
+    )
+    checkEqual(rule3.allowed, ["A.flac"], "规则 3 peerUntouched：对端没动过 → 放行")
+
+    let rule4 = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9")],
+        remote: [judgeEntry("A.flac", hash: "P2")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .agreed)]
+    )
+    checkEqual(rule4.conflicts.map(\.reason), [.peerChanged], "规则 4 peerChanged：对端自己改过 → 冲突")
+
+    // 规则 5 peerNewerByMtime / 规则 6 noRecordPeerOlder（容差内外）
+    let rule5 = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 1_000_000)],
+        remote: [judgeEntry("A.flac", hash: "P2", mtime: 1_002_001)]
+    )
+    checkEqual(rule5.conflicts.map(\.reason), [.peerNewerByMtime], "规则 5 peerNewerByMtime：对端超出容差更新 → 冲突")
+
+    let rule6a = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 2_000_000)],
+        remote: [judgeEntry("A.flac", hash: "P2", mtime: 1_000_000)]
+    )
+    checkEqual(rule6a.allowed, ["A.flac"], "规则 6 noRecordPeerOlder：对端更旧 → 放行")
+
+    let rule6b = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 1_000_000)],
+        remote: [judgeEntry("A.flac", hash: "P2", mtime: 1_002_000)]
+    )
+    checkEqual(rule6b.allowed, ["A.flac"], "规则 6 noRecordPeerOlder：对端略新但在容差内 → 放行")
+
+    // 规则 7 undecidable（相等 / 本端 0 / 对端 0）
+    let rule7a = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 1_000_000)],
+        remote: [judgeEntry("A.flac", hash: "P2", mtime: 1_000_000)]
+    )
+    checkEqual(rule7a.conflicts.map(\.reason), [.undecidable], "规则 7 undecidable：两侧 mtime 相等 → 保守冲突")
+
+    let rule7b = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 0)],
+        remote: [judgeEntry("A.flac", hash: "P2", mtime: 1_000_000)]
+    )
+    checkEqual(rule7b.conflicts.map(\.reason), [.undecidable], "规则 7 undecidable：本端 mtime 缺失（=0）→ 保守冲突")
+
+    let rule7c = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 1_000_000)],
+        remote: [judgeEntry("A.flac", hash: "P2", mtime: 0)]
+    )
+    checkEqual(rule7c.conflicts.map(\.reason), [.undecidable], "规则 7 undecidable：对端 mtime 缺失（=0）→ 保守冲突")
+
+    // 未指纹（对端 contentHash == nil）⇒ 台账不适用，落 mtime 兜底
+    let unfingerprinted = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H9", mtime: 1_000_000)],
+        remote: [judgeEntry("A.flac", hash: nil, mtime: 995_000)],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .agreed)]
+    )
+    checkEqual(unfingerprinted.allowed, ["A.flac"], "对端未指纹 ⇒ 视同无台账行，mtime 兜底放行")
+
+    // 排除 @lyrics/*（含 `./` 规范化形态）
+    let lyrics = judge(
+        toPush: ["@lyrics/hA.json", "./@lyrics/hB.json", "A.flac"],
+        local: [
+            judgeEntry("@lyrics/hA.json", hash: "H1"),
+            judgeEntry("./@lyrics/hB.json", hash: "H1"),
+            judgeEntry("A.flac", hash: "H9"),
+        ],
+        remote: [
+            judgeEntry("@lyrics/hA.json", hash: "P1"),
+            judgeEntry("./@lyrics/hB.json", hash: "P1"),
+            judgeEntry("A.flac", hash: "P2"),
+        ]
+    )
+    checkEqual(lyrics.allowed, ["@lyrics/hA.json", "./@lyrics/hB.json"], "排除 @lyrics/*：原样放行（不经判据，含 ./ 形态）")
+    checkEqual(lyrics.conflicts.map(\.relativePath), ["A.flac"], "排除 @lyrics/*：非歌词路径照常进判定")
+
+    // A2：对端缺路径（新建）
+    let peerMissing = judge(
+        toPush: ["New.flac"],
+        local: [judgeEntry("New.flac", hash: "H1")],
+        remote: []
+    )
+    checkEqual(peerMissing.allowed, ["New.flac"], "A2：对端无此路径（新建，无覆盖风险）→ 放行")
+
+    // 空 toPush / 顺序与去重 / 本端缺条目
+    let empty = judge(toPush: [])
+    check(empty.allowed.isEmpty && empty.conflicts.isEmpty, "空 toPush → 空决策")
+
+    let ordered = judge(
+        toPush: ["b.flac", "a.flac", "b.flac"],
+        local: [
+            judgeEntry("a.flac", hash: "HA", mtime: 2_000),
+            judgeEntry("b.flac", hash: "HB", mtime: 2_000),
+        ],
+        remote: [
+            judgeEntry("a.flac", hash: "PA", mtime: 1_000),
+            judgeEntry("b.flac", hash: "PB", mtime: 1_000),
+        ]
+    )
+    checkEqual(ordered.allowed, ["b.flac", "a.flac"], "顺序 = toPush 输入顺序，重复路径只判一次")
+
+    let inconsistent = judge(
+        toPush: ["Ghost.flac"],
+        local: [],
+        remote: [judgeEntry("Ghost.flac", hash: "P1")]
+    )
+    checkEqual(inconsistent.conflicts.map(\.reason), [.undecidable], "输入不自洽（本端无此条目）→ 保守冲突")
+
+    // 状态机取值（落库口径）
+    checkEqual(
+        PeerFileStateRow.State.allCases.map(\.rawValue),
+        ["agreed", "pending", "approved", "kept"],
+        "台账状态机取值：agreed / pending / approved / kept"
+    )
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")
