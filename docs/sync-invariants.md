@@ -356,6 +356,25 @@
 - **用例**：`SyncRelativePathIdentityTests.pendingKeyNamespacesDoNotCollide`（含非法键 = nil）、
   `replayByRelativePathKeyAppliesAndClears`（rel: 挂起行歌到位后重放并清行）。
 
+---
+
+## H. 覆盖确认与时钟防护（2026-10-16 用户拍板）
+
+### INV-33　文件覆盖（对端更新场景）必须先经**显式确认**，不得静默覆盖
+
+- **现有守护**：✗ 无守护（现状是「Mac 无条件覆盖移动端」，只活在 `docs/sync-contract.md` §2 G 的文字里；2026-10-16 修订后该措辞作废）
+- **建议**：`SyncFileOverwriteJudge`（纯函数、零 IO / 零 GRDB，可进 harness：输入 = `toPush` + 本端 / 对端 manifest + 每 peer 台账 + `nowMs`，输出 = `(allowed, conflicts)`）+ 新表 `sync_peer_file_state`（`peer_id, relative_path, content_hash, state, …`）+ 单测（判定 7 条 + 状态机 `pending` / `approved` / `kept` / `agreed` + 「自动通道只写 `pending`、不弹窗」）
+
+### INV-34　播放数据不接受「来自未来」的时间戳（远端 `updatedAtMs > 本机 now + 容差` → **不应用**并计数）
+
+- **现有守护**：✗ 无守护（`SyncLWWReconcile` 直接按 `updated_at` 比大小；对端时钟超前 ⇒ 它的旧行带未来时间戳，会压过本端新行）
+- **建议**：B1 skew guard（容差 5 分钟，常量可配）+ 单测（超前 / 滞后 / 边界）+ 计数上屏；判据 fail-closed —— 宁可暂不应用，也不让「来自未来的旧行」胜出
+
+### INV-35　播放位置 carry 的推送游标**单调不回退**（只增不减，少推已给过的行）
+
+- **现有守护**：✗ 无守护（`SyncPlaybackCarryPeer` 自承「没有『已推给该 peer 的位置』的反向记录，无法做单调保护」⇒ 批内末行可能小于对端已记位置 ⇒ `sync_push_cursor` 回退）
+- **建议**：新表 `sync_playback_carry_state(peer_id, entity, row_key, last_pushed_outbox_id, …)`（高水位）+ 帧 9 `lastOutboxID` 取 `max(高水位, batchLastID)` + `sync_push_cursor` 单调断言 + 单测；⚠️ 它只管游标单调，**不能单独承担「防旧冲新」**（那仍靠 LWW，且需 INV-34 的容差门）
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：

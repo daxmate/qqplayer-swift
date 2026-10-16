@@ -131,6 +131,8 @@
 | ⑥ | ~~部分~~ **✅ 有（2026-09-16）** | 计数 → 上屏（唯一投影 `SyncEntityOutcomeDisclosure.lyricsRows`，五语文案）：iOS「设置 → 同步 → 接收同步」区（`discardedLyrics` / `keptLocalLyrics`）+ Mac 同步面板（E 结果区 `SyncUIReportSummary.lyricsDiscarded` / `.lyricsKeptLocal`；补发区 `pendingResend` / `keptLocal`） |
 | ⑦ | 有 | `AlignedLyricsSyncTests.swift`（2026-09-16 新增：`resendPlanOnlyFills` / `resendPlanGatesOnSongPresence` / `resendPlanLyricsNamespaceOnly…` / `resendStateMachineAndAutoRunDecision` / `receiverKeepsLocalLyrics` / `lyricsDisclosureRows` / `lyricsResendRoundPushesMissingLyrics` / `lyricsResendRoundKeepsBothSides`）；无模拟器 harness `scripts/sync-harness/main.swift` ㊻ 节 |
 | ⑧ | △ | 无「歌词接收器已装配」的静态断言（`SyncWiringContractTests` 不含）；只有 `SyncLibraryPassiveTests.swift:355` 行为用例。**F2 的「只补不覆盖」同样只有行为用例**（`receiverKeepsLocalLyrics`），无静态断言 |
+>
+> **冲突语义（2026-10-16 复核）**：F 仍为「只补不覆盖」（与本轮修订一致，无变化）；本轮新增的「待确认覆盖」只作用于 G —— judge 显式排除 `@lyrics/*`（契约 `docs/sync-contract.md` §2 F2 / G；设计 `docs/lan-sync-design.md` §6.1）。
 
 ### G. 曲库音频文件（不在枚举）
 
@@ -144,6 +146,8 @@
 | ⑥ | 有 | `SyncUIReportSummary`（`SyncUIState.swift:449`）经 `MacSyncRunViewModel.swift:304` 上屏（含失败清单 `failedItems`） |
 | ⑦ | 有 | `SyncFileTransferTests`(7)、`SyncManifestReconcileTests`(11)、`SyncTransferIdentityTests`、`SyncLibrarySyncE2ETests`、`SyncLibraryPlanTests` |
 | ⑧ | △ | 无静态装配断言；有 `mac-playback-carry-attached`（`SyncWiringContractTests.swift:71`）间接覆盖跟歌走 |
+>
+> **冲突语义（2026-10-16 修订）**：G 行「内容权威在 Mac」**不再等于无条件覆盖**——对端文件更新（内容指纹 + 每 peer 反向台账为主，mtime 兜底，判不了 = 保守冲突）→ 本轮跳过并进「待确认覆盖」，用户在 Mac 同步页确认后才覆盖（契约 `docs/sync-contract.md` §2 G；设计 `docs/lan-sync-design.md` §6.1）。判定显式排除 `@lyrics/*`。
 
 ### H. 歌单自定义封面（不在枚举，搭 C 的 payload）
 

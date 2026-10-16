@@ -86,10 +86,51 @@ Host（macOS）                           Client（iOS）
   - **推送到设备**（Host→Client）：选歌单/歌曲 → manifest（相对路径、大小、mtime、content_hash）→ Client 对账 → 取缺失/差异 → 断点传输 → 校验 → 入库
   - **从设备下载**（Client→Host）：Host 浏览 Client 曲库 manifest → 勾选 → Host 拉取入库（手机导入的内容也能取回）
   - 移动端不主动发起同步（纯被动端）
-- **不传播删除（2026-09-10 拍板）**：任一端删除歌曲都是**本地事务**——iPhone 删歌不影响 Mac，Mac 删歌不影响 iPhone；同步只做「补齐缺失 + 内容不同则更新」，**永不因对端 manifest 变化而删任何一端文件**
+- **不传播删除（2026-09-10 拍板）**：任一端删除歌曲都是**本地事务**——iPhone 删歌不影响 Mac，Mac 删歌不影响 iPhone；同步只做「补齐缺失 + 内容不同则更新」（**对端文件更新的冲突场景见本节「冲突判定 + 待确认覆盖」**），**永不因对端 manifest 变化而删任何一端文件**
 - **同步集合 = 用户显式选择**（歌单 / 歌曲勾选）；**不做全库自动镜像**——移动端容量有限，全库自动推送会把设备充爆（2026-09-10 拍板）
 - **歌单同步**：可选（勾选要同步的歌单）；同步时目标端缺的歌**自动上传补齐**（收藏视为特殊歌单，同规则）
 
+**冲突判定 + 待确认覆盖（2026-10-16 用户拍板 · 契约见 `docs/sync-contract.md` §2 G）**
+
+> 本节是**设计**（批 0 只落文档；实现按批推进）。**零协议变更**：不新增帧、不新增帧字段。
+
+- **判定入口**：新增纯函数 `SyncFileOverwriteJudge`（零 IO / 零 GRDB，可进 harness）——输入 = `toPush` + 本端 manifest `local` + 对端 manifest `remote` + 每 peer 台账行 + `nowMs`；输出 = `(allowed, conflicts)`。
+  - **只在 `direction == .upload` 生效**；`download` 原样放行（现状本就不覆盖，冲突项进 `conflictingKept`）。
+  - **插入点** = 差集算完之后、推 / 拉分派之前（`SyncCollectionSyncCoordinator+Execution.swift` 的 `diff` 之后、`beginTransfers()` 之前）。
+  - **排除 `@lyrics/*`**：歌词走 §6.3 的「只补不覆盖」，用现成 `SyncLyricsNamespace.isLyricsPath` 排除（判据不落到文件覆盖门上）。
+- **判定 7 条**（记 `L` = 本端 entry、`P` = 对端 entry、`T` = 台账行 `(peer_id, relative_path)`）：
+  1. `P.hash == L.hash` → 放行（防御式；本不应进 `toPush`）｜`contentEqual`
+  2. `T` 存在 且 `T.state == "approved"` 且 `T.approvedLocalHash == L.hash` → 放行（用户已确认且本端未再变）｜`userApproved`
+  3. `T` 存在 且 `T.contentHash == P.hash` → 放行（对端自上次一致后没动过 = 正常更新）｜`peerUntouched`
+  4. `T` 存在 且 `T.contentHash != P.hash` → **冲突**（对端自己改过这个文件）｜`peerChanged`
+  5. `T` 不存在，两侧 `mtimeMs > 0` 且 `P.mtimeMs > L.mtimeMs + 容差` → **冲突**（对端更新）｜`peerNewerByMtime`
+  6. `T` 不存在，两侧 `mtimeMs > 0` 且 `P.mtimeMs <= L.mtimeMs + 容差` → 放行（对端只是旧副本）｜`noRecordPeerOlder`
+  7. `T` 不存在 且 mtime 不可判（任一侧为 0 / 相等）→ **冲突（保守）**｜`undecidable`
+  - 容差 = **2000 ms**（同族文件系统粒度 + 扫描抖动），落成常量便于调。
+  - `contentHash == nil`（未指纹）的条目无法比对台账 → 一律走「`T` 不存在」分支（mtime 兜底）。
+- **台账表 `sync_peer_file_state`**（本端 Mac DB，每端一份；`CREATE TABLE IF NOT EXISTS`，不动既有表结构 ⇒ 不需要完成门）：
+
+  ```sql
+  CREATE TABLE IF NOT EXISTS sync_peer_file_state (
+      peer_id             TEXT    NOT NULL,   -- 对端 DeviceID（与 sync_cursor / sync_push_cursor 同口径）
+      relative_path       TEXT    NOT NULL,   -- 对账键（POSIX，相对曲库根）
+      content_hash        TEXT    NOT NULL,   -- 「上次达成一致时」的内容指纹
+      state               TEXT    NOT NULL,   -- agreed | pending | approved | kept
+      peer_mtime_ms       INTEGER NOT NULL DEFAULT 0,
+      local_mtime_ms      INTEGER NOT NULL DEFAULT 0,
+      approved_local_hash TEXT,               -- state = approved 时的本端指纹（校验「确认后本端是否又变了」）
+      updated_at          INTEGER NOT NULL,
+      PRIMARY KEY (peer_id, relative_path)
+  );
+  CREATE INDEX IF NOT EXISTS idx_sync_peer_file_state_state ON sync_peer_file_state(state);
+  ```
+
+- **状态机**：`pending`（判为冲突，待确认）/ `approved`（用户点了覆盖）/ `kept`（用户选保持现状，下次不再打扰）/ `agreed`（双方一致）。
+  - 写入时机：推送成功或拉取落盘成功 → `agreed`（`content_hash` = 本次发出的 hash）；判为冲突 → `pending`（`content_hash` = `P.hash`）；点「保持现状」→ `kept`（`content_hash` = `P.hash`）；点「覆盖」→ `approved`（`approved_local_hash` = `L.hash`）。
+- **交互（三选项）**：手动一轮判出冲突 → 冲突项移出本轮 `plannedPush` 并写 `pending`，**本轮照常推其余文件**；结果区出现「待确认覆盖 (N)」并**弹确认对话框** ——〔覆盖全部〕〔逐条勾选〕〔保持现状〕；点覆盖 → 写 `approved` → **立即重跑一轮 upload**（复用同一入口）。
+- **自动通道**：将来若加内容自动同步，走**同一条 judge**；判为冲突 → **只写 `pending` + 计数上屏，不弹窗**（自动通道不阻塞用户）。
+- **手机被动端**：**不加阻塞式确认**（被动端不发起，也不该让用户在手机上等点确认）；本期只做 Mac 侧。
+- **形状守卫（P2，可下一批）**：`SyncLibraryPullController` 在 `selection == .all` 时会覆盖本端（未来误用即回归）→ 加形状测试（该控制器不得以 `.all` 构造）。
 ### 6.2 播放数据（双向 LWW · 仅共有歌曲 · 不传播删除）
 - 范围：收藏、播放历史/次数（自动歌单数据源）、歌单结构、播放位置上下文、设置白名单
 - 机制：本地变更日志表（outbox）+ 每 peer 游标；对端拉取/推送增量；**LWW（updated_at 大者胜）**
@@ -97,6 +138,9 @@ Host（macOS）                           Client（iOS）
 - **跟歌走**：推送/下载歌曲时跟随同步该歌的播放数据（歌到哪，数据到哪）
 - **不传播删除**：取消收藏/删歌单等删除操作**只在本地生效**，不跨端
 - 冲突：v1 简单 LWW + 变更留痕；歌单"来源主机"归属留 v2
+- **B1 时钟偏差防护（2026-10-16 用户拍板）**：应用远端行前判 `remote.updatedAtMs > localNowMs + 容差`（**5 分钟**）→ **不应用、计数上屏、丢弃本轮**（fail-closed：宁可暂不应用，也不让「来自未来」的旧行压过本端新行）。反方向（对端时钟滞后）本期无解，作为已知限制写入文档。
+- **B2 播放位置 carry 单调（2026-10-16 用户拍板）**：新增反向记录表 `sync_playback_carry_state(peer_id, entity, row_key, last_pushed_outbox_id, last_pushed_updated_at, pushed_at, PRIMARY KEY (peer_id, entity, row_key))`；帧 9 的 `lastOutboxID` 取 `max(高水位, batchLastID)` ⇒ `sync_push_cursor` **单调不回退**、少推已给过的行。⚠️ B2 与 B1 是**配套**关系：台账只证明「我推过什么」，防「旧冲新」仍靠 LWW，而 LWW 需 B1 的 skew guard 才不被时钟偏差击穿。
+- **零协议变更（2026-10-16 结论）**：A / B1 / B2 所需数据（`contentHash` + `mtimeMs` 已在帧 11 manifest 载荷里；`updated_at` 已在帧 8/9 载荷里；台账存本端 DB）→ **不新增帧、不新增帧字段**，旧端互通安全。若将来必须新增帧：帧号取 17，且**必须先做握手能力协商**（旧端收到未知帧类型会走解码失败路径，不是无声忽略，会打断会话）。
 - 引用映射：UI/本地外键用 `stable_id`；跨端同步载荷引用 `content_hash`，同步层做双向映射
 
 ### 6.3 歌词（仅对齐歌词同步，2026-09-08 拍板 B 方案）
@@ -222,3 +266,9 @@ Host（macOS）                           Client（iOS）
 - 被动端（帧 15/16）：`SyncPeerLibraryCatalog.trackPathsByPlaylist` 存**有序**成员表；tracks 范围带 playlistID 收窄时按该序返回（`matchedTracks`），**未带 playlistID 时仍是 relativePath 升序**（既有契约不动）。
 - 来源内搜索（query）只做过滤、**不重排**。
 - `trackCount` 恒等于「按该 id 筛 tracks」的条数（保存自洽纪律）。
+
+## 13. 变更记录
+
+| 日期 | 变更 | 依据 |
+| --- | --- | --- |
+| 2026-10-16 | §6.1 新增「冲突判定 + 待确认覆盖」（`SyncFileOverwriteJudge` 判定 7 条 + 新表 `sync_peer_file_state` + 状态机 `pending`/`approved`/`kept`/`agreed` + 三选项交互 + 自动通道只写 `pending` 不弹窗 + 只做 upload 方向 + P2 形状守卫 + 排除 `@lyrics/*`）；§6.2 新增 B1（对端时间戳超前 > 5 分钟 → 不应用 + 计数上屏）与 B2（`sync_playback_carry_state` + 游标单调不回退）；明确**零协议变更** | 用户 2026-10-16 拍板（契约 = `docs/sync-contract.md` §4） |
