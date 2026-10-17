@@ -148,16 +148,10 @@ struct SyncFileOverwriteJudgeTests {
         #expect(decision.conflicts.isEmpty)
     }
 
-    @Test("规则 3：台账 kept（用户选过保持现状）且对端未动 → 仍按规则 3 放行（口径见报告待确认）")
-    func keptRowWithPeerUnchangedAllows() {
-        let decision = Self.judge(
-            toPush: ["Album/A.flac"],
-            local: [Self.entry("Album/A.flac", hash: "H9")],
-            remote: [Self.entry("Album/A.flac", hash: "P1")],
-            ledger: [Self.row("Album/A.flac", hash: "P1", state: .kept)]
-        )
-        #expect(decision.allowed == ["Album/A.flac"])
-    }
+    // 批 1 遗留的「kept 未特判 ⇒ 与 agreed 同口径放行」对照用例（原 `keptRowWithPeerUnchangedAllows`）
+    // 已按 2026-10-17 用户拍板**作废**：kept 现在走规则 4 —— 对端 + 本端都未变 → **静默跳过**；
+    // 任一侧文件再变 → 重新确认（`keptLocalChanged` / `peerChanged`），不再按规则 5 放行。
+    // 新口径用例见下方「规则 4 kept」一节。
 
     // MARK: - 规则 4 peerChanged
 
