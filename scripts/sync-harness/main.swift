@@ -3292,7 +3292,7 @@ check(
 
 // MARK: - ㊼ 批 1：文件覆盖判定（`SyncFileOverwriteJudge`，§6.1 判定 7 条）
 
-section("㊼ 批 1：文件覆盖判定（判定 7 条 + 排除 @lyrics/* + 边界）")
+section("㊼ 批 1：文件覆盖判定（判定 7 条 + 排除 @lyrics/* + 边界 + kept 下次同步语义）")
 
 do {
     func judgeEntry(_ path: String, hash: String?, mtime: Int64 = 0) -> ManifestEntry {
@@ -3303,14 +3303,14 @@ do {
         _ path: String,
         hash: String,
         state: PeerFileStateRow.State,
-        approvedLocalHash: String? = nil
+        localHashAtDecision: String? = nil
     ) -> PeerFileStateRow {
         PeerFileStateRow(
             peerId: "peer-1",
             relativePath: path,
             contentHash: hash,
             state: state,
-            approvedLocalHash: approvedLocalHash
+            localHashAtDecision: localHashAtDecision
         )
     }
 
@@ -3344,7 +3344,7 @@ do {
         toPush: ["A.flac"],
         local: [judgeEntry("A.flac", hash: "H2")],
         remote: [judgeEntry("A.flac", hash: "P1")],
-        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, approvedLocalHash: "H2")]
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, localHashAtDecision: "H2")]
     )
     checkEqual(rule2.allowed, ["A.flac"], "规则 2 userApproved：确认后本端未再变 → 放行")
 
@@ -3353,7 +3353,7 @@ do {
         toPush: ["A.flac"],
         local: [judgeEntry("A.flac", hash: "H2")],
         remote: [judgeEntry("A.flac", hash: "P1")],
-        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, approvedLocalHash: "H1")]
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, localHashAtDecision: "H1")]
     )
     checkEqual(a1a.allowed, [], "边界 A1：approved 但本端已再变（对端未动）→ 不放行")
     checkEqual(a1a.conflicts.map(\.reason), [.undecidable], "边界 A1：原因 = undecidable（保守）")
@@ -3362,7 +3362,7 @@ do {
         toPush: ["A.flac"],
         local: [judgeEntry("A.flac", hash: "H2")],
         remote: [judgeEntry("A.flac", hash: "P2")],
-        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, approvedLocalHash: "H1")]
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, localHashAtDecision: "H1")]
     )
     checkEqual(a1b.conflicts.map(\.reason), [.peerChanged], "边界 A1：对端也变了 → 原因取 peerChanged")
 
@@ -3484,6 +3484,56 @@ do {
         remote: [judgeEntry("Ghost.flac", hash: "P1")]
     )
     checkEqual(inconsistent.conflicts.map(\.reason), [.undecidable], "输入不自洽（本端无此条目）→ 保守冲突")
+
+    // 规则 4 kept（2026-10-17 用户拍板）：〔保持现状〕的**下次同步**语义
+    // 4a：对端未变 **且** 本端未变 → 静默跳过（skipped 桶：不推、不弹窗、不计入「待确认」）
+    let keptUnchanged = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .kept, localHashAtDecision: "H2")]
+    )
+    checkEqual(keptUnchanged.skipped, ["A.flac"], "规则 4a kept：对端 + 本端都未变 → 静默跳过（skipped 桶）")
+    check(keptUnchanged.allowed.isEmpty, "规则 4a kept：静默跳过不进 allowed（不推）")
+    check(keptUnchanged.conflicts.isEmpty, "规则 4a kept：静默跳过不进 conflicts（不弹窗、不计入「待确认」）")
+
+    // 4b：本端文件后来变了（用户在 Mac 重导 / 换版本）→ 冲突（新原因码 keptLocalChanged）
+    let keptLocalChanged = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H3")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .kept, localHashAtDecision: "H2")]
+    )
+    checkEqual(keptLocalChanged.conflicts.map(\.reason), [.keptLocalChanged], "规则 4b kept：本端又变 → 冲突（keptLocalChanged）")
+    check(keptLocalChanged.skipped.isEmpty, "规则 4b kept：冲突项不进 skipped 桶")
+
+    // 4b-2：决策指纹缺失（旧行 / 未落库）→ 保守走冲突，绝不静默跳过
+    let keptNoDecisionHash = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .kept)]
+    )
+    checkEqual(keptNoDecisionHash.conflicts.map(\.reason), [.keptLocalChanged], "规则 4b kept：决策指纹缺失 → 保守冲突（keptLocalChanged）")
+    check(keptNoDecisionHash.skipped.isEmpty, "规则 4b kept：决策指纹缺失不静默跳过")
+
+    // 4c：对端文件又变了 → 冲突 peerChanged（重新弹窗）
+    let keptPeerChanged = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P9")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .kept, localHashAtDecision: "H2")]
+    )
+    checkEqual(keptPeerChanged.conflicts.map(\.reason), [.peerChanged], "规则 4c kept：对端又变 → 冲突（peerChanged）")
+
+    // approved 与 kept 的优先级：state 互斥，approved 行不受 kept 分支影响（回归锚）
+    let approvedStillAllows = judge(
+        toPush: ["A.flac"],
+        local: [judgeEntry("A.flac", hash: "H2")],
+        remote: [judgeEntry("A.flac", hash: "P1")],
+        ledger: [judgeRow("A.flac", hash: "P1", state: .approved, localHashAtDecision: "H2")]
+    )
+    checkEqual(approvedStillAllows.allowed, ["A.flac"], "规则 2 approved 未受 kept 分支影响 → 仍放行")
 
     // 状态机取值（落库口径）
     checkEqual(

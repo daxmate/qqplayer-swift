@@ -10,16 +10,17 @@
 //  覆盖映射（规则 → 用例）：
 //  1 `contentEqual`       → `规则 1 ……`
 //  2 `userApproved`       → `规则 2 ……` + 边界 A1 两条
-//  3 `peerUntouched`      → `规则 3 ……`
-//  4 `peerChanged`        → `规则 4 ……`
-//  5 `peerNewerByMtime`   → `规则 5 ……`
+//  3 `peerUntouched`      → `规则 5 ……`
+//  4 `peerChanged`        → `规则 4c / 6 ……`
+//  4 `keptLocalChanged`   → `规则 4b ……` ×2（本端又变 / 决策指纹缺失，后者为边界）
+//  5 `peerNewerByMtime`   → `规则 7 ……`
 //  6 `noRecordPeerOlder`  → `规则 6 ……` ×2（更旧 / 容差内）
 //  7 `undecidable`        → `规则 7 ……` ×3（相等 / 本端缺失 / 对端缺失）
 //  另：排除 `@lyrics/*`、空 `toPush`、对端缺路径（A2）、未指纹落 mtime、顺序与去重、状态机取值。
 //
-//  说明：判定 7 条里 4 条是**放行**原因、3 条是**冲突**原因；公开输出只有
-//  `allowed`（路径）+ `conflicts`（路径 + 冲突原因）⇒ 放行类规则靠**对照用例**区分
-//  （同一输入只改一个变量 → 结果由放行翻成特定原因的冲突）。
+//  说明：判定 7 条里 4 条是**放行**原因、4 条是**冲突**原因；公开输出为三段
+//  `allowed`（路径）+ `conflicts`（路径 + 冲突原因）+ `skipped`（静默跳过，无原因码）⇒
+//  放行类规则靠**对照用例**区分（同一输入只改一个变量 → 结果由放行翻成特定原因的冲突）。
 //
 
 import Foundation
@@ -41,14 +42,14 @@ struct SyncFileOverwriteJudgeTests {
         _ path: String,
         hash: String,
         state: PeerFileStateRow.State,
-        approvedLocalHash: String? = nil
+        localHashAtDecision: String? = nil
     ) -> PeerFileStateRow {
         PeerFileStateRow(
             peerId: "peer-1",
             relativePath: path,
             contentHash: hash,
             state: state,
-            approvedLocalHash: approvedLocalHash
+            localHashAtDecision: localHashAtDecision
         )
     }
 
@@ -84,13 +85,13 @@ struct SyncFileOverwriteJudgeTests {
 
     // MARK: - 规则 2 userApproved + 边界 A1
 
-    @Test("规则 2：approved 且 approvedLocalHash == 本端指纹 → 放行（userApproved，确认后本端未再变）")
+    @Test("规则 2：approved 且 localHashAtDecision == 本端指纹 → 放行（userApproved，确认后本端未再变）")
     func userApprovedAllows() {
         let decision = Self.judge(
             toPush: ["Album/A.flac"],
             local: [Self.entry("Album/A.flac", hash: "H2")],
             remote: [Self.entry("Album/A.flac", hash: "P1")],
-            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, approvedLocalHash: "H2")]
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, localHashAtDecision: "H2")]
         )
         #expect(decision.allowed == ["Album/A.flac"])
         #expect(decision.conflicts.isEmpty)
@@ -102,7 +103,7 @@ struct SyncFileOverwriteJudgeTests {
             toPush: ["Album/A.flac"],
             local: [Self.entry("Album/A.flac", hash: nil)],
             remote: [Self.entry("Album/A.flac", hash: "P1")],
-            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, approvedLocalHash: "H2")]
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, localHashAtDecision: "H2")]
         )
         #expect(decision.allowed.isEmpty)
         #expect(decision.conflicts.map(\.reason) == [.undecidable])
@@ -115,7 +116,7 @@ struct SyncFileOverwriteJudgeTests {
             toPush: ["Album/A.flac"],
             local: [Self.entry("Album/A.flac", hash: "H2")],
             remote: [Self.entry("Album/A.flac", hash: "P1")],
-            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, approvedLocalHash: "H1")]
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, localHashAtDecision: "H1")]
         )
         #expect(decision.allowed.isEmpty)
         #expect(decision.conflicts.map(\.reason) == [.undecidable])
@@ -127,7 +128,7 @@ struct SyncFileOverwriteJudgeTests {
             toPush: ["Album/A.flac"],
             local: [Self.entry("Album/A.flac", hash: "H2")],
             remote: [Self.entry("Album/A.flac", hash: "P2")],
-            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, approvedLocalHash: "H1")]
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, localHashAtDecision: "H1")]
         )
         #expect(decision.allowed.isEmpty)
         #expect(decision.conflicts.map(\.reason) == [.peerChanged])
@@ -332,6 +333,78 @@ struct SyncFileOverwriteJudgeTests {
         #expect(decision.conflicts.map(\.reason) == [.undecidable])
     }
 
+    // MARK: - 规则 4 kept（〔保持现状〕的下次同步语义 · 2026-10-17 用户拍板）
+
+    @Test("规则 4a kept：对端 + 本端都未变 → **静默跳过**（skipped 桶：不推、不弹窗、不计入「待确认」）")
+    func keptUnchangedIsSkippedSilently() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "H2")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .kept, localHashAtDecision: "H2")]
+        )
+        #expect(decision.skipped == ["Album/A.flac"])
+        #expect(decision.allowed.isEmpty)
+        #expect(decision.conflicts.isEmpty)
+    }
+
+    @Test("规则 4b kept：本端文件后来变了（Mac 重导 / 换版本）→ 冲突（keptLocalChanged，重新确认）")
+    func keptButLocalChangedConflicts() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "H3")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .kept, localHashAtDecision: "H2")]
+        )
+        #expect(decision.allowed.isEmpty)
+        #expect(decision.skipped.isEmpty)
+        #expect(decision.conflicts.map(\.reason) == [.keptLocalChanged])
+    }
+
+    @Test("规则 4b kept 边界：决策指纹缺失（旧行 / 未落库）→ 保守冲突（keptLocalChanged），绝不静默跳过")
+    func keptWithoutDecisionHashConflicts() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "H2")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .kept)]
+        )
+        #expect(decision.skipped.isEmpty)
+        #expect(decision.conflicts.map(\.reason) == [.keptLocalChanged])
+    }
+
+    @Test("规则 4c kept：对端文件又变了 → 冲突（peerChanged，重新确认）")
+    func keptButPeerChangedConflicts() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "H2")],
+            remote: [Self.entry("Album/A.flac", hash: "P9")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .kept, localHashAtDecision: "H2")]
+        )
+        #expect(decision.skipped.isEmpty)
+        #expect(decision.conflicts.map(\.reason) == [.peerChanged])
+    }
+
+    @Test("kept 分支不吞下 approved / agreed 的行为（回归锚：state 互斥，插在规则 5/6 之前也不改旧状态）")
+    func keptBranchDoesNotAffectOtherStates() {
+        let approved = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "H2")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, localHashAtDecision: "H2")]
+        )
+        #expect(approved.allowed == ["Album/A.flac"])
+        #expect(approved.skipped.isEmpty)
+
+        let agreed = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "H9")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .agreed)]
+        )
+        #expect(agreed.allowed == ["Album/A.flac"])
+        #expect(agreed.skipped.isEmpty)
+    }
     // MARK: - 状态机取值（落库口径）
 
     @Test("台账状态机取值：pending / approved / kept / agreed（rawValue 落库口径稳定）")
@@ -341,11 +414,12 @@ struct SyncFileOverwriteJudgeTests {
         #expect(PeerFileStateRow.State(rawValue: "unknown") == nil)
     }
 
-    @Test("判定原因码取值：7 条（4 放行 + 3 冲突）rawValue 落库 / 上屏口径稳定")
+    @Test("判定原因码取值：8 条（4 放行 + 4 冲突，含 keptLocalChanged）rawValue 落库 / 上屏口径稳定")
     func reasonRawValues() {
         #expect(SyncFileOverwriteReason.allCases.map(\.rawValue) == [
             "contentEqual", "userApproved", "peerUntouched",
             "peerChanged", "peerNewerByMtime", "noRecordPeerOlder", "undecidable",
+            "keptLocalChanged",
         ])
     }
 }
