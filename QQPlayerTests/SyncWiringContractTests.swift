@@ -101,6 +101,9 @@ enum SyncWiringContract {
         // G（曲库音频文件）
         "mac-library-push-attached",
         "ios-file-receiver-attached",
+        // G（覆盖确认接线，批 3）
+        "mac-overwrite-ledger-attached",
+        "mac-overwrite-store-attached",
         // 通道级 / 共享入口级 / 平台级编排
         "frame-8-9-handler-present",
         "frame-8-9-numbers-frozen",
