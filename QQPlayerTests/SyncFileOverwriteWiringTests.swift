@@ -325,6 +325,27 @@ struct SyncFileOverwriteWiringTests {
         #expect(scenario.store.row(peerId: scenario.peerId, relativePath: Self.path)?.state == .pending)
     }
 
+    // MARK: - 规则 5 收窄：pending 必须等确认，不得静默放行
+
+    @Test("接线 · 规则 5：pending + 双方未变 → 冲突 pendingConfirmation，本轮不推、台账仍 pending")
+    func pendingConfirmationBlocksPush() throws {
+        let localData = silentData(0x49, count: 4_096)
+        let remoteData = silentData(0x4A, count: 4_096)
+        let remoteHash = SyncFileChecksum.sha256Hex(of: remoteData)
+        let scenario = try makeScenario(
+            macData: localData,
+            deviceData: remoteData,
+            ledger: { peerId in
+                [self.makeRow(peerId: peerId, state: .pending, contentHash: remoteHash, localHashAtDecision: nil)]
+            }
+        )
+        #expect(waitUntil { scenario.coordinator.state == .done })
+        #expect(scenario.coordinator.report.plannedPush.isEmpty, "pending = 还没确认 → 本轮不得推")
+        #expect(scenario.coordinator.report.overwriteConflicts.map(\.reason) == [.pendingConfirmation])
+        #expect(try deviceData(scenario) == remoteData, "未确认 → 对端文件原样")
+        #expect(scenario.store.row(peerId: scenario.peerId, relativePath: Self.path)?.state == .pending, "仍是待确认")
+    }
+
     // MARK: - 规则 2：approved → 允许覆盖，成功后落 agreed
 
     @Test("接线 · 规则 2：approved 且本端未再变 → 覆盖执行，推送成功后台账落 agreed")

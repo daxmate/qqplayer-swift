@@ -42,7 +42,8 @@ import Foundation
 /// 判定 7 条的原因码（§6.1 逐条对应）。
 ///
 /// 其中 4 条是放行（`contentEqual` / `userApproved` / `peerUntouched` / `noRecordPeerOlder`）、
-/// 4 条是冲突（`peerChanged` / `peerNewerByMtime` / `undecidable` / `keptLocalChanged`）——
+/// 5 条是冲突（`peerChanged` / `peerNewerByMtime` / `undecidable` / `keptLocalChanged` /
+/// `pendingConfirmation`）——
 /// 冲突原因随 `SyncFileOverwriteConflict` 回给调用方（进「待确认覆盖」）。
 /// **静默跳过**（`skipped` 桶）没有原因码：它不是冲突，也不该出现在任何列表里。
 enum SyncFileOverwriteReason: String, Equatable, Sendable, CaseIterable {
@@ -50,7 +51,7 @@ enum SyncFileOverwriteReason: String, Equatable, Sendable, CaseIterable {
     case contentEqual
     /// 规则 2：用户已确认覆盖，且本端自确认后没再变。
     case userApproved
-    /// 规则 5：台账指纹 == 对端指纹 ⇒ 对端自上次一致后没动过 = 正常更新。
+    /// 规则 5：`agreed` 台账指纹 == 对端指纹 ⇒ 对端自上次一致后没动过 = 正常更新。
     case peerUntouched
     /// 规则 4c / 6：对端自己改过这个文件。
     case peerChanged
@@ -62,6 +63,9 @@ enum SyncFileOverwriteReason: String, Equatable, Sendable, CaseIterable {
     case undecidable
     /// 规则 4b：用户选过〔保持现状〕，但**本端文件后来变了**（Mac 重导 / 换版本）⇒ 重新确认。
     case keptLocalChanged
+    /// 规则 5（2026-10-17 复核修正）：`pending` = 用户还**没**确认；对端未变也**不得**按
+    /// 「正常更新」放行 —— 必须继续等显式确认（INV-33：不得静默覆盖）。
+    case pendingConfirmation
 }
 
 /// 一条「待确认覆盖」项（冲突）。
@@ -188,7 +192,20 @@ enum SyncFileOverwriteJudge {
                     continue
                 }
 
-                // 规则 5：其余状态（agreed / pending）且 `T.contentHash == P.hash`
+                // 规则 5（2026-10-17 复核修正）：`pending` = 用户**还没**确认，对端未变也不得
+                // 按「正常更新」放行（INV-33：不得静默覆盖）→ `pendingConfirmation`；
+                // 对端同时也变了 → 更精确的 `peerChanged`。
+                if row.state == .pending {
+                    decision.conflicts.append(
+                        SyncFileOverwriteConflict(
+                            relativePath: path,
+                            reason: row.contentHash == remoteHash ? .pendingConfirmation : .peerChanged
+                        )
+                    )
+                    continue
+                }
+
+                // 规则 5：其余状态（只剩 `agreed`）且 `T.contentHash == P.hash`
                 // → 放行（对端自上次一致后没动过 = 正常更新）｜peerUntouched
                 if row.contentHash == remoteHash {
                     decision.allowed.append(path)

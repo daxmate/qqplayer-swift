@@ -399,6 +399,45 @@ struct SyncFileOverwriteJudgeTests {
         #expect(agreed.allowed == ["Album/A.flac"])
         #expect(agreed.skipped.isEmpty)
     }
+    // MARK: - 规则 5 收窄：pending 必须等显式确认（2026-10-17 复核修正）
+
+    @Test("规则 5：pending + 对端未变 + 本端未变 → 冲突 pendingConfirmation（不得静默放行）")
+    func pendingUnchangedRequiresConfirmation() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "L1")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .pending)]
+        )
+        #expect(decision.allowed.isEmpty, "pending = 还没确认，绝不能按「对端未动」放行")
+        #expect(decision.conflicts.map(\.reason) == [.pendingConfirmation])
+        #expect(decision.skipped.isEmpty, "pending 不是〔保持现状〕，不进 skipped")
+    }
+
+    @Test("规则 2：pending 后用户点覆盖（approved）→ 放行 userApproved（显式确认生效）")
+    func pendingThenApprovedAllows() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "L1")],
+            remote: [Self.entry("Album/A.flac", hash: "P1")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .approved, localHashAtDecision: "L1")]
+        )
+        #expect(decision.allowed == ["Album/A.flac"])
+        #expect(decision.conflicts.isEmpty)
+    }
+
+    @Test("规则 6：pending + 对端又变 → 冲突 peerChanged（原因码更精确）")
+    func pendingPeerChangedConflicts() {
+        let decision = Self.judge(
+            toPush: ["Album/A.flac"],
+            local: [Self.entry("Album/A.flac", hash: "L1")],
+            remote: [Self.entry("Album/A.flac", hash: "P2")],
+            ledger: [Self.row("Album/A.flac", hash: "P1", state: .pending)]
+        )
+        #expect(decision.allowed.isEmpty)
+        #expect(decision.conflicts.map(\.reason) == [.peerChanged])
+    }
+
     // MARK: - 状态机取值（落库口径）
 
     @Test("台账状态机取值：pending / approved / kept / agreed（rawValue 落库口径稳定）")
@@ -408,12 +447,12 @@ struct SyncFileOverwriteJudgeTests {
         #expect(PeerFileStateRow.State(rawValue: "unknown") == nil)
     }
 
-    @Test("判定原因码取值：8 条（4 放行 + 4 冲突，含 keptLocalChanged）rawValue 落库 / 上屏口径稳定")
+    @Test("判定原因码取值：9 条（4 放行 + 5 冲突，含 keptLocalChanged / pendingConfirmation）rawValue 稳定")
     func reasonRawValues() {
         #expect(SyncFileOverwriteReason.allCases.map(\.rawValue) == [
             "contentEqual", "userApproved", "peerUntouched",
             "peerChanged", "peerNewerByMtime", "noRecordPeerOlder", "undecidable",
-            "keptLocalChanged",
+            "keptLocalChanged", "pendingConfirmation",
         ])
     }
 }

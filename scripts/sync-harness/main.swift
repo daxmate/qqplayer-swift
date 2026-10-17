@@ -3728,6 +3728,26 @@ do {
     check(false, "㊽ ⑤ 抛错：\(error)")
 }
 
+// ⑥ pending（待确认）+ 双方未变 → 不得按规则 5 放行（2026-10-17 复核修正）
+do {
+    let store = HarnessLedgerStore([
+        overwriteRow(.pending, contentHash: overwriteRemoteHash, localHashAtDecision: nil),
+    ])
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [(overwritePath, overwriteLocalBytes)],
+        deviceFiles: [(overwritePath, overwriteRemoteBytes)],
+        playlists: overwritePlaylists,
+        overwriteStore: store
+    )
+    check(scenario.coordinator.report.plannedPush.isEmpty, "㊽ pending 双方未变：不推（不得静默覆盖）")
+    checkEqual(scenario.coordinator.report.overwriteConflicts.map(\.reason), [.pendingConfirmation], "㊽ pending 双方未变 → pendingConfirmation")
+    checkEqual(deviceBytes(scenario), overwriteRemoteBytes, "㊽ pending：对端文件原样")
+    checkEqual(store.row(overwritePath)?.state, .pending, "㊽ pending：仍是待确认")
+} catch {
+    check(false, "㊽ ⑥ 抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

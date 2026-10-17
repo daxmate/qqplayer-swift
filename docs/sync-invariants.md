@@ -362,7 +362,7 @@
 
 ### INV-33　文件覆盖（对端更新场景）必须先经**显式确认**，不得静默覆盖
 
-- **现有守护**：✅ **批 3 已接线（2026-10-17）** —— 生产决策点 = `SyncCollectionSyncCoordinator+Execution.handlePeerManifest`（差集之后、推 / 拉分派之前）→ `SyncFileOverwriteGate`（读台账 → 判定 → 落台账），判定入口仍是唯一一处 `SyncFileOverwriteJudge`；冲突**本轮不推**并落 `pending`，推送成功落 `agreed`；`download`（用户显式「从设备取回」）是契约 G 行唯一例外，**不经过闸门**。静态装配断言 `mac-overwrite-ledger-attached` / `mac-overwrite-store-attached` + 运行时探针 `overwriteLedger`；行为用例 `SyncFileOverwriteWiringTests` + 无模拟器 harness ㊽ 节。
+- **现有守护**：✅ **批 3 已接线（2026-10-17）** —— 生产决策点 = `SyncCollectionSyncCoordinator+Execution.handlePeerManifest`（差集之后、推 / 拉分派之前）→ `SyncFileOverwriteGate`（读台账 → 判定 → 落台账），判定入口仍是唯一一处 `SyncFileOverwriteJudge`；冲突**本轮不推**并落 `pending`，推送成功落 `agreed`；**`pending` 不等于「对端未动」**——规则 5 只认 `agreed`，`pending` 下一轮仍判冲突（`pendingConfirmation` / `peerChanged`），直到用户显式确认；`download`（用户显式「从设备取回」）是契约 G 行唯一例外，**不经过闸门**。静态装配断言 `mac-overwrite-ledger-attached` / `mac-overwrite-store-attached` + 运行时探针 `overwriteLedger`；行为用例 `SyncFileOverwriteWiringTests` + 无模拟器 harness ㊽ 节。
 - **建议**：`SyncFileOverwriteJudge`（纯函数、零 IO / 零 GRDB，可进 harness：输入 = `toPush` + 本端 / 对端 manifest + 每 peer 台账 + `nowMs`，输出 = `(allowed, conflicts, skipped)`）+ 新表 `sync_peer_file_state`（`peer_id, relative_path, content_hash, local_hash_at_decision, state, updated_at_ms`）+ 单测（判定 7 条 + 状态机 `pending` / `approved` / `kept` / `agreed` + 「自动通道只写 `pending`、不弹窗」+ 〔保持现状〕的**下次同步**：双方都未变 → 静默跳过（`skipped`）；任一侧再变 → 重新确认（`keptLocalChanged` / `peerChanged`））
 
 ### INV-34　播放数据不接受「来自未来」的时间戳（远端 `updatedAtMs > 本机 now + 容差` → **不应用**并计数）

@@ -106,8 +106,9 @@ Host（macOS）                           Client（iOS）
      a. `T.contentHash == P.hash` 且 `T.localHashAtDecision == L.hash`（对端未变 **且** 本端未变）→ **静默跳过**：不推、**不弹窗**、不计入「待确认」｜`skipped`
      b. `T.contentHash == P.hash` 但本端已变（用户在 Mac 重导 / 换版本）→ **冲突**（重新确认）｜`keptLocalChanged`（新原因码）
      c. `T.contentHash != P.hash`（对端文件又变了）→ **冲突**（重新确认）｜`peerChanged`
-  5. `T` 存在（非 `approved` / 非 `kept`）且 `T.contentHash == P.hash` → 放行（对端自上次一致后没动过 = 正常更新）｜`peerUntouched`
-  6. `T` 存在（非 `approved` / 非 `kept`）且 `T.contentHash != P.hash` → **冲突**（对端自己改过这个文件）｜`peerChanged`
+  5. `T` 存在且 `T.state == "agreed"`，`T.contentHash == P.hash` → 放行（对端自上次一致后没动过 = 正常更新）｜`peerUntouched`
+  6. `T` 存在且 `T.state == "agreed"`，`T.contentHash != P.hash` → **冲突**（对端自己改过这个文件）｜`peerChanged`
+  6b. `T.state == "pending"`（用户**还没**确认 · 2026-10-17 复核修正）→ **不得**按规则 5 放行：`T.contentHash == P.hash` → **冲突**｜`pendingConfirmation`；`T.contentHash != P.hash` → **冲突**｜`peerChanged`
   7. `T` 不存在 → mtime 兜底：两侧 `mtimeMs > 0` 且 `P.mtimeMs > L.mtimeMs + 容差` → **冲突**（对端更新）｜`peerNewerByMtime`；`P.mtimeMs <= L.mtimeMs + 容差` → 放行（对端只是旧副本）｜`noRecordPeerOlder`；mtime 不可判（任一侧为 0 / 相等）→ **冲突（保守）**｜`undecidable`
   - 容差 = **2000 ms**（同族文件系统粒度 + 扫描抖动），落成常量便于调。
   - `contentHash == nil`（未指纹）的条目无法比对台账 → 一律走「`T` 不存在」分支（mtime 兜底）。
@@ -127,7 +128,7 @@ Host（macOS）                           Client（iOS）
   ```
 
 - **状态机**：`pending`（判为冲突，待确认）/ `approved`（用户点了覆盖）/ `kept`（用户选〔保持现状〕：后续每轮**静默跳过**，仅当对端或本端文件再变才重新确认）/ `agreed`（双方一致）。
-  - 写入时机：推送成功或拉取落盘成功 → `agreed`（`content_hash` = 本次发出的 hash）；判为冲突 → `pending`（`content_hash` = `P.hash`）；点「保持现状」→ `kept`（`content_hash` = `P.hash`，`local_hash_at_decision` = `L.hash`）；点「覆盖」→ `approved`（`content_hash` = `P.hash`，`local_hash_at_decision` = `L.hash`）。
+  - 写入时机：推送成功或拉取落盘成功 → `agreed`（`content_hash` = 本次发出的 hash）；判为冲突 → `pending`（`content_hash` = `P.hash`；`pending` 行下一轮仍是冲突，**不因「对端未变」自动放行** —— 规则 5 只认 `agreed`）；点「保持现状」→ `kept`（`content_hash` = `P.hash`，`local_hash_at_decision` = `L.hash`）；点「覆盖」→ `approved`（`content_hash` = `P.hash`，`local_hash_at_decision` = `L.hash`）。
    - **`kept` 的下次行为（本批补齐 · 2026-10-17 用户拍板）**：`kept` 行在后续每轮 upload 都过判定表**规则 4**——对端未变 **且** 本端未变 → **静默跳过**（不推、不弹窗、不计入「待确认」）；对端文件又变 → 重新弹窗（`peerChanged`）；本端文件又变（Mac 重导 / 换版本）→ 重新弹窗（`keptLocalChanged`）。「本端是否又变」靠 `local_hash_at_decision`（决策时落的本端指纹），与 `approved` 同口径。
 - **交互（三选项）**：手动一轮判出冲突 → 冲突项移出本轮 `plannedPush` 并写 `pending`，**本轮照常推其余文件**；结果区出现「待确认覆盖 (N)」并**弹确认对话框** ——〔覆盖全部〕〔逐条勾选〕〔保持现状〕；点覆盖 → 写 `approved` → **立即重跑一轮 upload**（复用同一入口）。
 - **自动通道**：将来若加内容自动同步，走**同一条 judge**；判为冲突 → **只写 `pending` + 计数上屏，不弹窗**（自动通道不阻塞用户）。
