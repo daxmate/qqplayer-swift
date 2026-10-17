@@ -245,6 +245,24 @@ extension DatabaseManager {
             """)
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sync_pending_row_key ON sync_pending_change(row_key)")
 
+            // 文件覆盖确认台账（S2, 批 2；docs/lan-sync-design.md §6.1）。
+            // 每 peer 一份「上次达成一致 / 用户决策」的快照：判定器（SyncFileOverwriteJudge）
+            // 按 (peer_id, relative_path) 取一行，决定「放行 / 冲突待确认 / 静默跳过」。
+            // 与既有 sync_* 表同样幂等建表（旧库下次启动自动补表；不动既有表列、不加迁移版本）。
+            // 模型见 Sync/PeerFileStateRow.swift；存储见 Sync/PeerFileStateStore.swift。
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_peer_file_state (
+                    peer_id                TEXT    NOT NULL,
+                    relative_path          TEXT    NOT NULL,
+                    content_hash           TEXT    NOT NULL,
+                    local_hash_at_decision TEXT,
+                    state                  TEXT    NOT NULL,
+                    updated_at_ms          INTEGER NOT NULL,
+                    PRIMARY KEY (peer_id, relative_path)
+                )
+            """)
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sync_peer_file_state_state ON sync_peer_file_state(state)")
+
             // Migration: Add last_played_at column if it doesn't exist
             do {
                 try db.execute(sql: """

@@ -60,3 +60,9 @@ QQPlayer/Sync/SyncDataSyncCoordinator.swift
 # SyncEntityOutcomeDisclosure：披露文案判定，`SyncDataSyncReport` 声明在
 # SyncDataSyncCoordinator.swift（上面已排除）⇒ 本文件也编不进命令行。
 QQPlayer/Sync/SyncEntityOutcomeDisclosure.swift
+
+# PeerFileStateStore：覆盖确认台账存储层（批 2），走 DatabaseManager.read / write
+# + db.execute(sql:arguments:) + Row.fetchAll + db.changesCount（真 GRDB）。
+# 行模型 PeerFileStateRow 不在本文件（零 GRDB 的 PeerFileStateRow.swift，能编进去）；
+# 判定器与 harness 都不需要本文件 ⇒ 排除。存储层用例只在 CI 跑（本地跑不了）。
+QQPlayer/Sync/PeerFileStateStore.swift
