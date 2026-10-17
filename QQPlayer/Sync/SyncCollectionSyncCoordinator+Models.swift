@@ -254,6 +254,10 @@ struct SyncCollectionSyncReport: Equatable, Sendable {
     var localOnlySkipped: [String] = []
     /// upload：对端有、本端没有 → 不拉回（仅记账）
     var peerOnlySkipped: [String] = []
+    /// upload：覆盖判定判为冲突 → **本轮不推**（「待确认覆盖」的数据 seam；批 4 UI 消费）。
+    var overwriteConflicts: [SyncFileOverwriteConflict] = []
+    /// upload：覆盖判定判为**静默跳过**（〔保持现状〕且双方都未变）→ 不推、不弹窗、不计待确认。
+    var overwriteSkipped: [String] = []
     /// 展开时未解析的曲目数（未指纹 / 未入库）
     var unresolvedCount: Int = 0
     /// 展开时忽略的未知/非法歌单标识（升序）

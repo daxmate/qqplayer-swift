@@ -105,6 +105,39 @@ extension SyncEntityRegistry {
             ),
             probe: .playbackCarry
         ),
+        SyncEntityAssemblyPoint(
+            platform: platformMac,
+            frame: 10,
+            detail: "文件覆盖判定接入生产决策点：SyncCollectionSyncCoordinator+Execution 在差集之后、推 / 拉分派之前调用 SyncFileOverwriteGate（内部唯一判定入口 = SyncFileOverwriteJudge），并在推送成功后落 agreed 台账",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "mac-overwrite-ledger-attached",
+                path: "QQPlayer/Sync/SyncCollectionSyncCoordinator+Execution.swift",
+                requiredMarkers: ["gate.decide(", "gate.recordPending(", "gate.recordAgreed("],
+                alternativeMarkers: [],
+                guidance: """
+                Mac 推送链路失去了覆盖确认闸门：对端文件被更新时会被静默覆盖（契约 G 行的「显式确认」承诺失效）。
+                请检查 SyncCollectionSyncCoordinator+Execution.handlePeerManifest 里是否仍调用 gate.decide(...) / recordPending(...)，
+                以及 handlePushState 的 .done 分支是否仍调用 gate.recordAgreed(...)。
+                """
+            ),
+            probe: .overwriteLedger
+        ),
+        SyncEntityAssemblyPoint(
+            platform: platformMac,
+            frame: nil,
+            detail: "覆盖台账装配：MacSyncCoordinatorFactory 构造 PeerFileStateStore + SyncFileOverwriteGate 并注入 SyncCollectionSyncCoordinator（对端 Device ID 为空则不装）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "mac-overwrite-store-attached",
+                path: "QQPlayer/Mac/MacSyncCoordinatorFactory.swift",
+                requiredMarkers: ["SyncFileOverwriteGate(", "PeerFileStateStore(database:", "overwriteGate:"],
+                alternativeMarkers: [],
+                guidance: """
+                覆盖台账没有装配：判定会退化成 mtime 兜底（或整批不判），「待确认覆盖」永远为空、对端更新可能被静默覆盖。
+                请检查 MacSyncCoordinatorFactory 是否构造 PeerFileStateStore 并作为 SyncFileOverwriteGate.store 注入协调器。
+                """
+            ),
+            probe: nil
+        ),
     ]
 
     // MARK: - 派生访问器（散落名单只准从这里取，不得手写第二份）

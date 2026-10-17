@@ -81,6 +81,9 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     let lyricsMapping: SyncLyricsContentMapping
     /// R3b：播放数据「跟歌走」驱动（nil = 不携带；R3a 行为零变化）。
     let playbackCarry: (any SyncPlaybackCarryDriving)?
+    /// 批 3：文件覆盖判定 + 台账生产接线（nil = 未装配；仅 upload 生效）。
+    /// 生产由 MacSyncCoordinatorFactory 注入；iOS 被动端不推歌 ⇒ 保持 nil。
+    let overwriteGate: SyncFileOverwriteGate?
     let fileManager: FileManager
 
     /// 等对端清单的超时定时（专用串行队列，与 `SyncPeerLibraryClient.timeoutQueue` 同款）。
@@ -98,6 +101,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     var expansionValue = SyncCollectionExpansion()
     /// 计划阶段取回的对端 manifest 条目（R3b 携带时算「对端持有」的身份集合）。
     var peerManifestEntriesValue: [ManifestEntry] = []
+    /// 本端计划阶段的 manifest（批 3：推送成功后按它落 `agreed` 台账）。
+    var localManifestEntriesValue: [ManifestEntry] = []
     /// R3b：各方向**已确认传输**的相对路径（完成回调收集，传输序；去重）。
     /// 为什么不用控制器 summary：拉取侧的 `summary.completed` 会晚于 `.done` 回调
     /// （见 `report` 文档），阶段收尾时现读会拿到空集合 → 携带永远不触发。
@@ -128,6 +133,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         lyricsStore: AlignedLyricsStore = .shared,
         lyricsMapping: SyncLyricsContentMapping,
         playbackCarry: (any SyncPlaybackCarryDriving)? = nil,
+        overwriteGate: SyncFileOverwriteGate? = nil,
         fileManager: FileManager = .default
     ) {
         self.session = session
@@ -140,6 +146,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         self.lyricsStore = lyricsStore
         self.lyricsMapping = lyricsMapping
         self.playbackCarry = playbackCarry
+        self.overwriteGate = overwriteGate
         self.fileManager = fileManager
     }
 

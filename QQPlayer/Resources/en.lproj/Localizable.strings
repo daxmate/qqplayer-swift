@@ -1044,6 +1044,7 @@
 "sync_wiring_probe_playback_position_sink" = "Resume-position sink";
 "sync_wiring_probe_playback_carry" = "Playback position carried with songs";
 "sync_wiring_probe_data_sync_entry" = "Sync Data entry";
+"sync_wiring_probe_overwrite_ledger" = "File overwrite confirmation";
 
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "Sync Direction";

@@ -1047,6 +1047,7 @@
 "sync_wiring_probe_playback_position_sink" = "跨端续播落点";
 "sync_wiring_probe_playback_carry" = "跟歌走携带";
 "sync_wiring_probe_data_sync_entry" = "同步数据入口";
+"sync_wiring_probe_overwrite_ledger" = "文件覆盖确认";
 
 // T10（2026-09-12）方向优先 · 内容源随方向切换
 "sync_run_direction_section" = "同步方向";

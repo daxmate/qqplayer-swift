@@ -96,8 +96,19 @@ extension SyncCollectionSyncCoordinator {
             direction: direction
         )
 
+        // 批 3：文件覆盖判定（§6.1 插入点 = 差集之后、推 / 拉分派之前）。
+        // 只对 upload 生效；download = 契约 G 行唯一例外「用户显式从设备取回」——原样放行。
+        // 判定只在 SyncFileOverwriteJudge 一处；本处只做 IO 编排（读台账 → 判定 → 落台账）。
+        var overwriteDecision: SyncFileOverwriteDecision?
+        if direction == .upload, let gate = overwriteGate {
+            let decision = gate.decide(toPush: diff.toPush, local: local, remote: response.entries)
+            overwriteDecision = decision
+            // 判为冲突 → 落 pending（content_hash = 对端指纹），供「待确认覆盖」跨轮留存。
+            gate.recordPending(conflicts: decision.conflicts, remote: response.entries)
+        }
+
         lock.lock()
-        reportValue.plannedPush = diff.toPush
+        reportValue.plannedPush = overwriteDecision?.allowed ?? diff.toPush
         reportValue.plannedPull = diff.toPull
         reportValue.skipped = diff.unchanged
         reportValue.alreadyPresent = diff.alreadyPresent
@@ -106,7 +117,10 @@ extension SyncCollectionSyncCoordinator {
         reportValue.conflictingKept = diff.conflictingKept
         reportValue.localOnlySkipped = diff.localOnlySkipped
         reportValue.peerOnlySkipped = diff.peerOnlySkipped
+        reportValue.overwriteConflicts = overwriteDecision?.conflicts ?? []
+        reportValue.overwriteSkipped = overwriteDecision?.skipped ?? []
         peerManifestEntriesValue = response.entries
+        localManifestEntriesValue = local
         // 后续（控制器自己的）manifest 响应不再触发本类计划
         let peer = manifestPeer
         manifestPeer = nil
@@ -127,6 +141,21 @@ extension SyncCollectionSyncCoordinator {
             diff: diff
         ) {
             SyncConnectDiag.log(line)
+        }
+
+        if let decision = overwriteDecision {
+            if !decision.conflicts.isEmpty {
+                let detail = decision.conflicts
+                    .map { "\($0.relativePath)(\($0.reason.rawValue))" }
+                    .joined(separator: ", ")
+                AppLog.info(.sync, "ℹ️ 文件覆盖：本轮 \(decision.conflicts.count) 项待确认，不覆盖：[\(detail)]")
+            }
+            if !decision.skipped.isEmpty {
+                AppLog.info(
+                    .sync,
+                    "ℹ️ 文件覆盖：〔保持现状〕且双方未变 → 静默跳过 \(decision.skipped.count) 项（不推、不弹窗）"
+                )
+            }
         }
 
         beginTransfers()
@@ -198,9 +227,11 @@ extension SyncCollectionSyncCoordinator {
             lock.unlock()
             return
         }
+        var completedPaths: [String]?
         switch state {
-        case .done:
-            break // 结果账目由 `report` 实时合并控制器 summary
+        case let .done(summary):
+            // 结果账目由 `report` 实时合并控制器 summary；这里只取「已确认送达」清单落台账。
+            completedPaths = summary.completed
         case let .failed(reason):
             if reportValue.pushAbortReason == nil {
                 reportValue.pushAbortReason = reason
@@ -209,7 +240,13 @@ extension SyncCollectionSyncCoordinator {
             lock.unlock()
             return
         }
+        let gate = overwriteGate
+        let local = localManifestEntriesValue
         lock.unlock()
+        // 批 3：只对确认送达的路径落 `agreed`（失败 / 跳过项不得写，否则下一轮会误判「对端未变」）。
+        if let gate, let completedPaths, !completedPaths.isEmpty {
+            gate.recordAgreed(paths: completedPaths, local: local)
+        }
         carryPlaybackData(direction: .push)
         finishStage()
     }

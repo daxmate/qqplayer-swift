@@ -1042,6 +1042,7 @@
 "sync_wiring_probe_playback_position_sink" = "Reprise de lecture";
 "sync_wiring_probe_playback_carry" = "Position de lecture transportée avec les morceaux";
 "sync_wiring_probe_data_sync_entry" = "Entrée « Synchroniser les données »";
+"sync_wiring_probe_overwrite_ledger" = "Confirmation d’écrasement de fichier";
 
 // T10 (2026-09-12) sens d'abord · la source de contenu suit le sens
 "sync_run_direction_section" = "Sens de synchronisation";

@@ -144,8 +144,8 @@
 | ④ | 有 | 断点续传 `.part`：`SyncFileTransferTests.swift:158`「断点续传」、`:235`「resume 不匹配」 |
 | ⑤ | 部分 | 无「本地真值补发」概念，靠**每次重算选择集 manifest**（`SyncCollectionSyncCoordinator+Execution.swift:60`）。已选歌但 manifest 缺条目时**无专门告警** |
 | ⑥ | 有 | `SyncUIReportSummary`（`SyncUIState.swift:449`）经 `MacSyncRunViewModel.swift:304` 上屏（含失败清单 `failedItems`） |
-| ⑦ | 有 | `SyncFileTransferTests`(7)、`SyncManifestReconcileTests`(11)、`SyncTransferIdentityTests`、`SyncLibrarySyncE2ETests`、`SyncLibraryPlanTests` |
-| ⑧ | △ | 无静态装配断言；有 `mac-playback-carry-attached`（`SyncWiringContractTests.swift:71`）间接覆盖跟歌走 |
+| ⑦ | 有 | `SyncFileTransferTests`(7)、`SyncManifestReconcileTests`(11)、`SyncTransferIdentityTests`、`SyncLibrarySyncE2ETests`、`SyncLibraryPlanTests`；覆盖确认接线：`SyncFileOverwriteWiringTests`（skipped / peerChanged / keptLocalChanged / approved / 读失败保守 / 取回例外）、无模拟器 harness ㊽ 节 |
+| ⑧ | ✅ 有（2026-10-17 批 3） | 静态：`mac-overwrite-ledger-attached`（调用点 = `SyncCollectionSyncCoordinator+Execution` 的 `gate.decide` / `recordPending` / `recordAgreed`）+ `mac-overwrite-store-attached`（`MacSyncCoordinatorFactory` 构造 `PeerFileStateStore` / `SyncFileOverwriteGate`）；运行时：`SyncWiringProbe.overwriteLedger`（`MacSyncRunViewModel` 回报装配事实） |
 >
 > **冲突语义（2026-10-16 修订）**：G 行「内容权威在 Mac」**不再等于无条件覆盖**——对端文件更新（内容指纹 + 每 peer 反向台账为主，mtime 兜底，判不了 = 保守冲突）→ 本轮跳过并进「待确认覆盖」，用户在 Mac 同步页确认后才覆盖（契约 `docs/sync-contract.md` §2 G；设计 `docs/lan-sync-design.md` §6.1）。判定显式排除 `@lyrics/*`。
 

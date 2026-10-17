@@ -49,6 +49,8 @@ enum SyncWiringProbe: String, CaseIterable, Equatable, Sendable {
     case playbackCarry
     /// Mac「同步数据」协调器（会话 ready 自动一轮）已装配
     case dataSyncEntry
+    /// 文件覆盖判定 + 台账闸门（`SyncFileOverwriteGate`）已装配（对端 Device ID 为空则不装）
+    case overwriteLedger
 
     /// 面板展示名（五语齐，见 `QQPlayer/Resources/*.lproj/Localizable.strings`）。
     var labelKey: String {
@@ -58,6 +60,7 @@ enum SyncWiringProbe: String, CaseIterable, Equatable, Sendable {
         case .playbackPositionSink: return "sync_wiring_probe_playback_position_sink"
         case .playbackCarry: return "sync_wiring_probe_playback_carry"
         case .dataSyncEntry: return "sync_wiring_probe_data_sync_entry"
+        case .overwriteLedger: return "sync_wiring_probe_overwrite_ledger"
         }
     }
 }

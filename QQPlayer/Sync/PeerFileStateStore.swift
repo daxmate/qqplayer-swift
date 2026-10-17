@@ -117,3 +117,9 @@ final class PeerFileStateStore: @unchecked Sendable {
         Int64((Date().timeIntervalSince1970 * 1000).rounded())
     }
 }
+
+// MARK: - 判官接线接口
+
+/// 判官接线（SyncFileOverwriteGate）只依赖最小读写接口；存储层是它的生产实现。
+/// 方法与协议逐字同形（load(peerId:) / upsert(_:)），不新增第二套读写路径。
+extension PeerFileStateStore: SyncFileOverwriteLedgering {}

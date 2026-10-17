@@ -260,6 +260,7 @@ final class MacSyncRunViewModel: ObservableObject {
         let coordinator = assembly.coordinator
         // 装配事实 → 运行时自检（INV-16 后半句）：跟歌走携带没装上要看得见，不能只留在注释里。
         SyncWiringFactsStore.shared.record(.playbackCarry, attached: assembly.playbackCarryAttached)
+        SyncWiringFactsStore.shared.record(.overwriteLedger, attached: assembly.overwriteLedgerAttached)
         coordinator.onStateChange = { [weak self] state in
             Task { @MainActor in self?.handleState(state, from: coordinator) }
         }

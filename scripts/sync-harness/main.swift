@@ -1447,6 +1447,8 @@ func makeCollectionScenario(
     attachDeviceHost: Bool = true,
     /// 编排配置（默认值 = 既有行为不变；㊶ 注入极小 `peerManifestTimeout`）。
     configuration: SyncCollectionSyncConfiguration = SyncCollectionSyncConfiguration(),
+    /// 批 3：覆盖判定 / 台账接线（nil = 不装，既有行为零变化）。
+    overwriteStore: SyncFileOverwriteLedgering? = nil,
     /// 在 `start(direction:)` **之前**配置编排器（㊸ S2 竞态用例：注入阻塞回调，
     /// 复现「清单已到、差集还没算完」这段窗口）。
     configureCoordinator: ((SyncCollectionSyncCoordinator) -> Void)? = nil
@@ -1516,7 +1518,10 @@ func makeCollectionScenario(
         sink: macSink,
         lyricsStore: macLyricsStore,
         lyricsMapping: macLyricsMapping,
-        playbackCarry: carryDriver
+        playbackCarry: carryDriver,
+        overwriteGate: overwriteStore.map {
+            SyncFileOverwriteGate(peerId: fixture.clientIdentity.deviceID, store: $0, nowMs: { 1_700_000_000_000 })
+        }
     )
     configureCoordinator?(coordinator)
     try coordinator.start(direction: direction)
@@ -3541,6 +3546,186 @@ do {
         ["agreed", "pending", "approved", "kept"],
         "台账状态机取值：agreed / pending / approved / kept"
     )
+}
+
+// MARK: - ㊽ 批 3：覆盖判定 / 台账接线（生产决策点）
+
+section("㊽ 批 3：覆盖判定接入生产决策点（skipped / peerChanged / approved / 取回例外）")
+
+/// 内存台账（harness 无 GRDB）：只实现判官接线需要的最小读写接口。
+final class HarnessLedgerStore: SyncFileOverwriteLedgering, @unchecked Sendable {
+    private let lock = NSLock()
+    private var rows: [PeerFileStateRow]
+    private var loadCountValue = 0
+    var failLoad = false
+
+    init(_ rows: [PeerFileStateRow] = []) {
+        self.rows = rows
+    }
+
+    var loadCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return loadCountValue
+    }
+
+    func load(peerId: String) throws -> [PeerFileStateRow] {
+        lock.lock()
+        defer { lock.unlock() }
+        loadCountValue += 1
+        if failLoad { throw NSError(domain: "HarnessLedgerStore", code: 1) }
+        return rows.sorted { $0.relativePath < $1.relativePath }
+    }
+
+    func upsert(_ row: PeerFileStateRow) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        rows.removeAll { $0.relativePath == row.relativePath }
+        rows.append(row)
+    }
+
+    func row(_ relativePath: String) -> PeerFileStateRow? {
+        lock.lock()
+        defer { lock.unlock() }
+        return rows.first { $0.relativePath == relativePath }
+    }
+}
+
+let overwritePath = "Album/wiring.flac"
+let overwriteLocalBytes = Data(repeating: 0x11, count: 4_096)
+let overwriteRemoteBytes = Data(repeating: 0x22, count: 4_096)
+let overwriteLocalHash = SyncFileChecksum.sha256Hex(of: overwriteLocalBytes)
+let overwriteRemoteHash = SyncFileChecksum.sha256Hex(of: overwriteRemoteBytes)
+let overwritePlaylists: [String: [SyncCollectionTrackFact]] = [
+    "p1": [
+        SyncCollectionTrackFact(
+            stableId: "s-ow",
+            relativePath: overwritePath,
+            contentHash: overwriteLocalHash
+        ),
+    ],
+]
+
+func overwriteRow(
+    _ state: PeerFileStateRow.State,
+    contentHash: String,
+    localHashAtDecision: String?
+) -> PeerFileStateRow {
+    PeerFileStateRow(
+        peerId: "harness-peer",
+        relativePath: overwritePath,
+        contentHash: contentHash,
+        state: state,
+        localHashAtDecision: localHashAtDecision
+    )
+}
+
+func deviceBytes(_ scenario: CollectionScenario) -> Data? {
+    try? Data(contentsOf: scenario.deviceRoot.appendingPathComponent(overwritePath))
+}
+
+// ① kept 且双方未变 → 静默跳过（不推、不弹窗、不进待确认）
+do {
+    let store = HarnessLedgerStore([
+        overwriteRow(.kept, contentHash: overwriteRemoteHash, localHashAtDecision: overwriteLocalHash),
+    ])
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [(overwritePath, overwriteLocalBytes)],
+        deviceFiles: [(overwritePath, overwriteRemoteBytes)],
+        playlists: overwritePlaylists,
+        overwriteStore: store
+    )
+    checkEqual(scenario.coordinator.state, .done, "㊽ kept 双方未变：编排 done")
+    check(scenario.coordinator.report.plannedPush.isEmpty, "㊽ kept 双方未变：不推")
+    checkEqual(scenario.coordinator.report.overwriteSkipped, [overwritePath], "㊽ kept 双方未变：进 skipped 桶")
+    check(scenario.coordinator.report.overwriteConflicts.isEmpty, "㊽ kept 双方未变：不计待确认")
+    checkEqual(deviceBytes(scenario), overwriteRemoteBytes, "㊽ kept 双方未变：对端文件原样")
+    checkEqual(store.row(overwritePath)?.state, .kept, "㊽ 静默跳过不改台账状态")
+} catch {
+    check(false, "㊽ ① 抛错：\(error)")
+}
+
+// ② kept 但对端又变 → 冲突 + 落 pending
+do {
+    let store = HarnessLedgerStore([
+        overwriteRow(.kept, contentHash: "stale-peer-hash", localHashAtDecision: overwriteLocalHash),
+    ])
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [(overwritePath, overwriteLocalBytes)],
+        deviceFiles: [(overwritePath, overwriteRemoteBytes)],
+        playlists: overwritePlaylists,
+        overwriteStore: store
+    )
+    checkEqual(scenario.coordinator.report.overwriteConflicts.map(\.reason), [.peerChanged], "㊽ kept 对端又变 → peerChanged")
+    check(scenario.coordinator.report.plannedPush.isEmpty, "㊽ 冲突本轮不推")
+    checkEqual(deviceBytes(scenario), overwriteRemoteBytes, "㊽ 冲突不得覆盖对端")
+    checkEqual(store.row(overwritePath)?.state, .pending, "㊽ 冲突 → 台账 pending")
+    checkEqual(store.row(overwritePath)?.contentHash, overwriteRemoteHash, "㊽ pending 行 = 对端指纹")
+} catch {
+    check(false, "㊽ ② 抛错：\(error)")
+}
+
+// ③ approved 且本端未再变 → 覆盖执行，成功后 agreed
+do {
+    let store = HarnessLedgerStore([
+        overwriteRow(.approved, contentHash: overwriteRemoteHash, localHashAtDecision: overwriteLocalHash),
+    ])
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [(overwritePath, overwriteLocalBytes)],
+        deviceFiles: [(overwritePath, overwriteRemoteBytes)],
+        playlists: overwritePlaylists,
+        overwriteStore: store
+    )
+    checkEqual(scenario.coordinator.state, .done, "㊽ approved：编排 done")
+    check(scenario.coordinator.report.pushed.contains(overwritePath), "㊽ approved：确认后真的推送")
+    checkEqual(deviceBytes(scenario), overwriteLocalBytes, "㊽ approved：对端被覆盖为 Mac 版本")
+    checkEqual(store.row(overwritePath)?.state, .agreed, "㊽ 推送成功 → agreed")
+    checkEqual(store.row(overwritePath)?.contentHash, overwriteLocalHash, "㊽ agreed 行 = 发出的本端指纹")
+} catch {
+    check(false, "㊽ ③ 抛错：\(error)")
+}
+
+// ④ 台账读失败 → 保守冲突（判不了不覆盖）
+do {
+    let store = HarnessLedgerStore()
+    store.failLoad = true
+    let scenario = try makeCollectionScenario(
+        selection: .playlists(["p1"]),
+        macFiles: [(overwritePath, overwriteLocalBytes)],
+        deviceFiles: [(overwritePath, overwriteRemoteBytes)],
+        playlists: overwritePlaylists,
+        overwriteStore: store
+    )
+    checkEqual(scenario.coordinator.report.overwriteConflicts.map(\.reason), [.undecidable], "㊽ 读台账失败 → 保守冲突")
+    check(scenario.coordinator.report.plannedPush.isEmpty, "㊽ 读台账失败：不覆盖")
+    checkEqual(deviceBytes(scenario), overwriteRemoteBytes, "㊽ 读台账失败：对端文件原样")
+} catch {
+    check(false, "㊽ ④ 抛错：\(error)")
+}
+
+// ⑤ download（用户显式从设备取回）= 契约 G 行唯一例外 → 不读台账、不判覆盖
+do {
+    let store = HarnessLedgerStore([
+        overwriteRow(.pending, contentHash: "stale-peer-hash", localHashAtDecision: nil),
+    ])
+    let scenario = try makeCollectionScenario(
+        selection: .all,
+        direction: .download,
+        macFiles: [],
+        deviceFiles: [(overwritePath, overwriteRemoteBytes)],
+        playlists: overwritePlaylists,
+        overwriteStore: store
+    )
+    checkEqual(scenario.coordinator.report.plannedPull, [overwritePath], "㊽ download：取回计划原样")
+    checkEqual(store.loadCount, 0, "㊽ download：不读覆盖台账（唯一例外）")
+    check(scenario.coordinator.report.overwriteConflicts.isEmpty, "㊽ download：不弹冲突")
+    checkEqual(store.row(overwritePath)?.state, .pending, "㊽ download：不改覆盖台账")
+    scenario.coordinator.cancel()
+} catch {
+    check(false, "㊽ ⑤ 抛错：\(error)")
 }
 
 // MARK: - 汇总

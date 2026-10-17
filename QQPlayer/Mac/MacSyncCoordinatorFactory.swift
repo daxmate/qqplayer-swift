@@ -44,6 +44,9 @@ struct MacSyncCoordinatorAssembly {
     let coordinator: SyncCollectionSyncCoordinator
     /// 跟歌走携带（`SyncPlaybackCarryPeer`）是否真的装上了。
     let playbackCarryAttached: Bool
+    /// 文件覆盖判定 + 台账（`SyncFileOverwriteGate`）是否真的装上了。
+    /// 对端 Device ID 为空 ⇒ 无法按 peer 记台账 ⇒ 不装（与 playbackCarry 同口径）。
+    let overwriteLedgerAttached: Bool
 }
 
 /// Mac 同步编排装配工厂。
@@ -85,6 +88,13 @@ enum MacSyncCoordinatorFactory {
         let playbackCarry = peerID.isEmpty
             ? nil
             : SyncPlaybackCarryPeer(session: session, libraryRoot: libraryRoot, peerID: peerID)
+        // 批 3：文件覆盖判定 + 台账（同一份 DB；peerID 为空时无法按 peer 记台账 ⇒ 不装）。
+        let overwriteGate = peerID.isEmpty
+            ? nil
+            : SyncFileOverwriteGate(
+                peerId: peerID,
+                store: PeerFileStateStore(database: database)
+            )
 
         let coordinator = SyncCollectionSyncCoordinator(
             session: session,
@@ -97,8 +107,13 @@ enum MacSyncCoordinatorFactory {
             // `.unresolved` 缺省）：缺了会让拉取侧 `SyncLyricsReceiver.install` 把对端发来的
             // 歌词全判为 orphan → iPhone 的歌同步到 Mac 时歌词永远不落库。
             lyricsMapping: lyricsMapping,
-            playbackCarry: playbackCarry
+            playbackCarry: playbackCarry,
+            overwriteGate: overwriteGate
         )
-        return MacSyncCoordinatorAssembly(coordinator: coordinator, playbackCarryAttached: playbackCarry != nil)
+        return MacSyncCoordinatorAssembly(
+            coordinator: coordinator,
+            playbackCarryAttached: playbackCarry != nil,
+            overwriteLedgerAttached: overwriteGate != nil
+        )
     }
 }
