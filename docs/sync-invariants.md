@@ -363,7 +363,7 @@
 ### INV-33　文件覆盖（对端更新场景）必须先经**显式确认**，不得静默覆盖
 
 - **现有守护**：✗ 无守护（现状是「Mac 无条件覆盖移动端」，只活在 `docs/sync-contract.md` §2 G 的文字里；2026-10-16 修订后该措辞作废）
-- **建议**：`SyncFileOverwriteJudge`（纯函数、零 IO / 零 GRDB，可进 harness：输入 = `toPush` + 本端 / 对端 manifest + 每 peer 台账 + `nowMs`，输出 = `(allowed, conflicts)`）+ 新表 `sync_peer_file_state`（`peer_id, relative_path, content_hash, state, …`）+ 单测（判定 7 条 + 状态机 `pending` / `approved` / `kept` / `agreed` + 「自动通道只写 `pending`、不弹窗」）
+- **建议**：`SyncFileOverwriteJudge`（纯函数、零 IO / 零 GRDB，可进 harness：输入 = `toPush` + 本端 / 对端 manifest + 每 peer 台账 + `nowMs`，输出 = `(allowed, conflicts, skipped)`）+ 新表 `sync_peer_file_state`（`peer_id, relative_path, content_hash, local_hash_at_decision, state, updated_at_ms`）+ 单测（判定 7 条 + 状态机 `pending` / `approved` / `kept` / `agreed` + 「自动通道只写 `pending`、不弹窗」+ 〔保持现状〕的**下次同步**：双方都未变 → 静默跳过（`skipped`）；任一侧再变 → 重新确认（`keptLocalChanged` / `peerChanged`））
 
 ### INV-34　播放数据不接受「来自未来」的时间戳（远端 `updatedAtMs > 本机 now + 容差` → **不应用**并计数）
 

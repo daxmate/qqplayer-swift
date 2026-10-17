@@ -94,18 +94,21 @@ Host（macOS）                           Client（iOS）
 
 > 本节是**设计**（批 0 只落文档；实现按批推进）。**零协议变更**：不新增帧、不新增帧字段。
 
-- **判定入口**：新增纯函数 `SyncFileOverwriteJudge`（零 IO / 零 GRDB，可进 harness）——输入 = `toPush` + 本端 manifest `local` + 对端 manifest `remote` + 每 peer 台账行 + `nowMs`；输出 = `(allowed, conflicts)`。
+- **判定入口**：新增纯函数 `SyncFileOverwriteJudge`（零 IO / 零 GRDB，可进 harness）——输入 = `toPush` + 本端 manifest `local` + 对端 manifest `remote` + 每 peer 台账行 + `nowMs`；输出 = `(allowed, conflicts, skipped)`（`skipped` = **本批新增**：静默跳过桶——不推、不弹窗、不计入「待确认」）。
   - **只在 `direction == .upload` 生效**；`download` 原样放行（现状本就不覆盖，冲突项进 `conflictingKept`）。
   - **插入点** = 差集算完之后、推 / 拉分派之前（`SyncCollectionSyncCoordinator+Execution.swift` 的 `diff` 之后、`beginTransfers()` 之前）。
   - **排除 `@lyrics/*`**：歌词走 §6.3 的「只补不覆盖」，用现成 `SyncLyricsNamespace.isLyricsPath` 排除（判据不落到文件覆盖门上）。
-- **判定 7 条**（记 `L` = 本端 entry、`P` = 对端 entry、`T` = 台账行 `(peer_id, relative_path)`）：
+- **判定 7 条**（记 `L` = 本端 entry、`P` = 对端 entry、`T` = 台账行 `(peer_id, relative_path)`；`T.localHashAtDecision` = **决策时的本端指纹**）：
   1. `P.hash == L.hash` → 放行（防御式；本不应进 `toPush`）｜`contentEqual`
-  2. `T` 存在 且 `T.state == "approved"` 且 `T.approvedLocalHash == L.hash` → 放行（用户已确认且本端未再变）｜`userApproved`
-  3. `T` 存在 且 `T.contentHash == P.hash` → 放行（对端自上次一致后没动过 = 正常更新）｜`peerUntouched`
-  4. `T` 存在 且 `T.contentHash != P.hash` → **冲突**（对端自己改过这个文件）｜`peerChanged`
-  5. `T` 不存在，两侧 `mtimeMs > 0` 且 `P.mtimeMs > L.mtimeMs + 容差` → **冲突**（对端更新）｜`peerNewerByMtime`
-  6. `T` 不存在，两侧 `mtimeMs > 0` 且 `P.mtimeMs <= L.mtimeMs + 容差` → 放行（对端只是旧副本）｜`noRecordPeerOlder`
-  7. `T` 不存在 且 mtime 不可判（任一侧为 0 / 相等）→ **冲突（保守）**｜`undecidable`
+  2. `T` 存在 且 `T.state == "approved"` 且 `T.localHashAtDecision == L.hash` → 放行（用户已确认且本端未再变）｜`userApproved`
+  3. `T` 存在 且 `T.state == "approved"` 但 `T.localHashAtDecision != L.hash`（确认后本端又变）→ **冲突**（确认作废，须重新确认；对端未变 `undecidable` / 对端也变 `peerChanged`）｜边界 A1
+  4. `T` 存在 且 `T.state == "kept"`（用户上次选〔保持现状〕，**本批新增**）：
+     a. `T.contentHash == P.hash` 且 `T.localHashAtDecision == L.hash`（对端未变 **且** 本端未变）→ **静默跳过**：不推、**不弹窗**、不计入「待确认」｜`skipped`
+     b. `T.contentHash == P.hash` 但本端已变（用户在 Mac 重导 / 换版本）→ **冲突**（重新确认）｜`keptLocalChanged`（新原因码）
+     c. `T.contentHash != P.hash`（对端文件又变了）→ **冲突**（重新确认）｜`peerChanged`
+  5. `T` 存在（非 `approved` / 非 `kept`）且 `T.contentHash == P.hash` → 放行（对端自上次一致后没动过 = 正常更新）｜`peerUntouched`
+  6. `T` 存在（非 `approved` / 非 `kept`）且 `T.contentHash != P.hash` → **冲突**（对端自己改过这个文件）｜`peerChanged`
+  7. `T` 不存在 → mtime 兜底：两侧 `mtimeMs > 0` 且 `P.mtimeMs > L.mtimeMs + 容差` → **冲突**（对端更新）｜`peerNewerByMtime`；`P.mtimeMs <= L.mtimeMs + 容差` → 放行（对端只是旧副本）｜`noRecordPeerOlder`；mtime 不可判（任一侧为 0 / 相等）→ **冲突（保守）**｜`undecidable`
   - 容差 = **2000 ms**（同族文件系统粒度 + 扫描抖动），落成常量便于调。
   - `contentHash == nil`（未指纹）的条目无法比对台账 → 一律走「`T` 不存在」分支（mtime 兜底）。
 - **台账表 `sync_peer_file_state`**（本端 Mac DB，每端一份；`CREATE TABLE IF NOT EXISTS`，不动既有表结构 ⇒ 不需要完成门）：
@@ -116,17 +119,16 @@ Host（macOS）                           Client（iOS）
       relative_path       TEXT    NOT NULL,   -- 对账键（POSIX，相对曲库根）
       content_hash        TEXT    NOT NULL,   -- 「上次达成一致时」的内容指纹
       state               TEXT    NOT NULL,   -- agreed | pending | approved | kept
-      peer_mtime_ms       INTEGER NOT NULL DEFAULT 0,
-      local_mtime_ms      INTEGER NOT NULL DEFAULT 0,
-      approved_local_hash TEXT,               -- state = approved 时的本端指纹（校验「确认后本端是否又变了」）
-      updated_at          INTEGER NOT NULL,
+      local_hash_at_decision TEXT,            -- **决策时的本端指纹**（state = approved / kept 都写；校验「决策后本端是否又变了」）
+      updated_at_ms       INTEGER NOT NULL,   -- 落库时刻（epoch 毫秒）
       PRIMARY KEY (peer_id, relative_path)
   );
   CREATE INDEX IF NOT EXISTS idx_sync_peer_file_state_state ON sync_peer_file_state(state);
   ```
 
-- **状态机**：`pending`（判为冲突，待确认）/ `approved`（用户点了覆盖）/ `kept`（用户选保持现状，下次不再打扰）/ `agreed`（双方一致）。
-  - 写入时机：推送成功或拉取落盘成功 → `agreed`（`content_hash` = 本次发出的 hash）；判为冲突 → `pending`（`content_hash` = `P.hash`）；点「保持现状」→ `kept`（`content_hash` = `P.hash`）；点「覆盖」→ `approved`（`approved_local_hash` = `L.hash`）。
+- **状态机**：`pending`（判为冲突，待确认）/ `approved`（用户点了覆盖）/ `kept`（用户选〔保持现状〕：后续每轮**静默跳过**，仅当对端或本端文件再变才重新确认）/ `agreed`（双方一致）。
+  - 写入时机：推送成功或拉取落盘成功 → `agreed`（`content_hash` = 本次发出的 hash）；判为冲突 → `pending`（`content_hash` = `P.hash`）；点「保持现状」→ `kept`（`content_hash` = `P.hash`，`local_hash_at_decision` = `L.hash`）；点「覆盖」→ `approved`（`content_hash` = `P.hash`，`local_hash_at_decision` = `L.hash`）。
+   - **`kept` 的下次行为（本批补齐 · 2026-10-17 用户拍板）**：`kept` 行在后续每轮 upload 都过判定表**规则 4**——对端未变 **且** 本端未变 → **静默跳过**（不推、不弹窗、不计入「待确认」）；对端文件又变 → 重新弹窗（`peerChanged`）；本端文件又变（Mac 重导 / 换版本）→ 重新弹窗（`keptLocalChanged`）。「本端是否又变」靠 `local_hash_at_decision`（决策时落的本端指纹），与 `approved` 同口径。
 - **交互（三选项）**：手动一轮判出冲突 → 冲突项移出本轮 `plannedPush` 并写 `pending`，**本轮照常推其余文件**；结果区出现「待确认覆盖 (N)」并**弹确认对话框** ——〔覆盖全部〕〔逐条勾选〕〔保持现状〕；点覆盖 → 写 `approved` → **立即重跑一轮 upload**（复用同一入口）。
 - **自动通道**：将来若加内容自动同步，走**同一条 judge**；判为冲突 → **只写 `pending` + 计数上屏，不弹窗**（自动通道不阻塞用户）。
 - **手机被动端**：**不加阻塞式确认**（被动端不发起，也不该让用户在手机上等点确认）；本期只做 Mac 侧。
@@ -272,3 +274,4 @@ Host（macOS）                           Client（iOS）
 | 日期 | 变更 | 依据 |
 | --- | --- | --- |
 | 2026-10-16 | §6.1 新增「冲突判定 + 待确认覆盖」（`SyncFileOverwriteJudge` 判定 7 条 + 新表 `sync_peer_file_state` + 状态机 `pending`/`approved`/`kept`/`agreed` + 三选项交互 + 自动通道只写 `pending` 不弹窗 + 只做 upload 方向 + P2 形状守卫 + 排除 `@lyrics/*`）；§6.2 新增 B1（对端时间戳超前 > 5 分钟 → 不应用 + 计数上屏）与 B2（`sync_playback_carry_state` + 游标单调不回退）；明确**零协议变更** | 用户 2026-10-16 拍板（契约 = `docs/sync-contract.md` §4） |
+| 2026-10-17 | §6.1 补齐〔保持现状〕(`kept`) 的**下次同步**语义：判定表新增 `kept` 分支（对端 + 本端都未变 → **静默跳过**，新增 `skipped` 输出桶；本端又变 → 冲突 `keptLocalChanged`（新原因码）；对端又变 → 冲突 `peerChanged`）；台账「决策时的本端指纹」字段统一为 `local_hash_at_decision`（`approved` / `kept` 都写），表列同批对齐（`updated_at_ms`；批 2 不落未被判据消费的 `peer_mtime_ms` / `local_mtime_ms`） | 用户 2026-10-17 拍板（契约 = `docs/sync-contract.md` §4） |
