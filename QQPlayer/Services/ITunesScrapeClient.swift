@@ -10,7 +10,9 @@
 //  MusicBrainzClient.itunesSearch（不重复 itunes.apple.com 字面量）。
 //
 //  语义：
-//  - 请求 https://itunes.apple.com/search?term=<query>&entity=song&country=cn&limit=20
+//  - 请求 https://itunes.apple.com/search?term=<query>&entity=song&country=tw&limit=20
+//  - 店区顺序 tw → us：CN 店区 entity=song 恒返回 0 条（2026-10 实测），tw 对中文原唱
+//    覆盖最好，空/失败才回退 us；primary 命中即返回，不再发 fallback 请求
 //  - 任何失败（超时 / 网络 / 非 2xx / 解析失败）→ 返回 []，绝不抛、不影响其它源
 //  - 映射唯一入口 candidates(fromJSON:)（纯函数，可单测）
 //  - URLProtocol 注入 seam（照 MusicBrainzClient 写法），便于测试
@@ -24,6 +26,8 @@ struct ITunesScrapeClient {
     /// 与 MusicBrainzClient 同一 UA（Apple 端点无强制 UA 要求，保持一致便于排查）
     static let userAgent = MusicBrainzClient.userAgent
 
+    /// 店区顺序：`tw` 主（中文原唱覆盖最好）、`us` 回退（CN 店区 `entity=song` 恒返回 0 条）
+    static let storefronts = ["tw", "us"]
     /// 单次查询候选上限（§3.B：limit=20）
     static let searchLimit = 20
     /// 网络超时（§3.B：10s）
@@ -37,28 +41,56 @@ struct ITunesScrapeClient {
     }
 
     /// 查询 → 候选；空 query / 任何失败 → []（不抛、不影响其它源）
+    ///
+    /// 按 `storefronts` 顺序尝试：某个店区拿到候选即返回（不再请求后续店区）；
+    /// 空结果 / 网络失败 / 非 2xx / 解析失败 → 继续下一个店区；全部失败 → []。
     func candidates(query: String) async -> [ScrapeCandidate] {
-        guard let url = Self.searchURL(query: query) else { return [] }
-        do {
-            let data = try await fetch(url)
-            return Self.candidates(fromJSON: data)
-        } catch {
-            return []
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return [] }
+        var merged: [ScrapeCandidate] = []
+        for storefront in Self.storefronts {
+            guard let url = Self.searchURL(term: term, storefront: storefront) else { return merged }
+            let batch: [ScrapeCandidate]
+            do {
+                batch = Self.candidates(fromJSON: try await fetch(url))
+            } catch {
+                continue
+            }
+            guard !batch.isEmpty else { continue }
+            merged = Self.merging(merged, with: batch)
+            break
         }
+        return merged
     }
 
-    /// 构造查询 URL（term 去空白后为空 → nil）
-    static func searchURL(query: String) -> URL? {
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// 构造查询 URL（term 去空白后为空 → nil）；storefront 由调用方按 `storefronts` 传入
+    static func searchURL(term rawTerm: String, storefront: String) -> URL? {
+        let term = rawTerm.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return nil }
         var components = URLComponents(url: searchBaseURL, resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "term", value: term),
             URLQueryItem(name: "entity", value: "song"),
-            URLQueryItem(name: "country", value: "cn"),
+            URLQueryItem(name: "country", value: storefront),
             URLQueryItem(name: "limit", value: String(searchLimit)),
         ]
         return components.url
+    }
+
+    /// 合并去重：按 `trackId`（候选 `id`）保留首次出现的条目；无 `id` 的候选无法判重，逐条保留。
+    static func merging(_ existing: [ScrapeCandidate], with incoming: [ScrapeCandidate]) -> [ScrapeCandidate] {
+        var result = existing
+        var seen = Set(existing.compactMap(\.id))
+        for candidate in incoming {
+            guard let id = candidate.id else {
+                result.append(candidate)
+                continue
+            }
+            guard !seen.contains(id) else { continue }
+            seen.insert(id)
+            result.append(candidate)
+        }
+        return result
     }
 
     /// iTunes search JSON → 候选（**唯一转换入口**，纯函数可单测）
