@@ -224,6 +224,33 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-mac-v2-
 
+      # 版本号单一真源（项目级 build settings）：iOS 与 macOS 必须始终一致，
+      # 不一致直接红并打印两侧实际值（防两边各自改版本导致漂移）。
+      - name: Assert iOS/macOS version sync
+        run: |
+          set -euo pipefail
+          ver() {
+            xcodebuild -showBuildSettings -project QQPlayer.xcodeproj -target "$1" -configuration Release 2>/dev/null \
+              | sed -nE 's/^[[:space:]]*(MARKETING_VERSION|CURRENT_PROJECT_VERSION) = (.*)$/\1=\2/p' \
+              | sort
+          }
+          IOS="$(ver QQPlayer)"
+          MAC="$(ver QQPlayerMac)"
+          echo "iOS:"
+          printf '%s\n' "$IOS"
+          echo "macOS:"
+          printf '%s\n' "$MAC"
+          for pair in "$IOS" "$MAC"; do
+            printf '%s\n' "$pair" | grep -qE '^MARKETING_VERSION=[0-9]+(\.[0-9]+)*$' \
+              || { echo "❌ 缺少/非法 MARKETING_VERSION（项目级未设？）"; exit 1; }
+            printf '%s\n' "$pair" | grep -qE '^CURRENT_PROJECT_VERSION=[0-9]+$' \
+              || { echo "❌ 缺少/非法 CURRENT_PROJECT_VERSION（项目级未设？）"; exit 1; }
+          done
+          if [ "$IOS" != "$MAC" ]; then
+            echo "❌ iOS 与 macOS 版本号不一致（应只改项目级一处）"
+            exit 1
+          fi
+          echo "✅ iOS 与 macOS 版本号同步：$(printf '%s ' $IOS)"
       - name: Build QQPlayerMac
         run: |
           set -o pipefail

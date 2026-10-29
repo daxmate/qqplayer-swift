@@ -331,6 +331,12 @@ cd qqplayer-swift
 >
 > 若不用该脚本，直接跑 `xcodebuild` 时记得自己补 `-derivedDataPath`；另：构建前 `unset CC CXX` 可避免 Homebrew gcc 劫持 SPM 的 C/C++ 依赖编译（`build.sh` 已内置）。
 
+### 版本号 🏷️
+
+- 版本号只改项目级一处：`QQPlayer.xcodeproj/project.pbxproj` 里项目级 Debug/Release 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`，各 target 一律继承
+- iOS 与 macOS 必须同步：任一侧改动都要同步升（CI 有 iOS/macOS 版本一致性检查，不一致直接红）
+- 升版用 `./scripts/bump-version.sh <marketing> <build>`（例：`./scripts/bump-version.sh 1.2.0 63`），脚本只改项目级并打印所有 target 的实际取值
+
 ### 🔑 环境变量（全部可选）
 
 复制 `.env.template` 为 `.env` 并填入所需凭据；`.env` 需随构建加入 App bundle（或使用 Xcode 环境变量）。以下 key **全部可选**——未配置不会导致崩溃：歌手网络资料自动降级（缓存仍可用），其余功能不受影响：
