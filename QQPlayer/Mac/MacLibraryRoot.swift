@@ -25,7 +25,7 @@ enum MacLibraryRoot {
     /// 默认曲库位置 `~/Music/QQPlayer`（展示用；**不判存在性**）。
     /// 唯一的「默认根在哪」定义仍在 `MusicFolderResolver.macDefaultFolderURL`。
     static var defaultRootURL: URL {
-        MusicFolderResolver.macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+        MusicFolderResolver.macDefaultFolderURL(homeDirectory: UserHomeDirectory.realHomeURL)
     }
 
     /// 设置里指定位置的**展开后绝对路径**（`~` 按当前用户 home 展开；空串 = nil）。
@@ -41,10 +41,25 @@ enum MacLibraryRoot {
     /// 曲库根（唯一地址）：读设置里的「指定」→ 交给纯逻辑解析（存在才用，否则回退默认）。
     static var resolvedRootURL: URL {
         MusicFolderResolver.macLibraryRootURL(
-            homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+            homeDirectory: UserHomeDirectory.realHomeURL,
             specifiedPath: DeleteSettings.load().libraryRoot,
             directoryExists: { FileManager.default.fileExists(atPath: $0.path) }
         )
+    }
+
+    /// **期望**曲库根（**不判存在性**）：设置里指定了就用指定，否则默认。
+    ///
+    /// 与 `resolvedRootURL` 的唯一差别：指定目录「暂时读不到」时**不回退默认**。
+    /// 沙盒授权前必须先知道用户到底想授权哪个目录——回退默认会把 NAS / 外接盘
+    /// 静默换成 `~/Music/QQPlayer`（授权错文件夹 = 后续扫描永远空库）。
+    static var desiredRootURL: URL {
+        let specified = DeleteSettings.load().libraryRoot
+        guard !specified.isEmpty else { return defaultRootURL }
+        let expanded = MusicFolderResolver.expandedPath(
+            specified,
+            homeDirectory: UserHomeDirectory.realHomeURL
+        )
+        return URL(fileURLWithPath: expanded, isDirectory: true)
     }
 
     /// 指定的曲库位置当前**不存在 / 不可用**（本次解析已回退默认）→ 设置页据此给一行说明。

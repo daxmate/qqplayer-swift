@@ -215,6 +215,7 @@
 		EE588BF6136F4785ADA33B36 /* SyncFileOverwriteJudgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6980499664C462C8EB60371 /* SyncFileOverwriteJudgeTests.swift */; };
 		DDA70F8395E6460B9BA42725 /* PeerFileStateStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DA3E9D1E7B405BADDD3769 /* PeerFileStateStoreTests.swift */; };
 		01E66447D73F4889A2B9AF7F /* SyncFileOverwriteWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */; };
+		6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -479,6 +480,7 @@
 		E6980499664C462C8EB60371 /* SyncFileOverwriteJudgeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileOverwriteJudgeTests.swift; sourceTree = "<group>"; };
 		E6DA3E9D1E7B405BADDD3769 /* PeerFileStateStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PeerFileStateStoreTests.swift; sourceTree = "<group>"; };
 		1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileOverwriteWiringTests.swift; sourceTree = "<group>"; };
+		AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryRootAccessPlanTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -501,7 +503,10 @@
 				Mac/MacImportService.swift,
 				Mac/MacKaraokeControlBar.swift,
 				Mac/MacKeyboardShortcuts.swift,
+				Mac/MacLegacyLibraryImporter.swift,
+				Mac/MacLibraryAccessGate.swift,
 				Mac/MacLibraryRoot.swift,
+				Mac/MacLibraryRootAccess.swift,
 				Mac/MacLibrarySettingsView.swift,
 				"Mac/MacLibraryView+Content.swift",
 				"Mac/MacLibraryView+Data.swift",
@@ -638,7 +643,10 @@
 				Mac/MacImportService.swift,
 				Mac/MacKaraokeControlBar.swift,
 				Mac/MacKeyboardShortcuts.swift,
+				Mac/MacLegacyLibraryImporter.swift,
+				Mac/MacLibraryAccessGate.swift,
 				Mac/MacLibraryRoot.swift,
+				Mac/MacLibraryRootAccess.swift,
 				Mac/MacLibrarySettingsView.swift,
 				"Mac/MacLibraryView+Content.swift",
 				"Mac/MacLibraryView+Data.swift",
@@ -783,6 +791,7 @@
 				Services/LibraryIndexerModels.swift,
 				Services/LibraryReads.swift,
 				Services/LibraryRoot.swift,
+				Services/LibraryRootAccessPlan.swift,
 				Services/LibraryScanGate.swift,
 				Services/LocalDeviceName.swift,
 				Services/LogRotation.swift,
@@ -870,6 +879,7 @@
 				Services/TrackFileRenameService.swift,
 				Services/TrackIdentityMigration.swift,
 				Services/TraditionalToSimplifiedMap.swift,
+				Services/UserHomeDirectory.swift,
 				Services/WhatsNew.swift,
 				Sync/DeviceID.swift,
 				Sync/DeviceStore.swift,
@@ -1300,6 +1310,7 @@
 				E6980499664C462C8EB60371 /* SyncFileOverwriteJudgeTests.swift */,
 				E6DA3E9D1E7B405BADDD3769 /* PeerFileStateStoreTests.swift */,
 				1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */,
+				AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1813,6 +1824,7 @@
 				EE588BF6136F4785ADA33B36 /* SyncFileOverwriteJudgeTests.swift in Sources */,
 				DDA70F8395E6460B9BA42725 /* PeerFileStateStoreTests.swift in Sources */,
 				01E66447D73F4889A2B9AF7F /* SyncFileOverwriteWiringTests.swift in Sources */,
+				6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2247,6 +2259,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = QQPlayerMac.entitlements;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -2273,6 +2286,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = QQPlayerMac.entitlements;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;

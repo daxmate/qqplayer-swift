@@ -1100,3 +1100,22 @@
 "reclaim_select_all" = "Выбрать все";
 "reclaim_deselect_all" = "Снять выделение";
 "reclaim_not_restorable" = "Не восстановить";
+
+/* MAS 批 2B（2026-10-29）：曲库根授权 + 旧库导入 */
+"library_access_section" = "Доступ к папке";
+"library_access_section_footer" = "macOS разрешает этому приложению читать только выбранную вами музыкальную папку. После переноса папки разрешите доступ заново.";
+"library_access_state_granted" = "Доступ к музыкальной папке разрешён";
+"library_access_state_needed" = "Требуется разрешение";
+"library_access_authorize" = "Выбрать папку библиотеки…";
+"library_access_gate_title" = "Разрешите доступ к музыкальной папке";
+"library_access_gate_body" = "macOS позволяет приложению читать только выбранные вами папки. Выберите папку библиотеки, чтобы продолжить.";
+"library_access_gate_default" = "Расположение по умолчанию: %@";
+"library_access_grant_failed" = "Не удалось сохранить разрешение: %@";
+"library_import_legacy" = "Импортировать базу из предыдущей версии…";
+"library_import_legacy_prompt" = "Выберите папку QQPlayerMac в Application Support";
+"library_import_legacy_done" = "Импортировано файлов: %d. Перезапустите QQPlayer, если библиотека не обновилась.";
+"library_import_legacy_failed" = "Импорт не удался: %@ (прежняя база не изменена)";
+"library_import_legacy_missing" = "В выбранной папке нет qqplayer.db";
+"library_import_legacy_backup" = "Существующая база сохранена как %@";
+"library_import_legacy_hint" = "Найдена база предыдущей (не в песочнице) версии — её можно импортировать.";
+"library_import_legacy_confirm" = "Текущая база будет заменена (резервная копия создаётся автоматически). После этого перезапустите QQPlayer. Продолжить?";

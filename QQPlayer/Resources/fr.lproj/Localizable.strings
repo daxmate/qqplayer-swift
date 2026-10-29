@@ -1103,3 +1103,22 @@
 "reclaim_select_all" = "Tout sélectionner";
 "reclaim_deselect_all" = "Tout désélectionner";
 "reclaim_not_restorable" = "Non restaurable";
+
+/* MAS 批 2B（2026-10-29）：曲库根授权 + 旧库导入 */
+"library_access_section" = "Accès au dossier";
+"library_access_section_footer" = "macOS autorise cette app à lire uniquement le dossier musical que vous choisissez. Autorisez à nouveau après un déplacement.";
+"library_access_state_granted" = "Accès au dossier musical accordé";
+"library_access_state_needed" = "Autorisation requise";
+"library_access_authorize" = "Choisir le dossier de musique…";
+"library_access_gate_title" = "Autoriser l'accès à votre dossier musical";
+"library_access_gate_body" = "macOS n'autorise cette app à lire que les dossiers que vous choisissez. Sélectionnez votre dossier musical pour continuer.";
+"library_access_gate_default" = "Emplacement par défaut : %@";
+"library_access_grant_failed" = "Impossible d'enregistrer l'autorisation : %@";
+"library_import_legacy" = "Importer la base d'une version précédente…";
+"library_import_legacy_prompt" = "Sélectionnez le dossier QQPlayerMac dans Application Support";
+"library_import_legacy_done" = "%d fichier(s) importé(s). Redémarrez QQPlayer si la bibliothèque ne se met pas à jour.";
+"library_import_legacy_failed" = "Échec de l'import : %@ (votre base précédente est intacte)";
+"library_import_legacy_missing" = "Aucun qqplayer.db dans le dossier sélectionné";
+"library_import_legacy_backup" = "Base existante sauvegardée sous %@";
+"library_import_legacy_hint" = "Une base d'une version précédente (non sandboxée) a été détectée et peut être importée.";
+"library_import_legacy_confirm" = "Cette action remplace la base actuelle (une sauvegarde est créée automatiquement). Redémarrez QQPlayer ensuite. Continuer ?";

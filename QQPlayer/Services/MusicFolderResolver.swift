@@ -47,7 +47,9 @@ enum MusicFolderResolver {
     /// 用的就是这两个值）。
     static var syncLibraryRoot: URL {
         #if os(macOS)
-            macDefaultFolderURL(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+            // 沙盒里 `homeDirectoryForCurrentUser` = 容器 home（同步 rel: 命名空间会错位）；
+            // 真实 home 的唯一入口是 `UserHomeDirectory`。
+            macDefaultFolderURL(homeDirectory: UserHomeDirectory.realHomeURL)
         #else
             iosMusicLibraryDirectoryURL()
         #endif

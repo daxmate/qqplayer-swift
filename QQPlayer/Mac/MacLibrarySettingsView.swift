@@ -28,6 +28,11 @@ struct MacLibrarySettingsView: View {
     /// 回收区管理弹窗（2026-09-29 回收区管理批）。
     @State private var showReclaimArea = false
 
+    /// 曲库根授权状态（MAS 批 2B）：设置页与引导页读同一份，避免「两个地方两套口径」。
+    @Environment(MacLibraryRootAccess.self) private var libraryAccess
+    @State private var accessMessage: String?
+    @State private var isImportingLegacy = false
+
     var body: some View {
         Form {
             Section {
@@ -76,6 +81,47 @@ struct MacLibrarySettingsView: View {
                     Label("library_root_change".localized, systemImage: "folder.badge.gearshape")
                 }
                 .disabled(copyProgress != nil)
+            }
+
+            // 曲库文件夹访问权限（MAS 批 2B，2026-10-29）：沙盒下容器外目录必须显式授权。
+            // 状态行 + 重新授权 + 旧库导入入口（首启引导页之外的常驻入口）。
+            Section {
+                HStack(spacing: DesignTokens.space8) {
+                    Image(systemName: libraryAccess.state == .granted ? "lock.open" : "lock.slash")
+                        .foregroundColor(libraryAccess.state == .granted ? .green : .orange)
+                    Text(libraryAccess.state == .granted
+                        ? "library_access_state_granted".localized
+                        : "library_access_state_needed".localized)
+                    Spacer()
+                    Button {
+                        authorizeLibraryFolder()
+                    } label: {
+                        Text("library_access_authorize".localized)
+                    }
+                }
+
+                Button {
+                    importLegacyDatabase()
+                } label: {
+                    if isImportingLegacy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("library_import_legacy".localized, systemImage: "internaldrive")
+                    }
+                }
+                .disabled(isImportingLegacy)
+
+                if let accessMessage {
+                    Text(accessMessage)
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                }
+            } header: {
+                Text("library_access_section".localized)
+            } footer: {
+                Text("library_access_section_footer".localized)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             // 文件类型（web 版「文件类型」chips 对齐，2026-09-03 B 组）：
@@ -195,6 +241,8 @@ struct MacLibrarySettingsView: View {
         guard !deleteSettings.libraryRoot.isEmpty else { return }
         copyProgress = nil
         applyRoot("")
+        // 默认根同样在容器外：回到默认后需要重新授权（主窗会自动回到授权引导页）。
+        libraryAccess.refreshState()
         resultMessage = "library_root_changed".localized
     }
 
@@ -217,9 +265,101 @@ struct MacLibrarySettingsView: View {
         case .keepOnly:
             copyProgress = nil
             applyRoot(newURL.path)
+            authorizeRootIfNeeded(newURL)
             resultMessage = "library_root_changed".localized
         case .cancel:
             return
+        }
+    }
+
+    /// 换位置后补授权：沙盒下新目录默认不可读，书签是唯一的持久授权手段。
+    /// 授权失败不阻断设置变更（目录仍是设置里的位置，主窗会回到授权引导页）。
+    private func authorizeRootIfNeeded(_ url: URL) {
+        do {
+            try libraryAccess.authorize(url, updateSettings: false)
+            accessMessage = nil
+        } catch {
+            accessMessage = "library_access_grant_failed".localized(with: error.localizedDescription)
+        }
+    }
+
+    /// 本页「授权…」按钮：选一次曲库文件夹（= 授权 + 指定位置，同一动作）。
+    private func authorizeLibraryFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = libraryAccess.desiredRootURL
+        panel.message = "library_access_gate_body".localized
+        panel.prompt = Localized.ok
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try libraryAccess.authorize(url)
+            accessMessage = nil
+            deleteSettings = DeleteSettings.load()
+            NotificationCenter.default.post(name: .libraryFoldersChanged, object: nil)
+        } catch {
+            accessMessage = "library_access_grant_failed".localized(with: error.localizedDescription)
+        }
+    }
+
+    /// 导入确认框（覆盖当前容器数据库 = 影响正在用的库）。
+    private func confirmLegacyImport() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "library_import_legacy".localized
+        alert.informativeText = "library_import_legacy_confirm".localized
+        alert.addButton(withTitle: Localized.ok)
+        alert.addButton(withTitle: "cancel".localized)
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// 「导入旧版数据库…」：选旧目录（Application Support/QQPlayerMac）→ 拷进容器。
+    private func importLegacyDatabase() {
+        // 本页导入时 App 正在运行（数据库已打开）：覆盖前必须让用户确认，
+        // 且明确「完成后重启」（当前会话仍读写旧 inode）。
+        guard confirmLegacyImport() else { return }
+
+        isImportingLegacy = true
+        defer { isImportingLegacy = false }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if let legacy = MacLegacyLibraryImporter.legacyDirectoryURL() {
+            let parent = legacy.deletingLastPathComponent()
+            if FileManager.default.fileExists(atPath: parent.path) { panel.directoryURL = parent }
+        }
+        panel.message = "library_import_legacy_prompt".localized
+        panel.prompt = Localized.ok
+        guard panel.runModal() == .OK, let directory = panel.url else { return }
+
+        guard let destination = LibraryRoot.macAppSupportRootURL() else {
+            accessMessage = "library_import_legacy_failed".localized(
+                with: "Application Support unavailable"
+            )
+            return
+        }
+        do {
+            let outcome = try MacLegacyLibraryImporter.importDatabase(
+                from: directory,
+                into: destination
+            )
+            var message = "library_import_legacy_done".localized(with: outcome.copiedFiles.count)
+            if let backup = outcome.backupFileName {
+                message += " " + "library_import_legacy_backup".localized(with: backup)
+            }
+            accessMessage = message
+        } catch let error as MacLegacyLibraryImporter.ImportError {
+            if case .sourceMissing = error {
+                accessMessage = "library_import_legacy_missing".localized
+            } else {
+                accessMessage = "library_import_legacy_failed".localized(with: error.localizedDescription)
+            }
+        } catch {
+            accessMessage = "library_import_legacy_failed".localized(with: error.localizedDescription)
         }
     }
 
@@ -253,6 +393,7 @@ struct MacLibrarySettingsView: View {
             }
             copyProgress = nil
             applyRoot(newRoot.path)
+            authorizeRootIfNeeded(newRoot)
             resultMessage = "library_root_copy_result".localized(
                 with: result.copied, result.skipped, result.failed
             )

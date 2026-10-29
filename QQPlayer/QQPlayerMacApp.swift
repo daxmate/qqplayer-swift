@@ -43,6 +43,8 @@ struct QQPlayerMacApp: App {
             // willTerminate 在主线程回调且必须同步写完（Task 异步可能来不及落盘）
             MainActor.assumeIsolated {
                 PlayerEngine.shared.savePlayerState()
+                // MAS 批 2B：退出时释放曲库根安全作用域（书签保留，下次启动再恢复）。
+                MacLibraryRootAccess.shared.releaseAccess()
             }
         }
         // D 组键盘快捷键（web shortcuts.ts 对齐）：App 内全局监听，启动即装。
@@ -56,6 +58,11 @@ struct QQPlayerMacApp: App {
         // ⇒ `activeSession` 恒 nil ⇒ UI「设备在线，但同步面板报尚未连接」。
         // 放在这里（App init）而不是 `AppCoordinator.initialize()`：后者是 async、晚于本处，
         // 赶不上启动即监听的首条连接。
+        // MAS 批 2B（2026-10-29）：沙盒下容器外曲库根默认不可读，必须先解析
+        // security-scoped 书签开启作用域，再 ensureRootExists（否则 createDirectory 必失败，
+        // 且后续扫描把「无权限」当「空库」）。状态由 `MacLibraryRootAccess` 唯一维护，
+        // 门视图 `MacLibraryAccessGate` 读同一份。
+        MacLibraryRootAccess.shared.refreshState()
         MacLibraryRoot.ensureRootExists()
         // M6 T1：局域网同步 Host 常驻监听——App 启动即开始（设置页只做控制面，
         // 生命周期归 SyncHostCenter）。“允许局域网设备连接”关掉时不启动。
@@ -66,42 +73,47 @@ struct QQPlayerMacApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MacLibraryView()
-                // macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar 内容会延伸到
-                // 标题栏区域、第一行与交通灯重叠。强制工具栏背景不透明后内容从标题栏下方开始。
-                .toolbarBackground(.visible, for: .windowToolbar)
-                // 强调色：对齐 web 版 ACCENT_OPTIONS 预设，设置页切换后全局生效。
-                // 值一律取 `MacAppearance.currentAccentColor`（唯一读取入口，M2）。
-                .tint(MacAppearance.currentAccentColor)
-                // App 强调色环境值（Color.accentColor 在 macOS 跟随系统而非 App tint）
-                .environment(\.appAccentColor, MacAppearance.currentAccentColor)
-                // 视图层单例收口（「下降预算」批 3a）：App 级叶子 store 的**唯一装配点**。
-                // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
-                // 新增一个对象 = 在此与 `Settings` 根各登记一行。
-                .environment(MacSearchAnythingState.shared)
-                .environment(MacLibraryFactsStore.shared)
-                // 桌面浮窗管理器（批 5b）；浮窗内容另由管理器手工 hosting 装配（见 MacDesktopWindowsManager）
-                .environment(DesktopWindowsManager.shared)
-                .environment(EQManager.shared)
-                // 频谱分析器（批 6-1）：播放页视觉条按属性追踪驱动重绘
-                .environment(MacSpectrumAnalyzer.shared)
-                // 曲库索引器（批 6-2）：MacLibraryView 读 isIndexing/tracksFound 按属性追踪
-                .environment(LibraryIndexer.shared)
-                // 全局协调器（批 6-4）：Mac 视图的方法调用入口（收藏/歌单写操作）
-                .environment(AppCoordinator.shared)
-                // App 级无状态入口容器（批 3b・方案 A）：WhatsNewStore / StateManager / MacFolderMonitor
-                .environment(AppServices.live)
-                // 播放引擎（批 6-6）：Mac 视图（播放页 / 列表高亮 / 浮窗 / 卡拉OK 条）按属性追踪
-                .environment(PlayerEngine.shared)
-                .environment(KaraokeController.shared)
-                // 同步三件（批 6-8）：`SyncHostCenter` / 装配自检事实 / 歌词补发事实迁 `@Observable`
-                // ⇒ 同步面板（设置页与工具栏面板）、相关视图改环境注入。新增一个对象 = 三处都登记。
-                .environment(SyncHostCenter.shared)
-                .environment(SyncWiringFactsStore.shared)
-                .environment(MacLyricsResendFactsStore.shared)
-                .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
-                    deleteSettings = DeleteSettings.load()
-                }
+            // MAS 批 2B：未授权曲库根时整窗换成授权引导（不进空库主页）。
+            MacLibraryAccessGate {
+                MacLibraryView()
+            }
+            // macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar 内容会延伸到
+            // 标题栏区域、第一行与交通灯重叠。强制工具栏背景不透明后内容从标题栏下方开始。
+            .toolbarBackground(.visible, for: .windowToolbar)
+            // 强调色：对齐 web 版 ACCENT_OPTIONS 预设，设置页切换后全局生效。
+            // 值一律取 `MacAppearance.currentAccentColor`（唯一读取入口，M2）。
+            .tint(MacAppearance.currentAccentColor)
+            // App 强调色环境值（Color.accentColor 在 macOS 跟随系统而非 App tint）
+            .environment(\.appAccentColor, MacAppearance.currentAccentColor)
+            // 视图层单例收口（「下降预算」批 3a）：App 级叶子 store 的**唯一装配点**。
+            // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
+            // 新增一个对象 = 在此与 `Settings` 根各登记一行。
+            .environment(MacSearchAnythingState.shared)
+            .environment(MacLibraryFactsStore.shared)
+            // 桌面浮窗管理器（批 5b）；浮窗内容另由管理器手工 hosting 装配（见 MacDesktopWindowsManager）
+            .environment(DesktopWindowsManager.shared)
+            .environment(EQManager.shared)
+            // 频谱分析器（批 6-1）：播放页视觉条按属性追踪驱动重绘
+            .environment(MacSpectrumAnalyzer.shared)
+            // 曲库索引器（批 6-2）：MacLibraryView 读 isIndexing/tracksFound 按属性追踪
+            .environment(LibraryIndexer.shared)
+            // 全局协调器（批 6-4）：Mac 视图的方法调用入口（收藏/歌单写操作）
+            .environment(AppCoordinator.shared)
+            // App 级无状态入口容器（批 3b・方案 A）：WhatsNewStore / StateManager / MacFolderMonitor
+            .environment(AppServices.live)
+            // 播放引擎（批 6-6）：Mac 视图（播放页 / 列表高亮 / 浮窗 / 卡拉OK 条）按属性追踪
+            .environment(PlayerEngine.shared)
+            .environment(KaraokeController.shared)
+            // 同步三件（批 6-8）：`SyncHostCenter` / 装配自检事实 / 歌词补发事实迁 `@Observable`
+            // ⇒ 同步面板（设置页与工具栏面板）、相关视图改环境注入。新增一个对象 = 三处都登记。
+            .environment(SyncHostCenter.shared)
+            .environment(SyncWiringFactsStore.shared)
+            .environment(MacLyricsResendFactsStore.shared)
+            // MAS 批 2B：曲库根授权状态（门视图 + 设置页读同一份）。
+            .environment(MacLibraryRootAccess.shared)
+            .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
+                deleteSettings = DeleteSettings.load()
+            }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
@@ -110,6 +122,8 @@ struct QQPlayerMacApp: App {
         Settings {
             MacSettingsView()
                 .tint(MacAppearance.currentAccentColor)
+                // MAS 批 2B：设置页要读曲库根授权状态（独立场景，不继承主窗环境）。
+                .environment(MacLibraryRootAccess.shared)
                 .environment(\.appAccentColor, MacAppearance.currentAccentColor)
                 // 同 WindowGroup 根：Settings 是独立场景，不继承主窗环境（批 3a）。
                 .environment(MacSearchAnythingState.shared)

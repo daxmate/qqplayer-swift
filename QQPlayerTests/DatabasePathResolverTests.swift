@@ -22,6 +22,27 @@ struct DatabasePathResolverTests {
         #expect(url.pathExtension == "db")
     }
 
+    @Test("macOS 沙盒：App Support 根在容器内 → 库落容器 Library/Application Support")
+    func macPathInsideSandboxContainer() {
+        // 沙盒下 `FileManager.urls(for: .applicationSupportDirectory, ...)` 返回的就是
+        // 容器内路径；这里锁死「不再二次拼容器路径」——拼了会变成
+        // Containers/.../Data/Library/Application Support/Containers/... 的双层错位。
+        let root = URL(
+            fileURLWithPath: "/Users/test/Library/Containers/com.daxmate.qqplayer.macos/Data/Library/Application Support"
+        )
+        let url = DatabasePathResolver.macDatabaseURL(appSupportRoot: root)
+        #expect(url.path
+            == "/Users/test/Library/Containers/com.daxmate.qqplayer.macos/Data/Library/Application Support/QQPlayerMac/qqplayer.db")
+    }
+
+    @Test("macOS 非容器（开发构建 / 未沙盒）：库仍落 ~/Library/Application Support")
+    func macPathOutsideContainer() {
+        let root = URL(fileURLWithPath: "/Users/test/Library/Application Support")
+        let url = DatabasePathResolver.macDatabaseURL(appSupportRoot: root)
+        #expect(url.path.hasPrefix("/Users/test/Library/Application Support/QQPlayerMac/"))
+        #expect(!url.path.contains("/Containers/"))
+    }
+
     @Test("macOS 路径：与桌面版 qqplayer 目录区分")
     func macPathSeparateFromDesktop() {
         let root = URL(fileURLWithPath: "/Users/test/Library/Application Support")

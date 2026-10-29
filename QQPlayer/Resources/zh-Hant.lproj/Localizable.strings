@@ -1443,3 +1443,22 @@
 "reclaim_select_all" = "全選";
 "reclaim_deselect_all" = "取消全選";
 "reclaim_not_restorable" = "無法恢復";
+
+/* MAS 批 2B（2026-10-29）：曲库根授权 + 旧库导入 */
+"library_access_section" = "文件夾訪問權限";
+"library_access_section_footer" = "macOS 只允許本 App 讀取你親自選擇的音樂文件夾；更換位置後需要重新授權。";
+"library_access_state_granted" = "已授權訪問曲庫文件夾";
+"library_access_state_needed" = "需要授權";
+"library_access_authorize" = "選擇曲庫文件夾…";
+"library_access_gate_title" = "允許訪問你的音樂文件夾";
+"library_access_gate_body" = "macOS 只允許本 App 讀取你親自選擇的文件夾。請選擇曲庫文件夾以繼續。";
+"library_access_gate_default" = "默認位置：%@";
+"library_access_grant_failed" = "無法保存文件夾授權：%@";
+"library_import_legacy" = "從舊版本導入數據庫…";
+"library_import_legacy_prompt" = "請選擇 Application Support 裏的 QQPlayerMac 文件夾";
+"library_import_legacy_done" = "已導入 %d 個文件；若曲庫未刷新請重啟 QQPlayer。";
+"library_import_legacy_failed" = "導入失敗：%@（舊數據庫保持原樣）";
+"library_import_legacy_missing" = "所選文件夾裏沒有 qqplayer.db";
+"library_import_legacy_backup" = "原有數據庫已備份為 %@";
+"library_import_legacy_hint" = "檢測到舊版本（非沙盒）的數據庫，可以導入。";
+"library_import_legacy_confirm" = "導入會覆蓋當前數據庫（已自動備份），完成後需要重啟 QQPlayer。繼續？";
