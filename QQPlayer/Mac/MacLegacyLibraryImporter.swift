@@ -197,8 +197,13 @@ enum MacLegacyLibraryImporter {
                 try? fileManager.removeItem(at: entry.destination)
             }
             guard let backup = entry.backup, fileManager.fileExists(atPath: backup.path) else { continue }
-            try? fileManager.copyItem(at: backup, to: entry.destination)
-            try? fileManager.removeItem(at: backup)
+            do {
+                try fileManager.copyItem(at: backup, to: entry.destination)
+                try? fileManager.removeItem(at: backup)
+            } catch {
+                // 复制不回就**保留备份文件**（宁留一个 .legacy-backup-*，也别让旧库只剩一份丢在临时名里）。
+                AppLog.warn(.ui, "⚠️ 回滚复制失败，旧库备份保留在：\(backup.path)")
+            }
         }
         // -wal / -shm 未被 importDatabase 的备份循环覆盖到的情况（目标原本不存在）已由上面的删档处理。
         AppLog.warn(.ui, "⚠️ 旧库导入失败，已回滚到导入前状态")
