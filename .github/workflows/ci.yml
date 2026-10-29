@@ -259,7 +259,7 @@ jobs:
 
       - name: Assert app resources (AppIcon + Assets.car)
         run: |
-          APP="build/DerivedDataMac/Build/Products/Debug/QQPlayerMac.app"
+          APP="build/DerivedDataMac/Build/Products/Debug/QQPlayer.app"
           test -f "$APP/Contents/Resources/AppIcon.icns" || { echo "❌ AppIcon.icns 缺失——AppIcon.appiconset 无 mac 条目或 target 缺 ASSETCATALOG_COMPILER_APPICON_NAME"; exit 1; }
           test -f "$APP/Contents/Resources/Assets.car" || { echo "❌ Assets.car 缺失——Assets.xcassets 未进 QQPlayerMac target 资源阶段"; exit 1; }
           echo "✅ AppIcon.icns + Assets.car 均在产物中"

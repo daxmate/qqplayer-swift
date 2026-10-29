@@ -8,7 +8,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 - 内建图形均衡器、ReplayGain 音量标准化、双源歌词、跟唱练习（倍速 / AB 循环）
 - **局域网配对与同步**：Mac 与 iPhone 扫码配对、端到端加密会话、音乐文件分块传输与校验、播放数据与对齐歌词随歌同步
 - iOS 端深度整合 Apple 生态：本地沙盒音乐库、CarPlay、Siri、主屏幕小组件
-- macOS 原生版（QQPlayerMac）提供桌面级体验：本地曲库扫描、在线搜索下载（网易云 / 歌曲海 + 夸克网盘，aria2 下载引擎）、标签刮削（MusicBrainz）、迷你模式与桌面歌词窗
+- macOS 原生版（QQPlayer）提供桌面级体验：本地曲库扫描、在线搜索下载（网易云 / 歌曲海 + 夸克网盘，aria2 下载引擎）、标签刮削（MusicBrainz）、迷你模式与桌面歌词窗
 
 ---
 
@@ -17,7 +17,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 | 平台 | 形态 | 版本 | 系统要求 |
 |------|------|------|----------|
 | 📱 iOS | App Store「QQPlayer」（iPhone / iPad，付费买断·无内购） | **1.0.0** | iOS 18.5+ |
-| 🖥️ macOS | QQPlayerMac 原生应用（仓库内 target，自行构建） | 随仓库迭代 | macOS 14.0+ |
+| 🖥️ macOS | QQPlayer 原生应用（仓库内 target，自行构建） | 随仓库迭代 | macOS 14.0+ |
 
 - **iOS 与 macOS 共享同一套 Core 逻辑**（数据库、播放引擎、歌词 / 跟唱、均衡器、元数据解析、本地化），两平台行为一致、同步演进。
 - 仓库：<https://github.com/daxmate/qqplayer-swift>（原 qqplayer-ios，2026-08-30 更名）
@@ -107,7 +107,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 ---
 
-### 🖥️ macOS（QQPlayerMac 原生版）
+### 🖥️ macOS（QQPlayer 原生版）
 
 > 纯 SwiftUI 原生桌面应用，与 iOS 共享 Core。默认曲库目录 `~/Music/QQPlayer`，可添加任意外部文件夹。
 

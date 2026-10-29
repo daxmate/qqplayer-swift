@@ -7,7 +7,7 @@
 #   ./build.sh mac          仅编译 macOS
 #   ./build.sh install      构建 + 安装 iOS（真机）+ macOS（+ 启动）
 #   ./build.sh install ios  仅安装 iOS（真机签名构建 + devicectl 安装 + 启动，team B6FA37AYT5）
-#   ./build.sh install mac  仅安装 macOS（构建 + 覆盖安装到 /Applications/QQPlayerMac.app + 启动）
+#   ./build.sh install mac  仅安装 macOS（构建 + 覆盖安装到 /Applications/QQPlayer.app + 启动）
 #   ./build.sh --install    install ios 的别名（旧用法兼容）
 #
 # 环境变量（可选）:
@@ -29,7 +29,7 @@ DERIVED="${QQPLAYER_DD}"
 IOS_SCHEME="QQPlayer"          # iOS scheme / 产物名
 MAC_SCHEME="QQPlayerMac"       # macOS scheme
 APP_NAME="QQPlayer"            # iOS 可执行/产物名
-MAC_APP_NAME="QQPlayerMac"     # macOS 可执行/产物名
+MAC_APP_NAME="QQPlayer"       # macOS 可执行/产物名（用户可见名统一为 QQPlayer）
 MAC_INSTALL_DIR="${QQPLAYER_MAC_INSTALL_DIR:-/Applications}"
 SIM_DEST='generic/platform=iOS Simulator'   # generic 模拟器目标（免签名，不依赖任何模拟器实例）
 IOS_BUNDLE_ID="com.daxmate.qqplayer.ios"
