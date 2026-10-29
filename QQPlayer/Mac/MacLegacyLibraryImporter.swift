@@ -76,6 +76,23 @@ enum MacLegacyLibraryImporter {
 
     // MARK: - 导入
 
+    /// 导入到 App 默认曲库目录（调用方不必自己解析容器路径——路径口径只留在服务层）。
+    @discardableResult
+    static func importDatabase(
+        from sourceDirectory: URL,
+        timestamp: Date = Date()
+    ) throws -> Outcome {
+        try importDatabase(from: sourceDirectory, into: defaultDestinationDirectory(), timestamp: timestamp)
+    }
+
+    /// 默认目标目录 = 容器内曲库数据目录（与 `LibraryRoot` 同一口径）。
+    static func defaultDestinationDirectory() throws -> URL {
+        guard let root = LibraryRoot.macAppSupportRootURL() else {
+            throw ImportError.destinationUnavailable("Application Support")
+        }
+        return root
+    }
+
     /// 把旧目录的数据库三件套拷进目标目录（覆盖前备份，失败回滚）。
     ///
     /// - Parameters:
@@ -153,21 +170,24 @@ enum MacLegacyLibraryImporter {
         }
     }
 
-    /// 原子替换：先拷到同目录临时文件，再 `replaceItemAt` / `moveItem` 落到目标名。
+    /// 发布拷贝：目标已存在 → 先拷到同目录临时文件，再 `replaceItemAt` 原子替换（旧库另有备份）；
+    /// 目标不存在 → 直接 `copyItem` 落盘（首装路径，无覆盖风险，不必绕临时文件）。
+    ///
+    /// 导入器**只做复制**，不做改名/搬迁语义（按标签改名的唯一入口是 `TrackFileRenameService`）。
     private static func replaceFile(at destination: URL, with source: URL, fileManager: FileManager) throws {
+        guard fileManager.fileExists(atPath: destination.path) else {
+            try fileManager.copyItem(at: source, to: destination)
+            return
+        }
         let temporary = destination.appendingPathExtension("legacy-importing")
         if fileManager.fileExists(atPath: temporary.path) {
             try fileManager.removeItem(at: temporary)
         }
         try fileManager.copyItem(at: source, to: temporary)
-        if fileManager.fileExists(atPath: destination.path) {
-            _ = try fileManager.replaceItemAt(destination, withItemAt: temporary)
-        } else {
-            try fileManager.moveItem(at: temporary, to: destination)
-        }
+        _ = try fileManager.replaceItemAt(destination, withItemAt: temporary)
     }
 
-    /// 回滚：恢复每个目标文件的导入前状态（有备份 → 备份搬回；无备份 → 删掉新写入的）。
+    /// 回滚：恢复每个目标文件的导入前状态（有备份 → 备份复制回目标后再删备份；无备份 → 删掉新写入的）。
     private static func rollback(
         _ backups: [(destination: URL, backup: URL?)],
         fileManager: FileManager
@@ -177,7 +197,8 @@ enum MacLegacyLibraryImporter {
                 try? fileManager.removeItem(at: entry.destination)
             }
             guard let backup = entry.backup, fileManager.fileExists(atPath: backup.path) else { continue }
-            try? fileManager.moveItem(at: backup, to: entry.destination)
+            try? fileManager.copyItem(at: backup, to: entry.destination)
+            try? fileManager.removeItem(at: backup)
         }
         // -wal / -shm 未被 importDatabase 的备份循环覆盖到的情况（目标原本不存在）已由上面的删档处理。
         AppLog.warn(.ui, "⚠️ 旧库导入失败，已回滚到导入前状态")

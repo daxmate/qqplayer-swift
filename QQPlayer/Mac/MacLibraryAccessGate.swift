@@ -9,7 +9,7 @@
 //  放行主窗，用户看到的是「歌全没了」，而不是「需要授权」。
 //
 //  为什么门放在 WindowGroup 根（而不是某个视图里弹 sheet）：
-//  未授权时连 `DatabaseManager` 都不该开（打开的是容器里空库 → 可能触发一次
+//  未授权时连数据库都不该打开（打开的是容器里空库 → 可能触发一次
 //  空扫描把旧状态覆盖掉）；门在根上，`MacLibraryView.task` 根本不会跑。
 //
 //  target: macos-only
@@ -20,6 +20,7 @@ import SwiftUI
 
 struct MacLibraryAccessGate<Content: View>: View {
     @Environment(MacLibraryRootAccess.self) private var access
+    @Environment(\.appAccentColor) private var appAccentColor
 
     private let content: () -> Content
 
@@ -54,8 +55,8 @@ struct MacLibraryAccessGate<Content: View>: View {
             Spacer(minLength: DesignTokens.space24)
 
             Image(systemName: "folder.badge.key")
-                .font(.system(size: 44, weight: .regular))
-                .foregroundColor(.accentColor)
+                .font(.system(size: DesignTokens.font44, weight: .regular))
+                .foregroundColor(appAccentColor)
 
             Text("library_access_gate_title".localized)
                 .font(.title2.weight(.semibold))
@@ -208,20 +209,13 @@ struct MacLibraryAccessGate<Content: View>: View {
         }
     }
 
+    /// 只负责「叫服务 + 把结果转成人话」；目录口径（容器路径）留在服务层。
     private func importDatabase(from directory: URL) throws {
-        let destination = try destinationDirectory()
-        let outcome = try MacLegacyLibraryImporter.importDatabase(from: directory, into: destination)
+        let outcome = try MacLegacyLibraryImporter.importDatabase(from: directory)
         var message = "library_import_legacy_done".localized(with: outcome.copiedFiles.count)
         if let backup = outcome.backupFileName {
             message += " " + "library_import_legacy_backup".localized(with: backup)
         }
         importMessage = message
-    }
-
-    private func destinationDirectory() throws -> URL {
-        guard let root = LibraryRoot.macAppSupportRootURL() else {
-            throw MacLegacyLibraryImporter.ImportError.destinationUnavailable("Application Support")
-        }
-        return root
     }
 }
