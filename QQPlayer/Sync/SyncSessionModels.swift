@@ -56,6 +56,9 @@ final class SyncPairingNonceRegistry: @unchecked Sendable {
     private struct Entry {
         let nonce: Data
         let registeredAt: Date
+        /// 单项有效期（秒；nil ⇒ 用注册表的 nonceTTL）。
+        /// 6 位配对码（批 1）注册 nonce 时传 120s，QR 路径仍用注册表默认值。
+        let ttl: TimeInterval?
     }
 
     private let lock = NSLock()
@@ -84,17 +87,19 @@ final class SyncPairingNonceRegistry: @unchecked Sendable {
 
     /// 注册一个 nonce。重复注册同一个 = 刷新有效期（同一张码重新展示的场景）；
     /// 空 nonce 忽略。
-    func register(_ nonce: Data) {
+    /// - Parameter ttl: 单项有效期覆盖（nil = 用注册表 nonceTTL）；6 位配对码传
+    ///   `SyncPairingCodeStore.defaultTTL`，让码过期即验签失败，而不是永久有效。
+    func register(_ nonce: Data, ttl: TimeInterval? = nil) {
         guard !nonce.isEmpty else { return }
         lock.lock()
         defer { lock.unlock() }
         purgeExpiredLocked()
         let stamp = now()
         if let index = pending.firstIndex(where: { $0.nonce == nonce }) {
-            pending[index] = Entry(nonce: nonce, registeredAt: stamp)
+            pending[index] = Entry(nonce: nonce, registeredAt: stamp, ttl: ttl)
             return
         }
-        pending.append(Entry(nonce: nonce, registeredAt: stamp))
+        pending.append(Entry(nonce: nonce, registeredAt: stamp, ttl: ttl))
     }
 
     /// 消耗一个 nonce（配对完成后作废）。
@@ -149,7 +154,7 @@ final class SyncPairingNonceRegistry: @unchecked Sendable {
     private func purgeExpiredLocked() -> Int {
         let stamp = now()
         let before = pending.count
-        pending.removeAll { stamp.timeIntervalSince($0.registeredAt) > nonceTTL }
+        pending.removeAll { stamp.timeIntervalSince($0.registeredAt) > ($0.ttl ?? nonceTTL) }
         return before - pending.count
     }
 }
