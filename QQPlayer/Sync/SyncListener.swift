@@ -191,8 +191,6 @@ final class SyncListener: @unchecked Sendable {
     /// 无源 → 静默拒绝，桌面不弹批准卡；同页面板同时打开时更必现）。旧码的作废时机
     /// 回到「配对完成 / 停止监听」，见 `SyncHostCenter.discardQRNonce()`。
     private let nonceRegistry = SyncPairingNonceRegistry(nonceTTL: .infinity)
-    /// 6 位配对码库（批 1）：TTL 120s / 一次性 / 同对端限速，见 SyncPairingCode.swift。
-    private let codeStore = SyncPairingCodeStore()
 
     init(localIdentity: SyncIdentity, trustStore: any SyncTrustStore, deviceName: String) {
         self.localIdentity = localIdentity
@@ -205,10 +203,6 @@ final class SyncListener: @unchecked Sendable {
 
     /// 配对 nonce 注册表（UI 展示 QR 时注册；验签成功自动消耗）。
     var pairingNonces: SyncPairingNonceRegistry { nonceRegistry }
-
-    /// 6 位配对码库（批 1）。host 生成码后把 nonce 注册进 `pairingNonces`（带 120s TTL），
-    /// 校验由会话内的 `pairingCodeStore` 完成。
-    var pairingCodes: SyncPairingCodeStore { codeStore }
 
     // MARK: 生命周期
 
@@ -264,7 +258,6 @@ final class SyncListener: @unchecked Sendable {
             trustStore: trustStore,
             config: sessionConfig,
             pairingNonces: nonceRegistry,
-            pairingCodeStore: codeStore,
             transport: channel
         )
         channel.session = session

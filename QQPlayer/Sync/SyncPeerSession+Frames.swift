@@ -130,10 +130,6 @@ extension SyncPeerSession {
     }
 
     private func processPairRequestLocked(_ frame: SyncFrame) -> [Effect] {
-        // 批 1：6 位配对码提交（与 PairRequest 同阶段，明文）
-        if !frame.isEncrypted, frame.type == .pairCodeSubmit {
-            return processPairCodeSubmitLocked(frame)
-        }
         guard !frame.isEncrypted, frame.type == .pairRequest else {
             return closeEffectsLocked(.protocolViolation("等待配对阶段收到非法帧"))
         }
@@ -171,47 +167,6 @@ extension SyncPeerSession {
             request: request,
             suggestedDisplayName: DeviceID.formatted(request.clientDeviceID)
         ))]
-    }
-
-    // MARK: Host 侧 6 位配对码（批 1，A 方案）
-
-    /// 处理 client 的码提交：结构校验 → 与 hello 身份一致 → 码库校验（TTL / 一次性 /
-    /// 限速）→ 通过则把 host 身份 + 一次性 nonce 回给 client（随后 client 发标准
-    /// PairRequest 对其签名，host 现有 nonce 池验签 → 批准卡）。
-    private func processPairCodeSubmitLocked(_ frame: SyncFrame) -> [Effect] {
-        let submit: PairCodeSubmit
-        do {
-            submit = try decodeJSON(PairCodeSubmit.self, from: frame.payload)
-            try SyncPairingCodeMessages.validate(submit)
-        } catch {
-            let detail = "配对码提交校验失败：\(error)"
-            AppLog.warn(.sync, "⚠️ SyncPeerSession: \(detail)")
-            return [.send(encodedCodeResponse(SyncPairingCodeMessages.protocolError(message: detail)))]
-                + closeEffectsLocked(.pairingRejected(SyncPairingCodeMessages.protocolErrorReason))
-        }
-        // 与握手 hello 的身份必须一致（防配流劫持）
-        guard submit.clientDeviceID == peerHelloValue?.deviceID else {
-            let reason = "配对码提交与握手身份不一致"
-            return [.send(encodedCodeResponse(SyncPairingCodeMessages.protocolError(message: reason)))]
-                + closeEffectsLocked(.pairingRejected(reason))
-        }
-        guard let store = pairingCodeStore else {
-            AppLog.warn(.sync, "⚠️ SyncPeerSession: 收到配对码提交但没有码库（非 host 侧装配）")
-            return [.send(encodedCodeResponse(SyncPairingCodeMessages.rejected(.noActiveCode)))]
-                + closeEffectsLocked(.pairingRejected(SyncPairingCodeFailure.noActiveCode.rawValue))
-        }
-        let peerLabel = DeviceID.formatted(submit.clientDeviceID)
-        switch store.verify(code: submit.code, peerID: submit.clientDeviceID) {
-        case let .success(nonce):
-            AppLog.info(.sync, "ℹ️ SyncPeerSession: 配对码校验通过 peer=\(peerLabel)")
-            return [.send(encodedCodeResponse(
-                SyncPairingCodeMessages.accepted(identity: localIdentity, nonce: nonce)
-            ))]
-        case let .failure(failure):
-            AppLog.warn(.sync, "⚠️ SyncPeerSession: 配对码校验失败 peer=\(peerLabel) reason=\(failure.rawValue)")
-            return [.send(encodedCodeResponse(SyncPairingCodeMessages.rejected(failure)))]
-                + closeEffectsLocked(.pairingRejected(failure.rawValue))
-        }
     }
 
     // MARK: Client 侧握手/配对
@@ -254,22 +209,6 @@ extension SyncPeerSession {
                 applyReadyTransitionLocked(effects: &effects)
                 return effects
             }
-            // 6 位配对码（批 1，A 方案）：无扫码候选时以「码 + nonce 签名」为带外
-            // 信任入口。host 公钥此时还没拿到 ⇒ 先提交码，拿到 host 公钥 + nonce 后
-            // 再验 host hello 签名（见 processPairCodeResponseLocked）。
-            if pairingCandidate == nil, let pairingCode = pairingCodeValue {
-                let submit = SyncPairingCodeMessages.makeSubmit(
-                    identity: localIdentity,
-                    code: pairingCode,
-                    clientName: config.clientDisplayName
-                )
-                let payload = try JSONEncoder().encode(submit)
-                let frameData = try encodedFrame(type: .pairCodeSubmit, encrypted: false, payload: payload)
-                peerHelloValue = hello
-                phaseValue = .waitingForPairResponse
-                cancelDeadlineLocked()
-                return [.send(frameData), .notifyState(phaseValue)]
-            }
             // 扫码配对（有候选）或未配对：候选公钥即 QR 信任根 → 发 pairRequest
             guard let candidate = pairingCandidate, candidate.deviceID == hello.deviceID else {
                 return closeEffectsLocked(.peerUntrusted(hello.deviceID))
@@ -299,13 +238,7 @@ extension SyncPeerSession {
     }
 
     private func processPairResponseLocked(_ frame: SyncFrame) -> [Effect] {
-        guard !frame.isEncrypted else {
-            return closeEffectsLocked(.protocolViolation("等待答复阶段收到非法帧"))
-        }
-        if frame.type == .pairCodeResponse {
-            return processPairCodeResponseLocked(frame)
-        }
-        guard frame.type == .pairResponse else {
+        guard !frame.isEncrypted, frame.type == .pairResponse else {
             return closeEffectsLocked(.protocolViolation("等待答复阶段收到非法帧"))
         }
         let response: PairResponse
@@ -373,7 +306,7 @@ extension SyncPeerSession {
              .libraryPushAnnounce, .peerLibraryRequest, .peerLibraryResponse:
             let delivered = SyncFrame(type: frame.type, flags: [], payload: plaintext)
             return [.notifyAppFrame(delivered)]
-        case .handshake, .pairRequest, .pairResponse, .pairCodeSubmit, .pairCodeResponse:
+        case .handshake, .pairRequest, .pairResponse:
             return closeEffectsLocked(.protocolViolation("ready 阶段收到握手/配对帧"))
         }
     }
@@ -425,64 +358,6 @@ extension SyncPeerSession {
         try encodedFrame(type: .handshake, encrypted: false, payload: JSONEncoder().encode(hello))
     }
 
-    // MARK: Client 侧 6 位配对码（批 1，A 方案）
-
-    /// 码校验答复：通过 ⇒ 用应答里的 host 公钥验 hello 签名、构造候选（公钥 / nonce
-    /// 即本次信任根）→ 发标准 PairRequest（对 nonce 签名）继续既有批准流程；
-    /// 不通过 ⇒ 按原因码关闭（UI 依据 reason 给出明确失败原因）。
-    private func processPairCodeResponseLocked(_ frame: SyncFrame) -> [Effect] {
-        let response: PairCodeResponsePayload
-        do {
-            response = try decodeJSON(PairCodeResponsePayload.self, from: frame.payload)
-        } catch {
-            return closeEffectsLocked(.pairingRejected("配对码答复解析失败"))
-        }
-        guard response.accepted else {
-            let key = SyncPairingCodeMessages.messageKey(forReason: response.reason)
-            AppLog.warn(.sync, "⚠️ SyncPeerSession: 配对码被拒 reason=\(response.reason ?? "-")")
-            return closeEffectsLocked(.pairingRejected(key))
-        }
-        guard let hostHello = peerHelloValue,
-              let hostDeviceID = response.hostDeviceID,
-              hostDeviceID == hostHello.deviceID,
-              let publicKeyBase64 = response.hostPublicKey,
-              let publicKey = Data(base64Encoded: publicKeyBase64),
-              publicKey.count == DeviceID.fingerprintByteCount,
-              DeviceID.fingerprintMatches(deviceID: hostDeviceID, publicKeyData: publicKey),
-              let nonceBase64 = response.sessionNonce,
-              let nonce = Data(base64Encoded: nonceBase64),
-              !nonce.isEmpty
-        else {
-            return closeEffectsLocked(.pairingRejected("配对码答复内容不合法"))
-        }
-        do {
-            // 用应答里的 host 公钥补验 hello 签名（码路径在提交前拿不到公钥）
-            try SyncHandshake.verifyHello(
-                hostHello,
-                signerPublicKeyRaw: publicKey,
-                expectedRole: SyncHello.roleHost,
-                expectedPeerDeviceID: localIdentity.deviceID,
-                allowEmptyPeerBinding: false
-            )
-            pairingCandidate = SyncPairingCandidate(
-                deviceID: hostDeviceID,
-                publicKeyRaw: publicKey,
-                sessionNonce: nonce,
-                hostName: hostHello.name ?? hostDeviceID
-            )
-            let request = try SyncPairingMessages.makePairRequest(
-                identity: localIdentity,
-                sessionNonce: nonce,
-                clientName: config.clientDisplayName
-            )
-            let payload = try JSONEncoder().encode(request)
-            let frameData = try encodedFrame(type: .pairRequest, encrypted: false, payload: payload)
-            return [.send(frameData)]
-        } catch {
-            return closeEffectsLocked(.handshakeFailed(mapError(error)))
-        }
-    }
-
     func encodedPairResponse(approved: Bool, reason: String?) -> Data {
         // 拒绝路径也必须送达：PairResponse 是 Codable 结构，编码恒成功
         // swiftlint:disable:next force_try
@@ -491,13 +366,6 @@ extension SyncPeerSession {
             encrypted: false,
             payload: JSONEncoder().encode(PairResponse(approved: approved, reason: reason))
         )
-    }
-
-    /// 编码 pairCodeResponse。拒绝路径也必须送达：结构固定、payload 远小于上限，
-    /// 编码不会失败；仍走 `try?` 而不是 `try!`（仓库「危险操作只减不增」契约）。
-    func encodedCodeResponse(_ payload: PairCodeResponsePayload) -> Data {
-        let encoded = (try? JSONEncoder().encode(payload)) ?? Data()
-        return (try? encodedFrame(type: .pairCodeResponse, encrypted: false, payload: encoded)) ?? Data()
     }
 
     func encodedFrame(type: SyncFrameType, encrypted: Bool, payload: Data) throws -> Data {

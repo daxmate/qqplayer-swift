@@ -30,16 +30,6 @@ import Network
 import Observation
 
 /// 当前已连接的对端（同步设置页「连接状态区」展示用）。
-/// 设备页「本机配对码」区展示值（视图只读值，不做时间计算）。
-struct PairingCodeDisplay: Equatable, Sendable {
-    /// 原始 6 位码（复制用）
-    let code: String
-    /// 分组展示（123 456）
-    let grouped: String
-    /// 剩余秒数（供倒计时文案）
-    let remainingSeconds: Int
-}
-
 struct SyncConnectedPeer: Equatable, Sendable {
     /// 展示名（取已配对设备记录；查不到回落 Device ID 分组格式）
     var displayName: String
@@ -138,50 +128,6 @@ final class SyncHostCenter {
         allowsLANConnections = defaults.object(forKey: Self.allowsLANDefaultsKey) as? Bool ?? true
     }
 
-    // MARK: - 6 位配对码（批 1，A 方案）
-
-    /// 当前展示的 6 位配对码（nil = 未生成 / 已作废 / 已过期）。
-    private(set) var activePairingCode: String? { didSet { stateChanges.send() } }
-    /// 当前码的过期时刻（UI 倒计时；nil = 无有效码）。
-    private(set) var pairingCodeExpiresAt: Date? { didSet { stateChanges.send() } }
-
-    /// 生成一张 6 位配对码（作废旧码）。返回 nil = 监听未运行（未生成）。
-    /// 语义 / TTL / 限速见 Sync/SyncPairingCode.swift 与 docs/lan-sync-pairing-code.md。
-    @discardableResult
-    func generatePairingCode() -> String? {
-        guard isRunning, let listener else {
-            AppLog.warn(.sync, "⚠️ SyncHostCenter: 监听未运行，拒绝生成配对码")
-            return nil
-        }
-        let issue = listener.pairingCodes.generate()
-        // nonce 带 120s TTL 注册：码过期 ⇒ 后续 PairRequest 验签必失败（不静默成功）
-        listener.pairingNonces.register(issue.nonce, ttl: SyncPairingCodeStore.defaultTTL)
-        activePairingCode = issue.code
-        pairingCodeExpiresAt = issue.expiresAt
-        AppLog.info(.sync, "ℹ️ SyncHostCenter: 已生成配对码（TTL \(Int(SyncPairingCodeStore.defaultTTL))s）")
-        return issue.code
-    }
-
-    /// 作废当前码（用户取消展示 / 配对完成 / 停止监听）。
-    func cancelPairingCode() {
-        listener?.pairingCodes.cancel()
-        activePairingCode = nil
-        pairingCodeExpiresAt = nil
-    }
-
-    /// UI 渲染用：当前码 + 剩余秒数（已过期 / 无码 ⇒ nil）。纯读，视图每次重算即可。
-    func currentPairingCode(now: Date = Date()) -> PairingCodeDisplay? {
-        guard let code = activePairingCode,
-              let expiry = pairingCodeExpiresAt,
-              expiry > now
-        else { return nil }
-        return PairingCodeDisplay(
-            code: code,
-            grouped: SyncPairingCodeStore.formatted(code),
-            remainingSeconds: max(0, Int(expiry.timeIntervalSince(now).rounded(.up)))
-        )
-    }
-
     /// 清空启动错误（弹窗关闭后）。
     func clearStartError() {
         startError = nil
@@ -265,8 +211,6 @@ final class SyncHostCenter {
         libraryHost = nil
         listener?.stop()
         listener = nil
-        activePairingCode = nil
-        pairingCodeExpiresAt = nil
         pendingSession = nil
         pendingCard = nil
         isRunning = false
@@ -401,7 +345,6 @@ final class SyncHostCenter {
         pendingSession = nil
         // 配对完成：展示码连同池里其它存货一并作废（下次配对需重新展示新码）
         discardQRNonce()
-        cancelPairingCode()
         onDevicesChanged?()
     }
 

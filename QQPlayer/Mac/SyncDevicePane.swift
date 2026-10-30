@@ -57,13 +57,6 @@ struct SyncDevicePane: View {
     /// 本次同步目标设备 ID（nil = 未选）。
     let targetDeviceID: String?
 
-    // 批 1（2026-10-30）Mac 侧客户端角色：发现列表 / 连接 / 6 位配对码。
-    // 仍遵守「父 = 唯一观察者」：本 struct 只读 peerClient 的值 + 走回调写回。
-    let peerClient: MacPeerClientCenter
-    /// 正在输入配对码的目标设备名（nil = 没有输入框）
-    @Binding var peerCodeTarget: String?
-    @Binding var peerCodeInput: String
-
     // 父持有的本地态：本 struct 只以绑定读写（状态不搬家，生命周期仍在父）。
     @Binding var identityError: String?
     @Binding var devicesError: String?
@@ -75,19 +68,12 @@ struct SyncDevicePane: View {
     let onSelectTarget: (String?) -> Void
     let onAdoptConnected: () -> Void
     let onUnpair: (PeerDevice) -> Void
-    // 批 1：客户端角色回调（发现开关 / 连接 / 配对码）。
-    let onTogglePeerBrowsing: (Bool) -> Void
-    let onConnectPeer: (String) -> Void
-    let onPairPeer: (String, String) -> Void
-    let onDisconnectPeer: () -> Void
 
     var body: some View {
         Group {
             pairingApprovalSection
             identitySection
-            pairingCodeSection
             connectionSection
-            peerDiscoverySection
             pairedDevicesSection
             deviceTargetSection
         }

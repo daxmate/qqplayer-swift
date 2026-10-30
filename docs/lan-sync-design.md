@@ -276,4 +276,3 @@ Host（macOS）                           Client（iOS）
 | --- | --- | --- |
 | 2026-10-16 | §6.1 新增「冲突判定 + 待确认覆盖」（`SyncFileOverwriteJudge` 判定 7 条 + 新表 `sync_peer_file_state` + 状态机 `pending`/`approved`/`kept`/`agreed` + 三选项交互 + 自动通道只写 `pending` 不弹窗 + 只做 upload 方向 + P2 形状守卫 + 排除 `@lyrics/*`）；§6.2 新增 B1（对端时间戳超前 > 5 分钟 → 不应用 + 计数上屏）与 B2（`sync_playback_carry_state` + 游标单调不回退）；明确**零协议变更** | 用户 2026-10-16 拍板（契约 = `docs/sync-contract.md` §4） |
 | 2026-10-17 | §6.1 补齐〔保持现状〕(`kept`) 的**下次同步**语义：判定表新增 `kept` 分支（对端 + 本端都未变 → **静默跳过**，新增 `skipped` 输出桶；本端又变 → 冲突 `keptLocalChanged`（新原因码）；对端又变 → 冲突 `peerChanged`）；台账「决策时的本端指纹」字段统一为 `local_hash_at_decision`（`approved` / `kept` 都写），表列同批对齐（`updated_at_ms`；批 2 不落未被判据消费的 `peer_mtime_ms` / `local_mtime_ms`） | 用户 2026-10-17 拍板（契约 = `docs/sync-contract.md` §4） |
-| 2026-10-30 | 批 1：Mac 侧客户端角色（对等）+ 6 位配对码 A 方案（帧 17/18，TTL 120s，限速 5/60s）——详见 `docs/lan-sync-pairing-code.md` | 用户 2026-10-30 拍板（A 方案 / 角色对等） |

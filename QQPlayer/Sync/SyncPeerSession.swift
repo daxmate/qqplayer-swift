@@ -33,8 +33,6 @@ final class SyncPeerSession: @unchecked Sendable {
     let trustStore: any SyncTrustStore
     /// 主机侧 QR nonce 池（client 角色为 nil）
     let pairingNonces: SyncPairingNonceRegistry?
-    /// 主机侧 6 位配对码库（批 1；client 角色为 nil）。host 收到 pairCodeSubmit 时用它校验。
-    let pairingCodeStore: SyncPairingCodeStore?
 
     /// 底层通道（弱引用：channel 持有 session，session 不反向持有）
     weak var transport: (any SyncPeerTransport)?
@@ -64,8 +62,6 @@ final class SyncPeerSession: @unchecked Sendable {
     var pendingPairRequest: PairRequest?
     var expectedPeerID: String?
     var pairingCandidate: SyncPairingCandidate?
-    /// client：本次 6 位配对码（nil = 不走码路径）
-    var pairingCodeValue: String?
     var sendCipher: SyncCipher?
     var receiveCipher: SyncCipher?
     private var deadlineItem: (any SyncScheduledDeadline)?
@@ -81,7 +77,6 @@ final class SyncPeerSession: @unchecked Sendable {
         trustStore: any SyncTrustStore,
         config: SyncSessionConfiguration = SyncSessionConfiguration(),
         pairingNonces: SyncPairingNonceRegistry? = nil,
-        pairingCodeStore: SyncPairingCodeStore? = nil,
         transport: (any SyncPeerTransport)? = nil,
         deadlineScheduler: any SyncDeadlineScheduling = DispatchSyncDeadlineScheduler.shared
     ) {
@@ -90,7 +85,6 @@ final class SyncPeerSession: @unchecked Sendable {
         self.trustStore = trustStore
         self.config = config
         self.pairingNonces = pairingNonces
-        self.pairingCodeStore = pairingCodeStore
         self.transport = transport
         self.deadlineScheduler = deadlineScheduler
     }
@@ -121,14 +115,6 @@ final class SyncPeerSession: @unchecked Sendable {
         lock.lock()
         expectedPeerID = expectedPeerDeviceID
         pairingCandidate = candidate
-        lock.unlock()
-    }
-
-    /// client：声明本次要用的 6 位配对码（批 1，A 方案）。
-    /// 与 QR 候选互斥：有 candidate 走扫码路径，否则有 code 走码路径（见 +Frames）。
-    func setPairingCode(_ code: String?) {
-        lock.lock()
-        pairingCodeValue = code
         lock.unlock()
     }
 

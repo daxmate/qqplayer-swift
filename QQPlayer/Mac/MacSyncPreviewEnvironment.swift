@@ -36,8 +36,6 @@ import Foundation
 enum MacSyncPreviewEnvironment {
     /// App 级 Host 监听中心（设置页「同步」与工具栏同步面板共用这一个实例）。
     static var hostCenter: SyncHostCenter { .shared }
-    /// 批 1：Mac 侧客户端角色（发现 / 连接 / 配对码），预览与 App 根同源。
-    static var peerClient: MacPeerClientCenter { .shared }
     /// 接线自检事实（`MacSyncRunSection` 的消费点之一）。
     static var wiringFacts: SyncWiringFactsStore { .shared }
     /// 歌词补发事实（`MacSyncRunSection` 的消费点之一）。

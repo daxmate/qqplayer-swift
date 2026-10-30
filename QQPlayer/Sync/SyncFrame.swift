@@ -73,12 +73,6 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     /// T9（2026-09-12）对端内容清单响应：一页条目 + 曲库摘要（恒返回）。
     /// 载荷 `SyncPeerLibraryResponsePayload`（Sync/SyncPeerLibraryModels.swift）。
     case peerLibraryResponse = 16
-    /// 批 1（2026-10-30）6 位配对码提交：client → host，明文，配对阶段。
-    /// 载荷 `PairCodeSubmit`（Sync/SyncPairingCodeMessages.swift）。
-    case pairCodeSubmit = 17
-    /// 批 1（2026-10-30）6 位配对码校验结果：host → client，明文，配对阶段。
-    /// 载荷 `PairCodeResponsePayload`（Sync/SyncPairingCodeMessages.swift）。
-    case pairCodeResponse = 18
 }
 
 /// 帧 flags（bit0 = encrypted）。

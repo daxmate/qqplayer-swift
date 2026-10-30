@@ -68,8 +68,6 @@ struct QQPlayerMacApp: App {
         // 生命周期归 SyncHostCenter）。“允许局域网设备连接”关掉时不启动。
         MainActor.assumeIsolated {
             SyncHostCenter.shared.start()
-            // 批 1：Mac 侧客户端角色（发现开关默认开；失败不影响 host 监听）。
-            MacPeerClientCenter.shared.start()
         }
     }
 
@@ -109,7 +107,6 @@ struct QQPlayerMacApp: App {
             // 同步三件（批 6-8）：`SyncHostCenter` / 装配自检事实 / 歌词补发事实迁 `@Observable`
             // ⇒ 同步面板（设置页与工具栏面板）、相关视图改环境注入。新增一个对象 = 三处都登记。
             .environment(SyncHostCenter.shared)
-            .environment(MacPeerClientCenter.shared)
             .environment(SyncWiringFactsStore.shared)
             .environment(MacLyricsResendFactsStore.shared)
             // MAS 批 2B：曲库根授权状态（门视图 + 设置页读同一份）。
@@ -142,7 +139,6 @@ struct QQPlayerMacApp: App {
                 .environment(KaraokeController.shared)
                 // 同步三件（批 6-8）：Settings 是独立场景，不继承主窗环境（同上一行原因）
                 .environment(SyncHostCenter.shared)
-                .environment(MacPeerClientCenter.shared)
                 .environment(SyncWiringFactsStore.shared)
                 .environment(MacLyricsResendFactsStore.shared)
         }

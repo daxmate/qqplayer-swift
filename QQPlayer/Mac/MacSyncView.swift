@@ -64,8 +64,6 @@ struct MacSyncRunSection: View {
     /// 2026-09-20 批 6-8：中心迁 `@Observable` ⇒ 视图侧改**组合根环境注入**（读属性即按需重绘）。
     /// 两个入口（设置页 `MacSyncSettingsView` / 工具栏面板 `MacSyncCenterView`）共用本视图。
     @Environment(SyncHostCenter.self) private var envHostCenter
-    /// 批 1：Mac 侧客户端角色中心（发现 / 连接 / 6 位码配对）。组合根注入。
-    @Environment(MacPeerClientCenter.self) private var envPeerClient
     /// App 强调色（读环境值，与主窗同源；macOS 上 `Color.accentColor` 跟随系统强调色而非
     /// App tint——2026-09-05 已统一，本文件 2026-09-11 新增时复发，见 M1）
     @Environment(\.appAccentColor) var accentColor
@@ -92,9 +90,6 @@ struct MacSyncRunSection: View {
 
     @State var identity: SyncIdentity?
     @State var identityError: String?
-    /// 批 1：正在输入配对码的目标设备名 / 输入内容（设备页本地态，不持久化）。
-    @State var peerCodeTarget: String?
-    @State var peerCodeInput = ""
     @State var qrPayload: PairQRPayload?
     @State var qrImage: NSImage?
     @State var devices: [PeerDevice] = []
@@ -308,9 +303,6 @@ struct MacSyncRunSection: View {
             deviceRows: deviceRows,
             syncTargetStatus: syncTargetStatus,
             targetDeviceID: targetDeviceID,
-            peerClient: envPeerClient,
-            peerCodeTarget: $peerCodeTarget,
-            peerCodeInput: $peerCodeInput,
             identityError: $identityError,
             devicesError: $devicesError,
             pendingUnpair: $pendingUnpair,
@@ -318,11 +310,7 @@ struct MacSyncRunSection: View {
             onRefreshQR: { refreshQR() },
             onSelectTarget: { selectTargetDevice($0) },
             onAdoptConnected: { adoptConnectedTarget() },
-            onUnpair: { unpair($0) },
-            onTogglePeerBrowsing: { envPeerClient.setBrowsing($0) },
-            onConnectPeer: { envPeerClient.connect(to: $0) },
-            onPairPeer: { name, code in envPeerClient.pair(with: name, code: code) },
-            onDisconnectPeer: { envPeerClient.disconnect() }
+            onUnpair: { unpair($0) }
         )
     }
 
