@@ -55,13 +55,23 @@ final class MacPeerClientCenter {
         }
     }
 
-    /// 发现列表一行（值类型；视图只读）。
+    /// 发现列表一行（与纯逻辑 `SyncPeerDiscoveryEntry` 同形；这里加 Identifiable 供 ForEach）。
     struct DiscoveredPeer: Identifiable, Equatable, Sendable {
         /// Bonjour 服务名（同网同名极少，够用；连接用 name 查回 endpoint）
         var id: String { name }
         let name: String
         /// 信任库里已有同名已配对设备（启发式：client 侧落库的 displayName = host 展示名）
         let isPaired: Bool
+
+        init(name: String, isPaired: Bool) {
+            self.name = name
+            self.isPaired = isPaired
+        }
+
+        init(_ entry: SyncPeerDiscoveryEntry) {
+            name = entry.name
+            isPaired = entry.isPaired
+        }
     }
 
     // MARK: 对外状态
@@ -179,11 +189,11 @@ final class MacPeerClientCenter {
     /// 发现结果上屏：排除本机自己的广播；标注已配对设备。
     private func apply(hosts: [SyncDiscoveredHost]) {
         discovered = Dictionary(hosts.map { ($0.name, $0) }, uniquingKeysWith: { _, latest in latest })
-        let selfName = localDeviceNameProvider()
-        peers = hosts
-            .filter { $0.name != selfName }
-            .map { DiscoveredPeer(name: $0.name, isPaired: pairedNames.contains($0.name)) }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        peers = SyncPeerDiscoveryList.entries(
+            names: hosts.map(\.name),
+            excludingSelf: localDeviceNameProvider(),
+            pairedNames: pairedNames
+        ).map(DiscoveredPeer.init)
         if case .idle = phase, browsingEnabled {
             phase = .browsing
         }

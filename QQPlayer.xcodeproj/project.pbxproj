@@ -218,6 +218,7 @@
 		6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */; };
 		11F281DA84CC48F1A80E79D4 /* SyncPairingCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41972F93B4554046BC29D64A /* SyncPairingCodeTests.swift */; };
 		DAB35BC95AC54497AE526A19 /* SyncPairingCodeFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9CDB340768A4FFCBF04FF04 /* SyncPairingCodeFlowTests.swift */; };
+		F060F1CAC5B74B9F96CACCCE /* SyncPeerDiscoveryListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A1CC3B8E1A4BA180621E05 /* SyncPeerDiscoveryListTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -485,6 +486,7 @@
 		AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryRootAccessPlanTests.swift; sourceTree = "<group>"; };
 		41972F93B4554046BC29D64A /* SyncPairingCodeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingCodeTests.swift; sourceTree = "<group>"; };
 		B9CDB340768A4FFCBF04FF04 /* SyncPairingCodeFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingCodeFlowTests.swift; sourceTree = "<group>"; };
+		02A1CC3B8E1A4BA180621E05 /* SyncPeerDiscoveryListTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerDiscoveryListTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -953,6 +955,7 @@
 				Sync/SyncPeerLibraryModels.swift,
 				Sync/SyncPairingCode.swift,
 				Sync/SyncPairingCodeMessages.swift,
+				Sync/SyncPeerDiscoveryList.swift,
 				Sync/SyncPeerSession.swift,
 				"Sync/SyncPeerSession+Frames.swift",
 				Sync/SyncPlaybackCarryPeer.swift,
@@ -1324,6 +1327,7 @@
 				AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */,
 				41972F93B4554046BC29D64A /* SyncPairingCodeTests.swift */,
 				B9CDB340768A4FFCBF04FF04 /* SyncPairingCodeFlowTests.swift */,
+				02A1CC3B8E1A4BA180621E05 /* SyncPeerDiscoveryListTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1840,6 +1844,7 @@
 				6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */,
 				11F281DA84CC48F1A80E79D4 /* SyncPairingCodeTests.swift in Sources */,
 				DAB35BC95AC54497AE526A19 /* SyncPairingCodeFlowTests.swift in Sources */,
+				F060F1CAC5B74B9F96CACCCE /* SyncPeerDiscoveryListTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
