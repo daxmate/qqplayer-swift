@@ -216,6 +216,9 @@
 		DDA70F8395E6460B9BA42725 /* PeerFileStateStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DA3E9D1E7B405BADDD3769 /* PeerFileStateStoreTests.swift */; };
 		01E66447D73F4889A2B9AF7F /* SyncFileOverwriteWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */; };
 		6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */; };
+		11F281DA84CC48F1A80E79D4 /* SyncPairingCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41972F93B4554046BC29D64A /* SyncPairingCodeTests.swift */; };
+		DAB35BC95AC54497AE526A19 /* SyncPairingCodeFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9CDB340768A4FFCBF04FF04 /* SyncPairingCodeFlowTests.swift */; };
+		F060F1CAC5B74B9F96CACCCE /* SyncPeerDiscoveryListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A1CC3B8E1A4BA180621E05 /* SyncPeerDiscoveryListTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -481,6 +484,9 @@
 		E6DA3E9D1E7B405BADDD3769 /* PeerFileStateStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PeerFileStateStoreTests.swift; sourceTree = "<group>"; };
 		1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileOverwriteWiringTests.swift; sourceTree = "<group>"; };
 		AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryRootAccessPlanTests.swift; sourceTree = "<group>"; };
+		41972F93B4554046BC29D64A /* SyncPairingCodeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingCodeTests.swift; sourceTree = "<group>"; };
+		B9CDB340768A4FFCBF04FF04 /* SyncPairingCodeFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPairingCodeFlowTests.swift; sourceTree = "<group>"; };
+		02A1CC3B8E1A4BA180621E05 /* SyncPeerDiscoveryListTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncPeerDiscoveryListTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -526,6 +532,7 @@
 				Mac/MacOnlineSearchView.swift,
 				Mac/MacOnlineSettingsView.swift,
 				Mac/MacPairApprovalCardView.swift,
+				Mac/MacPeerClientCenter.swift,
 				"Mac/MacPlayerView+PlayerSection.swift",
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
@@ -570,6 +577,7 @@
 				Mac/MacVisualizerView.swift,
 				Mac/SyncDataPane.swift,
 				Mac/SyncDevicePane.swift,
+				"Mac/SyncDevicePane+Peer.swift",
 				Mac/SyncHostCenter.swift,
 				Mac/SyncTracksPane.swift,
 				QQPlayerMacApp.swift,
@@ -666,6 +674,7 @@
 				Mac/MacOnlineSearchView.swift,
 				Mac/MacOnlineSettingsView.swift,
 				Mac/MacPairApprovalCardView.swift,
+				Mac/MacPeerClientCenter.swift,
 				"Mac/MacPlayerView+PlayerSection.swift",
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
@@ -710,6 +719,7 @@
 				Mac/MacVisualizerView.swift,
 				Mac/SyncDataPane.swift,
 				Mac/SyncDevicePane.swift,
+				"Mac/SyncDevicePane+Peer.swift",
 				Mac/SyncHostCenter.swift,
 				Mac/SyncTracksPane.swift,
 				Models/AppearanceTheme.swift,
@@ -889,6 +899,7 @@
 				Sync/PeerFileStateStore.swift,
 				Sync/SyncAlignedLyrics.swift,
 				Sync/SyncBrowseSource.swift,
+				Sync/SyncBrowser.swift,
 				Sync/SyncChangeLogApplier.swift,
 				Sync/SyncChangeLogDeletionPolicy.swift,
 				Sync/SyncChangeLogMapper.swift,
@@ -942,6 +953,9 @@
 				Sync/SyncPairingFlow.swift,
 				Sync/SyncPeerLibraryClient.swift,
 				Sync/SyncPeerLibraryModels.swift,
+				Sync/SyncPairingCode.swift,
+				Sync/SyncPairingCodeMessages.swift,
+				Sync/SyncPeerDiscoveryList.swift,
 				Sync/SyncPeerSession.swift,
 				"Sync/SyncPeerSession+Frames.swift",
 				Sync/SyncPlaybackCarryPeer.swift,
@@ -1311,6 +1325,9 @@
 				E6DA3E9D1E7B405BADDD3769 /* PeerFileStateStoreTests.swift */,
 				1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */,
 				AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */,
+				41972F93B4554046BC29D64A /* SyncPairingCodeTests.swift */,
+				B9CDB340768A4FFCBF04FF04 /* SyncPairingCodeFlowTests.swift */,
+				02A1CC3B8E1A4BA180621E05 /* SyncPeerDiscoveryListTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1825,6 +1842,9 @@
 				DDA70F8395E6460B9BA42725 /* PeerFileStateStoreTests.swift in Sources */,
 				01E66447D73F4889A2B9AF7F /* SyncFileOverwriteWiringTests.swift in Sources */,
 				6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */,
+				11F281DA84CC48F1A80E79D4 /* SyncPairingCodeTests.swift in Sources */,
+				DAB35BC95AC54497AE526A19 /* SyncPairingCodeFlowTests.swift in Sources */,
+				F060F1CAC5B74B9F96CACCCE /* SyncPeerDiscoveryListTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

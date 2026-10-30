@@ -67,6 +67,7 @@ enum SyncQRImageFactory {
         // Preview 是组合根之外的第二个合法装配点（App 根注入不覆盖画布）→ 显式装配（批 6-8）。
         // 实例取自 `MacSyncPreviewEnvironment`（非视图层 helper）⇒ 视图文件里不留 `.shared` 直连。
         .environment(MacSyncPreviewEnvironment.hostCenter)
+        .environment(MacSyncPreviewEnvironment.peerClient)
         .environment(MacSyncPreviewEnvironment.wiringFacts)
         .environment(MacSyncPreviewEnvironment.lyricsResendFacts)
 }

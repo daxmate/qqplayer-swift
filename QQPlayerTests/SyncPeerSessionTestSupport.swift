@@ -199,7 +199,8 @@ struct SessionFixture {
 
     static func make(
         config: SyncSessionConfiguration = SyncSessionConfiguration(),
-        deadlineScheduler: (any SyncDeadlineScheduling)? = nil
+        deadlineScheduler: (any SyncDeadlineScheduling)? = nil,
+        pairingCodeStore: SyncPairingCodeStore? = nil
     ) -> SessionFixture {
         let scheduler = deadlineScheduler ?? DispatchSyncDeadlineScheduler.shared
         let hostIdentity = SyncIdentity.generate()
@@ -217,6 +218,7 @@ struct SessionFixture {
             trustStore: hostTrust,
             config: config,
             pairingNonces: SyncPairingNonceRegistry(),
+            pairingCodeStore: pairingCodeStore,
             transport: hostChannel,
             deadlineScheduler: scheduler
         )
