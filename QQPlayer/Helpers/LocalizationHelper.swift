@@ -221,33 +221,17 @@ struct Localized {
 
     // MARK: - Sync and Connection
     static let libraryOutOfSync = "library_out_of_sync".localized
-    static let librarySyncMessage = "library_sync_message".localized
     static let offlineMode = "offline_mode".localized
-    static let offlineModeMessage = "offline_mode_message".localized
-    static let icloudConnectionRequired = "icloud_connection_required".localized
 
     // MARK: - Tutorial/Onboarding
     static let welcomeToQQPlayer = "welcome_to_qqplayer".localized
-    static let signInToAppleId = "sign_in_to_apple_id".localized
-    static let signInMessage = "sign_in_message".localized
     static let ifSignedInContinue = "if_signed_in_continue".localized
-    static let enableIcloudDrive = "enable_icloud_drive".localized
-    static let icloudDriveMessage = "icloud_drive_message".localized
-    static let ifIcloudEnabledContinue = "if_icloud_enabled_continue".localized
     static let addYourMusic = "add_your_music".localized
     static let howToAddMusic = "how_to_add_music".localized
     static let openFilesApp = "open_files_app".localized
     static let navigateToOnMyIphone = "navigate_to_on_my_iphone".localized
     static let findQQPlayerFolder = "find_qqplayer_folder".localized
     static let addYourMusicInstruction = "add_your_music_instruction".localized
-
-    // MARK: - Tutorial Status Messages
-    static let signedInToAppleId = "signed_in_to_apple_id".localized
-    static let notSignedInToAppleId = "not_signed_in_to_apple_id".localized
-    static let cannotDetectAppleIdStatus = "cannot_detect_apple_id_status".localized
-    static let icloudDriveEnabled = "icloud_drive_enabled".localized
-    static let icloudDriveNotEnabled = "icloud_drive_not_enabled".localized
-    static let cannotDetectIcloudStatus = "cannot_detect_icloud_status".localized
 
     // MARK: - Tutorial Instructions
     static let findOpenFilesApp = "find_open_files_app".localized

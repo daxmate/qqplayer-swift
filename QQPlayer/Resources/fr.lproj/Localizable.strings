@@ -190,33 +190,17 @@
 
 /* Sync and Connection */
 "library_out_of_sync" = "Bibliothèque désynchronisée";
-"library_sync_message" = "Votre bibliothèque musicale n'est actuellement pas synchronisée avec iCloud. Certaines fonctionnalités pourraient ne pas fonctionner jusqu'à ce que vous vous reconnectiez.";
 "offline_mode" = "Mode hors ligne";
-"offline_mode_message" = "Synchronisation iCloud désactivée. Fichiers musicaux dans le dossier Documents uniquement.";
-"icloud_connection_required" = "Connexion iCloud requise";
 
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "Bienvenue dans QQPlayer";
-"sign_in_to_apple_id" = "Se connecter à l'identifiant Apple";
-"sign_in_message" = "Pour synchroniser votre musique et vos favoris sur tous vos appareils, assurez-vous d'être connecté à votre identifiant Apple.";
 "if_signed_in_continue" = "Si vous êtes connecté, vous pouvez continuer";
-"enable_icloud_drive" = "Activer iCloud Drive";
-"icloud_drive_message" = "iCloud Drive vous permet d'accéder à vos fichiers musicaux depuis n'importe quel appareil et garde vos favoris synchronisés.";
-"if_icloud_enabled_continue" = "Si iCloud Drive est activé, vous pouvez continuer";
 "add_your_music" = "Ajoutez votre musique";
 "how_to_add_music" = "Ajoutez vos musiques dans le dossier QQPlayer de cet appareil (Fichiers → \'Sur mon iPhone\' → QQPlayer) :";
 "open_files_app" = "Ouvrir l'app Fichiers";
 "navigate_to_on_my_iphone" = "Allez dans \'Sur mon iPhone\'";
 "find_qqplayer_folder" = "Trouver le dossier QQPlayer";
 "add_your_music_instruction" = "Ajoutez votre musique";
-
-/* Tutorial Status Messages */
-"signed_in_to_apple_id" = "Connecté à l'identifiant Apple";
-"not_signed_in_to_apple_id" = "Non connecté à l'identifiant Apple";
-"cannot_detect_apple_id_status" = "Impossible de détecter le statut de l'identifiant Apple";
-"icloud_drive_enabled" = "iCloud Drive est activé";
-"icloud_drive_not_enabled" = "iCloud Drive n'est pas activé";
-"cannot_detect_icloud_status" = "Impossible de détecter le statut d'iCloud Drive";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "Trouvez et ouvrez l'app Fichiers";

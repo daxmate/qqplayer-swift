@@ -253,7 +253,6 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 - **StateManager**：本地状态 JSON（收藏 / 歌单 / 播放器状态）原子写、损坏文件隔离（iCloud 镜像层已退役，DB 为单一事实源）
 - **ArtworkManager**：封面提取（内嵌 / 文件头解析）+ 内存 + 磁盘缓存
 - **FileCleanupManager**（iOS）：磁盘删除 / 收录格式变更后的曲库一致性清理
-- **SandboxMusicMigrator**（iOS）：iCloud 容器 → 沙盒 Documents 的一次性存量迁移（计划器纯逻辑 + 执行器，幂等可断点）；旧的 iCloud 按需落地管理器 `CloudDownloadManager` 已随沙盒改造退役
 
 - **HybridMusicAPI / SpotifyAPI / DiscogsAPI**（iOS）：歌手资料——Spotify 优先、Discogs 兜底 + 磁盘缓存
 - **AudioMetadataParser**：FLAC / MP3 / WAV / M4A / DSF 分域解析（含 genre、MP4 空 covr 清理）

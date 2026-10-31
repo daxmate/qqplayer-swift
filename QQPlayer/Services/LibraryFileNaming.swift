@@ -100,7 +100,6 @@ enum LibraryFileNaming {
 
     /// 该路径组件是否为「改名备份」目录（`...rename-backup` / `...-rename-backup`）。
     /// 扫描、目录枚举、迁移器一律据此排除——否则备份文件会被重新收录
-    /// （`SandboxMusicMigrator` 未排除 `_migrated-backup/` 的旧坑同款）。
     static func isRenameBackupPathComponent(_ name: String) -> Bool {
         name.contains("rename-backup")
     }

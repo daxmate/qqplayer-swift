@@ -37,8 +37,8 @@
 //       **首句**、**同步**跑（此刻 `AppCoordinator` / `AppServices` / 各视图 singleton 尚未构造，
 //       `ArtworkManager` 等还没建 `.qqplayer/artwork` …）。同步是刻意的：异步会与紧随其后的
 //       组件构造竞争，「早于组件」就不再成立。这一轮**不置完成门**。
-//     · 第二轮 `runInBackground()`（`AppCoordinator.initialize()`，在 `SandboxMusicMigrator`
-//       与 v1 之后）：**收尾一轮**，判据见下「完成门」，它才置完成门。
+//     · 第二轮 `runInBackground()`（`AppCoordinator.initialize()`，在 v1 之后）：
+//       **收尾一轮**，判据见下「完成门」，它才置完成门。
 //   **为什么第一轮不置门**：启动还没走完 —— v1（`LibraryLayoutMigrator`）会无条件建出
 //   `Documents/{Music,Lyrics,Artwork,Logs}` 四个规划目录（它的 `plannedDirectoryNames`），
 //   首装设备上这发生在第一轮之后；若第一轮就置门，这些根目录将永远留在可见区。故门只在

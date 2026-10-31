@@ -31,7 +31,7 @@
 |---|---|
 | `QQPlayer/Sync/**`（变更日志、配对、会话） | `.sync` |
 | 文件传输实现（`SyncFileReceiver` / `SyncFileSender` / 分块、断点对齐） | `.transfer` |
-| `SandboxMigration` / `TrackIdentityMigration` | `.migration` |
+| `TrackIdentityMigration` | `.migration` |
 | `DatabaseManager*.swift` | `.db` |
 | 在线抓取类（`HybridMusicAPI` / `QuarkClient` / `SpotifyAPI` / `LyricsSearch` / 在线搜索） | `.scrape` |
 | `QQPlayer/Views/**`、`QQPlayer/Mac/**` 的 UI 层、`AppIntents` 用户交互 | `.ui` |

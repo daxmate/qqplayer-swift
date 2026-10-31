@@ -47,16 +47,9 @@ class AppCoordinator {
             StateManager.shared.migrateLegacyPaths()
         }.value
 
-        // M3-2：一次性 iCloud → 沙盒存量迁移（幂等可断点；无 iCloud 数据时自动跳过）。
-        // 必须在首次扫描前跑完，确保 LibraryIndexer 主扫只面对沙盒 Documents。
-        #if os(iOS)
-            _ = await SandboxMusicMigrator.shared.runIfNeeded()
-        #endif
-
         // 2026-09-22 曲库文件夹化：Documents 根下的规划类文件搬进
         // `Music/` `Lyrics/` `Artwork/` `Logs/`，并把 DB 里仍是绝对路径的曲目行改写成
-        // 「相对 Music 根」的相对路径。**顺序在 SandboxMusicMigrator 之后、首次扫描之前**：
-        // 前者可能往 Documents 根落文件，先跑完再搬才能一并收进 Music；扫描根已是
+        // 「相对 Music 根」的相对路径。**顺序在首次扫描之前**：扫描根已是
         // `Documents/Music`，所以必须搬完再扫（否则首启扫到空目录）。
         // 迁移器内部在后台串行队列上做文件/DB 动作（不阻塞主线程），幂等 + 完成门 +
         // 失败不删原件；`--library-layout-dry-run` 启动参数可先看清单再放手。

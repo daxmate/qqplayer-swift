@@ -94,7 +94,6 @@ private enum TrackFileRenameContract {
         "QQPlayer/Services/NeteaseOnlineClient+Transport.swift",
         "QQPlayer/Services/QuarkCookieStore.swift",
         "QQPlayer/Services/ReclaimRestoreService.swift",
-        "QQPlayer/Services/SandboxMigration.swift",
         "QQPlayer/Services/StateManager.swift",
         "QQPlayer/Services/TagWriterService.swift",
         "QQPlayer/Services/TrackDeletionService.swift",

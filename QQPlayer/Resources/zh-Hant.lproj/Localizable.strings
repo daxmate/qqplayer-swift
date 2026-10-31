@@ -303,28 +303,12 @@
 /* Sync and Connection */
 "library_out_of_sync" = "媒體庫未同步";
 
-"library_sync_message" = "你的媒體庫目前與 iCloud 不同步。請重新登入 Apple ID 恢復所有功能。";
-
 "offline_mode" = "離線純本地模式";
-
-"offline_mode_message" = "iCloud 同步已禁用。目前僅讀取本地資料夾中的音樂檔案。";
-
-"icloud_connection_required" = "需要連接 iCloud";
 
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "歡迎使用 QQPlayer";
 
-"sign_in_to_apple_id" = "登入 Apple ID";
-
-"sign_in_message" = "為了在多台設備間同步你的無損音樂和收藏夾，請確保已登入 Apple ID。";
-
 "if_signed_in_continue" = "如果你已登入，請點擊繼續";
-
-"enable_icloud_drive" = "啟用 iCloud 雲碟";
-
-"icloud_drive_message" = "啟用 iCloud 雲碟後，你可以在任何設備上訪問你的音樂庫並保持配置同步。";
-
-"if_icloud_enabled_continue" = "如果已啟用 iCloud 雲碟，請點擊繼續";
 
 "add_your_music" = "添加你的本地音樂";
 
@@ -337,19 +321,6 @@
 "find_qqplayer_folder" = "找到「QQPlayer」資料夾";
 
 "add_your_music_instruction" = "匯入你的音樂";
-
-/* Tutorial Status Messages */
-"signed_in_to_apple_id" = "Apple ID 已登入";
-
-"not_signed_in_to_apple_id" = "Apple ID 未登入";
-
-"cannot_detect_apple_id_status" = "無法檢測 Apple ID 狀態";
-
-"icloud_drive_enabled" = "iCloud 雲碟已啟用";
-
-"icloud_drive_not_enabled" = "iCloud 雲碟未啟用";
-
-"cannot_detect_icloud_status" = "無法檢測 iCloud 雲碟狀態";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "在手機桌面上找到並打開藍色的「檔案」App";

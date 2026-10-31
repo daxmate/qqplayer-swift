@@ -206,33 +206,17 @@
 
 /* Sync and Connection */
 "library_out_of_sync" = "媒体库未同步";
-"library_sync_message" = "你的媒体库目前与 iCloud 不同步。请重新登录 Apple ID 恢复所有功能。";
 "offline_mode" = "离线纯本地模式";
-"offline_mode_message" = "iCloud 同步已禁用。目前仅读取本地文件夹中的音乐文件。";
-"icloud_connection_required" = "需要连接 iCloud";
 
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "欢迎使用 QQPlayer";
-"sign_in_to_apple_id" = "登录 Apple ID";
-"sign_in_message" = "为了在多台设备间同步你的无损音乐和收藏夹，请确保已登录 Apple ID。";
 "if_signed_in_continue" = "如果你已登录，请点击继续";
-"enable_icloud_drive" = "启用 iCloud 云盘";
-"icloud_drive_message" = "启用 iCloud 云盘后，你可以在任何设备上访问你的音乐库并保持配置同步。";
-"if_icloud_enabled_continue" = "如果已启用 iCloud 云盘，请点击继续";
 "add_your_music" = "添加你的本地音乐";
 "how_to_add_music" = "请将音乐文件放入本机「文件」App 的 QQPlayer 文件夹（我的 iPhone → QQPlayer）：";
 "open_files_app" = "打开「文件」App";
 "navigate_to_on_my_iphone" = "进入「我的 iPhone」";
 "find_qqplayer_folder" = "找到「QQPlayer」文件夹";
 "add_your_music_instruction" = "导入你的音乐";
-
-/* Tutorial Status Messages */
-"signed_in_to_apple_id" = "Apple ID 已登录";
-"not_signed_in_to_apple_id" = "Apple ID 未登录";
-"cannot_detect_apple_id_status" = "无法检测 Apple ID 状态";
-"icloud_drive_enabled" = "iCloud 云盘已启用";
-"icloud_drive_not_enabled" = "iCloud 云盘未启用";
-"cannot_detect_icloud_status" = "无法检测 iCloud 云盘状态";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "在手机桌面上找到并打开蓝色的「文件」App";

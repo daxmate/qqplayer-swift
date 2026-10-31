@@ -2,8 +2,9 @@
 //  AppCoordinator+iCloud.swift
 //  QQPlayer
 //
-//  iCloud 同步/状态机/文件协调：容器状态检查、收藏同步、歌单云恢复/写回、
-//  索引完成后的 iCloud 收尾、widget 歌单数据刷新。
+//  历史：iCloud 同步/状态机（容器状态检查、收藏同步、歌单云恢复/写回）已退役。
+//  现仅保留索引完成后的 DB 关系维护与 widget 歌单数据刷新（文件名沿用，
+//  避免 pbxproj 抖动）。
 //
 import Foundation
 #if os(iOS)
@@ -114,13 +115,13 @@ extension AppCoordinator {
                     )
                     try stateManager.savePlaylist(playlistState)
                 }
-                AppLog.info(.general, "✅ Playlists synced to iCloud with \(playlists.count) playlists")
+                AppLog.info(.general, "✅ Playlist state synced with \(playlists.count) playlists")
 
                 // Update widget playlist data with artwork
                 await updateWidgetPlaylists(playlists: playlists)
 
             } catch {
-                AppLog.error(.general, "❌ Failed to sync playlists to iCloud: \(error)")
+                AppLog.error(.general, "❌ Failed to sync playlist state: \(error)")
             }
         }
     }
