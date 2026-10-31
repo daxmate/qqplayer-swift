@@ -296,6 +296,21 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 - iOS 端：有效的 Apple 开发者账号（CarPlay / Siri 能力签名）与真机
 - 依赖已锁定：`QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` 已入库，SPM 版本可复现构建
 
+### 🧭 统一构建入口（推荐）
+
+本仓库与其余 app 仓库共用同一入口写法：
+
+```bash
+./scripts/build-app.sh            # 默认 all：iOS + macOS 两端
+./scripts/build-app.sh ios        # 仅 iOS（generic 模拟器，免签名，不启动模拟器）
+./scripts/build-app.sh macos      # 仅 macOS
+./scripts/build-app.sh --release  # Release 配置（默认 Debug）
+./scripts/build-app.sh --open     # 构建后打开 QQPlayer.xcodeproj
+```
+
+它只是入口，内部仍调用 `scripts/xcbuild.sh`（共享 SPM 缓存 + 按工作区隔离的 DerivedData + 构建锁）；
+需要跑测试或传原生 `xcodebuild` 参数时直接用 `scripts/xcbuild.sh`，真机安装用 `./build.sh install`。
+
 ### 📱 iOS（App Store 版同源）
 
 ```bash
@@ -396,7 +411,7 @@ Share/                        # iOS 分享扩展
 SiriIntentsExtension/         # iOS Siri 意图扩展
 QQPlayerTests/                # Swift Testing 单测（含 Fixtures/Mock 辅助文件；用例数口径见「测试与 CI」）
 QQPlayerSiriTests/            # Siri 集成测试（需 Xcode 27 SDK，CI 已豁免）
-scripts/                      # 工程工具（xcbuild.sh 统一构建入口 / add-test-file.py / gen-zh-hant.py /
+scripts/                      # 工程工具（build-app.sh 统一入口 → xcbuild.sh / add-test-file.py / gen-zh-hant.py /
                               #   pbxproj-membership.py / run-local-sync-tests.sh / siri-tests-guard.py / sync-harness / git-hooks）
 .env.template                 # 可选 API Key 模板（复制为 .env）
 build.sh                      # 一键构建 / 安装脚本（编译：无参=iOS+macOS / ios / mac，generic 模拟器免签名；安装：install [ios|mac] / --install=install ios）
