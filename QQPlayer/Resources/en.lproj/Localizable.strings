@@ -204,10 +204,6 @@
 /* Search Categories */
 "all" = "All";
 
-/* Sync and Connection */
-"library_out_of_sync" = "Library Out of Sync";
-"offline_mode" = "Offline Mode";
-
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "Welcome to QQPlayer";
 "if_signed_in_continue" = "If you're signed in, you can continue";

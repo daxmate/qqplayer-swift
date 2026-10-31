@@ -188,10 +188,6 @@
 /* Search Categories */
 "all" = "Все";
 
-/* Sync and Connection */
-"library_out_of_sync" = "Медиатека не синхронизирована";
-"offline_mode" = "Офлайн-режим";
-
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "Добро пожаловать в QQPlayer";
 "if_signed_in_continue" = "Если вы уже вошли, можете продолжить";

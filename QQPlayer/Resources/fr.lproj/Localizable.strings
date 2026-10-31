@@ -188,10 +188,6 @@
 /* Search Categories */
 "all" = "Tout";
 
-/* Sync and Connection */
-"library_out_of_sync" = "Bibliothèque désynchronisée";
-"offline_mode" = "Mode hors ligne";
-
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "Bienvenue dans QQPlayer";
 "if_signed_in_continue" = "Si vous êtes connecté, vous pouvez continuer";

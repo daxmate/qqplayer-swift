@@ -204,10 +204,6 @@
 /* Search Categories */
 "all" = "全部";
 
-/* Sync and Connection */
-"library_out_of_sync" = "媒体库未同步";
-"offline_mode" = "离线纯本地模式";
-
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "欢迎使用 QQPlayer";
 "if_signed_in_continue" = "如果你已登录，请点击继续";

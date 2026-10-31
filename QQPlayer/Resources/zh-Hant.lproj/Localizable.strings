@@ -300,11 +300,6 @@
 /* Search Categories */
 "all" = "全部";
 
-/* Sync and Connection */
-"library_out_of_sync" = "媒體庫未同步";
-
-"offline_mode" = "離線純本地模式";
-
 /* Tutorial/Onboarding */
 "welcome_to_qqplayer" = "歡迎使用 QQPlayer";
 

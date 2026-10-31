@@ -219,10 +219,6 @@ struct Localized {
     // MARK: - Search Categories
     static let all = "all".localized
 
-    // MARK: - Sync and Connection
-    static let libraryOutOfSync = "library_out_of_sync".localized
-    static let offlineMode = "offline_mode".localized
-
     // MARK: - Tutorial/Onboarding
     static let welcomeToQQPlayer = "welcome_to_qqplayer".localized
     static let ifSignedInContinue = "if_signed_in_continue".localized
