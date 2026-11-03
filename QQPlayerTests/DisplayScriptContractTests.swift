@@ -89,7 +89,11 @@ enum DisplayScriptContract {
         WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                    return $0.track.title.localizedCaseInsensitiveCompare($1.track.title) == .orderedAscending", reason: "同分时的字母序 tie-break（排序）"),
         WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "                return \"\\(index): title=\\(track.title) | artist=\\(track.artistName ?? \"unknown\") | album=\\(track.albumTitle ?? \"unknown\")\"", reason: "LLM 候选清单文本（语义匹配输入）"),
         WhitelistEntry(fileSuffix: "SiriIntentsExtension/IntentHandler.swift", lineSnippet: "            SiriDiag.log(\"EXT LLM matched query=\\(query) index=\\(index) title=\\(shortlist[index].track.title)\")", reason: "SiriDiag 诊断日志（匹配透明度用，不是界面文案）"),
-
+        // 推荐页：黑名单是数据身份（与 contains 同口径），转字形会让同一首歌的键不一致
+        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel.swift", lineSnippet: "blacklist.add(title: candidate.title, artist: candidate.artist)", reason: "黑名单写入 = 数据身份键（与 contains 同口径），不是显示值"),
+        // 推荐页：跳转在线搜索的预填词是发给外部服务的查询串，显示值 ≠ 查询值
+        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel.swift", lineSnippet: "let artist = RecommendationKey.displayPrimaryArtist(candidate.artist)", reason: "在线搜索预填词 = 查询字面量（转字形会降低命中率）"),
+        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel.swift", lineSnippet: "return artist.isEmpty ? candidate.title", reason: "在线搜索预填词 = 查询字面量（转字形会降低命中率）"),
     ]
 
     /// 一次扫描的结果

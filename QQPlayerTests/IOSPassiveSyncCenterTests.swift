@@ -749,6 +749,7 @@ struct IOSPassiveSyncCenterTests {
             "onPushUnsupported",
             "onPushSkippedMissingParent",
             "onPushApplyFailed",
+            "onPushNotReady",
             "onDecodeFailure",
             "onIncrementSent",
             "onIncrementMissingIdentity",

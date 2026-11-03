@@ -82,7 +82,7 @@ struct MacRecommendationView: View {
     private func row(_ candidate: RecommendedCandidate) -> some View {
         HStack(alignment: .top, spacing: DesignTokens.space12) {
             VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                Text(candidate.title)
+                Text(DisplayScriptNormalizer.display(candidate.title))
                     .font(.body)
                     .lineLimit(1)
                 Text(subtitle(for: candidate))
@@ -108,7 +108,7 @@ struct MacRecommendationView: View {
     }
 
     private func subtitle(for candidate: RecommendedCandidate) -> String {
-        var parts = [candidate.artist, candidate.source.localizationKey.localized]
+        var parts = [DisplayScriptNormalizer.display(candidate.artist), candidate.source.localizationKey.localized]
         if let album = candidate.album, !album.isEmpty {
             parts.insert(album, at: 1)
         }
