@@ -14,6 +14,7 @@
 #   QQPLAYER_MAC_INSTALL_DIR  macOS 安装目录（默认 /Applications；便于自验指向 /tmp）
 #   QQPLAYER_SKIP_LAUNCH=1    跳过 macOS 启动（仅影响 macOS 安装分支）
 #   QQPLAYER_DD               DerivedData 路径（默认 <仓库>/build/DerivedData）
+#   QQPLAYER_BUILD_DIR        统一产物根目录（默认 <仓库>/build）
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -23,7 +24,8 @@ unset CC CXX 2>/dev/null || true
 
 # DerivedData 语义与既往一致（iOS 产物路径不变），交给 scripts/xcbuild.sh 统一注入
 # 共享 SPM 缓存 + 构建锁（禁止裸 xcodebuild：新路径会重新 clone 全部 21 个依赖）
-export QQPLAYER_DD="${QQPLAYER_DD:-$PWD/build/DerivedData}"
+BUILD_DIR="${QQPLAYER_BUILD_DIR:-$PWD/build}"
+export QQPLAYER_DD="${QQPLAYER_DD:-$BUILD_DIR/DerivedData}"
 DERIVED="${QQPLAYER_DD}"
 
 IOS_SCHEME="QQPlayer"          # iOS scheme / 产物名
@@ -73,11 +75,20 @@ device_hint() {
   echo "         ③ 同一 Wi-Fi 下也可用（无需数据线），但设备不能关机"
 }
 
+# 成品汇总：复制到 <build>/Products/<sdk>/<Config>/（ditto 保留签名/扩展属性）
+publish_product() { # $1=sdk 目录名 $2=源 .app $3=平台标签
+  local dest="${BUILD_DIR}/Products/$1/Debug/$(basename "$2")"
+  mkdir -p "$(dirname "${dest}")"
+  ditto "$2" "${dest}"
+  echo "✅ $3 成品：${dest}"
+}
+
 # iOS 编译：generic 模拟器构建（免签名、不需要真机/模拟器实例、不启动模拟器）
 build_sim() {
   echo "=== 模拟器构建（generic 目标） ==="
   scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "${IOS_SCHEME}" \
     -destination "${SIM_DEST}" CODE_SIGNING_ALLOWED=NO || { echo "❌ 模拟器构建失败"; return 1; }
+  publish_product iphonesimulator "${DERIVED}/Build/Products/Debug-iphonesimulator/${APP_NAME}.app" "iOS 模拟器"
 }
 
 # iOS 安装：真机签名构建 + devicectl 安装 + 启动。可选传入已探测到的 UDID。
@@ -109,6 +120,7 @@ build_mac() {
   echo "=== macOS 构建（scheme ${MAC_SCHEME}） ==="
   scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "${MAC_SCHEME}" \
     -destination 'platform=macOS' || { echo "❌ macOS 构建失败"; return 1; }
+  publish_product macosx "${DERIVED}/Build/Products/Debug/${MAC_APP_NAME}.app" "macOS"
 }
 
 # macOS 安装：构建 + 覆盖安装到 ${MAC_INSTALL_DIR} + 启动

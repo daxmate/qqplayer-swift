@@ -14,7 +14,9 @@
 #   scripts/xcbuild.sh test -scheme QQPlayer -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 #
 # 环境变量：
-#   QQPLAYER_DD       覆盖 DerivedData 路径（默认 /tmp/dd-<worktree 目录名>，按工作区隔离防互踩）
+#   QQPLAYER_DD       覆盖 DerivedData 路径（默认 <工作树根>/build/DerivedData，按工作区隔离防互踩）
+#   QQPLAYER_SPM      覆盖共享 SPM 缓存路径（默认主仓库 build/SourcePackagesShared）
+#   QQPLAYER_BUILD_DIR 覆盖统一产物根目录（默认 <工作树根>/build）
 #   QQPLAYER_NO_LOCK  置 1 跳过构建锁（仅在确知无并发构建时用）
 #
 # 构建锁（2026-09-13 立，血的教训）：
@@ -26,7 +28,28 @@
 #   走本入口的构建全局串行化；后到者排队等待，超时/陈旧锁自动清理。
 set -euo pipefail
 
-SHARED_SPM_DEFAULT="/Users/dax/codes/qqplayer-swift/build/SourcePackagesShared"
+# 工作树根：每个 worktree 各自一份 build/（产物不再落到 /tmp）。
+if command -v git >/dev/null 2>&1; then
+  ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  WORKSPACE_NAME="$(basename "$ROOT")"
+  GIT_COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+else
+  ROOT="$(pwd)"
+  WORKSPACE_NAME="$(basename "$ROOT")"
+  GIT_COMMON_DIR=""
+fi
+
+# 共享 SPM 缓存：本工作树 build/SourcePackagesShared 存在就用；否则回退到主仓库
+# （git-common-dir 的父目录），所有 worktree 复用同一份 clone 缓存，不重新 clone。
+if [ -n "$GIT_COMMON_DIR" ]; then
+  MAIN_ROOT="$(dirname "$GIT_COMMON_DIR")"
+else
+  MAIN_ROOT="$ROOT"
+fi
+SHARED_SPM_DEFAULT="$MAIN_ROOT/build/SourcePackagesShared"
+if [ -d "$ROOT/build/SourcePackagesShared" ]; then
+  SHARED_SPM_DEFAULT="$ROOT/build/SourcePackagesShared"
+fi
 SHARED_SPM="${QQPLAYER_SPM:-$SHARED_SPM_DEFAULT}"
 
 if [ ! -d "$SHARED_SPM/checkouts" ]; then
@@ -35,13 +58,8 @@ if [ ! -d "$SHARED_SPM/checkouts" ]; then
   exit 2
 fi
 
-if command -v git >/dev/null 2>&1; then
-  TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  WORKSPACE_NAME="$(basename "$TOPLEVEL")"
-else
-  WORKSPACE_NAME="$(basename "$(pwd)")"
-fi
-DERIVED_DATA="${QQPLAYER_DD:-/tmp/dd-$WORKSPACE_NAME}"
+BUILD_DIR="${QQPLAYER_BUILD_DIR:-$ROOT/build}"
+DERIVED_DATA="${QQPLAYER_DD:-$BUILD_DIR/DerivedData}"
 mkdir -p "$DERIVED_DATA"
 
 # ---- 构建锁（全局串行；mkdir 原子性做锁，macOS 无 flock）----
@@ -81,3 +99,45 @@ xcodebuild \
   -clonedSourcePackagesDirPath "$SHARED_SPM" \
   -derivedDataPath "$DERIVED_DATA" \
   "$@"
+
+# ---- 成品汇总（仅 build 动作）----
+# 所有 .app 统一复制到 <build>/Products/<sdk>/<Config>/，保留签名/扩展属性；
+# test / build-for-testing 不复制，避免测试构建污染成品目录。
+if [ "${1:-}" = "build" ]; then
+  CONFIG="Debug"
+  PREV=""
+  for ARG in "$@"; do
+    if [ "$PREV" = "-configuration" ]; then CONFIG="$ARG"; fi
+    case "$ARG" in
+      -configuration=*) CONFIG="${ARG#-configuration=}" ;;
+    esac
+    PREV="$ARG"
+  done
+
+  SDK=""
+  case " $* " in
+    *"iOS Simulator"*|*"-sdk iphonesimulator"*) SDK="iphonesimulator" ;;
+    *"-sdk iphoneos"*|*"platform=iOS"*|*"id="*) SDK="iphoneos" ;;
+    *"macOS"*|*"-sdk macosx"*) SDK="macosx" ;;
+  esac
+
+  if [ -n "$SDK" ]; then
+    if [ "$SDK" = "macosx" ]; then
+      SRC_PRODUCTS="$DERIVED_DATA/Build/Products/$CONFIG"
+    else
+      SRC_PRODUCTS="$DERIVED_DATA/Build/Products/$CONFIG-$SDK"
+    fi
+    DEST_DIR="$BUILD_DIR/Products/$SDK/$CONFIG"
+    FOUND=0
+    for APP in "$SRC_PRODUCTS"/*.app; do
+      [ -d "$APP" ] || continue
+      FOUND=1
+      mkdir -p "$DEST_DIR"
+      ditto "$APP" "$DEST_DIR/$(basename "$APP")"
+      echo "✅ 成品：$DEST_DIR/$(basename "$APP")"
+    done
+    if [ "$FOUND" = "0" ]; then
+      echo "⚠️  未在 $SRC_PRODUCTS 找到 .app（跳过成品复制）" >&2
+    fi
+  fi
+fi

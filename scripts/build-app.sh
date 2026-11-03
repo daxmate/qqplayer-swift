@@ -50,12 +50,13 @@ usage() {
   --release    使用 Release 配置（默认 Debug）
   --arch AR    指定 macOS 产物 CPU 架构（默认 native = 本机架构，与旧版行为一致）
                native | arm64 | x86_64 | universal；iOS 侧忽略（目标含 iOS 时会提示）
-               非 native 使用独立 DerivedData：/tmp/dd-<工作区名>-<arch>
+               非 native 使用独立 DerivedData：<工作树根>/build/DerivedData-<arch>
   --open       构建后打开 QQPlayer.xcodeproj
   --help       打印本用法
 
 底层脚本：scripts/xcbuild.sh（共享 SPM 缓存 / 隔离 DerivedData / 构建锁）
-环境变量：QQPLAYER_DD 可覆盖 DerivedData 路径（默认 /tmp/dd-<工作区名>）
+环境变量：QQPLAYER_DD 可覆盖 DerivedData 路径（默认 <工作树根>/build/DerivedData）
+          QQPLAYER_BUILD_DIR 可覆盖统一产物根目录（默认 <工作树根>/build）
 EOF
 }
 
@@ -99,9 +100,10 @@ esac
 # SPM 的 C/C++ 依赖编译（与 build.sh 一致）
 unset CC CXX 2>/dev/null || true
 
-# 与 scripts/xcbuild.sh 的推导保持一致，仅用于打印产物路径
-WORKSPACE_NAME="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-DERIVED="${QQPLAYER_DD:-/tmp/dd-$WORKSPACE_NAME}"
+# 统一产物根：<工作树根>/build（与 scripts/xcbuild.sh 的推导保持一致）
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+BUILD_DIR="${QQPLAYER_BUILD_DIR:-$ROOT/build}"
+DERIVED="${QQPLAYER_DD:-$BUILD_DIR/DerivedData}"
 
 # 非 native 构建与原生构建使用不同 DerivedData，避免产物互相覆盖。
 # 用户显式设置 QQPLAYER_DD 时尊重其值（不加后缀），并透传给 xcbuild.sh。
@@ -119,6 +121,14 @@ expect_app() { # $1=平台标签 $2=期望路径
     find "$DERIVED/Build/Products" -maxdepth 2 -type d -name '*.app' >&2 2>/dev/null || true
     return 1
   fi
+}
+
+# 成品汇总：复制到 <build>/Products/<sdk>/<Config>/（ditto 保留签名/扩展属性）
+publish_product() { # $1=sdk 目录名 $2=源 .app $3=平台标签
+  local dest="$BUILD_DIR/Products/$1/$CONFIG/$(basename "$2")"
+  mkdir -p "$(dirname "$dest")"
+  ditto "$2" "$dest"
+  echo "✅ $3 成品：$dest"
 }
 
 # 校验 macOS 产物架构；不匹配必须非零退出（expect_app 只看目录是否存在）。
@@ -167,6 +177,7 @@ build_ios() {
     -sdk iphonesimulator -destination "$IOS_DEST" \
     -configuration "$CONFIG" CODE_SIGNING_ALLOWED=NO
   expect_app "iOS" "$DERIVED/Build/Products/$CONFIG-iphonesimulator/$APP_NAME.app"
+  publish_product iphonesimulator "$DERIVED/Build/Products/$CONFIG-iphonesimulator/$APP_NAME.app" "iOS"
 }
 
 build_macos() {
@@ -190,6 +201,7 @@ build_macos() {
   fi
   expect_app "macOS" "$DERIVED/Build/Products/$CONFIG/$APP_NAME.app"
   verify_macos_arch "$DERIVED/Build/Products/$CONFIG/$APP_NAME.app"
+  publish_product macosx "$DERIVED/Build/Products/$CONFIG/$APP_NAME.app" "macOS"
 }
 
 echo "▶︎ 目标：${TARGET}　配置：${CONFIG}　macOS 架构：${ARCH}　DerivedData：${DERIVED}"
