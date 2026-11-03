@@ -7,7 +7,7 @@
 //  模型不进 bundle、不进仓库：全部文件从 hf-mirror.com 下载到
 //  `Application Support/QQPlayer/RecommendationModels/<modelId>/`。
 //
-//  - 清单：运行时请求 hf-mirror 的仓库 API，只取推理必需文件（config / tokenizer / 权重）。
+//  - 清单：硬编码推理必需文件清单，逐个 HEAD `resolve/main/<file>` 取大小（config / tokenizer / 权重）。
 //  - 下载：逐个文件、支持 Range 断点续传、进度回调、失败重试 1 次、可取消。
 //  - 校验：文件齐全 + 每个文件大小 == 清单大小（且 > 0）。
 //  - 删除：整目录移除（可恢复性由用户确认后触发，不在本层做 UI 询问）。
@@ -20,7 +20,7 @@ import Observation
 
 // MARK: - 清单
 
-/// 单个模型文件（大小来自 hf-mirror 仓库 API；缺失时为 nil）。
+/// 单个模型文件（大小来自 HEAD 的 Content-Length；服务端未给时为 nil）。
 struct RecommendationModelFile: Sendable, Equatable, Codable {
     var name: String
     var size: Int?
@@ -45,49 +45,39 @@ struct RecommendationModelManifest: Sendable, Equatable, Codable {
     }
 }
 
-enum RecommendationModelManifestParser {
-    /// 必须参与校验的固定文件名（存在才下载；不强制全部存在）。
-    static let fixedNames: Set<String> = [
-        "config.json",
-        "tokenizer.json",
-        "tokenizer.model",
-        "tokenizer_config.json",
-        "special_tokens_map.json",
-        "generation_config.json",
-        "chat_template.jinja",
-        "quantize_config.json",
+/// 默认模型清单构建：不依赖 hf-mirror 的仓库 API，逐个 HEAD 取文件大小。
+///
+/// 清单是硬编码的最小集合（固定名 + 权重），保证「不完整 / 不可达」能给出明确错误，
+/// 而不是把解析失败伪装成「没有模型」。
+enum RecommendationModelManifestBuilder {
+    /// 固定探测文件（required == true 的缺失即视为清单不可用）。
+    static let fixedFiles: [(name: String, required: Bool)] = [
+        ("config.json", true),
+        ("tokenizer.json", true),
+        ("tokenizer_config.json", false),
+        ("special_tokens_map.json", false),
+        ("generation_config.json", false),
     ]
 
-    private struct Payload: Decodable {
-        struct Sibling: Decodable {
-            var rfilename: String
-            var size: Int?
+    /// 单文件权重。
+    static let weightFile = "model.safetensors"
+    /// 分片权重索引。
+    static let weightIndexFile = "model.safetensors.index.json"
+
+    /// 从分片索引的 weight_map 提取分片文件名（去重、排序）。
+    static func shardNames(fromIndex data: Data) -> [String] {
+        struct Payload: Decodable {
+            var weightMap: [String: String]
+            enum CodingKeys: String, CodingKey { case weightMap = "weight_map" }
         }
-        var siblings: [Sibling]?
+        guard let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return [] }
+        return Set(payload.weightMap.values).sorted()
     }
 
-    /// 解析 hf-mirror 仓库 API；只保留推理必需文件（固定名 + safetensors / index）。
-    static func parse(_ data: Data, modelId: String) -> RecommendationModelManifest? {
-        guard let payload = try? JSONDecoder().decode(Payload.self, from: data),
-              let siblings = payload.siblings else { return nil }
-
-        var files: [RecommendationModelFile] = []
-        for sibling in siblings {
-            let name = sibling.rfilename
-            guard isRequired(name: name) else { continue }
-            files.append(RecommendationModelFile(name: name, size: sibling.size))
-        }
-
-        guard let manifest = Optional(RecommendationModelManifest(id: modelId, files: files)),
-              manifest.hasRequiredFiles else { return nil }
-        return manifest
-    }
-
-    static func isRequired(name: String) -> Bool {
-        if fixedNames.contains(name) { return true }
-        if name.hasSuffix(".safetensors") { return true }
-        if name.hasSuffix(".safetensors.index.json") { return true }
-        return false
+    /// 组装清单；必需文件不齐时返回 nil。
+    static func manifest(id: String, files: [RecommendationModelFile]) -> RecommendationModelManifest? {
+        let manifest = RecommendationModelManifest(id: id, files: files)
+        return manifest.hasRequiredFiles ? manifest : nil
     }
 }
 
@@ -196,13 +186,17 @@ protocol RecommendationModelDownloading: Sendable {
 enum RecommendationModelDownloadError: LocalizedError {
     case badStatus(Int)
     case incomplete(expected: Int, actual: Int)
-    case manifestUnavailable
+    case manifestUnavailable(modelId: String, missing: String)
+    case verificationFailed
+    case downloadFailed(file: String)
 
     var errorDescription: String? {
         switch self {
         case let .badStatus(code): return "HTTP \(code)"
         case let .incomplete(expected, actual): return "文件不完整（期望 \(expected) 字节，实际 \(actual)）"
-        case .manifestUnavailable: return "无法获取模型文件清单"
+        case let .manifestUnavailable(modelId, missing): return "无法获取模型文件清单：\(modelId) 缺少 \(missing)"
+        case .verificationFailed: return "模型文件校验未通过（大小不一致或缺失）"
+        case let .downloadFailed(file): return "模型文件下载失败：\(file)"
         }
     }
 }
@@ -214,17 +208,77 @@ struct HFMirrorModelDownloader: RecommendationModelDownloading {
     var session: URLSession = .shared
 
     func fetchManifest(modelId: String) async throws -> RecommendationModelManifest {
-        let url = Self.baseURL.appendingPathComponent("api/models/\(modelId)")
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 30
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw RecommendationModelDownloadError.manifestUnavailable
+        var files: [RecommendationModelFile] = []
+
+        for entry in RecommendationModelManifestBuilder.fixedFiles {
+            let probe = try await head(modelId: modelId, name: entry.name)
+            if probe.found {
+                files.append(RecommendationModelFile(name: entry.name, size: probe.size))
+            } else if entry.required {
+                throw RecommendationModelDownloadError.manifestUnavailable(modelId: modelId, missing: entry.name)
+            }
         }
-        guard let manifest = RecommendationModelManifestParser.parse(data, modelId: modelId) else {
-            throw RecommendationModelDownloadError.manifestUnavailable
+
+        let weight = try await head(modelId: modelId, name: RecommendationModelManifestBuilder.weightFile)
+        if weight.found {
+            files.append(RecommendationModelFile(
+                name: RecommendationModelManifestBuilder.weightFile,
+                size: weight.size
+            ))
+        } else {
+            let indexName = RecommendationModelManifestBuilder.weightIndexFile
+            let index = try await head(modelId: modelId, name: indexName)
+            guard index.found else {
+                throw RecommendationModelDownloadError.manifestUnavailable(
+                    modelId: modelId,
+                    missing: RecommendationModelManifestBuilder.weightFile
+                )
+            }
+            let indexData = try await fetchData(modelId: modelId, name: indexName)
+            let shards = RecommendationModelManifestBuilder.shardNames(fromIndex: indexData)
+            guard !shards.isEmpty else {
+                throw RecommendationModelDownloadError.manifestUnavailable(modelId: modelId, missing: indexName)
+            }
+            files.append(RecommendationModelFile(name: indexName, size: index.size))
+            for shard in shards {
+                let probe = try await head(modelId: modelId, name: shard)
+                guard probe.found else {
+                    throw RecommendationModelDownloadError.manifestUnavailable(modelId: modelId, missing: shard)
+                }
+                files.append(RecommendationModelFile(name: shard, size: probe.size))
+            }
+        }
+
+        guard let manifest = RecommendationModelManifestBuilder.manifest(id: modelId, files: files) else {
+            throw RecommendationModelDownloadError.manifestUnavailable(modelId: modelId, missing: "必需文件")
         }
         return manifest
+    }
+
+    /// HEAD 探测单文件：存在性 + Content-Length（服务端不给长度时为 nil）。
+    private func head(modelId: String, name: String) async throws -> (found: Bool, size: Int?) {
+        var request = URLRequest(url: Self.fileURL(modelId: modelId, name: name))
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 30
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { return (false, nil) }
+        if http.statusCode == 404 { return (false, nil) }
+        guard (200 ..< 300).contains(http.statusCode) else {
+            throw RecommendationModelDownloadError.badStatus(http.statusCode)
+        }
+        let length = http.value(forHTTPHeaderField: "Content-Length").flatMap(Int.init)
+        return (true, length)
+    }
+
+    /// 小文件（分片索引）直接读取内容。
+    private func fetchData(modelId: String, name: String) async throws -> Data {
+        var request = URLRequest(url: Self.fileURL(modelId: modelId, name: name))
+        request.timeoutInterval = 30
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
+            throw RecommendationModelDownloadError.manifestUnavailable(modelId: modelId, missing: name)
+        }
+        return data
     }
 
     func download(
@@ -416,7 +470,7 @@ final class RecommendationModelManager {
             }
 
             guard store.isComplete(manifest: fetched) else {
-                throw RecommendationModelDownloadError.manifestUnavailable
+                throw RecommendationModelDownloadError.verificationFailed
             }
             state = .ready
         } catch is CancellationError {
@@ -451,6 +505,6 @@ final class RecommendationModelManager {
                 }
             }
         }
-        throw lastError ?? RecommendationModelDownloadError.manifestUnavailable
+        throw lastError ?? RecommendationModelDownloadError.downloadFailed(file: file.name)
     }
 }

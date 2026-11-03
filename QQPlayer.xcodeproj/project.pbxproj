@@ -108,6 +108,8 @@
 		B01A8A177CE44A4484B46943 /* CloudFileAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D697F84D4C3D44EB8CE908CC /* CloudFileAvailabilityTests.swift */; };
 		B1A000000000000000000002 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 2312D6192E6090E4007F756D /* GRDB */; };
 		B1A000000000000000000003 /* SFBAudioEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 230D66362E894889007C642A /* SFBAudioEngine */; };
+		B1A0000000000000000000C4 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = B1A0000000000000000000C2 /* MLXLLM */; };
+		B1A0000000000000000000C5 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = B1A0000000000000000000C3 /* MLXLMCommon */; };
 		B1A000000000000000000016 /* en in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000010 /* en */; };
 		B1A000000000000000000017 /* zh-Hans in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000011 /* zh-Hans */; };
 		B1A000000000000000000018 /* zh-Hant in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000012 /* zh-Hant */; };
@@ -1067,6 +1069,8 @@
 			files = (
 				B1A000000000000000000002 /* GRDB in Frameworks */,
 				B1A000000000000000000003 /* SFBAudioEngine in Frameworks */,
+				B1A0000000000000000000C4 /* MLXLLM in Frameworks */,
+				B1A0000000000000000000C5 /* MLXLMCommon in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1493,6 +1497,8 @@
 			packageProductDependencies = (
 				2312D6192E6090E4007F756D /* GRDB */,
 				230D66362E894889007C642A /* SFBAudioEngine */,
+				B1A0000000000000000000C2 /* MLXLLM */,
+				B1A0000000000000000000C3 /* MLXLMCommon */,
 			);
 			productName = QQPlayerMac;
 			productReference = B1A000000000000000000001 /* QQPlayer.app */;
@@ -1545,6 +1551,7 @@
 			packageReferences = (
 				2312D6182E6090E4007F756D /* XCRemoteSwiftPackageReference "GRDB" */,
 				230D66352E894889007C642A /* XCRemoteSwiftPackageReference "SFBAudioEngine" */,
+				B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2312D60D2E6090E2007F756D /* Products */;
@@ -2478,6 +2485,14 @@
 				minimumVersion = 6.29.2;
 			};
 		};
+		B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.29.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2495,6 +2510,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2312D6182E6090E4007F756D /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
+		};
+		B1A0000000000000000000C2 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		B1A0000000000000000000C3 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

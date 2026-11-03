@@ -232,28 +232,35 @@ struct RecommendationModelManagementTests {
         #expect(layout.fileURL(named: "config.json").lastPathComponent == "config.json")
     }
 
-    @Test("清单解析：只保留推理必需文件")
-    func manifestParsing() throws {
-        let json = """
-        {"siblings":[
-          {"rfilename":"config.json","size":100},
-          {"rfilename":"tokenizer.json","size":200},
-          {"rfilename":"tokenizer_config.json","size":50},
-          {"rfilename":"model.safetensors","size":300},
-          {"rfilename":"README.md","size":10},
-          {"rfilename":".gitattributes","size":1}
-        ]}
+    @Test("清单构建：分片索引解析 + 必需文件校验")
+    func manifestBuilding() throws {
+        let index = """
+        {"weight_map":{
+          "a":"model-00001-of-00002.safetensors",
+          "b":"model-00002-of-00002.safetensors",
+          "c":"model-00001-of-00002.safetensors"
+        }}
         """
-        let manifest = try #require(RecommendationModelManifestParser.parse(Data(json.utf8), modelId: "m"))
-        #expect(manifest.files.map(\.name) == ["config.json", "tokenizer.json", "tokenizer_config.json", "model.safetensors"])
-        #expect(manifest.totalBytes == 650)
-        #expect(manifest.hasRequiredFiles)
-    }
+        #expect(RecommendationModelManifestBuilder.shardNames(fromIndex: Data(index.utf8)) == [
+            "model-00001-of-00002.safetensors",
+            "model-00002-of-00002.safetensors",
+        ])
+        #expect(RecommendationModelManifestBuilder.shardNames(fromIndex: Data("{}".utf8)).isEmpty)
+        #expect(RecommendationModelManifestBuilder.shardNames(fromIndex: Data("not json".utf8)).isEmpty)
 
-    @Test("清单缺失必需文件 → 解析失败")
-    func manifestMissingWeights() {
-        let json = #"{"siblings":[{"rfilename":"config.json","size":100},{"rfilename":"tokenizer.json","size":200}]}"#
-        #expect(RecommendationModelManifestParser.parse(Data(json.utf8), modelId: "m") == nil)
+        let complete = RecommendationModelManifestBuilder.manifest(id: "m", files: [
+            RecommendationModelFile(name: "config.json", size: 100),
+            RecommendationModelFile(name: "tokenizer.json", size: 200),
+            RecommendationModelFile(name: "model.safetensors", size: 300),
+        ])
+        #expect(complete?.id == "m")
+        #expect(complete?.totalBytes == 600)
+
+        let missingTokenizer = RecommendationModelManifestBuilder.manifest(id: "m", files: [
+            RecommendationModelFile(name: "config.json", size: 100),
+            RecommendationModelFile(name: "model.safetensors", size: 300),
+        ])
+        #expect(missingTokenizer == nil)
     }
 
     @Test("完整性校验：大小不符 / 空文件都不算 ready")

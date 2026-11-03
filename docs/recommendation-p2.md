@@ -1,6 +1,6 @@
 # 本地 AI 推荐 P2：Mac 内嵌 MLX 模型
 
-> 状态：代码层已落地；**MLX SPM 依赖未接入**（2026-11-03 构建机无法从 GitHub 拉取，见文末「依赖阻塞」）。
+> 状态：**MLX SPM 依赖已接入**（mlx-swift-examples exact 2.29.1，仅 QQPlayerMac）；Mac Debug / Release 构建成功、iOS 不受影响，见 §9。
 > 未接入期间：Mac / iOS 均按规则 planner 运行，功能不退化；模型管理 UI 已可用（下载 / 校验 / 删除）。
 
 ## 1. 架构
@@ -31,9 +31,12 @@ TasteProfile（P1 画像）
 
 ## 3. 下载与校验
 
-- 清单来源：`https://hf-mirror.com/api/models/<repo>`，解析 `siblings[].rfilename/size`。
-- 必需文件：`config.json` + `tokenizer.json|tokenizer.model` + 至少一个 `*.safetensors`；
-  另收 `tokenizer_config.json`、`special_tokens_map.json`、`generation_config.json`、`chat_template.jinja`、`*.safetensors.index.json`。
+- 清单来源：**硬编码文件清单 + 逐个 `HEAD https://hf-mirror.com/<repo>/resolve/main/<file>` 取 `Content-Length`**，
+  不再依赖 `/api/models` 仓库 API（该接口在镜像上经常不可用 / 限流，失败时无法区分「模型不存在」与「接口挂了」）。
+- 实测文件：`config.json`、`tokenizer.json`、`tokenizer_config.json`、`special_tokens_map.json`、`generation_config.json`；
+  权重先探 `model.safetensors`，404 则读 `model.safetensors.index.json` 的 `weight_map` 取出分片名再逐个 HEAD。
+- 必需文件：`config.json` + `tokenizer.json|tokenizer.model` + 至少一个 `*.safetensors`；缺任何一个直接抛
+  `manifestUnavailable(modelId, missing)`，UI 上表现为明确的失败文案（不再笼统「无法获取清单」）。
 - 下载：逐文件、`Range` 续传（206）、服务端不支持续传（200）时重下、失败重试 1 次、可取消。
 - 校验：`RecommendationModelStore.isComplete` = 每个文件存在、大小 == 清单大小、> 0。
 - 状态机：`notDownloaded → downloading(progress) → ready → loading`，失败 `failed(message)`；删除整目录回 `notDownloaded`。
@@ -80,20 +83,38 @@ TasteProfile（P1 画像）
 - [ ] 延迟：生成耗时是否可接受（规则 vs 模型）
 - [ ] 回退可见性：模型失败时是否无感回退（UI 正常出结果）
 
-## 9. 依赖阻塞（2026-11-03 实测）
+## 9. MLX 依赖接入（2026-11-03）
 
-- 目标：`https://github.com/ml-explore/mlx-swift-examples` tag `2.29.1`（产品 MLXLLM / MLXLMCommon）。
-- 实测结果：
-  - `git ls-remote` 可取到 tag（元数据通）。
-  - `git clone --depth 1` 直连 / 走本机代理：约 **10–12 KB/s**，60s 仅 ~500 KB。
-  - `https://ghproxy.net/...`：约 2.5 KB/s；`kkgithub.com` 不可达；`gitclone.com` 返回 500。
-  - 本机 SPM 缓存与全局缓存**均无** mlx 副本（`mdfind` 仅命中半成品 mirror）。
-- 结论：在当前网络下无法完成 SPM 解析（mlx-swift-examples + mlx-swift + swift-transformers 数百 MB），
-  因此 `project.pbxproj` **未**写入不完整的包引用（避免 Mac target 无法解析而整体不可构建）。
-- 代码已按 `#if canImport(MLXLLM) && arch(arm64) && os(macOS)` 隔离：
-  依赖可用时编译 MLX planner；不可用时工厂直接返回规则 planner。
-- 恢复步骤（网络可用后）：
-  1. 加包：`https://github.com/ml-explore/mlx-swift-examples.git`，exact `2.29.1`，产品 `MLXLLM` / `MLXLMCommon`，仅 QQPlayerMac。
-  2. Mac target 链接两产品；确认 `canImport(MLXLLM)` 为真。
-  3. 选择 hf-mirror 存在的 4bit 模型并更新 `RecommendationModelManager.defaultModelId`。
-  4. 跑 `scripts/xcbuild.sh build -scheme QQPlayerMac` + 真实下载冒烟 + 人工质量评估。
+- 依赖：`https://github.com/ml-explore/mlx-swift-examples.git`，**exact `2.29.1`**，产品 `MLXLLM` + `MLXLMCommon`，**只挂 QQPlayerMac**。
+  iOS target 不链接、也不编译 MLX 文件；`#if canImport(MLXLLM) && arch(arm64) && os(macOS)` 保证 Intel Mac / iOS 自动走规则 planner。
+- `project.pbxproj` 里写的是 GitHub 远端 URL；`Package.resolved` 只记录远端 tag，**不含任何本地路径或本地镜像 SHA**。
+- 首次编译需要 **Metal Toolchain**（Xcode 26 起独立分发）：`xcodebuild -downloadComponent MetalToolchain`。
+
+### 9.1 本机构建（网络受限时）
+
+构建机到 GitHub 很慢（10–20 KB/s），用本地 SPM 镜像 + 环境变量重写 URL，不改全局 git config：
+
+```bash
+GIT_CONFIG_COUNT=9 \
+GIT_CONFIG_KEY_0=url.file:///tmp/spm-mirrors/repos/mlx-swift-examples.insteadOf GIT_CONFIG_VALUE_0=https://github.com/ml-explore/mlx-swift-examples \
+GIT_CONFIG_KEY_1=url.file:///tmp/spm-mirrors/repos/mlx-swift.insteadOf          GIT_CONFIG_VALUE_1=https://github.com/ml-explore/mlx-swift \
+GIT_CONFIG_KEY_2=url.file:///tmp/spm-mirrors/repos/swift-transformers.insteadOf GIT_CONFIG_VALUE_2=https://github.com/huggingface/swift-transformers \
+GIT_CONFIG_KEY_3=url.file:///tmp/spm-mirrors/repos/swift-numerics.insteadOf    GIT_CONFIG_VALUE_3=https://github.com/apple/swift-numerics \
+GIT_CONFIG_KEY_4=url.file:///tmp/spm-mirrors/repos/swift-jinja.insteadOf       GIT_CONFIG_VALUE_4=https://github.com/huggingface/swift-jinja \
+GIT_CONFIG_KEY_5=url.file:///tmp/spm-mirrors/repos/GzipSwift.insteadOf         GIT_CONFIG_VALUE_5=https://github.com/1024jp/GzipSwift \
+GIT_CONFIG_KEY_6=url.file:///tmp/spm-mirrors/repos/swift-docc-plugin.insteadOf GIT_CONFIG_VALUE_6=https://github.com/swiftlang/swift-docc-plugin \
+GIT_CONFIG_KEY_7=url.file:///tmp/spm-mirrors/repos/swift-collections.insteadOf GIT_CONFIG_VALUE_7=https://github.com/apple/swift-collections \
+GIT_CONFIG_KEY_8=url.file:///tmp/spm-mirrors/repos/swift-docc-symbolkit.insteadOf GIT_CONFIG_VALUE_8=https://github.com/swiftlang/swift-docc-symbolkit \
+scripts/xcbuild.sh build -scheme QQPlayerMac -destination 'platform=macOS'
+```
+
+⚠️ 镜像坑（本机专用，不影响仓库）：镜像是源码快照，**没有 mlx / mlx-c 子模块**。需把
+mlx `ee18e1c`、mlx-c `d5b8715` 的源码放进 `build/SourcePackagesShared/checkouts/mlx-swift/Source/Cmlx/{mlx,mlx-c}`；
+用官方远端 clone 时 SPM 会自动 checkout 子模块，没有这一步。
+
+### 9.2 验证（2026-11-03）
+
+- Mac Debug：`BUILD SUCCEEDED`，项目代码 0 警告；`QQPlayer.debug.dylib` 含 102 个 `MLXRecommendationPlanner` 符号（canImport 生效）。
+- Mac Release：`BUILD SUCCEEDED`；仅剩 3 条 MLX 上游 Metal 头文件的 `-Wc++17-extensions` 警告（第三方源码，仓库内改不了）+ 1 条 appintents 工具提示。
+- iOS（generic/platform=iOS Simulator）：构建通过，日志里没有 MLX / Cmlx 目标，确认不链接。
+- 模型下载改为硬编码清单 + HEAD，见 §3；不再请求 `/api/models`。

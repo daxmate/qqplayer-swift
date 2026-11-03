@@ -15,7 +15,6 @@
 #if canImport(MLXLLM) && arch(arm64) && os(macOS)
 
     import Foundation
-    import MLX
     import MLXLLM
     import MLXLMCommon
 
