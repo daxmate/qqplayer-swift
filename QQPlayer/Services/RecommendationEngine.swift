@@ -148,9 +148,22 @@ struct RecommendationEngine: Sendable {
     }
 
     func recommend(profile: TasteProfile, count: Int) async -> Result<[RecommendedCandidate], RecommendationError> {
-        guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
+        await recommend(
+            profile: profile,
+            count: count,
+            intents: RecommendationIntentBuilder.intents(from: profile)
+        )
+    }
 
-        let intents = RecommendationIntentBuilder.intents(from: profile)
+    /// P2：意图由 planner（规则 / 本地模型）注入；召回、去重、打分逻辑不变。
+    func recommend(
+        profile: TasteProfile,
+        count: Int,
+        intents: [RecommendationIntent]
+    ) async -> Result<[RecommendedCandidate], RecommendationError> {
+        guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
+        guard !intents.isEmpty else { return .success([]) }
+
         let limit = perIntentLimit
         var candidatesByKey: [String: RecommendedCandidate] = [:]
         var succeededSources = 0

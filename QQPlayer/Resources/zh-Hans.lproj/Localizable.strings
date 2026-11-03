@@ -1125,3 +1125,23 @@
 "recommendation_reason_era" = "符合你爱听的 %d 年代";
 "recommendation_reason_trend" = "最近常听 %@";
 "recommendation_reason_new" = "曲库还没有";
+
+// MARK: - 本地 AI 推荐 P2（模型管理）
+"settings_category_recommendation" = "推荐";
+"recommendation_source_rule" = "规则";
+"recommendation_source_local_model" = "本地模型";
+"recommendation_model_title" = "本地 AI 模型";
+"recommendation_model_footer" = "模型只在本机运行，输入仅限听歌统计。需要 Apple Silicon；不可用时自动使用规则。";
+"recommendation_model_unsupported" = "本地模型需要 Apple Silicon Mac；推荐将使用规则生成。";
+"recommendation_use_local_model" = "使用本地模型生成推荐";
+"recommendation_model_keep_loaded" = "模型常驻内存";
+"recommendation_model_keep_loaded_footer" = "关闭：每次生成后卸载模型释放内存。开启：App 运行期间保留（占用更多内存）。";
+"recommendation_model_download" = "下载模型";
+"recommendation_model_cancel" = "取消";
+"recommendation_model_delete" = "删除模型";
+"recommendation_model_status_not_downloaded" = "未下载";
+"recommendation_model_status_downloading" = "下载中";
+"recommendation_model_status_ready" = "已就绪";
+"recommendation_model_status_loading" = "已加载";
+"recommendation_model_size_unknown" = "大小未知";
+"recommendation_footer_source" = "生成来源：%@";

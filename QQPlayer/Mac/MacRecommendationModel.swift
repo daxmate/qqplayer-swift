@@ -25,6 +25,8 @@ final class MacRecommendationModel {
     private(set) var phase: Phase = .idle
     private(set) var candidates: [RecommendedCandidate] = []
     private(set) var lastGeneratedAt: Date?
+    /// 最近一次生成用的检索计划来源（规则 / 本地模型），页脚展示用。
+    private(set) var planSource: RecommendationPlanSource = .rule
 
     /// 打开 App 时判断 24h（P1 不做定时器，见任务包 F）。
     static let refreshInterval: TimeInterval = 24 * 3600
@@ -83,7 +85,15 @@ final class MacRecommendationModel {
         if Task.isCancelled { return }
 
         let profile = RecommendationProfileBuilder.build(input)
-        let result = await RecommendationEngine().recommend(profile: profile, count: count)
+        let planner = RecommendationPlannerFactory.make(settings: DeleteSettings.load())
+        let plan = await planner.makePlan(for: profile)
+        if Task.isCancelled { return }
+        planSource = plan.source
+        let result = await RecommendationEngine().recommend(
+            profile: profile,
+            count: count,
+            intents: plan.intents
+        )
         if Task.isCancelled { return }
 
         switch result {

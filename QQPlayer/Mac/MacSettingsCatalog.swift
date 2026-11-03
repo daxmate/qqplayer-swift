@@ -43,6 +43,7 @@ enum MacSettingsCatalog {
         case scraping
         case shortcuts
         case sync
+        case recommendations
         case appearance
         case about
 
@@ -59,6 +60,7 @@ enum MacSettingsCatalog {
             case .scraping: return "settings_category_scraping"
             case .shortcuts: return "settings_category_shortcuts"
             case .sync: return "settings_category_sync"
+            case .recommendations: return "settings_category_recommendation"
             case .appearance: return "settings_category_appearance"
             case .about: return "settings_category_about"
             }
@@ -77,6 +79,7 @@ enum MacSettingsCatalog {
             case .scraping: return "tag"
             case .shortcuts: return "keyboard"
             case .sync: return "arrow.triangle.2.circlepath"
+            case .recommendations: return "sparkles"
             case .appearance: return "paintbrush"
             case .about: return "info.circle"
             }
@@ -93,6 +96,7 @@ enum MacSettingsCatalog {
             case .scraping: return ["刮削", "补全", "标签", "scraping", "scrape", "tag"]
             case .shortcuts: return ["快捷键", "热键", "键位", "shortcut", "hotkey"]
             case .sync: return ["同步", "局域网同步", "配对", "sync", "pair"]
+            case .recommendations: return ["推荐", "本地模型", "AI", "recommendation", "model", "mlx"]
             case .appearance: return ["界面", "外观", "主题", "配色", "appearance", "theme"]
             case .about: return ["关于", "版本", "about", "version"]
             }
@@ -267,6 +271,27 @@ enum MacSettingsCatalog {
         aliases: ["强调色", "配色", "颜色", "accent", "color"]
     )
 
+    static let recommendationModel = Item(
+        id: "settings.recommendation.model",
+        category: .recommendations,
+        titleKey: "recommendation_model_title",
+        aliases: ["推荐模型", "本地模型", "模型", "model", "mlx", "qwen"]
+    )
+
+    static let recommendationUseLocalModel = Item(
+        id: "settings.recommendation.useLocalModel",
+        category: .recommendations,
+        titleKey: "recommendation_use_local_model",
+        aliases: ["本地模型", "AI 推荐", "local model", "ai"]
+    )
+
+    static let recommendationKeepLoaded = Item(
+        id: "settings.recommendation.keepLoaded",
+        category: .recommendations,
+        titleKey: "recommendation_model_keep_loaded",
+        aliases: ["常驻", "内存", "keep loaded", "memory"]
+    )
+
     static let aboutVersion = Item(
         id: "settings.about.version",
         category: .about,
@@ -311,6 +336,9 @@ enum MacSettingsCatalog {
         scrapingBatchEnabled,
         appearanceTheme,
         appearanceAccentColor,
+        recommendationModel,
+        recommendationUseLocalModel,
+        recommendationKeepLoaded,
         aboutVersion,
         aboutAppName,
         aboutGitHub,

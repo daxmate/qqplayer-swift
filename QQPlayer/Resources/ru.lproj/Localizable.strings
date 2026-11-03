@@ -1117,3 +1117,23 @@
 "recommendation_reason_era" = "Совпадает с вашим десятилетием %d";
 "recommendation_reason_trend" = "В тренде ваших недавних прослушиваний: %@";
 "recommendation_reason_new" = "Пока нет в вашей библиотеке";
+
+// MARK: - 本地 AI 推荐 P2（模型管理）
+"settings_category_recommendation" = "Рекомендации";
+"recommendation_source_rule" = "Правила";
+"recommendation_source_local_model" = "Локальная модель";
+"recommendation_model_title" = "Локальная ИИ-модель";
+"recommendation_model_footer" = "Модель работает на этом Mac и получает только статистику прослушиваний. Требуется Apple Silicon; иначе используются правила.";
+"recommendation_model_unsupported" = "Локальная модель требует Mac с Apple Silicon. Рекомендации будут формироваться по правилам.";
+"recommendation_use_local_model" = "Использовать локальную модель для рекомендаций";
+"recommendation_model_keep_loaded" = "Держать модель в памяти";
+"recommendation_model_keep_loaded_footer" = "Выкл.: модель выгружается после каждой генерации. Вкл.: остаётся в памяти, пока работает приложение (больше памяти).";
+"recommendation_model_download" = "Скачать модель";
+"recommendation_model_cancel" = "Отмена";
+"recommendation_model_delete" = "Удалить модель";
+"recommendation_model_status_not_downloaded" = "Не загружено";
+"recommendation_model_status_downloading" = "Загрузка";
+"recommendation_model_status_ready" = "Готово";
+"recommendation_model_status_loading" = "Загружено";
+"recommendation_model_size_unknown" = "Размер неизвестен";
+"recommendation_footer_source" = "Источник: %@";

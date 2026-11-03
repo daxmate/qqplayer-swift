@@ -22,6 +22,9 @@ struct MacRecommendationView: View {
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if model.phase == .loaded {
+                sourceFooter
+            }
         }
         .task {
             await model.loadIfNeeded(
@@ -50,6 +53,18 @@ struct MacRecommendationView: View {
         }
         .padding(.horizontal, DesignTokens.space16)
         .padding(.vertical, DesignTokens.space12)
+    }
+
+    /// 页脚小字：本次生成用的是本地模型还是规则。
+    private var sourceFooter: some View {
+        HStack {
+            Text("recommendation_footer_source".localized(with: model.planSource.localizationKey.localized))
+            Spacer()
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.vertical, DesignTokens.space8)
     }
 
     // MARK: - Content

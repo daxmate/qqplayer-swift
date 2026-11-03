@@ -53,6 +53,7 @@ enum MacSettingsSearchContract {
         "QQPlayer/Mac/MacEQSettingsView.swift",
         "QQPlayer/Mac/MacShortcutsSettingsView.swift",
         "QQPlayer/Mac/MacSyncSettingsView.swift",
+        "QQPlayer/Mac/MacRecommendationSettingsView.swift",
     ]
 
     /// ⌘K 浮层（设置分组数据源必须来自目录）

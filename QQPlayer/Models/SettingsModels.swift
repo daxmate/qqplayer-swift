@@ -296,6 +296,10 @@ struct DeleteSettings: Codable {
     var recommendationCount: Int = DeleteSettings.defaultRecommendationCount
     /// 打开 App 时是否按 24h 自动刷新（P1 只存值，不做定时器）。
     var recommendationAutoRefresh: Bool = true
+    /// 推荐检索计划是否优先使用本地模型（P2；默认开，模型未就绪自动回退规则）。
+    var recommendationUseLocalModel: Bool = true
+    /// 本地模型是否常驻内存（P2；默认关 = 用完卸载）。
+    var recommendationKeepModelLoaded: Bool = false
 
     /// 推荐条数默认值 / 边界（唯一口径）。
     static let defaultRecommendationCount = 20
@@ -384,6 +388,12 @@ struct DeleteSettings: Codable {
             ?? Self.defaultRecommendationCount
         recommendationCount = Self.clampRecommendationCount(storedRecommendationCount)
         recommendationAutoRefresh = try container.decodeIfPresent(Bool.self, forKey: .recommendationAutoRefresh) ?? true
+        recommendationUseLocalModel = try container.decodeIfPresent(
+            Bool.self, forKey: .recommendationUseLocalModel
+        ) ?? true
+        recommendationKeepModelLoaded = try container.decodeIfPresent(
+            Bool.self, forKey: .recommendationKeepModelLoaded
+        ) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

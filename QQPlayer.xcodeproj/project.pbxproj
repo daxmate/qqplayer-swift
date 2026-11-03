@@ -215,6 +215,7 @@
 		01E66447D73F4889A2B9AF7F /* SyncFileOverwriteWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */; };
 		6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */; };
 		DCA5B5740BE2402198D99645 /* RecommendationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BB11223BF646E8ADE33812 /* RecommendationTests.swift */; };
+		B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -479,6 +480,7 @@
 		1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileOverwriteWiringTests.swift; sourceTree = "<group>"; };
 		AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryRootAccessPlanTests.swift; sourceTree = "<group>"; };
 		17BB11223BF646E8ADE33812 /* RecommendationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationTests.swift; sourceTree = "<group>"; };
+		B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationPlannerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -573,6 +575,9 @@
 				Mac/SyncHostCenter.swift,
 				Mac/SyncTracksPane.swift,
 				QQPlayerMacApp.swift,
+				Mac/MacRecommendationSettingsView.swift,
+				Mac/RecommendationPlannerFactory.swift,
+				Mac/MLXRecommendationPlanner.swift,
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
 		};
@@ -961,6 +966,11 @@
 				Views/Player/PlayerGestureLogic.swift,
 				Views/Utility/HintCardView.swift,
 				Views/Utility/WhatsNewView.swift,
+				Services/RecommendationPlanning.swift,
+				Services/RecommendationModelManager.swift,
+				Mac/MacRecommendationSettingsView.swift,
+				Mac/RecommendationPlannerFactory.swift,
+				Mac/MLXRecommendationPlanner.swift,
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};
@@ -1318,6 +1328,7 @@
 				1B564CDCEDFC4E93AB0EE700 /* SyncFileOverwriteWiringTests.swift */,
 				AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */,
 				17BB11223BF646E8ADE33812 /* RecommendationTests.swift */,
+				B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1831,6 +1842,7 @@
 				01E66447D73F4889A2B9AF7F /* SyncFileOverwriteWiringTests.swift in Sources */,
 				6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */,
 				DCA5B5740BE2402198D99645 /* RecommendationTests.swift in Sources */,
+				B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

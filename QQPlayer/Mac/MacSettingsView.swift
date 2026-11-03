@@ -56,6 +56,8 @@ struct MacSettingsView: View {
                         MacSyncSettingsView()
                     case .appearance:
                         MacAppearanceSettingsView()
+                    case .recommendations:
+                        MacRecommendationSettingsView()
                     case .about:
                         MacAboutSettingsView()
                     }

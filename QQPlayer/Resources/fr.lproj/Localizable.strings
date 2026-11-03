@@ -1120,3 +1120,23 @@
 "recommendation_reason_era" = "Correspond à votre décennie %d";
 "recommendation_reason_trend" = "Tendance dans vos écoutes récentes : %@";
 "recommendation_reason_new" = "Pas encore dans votre bibliothèque";
+
+// MARK: - 本地 AI 推荐 P2（模型管理）
+"settings_category_recommendation" = "Recommandations";
+"recommendation_source_rule" = "Règles";
+"recommendation_source_local_model" = "Modèle local";
+"recommendation_model_title" = "Modèle IA local";
+"recommendation_model_footer" = "Le modèle s'exécute sur ce Mac ; seules vos statistiques d'écoute lui sont fournies. Nécessite Apple Silicon ; sinon, les recommandations utilisent des règles.";
+"recommendation_model_unsupported" = "Le modèle local nécessite un Mac Apple Silicon. Les recommandations utiliseront des règles.";
+"recommendation_use_local_model" = "Utiliser le modèle local pour les recommandations";
+"recommendation_model_keep_loaded" = "Garder le modèle en mémoire";
+"recommendation_model_keep_loaded_footer" = "Désactivé : le modèle est déchargé après chaque génération. Activé : il reste en mémoire tant que l'app tourne (plus de mémoire utilisée).";
+"recommendation_model_download" = "Télécharger le modèle";
+"recommendation_model_cancel" = "Annuler";
+"recommendation_model_delete" = "Supprimer le modèle";
+"recommendation_model_status_not_downloaded" = "Non téléchargé";
+"recommendation_model_status_downloading" = "Téléchargement";
+"recommendation_model_status_ready" = "Prêt";
+"recommendation_model_status_loading" = "Chargé";
+"recommendation_model_size_unknown" = "Taille inconnue";
+"recommendation_footer_source" = "Généré par %@";
