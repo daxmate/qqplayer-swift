@@ -299,7 +299,7 @@ struct DeleteSettings: Codable {
 
     /// 推荐条数默认值 / 边界（唯一口径）。
     static let defaultRecommendationCount = 20
-    static let recommendationCountRange = 1...50
+    static let recommendationCountRange = 1 ... 50
 
     /// 读取时的边界归一（旧数据 / 手改 UserDefaults 都不越界）。
     static func clampRecommendationCount(_ value: Int) -> Int {
