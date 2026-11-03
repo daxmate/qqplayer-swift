@@ -68,6 +68,8 @@ struct MacPlayerView: View {
     @State private var dragStartPanelHeight: CGFloat?
     /// 歌词面板高度持久化 key
     private static let lyricsPanelHeightKey = "QQPlayer.lyricsPanelHeight"
+    /// 分隔条拖动坐标系：固定在播放页容器上，避免分隔条自身位移污染 translation（拖动抖动）
+    private static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
 
     /// 播放区是否隐藏/歌词是否撑满：跟唱或放大（决策上收 MacPlaybackGate，有测试）
     private var isLyricsFullscreen: Bool {
@@ -99,6 +101,7 @@ struct MacPlayerView: View {
                 )
                 .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
             }
+            .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -217,21 +220,25 @@ struct MacPlayerView: View {
                 }
             }
             .gesture(
-                DragGesture(minimumDistance: 1)
+                DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.lyricsResizeCoordinateSpace))
                     .onChanged { value in
                         if dragStartPanelHeight == nil {
                             dragStartPanelHeight = lyricsPanelHeight
                         }
-                        // 向上拖 = 歌词变高（container 顶部往下是播放区，需给播放区留最小空间）
+                        // 向上拖 = 歌词变高；clamp 数学上收 MacPlaybackGate（有测试）
                         let start = dragStartPanelHeight ?? lyricsPanelHeight
-                        let maxHeight = max(180, containerHeight - 360)
-                        lyricsPanelHeight = min(max(start - value.translation.height, 140), maxHeight)
+                        lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
+                            start: start,
+                            translation: value.translation.height,
+                            containerHeight: containerHeight
+                        )
                     }
                     .onEnded { _ in
-                        if let start = dragStartPanelHeight {
-                            let maxHeight = max(180, containerHeight - 360)
-                            lyricsPanelHeight = min(max(start, 140), maxHeight)
-                        }
+                        // 保留拖动结束时的当前高度，只做 clamp（不再回弹到起始高度）
+                        lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
+                            lyricsPanelHeight,
+                            containerHeight: containerHeight
+                        )
                         dragStartPanelHeight = nil
                         UserDefaults.standard.set(Double(lyricsPanelHeight), forKey: Self.lyricsPanelHeightKey)
                     }

@@ -6,6 +6,7 @@
 //  - segmentPlan：scheduleSegment 的帧范围校验与剩余帧计算
 //  - canResumeFromSavedPosition：恢复播放时的位置有效性
 //  - shouldHandleSegmentFinished：segment completion 是否应触发曲目结束
+//  - clampedLyricsHeight：歌词面板拖动高度规整（分隔条拖动 / 松手持久化）
 //    （seek/play 前 cancelPendingCompletions 使旧 completion 失效的判定核心）
 //
 //  设计遵循 InterruptionResumePolicy 模式：决策抽纯函数，引擎只执行不决策。
@@ -15,6 +16,7 @@
 //   二次点击才播）。判定逻辑上收为纯函数锁定，防再次被拆散。
 //
 
+import CoreGraphics
 import Foundation
 
 enum MacPlaybackGate {
@@ -107,5 +109,27 @@ enum MacPlaybackGate {
     /// 歌词区是否撑满整个 detail 区域（跟唱/放大时；普通态用面板高度 330 可拖）
     static func shouldExpandLyrics(isKaraokeOn: Bool, isLyricsExpanded: Bool) -> Bool {
         isKaraokeOn || isLyricsExpanded
+    }
+
+    // MARK: - 歌词面板拖拽高度（播放页分隔条）
+
+    /// 歌词面板最小高度
+    static let lyricsPanelMinHeight: CGFloat = 140
+    /// 分隔条上方播放区最小高度（容器高度扣掉后得到歌词上限）
+    static let playerSectionMinHeight: CGFloat = 360
+    /// 歌词上限的保底值（容器很矮时仍留出可拖空间）
+    static let lyricsPanelMaxHeightFloor: CGFloat = 180
+
+    /// 拖动中的歌词高度：起始高度 + 位移（向上拖 translation.height 为负 → 歌词变高）。
+    /// 位移来自容器命名坐标空间，与分隔条自身位移无关（2026-11-03 修抖动）。
+    static func clampedLyricsHeight(start: CGFloat, translation: CGFloat, containerHeight: CGFloat) -> CGFloat {
+        clampedLyricsHeight(start - translation, containerHeight: containerHeight)
+    }
+
+    /// 把任意高度规整到 [140, max(180, containerHeight - 360)]。
+    /// 松手时也走这里：保留拖动结束时的当前高度，只做 clamp（2026-11-03 修松手回弹）。
+    static func clampedLyricsHeight(_ height: CGFloat, containerHeight: CGFloat) -> CGFloat {
+        let maxHeight = Swift.max(lyricsPanelMaxHeightFloor, containerHeight - playerSectionMinHeight)
+        return Swift.min(Swift.max(height, lyricsPanelMinHeight), maxHeight)
     }
 }

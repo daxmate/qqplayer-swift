@@ -239,3 +239,51 @@ struct MacPlaybackGateKaraokeLayoutTests {
         #expect(!MacPlaybackGate.shouldExpandLyrics(isKaraokeOn: false, isLyricsExpanded: false))
     }
 }
+
+struct MacPlaybackGateLyricsHeightTests {
+    // 分隔条拖动高度（2026-11-03）：
+    //  - 松手回弹回归：onEnded 曾用拖动起始高度重算 → 松手即回到原值；现在必须保留当前高度
+    //  - 抖动回归：DragGesture 默认 .local 空间会随分隔条自身位移污染 translation
+    // 这两处手势层无法单测，但 clamp 语义抽纯函数锁定。
+    private let container: CGFloat = 900   // 上限 = max(180, 900 - 360) = 540
+
+    @Test("向下拖（translation 为正）：歌词变矮")
+    func dragDownShrinks() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(
+            start: 330, translation: 100, containerHeight: container) == 230)
+    }
+
+    @Test("向下拖：不低于最小高度 140")
+    func dragDownStopsAtMin() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(
+            start: 330, translation: 500, containerHeight: container) == 140)
+    }
+
+    @Test("向上拖（translation 为负）：歌词变高")
+    func dragUpGrows() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(
+            start: 330, translation: -100, containerHeight: container) == 430)
+    }
+
+    @Test("向上拖：不超过容器上限（containerHeight - 播放区最小 360）")
+    func dragUpStopsAtMax() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(
+            start: 330, translation: -1_000, containerHeight: container) == 540)
+    }
+
+    @Test("容器很矮：上限走保底 max(180, h - 360)")
+    func shortContainerUsesMaxFloor() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(
+            start: 140, translation: -300, containerHeight: 400) == 180)
+    }
+
+    @Test("松手保留当前值：clamp 幂等（覆盖回弹回归）")
+    func clampingIsIdempotent() {
+        for height in [CGFloat(-10), 0, 140, 200, 330, 540, 900, 10_000] {
+            let once = MacPlaybackGate.clampedLyricsHeight(height, containerHeight: container)
+            let twice = MacPlaybackGate.clampedLyricsHeight(once, containerHeight: container)
+            #expect(once >= 140 && once <= 540)
+            #expect(twice == once)
+        }
+    }
+}
