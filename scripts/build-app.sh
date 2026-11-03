@@ -93,7 +93,7 @@ build_macos() {
   expect_app "macOS" "$DERIVED/Build/Products/$CONFIG/$APP_NAME.app"
 }
 
-echo "▶︎ 目标：$TARGET　配置：$CONFIG　DerivedData：$DERIVED"
+echo "▶︎ 目标：${TARGET}　配置：${CONFIG}　DerivedData：$DERIVED"
 
 case "$TARGET" in
   all) build_ios; build_macos ;;
@@ -106,4 +106,4 @@ if [ "$OPEN_AFTER" -eq 1 ]; then
   open "$PROJECT"
 fi
 
-echo "🎉 构建完成（$TARGET / $CONFIG）"
+echo "🎉 构建完成（$TARGET / ${CONFIG}）"

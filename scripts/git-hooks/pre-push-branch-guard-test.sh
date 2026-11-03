@@ -48,7 +48,7 @@ no() { echo "  ❌ $1"; fail=$((fail + 1)); }
 echo "=== 断言 ①：推非 main 分支 → 被拦 ==="
 out1="$(cd "$repo" && git push origin feat/x 2>&1)"; rc1=$?
 echo "$out1"
-if [ "$rc1" -ne 0 ]; then ok "退出码非 0（=$rc1）"; else no "退出码应为非 0，实际 $rc1"; fi
+if [ "$rc1" -ne 0 ]; then ok "退出码非 0（=${rc1}）"; else no "退出码应为非 0，实际 $rc1"; fi
 case "$out1" in *AGENTS.md*) ok "输出含 AGENTS.md" ;; *) no "输出缺 AGENTS.md" ;; esac
 case "$out1" in *PROJECT_RULES/qqplayer-swift.md*) ok "输出含 PROJECT_RULES/qqplayer-swift.md" ;; *) no "输出缺 PROJECT_RULES/qqplayer-swift.md" ;; esac
 if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
@@ -61,7 +61,7 @@ fi
 echo "=== 断言 ②：QQPLAYER_ALLOW_BRANCH_PUSH=1 → 仍被拦 ==="
 out2="$(cd "$repo" && QQPLAYER_ALLOW_BRANCH_PUSH=1 git push origin feat/x 2>&1)"; rc2=$?
 echo "$out2"
-if [ "$rc2" -ne 0 ]; then ok "退出码非 0（=$rc2）"; else no "退出码应为非 0，实际 $rc2"; fi
+if [ "$rc2" -ne 0 ]; then ok "退出码非 0（=${rc2}）"; else no "退出码应为非 0，实际 $rc2"; fi
 if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
   no "远端不应出现 refs/heads/feat/x（例外开关应已失效）"
 else
@@ -72,7 +72,7 @@ fi
 echo "=== 断言 ②b：SKIP_PREPUSH=1 → 仍被拦 ==="
 out2b="$(cd "$repo" && SKIP_PREPUSH=1 git push origin feat/x 2>&1)"; rc2b=$?
 echo "$out2b"
-if [ "$rc2b" -ne 0 ]; then ok "退出码非 0（=$rc2b）"; else no "退出码应为非 0，实际 $rc2b"; fi
+if [ "$rc2b" -ne 0 ]; then ok "退出码非 0（=${rc2b}）"; else no "退出码应为非 0，实际 $rc2b"; fi
 if git -C "$remote" rev-parse --verify -q refs/heads/feat/x >/dev/null; then
   no "远端不应出现 refs/heads/feat/x（SKIP_PREPUSH 不得放行分支推送）"
 else

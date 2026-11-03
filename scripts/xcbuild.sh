@@ -60,7 +60,7 @@ if [ "${QQPLAYER_NO_LOCK:-0}" != "1" ]; then
       continue
     fi
     if [ "$waited" -ge 2400 ]; then
-      echo "❌ 等待构建锁超时（40 分钟）：$LOCK_DIR（如确无并发构建，用 QQPLAYER_NO_LOCK=1 绕过）" >&2
+      echo "❌ 等待构建锁超时（40 分钟）：${LOCK_DIR}（如确无并发构建，用 QQPLAYER_NO_LOCK=1 绕过）" >&2
       exit 3
     fi
     [ $(( waited % 60 )) -eq 0 ] && echo "⏳ 其他构建进行中，排队等待（已等 ${waited}s）…"

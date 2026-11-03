@@ -42,7 +42,7 @@ for arg in "$@"; do
     --verbose|-v) VERBOSE=1 ;;
     --refresh) REFRESH=1 ;;
     -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
-    *) echo "❌ 未知参数：$arg（仅支持 --verbose / --refresh）"; exit 2 ;;
+    *) echo "❌ 未知参数：${arg}（仅支持 --verbose / --refresh）"; exit 2 ;;
   esac
 done
 
@@ -101,7 +101,7 @@ while IFS= read -r line; do
   [ -n "$line" ] && SOURCES+=("$line")
 done < "$SOURCES_FILE"
 if [ "${#SOURCES[@]}" -eq 0 ]; then
-  echo "❌ 闭包解析返回空编译集（$SOURCES_FILE）"
+  echo "❌ 闭包解析返回空编译集（${SOURCES_FILE}）"
   exit 1
 fi
 FIXTURE_COUNT=0
