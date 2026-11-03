@@ -290,6 +290,22 @@ struct DeleteSettings: Codable {
     /// 不新造第二套存储，与 `syncPlaybackPositionEnabled` 同住一个设置 namespace。
     var syncTargetDeviceID: String = ""
 
+    // MARK: - 本地 AI 推荐（P1，2026-11-03）
+
+    /// 推荐条数（1–50，读取时统一 `DeleteSettings.clampRecommendationCount` 兜底）。
+    var recommendationCount: Int = DeleteSettings.defaultRecommendationCount
+    /// 打开 App 时是否按 24h 自动刷新（P1 只存值，不做定时器）。
+    var recommendationAutoRefresh: Bool = true
+
+    /// 推荐条数默认值 / 边界（唯一口径）。
+    static let defaultRecommendationCount = 20
+    static let recommendationCountRange = 1...50
+
+    /// 读取时的边界归一（旧数据 / 手改 UserDefaults 都不越界）。
+    static func clampRecommendationCount(_ value: Int) -> Int {
+        min(recommendationCountRange.upperBound, max(recommendationCountRange.lowerBound, value))
+    }
+
     // Home screen section visibility & order
     var homeSections: [HomeSectionItem] = HomeSectionItem.defaultSections
 
@@ -363,6 +379,11 @@ struct DeleteSettings: Codable {
         ) ?? false
         // 同步目标设备（批 B2）：旧设置文件（无此 key）必须是「未选」——同上兜底。
         syncTargetDeviceID = try container.decodeIfPresent(String.self, forKey: .syncTargetDeviceID) ?? ""
+        // 本地 AI 推荐（P1）：旧设置文件无 key → 默认 20 条 / 自动刷新开，且读取即夹到 1–50。
+        let storedRecommendationCount = try container.decodeIfPresent(Int.self, forKey: .recommendationCount)
+            ?? Self.defaultRecommendationCount
+        recommendationCount = Self.clampRecommendationCount(storedRecommendationCount)
+        recommendationAutoRefresh = try container.decodeIfPresent(Bool.self, forKey: .recommendationAutoRefresh) ?? true
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

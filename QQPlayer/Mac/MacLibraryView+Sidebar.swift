@@ -25,6 +25,9 @@ extension MacLibraryView {
                     Label(item.title, systemImage: item.icon)
                         .tag(MacLibrarySelection.section(item))
                 }
+                // 本地 AI 推荐（P1）：规则推荐页，入口放在一级分区之下
+                Label("recommendations".localized, systemImage: "sparkles")
+                    .tag(MacLibrarySelection.recommendations)
                 // 智能列表（自动歌单）：条目与顺序全部来自 `SmartPlaylistKind` 单一事实源
                 Section {
                     ForEach(SmartPlaylistKind.allCases) { kind in

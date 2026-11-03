@@ -1103,3 +1103,17 @@
 "library_import_legacy_backup" = "Существующая база сохранена как %@";
 "library_import_legacy_hint" = "Найдена база предыдущей (не в песочнице) версии — её можно импортировать.";
 "library_import_legacy_confirm" = "Текущая база будет заменена (резервная копия создаётся автоматически). После этого перезапустите QQPlayer. Продолжить?";
+
+/* Local AI recommendations (P1) */
+"recommendations" = "Для вас";
+"recommendation_refresh" = "Новая подборка";
+"recommendation_loading" = "Формируем рекомендации…";
+"recommendation_empty" = "Сейчас нет новых песен для рекомендаций. Попробуйте позже.";
+"recommendation_error_all_sources" = "Не удалось подключиться к онлайн-источникам. Проверьте сеть и повторите попытку.";
+"recommendation_error_load_failed" = "Не удалось прочитать локальную библиотеку.";
+"recommendation_download" = "Скачать";
+"recommendation_dismiss" = "Больше не рекомендовать";
+"recommendation_reason_artist" = "Вы часто слушаете %@";
+"recommendation_reason_era" = "Совпадает с вашим десятилетием %d";
+"recommendation_reason_trend" = "В тренде ваших недавних прослушиваний: %@";
+"recommendation_reason_new" = "Пока нет в вашей библиотеке";

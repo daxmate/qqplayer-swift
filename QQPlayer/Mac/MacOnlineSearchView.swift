@@ -77,6 +77,15 @@ struct MacOnlineSearchView: View {
     @State var suppressNextQueryDebounce = false
 
     /// 分片：跨文件可见（原 private）
+    /// 推荐页「下载」入口：预填检索词并在面板出现后自动执行一次搜索。
+    /// 默认空串 ⇒ 既有调用点行为完全不变。
+    private let autoSearchOnAppear: Bool
+
+    init(initialQuery: String = "") {
+        _query = State(initialValue: initialQuery)
+        autoSearchOnAppear = !initialQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     enum Status {
         case idle
         case loading
@@ -104,6 +113,11 @@ struct MacOnlineSearchView: View {
         .frame(width: 520, height: 480)
         .onChange(of: source) { _, _ in
             switchSource()
+        }
+        .onAppear {
+            guard autoSearchOnAppear else { return }
+            startSearch()
+            recordHistory()
         }
         .sheet(isPresented: $showQuarkLogin, onDismiss: {
             // 用户未登录成功就关掉面板 → 丢弃待重试条目（web close 语义；

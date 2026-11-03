@@ -1432,3 +1432,17 @@
 "library_import_legacy_backup" = "原有數據庫已備份為 %@";
 "library_import_legacy_hint" = "檢測到舊版本（非沙盒）的數據庫，可以導入。";
 "library_import_legacy_confirm" = "導入會覆蓋當前數據庫（已自動備份），完成後需要重啟 QQPlayer。繼續？";
+
+/* Local AI recommendations (P1) */
+"recommendations" = "為你推薦";
+"recommendation_refresh" = "換一批";
+"recommendation_loading" = "正在產生推薦…";
+"recommendation_empty" = "暫時沒有新的可推薦歌曲，稍後再試試";
+"recommendation_error_all_sources" = "線上來源都連不上，請檢查網路後重試";
+"recommendation_error_load_failed" = "讀取本機音樂庫失敗";
+"recommendation_download" = "下載";
+"recommendation_dismiss" = "不再推薦";
+"recommendation_reason_artist" = "常聽 %@";
+"recommendation_reason_era" = "符合你愛聽的 %d 年代";
+"recommendation_reason_trend" = "最近常聽 %@";
+"recommendation_reason_new" = "音樂庫還沒有";

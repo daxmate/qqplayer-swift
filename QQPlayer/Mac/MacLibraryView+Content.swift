@@ -31,6 +31,8 @@ extension MacLibraryView {
             switch selection {
             case let .section(section):
                 sectionContent(section)
+            case .recommendations:
+                MacRecommendationView()
             case let .smartPlaylist(kind):
                 // 自动歌单详情：复用既有 `MacSmartPlaylistDetailView`（不另立第二份实现）
                 MacSmartPlaylistDetailView(kind: kind) {

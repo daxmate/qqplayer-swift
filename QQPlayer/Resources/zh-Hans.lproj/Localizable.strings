@@ -1111,3 +1111,17 @@
 "library_import_legacy_backup" = "原有数据库已备份为 %@";
 "library_import_legacy_hint" = "检测到旧版本（非沙盒）的数据库，可以导入。";
 "library_import_legacy_confirm" = "导入会覆盖当前数据库（已自动备份），完成后需要重启 QQPlayer。继续？";
+
+/* Local AI recommendations (P1) */
+"recommendations" = "为你推荐";
+"recommendation_refresh" = "换一批";
+"recommendation_loading" = "正在生成推荐…";
+"recommendation_empty" = "暂时没有新的可推荐歌曲，稍后再试试";
+"recommendation_error_all_sources" = "在线源都连不上，请检查网络后重试";
+"recommendation_error_load_failed" = "读取本地曲库失败";
+"recommendation_download" = "下载";
+"recommendation_dismiss" = "不再推荐";
+"recommendation_reason_artist" = "常听 %@";
+"recommendation_reason_era" = "符合你爱听的 %d 年代";
+"recommendation_reason_trend" = "最近常听 %@";
+"recommendation_reason_new" = "曲库还没有";

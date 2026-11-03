@@ -1106,3 +1106,17 @@
 "library_import_legacy_backup" = "Base existante sauvegardée sous %@";
 "library_import_legacy_hint" = "Une base d'une version précédente (non sandboxée) a été détectée et peut être importée.";
 "library_import_legacy_confirm" = "Cette action remplace la base actuelle (une sauvegarde est créée automatiquement). Redémarrez QQPlayer ensuite. Continuer ?";
+
+/* Local AI recommendations (P1) */
+"recommendations" = "Pour vous";
+"recommendation_refresh" = "Nouvelle sélection";
+"recommendation_loading" = "Génération des recommandations…";
+"recommendation_empty" = "Aucun nouveau morceau à recommander pour le moment. Réessayez plus tard.";
+"recommendation_error_all_sources" = "Impossible de joindre les sources en ligne. Vérifiez votre réseau et réessayez.";
+"recommendation_error_load_failed" = "Impossible de lire votre bibliothèque locale.";
+"recommendation_download" = "Télécharger";
+"recommendation_dismiss" = "Ne plus recommander";
+"recommendation_reason_artist" = "Vous écoutez souvent %@";
+"recommendation_reason_era" = "Correspond à votre décennie %d";
+"recommendation_reason_trend" = "Tendance dans vos écoutes récentes : %@";
+"recommendation_reason_new" = "Pas encore dans votre bibliothèque";

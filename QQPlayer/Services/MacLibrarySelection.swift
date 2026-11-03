@@ -40,6 +40,8 @@ enum MacLibrarySection: String, CaseIterable, Identifiable {
 /// 侧栏选中项：一级分区 / 自动歌单 / 用户自建歌单。
 enum MacLibrarySelection: Hashable {
     case section(MacLibrarySection)
+    /// 「为你推荐」页（P1 本地 AI 推荐；无关联值，恒有效）。
+    case recommendations
     case smartPlaylist(SmartPlaylistKind)
     case userPlaylist(Int64)
 
@@ -55,7 +57,7 @@ enum MacLibrarySelection: Hashable {
         availableUserPlaylistIds: Set<Int64>
     ) -> MacLibrarySelection {
         switch selection {
-        case .section, .smartPlaylist:
+        case .section, .recommendations, .smartPlaylist:
             return selection
         case let .userPlaylist(id):
             return availableUserPlaylistIds.contains(id) ? selection : fallback
