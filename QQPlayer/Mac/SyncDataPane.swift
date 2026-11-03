@@ -95,7 +95,12 @@ struct SyncDataPane: View {
                     .help("sync_run_data_reset_help".localized)
                 }
 
-                if let phaseText = dataPhaseText {
+                if let waitingText = dataModel.waitingText {
+                    // 重试 / 等对端准备期间的实时提示（优先于阶段文案：阶段仍是拉取中）。
+                    Text(waitingText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else if let phaseText = dataPhaseText {
                     Text(phaseText)
                         .font(.callout)
                         .foregroundStyle(.secondary)

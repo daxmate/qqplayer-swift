@@ -31,6 +31,11 @@
 //  （`[SyncEntityOutcomeCount]`），本类只往唯一存储 `reportValue.tally` 里累加；
 //  面板的「按实体披露」明细行由 `SyncEntityOutcomeDisclosure` 从同一份账目派生。
 //
+//  ⚠️ pull 应答可重试（2026-11-03）：一次应答窗口内没收到应答不再直接失败——同轮内重发 pull
+//  （默认 3 次，间隔 2s / 5s）；对端回 notReady（曲库未就绪）按 2s / 5s / 10s
+//  退避，总窗口 ≤60s。迟到帧只累加账目、不二次收尾（finish 幂等）；
+//  取消 / 断连立即中止（在途的退避重发一并取消）。
+//
 //  ⚠️ 拉取方向的应收数 = 帧 9 到达（本端 peer 的 onPushApplied / onPushSuspended /
 //  onPushIgnoredDeletes / onPushUnresolved / onPushUnsupported 五者**累加**回填账目）。五个回调**任一**到达即视为
 //  「对端已应答」——`handlePush` 内五者总是同步顺序触发，不在其中挑一个「最后一个」当判据
@@ -98,6 +103,12 @@ struct SyncDataSyncReport: Equatable, Sendable {
     var ignoredDeletes: Int { tally.ignoredDeletes }
     /// 对端推来的行里**应用失败**的行数（载荷解不开 / 落库抛错；不落库、计入缺口）
     var applyFailedEntries: Int { tally.applyFailedEntries }
+    /// 失败原因的本地化 key（新路径；nil = 用 failureMessage 原文——旧文案保持不变）。
+    var failureKey: String?
+    /// 等待对端的提示 key（nil = 不在等待；UI 按 key 取文案）。
+    var waitingKey: String?
+    /// 本次拉取已发出的 change_log_pull 次数（1 = 只发了首次；>1 = 同轮内重发过）。
+    var pullAttempts: Int = 0
     /// 失败原因（nil = 未失败；「缺 peerID / 推失败 / 发拉取失败 / 对端无应答」/ cancelled）
     var failureMessage: String?
     /// 是否已收尾（与 `phase == .finished` 同义；冗余存一份便于调用方只读 report）
@@ -137,6 +148,21 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private var peerValue: SyncChangeLogPeer?
     private var timeoutItem: DispatchWorkItem?
 
+    /// pull 应答等待的重试策略（注入：单测把间隔压到毫秒级）。
+    private let retryPolicy: SyncPullRetryPolicy
+    /// 本次拉取已发出的 change_log_pull 次数（1 = 首次）。
+    private var pullAttempt = 0
+    /// 当前这段「等应答 / 等退避」的起点（notReady 总窗口的计时基准）。
+    private var pullWindowStartedAt = Date()
+    /// 当前这段是否因 notReady 而重试（决定用哪套退避表）。
+    private var awaitingNotReadyRetry = false
+    /// 退避重发的调度句柄（取消 / 收尾时一并取消）。
+    private var retryItem: DispatchWorkItem?
+    /// 重发代际：旧代际的调度即使漏网也不得再发帧。
+    private var retryGeneration = 0
+    /// 单次应答窗口（秒）——start(timeout:) 传入，后续每次重发沿用同一窗口。
+    private var answerWindow: TimeInterval = 20
+
     /// 每阶段回调（锁外触发；会话线程/超时队列）。
     var onStateChange: (@Sendable (SyncDataSyncPhase) -> Void)?
 
@@ -144,12 +170,14 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         session: SyncPeerSession,
         database: DatabaseManager = .shared,
         peerID: String? = nil,
+        retryPolicy: SyncPullRetryPolicy = .standard,
         libraryRoot: URL
     ) {
         self.session = session
         self.database = database
         self.store = SyncChangeLogStore(database: database)
         self.libraryRoot = libraryRoot
+        self.retryPolicy = retryPolicy
         var applier = SyncChangeLogApplier(database: database)
         // 跨端续播（默认关）：开关开且落点可用才注入落点；关 = 本端不接受播放位置（INV-26）。
         if applier.playbackPositionSyncEnabled {
@@ -202,6 +230,15 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
             lock.unlock()
             return
         }
+        retryItem?.cancel()
+        retryItem = nil
+        retryGeneration += 1
+        pullAttempt = 0
+        awaitingNotReadyRetry = false
+        pullWindowStartedAt = Date()
+        answerWindow = timeout
+        reportValue.waitingKey = nil
+        reportValue.pullAttempts = 0
         let peer = SyncChangeLogPeer(
             session: session,
             store: store,
@@ -227,6 +264,8 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
             self?.recordAnswered(.applyFailed, groups: groups)
         }
         peer.onPushIgnoredDeletes = { [weak self] count in self?.recordIgnoredDeletes(count) }
+        // 对端未就绪（notReady）：不是「应答成功」，也不是立刻失败的理由 → 退避重试。
+        peer.onPushNotReady = { [weak self] in self?.handleNotReadyAnswer() }
         // 发送侧缺身份键：只累加账目，**不收尾**（见文件头：推送阶段触发 / 入站帧触发，
         // 两者都不是「对端应答了本端拉取」）。
         peer.onIncrementMissingIdentity = { [weak self] groups in
@@ -259,11 +298,21 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
             return
         }
         stage = .pulling
+        pullAttempt = 1
+        pullWindowStartedAt = Date()
+        awaitingNotReadyRetry = false
+        reportValue.pullAttempts = 1
+        let window = answerWindow
         lock.unlock()
         emit(phase: .pulling)
         // 到点检查必须在**发请求之前**就位（否则「发送」这段本身不受超时约束；
         // 同 SyncCollectionSyncCoordinator 的 S2 修复）。
-        scheduleTimeout(seconds: timeout)
+        scheduleTimeout(seconds: window)
+        AppLog.info(
+            .sync,
+            "ℹ️ SyncDataSyncCoordinator: 发起 change_log_pull（第 1/\(retryPolicy.maxAttempts) 次，"
+                + "应答窗口 \(window)s，peer=\(peerID)）"
+        )
         do {
             try peer.sendPull()
         } catch {
@@ -280,8 +329,10 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
 
     private func recordApplied(_ count: Int) {
         lock.lock()
+        let wasFinished = stage == .finished
         reportValue.tally.accumulate(.applied, count: count)
         lock.unlock()
+        logAnswerReceived(wasFinished: wasFinished, applied: count, groups: nil)
         finish(failure: nil)
     }
 
@@ -291,11 +342,39 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     /// （挂起 / 未定位即使空数组也上报 → 空数组 = 累加零条 + 照常收尾）。
     private func recordAnswered(_ outcome: SyncRowOutcome, groups: [SyncEntityOutcomeCount]) {
         lock.lock()
+        let wasFinished = stage == .finished
         for group in groups {
             reportValue.tally.accumulate(outcome, entity: group.entity, count: group.count)
         }
         lock.unlock()
+        logAnswerReceived(wasFinished: wasFinished, applied: nil, groups: groups)
         finish(failure: nil)
+    }
+
+    /// 「收到应答 / 迟到帧」各一行（info）：收尾后再来的帧只累加账目，不二次收尾。
+    private func logAnswerReceived(
+        wasFinished: Bool,
+        applied: Int?,
+        groups: [SyncEntityOutcomeCount]?
+    ) {
+        if wasFinished {
+            AppLog.info(
+                .sync,
+                "ℹ️ SyncDataSyncCoordinator: 已收尾会话收到迟到的应答帧（只累加账目，不二次收尾；peer=\(resolvedPeerID)）"
+            )
+            return
+        }
+        let detail: String
+        if let applied {
+            detail = "应用 \(applied) 行"
+        } else {
+            let total = (groups ?? []).reduce(0) { $0 + $1.count }
+            detail = "分组应答 \(total) 行"
+        }
+        AppLog.info(
+            .sync,
+            "ℹ️ SyncDataSyncCoordinator: 收到对端应答（\(detail)，第 \(pullAttempt) 次尝试；peer=\(resolvedPeerID)）"
+        )
     }
 
     /// 发送方向：本端发出去但缺身份键的行数（按实体分组）。**只累加，不收尾**——这不是
@@ -320,7 +399,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private func scheduleTimeout(seconds: TimeInterval) {
         guard seconds > 0 else { return }
         let item = DispatchWorkItem { [weak self] in
-            self?.failWhileWaitingForAnswer()
+            self?.answerWindowElapsed()
         }
         lock.lock()
         timeoutItem = item
@@ -328,16 +407,123 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         timeoutQueue.asyncAfter(deadline: .now() + seconds, execute: item)
     }
 
-    /// 仅当**仍在等应答**时落失败：判定与置终态在**同一次持锁内**完成，
-    /// 与 `record*` 的收尾互斥（应答一到，到点检查必被挡回）。
-    private func failWhileWaitingForAnswer() {
+    /// 应答窗口到点仍没收到任何应答帧：同轮内重发 pull；次数用尽才落失败。
+    /// 快照（第几次 / 是否 notReady）与「要不要重发」在同一次持锁内取，
+    /// 与 record 系列的收尾互斥（应答一到，到点检查必被挡回）。
+    private func answerWindowElapsed() {
         lock.lock()
         guard stage == .pulling else {
             lock.unlock()
             return
         }
+        let attempt = pullAttempt
+        let notReady = awaitingNotReadyRetry
+        let elapsed = Date().timeIntervalSince(pullWindowStartedAt)
         lock.unlock()
-        finish(failure: "对端无应答（等待超时；请确认对端 QQPlayer 在前台并已连接）")
+
+        let delay = notReady
+            ? retryPolicy.notReadyRetryDelay(afterAttempt: attempt, elapsed: elapsed)
+            : retryPolicy.noAnswerRetryDelay(afterAttempt: attempt)
+        guard let delay else {
+            if notReady {
+                finish(
+                    failure: "对端持续未就绪（曲库整理中；已尝试 \(attempt) 次）",
+                    failureKey: SyncDataSyncMessageKey.notReadyTimeout
+                )
+            } else {
+                finish(
+                    failure: "对端无应答（已重试 \(attempt) 次；对端可能正在整理曲库或处理上一批数据）",
+                    failureKey: SyncDataSyncMessageKey.noAnswerTimeout
+                )
+            }
+            return
+        }
+        let retryNumber = attempt + 1
+        let maxAttempts = notReady ? retryPolicy.notReadyMaxAttempts : retryPolicy.maxAttempts
+        AppLog.info(
+            .sync,
+            "ℹ️ SyncDataSyncCoordinator: pull 第 \(attempt)/\(maxAttempts) 次"
+                + "\(notReady ? "未就绪" : "无应答")，\(delay)s 后重发第 \(retryNumber) 次"
+        )
+        scheduleRetry(after: delay, notReady: notReady)
+    }
+
+    /// 收到对端 notReady：不是应答成功，按退避重试；次数 / 窗口耗尽才失败。
+    private func handleNotReadyAnswer() {
+        lock.lock()
+        guard stage == .pulling else {
+            lock.unlock()
+            return
+        }
+        let attempt = pullAttempt
+        let elapsed = Date().timeIntervalSince(pullWindowStartedAt)
+        lock.unlock()
+        cancelTimeout()
+
+        let delay = retryPolicy.notReadyRetryDelay(afterAttempt: attempt, elapsed: elapsed)
+        guard let delay else {
+            finish(
+                failure: "对端持续未就绪（曲库整理中；已尝试 \(attempt) 次）",
+                failureKey: SyncDataSyncMessageKey.notReadyTimeout
+            )
+            return
+        }
+        AppLog.info(
+            .sync,
+            "ℹ️ SyncDataSyncCoordinator: 对端回 notReady（第 \(attempt) 次），\(delay)s 后重试"
+        )
+        scheduleRetry(after: delay, notReady: true)
+    }
+
+    /// 排程一次重发；代际递增，旧代际的漏网任务不得再发帧。
+    private func scheduleRetry(after seconds: TimeInterval, notReady: Bool) {
+        lock.lock()
+        guard stage == .pulling else {
+            lock.unlock()
+            return
+        }
+        retryGeneration += 1
+        let generation = retryGeneration
+        retryItem?.cancel()
+        reportValue.waitingKey = notReady
+            ? SyncDataSyncMessageKey.peerPreparing
+            : SyncDataSyncMessageKey.retryingNoAnswer
+        let item = DispatchWorkItem { [weak self] in
+            self?.retryPull(generation: generation, notReady: notReady)
+        }
+        retryItem = item
+        lock.unlock()
+        timeoutQueue.asyncAfter(deadline: .now() + seconds, execute: item)
+    }
+
+    private func retryPull(generation: Int, notReady: Bool) {
+        lock.lock()
+        guard stage == .pulling, retryGeneration == generation else {
+            lock.unlock()
+            return
+        }
+        pullAttempt += 1
+        pullWindowStartedAt = Date()
+        awaitingNotReadyRetry = notReady
+        reportValue.pullAttempts = pullAttempt
+        reportValue.waitingKey = nil
+        retryItem = nil
+        let attempt = pullAttempt
+        let window = answerWindow
+        lock.unlock()
+
+        let maxAttempts = notReady ? retryPolicy.notReadyMaxAttempts : retryPolicy.maxAttempts
+        AppLog.info(
+            .sync,
+            "ℹ️ SyncDataSyncCoordinator: 重发 change_log_pull（第 \(attempt)/\(maxAttempts) 次，"
+                + "应答窗口 \(window)s）"
+        )
+        scheduleTimeout(seconds: window)
+        do {
+            try peerValue?.sendPull()
+        } catch {
+            finish(failure: "请求拉取失败：\(error)")
+        }
     }
 
     private func cancelTimeout() {
@@ -348,11 +534,21 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         item?.cancel()
     }
 
+    /// 取消在途的退避重发（会话关闭 / 取消 / 收尾时调用；代际递增让漏网任务也发不出帧）。
+    private func cancelRetry() {
+        lock.lock()
+        let item = retryItem
+        retryItem = nil
+        retryGeneration += 1
+        lock.unlock()
+        item?.cancel()
+    }
+
     // MARK: 收尾
 
     /// 落终态（幂等：已 finished 则只保留首次结论——成功不会被迟到的超时覆盖，
     /// 失败也不会被后续迟到帧冲掉原因）。回调锁外触发。
-    private func finish(failure: String?) {
+    private func finish(failure: String?, failureKey: String? = nil) {
         lock.lock()
         guard stage != .finished else {
             lock.unlock()
@@ -361,10 +557,13 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         stage = .finished
         if let failure {
             reportValue.failureMessage = failure
+            reportValue.failureKey = failureKey
         }
+        reportValue.waitingKey = nil
         reportValue.isFinished = true
         lock.unlock()
         cancelTimeout()
+        cancelRetry()
         emit(phase: .finished)
     }
 

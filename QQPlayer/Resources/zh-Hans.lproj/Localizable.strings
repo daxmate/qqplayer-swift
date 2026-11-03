@@ -979,6 +979,10 @@
 "sync_run_data_cancel" = "取消";
 "sync_run_data_phase_pushing" = "正在发送本机的改动…";
 "sync_run_data_phase_pulling" = "正在接收对端的改动…";
+"sync_data_pull_peer_preparing" = "手机正在整理曲库…";
+"sync_data_pull_retrying_no_answer" = "对端暂时没有回应，正在重试…";
+"sync_data_pull_no_answer_timeout" = "对端多次未应答：对端可能正在整理曲库或处理上一批数据，请稍后再试";
+"sync_data_pull_not_ready_timeout" = "手机一直在整理曲库（索引未完成），请稍后再试";
 "sync_run_data_result_sent" = "发送";
 "sync_run_data_result_applied" = "应用";
 "sync_run_data_result_pending" = "挂起";
