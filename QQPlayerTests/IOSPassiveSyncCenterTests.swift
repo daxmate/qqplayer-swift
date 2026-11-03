@@ -735,6 +735,10 @@ struct IOSPassiveSyncCenterTests {
             "onResultSent",
             "onDecodeFailure",
         ],
+        "QQPlayer/Sync/SyncChangeLogNotReadyResponder.swift": [
+            "priorAppHandler",
+            "priorClosedHandler",
+        ],
         "QQPlayer/Sync/SyncChangeLogPeer.swift": [
             "onPullHandled",
             "onPushApplied",
@@ -818,7 +822,8 @@ struct IOSPassiveSyncCenterTests {
         "QQPlayer/Sync/SyncPeerLibraryClient.swift": 3,
         "QQPlayer/Sync/SyncPeerLibraryResponder.swift": 3,
         "QQPlayer/Sync/SyncLibraryFetchResponder.swift": 5,
-        "QQPlayer/Sync/SyncChangeLogPeer.swift": 15,
+        "QQPlayer/Sync/SyncChangeLogNotReadyResponder.swift": 2,
+        "QQPlayer/Sync/SyncChangeLogPeer.swift": 16,
         "QQPlayer/Sync/SyncChangeLogApplier.swift": 4,
         "QQPlayer/Sync/SyncLibraryPassiveHost.swift": 10,
         "QQPlayer/Sync/SyncLocalLibraryProvider.swift": 7,

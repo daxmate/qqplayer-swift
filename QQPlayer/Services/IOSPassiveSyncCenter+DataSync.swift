@@ -15,6 +15,32 @@
         }
 
         /// 被动端数据同步端的 applier：开关开（跨端续播）才注入落点；
+        /// 门控期的轻量应答端：只回 notReady（空批 + 不推进游标），不接数据、不补发对账。
+        private func installNotReadyResponderIfNeeded(on session: SyncPeerSession) {
+            guard dataSyncNotReadyResponder == nil else { return }
+            dataSyncNotReadyResponder = SyncChangeLogNotReadyResponder(session: session)
+            AppLog.warn(
+                .general,
+                "⏸️ IOSPassiveSyncCenter: 曲库索引未到终态，装配轻量应答端（只回 notReady；不发起数据同步、不补发对账，待终态后换真实应答端）"
+            )
+        }
+
+        /// 门控被命中时的事实（2026-11-03 真机复现用）：两个来源都记，便于区分
+        /// 「本启动还没扫完」与「曲库确实还没有行」。
+        /// ⚠️ 只读 isIndexing / 扫描 latch / track 行数，不在这里复述门的判定
+        /// （唯一实现仍是 IndexingGate）。
+        private func logGateFacts() {
+            let scanned = (indexingState as? LibraryIndexer)?.hasCompletedScanThisLaunch ?? false
+            let rows: Int? = try? database.read { db in
+                try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM track")
+            }
+            AppLog.info(
+                .general,
+                "ℹ️ IOSPassiveSyncCenter: 门控事实（hasCompletedScanThisLaunch=\(scanned)，"
+                    + "isIndexing=\(indexingState.isIndexing)，track 行数=\(rows.map(String.init) ?? "读取失败")）"
+            )
+        }
+
         /// 关 = 本端不接受播放位置（关着时行不落地也不计「已应用」，见 INV-20/INV-26）。
         private static func makePassiveApplier(database: DatabaseManager) -> SyncChangeLogApplier {
             var applier = SyncChangeLogApplier(database: database)
@@ -36,8 +62,9 @@
         /// 会话 ready → 装配数据同步端（帧 8/9 = `SyncChangeLogPeer`，全仓帧 8/9 唯一处理器）。
         ///
         /// **前置门**（唯一判定 = `IndexingGate.isReadyForChangeLogSync`）：曲库索引未到终态时
-        /// 本端**整体不接**——不装配 peer（不发起、不应答帧 8/9）、不跑补发对账，等终态后
-        /// 由 `refreshDataSyncAttachment()` 补装。理由见 `IndexingGate` 内的取证注释。
+        /// 本端**不接数据**——不装配 peer（不发起数据同步、不应用远端行、不跑补发对账），
+        /// 但**会回 notReady**（轻量应答端）：沉默会让对端每轮都等满 20s 应答窗口。等终态后
+        /// 由 `refreshDataSyncAttachment()` 换成真实应答端。理由见 `IndexingGate` 内的取证注释。
         ///
         /// 装配顺序：本方法在 `SyncLibraryPassiveHost.attach` **之后**调用——
         /// `SyncChangeLogPeer.init` 会把 handler 挂成链头并转发 prior，于是帧 8/9 由它处理、
@@ -45,9 +72,16 @@
         func attachDataSync(to session: SyncPeerSession) {
             guard dataSyncPeer == nil else { return }
             guard IndexingGate.isReadyForChangeLogSync(indexingState) else {
-                AppLog.warn(.general, "⏸️ IOSPassiveSyncCenter: 曲库索引未到终态，不装配数据同步端（不发起/不应答/不补发对账，待终态后补装）")
+                // 门控期**不能沉默**：对端发来 change_log_pull 时若无处理器，它只能等满
+                // 20s 应答窗口再报「对端无应答」（2026-11-03 真机取证）。装轻量应答端，
+                // 立刻回 notReady，对端按退避重试；门开后由本方法下半段换成真实应答端。
+                installNotReadyResponderIfNeeded(on: session)
+                logGateFacts()
                 return
             }
+            // 门开了：先停掉轻量应答端（否则它会和真实应答端各回一条），再装配真身。
+            dataSyncNotReadyResponder?.deactivate()
+            dataSyncNotReadyResponder = nil
             guard let peerID = IOSPassiveDataSyncLogic.dataSyncPeerID(
                 peerDeviceID: session.peerHelloValue?.deviceID
             ) else {

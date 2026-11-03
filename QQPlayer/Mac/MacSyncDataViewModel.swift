@@ -146,6 +146,12 @@ final class MacSyncDataViewModel: ObservableObject {
         }
     }
 
+    /// 等待对端的提示（nil = 无）：对端整理曲库（notReady 退避中）/ 本端无应答重发中。
+    var waitingText: String? {
+        guard !report.isFinished else { return nil }
+        return report.waitingKey?.localized
+    }
+
     /// 只是用户取消 / 掉线中断（UI 用次要色，不当错误红字）。
     var isInterrupted: Bool {
         didDisconnectWhileRunning || report.failureMessage == Self.cancelledReason
@@ -263,6 +269,8 @@ final class MacSyncDataViewModel: ObservableObject {
         guard let message = report.failureMessage else { return nil }
         if didDisconnectWhileRunning { return "sync_run_data_disconnected".localized }
         if message == Self.cancelledReason { return "sync_run_data_cancelled".localized }
+        // 新失败路径带本地化 key（5 语言）；旧路径 key 为 nil，沿用原文。
+        if let key = report.failureKey { return key.localized }
         return message
     }
 

@@ -146,6 +146,8 @@
             dataSyncPeer = nil
             dataSyncPeerID = nil
             dataSyncSession = nil
+            dataSyncNotReadyResponder?.deactivate()
+            dataSyncNotReadyResponder = nil
             playbackPositionSinkAttached = nil
             SyncWiringFactsStore.shared.clear()
             currentTarget = nil
@@ -231,6 +233,8 @@
             dataSyncPeer = nil
             dataSyncPeerID = nil
             dataSyncSession = nil
+            dataSyncNotReadyResponder?.deactivate()
+            dataSyncNotReadyResponder = nil
             playbackPositionSinkAttached = nil
             // 会话拆除：自检事实归零（不是缺口——没有会话就谈不上装配）。
             SyncWiringFactsStore.shared.clear()

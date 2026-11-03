@@ -1300,6 +1300,10 @@
 "sync_run_data_cancel" = "取消";
 "sync_run_data_phase_pushing" = "正在傳送本機的變更…";
 "sync_run_data_phase_pulling" = "正在接收對端的變更…";
+"sync_data_pull_peer_preparing" = "手機正在整理曲庫…";
+"sync_data_pull_retrying_no_answer" = "對端暫時沒有回應，正在重試…";
+"sync_data_pull_no_answer_timeout" = "對端多次未應答：對端可能正在整理曲庫或處理上一批資料，請稍後再試";
+"sync_data_pull_not_ready_timeout" = "手機一直在整理曲庫（索引未完成），請稍後再試";
 "sync_run_data_result_sent" = "傳送";
 "sync_run_data_result_applied" = "套用";
 "sync_run_data_result_pending" = "等待中";

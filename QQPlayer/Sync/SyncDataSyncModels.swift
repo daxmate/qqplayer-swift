@@ -145,6 +145,11 @@ struct SyncChangeLogPushPayload: Codable, Equatable, Sendable {
     var entries: [SyncChangeLogWireEntry]
     /// 本批末尾的本端 outbox id（= 对端应记下的游标）。
     var lastOutboxID: Int64
+    /// 对端「未就绪」的显式回答（2026-11-03）：应答端曲库索引未到终态 / 正在整理上一批
+    /// 数据时不再沉默（沉默 = 发起端只能等满整个应答窗口），而是回一条本字段为 true 的
+    /// 空批：entries 必为空、lastOutboxID = 请求里的 cursor（**不推进游标**）。
+    /// 缺省 nil = 旧端行为（旧载荷解码为 nil；旧端解码本字段会忽略未知键）。
+    var notReady: Bool?
 }
 
 /// 线上 outbox 行（changeLogPush 的 entry）。

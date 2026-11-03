@@ -1086,6 +1086,274 @@ struct SyncDataSyncCoreTests {
             "应用失败不推进游标（与收口前一致：下一轮重试）"
         )
     }
+
+    // MARK: - pull 应答重试 / notReady（2026-11-03）
+
+    /// 单测用快节奏策略（间隔压到毫秒级，wall clock 敏感）。
+    private static func fastPolicy(
+        noAnswerDelays: [TimeInterval] = [0.02, 0.02],
+        notReadyDelays: [TimeInterval] = [0.02, 0.02, 0.02]
+    ) -> SyncPullRetryPolicy {
+        SyncPullRetryPolicy(
+            maxAttempts: noAnswerDelays.count + 1,
+            noAnswerDelays: noAnswerDelays,
+            notReadyMaxAttempts: notReadyDelays.count + 1,
+            notReadyDelays: notReadyDelays,
+            notReadyWindow: 30
+        )
+    }
+
+    @Test("重试策略：无应答 3 次（2s / 5s）、notReady 4 次（2s / 5s / 10s），总窗口封顶")
+    func pullRetryPolicyPureLogic() {
+        let policy = SyncPullRetryPolicy.standard
+        #expect(policy.noAnswerRetryDelay(afterAttempt: 1) == 2)
+        #expect(policy.noAnswerRetryDelay(afterAttempt: 2) == 5)
+        #expect(policy.noAnswerRetryDelay(afterAttempt: 3) == nil)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 1, elapsed: 0) == 2)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 2, elapsed: 3) == 5)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 3, elapsed: 8) == 10)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 4, elapsed: 18) == nil)
+        // 总窗口：剩余时间不够下一次退避 → 不再重试
+        #expect(policy.notReadyRetryDelay(afterAttempt: 3, elapsed: 55) == nil)
+        // 默认值必须与任务书一致（改这里 = 改线上行为，需说明）
+        #expect(policy.maxAttempts == 3)
+        #expect(policy.notReadyMaxAttempts == 4)
+        #expect(policy.notReadyWindow == 60)
+    }
+
+    @Test("载荷：缺 notReady 解码为 nil（旧端行为）；notReady 往返保留")
+    func pushPayloadNotReadyCoding() throws {
+        let legacy = Data(#"{"entries":[],"lastOutboxID":7}"#.utf8)
+        let decoded = try JSONDecoder().decode(SyncChangeLogPushPayload.self, from: legacy)
+        #expect(decoded.notReady == nil, "旧端不发该字段 → 解码为 nil = 不是 notReady")
+        #expect(decoded.lastOutboxID == 7)
+
+        let notReady = SyncChangeLogPushPayload(entries: [], lastOutboxID: 5, notReady: true)
+        let roundtrip = try JSONDecoder().decode(
+            SyncChangeLogPushPayload.self,
+            from: JSONEncoder().encode(notReady)
+        )
+        #expect(roundtrip.notReady == true)
+        #expect(roundtrip.entries.isEmpty)
+        #expect(roundtrip.lastOutboxID == 5)
+    }
+
+    @Test("coordinator：对端一次都不应答 → 同轮重发到上限才失败（pullAttempts = 3）")
+    func coordinatorRetriesPullBeforeFailing() async throws {
+        let pair = try makePair()
+        try Self.insertTrack(pair.hostQueue, stableId: "host-retry", contentHash: "H-retry")
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-retry", updatedAtMs: 1000)
+
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            retryPolicy: Self.fastPolicy(),
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start(timeout: 0.05)
+        let deadline = Date().addingTimeInterval(5)
+        while !coordinator.report.isFinished, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(coordinator.phase == .finished)
+        #expect(coordinator.report.pullAttempts == 3, "默认 3 次尝试：首次 + 2 次重发")
+        #expect(coordinator.report.failureKey == SyncDataSyncMessageKey.noAnswerTimeout)
+        #expect(coordinator.report.waitingKey == nil, "收尾后不再显示等待文案")
+    }
+
+    @Test("coordinator：第 2 次尝试拿到应答 → 成功收尾（不报失败）")
+    func coordinatorSucceedsOnSecondAttempt() async throws {
+        let pair = try makePair()
+        try Self.insertTrack(pair.hostQueue, stableId: "host-second", contentHash: "H-second")
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-second", updatedAtMs: 1000)
+
+        let responder = ManualPullResponder(
+            session: pair.fixture.clientSession,
+            answerAfter: 2,
+            payload: SyncChangeLogPushPayload(entries: [], lastOutboxID: 0)
+        )
+        _ = responder
+
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            retryPolicy: Self.fastPolicy(),
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start(timeout: 0.05)
+        let deadline = Date().addingTimeInterval(5)
+        while !coordinator.report.isFinished, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(coordinator.report.isFinished)
+        #expect(coordinator.report.failureMessage == nil, "第 2 次应答到达即成功")
+        #expect(coordinator.report.failureKey == nil)
+        #expect(coordinator.report.pullAttempts == 2)
+    }
+
+    @Test("coordinator：notReady → 退避重试，下一次拿到真实应答即成功")
+    func coordinatorNotReadyRetriesThenSucceeds() async throws {
+        let pair = try makePair()
+        try Self.insertTrack(pair.hostQueue, stableId: "host-nr", contentHash: "H-nr")
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-nr", updatedAtMs: 1000)
+
+        let responder = ManualPullResponder(
+            session: pair.fixture.clientSession,
+            answerAfter: 1,
+            notReadyUntil: 1,
+            payload: SyncChangeLogPushPayload(entries: [], lastOutboxID: 0)
+        )
+        _ = responder
+
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            retryPolicy: Self.fastPolicy(),
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start(timeout: 0.5)
+        let deadline = Date().addingTimeInterval(5)
+        while !coordinator.report.isFinished, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(coordinator.report.isFinished)
+        #expect(coordinator.report.failureMessage == nil, "notReady 不是失败，后续应答才收尾")
+        #expect(coordinator.report.pullAttempts == 2)
+    }
+
+    @Test("coordinator：对端持续 notReady → 耗尽快照失败（明确原因，不是「无应答」）")
+    func coordinatorNotReadyExhaustedFails() async throws {
+        let pair = try makePair()
+        try Self.insertTrack(pair.hostQueue, stableId: "host-nrx", contentHash: "H-nrx")
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-nrx", updatedAtMs: 1000)
+
+        let responder = ManualPullResponder(
+            session: pair.fixture.clientSession,
+            answerAfter: 1,
+            notReadyUntil: 99,
+            payload: SyncChangeLogPushPayload(entries: [], lastOutboxID: 0)
+        )
+        _ = responder
+
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            retryPolicy: SyncPullRetryPolicy(
+                maxAttempts: 3,
+                noAnswerDelays: [0.02, 0.02],
+                notReadyMaxAttempts: 1,
+                notReadyDelays: [],
+                notReadyWindow: 30
+            ),
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start(timeout: 0.5)
+        let deadline = Date().addingTimeInterval(5)
+        while !coordinator.report.isFinished, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(coordinator.report.isFinished)
+        #expect(coordinator.report.failureKey == SyncDataSyncMessageKey.notReadyTimeout)
+    }
+
+    @Test("coordinator：已收尾会话的迟到应答帧只累加账目，不二次收尾")
+    func coordinatorLateAnswerDoesNotFinishTwice() async throws {
+        let pair = try makePair()
+        try Self.insertTrack(pair.hostQueue, stableId: "host-late", contentHash: "H-late")
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-late", updatedAtMs: 1000)
+
+        let phases = PhaseListBox()
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            retryPolicy: SyncPullRetryPolicy(
+                maxAttempts: 1,
+                noAnswerDelays: [],
+                notReadyMaxAttempts: 1,
+                notReadyDelays: [],
+                notReadyWindow: 30
+            ),
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.onStateChange = { phases.append($0) }
+        coordinator.start(timeout: 0.05)
+        let deadline = Date().addingTimeInterval(5)
+        while !coordinator.report.isFinished, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(coordinator.report.failureKey == SyncDataSyncMessageKey.noAnswerTimeout)
+        let firstFailure = coordinator.report.failureMessage
+
+        // 迟到帧：用对端会话补发一条「应答」（空批）
+        let late = SyncChangeLogPushPayload(entries: [], lastOutboxID: 0)
+        try pair.fixture.clientSession.sendApplicationFrame(
+            type: .changeLogPush,
+            payload: try JSONEncoder().encode(late)
+        )
+        #expect(phases.values.filter { $0 == .finished }.count == 1, "收尾只发生一次")
+        #expect(coordinator.report.failureMessage == firstFailure, "迟到帧不得冲掉首次结论")
+    }
+
+    @Test("coordinator：取消（会话关闭）→ 立即收尾，不等应答窗口")
+    func coordinatorCancelStopsImmediately() throws {
+        let pair = try makePair()
+        try Self.insertTrack(pair.hostQueue, stableId: "host-cancel", contentHash: "H-cancel")
+        try Self.recordFavorite(pair.hostQueue, rowKey: "host-cancel", updatedAtMs: 1000)
+
+        let coordinator = SyncDataSyncCoordinator(
+            session: pair.fixture.hostSession,
+            database: pair.hostManager,
+            peerID: pair.clientID,
+            libraryRoot: testLibraryRoot
+        )
+        coordinator.start(timeout: 30)
+        #expect(!coordinator.report.isFinished, "对端不应答 = 还在等窗口")
+        coordinator.cancel()
+        #expect(coordinator.report.isFinished, "取消必须立即收尾")
+        #expect(coordinator.report.failureMessage == "cancelled")
+    }
+
+    @Test("门控轻量应答端：门控期回 notReady 空批且不推进游标；停用后真实应答端回真实数据")
+    func notReadyResponderAnswersGatedPulls() throws {
+        let pair = try makePair()
+        let box = PushPayloadBox()
+        pair.fixture.hostSession.onApplicationFrame = { frame in
+            guard frame.type == .changeLogPush else { return }
+            box.append(try? JSONDecoder().decode(SyncChangeLogPushPayload.self, from: frame.payload))
+        }
+
+        let responder = SyncChangeLogNotReadyResponder(session: pair.fixture.clientSession)
+        // 门控期：立刻回 notReady（不能沉默等 20s）
+        try pair.fixture.hostSession.sendApplicationFrame(
+            type: .changeLogPull,
+            payload: try JSONEncoder().encode(SyncChangeLogPullRequest(cursor: 42))
+        )
+        #expect(responder.notReadyAnswers == 1)
+        #expect(box.values.count == 1)
+        #expect(box.values.first?.notReady == true)
+        #expect(box.values.first?.entries.isEmpty == true)
+        #expect(box.values.first?.lastOutboxID == 42, "notReady 必须回请求 cursor，绝不推进游标")
+        #expect(try Self.countRows(pair.clientQueue, table: "sync_outbox") == 0)
+
+        // 门开：停用轻量端 → 真实应答端接管，回真实数据
+        responder.deactivate()
+        try Self.recordFavorite(pair.clientQueue, rowKey: "client-gated", updatedAtMs: 5000)
+        let peer = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)
+        _ = peer
+        try pair.fixture.hostSession.sendApplicationFrame(
+            type: .changeLogPull,
+            payload: try JSONEncoder().encode(SyncChangeLogPullRequest(cursor: 0))
+        )
+        #expect(box.values.count == 2)
+        #expect(box.values.last?.notReady == nil)
+        #expect((box.values.last?.entries.count ?? 0) > 0, "门开后必须回真实数据")
+    }
+
 }
 
 // MARK: - 测试辅助（闭包捕获盒子；避免在 @MainActor 测试里捕获可变局部变量）
@@ -1203,7 +1471,6 @@ private final class IntListBox: @unchecked Sendable {
             "countOrder 里的类别必须都是计数行归属（否则 countRows 静默漏行）"
         )
     }
-
 }
 
 private final class PhaseListBox: @unchecked Sendable {
@@ -1219,6 +1486,73 @@ private final class PhaseListBox: @unchecked Sendable {
     func append(_ phase: SyncDataSyncPhase) {
         lock.lock()
         storage.append(phase)
+        lock.unlock()
+    }
+}
+
+/// 手工应答端（测试用）：按「第几次 pull」决定回 notReady 还是真实批。
+private final class ManualPullResponder: @unchecked Sendable {
+    private let session: SyncPeerSession
+    private let answerAfter: Int
+    private let notReadyUntil: Int
+    private let payload: SyncChangeLogPushPayload
+    private let lock = NSLock()
+    private var seen = 0
+    private var prior: (@Sendable (SyncFrame) -> Void)?
+
+    init(
+        session: SyncPeerSession,
+        answerAfter: Int,
+        notReadyUntil: Int = 0,
+        payload: SyncChangeLogPushPayload
+    ) {
+        self.session = session
+        self.answerAfter = answerAfter
+        self.notReadyUntil = notReadyUntil
+        self.payload = payload
+        self.prior = session.onApplicationFrame
+        session.onApplicationFrame = { [weak self] frame in
+            guard let self else { return }
+            if frame.type == .changeLogPull {
+                self.handlePull(frame)
+            }
+            self.prior?(frame)
+        }
+    }
+
+    private func handlePull(_ frame: SyncFrame) {
+        lock.lock()
+        seen += 1
+        let index = seen
+        lock.unlock()
+        guard index >= answerAfter else { return }
+        let reply: SyncChangeLogPushPayload
+        if index <= notReadyUntil {
+            let cursor = (try? JSONDecoder().decode(SyncChangeLogPullRequest.self, from: frame.payload))?.cursor ?? 0
+            reply = SyncChangeLogPushPayload(entries: [], lastOutboxID: cursor, notReady: true)
+        } else {
+            reply = payload
+        }
+        guard let data = try? JSONEncoder().encode(reply) else { return }
+        try? session.sendApplicationFrame(type: .changeLogPush, payload: data)
+    }
+}
+
+/// push 载荷捕获（测试用）。
+private final class PushPayloadBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [SyncChangeLogPushPayload] = []
+
+    var values: [SyncChangeLogPushPayload] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func append(_ payload: SyncChangeLogPushPayload?) {
+        guard let payload else { return }
+        lock.lock()
+        storage.append(payload)
         lock.unlock()
     }
 }

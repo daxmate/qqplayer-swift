@@ -180,6 +180,8 @@
         var dataSyncPeerID: String?
         /// 待装配数据同步端的会话（前置门挡住时留着，索引终态后补装；拆除时清）
         var dataSyncSession: SyncPeerSession?
+        /// 门控期的轻量应答端（只回 notReady；门开装配真实应答端前 deactivate）
+        var dataSyncNotReadyResponder: SyncChangeLogNotReadyResponder?
         /// 索引终态事实的订阅（start 挂、stop 摘）
         var indexingTerminalStateCancellable: AnyCancellable?
 
@@ -259,6 +261,8 @@
             indexingTerminalStateCancellable?.cancel()
             indexingTerminalStateCancellable = nil
             dataSyncSession = nil
+            dataSyncNotReadyResponder?.deactivate()
+            dataSyncNotReadyResponder = nil
             isWaitingBackoff = false
             cancelDiscovery()
             cancelReconnect()

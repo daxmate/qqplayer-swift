@@ -104,6 +104,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     /// 空 = 无、不触发。以前这类失败只进日志（面板零信号）——L0 契约 C 行要求
     /// 「歌单级失败必须单独计数上屏」，这条就是它的落点（歌单行失败 → 实体 = playlist）。
     var onPushApplyFailed: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
+    /// 对端回 notReady（曲库索引未到终态 / 正在整理上一批数据）：本批**不应用**，
+    /// 由调用方退避重试（锁外触发）。旧端不会发这个字段，因此不会触发。
+    var onPushNotReady: (@Sendable () -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: (@Sendable (DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
@@ -288,6 +291,17 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             payload = try JSONDecoder().decode(SyncChangeLogPushPayload.self, from: frame.payload)
         } catch {
             onDecodeFailure?(.invalidPayload("change_log_push 解码失败：\(error)"))
+            return
+        }
+        // notReady 应答：显式「我还没准备好」，不是数据批——不应用、不推进游标，
+        // 交给调用方退避重试（否则发起端只能等满应答窗口，浪费 20s 还不知道原因）。
+        if payload.notReady == true {
+            AppLog.info(
+                .sync,
+                "ℹ️ SyncChangeLogPeer: 对端回 notReady（entries=\(payload.entries.count)，"
+                    + "cursor=\(payload.lastOutboxID)）→ 本批不应用，等待退避重试"
+            )
+            onPushNotReady?()
             return
         }
         do {

@@ -974,6 +974,10 @@
 "sync_run_data_cancel" = "Annuler";
 "sync_run_data_phase_pushing" = "Envoi de vos modifications…";
 "sync_run_data_phase_pulling" = "Réception des modifications…";
+"sync_data_pull_peer_preparing" = "L'iPhone organise sa bibliothèque…";
+"sync_data_pull_retrying_no_answer" = "Pas encore de réponse — nouvelle tentative…";
+"sync_data_pull_no_answer_timeout" = "L'autre appareil n'a pas répondu après plusieurs tentatives : il organise peut-être encore sa bibliothèque ou traite un lot précédent. Réessayez plus tard.";
+"sync_data_pull_not_ready_timeout" = "L'iPhone organise toujours sa bibliothèque (indexation non terminée). Réessayez plus tard.";
 "sync_run_data_result_sent" = "Envoyées";
 "sync_run_data_result_applied" = "Appliquées";
 "sync_run_data_result_pending" = "En attente";
