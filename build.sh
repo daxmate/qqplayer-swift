@@ -115,8 +115,22 @@ build_install_ios() {
     || { echo "❌ 启动失败"; return 1; }
 }
 
+# macOS 27 / Xcode 27 起 Metal 工具链是可选组件；缺失时 mlx-swift 的 .metal 文件
+# 会在编译中途失败（cannot execute tool 'metal' due to missing Metal Toolchain）。
+# 开工前显式检查，给出可执行的修复命令。
+require_metal_toolchain() {
+  if xcrun -sdk macosx metal --version >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "❌ 缺少 Metal Toolchain（Xcode 27 可选组件），macOS 构建无法编译 mlx-swift 的 Metal 内核" >&2
+  echo "   修复：xcodebuild -downloadComponent MetalToolchain" >&2
+  echo "   或 Xcode → Settings → Components 安装 Metal Toolchain 后重试" >&2
+  return 1
+}
+
 # macOS 编译：构建（scheme QQPlayerMac），不安装、不启动
 build_mac() {
+  require_metal_toolchain || return 1
   echo "=== macOS 构建（scheme ${MAC_SCHEME}） ==="
   scripts/xcbuild.sh build -project QQPlayer.xcodeproj -scheme "${MAC_SCHEME}" \
     -destination 'platform=macOS' || { echo "❌ macOS 构建失败"; return 1; }
