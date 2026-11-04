@@ -1,0 +1,174 @@
+//
+//  DSQSharedPaths.swift
+//  QQPlayer
+//
+//  三个 macOS App（QQPlayer / DDReader / SSTypist）共享资源目录的**唯一解析层**。
+//
+//  背景（2026-11-04）：DDReader / SSTypist 要上 Mac App Store，必须开 App Sandbox，
+//  只能访问 App Group 容器；QQPlayer Mac 走 Developer ID 直发，保持非沙盒。三者需要
+//  共享同一批资源（Books / Dictionaries / Audiobooks / Models）。
+//
+//  根目录优先级（**只有本文件允许出现 Group Containers 字面量**）：
+//   1. 环境变量 `DSQ_SHARED_ROOT`（测试 / 开发）
+//   2. App Group 容器 `group.com.daxmate.dsqcommon/DSQ Common Resources`（沙盒 App）
+//   3. 非沙盒且该 Group 容器目录已存在（DDReader 建过）→ 直接使用
+//   4. 兜底 `<Application Support>/DSQ Common Resources`
+//
+//  布局：`<root>/{Models,Books,Dictionaries,Audiobooks}`；目录按需创建（幂等）。
+//  本文件只做路径解析，不碰业务语义；日志由 `DSQShared.swift` 统一出口。
+//
+
+import Foundation
+
+// MARK: - 解析来源
+
+/// 根目录实际走的分支（日志 / 测试断言用）。
+enum DSQSharedSource: String, Sendable {
+    case environment
+    case appGroupContainer = "app-group-container"
+    case groupContainerDirectory = "group-container-directory"
+    case applicationSupport = "application-support"
+}
+
+// MARK: - 解析结果
+
+/// 共享资源根与四个子目录。
+///
+/// 调用方**解析一次、复用结果**（每次 `DSQShared.resolve()` 都会记一条日志）。
+struct DSQSharedLocations: Equatable, Sendable {
+    static let rootDirectoryName = "DSQ Common Resources"
+    static let appGroupIdentifier = "group.com.daxmate.dsqcommon"
+    static let environmentKey = "DSQ_SHARED_ROOT"
+
+    static let modelsDirectoryName = "Models"
+    static let booksDirectoryName = "Books"
+    static let dictionariesDirectoryName = "Dictionaries"
+    static let audiobooksDirectoryName = "Audiobooks"
+
+    let root: URL
+    let source: DSQSharedSource
+
+    var modelsRoot: URL { child(Self.modelsDirectoryName) }
+    var booksRoot: URL { child(Self.booksDirectoryName) }
+    var dictionariesRoot: URL { child(Self.dictionariesDirectoryName) }
+    var audiobooksRoot: URL { child(Self.audiobooksDirectoryName) }
+
+    /// 模型版本目录：`<modelsRoot>/<kind>/<modelID>/<version>/`。
+    func modelDirectory(kind: String, modelID: String, version: String) -> URL {
+        modelsRoot
+            .appendingPathComponent(kind, isDirectory: true)
+            .appendingPathComponent(modelID, isDirectory: true)
+            .appendingPathComponent(version, isDirectory: true)
+    }
+
+    /// 按需创建根与四个子目录（幂等）。
+    func ensureDirectories(fileManager: FileManager = .default) throws {
+        for directory in [root, modelsRoot, booksRoot, dictionariesRoot, audiobooksRoot] {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+    }
+
+    private func child(_ name: String) -> URL {
+        root.appendingPathComponent(name, isDirectory: true)
+    }
+}
+
+// MARK: - 解析器
+
+/// 路径解析器。所有外部依赖（环境变量 / 容器 / home / 文件系统）都可注入，便于无模拟器测试。
+struct DSQSharedResolver {
+    var environment: [String: String]
+    var fileManager: FileManager
+    var homeDirectory: URL
+    var isSandboxed: Bool
+    var containerURL: (String) -> URL?
+    var applicationSupportDirectory: () -> URL
+
+    init(
+        environment: [String: String]? = nil,
+        fileManager: FileManager = .default,
+        homeDirectory: URL? = nil,
+        isSandboxed: Bool? = nil,
+        containerURL: ((String) -> URL?)? = nil,
+        applicationSupportDirectory: (() -> URL)? = nil
+    ) {
+        let environment = environment ?? ProcessInfo.processInfo.environment
+        self.environment = environment
+        self.fileManager = fileManager
+        self.homeDirectory = homeDirectory ?? UserHomeDirectory.realHomeURL
+        self.isSandboxed = isSandboxed ?? Self.detectSandbox(environment: environment)
+        self.containerURL = containerURL ?? { identifier in
+            fileManager.containerURL(forSecurityApplicationGroupIdentifier: identifier)
+        }
+        self.applicationSupportDirectory = applicationSupportDirectory ?? {
+            fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? fileManager.temporaryDirectory
+        }
+    }
+
+    func resolve() -> DSQSharedLocations {
+        if let raw = environment[DSQSharedLocations.environmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !raw.isEmpty {
+            return DSQSharedLocations(
+                root: Self.url(from: raw),
+                source: .environment
+            )
+        }
+
+        if let container = containerURL(DSQSharedLocations.appGroupIdentifier) {
+            return DSQSharedLocations(
+                root: container.appendingPathComponent(
+                    DSQSharedLocations.rootDirectoryName,
+                    isDirectory: true
+                ),
+                source: .appGroupContainer
+            )
+        }
+
+        if !isSandboxed {
+            let groupRoot = homeDirectory
+                .appendingPathComponent("Library", isDirectory: true)
+                .appendingPathComponent("Group Containers", isDirectory: true)
+                .appendingPathComponent(DSQSharedLocations.appGroupIdentifier, isDirectory: true)
+                .appendingPathComponent(DSQSharedLocations.rootDirectoryName, isDirectory: true)
+            if isDirectory(groupRoot) {
+                return DSQSharedLocations(root: groupRoot, source: .groupContainerDirectory)
+            }
+        }
+
+        let base = applicationSupportDirectory()
+        return DSQSharedLocations(
+            root: base.appendingPathComponent(DSQSharedLocations.rootDirectoryName, isDirectory: true),
+            source: .applicationSupport
+        )
+    }
+
+    /// 沙盒判定：`APP_SANDBOX_CONTAINER_ID` 由沙盒进程注入；home 路径兜底。
+    static func detectSandbox(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        if environment["APP_SANDBOX_CONTAINER_ID"] != nil {
+            return true
+        }
+        return NSHomeDirectory().contains("/Library/Containers/")
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    private static func url(from raw: String) -> URL {
+        URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
+            .standardizedFileURL
+    }
+}
+
+// MARK: - 模型目录约定
+
+/// 跨 App 共享的模型目录命名约定（QQPlayer 目前只有推荐模型）。
+enum DSQSharedModelCatalog {
+    /// 推荐模型（MLX）的 kind 目录名。
+    static let recommendationKind = "Recommendation"
+    /// 当前模型目录布局版本。
+    static let currentVersion = "v1"
+}

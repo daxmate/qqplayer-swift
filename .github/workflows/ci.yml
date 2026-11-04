@@ -201,6 +201,9 @@ jobs:
       - name: Run local sync harness (closure + assertions)
         run: bash scripts/run-local-sync-tests.sh
 
+      - name: Run DSQ shared resources harness (path resolver + migrator)
+        run: bash scripts/run-dsq-shared-tests.sh
+
   macos:
     name: macOS (build QQPlayerMac + 资源产物断言)
     # macOS 原生版（QQPlayerMac target）编译级验证。
