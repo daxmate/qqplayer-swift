@@ -78,6 +78,8 @@ private enum TrackFileRenameContract {
         "QQPlayer/Services/AlignedLyricsStore.swift",
         "QQPlayer/Services/ArtworkCache.swift",
         "QQPlayer/Services/DatabaseHiddenLayoutRelocation.swift",
+        // 资源根迁移/布局搬迁（非按标签改名）：同卷 move + 跨卷 copy→校验→删源，带回滚与 symlink 影子
+        "QQPlayer/Services/DSQSharedMigrator.swift",
         "QQPlayer/Services/DatabaseManager.swift",
         "QQPlayer/Services/DiscogsAPI.swift",
         "QQPlayer/Services/HybridMusicAPI.swift",
