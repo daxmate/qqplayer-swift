@@ -110,9 +110,7 @@ struct RecommendationModelLayout: Sendable, Equatable {
     static func legacyRoot(fileManager: FileManager = .default) -> URL {
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
-        return base
-            .appendingPathComponent("QQPlayer", isDirectory: true)
-            .appendingPathComponent("RecommendationModels", isDirectory: true)
+        return DSQSharedLegacyPaths.recommendationModelsRoot(applicationSupport: base)
     }
 
     /// 解析实际应使用的布局：新目录有 manifest → 新；否则旧目录有 manifest → 旧；

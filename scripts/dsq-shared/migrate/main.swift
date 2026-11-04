@@ -43,16 +43,11 @@ let home = UserHomeDirectory.realHomeURL
 let locations = DSQSharedResolver().resolve()
 let markerURL = locations.root.appendingPathComponent(DSQSharedMigrator.markerFileName)
 
-let legacyResources = home
+let applicationSupport = home
     .appendingPathComponent("Library", isDirectory: true)
     .appendingPathComponent("Application Support", isDirectory: true)
-    .appendingPathComponent(DSQSharedLocations.rootDirectoryName, isDirectory: true)
-
-let legacyModelsRoot = home
-    .appendingPathComponent("Library", isDirectory: true)
-    .appendingPathComponent("Application Support", isDirectory: true)
-    .appendingPathComponent("QQPlayer", isDirectory: true)
-    .appendingPathComponent("RecommendationModels", isDirectory: true)
+let legacyResources = DSQSharedLegacyPaths.resourcesRoot(applicationSupport: applicationSupport)
+let legacyModelsRoot = DSQSharedLegacyPaths.recommendationModelsRoot(applicationSupport: applicationSupport)
 
 var items: [DSQSharedMigrator.Item] = [
     .init(name: "public-resources", source: legacyResources, destination: locations.root),

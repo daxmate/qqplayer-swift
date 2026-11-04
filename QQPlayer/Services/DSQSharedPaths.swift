@@ -171,4 +171,23 @@ enum DSQSharedModelCatalog {
     static let recommendationKind = "Recommendation"
     /// 当前模型目录布局版本。
     static let currentVersion = "v1"
+    /// QQPlayer 旧 App 目录名（仅迁移 / 只读兼容使用）。
+    static let legacyAppDirectoryName = "QQPlayer"
+    /// QQPlayer 旧模型目录名（仅迁移 / 只读兼容使用）。
+    static let legacyModelsDirectoryName = "RecommendationModels"
+}
+
+/// 旧路径的唯一构造入口（迁移器与只读兼容共用，避免两处手拼）。
+enum DSQSharedLegacyPaths {
+    /// `<Application Support>/DSQ Common Resources`。
+    static func resourcesRoot(applicationSupport: URL) -> URL {
+        applicationSupport.appendingPathComponent(DSQSharedLocations.rootDirectoryName, isDirectory: true)
+    }
+
+    /// `<Application Support>/QQPlayer/RecommendationModels`。
+    static func recommendationModelsRoot(applicationSupport: URL) -> URL {
+        applicationSupport
+            .appendingPathComponent(DSQSharedModelCatalog.legacyAppDirectoryName, isDirectory: true)
+            .appendingPathComponent(DSQSharedModelCatalog.legacyModelsDirectoryName, isDirectory: true)
+    }
 }
