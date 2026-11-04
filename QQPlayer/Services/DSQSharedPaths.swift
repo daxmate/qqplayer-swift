@@ -10,7 +10,7 @@
 //
 //  根目录优先级（**只有本文件允许出现 Group Containers 字面量**）：
 //   1. 环境变量 `DSQ_SHARED_ROOT`（测试 / 开发）
-//   2. App Group 容器 `group.com.daxmate.dsqcommon/DSQ Common Resources`（沙盒 App）
+//   2. App Group 容器 `B6FA37AYT5.dsqcommon/DSQ Common Resources`（沙盒 App）
 //   3. 非沙盒且该 Group 容器目录已存在（DDReader 建过）→ 直接使用
 //   4. 兜底 `<Application Support>/DSQ Common Resources`
 //
@@ -37,7 +37,7 @@ enum DSQSharedSource: String, Sendable {
 /// 调用方**解析一次、复用结果**（每次 `DSQShared.resolve()` 都会记一条日志）。
 struct DSQSharedLocations: Equatable, Sendable {
     static let rootDirectoryName = "DSQ Common Resources"
-    static let appGroupIdentifier = "group.com.daxmate.dsqcommon"
+    static let appGroupIdentifier = "B6FA37AYT5.dsqcommon"
     static let environmentKey = "DSQ_SHARED_ROOT"
 
     static let modelsDirectoryName = "Models"

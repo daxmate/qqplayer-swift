@@ -4,7 +4,7 @@
 //
 //  DSQShared 解析层 + 迁移器的无模拟器自检（swiftc 直编生产源码）。
 //  覆盖任务要求的 5 个场景：环境变量覆盖 / 无容器回落 / dry-run 零变更 /
-//  迁移幂等 / 目标非空不覆盖；额外覆盖同卷 move 与跨卷 copy 两条路径。
+//  迁移幂等 / 目标非空不覆盖；额外覆盖空目标目录、同卷 move 与跨卷 copy。
 //
 
 import Darwin
@@ -247,6 +247,27 @@ do {
     expectEqual(try DSQSharedMigrator.measure(fixture.source, fileManager: fm), before, "失败时源内容不变")
     expect(fm.fileExists(atPath: fixture.destination.appendingPathComponent("existing.txt").path), "目标既有文件保留")
     expect(!fm.fileExists(atPath: fixture.marker.path), "失败不写 marker")
+}
+
+// MARK: - 9b. 目标已存在但为空 → 正常迁移（本机容器空目录场景）
+
+do {
+    let fixture = try makeMigrationFixture("empty-destination")
+    try fm.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+    let report = DSQSharedMigrator(fileManager: fm).run(
+        items: [sourceItem(fixture)],
+        markerURL: fixture.marker,
+        options: .init(dryRun: false)
+    )
+    expect(report.succeeded, "空目标目录 → 成功")
+    expectEqual(report.items.first?.outcome, .moved, "空目标目录结果 = moved")
+    expectEqual(
+        try DSQSharedMigrator.measure(fixture.destination, fileManager: fm),
+        DSQSharedMigrator.Measurement(files: 2, bytes: 8),
+        "空目标目录迁移后文件数 / 字节数"
+    )
+    expect(isSymbolicLink(fixture.source), "空目标目录迁移后旧路径 symlink")
+    expect(fm.fileExists(atPath: fixture.marker.path), "空目标目录迁移写 marker")
 }
 
 // MARK: - 10. 跨卷：copy → 校验 → 删源

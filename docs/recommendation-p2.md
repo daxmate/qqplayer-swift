@@ -29,7 +29,7 @@ TasteProfile（P1 画像）
 - 模型文件**不进 bundle、不进仓库**，落盘（2026-11-04 起并入共享资源根）：
   `<DSQ 共享根>/Models/Recommendation/<sanitize(modelId)>/v1/`
   - 共享根优先级：`DSQ_SHARED_ROOT` → App Group 容器
-    `group.com.daxmate.dsqcommon/DSQ Common Resources` → 非沙盒且该目录已存在 → Application Support 兜底；
+    `B6FA37AYT5.dsqcommon/DSQ Common Resources` → 非沙盒且该目录已存在 → Application Support 兜底；
     唯一实现在 `QQPlayer/Services/DSQSharedPaths.swift`。
   - 旧路径 `~/Library/Application Support/QQPlayer/RecommendationModels/<modelId>/`
     在迁移完成前仍可读（`RecommendationModelLayout.resolved` 自动回落）。
