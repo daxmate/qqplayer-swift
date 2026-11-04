@@ -1140,3 +1140,6 @@
 "recommendation_model_status_loading" = "Chargé";
 "recommendation_model_size_unknown" = "Taille inconnue";
 "recommendation_footer_source" = "Généré par %@";
+"recommendation_reason_similar_artist" = "Semblable à %@";
+"recommendation_reason_genre" = "Même genre : %@";
+"recommendation_reason_matched_taste" = "Correspond à vos goûts";

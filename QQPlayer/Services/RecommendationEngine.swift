@@ -22,6 +22,26 @@ struct RecommendationRemoteSong: Sendable, Equatable {
     var artist: String
     var album: String?
     var year: Int?
+    /// 在线源歌曲 ID（相似歌曲召回用；给不出就是 nil）。
+    var songID: Int?
+    /// 时长（毫秒；歌单 / 串烧过滤用；给不出就是 nil）。
+    var durationMs: Int?
+
+    init(
+        title: String,
+        artist: String,
+        album: String? = nil,
+        year: Int? = nil,
+        songID: Int? = nil,
+        durationMs: Int? = nil
+    ) {
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.year = year
+        self.songID = songID
+        self.durationMs = durationMs
+    }
 }
 
 /// 在线搜索 seam（生产适配既有客户端，测试注入桩；不新增第二套搜索实现）。
@@ -31,7 +51,7 @@ protocol OnlineSearchProviding: Sendable {
 }
 
 /// 网易云适配器（复用 `NeteaseOnlineClient.search`，不改客户端）。
-struct NeteaseSearchProvider: OnlineSearchProviding {
+struct NeteaseSearchProvider: OnlineSearchProviding, SimilarSongProviding {
     var client: NeteaseOnlineClient = .shared
 
     var source: RecommendationSource { .netease }
@@ -39,7 +59,21 @@ struct NeteaseSearchProvider: OnlineSearchProviding {
     func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
         let songs = try await client.search(query: query, limit: limit)
         return songs.map {
-            RecommendationRemoteSong(title: $0.title, artist: $0.artist, album: $0.album, year: nil)
+            RecommendationRemoteSong(
+                title: $0.title, artist: $0.artist, album: $0.album, year: nil,
+                songID: $0.id, durationMs: $0.durationMs
+            )
+        }
+    }
+
+    /// 相似歌曲（网易云 eapi）；不可用时抛错，由引擎降级到同艺人热歌。
+    func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong] {
+        let songs = try await client.similarSongs(songID: songID, limit: limit)
+        return songs.map {
+            RecommendationRemoteSong(
+                title: $0.title, artist: $0.artist, album: $0.album, year: nil,
+                songID: $0.id, durationMs: $0.durationMs
+            )
         }
     }
 }
@@ -66,53 +100,6 @@ final class GequhaiSearchProvider: OnlineSearchProviding, @unchecked Sendable {
     }
 }
 
-// MARK: - 检索意图
-
-struct RecommendationIntent: Sendable, Equatable {
-    enum Kind: String, Sendable {
-        case artist
-        case decade
-        case genre
-    }
-
-    var query: String
-    var kind: Kind
-}
-
-/// 意图生成（纯函数）：top 艺人 ≤ 8 + 年代 ≤ 2 + 干净 genre ≤ 2，总数 ≤ 12。
-enum RecommendationIntentBuilder {
-    static let maxArtistIntents = 8
-    static let maxDecadeIntents = 2
-    static let maxGenreIntents = 2
-    static let maxTotalIntents = 12
-    /// 年代桶占比低于该值不生成意图（避免长尾噪声）。
-    static let minimumDecadeShare = 0.2
-
-    static func intents(from profile: TasteProfile) -> [RecommendationIntent] {
-        var intents: [RecommendationIntent] = []
-
-        for artist in profile.topArtists.prefix(maxArtistIntents) where !artist.artist.isEmpty {
-            intents.append(RecommendationIntent(query: artist.artist, kind: .artist))
-        }
-
-        let dominantDecades = profile.decadeShare.filter { share in
-            share.value >= minimumDecadeShare
-        }
-        let orderedDecades = dominantDecades.sorted { lhs, rhs in
-            lhs.value == rhs.value ? lhs.key > rhs.key : lhs.value > rhs.value
-        }
-        for decade in orderedDecades.prefix(maxDecadeIntents) {
-            intents.append(RecommendationIntent(query: "\(decade.key)年代", kind: .decade))
-        }
-
-        for genre in profile.topGenres.prefix(maxGenreIntents) {
-            intents.append(RecommendationIntent(query: genre, kind: .genre))
-        }
-
-        return Array(intents.prefix(maxTotalIntents))
-    }
-}
-
 // MARK: - 错误
 
 enum RecommendationError: LocalizedError, Equatable {
@@ -127,6 +114,16 @@ enum RecommendationError: LocalizedError, Equatable {
     }
 }
 
+// MARK: - 相似歌曲召回契约
+
+/// 可选能力：支持「相似歌曲」的在线源（当前只有网易云）。
+///
+/// 接口不可用（匿名态未登录 / 改版）时必须抛错或返回空；引擎运行时探测后整轮降级，
+/// 绝不阻塞主召回链路。
+protocol SimilarSongProviding: Sendable {
+    func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong]
+}
+
 // MARK: - 引擎
 
 /// 规则推荐引擎（无状态、可注入 providers；测试用桩，不打真实网络）。
@@ -136,6 +133,14 @@ struct RecommendationEngine: Sendable {
     var perIntentLimit: Int = 10
     /// 同一艺人最多 N 首。
     var maxSongsPerArtist: Int = 2
+    /// 单个意图最多贡献 N 条（来源多样性）。
+    var maxSongsPerIntent: Int = 4
+    /// 单一在线源最多占最终列表的比例。
+    var maxSourceShare: Double = 0.7
+    /// 是否尝试相似歌曲召回（接口不可用时自动降级）。
+    var similarRecallEnabled: Bool = true
+    /// 最多对几个艺人意图做相似召回（限制请求放大）。
+    var maxSimilarProbes: Int = 3
 
     init(
         providers: [any OnlineSearchProviding] = [NeteaseSearchProvider(), GequhaiSearchProvider()],
@@ -147,7 +152,10 @@ struct RecommendationEngine: Sendable {
         self.maxSongsPerArtist = maxSongsPerArtist
     }
 
-    func recommend(profile: TasteProfile, count: Int) async -> Result<[RecommendedCandidate], RecommendationError> {
+    func recommend(
+        profile: TasteProfile,
+        count: Int
+    ) async -> Result<[RecommendedCandidate], RecommendationError> {
         await recommend(
             profile: profile,
             count: count,
@@ -155,7 +163,7 @@ struct RecommendationEngine: Sendable {
         )
     }
 
-    /// P2：意图由 planner（规则 / 本地模型）注入；召回、去重、打分逻辑不变。
+    /// P2：意图由 planner（规则 / 本地模型）注入；召回、打分、理由逻辑不变。
     func recommend(
         profile: TasteProfile,
         count: Int,
@@ -164,30 +172,66 @@ struct RecommendationEngine: Sendable {
         guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
         guard !intents.isEmpty else { return .success([]) }
 
-        let limit = perIntentLimit
-        var candidatesByKey: [String: RecommendedCandidate] = [:]
-        var succeededSources = 0
+        let gathered = await gather(profile: profile, intents: intents)
+        if gathered.items.isEmpty {
+            // 一个成功响应都没有、且有失败尝试 → 明确错误，不假装「没找到」。
+            return gathered.allFailed ? .failure(.allSourcesFailed) : .success([])
+        }
+
+        let ranked = rank(gathered.items, profile: profile)
+        let picked = select(ranked, count: count, profile: profile)
+        return .success(picked)
+    }
+
+    // MARK: 召回
+
+    private struct GatheredItem: Sendable {
+        var song: RecommendationRemoteSong
+        var source: RecommendationSource
+        var intent: RecommendationIntent
+    }
+
+    private struct GatherResult: Sendable {
+        var items: [GatheredItem]
+        var allFailed: Bool
+    }
+
+    private struct SourceOutcome: Sendable {
+        var source: RecommendationSource
+        var songs: [RecommendationRemoteSong]
+        var failed: Bool
+    }
+
+    private func gather(profile: TasteProfile, intents: [RecommendationIntent]) async -> GatherResult {
+        var items: [GatheredItem] = []
+        var indexByKey: [String: Int] = [:]
         var failedAttempts = 0
+        var succeededSources = 0
+
+        func accept(_ song: RecommendationRemoteSong, source: RecommendationSource, intent: RecommendationIntent) {
+            guard !song.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            let artistKey = RecommendationKey.primaryArtist(song.artist)
+            guard !artistKey.isEmpty else { return }
+            let key = RecommendationKey.normalize(title: song.title, artist: song.artist)
+            guard !profile.libraryKeys.contains(key),
+                  !profile.blacklistTracks.contains(key),
+                  !profile.blacklistArtists.contains(artistKey)
+            else { return }
+            guard !RecommendationCandidateFilter.isLikelyNonSong(song) else { return }
+
+            if let existing = indexByKey[key] {
+                // 同曲两源都召回：保留可靠度更高的源。
+                if source.reliability > items[existing].source.reliability {
+                    items[existing].source = source
+                }
+                return
+            }
+            indexByKey[key] = items.count
+            items.append(GatheredItem(song: song, source: source, intent: intent))
+        }
 
         for intent in intents {
-            let outcomes = await withTaskGroup(of: SourceOutcome.self) { group -> [SourceOutcome] in
-                for provider in providers {
-                    group.addTask {
-                        do {
-                            let songs = try await provider.search(query: intent.query, limit: limit)
-                            return SourceOutcome(source: provider.source, songs: songs, failed: false)
-                        } catch {
-                            return SourceOutcome(source: provider.source, songs: [], failed: true)
-                        }
-                    }
-                }
-                var collected: [SourceOutcome] = []
-                for await outcome in group {
-                    collected.append(outcome)
-                }
-                return collected
-            }
-
+            let outcomes = await searchAll(query: intent.query, limit: perIntentLimit)
             for outcome in outcomes {
                 if outcome.failed {
                     failedAttempts += 1
@@ -195,76 +239,247 @@ struct RecommendationEngine: Sendable {
                 }
                 succeededSources += 1
                 for song in outcome.songs {
-                    let key = RecommendationKey.normalize(title: song.title, artist: song.artist)
-                    guard !key.hasPrefix("|"), !profile.libraryKeys.contains(key) else { continue }
-                    let artistKey = RecommendationKey.primaryArtist(song.artist)
-                    guard !artistKey.isEmpty else { continue }
-                    guard !profile.blacklistTracks.contains(key),
-                          !profile.blacklistArtists.contains(artistKey)
-                    else { continue }
+                    accept(song, source: outcome.source, intent: intent)
+                }
+            }
+        }
 
-                    let candidate = RecommendedCandidate(
-                        title: song.title,
-                        artist: song.artist,
-                        album: song.album,
-                        year: song.year,
-                        source: outcome.source
-                    )
-                    if let existing = candidatesByKey[key] {
-                        // 同曲两源都召回：保留可靠度更高的源（网易云 > 歌曲海）。
-                        if outcome.source.reliability > existing.source.reliability {
-                            candidatesByKey[key] = candidate
-                        }
-                    } else {
-                        candidatesByKey[key] = candidate
+        // 相似歌曲：运行时特性探测——第一次不可用就整轮放弃，回落到同艺人热歌。
+        if similarRecallEnabled {
+            var probes = 0
+            var similarUnavailable = false
+            for intent in intents where intent.kind == .artist {
+                guard probes < maxSimilarProbes, !similarUnavailable else { break }
+                guard let seed = seedSongID(for: intent, in: items) else { continue }
+                probes += 1
+                let outcomes = await similarAll(songID: seed, limit: perIntentLimit)
+                let usable = outcomes.filter { !$0.failed && !$0.songs.isEmpty }
+                guard !usable.isEmpty else {
+                    similarUnavailable = true
+                    continue
+                }
+                let similarIntent = RecommendationIntent(
+                    query: intent.query,
+                    kind: .similar,
+                    artist: intent.artist,
+                    decade: intent.decade,
+                    genre: intent.genre
+                )
+                for outcome in usable {
+                    for song in outcome.songs {
+                        accept(song, source: outcome.source, intent: similarIntent)
                     }
                 }
             }
         }
 
-        // 全失败（一个成功响应都没有）→ 明确错误，不假装「没找到」。
-        if succeededSources == 0, failedAttempts > 0 {
-            return .failure(.allSourcesFailed)
-        }
+        let allFailed = succeededSources == 0 && failedAttempts > 0
+        return GatherResult(items: items, allFailed: allFailed)
+    }
 
-        var scored: [RecommendedCandidate] = candidatesByKey.map { key, candidate in
-            var scoredCandidate = candidate
+    private func seedSongID(for intent: RecommendationIntent, in items: [GatheredItem]) -> Int? {
+        let artistKey = RecommendationKey.primaryArtist(intent.artist ?? intent.query)
+        let sameArtist = items.first {
+            $0.song.songID != nil
+                && RecommendationKey.primaryArtist($0.song.artist) == artistKey
+                && $0.intent.kind != .similar
+        }
+        return sameArtist?.song.songID
+    }
+
+    private func searchAll(query: String, limit: Int) async -> [SourceOutcome] {
+        let providers = self.providers
+        return await withTaskGroup(of: SourceOutcome.self) { group in
+            for provider in providers {
+                group.addTask {
+                    do {
+                        let songs = try await provider.search(query: query, limit: limit)
+                        return SourceOutcome(source: provider.source, songs: songs, failed: false)
+                    } catch {
+                        return SourceOutcome(source: provider.source, songs: [], failed: true)
+                    }
+                }
+            }
+            var collected: [SourceOutcome] = []
+            for await outcome in group {
+                collected.append(outcome)
+            }
+            return collected
+        }
+    }
+
+    private func similarAll(songID: Int, limit: Int) async -> [SourceOutcome] {
+        let providers = self.providers
+        return await withTaskGroup(of: SourceOutcome.self) { group in
+            for provider in providers {
+                guard let similar = provider as? any SimilarSongProviding else { continue }
+                group.addTask {
+                    do {
+                        let songs = try await similar.similarSongs(songID: songID, limit: limit)
+                        return SourceOutcome(source: provider.source, songs: songs, failed: false)
+                    } catch {
+                        return SourceOutcome(source: provider.source, songs: [], failed: true)
+                    }
+                }
+            }
+            var collected: [SourceOutcome] = []
+            for await outcome in group {
+                collected.append(outcome)
+            }
+            return collected
+        }
+    }
+
+    // MARK: 重排
+
+    private struct RankedItem: Sendable {
+        var item: GatheredItem
+        var score: Double
+    }
+
+    private func rank(_ items: [GatheredItem], profile: TasteProfile) -> [RankedItem] {
+        items.map { item in
+            let key = RecommendationKey.normalize(title: item.song.title, artist: item.song.artist)
             let score = RecommendationScorer.score(
                 RecommendationScoreInput(
-                    artist: candidate.artist,
-                    year: candidate.year,
-                    source: candidate.source,
+                    artist: item.song.artist,
+                    year: item.song.year,
+                    source: item.source,
                     isKnownTrack: profile.playedKeys.contains(key)
                 ),
                 profile: profile
             )
-            scoredCandidate.score = score.total
-            scoredCandidate.reasons = score.reasons
-            return scoredCandidate
+            return RankedItem(item: item, score: score.total + intentBoost(item.intent))
         }
-
-        scored.sort { lhs, rhs in
-            lhs.score == rhs.score ? lhs.title < rhs.title : lhs.score > rhs.score
+        .sorted { lhs, rhs in
+            if lhs.score == rhs.score {
+                return lhs.item.song.title.localizedStandardCompare(rhs.item.song.title) == .orderedAscending
+            }
+            return lhs.score > rhs.score
         }
-
-        var perArtistCount: [String: Int] = [:]
-        var picked: [RecommendedCandidate] = []
-        for candidate in scored {
-            let artistKey = RecommendationKey.primaryArtist(candidate.artist)
-            let used = perArtistCount[artistKey, default: 0]
-            guard used < maxSongsPerArtist else { continue }
-            perArtistCount[artistKey] = used + 1
-            picked.append(candidate)
-            if picked.count >= max(1, count) { break }
-        }
-
-        return .success(picked)
     }
 
-    private struct SourceOutcome: Sendable {
-        var source: RecommendationSource
-        var songs: [RecommendationRemoteSong]
-        var failed: Bool
+    /// 意图置信度加成：相似 > 同艺人 > 年代 > 曲风（越具体越靠前）。
+    private func intentBoost(_ intent: RecommendationIntent) -> Double {
+        switch intent.kind {
+        case .similar: return 0.08
+        case .artist: return 0.06
+        case .decade: return 0.04
+        case .genre: return 0.03
+        }
+    }
+
+    private func intentKey(_ intent: RecommendationIntent) -> String {
+        "\(intent.kind.rawValue)|\(intent.query.lowercased())"
+    }
+
+    // MARK: 选取（上限 + 多样性）
+
+    private func select(_ ranked: [RankedItem], count: Int, profile: TasteProfile) -> [RecommendedCandidate] {
+        let target = max(1, count)
+        let perIntentCap = max(2, min(maxSongsPerIntent, target / 3 + 1))
+        let perSourceCap = max(1, Int((Double(target) * maxSourceShare).rounded(.up)))
+        let perArtistCap = max(1, maxSongsPerArtist)
+
+        var artistCounts: [String: Int] = [:]
+        var intentCounts: [String: Int] = [:]
+        var sourceCounts: [RecommendationSource: Int] = [:]
+        var usedKeys = Set<String>()
+        var picked: [RecommendedCandidate] = []
+        var previousPrimary: String?
+
+        func take(_ item: RankedItem) {
+            let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
+            let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
+                + "#" + item.item.source.rawValue
+            artistCounts[artistKey, default: 0] += 1
+            intentCounts[intentKey(item.item.intent), default: 0] += 1
+            sourceCounts[item.item.source, default: 0] += 1
+            usedKeys.insert(key)
+
+            let reasons = reasonsFor(item.item, previousPrimary: previousPrimary)
+            previousPrimary = reasons.first
+
+            var candidate = RecommendedCandidate(
+                title: item.item.song.title,
+                artist: item.item.song.artist,
+                album: item.item.song.album,
+                year: item.item.song.year,
+                source: item.item.source
+            )
+            candidate.score = item.score
+            candidate.reasons = reasons
+            picked.append(candidate)
+        }
+
+        // 第一轮守多样性上限；条数不够时第二轮放宽意图 / 来源上限（艺人上限始终保留）。
+        for pass in 0 ..< 2 {
+            for item in ranked {
+                guard picked.count < target else { break }
+                let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
+                    + "#" + item.item.source.rawValue
+                guard !usedKeys.contains(key) else { continue }
+                let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
+                if artistCounts[artistKey, default: 0] >= perArtistCap { continue }
+                if pass == 0 {
+                    if intentCounts[intentKey(item.item.intent), default: 0] >= perIntentCap { continue }
+                    if sourceCounts[item.item.source, default: 0] >= perSourceCap { continue }
+                }
+                take(item)
+            }
+        }
+
+        return picked
+    }
+
+    /// 逐曲理由：由**产生该候选的意图**生成；相邻行首条理由不能相同。
+    private func reasonsFor(_ item: GatheredItem, previousPrimary: String?) -> [String] {
+        var reasons: [String] = []
+        let display = RecommendationKey.displayPrimaryArtist(item.intent.artist ?? item.song.artist)
+
+        switch item.intent.kind {
+        case .artist:
+            if !display.isEmpty {
+                reasons.append("recommendation_reason_artist".localized(with: display))
+            }
+        case .similar:
+            if !display.isEmpty {
+                reasons.append("recommendation_reason_similar_artist".localized(with: display))
+            }
+        case .decade:
+            if let decade = item.intent.decade {
+                reasons.append("recommendation_reason_era".localized(with: decade))
+            }
+        case .genre:
+            if let genre = item.intent.genre, !genre.isEmpty {
+                reasons.append("recommendation_reason_genre".localized(with: genre))
+            }
+        }
+
+        if let year = item.song.year {
+            let decade = RecommendationScorer.decadeBucket(for: year)
+            if item.intent.decade != decade {
+                reasons.append("recommendation_reason_era".localized(with: decade))
+            }
+        }
+
+        var unique: [String] = []
+        for reason in reasons where !unique.contains(reason) {
+            unique.append(reason)
+        }
+        if unique.isEmpty {
+            unique.append("recommendation_reason_matched_taste".localized)
+        }
+
+        if let previousPrimary, unique.first == previousPrimary {
+            if unique.count > 1 {
+                unique.removeFirst()
+            } else {
+                unique = ["recommendation_reason_matched_taste".localized]
+            }
+        }
+
+        return Array(unique.prefix(2))
     }
 }
 

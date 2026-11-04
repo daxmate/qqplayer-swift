@@ -261,3 +261,132 @@ enum RecommendationScorer {
         return min(1, drift / maxPositive)
     }
 }
+
+// MARK: - 检索意图
+
+/// 召回意图：只描述「去哪儿找歌」，不承担打分。
+///
+/// `kind` 决定召回策略与理由文案；`artist` / `decade` / `genre` 是产生它的画像依据。
+/// 禁止再用「1990年代」「流行」这类泛词直接搜歌（泛词只会召回歌单 / 合辑）。
+struct RecommendationIntent: Sendable, Equatable {
+    enum Kind: String, Sendable {
+        /// 同艺人热歌。
+        case artist
+        /// 与种子歌曲相似（在线源支持时才用）。
+        case similar
+        /// 曲库里该年代的高权重艺人。
+        case decade
+        /// 曲库里该曲风的高权重艺人。
+        case genre
+    }
+
+    var query: String
+    var kind: Kind
+    var artist: String?
+    var decade: Int?
+    var genre: String?
+
+    init(query: String, kind: Kind, artist: String? = nil, decade: Int? = nil, genre: String? = nil) {
+        self.query = query
+        self.kind = kind
+        self.artist = artist
+        self.decade = decade
+        self.genre = genre
+    }
+}
+
+/// 意图生成（纯函数）：top 艺人 ≤ 8 + 年代代表艺人 + 曲风代表艺人，总数 ≤ 12。
+///
+/// 所有意图最终都落到「艺人名 → 热歌」这一条召回路径上：
+/// 年代 / 曲风只用来挑**用户自己曲库里**的高权重艺人，不再直接搜泛词。
+enum RecommendationIntentBuilder {
+    static let maxArtistIntents = 8
+    static let maxDecadeIntents = 2
+    static let maxGenreIntents = 2
+    static let maxTotalIntents = 12
+    /// 年代桶占比低于该值不生成意图（避免长尾噪声）。
+    static let minimumDecadeShare = 0.2
+    /// 每个年代 / 曲风最多取几个代表艺人。
+    static let maxArtistsPerBucket = 2
+
+    static func intents(from profile: TasteProfile) -> [RecommendationIntent] {
+        var intents: [RecommendationIntent] = []
+        var seenQueries = Set<String>()
+
+        func append(_ intent: RecommendationIntent) {
+            let key = intent.query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !key.isEmpty, seenQueries.insert(key).inserted else { return }
+            intents.append(intent)
+        }
+
+        for artist in profile.topArtists.prefix(maxArtistIntents) {
+            let name = artist.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { continue }
+            append(RecommendationIntent(query: name, kind: .artist, artist: name))
+        }
+
+        let decades = profile.decadeShare
+            .filter { $0.value >= minimumDecadeShare }
+            .sorted { lhs, rhs in
+                if lhs.value == rhs.value { return lhs.key < rhs.key }
+                return lhs.value > rhs.value
+            }
+            .prefix(maxDecadeIntents)
+
+        for (decade, _) in decades {
+            let artists = profile.decadeArtists[decade] ?? []
+            for name in artists.prefix(maxArtistsPerBucket) {
+                append(RecommendationIntent(query: name, kind: .decade, artist: name, decade: decade))
+            }
+        }
+
+        for genre in profile.topGenres.prefix(maxGenreIntents) {
+            let artists = profile.genreArtists[genre] ?? []
+            for name in artists.prefix(maxArtistsPerBucket) {
+                append(RecommendationIntent(query: name, kind: .genre, artist: name, genre: genre))
+            }
+        }
+
+        return Array(intents.prefix(maxTotalIntents))
+    }
+}
+
+// MARK: - 非单曲过滤
+
+/// 歌单 / 合辑 / 串烧识别（搜索结果是网页索引，混进歌单是常态）。
+///
+/// 依据：标题特征词 + 艺人字段为群星/VA + 时长异常（≥10 分钟）+ 纯年代标题。
+/// 保守取值：宁放过可疑单曲，也不把正常歌错杀。
+enum RecommendationCandidateFilter {
+    static let playlistMarkers: [String] = [
+        "歌单", "精选", "合辑", "合集", "串烧", "榜单", "排行", "循环",
+        "playlist", "collection", "compilation", "greatest hits", "best of",
+        "hits", "decade", "top 100", "top100", "100首", "medley", "non-stop", "nonstop",
+        "dj mix", "megamix",
+    ]
+
+    static let genericArtists: Set<String> = [
+        "群星", "various artists", "various", "va", "未知", "未知艺术家", "unknown", "unknown artist", "佚名",
+    ]
+
+    /// 单曲时长上限（毫秒）：超过 10 分钟基本是串烧 / 合辑。
+    static let maxDurationMs = 10 * 60 * 1000
+
+    static func isLikelyNonSong(_ song: RecommendationRemoteSong) -> Bool {
+        let rawArtist = song.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if genericArtists.contains(rawArtist) { return true }
+        let primary = RecommendationKey.primaryArtist(song.artist).lowercased()
+        if genericArtists.contains(primary) { return true }
+        if let duration = song.durationMs, duration >= maxDurationMs { return true }
+
+        let title = song.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !title.isEmpty else { return true }
+        if playlistMarkers.contains(where: { title.contains($0) }) { return true }
+        // 「1990s Golden Decade」这类：纯年代开场 + 无专辑信息。
+        let albumEmpty = song.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        if albumEmpty, title.range(of: "^(19|20)\\d{2}s?\\b", options: .regularExpression) != nil {
+            return true
+        }
+        return false
+    }
+}

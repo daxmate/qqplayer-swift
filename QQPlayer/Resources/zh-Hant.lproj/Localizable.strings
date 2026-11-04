@@ -1466,3 +1466,6 @@
 "recommendation_model_status_loading" = "已載入";
 "recommendation_model_size_unknown" = "大小未知";
 "recommendation_footer_source" = "產生來源：%@";
+"recommendation_reason_similar_artist" = "與你喜歡的 %@ 相似";
+"recommendation_reason_genre" = "同曲風：%@";
+"recommendation_reason_matched_taste" = "與你口味相近";

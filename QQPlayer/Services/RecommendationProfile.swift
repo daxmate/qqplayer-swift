@@ -68,6 +68,12 @@ struct TasteProfile: Sendable, Equatable {
     /// 曲库里干净且高频的 genre 值（召回意图用；脏值已在构建期剔除）。
     var topGenres: [String] = []
 
+    /// 年代 → 该年代的高权重艺人（按权重降序；召回回退用，不硬编码年代代表歌手）。
+    var decadeArtists: [Int: [String]] = [:]
+
+    /// 曲风 → 该曲风的高权重艺人（按权重降序）。
+    var genreArtists: [String: [String]] = [:]
+
     /// 艺人权重查表（artist 为归一化主艺人）。
     func weight(forArtist artist: String) -> Double {
         topArtists.first { $0.artist == artist }?.weight ?? 0
@@ -95,6 +101,8 @@ enum RecommendationProfileBuilder {
     static let minimumCompletionWeight: Double = 0.2
     static let maxTopArtists = 50
     static let maxGenres = 5
+    /// 每个年代 / 曲风最多保留几个代表艺人。
+    static let maxArtistsPerBucket = 2
     static let maxGenreLength = 24
 
     static func build(_ input: RecommendationProfileInput) -> TasteProfile {
@@ -190,6 +198,35 @@ enum RecommendationProfileBuilder {
             lhs.count == rhs.count ? lhs.display < rhs.display : lhs.count > rhs.count
         }
         profile.topGenres = Array(orderedGenres.prefix(maxGenres)).map { $0.display }
+
+        // 年代 / 曲风 → 代表艺人：只用用户曲库里的高权重艺人，不硬编码年代代表歌手。
+        var decadeArtistWeights: [Int: [String: Double]] = [:]
+        var genreArtistWeights: [String: [String: Double]] = [:]
+        for track in input.tracks {
+            let artistKey = RecommendationKey.primaryArtist(track.artist)
+            guard !artistKey.isEmpty, let weight = artistWeights[artistKey] else { continue }
+            if let year = track.year {
+                let bucket = RecommendationScorer.decadeBucket(for: year)
+                decadeArtistWeights[bucket, default: [:]][artistKey, default: 0] += weight
+            }
+            if let genre = cleanedGenre(track.genre), let display = genreCounts[genre.lowercased()]?.display {
+                genreArtistWeights[display, default: [:]][artistKey, default: 0] += weight
+            }
+        }
+        profile.decadeArtists = decadeArtistWeights.mapValues { weights in
+            Array(
+                weights.sorted { lhs, rhs in
+                    lhs.value == rhs.value ? lhs.key < rhs.key : lhs.value > rhs.value
+                }.prefix(maxArtistsPerBucket).map(\.key)
+            )
+        }
+        profile.genreArtists = genreArtistWeights.mapValues { weights in
+            Array(
+                weights.sorted { lhs, rhs in
+                    lhs.value == rhs.value ? lhs.key < rhs.key : lhs.value > rhs.value
+                }.prefix(maxArtistsPerBucket).map(\.key)
+            )
+        }
 
         return profile
     }

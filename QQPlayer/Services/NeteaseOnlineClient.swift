@@ -100,6 +100,29 @@ struct NeteaseOnlineClient: Sendable {
         return songs.compactMap { mapSong($0) }
     }
 
+    // MARK: 相似歌曲（eapi /api/v1/discovery/similar/song）
+
+    /// 相似歌曲；匿名态不可用 / 接口改版时抛错或返回空，由推荐引擎降级（本层不兜底搜索）。
+    func similarSongs(songID: Int, limit: Int = 10) async throws -> [NeteaseOnlineSong] {
+        guard songID > 0 else { return [] }
+        let bounded = max(1, min(30, limit))
+        let payload = OrderedJSON {
+            OrderedJSONEntry("header", requestHeader())
+            OrderedJSONEntry("e_r", true)
+            OrderedJSONEntry("id", songID)
+            OrderedJSONEntry("limit", bounded)
+        }
+        let body = try eapiBody(uri: "/api/v1/discovery/similar/song", payload: payload)
+        let url = URL(string: "\(apiDomain)/eapi/api/v1/discovery/similar/song")!
+        let data = try await post(url: url, body: body)
+        let obj = try NeteaseEAPI.decrypt(data, contentType: "application/json")
+
+        let rawSongs = (obj["songs"] as? [[String: Any]])
+            ?? ((obj["data"] as? [String: Any])?["songs"] as? [[String: Any]])
+            ?? []
+        return rawSongs.compactMap { mapSong($0) }
+    }
+
     // MARK: 播放直链（Meting → cenguigui 兜底）
 
     /// 取播放直链；Meting 失败自动 cenguigui 兜底，两者皆失败抛 noPlayURL。

@@ -271,3 +271,217 @@ struct RecommendationProfileTests {
         #expect(loaded.contains(title: "Song - Remastered", artist: "A"))
     }
 }
+
+// MARK: - 推荐质量（A–D）
+
+private actor SimilarCallRecorder {
+    private(set) var count = 0
+
+    func record() {
+        count += 1
+    }
+}
+
+private struct MockSimilarProvider: OnlineSearchProviding, SimilarSongProviding, Sendable {
+    var source: RecommendationSource = .netease
+    var songs: [String: [RecommendationRemoteSong]] = [:]
+    var similar: [RecommendationRemoteSong] = []
+    var similarFails = false
+    let recorder = SimilarCallRecorder()
+
+    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        Array((songs[query] ?? []).prefix(limit))
+    }
+
+    func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong] {
+        await recorder.record()
+        if similarFails { throw MockError.offline }
+        return Array(similar.prefix(limit))
+    }
+
+    enum MockError: Error { case offline }
+}
+
+@Suite("推荐质量：召回意图")
+struct RecommendationIntentQualityTests {
+    @Test("年代意图改成曲库里该年代的高权重艺人，不再搜泛词")
+    func decadeUsesLibraryArtists() {
+        // 代表艺人不在 topArtists 里，避免被「同一艺人只搜一次」的意图去重吃掉。
+        var profile = makeProfile(artists: [("someone", 10)], decades: [1990: 0.7])
+        profile.decadeArtists = [1990: ["Jay"]]
+        let intents = RecommendationIntentBuilder.intents(from: profile)
+        #expect(intents.contains { $0.kind == .decade && $0.query == "Jay" && $0.decade == 1990 })
+        #expect(!intents.contains { $0.query.contains("年代") || $0.query.contains("1990") })
+    }
+
+    @Test("没有代表艺人时不为年代 / 曲风生成泛词意图")
+    func noGenericFallback() {
+        var profile = makeProfile(artists: [("a", 10)], decades: [1990: 0.9])
+        profile.topGenres = ["流行"]
+        let intents = RecommendationIntentBuilder.intents(from: profile)
+        #expect(intents.allSatisfy { $0.kind == .artist })
+        #expect(intents.allSatisfy { !$0.query.contains("1990") && $0.query != "流行" })
+    }
+
+    @Test("曲风意图用曲风下的高权重艺人")
+    func genreUsesLibraryArtists() {
+        var profile = makeProfile(artists: [("a", 10)])
+        profile.topGenres = ["流行"]
+        profile.genreArtists = ["流行": ["David Tao"]]
+        let intents = RecommendationIntentBuilder.intents(from: profile)
+        #expect(intents.contains { $0.kind == .genre && $0.query == "David Tao" && $0.genre == "流行" })
+        #expect(!intents.contains { $0.query == "流行" })
+    }
+}
+
+@Suite("推荐质量：非单曲过滤")
+struct RecommendationFilterTests {
+    @Test("歌单 / 合辑 / 群星 / 超长条目被过滤")
+    func filtersPlaylistEntries() {
+        #expect(RecommendationCandidateFilter.isLikelyNonSong(remote("1990s Golden Decade", "Playlist Co")))
+        #expect(RecommendationCandidateFilter.isLikelyNonSong(remote("华语精选100首", "群星")))
+        #expect(RecommendationCandidateFilter.isLikelyNonSong(remote("Greatest Hits", "Queen")))
+        #expect(RecommendationCandidateFilter.isLikelyNonSong(remote("Night Mix", "Various Artists")))
+        var long = remote("Long Set", "DJ")
+        long.durationMs = 15 * 60 * 1000
+        #expect(RecommendationCandidateFilter.isLikelyNonSong(long))
+        #expect(RecommendationCandidateFilter.isLikelyNonSong(remote("1990s", "Somebody")))
+    }
+
+    @Test("正常单曲不被误杀")
+    func keepsNormalSongs() {
+        let creep = remote("Creep", "Radiohead", album: "Pablo Honey", year: 1993)
+        #expect(!RecommendationCandidateFilter.isLikelyNonSong(creep))
+        var song = remote("晴天", "周杰伦", album: "叶惠美", year: 2003)
+        song.durationMs = 269_000
+        #expect(!RecommendationCandidateFilter.isLikelyNonSong(song))
+    }
+
+    @Test("引擎归一化阶段丢弃歌单条目")
+    func engineDropsPlaylists() async {
+        let songs = [
+            remote("1990s Golden Decade", "Playlist Co"),
+            remote("Real Song", "Somebody"),
+        ]
+        let engine = RecommendationEngine(
+            providers: [MockProvider(source: .netease, songs: ["a": songs])]
+        )
+        let profile = makeProfile(artists: [("a", 10)])
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 5) else {
+            Issue.record("推荐应成功")
+            return
+        }
+        #expect(list.map(\.title) == ["Real Song"])
+    }
+}
+
+@Suite("推荐质量：重排与多样性")
+struct RecommendationRankingQualityTests {
+    @Test("相关性重排：高亲和艺人排到前面，而不是来源顺序")
+    func rankingBeatsSourceOrder() async {
+        let songs = [
+            remote("Weak", "B", year: 2001),
+            remote("Strong", "A", year: 2001),
+        ]
+        let engine = RecommendationEngine(
+            providers: [MockProvider(source: .netease, songs: ["a": songs, "b": songs])]
+        )
+        let profile = makeProfile(artists: [("a", 10), ("b", 1)])
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 5) else {
+            Issue.record("推荐应成功")
+            return
+        }
+        #expect(list.first?.title == "Strong")
+    }
+
+    @Test("来源多样性：单意图不霸占整份列表")
+    func intentDiversity() async {
+        let aSongs = (1 ... 6).map { remote("Alpha \($0)", "ArtistA\($0)") }
+        let bSongs = [remote("Beta 1", "ArtistB1"), remote("Beta 2", "ArtistB2")]
+        let engine = RecommendationEngine(
+            providers: [MockProvider(source: .netease, songs: ["a": aSongs, "b": bSongs])]
+        )
+        let profile = makeProfile(artists: [("a", 10), ("b", 2)])
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 4) else {
+            Issue.record("推荐应成功")
+            return
+        }
+        #expect(list.contains { $0.title.hasPrefix("Beta") })
+    }
+}
+
+@Suite("推荐质量：逐曲理由")
+struct RecommendationReasonTests {
+    @Test("理由来自产生它的意图，相邻行不同")
+    func perIntentReasons() async {
+        let aSongs = [remote("S1", "ArtistA1"), remote("S2", "ArtistA2")]
+        let bSongs = [remote("S3", "ArtistB1")]
+        let engine = RecommendationEngine(
+            providers: [MockProvider(source: .netease, songs: ["a": aSongs, "b": bSongs])]
+        )
+        let profile = makeProfile(artists: [("a", 10), ("b", 5)])
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 4), list.count >= 2 else {
+            Issue.record("推荐应成功且至少两条")
+            return
+        }
+        #expect(list.allSatisfy { !$0.reasons.isEmpty })
+        #expect(list.allSatisfy { $0.reasons.count <= 2 })
+        #expect(list[0].reasons.first != list[1].reasons.first)
+        #expect(list[0].reasons.first?.lowercased().contains("a") == true)
+    }
+
+    @Test("年代意图的理由带年代数字")
+    func decadeReason() async {
+        let engine = RecommendationEngine(
+            providers: [MockProvider(source: .netease, songs: ["Jay": [remote("Nunchucks", "Jay")]])]
+        )
+        let profile = makeProfile(artists: [("jay", 10)], decades: [1990: 0.8])
+        let intents = [RecommendationIntent(query: "Jay", kind: .decade, artist: "Jay", decade: 1990)]
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 3, intents: intents) else {
+            Issue.record("推荐应成功")
+            return
+        }
+        #expect(list.first?.reasons.contains { $0.contains("1990") } == true)
+    }
+}
+
+@Suite("推荐质量：相似召回回退")
+struct RecommendationSimilarFallbackTests {
+    private func seed(_ title: String, _ artist: String, id: Int) -> RecommendationRemoteSong {
+        RecommendationRemoteSong(title: title, artist: artist, album: nil, year: nil, songID: id)
+    }
+
+    @Test("相似接口失败 → 回退同艺人热歌，且只探测一次")
+    func similarFailureFallsBack() async {
+        var provider = MockSimilarProvider()
+        provider.songs = [
+            "a": [seed("SeedA", "a", id: 1)],
+            "b": [seed("SeedB", "b", id: 2)],
+            "c": [seed("SeedC", "c", id: 3)],
+        ]
+        provider.similarFails = true
+        let engine = RecommendationEngine(providers: [provider])
+        let profile = makeProfile(artists: [("a", 10), ("b", 9), ("c", 8)])
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 6) else {
+            Issue.record("回退后仍应有结果")
+            return
+        }
+        #expect(list.count == 3)
+        let calls = await provider.recorder.count
+        #expect(calls == 1)
+    }
+
+    @Test("相似接口可用 → 追加相似候选")
+    func similarAddsCandidates() async {
+        var provider = MockSimilarProvider()
+        provider.songs = ["a": [seed("SeedA", "a", id: 1)]]
+        provider.similar = [RecommendationRemoteSong(title: "Sim", artist: "Someone", album: nil, year: nil)]
+        let engine = RecommendationEngine(providers: [provider])
+        let profile = makeProfile(artists: [("a", 10)])
+        guard case let .success(list) = await engine.recommend(profile: profile, count: 5) else {
+            Issue.record("推荐应成功")
+            return
+        }
+        #expect(list.contains { $0.title == "Sim" })
+    }
+}
