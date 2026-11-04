@@ -26,8 +26,15 @@ TasteProfile（P1 画像）
 - 镜像实测（2026-11-03）：
   - 原定 `Qwen2.5-4B-Instruct-4bit`：`resolve/main/config.json` → **404**（hf-mirror 无此 repo）。
   - `Qwen2.5-3B-Instruct-4bit` → **307 → 200**（存在），选为最近可用的 4bit MLX 指令模型并更新默认值。
-- 模型文件**不进 bundle、不进仓库**，落盘：
-  `~/Library/Application Support/QQPlayer/RecommendationModels/<sanitize(modelId)>/`
+- 模型文件**不进 bundle、不进仓库**，落盘（2026-11-04 起并入共享资源根）：
+  `<DSQ 共享根>/Models/Recommendation/<sanitize(modelId)>/v1/`
+  - 共享根优先级：`DSQ_SHARED_ROOT` → App Group 容器
+    `group.com.daxmate.dsqcommon/DSQ Common Resources` → 非沙盒且该目录已存在 → Application Support 兜底；
+    唯一实现在 `QQPlayer/Services/DSQSharedPaths.swift`。
+  - 旧路径 `~/Library/Application Support/QQPlayer/RecommendationModels/<modelId>/`
+    在迁移完成前仍可读（`RecommendationModelLayout.resolved` 自动回落）。
+  - 迁移（默认 dry-run，必须显式 apply）：
+    `bash scripts/dsq-shared-migrate.sh --dry-run` / `--apply`。
 
 ## 3. 下载与校验
 

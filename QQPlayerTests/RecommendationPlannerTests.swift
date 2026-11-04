@@ -228,8 +228,49 @@ struct RecommendationModelManagementTests {
         #expect(RecommendationModelLayout.sanitize(modelId: "a:b/c d") == "a-b-c-d")
         #expect(RecommendationModelLayout.sanitize(modelId: "") == "model")
         let layout = tempLayout()
-        #expect(layout.directory.lastPathComponent == "mlx-community-Qwen2.5-4B-Instruct-4bit")
+        #expect(layout.directory.lastPathComponent == DSQSharedModelCatalog.currentVersion)
+        #expect(layout.directory.deletingLastPathComponent().lastPathComponent == "mlx-community-Qwen2.5-4B-Instruct-4bit")
+        #expect(
+            layout.directory.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
+                == DSQSharedModelCatalog.recommendationKind
+        )
         #expect(layout.fileURL(named: "config.json").lastPathComponent == "config.json")
+    }
+
+    @Test("旧布局：legacy shape 仍解析到 <root>/<modelId>")
+    func legacyLayoutShape() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("qqp-legacy-\(UUID().uuidString)")
+        let layout = RecommendationModelLayout(root: root, modelId: "a:b/c", shape: .legacy)
+        #expect(layout.directory == root.appendingPathComponent("a-b-c", isDirectory: true))
+    }
+
+    @Test("迁移前兼容：旧目录有 manifest 时回落到只读布局")
+    func resolvedFallsBackToLegacy() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("qqp-resolve-\(UUID().uuidString)")
+        let newRoot = base.appendingPathComponent("Models", isDirectory: true)
+        let legacyRoot = base.appendingPathComponent("LegacyModels", isDirectory: true)
+        let legacy = RecommendationModelLayout(root: legacyRoot, modelId: "m", shape: .legacy)
+        try FileManager.default.createDirectory(at: legacy.directory, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: legacy.manifestURL)
+
+        let resolved = RecommendationModelLayout.resolved(
+            modelId: "m",
+            newRoot: newRoot,
+            legacyRoot: legacyRoot
+        )
+        #expect(resolved.shape == .legacy)
+        #expect(resolved.directory == legacy.directory)
+
+        let versioned = RecommendationModelLayout(root: newRoot, modelId: "m")
+        try FileManager.default.createDirectory(at: versioned.directory, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: versioned.manifestURL)
+        let upgraded = RecommendationModelLayout.resolved(
+            modelId: "m",
+            newRoot: newRoot,
+            legacyRoot: legacyRoot
+        )
+        #expect(upgraded.shape == .versioned)
+        #expect(upgraded.directory == versioned.directory)
     }
 
     @Test("清单构建：分片索引解析 + 必需文件校验")
