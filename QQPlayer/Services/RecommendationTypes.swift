@@ -278,6 +278,8 @@ struct RecommendationIntent: Sendable, Equatable {
         case decade
         /// 曲库里该曲风的高权重艺人。
         case genre
+        /// 指令输入里的关键词 / 情绪词（直接在线搜索）。
+        case keyword
     }
 
     var query: String

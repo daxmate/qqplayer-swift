@@ -1148,3 +1148,18 @@
 "recommendation_reason_similar_artist" = "与你喜欢的 %@ 相似";
 "recommendation_reason_genre" = "同曲风：%@";
 "recommendation_reason_matched_taste" = "与你口味相近";
+
+// MARK: - 本地 AI 推荐：指令输入（2026-11-04）
+"recommendation_chat_placeholder" = "描述你想听什么，例如：推荐一些和五月天风格类似的歌手的歌";
+"recommendation_chat_send" = "发送";
+"recommendation_chat_model_not_ready" = "本地模型尚未就绪，请先在设置中下载模型。";
+"recommendation_chat_go_to_settings" = "去设置";
+"recommendation_chat_clear" = "清除指令";
+"recommendation_chat_results_title" = "按你的要求";
+"recommendation_results_for_you" = "为你推荐";
+"recommendation_chat_rounds_title" = "对话上下文轮数";
+"recommendation_chat_rounds_footer" = "仅用于理解追问，不会显示在界面上。";
+"recommendation_empty_request" = "没听懂你的要求，换个说法试试。";
+"recommendation_chat_invalid_output" = "本地模型返回了无法解析的结果，请重试。";
+"recommendation_chat_timeout" = "本地模型响应超时，请重试。";
+"recommendation_reason_request" = "符合你的要求：%@";

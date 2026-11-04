@@ -132,6 +132,24 @@ enum RecommendationPlanPrompt {
     - Never include file paths, database ids, URLs, or personal data.
     """
 
+    /// 指令输入 system prompt：只输出结构化检索条件，不做推荐解释。
+    static let requestSystem = """
+    You are a music discovery planner. Convert the listener's request plus the recent background context
+    into structured search conditions.
+    Rules:
+    - Reply with JSON only. No markdown, no code fences, no explanations.
+    - Schema: {"referenceArtists":["..."],"keywords":["..."],"decades":[1990],"languages":["Chinese"],"moods":["..."],"excludeArtists":["..."]}
+    - Every array holds at most 8 plain-text items; each item is a single line of at most 64 characters.
+    - referenceArtists: artists the listener explicitly referenced ("similar to X" includes X).
+    - keywords: concrete searchable terms (specific song / album / artist names or themes); never generic words like "music", "songs", "hits".
+    - decades: integer decade start between 1900 and 2030 (for example 1990).
+    - languages: language hints implied by the request; keep the array empty when unsure.
+    - moods: at most three short mood words.
+    - excludeArtists: artists the listener wants to avoid.
+    - Use an empty array for any field the listener did not ask for.
+    - Never include file paths, database ids, URLs, or personal data.
+    """
+
     /// 用户消息：把摘要渲染成稳定、可测试的文本（字段顺序固定）。
     static func user(for summary: RecommendationProfileSummary) -> String {
         var lines: [String] = []
@@ -152,6 +170,44 @@ enum RecommendationPlanPrompt {
         }
         lines.append("")
         lines.append("Return the JSON plan now.")
+        return lines.joined(separator: "\n")
+    }
+
+    /// 指令输入 user 消息：画像摘要 + 当前要求 + 最近 N 轮上下文（顺序固定）。
+    static func requestUser(
+        for summary: RecommendationProfileSummary,
+        requestText: String,
+        history: [RecommendationRequestHistoryEntry]
+    ) -> String {
+        var lines: [String] = []
+        lines.append("Top artists: " + (summary.topArtists.isEmpty ? "(none)" : summary.topArtists.joined(separator: ", ")))
+        if summary.decades.isEmpty {
+            lines.append("Decades: (unknown)")
+        } else {
+            let decades = summary.decades.map { row in
+                "\(row.decade)s \(Self.percent(row.share))"
+            }
+            lines.append("Decades: " + decades.joined(separator: ", "))
+        }
+        lines.append("Genres: " + (summary.genres.isEmpty ? "(none)" : summary.genres.joined(separator: ", ")))
+        if !summary.languageHints.isEmpty {
+            lines.append("Language hints: " + summary.languageHints.joined(separator: ", "))
+        }
+        lines.append("")
+        lines.append("Current request: " + RecommendationRequestParser.singleLine(requestText))
+        if history.isEmpty {
+            lines.append("Recent context: (none)")
+        } else {
+            lines.append("Recent context (oldest first):")
+            for entry in history {
+                lines.append("- Request: " + RecommendationRequestParser.singleLine(entry.requestText))
+                if !entry.results.isEmpty {
+                    lines.append("  Returned: " + entry.results.joined(separator: "; "))
+                }
+            }
+        }
+        lines.append("")
+        lines.append("Return the JSON request now.")
         return lines.joined(separator: "\n")
     }
 

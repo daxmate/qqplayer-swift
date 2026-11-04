@@ -1,0 +1,364 @@
+//
+//  RecommendationRequestTests.swift
+//  QQPlayerTests
+//
+//  本地 AI 推荐：指令输入纯逻辑单测（解析 / 历史裁剪 / 设置 clamp / 引擎召回 / 可用性）。
+//
+//  只测共享层：模型推理（MLX）不在单测范围，模型缺失路径用纯函数覆盖。
+//
+
+import Foundation
+import Testing
+
+@testable import QQPlayer
+
+// MARK: - 桩
+
+private struct KeywordProvider: OnlineSearchProviding {
+    let source: RecommendationSource
+    var songs: [String: [RecommendationRemoteSong]] = [:]
+
+    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        Array((songs[query] ?? []).prefix(limit))
+    }
+}
+
+private struct SimilarProvider: OnlineSearchProviding, SimilarSongProviding {
+    let source: RecommendationSource
+    var songs: [String: [RecommendationRemoteSong]] = [:]
+    var similar: [Int: [RecommendationRemoteSong]] = [:]
+
+    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        Array((songs[query] ?? []).prefix(limit))
+    }
+
+    func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong] {
+        Array((similar[songID] ?? []).prefix(limit))
+    }
+}
+
+private func remote(
+    _ title: String,
+    _ artist: String,
+    songID: Int? = nil,
+    year: Int? = nil
+) -> RecommendationRemoteSong {
+    RecommendationRemoteSong(title: title, artist: artist, year: year, songID: songID)
+}
+
+private func request(
+    artists: [String] = [],
+    keywords: [String] = [],
+    decades: [Int] = [],
+    languages: [String] = [],
+    moods: [String] = [],
+    excludes: [String] = []
+) -> RecommendationUserRequest {
+    RecommendationUserRequest(
+        referenceArtists: artists,
+        keywords: keywords,
+        decades: decades,
+        languages: languages,
+        moods: moods,
+        excludeArtists: excludes
+    )
+}
+
+// MARK: - 解析
+
+@Suite("推荐指令：JSON 解析")
+struct RecommendationRequestParserTests {
+    @Test("正常解析：字段齐全、年代取整、rawText 保留")
+    func parsesValidPayload() throws {
+        let output = """
+        {"referenceArtists":["五月天"],"keywords":["青春"],"decades":[1997],
+         "languages":["Chinese"],"moods":["热血"],"excludeArtists":["告五人"]}
+        """
+        let parsed = try RecommendationRequestParser.parse(output, rawText: "推荐和五月天类似的").get()
+        #expect(parsed.referenceArtists == ["五月天"])
+        #expect(parsed.keywords == ["青春"])
+        #expect(parsed.decades == [1990])
+        #expect(parsed.languages == ["Chinese"])
+        #expect(parsed.moods == ["热血"])
+        #expect(parsed.excludeArtists == ["告五人"])
+        #expect(parsed.rawText == "推荐和五月天类似的")
+    }
+
+    @Test("字符串年代：\"1990s\" 按十年取整")
+    func parsesStringDecade() throws {
+        let parsed = try RecommendationRequestParser.parse(
+            #"{"referenceArtists":[],"decades":["1990s"]}"#,
+            rawText: "90 年代"
+        ).get()
+        #expect(parsed.decades == [1990])
+    }
+
+    @Test("空条件：没有任何正向条件 → emptyRequest")
+    func rejectsEmptyRequest() {
+        let result = RecommendationRequestParser.parse(
+            #"{"referenceArtists":[],"keywords":[],"decades":[],"languages":[],"moods":[],"excludeArtists":["A"]}"#,
+            rawText: "别放 A"
+        )
+        #expect(result == .failure(.emptyRequest))
+    }
+
+    @Test("超长字段截断到 64 字符、数组最多 8 条")
+    func trimsLongFieldsAndArrays() throws {
+        let long = String(repeating: "a", count: 100)
+        let many = (1 ... 12).map { "k\($0)" }
+        let output = "{\"referenceArtists\":[\"\(long)\"],\"keywords\":[\(many.map { "\"\($0)\"" }.joined(separator: ","))]}"
+        let parsed = try RecommendationRequestParser.parse(output, rawText: "x").get()
+        #expect(parsed.referenceArtists.first?.count == 64)
+        #expect(parsed.keywords.count == 8)
+        #expect(parsed.keywords == ["k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8"])
+    }
+
+    @Test("重复项去重（忽略大小写与多余空白）")
+    func deduplicatesItems() throws {
+        let output = #"{"referenceArtists":["五月天"," 五月天 ","MAYDAY","mayday"]}"#
+        let parsed = try RecommendationRequestParser.parse(output, rawText: "x").get()
+        #expect(parsed.referenceArtists == ["五月天", "MAYDAY"])
+    }
+
+    @Test("非法年代丢弃（1800 / 2050），合法值保留")
+    func dropsInvalidDecades() throws {
+        let parsed = try RecommendationRequestParser.parse(
+            #"{"referenceArtists":[],"decades":[1800,2050,1989]}"#,
+            rawText: "x"
+        ).get()
+        #expect(parsed.decades == [1980])
+    }
+
+    @Test("截断 JSON → invalidOutput（不静默吞掉）")
+    func rejectsTruncatedJSON() {
+        let result = RecommendationRequestParser.parse(
+            #"{"referenceArtists":["五月天""#,
+            rawText: "x"
+        )
+        #expect(result == .failure(.invalidOutput))
+    }
+}
+
+// MARK: - 历史
+
+@Suite("推荐指令：后台历史")
+struct RecommendationRequestHistoryTests {
+    private func entries(_ count: Int) -> [RecommendationRequestHistoryEntry] {
+        (1 ... count).map { index in
+            RecommendationRequestHistoryEntry(
+                requestText: "请求 \(index)",
+                results: ["歌 \(index) - 艺人"],
+                createdAt: nil
+            )
+        }
+    }
+
+    @Test("裁剪：N = 0 / 3 / 9")
+    func trimsToRounds() {
+        let history = RecommendationRequestHistory(entries: entries(12))
+        #expect(history.trimmed(to: 0).entries.isEmpty)
+        #expect(history.trimmed(to: 3).entries.map(\.requestText) == ["请求 10", "请求 11", "请求 12"])
+        #expect(history.trimmed(to: 9).entries.count == 9)
+    }
+
+    @Test("追加即裁剪：超出上限只留最近 N 轮")
+    func appendTrims() {
+        var history = RecommendationRequestHistory(entries: entries(3))
+        history.append(
+            RecommendationRequestHistoryEntry(requestText: "新请求", results: [], createdAt: nil),
+            limit: 3
+        )
+        #expect(history.entries.map(\.requestText) == ["请求 2", "请求 3", "新请求"])
+    }
+
+    @Test("写入 / 读取按当前上限裁剪（跨轮读写）")
+    func storeRoundTrip() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("recommendation-history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        var history = RecommendationRequestHistory(entries: entries(5))
+        #expect(RecommendationRequestHistoryStore.save(history, to: url, limit: 5))
+        #expect(RecommendationRequestHistoryStore.load(from: url, limit: 2).entries.count == 2)
+
+        history.append(
+            RecommendationRequestHistoryEntry(requestText: "再来一首", results: ["A - B"], createdAt: nil),
+            limit: 5
+        )
+        #expect(RecommendationRequestHistoryStore.save(history, to: url, limit: 5))
+        let reloaded = RecommendationRequestHistoryStore.load(from: url, limit: 5)
+        #expect(reloaded.entries.last?.requestText == "再来一首")
+    }
+
+    @Test("结果摘要：最多 5 条「歌名 - 主艺人」")
+    func resultSummary() {
+        let candidates = (1 ... 7).map { index in
+            RecommendedCandidate(
+                title: "歌 \(index)",
+                artist: "艺人 A feat. 艺人 B",
+                album: nil,
+                year: nil,
+                source: .netease
+            )
+        }
+        let summary = RecommendationRequestHistory.results(from: candidates)
+        #expect(summary.count == 5)
+        #expect(summary.first == "歌 1 - 艺人 A")
+    }
+}
+
+// MARK: - 设置
+
+@Suite("推荐指令：设置 clamp")
+struct RecommendationChatRoundsSettingTests {
+    @Test("轮数 clamp：-1 / 0 / 3 / 10")
+    func clampsRounds() {
+        #expect(DeleteSettings.clampRecommendationChatRounds(-1) == 0)
+        #expect(DeleteSettings.clampRecommendationChatRounds(0) == 0)
+        #expect(DeleteSettings.clampRecommendationChatRounds(3) == 3)
+        #expect(DeleteSettings.clampRecommendationChatRounds(10) == 9)
+        #expect(DeleteSettings.defaultRecommendationChatRounds == 3)
+    }
+}
+
+// MARK: - 引擎
+
+@Suite("推荐指令：引擎召回")
+struct RecommendationRequestEngineTests {
+    @Test("关键词路径：在线搜索命中的歌进入结果")
+    func keywordPath() async {
+        let provider = KeywordProvider(
+            source: .netease,
+            songs: ["city pop": [remote("Plastic Love", "Mariya Takeuchi")]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(keywords: ["city pop"]),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.map(\.title) == ["Plastic Love"])
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("相似艺人路径：用同艺人热歌做种子，追加相似歌曲")
+    func similarArtistPath() async {
+        let provider = SimilarProvider(
+            source: .netease,
+            songs: ["五月天": [remote("倔强", "五月天", songID: 42)]],
+            similar: [42: [remote("想见你想见你想见你", "八三夭")]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["五月天"]),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.contains { $0.title == "想见你想见你想见你" })
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("排除艺人：excludeArtists 命中的候选被剔除")
+    func excludesArtist() async {
+        let provider = KeywordProvider(
+            source: .netease,
+            songs: ["A": [remote("A 的歌", "A"), remote("B 的歌", "B")]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["A"], excludes: ["A"]),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.map(\.artist) == ["B"])
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("空条件：直接返回 emptyRequest，不退回画像推荐")
+    func emptyRequestFails() async {
+        let provider = KeywordProvider(
+            source: .netease,
+            songs: ["五月天": [remote("倔强", "五月天")]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(excludes: ["A"]),
+            profile: TasteProfile(),
+            count: 10
+        )
+        #expect(result == .failure(.emptyRequest))
+    }
+
+    @Test("年代条件：复用曲库该年代高权重艺人")
+    func decadePath() async {
+        var profile = TasteProfile()
+        profile.decadeArtists = [1990: ["王菲"]]
+        let provider = KeywordProvider(
+            source: .netease,
+            songs: ["王菲": [remote("红豆", "王菲", year: 1998)]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(decades: [1990]),
+            profile: profile,
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.map(\.title) == ["红豆"])
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+}
+
+// MARK: - 可用性
+
+@Suite("推荐指令：模型可用性")
+struct RecommendationChatAvailabilityTests {
+    @Test("模型未就绪：禁用提交，且不是 available（不走规则回退）")
+    func modelNotReadyDisablesSubmit() {
+        let availability = RecommendationChatAvailability.resolve(
+            mlxSupported: true,
+            useLocalModel: true,
+            modelReady: false
+        )
+        #expect(availability == .modelNotReady)
+        #expect(!availability.canSubmit)
+    }
+
+    @Test("关闭本地模型 / 不支持 MLX：同样禁用")
+    func disabledStates() {
+        #expect(RecommendationChatAvailability.resolve(
+            mlxSupported: true,
+            useLocalModel: false,
+            modelReady: true
+        ) == .disabledBySettings)
+        #expect(RecommendationChatAvailability.resolve(
+            mlxSupported: false,
+            useLocalModel: true,
+            modelReady: true
+        ) == .modelNotReady)
+    }
+
+    @Test("模型就绪 + 开关开启：唯一可提交状态")
+    func availableOnlyWhenReady() {
+        #expect(RecommendationChatAvailability.resolve(
+            mlxSupported: true,
+            useLocalModel: true,
+            modelReady: true
+        ).canSubmit)
+    }
+}

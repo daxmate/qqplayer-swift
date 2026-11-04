@@ -54,6 +54,27 @@ struct MacRecommendationSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Stepper(value: $settings.recommendationChatRounds, in: DeleteSettings.recommendationChatRoundsRange) {
+                    HStack {
+                        Text("recommendation_chat_rounds_title".localized)
+                        Spacer()
+                        Text("\(settings.recommendationChatRounds)")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .settingsAnchor(MacSettingsCatalog.recommendationChatRounds)
+                .onChange(of: settings.recommendationChatRounds) { _, newValue in
+                    settings.recommendationChatRounds = DeleteSettings.clampRecommendationChatRounds(newValue)
+                    settings.save()
+                }
+            } footer: {
+                Text("recommendation_chat_rounds_footer".localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear {

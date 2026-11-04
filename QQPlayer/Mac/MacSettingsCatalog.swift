@@ -292,6 +292,13 @@ enum MacSettingsCatalog {
         aliases: ["常驻", "内存", "keep loaded", "memory"]
     )
 
+    static let recommendationChatRounds = Item(
+        id: "settings.recommendation.chatRounds",
+        category: .recommendations,
+        titleKey: "recommendation_chat_rounds_title",
+        aliases: ["对话上下文", "上下文", "轮数", "追问", "chat", "context", "rounds"]
+    )
+
     static let aboutVersion = Item(
         id: "settings.about.version",
         category: .about,
@@ -339,6 +346,7 @@ enum MacSettingsCatalog {
         recommendationModel,
         recommendationUseLocalModel,
         recommendationKeepLoaded,
+        recommendationChatRounds,
         aboutVersion,
         aboutAppName,
         aboutGitHub,

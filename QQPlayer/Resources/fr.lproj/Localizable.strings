@@ -1143,3 +1143,18 @@
 "recommendation_reason_similar_artist" = "Semblable à %@";
 "recommendation_reason_genre" = "Même genre : %@";
 "recommendation_reason_matched_taste" = "Correspond à vos goûts";
+
+// MARK: - 本地 AI 推荐：指令输入（2026-11-04）
+"recommendation_chat_placeholder" = "Décrivez ce que vous voulez écouter…";
+"recommendation_chat_send" = "Envoyer";
+"recommendation_chat_model_not_ready" = "Le modèle local n'est pas prêt. Téléchargez-le dans Réglages pour utiliser les demandes.";
+"recommendation_chat_go_to_settings" = "Ouvrir les réglages";
+"recommendation_chat_clear" = "Effacer la demande";
+"recommendation_chat_results_title" = "Selon votre demande";
+"recommendation_results_for_you" = "Pour vous";
+"recommendation_chat_rounds_title" = "Tours de contexte";
+"recommendation_chat_rounds_footer" = "Utilisés uniquement pour comprendre les demandes de suivi ; jamais affichés dans l'app.";
+"recommendation_empty_request" = "Demande incomprise. Essayez de la reformuler.";
+"recommendation_chat_invalid_output" = "Le modèle local a renvoyé un résultat illisible. Réessayez.";
+"recommendation_chat_timeout" = "Le modèle local a expiré. Réessayez.";
+"recommendation_reason_request" = "Correspond à votre demande : %@";

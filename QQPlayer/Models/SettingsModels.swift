@@ -300,14 +300,24 @@ struct DeleteSettings: Codable {
     var recommendationUseLocalModel: Bool = true
     /// 本地模型是否常驻内存（P2；默认关 = 用完卸载）。
     var recommendationKeepModelLoaded: Bool = false
+    /// 指令输入的后台上下文轮数（0–9；只用于理解追问，界面不显示）。
+    var recommendationChatRounds: Int = DeleteSettings.defaultRecommendationChatRounds
 
     /// 推荐条数默认值 / 边界（唯一口径）。
     static let defaultRecommendationCount = 20
     static let recommendationCountRange = 1 ... 50
 
+    /// 指令输入上下文轮数默认值 / 边界（唯一口径）。
+    static let defaultRecommendationChatRounds = 3
+    static let recommendationChatRoundsRange = 0 ... 9
+
     /// 读取时的边界归一（旧数据 / 手改 UserDefaults 都不越界）。
     static func clampRecommendationCount(_ value: Int) -> Int {
         min(recommendationCountRange.upperBound, max(recommendationCountRange.lowerBound, value))
+    }
+
+    static func clampRecommendationChatRounds(_ value: Int) -> Int {
+        min(recommendationChatRoundsRange.upperBound, max(recommendationChatRoundsRange.lowerBound, value))
     }
 
     // Home screen section visibility & order
@@ -394,6 +404,10 @@ struct DeleteSettings: Codable {
         recommendationKeepModelLoaded = try container.decodeIfPresent(
             Bool.self, forKey: .recommendationKeepModelLoaded
         ) ?? false
+        recommendationChatRounds = Self.clampRecommendationChatRounds(
+            try container.decodeIfPresent(Int.self, forKey: .recommendationChatRounds)
+                ?? Self.defaultRecommendationChatRounds
+        )
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

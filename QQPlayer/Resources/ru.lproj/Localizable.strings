@@ -1140,3 +1140,18 @@
 "recommendation_reason_similar_artist" = "Похоже на %@";
 "recommendation_reason_genre" = "Тот же жанр: %@";
 "recommendation_reason_matched_taste" = "Соответствует вашему вкусу";
+
+// MARK: - 本地 AI 推荐：指令输入（2026-11-04）
+"recommendation_chat_placeholder" = "Опишите, что хотите услышать…";
+"recommendation_chat_send" = "Отправить";
+"recommendation_chat_model_not_ready" = "Локальная модель не готова. Загрузите её в настройках, чтобы использовать запросы.";
+"recommendation_chat_go_to_settings" = "Открыть настройки";
+"recommendation_chat_clear" = "Очистить запрос";
+"recommendation_chat_results_title" = "По вашему запросу";
+"recommendation_results_for_you" = "Для вас";
+"recommendation_chat_rounds_title" = "Раунды контекста";
+"recommendation_chat_rounds_footer" = "Используются только для понимания уточняющих запросов и не отображаются в приложении.";
+"recommendation_empty_request" = "Запрос не распознан. Попробуйте сформулировать иначе.";
+"recommendation_chat_invalid_output" = "Локальная модель вернула нечитаемый результат. Повторите попытку.";
+"recommendation_chat_timeout" = "Локальная модель не ответила вовремя. Повторите попытку.";
+"recommendation_reason_request" = "Соответствует запросу: %@";

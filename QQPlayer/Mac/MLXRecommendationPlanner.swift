@@ -34,7 +34,7 @@
 
     /// 主线程门面：设置页同步调用 `setKeepLoaded` / `unload`，重活都在 `MLXRunner` actor。
     @MainActor
-    final class MLXRecommendationPlanner: RecommendationPlanning {
+    final class MLXRecommendationPlanner: RecommendationPlanning, RecommendationRequestPlanning {
         static let shared = MLXRecommendationPlanner()
 
         private let runner = MLXRunner()
@@ -68,6 +68,48 @@
                 AppLog.warn(.general, "⚠️ 本地模型生成失败，回退规则：\(error.localizedDescription)")
                 if !keepLoaded { unload() }
                 return RecommendationPlan(intents: [], source: .localModel)
+            }
+        }
+
+        /// 指令输入是否可用：只看模型文件是否完整（不加载、不联网）。
+        nonisolated static func isModelReady() -> Bool {
+            let layout = RecommendationModelLayout(
+                root: RecommendationModelLayout.defaultRoot(),
+                modelId: RecommendationModelManager.defaultModelId
+            )
+            let store = RecommendationModelStore(layout: layout)
+            guard let manifest = store.loadManifest() else { return false }
+            return store.isComplete(manifest: manifest)
+        }
+
+        /// 指令 → 结构化请求；失败必须抛出可识别错误，绝不回退规则解析。
+        func makeRequest(
+            text: String,
+            history: [RecommendationRequestHistoryEntry],
+            profile: TasteProfile
+        ) async -> Result<RecommendationUserRequest, RecommendationRequestError> {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return .failure(.emptyRequest) }
+            let summary = RecommendationProfileSummary.make(from: profile)
+
+            do {
+                let output = try await runner.generateRequest(
+                    summary: summary,
+                    text: trimmed,
+                    history: history,
+                    timeout: .seconds(30)
+                )
+                if !keepLoaded { unload() }
+                return RecommendationRequestParser.parse(output, rawText: trimmed)
+            } catch {
+                AppLog.warn(.general, "⚠️ 推荐指令模型生成失败：\(error.localizedDescription)")
+                if !keepLoaded { unload() }
+                guard let mlxError = error as? MLXRecommendationError else { return .failure(.invalidOutput) }
+                switch mlxError {
+                case .modelNotReady: return .failure(.modelNotReady)
+                case .timedOut: return .failure(.timedOut)
+                case .emptyOutput: return .failure(.invalidOutput)
+                }
             }
         }
     }
@@ -106,6 +148,40 @@
             return text
         }
 
+        func generateRequest(
+            summary: RecommendationProfileSummary,
+            text: String,
+            history: [RecommendationRequestHistoryEntry],
+            timeout: Duration
+        ) async throws -> String {
+            let container = try await ensureContainer()
+
+            let output: String = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    try await Self.runRequest(
+                        container: container,
+                        summary: summary,
+                        text: text,
+                        history: history
+                    )
+                }
+                group.addTask {
+                    try await Task.sleep(for: timeout)
+                    throw MLXRecommendationError.timedOut
+                }
+                guard let first = try await group.next() else {
+                    throw MLXRecommendationError.emptyOutput
+                }
+                group.cancelAll()
+                return first
+            }
+
+            if output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw MLXRecommendationError.emptyOutput
+            }
+            return output
+        }
+
         private func ensureContainer() async throws -> ModelContainer {
             let layout = RecommendationModelLayout(
                 root: RecommendationModelLayout.defaultRoot(),
@@ -131,13 +207,39 @@
             container: ModelContainer,
             summary: RecommendationProfileSummary
         ) async throws -> String {
-            let system = RecommendationPlanPrompt.system
-            let user = RecommendationPlanPrompt.user(for: summary)
+            try await runChat(
+                container: container,
+                system: RecommendationPlanPrompt.system,
+                user: RecommendationPlanPrompt.user(for: summary),
+                temperature: 0.3
+            )
+        }
 
-            return try await container.perform { context in
+        private static func runRequest(
+            container: ModelContainer,
+            summary: RecommendationProfileSummary,
+            text: String,
+            history: [RecommendationRequestHistoryEntry]
+        ) async throws -> String {
+            try await runChat(
+                container: container,
+                system: RecommendationPlanPrompt.requestSystem,
+                user: RecommendationPlanPrompt.requestUser(for: summary, requestText: text, history: history),
+                temperature: 0.2
+            )
+        }
+
+        /// 规划器 / 指令输入共用的单次生成（同一套推理栈，不复制第二套）。
+        private static func runChat(
+            container: ModelContainer,
+            system: String,
+            user: String,
+            temperature: Float
+        ) async throws -> String {
+            try await container.perform { context in
                 let input = UserInput(chat: [.system(system), .user(user)])
                 let lmInput = try await context.processor.prepare(input: input)
-                var parameters = GenerateParameters(temperature: 0.3)
+                var parameters = GenerateParameters(temperature: temperature)
                 parameters.maxTokens = 512
 
                 var output = ""

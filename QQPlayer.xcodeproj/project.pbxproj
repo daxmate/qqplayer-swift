@@ -218,6 +218,7 @@
 		6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */; };
 		DCA5B5740BE2402198D99645 /* RecommendationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BB11223BF646E8ADE33812 /* RecommendationTests.swift */; };
 		B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */; };
+		B1A0000000000000000000E2 /* RecommendationRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000E1 /* RecommendationRequestTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -483,6 +484,7 @@
 		AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryRootAccessPlanTests.swift; sourceTree = "<group>"; };
 		17BB11223BF646E8ADE33812 /* RecommendationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationTests.swift; sourceTree = "<group>"; };
 		B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationPlannerTests.swift; sourceTree = "<group>"; };
+		B1A0000000000000000000E1 /* RecommendationRequestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationRequestTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -970,6 +972,7 @@
 				Views/Utility/WhatsNewView.swift,
 				Services/RecommendationPlanning.swift,
 				Services/RecommendationModelManager.swift,
+				Services/RecommendationRequest.swift,
 				Mac/MacRecommendationSettingsView.swift,
 				Mac/RecommendationPlannerFactory.swift,
 				Mac/MLXRecommendationPlanner.swift,
@@ -1333,6 +1336,7 @@
 				AEFB8FA58968408FB4DCDAC1 /* LibraryRootAccessPlanTests.swift */,
 				17BB11223BF646E8ADE33812 /* RecommendationTests.swift */,
 				B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */,
+				B1A0000000000000000000E1 /* RecommendationRequestTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1850,6 +1854,7 @@
 				6F8DBA5E68454962B2D7509C /* LibraryRootAccessPlanTests.swift in Sources */,
 				DCA5B5740BE2402198D99645 /* RecommendationTests.swift in Sources */,
 				B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */,
+				B1A0000000000000000000E2 /* RecommendationRequestTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

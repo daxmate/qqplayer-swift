@@ -15,10 +15,14 @@ struct MacRecommendationView: View {
     @State private var model = MacRecommendationModel()
     @State private var settings = DeleteSettings.load()
     @State private var downloadTarget: RecommendedCandidate?
+    @State private var query = ""
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
             header
+            Divider()
+            chatBar
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -45,7 +49,7 @@ struct MacRecommendationView: View {
                 .font(.title3.weight(.semibold))
             Spacer()
             Button {
-                Task { await model.refresh(count: settings.recommendationCount) }
+                Task { await refresh() }
             } label: {
                 Label("recommendation_refresh".localized, systemImage: "arrow.triangle.2.circlepath")
             }
@@ -53,6 +57,108 @@ struct MacRecommendationView: View {
         }
         .padding(.horizontal, DesignTokens.space16)
         .padding(.vertical, DesignTokens.space12)
+    }
+
+    // MARK: - 指令输入
+
+    private var chatAvailability: RecommendationChatAvailability {
+        RecommendationPlannerFactory.chatAvailability(useLocalModel: settings.recommendationUseLocalModel)
+    }
+
+    private var canSubmit: Bool {
+        chatAvailability.canSubmit
+            && model.phase != .loading
+            && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var chatBar: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.space6) {
+            HStack(spacing: DesignTokens.space8) {
+                TextField("recommendation_chat_placeholder".localized, text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submit() }
+                    .disabled(chatAvailability != .available || model.phase == .loading)
+
+                Button {
+                    submit()
+                } label: {
+                    if model.phase == .loading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.up.circle.fill")
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canSubmit)
+                .help("recommendation_chat_send".localized)
+            }
+
+            if chatAvailability != .available {
+                HStack(spacing: DesignTokens.space8) {
+                    Text("recommendation_chat_model_not_ready".localized)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("recommendation_chat_go_to_settings".localized) {
+                        openRecommendationSettings()
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+            }
+
+            if let text = model.activeRequestText {
+                HStack(spacing: DesignTokens.space6) {
+                    Image(systemName: "text.bubble")
+                        .font(.caption)
+                    Text(text)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Button {
+                        query = ""
+                        Task { await model.clearRequest(count: settings.recommendationCount) }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("recommendation_chat_clear".localized)
+                    Spacer(minLength: DesignTokens.space0)
+                }
+                .padding(.horizontal, DesignTokens.space8)
+                .padding(.vertical, DesignTokens.space4)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                )
+            }
+        }
+        .padding(.horizontal, DesignTokens.space16)
+        .padding(.bottom, DesignTokens.space8)
+    }
+
+    private func submit() {
+        guard canSubmit else { return }
+        let text = query
+        Task { await model.submit(text, count: settings.recommendationCount, rounds: settings.recommendationChatRounds, useLocalModel: settings.recommendationUseLocalModel) }
+    }
+
+    private func refresh() async {
+        await model.refresh(
+            count: settings.recommendationCount,
+            rounds: settings.recommendationChatRounds,
+            useLocalModel: settings.recommendationUseLocalModel
+        )
+    }
+
+    private func openRecommendationSettings() {
+        openSettings()
+        MacSettingsRouter.open(
+            .init(
+                category: .recommendations,
+                itemID: MacSettingsCatalog.recommendationModel.id
+            )
+        )
     }
 
     /// 页脚小字：本次生成用的是本地模型还是规则。
@@ -87,11 +193,23 @@ struct MacRecommendationView: View {
 
     private var candidateList: some View {
         List {
-            ForEach(model.candidates) { candidate in
-                row(candidate)
+            Section {
+                ForEach(model.candidates) { candidate in
+                    row(candidate)
+                }
+            } header: {
+                Text(resultsTitle)
+                    .font(.caption.weight(.semibold))
             }
         }
         .listStyle(.inset)
+    }
+
+    /// 结果标题：有指令 = 按你的要求；否则 = 为你推荐（不展示任何历史消息）。
+    private var resultsTitle: String {
+        model.activeRequestText == nil
+            ? "recommendation_results_for_you".localized
+            : "recommendation_chat_results_title".localized
     }
 
     private func row(_ candidate: RecommendedCandidate) -> some View {
@@ -152,7 +270,7 @@ struct MacRecommendationView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("recommendation_refresh".localized) {
-                Task { await model.refresh(count: settings.recommendationCount) }
+                Task { await refresh() }
             }
         }
         .padding(DesignTokens.space24)
@@ -168,7 +286,7 @@ struct MacRecommendationView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("recommendation_refresh".localized) {
-                Task { await model.refresh(count: settings.recommendationCount) }
+                Task { await refresh() }
             }
         }
         .padding(DesignTokens.space24)

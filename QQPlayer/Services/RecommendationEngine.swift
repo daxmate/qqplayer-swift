@@ -105,11 +105,15 @@ final class GequhaiSearchProvider: OnlineSearchProviding, @unchecked Sendable {
 enum RecommendationError: LocalizedError, Equatable {
     /// 所有在线源都失败（网络断 / 双源同时不可用）。
     case allSourcesFailed
+    /// 指令输入没有解析出任何有效条件（提示用户换个说法，不退回画像推荐）。
+    case emptyRequest
 
     var errorDescription: String? {
         switch self {
         case .allSourcesFailed:
             return "recommendation_error_all_sources".localized
+        case .emptyRequest:
+            return "recommendation_empty_request".localized
         }
     }
 }
@@ -183,6 +187,32 @@ struct RecommendationEngine: Sendable {
         return .success(picked)
     }
 
+    /// 指令输入：显式条件优先于画像；召回 / 打分 / 去重 / 多样性上限全部复用。
+    func recommend(
+        request: RecommendationUserRequest,
+        profile: TasteProfile,
+        count: Int
+    ) async -> Result<[RecommendedCandidate], RecommendationError> {
+        guard !request.isEmpty else { return .failure(.emptyRequest) }
+        let intents = RecommendationIntentBuilder.intents(from: request, profile: profile)
+        guard !intents.isEmpty else { return .failure(.emptyRequest) }
+        guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
+
+        let excluded = Set(
+            request.excludeArtists
+                .map { RecommendationKey.primaryArtist($0) }
+                .filter { !$0.isEmpty }
+        )
+        let gathered = await gather(profile: profile, intents: intents, excludedArtists: excluded)
+        if gathered.items.isEmpty {
+            return gathered.allFailed ? .failure(.allSourcesFailed) : .success([])
+        }
+
+        let ranked = rank(gathered.items, profile: profile)
+        let picked = select(ranked, count: count, profile: profile)
+        return .success(picked)
+    }
+
     // MARK: 召回
 
     private struct GatheredItem: Sendable {
@@ -202,7 +232,11 @@ struct RecommendationEngine: Sendable {
         var failed: Bool
     }
 
-    private func gather(profile: TasteProfile, intents: [RecommendationIntent]) async -> GatherResult {
+    private func gather(
+        profile: TasteProfile,
+        intents: [RecommendationIntent],
+        excludedArtists: Set<String> = []
+    ) async -> GatherResult {
         var items: [GatheredItem] = []
         var indexByKey: [String: Int] = [:]
         var failedAttempts = 0
@@ -215,7 +249,8 @@ struct RecommendationEngine: Sendable {
             let key = RecommendationKey.normalize(title: song.title, artist: song.artist)
             guard !profile.libraryKeys.contains(key),
                   !profile.blacklistTracks.contains(key),
-                  !profile.blacklistArtists.contains(artistKey)
+                  !profile.blacklistArtists.contains(artistKey),
+                  !excludedArtists.contains(artistKey)
             else { return }
             guard !RecommendationCandidateFilter.isLikelyNonSong(song) else { return }
 
@@ -364,6 +399,7 @@ struct RecommendationEngine: Sendable {
         switch intent.kind {
         case .similar: return 0.08
         case .artist: return 0.06
+        case .keyword: return 0.06
         case .decade: return 0.04
         case .genre: return 0.03
         }
@@ -453,6 +489,10 @@ struct RecommendationEngine: Sendable {
         case .genre:
             if let genre = item.intent.genre, !genre.isEmpty {
                 reasons.append("recommendation_reason_genre".localized(with: genre))
+            }
+        case .keyword:
+            if !item.intent.query.isEmpty {
+                reasons.append("recommendation_reason_request".localized(with: item.intent.query))
             }
         }
 
