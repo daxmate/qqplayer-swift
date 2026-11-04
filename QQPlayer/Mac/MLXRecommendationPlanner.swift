@@ -73,8 +73,7 @@
 
         /// 指令输入是否可用：只看模型文件是否完整（不加载、不联网）。
         nonisolated static func isModelReady() -> Bool {
-            let layout = RecommendationModelLayout(
-                root: RecommendationModelLayout.defaultRoot(),
+            let layout = RecommendationModelLayout.resolved(
                 modelId: RecommendationModelManager.defaultModelId
             )
             let store = RecommendationModelStore(layout: layout)
@@ -183,8 +182,7 @@
         }
 
         private func ensureContainer() async throws -> ModelContainer {
-            let layout = RecommendationModelLayout(
-                root: RecommendationModelLayout.defaultRoot(),
+            let layout = RecommendationModelLayout.resolved(
                 modelId: RecommendationModelManager.defaultModelId
             )
             let store = RecommendationModelStore(layout: layout)

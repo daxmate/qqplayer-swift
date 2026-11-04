@@ -5,7 +5,8 @@
 //  本地 AI 推荐 P2：模型文件管理（下载 / 续传 / 校验 / 删除 / 状态机）。
 //
 //  模型不进 bundle、不进仓库：全部文件从 hf-mirror.com 下载到
-//  `Application Support/QQPlayer/RecommendationModels/<modelId>/`。
+//  `<共享根>/Models/Recommendation/<modelId>/v1/`（DSQShared 解析；旧
+//  `Application Support/QQPlayer/RecommendationModels/` 在迁移前仍可读）。
 //
 //  - 清单：硬编码推理必需文件清单，逐个 HEAD `resolve/main/<file>` 取大小（config / tokenizer / 权重）。
 //  - 下载：逐个文件、支持 Range 断点续传、进度回调、失败重试 1 次、可取消。
@@ -84,17 +85,64 @@ enum RecommendationModelManifestBuilder {
 // MARK: - 目录
 
 /// 模型目录布局（可注入 root，测试用临时目录）。
+///
+/// 新布局：`<共享根>/Models/Recommendation/<modelId>/v1/`（见 `DSQSharedLocations.modelDirectory`）。
+/// 旧布局：`<Application Support>/QQPlayer/RecommendationModels/<modelId>/`——
+/// 迁移完成前仍可读，避免「升级后模型全丢」。
 struct RecommendationModelLayout: Sendable, Equatable {
+    enum Shape: Sendable, Equatable {
+        /// 共享根内的版本化布局。
+        case versioned
+        /// 旧 Application Support 布局（只读兼容）。
+        case legacy
+    }
+
     var root: URL
     var modelId: String
+    var shape: Shape = .versioned
 
-    /// `Application Support/QQPlayer/RecommendationModels`。
+    /// `<共享根>/Models`（经 `DSQShared` 记录实际解析分支）。
     static func defaultRoot(fileManager: FileManager = .default) -> URL {
+        DSQShared.resolve(fileManager: fileManager).modelsRoot
+    }
+
+    /// `Application Support/QQPlayer/RecommendationModels`（旧布局，只读兼容）。
+    static func legacyRoot(fileManager: FileManager = .default) -> URL {
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
         return base
             .appendingPathComponent("QQPlayer", isDirectory: true)
             .appendingPathComponent("RecommendationModels", isDirectory: true)
+    }
+
+    /// 解析实际应使用的布局：新目录有 manifest → 新；否则旧目录有 manifest → 旧；
+    /// 都没有 → 新（准备下载）。同一语义的唯一入口，调用方别再手拼路径。
+    static func resolved(modelId: String, fileManager: FileManager = .default) -> Self {
+        resolved(
+            modelId: modelId,
+            newRoot: defaultRoot(fileManager: fileManager),
+            legacyRoot: legacyRoot(fileManager: fileManager),
+            fileManager: fileManager
+        )
+    }
+
+    /// 可注入版本（测试用）。
+    static func resolved(
+        modelId: String,
+        newRoot: URL,
+        legacyRoot: URL,
+        fileManager: FileManager = .default
+    ) -> Self {
+        let versioned = RecommendationModelLayout(root: newRoot, modelId: modelId)
+        if fileManager.fileExists(atPath: versioned.manifestURL.path) {
+            return versioned
+        }
+        let legacy = RecommendationModelLayout(root: legacyRoot, modelId: modelId, shape: .legacy)
+        if fileManager.fileExists(atPath: legacy.manifestURL.path) {
+            AppLog.info(.migration, "📦 推荐模型仍在旧目录，暂用只读布局：\(legacy.directory.path)")
+            return legacy
+        }
+        return versioned
     }
 
     /// 目录名只保留安全字符（repo id 里的 `/` 不能进路径）。
@@ -108,7 +156,15 @@ struct RecommendationModelLayout: Sendable, Equatable {
     }
 
     var directory: URL {
-        root.appendingPathComponent(Self.sanitize(modelId: modelId), isDirectory: true)
+        switch shape {
+        case .versioned:
+            return root
+                .appendingPathComponent(DSQSharedModelCatalog.recommendationKind, isDirectory: true)
+                .appendingPathComponent(Self.sanitize(modelId: modelId), isDirectory: true)
+                .appendingPathComponent(DSQSharedModelCatalog.currentVersion, isDirectory: true)
+        case .legacy:
+            return root.appendingPathComponent(Self.sanitize(modelId: modelId), isDirectory: true)
+        }
     }
 
     var manifestURL: URL {
@@ -391,7 +447,7 @@ final class RecommendationModelManager {
         downloader: any RecommendationModelDownloading = HFMirrorModelDownloader()
     ) {
         self.modelId = modelId
-        self.layout = layout ?? RecommendationModelLayout(root: RecommendationModelLayout.defaultRoot(), modelId: modelId)
+        self.layout = layout ?? RecommendationModelLayout.resolved(modelId: modelId)
         self.downloader = downloader
         self.manifest = RecommendationModelStore(layout: self.layout).loadManifest()
         refreshState()

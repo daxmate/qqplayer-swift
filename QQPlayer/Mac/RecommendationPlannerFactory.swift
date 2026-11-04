@@ -26,8 +26,7 @@
 
             #if canImport(MLXLLM) && arch(arm64)
                 MLXRecommendationPlanner.shared.setKeepLoaded(settings.recommendationKeepModelLoaded)
-                let layout = RecommendationModelLayout(
-                    root: RecommendationModelLayout.defaultRoot(),
+                let layout = RecommendationModelLayout.resolved(
                     modelId: RecommendationModelManager.defaultModelId
                 )
                 let store = RecommendationModelStore(layout: layout)
