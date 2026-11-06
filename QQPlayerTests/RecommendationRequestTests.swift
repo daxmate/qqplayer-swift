@@ -52,7 +52,8 @@ private func request(
     decades: [Int] = [],
     languages: [String] = [],
     moods: [String] = [],
-    excludes: [String] = []
+    excludes: [String] = [],
+    rawText: String = ""
 ) -> RecommendationUserRequest {
     RecommendationUserRequest(
         referenceArtists: artists,
@@ -60,7 +61,8 @@ private func request(
         decades: decades,
         languages: languages,
         moods: moods,
-        excludeArtists: excludes
+        excludeArtists: excludes,
+        rawText: rawText
     )
 }
 
@@ -360,5 +362,93 @@ struct RecommendationChatAvailabilityTests {
             useLocalModel: true,
             modelReady: true
         ).canSubmit)
+    }
+}
+
+@Suite("推荐指令：显式艺人优先")
+struct RecommendationIntentPriorityTests {
+    @Test("referenceArtists 对应的 artist intent 前置，其余保持相对顺序")
+    func promotesReferenceArtist() {
+        let intents = [
+            RecommendationIntent(query: "华语流行", kind: .genre, genre: "华语流行"),
+            RecommendationIntent(query: "City Pop", kind: .keyword),
+            RecommendationIntent(query: "Westlife", kind: .artist, artist: "Westlife"),
+        ]
+        let ordered = RecommendationIntentBuilder.prioritized(
+            intents,
+            request: request(artists: ["Westlife"])
+        )
+        #expect(ordered.map(\.query) == ["Westlife", "华语流行", "City Pop"])
+    }
+
+    @Test("模型只给 keywords 时，按 rawText 点名前置")
+    func promotesRawTextMention() {
+        let intents = [
+            RecommendationIntent(query: "华语流行", kind: .genre, genre: "华语流行"),
+            RecommendationIntent(query: "西城男孩", kind: .keyword),
+        ]
+        let ordered = RecommendationIntentBuilder.prioritized(
+            intents,
+            request: request(rawText: "我想听一些西城男孩的歌曲")
+        )
+        #expect(ordered.map(\.query) == ["西城男孩", "华语流行"])
+    }
+
+    @Test("泛词不算点名：顺序不变")
+    func ignoresGenericTerms() {
+        let intents = [
+            RecommendationIntent(query: "华语流行", kind: .genre, genre: "华语流行"),
+            RecommendationIntent(query: "歌曲", kind: .keyword),
+        ]
+        let ordered = RecommendationIntentBuilder.prioritized(
+            intents,
+            request: request(rawText: "我想听一些歌曲")
+        )
+        #expect(ordered.map(\.query) == ["华语流行", "歌曲"])
+    }
+
+    @Test("无显式艺人时顺序原样返回（回归）")
+    func keepsOrderWithoutExplicitArtist() {
+        let intents = [
+            RecommendationIntent(query: "华语流行", kind: .genre, genre: "华语流行"),
+            RecommendationIntent(query: "City Pop", kind: .keyword),
+        ]
+        let ordered = RecommendationIntentBuilder.prioritized(intents, request: request())
+        #expect(ordered.map(\.query) == ["华语流行", "City Pop"])
+    }
+}
+
+@Suite("推荐引擎：显式艺人结果前置")
+struct RecommendationExplicitArtistOrderTests {
+    @Test("画像亲和更高时，点名艺人仍排在最前")
+    func explicitArtistFirstDespiteProfileAffinity() async {
+        let provider = KeywordProvider(
+            source: .netease,
+            songs: [
+                "华语流行": [remote("十年", "陈奕迅"), remote("浮夸", "陈奕迅")],
+                "西城男孩": [remote("My Love", "Westlife"), remote("You Raise Me Up", "Westlife")],
+            ]
+        )
+        var engine = RecommendationEngine(providers: [provider])
+        engine.maxSourceShare = 1
+        var profile = TasteProfile()
+        profile.topArtists = [ArtistWeight(artist: "陈奕迅", weight: 1)]
+
+        let result = await engine.recommend(
+            request: request(
+                artists: ["西城男孩"],
+                keywords: ["华语流行"],
+                rawText: "我想听一些西城男孩的歌曲"
+            ),
+            profile: profile,
+            count: 6
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 4)
+            #expect(list.prefix(2).map(\.artist) == ["Westlife", "Westlife"])
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
     }
 }

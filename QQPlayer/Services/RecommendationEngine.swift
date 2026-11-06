@@ -208,8 +208,19 @@ struct RecommendationEngine: Sendable {
             return gathered.allFailed ? .failure(.allSourcesFailed) : .success([])
         }
 
+        let explicitArtists = RecommendationIntentBuilder.explicitArtistTokens(intents: intents, request: request)
+        let explicitKeys = Set(
+            intents
+                .filter { RecommendationIntentBuilder.isExplicit($0, artists: explicitArtists) }
+                .map(\.priorityKey)
+        )
+
         let ranked = rank(gathered.items, profile: profile)
-        let picked = select(ranked, count: count, profile: profile)
+        let ordered = RecommendationExplicitPriority.order(ranked) { item in
+            explicitKeys.contains(item.item.intent.priorityKey)
+                || RecommendationExplicitPriority.matches(RecommendationKey.primaryArtist(item.item.song.artist), artists: explicitArtists)
+        }
+        let picked = select(ordered, count: count, profile: profile)
         return .success(picked)
     }
 
@@ -405,10 +416,6 @@ struct RecommendationEngine: Sendable {
         }
     }
 
-    private func intentKey(_ intent: RecommendationIntent) -> String {
-        "\(intent.kind.rawValue)|\(intent.query.lowercased())"
-    }
-
     // MARK: 选取（上限 + 多样性）
 
     private func select(_ ranked: [RankedItem], count: Int, profile: TasteProfile) -> [RecommendedCandidate] {
@@ -429,7 +436,7 @@ struct RecommendationEngine: Sendable {
             let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
                 + "#" + item.item.source.rawValue
             artistCounts[artistKey, default: 0] += 1
-            intentCounts[intentKey(item.item.intent), default: 0] += 1
+            intentCounts[item.item.intent.priorityKey, default: 0] += 1
             sourceCounts[item.item.source, default: 0] += 1
             usedKeys.insert(key)
 
@@ -458,7 +465,7 @@ struct RecommendationEngine: Sendable {
                 let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
                 if artistCounts[artistKey, default: 0] >= perArtistCap { continue }
                 if pass == 0 {
-                    if intentCounts[intentKey(item.item.intent), default: 0] >= perIntentCap { continue }
+                    if intentCounts[item.item.intent.priorityKey, default: 0] >= perIntentCap { continue }
                     if sourceCounts[item.item.source, default: 0] >= perSourceCap { continue }
                 }
                 take(item)

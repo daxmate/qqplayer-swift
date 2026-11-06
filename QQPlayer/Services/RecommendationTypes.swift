@@ -74,6 +74,15 @@ enum RecommendationKey {
         return collapseWhitespace(text)
     }
 
+    /// 文本比对口径：全半角归并 + 小写 + 空白折叠（不截断多艺人 / 不删括号）。
+    ///
+    /// 用于「用户点名的艺人」与 intent.query / 候选艺人之间的匹配；
+    /// 与 primaryArtist 的区别是不做截断，避免把关键词短语误截成半截。
+    static func comparisonToken(_ raw: String) -> String {
+        let folded = raw.precomposedStringWithCompatibilityMapping.lowercased()
+        return folded.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
     // MARK: 内部步骤
 
     /// 去掉所有成对括号段（含括号内容）：`Song (Live)` → `Song`。
@@ -287,6 +296,11 @@ struct RecommendationIntent: Sendable, Equatable {
     var artist: String?
     var decade: Int?
     var genre: String?
+
+    /// 意图稳定标识（kind + query 小写）：去重与「显式优先」匹配共用同一口径。
+    var priorityKey: String {
+        "\(kind.rawValue)|\(query.lowercased())"
+    }
 
     init(query: String, kind: Kind, artist: String? = nil, decade: Int? = nil, genre: String? = nil) {
         self.query = query

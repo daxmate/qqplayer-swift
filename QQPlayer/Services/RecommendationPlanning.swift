@@ -127,6 +127,7 @@ enum RecommendationPlanPrompt {
     - Reply with JSON only. No markdown, no code fences, no explanations.
     - Schema: {"queries":[{"query":"<search keywords>","kind":"artist|decade|genre"}]}
     - 6 to 12 queries, ordered by expected value.
+    - If the listener names an artist, that artist MUST be the first query; never place it last.
     - "query" must be non-empty, no line breaks, at most 40 characters.
     - kind=artist: an artist name. kind=decade: a decade label such as "1990s". kind=genre: a music genre.
     - Never include file paths, database ids, URLs, or personal data.
@@ -141,6 +142,7 @@ enum RecommendationPlanPrompt {
     - Schema: {"referenceArtists":["..."],"keywords":["..."],"decades":[1990],"languages":["Chinese"],"moods":["..."],"excludeArtists":["..."]}
     - Every array holds at most 8 plain-text items; each item is a single line of at most 64 characters.
     - referenceArtists: artists the listener explicitly referenced ("similar to X" includes X).
+    - If the listener names an artist, that artist MUST go in referenceArtists first; never bury it in keywords or place it last.
     - keywords: concrete searchable terms (specific song / album / artist names or themes); never generic words like "music", "songs", "hits".
     - decades: integer decade start between 1900 and 2030 (for example 1990).
     - languages: language hints implied by the request; keep the array empty when unsure.

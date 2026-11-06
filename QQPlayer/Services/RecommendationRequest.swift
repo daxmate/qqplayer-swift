@@ -327,8 +327,7 @@ extension RecommendationIntentBuilder {
 
         func append(_ intent: RecommendationIntent) {
             guard intents.count < maxTotalIntents else { return }
-            let key = "\(intent.kind.rawValue)|\(intent.query.lowercased())"
-            guard seen.insert(key).inserted else { return }
+            guard seen.insert(intent.priorityKey).inserted else { return }
             intents.append(intent)
         }
 
@@ -350,9 +349,94 @@ extension RecommendationIntentBuilder {
             }
         }
 
-        return intents
+        return prioritized(intents, request: request)
     }
+
+    // MARK: 显式艺人优先
+
+    /// 用户请求里被明确点名的艺人（referenceArtists + rawText 中原样出现的搜索词）。
+    ///
+    /// 只用于排序：不改变 intent 的 kind / query，也不参与打分。
+    static func explicitArtistTokens(
+        intents: [RecommendationIntent],
+        request: RecommendationUserRequest
+    ) -> Set<String> {
+        var tokens = request.referenceArtists.map(RecommendationKey.comparisonToken)
+        let text = RecommendationKey.comparisonToken(request.rawText)
+        if !text.isEmpty {
+            for intent in intents {
+                for candidate in [intent.artist, intent.query].compactMap({ $0 }) {
+                    let token = RecommendationKey.comparisonToken(candidate)
+                    guard token.count >= 2, !genericRequestTerms.contains(token), text.contains(token) else { continue }
+                    tokens.append(token)
+                }
+            }
+        }
+        return Set(tokens.filter { !$0.isEmpty })
+    }
+
+    /// 稳定重排：显式艺人对应的 intent 前置，其余保持原相对顺序。
+    static func prioritized(
+        _ intents: [RecommendationIntent],
+        request: RecommendationUserRequest
+    ) -> [RecommendationIntent] {
+        let explicit = explicitArtistTokens(intents: intents, request: request)
+        guard !explicit.isEmpty else { return intents }
+        var head: [RecommendationIntent] = []
+        var tail: [RecommendationIntent] = []
+        for intent in intents {
+            if isExplicit(intent, artists: explicit) {
+                head.append(intent)
+            } else {
+                tail.append(intent)
+            }
+        }
+        return head + tail
+    }
+
+    /// intent 是否指向用户点名的艺人：query / artist 命中，允许关键词短语包含艺人名。
+    static func isExplicit(_ intent: RecommendationIntent, artists: Set<String>) -> Bool {
+        [intent.artist, intent.query]
+            .compactMap { $0 }
+            .contains { RecommendationExplicitPriority.matches($0, artists: artists) }
+    }
+
+    /// rawText 匹配时不算「点名」的泛词（与 prompt 的 never generic words 同口径）。
+    static let genericRequestTerms: Set<String> = [
+        "music", "song", "songs", "hits", "pop", "rock", "classics",
+        "歌曲", "歌", "音乐", "热歌", "金曲", "流行", "经典", "老歌", "情歌",
+    ]
 
     /// 指令里的关键词 / 情绪词最多生成几条搜索意图（限制请求放大）。
     static let maxKeywordIntents = 4
+}
+
+// MARK: - 显式优先排序
+
+/// 最终结果排序：用户点名的艺人优先于画像推断（稳定分区，不改分）。
+enum RecommendationExplicitPriority {
+    /// 把满足 isPriority 的元素整体前置，组内保持原有顺序。
+    static func order<T>(_ items: [T], isPriority: (T) -> Bool) -> [T] {
+        var head: [T] = []
+        var tail: [T] = []
+        for item in items {
+            if isPriority(item) {
+                head.append(item)
+            } else {
+                tail.append(item)
+            }
+        }
+        return head + tail
+    }
+
+    /// 文本是否命中用户点名的艺人（允许关键词短语 / 候选艺人字段包含艺人名）。
+    static func matches(_ value: String, artists: Set<String>) -> Bool {
+        guard !artists.isEmpty else { return false }
+        let token = RecommendationKey.comparisonToken(value)
+        guard token.count >= 2 else { return false }
+        return artists.contains { name in
+            guard name.count >= 2 else { return false }
+            return name == token || token.contains(name) || (token.count >= 3 && name.contains(token))
+        }
+    }
 }
