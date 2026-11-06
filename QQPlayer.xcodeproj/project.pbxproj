@@ -868,6 +868,7 @@
 				Services/ReclaimPurgeService.swift,
 				Services/ReclaimRestoreService.swift,
 				Services/RecommendationArtistConstraint.swift,
+				"Services/RecommendationEngine+ArtistConstraint.swift",
 				Services/RecommendationEngine.swift,
 				Services/RecommendationProfile.swift,
 				Services/RecommendationResultCache.swift,

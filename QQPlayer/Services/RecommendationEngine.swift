@@ -51,7 +51,7 @@ protocol OnlineSearchProviding: Sendable {
 }
 
 /// 网易云适配器（复用 `NeteaseOnlineClient.search`，不改客户端）。
-struct NeteaseSearchProvider: OnlineSearchProviding, SimilarSongProviding, ArtistAliasProviding {
+struct NeteaseSearchProvider: OnlineSearchProviding, SimilarSongProviding {
     var client: NeteaseOnlineClient = .shared
 
     var source: RecommendationSource { .netease }
@@ -63,20 +63,6 @@ struct NeteaseSearchProvider: OnlineSearchProviding, SimilarSongProviding, Artis
                 title: $0.title, artist: $0.artist, album: $0.album, year: nil,
                 songID: $0.id, durationMs: $0.durationMs
             )
-        }
-    }
-
-    /// 点名艺人别名：只返回与点名归一化后相等的艺人条目的名称集合；失败降级为空。
-    func aliases(for artist: String) async -> [String] {
-        do {
-            let artists = try await client.searchArtists(query: artist, limit: 5)
-            let candidates = artists.map {
-                RecommendationArtistAliasResolver.Candidate(name: $0.name, aliases: $0.aliases)
-            }
-            return RecommendationArtistAliasResolver.aliases(for: artist, from: candidates)
-        } catch {
-            AppLog.warn(.general, "⚠️ 推荐艺人别名解析失败（\(artist)）：\(error.localizedDescription)")
-            return []
         }
     }
 
@@ -201,101 +187,15 @@ struct RecommendationEngine: Sendable {
         return .success(picked)
     }
 
-    /// 指令输入：显式条件优先于画像；召回 / 打分 / 去重 / 多样性上限全部复用。
-    func recommend(
-        request: RecommendationUserRequest,
-        profile: TasteProfile,
-        count: Int
-    ) async -> Result<[RecommendedCandidate], RecommendationError> {
-        guard !request.isEmpty else { return .failure(.emptyRequest) }
-        let intents = RecommendationIntentBuilder.intents(from: request, profile: profile)
-        guard !intents.isEmpty else { return .failure(.emptyRequest) }
-        guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
-
-        let excluded = Set(
-            request.excludeArtists
-                .map { RecommendationKey.primaryArtist($0) }
-                .filter { !$0.isEmpty }
-        )
-        let artistConstraint = await makeArtistConstraint(for: request)
-        let gathered = await gather(
-            profile: profile,
-            intents: intents,
-            excludedArtists: excluded,
-            artistConstraint: artistConstraint
-        )
-        if gathered.items.isEmpty {
-            if gathered.allFailed { return .failure(.allSourcesFailed) }
-            AppLog.info(.general, "🎵 推荐结果：点名艺人 \(artistConstraint?.displayName ?? "无") 无匹配候选，返回 0 条")
-            return .success([])
-        }
-
-        let explicitArtists = RecommendationIntentBuilder.explicitArtistTokens(intents: intents, request: request)
-        let explicitKeys = Set(
-            intents
-                .filter { RecommendationIntentBuilder.isExplicit($0, artists: explicitArtists) }
-                .map(\.priorityKey)
-        )
-
-        let ranked = rank(gathered.items, profile: profile)
-        let ordered = RecommendationExplicitPriority.order(ranked) { item in
-            explicitKeys.contains(item.item.intent.priorityKey)
-                || RecommendationExplicitPriority.matches(RecommendationKey.primaryArtist(item.item.song.artist), artists: explicitArtists)
-        }
-        let picked = select(ordered, count: count, profile: profile, artistConstraint: artistConstraint)
-        AppLog.info(
-            .general,
-            "🎵 推荐结果：\(picked.count)/\(max(1, count)) 条（点名艺人 \(artistConstraint?.displayName ?? "无")）"
-        )
-        return .success(picked)
-    }
-
-    /// 点名艺人约束：referenceArtists 非空、且请求不是「类似 X」、别名解析成功时才启用。
-    /// 任一条件不满足返回 nil，保持既有行为（宁可不约束，也不静默返回 0 条）。
-    private func makeArtistConstraint(for request: RecommendationUserRequest) async -> RecommendationArtistConstraint? {
-        if RecommendationArtistRequestSemantics.isSimilarityRequest(request.rawText) {
-            AppLog.info(.general, "🎵 推荐解析：识别为相似/风格请求，不启用点名硬约束")
-            return nil
-        }
-
-        let named = request.referenceArtists
-            .map { RecommendationKey.displayPrimaryArtist($0) }
-            .filter { !$0.isEmpty }
-        guard let primary = named.first else {
-            AppLog.debug(.general, "🎵 推荐解析：referenceArtists 为空，按既有行为召回")
-            return nil
-        }
-
-        let aliasProvider = providers.compactMap { $0 as? any ArtistAliasProviding }.first
-        var names: [String] = []
-        for artist in named {
-            let aliases = await aliasProvider?.aliases(for: artist) ?? []
-            guard !aliases.isEmpty else {
-                AppLog.warn(
-                    .general,
-                    "⚠️ 推荐点名艺人别名解析失败/为空（\(artist)），放弃硬约束并回退旧行为"
-                )
-                return nil
-            }
-            names.append(contentsOf: aliases)
-        }
-        let constraint = RecommendationArtistConstraint(displayName: primary, names: names)
-        AppLog.info(
-            .general,
-            "🎵 推荐点名艺人：\(named.joined(separator: "、")) 约束集合=\(constraint.tokens.sorted())"
-        )
-        return constraint
-    }
-
     // MARK: 召回
 
-    private struct GatheredItem: Sendable {
+    struct GatheredItem: Sendable {
         var song: RecommendationRemoteSong
         var source: RecommendationSource
         var intent: RecommendationIntent
     }
 
-    private struct GatherResult: Sendable {
+    struct GatherResult: Sendable {
         var items: [GatheredItem]
         var allFailed: Bool
     }
@@ -306,7 +206,7 @@ struct RecommendationEngine: Sendable {
         var failed: Bool
     }
 
-    private func gather(
+    func gather(
         profile: TasteProfile,
         intents: [RecommendationIntent],
         excludedArtists: Set<String> = [],
@@ -460,12 +360,12 @@ struct RecommendationEngine: Sendable {
 
     // MARK: 重排
 
-    private struct RankedItem: Sendable {
+    struct RankedItem: Sendable {
         var item: GatheredItem
         var score: Double
     }
 
-    private func rank(_ items: [GatheredItem], profile: TasteProfile) -> [RankedItem] {
+    func rank(_ items: [GatheredItem], profile: TasteProfile) -> [RankedItem] {
         items.map { item in
             let key = RecommendationKey.normalize(title: item.song.title, artist: item.song.artist)
             let score = RecommendationScorer.score(
@@ -500,7 +400,7 @@ struct RecommendationEngine: Sendable {
 
     // MARK: 选取（上限 + 多样性）
 
-    private func select(
+    func select(
         _ ranked: [RankedItem],
         count: Int,
         profile: TasteProfile,
