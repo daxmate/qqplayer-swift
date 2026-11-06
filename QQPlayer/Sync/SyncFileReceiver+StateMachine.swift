@@ -141,9 +141,15 @@ extension SyncFileReceiver {
     }
 
     /// chunk 处理（锁内；返回待执行效果）。
-    /// - Parameter wireBytes: 该帧 payload 的实际字节数（诊断用）
-    func processChunkLocked(_ chunk: FileChunkPayload, wireBytes: Int) -> [Action] {
-        let fileID = chunk.fileID
+    /// - Parameters:
+    ///   - chunk: 入站块（JSON 显式 offset / 二进制按序隐式定位）
+    ///   - wireBytes: 该帧 payload 的实际字节数（诊断用）
+    func processChunkLocked(_ chunk: InboundChunk, wireBytes: Int) -> [Action] {
+        let fileID: String
+        switch chunk {
+        case let .positioned(payload): fileID = payload.fileID
+        case let .sequential(id, _): fileID = id
+        }
         guard let current = active else {
             // 无 meta 先到块：无从校验，回 protocolError 让对端发送端干净失败
             return [.sendAck(ack(fileID: fileID, receivedBytes: 0, error: .protocolError))]
@@ -153,8 +159,17 @@ extension SyncFileReceiver {
             return [.sendAck(ack(fileID: fileID, receivedBytes: 0, error: .protocolError))]
         }
 
-        let offset = chunk.offset
-        let data = chunk.data
+        let offset: Int64
+        let data: Data
+        switch chunk {
+        case let .positioned(payload):
+            offset = payload.offset
+            data = payload.data
+        case let .sequential(_, bytes):
+            // 二进制块没有 offset：TCP 有序 + 发送端保序 ⇒ 期望位置就是已收完整字节
+            offset = current.received
+            data = bytes
+        }
 
         // offset < 期望 = 过期块（ack 丢失/滞后时的幂等重传）：**不重复写盘**，
         // 只补发当前累计 ack 把发送端拉回同步（重复写会把文件写坏，比失败更糟）

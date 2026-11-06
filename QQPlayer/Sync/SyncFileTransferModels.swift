@@ -4,8 +4,9 @@
 //
 //  局域网同步（S2, M2b）文件传输协议载荷 + 错误模型（纯声明，无 IO）：
 //  - FileMetaPayload：file_meta 帧（type 4）——传输声明（文件名/大小/分块/SHA-256/续传起点）
-//  - FileChunkPayload：file_chunk 帧（type 5）——一块数据（offset 定位 + data base64）
-//  - FileAckPayload：file_ack 帧（type 6）——接收端进度/结论（停等协议推进信号）
+//  - FileChunkPayload：file_chunk 帧（type 5）——一块数据（offset 定位 + data）
+//    数据默认走 JSON（base64）；协商后走 flags bit1 的原始二进制（见 SyncFileChunkCodec）
+//  - FileAckPayload：file_ack 帧（type 6）——接收端进度/结论（窗口推进信号 + 能力协商）
 //  - FileTransferErrorCode：线上错误码（ack.error / 帧级中止原因）
 //  - SyncFileTransferError：本端视角错误（含线上码映射；resumeMismatch 等供调用方做重试决策）
 //
@@ -144,16 +145,21 @@ struct FileAckPayload: Codable, Equatable, Sendable {
     /// 接收端可接受的在途窗口深度（**能力协商**，只在应答 file_meta 那条 ack 里带）。
     /// nil = 对端不声明（旧端）→ 发送端回退停等。可选字段对旧端的 JSON 解码透明。
     var maxInFlight: Int?
+    /// 接收端是否支持 file_chunk 二进制载荷（flags bit1）。nil = 旧端 → 继续 base64 JSON。
+    var binaryChunks: Bool?
 }
 
-/// 接收端能力声明（`FileAckPayload` 的协商字段打包；测试注入 / 生产默认值共用）。
+/// 接收端能力声明（`FileAckPayload` 的两个协商字段打包；测试注入 / 生产默认值共用）。
 struct SyncFileTransferCapabilities: Equatable, Sendable {
     var maxInFlight: Int?
+    var binaryChunks: Bool?
 
-    /// 生产默认：窗口 8。
-    static let current = SyncFileTransferCapabilities(maxInFlight: SyncFileTransfer.maxInFlight)
-    /// 旧端（不声明任何能力）：发送端据此回退停等。
-    static let legacy = SyncFileTransferCapabilities(maxInFlight: nil)
+    /// 生产默认：窗口 8 + 二进制块。
+    static let current = SyncFileTransferCapabilities(
+        maxInFlight: SyncFileTransfer.maxInFlight, binaryChunks: true
+    )
+    /// 旧端（不声明任何能力）：发送端据此回退停等 + base64。
+    static let legacy = SyncFileTransferCapabilities(maxInFlight: nil, binaryChunks: nil)
 }
 
 /// 线上错误码（v1 定案枚举值）。
@@ -194,6 +200,47 @@ enum SyncFileTransferError: Error, Equatable, Sendable {
     case resumeMismatch(String)
     /// 协议违例（对端 protocolError / 本地检出），附 fileID + 原因
     case protocolError(String, String)
+}
+
+/// file_chunk 二进制载荷编解码（阶段 B，2026-11-06）。
+///
+/// 线上（**加密前**的明文载荷；帧头 flags bit1 = 原始二进制）：
+///   `fileIDLen(UInt16 BE) | fileID(UTF8) | data`
+///
+/// 为什么不再走 JSON：`FileChunkPayload.data` 是 `Data`，`JSONEncoder` 会编成 base64
+/// 字符串 —— 线上体积 ×1.33，且每块多一次 base64 编解码。二进制格式把这块开销抹掉，
+/// 帧本身（magic/len/type/flags/加密）完全不变。
+///
+/// 迁移口径：接收端在 file_ack 里声明 `binaryChunks`，发送端**只在对端声明后才用**；
+/// 旧对端继续收 base64 JSON（旧解码器看到 bit1 帧会当 JSON 解码失败，故必须协商）。
+/// 二进制块没有 offset 字段：TCP 有序 + 发送端保序 ⇒ 接收端按「当前已收字节」隐式定位。
+enum SyncFileChunkCodec {
+    /// 编码为二进制块载荷；fileID 超 UInt16 长度上限返回 nil（调用方按协议错误处理）。
+    static func encodeBinary(fileID: String, data: Data) -> Data? {
+        let idBytes = Data(fileID.utf8)
+        guard !idBytes.isEmpty, idBytes.count <= Int(UInt16.max) else { return nil }
+        var out = Data(capacity: 2 + idBytes.count + data.count)
+        out.append(UInt8((idBytes.count >> 8) & 0xFF))
+        out.append(UInt8(idBytes.count & 0xFF))
+        out.append(idBytes)
+        out.append(data)
+        return out
+    }
+
+    /// 解码二进制块载荷；长度前缀越界 / fileID 非 UTF-8 / 空 fileID → nil（调用方报协议错误）。
+    /// 严格校验：`2 + 前缀长度 ≤ 载荷长度`，绝不越界读（`payload[..]` 一律走受检区间）。
+    static func decodeBinary(_ payload: Data) -> (fileID: String, data: Data)? {
+        guard payload.count >= 2 else { return nil }
+        let start = payload.startIndex
+        let idLength = Int(payload[start]) << 8 | Int(payload[start + 1])
+        guard idLength > 0, payload.count >= 2 + idLength else { return nil }
+        let idStart = start + 2
+        let idEnd = idStart + idLength
+        guard let fileID = String(data: Data(payload[idStart ..< idEnd]), encoding: .utf8),
+              !fileID.isEmpty
+        else { return nil }
+        return (fileID, Data(payload[idEnd...]))
+    }
 }
 
 /// 帧载荷 JSON 编解码（帧 payload = 载荷类型 JSON 字节）。

@@ -304,7 +304,11 @@ extension SyncPeerSession {
         case .fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush,
              .manifestRequest, .manifestResponse, .syncFetchRequest, .syncFetchResult,
              .libraryPushAnnounce, .peerLibraryRequest, .peerLibraryResponse:
-            let delivered = SyncFrame(type: frame.type, flags: [], payload: plaintext)
+            // 保留加密位以外的 flags（bit1 = 二进制块载荷）：文件传输层靠它区分
+            // 「原始二进制 file_chunk」与「base64 JSON file_chunk」；加密位在分发时已无意义。
+            let delivered = SyncFrame(type: frame.type,
+                                      flags: frame.flags.subtracting(.encrypted),
+                                      payload: plaintext)
             return [.notifyAppFrame(delivered)]
         case .handshake, .pairRequest, .pairResponse:
             return closeEffectsLocked(.protocolViolation("ready 阶段收到握手/配对帧"))

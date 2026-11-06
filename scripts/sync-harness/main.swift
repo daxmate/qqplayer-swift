@@ -3750,7 +3750,7 @@ do {
 
 // MARK: - ㊾ 文件传输吞吐 v2（滑动窗口 / 二进制块 / 无进展超时 / 旧端回退）
 
-section("㊾ 传输吞吐 v2：窗口补齐 / 幂等重投 / 无进展超时 / 旧端回退")
+section("㊾ 传输吞吐 v2：窗口补齐 / 二进制块 / 幂等重投 / 无进展超时 / 旧端回退")
 
 /// 在**手动投递**通道上跑完一轮传输：反复「投递发送端帧 → 投递 ack 帧」直到发送端出结论。
 /// - Returns: 观测到的最大在途块数（= 一次补窗压进去几块 = 窗口占用）
@@ -3770,18 +3770,20 @@ func driveDeferredTransfer(
     return maxChunks
 }
 
-/// 原始帧统计（type 恒明文在帧头第 9 字节）：块帧数 / 块帧线上载荷总字节
-/// （含每帧 28B 的 nonce+tag）。
-func chunkFrameStats(_ frames: [Data]) -> (count: Int, payloadBytes: Int) {
+/// 原始帧统计（type 恒明文在帧头第 9 字节；flags 第 10 字节）：块帧数 / 二进制块帧数 /
+/// 块帧线上载荷总字节（含每帧 28B 的 nonce+tag，两种编码同样多，对比不受影响）。
+func chunkFrameStats(_ frames: [Data]) -> (count: Int, binary: Int, payloadBytes: Int) {
     var count = 0
+    var binary = 0
     var payloadBytes = 0
     for frame in frames where frame.count >= SyncFrame.headerLength {
         let start = frame.startIndex
         guard frame[start + 8] == SyncFrameType.fileChunk.rawValue else { continue }
         count += 1
+        if frame[start + 9] & 0x02 != 0 { binary += 1 }
         payloadBytes += frame.count - SyncFrame.headerLength
     }
-    return (count, payloadBytes)
+    return (count, binary, payloadBytes)
 }
 
 // 窗口等价性：同一个文件分别按「窗口 8 / 窗口 1 / 旧端无能力」传一遍。
@@ -3792,7 +3794,7 @@ do {
     let sha = try SyncFileChecksum.sha256Hex(ofFile: sourceURL)
 
     func run(_ capabilities: SyncFileTransferCapabilities, tag: String) throws
-        -> (landed: Data, maxInFlight: Int, frame: (count: Int, payloadBytes: Int)) {
+        -> (landed: Data, maxInFlight: Int, frame: (count: Int, binary: Int, payloadBytes: Int)) {
         let fixture = DeferredSessionFixture.pairedHandshake()
         let dir = try tempRoot("tw-rx-\(tag)")
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
@@ -3820,14 +3822,20 @@ do {
     checkEqual(wide.maxInFlight, SyncFileTransfer.maxInFlight, "㊾ 窗口 8：单次补窗压进 8 块（窗口真的打满）")
     checkEqual(wide.landed, source, "㊾ 窗口 8：落盘字节与源完全一致")
     checkEqual(SyncFileChecksum.sha256Hex(of: wide.landed), sha, "㊾ 窗口 8：落盘 SHA-256 与源一致")
+    checkEqual(wide.frame.binary, expectedChunks, "㊾ 窗口 8：全部块帧走二进制载荷（flags bit1）")
+    check(wide.frame.payloadBytes < source.count + 4_096,
+          "㊾ 窗口 8：线上载荷 ≈ 源字节（无 base64 膨胀）")
 
-    let narrow = try run(SyncFileTransferCapabilities(maxInFlight: 1), tag: "win1")
+    let narrow = try run(SyncFileTransferCapabilities(maxInFlight: 1, binaryChunks: true), tag: "win1")
     checkEqual(narrow.maxInFlight, 1, "㊾ 窗口 1：停等（单次只压 1 块）")
     checkEqual(narrow.landed, source, "㊾ 窗口 1：落盘字节与窗口 8 完全一致（等价性）")
     checkEqual(SyncFileChecksum.sha256Hex(of: narrow.landed), sha, "㊾ 窗口 1：SHA-256 一致")
 
     let legacy = try run(.legacy, tag: "legacy")
     checkEqual(legacy.maxInFlight, 1, "㊾ 旧端（不声明能力）：自动回退停等")
+    checkEqual(legacy.frame.binary, 0, "㊾ 旧端：0 个二进制块帧（继续 base64 JSON）")
+    check(legacy.frame.payloadBytes > source.count * 13 / 10,
+          "㊾ 旧端：base64 线上载荷 ≥ 1.3×源字节（对照二进制的 ≈1.0×）")
     checkEqual(legacy.landed, source, "㊾ 旧端：落盘字节仍完全一致")
 } catch {
     check(false, "㊾ 窗口等价性抛错：\(error)")

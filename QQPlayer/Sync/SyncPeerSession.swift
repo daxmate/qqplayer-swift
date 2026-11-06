@@ -219,7 +219,9 @@ final class SyncPeerSession: @unchecked Sendable {
     /// + library_push_announce + peer_library_request/peer_library_response；加密）。
     /// 未 ready / 类型非法抛错。
     /// ⚠️ 新增业务帧必须同时登记此处（漏登记 → 运行期 invalidType，编译不报错）。
-    func sendApplicationFrame(type: SyncFrameType, payload: Data) throws {
+    /// - Parameter extraFlags: 额外帧 flags（如 `.binaryChunk`；加密位由本方法自置）。
+    func sendApplicationFrame(type: SyncFrameType, payload: Data,
+                              extraFlags: SyncFrameFlags = []) throws {
         guard [
             .fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush,
             .manifestRequest, .manifestResponse, .syncFetchRequest, .syncFetchResult,
@@ -227,7 +229,7 @@ final class SyncPeerSession: @unchecked Sendable {
         ].contains(type) else {
             throw SyncFrameError.invalidType(type.rawValue)
         }
-        try sendEncryptedFrame(type: type, payload: payload)
+        try sendEncryptedFrame(type: type, payload: payload, extraFlags: extraFlags)
     }
 
     /// 发送 ping（v1 无心跳语义，仅协议占位）。未 ready 抛错。
@@ -300,7 +302,8 @@ final class SyncPeerSession: @unchecked Sendable {
     }
 
     /// 就绪后加密发送一帧（AAD = 帧头；锁内组装，锁外发送）。
-    private func sendEncryptedFrame(type: SyncFrameType, payload: Data) throws {
+    private func sendEncryptedFrame(type: SyncFrameType, payload: Data,
+                                    extraFlags: SyncFrameFlags = []) throws {
         lock.lock()
         var effects: [Effect] = []
         defer {
@@ -310,17 +313,20 @@ final class SyncPeerSession: @unchecked Sendable {
         guard phaseValue == .ready else {
             throw SyncFrameError.invalidType(type.rawValue)
         }
-        effects.append(.send(try sealEncryptedFrameLocked(type: type, plaintext: payload)))
+        effects.append(.send(try sealEncryptedFrameLocked(type: type, plaintext: payload,
+                                                          extraFlags: extraFlags)))
     }
 
     /// 锁内加密组帧（ready 后；nonce 计数递增）。combined = nonce(12)+ct+tag(16)，
     /// 故加密后 payload 长度 = plaintext + 28，帧头可在加密前确定（AAD 一致）。
-    private func sealEncryptedFrameLocked(type: SyncFrameType, plaintext: Data) throws -> Data {
+    private func sealEncryptedFrameLocked(type: SyncFrameType, plaintext: Data,
+                                          extraFlags: SyncFrameFlags = []) throws -> Data {
         guard var cipher = sendCipher else {
             throw SyncHandshakeError.invalidMessage("会话密钥未就绪")
         }
         let payloadCount = plaintext.count + 28
-        let header = Self.headerBytes(type: type, flags: [.encrypted], payloadCount: payloadCount)
+        let flags = SyncFrameFlags.encrypted.union(extraFlags)
+        let header = Self.headerBytes(type: type, flags: flags, payloadCount: payloadCount)
         let sealed = try cipher.seal(plaintext: plaintext, aad: header)
         sendCipher = cipher
         var out = Data(capacity: header.count + sealed.count)

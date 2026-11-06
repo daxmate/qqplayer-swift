@@ -81,7 +81,8 @@ Host（macOS）                           Client（iOS）
 
 实测基线：143 个文件 / 1369MB，平均 **2.12 MB/s**；1MB 停等在链路上单块 ack 往返 424–500ms（好批次 56ms）。改造两条，**零破坏兼容**：
 
-- **滑动窗口**：`SyncFileTransfer.maxInFlight = 8`（8 × 1MB 在途，硬上限在发送端）。接收端在**应答 `file_meta` 的那条 `file_ack`** 里带 `maxInFlight: Int?`；发送端取 `min(声明值, 8)`，对端不声明 → **1**（停等，行为与 v1 完全一致）。发送严格有序（`nextOffset` 只增），接收端仍按序落盘；ack 语义放宽为「不前进即忽略（重复/滞后）」，超时改为「**无进展**」：仅当 `ackTimeout`（默认 30s）内 `receivedBytes` 一直不前进才失败，单块慢不算失败。
+- **滑动窗口**（阶段 A）：`SyncFileTransfer.maxInFlight = 8`（8 × 1MB 在途，硬上限在发送端）。接收端在**应答 `file_meta` 的那条 `file_ack`** 里带 `maxInFlight: Int?`；发送端取 `min(声明值, 8)`，对端不声明 → **1**（停等，行为与 v1 完全一致）。发送严格有序（`nextOffset` 只增），接收端仍按序落盘；ack 语义放宽为「不前进即忽略（重复/滞后）」，超时改为「**无进展**」：仅当 `ackTimeout`（默认 30s）内 `receivedBytes` 一直不前进才失败，单块慢不算失败。
+- **二进制块载荷**（阶段 B）：`file_chunk`（type 5）帧 `flags` **bit1 (0x02)** = 明文载荷为 `fileIDLen(UInt16 BE) | fileID(UTF8) | data`；bit0 加密语义不变。接收端在 `file_ack` 里带 `binaryChunks: Bool?` 声明支持，发送端**只在对端声明后**才用；旧对端继续收 base64 JSON（`FileChunkPayload`）。收益 = 去掉 base64 的 33% 膨胀与 JSON 编解码开销；帧上限 16MB 不变，二进制长度前缀越界即按协议错误中止（不崩溃）。
 - **诊断**：`transfer send|receive` 行只追加 `win=` / `inFlightMax=` / `wireBytes=`（旧键不动），即可直接对比线上字节与源字节判断膨胀。
 
 ## 6. 同步内容

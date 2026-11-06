@@ -16,7 +16,7 @@
 //      （写失败按 ENOSPC 映射 diskFull/ioError）；收齐 → 整文件 SHA-256 →
 //      匹配：原子改名去 .part + ack(done)；不匹配：删 .part + ack(checksumMismatch)
 //      2026-11-06 提速：每块一条 ack（滑动窗口下会连续来多条），meta 的 ack 带能力协商
-//      （maxInFlight，声明本端能吃多深的窗口；不声明 = 旧端）。
+//      （maxInFlight / binaryChunks），file_chunk 可走 flags bit1 的原始二进制载荷。
 //    file_ack：接收端不收 ack → 静默忽略（有测试锁定）
 //    cancel()/会话断连：清理内存状态；.part 保留磁盘（断点数据源，不删）
 //
@@ -102,6 +102,13 @@ final class SyncFileReceiver: @unchecked Sendable {
         var wireBytes: Int
     }
 
+    /// 入站块：JSON 载荷带**显式 offset**（可容忍幂等重传）；二进制载荷（flags bit1）
+    /// 没有 offset 字段，按「当前已收完整字节」隐式定位（TCP 有序 + 发送端保序）。
+    enum InboundChunk {
+        case positioned(FileChunkPayload)
+        case sequential(fileID: String, data: Data)
+    }
+
     /// 收尾时的进度快照（诊断用；`completePartLocked` 已脱离 Active，故显式携带）。
     struct Progress {
         let startedAt: Date
@@ -175,12 +182,24 @@ final class SyncFileReceiver: @unchecked Sendable {
             }
             runLocked { [meta] in self.processMetaLocked(meta) }
         case .fileChunk:
+            // flags bit1 = 原始二进制载荷（协商后）；否则是 base64 JSON（旧格式，始终兼容）
+            if frame.flags.contains(.binaryChunk) {
+                guard let decoded = SyncFileChunkCodec.decodeBinary(frame.payload) else {
+                    abortCorruptChunk()
+                    return
+                }
+                runLocked { [decoded] in
+                    self.processChunkLocked(.sequential(fileID: decoded.fileID, data: decoded.data),
+                                            wireBytes: frame.payload.count)
+                }
+                return
+            }
             guard let chunk = try? SyncFilePayloadCodec.decode(FileChunkPayload.self, from: frame.payload) else {
                 abortCorruptChunk()
                 return
             }
             runLocked { [chunk] in
-                self.processChunkLocked(chunk, wireBytes: frame.payload.count)
+                self.processChunkLocked(.positioned(chunk), wireBytes: frame.payload.count)
             }
         case .fileAck:
             // 接收端不收 ack：忽略（有测试锁定该行为）
@@ -231,17 +250,17 @@ final class SyncFileReceiver: @unchecked Sendable {
     }
     func ack(fileID: String, receivedBytes: Int64, done: Bool = false,
              error: FileTransferErrorCode = .none,
-             maxInFlight: Int? = nil) -> FileAckPayload {
+             maxInFlight: Int? = nil, binaryChunks: Bool? = nil) -> FileAckPayload {
         FileAckPayload(fileID: fileID, receivedBytes: receivedBytes, done: done, error: error,
-                       maxInFlight: maxInFlight)
+                       maxInFlight: maxInFlight, binaryChunks: binaryChunks)
     }
 
-    /// 应答 file_meta 的 ack：**唯一的**能力协商点（窗口深度）。
-    /// 旧发送端会把这个可选字段当未知键忽略 ⇒ 自动回退停等。
+    /// 应答 file_meta 的 ack：**唯一的**能力协商点（窗口深度 + 二进制块）。
+    /// 旧发送端会把这两个可选字段当未知键忽略 ⇒ 自动回退停等 + base64。
     func metaAck(fileID: String, receivedBytes: Int64) -> FileAckPayload {
         let capabilities = capabilityOverride ?? .current
         return ack(fileID: fileID, receivedBytes: receivedBytes,
-                   maxInFlight: capabilities.maxInFlight)
+                   maxInFlight: capabilities.maxInFlight, binaryChunks: capabilities.binaryChunks)
     }
 
     // MARK: 计时诊断（锁内取快照）

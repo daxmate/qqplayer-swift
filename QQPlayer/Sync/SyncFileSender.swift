@@ -89,6 +89,8 @@ final class SyncFileSender: @unchecked Sendable {
         var inFlightMax: Int
         /// file_chunk 载荷累计字节（诊断：看 base64 的 33% 膨胀）
         var wireBytes: Int
+        /// 是否走二进制块载荷（对端在 ack 里声明才开）
+        var binaryChunks: Bool
         /// 已发出的块数（诊断用）
         var chunksSent: Int
         /// 首块/末块发出时刻 + 对应往返（秒；只留首末两次，不逐块刷屏）
@@ -207,7 +209,7 @@ final class SyncFileSender: @unchecked Sendable {
                               startedAt: Date(), handle: nil, lastAckBytes: nil,
                               nextOffset: startOffset, inFlight: [],
                               window: 1, // 协商前按停等发（= 旧端行为）；meta ack 后再放大
-                              inFlightMax: 0, wireBytes: 0,
+                              inFlightMax: 0, wireBytes: 0, binaryChunks: false,
                               chunksSent: 0, firstChunkSentAt: nil, lastChunkSentAt: nil,
                               firstChunkWait: nil, lastChunkWait: nil)
         lock.lock()
@@ -309,6 +311,9 @@ final class SyncFileSender: @unchecked Sendable {
         if let advertised = ack.maxInFlight {
             current.window = min(max(advertised, 1), SyncFileTransfer.maxInFlight)
         }
+        if let binary = ack.binaryChunks {
+            current.binaryChunks = binary
+        }
         // 首次推进 = 首块往返（发送 → 对端写盘确认）
         if current.firstChunkWait == nil, let sentAt = current.firstChunkSentAt {
             current.firstChunkWait = Date().timeIntervalSince(sentAt)
@@ -341,8 +346,8 @@ final class SyncFileSender: @unchecked Sendable {
             switch decision {
             case .stop:
                 break loop
-            case let .send(payload):
-                if let actions = sendChunk(payload) {
+            case let .send(payload, flags):
+                if let actions = sendChunk(payload, flags: flags) {
                     pending += actions
                     break loop
                 }
@@ -360,7 +365,7 @@ final class SyncFileSender: @unchecked Sendable {
 
     private enum SendDecision {
         case stop
-        case send(payload: Data)
+        case send(payload: Data, flags: SyncFrameFlags)
         case fail([Action])
     }
 
@@ -390,14 +395,26 @@ final class SyncFileSender: @unchecked Sendable {
                                          current: current))
         }
 
-        // 编码（base64 JSON）：线上字节在这里定，记账也在这里
+        // 编码（二进制 or base64 JSON）：线上字节在这里定，记账也在这里
         let chunk = FileChunkPayload(fileID: current.fileID, offset: offset, data: data)
         let payload: Data
-        do {
-            payload = try SyncFilePayloadCodec.encode(chunk)
-        } catch {
-            if current.handle == nil { try? handle?.close() }
-            return .fail(terminateLocked(.sendFailed("编码 file_chunk 失败：\(error)"), current: current))
+        let flags: SyncFrameFlags
+        if current.binaryChunks {
+            guard let binary = SyncFileChunkCodec.encodeBinary(fileID: current.fileID, data: data) else {
+                if current.handle == nil { try? handle?.close() }
+                return .fail(terminateLocked(.protocolError(current.fileID, "fileID 过长，二进制块无法编码"),
+                                             current: current))
+            }
+            payload = binary
+            flags = [.binaryChunk]
+        } else {
+            do {
+                payload = try SyncFilePayloadCodec.encode(chunk)
+            } catch {
+                if current.handle == nil { try? handle?.close() }
+                return .fail(terminateLocked(.sendFailed("编码 file_chunk 失败：\(error)"), current: current))
+            }
+            flags = []
         }
 
         current.handle = handle
@@ -410,7 +427,7 @@ final class SyncFileSender: @unchecked Sendable {
         if current.firstChunkSentAt == nil { current.firstChunkSentAt = now }
         current.lastChunkSentAt = now
         active = current
-        return .send(payload: payload)
+        return .send(payload: payload, flags: flags)
     }
 
     // MARK: ack 超时
@@ -547,9 +564,9 @@ final class SyncFileSender: @unchecked Sendable {
     }
 
     /// 发一块（锁外）。返回非 nil = 已终止本轮的待执行效果（发帧失败）。
-    private func sendChunk(_ payload: Data) -> [Action]? {
+    private func sendChunk(_ payload: Data, flags: SyncFrameFlags) -> [Action]? {
         do {
-            try session.sendApplicationFrame(type: .fileChunk, payload: payload)
+            try session.sendApplicationFrame(type: .fileChunk, payload: payload, extraFlags: flags)
             return nil
         } catch {
             // 发块失败（典型：会话刚关闭）→ 按终态通知（会话关闭路径已兜底则这里空跑）

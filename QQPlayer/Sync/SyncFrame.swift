@@ -75,12 +75,19 @@ enum SyncFrameType: UInt8, Equatable, Sendable, CaseIterable {
     case peerLibraryResponse = 16
 }
 
-/// 帧 flags（bit0 = encrypted）。
+/// 帧 flags（bit0 = encrypted，bit1 = 二进制块载荷）。
 struct SyncFrameFlags: OptionSet, Equatable, Sendable {
     let rawValue: UInt8
 
     /// payload 已用会话密钥加密
     static let encrypted = SyncFrameFlags(rawValue: 0x01)
+
+    /// file_chunk 的 payload 是**原始二进制**块（`fileIDLen|fileID|data`），不是 base64 JSON。
+    ///
+    /// 只在双方协商后置位（接收端在 file_ack 里声明 `binaryChunks`）：旧解码器会把这种
+    /// payload 当 JSON 解码失败，故不能无条件发。加解密与 AAD 不受影响——帧头 flags
+    /// 本身进 AAD，收端按线上 flags 重组，天然一致。
+    static let binaryChunk = SyncFrameFlags(rawValue: 0x02)
 }
 
 /// 一帧（值类型，编解码纯函数）。
