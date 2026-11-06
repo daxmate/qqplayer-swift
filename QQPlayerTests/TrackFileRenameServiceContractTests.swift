@@ -19,9 +19,8 @@
 //
 
 import Foundation
-import Testing
-
 @testable import QQPlayer
+import Testing
 
 private enum TrackFileRenameContract {
     /// 仓库根（`#filePath` 上两级 = QQPlayerTests/ → 仓库根）。
@@ -96,6 +95,8 @@ private enum TrackFileRenameContract {
         "QQPlayer/Services/NeteaseOnlineClient+Transport.swift",
         "QQPlayer/Services/QuarkCookieStore.swift",
         "QQPlayer/Services/ReclaimRestoreService.swift",
+        // 推荐结果缓存落盘（原子写：临时文件 → 目标 JSON，非按标签改名）
+        "QQPlayer/Services/RecommendationResultCache.swift",
         "QQPlayer/Services/StateManager.swift",
         "QQPlayer/Services/TagWriterService.swift",
         "QQPlayer/Services/TrackDeletionService.swift",
