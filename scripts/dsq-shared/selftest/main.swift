@@ -82,6 +82,28 @@ let groupLocations = DSQSharedResolver(
 expectEqual(groupLocations.source, .appGroupContainer, "App Group 分支来源")
 expectEqual(path(groupLocations.root), path(container.appendingPathComponent(DSQSharedLocations.rootDirectoryName)), "App Group 根路径")
 
+// MARK: - 2b. 容器路径不可写（ad-hoc / 未授权）→ 回落 Application Support
+
+let readOnlyContainer = sandbox.appendingPathComponent("readonly-container", isDirectory: true)
+try fm.createDirectory(at: readOnlyContainer, withIntermediateDirectories: true)
+try fm.setAttributes([.posixPermissions: 0o500], ofItemAtPath: readOnlyContainer.path)
+let unwritableLocations = DSQSharedResolver(
+    environment: [:],
+    fileManager: fm,
+    homeDirectory: sandbox,
+    isSandboxed: true,
+    containerURL: { _ in readOnlyContainer },
+    applicationSupportDirectory: { sandbox }
+).resolve()
+// 还原权限，避免影响沙盒目录清理
+try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: readOnlyContainer.path)
+expectEqual(unwritableLocations.source, .applicationSupport, "容器不可写 → 回落 Application Support")
+expect(unwritableLocations.fallbackNote != nil, "容器不可写时记录回落原因")
+expect(
+    unwritableLocations.fallbackNote?.contains("不可写") == true,
+    "回落原因包含不可写字样"
+)
+
 // MARK: - 3. 无容器 → Application Support 兜底
 
 let appSupport = sandbox.appendingPathComponent("app-support", isDirectory: true)

@@ -47,6 +47,14 @@ struct DSQSharedLocations: Equatable, Sendable {
 
     let root: URL
     let source: DSQSharedSource
+    /// 非首选分支的原因（仅回落时填写，用于日志排查；正常路径为 nil）。
+    let fallbackNote: String?
+
+    init(root: URL, source: DSQSharedSource, fallbackNote: String? = nil) {
+        self.root = root
+        self.source = source
+        self.fallbackNote = fallbackNote
+    }
 
     var modelsRoot: URL { child(Self.modelsDirectoryName) }
     var booksRoot: URL { child(Self.booksDirectoryName) }
@@ -116,14 +124,20 @@ struct DSQSharedResolver {
             )
         }
 
+        // App Group 容器路径“存在”不等于“能写”：ad-hoc / 未授权的签名也能拿到路径，
+        // 真正落盘时才 EPERM。因此每个候选都要做一次写入探测，失败才继续回落。
+        var fallbackNotes: [String] = []
+
         if let container = containerURL(DSQSharedLocations.appGroupIdentifier) {
-            return DSQSharedLocations(
-                root: container.appendingPathComponent(
-                    DSQSharedLocations.rootDirectoryName,
-                    isDirectory: true
-                ),
-                source: .appGroupContainer
+            let root = container.appendingPathComponent(
+                DSQSharedLocations.rootDirectoryName,
+                isDirectory: true
             )
+            if let failure = Self.writeProbeFailure(in: root, fileManager: fileManager) {
+                fallbackNotes.append("App Group 容器不可写（\(failure)）")
+            } else {
+                return DSQSharedLocations(root: root, source: .appGroupContainer)
+            }
         }
 
         if !isSandboxed {
@@ -133,15 +147,34 @@ struct DSQSharedResolver {
                 .appendingPathComponent(DSQSharedLocations.appGroupIdentifier, isDirectory: true)
                 .appendingPathComponent(DSQSharedLocations.rootDirectoryName, isDirectory: true)
             if isDirectory(groupRoot) {
-                return DSQSharedLocations(root: groupRoot, source: .groupContainerDirectory)
+                if let failure = Self.writeProbeFailure(in: groupRoot, fileManager: fileManager) {
+                    fallbackNotes.append("Group Containers 目录不可写（\(failure)）")
+                } else {
+                    return DSQSharedLocations(root: groupRoot, source: .groupContainerDirectory)
+                }
             }
         }
 
         let base = applicationSupportDirectory()
         return DSQSharedLocations(
             root: base.appendingPathComponent(DSQSharedLocations.rootDirectoryName, isDirectory: true),
-            source: .applicationSupport
+            source: .applicationSupport,
+            fallbackNote: fallbackNotes.isEmpty ? nil : fallbackNotes.joined(separator: "；")
         )
+    }
+
+    /// 写入探测：能建目录并落一个临时文件才算可用；返回 nil 表示可写，否则返回失败原因。
+    static func writeProbeFailure(in directory: URL, fileManager: FileManager) -> String? {
+        let probe = directory.appendingPathComponent(".dsq-write-probe-\(UUID().uuidString)")
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data("probe".utf8).write(to: probe, options: .atomic)
+            try? fileManager.removeItem(at: probe)
+            return nil
+        } catch {
+            try? fileManager.removeItem(at: probe)
+            return error.localizedDescription
+        }
     }
 
     /// 沙盒判定：`APP_SANDBOX_CONTAINER_ID` 由沙盒进程注入；home 路径兜底。

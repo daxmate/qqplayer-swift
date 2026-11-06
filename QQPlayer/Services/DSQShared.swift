@@ -17,10 +17,11 @@ enum DSQShared {
     ) -> DSQSharedLocations {
         let resolver = DSQSharedResolver(environment: environment, fileManager: fileManager)
         let locations = resolver.resolve()
-        AppLog.info(
-            .migration,
-            "🗂️ 共享资源根 source=\(locations.source.rawValue) root=\(locations.root.path)"
-        )
+        var message = "🗂️ 共享资源根 source=\(locations.source.rawValue) root=\(locations.root.path)"
+        if let note = locations.fallbackNote {
+            message += " fallback=\(note)"
+        }
+        AppLog.info(.migration, message)
         return locations
     }
 
