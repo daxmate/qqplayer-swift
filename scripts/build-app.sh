@@ -192,12 +192,12 @@ build_macos() {
     echo "ℹ️  覆盖构建设置：ARCHS=${archs} ONLY_ACTIVE_ARCH=NO"
     scripts/xcbuild.sh build -project "$PROJECT" -scheme "$MAC_SCHEME" \
       -destination "$MAC_DEST" \
-      -configuration "$CONFIG" CODE_SIGNING_ALLOWED=NO \
+      -configuration "$CONFIG" \
       ARCHS="$archs" ONLY_ACTIVE_ARCH=NO
   else
     scripts/xcbuild.sh build -project "$PROJECT" -scheme "$MAC_SCHEME" \
       -destination "$MAC_DEST" \
-      -configuration "$CONFIG" CODE_SIGNING_ALLOWED=NO
+      -configuration "$CONFIG"
   fi
   expect_app "macOS" "$DERIVED/Build/Products/$CONFIG/$APP_NAME.app"
   verify_macos_arch "$DERIVED/Build/Products/$CONFIG/$APP_NAME.app"
