@@ -46,6 +46,20 @@ struct RecommendationArtistConstraint: Sendable, Equatable {
     }
 }
 
+/// 请求语义判定：相似 / 风格类请求不以点名艺人做硬约束（异艺人相似结果应保留）。
+enum RecommendationArtistRequestSemantics {
+    /// 中文「类似 / 相似 / 风格接近…」与英文 similar；命中任一即视为相似语义。
+    static let similarityKeywords = [
+        "类似", "相似", "像", "风格接近", "差不多", "那种感觉", "比肩", "similar",
+    ]
+
+    static func isSimilarityRequest(_ rawText: String) -> Bool {
+        let text = rawText.precomposedStringWithCompatibilityMapping.lowercased()
+        guard !text.isEmpty else { return false }
+        return similarityKeywords.contains { text.contains($0) }
+    }
+}
+
 /// 从艺人搜索结果里解析同一艺人的名称集合（纯函数，便于单测）。
 enum RecommendationArtistAliasResolver {
     struct Candidate: Sendable, Equatable {

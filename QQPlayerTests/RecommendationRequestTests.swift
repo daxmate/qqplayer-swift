@@ -23,10 +23,11 @@ private struct KeywordProvider: OnlineSearchProviding {
     }
 }
 
-private struct SimilarProvider: OnlineSearchProviding, SimilarSongProviding {
+private struct SimilarProvider: OnlineSearchProviding, SimilarSongProviding, ArtistAliasProviding {
     let source: RecommendationSource
     var songs: [String: [RecommendationRemoteSong]] = [:]
     var similar: [Int: [RecommendationRemoteSong]] = [:]
+    var aliasesByArtist: [String: [String]] = [:]
 
     func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
         Array((songs[query] ?? []).prefix(limit))
@@ -34,6 +35,10 @@ private struct SimilarProvider: OnlineSearchProviding, SimilarSongProviding {
 
     func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong] {
         Array((similar[songID] ?? []).prefix(limit))
+    }
+
+    func aliases(for artist: String) async -> [String] {
+        aliasesByArtist[artist] ?? []
     }
 }
 
@@ -262,30 +267,52 @@ struct RecommendationRequestEngineTests {
         }
     }
 
-    @Test("相似艺人路径：用同艺人热歌做种子，追加相似歌曲")
-    func similarArtistPath() async {
-        let provider = SimilarProvider(
-            source: .netease,
-            songs: ["五月天": [remote("倔强", "五月天", songID: 42)]],
-            similar: [42: [
-                remote("温柔", "五月天"),
-                remote("想见你想见你想见你", "八三夭"),
-            ]]
-        )
+    @Test("纯点名请求：同艺人相似照常追加，异艺人相似被剔除")
+    func similarArtistPathUnderExplicitName() async {
+        let provider = makeSimilarProvider()
         let engine = RecommendationEngine(providers: [provider])
         let result = await engine.recommend(
-            request: request(artists: ["五月天"]),
+            request: request(artists: ["五月天"], rawText: "给我推荐一些五月天的歌"),
             profile: TasteProfile(),
             count: 10
         )
         switch result {
         case let .success(list):
-            // 同艺人相似的照常追加；点名艺人约束下，异艺人相似结果被剔除。
             #expect(list.map(\.title) == ["倔强", "温柔"])
             #expect(!list.contains { $0.artist == "八三夭" })
         case let .failure(error):
             Issue.record("不应失败：\(error)")
         }
+    }
+
+    @Test("类似语义：不建硬约束，异艺人相似结果保留")
+    func similarRequestKeepsOtherArtists() async {
+        let provider = makeSimilarProvider()
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["五月天"], rawText: "推荐和五月天类似的歌"),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 3)
+            #expect(list.contains { $0.title == "想见你想见你想见你" && $0.artist == "八三夭" })
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    private func makeSimilarProvider() -> SimilarProvider {
+        SimilarProvider(
+            source: .netease,
+            songs: ["五月天": [remote("倔强", "五月天", songID: 42)]],
+            similar: [42: [
+                remote("温柔", "五月天"),
+                remote("想见你想见你想见你", "八三夭"),
+            ]],
+            aliasesByArtist: ["五月天": ["五月天", "Mayday"]]
+        )
     }
 
     @Test("排除艺人：excludeArtists 命中的候选被剔除")
@@ -634,5 +661,39 @@ struct RecommendationArtistConstraintTests {
         ]
         let aliases = RecommendationArtistAliasResolver.aliases(for: "西城男孩", from: candidates)
         #expect(Set(aliases) == Set(["西城男孩", "Westlife"]))
+    }
+
+    @Test("别名解析失败/为空：放弃硬约束，回退旧行为（不静默出 0 条）")
+    func aliasFailureDisablesConstraint() async {
+        let provider = ArtistAliasProvider(
+            source: .netease,
+            songs: ["西城男孩": [
+                remote("My Love", "Westlife"),
+                remote("十年", "陈奕迅"),
+            ]]
+            // aliasesByArtist 为空 = 在线别名解析失败/无结果
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["西城男孩"], rawText: "给我推荐一些西城男孩的歌曲。"),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 2)
+            #expect(Set(list.map(\.artist)) == Set(["Westlife", "陈奕迅"]))
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("相似语义识别：命中关键词才视为相似请求")
+    func similaritySemantics() {
+        #expect(RecommendationArtistRequestSemantics.isSimilarityRequest("推荐和五月天类似的歌"))
+        #expect(RecommendationArtistRequestSemantics.isSimilarityRequest("来点像周杰伦的歌"))
+        #expect(RecommendationArtistRequestSemantics.isSimilarityRequest("风格接近五月天"))
+        #expect(!RecommendationArtistRequestSemantics.isSimilarityRequest("给我推荐一些西城男孩的歌曲。"))
+        #expect(!RecommendationArtistRequestSemantics.isSimilarityRequest(""))
     }
 }

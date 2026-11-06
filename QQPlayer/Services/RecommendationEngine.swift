@@ -250,9 +250,14 @@ struct RecommendationEngine: Sendable {
         return .success(picked)
     }
 
-    /// 点名艺人约束：referenceArtists 非空时，用在线别名把中文名 / 英文名归并成同一艺人集合。
-    /// 模型没给出 referenceArtists 时返回 nil，保持既有行为。
+    /// 点名艺人约束：referenceArtists 非空、且请求不是「类似 X」、别名解析成功时才启用。
+    /// 任一条件不满足返回 nil，保持既有行为（宁可不约束，也不静默返回 0 条）。
     private func makeArtistConstraint(for request: RecommendationUserRequest) async -> RecommendationArtistConstraint? {
+        if RecommendationArtistRequestSemantics.isSimilarityRequest(request.rawText) {
+            AppLog.info(.general, "🎵 推荐解析：识别为相似/风格请求，不启用点名硬约束")
+            return nil
+        }
+
         let named = request.referenceArtists
             .map { RecommendationKey.displayPrimaryArtist($0) }
             .filter { !$0.isEmpty }
@@ -265,6 +270,13 @@ struct RecommendationEngine: Sendable {
         var names: [String] = []
         for artist in named {
             let aliases = await aliasProvider?.aliases(for: artist) ?? []
+            guard !aliases.isEmpty else {
+                AppLog.warn(
+                    .general,
+                    "⚠️ 推荐点名艺人别名解析失败/为空（\(artist)），放弃硬约束并回退旧行为"
+                )
+                return nil
+            }
             names.append(contentsOf: aliases)
         }
         let constraint = RecommendationArtistConstraint(displayName: primary, names: names)
