@@ -77,6 +77,13 @@ Host（macOS）                           Client（iOS）
 - **大文件**：分块流式 + offset 断点（`.part` 原子落盘，沿用下载链路语义）+ SHA-256 完整性校验
 - 原语集（逻辑层，与传输解耦）：`pairRequest/pairConfirm`、`manifestFetch`、`filePull(fileID, offset)`、`filePush`、`changeLogPull(cursor)`、`changeLogPush(batch)`、`deviceList`
 
+### 5.1 文件传输吞吐 v2（2026-11-06 落定）
+
+实测基线：143 个文件 / 1369MB，平均 **2.12 MB/s**；1MB 停等在链路上单块 ack 往返 424–500ms（好批次 56ms）。改造两条，**零破坏兼容**：
+
+- **滑动窗口**：`SyncFileTransfer.maxInFlight = 8`（8 × 1MB 在途，硬上限在发送端）。接收端在**应答 `file_meta` 的那条 `file_ack`** 里带 `maxInFlight: Int?`；发送端取 `min(声明值, 8)`，对端不声明 → **1**（停等，行为与 v1 完全一致）。发送严格有序（`nextOffset` 只增），接收端仍按序落盘；ack 语义放宽为「不前进即忽略（重复/滞后）」，超时改为「**无进展**」：仅当 `ackTimeout`（默认 30s）内 `receivedBytes` 一直不前进才失败，单块慢不算失败。
+- **诊断**：`transfer send|receive` 行只追加 `win=` / `inFlightMax=` / `wireBytes=`（旧键不动），即可直接对比线上字节与源字节判断膨胀。
+
 ## 6. 同步内容
 
 ### 6.1 文件同步（Host 发起 · 不传播删除）

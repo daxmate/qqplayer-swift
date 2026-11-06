@@ -2,17 +2,20 @@
 //  SyncFileSender.swift
 //  QQPlayer
 //
-//  局域网同步（S2, M2b）发送端：单文件 停等协议（stop-and-wait）分块上传。
+//  局域网同步（S2, M2b）发送端：单文件分块上传。
 //
-//  流程（v1 定案，见任务包 3.2）：
+//  流程（v1 定案 + 2026-11-06 滑动窗口）：
 //    发送前整文件 SHA-256（流式读一遍）→ 发 file_meta(startOffset) → 等 file_ack：
 //      ack.error != none → 失败回调（resumeMismatch 时调用方可 startOffset=0 重试一次）
 //      ack.done        → 成功回调结束
-//      否则从 alignDown(ack.receivedBytes) 起发下一块（每块发完等 ack 再发下一块）
-//  发块用 FileHandle 分段读**本轮声明的块大小**（`Active.chunkSize` = 写进 file_meta 的
-//  同一个值；不整文件进内存）；空文件只发 meta 即 done。
-//  调用方已算好 SHA-256 时可经 `precomputedSHA256` 复用（省一次全文件读；对端仍会
-//  校验文件内容，传错只表现为对端 checksumMismatch，不会静默落错数据）。
+//      否则按 ack.receivedBytes 推进窗口，补齐到窗口深度（`Active.window`）继续发块
+//
+//  窗口（2026-11-06；1MB 停等在 424–500ms RTT 链路上实测只有 2.12MB/s）：
+//    深度由接收端在**应答 file_meta 那条 ack** 里声明，发送端取 min(声明, 硬上限)；
+//    对端不声明 → 1（停等，行为不变）。发送严格有序、在途块连续；ack 不前进 = 重复/滞后
+//    → 忽略（旧实现判违例）。发块恒为 FileHandle 分段读**本轮声明的块大小**，在途
+//    ≤ 窗口 × 块大小，绝不整文件入内存；空文件只发 meta 即 done。
+//  `precomputedSHA256` 可复用调用方算好的 SHA-256（省一次全文件读；对端仍校验内容）。
 //  cancel()/会话断连 → 失败回调（接收端 .part 保留，之后可续传）。
 //
 //  回调契约：send() 只对“未开始的传输”（参数/文件/会话前置错误）抛错；一旦传输
@@ -21,8 +24,8 @@
 //  并发：@unchecked Sendable + NSLock。帧回调内只迁移状态，发帧/回调在锁外执行
 //  （内存回环同步投递下 ack 会同步重入本对象：持锁发帧必死锁）。
 //  会话回调槽位链式挂接（先己后彼），结束用 enabled 开关静默自己，不拆链。
-//  停等 ack **有超时**（2026-09-12 审计 🟡T4）：对端没回应（meta 解码失败静默 /
-//  对端卡死）→ 超时按 `protocolError` 终止本轮、清状态（可重试），不留悬挂。
+//  ack **无进展超时**（2026-09-12 审计 🟡T4）：ackTimeout 内 receivedBytes 一直不前进
+//  （对端静默/卡死）→ 按 `protocolError` 终止、清状态（可重试），不留悬挂。
 //
 //  计时诊断（2026-09-18 提速）：一轮终态记**一行** `SyncTransferMetrics`（字节数 /
 //  块数 / 声明块大小 / 耗时 / 首末块等 ack 往返），经 `SyncConnectDiag.log` 落到各端
@@ -57,32 +60,50 @@ final class SyncFileSender: @unchecked Sendable {
 
     // MARK: 当前传输（锁保护）
 
+    /// 已发出但未确认的块（窗口占位；`end` = 该块末字节的绝对偏移）。
+    private struct SentChunk {
+        let offset: Int64, length: Int64
+        var end: Int64 { offset + length }
+    }
+
     private struct Active {
         let fileID: String
         let fileURL: URL
         let totalSize: Int64
         let name: String
-        /// 本轮**声明**的块大小（= file_meta.chunkSize；读块/对齐都用它，不再读常量）
+        /// 本轮**声明**的块大小（= file_meta.chunkSize；读块用它，不读常量）
         let chunkSize: Int64
-        /// 本轮起点（0 = 从头；> 0 = 断点续传；诊断用）
+        /// 本轮起点（> 0 = 断点续传）/ 开始时刻（诊断）
         let startOffset: Int64
-        /// 本轮开始时刻（诊断计时基线）
         let startedAt: Date
         var handle: FileHandle?
-        /// 最近一次有效 ack 的 receivedBytes（推进检测基线）
+        /// 最近一次**推进**的 ack 的 receivedBytes（重复/滞后 ack 的判定基线）
         var lastAckBytes: Int64?
+        /// 下一个要发的字节偏移（严格有序、连续；窗口内可多块在途）
+        var nextOffset: Int64
+        /// 在途未确认的块（按发送顺序；窗口占用 = `inFlight.count`）
+        var inFlight: [SentChunk]
+        /// 窗口深度（1 = 停等 / 旧对端；应答 file_meta 的 ack 协商后可能 > 1）
+        var window: Int
+        /// 在途块数峰值（诊断：判断窗口是否真的打满）
+        var inFlightMax: Int
+        /// file_chunk 载荷累计字节（诊断：看 base64 的 33% 膨胀）
+        var wireBytes: Int
         /// 已发出的块数（诊断用）
         var chunksSent: Int
-        /// 最后一块的发出时刻（算等 ack 往返；nil = 当前不在等 ack）
-        var chunkSentAt: Date?
-        /// 首块等 ack 往返（秒；只留首末两次，不逐块刷屏）
+        /// 首块/末块发出时刻 + 对应往返（秒；只留首末两次，不逐块刷屏）
+        var firstChunkSentAt: Date?
+        var lastChunkSentAt: Date?
         var firstChunkWait: TimeInterval?
         var lastChunkWait: TimeInterval?
     }
 
     private var active: Active?
-    /// 已排定的 ack 超时（锁保护；nil = 当前没在等 ack）
-    private var ackDeadlineItem: (any SyncScheduledDeadline)?
+    private var ackDeadlineItem: (any SyncScheduledDeadline)? // 已排定的 ack 超时（nil = 没在等）
+    /// 超时代号（锁保护）：每次重挂 +1，旧 deadline 到点按代号自证过期（cancel 是尽力而为）
+    private var deadlineGeneration = 0
+    /// 是否在窗口泵里（锁保护）：泵内 ack 只推进状态、由外层补齐 —— 否则同步回环会深递归爆栈
+    private var pumping = false
 
     /// 当前进行中传输的 fileID（nil = 空闲；诊断用）。
     var activeFileID: String? {
@@ -122,13 +143,9 @@ final class SyncFileSender: @unchecked Sendable {
     /// 发起一轮传输（同步完成本地准备并发 meta；后续由 ack 驱动，可能在本调用内
     /// 同步跑完——内存回环下是同步的，真实网络是异步的，两者都必须 work）。
     /// - Parameters:
-    ///   - fileURL: 本地源文件
     ///   - fileID: 传输唯一 ID（调用方保证；断点续传时须与首轮一致）
-    ///   - name: 接收端落盘名（默认取文件名）
     ///   - startOffset: 续传起点（上一轮 ack.receivedBytes；默认 0 = 从头）
-    ///   - precomputedSHA256: 调用方已算好的全文件 SHA-256（小写 hex；nil = 本方法现算）。
-    ///     复用可省一次全文件读；**调用方须保证它确实是该文件当前内容的 SHA-256**
-    ///     （内容不符时对端会 checksumMismatch 中止，不会静默落错数据）。
+    ///   - precomputedSHA256: 调用方已算好的全文件 SHA-256（须确实对应该文件当前内容）。
     func send(fileURL: URL, fileID: String, name: String? = nil, startOffset: Int64 = 0,
               precomputedSHA256: String? = nil) throws {
         // 前置校验（未开始传输的错误用 throw 报，不经 onCompletion）
@@ -187,8 +204,12 @@ final class SyncFileSender: @unchecked Sendable {
         // 若 meta 发出时还没有 active，同步到达的 ack 会被当 stray 丢弃
         let transfer = Active(fileID: fileID, fileURL: fileURL, totalSize: size,
                               name: resolvedName, chunkSize: chunkSize, startOffset: startOffset,
-                              startedAt: Date(), handle: nil, lastAckBytes: nil, chunksSent: 0,
-                              chunkSentAt: nil, firstChunkWait: nil, lastChunkWait: nil)
+                              startedAt: Date(), handle: nil, lastAckBytes: nil,
+                              nextOffset: startOffset, inFlight: [],
+                              window: 1, // 协商前按停等发（= 旧端行为）；meta ack 后再放大
+                              inFlightMax: 0, wireBytes: 0,
+                              chunksSent: 0, firstChunkSentAt: nil, lastChunkSentAt: nil,
+                              firstChunkWait: nil, lastChunkWait: nil)
         lock.lock()
         active = transfer
         scheduleAckDeadlineLocked()
@@ -209,6 +230,9 @@ final class SyncFileSender: @unchecked Sendable {
         }
         // 注：内存回环下整轮传输可能在 sendApplicationFrame 内同步跑完（active 已清）；
         // 异步网络下此处返回，等 ack 经 handleInboundFrame 推进。
+        // 块**只在收到 meta ack 之后**才发（`handleInboundFrame → pump`）：那条 ack 同时
+        // 是能力协商（窗口深度 / 二进制块）与续传对齐的确认点——先发块会在「对端其实要
+        // 从头重传」时白传，也拿不到协商结果（首块只能退回 base64）。
     }
 
     /// 中止当前发送（无传输则无操作）：停止发送并失败回调。
@@ -237,13 +261,17 @@ final class SyncFileSender: @unchecked Sendable {
             return
         }
         runLocked { [ack] in self.processAckLocked(ack) }
+        // ack 推进窗口后补齐（泵内到达时由外层循环接手，见 `pumping`）
+        pump()
     }
 
     // MARK: 锁内 ack 状态机
 
-    /// ack 处理（锁内；返回待执行效果）。ack 驱动：发完一块即挂起，不假设同步到达。
+    /// ack 处理（锁内）。窗口推进只迁状态，发块由 `pump()` 在锁外补齐。
+    /// 只有 error / done 字节不符 / 进度越界 / 超过已发送字节才中止；
+    /// 重复/滞后 ack 忽略（窗口下多条 ack 在途是常态，不是协议违例）。
     private func processAckLocked(_ ack: FileAckPayload) -> [Action] {
-        guard let current = active else { return [] } // 空闲 stray ack 忽略
+        guard var current = active else { return [] } // 空闲 stray ack 忽略
         guard ack.fileID == current.fileID else { return [] } // 别的传输的 ack 与本轮无关
 
         // ack.error → 失败（resumeMismatch 保留给调用方做 startOffset=0 重试决策）
@@ -256,56 +284,133 @@ final class SyncFileSender: @unchecked Sendable {
                 return terminateLocked(.protocolError(current.fileID, "done ack 字节数与 totalSize 不符"),
                                        current: current)
             }
+            // 末块往返：最后一块的发出时刻 → done 落地（诊断「尾部还差多少」）
+            if let sentAt = current.lastChunkSentAt {
+                current.lastChunkWait = Date().timeIntervalSince(sentAt)
+            }
             return terminateLocked(nil, current: current) // nil = 成功
         }
-        // 进度边界防御
+        // 进度边界防御（上界 = 本轮总字节；且不得比已发出的还多）
         guard ack.receivedBytes >= 0, ack.receivedBytes <= current.totalSize else {
             return terminateLocked(.protocolError(current.fileID, "ack 进度越界"), current: current)
         }
-        // 推进检测：ack 必须单调前进（重复/回退 ack = 协议违例，避免死循环重发）
-        if let last = current.lastAckBytes, ack.receivedBytes <= last {
-            return terminateLocked(.protocolError(current.fileID, "ack 未前进（重复/回退）"), current: current)
+        guard ack.receivedBytes <= current.nextOffset else {
+            return terminateLocked(.protocolError(current.fileID, "ack 超过已发送字节"), current: current)
         }
-        // 续传起点 = ack 进度对齐到**本轮声明**的块边界（防御：理论已对齐）
-        let offset = alignDown(ack.receivedBytes, to: current.chunkSize)
-        guard offset < current.totalSize else {
-            return terminateLocked(.protocolError(current.fileID, "ack 未 done 但字节已收齐"), current: current)
+        // 未前进的 ack（重复 / 滞后）→ 忽略（幂等；不能因此中止窗口内的传输）
+        if let last = current.lastAckBytes, ack.receivedBytes <= last {
+            return []
         }
 
-        // 读下一块（FileHandle 分段读，不整文件进内存；handle 惰性打开复用）
+        current.lastAckBytes = ack.receivedBytes
+        // 推进窗口：摘掉已被对端确认的块
+        current.inFlight.removeAll { $0.end <= ack.receivedBytes }
+        // 能力协商（应答 file_meta 的那条 ack 才带；旧端不带 → 保持停等 / base64）
+        if let advertised = ack.maxInFlight {
+            current.window = min(max(advertised, 1), SyncFileTransfer.maxInFlight)
+        }
+        // 首次推进 = 首块往返（发送 → 对端写盘确认）
+        if current.firstChunkWait == nil, let sentAt = current.firstChunkSentAt {
+            current.firstChunkWait = Date().timeIntervalSince(sentAt)
+        }
+        active = current
+        // 有推进才重挂：无进展超时语义（单块慢无所谓，一直不动才失败）
+        scheduleAckDeadlineLocked()
+        return []
+    }
+
+    // MARK: 窗口泵（锁外驱动，按窗口补齐发块）
+
+    /// 窗口补齐：只要窗口还有空位且没发完，就继续发下一块。
+    ///
+    /// 每块一次「持锁取快照 → 锁外发帧」，发帧期间到达的 ack 只推进状态；`pumping` 防重入
+    /// （同步回环下 ack 会同步重入，递归补齐会上千层）。失败/终止动作在退出泵后执行
+    /// （用户回调里可能立刻发起下一轮 send）。
+    private func pump() {
+        lock.lock()
+        let alreadyPumping = pumping
+        if !alreadyPumping { pumping = true }
+        lock.unlock()
+        guard !alreadyPumping else { return }
+
+        var pending: [Action] = []
+        loop: while true {
+            lock.lock()
+            let decision = nextSendLocked()
+            lock.unlock()
+            switch decision {
+            case .stop:
+                break loop
+            case let .send(payload):
+                if let actions = sendChunk(payload) {
+                    pending += actions
+                    break loop
+                }
+            case let .fail(actions):
+                pending += actions
+                break loop
+            }
+        }
+
+        lock.lock()
+        pumping = false
+        lock.unlock()
+        perform(pending)
+    }
+
+    private enum SendDecision {
+        case stop
+        case send(payload: Data)
+        case fail([Action])
+    }
+
+    private func nextSendLocked() -> SendDecision {
+        guard var current = active else { return .stop }
+        guard current.inFlight.count < current.window else { return .stop }
+        guard current.nextOffset < current.totalSize else { return .stop }
+
+        let offset = current.nextOffset
+        let length = min(current.chunkSize, current.totalSize - offset) // 尾块短读
+
+        var handle = current.handle // FileHandle 分段读 + 惰性打开复用
         let data: Data
         do {
-            if current.handle == nil {
-                var opened = current
-                opened.handle = try FileHandle(forReadingFrom: current.fileURL)
-                active = opened
+            if handle == nil {
+                handle = try FileHandle(forReadingFrom: current.fileURL)
             }
-            let handle = active?.handle // 刚打开或复用
             try handle?.seek(toOffset: UInt64(offset))
-            data = try handle?.read(upToCount: Int(current.chunkSize)) ?? Data()
+            data = try handle?.read(upToCount: Int(length)) ?? Data()
         } catch {
-            return terminateLocked(.fileUnavailable("读源文件失败：\(error)"), current: current)
+            if current.handle == nil { try? handle?.close() } // 刚打开失败 → 别泄漏
+            return .fail(terminateLocked(.fileUnavailable("读源文件失败：\(error)"), current: current))
         }
-        guard !data.isEmpty else {
-            return terminateLocked(.fileUnavailable("源文件比声明短（传输未完已到文件尾）"), current: current)
+        guard Int64(data.count) == length else {
+            if current.handle == nil { try? handle?.close() }
+            return .fail(terminateLocked(.fileUnavailable("源文件比声明短（传输未完已到文件尾）"),
+                                         current: current))
         }
 
-        // 记推进基线 → 发块（发帧在锁外执行）；重挂 ack 超时（每块都是一次新的等待）
-        var updated = current
-        updated.handle = active?.handle
-        updated.lastAckBytes = ack.receivedBytes
-        // 上一块等 ack 的往返（首末各留一次，诊断用）
-        if let sentAt = current.chunkSentAt {
-            let wait = Date().timeIntervalSince(sentAt)
-            if updated.firstChunkWait == nil {
-                updated.firstChunkWait = wait
-            }
-            updated.lastChunkWait = wait
-            updated.chunkSentAt = nil
+        // 编码（base64 JSON）：线上字节在这里定，记账也在这里
+        let chunk = FileChunkPayload(fileID: current.fileID, offset: offset, data: data)
+        let payload: Data
+        do {
+            payload = try SyncFilePayloadCodec.encode(chunk)
+        } catch {
+            if current.handle == nil { try? handle?.close() }
+            return .fail(terminateLocked(.sendFailed("编码 file_chunk 失败：\(error)"), current: current))
         }
-        active = updated
-        scheduleAckDeadlineLocked()
-        return [.sendChunk(FileChunkPayload(fileID: current.fileID, offset: offset, data: data))]
+
+        current.handle = handle
+        current.inFlight.append(SentChunk(offset: offset, length: length))
+        current.nextOffset = offset + length
+        current.inFlightMax = max(current.inFlightMax, current.inFlight.count)
+        current.chunksSent += 1
+        current.wireBytes += payload.count
+        let now = Date()
+        if current.firstChunkSentAt == nil { current.firstChunkSentAt = now }
+        current.lastChunkSentAt = now
+        active = current
+        return .send(payload: payload)
     }
 
     // MARK: ack 超时
@@ -316,8 +421,10 @@ final class SyncFileSender: @unchecked Sendable {
     private func scheduleAckDeadlineLocked() {
         cancelAckDeadlineLocked()
         guard ackTimeout > 0 else { return }
+        deadlineGeneration += 1
+        let generation = deadlineGeneration
         ackDeadlineItem = deadlineScheduler.schedule(after: ackTimeout) { [weak self] in
-            self?.handleAckDeadline()
+            self?.handleAckDeadline(generation: generation)
         }
     }
 
@@ -326,10 +433,17 @@ final class SyncFileSender: @unchecked Sendable {
         ackDeadlineItem = nil
     }
 
-    /// 超时：对端不再推进 → 按协议违例终止本轮并**清状态**（调用方可重试，不留悬挂）。
-    private func handleAckDeadline() {
+    /// 超时：**无进展**超时（不是「某一块慢」）→ 按协议违例终止本轮并**清状态**
+    /// （调用方可重试，不留悬挂）。
+    /// - Parameter generation: 排定时的代号；与当前不符 = 已被推进重挂，直接忽略。
+    private func handleAckDeadline(generation: Int) {
+        lock.lock()
+        let isCurrent = generation == deadlineGeneration
+        let fileID = active?.fileID
+        lock.unlock()
+        guard isCurrent, let fileID else { return }
         if let actions = terminateActive(
-            .protocolError(activeID() ?? "", "等待 file_ack 超时（\(ackTimeout)s）")
+            .protocolError(fileID, "等待 file_ack 无进展超时（\(ackTimeout)s）")
         ) {
             perform(actions)
         }
@@ -376,7 +490,10 @@ final class SyncFileSender: @unchecked Sendable {
             firstChunkWaitMs: current.firstChunkWait.map { Int($0 * 1000) },
             lastChunkWaitMs: current.lastChunkWait.map { Int($0 * 1000) },
             succeeded: succeeded,
-            errorLine: error.map { "\($0)" }
+            errorLine: error.map { "\($0)" },
+            window: current.window,
+            inFlightMax: current.inFlightMax,
+            wireBytes: current.wireBytes
         )
     }
 
@@ -392,10 +509,6 @@ final class SyncFileSender: @unchecked Sendable {
         }
     }
 
-    private func alignDown(_ value: Int64, to chunkSize: Int64) -> Int64 {
-        value - value % chunkSize
-    }
-
     private func fileSize(_ url: URL) -> Int64? {
         (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int64
     }
@@ -409,7 +522,6 @@ final class SyncFileSender: @unchecked Sendable {
     // MARK: 锁 + 效果执行
 
     private enum Action {
-        case sendChunk(FileChunkPayload)
         case log(SyncTransferMetrics)
         case finish(Outcome)
     }
@@ -422,12 +534,10 @@ final class SyncFileSender: @unchecked Sendable {
         perform(actions)
     }
 
-    /// 执行效果（锁外；顺序 = 生产顺序：先发块/记日志，再用户回调）。
+    /// 执行效果（锁外；顺序 = 生产顺序：先记日志，再用户回调）。
     private func perform(_ actions: [Action]) {
         for action in actions {
             switch action {
-            case let .sendChunk(chunk):
-                sendChunk(chunk)
             case let .log(metrics):
                 SyncConnectDiag.log(metrics.logLine)
             case let .finish(outcome):
@@ -436,26 +546,15 @@ final class SyncFileSender: @unchecked Sendable {
         }
     }
 
-    private func sendChunk(_ chunk: FileChunkPayload) {
-        markChunkSent()
+    /// 发一块（锁外）。返回非 nil = 已终止本轮的待执行效果（发帧失败）。
+    private func sendChunk(_ payload: Data) -> [Action]? {
         do {
-            try session.sendApplicationFrame(type: .fileChunk, payload: SyncFilePayloadCodec.encode(chunk))
+            try session.sendApplicationFrame(type: .fileChunk, payload: payload)
+            return nil
         } catch {
             // 发块失败（典型：会话刚关闭）→ 按终态通知（会话关闭路径已兜底则这里空跑）
-            if let actions = terminateActive(.sendFailed("发送 file_chunk 失败：\(error)")) {
-                perform(actions)
-            }
+            return terminateActive(.sendFailed("发送 file_chunk 失败：\(error)"))
         }
-    }
-
-    /// 记「刚发出第 N 块」（诊断计时基线；锁内只动计数/时刻）。
-    private func markChunkSent() {
-        lock.lock()
-        defer { lock.unlock() }
-        guard var current = active else { return }
-        current.chunksSent += 1
-        current.chunkSentAt = Date()
-        active = current
     }
 
     // MARK: 会话槽位挂接（链式：先己后彼；结束用开关静默，不拆链）

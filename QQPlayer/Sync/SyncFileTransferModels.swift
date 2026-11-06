@@ -24,8 +24,16 @@ enum SyncFileTransfer {
     /// 一次往返的固定开销（含 Nagle/delayed-ACK、Wi-Fi 唤醒、帧加解密与 JSON 编解码）
     /// 在「只传 3 首」时占大头——放大块把块数（= 往返次数）压到 1/4。
     /// 1MB 块 base64 后 ~1.37MB，仍远小于 16MB 帧限（`SyncFrame.maxPayloadSize`）；
-    /// 保守起步，滑动窗口/并发留待实测数据后再定。
+    /// 保守起步；滑动窗口 / 二进制块见 2026-11-06 提速（`maxInFlight`）。
     static let chunkSize: Int64 = 1_048_576
+
+    /// 滑动窗口深度上限（2026-11-06 提速，阶段 A）。
+    ///
+    /// 发送端最多这么多块同时在途未确认：8 × 1MB = 8MB —— 在途内存的**硬上限在这里**，
+    /// 不随对端声明放大。接收端在应答 file_meta 的那条 file_ack 里声明自己能吃多深
+    /// （`FileAckPayload.maxInFlight`），发送端取 `min(声明值, 本常量)`；旧接收端不声明
+    /// → 发送端回退 1（停等，行为与 v1 完全一致）。
+    static let maxInFlight = 8
 }
 
 /// 一轮文件传输的实测计时（**纯值，无 IO**；落点见 `SyncConnectDiag.log`）。
@@ -60,6 +68,15 @@ struct SyncTransferMetrics: Equatable, Sendable {
     let succeeded: Bool
     /// 失败时的简短原因（成功为 nil）
     let errorLine: String?
+    /// 本轮实际采用的窗口深度（发送端；1 = 停等 / 旧对端。接收端恒为 nil）
+    ///
+    /// 三个字段用 `var` 而非 `let`：可选 `var` 在 memberwise init 里有隐式 nil 默认值，
+    /// 既有构造点（接收端 metricsLocked 等）一行都不用改——「可选字段，旧调用点不破」。
+    var window: Int?
+    /// 在途块数峰值（发送端；用来判断窗口是否真的打满，而不是只配了 8 却一直发 1）
+    var inFlightMax: Int?
+    /// 本轮 file_chunk 载荷的实际字节数（两端都记）：与 `bytes` 对比即知 base64 的 33% 膨胀
+    var wireBytes: Int?
 
     /// 单行日志（键=值，便于 grep/切分；一行一个文件）。
     var logLine: String {
@@ -79,6 +96,9 @@ struct SyncTransferMetrics: Equatable, Sendable {
             "chunks=\(chunks)",
             "ms=\(milliseconds)",
         ]
+        if let window { parts.append("win=\(window)") }
+        if let inFlightMax { parts.append("inFlightMax=\(inFlightMax)") }
+        if let wireBytes { parts.append("wireBytes=\(wireBytes)") }
         if seconds > 0 {
             let mbPerSecond = Double(moved) / seconds / 1_048_576
             parts.append(String(format: "rate=%.2fMB/s", mbPerSecond))
@@ -114,13 +134,26 @@ struct FileChunkPayload: Codable, Equatable, Sendable {
     var data: Data
 }
 
-/// file_ack 载荷：停等协议推进信号。
+/// file_ack 载荷：传输推进信号（滑动窗口下每块一条，可能多条同时在途）。
 /// receivedBytes = 接收端 .part 当前**完整**字节数（已对齐块边界）。
 struct FileAckPayload: Codable, Equatable, Sendable {
     var fileID: String
     var receivedBytes: Int64
     var done: Bool
     var error: FileTransferErrorCode
+    /// 接收端可接受的在途窗口深度（**能力协商**，只在应答 file_meta 那条 ack 里带）。
+    /// nil = 对端不声明（旧端）→ 发送端回退停等。可选字段对旧端的 JSON 解码透明。
+    var maxInFlight: Int?
+}
+
+/// 接收端能力声明（`FileAckPayload` 的协商字段打包；测试注入 / 生产默认值共用）。
+struct SyncFileTransferCapabilities: Equatable, Sendable {
+    var maxInFlight: Int?
+
+    /// 生产默认：窗口 8。
+    static let current = SyncFileTransferCapabilities(maxInFlight: SyncFileTransfer.maxInFlight)
+    /// 旧端（不声明任何能力）：发送端据此回退停等。
+    static let legacy = SyncFileTransferCapabilities(maxInFlight: nil)
 }
 
 /// 线上错误码（v1 定案枚举值）。

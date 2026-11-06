@@ -130,8 +130,9 @@ extension SyncFileReceiver {
             active = Active(fileID: meta.fileID, name: meta.name, totalSize: meta.totalSize,
                             chunkSize: meta.chunkSize, sha256Hex: sha, finalURL: finalURL,
                             partURL: partURL, startOffset: meta.startOffset, startedAt: Date(),
-                            handle: handle, received: received, chunksReceived: 0)
-            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: received, done: false))]
+                            handle: handle, received: received, chunksReceived: 0, wireBytes: 0)
+            // 起始 ack 是本轮**唯一**的能力协商点（窗口深度 + 二进制块）
+            return [.sendAck(metaAck(fileID: meta.fileID, receivedBytes: received))]
         } catch {
             let code = errorCode(for: error)
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: code)),
@@ -140,14 +141,25 @@ extension SyncFileReceiver {
     }
 
     /// chunk 处理（锁内；返回待执行效果）。
-    func processChunkLocked(_ chunk: FileChunkPayload) -> [Action] {
+    /// - Parameter wireBytes: 该帧 payload 的实际字节数（诊断用）
+    func processChunkLocked(_ chunk: FileChunkPayload, wireBytes: Int) -> [Action] {
+        let fileID = chunk.fileID
         guard let current = active else {
             // 无 meta 先到块：无从校验，回 protocolError 让对端发送端干净失败
-            return [.sendAck(ack(fileID: chunk.fileID, receivedBytes: 0, error: .protocolError))]
+            return [.sendAck(ack(fileID: fileID, receivedBytes: 0, error: .protocolError))]
         }
-        guard chunk.fileID == current.fileID else {
+        guard fileID == current.fileID else {
             // 交叠传输的块（本对象正收别的 fileID）→ protocolError（v1 不交叠）
-            return [.sendAck(ack(fileID: chunk.fileID, receivedBytes: 0, error: .protocolError))]
+            return [.sendAck(ack(fileID: fileID, receivedBytes: 0, error: .protocolError))]
+        }
+
+        let offset = chunk.offset
+        let data = chunk.data
+
+        // offset < 期望 = 过期块（ack 丢失/滞后时的幂等重传）：**不重复写盘**，
+        // 只补发当前累计 ack 把发送端拉回同步（重复写会把文件写坏，比失败更糟）
+        if offset < current.received {
+            return [.sendAck(ack(fileID: current.fileID, receivedBytes: current.received))]
         }
 
         let abortError = SyncFileTransferError.protocolError(current.fileID, "块序违例")
@@ -155,14 +167,14 @@ extension SyncFileReceiver {
                                             error: .protocolError)),
                                .log(metrics(current, succeeded: false, error: abortError)),
                                .finish(.failed(abortError))]
-        // offset 必须 == 期望偏移（= 已收完整字节）；跳/乱序 → protocolError 中止
-        guard chunk.offset == current.received else {
+        // offset 必须 == 期望偏移（= 已收完整字节）；跳块（offset > 期望）→ protocolError 中止
+        guard offset == current.received else {
             active = nil
             closeHandle(current)
             return abort
         }
         // 块大小/长度边界防御（上界 = **声明**块大小，不是本地常量）
-        let byteCount = Int64(chunk.data.count)
+        let byteCount = Int64(data.count)
         guard byteCount > 0,
               byteCount <= current.chunkSize,
               byteCount <= current.totalSize - current.received
@@ -173,7 +185,7 @@ extension SyncFileReceiver {
         }
 
         do {
-            try current.handle?.write(contentsOf: chunk.data)
+            try current.handle?.write(contentsOf: data)
         } catch {
             let code = errorCode(for: error)
             active = nil
@@ -187,6 +199,7 @@ extension SyncFileReceiver {
         var advanced = current
         advanced.received += byteCount
         advanced.chunksReceived += 1
+        advanced.wireBytes += wireBytes
         active = advanced
 
         if advanced.received == advanced.totalSize {

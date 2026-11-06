@@ -89,6 +89,147 @@ final class LoopbackTransport: SyncPeerTransport, @unchecked Sendable {
     }
 }
 
+// MARK: - 手动投递通道（窗口 / 滞后 ack 用例）
+
+/// 与 `LoopbackTransport` 同协议，但 `send` 只**入队**，由用例 `flush` 决定何时投递对端。
+///
+/// 为什么需要（2026-11-06 滑动窗口）：同步回环下「发一块 → 立刻收到 ack」⇒ 窗口里永远
+/// 只有 1 块在途，窗口 8 与窗口 1 在行为上不可区分（等于没测）。攒住帧才有观察点：
+/// 「一次补齐发了几块」= 窗口占用。
+final class DeferredTransport: SyncPeerTransport, @unchecked Sendable {
+    weak var session: SyncPeerSession?
+    var peer: DeferredTransport?
+    private let lock = NSLock()
+    private var outbox: [Data] = []
+    private var history: [Data] = []
+
+    func sendFrameBytes(_ data: Data) {
+        lock.lock()
+        outbox.append(data)
+        history.append(data)
+        lock.unlock()
+    }
+
+    func closeTransport() {
+        peer?.deliverClosed()
+    }
+
+    /// 待投递帧数。
+    var pendingCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return outbox.count
+    }
+
+    /// 待投递帧的类型（帧头第 9 字节 = type，恒明文）。
+    var pendingTypes: [SyncFrameType] {
+        lock.lock(); defer { lock.unlock() }
+        return outbox.compactMap { data in
+            guard data.count >= SyncFrame.headerLength else { return nil }
+            return SyncFrameType(rawValue: data[data.startIndex + 8])
+        }
+    }
+
+    /// 本端发出过的全部原始帧（flags / 载荷体量断言用）。
+    var sentFrames: [Data] {
+        lock.lock(); defer { lock.unlock() }
+        return history
+    }
+
+    /// 把队列里的帧按顺序投递给对端；投递中新产生的帧留在队列（不参与本轮）。
+    /// - Returns: 本轮投递帧数
+    @discardableResult
+    func flushAll() -> Int {
+        lock.lock()
+        let batch = outbox
+        outbox.removeAll()
+        lock.unlock()
+        for data in batch { peer?.deliver(data) }
+        return batch.count
+    }
+
+    /// 只投递队首 `count` 帧（滞后 ack / 半窗推进用）。
+    @discardableResult
+    func flush(_ count: Int) -> Int {
+        lock.lock()
+        let n = min(count, outbox.count)
+        let batch = Array(outbox.prefix(n))
+        outbox.removeFirst(n)
+        lock.unlock()
+        for data in batch { peer?.deliver(data) }
+        return n
+    }
+
+    func deliver(_ data: Data) {
+        session?.handleInboundData(data)
+    }
+
+    func deliverClosed() {
+        session?.handleTransportClosed()
+    }
+}
+
+// MARK: - 手动投递版双 ready 夹具
+
+/// `SessionFixture` 的延迟投递版：握手也走 DeferredTransport（内部反复 flush 直到两端
+/// ready），之后由用例逐帧推进。
+struct DeferredSessionFixture {
+    let hostSession: SyncPeerSession
+    let clientSession: SyncPeerSession
+    let hostChannel: DeferredTransport
+    let clientChannel: DeferredTransport
+
+    static func pairedHandshake() -> DeferredSessionFixture {
+        let hostIdentity = SyncIdentity.generate()
+        let clientIdentity = SyncIdentity.generate()
+        let hostTrust = MemoryTrustStore()
+        let clientTrust = MemoryTrustStore()
+        let hostChannel = DeferredTransport()
+        let clientChannel = DeferredTransport()
+        hostChannel.peer = clientChannel
+        clientChannel.peer = hostChannel
+
+        let hostSession = SyncPeerSession(
+            role: .host,
+            localIdentity: hostIdentity,
+            trustStore: hostTrust,
+            config: SyncSessionConfiguration(),
+            pairingNonces: SyncPairingNonceRegistry(),
+            transport: hostChannel
+        )
+        let clientSession = SyncPeerSession(
+            role: .client,
+            localIdentity: clientIdentity,
+            trustStore: clientTrust,
+            config: SyncSessionConfiguration(),
+            transport: clientChannel
+        )
+        hostChannel.session = hostSession
+        clientChannel.session = clientSession
+
+        hostTrust.seed(deviceID: clientIdentity.deviceID, publicKeyRaw: clientIdentity.publicKeyRaw,
+                       displayName: "iPhone", role: .client)
+        clientTrust.seed(deviceID: hostIdentity.deviceID, publicKeyRaw: hostIdentity.publicKeyRaw,
+                         displayName: "MacBook", role: .host)
+        hostSession.handleTransportReady()
+        clientSession.handleTransportReady()
+        // 已配对重连：hello 一来一回即 ready（20 轮上限 = 防死循环的硬闸）
+        var rounds = 0
+        while !(hostSession.isReady && clientSession.isReady), rounds < 20 {
+            hostChannel.flushAll()
+            clientChannel.flushAll()
+            rounds += 1
+        }
+        hostChannel.flushAll()
+        clientChannel.flushAll()
+        return DeferredSessionFixture(
+            hostSession: hostSession,
+            clientSession: clientSession,
+            hostChannel: hostChannel,
+            clientChannel: clientChannel
+        )
+    }
+}
+
 // MARK: - R3a 曲库事实桩（选择集展开器注入）
 
 /// 内存曲库事实（歌单 → 曲目 → content_hash/相对路径）：harness 里模拟 Mac 侧 DB。

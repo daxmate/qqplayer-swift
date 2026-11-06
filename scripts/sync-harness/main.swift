@@ -3748,6 +3748,240 @@ do {
     check(false, "㊽ ⑥ 抛错：\(error)")
 }
 
+// MARK: - ㊾ 文件传输吞吐 v2（滑动窗口 / 二进制块 / 无进展超时 / 旧端回退）
+
+section("㊾ 传输吞吐 v2：窗口补齐 / 幂等重投 / 无进展超时 / 旧端回退")
+
+/// 在**手动投递**通道上跑完一轮传输：反复「投递发送端帧 → 投递 ack 帧」直到发送端出结论。
+/// - Returns: 观测到的最大在途块数（= 一次补窗压进去几块 = 窗口占用）
+func driveDeferredTransfer(
+    _ fixture: DeferredSessionFixture,
+    senderOutcome: LockedBox<SyncFileSender.Outcome?>,
+    maxRounds: Int = 400
+) -> Int {
+    var maxChunks = 0
+    var rounds = 0
+    while senderOutcome.value == nil, rounds < maxRounds {
+        fixture.hostChannel.flushAll() // 发送端帧 → 接收端（写盘 + 回 ack）
+        fixture.clientChannel.flushAll() // ack → 发送端（推进窗口 + 补发）
+        maxChunks = max(maxChunks, fixture.hostChannel.pendingTypes.filter { $0 == .fileChunk }.count)
+        rounds += 1
+    }
+    return maxChunks
+}
+
+/// 原始帧统计（type 恒明文在帧头第 9 字节）：块帧数 / 块帧线上载荷总字节
+/// （含每帧 28B 的 nonce+tag）。
+func chunkFrameStats(_ frames: [Data]) -> (count: Int, payloadBytes: Int) {
+    var count = 0
+    var payloadBytes = 0
+    for frame in frames where frame.count >= SyncFrame.headerLength {
+        let start = frame.startIndex
+        guard frame[start + 8] == SyncFrameType.fileChunk.rawValue else { continue }
+        count += 1
+        payloadBytes += frame.count - SyncFrame.headerLength
+    }
+    return (count, payloadBytes)
+}
+
+// 窗口等价性：同一个文件分别按「窗口 8 / 窗口 1 / 旧端无能力」传一遍。
+do {
+    let source = silentData(0x91, count: Int(SyncFileTransfer.chunkSize) * 10 + 12_345) // 10 整块 + 尾块
+    let expectedChunks = 11
+    let sourceURL = try writeFile("big.bin", in: try tempRoot("tw-src"), data: source)
+    let sha = try SyncFileChecksum.sha256Hex(ofFile: sourceURL)
+
+    func run(_ capabilities: SyncFileTransferCapabilities, tag: String) throws
+        -> (landed: Data, maxInFlight: Int, frame: (count: Int, payloadBytes: Int)) {
+        let fixture = DeferredSessionFixture.pairedHandshake()
+        let dir = try tempRoot("tw-rx-\(tag)")
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+        receiver.capabilityOverride = capabilities
+        let rxOutcome = LockedBox<SyncFileReceiver.Outcome?>(nil)
+        receiver.onCompletion = { outcome in rxOutcome.mutate { $0 = outcome } }
+        let txOutcome = LockedBox<SyncFileSender.Outcome?>(nil)
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.onCompletion = { outcome in txOutcome.mutate { $0 = outcome } }
+
+        try sender.send(fileURL: sourceURL, fileID: "win-\(tag)", name: "big.bin")
+        let maxInFlight = driveDeferredTransfer(fixture, senderOutcome: txOutcome)
+        checkEqual(txOutcome.value, .succeeded, "㊾ [\(tag)] 发送端成功")
+        if case .received = rxOutcome.value {
+            check(true, "㊾ [\(tag)] 接收端 received")
+        } else {
+            check(false, "㊾ [\(tag)] 接收端 received（实际 \(String(describing: rxOutcome.value))）")
+        }
+        let landed = try Data(contentsOf: dir.appendingPathComponent("big.bin"))
+        return (landed, maxInFlight, chunkFrameStats(fixture.hostChannel.sentFrames))
+    }
+
+    let wide = try run(.current, tag: "win8")
+    checkEqual(wide.frame.count, expectedChunks, "㊾ 窗口 8：块帧数 = \(expectedChunks)")
+    checkEqual(wide.maxInFlight, SyncFileTransfer.maxInFlight, "㊾ 窗口 8：单次补窗压进 8 块（窗口真的打满）")
+    checkEqual(wide.landed, source, "㊾ 窗口 8：落盘字节与源完全一致")
+    checkEqual(SyncFileChecksum.sha256Hex(of: wide.landed), sha, "㊾ 窗口 8：落盘 SHA-256 与源一致")
+
+    let narrow = try run(SyncFileTransferCapabilities(maxInFlight: 1), tag: "win1")
+    checkEqual(narrow.maxInFlight, 1, "㊾ 窗口 1：停等（单次只压 1 块）")
+    checkEqual(narrow.landed, source, "㊾ 窗口 1：落盘字节与窗口 8 完全一致（等价性）")
+    checkEqual(SyncFileChecksum.sha256Hex(of: narrow.landed), sha, "㊾ 窗口 1：SHA-256 一致")
+
+    let legacy = try run(.legacy, tag: "legacy")
+    checkEqual(legacy.maxInFlight, 1, "㊾ 旧端（不声明能力）：自动回退停等")
+    checkEqual(legacy.landed, source, "㊾ 旧端：落盘字节仍完全一致")
+} catch {
+    check(false, "㊾ 窗口等价性抛错：\(error)")
+}
+
+// 重复 / 滞后 ack：不中止、不重复写。
+do {
+    let fixture = DeferredSessionFixture.pairedHandshake()
+    let dir = try tempRoot("tw-dup-rx")
+    let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+    let source = silentData(0x92, count: Int(SyncFileTransfer.chunkSize) * 3)
+    let sourceURL = try writeFile("dup.bin", in: try tempRoot("tw-dup-src"), data: source)
+    let outcomes = LockedBox<[SyncFileSender.Outcome]>([])
+    let sender = SyncFileSender(session: fixture.hostSession)
+    sender.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
+
+    try sender.send(fileURL: sourceURL, fileID: "dup-ack", name: "dup.bin")
+    fixture.hostChannel.flushAll()
+    fixture.clientChannel.flushAll()
+    // 之后再补一条**不前进**的重复 ack（receivedBytes=0）：窗口语义下必须忽略
+    try fixture.clientSession.sendApplicationFrame(
+        type: .fileAck,
+        payload: try SyncFilePayloadCodec.encode(FileAckPayload(
+            fileID: "dup-ack", receivedBytes: 0, done: false, error: .none
+        ))
+    )
+    fixture.clientChannel.flushAll()
+    check(sender.isActive || outcomes.value == [.succeeded],
+          "㊾ 重复 ack：被忽略（传输未因此中止）")
+    var rounds = 0
+    while outcomes.value.isEmpty, rounds < 200 {
+        fixture.hostChannel.flushAll()
+        fixture.clientChannel.flushAll()
+        rounds += 1
+    }
+    checkEqual(outcomes.value, [.succeeded], "㊾ 重复 ack：最终仍成功（恰一次 Outcome）")
+    check(!receiver.isActive, "㊾ 重复 ack：接收端无残留传输")
+    checkEqual(try Data(contentsOf: dir.appendingPathComponent("dup.bin")), source,
+               "㊾ 重复 ack：落盘内容未被重复写")
+} catch {
+    check(false, "㊾ 重复 ack 抛错：\(error)")
+}
+
+// 接收端幂等重投：offset < 已收 → 不写盘、补发当前累计 ack。
+do {
+    let dir = try tempRoot("tw-rechunk")
+    let fixture = SessionFixture.pairedHandshake()
+    let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+    let acks = LockedBox<[FileAckPayload]>([])
+    receiver.onAckSent = { ack in acks.mutate { $0.append(ack) } }
+    let chunkSize = Int(SyncFileTransfer.chunkSize)
+    let source = silentData(0x93, count: chunkSize + 1_000)
+    let meta = FileMetaPayload(fileID: "rechunk", name: "rc.bin", totalSize: Int64(source.count),
+                               chunkSize: SyncFileTransfer.chunkSize,
+                               sha256Hex: SyncFileChecksum.sha256Hex(of: source), startOffset: 0)
+    receiver.handleInboundFrame(SyncFrame(type: .fileMeta,
+                                          payload: try SyncFilePayloadCodec.encode(meta)))
+    let first = FileChunkPayload(fileID: "rechunk", offset: 0, data: Data(source.prefix(chunkSize)))
+    receiver.handleInboundFrame(SyncFrame(type: .fileChunk,
+                                          payload: try SyncFilePayloadCodec.encode(first)))
+    receiver.handleInboundFrame(SyncFrame(type: .fileChunk,
+                                          payload: try SyncFilePayloadCodec.encode(first))) // 重复块
+    checkEqual(acks.value.last?.receivedBytes, Int64(chunkSize),
+               "㊾ 重复块：ack 仍报「已收 1 块」（不重复累加、不写两遍）")
+    receiver.handleInboundFrame(SyncFrame(
+        type: .fileChunk,
+        payload: try SyncFilePayloadCodec.encode(FileChunkPayload(
+            fileID: "rechunk", offset: Int64(chunkSize), data: Data(source.dropFirst(chunkSize))
+        ))
+    ))
+    checkEqual(try Data(contentsOf: dir.appendingPathComponent("rc.bin")), source,
+               "㊾ 重复块：最终内容与源一致（重复块未落两遍）")
+} catch {
+    check(false, "㊾ 重复块抛错：\(error)")
+}
+
+// 无进展超时：窗口打开后不再投递 ack → 失败、Outcome 恰一次、状态清空。
+do {
+    let fixture = DeferredSessionFixture.pairedHandshake()
+    let receiver = SyncFileReceiver(session: fixture.clientSession,
+                                    directory: try tempRoot("tw-stall-rx"))
+    _ = receiver.isActive
+    let source = silentData(0x94, count: Int(SyncFileTransfer.chunkSize) * 10)
+    let sourceURL = try writeFile("stall.bin", in: try tempRoot("tw-stall-src"), data: source)
+    let outcomes = LockedBox<[SyncFileSender.Outcome]>([])
+    let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.25)
+    sender.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
+
+    try sender.send(fileURL: sourceURL, fileID: "stall", name: "stall.bin")
+    fixture.hostChannel.flushAll() // meta + 首块 → 接收端
+    fixture.clientChannel.flushAll() // meta ack（打开窗口）+ 首块 ack
+    check(sender.isActive, "㊾ 无进展：窗口已打开、正在等 ack")
+    Thread.sleep(forTimeInterval: 0.8)
+    checkEqual(outcomes.value.count, 1, "㊾ 无进展超时：Outcome 只触发一次")
+    var timedOut = false
+    if case let .failed(.protocolError(id, reason))? = outcomes.value.first {
+        timedOut = id == "stall" && reason.contains("无进展")
+    }
+    check(timedOut, "㊾ 无进展超时：protocolError 且原因点名「无进展」")
+    check(!sender.isActive, "㊾ 无进展超时：状态已清（可重试）")
+} catch {
+    check(false, "㊾ 无进展超时抛错：\(error)")
+}
+
+// 单块慢 ≠ 失败：ack 间隔 0.12s（> ackTimeout 的 1/3）但一直在前进 → 不超时。
+do {
+    let fixture = DeferredSessionFixture.pairedHandshake()
+    // 持有强引用：会话回调是 weak self，接收端被释放就没人回 ack 了
+    let receiver = SyncFileReceiver(session: fixture.clientSession, directory: try tempRoot("tw-slow-rx"))
+    let source = silentData(0x96, count: Int(SyncFileTransfer.chunkSize) * 4)
+    let sourceURL = try writeFile("slow.bin", in: try tempRoot("tw-slow-src"), data: source)
+    let outcomes = LockedBox<[SyncFileSender.Outcome]>([])
+    let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.3)
+    sender.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
+
+    try sender.send(fileURL: sourceURL, fileID: "slow", name: "slow.bin")
+    var rounds = 0
+    while outcomes.value.isEmpty, rounds < 40 {
+        fixture.hostChannel.flushAll() // 窗口补出来的块 → 接收端
+        fixture.clientChannel.flush(1) // 每轮只放一条 ack：慢，但一直在推进
+        Thread.sleep(forTimeInterval: 0.12)
+        rounds += 1
+    }
+    check(receiver.isActive || outcomes.value == [.succeeded], "㊾ 慢但前进：接收端已收尾")
+    checkEqual(outcomes.value, [.succeeded], "㊾ 慢但前进：不误判无进展超时")
+} catch {
+    check(false, "㊾ 慢但前进抛错：\(error)")
+}
+
+// resumeMismatch 重试路径仍工作（窗口改造不得破坏续传语义）。
+do {
+    let dir = try tempRoot("tw-resume")
+    let source = silentData(0x95, count: Int(SyncFileTransfer.chunkSize) + 5_000)
+    let sourceURL = try writeFile("r.bin", in: try tempRoot("tw-resume-src"), data: source)
+    try silentData(0x00, count: 500).write(to: dir.appendingPathComponent("r.bin.part"))
+    let fixture = SessionFixture.pairedHandshake()
+    let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+    _ = receiver
+    let outcomes = LockedBox<[SyncFileSender.Outcome]>([])
+    let sender = SyncFileSender(session: fixture.hostSession)
+    sender.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
+
+    try sender.send(fileURL: sourceURL, fileID: "resume-tw", name: "r.bin",
+                    startOffset: SyncFileTransfer.chunkSize)
+    checkEqual(outcomes.value, [.failed(.resumeMismatch("resume-tw"))],
+               "㊾ resumeMismatch：首轮按预期失败（.part 与起点不符）")
+    try sender.send(fileURL: sourceURL, fileID: "resume-tw", name: "r.bin", startOffset: 0)
+    checkEqual(outcomes.value.last, .succeeded, "㊾ resumeMismatch：startOffset=0 重传成功")
+    checkEqual(try Data(contentsOf: dir.appendingPathComponent("r.bin")), source,
+               "㊾ resumeMismatch：重传后落盘一致")
+} catch {
+    check(false, "㊾ resumeMismatch 抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")
