@@ -1137,6 +1137,9 @@
 "recommendation_model_status_loading" = "Загружено";
 "recommendation_model_size_unknown" = "Размер неизвестен";
 "recommendation_footer_source" = "Источник: %@";
+"recommendation_footer_cache" = "Результат из кэша · %@";
+"recommendation_cache_age_minutes" = "%d мин назад";
+"recommendation_cache_age_hours" = "%d ч назад";
 "recommendation_reason_similar_artist" = "Похоже на %@";
 "recommendation_reason_genre" = "Тот же жанр: %@";
 "recommendation_reason_matched_taste" = "Соответствует вашему вкусу";

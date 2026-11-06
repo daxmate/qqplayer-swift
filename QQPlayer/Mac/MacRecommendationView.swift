@@ -161,16 +161,35 @@ struct MacRecommendationView: View {
         )
     }
 
-    /// 页脚小字：本次生成用的是本地模型还是规则。
+    /// 页脚小字：生成来源 +（命中缓存时）「缓存结果 · X 分钟前」与「刷新」。
     private var sourceFooter: some View {
-        HStack {
+        HStack(spacing: DesignTokens.space8) {
             Text("recommendation_footer_source".localized(with: model.planSource.localizationKey.localized))
+            if model.cacheHit, let cachedAt = model.cacheCreatedAt {
+                Text("recommendation_footer_cache".localized(with: cacheAgeText(cachedAt)))
+            }
             Spacer()
+            if model.cacheHit {
+                Button("recommendation_refresh".localized) {
+                    Task { await refresh() }
+                }
+                .buttonStyle(.link)
+                .disabled(model.phase == .loading)
+            }
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
         .padding(.horizontal, DesignTokens.space16)
         .padding(.vertical, DesignTokens.space8)
+    }
+
+    /// 缓存时间的相对文案（分钟 / 小时两档，够用且不引第三方格式化）。
+    private func cacheAgeText(_ date: Date) -> String {
+        let minutes = max(0, Int(Date().timeIntervalSince(date) / 60))
+        if minutes < 60 {
+            return "recommendation_cache_age_minutes".localized(with: minutes)
+        }
+        return "recommendation_cache_age_hours".localized(with: minutes / 60)
     }
 
     // MARK: - Content

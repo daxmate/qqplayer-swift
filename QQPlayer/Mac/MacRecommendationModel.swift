@@ -33,20 +33,30 @@ final class MacRecommendationModel {
     /// 打开 App 时判断 24h（P1 不做定时器，见任务包 F）。
     static let refreshInterval: TimeInterval = 24 * 3600
 
+    /// 本次结果是否来自结果缓存（UI 页脚展示「缓存结果 · X 分钟前」）。
+    private(set) var cacheHit = false
+    /// 缓存条目的生成时间（命中时展示；未命中为 nil）。
+    private(set) var cacheCreatedAt: Date?
+
     private let blacklistURL: URL?
     private let historyURL: URL?
     private let clock: () -> Date
+    private let cache: RecommendationResultCache?
     private var blacklist: RecommendationBlacklist
     private var isGenerating = false
+    /// 最近一次请求的缓存键（「不再推荐」时清掉，避免下次命中把已拉黑的歌带回来）。
+    private var lastCacheKey: RecommendationCacheKeyInput?
 
     init(
         blacklistURL: URL? = RecommendationBlacklistStore.defaultURL(),
         historyURL: URL? = RecommendationRequestHistoryStore.defaultURL(),
+        cacheDirectoryURL: URL? = RecommendationResultCache.defaultDirectoryURL(),
         clock: @escaping () -> Date = { Date() }
     ) {
         self.blacklistURL = blacklistURL
         self.historyURL = historyURL
         self.clock = clock
+        cache = cacheDirectoryURL.map { RecommendationResultCache(directory: $0, clock: clock) }
         blacklist = RecommendationBlacklistStore.load(from: blacklistURL)
     }
 
@@ -59,25 +69,33 @@ final class MacRecommendationModel {
         await generate(count: count)
     }
 
-    /// 「换一批」：有指令时重跑该指令，否则重新生成画像推荐。
+    /// 「换一批」/ 页脚「刷新」：手动动作，**强制绕过缓存并覆盖**。
     func refresh(
         count: Int,
         rounds: Int = DeleteSettings.defaultRecommendationChatRounds,
         useLocalModel: Bool = true
     ) async {
         if let text = activeRequestText {
-            await submit(text, count: count, rounds: rounds, useLocalModel: useLocalModel)
+            await submit(text, count: count, rounds: rounds, useLocalModel: useLocalModel, bypassCache: true)
         } else {
-            await generate(count: count)
+            await generate(count: count, bypassCache: true)
         }
     }
 
     /// 指令输入：只走本地模型；模型未就绪直接失败，绝不回退规则解析。
-    func submit(_ text: String, count: Int, rounds: Int, useLocalModel: Bool) async {
+    func submit(
+        _ text: String,
+        count: Int,
+        rounds: Int,
+        useLocalModel: Bool,
+        bypassCache: Bool = false
+    ) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isGenerating else { return }
         isGenerating = true
         phase = .loading
+        cacheHit = false
+        cacheCreatedAt = nil
         defer { isGenerating = false }
 
         #if canImport(MLXLLM) && arch(arm64) && os(macOS)
@@ -95,6 +113,20 @@ final class MacRecommendationModel {
             if Task.isCancelled { return }
 
             let profile = RecommendationProfileBuilder.build(input)
+            let key = cacheKey(
+                rawText: trimmed,
+                profile: profile,
+                libraryFingerprint: input.libraryFingerprint,
+                planSource: .localModel,
+                modelIdentity: RecommendationPlannerFactory.localModelIdentity() ?? "none"
+            )
+            lastCacheKey = key
+            if bypassCache {
+                cache?.invalidate(key)
+            } else if applyCacheHit(key, requestText: trimmed) {
+                return
+            }
+
             let history = RecommendationRequestHistoryStore.load(from: historyURL, limit: rounds)
             let planned = await planner.makeRequest(text: trimmed, history: history.entries, profile: profile)
             if Task.isCancelled { return }
@@ -122,6 +154,7 @@ final class MacRecommendationModel {
                 lastGeneratedAt = clock()
                 planSource = .localModel
                 phase = .loaded
+                storeCache(key, planSource: .localModel, candidates: list)
                 var updated = history
                 updated.append(
                     RecommendationRequestHistoryEntry(
@@ -151,6 +184,9 @@ final class MacRecommendationModel {
         blacklist.add(title: candidate.title, artist: candidate.artist)
         RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
         candidates.removeAll { $0.id == candidate.id }
+        if let lastCacheKey {
+            cache?.invalidate(lastCacheKey)
+        }
     }
 
     /// 跳转在线搜索时的预填词：`歌名 主艺人`。
@@ -159,10 +195,12 @@ final class MacRecommendationModel {
         return artist.isEmpty ? candidate.title : "\(candidate.title) \(artist)"
     }
 
-    private func generate(count: Int) async {
+    private func generate(count: Int, bypassCache: Bool = false) async {
         guard !isGenerating else { return }
         isGenerating = true
         phase = .loading
+        cacheHit = false
+        cacheCreatedAt = nil
         defer { isGenerating = false }
 
         guard let input = await RecommendationDataSource.loadInput(now: clock(), blacklist: blacklist) else {
@@ -172,8 +210,22 @@ final class MacRecommendationModel {
         if Task.isCancelled { return }
 
         let profile = RecommendationProfileBuilder.build(input)
-        let planner = RecommendationPlannerFactory.make(settings: DeleteSettings.load())
-        let plan = await planner.makePlan(for: profile)
+        let selection = RecommendationPlannerFactory.selection(settings: DeleteSettings.load())
+        let key = cacheKey(
+            rawText: "",
+            profile: profile,
+            libraryFingerprint: input.libraryFingerprint,
+            planSource: selection.planSource,
+            modelIdentity: selection.modelIdentity
+        )
+        lastCacheKey = key
+        if bypassCache {
+            cache?.invalidate(key)
+        } else if applyCacheHit(key, requestText: nil) {
+            return
+        }
+
+        let plan = await selection.planner.makePlan(for: profile)
         if Task.isCancelled { return }
         planSource = plan.source
         let result = await RecommendationEngine().recommend(
@@ -188,8 +240,56 @@ final class MacRecommendationModel {
             candidates = list
             lastGeneratedAt = clock()
             phase = .loaded
+            storeCache(key, planSource: plan.source, candidates: list)
         case let .failure(error):
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: - 结果缓存
+
+    /// 缓存键：请求原话 + 画像摘要 + 曲库指纹 + planner/模型身份 + locale。
+    ///
+    /// 说明：chat 指令的解析结果（referenceArtists 等）是模型的非确定输出，放进键会让同句
+    /// 复现率趋零，故请求身份用 rawText；解析结果只作为条目摘要留档。
+    private func cacheKey(
+        rawText: String,
+        profile: TasteProfile,
+        libraryFingerprint: String,
+        planSource: RecommendationPlanSource,
+        modelIdentity: String
+    ) -> RecommendationCacheKeyInput {
+        RecommendationCacheKeyInput(
+            rawText: rawText,
+            profileSummary: RecommendationProfileSummary.make(from: profile).cacheKeyText,
+            libraryFingerprint: libraryFingerprint,
+            planner: planSource,
+            modelIdentity: modelIdentity,
+            localeIdentifier: Locale.current.identifier
+        )
+    }
+
+    /// 命中即落状态并返回 true（planner / 召回引擎都不启动）。
+    private func applyCacheHit(_ key: RecommendationCacheKeyInput, requestText: String?) -> Bool {
+        guard let cache, let hit = cache.load(key) else { return false }
+        candidates = hit.candidates
+        planSource = hit.planSource
+        lastGeneratedAt = hit.createdAt
+        cacheHit = true
+        cacheCreatedAt = hit.createdAt
+        if let requestText {
+            activeRequestText = requestText
+        }
+        phase = .loaded
+        return true
+    }
+
+    /// 成功后写缓存（空结果 / 失败结果不写）。
+    private func storeCache(
+        _ key: RecommendationCacheKeyInput,
+        planSource: RecommendationPlanSource,
+        candidates: [RecommendedCandidate]
+    ) {
+        _ = cache?.store(key, planSource: planSource, candidates: candidates)
     }
 }

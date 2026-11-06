@@ -219,6 +219,7 @@
 		DCA5B5740BE2402198D99645 /* RecommendationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BB11223BF646E8ADE33812 /* RecommendationTests.swift */; };
 		B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */; };
 		B1A0000000000000000000E2 /* RecommendationRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000E1 /* RecommendationRequestTests.swift */; };
+		8C165FE153CE4AE890B73BFD /* RecommendationResultCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -485,6 +486,7 @@
 		17BB11223BF646E8ADE33812 /* RecommendationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationTests.swift; sourceTree = "<group>"; };
 		B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationPlannerTests.swift; sourceTree = "<group>"; };
 		B1A0000000000000000000E1 /* RecommendationRequestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationRequestTests.swift; sourceTree = "<group>"; };
+		B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationResultCacheTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -867,6 +869,7 @@
 				Services/ReclaimRestoreService.swift,
 				Services/RecommendationEngine.swift,
 				Services/RecommendationProfile.swift,
+				Services/RecommendationResultCache.swift,
 				Services/RecommendationStore.swift,
 				Services/RecommendationTypes.swift,
 				"Services/SFBAudioEngineManager+Decoder.swift",
@@ -1340,6 +1343,7 @@
 				17BB11223BF646E8ADE33812 /* RecommendationTests.swift */,
 				B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */,
 				B1A0000000000000000000E1 /* RecommendationRequestTests.swift */,
+				B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1858,6 +1862,7 @@
 				DCA5B5740BE2402198D99645 /* RecommendationTests.swift in Sources */,
 				B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */,
 				B1A0000000000000000000E2 /* RecommendationRequestTests.swift in Sources */,
+				8C165FE153CE4AE890B73BFD /* RecommendationResultCacheTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

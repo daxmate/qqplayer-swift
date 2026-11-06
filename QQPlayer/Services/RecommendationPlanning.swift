@@ -18,7 +18,7 @@ import Foundation
 // MARK: - 计划来源
 
 /// 检索计划来源（用于设置页 / 推荐页脚注展示，不参与召回打分）。
-enum RecommendationPlanSource: String, Sendable, Equatable {
+enum RecommendationPlanSource: String, Codable, Sendable, Equatable {
     case rule
     case localModel
 

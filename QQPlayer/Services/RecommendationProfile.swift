@@ -39,6 +39,8 @@ struct RecommendationProfileInput: Sendable {
     var tracks: [TrackInfo] = []
     var blacklist: RecommendationBlacklist = RecommendationBlacklist()
     var now: Date = Date()
+    /// 曲库指纹（缓存键用；空串 = 未知，调用方按不可缓存处理）。
+    var libraryFingerprint: String = ""
 }
 
 // MARK: - 输出

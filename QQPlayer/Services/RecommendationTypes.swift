@@ -15,7 +15,7 @@ import Foundation
 // MARK: - 来源
 
 /// 推荐候选来源（P1 只有两个在线源；rawValue 进候选 id，不得随意改）。
-enum RecommendationSource: String, CaseIterable, Sendable {
+enum RecommendationSource: String, CaseIterable, Codable, Sendable {
     case netease
     case gequhai
 
@@ -149,7 +149,7 @@ enum RecommendationKey {
 // MARK: - 候选
 
 /// 一条推荐候选（召回 → 去重 → 打分后的展示模型）。
-struct RecommendedCandidate: Identifiable, Equatable, Sendable {
+struct RecommendedCandidate: Identifiable, Codable, Equatable, Sendable {
     var title: String
     var artist: String
     var album: String?

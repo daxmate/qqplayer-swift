@@ -579,7 +579,11 @@ enum RecommendationDataSource {
                         plays: playRows,
                         tracks: trackInfos,
                         blacklist: blacklist,
-                        now: now
+                        now: now,
+                        libraryFingerprint: RecommendationLibraryFingerprint.make(
+                            stableIds: tracks.map(\.stableId),
+                            latestModificationMicros: tracks.compactMap(\.modificationDate).max()
+                        )
                     )
                 }
             } catch {

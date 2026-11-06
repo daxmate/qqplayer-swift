@@ -1140,6 +1140,9 @@
 "recommendation_model_status_loading" = "Chargé";
 "recommendation_model_size_unknown" = "Taille inconnue";
 "recommendation_footer_source" = "Généré par %@";
+"recommendation_footer_cache" = "Résultat en cache · %@";
+"recommendation_cache_age_minutes" = "il y a %d min";
+"recommendation_cache_age_hours" = "il y a %d h";
 "recommendation_reason_similar_artist" = "Semblable à %@";
 "recommendation_reason_genre" = "Même genre : %@";
 "recommendation_reason_matched_taste" = "Correspond à vos goûts";

@@ -1145,6 +1145,9 @@
 "recommendation_model_status_loading" = "已加载";
 "recommendation_model_size_unknown" = "大小未知";
 "recommendation_footer_source" = "生成来源：%@";
+"recommendation_footer_cache" = "缓存结果 · %@";
+"recommendation_cache_age_minutes" = "%d 分钟前";
+"recommendation_cache_age_hours" = "%d 小时前";
 "recommendation_reason_similar_artist" = "与你喜欢的 %@ 相似";
 "recommendation_reason_genre" = "同曲风：%@";
 "recommendation_reason_matched_taste" = "与你口味相近";
