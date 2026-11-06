@@ -2295,6 +2295,8 @@
 				CODE_SIGN_ENTITLEMENTS = QQPlayerMac.entitlements;
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 65;
+				MARKETING_VERSION = 1.1.3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "QQPlayerMac-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = QQPlayer;
@@ -2322,6 +2324,8 @@
 				CODE_SIGN_ENTITLEMENTS = QQPlayerMac.entitlements;
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 65;
+				MARKETING_VERSION = 1.1.3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "QQPlayerMac-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = QQPlayer;
