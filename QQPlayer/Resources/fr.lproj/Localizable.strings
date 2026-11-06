@@ -1117,6 +1117,8 @@
 "recommendation_download" = "Télécharger";
 "recommendation_dismiss" = "Ne plus recommander";
 "recommendation_reason_artist" = "Vous écoutez souvent %@";
+"recommendation_reason_requested_artist" = "Artiste demandé";
+"recommendation_artist_shortfall" = "Seulement %d morceaux de %@ trouvés";
 "recommendation_reason_era" = "Correspond à votre décennie %d";
 "recommendation_reason_trend" = "Tendance dans vos écoutes récentes : %@";
 "recommendation_reason_new" = "Pas encore dans votre bibliothèque";

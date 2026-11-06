@@ -1443,6 +1443,8 @@
 "recommendation_download" = "下載";
 "recommendation_dismiss" = "不再推薦";
 "recommendation_reason_artist" = "常聽 %@";
+"recommendation_reason_requested_artist" = "你點名的藝人";
+"recommendation_artist_shortfall" = "只找到 %d 首 %@ 的歌";
 "recommendation_reason_era" = "符合你愛聽的 %d 年代";
 "recommendation_reason_trend" = "最近常聽 %@";
 "recommendation_reason_new" = "音樂庫還沒有";

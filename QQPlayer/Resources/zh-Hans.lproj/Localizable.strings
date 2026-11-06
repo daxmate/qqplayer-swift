@@ -1122,6 +1122,8 @@
 "recommendation_download" = "下载";
 "recommendation_dismiss" = "不再推荐";
 "recommendation_reason_artist" = "常听 %@";
+"recommendation_reason_requested_artist" = "你点名的艺人";
+"recommendation_artist_shortfall" = "只找到 %d 首 %@ 的歌";
 "recommendation_reason_era" = "符合你爱听的 %d 年代";
 "recommendation_reason_trend" = "最近常听 %@";
 "recommendation_reason_new" = "曲库还没有";

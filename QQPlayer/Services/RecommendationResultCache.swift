@@ -132,6 +132,8 @@ struct RecommendationCacheEntry: Codable, Equatable, Sendable {
     var planSource: RecommendationPlanSource
     var keySummary: RecommendationCacheKeySummary
     var candidates: [RecommendedCandidate]
+    /// 点名艺人展示名（旧条目无此字段 → nil，UI 不展示不足说明）。
+    var requestedArtist: String?
 }
 
 /// 命中结果（`createdAt` 用于 UI「缓存结果 · X 分钟前」）。
@@ -140,6 +142,7 @@ struct RecommendationCacheHit: Equatable, Sendable {
     var planSource: RecommendationPlanSource
     var createdAt: Date
     var hitCount: Int
+    var requestedArtist: String?
 }
 
 // MARK: - 存储
@@ -204,7 +207,8 @@ struct RecommendationResultCache {
             candidates: entry.candidates,
             planSource: entry.planSource,
             createdAt: entry.createdAt,
-            hitCount: refreshed.hitCount
+            hitCount: refreshed.hitCount,
+            requestedArtist: entry.requestedArtist
         )
     }
 
@@ -215,7 +219,8 @@ struct RecommendationResultCache {
     func store(
         _ key: RecommendationCacheKeyInput,
         planSource: RecommendationPlanSource,
-        candidates: [RecommendedCandidate]
+        candidates: [RecommendedCandidate],
+        requestedArtist: String? = nil
     ) -> Bool {
         guard !candidates.isEmpty else { return false }
         let now = clock()
@@ -226,7 +231,8 @@ struct RecommendationResultCache {
             hitCount: 0,
             planSource: planSource,
             keySummary: RecommendationCacheKeySummary(input: key),
-            candidates: candidates
+            candidates: candidates,
+            requestedArtist: requestedArtist
         )
         guard write(entry, key: key.sha256) else { return false }
         pruneIfNeeded()

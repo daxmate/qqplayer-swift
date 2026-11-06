@@ -37,6 +37,21 @@ private struct SimilarProvider: OnlineSearchProviding, SimilarSongProviding {
     }
 }
 
+/// 带别名能力的桩：点名艺人约束测试用（不联网）。
+private struct ArtistAliasProvider: OnlineSearchProviding, ArtistAliasProviding {
+    let source: RecommendationSource
+    var songs: [String: [RecommendationRemoteSong]] = [:]
+    var aliasesByArtist: [String: [String]] = [:]
+
+    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        Array((songs[query] ?? []).prefix(limit))
+    }
+
+    func aliases(for artist: String) async -> [String] {
+        aliasesByArtist[artist] ?? []
+    }
+}
+
 private func remote(
     _ title: String,
     _ artist: String,
@@ -252,7 +267,10 @@ struct RecommendationRequestEngineTests {
         let provider = SimilarProvider(
             source: .netease,
             songs: ["五月天": [remote("倔强", "五月天", songID: 42)]],
-            similar: [42: [remote("想见你想见你想见你", "八三夭")]]
+            similar: [42: [
+                remote("温柔", "五月天"),
+                remote("想见你想见你想见你", "八三夭"),
+            ]]
         )
         let engine = RecommendationEngine(providers: [provider])
         let result = await engine.recommend(
@@ -262,7 +280,9 @@ struct RecommendationRequestEngineTests {
         )
         switch result {
         case let .success(list):
-            #expect(list.contains { $0.title == "想见你想见你想见你" })
+            // 同艺人相似的照常追加；点名艺人约束下，异艺人相似结果被剔除。
+            #expect(list.map(\.title) == ["倔强", "温柔"])
+            #expect(!list.contains { $0.artist == "八三夭" })
         case let .failure(error):
             Issue.record("不应失败：\(error)")
         }
@@ -422,12 +442,13 @@ struct RecommendationIntentPriorityTests {
 struct RecommendationExplicitArtistOrderTests {
     @Test("画像亲和更高时，点名艺人仍排在最前")
     func explicitArtistFirstDespiteProfileAffinity() async {
-        let provider = KeywordProvider(
+        let provider = ArtistAliasProvider(
             source: .netease,
             songs: [
                 "华语流行": [remote("十年", "陈奕迅"), remote("浮夸", "陈奕迅")],
                 "西城男孩": [remote("My Love", "Westlife"), remote("You Raise Me Up", "Westlife")],
-            ]
+            ],
+            aliasesByArtist: ["西城男孩": ["Westlife"]]
         )
         var engine = RecommendationEngine(providers: [provider])
         engine.maxSourceShare = 1
@@ -445,10 +466,173 @@ struct RecommendationExplicitArtistOrderTests {
         )
         switch result {
         case let .success(list):
-            #expect(list.count == 4)
-            #expect(list.prefix(2).map(\.artist) == ["Westlife", "Westlife"])
+            // 点名艺人 = 硬约束：画像项（陈奕迅）不再补足。
+            #expect(list.map(\.artist) == ["Westlife", "Westlife"])
         case let .failure(error):
             Issue.record("不应失败：\(error)")
         }
+    }
+}
+
+// MARK: - 点名艺人硬约束
+
+@Suite("推荐指令：点名艺人硬约束")
+struct RecommendationArtistConstraintTests {
+    @Test("点名艺人：只出该艺人（含别名），标题命中的其他艺人被剔除")
+    func onlyNamedArtist() async {
+        let provider = ArtistAliasProvider(
+            source: .netease,
+            songs: [
+                "西城男孩": [
+                    remote("My Love", "Westlife"),
+                    remote("You Raise Me Up", "Westlife"),
+                    remote("此情永不移", "鲸鱼向海_Joy声声"),
+                    remote("季候风", "王菲"),
+                ],
+            ],
+            aliasesByArtist: ["西城男孩": ["Westlife", "西城男孩"]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["西城男孩"], rawText: "给我推荐一些西城男孩的歌曲。"),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.map(\.artist) == ["Westlife", "Westlife"])
+            #expect(!list.contains { $0.artist.contains("王菲") })
+            #expect(!list.contains { $0.artist.contains("鲸鱼向海") })
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("别名双向：点名英文名也能匹配中文名结果")
+    func aliasBothWays() async {
+        let provider = ArtistAliasProvider(
+            source: .netease,
+            songs: ["Westlife": [remote("My Love", "西城男孩")]],
+            aliasesByArtist: ["Westlife": ["西城男孩", "Westlife"]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["Westlife"]),
+            profile: TasteProfile(),
+            count: 5
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.map(\.title) == ["My Love"])
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("不足不补足：命中 N 首就返回 N 首，绝不用画像项凑数")
+    func noBackfill() async {
+        let provider = ArtistAliasProvider(
+            source: .netease,
+            songs: [
+                "西城男孩": [
+                    remote("A", "Westlife"),
+                    remote("B", "Westlife"),
+                    remote("C", "Westlife"),
+                    remote("十年", "陈奕迅"),
+                    remote("浮夸", "陈奕迅"),
+                    remote("处处吻", "杨千嬅"),
+                ],
+            ],
+            aliasesByArtist: ["西城男孩": ["Westlife"]]
+        )
+        var engine = RecommendationEngine(providers: [provider])
+        engine.maxSongsPerArtist = 10
+        let result = await engine.recommend(
+            request: request(artists: ["西城男孩"]),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 3)
+            #expect(list.allSatisfy { $0.artist == "Westlife" })
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("全半角 / 空白归一后仍匹配点名艺人")
+    func normalizedArtistMatch() async {
+        let provider = ArtistAliasProvider(
+            source: .netease,
+            songs: ["西城男孩": [remote("My Love", "ｗｅｓｔ  ｌｉｆｅ")]],
+            aliasesByArtist: ["西城男孩": ["Westlife"]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["西城男孩"]),
+            profile: TasteProfile(),
+            count: 5
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.map(\.title) == ["My Love"])
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("理由文案：点名艺人不说「常听 X」")
+    func requestedArtistReason() async {
+        let provider = ArtistAliasProvider(
+            source: .netease,
+            songs: ["西城男孩": [remote("My Love", "Westlife"), remote("Seasons in the Sun", "Westlife")]],
+            aliasesByArtist: ["西城男孩": ["Westlife"]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(artists: ["西城男孩"]),
+            profile: TasteProfile(),
+            count: 5
+        )
+        switch result {
+        case let .success(list):
+            let expected = "recommendation_reason_requested_artist".localized
+            #expect(list.allSatisfy { $0.reasons.first == expected })
+            #expect(!list.contains { $0.reasons.contains { $0.contains("常听") } })
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("无点名艺人时行为不变：关键词结果里不同艺人都保留")
+    func unchangedWithoutExplicitArtist() async {
+        let provider = KeywordProvider(
+            source: .netease,
+            songs: ["city pop": [remote("Plastic Love", "Mariya Takeuchi"), remote("Ride On Time", "Tatsuro Yamashita")]]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            request: request(keywords: ["city pop"]),
+            profile: TasteProfile(),
+            count: 10
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 2)
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("别名解析器：只收名称/别名与点名相等的艺人，忽略无关搜索结果")
+    func aliasResolverFiltersUnrelated() {
+        let candidates = [
+            RecommendationArtistAliasResolver.Candidate(name: "西城男孩", aliases: ["Westlife"]),
+            RecommendationArtistAliasResolver.Candidate(name: "Westlife", aliases: ["西城男孩"]),
+            RecommendationArtistAliasResolver.Candidate(name: "西城秀樹", aliases: []),
+        ]
+        let aliases = RecommendationArtistAliasResolver.aliases(for: "西城男孩", from: candidates)
+        #expect(Set(aliases) == Set(["西城男孩", "Westlife"]))
     }
 }

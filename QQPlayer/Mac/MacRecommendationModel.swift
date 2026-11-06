@@ -29,6 +29,8 @@ final class MacRecommendationModel {
     private(set) var planSource: RecommendationPlanSource = .rule
     /// 当前生效的指令原话（只用于 chip 展示；历史不展示）。
     private(set) var activeRequestText: String?
+    /// 本轮点名的艺人（展示名）：结果不足时页面据此说明「只找到 N 首 X 的歌」。
+    private(set) var requestedArtist: String?
 
     /// 打开 App 时判断 24h（P1 不做定时器，见任务包 F）。
     static let refreshInterval: TimeInterval = 24 * 3600
@@ -151,10 +153,18 @@ final class MacRecommendationModel {
             case let .success(list):
                 candidates = list
                 activeRequestText = trimmed
+                requestedArtist = request.referenceArtists
+                    .map { RecommendationKey.displayPrimaryArtist($0) }
+                    .first { !$0.isEmpty }
                 lastGeneratedAt = clock()
                 planSource = .localModel
                 phase = .loaded
-                storeCache(key, planSource: .localModel, candidates: list)
+                storeCache(
+                    key,
+                    planSource: .localModel,
+                    candidates: list,
+                    requestedArtist: requestedArtist
+                )
                 var updated = history
                 updated.append(
                     RecommendationRequestHistoryEntry(
@@ -166,9 +176,11 @@ final class MacRecommendationModel {
                 )
                 _ = RecommendationRequestHistoryStore.save(updated, to: historyURL, limit: rounds)
             case let .failure(error):
+                requestedArtist = nil
                 phase = .failed(error.localizedDescription)
             }
         #else
+            requestedArtist = nil
             phase = .failed(RecommendationRequestError.modelNotReady.localizedDescription)
         #endif
     }
@@ -176,6 +188,7 @@ final class MacRecommendationModel {
     /// 清除当前指令，回到画像推荐。
     func clearRequest(count: Int) async {
         activeRequestText = nil
+        requestedArtist = nil
         await generate(count: count)
     }
 
@@ -201,6 +214,7 @@ final class MacRecommendationModel {
         phase = .loading
         cacheHit = false
         cacheCreatedAt = nil
+        requestedArtist = nil
         defer { isGenerating = false }
 
         guard let input = await RecommendationDataSource.loadInput(now: clock(), blacklist: blacklist) else {
@@ -280,6 +294,7 @@ final class MacRecommendationModel {
         if let requestText {
             activeRequestText = requestText
         }
+        requestedArtist = hit.requestedArtist
         phase = .loaded
         return true
     }
@@ -288,8 +303,14 @@ final class MacRecommendationModel {
     private func storeCache(
         _ key: RecommendationCacheKeyInput,
         planSource: RecommendationPlanSource,
-        candidates: [RecommendedCandidate]
+        candidates: [RecommendedCandidate],
+        requestedArtist: String? = nil
     ) {
-        _ = cache?.store(key, planSource: planSource, candidates: candidates)
+        _ = cache?.store(
+            key,
+            planSource: planSource,
+            candidates: candidates,
+            requestedArtist: requestedArtist
+        )
     }
 }

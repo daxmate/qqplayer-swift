@@ -83,6 +83,11 @@ enum RecommendationKey {
         return folded.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
     }
 
+    /// 艺人比对键：主艺人再去掉所有空白（大小写 / 全半角 / 空白归一的统一口径）。
+    static func artistMatchKey(_ raw: String) -> String {
+        primaryArtist(raw).filter { !$0.isWhitespace }
+    }
+
     // MARK: 内部步骤
 
     /// 去掉所有成对括号段（含括号内容）：`Song (Live)` → `Song`。

@@ -41,6 +41,14 @@ struct NeteaseOnlineSong: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// 网易云艺人搜索结果（type=100）：名称 + 官方别名，用于点名艺人别名解析。
+struct NeteaseOnlineArtist: Codable, Equatable, Identifiable, Sendable {
+    let id: Int
+    let name: String
+    /// 官方别名 / 罗马音（web artist.alias + artist.trans）。
+    let aliases: [String]
+}
+
 /// 播放直链信息（web netease_provider.get_play_info 结构对齐）
 struct NeteasePlayInfo: Sendable {
     let url: URL
@@ -98,6 +106,36 @@ struct NeteaseOnlineClient: Sendable {
             return []
         }
         return songs.compactMap { mapSong($0) }
+    }
+
+    // MARK: 艺人搜索（eapi /api/cloudsearch/pc, type=100）
+
+    /// 艺人搜索：把点名的中文 / 英文名解析成同一艺人的名称与别名集合。
+    /// query 去空白后为空返回 []；网络 / 解析失败抛 NeteaseOnlineError，由调用方降级。
+    func searchArtists(query: String, limit: Int = 5) async throws -> [NeteaseOnlineArtist] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+        let bounded = max(1, min(30, limit))
+
+        let payload = OrderedJSON {
+            OrderedJSONEntry("header", requestHeader())
+            OrderedJSONEntry("e_r", true)
+            OrderedJSONEntry("s", q)
+            OrderedJSONEntry("type", 100)
+            OrderedJSONEntry("limit", bounded)
+            OrderedJSONEntry("offset", 0)
+            OrderedJSONEntry("total", true)
+        }
+        let body = try eapiBody(uri: "/api/cloudsearch/pc", payload: payload)
+        let url = URL(string: "\(apiDomain)/eapi/cloudsearch/pc")!
+        let data = try await post(url: url, body: body)
+        let obj = try NeteaseEAPI.decrypt(data, contentType: "application/json")
+
+        guard let result = obj["result"] as? [String: Any],
+              let artists = result["artists"] as? [[String: Any]] else {
+            return []
+        }
+        return artists.compactMap { mapArtist($0) }
     }
 
     // MARK: 相似歌曲（eapi /api/v1/discovery/similar/song）
@@ -261,6 +299,28 @@ struct NeteaseOnlineClient: Sendable {
             url: url,
             ext: NeteaseOnlineLogic.extractExtension(from: url),
             bitrate: bitrate
+        )
+    }
+
+    /// 艺人条目：name + alias + trans；缺 name 视为无效条目。
+    private func mapArtist(_ artist: [String: Any]) -> NeteaseOnlineArtist? {
+        guard let id = artist["id"] as? Int else { return nil }
+        guard let name = artist["name"] as? String else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        var aliases: [String] = []
+        for key in ["alias", "trans"] {
+            if let list = artist[key] as? [String] {
+                aliases.append(contentsOf: list)
+            } else if let single = artist[key] as? String, !single.isEmpty {
+                aliases.append(single)
+            }
+        }
+        return NeteaseOnlineArtist(
+            id: id,
+            name: trimmed,
+            aliases: aliases.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         )
     }
 

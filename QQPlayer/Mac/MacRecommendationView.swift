@@ -219,9 +219,23 @@ struct MacRecommendationView: View {
             } header: {
                 Text(resultsTitle)
                     .font(.caption.weight(.semibold))
+            } footer: {
+                if let notice = artistShortfallNotice {
+                    Text(notice)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .listStyle(.inset)
+    }
+
+    /// 点名艺人结果不足时如实说明（不静默填充画像项）。
+    private var artistShortfallNotice: String? {
+        guard let artist = model.requestedArtist,
+              model.candidates.count < settings.recommendationCount
+        else { return nil }
+        return "recommendation_artist_shortfall".localized(with: model.candidates.count, artist)
     }
 
     /// 结果标题：有指令 = 按你的要求；否则 = 为你推荐（不展示任何历史消息）。
@@ -285,7 +299,7 @@ struct MacRecommendationView: View {
             Image(systemName: "sparkles")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text("recommendation_empty".localized)
+            Text(artistShortfallNotice ?? "recommendation_empty".localized)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("recommendation_refresh".localized) {

@@ -1119,6 +1119,8 @@
 "recommendation_download" = "Download";
 "recommendation_dismiss" = "Not for me";
 "recommendation_reason_artist" = "You often play %@";
+"recommendation_reason_requested_artist" = "Requested artist";
+"recommendation_artist_shortfall" = "Only found %d songs by %@";
 "recommendation_reason_era" = "Matches your %d decade";
 "recommendation_reason_trend" = "Trending in your recent plays: %@";
 "recommendation_reason_new" = "Not in your library yet";

@@ -222,7 +222,8 @@ struct RecommendationResultCacheTests {
             hitCount: 0,
             planSource: .rule,
             keySummary: RecommendationCacheKeySummary(input: key),
-            candidates: [makeCandidate("a")]
+            candidates: [makeCandidate("a")],
+            requestedArtist: nil
         )
         try encoder.encode(entry).write(to: url)
 
