@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-06T11:39:37Z",
+  "updated_at": "2026-11-08T11:22:36Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -4568,9 +4568,9 @@
     },
     "README.md": {
       "role": "index",
-      "sha256": "1fd4f36f75837629b438e4213ffe2ed97a18b74f196956947668b70ef8b9f3c6",
-      "size": 37653,
-      "normalized_sha256": "1fd4f36f75837629b438e4213ffe2ed97a18b74f196956947668b70ef8b9f3c6"
+      "sha256": "509fdcefdfbc7a42890eca503c51cdbc790ca5cce267cd77ff706b48e69a0c7b",
+      "size": 37683,
+      "normalized_sha256": "509fdcefdfbc7a42890eca503c51cdbc790ca5cce267cd77ff706b48e69a0c7b"
     },
     "Share/Base.lproj/MainInterface.storyboard": {
       "role": "index",
@@ -4622,9 +4622,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "575a6cac4fb332fd0d43485a67b15656280058626bbe7c38615c168b84e1ab3c",
-      "size": 339679,
-      "normalized_sha256": "575a6cac4fb332fd0d43485a67b15656280058626bbe7c38615c168b84e1ab3c"
+      "sha256": "93446175710fc8c58c107f729278759bbee57c33fd59b062b807255bf4617f9e",
+      "size": 339409,
+      "normalized_sha256": "93446175710fc8c58c107f729278759bbee57c33fd59b062b807255bf4617f9e"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -4706,9 +4706,9 @@
     },
     "scripts/build-app.sh": {
       "role": "index",
-      "sha256": "d808b24fb50303329b8586aeca604e1a07bd33ddba54682aa8f7fa7e40b780e9",
-      "size": 8127,
-      "normalized_sha256": "d808b24fb50303329b8586aeca604e1a07bd33ddba54682aa8f7fa7e40b780e9"
+      "sha256": "73bceb330c3c8b442275defc8ab07417d5dcb9a910c468cf8b74b8b928fea0e3",
+      "size": 14334,
+      "normalized_sha256": "73bceb330c3c8b442275defc8ab07417d5dcb9a910c468cf8b74b8b928fea0e3"
     },
     "scripts/bump-version.sh": {
       "role": "index",
@@ -4730,15 +4730,15 @@
     },
     "scripts/detect-device-test.py": {
       "role": "index",
-      "sha256": "ace57d910668a86e1c602a19caf33c714550643975e8954bf7213b1ed850e8cb",
-      "size": 4545,
-      "normalized_sha256": "ace57d910668a86e1c602a19caf33c714550643975e8954bf7213b1ed850e8cb"
+      "sha256": "cd03fbb4d484605676e686e09305f834b1c78588760b501b9d548bb1b75c1d30",
+      "size": 4557,
+      "normalized_sha256": "cd03fbb4d484605676e686e09305f834b1c78588760b501b9d548bb1b75c1d30"
     },
     "scripts/detect-device.py": {
       "role": "index",
-      "sha256": "cef98fe2973f49b708ccd3b65195e6d500174be037d7d71175fba3f1c972b7d5",
-      "size": 3753,
-      "normalized_sha256": "cef98fe2973f49b708ccd3b65195e6d500174be037d7d71175fba3f1c972b7d5"
+      "sha256": "d82fb4a7c1dc12b770f2b40959c47e3c9fbc06cda38a8e62ea68e52a34f14cb8",
+      "size": 3758,
+      "normalized_sha256": "d82fb4a7c1dc12b770f2b40959c47e3c9fbc06cda38a8e62ea68e52a34f14cb8"
     },
     "scripts/dsq-shared-migrate.sh": {
       "role": "index",
