@@ -258,6 +258,14 @@ final class MacSyncRunViewModel: ObservableObject {
 
         let assembly = makeCoordinator(session, content.selection)
         let coordinator = assembly.coordinator
+        // 观测：一次编排运行的量化记录（纯观测；不参与任何判定）。
+        coordinator.diag = SyncDiagAttempt(
+            kind: .run,
+            role: "host",
+            channel: .session,
+            candidates: 0,
+            peerDeviceID: hostCenter.connectedPeer?.peerID
+        )
         // 装配事实 → 运行时自检（INV-16 后半句）：跟歌走携带没装上要看得见，不能只留在注释里。
         SyncWiringFactsStore.shared.record(.playbackCarry, attached: assembly.playbackCarryAttached)
         SyncWiringFactsStore.shared.record(.overwriteLedger, attached: assembly.overwriteLedgerAttached)

@@ -191,9 +191,20 @@ final class SyncBrowser: @unchecked Sendable {
         to endpoint: NWEndpoint,
         expectedPeerDeviceID: String? = nil,
         candidate: SyncPairingCandidate? = nil,
-        config: SyncSessionConfiguration = SyncSessionConfiguration()
+        config: SyncSessionConfiguration = SyncSessionConfiguration(),
+        diagChannel: SyncDiagChannel = .unknown,
+        diagCandidates: Int = -1
     ) -> SyncPeerSession {
         let id = UUID()
+        // 观测：一次连接尝试从「开始拨号」起算（纯观测；不参与判定/时序）。
+        let diag = SyncDiagAttempt(
+            kind: .conn,
+            role: "client",
+            channel: diagChannel,
+            candidates: diagCandidates,
+            peerDeviceID: candidate?.deviceID ?? expectedPeerDeviceID
+        )
+        diag.begin(.dial)
         SyncConnectDiag.log(
             "🧭 connect target=\(SyncConnectDiag.describe(endpoint)) "
                 + "expectedPeer=\(expectedPeerDeviceID.map { String($0.prefix(8)) } ?? "-") candidate=\(candidate != nil)"
@@ -206,8 +217,15 @@ final class SyncBrowser: @unchecked Sendable {
             localIdentity: localIdentity,
             trustStore: trustStore,
             config: config,
-            transport: channel
+            transport: channel,
+            diag: diag
         )
+        // 观测：拨号失败的具体 NWError（domain/code）比「关闭原因=transportError」更有用；
+        // 只记录、不影响重连/关闭流程。
+        channel.onFailure = { [weak diag] error in
+            guard let diag, let error, let mapped = SyncDiagTransportError(nwError: error) else { return }
+            diag.fail(.dial, error: mapped)
+        }
         channel.session = session
         session.setPairingExpectations(
             expectedPeerDeviceID: expectedPeerDeviceID,

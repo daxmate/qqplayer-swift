@@ -69,6 +69,11 @@ final class SyncPeerSession: @unchecked Sendable {
     /// 超时调度入口（唯一入口；测试注入手动调度器 = 显式触发，不等真实定时器）
     private let deadlineScheduler: any SyncDeadlineScheduling
 
+    /// 观测：一次连接尝试的诊断记录（纯观测；不影响任何判定/时序）。
+    /// 由发起方（`SyncBrowser` 出站 / `SyncListener` 入站）创建并注入；
+    /// nil = 该调用方未接入观测（行为与接入前完全一致）。
+    let diag: SyncDiagAttempt?
+
     // MARK: init / 公开查询
 
     init(
@@ -78,7 +83,8 @@ final class SyncPeerSession: @unchecked Sendable {
         config: SyncSessionConfiguration = SyncSessionConfiguration(),
         pairingNonces: SyncPairingNonceRegistry? = nil,
         transport: (any SyncPeerTransport)? = nil,
-        deadlineScheduler: any SyncDeadlineScheduling = DispatchSyncDeadlineScheduler.shared
+        deadlineScheduler: any SyncDeadlineScheduling = DispatchSyncDeadlineScheduler.shared,
+        diag: SyncDiagAttempt? = nil
     ) {
         self.role = role
         self.localIdentity = localIdentity
@@ -87,6 +93,7 @@ final class SyncPeerSession: @unchecked Sendable {
         self.pairingNonces = pairingNonces
         self.transport = transport
         self.deadlineScheduler = deadlineScheduler
+        self.diag = diag
     }
 
     var phase: SyncSessionPhase {
@@ -130,6 +137,9 @@ final class SyncPeerSession: @unchecked Sendable {
             return
         }
         phaseValue = .waitingForPeerHello
+        // 观测：拨号结束（连接 ready）、握手开始。不改任何时序/判定。
+        diag?.end(.dial)
+        diag?.begin(.handshake)
         effects.append(.notifyState(phaseValue))
         do {
             switch role {
@@ -290,15 +300,53 @@ final class SyncPeerSession: @unchecked Sendable {
         effects.append(contentsOf: closeEffectsLocked(.pairingRejected(reason)))
     }
 
+    // MARK: 观测映射（纯函数，不参与任何判定）
+
+    /// 关闭时所在阶段 → 失败归因阶段；`nil` = 该阶段不算连接尝试失败。
+    static func diagStage(for phase: SyncSessionPhase) -> SyncDiagStage? {
+        switch phase {
+        case .idle: return .dial
+        case .waitingForPeerHello: return .handshake
+        case .waitingForPairRequest, .waitingForPairApproval, .waitingForPairResponse: return .negotiate
+        case .ready, .closed: return nil
+        }
+    }
+
+    /// 关闭原因的稳定错误码（domain=session；只增不改，便于跨版本聚合）。
+    static func diagCloseCode(_ reason: SyncSessionCloseReason) -> Int {
+        switch reason {
+        case .userCancelled: return 1
+        case .remoteClosed: return 2
+        case .receivedBye: return 3
+        case .handshakeTimeout: return 4
+        case .handshakeFailed: return 5
+        case .peerUntrusted: return 6
+        case .pairingRejected: return 7
+        case .storageError: return 8
+        case .protocolViolation: return 9
+        case .transportError: return 10
+        }
+    }
+
     // MARK: 内部辅助（锁内调用；extension 帧处理器共用）
 
     /// 置 closed 并返回效果（[状态通知, 关闭]；锁内调用）。
     func closeEffectsLocked(_ reason: SyncSessionCloseReason) -> [Effect] {
         guard phaseValue != .closed else { return [] }
+        // 观测：就绪前关闭 = 本次连接尝试失败，按**关闭时所在阶段**归因并落一行汇总。
+        // 就绪后关闭不属于连接尝试的失败（连接已成立），这里不记录。
+        var extraEffects: [Effect] = []
+        if let diag, phaseValue != .ready, let stage = Self.diagStage(for: phaseValue) {
+            diag.fail(stage, domain: "session", code: Self.diagCloseCode(reason))
+            // 落盘排到锁外（见 `flush`）：避免在会话临界区里做文件 IO。
+            if let line = diag.finishLine() {
+                extraEffects.append(.diagLine(line))
+            }
+        }
         phaseValue = .closed
         closeReasonValue = reason
         cancelDeadlineLocked()
-        return [.notifyState(phaseValue), .close(reason)]
+        return extraEffects + [.notifyState(phaseValue), .close(reason)]
     }
 
     /// 就绪后加密发送一帧（AAD = 帧头；锁内组装，锁外发送）。
@@ -391,6 +439,9 @@ final class SyncPeerSession: @unchecked Sendable {
                 transport?.closeTransport()
             case let .notifyApproval(pending):
                 pairApprovalHandler?(self, pending)
+            case let .diagLine(line):
+                // 观测：结构化汇总行（已渲染；这里只落盘）。
+                AppLog.info(.sync, line)
             case let .notifyAppFrame(frame):
                 onApplicationFrame?(frame)
             }

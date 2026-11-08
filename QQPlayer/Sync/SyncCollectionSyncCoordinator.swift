@@ -92,6 +92,10 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         qos: .utility
     )
 
+    /// 观测：一次编排运行的诊断记录（纯观测；不参与任何判定）。
+    /// nil = 未接入观测（行为与接入前完全一致）。
+    var diag: SyncDiagAttempt?
+
     let lock = NSLock()
     var stateValue: SyncCollectionSyncState = .idle
     var stage: Stage = .idle
@@ -134,7 +138,8 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         lyricsMapping: SyncLyricsContentMapping,
         playbackCarry: (any SyncPlaybackCarryDriving)? = nil,
         overwriteGate: SyncFileOverwriteGate? = nil,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        diag: SyncDiagAttempt? = nil
     ) {
         self.session = session
         self.descriptor = descriptor
@@ -148,6 +153,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         self.playbackCarry = playbackCarry
         self.overwriteGate = overwriteGate
         self.fileManager = fileManager
+        self.diag = diag
     }
 
     // MARK: 生命周期
@@ -360,6 +366,42 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         lock.lock()
         stateValue = state
         lock.unlock()
+        observeDiag(state)
         onStateChange?(state)
+    }
+
+    /// 观测：把状态推进翻译成阶段计时（**只记录**，不返回、不影响任何分支）。
+    /// 观测：本次运行实际搬动的文件数（字节数不在本层，记 -1 = 未测量；
+    /// 字节级事实见既有的 per-file `transfer send/receive` 行，不重复累计）。
+    private func diagFileCount() -> Int {
+        let snapshot = report
+        return snapshot.pushed.count + snapshot.pulled.count
+    }
+
+    private func observeDiag(_ state: SyncCollectionSyncState) {
+        guard let diag else { return }
+        switch state {
+        case .pushing, .pulling:
+            // 首字节（编排开始真正搬数据）→ transfer 起算（幂等）。
+            diag.begin(.transfer)
+        case .done:
+            diag.end(.transfer)
+            diag.begin(.settle)
+            diag.record(files: diagFileCount(), bytes: -1)
+            diag.end(.settle)
+            diag.finish()
+        case .failed:
+            // 还没开始搬数据就失败 = 计划阶段失败（transfer 未起算，仍归到 transfer 段，
+            // 由 faildom 区分 plan/transfer）。
+            let started = diag.hasBegun(.transfer)
+            diag.end(.transfer)
+            diag.fail(.transfer, domain: started ? "transfer" : "plan", code: 0)
+            diag.begin(.settle)
+            diag.record(files: diagFileCount(), bytes: -1)
+            diag.end(.settle)
+            diag.finish()
+        case .idle, .planning:
+            break
+        }
     }
 }

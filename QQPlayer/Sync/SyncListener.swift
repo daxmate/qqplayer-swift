@@ -56,6 +56,8 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
     var session: SyncPeerSession?
     /// 连接状态变化（UI 设备列表用；线程 = 本通道串行队列）
     var onStateUpdate: (@Sendable (NWConnection.State) -> Void)?
+    /// 观测：连接失败的具体 `NWError`（只记录，不参与任何判定/重连决策）。
+    var onFailure: (@Sendable (NWError?) -> Void)?
 
     private let connection: NWConnection
     private let queue: DispatchQueue
@@ -81,6 +83,10 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
                     self.session?.handleTransportReady()
                     self.startReceiveLoopIfNeeded()
                 case .failed, .cancelled:
+                    // 观测：把失败事实交给诊断记录（nil = 无错误对象）。
+                    if case let .failed(error) = state {
+                        self.onFailure?(error)
+                    }
                     self.notifyChannelClosed()
                 case .waiting:
                     // 连接失活（无路由 / 对端离线）：会话已 ready 时按「远端断开」收尾，
@@ -252,14 +258,22 @@ final class SyncListener: @unchecked Sendable {
     private func accept(_ connection: NWConnection) {
         let id = UUID()
         let channel = NWPeerChannel(connection: connection, queue: queue)
+        // 观测：一次入站连接尝试（纯观测；不参与判定/时序）。
+        let diag = SyncDiagAttempt(kind: .conn, role: "host", channel: .inbound)
+        diag.begin(.dial)
         let session = SyncPeerSession(
             role: .host,
             localIdentity: localIdentity,
             trustStore: trustStore,
             config: sessionConfig,
             pairingNonces: nonceRegistry,
-            transport: channel
+            transport: channel,
+            diag: diag
         )
+        channel.onFailure = { [weak diag] error in
+            guard let diag, let error, let mapped = SyncDiagTransportError(nwError: error) else { return }
+            diag.fail(.dial, error: mapped)
+        }
         channel.session = session
         // 闭包弱捕获 session：闭包存在 session 上，强捕获会成环（session→closure→session）
         session.onStateChange = { [weak self, weak session] phase in

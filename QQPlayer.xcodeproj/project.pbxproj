@@ -220,6 +220,7 @@
 		B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */; };
 		B1A0000000000000000000E2 /* RecommendationRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000000000000000000E1 /* RecommendationRequestTests.swift */; };
 		8C165FE153CE4AE890B73BFD /* RecommendationResultCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */; };
+		DECAFFA964C3421DA80AFD08 /* SyncDiagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18C3DA8AEDD498C82AAD0B3 /* SyncDiagTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -487,6 +488,7 @@
 		B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationPlannerTests.swift; sourceTree = "<group>"; };
 		B1A0000000000000000000E1 /* RecommendationRequestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationRequestTests.swift; sourceTree = "<group>"; };
 		B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationResultCacheTests.swift; sourceTree = "<group>"; };
+		D18C3DA8AEDD498C82AAD0B3 /* SyncDiagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDiagTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -930,6 +932,7 @@
 				Sync/SyncDataSyncCoordinator.swift,
 				Sync/SyncDataSyncModels.swift,
 				Sync/SyncDeadlineScheduler.swift,
+				Sync/SyncDiag.swift,
 				Sync/SyncEntityOutcomeDisclosure.swift,
 				"Sync/SyncEntityRegistry+Assembly.swift",
 				"Sync/SyncEntityRegistry+Shape.swift",
@@ -1346,6 +1349,7 @@
 				B1A0000000000000000000D1 /* RecommendationPlannerTests.swift */,
 				B1A0000000000000000000E1 /* RecommendationRequestTests.swift */,
 				B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */,
+				D18C3DA8AEDD498C82AAD0B3 /* SyncDiagTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1865,6 +1869,7 @@
 				B1A0000000000000000000D2 /* RecommendationPlannerTests.swift in Sources */,
 				B1A0000000000000000000E2 /* RecommendationRequestTests.swift in Sources */,
 				8C165FE153CE4AE890B73BFD /* RecommendationResultCacheTests.swift in Sources */,
+				DECAFFA964C3421DA80AFD08 /* SyncDiagTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

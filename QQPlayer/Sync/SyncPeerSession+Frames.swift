@@ -37,6 +37,8 @@ enum Effect {
     case notifyApproval(PendingPairRequest)
     /// ready 后业务帧（payload 已解密；onApplicationFrame）
     case notifyAppFrame(SyncFrame)
+    /// 观测：结构化诊断汇总行（已渲染；flush 时落 AppLog，锁外执行）
+    case diagLine(String)
 }
 
 extension SyncPeerSession {
@@ -53,6 +55,9 @@ extension SyncPeerSession {
             }
             do {
                 let hello: SyncHello = try decodeJSON(SyncHello.self, from: frame.payload)
+                // 观测：首帧收到且可解析 = 握手结束、协商（身份/密钥）开始。不改判定。
+                diag?.end(.handshake)
+                diag?.begin(.negotiate)
                 switch role {
                 case .host:
                     return processClientHelloLocked(hello)
@@ -341,6 +346,11 @@ extension SyncPeerSession {
                 receiveCipher = SyncCipher(key: keys.hostToClient)
             }
             phaseValue = .ready
+            // 观测：协商完成（ready）→ 连接尝试成功，落一行汇总。不改判定。
+            diag?.end(.negotiate)
+            if let line = diag?.finishLine() {
+                effects.append(.diagLine(line))
+            }
             cancelDeadlineLocked()
             effects.append(.notifyState(phaseValue))
         } catch {
