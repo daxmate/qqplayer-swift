@@ -96,7 +96,7 @@ def main():
             if err:
                 print(f"   stderr: {err.strip()}")
 
-    # 被拒绝时必须解释原因（build.sh 会把 stderr 直接展示给用户）
+    # 被拒绝时必须解释原因（scripts/build-app.sh 会把 stderr 直接展示给用户）
     code, out, err = run([device("W", udid="WATCH-UDID", name="Watch", platform="watchOS")])
     if code == 1 and "watchOS" in err:
         print("✅ 拒绝时 stderr 给出原因（含 platform=watchOS）")

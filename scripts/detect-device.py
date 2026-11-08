@@ -8,7 +8,7 @@
 
 为什么不能只认 tunnelState == "connected"（2026-09-20 真机误报事故）：
     devicectl 的隧道是**按需建立**的。设备完全可达（能装包、能拉崩溃日志）时，list 输出也可能是
-    `tunnelState = "disconnected"` —— 实测 iPhone 16 Pro：connected 从未出现，而 build.sh 按它判定，
+    `tunnelState = "disconnected"` —— 实测 iPhone 16 Pro：connected 从未出现，而旧一键脚本按它判定，
     直接误报「未发现已连接的真机」，只能绕开探测手工 install。
 
 判据（全部满足才选；**已知坏值才拒，字段缺失一律放行**，避免换 macOS/DeviceKit 版本后变成新的误报）：
