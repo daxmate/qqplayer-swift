@@ -1396,7 +1396,7 @@ private final class IntListBox: @unchecked Sendable {
     @Test("结果枚举：每个类别一个槽位（allCases 1:1，累加互不串台）")
     func outcomeTallySlotsAreOneToOne() {
         #expect(
-            SyncRowOutcome.allCases.count == 10,
+            SyncRowOutcome.allCases.count == 11,
             "类别数变了：新增/删除结果类别必须同步改这里与 SyncOutcomeContractTests 的形状断言"
         )
         for outcome in SyncRowOutcome.allCases {
