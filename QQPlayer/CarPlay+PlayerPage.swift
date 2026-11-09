@@ -127,7 +127,11 @@ enum CarPlayPlayerPageBuilder {
     static func progress(elapsed: TimeInterval, duration: TimeInterval) -> CarPlayPlayerPageProgress? {
         guard duration > 0 else { return nil }
         let clamped = min(max(elapsed, 0), duration)
-        let stepped = min((clamped / progressStep).rounded(.down) * progressStep, duration)
+        // 终点对齐：走到/超过总时长时必须停在 duration 本身。只按桶量化的话
+        // 100s + 30s 桶 = 90s（fraction 0.9、文案 1:30），进度条永远差一截、终点文案到不了。
+        let stepped = clamped >= duration
+            ? duration
+            : min((clamped / progressStep).rounded(.down) * progressStep, duration)
         return CarPlayPlayerPageProgress(
             fraction: stepped / duration,
             elapsedText: PlaybackTimeFormat.mmss(stepped),

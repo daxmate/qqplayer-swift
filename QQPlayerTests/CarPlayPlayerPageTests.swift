@@ -195,6 +195,16 @@ struct CarPlayPlayerPageBuilderTests {
         #expect(overrun?.elapsedText == "1:40")
         #expect(overrun?.totalText == "1:40")
 
+        // 终点对齐：正好到总时长也要贴到 100%（100s 按 30s 桶量化会停在 90s = 0.9）
+        let atEnd = content(elapsed: 100, duration: 100, lyrics: makeLyrics(makeLines(["一"]))).header?.progress
+        #expect(atEnd?.fraction == 1)
+        #expect(atEnd?.elapsedText == "1:40")
+        #expect(atEnd?.totalText == "1:40")
+
+        // 未到终点的桶行为不变：95s 仍落在 90s 桶（粗粒度是刻意的，只为降频）
+        let midBucket = content(elapsed: 95, duration: 100, lyrics: makeLyrics(makeLines(["一"]))).header?.progress
+        #expect(midBucket?.elapsedText == "1:30")
+
         let negative = content(elapsed: -5, duration: 100, lyrics: makeLyrics(makeLines(["一"]))).header?.progress
         #expect(negative?.fraction == 0)
         #expect(negative?.elapsedText == "0:00")
