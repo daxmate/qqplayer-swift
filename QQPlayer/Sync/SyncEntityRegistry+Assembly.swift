@@ -138,6 +138,45 @@ extension SyncEntityRegistry {
             ),
             probe: nil
         ),
+        // 会话期能力（INV-8 / INV-9）：两条都只做**静态契约**——它们不依赖会话期状态（重放挂在入库路径、
+        // 重置入口是否存在的判定在界面层），没有可观测的运行时事实 → `probe: nil`，不新增探针。
+        SyncEntityAssemblyPoint(
+            platform: nil,
+            frame: nil,
+            detail: "重放触发点（INV-8）：歌曲入库成功后由 DatabaseManager+Tracks 调 SyncChangeLogReplay.replayAfterTrackSave 重放挂起行；挂点不属单一帧（挂起行来自帧 8/9 两个方向）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "replay-trigger-attached",
+                path: "QQPlayer/Services/DatabaseManager+Tracks.swift",
+                requiredMarkers: ["SyncChangeLogReplay.replayAfterTrackSave("],
+                alternativeMarkers: [],
+                guidance: """
+                歌曲入库路径不再重放挂起行：INV-8 的「挂起」会退化成「永久积压」——本地缺歌 / 缺身份键时被挂起的对端播放数据
+                再也等不到落库，且零报错（正是 2026-09-14「从来没同步过」事故的形状）。
+                请恢复 DatabaseManager 的歌曲入库成功分支里的 `try SyncChangeLogReplay.replayAfterTrackSave(...)` 调用；
+                另一半触发点（content_hash 回填后调 `SyncChangeLogReplay.replay(...)`）由用例 `replayTriggersAttachToTrackIngestion` 一并钉住。
+                """
+            ),
+            probe: nil
+        ),
+        SyncEntityAssemblyPoint(
+            platform: platformIOS,
+            frame: nil,
+            detail: "游标重置入口（INV-9）：iOS 为纯被动端，**显式不支持**重置；重置入口在 Mac（MacSyncView 的「重新对账」→ MacSyncDataViewModel 的清零编排 → SyncChangeLogStore）。本申报钉住「iOS 无 UI 入口 + 文档写明不支持」，帧不适用（游标覆盖 8/9 两个方向）",
+            assertion: SyncEntityAssemblyAssertion(
+                id: "ios-data-sync-reset-reachable",
+                path: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+                requiredMarkers: ["同步发起方**恒为 Mac**", "iOS 只应答"],
+                alternativeMarkers: [],
+                guidance: """
+                iOS 被动端的定位声明被改动了：INV-9 只允许两种形态——iOS 自带「重新对账」入口，或**显式声明不支持**
+                （当前形态：重置在 Mac 侧，iOS 纯被动）。
+                若 iOS 真加了入口：把本申报改成入口断言、同步更新 docs/sync-invariants.md 的 INV-9，
+                并让 `iosHasNoCursorResetEntryPoint` 的白名单跟着改；
+                若只是改注释：恢复 `同步发起方**恒为 Mac**` / `iOS 只应答` 的定位说明。
+                """
+            ),
+            probe: nil
+        ),
     ]
 
     // MARK: - 派生访问器（散落名单只准从这里取，不得手写第二份）

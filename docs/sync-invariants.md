@@ -74,8 +74,13 @@
 ### INV-8　本地缺歌时必须**挂起**而不是丢弃；且挂起行必须有重放触发点
 
 - **现有守护**：**行为用例**：`SyncChangeLogContentMapTests.swift:471`（挂起 → 歌带 `content_hash` 入库 → 自动补上）、`:504`（重放幂等）、`:522`（重放走 LWW）、`:549`（挂起幂等）。
-- **装配守护**：重放触发点两处（`DatabaseManager+Tracks.swift:87`、`DatabaseManager.swift:999`）**无静态断言** → `✗ 无守护`。若哪天 `upsertTrack` 的 replay 调用被删，挂起行会永久积压且零报错。
-- **建议**：**静态契约**：在 `SyncWiringContract.requirements` 加一条「track 入库路径必须调用 `SyncChangeLogReplay.replay`」（路径 `QQPlayer/Services/DatabaseManager*.swift`，标记 `SyncChangeLogReplay.replay(`）。
+- **装配守护：✅ 已收（2026-11-09，`replay-trigger-attached`）**
+  - 注册表申报：`QQPlayer/Sync/SyncEntityRegistry+Assembly.swift` 的 `sharedAssemblyPoints` → `replay-trigger-attached`
+    （路径 `QQPlayer/Services/DatabaseManager+Tracks.swift`，标记 `SyncChangeLogReplay.replayAfterTrackSave(`）。
+  - 第二个触发点（`content_hash` 回填后重放「缺身份键」那一半）由用例 `replayTriggersAttachToTrackIngestion` 一并扫源码钉住
+    （`DatabaseManager+ContentHash.swift` 的 `SyncChangeLogReplay.replay(`）。
+  - 现状核实：触发点已从 `DatabaseManager.swift:999` 迁到 `DatabaseManager+ContentHash.swift`（旧文档指针作废，已改）。
+  - 反向验证：删掉任一处调用 → 对应断言/用例红（静态契约，不依赖运行时状态 → 无 probe）。
 
 ---
 
@@ -84,8 +89,18 @@
 ### INV-9　游标越过即不回头 ⇒ **必须**有重置入口（否则身份键修复后，被越过的行永不再同步）
 
 - **现有守护**：**行为用例**：`SyncChangeLogStoreTests.swift:300`（`resetCursors` 同时清零两个方向、不碰其它 peer、可重复调用）；UI 入口 `MacSyncView.swift:918`（按钮）+ `:100`（二次确认）；编排 `MacSyncDataViewModel.resetCursorsForPeer` `QQPlayer/Mac/MacSyncDataViewModel.swift:189`。
-- **缺口**：**iOS 端无重置入口**（`grep -rn resetCursors QQPlayer/` → 只有 Mac 侧调用点 + store 定义）→ 被动端一旦被越过就**没有任何自救手段**。
-- **建议**：**面板披露 + 行为用例**：iOS 被动端补一个「重新对账」入口（或在文档中显式声明「被动端不支持，需在 Mac 侧重置」并断言该声明）。
+- **现状：✅ 已收（2026-11-09，`ios-data-sync-reset-reachable`，形态 = 显式不支持）**
+  - 事实：`grep -rn resetCursors QQPlayer/` → 只有 Mac 侧调用点（`MacSyncView.swift:235` → `MacSyncDataViewModel.resetCursorsForPeer`）
+    + store 定义（`SyncChangeLogStore.swift:193`）；iOS 侧**零调用点**。
+  - 决策（本次）：**iOS 不提供「重新对账」入口（显式不支持）** —— 生产装配里 iOS 是纯被动端（发起方恒为 Mac），
+    重置入口留在 Mac 侧；不新增 UI。
+  - 守护（三层，均扫真实源码）：
+    1. 注册表申报 `ios-data-sync-reset-reachable`（`sharedAssemblyPoints`，platform = iOS）：钉住
+       `IOSPassiveSyncCenter.swift` 的被动定位声明（`同步发起方**恒为 Mac**` / `iOS 只应答`）——改了定位就必须改申报与本节。
+    2. 用例 `iosHasNoCursorResetEntryPoint`：递归扫 `QQPlayer/` 全部 `.swift`，除白名单
+       （Mac 三个入口文件 + `SyncChangeLogStore.swift`）外**出现 `resetCursors` 即红**——将来给 iOS 加入口会立刻失败。
+    3. 用例 `iosResetUnsupportedIsDocumented`：钉住本节这句话本身（文档不得与代码互相沉默）。
+  - 剩余边界：若将来要给 iOS 加「重新对账」，必须把申报改成入口可达断言 + 改本节 + 改白名单（三处同改，漏一处即红）。
 
 ### INV-10　游标推进值必须 = **本批实际发出去的最后一行 id**，且与取批在同一读事务（否则分页下第 N+1 行起被永久越过）
 
@@ -154,9 +169,9 @@
     `ios-playback-position-sink-attached`、`mac-lyrics-push-attached`、`ios-file-receiver-attached`、`mac-library-push-attached`。
 - **缺口**：粒度仍是「类型被构造」而不是「每个实体都被处理」（B/C/D 三实体共用 A 的帧 8/9 装配点，登记里写明「同 A」）；
   且 `QQPlayer/Mac/*` 属 Mac target（iOS 单测 target 看不到，仓库无 macOS 单测 target）→ Mac 侧行为**只能靠编译 + 契约扫源码 + Mac 侧运行时自检**（`MacSyncDataViewModel.swift:29-31` 自述）。
-- **建议（仍未做）**：
-  1. `ios-data-sync-reset-reachable`（或显式断言 iOS 不支持重置，见 INV-9）
-  2. `replay-trigger-attached`（见 INV-8）
+- **✅ 原「建议（仍未做）」两条已落地（2026-11-09）**：
+  1. `ios-data-sync-reset-reachable` —— 形态 = **显式不支持**（iOS 无重置入口，重置在 Mac；见 INV-9）
+  2. `replay-trigger-attached` —— 静态契约 + 双触发点用例（见 INV-8）
 - **L0 守护（2026-09-15 立，实体注册表包——粒度从「帧 8/9 被装配」细化到「每个实体都被表态」）**：
   - `QQPlayerTests/SyncWiringContractTests.swift` → `registryEntriesAreSelfConsistent`
     （走变更日志通道的实体必须在注册表里登记**装配点 + 帧号 8/9**；`notSynced` 实体不得有装配点；
@@ -273,8 +288,8 @@
 | --- | --- | --- |
 | INV-1 outbox = 本地真值派生 | `docs/lan-sync-design.md` §6.2 文字 + `SyncChangeLogMapping.swift:37-48` 注释 | **静态契约**（allCases × 补发归属全覆盖） |
 | INV-4 无身份键不得落库 | 实现有、注释有 | 静态契约（applier 分支全覆盖） |
-| INV-8 挂起必须有重放触发点 | `SyncChangeLogPendingStore.swift` 文件头 | **静态契约**（`SyncChangeLogReplay.replay(` 必须出现在 track 入库路径） |
-| INV-9 游标越过即不回头 ⇒ 必须有重置入口 | `SyncChangeLogStore.swift:134-147` 注释 | iOS 侧入口 or 显式「不支持」断言 |
+| INV-8 挂起必须有重放触发点 | **✅ 已收（2026-11-09）** | 静态契约 `replay-trigger-attached` + 用例 `replayTriggersAttachToTrackIngestion`（两处触发点） |
+| INV-9 游标越过即不回头 ⇒ 必须有重置入口 | **✅ 已收（2026-11-09，显式不支持）** | 申报 `ios-data-sync-reset-reachable` + 负向扫描用例 `iosHasNoCursorResetEntryPoint` + 文档用例 |
 | INV-13 删除不传播收口到单一事实源 | `SyncChangeLogDeletionPolicy.swift:13-18` 注释 | **静态契约**（delete 判定只准出现在该文件） |
 | INV-17 同一会话只装一个 changeLog 处理器 | `IOSPassiveSyncCenter.swift:21-32` 注释 | 静态契约（构造点计数上限） |
 | ~~INV-18 缺口必须计数并上屏~~ **已收（2026-09-15）** | — | 已落：二维分桶 + `SyncEntityOutcomeDisclosure` 唯一投影 + 界面层自算静态契约 |

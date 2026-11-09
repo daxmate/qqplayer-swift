@@ -109,6 +109,9 @@ enum SyncWiringContract {
         "frame-8-9-numbers-frozen",
         "identity-entry-implemented-and-wired",
         "mac-playback-carry-attached",
+        // 会话期能力（INV-8 / INV-9，2026-11-09 ③）：挂起重放触发点 / iOS 显式不支持重置
+        "replay-trigger-attached",
+        "ios-data-sync-reset-reachable",
     ]
 
     /// 纯函数：派生 id × 基线 → 差异（基线断言与合成自证共用）。
@@ -936,6 +939,82 @@ struct SyncOutcomeContractTests {
                 relativePath: SyncOutcomeContract.tallyDefinitionPath
             ).isEmpty,
             "账目定义文件自身必须放行"
+        )
+    }
+
+    // MARK: INV-8 / INV-9（③，2026-11-09）：挂起重放触发点 / iOS 显式不支持重置
+
+    @Test("INV-8：挂起行的两个重放触发点都必须挂在歌曲入库路径上（删任一处 = 挂起行永久积压）")
+    func replayTriggersAttachToTrackIngestion() {
+        // 触发点 1：歌曲入库成功（upsertTrack）→ replayAfterTrackSave；
+        // 触发点 2：content_hash 回填成功 → replay（「因缺身份键而挂起」的那一半）。
+        let expectations: [(path: String, marker: String)] = [
+            ("QQPlayer/Services/DatabaseManager+Tracks.swift", "SyncChangeLogReplay.replayAfterTrackSave("),
+            ("QQPlayer/Services/DatabaseManager+ContentHash.swift", "SyncChangeLogReplay.replay("),
+        ]
+        for expectation in expectations {
+            let source = try? String(
+                contentsOf: Self.repoRoot.appendingPathComponent(expectation.path),
+                encoding: .utf8
+            )
+            #expect(source != nil, "\(expectation.path) 读取失败（fail-closed，不静默跳过）")
+            #expect(
+                source?.contains(expectation.marker) == true,
+                """
+                INV-8 重放触发点缺失：\(expectation.path) 里找不到 \(expectation.marker)。
+                挂起行（本地缺歌 / 缺身份键时暂存的对端播放数据）只能靠入库后的重放落库；
+                删掉这个调用 = 那些行永久积压且零报错。
+                """
+            )
+        }
+    }
+
+    @Test("INV-9：iOS 侧没有任何游标重置入口（显式不支持重置，入口只在 Mac）")
+    func iosHasNoCursorResetEntryPoint() {
+        let sources = SyncWiringContract.swiftSources(repoRoot: Self.repoRoot, at: "QQPlayer")
+        #expect(!sources.isEmpty, "QQPlayer 源码枚举为空 = 契约空转")
+        // 白名单 = 合法出现处：Mac 侧 UI / 编排（重置入口就在这）与 store 定义本身。
+        let allowed: Set<String> = [
+            "QQPlayer/Mac/MacSyncDataViewModel.swift",
+            "QQPlayer/Mac/MacSyncView.swift",
+            "QQPlayer/Mac/SyncDataPane.swift",
+            "QQPlayer/Sync/SyncChangeLogStore.swift",
+        ]
+        var offenders: [String] = []
+        for url in sources {
+            let relativePath = url.path.replacingOccurrences(of: Self.repoRoot.path + "/", with: "")
+            guard !allowed.contains(relativePath) else { continue }
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                offenders.append("\(relativePath)（读取失败，fail-closed）")
+                continue
+            }
+            if source.contains("resetCursors") { offenders.append(relativePath) }
+        }
+        #expect(
+            offenders.isEmpty,
+            """
+            iOS 侧出现了游标重置入口：\(offenders)。
+            INV-9 当前形态是「iOS 显式不支持重置」（重置入口只在 Mac）。若这是有意的产品变更，
+            请把注册表 ios-data-sync-reset-reachable 申报改成入口可达断言，并同步
+            docs/sync-invariants.md 的 INV-9 与上面的白名单。
+            """
+        )
+    }
+
+    @Test("INV-9：文档写明「iOS 不支持重置」（代码与文档不得互相沉默）")
+    func iosResetUnsupportedIsDocumented() {
+        let source = try? String(
+            contentsOf: Self.repoRoot.appendingPathComponent("docs/sync-invariants.md"),
+            encoding: .utf8
+        )
+        #expect(source != nil, "docs/sync-invariants.md 读取失败（fail-closed）")
+        #expect(
+            source?.contains("iOS 不提供「重新对账」入口（显式不支持）") == true,
+            """
+            INV-9 的「iOS 显式不支持」没有写进文档：被动端被越过游标后没有任何自救手段，
+            必须在 docs/sync-invariants.md 的 INV-9 里写明「iOS 不提供「重新对账」入口（显式不支持），
+            重置入口在 Mac 侧」，否则读文档的人会以为这个能力两端都有。
+            """
         )
     }
 }
