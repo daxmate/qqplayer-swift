@@ -38,6 +38,11 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         // Update SFBAudioEngine CarPlay status
         SFBAudioEngineManager.shared.updateCarPlayStatus()
 
+        // 冷启动装配（2026-11-09）：车机直接接管屏幕时，App 启动只恢复过 UI 状态，
+        // 音频会话 / 引擎 / 通知 / 远程命令都还没装 → 车机上的播放键落空。
+        // 门闸在 AppLaunchBootstrap 内部，重复 didConnect 不会重复注册。
+        AppLaunchBootstrap.ensure(reason: "carplay-connect")
+
         let allSongsTemplate = createAllSongsTab()
         self.allSongsTemplate = allSongsTemplate
 

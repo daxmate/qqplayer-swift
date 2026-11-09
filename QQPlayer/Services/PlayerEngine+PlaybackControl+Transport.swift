@@ -9,8 +9,40 @@
     import AVFoundation
     import Foundation
     extension PlayerEngine {
+        /// 无当前曲目时先补冷启动装配/状态恢复，再决定重入 play() 还是报可见错误。
+        /// 不能静默 return：车机上没有任何日志可看，用户只会觉得按钮坏了。
+        private func handlePlayWithoutCurrentTrack() {
+            guard !AppLaunchBootstrap.isColdStartPlayPending else { return }
+            AppLaunchBootstrap.isColdStartPlayPending = true
+            AppLog.warn(.general, "⚠️ play() 时没有当前曲目：先补冷启动装配与状态恢复")
+
+            Task { @MainActor [weak self] in
+                defer { AppLaunchBootstrap.isColdStartPlayPending = false }
+                guard let self else { return }
+
+                AppLaunchBootstrap.ensure(reason: "cold-play")
+                let restored = await AppLaunchBootstrap.restoreStateIfNeeded(reason: "cold-play")
+                guard restored else {
+                    let message = "没有可播放的曲目，请先在 iPhone 上选择歌曲"
+                    AppLog.error(.general, "❌ play() 无曲目可播：状态恢复后仍为空")
+                    self.reportPlaybackFailure(message)
+                    return
+                }
+                AppLog.info(.general, "✅ play() 冷启动恢复出曲目，重入 play()")
+                self.play()
+            }
+        }
+
         func play() {
             AppLog.info(.general, "▶️ play() called - state: \(playbackState), loading: \(isLoadingTrack), usingSFBEngine: \(usingSFBEngine)")
+
+            // 冷启动收口（2026-11-09）：CarPlay 直接接管屏幕时 App 可能还没恢复出曲目。
+            // 旧逻辑在下面 guard 里只 warn 后 return —— 车机上点播放等于没反应、界面也没提示。
+            // 现在先补一次冷启动装配 + 状态恢复，恢复出曲目再重入；确实没得播才报可见错误。
+            guard currentTrack != nil else {
+                handlePlayWithoutCurrentTrack()
+                return
+            }
 
             // Delegate to SFBAudioEngine if it's handling this track
             if usingSFBEngine {
