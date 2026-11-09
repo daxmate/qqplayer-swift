@@ -480,22 +480,23 @@ struct SyncPlaybackCarryTests {
     @Test("INV-35 I3：高水位跨重启持久化（重建 Peer / Store，同一库）")
     func carryHighWaterPersistsAcrossRebuild() throws {
         let harness = try makeMonotoneHarness()
+        let peerID = harness.fixture.clientIdentity.deviceID
         let hostID = harness.fixture.hostIdentity.deviceID
         let macStore = SyncChangeLogStore(database: harness.macManager)
 
         _ = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
-        let highWater = try macStore.carryHighWater(forPeer: hostID)
+        let highWater = try macStore.carryHighWater(forPeer: peerID)
         #expect(highWater == 2)
-        let ledger = try macStore.pushedOutboxIDs(forPeer: hostID)
+        let ledger = try macStore.pushedOutboxIDs(forPeer: peerID)
         #expect(ledger[SyncChangeEntity.favorite.rawValue + "\u{1F}" + "s-a"] == 2, "逐行账落在库里")
 
         // 重新构造 Store / Peer（同库文件）：账本与高水位都还在
         let rebuiltStore = SyncChangeLogStore(database: harness.macManager)
-        #expect(try rebuiltStore.carryHighWater(forPeer: hostID) == 2, "跨重启（同库）高水位仍在")
+        #expect(try rebuiltStore.carryHighWater(forPeer: peerID) == 2, "跨重启（同库）高水位仍在")
         let rebuiltPeer = SyncPlaybackCarryPeer(
             session: harness.fixture.hostSession,
             libraryRoot: harness.macRoot,
-            peerID: hostID,
+            peerID: peerID,
             database: harness.macManager
         )
         let repeatPlan = try rebuiltPeer.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
@@ -510,7 +511,7 @@ struct SyncPlaybackCarryTests {
     @Test("INV-35 I3：peer 重新对账（resetCursors）后 carry 账目清零、可重新推全量")
     func carryHighWaterResetsWithPeerReconcile() throws {
         let harness = try makeMonotoneHarness()
-        let hostID = harness.fixture.hostIdentity.deviceID
+        let peerID = harness.fixture.clientIdentity.deviceID
         let macStore = SyncChangeLogStore(database: harness.macManager)
 
         _ = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
@@ -518,9 +519,9 @@ struct SyncPlaybackCarryTests {
         #expect(accepted.entries.isEmpty)
 
         // 「重新对账」= 既有唯一重置入口：两个游标 + carry 账目同口径清零
-        try macStore.resetCursors(forPeer: hostID)
-        let highWaterAfterReset = try macStore.carryHighWater(forPeer: hostID)
-        let ledgerAfterReset = try macStore.pushedOutboxIDs(forPeer: hostID)
+        try macStore.resetCursors(forPeer: peerID)
+        let highWaterAfterReset = try macStore.carryHighWater(forPeer: peerID)
+        let ledgerAfterReset = try macStore.pushedOutboxIDs(forPeer: peerID)
         #expect(highWaterAfterReset == 0, "高水位归零")
         #expect(ledgerAfterReset.isEmpty, "逐行账清空")
 
@@ -532,10 +533,11 @@ struct SyncPlaybackCarryTests {
     func carryCursorNeverBelowIncrementCursor() throws {
         let harness = try makeMonotoneHarness()
         let hostID = harness.fixture.hostIdentity.deviceID
+        let peerID = harness.fixture.clientIdentity.deviceID
         let macStore = SyncChangeLogStore(database: harness.macManager)
 
         // 先推过数据增量到 5（sendIncrement 只在全部批次成功后推进）
-        try macStore.setPushCursor(forPeer: hostID, lastOutboxID: 5)
+        try macStore.setPushCursor(forPeer: peerID, lastOutboxID: 5)
 
         let plan = try harness.macCarry.carryPush(transferredPaths: ["Album/b.flac"], peerEntries: [])
         #expect(plan.entries.map(\.outboxID) == [1])
