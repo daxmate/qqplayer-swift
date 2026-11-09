@@ -24,14 +24,17 @@
 //  1. 帧 8/9 **没有歌维度字段**，且 §12b 修订不允许改帧语义 → 「只带这次传输的歌」
 //     在**发送侧**强制（推送方向由计划器收口）；拉取方向沿用既有**游标增量**语义
 //     （对端 outbox 中 > 本端游标的行），按 content_hash 本地化，本地缺歌挂起不丢。
-//  2. 推送批次是**歌维度子集**，帧 9 的 `lastOutboxID` 只有「本批实际末行 id」一种口径
-//     （S3，2026-09-12 审计修复：与 `SyncChangeLogPeer.handlePull` 应答同口径；
-//     空批不发帧、不动游标）→ 回执方（设备）的游标被推进到本批末行。
-//     ⚠️ 批内末行可能小于对端已记下的位置（早先的批推得更靠后）→ 游标会回退；
-//     本端没有「已推给该 peer 的位置」的反向记录，无法做单调保护。
-//     v1 该游标是**惰性的**（移动端纯被动、永不主动 pull，§12b 决策 6）；若 v2 引入
-//     移动端主动 pull，必须把 carry 与游标语义分开（见报告「遗留问题」）。
-//     carry 本身不是游标驱动：每次传输按当前 outbox 重新计算。
+//  2. 推送批次是**歌维度子集**，帧 9 的 `lastOutboxID` = **max(已推给该 peer 的高水位,
+//     本批实际末行 id)**（INV-35，2026-11-09）：高水位按 **(entity, row_key) 逐行**
+//     持久化在 `sync_playback_carry_state`，跨重启有效、peer 重新对账时同口径清零。
+//     ⇒ 对端把帧 9 记成 `sync_cursor` 后**只增不减**，不会被后到的小批覆盖成更小的值；
+//     高水位同时并入 `sync_push_cursor`（`sendIncrement` 已推给该 peer 的增量位置），
+//     否则「先推进数据增量、再传歌」这条常见序列仍会把对端游标顶回去；
+//     已推过的同一行不再重推（空批 = 不发帧、不动游标、不记账）。
+//     ⚠️ 抬升只到「真的推出去过的最大 id」：行 id 落在高水位之内、但从未随任何批次
+//     发过的行（别的歌），仍会在**那首歌本轮被传输时**照常带上——判据是逐行账目，
+//     不是「id ≤ 游标就跳过」（后者会永久漏推那些行）。
+//     carry 本身不是游标驱动：每次传输仍按当前 outbox 重新计算（只是过滤掉已推过的行）。
 //  3. `playback_position` 不在 `SyncChangeEntity.v1Synced`（本地载体 = UserDefaults），
 //     不参与本携带；歌单结构（playlist 行）非歌维度，走决策 9 的选择集同步。
 //
@@ -115,6 +118,9 @@ final class SyncPlaybackCarryPeer: SyncPlaybackCarryDriving, @unchecked Sendable
     private let session: SyncPeerSession
     private let facts: SyncPlaybackCarryFactsProviding
     private let store: SyncChangeLogStore
+    /// carry 推送的已推行账（INV-35）：帧 9 游标下界 + 「不再重推已给过的行」。
+    /// 缺省 = 自身 store（表 `sync_playback_carry_state`）；测试可注入内存替身。
+    private let pushState: any SyncPlaybackCarryPushStateStoring
     /// 帧 8/9 的既有处理器：接收对端 carry（帧 9）+ 发起增量拉取（帧 8）。
     /// ⚠️ 必须强持有：它以 `[weak self]` 挂接会话回调，弃之则永不处理入站帧。
     private let peer: SyncChangeLogPeer
@@ -127,13 +133,15 @@ final class SyncPlaybackCarryPeer: SyncPlaybackCarryDriving, @unchecked Sendable
         libraryRoot: URL,
         peerID: String,
         database: DatabaseManager = .shared,
-        facts: SyncPlaybackCarryFactsProviding? = nil
+        facts: SyncPlaybackCarryFactsProviding? = nil,
+        pushState: (any SyncPlaybackCarryPushStateStoring)? = nil
     ) {
         self.session = session
         self.peerID = peerID
         self.facts = facts ?? SyncPlaybackCarryDatabaseFacts(database: database, libraryRoot: libraryRoot)
         let store = SyncChangeLogStore(database: database)
         self.store = store
+        self.pushState = pushState ?? store
         self.peer = SyncChangeLogPeer(
             session: session,
             store: store,
@@ -158,26 +166,48 @@ final class SyncPlaybackCarryPeer: SyncPlaybackCarryDriving, @unchecked Sendable
             peerEntries: peerEntries,
             facts: facts
         )
-        let plan = SyncPlaybackCarryPlanner.plan(scope: scope, facts: facts)
-        // 空批 = 不发帧（不产生空批次噪音），**也不动对端游标**。
+        // 已推行账。读失败按空处理 = 不过滤：宁可重推（对端 LWW 幂等），
+        // 也绝不因为一次读账失败而漏推。
+        let pushed = (try? pushState.pushedOutboxIDs(forPeer: peerID)) ?? [:]
+        // 高水位 = max(carry 已推最大 id, **本端已推给该 peer 的增量位置**)：
+        // 后者由 `sendIncrement` 维护（每个成功批次的帧 9 末行 id）。不并入它的话，
+        // 「先推数据增量（游标 500）→ 再传歌触发 carry（批末行 2）」仍会把对端游标
+        // 顶回 2 —— 同一类回退，只是换了个写入方。读失败按 0（保守：不抬升）。
+        let carryHighWater = (try? pushState.carryHighWater(forPeer: peerID)) ?? 0
+        let incrementHighWater = (try? store.pushCursor(forPeer: peerID)) ?? 0
+        let highWater = max(carryHighWater, incrementHighWater)
+        let plan = SyncPlaybackCarryPlanner.plan(
+            scope: scope,
+            facts: facts,
+            alreadyPushed: pushed
+        )
+        // 空批（含「本批全部已推过」）= 不发帧（不产生空批次噪音），
+        // **也不动对端游标、不记账**（高水位保持原值）。
         guard !plan.entries.isEmpty else { return plan }
-        // S3（2026-09-12 审计修复）：`lastOutboxID` = **本批实际最后一行 outbox id**，
-        // 与 `SyncChangeLogPeer.handlePull` 应答同口径（不再取 outbox 全局末尾——
-        // 那会把本批没带的行的游标越过去）。
-        // ⚠️ 已知边界（v1 惰性游标下无影响）：批内末行可能**小于**对端已记下的位置
-        // （早先的批推得更靠后）→ 游标会回退；`sync_cursor` 的键是「该游标描述的是
-        // **谁**的 outbox」，本端查不到「已推给该 peer 的位置」这种反向记录，
-        // 因此无法在本端做单调保护。v2 若引入移动端主动 pull，须把 carry 与游标
-        // 语义分开（见文件头边界 2）。
+        // INV-35（I1）：帧 9 的 `lastOutboxID` 只增不减 = max(已推高水位, 本批末行 id)。
+        // 批内末行仍与 `SyncChangeLogPeer.handlePull` 的「本批实际末行」同口径（S3），
+        // 只是再与高水位取大：后到的小批不会把对端已记下的位置顶低。
         let batchLastID = plan.entries.map(\.outboxID).max() ?? 0
+        let lastOutboxID = SyncPlaybackCarryCursor.lastOutboxID(
+            batchLastID: batchLastID,
+            highWater: highWater
+        )
         let payload = SyncChangeLogPushPayload(
             entries: plan.entries.map(Self.wireEntry),
-            lastOutboxID: batchLastID
+            lastOutboxID: lastOutboxID
         )
         try session.sendApplicationFrame(
             type: .changeLogPush,
             payload: try JSONEncoder().encode(payload)
         )
+        // 发送成功后才记账（失败 = 下一轮重推，幂等由对端 LWW 保证）。
+        // 写账失败只告警不抛：帧已经发出去了，把失败翻转成 carry 阶段报错会
+        // 掩盖「数据其实到了」这一事实；下轮重推是安全的。
+        do {
+            try pushState.recordCarryPush(plan.entries, lastOutboxID: lastOutboxID, forPeer: peerID)
+        } catch {
+            AppLog.warn(.sync, "⚠️ SyncPlaybackCarryPeer: carry 已推行账写入失败（下轮重推，幂等）：\(error)")
+        }
         return plan
     }
 

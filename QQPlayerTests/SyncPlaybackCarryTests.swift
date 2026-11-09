@@ -395,11 +395,152 @@ struct SyncPlaybackCarryTests {
         let cursor = try harness.deviceStore.cursor(forPeer: harness.fixture.hostIdentity.deviceID)
         #expect(cursor == 1, "游标 = 本批实际末行（修复前 = outbox 全局末尾 3，越过未发出的歌 z）")
 
-        // 已知边界（v1 惰性游标下无影响）；见 SyncPlaybackCarryPeer 文件头边界 2：
-        // 批内末行更早时游标会回退（本端没有「已推给该 peer 的位置」的反向记录）。
+        // INV-35（2026-11-09 起）：同一行已经推过 → 不再进批次、不发帧，对端游标保持不动
+        // （修复前这里会把 5 顶回 1）。外部写入的游标值本端看不到（没有反向记录），
+        // 本不变量保证的是**本端发出的帧 9 序列**只增不减，见文件头边界 2。
         try harness.deviceStore.setCursor(forPeer: harness.fixture.hostIdentity.deviceID, lastOutboxID: 5)
-        _ = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        let framesBefore = harness.fixture.hostChannel.sentLog.count
+        let secondPlan = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(secondPlan.entries.isEmpty, "已推过的行不再进批次（I2）")
+        #expect(harness.fixture.hostChannel.sentLog.count == framesBefore, "空批不发帧")
         let afterSecondPush = try harness.deviceStore.cursor(forPeer: harness.fixture.hostIdentity.deviceID)
-        #expect(afterSecondPush == 1, "游标跟本批末行走（批内末行 1 < 已记下的 5 → 回退；2/3 号行未被越过）")
+        #expect(afterSecondPush == 5, "空批不动游标（游标回退消失）")
+    }
+
+    // MARK: - INV-35：carry 推送游标单调不回退
+
+    /// 设备侧两首歌都在；Mac 先入库 b 的行（outbox id 小）、再入库 a 的行（id 大）
+    /// —— 用来复现「先推高 id 批次，后推低 id 批次」。
+    private func makeMonotoneHarness() throws -> CarryHarness {
+        let harness = try makeHarness(deviceTracks: [
+            ("d-a", "h-a", "Album/a.flac"),
+            ("d-b", "h-b", "Album/b.flac"),
+        ])
+        for (stableID, hash, relative) in [
+            ("s-a", "h-a", "Album/a.flac"),
+            ("s-b", "h-b", "Album/b.flac"),
+        ] {
+            try Self.insertTrack(
+                harness.macManager, stableId: stableID, contentHash: hash,
+                root: harness.macRoot, relative: relative
+            )
+        }
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-b", op: .upsert, updatedAtMs: 10)
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-a", op: .upsert, updatedAtMs: 11)
+        return harness
+    }
+
+    @Test("INV-35 I1：老批次后到 → 帧 9 游标不下降；未推过的低 id 行照常携带")
+    func carryPushCursorNeverRegresses() throws {
+        let harness = try makeMonotoneHarness()
+        let hostID = harness.fixture.hostIdentity.deviceID
+        let macStore = SyncChangeLogStore(database: harness.macManager)
+        #expect(try macStore.maxOutboxID() == 2, "b = id 1、a = id 2")
+
+        // 先推「高 id」批次：s-a（id 2）
+        let highPlan = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(highPlan.entries.map(\.outboxID) == [2])
+        let cursorAfterHigh = try harness.deviceStore.cursor(forPeer: hostID)
+        #expect(cursorAfterHigh == 2, "首次携带（无高水位）→ 本批末行")
+
+        // 再推「低 id」批次：s-b（id 1）→ 行仍要带，但帧 9 游标不得回落
+        let framesBefore = harness.fixture.hostChannel.sentLog.count
+        let lowPlan = try harness.macCarry.carryPush(transferredPaths: ["Album/b.flac"], peerEntries: [])
+        #expect(lowPlan.entries.map(\.outboxID) == [1], "没推过的低 id 行照常携带（逐行判据）")
+        #expect(harness.fixture.hostChannel.sentLog.count > framesBefore, "有真实条目 → 仍发帧")
+
+        let cursorAfterLow = try harness.deviceStore.cursor(forPeer: hostID)
+        #expect(cursorAfterLow == 2, "帧 9 游标 = max(高水位 2, 本批末行 1) → 不被顶回 1")
+    }
+
+    @Test("INV-35 I2：已推过的行不再重复进入 carry 批次；同一键的新变更仍会带")
+    func carryPushFiltersAlreadyPushedRows() throws {
+        let harness = try makeMonotoneHarness()
+        let hostID = harness.fixture.hostIdentity.deviceID
+
+        let first = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(first.entries.map(\.outboxID) == [2])
+
+        // 同一行再传一次 → 全部被账本滤掉
+        let framesBefore = harness.fixture.hostChannel.sentLog.count
+        let repeatPlan = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(repeatPlan.entries.isEmpty, "已推过的行不重推")
+        #expect(repeatPlan.carriedPaths.isEmpty)
+        #expect(harness.fixture.hostChannel.sentLog.count == framesBefore, "全被过滤 → 不发帧")
+
+        // 同一键出现新变更（新 outbox id = 3）→ 只带新行
+        try Self.record(harness.macManager, entity: .favorite, rowKey: "s-a", op: .upsert, updatedAtMs: 12)
+        let newPlan = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(newPlan.entries.map(\.outboxID) == [3], "内容改动 = 新 outbox id，不被误滤")
+
+        let cursor = try harness.deviceStore.cursor(forPeer: hostID)
+        #expect(cursor == 3, "新批次推进游标（只增）")
+    }
+
+    @Test("INV-35 I3：高水位跨重启持久化（重建 Peer / Store，同一库）")
+    func carryHighWaterPersistsAcrossRebuild() throws {
+        let harness = try makeMonotoneHarness()
+        let hostID = harness.fixture.hostIdentity.deviceID
+        let macStore = SyncChangeLogStore(database: harness.macManager)
+
+        _ = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        let highWater = try macStore.carryHighWater(forPeer: hostID)
+        #expect(highWater == 2)
+        let ledger = try macStore.pushedOutboxIDs(forPeer: hostID)
+        #expect(ledger[SyncChangeEntity.favorite.rawValue + "\u{1F}" + "s-a"] == 2, "逐行账落在库里")
+
+        // 重新构造 Store / Peer（同库文件）：账本与高水位都还在
+        let rebuiltStore = SyncChangeLogStore(database: harness.macManager)
+        #expect(try rebuiltStore.carryHighWater(forPeer: hostID) == 2, "跨重启（同库）高水位仍在")
+        let rebuiltPeer = SyncPlaybackCarryPeer(
+            session: harness.fixture.hostSession,
+            libraryRoot: harness.macRoot,
+            peerID: hostID,
+            database: harness.macManager
+        )
+        let repeatPlan = try rebuiltPeer.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(repeatPlan.entries.isEmpty, "重建后仍知道这行已推过")
+
+        let lowPlan = try rebuiltPeer.carryPush(transferredPaths: ["Album/b.flac"], peerEntries: [])
+        #expect(lowPlan.entries.map(\.outboxID) == [1])
+        let cursor = try harness.deviceStore.cursor(forPeer: hostID)
+        #expect(cursor == 2, "重建后仍按高水位 2 发帧，游标不回落")
+    }
+
+    @Test("INV-35 I3：peer 重新对账（resetCursors）后 carry 账目清零、可重新推全量")
+    func carryHighWaterResetsWithPeerReconcile() throws {
+        let harness = try makeMonotoneHarness()
+        let hostID = harness.fixture.hostIdentity.deviceID
+        let macStore = SyncChangeLogStore(database: harness.macManager)
+
+        _ = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        let accepted = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(accepted.entries.isEmpty)
+
+        // 「重新对账」= 既有唯一重置入口：两个游标 + carry 账目同口径清零
+        try macStore.resetCursors(forPeer: hostID)
+        let highWaterAfterReset = try macStore.carryHighWater(forPeer: hostID)
+        let ledgerAfterReset = try macStore.pushedOutboxIDs(forPeer: hostID)
+        #expect(highWaterAfterReset == 0, "高水位归零")
+        #expect(ledgerAfterReset.isEmpty, "逐行账清空")
+
+        let fullPlan = try harness.macCarry.carryPush(transferredPaths: ["Album/a.flac"], peerEntries: [])
+        #expect(fullPlan.entries.map(\.outboxID) == [2], "清零后可重新推全量")
+    }
+
+    @Test("INV-35：carry 帧游标不低于 sendIncrement 已推位置（跨写入方不回退）")
+    func carryCursorNeverBelowIncrementCursor() throws {
+        let harness = try makeMonotoneHarness()
+        let hostID = harness.fixture.hostIdentity.deviceID
+        let macStore = SyncChangeLogStore(database: harness.macManager)
+
+        // 先推过数据增量到 5（sendIncrement 只在全部批次成功后推进）
+        try macStore.setPushCursor(forPeer: hostID, lastOutboxID: 5)
+
+        let plan = try harness.macCarry.carryPush(transferredPaths: ["Album/b.flac"], peerEntries: [])
+        #expect(plan.entries.map(\.outboxID) == [1])
+
+        let cursor = try harness.deviceStore.cursor(forPeer: hostID)
+        #expect(cursor == 5, "carry 不能把 sendIncrement 已告诉对端的位置顶回 1")
     }
 }

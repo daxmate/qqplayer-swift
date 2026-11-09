@@ -223,6 +223,23 @@ extension DatabaseManager {
                 )
             """)
 
+            // carry 推送已推行账（INV-35，2026-11-09）：逐行记「这一行播放数据已经
+            // 推给该 peer」。MAX(last_pushed_outbox_id) = carry 推送高水位（帧 9 游标
+            // 下界，只增不减）；同一 (peer_id, entity, row_key) 命中即不再重推。
+            // 与 sync_cursor / sync_push_cursor 是**三种不同粒度/方向**的账，刻意分表
+            // （见 SyncDataSyncModels.swift 的 SyncPlaybackCarryPushState）。
+            // 新表幂等建表 ⇒ 已安装的老库下次启动自动补表，不需要重装（无列迁移）。
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS sync_playback_carry_state (
+                    peer_id TEXT NOT NULL,
+                    entity TEXT NOT NULL,
+                    row_key TEXT NOT NULL,
+                    last_pushed_outbox_id INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (peer_id, entity, row_key)
+                )
+            """)
+
             // 局域网同步挂起变更（S2, M4-2a）：“远端变更引用的歌曲本地还没有”时
             // 挂起在此（row_key = content_hash），歌曲入库后重放，不丢数据。
             // 模型/存储/重放见 Sync/SyncChangeLogPendingStore.swift，映射见

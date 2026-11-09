@@ -21,7 +21,7 @@ struct SyncChangeLogRef: Hashable, Sendable {
     var rowKey: String
 }
 
-final class SyncChangeLogStore: @unchecked Sendable {
+final class SyncChangeLogStore: @unchecked Sendable, SyncPlaybackCarryPushStateStoring {
     private let database: DatabaseManager
 
     init(database: DatabaseManager = .shared) {
@@ -131,18 +131,73 @@ final class SyncChangeLogStore: @unchecked Sendable {
         try SyncPeerPushCursor(peerID: peerID, lastOutboxID: lastOutboxID).upsert(db)
     }
 
+    // MARK: - carry 推送已推行账（sync_playback_carry_state；INV-35）
+
+    /// 已推给该 peer 的**逐行**账目（键 = `SyncPlaybackCarryEntry.reconciliationKey`）。
+    /// 查不到 = 空（首次携带 / 新 peer）。
+    func pushedOutboxIDs(forPeer peerID: String) throws -> [String: Int64] {
+        try database.read { db in
+            try SyncPlaybackCarryPushState
+                .filter(Column("peer_id") == peerID)
+                .fetchAll(db)
+                .reduce(into: [String: Int64]()) { result, row in
+                    result["\(row.entity)\u{1F}\(row.rowKey)"] = row.lastPushedOutboxID
+                }
+        }
+    }
+
+    /// carry 推送高水位：已推给该 peer 的最大 outbox id（无记录 = 0）。
+    /// 帧 9 `lastOutboxID` 的下界（INV-35：只增不减）。
+    func carryHighWater(forPeer peerID: String) throws -> Int64 {
+        try database.read { db in
+            try Int64.fetchOne(
+                db,
+                sql: "SELECT MAX(last_pushed_outbox_id) FROM sync_playback_carry_state WHERE peer_id = ?",
+                arguments: [peerID]
+            ) ?? 0
+        }
+    }
+
+    /// 记下本批**实际推出**的行（发送成功后调用）。每行的值 = 帧 9 游标（≥ 本行 id），
+    /// 因此 `MAX(last_pushed_outbox_id)` 恒等于「已推高水位」。幂等 upsert。
+    func recordCarryPush(
+        _ entries: [SyncPlaybackCarryEntry],
+        lastOutboxID: Int64,
+        forPeer peerID: String
+    ) throws {
+        guard !entries.isEmpty else { return }
+        try database.write { db in
+            let now = Self.nowMs()
+            for entry in entries {
+                try SyncPlaybackCarryPushState(
+                    peerID: peerID,
+                    entity: entry.entity,
+                    rowKey: entry.rowKey,
+                    lastPushedOutboxID: lastOutboxID,
+                    updatedAtMs: now
+                ).upsert(db)
+            }
+        }
+    }
+
     // MARK: - 重置游标（「重新对账」）
 
-    /// 把该 peer 的**两个**游标都清零：拉取游标（sync_cursor）+ 推送游标（sync_push_cursor）。
+    /// 把该 peer 的**两个**游标都清零：拉取游标（sync_cursor）+ 推送游标（sync_push_cursor），
+    /// 并清掉 carry 推送的已推行账（sync_playback_carry_state；INV-35 / I3「同口径清零」）。
     ///
     /// 为什么需要：游标一旦越过某行就永不回头（见 `page` 的口径）——身份键修复后，
     /// 之前因缺指纹被跳过的行不会自己重来，必须能把位置退回去重拉 / 重推。
     /// 两个方向一起清：只退一边会得到「本端重发了一遍但对方不会再回推」的半途状态。
+    /// carry 账目同口径清空：否则「重新对账」会因「这行已推过」而永远不再携带它。
     /// 幂等（无记录 = 0）；不动任何业务行 / outbox 行。
     func resetCursors(forPeer peerID: String) throws {
         try database.write { db in
             try self.setCursor(db, forPeer: peerID, lastOutboxID: 0)
             try self.setPushCursor(db, forPeer: peerID, lastOutboxID: 0)
+            try db.execute(
+                sql: "DELETE FROM sync_playback_carry_state WHERE peer_id = ?",
+                arguments: [peerID]
+            )
         }
     }
 

@@ -367,13 +367,38 @@
 
 ### INV-34　播放数据不接受「来自未来」的时间戳（远端 `updatedAtMs > 本机 now + 容差` → **不应用**并计数）
 
-- **现有守护**：✗ 无守护（`SyncLWWReconcile` 直接按 `updated_at` 比大小；对端时钟超前 ⇒ 它的旧行带未来时间戳，会压过本端新行）
-- **建议**：B1 skew guard（容差 5 分钟，常量可配）+ 单测（超前 / 滞后 / 边界）+ 计数上屏；判据 fail-closed —— 宁可暂不应用，也不让「来自未来的旧行」胜出
+- **现有守护：✅ 已收（2026-11-09，`e369c9a`）**
+  - B1 时钟超前门 = `SyncLWWReconcile.isAheadOfClock(_:nowMs:)`（容差 5 分钟，`clockSkewToleranceMs` 唯一出处）；
+    `merge` 把超前键放进 `MergeResult.futureRejected`，由 `SyncChangeLogPeer.handlePush`
+    按实体计数（`onPushFutureTimestamp` → `SyncOutcomeTally` → 面板按实体披露）。
+  - 判据 fail-closed：超前 **> 容差** 才拒绝，**恰好等于容差放行**（边界含义固定，用例钉死）。
+- **用例**：`SyncLWWReconcileTests.clockSkewGateBoundary`（`时钟超前门边界：容差 = 5 分钟…`）、
+  `futureRemoteOnlyKeyRejected`、`futureRemoteSameKeyLocalWinsAndCountedOnce`、
+  `futureTimestampCountedThroughTally`（本地 harness 未覆盖本节，靠 CI 跑 Swift Testing）。
 
 ### INV-35　播放位置 carry 的推送游标**单调不回退**（只增不减，少推已给过的行）
 
-- **现有守护**：✗ 无守护（`SyncPlaybackCarryPeer` 自承「没有『已推给该 peer 的位置』的反向记录，无法做单调保护」⇒ 批内末行可能小于对端已记位置 ⇒ `sync_push_cursor` 回退）
-- **建议**：新表 `sync_playback_carry_state(peer_id, entity, row_key, last_pushed_outbox_id, …)`（高水位）+ 帧 9 `lastOutboxID` 取 `max(高水位, batchLastID)` + `sync_push_cursor` 单调断言 + 单测；⚠️ 它只管游标单调，**不能单独承担「防旧冲新」**（那仍靠 LWW，且需 INV-34 的容差门）
+- **现有守护：✅ 已收（2026-11-09）**
+  - 已推行账 = 新表 `sync_playback_carry_state(peer_id, entity, row_key, last_pushed_outbox_id, updated_at_ms)`
+    （`PRIMARY KEY (peer_id, entity, row_key)`，模型 `SyncPlaybackCarryPushState`，
+    存储 `SyncChangeLogStore.pushedOutboxIDs / carryHighWater / recordCarryPush`）；
+    幂等建表 ⇒ 老库自动补表，不要求重装。
+  - 帧 9 `lastOutboxID` = `SyncPlaybackCarryCursor.lastOutboxID(batchLastID:highWater:)`
+    = **max(carry 已推高水位, `sync_push_cursor`, 本批末行 id)**——唯一实现点；
+    `sync_push_cursor` 并入下界是为了「先推数据增量、再传歌」这条常见序列同样不回退。
+  - 「少推已给过的行」= `SyncPlaybackCarryPlanner.plan(..., alreadyPushed:)` **逐行**过滤
+    （同 entity + row_key 且该 outbox id 已推过）；全被过滤 → 不发帧、不动游标、不记账。
+  - 重置口径：`SyncChangeLogStore.resetCursors(forPeer:)`（peer「重新对账」唯一入口）
+    一并删该 peer 的 carry 账目（否则重推永远不会发生）。
+- **用例**：`SyncPlaybackCarryTests.carryPushCursorNeverRegresses`（老批次后到不复位）、
+  `carryPushFiltersAlreadyPushedRows`、`carryHighWaterPersistsAcrossRebuild`、
+  `carryHighWaterResetsWithPeerReconcile`、`carryCursorNeverBelowIncrementCursor`、
+  `carryPushCursorIsBatchTail`（S3 口径 + 空批不动游标）；
+  harness ㉙ 节纯逻辑断言（游标 max 三边界 + 逐行过滤不误伤低 id 未推行）。
+- **剩余边界（如实记录）**：本端看不到对端**自己写**的 `sync_cursor`（协议没有反向回执），
+  因此保证的是「本端发出的帧 9 序列只增不减」；若 v2 引入移动端主动 pull，
+  需要再评估「游标抬升 vs 对端漏拉」的取捨（当下 iOS 纯被动、从不 pull）。
+  ⚠️ 仍**不能单独承担「防旧冲新」**（那靠 LWW + INV-34 的容差门）。
 
 ## 9. 判断标准（新增能力时怎么自检）
 

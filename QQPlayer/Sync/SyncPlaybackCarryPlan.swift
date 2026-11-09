@@ -227,9 +227,15 @@ enum SyncPlaybackCarryPlanner {
     /// ④ 同 content_hash 去重（一首歌多个路径只带一次，按路径升序取先到者）
     /// ⑤ 本端播放数据行 → 按 outboxID 升序 → 过滤 delete（决策 7，含批次抑制）→ 附着身份键
     ///    过滤后为空 → `skippedNoPlaybackData`
+    /// 参数 `alreadyPushed`：**已经推给该 peer 的行账**（键 = `reconciliationKey`，
+    /// 值 = 该行上次推送时的 outbox id）。命中的行不再进本批（INV-35 / I2，少推已给过的行）。
+    /// 缺省空 = 不过滤（首次携带 / 未接账本）。
+    /// ⚠️ 判据是**逐行**（同 entity + row_key 且 outbox id 未变），不是「id ≤ 某游标」：
+    /// 后者会把「更早入库、但这首歌本轮才传」的行一并滤掉（那些行对端从没收到过）。
     static func plan(
         scope: SyncPlaybackCarryScope,
-        facts: SyncPlaybackCarryFactsProviding
+        facts: SyncPlaybackCarryFactsProviding,
+        alreadyPushed: [String: Int64] = [:]
     ) -> SyncPlaybackCarryPlan {
         var plan = pairingPlan(scope: scope, facts: facts)
         guard !plan.songs.isEmpty else { return plan }
@@ -239,7 +245,8 @@ enum SyncPlaybackCarryPlanner {
         for song in plan.songs {
             let carried = carryEntries(
                 rows: facts.playbackRows(forTrackStableId: song.stableId),
-                contentHash: song.contentHash
+                contentHash: song.contentHash,
+                alreadyPushed: alreadyPushed
             )
             guard !carried.isEmpty else {
                 plan.skippedNoPlaybackData.append(song.relativePath)
@@ -307,10 +314,12 @@ enum SyncPlaybackCarryPlanner {
         return plan
     }
 
-    /// 一批本端行 → 可携带条目（delete 不上线；身份键统一为歌曲 content_hash）。
+    /// 一批本端行 → 可携带条目（delete 不上线；身份键统一为歌曲 content_hash；
+    /// 已推过的同一行不再重推）。
     private static func carryEntries(
         rows: [SyncPlaybackCarryRow],
-        contentHash: String
+        contentHash: String,
+        alreadyPushed: [String: Int64] = [:]
     ) -> [SyncPlaybackCarryEntry] {
         let ordered = rows.sorted { $0.outboxID < $1.outboxID }
         let transmittable = SyncChangeLogDeletionPolicy
@@ -318,6 +327,14 @@ enum SyncPlaybackCarryPlanner {
                 SyncChangeLogPolicyRow(entity: $0.entity, rowKey: $0.rowKey, op: $0.op)
             })
             .map { ordered[$0] }
+            .filter { row in
+                // outbox id 0 = 无 id 的合成行：判不出「是不是同一行」，一律带上（宁可重推）。
+                guard row.outboxID > 0 else { return true }
+                guard let pushedID = alreadyPushed["\(row.entity)\u{1F}\(row.rowKey)"] else { return true }
+                // 同一 (entity, row_key) 的行只会以更大的 outbox id 再次出现；
+                // pushedID >= 本行 id ⇒ 这一行本身已经推过（内容改动 = 新 id，不会被误滤）。
+                return row.outboxID > pushedID
+            }
         return transmittable.map {
             SyncPlaybackCarryEntry(
                 outboxID: $0.outboxID,
@@ -329,5 +346,42 @@ enum SyncPlaybackCarryPlanner {
                 payloadJSON: $0.payloadJSON
             )
         }
+    }
+}
+
+// MARK: - 推送已推行账（INV-35：carry 游标单调不回退）
+
+/// carry 推送的「已推给该 peer 的行」账本（协议层，**不依赖 GRDB**）。
+///
+/// 为什么需要它：carry 推送的批次只是「本轮传输的歌」的子集，帧 9 的
+/// `lastOutboxID` 若直接取本批末行，对端把它记成 `sync_cursor` 后，后到的小批
+/// 会把更大的位置覆盖成更小的值 → 游标回退（INV-35）。本账本同时回答两件事：
+/// ① 帧 9 游标的下界（只增不减）；② 哪些行已经给过该 peer（不再重推）。
+///
+/// ⚠️ 它与 `sync_push_cursor`（`SyncPeerPushCursor`）**不是同一个概念、不可复用**：
+/// 那张表是「本端 outbox 已整体推给该 peer 的位置」（`sendIncrement` 的起点），
+/// carry 的批次是歌维度子集，共用会把行数口径搅在一起（推增量会跳过从没发过的行）。
+/// 本账本按 **(entity, row_key) 逐行**记，同表不同粒度，故单独立表。
+///
+/// 生产实现 = `SyncChangeLogStore`（表 `sync_playback_carry_state`）；测试可注入内存替身。
+protocol SyncPlaybackCarryPushStateStoring: AnyObject {
+    /// 已推给该 peer 的行 → 该行最后一次推送时的 outbox id（键 = `reconciliationKey`）。
+    func pushedOutboxIDs(forPeer peerID: String) throws -> [String: Int64]
+    /// 已推给该 peer 的最大 outbox id（无记录 = 0）；帧 9 游标的下界。
+    func carryHighWater(forPeer peerID: String) throws -> Int64
+    /// 记下本批**实际推出**的行（发送成功后调用；失败不记账 = 下轮重推，幂等）。
+    func recordCarryPush(_ entries: [SyncPlaybackCarryEntry], lastOutboxID: Int64, forPeer peerID: String) throws
+}
+
+/// carry 推送游标口径（纯函数，单一实现点）。
+enum SyncPlaybackCarryCursor {
+    /// 帧 9 的 `lastOutboxID` = **max(已推高水位, 本批末行 id)**（INV-35 / I1 只增不减）。
+    ///
+    /// 为什么可以抬升：carry 的批次本身就是「本轮传输的歌」的子集，对端游标只在
+    /// 「拉对端 outbox 增量」时被读取；同一批里没有被带上的行（别的歌）本来也不会由
+    /// 这一批带过去——不抬升反而会让对端每次重拉更大的区间（游标回退）。
+    /// 抬升只到「已经真的推出去过的最大 id」，不会凭空越过没发过的行（见 I1 用例）。
+    static func lastOutboxID(batchLastID: Int64, highWater: Int64) -> Int64 {
+        max(highWater, batchLastID)
     }
 }

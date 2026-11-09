@@ -129,6 +129,36 @@ struct SyncPeerPushCursor: Codable, FetchableRecord, PersistableRecord, Equatabl
     }
 }
 
+// MARK: - carry 推送已推行账（sync_playback_carry_state）
+
+/// sync_playback_carry_state 一行：**某行播放数据已推给某 peer** 的账目（INV-35）。
+///
+/// 粒度是 (peer_id, entity, row_key)（对账键），`last_pushed_outbox_id` = 该行
+/// 最后一次推送时的**帧 9 游标**（= 那批的 max(已推高水位, 本批末行 id)）。
+///
+/// 与另外两张表的分工（三张表都不能合）：
+/// - `sync_cursor`：本端已消费的**对端** outbox 位置（拉取游标）。
+/// - `sync_push_cursor`：本端 outbox **整体**已推给该 peer 的位置（增量推送起点）。
+/// - 本表：**逐行**「这一行已经给过该 peer」的账本；`MAX(last_pushed_outbox_id)`
+///   即 carry 推送的高水位（帧 9 游标下界），也是「不再重推」的判据来源。
+struct SyncPlaybackCarryPushState: Codable, FetchableRecord, PersistableRecord, Equatable, Sendable {
+    var peerID: String
+    var entity: String
+    var rowKey: String
+    var lastPushedOutboxID: Int64
+    var updatedAtMs: Int64
+
+    static let databaseTableName = "sync_playback_carry_state"
+
+    enum CodingKeys: String, CodingKey {
+        case peerID = "peer_id"
+        case entity
+        case rowKey = "row_key"
+        case lastPushedOutboxID = "last_pushed_outbox_id"
+        case updatedAtMs = "updated_at_ms"
+    }
+}
+
 // MARK: - 线载荷（changeLogPull / changeLogPush）
 
 /// changeLogPull 请求：对端带自己已消费的本端 outbox id（cursor）来拉增量。

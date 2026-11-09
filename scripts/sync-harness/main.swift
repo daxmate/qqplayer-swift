@@ -2073,6 +2073,62 @@ do {
     )
     checkEqual(dupPlan.entries.count, 1, "同一首歌（同指纹）多路径只带一次")
     checkEqual(dupPlan.carriedPaths, ["A/dup-a.flac"], "首见路径获胜（路径升序确定性）")
+
+    // INV-35（I1）：帧 9 游标 = max(已推高水位, 本批末行 id) —— 只增不减。
+    checkEqual(SyncPlaybackCarryCursor.lastOutboxID(batchLastID: 5, highWater: 9), 9, "后到的小批 → 游标不回落")
+    checkEqual(SyncPlaybackCarryCursor.lastOutboxID(batchLastID: 7, highWater: 0), 7, "首次携带（无高水位）→ 用本批末行")
+    checkEqual(SyncPlaybackCarryCursor.lastOutboxID(batchLastID: 9, highWater: 9), 9, "边界：本批末行 == 高水位")
+
+    // INV-35（I2）：已推过的同一行不再进批次（逐行判据，不是「id ≤ 游标就跳过」）。
+    let ledgerFacts = MemoryCarryFacts(
+        tracks: [
+            "A/hi.flac": SyncCollectionTrackFact(stableId: "s-hi", relativePath: "A/hi.flac", contentHash: "h-hi"),
+            "A/lo.flac": SyncCollectionTrackFact(stableId: "s-lo", relativePath: "A/lo.flac", contentHash: "h-lo"),
+        ],
+        rows: [
+            "s-hi": [SyncPlaybackCarryRow(outboxID: 300, entity: "favorite", rowKey: "s-hi", op: "upsert", updatedAtMs: 1)],
+            "s-lo": [SyncPlaybackCarryRow(outboxID: 10, entity: "favorite", rowKey: "s-lo", op: "upsert", updatedAtMs: 2)],
+        ]
+    )
+    let ledgerScope = SyncPlaybackCarryScope(
+        direction: .push,
+        transferredPaths: ["A/hi.flac", "A/lo.flac"],
+        peerContentHashes: ["h-hi", "h-lo"]
+    )
+    let unfiltered = SyncPlaybackCarryPlanner.plan(scope: ledgerScope, facts: ledgerFacts)
+    checkEqual(unfiltered.entries.map(\.outboxID), [10, 300], "无账本 → 全带（首次携带口径不变）")
+
+    let ledgerPlan = SyncPlaybackCarryPlanner.plan(
+        scope: ledgerScope,
+        facts: ledgerFacts,
+        alreadyPushed: ["favorite\u{1F}s-hi": 300]
+    )
+    checkEqual(ledgerPlan.entries.map(\.outboxID), [10], "已推过的行滤掉；高水位 300 不滤从未推过的低 id 行（逐行判据）")
+    checkEqual(ledgerPlan.carriedPaths, ["A/lo.flac"], "只带还有新行的歌")
+    checkEqual(ledgerPlan.skippedNoPlaybackData, ["A/hi.flac"], "该歌行全部已推 → 记为无数据可带（不发帧）")
+
+    let allPushed = SyncPlaybackCarryPlanner.plan(
+        scope: ledgerScope,
+        facts: ledgerFacts,
+        alreadyPushed: ["favorite\u{1F}s-hi": 300, "favorite\u{1F}s-lo": 300]
+    )
+    checkEqual(allPushed.entries.map(\.outboxID), [], "全部已推 → 空批（不发帧、不动游标）")
+
+    // outbox id 0 = 无 id 的合成行：判不出「同一行」→ 不参与过滤（宁可重推，绝不漏推）。
+    let zeroIDFacts = MemoryCarryFacts(
+        tracks: [
+            "A/zero.flac": SyncCollectionTrackFact(stableId: "s-zero", relativePath: "A/zero.flac", contentHash: "h-zero"),
+        ],
+        rows: [
+            "s-zero": [SyncPlaybackCarryRow(outboxID: 0, entity: "favorite", rowKey: "s-zero", op: "upsert", updatedAtMs: 3)],
+        ]
+    )
+    let zeroIDPlan = SyncPlaybackCarryPlanner.plan(
+        scope: SyncPlaybackCarryScope(direction: .push, transferredPaths: ["A/zero.flac"], peerContentHashes: ["h-zero"]),
+        facts: zeroIDFacts,
+        alreadyPushed: ["favorite\u{1F}s-zero": 99]
+    )
+    checkEqual(zeroIDPlan.entries.map(\.outboxID), [0], "无 id 的合成行不参与「已推过」过滤")
 }
 
 // MARK: - ㉙ R3b：编排端到端——推送方向跟歌走
