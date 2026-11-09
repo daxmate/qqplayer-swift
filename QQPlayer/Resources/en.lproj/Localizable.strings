@@ -997,6 +997,8 @@
 "sync_run_data_missing_identity_hint" = "%d entries were sent without a song fingerprint, so the other device can't match them.";
 "sync_run_data_apply_failed" = "Apply failed";
 "sync_run_data_apply_failed_hint" = "%d changes couldn't be applied (the data was unreadable or couldn't be written on this device).";
+"sync_run_data_future_timestamp" = "Clock ahead";
+"sync_run_data_future_timestamp_hint" = "%d changes were not applied because their timestamps are more than 5 minutes ahead of this Mac's clock (the other device's clock may be wrong).";
 "sync_run_data_entity_breakdown" = "Broken down by entity";
 "sync_run_data_entity_row" = "%1$@ · %2$@";
 "sync_run_data_entity_favorite" = "Favorites";

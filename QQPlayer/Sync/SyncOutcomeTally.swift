@@ -64,6 +64,10 @@ enum SyncRowOutcome: CaseIterable, Hashable, Sendable {
     /// INV-18 按实体披露包）。此前这类失败只进日志：对端面板看不到「是歌单结构还是
     /// 收藏出的问题」（歌单级失败尤其如此，INV-18 的 C 格）。批次中断语义不变。
     case applyFailed
+    /// 远端行的 `updated_at` **超前本机超过容差**（5 分钟）→ **不应用**并计数上屏
+    /// （契约 B1 / INV-34，2026-11-09）：防「来自未来」的旧值永久压过本端新值。
+    /// 判据 = `SyncLWWReconcile.isAheadOfClock`（容差唯一出处）。
+    case futureTimestamp
 }
 
 /// 一个 **(实体, 计数)** 分组：某类结果里某条实体占多少条。
@@ -134,6 +138,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
     private var missingIdentityCounts = SyncOutcomeSlot()
     private var ignoredDeleteCounts = SyncOutcomeSlot()
     private var applyFailedCounts = SyncOutcomeSlot()
+    private var futureTimestampCounts = SyncOutcomeSlot()
 
     /// 累加一条（或一批）结果；`entity` = 这条处置属于哪条实体（nil = 未归属）。
     ///
@@ -150,6 +155,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
         case .missingIdentity: missingIdentityCounts.add(entity: entity, count: count)
         case .ignoredDelete: ignoredDeleteCounts.add(entity: entity, count: count)
         case .applyFailed: applyFailedCounts.add(entity: entity, count: count)
+        case .futureTimestamp: futureTimestampCounts.add(entity: entity, count: count)
         }
     }
 
@@ -177,6 +183,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
         case .missingIdentity: return missingIdentityCounts.total
         case .ignoredDelete: return ignoredDeleteCounts.total
         case .applyFailed: return applyFailedCounts.total
+        case .futureTimestamp: return futureTimestampCounts.total
         }
     }
 
@@ -195,6 +202,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
         case .missingIdentity: return missingIdentityCounts.count(entity: entity)
         case .ignoredDelete: return ignoredDeleteCounts.count(entity: entity)
         case .applyFailed: return applyFailedCounts.count(entity: entity)
+        case .futureTimestamp: return futureTimestampCounts.count(entity: entity)
         }
     }
 
@@ -214,6 +222,7 @@ struct SyncOutcomeTally: Equatable, Sendable {
         case .missingIdentity: return missingIdentityCounts.nonZeroEntityCounts
         case .ignoredDelete: return ignoredDeleteCounts.nonZeroEntityCounts
         case .applyFailed: return applyFailedCounts.nonZeroEntityCounts
+        case .futureTimestamp: return futureTimestampCounts.nonZeroEntityCounts
         }
     }
 }
@@ -241,4 +250,6 @@ extension SyncOutcomeTally {
     var ignoredDeletes: Int { count(for: .ignoredDelete) }
     /// 应用失败的远端行条数（载荷解不开 / 落库抛错；按实体披露）。
     var applyFailedEntries: Int { count(for: .applyFailed) }
+    /// 因**时钟超前**（对端时间戳来自未来，超过 5 分钟容差）而拒绝应用的远端行条数。
+    var futureTimestampEntries: Int { count(for: .futureTimestamp) }
 }

@@ -106,7 +106,8 @@
             SyncEntityOutcomeDisclosure.placement(of: outcome)
         }
 
-        /// 缺口行展示顺序（严重度：未定位 → 应用失败 → 身份歧义 → 缺依赖 → 未支持 → 缺指纹）。
+        /// 缺口行展示顺序（严重度：未定位 → 应用失败 → 身份歧义 → 缺依赖 → 时钟超前 →
+        /// 未支持 → 缺指纹）。
         /// ⚠️ 与 `countOrder` 合起来必须**恰好覆盖** `SyncRowOutcome.allCases`（有用例钉住）。
         static var gapOrder: [SyncRowOutcome] { SyncEntityOutcomeDisclosure.gapOrder }
 

@@ -1000,6 +1000,8 @@
 "sync_run_data_missing_identity_hint" = "有 %d 条改动没有携带歌曲指纹，对端无法定位。";
 "sync_run_data_apply_failed" = "应用失败";
 "sync_run_data_apply_failed_hint" = "有 %d 条改动没能应用（数据读不出，或写入本机失败）。";
+"sync_run_data_future_timestamp" = "时钟超前";
+"sync_run_data_future_timestamp_hint" = "有 %d 条改动的时间戳比本机快 5 分钟以上，没有应用（对端时钟可能不准）。";
 "sync_run_data_entity_breakdown" = "按类别明细";
 "sync_run_data_entity_row" = "%1$@ · %2$@";
 "sync_run_data_entity_favorite" = "收藏";

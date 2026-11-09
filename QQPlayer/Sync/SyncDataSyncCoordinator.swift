@@ -263,6 +263,10 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         peer.onPushApplyFailed = { [weak self] groups in
             self?.recordAnswered(.applyFailed, groups: groups)
         }
+        // 时钟超前门（契约 B1 / INV-34）：对端时间戳来自未来的行不应用，按实体计数上屏。
+        peer.onPushFutureTimestamp = { [weak self] groups in
+            self?.recordAnswered(.futureTimestamp, groups: groups)
+        }
         peer.onPushIgnoredDeletes = { [weak self] count in self?.recordIgnoredDeletes(count) }
         // 对端未就绪（notReady）：不是「应答成功」，也不是立刻失败的理由 → 退避重试。
         peer.onPushNotReady = { [weak self] in self?.handleNotReadyAnswer() }

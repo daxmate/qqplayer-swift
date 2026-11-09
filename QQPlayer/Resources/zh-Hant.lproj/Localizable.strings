@@ -1321,6 +1321,8 @@
 "sync_run_data_missing_identity_hint" = "有 %d 筆變更沒有帶歌曲指紋，對端無法定位。";
 "sync_run_data_apply_failed" = "套用失敗";
 "sync_run_data_apply_failed_hint" = "有 %d 筆變更無法套用（資料讀不出，或寫入本機失敗）。";
+"sync_run_data_future_timestamp" = "時鐘超前";
+"sync_run_data_future_timestamp_hint" = "有 %d 筆變更的時間戳比本機快 5 分鐘以上，沒有套用（對端時鐘可能不準）。";
 "sync_run_data_entity_breakdown" = "依類別明細";
 "sync_run_data_entity_row" = "%1$@ · %2$@";
 "sync_run_data_entity_favorite" = "收藏";

@@ -117,6 +117,87 @@ struct SyncLWWReconcileTests {
         #expect(deleteTie.applyRemote.isEmpty)
     }
 
+    // MARK: - B1 时钟超前门（INV-34）
+
+    /// 固定「本机现在」（毫秒），判定一律注入，不依赖真实时钟。
+    private static let fixedNowMs: Int64 = 1_760_000_000_000
+
+    @Test("时钟超前门边界：容差 = 5 分钟；> 容差拒绝、== 容差放行、落后方向放行")
+    func clockSkewGateBoundary() {
+        let now = Self.fixedNowMs
+        let tolerance = SyncLWWReconcile.clockSkewToleranceMs
+        #expect(tolerance == 300_000, "容差必须是契约承诺的 5 分钟，且单一出处")
+        #expect(SyncLWWReconcile.isAheadOfClock(now + tolerance + 1, nowMs: now))
+        #expect(!SyncLWWReconcile.isAheadOfClock(now + tolerance, nowMs: now), "恰好等于容差放行（「超过」= 严格大于）")
+        #expect(!SyncLWWReconcile.isAheadOfClock(now, nowMs: now))
+        #expect(!SyncLWWReconcile.isAheadOfClock(now - tolerance * 10, nowMs: now), "本机时钟超前（远端更旧）不归此门管")
+    }
+
+    @Test("超前 5 分 1 毫秒的远端独有键 → 不应用，并带进 futureRejected（计数来源）")
+    func futureRemoteOnlyKeyRejected() {
+        let now = Self.fixedNowMs
+        let remote = [
+            Self.row(id: 10, rowKey: "a", updatedAtMs: now + SyncLWWReconcile.clockSkewToleranceMs + 1),
+        ]
+        let result = SyncLWWReconcile.merge(localRows: [], remoteRows: remote, nowMs: now)
+        #expect(result.applyRemote.isEmpty, "来自未来的行不得应用")
+        #expect(result.futureRejected.map(\.id) == [10])
+    }
+
+    @Test("超前正好 5 分钟 / 超前 4 分 59 秒 → 照常应用（边界放行）")
+    func futureRemoteWithinToleranceApplied() {
+        let now = Self.fixedNowMs
+        let atBoundary = [
+            Self.row(id: 10, rowKey: "a", updatedAtMs: now + SyncLWWReconcile.clockSkewToleranceMs),
+        ]
+        let boundaryResult = SyncLWWReconcile.merge(localRows: [], remoteRows: atBoundary, nowMs: now)
+        #expect(boundaryResult.applyRemote.map(\.id) == [10])
+        #expect(boundaryResult.futureRejected.isEmpty)
+
+        let justUnder = [
+            Self.row(id: 11, rowKey: "b", updatedAtMs: now + SyncLWWReconcile.clockSkewToleranceMs - 1_000),
+        ]
+        let underResult = SyncLWWReconcile.merge(localRows: [], remoteRows: justUnder, nowMs: now)
+        #expect(underResult.applyRemote.map(\.id) == [11])
+        #expect(underResult.futureRejected.isEmpty)
+    }
+
+    @Test("本机时钟超前（远端时间戳更小）→ 行为不变：远端独有键仍应用")
+    func localClockAheadUnchanged() {
+        let now = Self.fixedNowMs
+        // 远端比本机慢一小时：远不构成「来自未来」。
+        let remote = [Self.row(id: 10, rowKey: "a", updatedAtMs: now - 3_600_000)]
+        let result = SyncLWWReconcile.merge(localRows: [], remoteRows: remote, nowMs: now)
+        #expect(result.applyRemote.map(\.id) == [10])
+        #expect(result.futureRejected.isEmpty)
+    }
+
+    @Test("同键且远端来自未来 → 不应用、本端胜出；同键多行只计一次（不重复计）")
+    func futureRemoteSameKeyLocalWinsAndCountedOnce() {
+        let now = Self.fixedNowMs
+        let tolerance = SyncLWWReconcile.clockSkewToleranceMs
+        let local = [Self.row(id: 1, rowKey: "k", updatedAtMs: now - 10_000)]
+        let remote = [
+            Self.row(id: 20, rowKey: "k", updatedAtMs: now + tolerance + 5),
+            Self.row(id: 30, rowKey: "k", updatedAtMs: now + tolerance + 9),
+        ]
+        let result = SyncLWWReconcile.merge(localRows: local, remoteRows: remote, nowMs: now)
+        #expect(result.applyRemote.isEmpty)
+        #expect(result.localWins.map(\.id) == [1], "本端有同键行时它照常是本端胜出")
+        #expect(result.futureRejected.map(\.id) == [30], "每键一条代表行：重复 resolve 同一批不重复计")
+    }
+
+    @Test("计数链路：futureTimestamp 按实体入账目 → 出现在按实体披露行（面板）")
+    func futureTimestampCountedThroughTally() {
+        var tally = SyncOutcomeTally()
+        tally.accumulate(.futureTimestamp, entity: .favorite)
+        #expect(tally.futureTimestampEntries == 1)
+        #expect(tally.entityGroups(for: .futureTimestamp) == [SyncEntityOutcomeCount(entity: .favorite, count: 1)])
+
+        let rows = SyncEntityOutcomeDisclosure.rows(tally)
+        #expect(rows == [.init(outcome: .futureTimestamp, entity: .favorite, count: 1)])
+    }
+
     @Test("同键远端批多行：取 updated_at 最大的一行代表参与比较")
     func remoteGroupRepresentative() {
         let local = [Self.row(id: 1, rowKey: "k", updatedAtMs: 1000)]

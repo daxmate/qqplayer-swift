@@ -995,6 +995,8 @@
 "sync_run_data_missing_identity_hint" = "%d modifications ont été envoyées sans empreinte de morceau : l'autre appareil ne peut pas les associer.";
 "sync_run_data_apply_failed" = "Échec d’application";
 "sync_run_data_apply_failed_hint" = "%d modifications n’ont pas pu être appliquées (données illisibles ou écriture impossible sur cet appareil).";
+"sync_run_data_future_timestamp" = "Horloge en avance";
+"sync_run_data_future_timestamp_hint" = "%d modifications n’ont pas été appliquées car leur horodatage dépasse l’horloge de ce Mac de plus de 5 minutes (l’horloge de l’autre appareil est peut-être fausse).";
 "sync_run_data_entity_breakdown" = "Détail par catégorie";
 "sync_run_data_entity_row" = "%1$@ · %2$@";
 "sync_run_data_entity_favorite" = "Favoris";

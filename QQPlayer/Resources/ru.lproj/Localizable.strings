@@ -992,6 +992,8 @@
 "sync_run_data_missing_identity_hint" = "%d изменений отправлены без отпечатка песни, другое устройство не может их сопоставить.";
 "sync_run_data_apply_failed" = "Не удалось применить";
 "sync_run_data_apply_failed_hint" = "%d изменений не удалось применить (данные не читаются или не удалось записать на это устройство).";
+"sync_run_data_future_timestamp" = "Часы спешат";
+"sync_run_data_future_timestamp_hint" = "%d изменений не применены: их отметка времени более чем на 5 минут опережает часы этого Mac (возможно, часы другого устройства неверны).";
 "sync_run_data_entity_breakdown" = "По категориям";
 "sync_run_data_entity_row" = "%1$@ · %2$@";
 "sync_run_data_entity_favorite" = "Избранное";

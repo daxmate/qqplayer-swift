@@ -108,6 +108,11 @@ enum SyncEntityOutcomeDisclosure {
                 labelKey: "sync_run_data_skipped_parent",
                 hintKey: "sync_run_data_skipped_parent_hint"
             )
+        case .futureTimestamp:
+            return .gap(
+                labelKey: "sync_run_data_future_timestamp",
+                hintKey: "sync_run_data_future_timestamp_hint"
+            )
         case .unsupported:
             return .gap(
                 labelKey: "sync_run_data_unsupported",
@@ -129,13 +134,15 @@ enum SyncEntityOutcomeDisclosure {
         }
     }
 
-    /// 缺口行展示顺序（严重度：未定位 → 应用失败 → 身份歧义 → 缺依赖 → 未支持 → 缺指纹）。
+    /// 缺口行展示顺序（严重度：未定位 → 应用失败 → 身份歧义 → 缺依赖 → 时钟超前 →
+    /// 未支持 → 缺指纹）。
     /// ⚠️ 与 `countOrder` 合起来必须**恰好覆盖** `SyncRowOutcome.allCases`（有用例钉住）。
     static let gapOrder: [SyncRowOutcome] = [
         .unresolved,
         .applyFailed,
         .ambiguousIdentity,
         .skippedMissingParent,
+        .futureTimestamp,
         .unsupported,
         .missingIdentity,
     ]
@@ -159,7 +166,7 @@ enum SyncEntityOutcomeDisclosure {
     static func disclosesByEntity(_ outcome: SyncRowOutcome) -> Bool {
         switch outcome {
         case .unresolved, .applyFailed, .ambiguousIdentity, .skippedMissingParent,
-             .unsupported, .missingIdentity, .suspended:
+             .futureTimestamp, .unsupported, .missingIdentity, .suspended:
             return true
         case .applied, .outbound, .ignoredDelete:
             return false
@@ -174,6 +181,7 @@ enum SyncEntityOutcomeDisclosure {
         .applyFailed,
         .ambiguousIdentity,
         .skippedMissingParent,
+        .futureTimestamp,
         .unsupported,
         .missingIdentity,
         .suspended,
@@ -319,7 +327,7 @@ enum SyncEntityOutcomeDisclosure {
     static func conclusionSeverity(_ outcome: SyncRowOutcome) -> SyncResultConclusionSegment.Severity {
         switch outcome {
         case .unresolved, .applyFailed, .ambiguousIdentity, .skippedMissingParent,
-             .unsupported, .missingIdentity, .suspended:
+             .futureTimestamp, .unsupported, .missingIdentity, .suspended:
             return .gap
         case .applied, .outbound, .ignoredDelete:
             return .normal

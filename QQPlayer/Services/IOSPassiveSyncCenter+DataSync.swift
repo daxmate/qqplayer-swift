@@ -202,6 +202,19 @@
                 guard total > 0 else { return }
                 AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 应用失败的远端行（行数=\(total)，载荷非法或落库失败）")
             }
+            // 时钟超前门（契约 B1 / INV-34）：对端时间戳来自未来的行不应用，按实体计数上屏。
+            peer.onPushFutureTimestamp = { [weak self] groups in
+                Task { @MainActor in
+                    self?.recordDataSync { summary in
+                        for group in groups {
+                            summary.tally.accumulate(.futureTimestamp, entity: group.entity, count: group.count)
+                        }
+                    }
+                }
+                let total = groups.reduce(0) { $0 + $1.count }
+                guard total > 0 else { return }
+                AppLog.warn(.general, "⚠️ SyncChangeLogPeer: 对端时间戳超前的远端行（行数=\(total)，超过 5 分钟容差，未应用）")
+            }
             peer.onPullMissingIdentity = { [weak self] groups in
                 Task { @MainActor in
                     self?.recordDataSync { summary in

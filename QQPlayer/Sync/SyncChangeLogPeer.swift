@@ -104,6 +104,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     /// 空 = 无、不触发。以前这类失败只进日志（面板零信号）——L0 契约 C 行要求
     /// 「歌单级失败必须单独计数上屏」，这条就是它的落点（歌单行失败 → 实体 = playlist）。
     var onPushApplyFailed: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
+    /// push 中因**对端时间戳超前本机超过容差**（时钟超前门，契约 B1 / INV-34）而
+    /// **不应用**的行数，**按实体分组**；锁外触发；空 = 无、不触发。
+    var onPushFutureTimestamp: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// 对端回 notReady（曲库索引未到终态 / 正在整理上一批数据）：本批**不应用**，
     /// 由调用方退避重试（锁外触发）。旧端不会发这个字段，因此不会触发。
     var onPushNotReady: (@Sendable () -> Void)?
@@ -378,6 +381,10 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             }
             // LWW 合并 → 应用远端胜出行
             let mergeResult = SyncLWWReconcile.merge(localRows: localRows, remoteRows: remoteRows)
+            // B1 时钟超前门拒绝的行：不应用，按实体进本批账目（与其它缺口同一链路）。
+            for row in mergeResult.futureRejected {
+                batchTally.accumulate(.futureTimestamp, entity: row.entityValue)
+            }
             // 播放位置未落地（跨端续播关 / 落点未接）逐条回调 → 本批累加（应用前清零）。
             applierBatchTally = SyncOutcomeTally()
             let applied = try applier.apply(mergeResult.applyRemote)
@@ -390,6 +397,8 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             onPushIgnoredDeletes?(batchTally.count(for: .ignoredDelete))
             let ambiguousGroups = batchTally.entityGroups(for: .ambiguousIdentity)
             if !ambiguousGroups.isEmpty { onPushAmbiguous?(ambiguousGroups) }
+            let futureGroups = batchTally.entityGroups(for: .futureTimestamp)
+            if !futureGroups.isEmpty { onPushFutureTimestamp?(futureGroups) }
             reportApplierGroups()
         } catch {
             // 应用中途失败：先把**已经发生**的失败行按实体上报（面板可见，INV-18），
