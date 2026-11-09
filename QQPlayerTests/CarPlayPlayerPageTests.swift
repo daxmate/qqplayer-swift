@@ -171,15 +171,16 @@ struct CarPlayPlayerPageBuilderTests {
 
     // MARK: - 进度
 
-    @Test("进度按 2s 量化：同一段内内容不变（否则页头会按 tick 重建）")
+    @Test("进度按 30s 量化：同一桶内内容不变（页头缩略图按桶缓存，避免每 tick 重画）")
     func progressIsQuantized() {
-        let lyrics = makeLyrics(makeLines(["一", "二", "三", "四"]))
-        let at0 = content(elapsed: 0, duration: 200, lyrics: lyrics)
-        let at19 = content(elapsed: 1.9, duration: 200, lyrics: lyrics)
-        let at2 = content(elapsed: 2, duration: 200, lyrics: lyrics)
+        // 用空歌词隔离进度这一个变量：歌词行会随时间变，混进来就测不出进度桶本身
+        let lyrics = makeLyrics([])
+        let at0 = content(elapsed: 0, duration: 600, lyrics: lyrics)
+        let at29 = content(elapsed: 29.9, duration: 600, lyrics: lyrics)
+        let at30 = content(elapsed: 30, duration: 600, lyrics: lyrics)
 
-        #expect(at0 == at19)
-        #expect(at0 != at2)
+        #expect(at0 == at29)
+        #expect(at0 != at30)
     }
 
     @Test("进度：总时长未知不画进度条")

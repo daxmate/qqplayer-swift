@@ -73,6 +73,9 @@
             }
             restoreTask = task
             let restored = await task.value
+            // 完成后立刻清空：单飞只覆盖「在途」的那次；首次恢复失败（库/数据暂时读不到）时
+            // 下一次调用必须能重新尝试，不能被一个 false 永久钉住。
+            restoreTask = nil
             AppLog.info(.general, "🔄 AppLaunchBootstrap: 状态恢复完成（\(reason)），有曲目=\(restored)")
             return restored
         }

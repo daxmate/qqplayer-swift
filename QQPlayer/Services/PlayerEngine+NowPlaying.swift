@@ -252,6 +252,8 @@
             if isPlaying {
                 playbackTime = calculatedTime
                 playbackTimeUpdatedAt = Date()
+                // 播放中每 30s 打一条内存曲线（自带节流，不轮询、不额外起 timer）
+                MemoryDiagnostics.logPeriodically("播放中")
             }
 
             // Remove this duplicate detection - it's handled by checkIfTrackEnded()

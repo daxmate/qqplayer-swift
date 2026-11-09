@@ -79,8 +79,10 @@ enum CarPlayPlayerPageBuilder {
     /// 播放页显示几行歌词（当前句 + 后续 2 句）
     static let lyricLineCount = 3
 
-    /// 进度量化步长（秒）：页头重建有成本，进度按 2s 跳而不是按 0.5s tick 跳
-    static let progressStep: TimeInterval = 2
+    /// 进度量化步长（秒）：页头重建 = 重画缩略图（时间文案与进度条都画在图上）。
+    /// 2026-11-09 真机：2s 桶 → 同一首歌 4 分钟重建约 120 次。取 30s（4 分钟 ≤9 次），
+    /// 既满足「≥10 秒粒度」的降频要求，也和「4 分钟页头图像生成 ≤10 次」的目标对齐。
+    static let progressStep: TimeInterval = 30
 
     static func content(
         track: CarPlayPlayerPageTrackInfo?,
@@ -168,6 +170,12 @@ final class CarPlayPlayerPageController {
     private var showRoman = DeleteSettings.load().lyricShowRoman
     /// 已写进系统「正在播放」标题位的歌词行（车载歌词；nil = 当前无覆盖）
     private var appliedCarLyricsTitle: String?
+    /// 播放页是否在车机屏幕上。不可见时停掉 tick 的 UI 更新（2026-11-09：页头 4 分钟重建 423 次）。
+    /// 默认 true：CPInterfaceControllerDelegate 回调缺失时保持旧行为，不至于整页不刷新。
+    private var isVisible = true
+    /// 页头缩略图 / 控制键复用缓存（见 CarPlay+PlayerPageCache.swift）
+    private var thumbnailCache = CarPlayPlayerPageThumbnailCache()
+    private var buttonCache = CarPlayPlayerPageButtonCache()
 
     init() {
         template = CPListTemplate(title: "lyrics".localized, sections: [])
@@ -181,6 +189,26 @@ final class CarPlayPlayerPageController {
         tickTimer?.invalidate()
         tickTimer = nil
         clearCarLyricsTitle()
+        thumbnailCache.removeAll()
+        buttonCache.removeAll()
+    }
+
+    /// 页面进出可见性（由 CarPlay 场景 delegate 的 templateWillAppear / templateDidDisappear 驱动）。
+    /// 不可见时连 2s tick 的刷新都不做；重新出现时立刻补一帧，避免看到旧状态。
+    func setVisible(_ visible: Bool) {
+        guard visible != isVisible else {
+            if visible { refresh() }
+            return
+        }
+        isVisible = visible
+        AppLog.info(.ui, visible ? "📺 CarPlay 播放页进入可见" : "📴 CarPlay 播放页离开可见，停止刷新")
+        if visible {
+            startTickTimer()
+            refresh()
+        } else {
+            tickTimer?.invalidate()
+            tickTimer = nil
+        }
     }
 
     // MARK: - 订阅
@@ -195,11 +223,7 @@ final class CarPlayPlayerPageController {
             }
             .store(in: &cancellables)
 
-        // 0.5s 与播放器后台曲终检测同档（源码注释 "timer that works in background"）。
-        // 内容不变时 apply 内直接返回，不上屏。
-        tickTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
+        startTickTimer()
 
         // 设置页改动（显示罗马音开关）→ 下次 refresh 用新值重建内容
         NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)
@@ -234,6 +258,8 @@ final class CarPlayPlayerPageController {
         artwork = nil
         loadedArtworkKey = nil
         appliedArtworkKey = nil
+        // 旧曲目的缩略图既不该复用，也没必要占内存
+        thumbnailCache.removeAll()
         refresh()
 
         guard let track else { return }
@@ -279,8 +305,25 @@ final class CarPlayPlayerPageController {
         return artistCache?.name
     }
 
+    /// 2s tick：只在播放页可见时刷新（不可见时不排队、不上屏）。
+    /// 歌词行与页头各自有变化判据（apply 内比较），同一内容不会重复上屏。
+    private func startTickTimer() {
+        tickTimer?.invalidate()
+        guard isVisible else { return }
+        tickTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isVisible else { return }
+                // CarPlay 时手机主 App 通常已在后台，播放器 0.25s timer 是停的 →
+                // 内存曲线只能在这里采（自带 30s 节流，不额外起 timer）。
+                MemoryDiagnostics.logPeriodically("CarPlay 播放页")
+                self.refresh()
+            }
+        }
+    }
+
     /// 由播放态算出内容；与上次上屏内容相同则不动模板
     private func refresh() {
+        guard isVisible else { return }
         let engine = PlayerEngine.shared
         let track = engine.currentTrack
         let lines = lyrics?.syncedLyrics ?? []
@@ -403,13 +446,25 @@ final class CarPlayPlayerPageController {
 
         let artworkSettled = (loadedArtworkKey == header.artworkKey)
         let image = artworkSettled ? artwork : nil
-        let thumbnail = CPThumbnailImage(image: headerThumbnail(artwork: image, progress: header.progress))
+        // 缩略图按 (artworkKey, 进度桶, 封面是否就绪) 复用：同一桶内的重复 tick 不再重画
+        // CoreGraphics；封面晚到时会因 ready 位变化而重画一次，不会把占位图钉住。
+        let bucket = header.progress.map { "\($0.elapsedText)/\($0.totalText)" } ?? "none"
+        let thumbnailKey = "\(header.artworkKey ?? "none")|\(bucket)|\(image != nil ? 1 : 0)"
+        let thumbnail = CPThumbnailImage(image: thumbnailCache.image(for: thumbnailKey) {
+            headerThumbnail(artwork: image, progress: header.progress)
+        })
+
+        // 控制键只在播放态 / 播放顺序变化时重建（CPButton 实例可复用）
+        let buttonSignature = "\(header.isPlaying)|\(String(describing: header.playOrderMode))"
+        let buttons = buttonCache.buttons(signature: buttonSignature) {
+            controlButtons(for: header)
+        }
 
         let details = CPListTemplateDetailsHeader(
             thumbnail: thumbnail,
             title: header.title,
             subtitle: header.subtitle,
-            actionButtons: controlButtons(for: header)
+            actionButtons: buttons
         )
         // 页头背景由封面派生（与车载播放页的观感一致）；系统自适应日夜
         details.wantsAdaptiveBackgroundStyle = true
@@ -488,82 +543,13 @@ final class CarPlayPlayerPageController {
         refresh()
     }
 
-    // MARK: - 封面绘制
-
-    /// 页头缩略图：封面（或占位）+ 底部进度条与时间文案。
-    /// CarPlay 列表模板没有滑块/进度控件，进度只能自绘进封面里（只读，不可拖动）。
-    private func headerThumbnail(artwork: UIImage?, progress: CarPlayPlayerPageProgress?) -> UIImage {
-        let side = playerPageThumbnailSide
-        let size = CGSize(width: side, height: side)
-        return UIGraphicsImageRenderer(size: size).image { _ in
-            let rect = CGRect(origin: .zero, size: size)
-            if let artwork {
-                drawAspectFill(artwork, in: rect)
-            } else {
-                drawPlaceholderFill(in: rect)
-            }
-            if let progress {
-                drawProgressFooter(progress, in: rect)
-            }
-        }
-    }
-
-    /// 封面未就绪时的占位填充（页头条目要求缩略图非空）
-    private func drawPlaceholderFill(in rect: CGRect) {
-        UIColor.systemGray5.setFill()
-        UIRectFill(rect)
-
-        guard let note = UIImage(systemName: "music.note")?.withConfiguration(
-            UIImage.SymbolConfiguration(pointSize: rect.width * 0.3, weight: .medium)
-        ) else { return }
-        let noteRect = CGRect(
-            x: rect.midX - note.size.width / 2,
-            y: rect.midY - note.size.height / 2,
-            width: note.size.width,
-            height: note.size.height
-        )
-        note.withTintColor(.systemGray3, renderingMode: .alwaysOriginal).draw(in: noteRect)
-    }
-
-    /// 底部压暗 + 进度条 + 「已播 / 总长」：任何封面上都读得清
-    private func drawProgressFooter(_ progress: CarPlayPlayerPageProgress, in rect: CGRect) {
-        let side = rect.width
-        let footerHeight = side * 0.22
-        let footer = CGRect(x: 0, y: rect.maxY - footerHeight, width: side, height: footerHeight)
-        UIColor.black.withAlphaComponent(0.42).setFill()
-        UIRectFill(footer)
-
-        let inset = side * 0.08
-        let barHeight = side * 0.03
-        let trackRect = CGRect(x: inset, y: footer.minY + footerHeight * 0.58, width: side - inset * 2, height: barHeight)
-        UIColor.white.withAlphaComponent(0.28).setFill()
-        UIBezierPath(roundedRect: trackRect, cornerRadius: barHeight / 2).fill()
-
-        // 跑过的部分：至少留一个圆点，起始处也看得见
-        let filledWidth = min(max(trackRect.width * CGFloat(progress.fraction), barHeight), trackRect.width)
-        UIColor.white.setFill()
-        UIBezierPath(
-            roundedRect: CGRect(x: trackRect.minX, y: trackRect.minY, width: filledWidth, height: barHeight),
-            cornerRadius: barHeight / 2
-        ).fill()
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: side * 0.08, weight: .semibold),
-            .foregroundColor: UIColor.white,
-        ]
-        let textY = footer.minY + footerHeight * 0.12
-        (progress.elapsedText as NSString).draw(at: CGPoint(x: inset, y: textY), withAttributes: attributes)
-
-        let totalText = progress.totalText as NSString
-        let totalWidth = totalText.size(withAttributes: attributes).width
-        totalText.draw(at: CGPoint(x: rect.maxX - inset - totalWidth, y: textY), withAttributes: attributes)
-    }
 }
 
 // MARK: - 封面绘制
 
-/// 播放页页头缩略图边长（页头是大图，不能用 CPListItem.maximumImageSize 那个列表尺寸）
-private let playerPageThumbnailSide = 512.0
+/// 播放页页头缩略图边长（页头是大图，不能用 CPListItem.maximumImageSize 那个列表尺寸）。
+/// 绘制实现已拆到 CarPlay+PlayerPageThumbnail.swift，两边共用这一个常量。
+let playerPageThumbnailSide = 512.0
 
 /// 播放页页头缩略图：封面按 aspect-fill 画进正方形。
 /// 填充规则复用列表页的 drawAspectFill（同一套「封面怎么裁」只有一份实现）。

@@ -227,6 +227,7 @@ struct QQPlayerApp: App {
     /// 局域网同步被动端跟随 App 前后台：前台回连、后台断开（唯一生命周期入口，
     /// 不依赖扫码流程）。
     private func handleScenePhase(_ phase: ScenePhase) {
+        MemoryDiagnostics.log("scenePhase: \(String(describing: phase))")
         // 映射到被动同步中心的回前台决策（bg→fg 立即补试 / inactive→fg 去抖；
         // 逻辑抽在 IOSPassiveForegroundGate，不塞在这一层）。
         let gatePhase: IOSPassiveForegroundGate.Phase

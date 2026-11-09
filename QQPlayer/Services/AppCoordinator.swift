@@ -39,6 +39,12 @@ class AppCoordinator {
 
     func initialize() async {
         AppLog.info(.general, "🚀 AppCoordinator.initialize() started")
+        #if os(iOS)
+            // 内存曲线基点（含版本/build，便于和崩溃日志对齐）；打点在 iOS 侧（Mac 无 CarPlay 路径）
+            let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?"
+            let build = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "?"
+            MemoryDiagnostics.log("启动 v\(version) (\(build))")
+        #endif
 
         // Cosmos → QQPlayer rebrand: rename legacy data paths once so
         // playlists/favorites/player-state created by older installs stay

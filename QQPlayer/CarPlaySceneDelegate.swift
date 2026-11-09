@@ -28,6 +28,8 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
                                   didConnect interfaceController: CPInterfaceController) {
         self.interfaceController = interfaceController
+        // 播放页可见性回调（不可见时停掉 tick 刷新；见 CarPlay+PlayerPage.setVisible）
+        interfaceController.delegate = self
 
         // 重连时先停掉上一份播放页（订阅 + 时钟），防同场景重复 didConnect 时旧控制器残活
         playerPageController?.stop()
@@ -560,5 +562,21 @@ private func createPlaceholderImage(systemName: String = "music.note") -> UIImag
             UIColor.systemGray3.setFill()
             musicIcon.draw(in: iconRect, blendMode: .normal, alpha: 1.0)
         }
+    }
+}
+
+// MARK: - 播放页可见性
+
+extension CarPlaySceneDelegate: CPInterfaceControllerDelegate {
+    /// 播放页模板进入屏幕 → 恢复 2s tick 刷新并立刻补一帧
+    func templateWillAppear(_ aTemplate: CPTemplate, animated: Bool) {
+        guard aTemplate === playerPageController?.template else { return }
+        playerPageController?.setVisible(true)
+    }
+
+    /// 播放页模板离开屏幕（返回 Tab / 被别的模板盖住）→ 停掉 tick 的 UI 更新
+    func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+        guard aTemplate === playerPageController?.template else { return }
+        playerPageController?.setVisible(false)
     }
 }

@@ -363,6 +363,7 @@
 
         private func processMemoryWarning() {
             AppLog.warn(.general, "⚠️ Memory warning received - cleaning up audio resources")
+            MemoryDiagnostics.log("内存警告")
 
             // Clear cached artwork to free memory
             cachedArtwork = nil

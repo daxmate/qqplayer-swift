@@ -125,6 +125,7 @@
                 AppLog.error(.general, "❌ Session activate failed: \(error)")
                 // Try to continue anyway - might still work
             }
+            MemoryDiagnostics.log("开始播放:\(currentTrack?.title ?? "nil")")
 
             if playbackState == .paused {
                 AppLog.info(.general, "▶️ Resuming from pause at position: \(playbackTime)s")
