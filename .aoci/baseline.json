@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-09T04:42:40Z",
+  "updated_at": "2026-11-09T05:13:21Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -2564,9 +2564,9 @@
     },
     "QQPlayer/Sync/SyncEntityRegistry+Assembly.swift": {
       "role": "index",
-      "sha256": "23c12a9ec4de28e992a84d236fff0a1580278b6b98183d52b9e50f97fbc13fa9",
-      "size": 10698,
-      "normalized_sha256": "23c12a9ec4de28e992a84d236fff0a1580278b6b98183d52b9e50f97fbc13fa9"
+      "sha256": "6c8e315f83ecf4c39eda17d88cf414efb751a21aa5363be13a1e6bbe6d2d40ee",
+      "size": 13657,
+      "normalized_sha256": "6c8e315f83ecf4c39eda17d88cf414efb751a21aa5363be13a1e6bbe6d2d40ee"
     },
     "QQPlayer/Sync/SyncEntityRegistry+Shape.swift": {
       "role": "index",
@@ -4484,9 +4484,9 @@
     },
     "QQPlayerTests/SyncWiringContractTests.swift": {
       "role": "index",
-      "sha256": "9532ac0b332a032c25e3a1ba3fc31f4b683947458f76aa230f72d5d19bb3860c",
-      "size": 113316,
-      "normalized_sha256": "9532ac0b332a032c25e3a1ba3fc31f4b683947458f76aa230f72d5d19bb3860c"
+      "sha256": "cdb9af3e49e2e70a8f1140f05729844c04bc0f3bf2709b3624b7bb5aa0639c49",
+      "size": 117639,
+      "normalized_sha256": "cdb9af3e49e2e70a8f1140f05729844c04bc0f3bf2709b3624b7bb5aa0639c49"
     },
     "QQPlayerTests/SyncWiringSelfCheckTests.swift": {
       "role": "index",
@@ -4634,9 +4634,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ca5fec77387435118af33933e3030dce0352d4a228e03cc4799edfe76e218621",
-      "size": 341882,
-      "normalized_sha256": "ca5fec77387435118af33933e3030dce0352d4a228e03cc4799edfe76e218621"
+      "sha256": "0c74ffaf564a4f2483db5cc3f0f10b885008087be34dbdbc3dda58bb753c44d0",
+      "size": 341989,
+      "normalized_sha256": "0c74ffaf564a4f2483db5cc3f0f10b885008087be34dbdbc3dda58bb753c44d0"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -4694,9 +4694,9 @@
     },
     "docs/sync-invariants.md": {
       "role": "index",
-      "sha256": "2bde49a464a56689d77c4a4e401e98f46e17d210a30176a16312249c32c3db1d",
-      "size": 41657,
-      "normalized_sha256": "2bde49a464a56689d77c4a4e401e98f46e17d210a30176a16312249c32c3db1d"
+      "sha256": "db9a19498a85c17feead0e010a93dadfe26c1968e058e37d4ccd9376229db1e2",
+      "size": 43226,
+      "normalized_sha256": "db9a19498a85c17feead0e010a93dadfe26c1968e058e37d4ccd9376229db1e2"
     },
     "docs/sync-matrix.md": {
       "role": "index",
