@@ -690,6 +690,7 @@ struct IOSPassiveSyncCenterTests {
         "QQPlayer/Sync/SyncListener.swift": [
             "onStateUpdate",
             "onReady",
+            "onFailure",
             "onStopped",
             "onSessionStateChange",
             "onSessionClosed",
@@ -815,7 +816,7 @@ struct IOSPassiveSyncCenterTests {
         "QQPlayer/Sync/SyncEventHandlerChain.swift": 3,
         "QQPlayer/Sync/SyncPeerSession.swift": 4,
         "QQPlayer/Sync/SyncPeerSession+Frames.swift": 0,
-        "QQPlayer/Sync/SyncListener.swift": 6,
+        "QQPlayer/Sync/SyncListener.swift": 7,
         "QQPlayer/Sync/SyncBrowser.swift": 2,
         "QQPlayer/Sync/SyncFileReceiver.swift": 5,
         "QQPlayer/Sync/SyncFileSender.swift": 3,
