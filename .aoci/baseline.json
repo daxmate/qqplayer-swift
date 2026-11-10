@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-09T15:20:34Z",
+  "updated_at": "2026-11-10T00:31:16Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -4664,9 +4664,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "e005b10d22cf83845f3ae85d2140d298d30375af588934420e47b0c963862f34",
-      "size": 344272,
-      "normalized_sha256": "e005b10d22cf83845f3ae85d2140d298d30375af588934420e47b0c963862f34"
+      "sha256": "9baa7d8d476f3dbb1bddb20d9d156849d2bd801b70598f5702d6be1a96a86cd3",
+      "size": 344359,
+      "normalized_sha256": "9baa7d8d476f3dbb1bddb20d9d156849d2bd801b70598f5702d6be1a96a86cd3"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -4772,15 +4772,15 @@
     },
     "scripts/detect-device-test.py": {
       "role": "index",
-      "sha256": "cd03fbb4d484605676e686e09305f834b1c78588760b501b9d548bb1b75c1d30",
-      "size": 4557,
-      "normalized_sha256": "cd03fbb4d484605676e686e09305f834b1c78588760b501b9d548bb1b75c1d30"
+      "sha256": "9b3c6f9fd700a3035d280bc2bd759bd86fd8cd111af1c6a5412dd1e724b9d358",
+      "size": 6354,
+      "normalized_sha256": "9b3c6f9fd700a3035d280bc2bd759bd86fd8cd111af1c6a5412dd1e724b9d358"
     },
     "scripts/detect-device.py": {
       "role": "index",
-      "sha256": "d82fb4a7c1dc12b770f2b40959c47e3c9fbc06cda38a8e62ea68e52a34f14cb8",
-      "size": 3758,
-      "normalized_sha256": "d82fb4a7c1dc12b770f2b40959c47e3c9fbc06cda38a8e62ea68e52a34f14cb8"
+      "sha256": "8991f6f563037bbafda3054075d00dc8c1c02c8d0e9d5cbfc493a980c270d3d7",
+      "size": 4082,
+      "normalized_sha256": "8991f6f563037bbafda3054075d00dc8c1c02c8d0e9d5cbfc493a980c270d3d7"
     },
     "scripts/dsq-shared-migrate.sh": {
       "role": "index",
