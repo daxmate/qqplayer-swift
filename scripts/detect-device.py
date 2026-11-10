@@ -15,7 +15,8 @@
     1. connectionProperties.pairingState      已知且 != "paired"          → 跳过（未与这台 Mac 配对）
     2. connectionProperties.tunnelState       已知且 == "unavailable"     → 跳过（设备关机/失联）
     3. hardwareProperties.platform            已知且 != "iOS"             → 跳过（Apple Watch 等）
-    4. deviceProperties.developerModeStatus   已知且 == "disabled"        → 跳过（开发构建装不上）
+    4. hardwareProperties.reality             已知且 != "physical"        → 跳过（模拟器等仿真设备：reality=simulated）
+    5. deviceProperties.developerModeStatus   已知且 == "disabled"        → 跳过（开发构建装不上）
 
 多台同时满足时取第一台（devicectl 按最近使用排序），与旧行为一致。
 """
@@ -36,6 +37,7 @@ def pick_device(data):
         pairing = conn.get("pairingState")
         tunnel = conn.get("tunnelState")
         platform = hw.get("platform")
+        reality = hw.get("reality")
         devmode = dp.get("developerModeStatus")
         udid = hw.get("udid")
 
@@ -47,6 +49,8 @@ def pick_device(data):
             reasons.append((name, "不可达（tunnelState=unavailable：关机 / 不在同一网络）"))
         elif platform and platform != "iOS":
             reasons.append((name, f"非 iOS 设备（platform={platform}）"))
+        elif reality and reality != "physical":
+            reasons.append((name, f"不是真机（reality={reality}：模拟器等仿真设备）"))
         elif devmode == "disabled":
             reasons.append((name, "未开启开发者模式（设置 → 隐私与安全性 → 开发者模式）"))
         else:

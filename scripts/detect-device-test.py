@@ -6,6 +6,8 @@
 fixture 全部取自 2026-09-20 真机实测输出的字段形状：
   - iPhone 16 Pro：pairingState=paired / tunnelState=disconnected（**可达但隧道未建立**，旧判据在这里误报）
   - Apple Watch Series 9：platform=watchOS / tunnelState=unavailable
+  - 模拟器（iPhone 17 / 18 Pro）：hardwareProperties.reality=simulated / pairingState=paired /
+    tunnelState=sameMachine（2026-11-10 误选模拟器事故，旧判据在这里误报）
 """
 
 import json
@@ -18,7 +20,8 @@ SCRIPT = Path(__file__).resolve().parent / "detect-device.py"
 
 
 def device(identifier, *, udid="00008140-001639913E42801C", name="dax's iPhone",
-           pairing="paired", tunnel="disconnected", platform="iOS", devmode="enabled"):
+           pairing="paired", tunnel="disconnected", platform="iOS", devmode="enabled",
+           reality="physical"):
     """造一台设备；传 None 表示该字段在输出里不存在。"""
     conn = {"authenticationType": "manualPairing", "transportType": "localNetwork"}
     if pairing is not None:
@@ -30,6 +33,8 @@ def device(identifier, *, udid="00008140-001639913E42801C", name="dax's iPhone",
         hw["udid"] = udid
     if platform is not None:
         hw["platform"] = platform
+    if reality is not None:
+        hw["reality"] = reality
     dp = {"name": name, "osVersionNumber": "26.6.2"}
     if devmode is not None:
         dp["developerModeStatus"] = devmode
@@ -75,6 +80,23 @@ CASES = [
      [device("A", udid="IPHONE-UDID", pairing=None, tunnel=None, platform=None, devmode=None)],
      0, "IPHONE-UDID"),
 
+    ("只有模拟器（reality=simulated / tunnel=sameMachine）：应拒绝",
+     [device("S", udid="SIM-UDID", name="iPhone 17", reality="simulated",
+             tunnel="sameMachine")], 1, ""),
+
+    ("真机不可达 + 两台模拟器：应判定没有可用真机",
+     [device("A", udid="IPHONE-UDID", tunnel="unavailable"),
+      device("S1", udid="SIM-1", name="iPhone 17", reality="simulated", tunnel="sameMachine"),
+      device("S2", udid="SIM-2", name="iPhone 18 Pro", reality="simulated",
+             tunnel="sameMachine")], 1, ""),
+
+    ("模拟器在前、真机在后：应跳过模拟器选真机",
+     [device("S", udid="SIM-UDID", name="iPhone 17", reality="simulated", tunnel="sameMachine"),
+      device("A", udid="IPHONE-UDID")], 0, "IPHONE-UDID"),
+
+    ("reality 字段缺失（旧 Xcode 输出）：不应变成新误报",
+     [device("A", udid="IPHONE-UDID", reality=None)], 0, "IPHONE-UDID"),
+
     ("无 udid 字段：应拒绝",
      [device("A", udid=None)], 1, ""),
 
@@ -105,11 +127,21 @@ def main():
         print(f"   stderr: {err.strip()!r}")
         failures.append("拒绝原因诊断")
 
+    # 模拟器被跳过时也必须说明原因（2026-11-10 误选模拟器事故的回归守卫）
+    code, out, err = run([device("S", udid="SIM-UDID", name="iPhone 17",
+                                reality="simulated", tunnel="sameMachine")])
+    if code == 1 and "模拟器" in err and "simulated" in err:
+        print("✅ 跳过模拟器时 stderr 给出原因（含「模拟器」与 reality=simulated）")
+    else:
+        print("❌ 跳过模拟器时未解释原因")
+        print(f"   stderr: {err.strip()!r}")
+        failures.append("模拟器跳过原因诊断")
+
     print()
     if failures:
-        print(f"❌ {len(failures)}/{len(CASES) + 1} 个用例失败：" + "、".join(failures))
+        print(f"❌ {len(failures)}/{len(CASES) + 2} 个用例失败：" + "、".join(failures))
         return 1
-    print(f"✅ 全部 {len(CASES) + 1} 个用例通过")
+    print(f"✅ 全部 {len(CASES) + 2} 个用例通过")
     return 0
 
 
