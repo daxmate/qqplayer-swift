@@ -144,8 +144,9 @@ struct SyncFileConcurrencyTests {
         #expect(restartAck?.receivedBytes == 0)
 
         try feedAll(receiver, fileID: "same-a", chunks: partsA, chunkSize: Int64(chunk))
-        try feedAll(receiver, fileID: "same-b", chunks: Array(partsB.dropFirst()),
-                    chunkSize: Int64(chunk))
+        for index in 1 ..< partsB.count {
+            try feedChunk(receiver, "same-b", offset: Int64(index * chunk), data: partsB[index])
+        }
 
         #expect(log.outcomes.count == 2)
         #expect(try landed(dir, "ra.bin") == dataA)

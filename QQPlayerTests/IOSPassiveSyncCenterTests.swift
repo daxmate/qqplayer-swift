@@ -709,6 +709,7 @@ struct IOSPassiveSyncCenterTests {
         ],
         "QQPlayer/Sync/SyncFileSender.swift": [
             "onCompletion",
+            "onConcurrencyNegotiated",
             "priorAppHandler",
             "priorClosedHandler",
         ],
