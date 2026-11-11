@@ -130,8 +130,18 @@ extension SyncFileReceiver {
                             chunkSize: meta.chunkSize, sha256Hex: sha, finalURL: finalURL,
                             partURL: partURL, startOffset: meta.startOffset, startedAt: Date(),
                             handle: handle, received: received, chunksReceived: 0, wireBytes: 0,
-                            slot: lowestFreeSlotLocked())
+                            slot: lowestFreeSlotLocked(),
+                            concurrencyObserved: max(1, actives.count))
             concurrencyPeak = max(concurrencyPeak, actives.count)
+            // 新文件入场 = 每个在途文件的「本轮并发度」都可能上升（计时行 conc= 取峰值）
+            let observed = actives.count
+            for key in Array(actives.keys) {
+                guard var entry = actives[key] else { continue }
+                if entry.concurrencyObserved < observed {
+                    entry.concurrencyObserved = observed
+                    actives[key] = entry
+                }
+            }
             // 起始 ack 是本轮**唯一**的能力协商点（窗口深度 + 二进制块）
             return [.sendAck(metaAck(fileID: meta.fileID, receivedBytes: received))]
         } catch {
@@ -231,7 +241,7 @@ extension SyncFileReceiver {
                                                          chunks: advanced.chunksReceived,
                                                          chunkSize: advanced.chunkSize,
                                                          startOffset: advanced.startOffset,
-                                                         concurrency: max(1, actives.count),
+                                                         concurrency: max(1, advanced.concurrencyObserved),
                                                          slot: advanced.slot))
         }
         return [.sendAck(ack(fileID: advanced.fileID, receivedBytes: advanced.received, done: false))]

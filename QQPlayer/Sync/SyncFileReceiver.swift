@@ -102,6 +102,8 @@ final class SyncFileReceiver: @unchecked Sendable {
         var wireBytes: Int
         /// 占用槽位（0 起；并发日志用）
         let slot: Int
+        /// 本文件在途期间观察到的并发文件数峰值（计时行的 conc=）
+        var concurrencyObserved: Int
     }
 
     /// 入站块：JSON 载荷带**显式 offset**（可容忍幂等重传）；二进制载荷（flags bit1）
@@ -354,7 +356,7 @@ final class SyncFileReceiver: @unchecked Sendable {
                       progress: Progress(startedAt: current.startedAt, chunks: current.chunksReceived,
                                          chunkSize: current.chunkSize, startOffset: current.startOffset,
                                          wireBytes: current.wireBytes,
-                                         concurrency: max(1, self.actives.count),
+                                         concurrency: max(1, current.concurrencyObserved),
                                          slot: current.slot),
                       succeeded: succeeded, error: error)
     }
