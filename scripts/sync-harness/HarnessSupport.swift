@@ -159,6 +159,14 @@ final class DeferredTransport: SyncPeerTransport, @unchecked Sendable {
         return n
     }
 
+    /// 取下一条待投递帧（用例手工编排投递顺序用，例如多文件交织 / 分步推进）。
+    func takeNext() -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !outbox.isEmpty else { return nil }
+        return outbox.removeFirst()
+    }
+
     func deliver(_ data: Data) {
         session?.handleInboundData(data)
     }

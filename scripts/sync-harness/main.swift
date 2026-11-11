@@ -4046,6 +4046,129 @@ do {
     check(false, "㊾ resumeMismatch 抛错：\(error)")
 }
 
+
+// MARK: - 阶段 C：文件级并发（多文件同时在途）
+
+// ㊿ 端到端：两个文件同时在途 → 各自落盘字节一致、峰值并发 ≥ 2。
+do {
+    let fixture = DeferredSessionFixture.pairedHandshake()
+    let dir = try tempRoot("tw-conc-rx")
+    let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+    let outcomes = LockedBox<[SyncFileReceiver.Outcome]>([])
+    receiver.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
+
+    let chunk = Int(SyncFileTransfer.chunkSize)
+    let sourceA = silentData(0xA1, count: chunk * 3)
+    let sourceB = silentData(0xB2, count: chunk * 2)
+    let urlA = try tempRoot("tw-conc-src-a").appendingPathComponent("a.bin")
+    let urlB = try tempRoot("tw-conc-src-b").appendingPathComponent("b.bin")
+    try sourceA.write(to: urlA)
+    try sourceB.write(to: urlB)
+
+    let senderA = SyncFileSender(session: fixture.hostSession)
+    let senderB = SyncFileSender(session: fixture.hostSession)
+    let doneA = LockedBox<Bool>(false)
+    let doneB = LockedBox<Bool>(false)
+    senderA.onCompletion = { outcome in if case .succeeded = outcome { doneA.mutate { $0 = true } } }
+    senderB.onCompletion = { outcome in if case .succeeded = outcome { doneB.mutate { $0 = true } } }
+
+    try senderA.send(fileURL: urlA, fileID: "conc-a", name: "a.bin")
+    try senderB.send(fileURL: urlB, fileID: "conc-b", name: "b.bin")
+
+    for _ in 0 ..< 60 {
+        _ = fixture.hostChannel.flushAll()
+        _ = fixture.clientChannel.flushAll()
+        if doneA.value, doneB.value { break }
+    }
+
+    check(doneA.value, "㊿ 并发：A 发送完成")
+    check(doneB.value, "㊿ 并发：B 发送完成")
+    checkEqual(outcomes.value.count, 2, "㊿ 并发：两个文件各一条终态")
+    checkEqual(
+        try Data(contentsOf: dir.appendingPathComponent("a.bin")), sourceA,
+        "㊿ 并发：A 落盘字节完全一致"
+    )
+    checkEqual(
+        try Data(contentsOf: dir.appendingPathComponent("b.bin")), sourceB,
+        "㊿ 并发：B 落盘字节完全一致"
+    )
+    check(receiver.concurrencyPeak >= 2, "㊿ 并发：峰值在途文件数 ≥ 2（实得 \(receiver.concurrencyPeak)）")
+} catch {
+    check(false, "㊿ 并发端到端抛错：\(error)")
+}
+
+// ㊿ 全局在途字节触顶：立即停止派新块（不排队、不轮询），ack 回来后再继续。
+do {
+    let fixture = DeferredSessionFixture.pairedHandshake()
+    let dir = try tempRoot("tw-conc-budget-rx")
+    // 必须强持有：receiver 的帧钩子用 [weak self]，被释放后 meta 永远不会回 ack
+    let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+    _ = receiver.isActive
+    let source = silentData(0xC3, count: Int(SyncFileTransfer.chunkSize) * 3)
+    let url = try tempRoot("tw-conc-budget-src").appendingPathComponent("c.bin")
+    try source.write(to: url)
+
+    let budget = SyncTransferBudget(byteLimit: Int(SyncFileTransfer.chunkSize) + 1024)
+    let sender = SyncFileSender(session: fixture.hostSession)
+    sender.budget = budget
+    let done = LockedBox<Bool>(false)
+    sender.onCompletion = { outcome in if case .succeeded = outcome { done.mutate { $0 = true } } }
+    try sender.send(fileURL: url, fileID: "conc-budget", name: "c.bin")
+
+    _ = fixture.hostChannel.flushAll()
+    _ = fixture.clientChannel.flushAll()
+
+    let chunksDispatched = fixture.hostChannel.pendingTypes.filter { $0 == .fileChunk }.count
+    checkEqual(chunksDispatched, 1, "㊿ budget：触顶时只派 1 块（实得 \(chunksDispatched)）")
+    check(
+        budget.inFlightBytes <= budget.byteLimit,
+        "㊿ budget：在途字节不超上限（\(budget.inFlightBytes) ≤ \(budget.byteLimit)）"
+    )
+
+    for _ in 0 ..< 40 {
+        _ = fixture.hostChannel.flushAll()
+        _ = fixture.clientChannel.flushAll()
+        if done.value { break }
+    }
+    check(done.value, "㊿ budget：释放后继续传完")
+    checkEqual(try Data(contentsOf: dir.appendingPathComponent("c.bin")), source, "㊿ budget：落盘字节一致")
+    checkEqual(budget.inFlightBytes, 0, "㊿ budget：结束后在途字节归零（无泄漏）")
+} catch {
+    check(false, "㊿ budget 抛错：\(error)")
+}
+
+// ㊿ 能力协商两分支：对端声明 → 通知 4；旧端不声明 → 通知 nil（发送端回退串行）。
+do {
+    func negotiated(_ capabilities: SyncFileTransferCapabilities?,
+                    tag: String) throws -> (notified: Bool, declared: Int?) {
+        let fixture = DeferredSessionFixture.pairedHandshake()
+        let dir = try tempRoot("tw-conc-neg-rx-\(tag)")
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+        if let capabilities { receiver.capabilityOverride = capabilities }
+        let source = silentData(0x5A, count: 4096)
+        let url = try tempRoot("tw-conc-neg-src-\(tag)").appendingPathComponent("n.bin")
+        try source.write(to: url)
+        let box = LockedBox<(Bool, Int?)>((false, nil))
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.onConcurrencyNegotiated = { declared in box.mutate { $0 = (true, declared) } }
+        try sender.send(fileURL: url, fileID: "neg-\(tag)", name: "n.bin")
+        for _ in 0 ..< 10 {
+            _ = fixture.hostChannel.flushAll()
+            _ = fixture.clientChannel.flushAll()
+            if box.value.0 { break }
+        }
+        return box.value
+    }
+    let modern = try negotiated(nil, tag: "modern")
+    check(modern.notified, "㊿ 协商：新端有通知")
+    checkEqual(modern.declared ?? -1, SyncFileTransfer.maxConcurrentFiles, "㊿ 协商：新端声明并发文件数 = 4")
+    let legacy = try negotiated(.legacy, tag: "legacy")
+    check(legacy.notified, "㊿ 协商：旧端也有通知（只是值为 nil）")
+    check(legacy.declared == nil, "㊿ 协商：旧端不声明 → nil（发送端回退串行）")
+} catch {
+    check(false, "㊿ 协商抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

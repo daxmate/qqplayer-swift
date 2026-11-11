@@ -222,6 +222,7 @@
 		8C165FE153CE4AE890B73BFD /* RecommendationResultCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */; };
 		DECAFFA964C3421DA80AFD08 /* SyncDiagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18C3DA8AEDD498C82AAD0B3 /* SyncDiagTests.swift */; };
 		BAC85622166749FBA1B16913 /* SyncHostSupersedePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22AB35B00FF54AD19AA44E7A /* SyncHostSupersedePolicyTests.swift */; };
+		768820480E634D43A9EF1313 /* SyncFileConcurrencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AEDB6058BE04727A434B174 /* SyncFileConcurrencyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -491,6 +492,7 @@
 		B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationResultCacheTests.swift; sourceTree = "<group>"; };
 		D18C3DA8AEDD498C82AAD0B3 /* SyncDiagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDiagTests.swift; sourceTree = "<group>"; };
 		22AB35B00FF54AD19AA44E7A /* SyncHostSupersedePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncHostSupersedePolicyTests.swift; sourceTree = "<group>"; };
+		3AEDB6058BE04727A434B174 /* SyncFileConcurrencyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileConcurrencyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -946,12 +948,14 @@
 				Sync/SyncFileOverwriteJudge.swift,
 				"Sync/SyncFileReceiver+StateMachine.swift",
 				Sync/SyncFileReceiver.swift,
+				"Sync/SyncFileSender+Metrics.swift",
 				Sync/SyncFileSender.swift,
 				Sync/SyncFileTransferModels.swift,
 				Sync/SyncFrame.swift,
 				Sync/SyncIdentity.swift,
 				Sync/SyncLibraryFetchResponder.swift,
 				Sync/SyncLibraryPullController.swift,
+				"Sync/SyncLibraryPushController+Concurrency.swift",
 				Sync/SyncLibraryPushController.swift,
 				Sync/SyncLibraryPushModels.swift,
 				Sync/SyncLibrarySink.swift,
@@ -979,6 +983,7 @@
 				Sync/SyncPullRetryPolicy.swift,
 				Sync/SyncQRCodec.swift,
 				Sync/SyncSessionModels.swift,
+				Sync/SyncTransferConcurrency.swift,
 				Sync/SyncWiringSelfCheck.swift,
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/PlayerGestureLogic.swift,
@@ -1354,6 +1359,7 @@
 				B20D989007E641E785F298D4 /* RecommendationResultCacheTests.swift */,
 				D18C3DA8AEDD498C82AAD0B3 /* SyncDiagTests.swift */,
 				22AB35B00FF54AD19AA44E7A /* SyncHostSupersedePolicyTests.swift */,
+				3AEDB6058BE04727A434B174 /* SyncFileConcurrencyTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1875,6 +1881,7 @@
 				8C165FE153CE4AE890B73BFD /* RecommendationResultCacheTests.swift in Sources */,
 				DECAFFA964C3421DA80AFD08 /* SyncDiagTests.swift in Sources */,
 				BAC85622166749FBA1B16913 /* SyncHostSupersedePolicyTests.swift in Sources */,
+				768820480E634D43A9EF1313 /* SyncFileConcurrencyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
