@@ -348,9 +348,9 @@ cd qqplayer-swift
 
 ### 版本号 🏷️
 
-- 版本号只改项目级一处：`QQPlayer.xcodeproj/project.pbxproj` 里项目级 Debug/Release 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`，各 target 一律继承
+- 版本号真源是项目级：`QQPlayer.xcodeproj/project.pbxproj` 里项目级 Debug/Release 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`；`QQPlayerMac` 另有 target 级同名覆盖（代码里写死），必须跟着一起升
 - iOS 与 macOS 必须同步：任一侧改动都要同步升（CI 有 iOS/macOS 版本一致性检查，不一致直接红）
-- 升版用 `./scripts/bump-version.sh <marketing> <build>`（例：`./scripts/bump-version.sh 1.2.0 63`），脚本只改项目级并打印所有 target 的实际取值
+- 升版用 `./scripts/bump-version.sh <marketing> <build>`（例：`./scripts/bump-version.sh 1.2.0 63`）：脚本改项目级，并把值等于旧版的 target 级覆盖一并跟随；与旧版无关的覆盖（如 `QQPlayerSiriTests` 的 `1.0/1`）保持不动，最后打印每个 target 的实际取值
 
 ### 🔑 环境变量（全部可选）
 
