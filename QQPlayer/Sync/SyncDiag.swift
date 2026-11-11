@@ -170,6 +170,8 @@ final class SyncDiagAttempt: @unchecked Sendable {
     private var peerPrefix = "-"
     private var byteCount: Int64 = -1
     private var fileCount: Int = -1
+    /// 文件级并发峰值（0 = 未测量；可选字段，仅在有值时追加）
+    private var concurrencyPeak = 0
     private var finished = false
 
     /// - Parameters:
@@ -246,6 +248,13 @@ final class SyncDiagAttempt: @unchecked Sendable {
         byteCount = bytes
     }
 
+    /// 记录实际文件并发峰值（0 = 未测量 → 不打印，旧行形状不变）。
+    func noteConcurrencyPeak(_ value: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        concurrencyPeak = max(0, value)
+    }
+
     /// 是否已开始计时（调用方可据此区分「计划阶段就失败」与「传了一半失败」）。
     func hasBegun(_ stage: SyncDiagStage) -> Bool {
         lock.lock()
@@ -301,6 +310,8 @@ final class SyncDiagAttempt: @unchecked Sendable {
         fields.append("total=\(max(0, now() - startedAt))")
         fields.append("bytes=\(byteCount)")
         fields.append("files=\(fileCount)")
+        // 可选字段（追加在末尾，旧行形状不变；golden 测试不设值时逐字一致）
+        if concurrencyPeak > 0 { fields.append("concMax=\(concurrencyPeak)") }
         return fields.joined(separator: " ")
     }
 

@@ -388,6 +388,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             diag.end(.transfer)
             diag.begin(.settle)
             diag.record(files: diagFileCount(), bytes: -1)
+            diag.noteConcurrencyPeak(pushController?.peakConcurrencyValue ?? 0)
             diag.end(.settle)
             diag.finish()
         case .failed:
@@ -398,6 +399,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             diag.fail(.transfer, domain: started ? "transfer" : "plan", code: 0)
             diag.begin(.settle)
             diag.record(files: diagFileCount(), bytes: -1)
+            diag.noteConcurrencyPeak(pushController?.peakConcurrencyValue ?? 0)
             diag.end(.settle)
             diag.finish()
         case .idle, .planning:

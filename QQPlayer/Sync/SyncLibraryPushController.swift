@@ -191,30 +191,51 @@ final class SyncLibraryPushController: @unchecked Sendable {
         case sessionNotReady
     }
 
-    private let session: SyncPeerSession
+    let session: SyncPeerSession
     private let descriptor: SyncLocalLibraryDescriptor
     private let selection: SyncLibraryPushSelection
     private let members: SyncCollectionMembers
     private let fileManager: FileManager
-    private let lock = NSLock()
+    let lock = NSLock()
 
     private var manifestPeer: SyncManifestPeer?
-    private var sender: SyncFileSender?
+
+    /// 在途发送者（按 fileID；文件级并发下可同时多个）。
+    var senders: [String: SyncFileSender] = [:]
+    /// fileID → 相对路径（fileAck 只带 fileID，终态回填账目要用）。
+    var dispatchedPaths: [String: String] = [:]
+
+    /// 并发杠杆（注入点：并发度 / 全局在途上限）。必须在任何一次 `send` 之前设置。
+    var concurrencyPolicy = SyncTransferConcurrencyPolicy.default
+    /// 跨文件共享的全局在途字节预算（默认按 `concurrencyPolicy.inFlightByteLimit` 创建；
+    /// 测试可注入更小的上限来验证「触顶不派新块」）。
+    lazy var budget = SyncTransferBudget(byteLimit: concurrencyPolicy.inFlightByteLimit)
+    /// 对端声明的并发文件数（nil = 尚未协商 / 旧端不声明 → 串行）。
+    var negotiatedConcurrency: Int?
+    /// 实际并发度峰值（诊断：`SYNCDIAG kind=run` 的 concMax）。
+    var peakConcurrency = 0
 
     /// 待推送队列（已按声明顺序排好）
-    private var queue: [PendingPush] = []
+    var queue: [PendingPush] = []
     /// 队列驱动中标志（防内存回环同步完成导致递归/重入）
-    private var pumping = false
+    var pumping = false
 
-    private var stateValue: SyncLibraryPushState = .idle
-    private var summaryValue = SyncLibraryPushSummary()
+    var stateValue: SyncLibraryPushState = .idle
+    var summaryValue = SyncLibraryPushSummary()
 
     /// 每态回调（锁外触发；会话线程）。
     var onStateChange: (@Sendable (SyncLibraryPushState) -> Void)?
     /// 一个文件确认送达（锁外触发；进度用）。
     var onFilePushed: (@Sendable (String) -> Void)?
 
-    private struct PendingPush {
+    /// 实际并发度峰值（诊断用；本轮结束由调用方写进 `SYNCDIAG kind=run` 的 concMax）。
+    var peakConcurrencyValue: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return peakConcurrency
+    }
+
+    struct PendingPush {
         let entry: SyncPushEntry
         let fileURL: URL
         /// 声明时就已算好的全文件 SHA-256（= `entry.sha256Hex`）。传给 sender 复用，
@@ -275,12 +296,6 @@ final class SyncLibraryPushController: @unchecked Sendable {
         }
         manifestPeer = peer
 
-        let sender = SyncFileSender(session: session)
-        sender.onCompletion = { [weak self] outcome in
-            self?.handleSendOutcome(outcome)
-        }
-        self.sender = sender
-
         transition(to: .requestingManifest)
         do {
             try peer.requestManifest(collection: collection)
@@ -292,7 +307,11 @@ final class SyncLibraryPushController: @unchecked Sendable {
 
     /// 中止（会话关闭 / 用户取消）：停发文件，状态落 failed。
     func cancel() {
-        sender?.cancel()
+        // 取消：每个在途文件各自终止（.part 由对端保留，重试可续传）
+        lock.lock()
+        let live = Array(senders.values)
+        lock.unlock()
+        for sender in live { sender.cancel() }
         transition(to: .failed("cancelled"))
     }
 
@@ -450,108 +469,13 @@ final class SyncLibraryPushController: @unchecked Sendable {
         peer?.detach()
     }
 
-    // MARK: 串行推送（停等，一次一个）
-
-    /// 驱动队列：给空闲的 sender 喂下一个文件。
-    /// 内存回环下 `send` 会同步跑完整轮（onCompletion 在 send 内触发 → `pump`
-    /// 重入被 `pumping` 挡住），真实网络下 `send` 返回时仍在传输 → 退出循环，
-    /// 由 onCompletion 再次 `pump`。
-    private func pump() {
-        lock.lock()
-        if pumping {
-            lock.unlock()
-            return
-        }
-        pumping = true
-        lock.unlock()
-        defer {
-            lock.lock()
-            pumping = false
-            lock.unlock()
-        }
-        while true {
-            lock.lock()
-            let isPushing: Bool = {
-                if case .pushing = stateValue { return true }
-                return false
-            }()
-            let next = queue.isEmpty ? nil : queue.removeFirst()
-            lock.unlock()
-
-            guard isPushing else { return }
-            guard let pending = next else {
-                transition(to: .done(summaryValue))
-                return
-            }
-            guard let sender else { return }
-            lock.lock()
-            lastDispatchedPath = pending.entry.relativePath
-            lock.unlock()
-            do {
-                try sender.send(
-                    fileURL: pending.fileURL,
-                    fileID: pending.entry.fileID,
-                    name: pending.entry.transferName,
-                    precomputedSHA256: pending.sha256Hex
-                )
-            } catch {
-                appendFailure(
-                    SyncPushFailure(
-                        relativePath: pending.entry.relativePath,
-                        reason: SyncPushFailureReason.sendFailed,
-                        detail: "\(error)"
-                    )
-                )
-                continue
-            }
-            if sender.isActive {
-                return // 异步进行中：等 onCompletion 再驱动
-            }
-        }
-    }
-
-    private func handleSendOutcome(_ outcome: SyncFileSender.Outcome) {
-        let path = consumeLastDispatched()
-        switch outcome {
-        case .succeeded:
-            if let path {
-                lock.lock()
-                summaryValue.completed.append(path)
-                lock.unlock()
-                onFilePushed?(path)
-            }
-        case let .failed(error):
-            if let path {
-                appendFailure(
-                    SyncPushFailure(
-                        relativePath: path,
-                        reason: SyncPushFailureReason.sendFailed,
-                        detail: "\(error)"
-                    )
-                )
-            }
-        }
-        pump()
-    }
-
-    /// 最近派发（尚未收到终态）的相对路径——fileAck 只带 fileID，本端按派发序回收。
-    private var lastDispatchedPath: String?
-
-    private func consumeLastDispatched() -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        let path = lastDispatchedPath
-        lastDispatchedPath = nil
-        return path
-    }
-
-    private func appendFailure(_ failure: SyncPushFailure) {
+    func appendFailure(_ failure: SyncPushFailure) {
         lock.lock()
         summaryValue.failed.append(failure)
         lock.unlock()
     }
 
-    private func transition(to newState: SyncLibraryPushState) {
+    func transition(to newState: SyncLibraryPushState) {
         lock.lock()
         let current = stateValue
         guard SyncLibraryPushStateMachine.canTransition(from: current, to: newState) else {
