@@ -162,7 +162,7 @@ struct SyncFileConcurrencyTests {
         try feed(receiver, meta("ok-b", "ob.bin", dataB, chunk: Int64(chunk)))
 
         var partsA = split(dataA, chunk: chunk)
-        partsA[1] = partsA[1].map { $0 ^ 0xFF }   // 篡改尾块：长度合法、内容错 → SHA 不匹配
+        partsA[1] = Data(partsA[1].map { $0 ^ 0xFF })   // 篡改尾块：长度合法、内容错 → SHA 不匹配
         let partsB = split(dataB, chunk: chunk)
 
         try feedChunk(receiver, "fail-a", offset: 0, data: partsA[0])

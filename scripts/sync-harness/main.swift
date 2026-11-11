@@ -4169,6 +4169,145 @@ do {
     check(false, "㊿ 协商抛错：\(error)")
 }
 
+// ㊿ 接收端直驱：两文件交错 chunk / 同 fileID 重复 meta / 失败隔离 / 并发上限。
+do {
+    func metaFrame(_ meta: FileMetaPayload) throws -> SyncFrame {
+        SyncFrame(type: .fileMeta, payload: try SyncFilePayloadCodec.encode(meta))
+    }
+    func chunkFrame(_ fileID: String, _ offset: Int64, _ data: Data) throws -> SyncFrame {
+        let chunk = FileChunkPayload(fileID: fileID, offset: offset, data: data)
+        return SyncFrame(type: .fileChunk, payload: try SyncFilePayloadCodec.encode(chunk))
+    }
+    func makeMeta(_ fileID: String, _ name: String, _ data: Data, chunk: Int) -> FileMetaPayload {
+        FileMetaPayload(fileID: fileID, name: name, totalSize: Int64(data.count),
+                        chunkSize: Int64(chunk), sha256Hex: SyncFileChecksum.sha256Hex(of: data))
+    }
+    func split(_ data: Data, _ chunk: Int) -> [Data] {
+        stride(from: 0, to: data.count, by: chunk).map { data.subdata(in: $0 ..< min($0 + chunk, data.count)) }
+    }
+
+    // (1) 两文件交错 + ack 累计
+    do {
+        let fixture = DeferredSessionFixture.pairedHandshake()
+        let dir = try tempRoot("tw-conc-direct-rx")
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+        let outcomes = LockedBox<[SyncFileReceiver.Outcome]>([])
+        receiver.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
+        let ackLog = LockedBox<[String: Int64]>([:])
+        receiver.onAckSent = { ack in ackLog.mutate { $0[ack.fileID] = ack.receivedBytes } }
+
+        let chunk = 4096
+        let dataA = silentData(0xA1, count: chunk * 3)
+        let dataB = silentData(0xB2, count: chunk * 3)
+        try receiver.handleInboundFrame(metaFrame(makeMeta("d-a", "da.bin", dataA, chunk: chunk)))
+        try receiver.handleInboundFrame(metaFrame(makeMeta("d-b", "db.bin", dataB, chunk: chunk)))
+        checkEqual(receiver.activeCount, 2, "㊿ 直驱：两个 fileID 同时在途")
+
+        let partsA = split(dataA, chunk)
+        let partsB = split(dataB, chunk)
+        for index in 0 ..< max(partsA.count, partsB.count) {
+            if index < partsA.count {
+                try receiver.handleInboundFrame(chunkFrame("d-a", Int64(index * chunk), partsA[index]))
+            }
+            if index < partsB.count {
+                try receiver.handleInboundFrame(chunkFrame("d-b", Int64(index * chunk), partsB[index]))
+            }
+        }
+        checkEqual(outcomes.value.count, 2, "㊿ 直驱：两文件各一条终态")
+        checkEqual(try Data(contentsOf: dir.appendingPathComponent("da.bin")), dataA,
+                   "㊿ 直驱：A 落盘字节一致")
+        checkEqual(try Data(contentsOf: dir.appendingPathComponent("db.bin")), dataB,
+                   "㊿ 直驱：B 落盘字节一致")
+        checkEqual(ackLog.value["d-a"] ?? -1, Int64(dataA.count), "㊿ 直驱：A 的 ack 累计到整文件字节")
+        checkEqual(ackLog.value["d-b"] ?? -1, Int64(dataB.count), "㊿ 直驱：B 的 ack 累计到整文件字节")
+    }
+
+    // (2) 并发中同 fileID 重复 meta：只重置该文件
+    do {
+        let fixture = DeferredSessionFixture.pairedHandshake()
+        let dir = try tempRoot("tw-conc-restart-rx")
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+        let chunk = 4096
+        let dataA = silentData(0xA7, count: chunk * 2)
+        let dataB = silentData(0xB9, count: chunk * 2)
+        let metaA = makeMeta("r-a", "ra.bin", dataA, chunk: chunk)
+        try receiver.handleInboundFrame(metaFrame(metaA))
+        try receiver.handleInboundFrame(metaFrame(makeMeta("r-b", "rb.bin", dataB, chunk: chunk)))
+        let partsA = split(dataA, chunk)
+        let partsB = split(dataB, chunk)
+        try receiver.handleInboundFrame(chunkFrame("r-a", 0, partsA[0]))
+        try receiver.handleInboundFrame(chunkFrame("r-b", 0, partsB[0]))
+        try receiver.handleInboundFrame(metaFrame(metaA))
+        checkEqual(receiver.activeCount, 2, "㊿ 直驱：同 fileID 重启不影响另一文件")
+        for (index, part) in partsA.enumerated() {
+            try receiver.handleInboundFrame(chunkFrame("r-a", Int64(index * chunk), part))
+        }
+        for index in 1 ..< partsB.count {
+            try receiver.handleInboundFrame(chunkFrame("r-b", Int64(index * chunk), partsB[index]))
+        }
+        checkEqual(try Data(contentsOf: dir.appendingPathComponent("ra.bin")), dataA,
+                   "㊿ 直驱：重启后 A 从头收完、字节一致")
+        checkEqual(try Data(contentsOf: dir.appendingPathComponent("rb.bin")), dataB,
+                   "㊿ 直驱：B 仍完整落盘")
+    }
+
+    // (3) 失败隔离
+    do {
+        let fixture = DeferredSessionFixture.pairedHandshake()
+        let dir = try tempRoot("tw-conc-isolate-rx")
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+        let outcomes = LockedBox<[String]>([])
+        receiver.onCompletion = { outcome in
+            switch outcome {
+            case let .received(file): outcomes.mutate { $0.append("ok:\(file.fileID)") }
+            case let .failed(error): outcomes.mutate { $0.append("fail:\(error)") }
+            }
+        }
+        let chunk = 4096
+        let dataA = silentData(0xC1, count: chunk * 2)
+        let dataB = silentData(0xD2, count: chunk * 2)
+        try receiver.handleInboundFrame(metaFrame(makeMeta("f-a", "fa.bin", dataA, chunk: chunk)))
+        try receiver.handleInboundFrame(metaFrame(makeMeta("o-b", "ob.bin", dataB, chunk: chunk)))
+        var partsA = split(dataA, chunk)
+        partsA[1] = Data(partsA[1].map { $0 ^ 0xFF })
+        let partsB = split(dataB, chunk)
+        try receiver.handleInboundFrame(chunkFrame("f-a", 0, partsA[0]))
+        try receiver.handleInboundFrame(chunkFrame("o-b", 0, partsB[0]))
+        try receiver.handleInboundFrame(chunkFrame("f-a", Int64(chunk), partsA[1]))
+        try receiver.handleInboundFrame(chunkFrame("o-b", Int64(chunk), partsB[1]))
+        check(outcomes.value.contains { $0.hasPrefix("fail:") }, "㊿ 直驱：A 校验失败进终态")
+        check(outcomes.value.contains("ok:o-b"), "㊿ 直驱：B 不受影响、正常完成")
+        checkEqual(try Data(contentsOf: dir.appendingPathComponent("ob.bin")), dataB,
+                   "㊿ 直驱：B 落盘字节一致")
+    }
+
+    // (4) 并发上限：超出的新文件被拒
+    do {
+        let fixture = DeferredSessionFixture.pairedHandshake()
+        let dir = try tempRoot("tw-conc-limit-rx")
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: dir)
+        let rejects = LockedBox<[String]>([])
+        receiver.onAckSent = { ack in
+            if ack.error == .protocolError { rejects.mutate { $0.append(ack.fileID) } }
+        }
+        for index in 0 ..< SyncFileTransfer.maxConcurrentFiles {
+            let data = silentData(UInt8(0x40 + index), count: 16)
+            try receiver.handleInboundFrame(
+                metaFrame(makeMeta("cap-\(index)", "cap-\(index).bin", data, chunk: 4096))
+            )
+        }
+        checkEqual(receiver.activeCount, SyncFileTransfer.maxConcurrentFiles,
+                   "㊿ 直驱：在途文件数 = maxConcurrentFiles")
+        let extra = silentData(0x7F, count: 16)
+        try receiver.handleInboundFrame(metaFrame(makeMeta("cap-extra", "cap-extra.bin", extra, chunk: 4096)))
+        checkEqual(receiver.activeCount, SyncFileTransfer.maxConcurrentFiles,
+                   "㊿ 直驱：超限的新文件不占在途")
+        check(rejects.value.contains("cap-extra"), "㊿ 直驱：超限文件回 protocolError")
+    }
+} catch {
+    check(false, "㊿ 直驱接收端抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")
