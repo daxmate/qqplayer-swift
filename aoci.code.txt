@@ -15,7 +15,7 @@ PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 ent
 QQPlayerMac-Info.plist[FN5T]: F:macOS target 的 Info.plist 补充片段：用显式 plist 承载数组型键 NSBonjourServices（_qqplayer-sync._tcp） | R:code:QQPlayer/Info.plist,code:QQPlayer/Sync/SyncListener.swift,code:QQPlayer/Sync/SyncBrowser.swift | A:NSBonjourServices | S:INFOPLIST_KEY_NSBonjourServices 不被 Xcode 支持，须显式 plist 合并；服务类型三处必须一致
 README.md[SZ7L]: F:项目总览：平台矩阵、双端功能清单、局域网配对与同步、技术架构（双入口/服务层/GRDB）、测试与构建、版本号与升版脚本口径 | R:code:docs/logging.md, code:scripts/build-app.sh | A:- | S:功能矩阵与实际 target 能力必须同步更新
 QQPlayerMac.entitlements[FS8T]: F:macOS 授权：App Group B6FA37AYT5.dsqcommon（共享资源根）＋ network.client；未声明 App Sandbox（非沙盒，便于共享根与旧路径 symlink） | R:code:QQPlayer/Services/DSQSharedPaths.swift, code:QQPlayer/QQPlayer.entitlements | A:com.apple.security.application-groups | S:App Group ID 必须与 DSQSharedLocations.appGroupIdentifier 一致；删 network.client → 在线搜索/模型下载全断
-CHANGELOG.md[SV6T]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记修复与变更，1.1.4 起收录 | R:- | A:- | S:发版时与版本号同批更新；每条只写能对上真实提交的事实，compare 链接用实际存在的 tag 或提交
+CHANGELOG.md[SV6T]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记修复、性能与变更，1.1.4 起收录（1.1.5 记文件级同步并发） | R:- | A:- | S:发版时与版本号同批更新；每条只写能对上真实提交的事实，compare 链接用实际存在的 tag 或提交
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/.github/workflows/===
 ci.yml[OQ8M]: F:GitHub Actions CI：swift job 锁 lint 工具版本并跑结构守卫/设备自检/lint/format/target membership/模拟器测试/零警告；local-harness 跑同步与 DSQ 共享资源脚本；macos job 断言版本一致、构建与资源产物 | R:code:scripts/xcbuild.sh, code:.swiftlint.yml, code:scripts/run-local-sync-tests.sh, code:scripts/run-dsq-shared-tests.sh | A:jobs: Swift, local-harness, macOS | S:CI 用例数必须与本地一致，警告零容忍；lint 工具版本由环境变量锁定并校验实际版本
@@ -41,7 +41,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV9L]: F:Xcode 工程定义：7 个 native target 与构建配置；项目级 MARKETING_VERSION/CURRENT_PROJECT_VERSION 为版号真源（1.1.4/66），Mac target 另有同名覆盖；MLX 包只链 Mac target；点名约束拆独立源文件 | R:code:QQPlayer.xcodeproj/xcshareddata/xcschemes/QQPlayerMac.xcscheme | A:7 个 PBXNativeTarget | S:加源文件须勾 target membership 并注册到对应测试 target；升版走 scripts/bump-version.sh，但它只改项目级，Mac target 的 target 级覆盖必须手工同步，否则 CI 的 iOS/macOS 版本一致性断言直接红
+project.pbxproj[FV9L]: F:Xcode 工程定义：7 个 native target 与构建配置；项目级 MARKETING_VERSION/CURRENT_PROJECT_VERSION 为版号真源（1.1.5/67），Mac target 另有同名覆盖；MLX 包只链 Mac target；点名约束拆独立源文件 | R:code:QQPlayer.xcodeproj/xcshareddata/xcschemes/QQPlayerMac.xcscheme | A:7 个 PBXNativeTarget | S:加源文件须勾 target membership 并注册到对应测试 target；升版一律走 scripts/bump-version.sh（项目级 + target 级覆盖一起同步），手工改漏覆盖会让 CI 版本一致性断言变红
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
