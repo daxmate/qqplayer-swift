@@ -100,6 +100,8 @@ final class SyncFileReceiver: @unchecked Sendable {
         var chunksReceived: Int
         /// 本轮 file_chunk 载荷累计字节（诊断用：与字节数对比即知 base64 膨胀）
         var wireBytes: Int
+        /// 占用槽位（0 起；并发日志用）
+        let slot: Int
     }
 
     /// 入站块：JSON 载荷带**显式 offset**（可容忍幂等重传）；二进制载荷（flags bit1）
@@ -117,22 +119,57 @@ final class SyncFileReceiver: @unchecked Sendable {
         let startOffset: Int64
         /// file_chunk 载荷累计字节（诊断；`var` + 默认值 = 既有构造点无需改动）
         var wireBytes: Int = 0
+        /// 收尾时的在途文件数（诊断：`conc=`；nil = 不打印）
+        var concurrency: Int?
+        /// 本文件占用的并发槽位（诊断：`slot=`；nil = 不打印）
+        var slot: Int?
     }
 
-    var active: Active?
+    /// 在途传输（按 fileID 分桶；文件级并发下可同时多个）。
+    ///
+    /// 为什么按 fileID 分桶：每块本来就自带 fileID（JSON 的 `fileID` / 二进制的
+    /// `fileIDLen|fileID|data`），同一会话内两条传输可以自然交织 —— 接收端只要给每个
+    /// fileID 各留一份 .part handle / 累计字节 / ack 就成立，**不需要动帧格式**。
+    var actives: [String: Active] = [:]
 
-    /// 当前进行中传输的 fileID（nil = 空闲；诊断用）。
+    /// 状态机游标：当前正在处理的 fileID（锁内设置）。
+    ///
+    /// 为什么用游标 + 下面的 `active` 视图：状态机原本是单文件写法（大量
+    /// `guard let current = active` / `active = nil`），改成按 fileID 分桶后只把
+    /// 「取/放」换成视图，判定与 IO 顺序一行不重排（锁内单线程语义完全不变）。
+    private var activeKey = ""
+
+    /// 锁内视图：读写 `actives[activeKey]`。
+    var active: Active? {
+        get { actives[activeKey] }
+        set { actives[activeKey] = newValue }
+    }
+
+    /// 并发文件上限（注入；生产默认 4）。应答 file_meta 的 ack 里作为能力声明发给发送端。
+    var maxConcurrentFiles: Int = SyncFileTransfer.maxConcurrentFiles
+
+    /// 当前在途文件数（诊断用）。
     var activeFileID: String? {
         lock.lock()
         defer { lock.unlock() }
-        return active?.fileID
+        return actives.keys.first
     }
 
     var isActive: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return active != nil
+        return !actives.isEmpty
     }
+
+    /// 在途文件数（诊断：写进每文件计时行的 conc=）。
+    var activeCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return actives.count
+    }
+
+    /// 在途文件数峰值（诊断：`SYNCDIAG kind=run` 的 concMax / 计时行的 conc=）。
+    var concurrencyPeak = 0
 
     // MARK: init
 
@@ -144,27 +181,30 @@ final class SyncFileReceiver: @unchecked Sendable {
 
     // MARK: 对外 API
 
-    /// 中止当前传输（无传输则无操作）：清理内存状态，.part 保留（断点数据源）。
+    /// 中止**所有**在途传输（无传输则无操作）：清理内存状态，.part 保留（断点数据源）。
     func cancel() {
-        runLocked {
-            guard let current = self.active else { return [] }
-            self.active = nil
-            self.closeHandle(current)
-            let error = SyncFileTransferError.cancelled(current.fileID)
-            return [.log(self.metrics(current, succeeded: false, error: error)),
-                    .finish(.failed(error))]
-        }
+        finishAllLocked { SyncFileTransferError.cancelled($0) }
     }
 
     /// 会话断开（链式 onClosed 转发进来）：与 cancel 同语义（.part 保留）。
     private func handleSessionClosed(_ reason: SyncSessionCloseReason) {
+        finishAllLocked { SyncFileTransferError.sessionClosed($0) }
+    }
+
+    /// 锁内：把每个在途文件按各自的 fileID 收尾（互不影响；.part 全部保留）。
+    private func finishAllLocked(_ makeError: (String) -> SyncFileTransferError) {
         runLocked {
-            guard let current = self.active else { return [] }
-            self.active = nil
-            self.closeHandle(current)
-            let error = SyncFileTransferError.sessionClosed(current.fileID)
-            return [.log(self.metrics(current, succeeded: false, error: error)),
-                    .finish(.failed(error))]
+            var actions: [Action] = []
+            for key in Array(self.actives.keys) {
+                self.activeKey = key
+                guard let current = self.active else { continue }
+                self.active = nil
+                self.closeHandle(current)
+                let error = makeError(current.fileID)
+                actions.append(.log(self.metrics(current, succeeded: false, error: error)))
+                actions.append(.finish(.failed(error)))
+            }
+            return actions
         }
     }
 
@@ -180,26 +220,37 @@ final class SyncFileReceiver: @unchecked Sendable {
                 abortActive(fileID: fileID, reason: "file_meta 解码失败")
                 return
             }
-            runLocked { [meta] in self.processMetaLocked(meta) }
+            runLocked { [meta] in
+                self.activeKey = meta.fileID
+                return self.processMetaLocked(meta)
+            }
         case .fileChunk:
             // flags bit1 = 原始二进制载荷（协商后）；否则是 base64 JSON（旧格式，始终兼容）
             if frame.flags.contains(.binaryChunk) {
                 guard let decoded = SyncFileChunkCodec.decodeBinary(frame.payload) else {
-                    abortCorruptChunk()
+                    // 连 fileID 都取不到（载荷长度/前缀损坏）→ 只能整体按协议错误中止
+                    abortAllCorruptChunk()
                     return
                 }
                 runLocked { [decoded] in
-                    self.processChunkLocked(.sequential(fileID: decoded.fileID, data: decoded.data),
-                                            wireBytes: frame.payload.count)
+                    self.activeKey = decoded.fileID
+                    return self.processChunkLocked(.sequential(fileID: decoded.fileID, data: decoded.data),
+                                                   wireBytes: frame.payload.count)
                 }
                 return
             }
             guard let chunk = try? SyncFilePayloadCodec.decode(FileChunkPayload.self, from: frame.payload) else {
-                abortCorruptChunk()
+                // 载荷损坏：能从原始 JSON 里取出 fileID 就只中止该文件，否则整体中止
+                if let fileID = Self.extractFileID(from: frame.payload), !fileID.isEmpty {
+                    abortCorruptChunk(fileID: fileID)
+                } else {
+                    abortAllCorruptChunk()
+                }
                 return
             }
             runLocked { [chunk] in
-                self.processChunkLocked(.positioned(chunk), wireBytes: frame.payload.count)
+                self.activeKey = chunk.fileID
+                return self.processChunkLocked(.positioned(chunk), wireBytes: frame.payload.count)
             }
         case .fileAck:
             // 接收端不收 ack：忽略（有测试锁定该行为）
@@ -211,8 +262,9 @@ final class SyncFileReceiver: @unchecked Sendable {
 
     /// 传输进行中收到损坏块（JSON / 二进制都可能是）：回 protocolError 让对端干净失败
     /// （避免双方悬挂——发送端在等 ack）。
-    private func abortCorruptChunk() {
+    private func abortCorruptChunk(fileID: String) {
         runLocked {
+            self.activeKey = fileID
             guard let current = self.active else { return [] }
             self.active = nil
             self.closeHandle(current)
@@ -224,11 +276,31 @@ final class SyncFileReceiver: @unchecked Sendable {
         }
     }
 
+    /// 载荷损坏且连 fileID 都取不到：会话已不可信 → 按协议错误中止**所有**在途文件。
+    private func abortAllCorruptChunk() {
+        runLocked {
+            var actions: [Action] = []
+            for key in Array(self.actives.keys) {
+                self.activeKey = key
+                guard let current = self.active else { continue }
+                self.active = nil
+                self.closeHandle(current)
+                let error = SyncFileTransferError.protocolError(current.fileID, "块解码失败")
+                actions.append(.sendAck(self.ack(fileID: current.fileID, receivedBytes: current.received,
+                                                 error: .protocolError)))
+                actions.append(.log(self.metrics(current, succeeded: false, error: error)))
+                actions.append(.finish(.failed(error)))
+            }
+            return actions
+        }
+    }
+
     /// 解码失败的 meta：从原始 JSON 里尽量取出 fileID（不可信输入，只取字符串），
     /// 取到则回 protocolError 并中止同 fileID 的进行中传输（发送端据此干净失败）。
     private func abortActive(fileID: String, reason: String) {
         runLocked {
-            guard let current = self.active, current.fileID == fileID else {
+            self.activeKey = fileID
+            guard let current = self.active else {
                 // 没有同名进行中传输：只回 ack（发送端在等 meta 的 ack）
                 return [.sendAck(self.ack(fileID: fileID, receivedBytes: 0, error: .protocolError))]
             }
@@ -250,17 +322,27 @@ final class SyncFileReceiver: @unchecked Sendable {
     }
     func ack(fileID: String, receivedBytes: Int64, done: Bool = false,
              error: FileTransferErrorCode = .none,
-             maxInFlight: Int? = nil, binaryChunks: Bool? = nil) -> FileAckPayload {
+             maxInFlight: Int? = nil, binaryChunks: Bool? = nil,
+             maxConcurrentFiles: Int? = nil) -> FileAckPayload {
         FileAckPayload(fileID: fileID, receivedBytes: receivedBytes, done: done, error: error,
-                       maxInFlight: maxInFlight, binaryChunks: binaryChunks)
+                       maxInFlight: maxInFlight, binaryChunks: binaryChunks,
+                       maxConcurrentFiles: maxConcurrentFiles)
     }
 
     /// 应答 file_meta 的 ack：**唯一的**能力协商点（窗口深度 + 二进制块）。
     /// 旧发送端会把这两个可选字段当未知键忽略 ⇒ 自动回退停等 + base64。
     func metaAck(fileID: String, receivedBytes: Int64) -> FileAckPayload {
         let capabilities = capabilityOverride ?? .current
+        // 并发文件数：注入的 override 优先（模拟旧端 → nil ⇒ 对端串行），否则用本端上限
+        let declaredConcurrency: Int?
+        if let override = capabilityOverride {
+            declaredConcurrency = override.maxConcurrentFiles
+        } else {
+            declaredConcurrency = maxConcurrentFiles
+        }
         return ack(fileID: fileID, receivedBytes: receivedBytes,
-                   maxInFlight: capabilities.maxInFlight, binaryChunks: capabilities.binaryChunks)
+                   maxInFlight: capabilities.maxInFlight, binaryChunks: capabilities.binaryChunks,
+                   maxConcurrentFiles: declaredConcurrency)
     }
 
     // MARK: 计时诊断（锁内取快照）
@@ -271,7 +353,9 @@ final class SyncFileReceiver: @unchecked Sendable {
         metricsLocked(fileID: current.fileID, totalSize: current.totalSize,
                       progress: Progress(startedAt: current.startedAt, chunks: current.chunksReceived,
                                          chunkSize: current.chunkSize, startOffset: current.startOffset,
-                                         wireBytes: current.wireBytes),
+                                         wireBytes: current.wireBytes,
+                                         concurrency: max(1, self.actives.count),
+                                         slot: current.slot),
                       succeeded: succeeded, error: error)
     }
 
@@ -290,7 +374,9 @@ final class SyncFileReceiver: @unchecked Sendable {
             lastChunkWaitMs: nil,
             succeeded: succeeded,
             errorLine: error.map { "\($0)" },
-            wireBytes: progress.wireBytes
+            wireBytes: progress.wireBytes,
+            concurrency: progress.concurrency,
+            slot: progress.slot
         )
     }
 

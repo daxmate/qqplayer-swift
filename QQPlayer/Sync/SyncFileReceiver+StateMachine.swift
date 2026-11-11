@@ -25,15 +25,14 @@ extension SyncFileReceiver {
     /// meta 处理（锁内；返回待执行效果）。
     func processMetaLocked(_ meta: FileMetaPayload) -> [Action] {
         if let current = active {
-            if current.fileID == meta.fileID {
-                // 同 fileID 新 meta = 发送端重启（如 checksumMismatch 后从头重发 /
-                // cancel 后同会话再传）：关旧 handle，保留 .part，按新 meta 重对齐
-                closeHandle(current)
-                active = nil
-            } else {
-                // v1 不支不同 fileID 交叠传输（对端并发双传 = 调用方 bug）
-                return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .protocolError))]
-            }
+            // 同 fileID 新 meta = 发送端重启（如 checksumMismatch 后从头重发 / cancel 后同会话再传）：
+            // 关旧 handle，保留 .part，按新 meta 重对齐。文件级并发下只影响这一个 fileID。
+            closeHandle(current)
+            active = nil
+        } else if actives.count >= maxConcurrentFiles {
+            // 在途文件数已满 → 不再接新文件。正常协商下发送端按我们的声明派发，不会超派；
+            // 触发只可能是对端没读声明（旧端并发双传）→ 明确拒绝，避免句柄/内存超量。
+            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .protocolError))]
         }
 
         // 参数合法性（v1 校验集：非法 → protocolError 中止）
@@ -130,7 +129,9 @@ extension SyncFileReceiver {
             active = Active(fileID: meta.fileID, name: meta.name, totalSize: meta.totalSize,
                             chunkSize: meta.chunkSize, sha256Hex: sha, finalURL: finalURL,
                             partURL: partURL, startOffset: meta.startOffset, startedAt: Date(),
-                            handle: handle, received: received, chunksReceived: 0, wireBytes: 0)
+                            handle: handle, received: received, chunksReceived: 0, wireBytes: 0,
+                            slot: lowestFreeSlotLocked())
+            concurrencyPeak = max(concurrencyPeak, actives.count)
             // 起始 ack 是本轮**唯一**的能力协商点（窗口深度 + 二进制块）
             return [.sendAck(metaAck(fileID: meta.fileID, receivedBytes: received))]
         } catch {
@@ -229,7 +230,9 @@ extension SyncFileReceiver {
                                       progress: Progress(startedAt: advanced.startedAt,
                                                          chunks: advanced.chunksReceived,
                                                          chunkSize: advanced.chunkSize,
-                                                         startOffset: advanced.startOffset))
+                                                         startOffset: advanced.startOffset,
+                                                         concurrency: max(1, actives.count),
+                                                         slot: advanced.slot))
         }
         return [.sendAck(ack(fileID: advanced.fileID, receivedBytes: advanced.received, done: false))]
     }
@@ -274,6 +277,14 @@ extension SyncFileReceiver {
                 .finish(.received(ReceivedFile(fileID: fileID,
                                                sha256Hex: sha256Hex.lowercased(),
                                                url: finalURL)))]
+    }
+
+    /// 最低可用槽位（0 起；文件级并发日志用）。
+    private func lowestFreeSlotLocked() -> Int {
+        let used = Set(actives.values.map(\.slot))
+        var slot = 0
+        while used.contains(slot) { slot += 1 }
+        return slot
     }
 
     // MARK: 校验与辅助（锁内调用）

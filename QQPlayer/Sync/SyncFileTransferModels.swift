@@ -35,6 +35,20 @@ enum SyncFileTransfer {
     /// （`FileAckPayload.maxInFlight`），发送端取 `min(声明值, 本常量)`；旧接收端不声明
     /// → 发送端回退 1（停等，行为与 v1 完全一致）。
     static let maxInFlight = 8
+
+    /// 文件级并发度上限（2026-11-11，阶段 C）。
+    ///
+    /// 每文件仍有自己的在途窗口（`maxInFlight`），这里限制**同时推进的文件数**：
+    /// 单文件停等/窗口的瓶颈是「每块一次往返」，多文件同时在途才能把往返叠起来
+    /// （家里 2.4G 穿墙 RTT 18-127ms 抖动时尤其明显）。
+    /// 旧接收端不声明 → 发送端回退 1（串行）。
+    static let maxConcurrentFiles = 4
+
+    /// 全局在途字节上限（跨文件共享，防 iPhone 内存峰值）。
+    ///
+    /// 来源：4 文件 × 窗口 8 × 1MB = 32MB 的理论峰值对接收端（内存里攒一帧 + 解密缓冲）
+    /// 偏大；取 24MB 作为硬顶（≈ 3 个满窗口文件的在途量），触顶后暂停派新块等 ack。
+    static let inFlightByteLimit = 24 * 1024 * 1024
 }
 
 /// 一轮文件传输的实测计时（**纯值，无 IO**；落点见 `SyncConnectDiag.log`）。
@@ -78,6 +92,10 @@ struct SyncTransferMetrics: Equatable, Sendable {
     var inFlightMax: Int?
     /// 本轮 file_chunk 载荷的实际字节数（两端都记）：与 `bytes` 对比即知 base64 的 33% 膨胀
     var wireBytes: Int?
+    /// 本轮实际的文件并发度（发送端 = 本文件派发时的并发上限；接收端 = 收齐时的在途文件数）
+    var concurrency: Int?
+    /// 本文件占用的并发槽位（0 起；串行时恒为 0）
+    var slot: Int?
 
     /// 单行日志（键=值，便于 grep/切分；一行一个文件）。
     var logLine: String {
@@ -106,6 +124,8 @@ struct SyncTransferMetrics: Equatable, Sendable {
         }
         if let first = firstChunkWaitMs { parts.append("ackWaitFirst=\(first)ms") }
         if let last = lastChunkWaitMs { parts.append("ackWaitLast=\(last)ms") }
+        if let concurrency { parts.append("conc=\(concurrency)") }
+        if let slot { parts.append("slot=\(slot)") }
         if let errorLine { parts.append("error=\(errorLine)") }
         return parts.joined(separator: " ")
     }
@@ -147,19 +167,28 @@ struct FileAckPayload: Codable, Equatable, Sendable {
     var maxInFlight: Int?
     /// 接收端是否支持 file_chunk 二进制载荷（flags bit1）。nil = 旧端 → 继续 base64 JSON。
     var binaryChunks: Bool?
+    /// 接收端可同时推进的文件数（**能力协商**，只在应答 file_meta 那条 ack 里带）。
+    /// nil = 对端不声明（旧端）→ 发送端回退串行（一次只派一个文件，行为与现在完全一致）。
+    var maxConcurrentFiles: Int?
 }
 
 /// 接收端能力声明（`FileAckPayload` 的两个协商字段打包；测试注入 / 生产默认值共用）。
 struct SyncFileTransferCapabilities: Equatable, Sendable {
     var maxInFlight: Int?
     var binaryChunks: Bool?
+    /// 可同时推进的文件数（nil = 旧端 → 串行）。
+    var maxConcurrentFiles: Int?
 
-    /// 生产默认：窗口 8 + 二进制块。
+    /// 生产默认：窗口 8 + 二进制块 + 4 文件并发。
     static let current = SyncFileTransferCapabilities(
-        maxInFlight: SyncFileTransfer.maxInFlight, binaryChunks: true
+        maxInFlight: SyncFileTransfer.maxInFlight,
+        binaryChunks: true,
+        maxConcurrentFiles: SyncFileTransfer.maxConcurrentFiles
     )
-    /// 旧端（不声明任何能力）：发送端据此回退停等 + base64。
-    static let legacy = SyncFileTransferCapabilities(maxInFlight: nil, binaryChunks: nil)
+    /// 旧端（不声明任何能力）：发送端据此回退停等 + base64 + 串行。
+    static let legacy = SyncFileTransferCapabilities(
+        maxInFlight: nil, binaryChunks: nil, maxConcurrentFiles: nil
+    )
 }
 
 /// 线上错误码（v1 定案枚举值）。
