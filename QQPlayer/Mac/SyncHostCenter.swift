@@ -105,6 +105,10 @@ final class SyncHostCenter {
     /// 已就绪会话的曲库接线（M3-3b：manifest 应答 + 按路径拉取推送）。
     /// 每个 ready 会话一份；会话关闭 / 服务停止时拆除。
     @ObservationIgnored private var libraryHost: MacSyncLibraryHost?
+    /// `libraryHost` 绑定的那个会话 —— 让位判定与定向拆除的**唯一判据**。
+    /// 半开旧会话永不 closed 时 `connectedPeer` 是脏的，不能拿它当依据；
+    /// 生命周期与 `libraryHost` 一致（attach 成功时赋值，拆除时清空）。
+    @ObservationIgnored private var libraryHostSession: SyncPeerSession?
 
     /// 曲库根（注入便于测试；默认 = 曲库唯一地址，见 `MacLibraryRoot`）。
     @ObservationIgnored var libraryRootProvider: () -> URL = {
@@ -189,9 +193,8 @@ final class SyncHostCenter {
             Task { @MainActor in
                 guard let self else { return }
                 self.clearConnection(ifMatching: session)
-                guard let host = self.libraryHost else { return }
-                host.detach()
-                self.libraryHost = nil
+                // 只拆**绑定到该会话**的接线：半开旧会话迟到的关闭不得拆掉新会话刚接上的 host。
+                self.detachLibraryHost(ifMatching: session)
             }
         }
         do {
@@ -209,6 +212,7 @@ final class SyncHostCenter {
         discardQRNonce()
         libraryHost?.detach()
         libraryHost = nil
+        libraryHostSession = nil
         listener?.stop()
         listener = nil
         pendingSession = nil
@@ -225,9 +229,33 @@ final class SyncHostCenter {
     private func handleSessionPhase(_ session: SyncPeerSession, phase: SyncSessionPhase) {
         switch phase {
         case .ready:
-            guard libraryHost == nil else { return } // v1 单会话接线
+            // 让位判定（v1 单会话接线的修正，2026-11-11）：对端重连会产生**新会话**，
+            // 而半开的旧会话永远不会 closed。旧实现 `guard libraryHost == nil else { return }`
+            // 直接丢掉新会话 → activeSession 仍指向死会话 → 之后每次同步都等清单 20s 超时。
+            // 判据一律以 `libraryHostSession`（host 真正绑定的会话）为准，不看 `connectedPeer`
+            // 是否已清（半开时它是脏的）。
+            let newPeerID = session.peerHelloValue?.deviceID
+            let decision = SyncHostSupersedePolicy.decide(
+                hasAttachedHost: libraryHost != nil,
+                attachedSessionMatches: libraryHostSession === session,
+                attachedPeerID: libraryHostSession?.peerHelloValue?.deviceID,
+                newPeerID: newPeerID
+            )
+            switch decision {
+            case .ignore:
+                // v1 单会话语义：不同设备不抢接线（保既有行为，只把原因写进日志）。
+                AppLog.info(.sync, "↩️ SyncHostCenter: 已有其他设备接线，忽略新会话（peer=\(logPeerID(newPeerID))）")
+                return
+            case .supersede:
+                AppLog.info(.sync, "↩️ SyncHostCenter: 旧会话让位给同设备新会话（peer=\(logPeerID(newPeerID))）")
+                releaseWiringForSupersede()
+            case .attach:
+                // 幂等：同一条会话的 ready 再来一次（重放/重入）不得重复接线——
+                // 两份 MacSyncLibraryHost 会各自应答 manifest，对端可能收到两次应答。
+                if libraryHostSession === session { return }
+            }
             // 连接状态以**会话**为准（与是否接上曲库无关，UI 才说得清「连上了但库不可用」）。
-            let peerID = session.peerHelloValue?.deviceID ?? ""
+            let peerID = newPeerID ?? ""
             connectedSession = session
             connectedPeer = SyncConnectedPeer(
                 displayName: displayName(forPeerID: peerID),
@@ -243,6 +271,7 @@ final class SyncHostCenter {
             // 曲库根不存在 → 不接线（宁可不服务，也不回空 manifest 害对端误删）
             guard host.attach(to: session) else { return }
             libraryHost = host
+            libraryHostSession = session
             activeSession = session
             // 连接就绪 → 后台自动跑一次「同步数据」（用户 2026-09-15 拍板：触发时机 = 连接后自动）。
             // 放在这里而不是面板 view model 里：面板没打开时也要跑（否则又变成“点过的才同步”）。
@@ -253,11 +282,51 @@ final class SyncHostCenter {
             MacLyricsResendAutoRunner.shared.sessionDidBecomeReady(session, libraryRoot: libraryRootProvider())
         case .closed:
             clearConnection(ifMatching: session)
-            libraryHost?.detach()
-            libraryHost = nil
+            // 只拆**绑定到该会话**的接线：旧会话迟到的 closed 不得拆掉新会话的接线。
+            detachLibraryHost(ifMatching: session)
         default:
             break
         }
+    }
+
+    /// 旧会话让位（同一台设备重连）：拆掉旧接线 += 把「一次连接一次」的轮次标记归位。
+    ///
+    /// 只 `detach()`，**不** cancel 旧会话：它多半已经半开（永远等不到 closed），
+    /// 取消只会多制造一个关闭因噪声，对本次判定没有帮助（任务包 §3 A）。
+    private func releaseWiringForSupersede() {
+        libraryHost?.detach()
+        libraryHost = nil
+        libraryHostSession = nil
+        // 连接状态按「旧会话已结束」归位：即使 connectedSession 已被清（脏态）也强制清。
+        connectedSession = nil
+        connectedPeer = nil
+        activeSession = nil
+        // 新会话 = 新的一次连接：自动轮次标记归位，否则会被旧连接（永不 closed）的标记挡住，
+        // 「连接就绪 → 自动跑一轮」永远触发不了（真机日志里正是缺了这一行）。
+        MacDataSyncAutoRunner.shared.sessionDidClose()
+        MacLyricsResendAutoRunner.shared.sessionDidClose()
+        SyncWiringFactsStore.shared.clear()
+    }
+
+    /// 拆除曲库接线 —— **只在该会话确实是当前绑定时**。
+    ///
+    /// 为什么必须定向：半开旧会话迟到 closed 时，`libraryHost` 可能已经属于新会话；
+    /// 无条件 `detach()` 会把刚接好的新会话拆掉（第二重竞态，任务包 §3 B）。
+    private func detachLibraryHost(ifMatching session: SyncPeerSession) {
+        guard libraryHostSession === session else {
+            AppLog.debug(.sync, "↩️ SyncHostCenter: 非绑定会话关闭，保留现有接线（peer=\(logPeerID(session.peerHelloValue?.deviceID))）")
+            return
+        }
+        AppLog.info(.sync, "↩️ SyncHostCenter: 绑定会话关闭 → 拆除曲库接线（peer=\(logPeerID(session.peerHelloValue?.deviceID))）")
+        libraryHost?.detach()
+        libraryHost = nil
+        libraryHostSession = nil
+    }
+
+    /// 日志用 peer 短标识：只取前 8 位（日志不落全量 Device ID）。
+    private func logPeerID(_ peerID: String?) -> String {
+        guard let peerID, !peerID.isEmpty else { return "未知" }
+        return String(peerID.prefix(8))
     }
 
     /// 会话下线时清理连接状态（只清**当前这个**会话，防旧会话回调误清新连接）。

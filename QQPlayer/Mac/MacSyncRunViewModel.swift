@@ -98,6 +98,10 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 因为落盘发生在终态后 800ms，彼时可能已断线拿不到分桶 key。
     private var runPeerID: String?
     private var runPeerName: String?
+    /// 本次运行**绑定的会话身份**（启动时快照）。
+    /// 对端重连会让 host 让位到新会话 —— 此时 `isConnected` 仍为 true（新会话已连上），
+    /// 只有会话身份变了，所以「断开就取消」的分支看不见这件事（任务包 §3 D）。
+    private var runSessionIdentity: ObjectIdentifier?
     private var runDirection: SyncTransferDirection?
 
     init(
@@ -254,6 +258,8 @@ final class MacSyncRunViewModel: ObservableObject {
         runPeerID = hostCenter.connectedPeer?.peerID
         runPeerName = hostCenter.connectedPeer?.displayName
         runDirection = direction
+        // 会话身份快照：host 让位（同设备重连）时据此立即取消，而不是对着死会话等清单 20s 超时。
+        runSessionIdentity = ObjectIdentifier(session)
         errorMessage = nil
 
         let assembly = makeCoordinator(session, content.selection)
@@ -328,6 +334,7 @@ final class MacSyncRunViewModel: ObservableObject {
     private func hostDidChange() {
         if isConnected {
             startTicking()
+            cancelIfRunSessionReplaced()
         } else {
             stopTicking()
             if let coordinator, !SyncCollectionSyncState.isTerminal(coordinator.state) {
@@ -336,6 +343,21 @@ final class MacSyncRunViewModel: ObservableObject {
             }
         }
         refreshAvailability()
+    }
+
+    /// 运行中的会话被替换（对端重连 → host 让位到新会话）：**立即取消**进行中的同步。
+    ///
+    /// 为什么不能只靠「断开就取消」：让位后 `connectedPeer` 立刻是新会话（isConnected 仍 true），
+    /// 而本次运行仍绑在旧会话上 → 会一直等清单直到 20s 超时（真机现象：面板报
+    /// 「等待设备清单超时」，重试同样超时）。
+    private func cancelIfRunSessionReplaced() {
+        guard let coordinator, !SyncCollectionSyncState.isTerminal(coordinator.state),
+              let runSessionIdentity, let activeSession = hostCenter.activeSession,
+              ObjectIdentifier(activeSession) != runSessionIdentity
+        else { return }
+        // 复用既有「设备已断开，同步已停止」展示路径（不新增 UI 语义）。
+        didDisconnectWhileRunning = true
+        coordinator.cancel()
     }
 
     // MARK: - 内部
