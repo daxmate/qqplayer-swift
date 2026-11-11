@@ -820,7 +820,7 @@ struct IOSPassiveSyncCenterTests {
         "QQPlayer/Sync/SyncListener.swift": 7,
         "QQPlayer/Sync/SyncBrowser.swift": 2,
         "QQPlayer/Sync/SyncFileReceiver.swift": 5,
-        "QQPlayer/Sync/SyncFileSender.swift": 3,
+        "QQPlayer/Sync/SyncFileSender.swift": 4,
         "QQPlayer/Sync/SyncManifestPeer.swift": 5,
         "QQPlayer/Sync/SyncPeerLibraryClient.swift": 3,
         "QQPlayer/Sync/SyncPeerLibraryResponder.swift": 3,
