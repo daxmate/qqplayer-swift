@@ -23,6 +23,13 @@ struct SyncManifestSourceFile: Equatable, Sendable {
     var contentHash: String?
     var stableId: String?
 
+    /// 是否已带内容指纹（`nil` 或空串 = 缺指纹）。
+    ///
+    /// 为什么把「缺不缺指纹」放进数据本体：消费点（清单统计 / 诊断）不必去读裸
+    /// `content_hash` 列（那会绕过唯一兜底入口），也不该为了统计现算一次 SHA-256
+    /// ——现算正是清单变慢的根因（见 `DatabaseManager.resolvedContentHash` 的用途区分）。
+    var hasContentHash: Bool { contentHash?.isEmpty == false }
+
     init(
         relativePath: String,
         size: Int64,

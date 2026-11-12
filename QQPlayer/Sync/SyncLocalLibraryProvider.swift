@@ -291,9 +291,11 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
         let started = Date()
         let files = descriptor.sourceFiles()
         // 缺指纹 = 本端没有 content_hash（旧实现会在这些文件上现算 SHA-256，正是清单变慢的来源）。
-        let missingHash = files.reduce(0) {
-            $1.contentHash?.isEmpty == false ? $0 : $0 + 1
-        }
+        // 判定交给数据本体（`SyncManifestSourceFile.hasContentHash`）：这里只做计数，
+        // 不碰裸 `content_hash` 列、更不为统计现算哈希 —— 指纹兜底只有
+        // `DatabaseManager.resolvedContentHash` 一个入口（形状契约见
+        // `SyncContentHashFallbackTests`）。
+        let missingHash = files.filter { !$0.hasContentHash }.count
         let library = SyncManifestGenerator.generate(files: files)
         let entries = collection.filter(
             library + descriptor.lyricsEntries(),
