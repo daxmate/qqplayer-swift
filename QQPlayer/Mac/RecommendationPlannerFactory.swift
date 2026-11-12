@@ -67,6 +67,19 @@
             #endif
         }
 
+        /// 逐曲理由来源（P3）：本地模型就绪 → MLX；否则规则（iOS 端用 `RuleRecommendationReasonProvider`）。
+        @MainActor
+        static func makeReasonProvider(settings: DeleteSettings) -> any RecommendationReasonProviding {
+            #if canImport(MLXLLM) && arch(arm64)
+                guard settings.recommendationUseLocalModel, localModelIdentity() != nil else {
+                    return RuleRecommendationReasonProvider()
+                }
+                return MLXRecommendationReasonProvider()
+            #else
+                return RuleRecommendationReasonProvider()
+            #endif
+        }
+
         /// 指令输入是否可用：必须是可用的本地模型（模型未就绪禁用，绝不回退规则）。
         static func chatAvailability(useLocalModel: Bool) -> RecommendationChatAvailability {
             RecommendationChatAvailability.resolve(

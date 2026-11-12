@@ -71,6 +71,25 @@
             }
         }
 
+        /// 逐曲理由（P3）：一次整批；超时 ≤20s，失败 / 校验不过返回空字典（调用方保留规则理由）。
+        func reasons(for items: [RecommendationReasonItem], locale: Locale) async -> [String: [String]] {
+            guard !items.isEmpty else { return [:] }
+
+            do {
+                let output = try await runner.generateReasons(
+                    system: RecommendationReasonPrompt.system(locale: locale),
+                    user: RecommendationReasonPrompt.user(for: items),
+                    timeout: .seconds(20)
+                )
+                if !keepLoaded { unload() }
+                return RecommendationReasonParser.parse(output, items: items)
+            } catch {
+                AppLog.warn(.general, "⚠️ 推荐理由模型生成失败，保留规则理由：\(error.localizedDescription)")
+                if !keepLoaded { unload() }
+                return [:]
+            }
+        }
+
         /// 指令输入是否可用：只看模型文件是否完整（不加载、不联网）。
         nonisolated static func isModelReady() -> Bool {
             let layout = RecommendationModelLayout.resolved(
@@ -181,6 +200,31 @@
             return output
         }
 
+        /// 逐曲理由（P3）：**一次整批**发一次请求（不做逐曲调用）。
+        func generateReasons(system: String, user: String, timeout: Duration) async throws -> String {
+            let container = try await ensureContainer()
+
+            let output: String = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    try await Self.runReasons(container: container, system: system, user: user)
+                }
+                group.addTask {
+                    try await Task.sleep(for: timeout)
+                    throw MLXRecommendationError.timedOut
+                }
+                guard let first = try await group.next() else {
+                    throw MLXRecommendationError.emptyOutput
+                }
+                group.cancelAll()
+                return first
+            }
+
+            if output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw MLXRecommendationError.emptyOutput
+            }
+            return output
+        }
+
         private func ensureContainer() async throws -> ModelContainer {
             let layout = RecommendationModelLayout.resolved(
                 modelId: RecommendationModelManager.defaultModelId
@@ -223,6 +267,20 @@
                 container: container,
                 system: RecommendationPlanPrompt.requestSystem,
                 user: RecommendationPlanPrompt.requestUser(for: summary, requestText: text, history: history),
+                temperature: 0.2
+            )
+        }
+
+        /// 逐曲理由：system + user 直接给（P3；一次整批）。
+        private static func runReasons(
+            container: ModelContainer,
+            system: String,
+            user: String
+        ) async throws -> String {
+            try await runChat(
+                container: container,
+                system: system,
+                user: user,
                 temperature: 0.2
             )
         }

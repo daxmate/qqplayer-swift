@@ -58,6 +58,15 @@ final class MacRecommendationModel {
     var batchRemaining = 0
     /// 池不足一批、正在增量查询（UI「补充中」）。
     private(set) var isRefilling = false
+
+    // MARK: P3 模型理由（首屏规则 → 异步替换）
+
+    /// 理由来源（nil = 按设置解析：本地模型就绪用 MLX，否则规则；单测可注入桩）。
+    var reasonProvider: (any RecommendationReasonProviding)?
+    /// 在跑的理由刷新任务（换批 / 新一批时取消）。
+    var reasonTask: Task<Void, Never>?
+    /// 理由刷新代次（防止旧任务把旧理由盖到新一批上）。
+    var reasonGeneration = 0
     /// 本次计算是否为「补池」（true = 追加到现有会话，不重建池）。
     var isRefillingSession = false
     /// 当前是否有会话池（决定「换一批 / 已看完」文案）。
@@ -211,6 +220,7 @@ final class MacRecommendationModel {
                     return
                 }
                 candidates = batch
+                startReasonRefresh(for: batch)
                 blacklist.markRecommended(batch, at: clock())
                 _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
                 activeRequestText = trimmed
@@ -348,6 +358,7 @@ final class MacRecommendationModel {
             candidates = batch
             lastGeneratedAt = clock()
             phase = .loaded
+            startReasonRefresh(for: batch)
             blacklist.markRecommended(batch, at: clock())
             _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
             storeCache(key, planSource: plan.source, candidates: batch)
@@ -395,6 +406,7 @@ final class MacRecommendationModel {
         }
         requestedArtist = hit.requestedArtist
         phase = .loaded
+        startReasonRefresh(for: candidates)
     }
 
     /// 成功后写缓存（空结果 / 失败结果不写）。

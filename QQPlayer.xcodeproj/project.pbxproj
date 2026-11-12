@@ -603,6 +603,8 @@
 				Mac/MacRecommendationSettingsView.swift,
 				Mac/RecommendationPlannerFactory.swift,
 				Mac/MLXRecommendationPlanner.swift,
+				Mac/MLXRecommendationReasonProvider.swift,
+				"Mac/MacRecommendationModel+Reasons.swift",
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
 		};
@@ -1022,6 +1024,8 @@
 				Mac/MacRecommendationSettingsView.swift,
 				Mac/RecommendationPlannerFactory.swift,
 				Mac/MLXRecommendationPlanner.swift,
+				Mac/MLXRecommendationReasonProvider.swift,
+				"Mac/MacRecommendationModel+Reasons.swift",
 				Services/RecommendationBatchDiversity.swift,
 				Services/RecommendationReasonParser.swift,
 				Services/RecommendationReasonPrompt.swift,

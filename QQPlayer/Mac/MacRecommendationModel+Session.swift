@@ -25,6 +25,7 @@ extension MacRecommendationModel {
         guard !batch.isEmpty else { return false }
         candidates = batch
         phase = .loaded
+        startReasonRefresh(for: batch)
         blacklist.markRecommended(batch, at: clock())
         _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
         if let key = lastCacheKey {
@@ -51,6 +52,7 @@ extension MacRecommendationModel {
         if let batch = working.takeFullBatchOrNil(minimum: target) {
             session = working
             batchRemaining = working.remaining
+            logDiversity(working.lastBatchDiversity)
             return batch
         }
 
@@ -62,6 +64,7 @@ extension MacRecommendationModel {
             let rest = final.nextBatch()
             session = final
             batchRemaining = final.remaining
+            logDiversity(final.lastBatchDiversity)
             return rest
         }
         session = working
@@ -76,6 +79,12 @@ extension MacRecommendationModel {
 
     /// P2 池构建引擎：**池不设**每艺人 / 每专辑 / 每意图上限（目标 60）。
     /// 同艺人 ≤4、同专辑 ≤2 是「首批 15」的约束，由 `RecallSession.nextBatch()` 执行。
+    /// 批次多样性日志：放宽时显式标记 `diversity_relaxed=`（禁止静默）。
+    private func logDiversity(_ report: RecallSession.BatchDiversityReport) {
+        guard report.isRelaxed else { return }
+        AppLog.info(.general, "diversity_relaxed=\(report.logToken) artists=\(report.distinctArtists)")
+    }
+
     func poolEngine() -> RecommendationEngine {
         var engine = RecommendationEngine(
             perIntentLimit: 20,
