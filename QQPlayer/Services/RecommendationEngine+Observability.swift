@@ -80,6 +80,7 @@ extension RecommendationEngine {
                 + " | flagged=\(flagged.isEmpty ? "none" : flagged)"
                 + " | final=\(finalCount)/\(max(1, targetCount)) | ms=\(durationMs)"
                 + " | planner=\(context.planSource?.rawValue ?? "unknown")"
+                + " | chain=\(chainAudit?.summary ?? "none")"
         )
     }
 

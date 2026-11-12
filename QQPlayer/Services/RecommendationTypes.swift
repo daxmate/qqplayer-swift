@@ -16,24 +16,47 @@ import Foundation
 
 /// 推荐候选来源（P1 只有两个在线源；rawValue 进候选 id，不得随意改）。
 enum RecommendationSource: String, CaseIterable, Codable, Sendable {
+    case itunes
+    case musicbrainz
     case netease
     case gequhai
 
-    /// 源可靠度（打分权重 `sourceReliability` 的输入）：网易云走官方 eapi，歌曲海是 HTML 解析。
+    /// 源可靠度（打分权重 `sourceReliability` 的输入）：
+    /// iTunes 官方 Search API 元数据最全；MusicBrainz 是社区库；网易云 eapi 稳定；歌曲海是 HTML 解析。
     var reliability: Double {
         switch self {
+        case .itunes: return 1.0
+        case .musicbrainz: return 0.8
         case .netease: return 1.0
         case .gequhai: return 0.6
         }
     }
 
-    /// 展示名本地化键（与刮削源共用 `source_netease` / `source_gequhai`，不另立第二套）。
+    /// 展示名本地化键（与刮削源共用 `source_*`，不另立第二套）。
     var localizationKey: String {
         switch self {
+        case .itunes: return "source_itunes"
+        case .musicbrainz: return "source_musicbrainz"
         case .netease: return "source_netease"
         case .gequhai: return "source_gequhai"
         }
     }
+}
+
+// MARK: - 批量策略（P2）
+
+/// 「为你推荐」v2 P2 的批量口径（设计 §5：15 首一批、池 ≥60、同艺人 ≤4、同专辑 ≤2）。
+enum RecommendationBatchPolicy {
+    /// 单批展示条数。
+    static let batchSize = 15
+    /// 会话池目标（15 × 4 余量）。
+    static let poolTarget = 60
+    /// 同艺人上限（30%）。
+    static let maxSongsPerArtist = 4
+    /// 同专辑上限。
+    static let maxSongsPerAlbum = 2
+    /// 跨会话「最近推过」软黑名单窗口（7 天）。
+    static let recentBlacklistWindow: TimeInterval = 7 * 24 * 3600
 }
 
 // MARK: - 归一化键

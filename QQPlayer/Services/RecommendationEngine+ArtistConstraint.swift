@@ -79,8 +79,11 @@ extension RecommendationEngine {
         request: RecommendationUserRequest,
         profile: TasteProfile,
         count: Int,
-        planSource: RecommendationPlanSource? = nil
+        planSource: RecommendationPlanSource? = nil,
+        excludedTrackKeys: Set<String> = []
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
+        await runBudget?.beginRun()
+        chainAudit?.reset()
         let context = RecommendationRunContext(
             requestText: request.rawText.isEmpty ? request.keywords.joined(separator: ",") : request.rawText,
             planSource: planSource
@@ -118,7 +121,8 @@ extension RecommendationEngine {
             profile: profile,
             intents: intents,
             excludedArtists: excluded,
-            artistConstraint: artistConstraint
+            artistConstraint: artistConstraint,
+            excludedTrackKeys: excludedTrackKeys
         )
         if gathered.items.isEmpty {
             logRunSummary(

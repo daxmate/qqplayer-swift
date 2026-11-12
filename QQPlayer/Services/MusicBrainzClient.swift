@@ -48,7 +48,7 @@ enum MusicBrainzClientError: Error {
     case badResponse
 }
 
-struct MusicBrainzClient {
+struct MusicBrainzClient: @unchecked Sendable {
     static let apiBase = URL(string: "https://musicbrainz.org/ws/2/recording")!
     static let coverArtArchiveFront = "https://coverartarchive.org/release/{mbid}/front"
     static let itunesSearch = URL(string: "https://itunes.apple.com/search")!
@@ -150,6 +150,59 @@ struct MusicBrainzClient {
                 artist: Self.joinArtistCredit(credit),
                 album: Self.stringValue(release?["title"]),
                 coverURL: cover,
+                year: Self.releaseYear(release: release, recording: recording),
+                genre: Self.recordingGenre(recording),
+                track: Self.recordingTrackNumber(recording),
+                albumArtist: release.map { Self.joinArtistCredit(($0["artist-credit"] as? [Any]) ?? []) } ?? "",
+                durationMs: nil
+            ))
+        }
+        return results
+    }
+
+    /// 按艺人名查 recording（P2 推荐降级链；只在线查询，不建库、不做艺人关系扩展）。
+    ///
+    /// - 1 req/s 由注入的 `sleep` 保证（与既有搜索同一约束）。
+    /// - 失败直接抛出（降级链按硬失败处理）；不做封面兜底（省请求）。
+    func searchRecordings(byArtist artist: String, limit: Int = 80) async throws -> [ScrapeCandidate] {
+        let name = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return [] }
+        try await sleep(1)
+        let escaped = name.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        var components = URLComponents(url: Self.apiBase, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "query", value: "artist:\"\(escaped)\""),
+            URLQueryItem(name: "fmt", value: "json"),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+        let obj = try await getJSON(
+            url: components.url!,
+            headers: ["User-Agent": Self.userAgent, "Accept": "application/json"]
+        )
+        let recordings = (obj["recordings"] as? [[String: Any]]) ?? []
+        return Self.candidates(fromRecordings: recordings)
+    }
+
+    /// recording JSON → 候选（无封面请求；字段缺失尽量取 nil）。
+    static func candidates(fromRecordings recordings: [[String: Any]]) -> [ScrapeCandidate] {
+        var results: [ScrapeCandidate] = []
+        for recording in recordings {
+            guard let mbid = recording["id"] as? String, !mbid.isEmpty,
+                  let titleValue = recording["title"] as? String, !titleValue.isEmpty else {
+                continue
+            }
+            let release = ((recording["releases"] as? [Any]) ?? [])
+                .compactMap { $0 as? [String: Any] }
+                .first { ($0["id"] as? String)?.isEmpty == false }
+            let credit = (recording["artist-credit"] as? [Any]) ?? []
+            results.append(ScrapeCandidate(
+                source: ScrapeSource.musicbrainz.rawValue,
+                id: mbid,
+                title: titleValue,
+                artist: Self.joinArtistCredit(credit),
+                album: Self.stringValue(release?["title"]),
+                coverURL: nil,
                 year: Self.releaseYear(release: release, recording: recording),
                 genre: Self.recordingGenre(recording),
                 track: Self.recordingTrackNumber(recording),

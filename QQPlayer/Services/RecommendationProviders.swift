@@ -20,6 +20,12 @@ struct RecommendationRemoteSong: Sendable, Equatable {
     var songID: Int?
     /// 时长（毫秒；歌单 / 串烧过滤用；给不出就是 nil）。
     var durationMs: Int?
+    /// 试听地址（iTunes 30s preview；其他源给不出就是 nil）。**不下载**，只做下载衔接的线索。
+    var previewURL: URL?
+    /// 实际来源（降级链 / 聚合源用）：nil = 由 provider 的 `source` 归属。
+    var source: RecommendationSource?
+    /// 来源质量降级原因（如网易云兜底）；nil = 原级来源。
+    var degradedReason: String?
 
     init(
         title: String,
@@ -27,7 +33,10 @@ struct RecommendationRemoteSong: Sendable, Equatable {
         album: String? = nil,
         year: Int? = nil,
         songID: Int? = nil,
-        durationMs: Int? = nil
+        durationMs: Int? = nil,
+        previewURL: URL? = nil,
+        source: RecommendationSource? = nil,
+        degradedReason: String? = nil
     ) {
         self.title = title
         self.artist = artist
@@ -35,6 +44,9 @@ struct RecommendationRemoteSong: Sendable, Equatable {
         self.year = year
         self.songID = songID
         self.durationMs = durationMs
+        self.previewURL = previewURL
+        self.source = source
+        self.degradedReason = degradedReason
     }
 }
 

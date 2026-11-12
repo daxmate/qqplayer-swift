@@ -20,7 +20,7 @@
 
 import Foundation
 
-struct ITunesScrapeClient {
+struct ITunesScrapeClient: @unchecked Sendable {
     /// 复用既有 iTunes 端点常量（MusicBrainzClient 封面 fallback 用同一常量）
     static let searchBaseURL = MusicBrainzClient.itunesSearch
     /// 与 MusicBrainzClient 同一 UA（Apple 端点无强制 UA 要求，保持一致便于排查）
@@ -30,6 +30,10 @@ struct ITunesScrapeClient {
     static let storefronts = ["tw", "us"]
     /// 单次查询候选上限（§3.B：limit=20）
     static let searchLimit = 20
+    /// 推荐召回单次查询上限（设计 §3：limit=200）
+    static let recommendationLimit = 200
+    /// 推荐召回网络超时（设计 §6：3s 硬失败）
+    static let recommendationTimeout: TimeInterval = 3
     /// 网络超时（§3.B：10s）
     static let requestTimeout: TimeInterval = 10
 
@@ -160,23 +164,103 @@ struct ITunesScrapeClient {
         return URL(string: text.replacingOccurrences(of: "100x100bb", with: "600x600bb"))
     }
 
+    // MARK: - 推荐召回（P2：艺人解析 + lookup；HTTP 只有本文件一份）
+
+    /// 通用请求 URL：search（term/entity）与 lookup（id/entity）共用一套 query 组装。
+    static func requestURL(
+        term: String? = nil,
+        id: Int? = nil,
+        entity: String,
+        storefront: String,
+        limit: Int
+    ) -> URL? {
+        var components = URLComponents(url: searchBaseURL, resolvingAgainstBaseURL: false)!
+        var items: [URLQueryItem] = []
+        if let term {
+            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            items.append(URLQueryItem(name: "term", value: trimmed))
+        } else if let id {
+            items.append(URLQueryItem(name: "id", value: String(id)))
+        } else {
+            return nil
+        }
+        items.append(URLQueryItem(name: "entity", value: entity))
+        items.append(URLQueryItem(name: "country", value: storefront))
+        items.append(URLQueryItem(name: "limit", value: String(limit)))
+        components.queryItems = items
+        return components.url
+    }
+
+    /// search：返回 results 原始字典（推荐召回按字段自行映射；刮削解析仍走 `candidates(fromJSON:)`）。
+    func rawSearch(
+        term: String,
+        entity: String,
+        storefront: String,
+        limit: Int,
+        timeout: TimeInterval = recommendationTimeout
+    ) async throws -> [[String: Any]] {
+        guard let url = Self.requestURL(term: term, entity: entity, storefront: storefront, limit: limit) else {
+            return []
+        }
+        return try await rawResults(url: url, timeout: timeout)
+    }
+
+    /// lookup：按 artistId 拉该艺人歌曲（id + entity=song）。
+    func rawLookup(
+        id: Int,
+        entity: String,
+        storefront: String,
+        limit: Int,
+        timeout: TimeInterval = recommendationTimeout
+    ) async throws -> [[String: Any]] {
+        guard let url = Self.requestURL(id: id, entity: entity, storefront: storefront, limit: limit) else {
+            return []
+        }
+        return try await rawResults(url: url, timeout: timeout)
+    }
+
+    private func rawResults(url: URL, timeout: TimeInterval) async throws -> [[String: Any]] {
+        let data = try await fetch(url, timeout: timeout)
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = object["results"] as? [[String: Any]] else {
+            throw ITunesHTTPError.invalidPayload
+        }
+        return results
+    }
+
     // MARK: - 网络层（照 MusicBrainzClient 的 URLProtocol 注入写法）
 
-    private func fetch(_ url: URL) async throws -> Data {
+    private func fetch(_ url: URL, timeout: TimeInterval? = nil) async throws -> Data {
+        let timeout = timeout ?? Self.requestTimeout
         var request = URLRequest(url: url)
-        request.timeoutInterval = Self.requestTimeout
+        request.timeoutInterval = timeout
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = Self.requestTimeout
+        configuration.timeoutIntervalForRequest = timeout
         if let protocolClasses {
             configuration.protocolClasses = protocolClasses
         }
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
-        return data
+        switch http.statusCode {
+        case 200 ..< 300:
+            return data
+        case 429:
+            throw ITunesHTTPError.rateLimited
+        default:
+            throw ITunesHTTPError.httpStatus(http.statusCode)
+        }
     }
+}
+
+/// iTunes 请求的硬失败分类（供降级链判定与日志；不暴露给 UI）。
+enum ITunesHTTPError: Error, Equatable {
+    case rateLimited
+    case httpStatus(Int)
+    case invalidPayload
 }

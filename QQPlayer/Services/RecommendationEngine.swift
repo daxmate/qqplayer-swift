@@ -19,10 +19,16 @@ import Foundation
 /// 规则推荐引擎（无状态、可注入 providers；测试用桩，不打真实网络）。
 struct RecommendationEngine: Sendable {
     var providers: [any OnlineSearchProviding]
+    /// P2：降级 / iTunes 调用预算（默认链自带；显式注入 providers 时为 nil）。
+    var runBudget: RecommendationRunBudget?
+    /// P2：降级链诊断（summary 日志用）。
+    var chainAudit: RecommendationChainAudit?
     /// 每个意图每源取前 N 条。
     var perIntentLimit: Int = 10
     /// 同一艺人最多 N 首。
     var maxSongsPerArtist: Int = 2
+    /// 同一专辑最多 N 首（nil = 不限；P2 池构建传 2）。
+    var maxSongsPerAlbum: Int?
     /// 单个意图最多贡献 N 条（来源多样性）。
     var maxSongsPerIntent: Int = 4
     /// 单一在线源最多占最终列表的比例。
@@ -32,14 +38,28 @@ struct RecommendationEngine: Sendable {
     /// 最多对几个艺人意图做相似召回（限制请求放大）。
     var maxSimilarProbes: Int = 3
 
+    /// 默认 = P2 主源降级链（iTunes tw → us → MusicBrainz → 网易云）；
+    /// 测试注入 providers 时预算 / 诊断不接线（行为与 P1 相同）。
     init(
-        providers: [any OnlineSearchProviding] = [NeteaseSearchProvider(), GequhaiSearchProvider()],
+        providers: [any OnlineSearchProviding]? = nil,
         perIntentLimit: Int = 10,
-        maxSongsPerArtist: Int = 2
+        maxSongsPerArtist: Int = 2,
+        maxSongsPerAlbum: Int? = nil
     ) {
-        self.providers = providers
+        if let providers {
+            self.providers = providers
+            runBudget = nil
+            chainAudit = nil
+        } else {
+            let budget = RecommendationRunBudget()
+            let audit = RecommendationChainAudit()
+            self.providers = [RecommendationSourceChain.defaultProvider(budget: budget, audit: audit)]
+            runBudget = budget
+            chainAudit = audit
+        }
         self.perIntentLimit = perIntentLimit
         self.maxSongsPerArtist = maxSongsPerArtist
+        self.maxSongsPerAlbum = maxSongsPerAlbum
     }
 
     func recommend(
@@ -60,8 +80,11 @@ struct RecommendationEngine: Sendable {
         profile: TasteProfile,
         count: Int,
         intents: [RecommendationIntent],
-        planSource: RecommendationPlanSource? = nil
+        planSource: RecommendationPlanSource? = nil,
+        excludedTrackKeys: Set<String> = []
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
+        await runBudget?.beginRun()
+        chainAudit?.reset()
         let context = RecommendationRunContext(
             requestText: intents.map(\.query).joined(separator: ","),
             planSource: planSource
@@ -81,7 +104,7 @@ struct RecommendationEngine: Sendable {
             return .success([])
         }
 
-        let gathered = await gather(profile: profile, intents: intents)
+        let gathered = await gather(profile: profile, intents: intents, excludedTrackKeys: excludedTrackKeys)
         if gathered.items.isEmpty {
             logRunSummary(
                 context: context, intents: intents, gathered: gathered,
@@ -131,7 +154,8 @@ struct RecommendationEngine: Sendable {
         profile: TasteProfile,
         intents: [RecommendationIntent],
         excludedArtists: Set<String> = [],
-        artistConstraint: RecommendationArtistConstraint? = nil
+        artistConstraint: RecommendationArtistConstraint? = nil,
+        excludedTrackKeys: Set<String> = []
     ) async -> GatherResult {
         var items: [GatheredItem] = []
         var indexByKey: [String: Int] = [:]
@@ -163,7 +187,9 @@ struct RecommendationEngine: Sendable {
             sourceStats[outcome.source] = stat
         }
 
-        func accept(_ song: RecommendationRemoteSong, source: RecommendationSource, intent: RecommendationIntent) {
+        func accept(_ song: RecommendationRemoteSong, providerSource: RecommendationSource, intent: RecommendationIntent) {
+            // 降级链结果自带真实来源（song.source）；provider 的 source 只是原级归属。
+            let source = song.source ?? providerSource
             let artistKey = RecommendationKey.primaryArtist(song.artist)
             let hasFields = !song.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && !artistKey.isEmpty
@@ -194,6 +220,8 @@ struct RecommendationEngine: Sendable {
                 !profile.blacklistTracks.contains(key) && !profile.blacklistArtists.contains(artistKey)
             ) else { return }
             guard passGate("excluded_artists", !excludedArtists.contains(artistKey)) else { return }
+            // P2 软黑名单：最近 7 天推过的曲目直接跳过（跨会话，不永久拉黑）。
+            guard passGate("recent", !excludedTrackKeys.contains(key)) else { return }
 
             if let existing = indexByKey[key] {
                 _ = passGate("dedupe", false)
@@ -225,7 +253,7 @@ struct RecommendationEngine: Sendable {
                 }
                 succeededSources += 1
                 for song in outcome.songs {
-                    accept(song, source: outcome.source, intent: intent)
+                    accept(song, providerSource: outcome.source, intent: intent)
                 }
             }
             AppLog.debug(
@@ -260,7 +288,7 @@ struct RecommendationEngine: Sendable {
                 )
                 for outcome in usable {
                     for song in outcome.songs {
-                        accept(song, source: outcome.source, intent: similarIntent)
+                        accept(song, providerSource: outcome.source, intent: similarIntent)
                     }
                 }
             }
@@ -377,76 +405,8 @@ struct RecommendationEngine: Sendable {
         }
     }
 
-    // MARK: 选取（上限 + 多样性）
-
-    func select(
-        _ ranked: [RankedItem],
-        count: Int,
-        profile: TasteProfile,
-        artistConstraint: RecommendationArtistConstraint? = nil
-    ) -> [RecommendedCandidate] {
-        let target = max(1, count)
-        let perIntentCap = max(2, min(maxSongsPerIntent, target / 3 + 1))
-        let perSourceCap = max(1, Int((Double(target) * maxSourceShare).rounded(.up)))
-        let perArtistCap = max(1, maxSongsPerArtist)
-
-        var artistCounts: [String: Int] = [:]
-        var intentCounts: [String: Int] = [:]
-        var sourceCounts: [RecommendationSource: Int] = [:]
-        var usedKeys = Set<String>()
-        var picked: [RecommendedCandidate] = []
-        var previousPrimary: String?
-
-        func take(_ item: RankedItem) {
-            let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
-            let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
-                + "#" + item.item.source.rawValue
-            artistCounts[artistKey, default: 0] += 1
-            intentCounts[item.item.intent.priorityKey, default: 0] += 1
-            sourceCounts[item.item.source, default: 0] += 1
-            usedKeys.insert(key)
-
-            let reasons = reasonsFor(
-                item.item,
-                previousPrimary: previousPrimary,
-                artistConstraint: artistConstraint
-            )
-            previousPrimary = reasons.first
-
-            var candidate = RecommendedCandidate(
-                title: item.item.song.title,
-                artist: item.item.song.artist,
-                album: item.item.song.album,
-                year: item.item.song.year,
-                source: item.item.source
-            )
-            candidate.score = item.score
-            candidate.reasons = reasons
-            picked.append(candidate)
-        }
-
-        // 第一轮守多样性上限；条数不够时第二轮放宽意图 / 来源上限（艺人上限始终保留）。
-        for pass in 0 ..< 2 {
-            for item in ranked {
-                guard picked.count < target else { break }
-                let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
-                    + "#" + item.item.source.rawValue
-                guard !usedKeys.contains(key) else { continue }
-                let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
-                if artistCounts[artistKey, default: 0] >= perArtistCap { continue }
-                if pass == 0 {
-                    if intentCounts[item.item.intent.priorityKey, default: 0] >= perIntentCap { continue }
-                    if sourceCounts[item.item.source, default: 0] >= perSourceCap { continue }
-                }
-                take(item)
-            }
-        }
-
-        return picked
-    }
-
     /// 逐曲理由：由**产生该候选的意图**生成；相邻行首条理由不能相同。
-    private func reasonsFor(
+    func reasonsFor(
         _ item: GatheredItem,
         previousPrimary: String?,
         artistConstraint: RecommendationArtistConstraint? = nil
