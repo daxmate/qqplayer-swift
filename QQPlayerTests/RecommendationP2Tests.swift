@@ -118,6 +118,20 @@ struct RecommendationRecallSessionTests {
         #expect(second.count == 15)
     }
 
+    @Test("不足一批时 takeFullBatchOrNil 不消费：保留新池且 remaining 正确")
+    func fullBatchOrNilKeepsPool() {
+        var session = RecallSession(pool: [candidate("S1", "A1")])
+        session.append(pool: (2 ... 6).map { candidate("S\($0)", "A\($0)") })
+        #expect(session.takeFullBatchOrNil(minimum: 15) == nil)
+        #expect(session.remaining == 6)
+        #expect(session.seen.isEmpty)
+        let added = session.append(pool: (7 ... 26).map { candidate("S\($0)", "A\($0)") })
+        #expect(added == 20)
+        let batch = session.takeFullBatchOrNil(minimum: 15)
+        #expect(batch?.count == 15)
+        #expect(session.remaining == 11)
+    }
+
     @Test("增量补池去重且保留游标")
     func appendRefillDeduplicates() {
         var session = RecallSession(pool: [candidate("S1", "A")])
@@ -520,6 +534,38 @@ struct RecommendationITunesRequestPathTests {
             )
         }
         let songs = try await makeProvider().searchArtist("周杰伦", limit: 20)
+        #expect(songs.first?.title == "晴天")
+        #expect(P2ITunesMockURLProtocol.requestCount == 2)
+    }
+
+    @Test("真实 iTunes provider 经降级链 searchArtist：仍走 artistId→lookup（2 次请求）")
+    func realProviderArtistPathThroughChain() async throws {
+        P2ITunesMockURLProtocol.reset()
+        P2ITunesMockURLProtocol.handler = { request in
+            try p2ITunesResponse(
+                for: request,
+                search: [["artistId": 42, "trackName": "hit", "artistName": "周杰伦"]],
+                lookup: [["trackId": 7, "trackName": "晴天", "artistName": "周杰伦"]]
+            )
+        }
+        let provider = makeProvider()
+        // 编译期断言：真实 provider 必须遵循 ArtistSearchProviding（否则链上会静默回落 keyword）。
+        let artistProvider: any ArtistSearchProviding = provider
+        _ = artistProvider
+        let chain = RecommendationDegradingProvider(
+            steps: [
+                RecommendationChainStep(
+                    kind: .itunesTW,
+                    provider: provider,
+                    minimumCandidates: 1,
+                    degradedReason: nil
+                ),
+            ],
+            budget: RecommendationRunBudget(maxDowngrades: 2),
+            audit: nil
+        )
+        let songs = try await chain.searchArtist("周杰伦", limit: 20)
+        #expect(songs.count == 1)
         #expect(songs.first?.title == "晴天")
         #expect(P2ITunesMockURLProtocol.requestCount == 2)
     }

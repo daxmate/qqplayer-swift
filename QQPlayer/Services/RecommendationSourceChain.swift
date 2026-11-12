@@ -161,7 +161,7 @@ enum ITunesRecommendationError: Error, Equatable {
 }
 
 /// iTunes 主源：艺人名 → artistId → 该艺人歌曲池（复用 `ITunesScrapeClient` 的 HTTP 与店区）。
-struct ITunesRecommendationProvider: OnlineSearchProviding {
+struct ITunesRecommendationProvider: OnlineSearchProviding, ArtistSearchProviding {
     var storefront: String
     var client: ITunesScrapeClient = ITunesScrapeClient()
     var gate: ITunesRecommendationGate = .shared

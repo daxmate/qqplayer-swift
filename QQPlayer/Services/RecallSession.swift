@@ -80,6 +80,20 @@ struct RecallSession: Sendable, Equatable {
         return picked
     }
 
+    /// 取一整批；不足 `minimum` 且池未耗尽时 **不消费**（游标 / seen 原样保留），返回 nil。
+    ///
+    /// 语义要点：调用方可在补池后重试；只有池真正耗尽时才返回不足一批的剩余。
+    mutating func takeFullBatchOrNil(minimum: Int? = nil) -> [RecommendedCandidate]? {
+        let target = min(max(1, minimum ?? batchSize), batchSize)
+        var working = self
+        let batch = working.nextBatch()
+        if batch.count < target {
+            return nil
+        }
+        self = working
+        return batch
+    }
+
     /// 增量补池（去重；返回实际加入条数）。游标保持不动，新条目追加在末尾。
     @discardableResult
     mutating func append(pool newItems: [RecommendedCandidate]) -> Int {

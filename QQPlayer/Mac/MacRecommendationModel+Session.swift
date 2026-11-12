@@ -38,21 +38,35 @@ extension MacRecommendationModel {
     /// 规则：补池后不足一批且仍有剩余 → 不返回残批（等下一次补池）；
     /// 只有「补池后为空或已耗尽」才允许返回剩余。
     func applyPool(_ pool: [RecommendedCandidate], count: Int) -> [RecommendedCandidate] {
-        var session: RecallSession
-        if isRefillingSession, let existing = self.session {
-            session = existing
-            session.append(pool: pool)
+        let target = min(max(1, count), RecommendationBatchPolicy.batchSize)
+        var working: RecallSession
+        var added = 0
+        if isRefillingSession, let existing = session {
+            working = existing
+            added = working.append(pool: pool)
         } else {
-            session = RecallSession(pool: pool)
+            working = RecallSession(pool: pool)
         }
-        self.session = session
-        let target = min(count, RecommendationBatchPolicy.batchSize)
-        let batch = session.nextBatch()
-        batchRemaining = session.remaining
-        if batch.count < target, session.state != .exhausted {
-            return []
+
+        if let batch = working.takeFullBatchOrNil(minimum: target) {
+            session = working
+            batchRemaining = working.remaining
+            return batch
         }
-        return batch
+
+        // 不足一批：
+        // - 新请求本身池小 / 补池没有新增 → 允许返回剩余（UI 显示已看完）
+        // - 补池有新增 → 不消费、保留新池，batchRemaining 反映真实剩余
+        if !isRefillingSession || added == 0 {
+            var final = working
+            let rest = final.nextBatch()
+            session = final
+            batchRemaining = final.remaining
+            return rest
+        }
+        session = working
+        batchRemaining = working.remaining
+        return []
     }
 
     /// 召回排除集：会话内 seen ∪ 最近 7 天软黑名单（跨会话）。
