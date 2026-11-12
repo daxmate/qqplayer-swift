@@ -135,7 +135,10 @@ jobs:
       #   - ~/Library/Caches/org.swift.swiftpm（包源码/解析结果）
       #   - build/DerivedData（编译产物，命中后 xcodebuild 增量秒级）
       # key 绑定 Package.resolved 内容，依赖不变即命中。
+      # 自托管 runner 的 _work / build/ 本来就跨 run 保留，且本机到 GitHub 的带宽
+      # 撑不住缓存归档（实测 restore 超时 108s 直接把 job 判死）→ 自托管上跳过。
       - name: Cache SPM packages + DerivedData
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v5
         with:
           path: |
