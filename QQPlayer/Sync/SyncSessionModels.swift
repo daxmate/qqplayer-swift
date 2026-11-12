@@ -234,4 +234,12 @@ protocol SyncPeerTransport: AnyObject {
     func sendFrameBytes(_ data: Data)
     /// 关闭底层通道（幂等）。
     func closeTransport()
+    /// 链路事实（INV-37）：真实通道按 `NWConnection.currentPath` 实测；
+    /// 内存回环 / 测试通道取默认值（全未知）。
+    var linkFacts: SyncDiagLinkFacts { get }
+}
+
+extension SyncPeerTransport {
+    /// 默认：拿不到真实通道事实 → 全未知（**不编造**）。
+    var linkFacts: SyncDiagLinkFacts { .unknown }
 }

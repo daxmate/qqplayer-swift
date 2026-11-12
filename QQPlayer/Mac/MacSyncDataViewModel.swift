@@ -147,9 +147,19 @@ final class MacSyncDataViewModel: ObservableObject {
     }
 
     /// 等待对端的提示（nil = 无）：对端整理曲库（notReady 退避中）/ 本端无应答重发中。
+    ///
+    /// notReady 退避中带**具体倒计时**（T1：3 轮 × 5s）：用户必须看见「几秒后重试」，
+    /// 而不是一句静态的「正在整理曲库」——静态文案让人以为卡死。
     var waitingText: String? {
-        guard !report.isFinished else { return nil }
-        return report.waitingKey?.localized
+        guard !report.isFinished, let key = report.waitingKey else { return nil }
+        if key == SyncDataSyncMessageKey.peerPreparing,
+           let seconds = report.retryCountdownSeconds {
+            let countdownKey = report.notReadyReason == .importing
+                ? SyncDataSyncMessageKey.peerImportingCountdown
+                : SyncDataSyncMessageKey.peerPreparingCountdown
+            return countdownKey.localized(with: seconds)
+        }
+        return key.localized
     }
 
     /// 只是用户取消 / 掉线中断（UI 用次要色，不当错误红字）。

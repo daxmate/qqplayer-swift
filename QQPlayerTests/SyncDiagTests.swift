@@ -142,7 +142,9 @@ struct SyncDiagTests {
         let expected = "SYNCDIAG v=1 kind=run id=00000000 role=host chan=session cand=0 "
             + "peer=ABCDEFGH ok=1 fail=none faildom=- failcode=0 "
             + "d_discover=-1 d_dial=-1 d_handshake=-1 d_negotiate=-1 d_transfer=240 d_settle=6 "
-            + "total=1246 bytes=4096 files=2"
+            + "total=1246 bytes=4096 files=2 "
+            // INV-37（2026-11-12 T1）：链路事实 8 字段固定在行尾；未实测 = -1 / unknown。
+            + "addr=-1 if=-1 link=unknown importing=0 pullSent=-1 pullRecv=-1 pullLate=-1 probeMBps=-1"
         #expect(line == expected)
 
         // 值内不得含空格：按空格切后每段要么是前缀，要么是 k=v 形式。

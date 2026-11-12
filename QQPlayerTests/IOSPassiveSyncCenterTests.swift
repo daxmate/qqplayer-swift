@@ -753,6 +753,7 @@ struct IOSPassiveSyncCenterTests {
             "onPushApplyFailed",
             "onPushFutureTimestamp",
             "onPushNotReady",
+            "onPushDuplicate",
             "onDecodeFailure",
             "onIncrementSent",
             "onIncrementMissingIdentity",
@@ -826,8 +827,8 @@ struct IOSPassiveSyncCenterTests {
         "QQPlayer/Sync/SyncPeerLibraryClient.swift": 3,
         "QQPlayer/Sync/SyncPeerLibraryResponder.swift": 3,
         "QQPlayer/Sync/SyncLibraryFetchResponder.swift": 5,
-        "QQPlayer/Sync/SyncChangeLogNotReadyResponder.swift": 2,
-        "QQPlayer/Sync/SyncChangeLogPeer.swift": 17,
+        "QQPlayer/Sync/SyncChangeLogNotReadyResponder.swift": 3,
+        "QQPlayer/Sync/SyncChangeLogPeer.swift": 18,
         "QQPlayer/Sync/SyncChangeLogApplier.swift": 4,
         "QQPlayer/Sync/SyncLibraryPassiveHost.swift": 10,
         "QQPlayer/Sync/SyncLocalLibraryProvider.swift": 7,
@@ -843,6 +844,9 @@ struct IOSPassiveSyncCenterTests {
 
     /// 经审计的豁免（逐条给理由；不许静默漏 —— 未登记也未豁免的闭包属性会直接报错）。
     private static let sendableCallbackExemptions: [String: [String: String]] = [
+        "QQPlayer/Sync/SyncChangeLogNotReadyResponder.swift": [
+            "reasonProvider": "非 @Sendable：装配时捕获 @MainActor 索引状态源（IndexingStateProviding，非 Sendable）；应答路径只在会话线程同步读一次 Bool，标 @Sendable 只会靠 @unchecked 盒子糊过去（本任务禁止）。",
+        ],
         "QQPlayer/Sync/SyncEventHandlerChain.swift": [
             "removal": "内部管道：闭包捕获私有引用计数对象 Entry（非 Sendable），要标就得给 Entry 加 @unchecked Sendable = 本任务禁止的糊法；构造与调用都在本层非隔离调用栈内。",
         ],

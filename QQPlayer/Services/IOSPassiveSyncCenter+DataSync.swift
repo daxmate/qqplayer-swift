@@ -18,7 +18,13 @@
         /// 门控期的轻量应答端：只回 notReady（空批 + 不推进游标），不接数据、不补发对账。
         private func installNotReadyResponderIfNeeded(on session: SyncPeerSession) {
             guard dataSyncNotReadyResponder == nil else { return }
-            dataSyncNotReadyResponder = SyncChangeLogNotReadyResponder(session: session)
+            // 原因回带（2026-11-12 T1）：正在索引 = 导入中；否则 = 曲库整理。
+            // 判定只读索引状态（不新造语义）；镜像到 @Sendable 闭包避免跨线程读实例。
+            let indexingState = self.indexingState
+            dataSyncNotReadyResponder = SyncChangeLogNotReadyResponder(
+                session: session,
+                reasonProvider: { indexingState.isIndexing ? .importing : .tidying }
+            )
             AppLog.warn(
                 .general,
                 "⏸️ IOSPassiveSyncCenter: 曲库索引未到终态，装配轻量应答端（只回 notReady；不发起数据同步、不补发对账，待终态后换真实应答端）"

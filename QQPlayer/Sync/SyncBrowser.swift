@@ -204,6 +204,8 @@ final class SyncBrowser: @unchecked Sendable {
             candidates: diagCandidates,
             peerDeviceID: candidate?.deviceID ?? expectedPeerDeviceID
         )
+        // 链路事实（INV-37）：拨号期只有端点事实（对端地址可能尚未解析 → -1）。
+        diag.setLinkFacts(SyncDiagLinkFacts.from(path: nil, remoteEndpoint: endpoint))
         diag.begin(.dial)
         SyncConnectDiag.log(
             "🧭 connect target=\(SyncConnectDiag.describe(endpoint)) "
@@ -226,6 +228,8 @@ final class SyncBrowser: @unchecked Sendable {
             guard let diag, let error, let mapped = SyncDiagTransportError(nwError: error) else { return }
             diag.fail(.dial, error: mapped)
         }
+        // 连接就绪后 path 才有事实：汇总行落盘时再取一次（只观测）。
+        diag.setLinkFactsProvider { [weak channel] in channel?.linkFacts ?? .unknown }
         channel.session = session
         session.setPairingExpectations(
             expectedPeerDeviceID: expectedPeerDeviceID,

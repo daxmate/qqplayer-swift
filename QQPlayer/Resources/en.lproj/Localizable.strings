@@ -977,6 +977,8 @@
 "sync_run_data_phase_pushing" = "Sending your changes…";
 "sync_run_data_phase_pulling" = "Receiving changes…";
 "sync_data_pull_peer_preparing" = "The iPhone is organizing its library…";
+"sync_data_pull_peer_preparing_countdown" = "The other device is organizing its library — retrying automatically in %d s";
+"sync_data_pull_peer_importing_countdown" = "The other device is importing its library — retrying automatically in %d s";
 "sync_data_pull_retrying_no_answer" = "No response yet — retrying…";
 "sync_data_pull_no_answer_timeout" = "The other device did not answer after several attempts: it may still be organizing its library or processing a previous batch. Please try again later.";
 "sync_data_pull_not_ready_timeout" = "The iPhone is still organizing its library (indexing not finished). Please try again later.";

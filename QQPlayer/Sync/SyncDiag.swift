@@ -52,10 +52,122 @@ enum SyncDiagStage: String, CaseIterable, Sendable {
     static let timed: [SyncDiagStage] = [.discover, .dial, .handshake, .negotiate, .transfer, .settle]
 }
 
-/// 尝试类型：连接（conn）/ 编排运行（run）。见文件头「两行/一次尝试」。
+/// 尝试类型：连接（conn）/ 帧往返（frame）/ 编排运行（run）。见文件头「两行/一次尝试」。
+///
+/// `frame`（2026-11-12 T1）：数据同步 pull 往返的观测行——回答「应答发出去没有、
+/// 收到几条、迟到几条、走的哪条链路」。与 conn / run 一样带同一组链路事实字段。
 enum SyncDiagKind: String, Sendable {
     case conn
+    case frame
     case run
+}
+
+// MARK: - 链路事实（INV-37）
+
+/// 一次尝试的链路事实：回答「这次同步走的哪条链路、pull 往返几条」。
+///
+/// **取不到就写 -1 / unknown，绝不编造默认值**（编造出来的 addr 会让日志骗人，
+/// 排查时比没有更糟）。字段顺序固定，便于脚本解析（INV-37）。
+struct SyncDiagLinkFacts: Equatable, Sendable {
+    /// 对端 `IP:port`（未解析到具体地址 = -1）
+    var addr = "-1"
+    /// 本端出口接口名（en0 / en1 / awdl0 / utun / other；未知 = -1）
+    var interface = "-1"
+    /// 链路类型（wifi / eth / awdl / unknown）
+    var link = "unknown"
+    /// 对端是否在导入曲库（0/1）
+    var importing = false
+    /// 本轮已发出 pull 帧数（-1 = 不适用 / 未测）
+    var pullSent = -1
+    /// 本轮已收到应答批数（-1 = 不适用 / 未测）
+    var pullRecv = -1
+    /// 本轮收尾后才到的应答批数（-1 = 不适用 / 未测）
+    var pullLate = -1
+    /// 实测吞吐 MB/s（nil = 未测；probe 实测属 T2）
+    var probeMBps: Double?
+
+    /// 全未知（内存回环 / 测试通道 / 拿不到 path 的场合）。
+    static let unknown = SyncDiagLinkFacts()
+
+    /// 追加到汇总行末尾的固定字段（顺序固定，脚本按位置/键解析）。
+    var fields: [String] {
+        [
+            "addr=\(Self.sanitize(addr))",
+            "if=\(Self.sanitize(interface))",
+            "link=\(Self.sanitize(link))",
+            "importing=\(importing ? 1 : 0)",
+            "pullSent=\(pullSent)",
+            "pullRecv=\(pullRecv)",
+            "pullLate=\(pullLate)",
+            "probeMBps=\(probeMBps.map { String(format: "%.1f", $0) } ?? "-1")",
+        ]
+    }
+
+    /// 合并（后者有实质值时覆盖前者）：provider 给出的链路面事实优先于静态缺省。
+    func merged(over base: SyncDiagLinkFacts) -> SyncDiagLinkFacts {
+        var out = base
+        if addr != "-1" { out.addr = addr }
+        if interface != "-1" { out.interface = interface }
+        if link != "unknown" { out.link = link }
+        return out
+    }
+
+    /// 值内不得含空格（与汇总行同一纪律）。
+    static func sanitize(_ raw: String) -> String {
+        var out = ""
+        out.reserveCapacity(raw.count)
+        for character in raw {
+            switch character {
+            case " ", "\t", "\n", "\r": out.append("_")
+            default: out.append(character)
+            }
+        }
+        return out
+    }
+}
+
+extension SyncDiagLinkFacts {
+    /// 从 Network 端点取 `IP:port`；具名服务 / 无法解析 → -1（不猜）。
+    static func addr(from endpoint: NWEndpoint?) -> String {
+        guard let endpoint, case let .hostPort(host, port) = endpoint else { return "-1" }
+        if case let .ipv4(address) = host {
+            return "\(address):\(port.rawValue)"
+        }
+        if case let .ipv6(address) = host {
+            return "[\(address)]:\(port.rawValue)"
+        }
+        return "-1"
+    }
+
+    /// 从 NWPath + 对端端点取链路事实（addr / if / link）。
+    ///
+    /// 接口名口径：只用 path 自己声明的事实——`usesInterfaceType` 决定链路类型，
+    /// 同名类型若有**唯一**可用接口才写它的名字；多个同类型接口时写字面量 `other`
+    /// （挑一个就是猜）。
+    static func from(path: NWPath?, remoteEndpoint: NWEndpoint?) -> SyncDiagLinkFacts {
+        var facts = SyncDiagLinkFacts()
+        facts.addr = addr(from: remoteEndpoint)
+        guard let path else { return facts }
+        if path.usesInterfaceType(.wifi) {
+            facts.link = "wifi"
+            facts.interface = interfaceName(path: path, type: .wifi)
+        } else if path.usesInterfaceType(.wiredEthernet) {
+            facts.link = "eth"
+            facts.interface = interfaceName(path: path, type: .wiredEthernet)
+        } else if let name = path.availableInterfaces.first(where: { $0.name.hasPrefix("awdl") })?.name {
+            // awdl 在 NWInterface.InterfaceType 里也是 .other：只能按名字认。
+            facts.link = "awdl"
+            facts.interface = name
+        }
+        return facts
+    }
+
+    private static func interfaceName(path: NWPath, type: NWInterface.InterfaceType) -> String {
+        let matches = path.availableInterfaces.filter { $0.type == type }
+        guard matches.count == 1, let name = matches.first?.name else { return "other" }
+        if name.hasPrefix("en") || name.hasPrefix("awdl") || name.hasPrefix("utun") { return name }
+        return "other"
+    }
 }
 
 /// 发现通道。值直接进汇总行，不得含空格。
@@ -173,6 +285,11 @@ final class SyncDiagAttempt: @unchecked Sendable {
     /// 文件级并发峰值（0 = 未测量；可选字段，仅在有值时追加）
     private var concurrencyPeak = 0
     private var finished = false
+    /// 链路事实（INV-37）：默认全未知，由调用方实测后 `setLinkFacts` 覆盖。
+    private var linkFacts = SyncDiagLinkFacts.unknown
+    /// 链路事实的**实时**来源（连接就绪后才有 path 事实）：取值时优先于静态值。
+    /// 只读观测，不参与任何判定。
+    private var linkFactsProvider: (@Sendable () -> SyncDiagLinkFacts)?
 
     /// - Parameters:
     ///   - attemptId: 由调用方传入便于串联；缺省随机生成。
@@ -255,6 +372,20 @@ final class SyncDiagAttempt: @unchecked Sendable {
         concurrencyPeak = max(0, value)
     }
 
+    /// 记录链路事实（幂等合并：非 -1 / 非 unknown 的字段覆盖旧值）。
+    func setLinkFacts(_ facts: SyncDiagLinkFacts) {
+        lock.lock()
+        linkFacts = facts.merged(over: linkFacts)
+        lock.unlock()
+    }
+
+    /// 挂接链路事实的实时来源（连接就绪后才有 `currentPath`）。
+    func setLinkFactsProvider(_ provider: @escaping @Sendable () -> SyncDiagLinkFacts) {
+        lock.lock()
+        linkFactsProvider = provider
+        lock.unlock()
+    }
+
     /// 是否已开始计时（调用方可据此区分「计划阶段就失败」与「传了一半失败」）。
     func hasBegun(_ stage: SyncDiagStage) -> Bool {
         lock.lock()
@@ -271,7 +402,12 @@ final class SyncDiagAttempt: @unchecked Sendable {
     /// 汇总（不落盘）：返回本次第一行汇总，重复调用返回 nil。
     /// 供「持锁路径」把落盘推迟到锁外（例：会话状态机把行当 effect 排队）。
     func finishLine() -> String? {
+        // 先取实时链路事实（锁外调用外部闭包，避免持锁回调）。
+        let liveFacts = linkFactsProvider?()
         lock.lock()
+        if let liveFacts {
+            linkFacts = liveFacts.merged(over: linkFacts)
+        }
         guard !finished else {
             lock.unlock()
             return nil
@@ -312,6 +448,8 @@ final class SyncDiagAttempt: @unchecked Sendable {
         fields.append("files=\(fileCount)")
         // 可选字段（追加在末尾，旧行形状不变；golden 测试不设值时逐字一致）
         if concurrencyPeak > 0 { fields.append("concMax=\(concurrencyPeak)") }
+        // INV-37：链路事实字段（固定顺序、恒定出现；取值取不到就是 -1 / unknown）。
+        fields.append(contentsOf: linkFacts.fields)
         return fields.joined(separator: " ")
     }
 

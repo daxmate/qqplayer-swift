@@ -59,6 +59,9 @@ final class SyncPeerSession: @unchecked Sendable {
     var closeReasonValue: SyncSessionCloseReason = .userCancelled
     var myEphemeralPrivateKey: Curve25519.KeyAgreement.PrivateKey?
     var peerHelloValue: SyncHello?
+
+    /// 链路事实（INV-37）：转发底层通道的实测值（取不到 = 全未知）。
+    var linkFacts: SyncDiagLinkFacts { transport?.linkFacts ?? .unknown }
     var pendingPairRequest: PairRequest?
     var expectedPeerID: String?
     var pairingCandidate: SyncPairingCandidate?

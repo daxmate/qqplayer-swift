@@ -61,6 +61,16 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
 
     private let connection: NWConnection
     private let queue: DispatchQueue
+
+    /// 链路事实（INV-37）：对端端点 + 当前 path 的实测值；
+    /// path 未就绪时只有 addr（或全 -1），绝不填猜测值。
+    var linkFacts: SyncDiagLinkFacts {
+        let path = connection.currentPath
+        return SyncDiagLinkFacts.from(
+            path: path,
+            remoteEndpoint: path?.remoteEndpoint ?? connection.endpoint
+        )
+    }
     /// 收帧循环进行中（防重入）
     private var receiving = false
     private var closed = false
@@ -260,6 +270,9 @@ final class SyncListener: @unchecked Sendable {
         let channel = NWPeerChannel(connection: connection, queue: queue)
         // 观测：一次入站连接尝试（纯观测；不参与判定/时序）。
         let diag = SyncDiagAttempt(kind: .conn, role: "host", channel: .inbound)
+        // 链路事实（INV-37）：拨号期先取端点事实，连接就绪后再由 channel 覆盖。
+        diag.setLinkFacts(SyncDiagLinkFacts.from(path: nil, remoteEndpoint: connection.endpoint))
+        diag.setLinkFactsProvider { [weak channel] in channel?.linkFacts ?? .unknown }
         diag.begin(.dial)
         let session = SyncPeerSession(
             role: .host,

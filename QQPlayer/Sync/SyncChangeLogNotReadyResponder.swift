@@ -25,9 +25,17 @@ final class SyncChangeLogNotReadyResponder: @unchecked Sendable {
     private var priorClosedHandler: (@Sendable (SyncSessionCloseReason) -> Void)?
     /// 已回过多少次 notReady（诊断 / 单测断言）。
     private var answeredPulls = 0
+    /// 本次 notReady 的原因（导入中 / 曲库整理）；默认「曲库整理」= 门控期最保守说法。
+    /// 非 Sendable：调用方（IOSPassiveSyncCenter，@MainActor）在装配时捕获索引状态源；
+    /// 本类虽然标 @unchecked Sendable，但应答只在会话线程同步调用一次，只读 Bool。
+    private let reasonProvider: () -> SyncChangeLogNotReadyReason
 
-    init(session: SyncPeerSession) {
+    init(
+        session: SyncPeerSession,
+        reasonProvider: @escaping () -> SyncChangeLogNotReadyReason = { .tidying }
+    ) {
         self.session = session
+        self.reasonProvider = reasonProvider
         attachHandlers()
     }
 
@@ -64,7 +72,14 @@ final class SyncChangeLogNotReadyResponder: @unchecked Sendable {
     private func answerNotReady(_ frame: SyncFrame) {
         let request = try? JSONDecoder().decode(SyncChangeLogPullRequest.self, from: frame.payload)
         let cursor = request?.cursor ?? 0
-        let payload = SyncChangeLogPushPayload(entries: [], lastOutboxID: cursor, notReady: true)
+        let reason = reasonProvider()
+        let payload = SyncChangeLogPushPayload(
+            entries: [],
+            lastOutboxID: cursor,
+            notReady: true,
+            notReadyReason: reason.rawValue,
+            requestID: request?.requestID
+        )
         do {
             let data = try JSONEncoder().encode(payload)
             try session.sendApplicationFrame(type: .changeLogPush, payload: data)

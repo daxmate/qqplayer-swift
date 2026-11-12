@@ -166,6 +166,10 @@ struct SyncPlaybackCarryPushState: Codable, FetchableRecord, PersistableRecord, 
 struct SyncChangeLogPullRequest: Codable, Equatable, Sendable {
     /// 请求方已消费到的**本端** outbox 最大 id（0 = 全量拉）。
     var cursor: Int64
+    /// 本次 pull 的请求标识（2026-11-12 T1，加性可选字段）：应答原样回带，
+    /// **只用于诊断与去重**——绝不用「id 不匹配」拒收应答（迟到 / 跨代际应答
+    /// 必须被幂等接受，见 INV-36）。旧端解新载荷忽略本键，新端解旧载荷得 nil。
+    var requestID: String?
 }
 
 /// changeLogPush 载荷：一批 outbox 行 + 该批末尾 id（供对端推进游标）。
@@ -180,6 +184,27 @@ struct SyncChangeLogPushPayload: Codable, Equatable, Sendable {
     /// 空批：entries 必为空、lastOutboxID = 请求里的 cursor（**不推进游标**）。
     /// 缺省 nil = 旧端行为（旧载荷解码为 nil；旧端解码本字段会忽略未知键）。
     var notReady: Bool?
+    /// notReady 的原因（"importing" = 正在导入曲库 / "tidying" = 曲库整理中）。
+    /// 加性可选：旧端忽略；新端解旧载荷得 nil → 面板回落到笼统「未就绪」文案。
+    var notReadyReason: String?
+    /// 应答回带的 pull 请求标识（与 `SyncChangeLogPullRequest.requestID` 同值）。
+    /// **只用于诊断与去重**：不匹配 = 迟到 / 重发应答，照常幂等应用。
+    var requestID: String?
+}
+
+/// notReady 的原因码（2026-11-12 T1）：对端要能说清「为什么现在不能同步」，
+/// 面板据此显示「对端正在导入曲库」/「对端正在整理曲库」，而不是笼统的未就绪。
+enum SyncChangeLogNotReadyReason: String, Codable, Equatable, Sendable {
+    /// 正在导入 / 扫描曲库（ID3 扫描、AVURLAsset、建歌手等）。
+    case importing
+    /// 曲库整理中（索引未到终态 / 正在整理上一批数据）。
+    case tidying
+
+    /// 解析线上值；未知值（未来新原因）按 nil 处理（面板回落笼统文案）。
+    static func parse(_ raw: String?) -> SyncChangeLogNotReadyReason? {
+        guard let raw else { return nil }
+        return SyncChangeLogNotReadyReason(rawValue: raw)
+    }
 }
 
 /// 线上 outbox 行（changeLogPush 的 entry）。

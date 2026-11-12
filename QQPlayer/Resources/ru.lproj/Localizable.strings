@@ -972,6 +972,8 @@
 "sync_run_data_phase_pushing" = "Отправка ваших изменений…";
 "sync_run_data_phase_pulling" = "Получение изменений…";
 "sync_data_pull_peer_preparing" = "iPhone упорядочивает медиатеку…";
+"sync_data_pull_peer_preparing_countdown" = "Устройство упорядочивает медиатеку — автоматический повтор через %d с";
+"sync_data_pull_peer_importing_countdown" = "Устройство импортирует медиатеку — автоматический повтор через %d с";
 "sync_data_pull_retrying_no_answer" = "Ответа пока нет — повторная попытка…";
 "sync_data_pull_no_answer_timeout" = "Устройство не ответило после нескольких попыток: возможно, оно ещё упорядочивает медиатеку или обрабатывает предыдущую партию. Повторите позже.";
 "sync_data_pull_not_ready_timeout" = "iPhone всё ещё упорядочивает медиатеку (индексация не завершена). Повторите позже.";

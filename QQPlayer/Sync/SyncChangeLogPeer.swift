@@ -109,7 +109,11 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     var onPushFutureTimestamp: (@Sendable ([SyncEntityOutcomeCount]) -> Void)?
     /// 对端回 notReady（曲库索引未到终态 / 正在整理上一批数据）：本批**不应用**，
     /// 由调用方退避重试（锁外触发）。旧端不会发这个字段，因此不会触发。
-    var onPushNotReady: (@Sendable () -> Void)?
+    /// 参数 = 对端回带的原因（nil = 旧端未带 / 未知原因）。
+    var onPushNotReady: (@Sendable (SyncChangeLogNotReadyReason?) -> Void)?
+    /// 重复批（INV-36）：该批的 `lastOutboxID` 已在本端游标之内 → 已应用过，
+    /// **不重复应用**，只计数上报（迟到 / 重发应答照常算「已应答」）。
+    var onPushDuplicate: (@Sendable (Int) -> Void)?
     /// 解码失败（载荷非法；锁外触发）。
     var onDecodeFailure: (@Sendable (DecodeError) -> Void)?
     /// 主动推送增量完成（已推条目数；锁外触发；0 条不触发）。
@@ -162,9 +166,9 @@ final class SyncChangeLogPeer: @unchecked Sendable {
     /// 主动发起增量拉取（v1 供测试/未来调度调用）：向对端发 change_log_pull，
     /// 携带本端记录的对端 outbox 游标。应答经 change_log_push 帧回来，由
     /// handleInboundFrame 处理。
-    func sendPull() throws {
+    func sendPull(requestID: String? = nil) throws {
         let cursor = try store.cursor(forPeer: peerID)
-        let request = SyncChangeLogPullRequest(cursor: cursor)
+        let request = SyncChangeLogPullRequest(cursor: cursor, requestID: requestID)
         let payload = try JSONEncoder().encode(request)
         try session.sendApplicationFrame(type: .changeLogPull, payload: payload)
     }
@@ -275,7 +279,11 @@ final class SyncChangeLogPeer: @unchecked Sendable {
             let batch = try mapper.wireEntriesDetailed(transmittable)
             // 游标 = **本批实际末行 id**（含被本批过滤的 delete 行）：被过滤的行永不重发、
             // 允许被越过；批外的行（任何 upsert）一律不被越过（下一轮继续发）。
-            let response = SyncChangeLogPushPayload(entries: batch.entries, lastOutboxID: page.lastOutboxID)
+            let response = SyncChangeLogPushPayload(
+                entries: batch.entries,
+                lastOutboxID: page.lastOutboxID,
+                requestID: request.requestID
+            )
             try session.sendApplicationFrame(type: .changeLogPush, payload: JSONEncoder().encode(response))
             // 计数语义保持不变 = "本端 outbox 增量行数"（含被过滤的 delete），与 wire 条目数无关。
             onPullHandled?(request, entries.count)
@@ -299,12 +307,29 @@ final class SyncChangeLogPeer: @unchecked Sendable {
         // notReady 应答：显式「我还没准备好」，不是数据批——不应用、不推进游标，
         // 交给调用方退避重试（否则发起端只能等满应答窗口，浪费 20s 还不知道原因）。
         if payload.notReady == true {
+            let reason = SyncChangeLogNotReadyReason.parse(payload.notReadyReason)
             AppLog.info(
                 .sync,
                 "ℹ️ SyncChangeLogPeer: 对端回 notReady（entries=\(payload.entries.count)，"
-                    + "cursor=\(payload.lastOutboxID)）→ 本批不应用，等待退避重试"
+                    + "cursor=\(payload.lastOutboxID)，reason=\(reason?.rawValue ?? "-")）"
+                    + "→ 本批不应用，等待退避重试"
             )
-            onPushNotReady?()
+            onPushNotReady?(reason)
+            return
+        }
+        // INV-36：重复批识别（已应用过的不重复应用，但要记账、且算「已应答」）。
+        // 判定只看持久化游标（本批末行 id 已在游标之内 = 内容早已消费）；
+        // ⚠️ 绝不用 requestID 不匹配拒收——迟到 / 跨代际应答必须被幂等接受。
+        if !payload.entries.isEmpty,
+           payload.lastOutboxID > 0,
+           let cursor = try? store.cursor(forPeer: peerID),
+           payload.lastOutboxID <= cursor {
+            AppLog.info(
+                .sync,
+                "ℹ️ SyncChangeLogPeer: 重复批（entries=\(payload.entries.count)，"
+                    + "last=\(payload.lastOutboxID) ≤ 本端游标 \(cursor)）→ 不重复应用"
+            )
+            onPushDuplicate?(payload.entries.count)
             return
         }
         do {

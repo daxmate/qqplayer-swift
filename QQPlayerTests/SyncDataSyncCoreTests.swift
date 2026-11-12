@@ -1103,18 +1103,19 @@ struct SyncDataSyncCoreTests {
         )
     }
 
-    @Test("重试策略：无应答 3 次（2s / 5s）、notReady 4 次（2s / 5s / 10s），总窗口封顶")
+    @Test("重试策略：无应答 3 次（2s / 5s）、notReady 3 轮 × 5s，总窗口封顶")
     func pullRetryPolicyPureLogic() {
         let policy = SyncPullRetryPolicy.standard
         #expect(policy.noAnswerRetryDelay(afterAttempt: 1) == 2)
         #expect(policy.noAnswerRetryDelay(afterAttempt: 2) == 5)
         #expect(policy.noAnswerRetryDelay(afterAttempt: 3) == nil)
-        #expect(policy.notReadyRetryDelay(afterAttempt: 1, elapsed: 0) == 2)
-        #expect(policy.notReadyRetryDelay(afterAttempt: 2, elapsed: 3) == 5)
-        #expect(policy.notReadyRetryDelay(afterAttempt: 3, elapsed: 8) == 10)
-        #expect(policy.notReadyRetryDelay(afterAttempt: 4, elapsed: 18) == nil)
+        // T1（2026-11-12）：notReady = 首次 + 3 轮自动重试，每轮 5s（任务包 C）。
+        #expect(policy.notReadyRetryDelay(afterAttempt: 1, elapsed: 0) == 5)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 2, elapsed: 5) == 5)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 3, elapsed: 10) == 5)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 4, elapsed: 15) == nil)
         // 总窗口：剩余时间不够下一次退避 → 不再重试
-        #expect(policy.notReadyRetryDelay(afterAttempt: 3, elapsed: 55) == nil)
+        #expect(policy.notReadyRetryDelay(afterAttempt: 3, elapsed: 58) == nil)
         // 默认值必须与任务书一致（改这里 = 改线上行为，需说明）
         #expect(policy.maxAttempts == 3)
         #expect(policy.notReadyMaxAttempts == 4)

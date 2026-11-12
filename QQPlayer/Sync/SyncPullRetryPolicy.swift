@@ -20,17 +20,19 @@ struct SyncPullRetryPolicy: Equatable, Sendable {
     var noAnswerDelays: [TimeInterval]
     /// 「对端未就绪（notReady）」的总尝试次数（含首次）。
     var notReadyMaxAttempts: Int
-    /// 「对端未就绪」的退避间隔（默认 2s / 5s / 10s）。
+    /// 「对端未就绪」的退避间隔（默认 5s / 5s / 5s = 3 轮 × 5s）。
     var notReadyDelays: [TimeInterval]
     /// 「对端未就绪」的总窗口上限（秒，从首次发 pull 起算，超了不再等）。
     var notReadyWindow: TimeInterval
 
-    /// 生产默认：无应答 3 次（间隔 2s / 5s）；notReady 最多 4 次，退避 2s / 5s / 10s，窗口 60s。
+    /// 生产默认：无应答 3 次（间隔 2s / 5s）；notReady **3 轮 × 5s**
+    /// （2026-11-12 T1 任务包 C：总尝试 = 首次 + 3 轮自动重试，3 轮后显式失败并给手动入口），
+    /// 总窗口 60s（重试节奏 5s × 3 远小于窗口，窗口只作兜底）。
     static let standard = SyncPullRetryPolicy(
         maxAttempts: 3,
         noAnswerDelays: [2, 5],
         notReadyMaxAttempts: 4,
-        notReadyDelays: [2, 5, 10],
+        notReadyDelays: [5, 5, 5],
         notReadyWindow: 60
     )
 
@@ -57,6 +59,10 @@ struct SyncPullRetryPolicy: Equatable, Sendable {
 enum SyncDataSyncMessageKey {
     /// 等待对端整理曲库（notReady 退避中）
     static let peerPreparing = "sync_data_pull_peer_preparing"
+    /// 等待对端整理曲库 + 倒计时（%d = 秒；T1：3 轮 × 5s 显式倒计时）
+    static let peerPreparingCountdown = "sync_data_pull_peer_preparing_countdown"
+    /// 等待对端导入曲库 + 倒计时（%d = 秒；notReady reason=importing）
+    static let peerImportingCountdown = "sync_data_pull_peer_importing_countdown"
     /// 对端无应答，同轮内重发中
     static let retryingNoAnswer = "sync_data_pull_retrying_no_answer"
     /// 多次无应答后失败

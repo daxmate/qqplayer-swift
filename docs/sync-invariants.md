@@ -415,6 +415,38 @@
   需要再评估「游标抬升 vs 对端漏拉」的取捨（当下 iOS 纯被动、从不 pull）。
   ⚠️ 仍**不能单独承担「防旧冲新」**（那靠 LWW + INV-34 的容差门）。
 
+### INV-36　迟到 / 跨代际的 pull 应答必须被幂等接受，不得因代际翻转静默丢弃
+
+- **现有守护：✅ 已收（2026-11-12，T1）**
+  - **接受与重发解耦**（唯一实现点 `SyncDataSyncCoordinator`）：
+    - 窗口（`pullWindowStartedAt` / `scheduleTimeout`）只决定**要不要重发**；
+    - 应答到达即应用 + 记账：`recordApplied` / `recordAnswered` **不看** `stage` / `retryGeneration`；
+    - `pullLate`（收尾后才到）、`pullRecv`（窗口内到）分别计数，`report.failureMessage` 不被迟到帧覆盖。
+  - **去重**：`SyncChangeLogPeer.handlePush` 以持久化游标判定重复批
+    （`lastOutboxID <= cursor` = 已消费）→ **不重复应用**、回调 `onPushDuplicate` 记账，
+    但**仍算「对端已应答」**（`pullDuplicates`）。
+  - **requestID 只用于诊断 / 去重**：`change_log_pull` 带 `requestID`、应答原样回带；
+    **绝不用 id 不匹配拒收**（否则迟到应答又被丢掉——正是本不变量要防的事）。
+  - 上限不变：无应答 3 次（2s / 5s，最坏 ~45s）后才算协议失败；notReady 3 轮 × 5s。
+- **用例**：`SyncProtocolHardeningTests.inv36LateAnswerIsAccepted`（收尾后到达 → `pullLate=1` + 落库）、
+  `inv36CrossGenerationAnswerIsAccepted`（第 2 次尝试到达 → 成功）、
+  `inv36DuplicateBatchIsNotAppliedTwice`（同批两次 → `pullDuplicates=1` 且只应用一次）。
+- **反向验证**：给 `notePullAnswerLocked` 注入「收尾后丢弃」→ 上述两用例必须红 → 精确还原 → 复跑绿。
+
+### INV-37　链路事实必须落盘（addr / if / link 缺失即缺陷）
+
+- **现有守护：✅ 已收（2026-11-12，T1）**
+  - `SYNCDIAG` 三类行（`kind=conn|frame|run`）末尾追加固定 8 字段（顺序固定）：
+    `addr` / `if` / `link` / `importing` / `pullSent` / `pullRecv` / `pullLate` / `probeMBps`；
+    既有字段一个不删（向后兼容既有解析）。
+  - 取值口径：**取不到写 `-1` / `unknown`，不许编造**；`probeMBps` 未测 = `-1`（probe 属 T2）。
+  - 来源：`SyncDiagLinkFacts`（唯一构造点）← `NWPeerChannel.linkFacts`（`currentPath` +
+    `remoteEndpoint`）← `SyncPeerSession.linkFacts`；内存回环 / 测试通道默认全未知。
+  - `kind=frame` 行在 `SyncDataSyncCoordinator` 每轮收尾落一行（pull 往返 + 链路事实）。
+- **用例**：`SyncProtocolHardeningTests.inv37LinkFactsOnAllKinds`（三类行 8 字段齐全 + `-1` 缺省）、
+  `inv37LinkFactsMergeAndOrder`（顺序固定、实测覆盖缺省）、`inv37EndpointAddressParsing`（具名服务 = `-1`）。
+- **反向验证**：删掉 `fields.append(contentsOf: linkFacts.fields)` → 三类行用例必须红 → 精确还原 → 复跑绿。
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：
