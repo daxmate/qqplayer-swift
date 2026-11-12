@@ -1,297 +1,84 @@
+//
+//  SettingsView.swift
+//  QQPlayer
+//
+//  iOS 设置首页（齿轮 → sheet）。
+//  2026-11-12 设置页分类化（用户拍板 A 方案）：原「一个 Form 平铺约 10 个 Section」
+//  改为分类入口列表，每类进独立子页（两下即达）；外层 NavigationView / sheet 形态、
+//  齿轮入口（LibraryView）、Done 按钮与底部安全区留白均不变。
+//  各分类页内容见 Views/Utility/Settings/。
+//
+
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.dismiss) private var dismiss
-    @State private var deleteSettings = DeleteSettings.load()
-    /// 歌词延迟校准（按输出路由存；车里最常用）
-    /// 2026-09-19 批 2：由组合根（`QQPlayerApp`）环境注入，不再直连 `.shared`。
-    @Environment(LyricOffsetStore.self) private var lyricOffsetStore
 
     var body: some View {
         NavigationView {
-            Form {
-                // 功能与手势：帮助中心入口（置顶）
+            List {
+                Section {
+                    NavigationLink(destination: SettingsAppearanceView()) {
+                        SettingsCategoryRow(
+                            title: Localized.appearance,
+                            systemImage: "paintbrush.fill",
+                            tint: .blue
+                        )
+                    }
+
+                    NavigationLink(destination: SettingsAudioView()) {
+                        SettingsCategoryRow(
+                            title: Localized.audioSettings,
+                            systemImage: "waveform",
+                            tint: .purple
+                        )
+                    }
+
+                    NavigationLink(destination: SettingsLyricsView()) {
+                        SettingsCategoryRow(
+                            title: Localized.lyricsDisplay,
+                            systemImage: "text.quote",
+                            tint: .indigo
+                        )
+                    }
+
+                    NavigationLink(destination: SettingsLibraryView()) {
+                        SettingsCategoryRow(
+                            title: Localized.librarySection,
+                            systemImage: "books.vertical.fill",
+                            tint: .orange
+                        )
+                    }
+
+                    // S2 M1-UI：局域网同步设置（Client 侧：主机列表/扫码/手输配对）
+                    NavigationLink(destination: SyncSettingsView()) {
+                        SettingsCategoryRow(
+                            title: "sync_settings".localized,
+                            systemImage: "arrow.triangle.2.circlepath",
+                            tint: .green
+                        )
+                    }
+                }
+
                 Section {
                     NavigationLink(destination: FeatureGuideView()) {
-                        HStack {
-                            Image(systemName: "questionmark.circle.fill")
-                                .foregroundColor(.blue)
-                            Text(Localized.featureGuide)
-                        }
-                    }
-                }
-
-                Section(Localized.appearance) {
-                    Toggle(Localized.minimalistLibraryIcons, isOn: $deleteSettings.minimalistIcons)
-                        .onChange(of: deleteSettings.minimalistIcons) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                    Text(Localized.useSimpleIcons)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Toggle(Localized.forceDarkMode, isOn: $deleteSettings.forceDarkMode)
-                        .onChange(of: deleteSettings.forceDarkMode) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                    Text(Localized.overrideSystemAppearance)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    VStack(alignment: .leading, spacing: DesignTokens.space12) {
-                        // 标题用「强调色」（2026-09-17）：与 macOS 设置页同一语义、同写
-                        // 唯一字段 accentColorName，两端不该两个措辞。
-                        Text(Localized.accentColor)
-                            .font(.headline)
-
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                        ], spacing: DesignTokens.space16) {
-                            ForEach(IOSAppearance.accentPresets, id: \.key) { preset in
-                                Button(action: {
-                                    // 唯一配色字段（2026-09-17 字段层收口）：写 token。
-                                    // save() 本身已发 .qqplayerSettingsDidChange（设置变更唯一信号）——
-                                    // 不再补发第二个「配色变更」事件（.backgroundColorChanged 已退役）。
-                                    deleteSettings.accentColorName = preset.key
-                                    deleteSettings.save()
-                                }) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(IOSAppearance.accentColor(forKey: preset.key))
-                                            .frame(width: 44, height: 44)
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(deleteSettings.accentColorName == preset.key ? Color.primary : Color.clear, lineWidth: 3)
-                                            )
-
-                                        if deleteSettings.accentColorName == preset.key {
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: DesignTokens.font16, weight: .bold))
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                    }
-
-                    Text(Localized.chooseColorTheme)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Section(Localized.audioSettings) {
-                    NavigationLink(destination: EQSettingsView()) {
-                        HStack {
-                            Image(systemName: "slider.horizontal.3")
-                                .foregroundColor(.blue)
-                                .font(.system(size: DesignTokens.font20))
-                            Text(Localized.graphicEqualizer)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
-                        Text(Localized.dsdPlaybackMode)
-                            .font(.headline)
-
-                        Text(Localized.dsdPlaybackModeDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Picker("", selection: $deleteSettings.dsdPlaybackMode) {
-                            ForEach(DSDPlaybackMode.allCases, id: \.self) { mode in
-                                VStack(alignment: .leading) {
-                                    Text(mode.displayName)
-                                        .font(.body)
-                                }
-                                .tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .onChange(of: deleteSettings.dsdPlaybackMode) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                        Text(deleteSettings.dsdPlaybackMode.description)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, DesignTokens.space4)
-                    }
-                    .padding(.vertical, DesignTokens.space4)
-                }
-
-                Section(Localized.lyricsDisplay) {
-                    Toggle(Localized.lyricsShowRoman, isOn: $deleteSettings.lyricShowRoman)
-                        .onChange(of: deleteSettings.lyricShowRoman) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                    // 歌词延迟校准：无线 CarPlay / 蓝牙下「听到的」比「看到的」晚，
-                    // 这里把偏移补回去（正值 = 歌词延后显示）。不手动校准时用系统报的输出延迟当初值。
-                    VStack(alignment: .leading, spacing: DesignTokens.space8) {
-                        HStack {
-                            Text(Localized.lyricsOffset)
-                            Spacer()
-                            Text(String(format: "%+.2f s", lyricOffsetStore.effectiveOffset))
-                                .foregroundColor(.secondary)
-                                .monospacedDigit()
-                        }
-
-                        Slider(
-                            value: Binding(
-                                get: { lyricOffsetStore.manualOffset ?? lyricOffsetStore.effectiveOffset },
-                                set: { lyricOffsetStore.setManualOffset($0) }
-                            ),
-                            in: -1.0 ... 1.0,
-                            step: 0.05
+                        SettingsCategoryRow(
+                            title: Localized.featureGuide,
+                            systemImage: "hand.point.up.left.fill",
+                            tint: .teal
                         )
-
-                        HStack {
-                            Text(lyricOffsetRouteDescription)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Button(Localized.lyricsOffsetReset) {
-                                lyricOffsetStore.clearManualOffset()
-                            }
-                            .buttonStyle(.borderless)
-                            .disabled(lyricOffsetStore.manualOffset == nil)
-                        }
-
-                        Text(Localized.lyricsOffsetHint)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Section(Localized.librarySection) {
-                    Toggle(Localized.removeFromLibraryOnly, isOn: $deleteSettings.deleteFromLibraryOnly)
-                        .onChange(of: deleteSettings.deleteFromLibraryOnly) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                    Text(Localized.removeFromLibraryOnlyDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                // 回收区（2026-09-29 回收区管理批）：查看 / 恢复 / 彻底删除
-                // （生产回收区 `<曲库根>/.Trash`；业务逻辑全在 Services，本页只做入口）。
-                Section {
-                    NavigationLink(destination: ReclaimAreaView()) {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(.blue)
-                                .font(.system(size: DesignTokens.font20))
-                            Text("reclaim_area".localized)
-                        }
-                    }
-                } footer: {
-                    Text("reclaim_area_description".localized)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Section(Localized.playerControls) {
-                    Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
-                        .onChange(of: deleteSettings.showSleepTimerButton) { _, _ in
-                            deleteSettings.save()
-                        }
-
-                    Text(Localized.showSleepTimerButtonDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                // S2 M1-UI：局域网同步设置（Client 侧：主机列表/扫码/手输配对）
-                Section {
-                    NavigationLink(destination: SyncSettingsView()) {
-                        HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .foregroundColor(.blue)
-                                .font(.system(size: DesignTokens.font20))
-                            Text("sync_settings_entry".localized)
-                        }
-                    }
-                } header: {
-                    Text("sync_settings".localized)
-                } footer: {
-                    Text("sync_settings_footer".localized)
-                }
-
-                Section {
-                    ForEach($deleteSettings.homeSections) { $section in
-                        HStack {
-                            Image(systemName: section.id.icon)
-                                .foregroundColor(.secondary)
-                                .frame(width: 24)
-
-                            Toggle(section.id.displayName, isOn: $section.isVisible)
-                                .onChange(of: section.isVisible) { _, _ in
-                                    deleteSettings.save()
-                                }
-                        }
-                    }
-                    .onMove { source, destination in
-                        deleteSettings.homeSections.move(fromOffsets: source, toOffset: destination)
-                        deleteSettings.save()
                     }
 
-                    Text(Localized.chooseVisibleSections)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } header: {
-                    HStack {
-                        Text(Localized.homeSections)
-                        Spacer()
-                        EditButton()
-                            .font(.caption)
+                    NavigationLink(destination: SettingsAboutView()) {
+                        SettingsCategoryRow(
+                            title: Localized.information,
+                            systemImage: "info.circle.fill",
+                            tint: .gray
+                        )
                     }
-                }
-
-                Section(Localized.information) {
-                    HStack {
-                        Text(Localized.version)
-                        Spacer()
-                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text(Localized.appName)
-                        Spacer()
-                        Text(Localized.qqplayerName)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Button(action: {
-                        if let url = URL(string: "https://github.com/daxmate/qqplayer-ios") {
-                            AppLog.info(.ui, "🔗 Opening URL: \(url)")
-                            UIApplication.shared.open(url)
-                        } else {
-                            AppLog.error(.ui, "❌ Invalid GitHub URL")
-                        }
-                    }) {
-                        HStack {
-                            Text(Localized.githubRepository)
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.system(size: DesignTokens.font16))
-                        }
-                        .contentShape(Rectangle()) // Make entire area tappable
-                    }
-                    .buttonStyle(PlainButtonStyle()) // Remove default button styling that might interfere
                 }
             }
+            .listStyle(.insetGrouped)
             .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 100)
             }
@@ -306,19 +93,31 @@ struct SettingsView: View {
             }
         }
     }
+}
 
-    /// 设置页里「当前输出 + 偏移初值从哪来」的说明（端口名用系统给的，别再自造一份翻译）
-    private var lyricOffsetRouteDescription: String {
-        let name = lyricOffsetStore.routeName ?? lyricOffsetStore.route.rawValue
-        if lyricOffsetStore.manualOffset != nil {
-            return name
+/// 设置分类入口行：圆角方形图标底（半透明色）+ SF Symbol + 主标题。
+/// 跳转箭头由 List 里的 NavigationLink 自带（视觉对齐 iOS 系统设置）。
+private struct SettingsCategoryRow: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: DesignTokens.space12) {
+            Image(systemName: systemImage)
+                .font(.system(size: DesignTokens.font15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignTokens.radius6, style: .continuous)
+                        .fill(tint.opacity(0.16))
+                )
+
+            Text(title)
         }
-        return "\(name) · +\(String(format: "%.2f", lyricOffsetStore.autoOffset)) s"
     }
 }
 
 #Preview {
     SettingsView()
-        // Preview 是组合根之外的第二个合法装配点 → 显式装配（计预算，见预算账本）。
-        .environment(LyricOffsetStore.shared)
 }

@@ -51,7 +51,7 @@ private enum ReclaimShapeContract {
     static let platformWiring: [(platform: String, entry: String, marker: String, view: String)] = [
         (
             "iOS",
-            "QQPlayer/Views/Utility/SettingsView.swift",
+            "QQPlayer/Views/Utility/Settings/SettingsLibraryView.swift",
             "ReclaimAreaView()",
             "QQPlayer/Views/Library/ReclaimAreaView.swift"
         ),

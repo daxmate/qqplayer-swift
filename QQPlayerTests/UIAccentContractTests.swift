@@ -70,12 +70,12 @@ enum UIAccentContract {
         pattern: #"accentColorName"#,
         whitelist: [
             WhitelistEntry(
-                fileSuffix: "QQPlayer/Views/Utility/SettingsView.swift",
+                fileSuffix: "QQPlayer/Views/Utility/Settings/SettingsAppearanceView.swift",
                 lineSnippet: "deleteSettings.accentColorName == preset.key",
                 reason: "设置页配色选择器：读当前 token 做选中态（设置页本身要读写这个字段）"
             ),
             WhitelistEntry(
-                fileSuffix: "QQPlayer/Views/Utility/SettingsView.swift",
+                fileSuffix: "QQPlayer/Views/Utility/Settings/SettingsAppearanceView.swift",
                 lineSnippet: "deleteSettings.accentColorName = preset.key",
                 reason: "设置页配色选择器：写新 token（iOS 侧唯一写点）"
             ),
@@ -525,7 +525,7 @@ struct UIAccentContractTests {
         // 同一份合成源码换成 Views 路径 + iOS 规则：设置页读那行应走 iOS 规则白名单
         let iosReport = UIAccentContract.scan(
             source: source,
-            filePath: "QQPlayer/Views/Utility/SettingsView.swift",
+            filePath: "QQPlayer/Views/Utility/Settings/SettingsAppearanceView.swift",
             rules: [UIAccentContract.iosDirectReadRule]
         )
         #expect(iosReport.violations.isEmpty, "iOS 规则扫 Views 范围时应放行设置页读写：\(iosReport.violations)")
@@ -620,7 +620,7 @@ struct UIAccentContractTests {
         // 写点：iOS 设置页 / macOS 设置页各一处，写的都是同一个字段名（`[^=]` 排除 `==` 比较）
         let writes = Self.linesContaining(#"(?:deleteSettings|settings)\.accentColorName\s*=[^=]"#, in: files)
         #expect(writes.count == 2, "配色写点应只有两处（iOS / macOS 设置页）：\n\(writes.joined(separator: "\n"))")
-        #expect(writes.contains { $0.hasPrefix("QQPlayer/Views/Utility/SettingsView.swift") }, "iOS 设置页应写 accentColorName：\(writes)")
+        #expect(writes.contains { $0.hasPrefix("QQPlayer/Views/Utility/Settings/SettingsAppearanceView.swift") }, "iOS 设置页应写 accentColorName：\(writes)")
         #expect(writes.contains { $0.hasPrefix("QQPlayer/Mac/MacSettingsView.swift") }, "macOS 设置页应写 accentColorName：\(writes)")
     }
 

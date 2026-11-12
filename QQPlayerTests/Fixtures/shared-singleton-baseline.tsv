@@ -203,7 +203,7 @@
 #   源码里消失了 ⇒ 红（防白名单变成僵尸豁免）；条目与下面的文件行数值包含关系也必须自洽（(f)）。
 #+	UIApplication	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
 #+	UIApplication	QQPlayer/Views/Utility/EQSettingsView.swift	1
-#+	UIApplication	QQPlayer/Views/Utility/SettingsView.swift	1
+#+	UIApplication	QQPlayer/Views/Utility/Settings/SettingsAboutView.swift	1
 #+	UIApplication	QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 #+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistCardView.swift	1
 #+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistDetailScreen+CustomCover.swift	2
@@ -238,7 +238,7 @@
 #     `QQPlayer/Views/Utility/SyncSettingsView.swift:473` `SyncWiringFactsStore.shared`
 #     `QQPlayer/Views/Player/LyricsView.swift:757` `KaraokeController.shared`
 #~	AppCoordinator	QQPlayer/ContentView.swift	1
-#~	LyricOffsetStore	QQPlayer/Views/Utility/SettingsView.swift	1
+#~	LyricOffsetStore	QQPlayer/Views/Utility/Settings/SettingsLyricsView.swift	1
 #~	IOSPassiveSyncCenter	QQPlayer/Views/Utility/SyncSettingsView.swift	1
 #~	PlaylistCoverLoadFailuresStore	QQPlayer/Views/Utility/SyncSettingsView.swift	1
 #~	SyncWiringFactsStore	QQPlayer/Views/Utility/SyncSettingsView.swift	1
@@ -246,6 +246,9 @@
 # PREVIEW TOTAL: 6
 
 
+# 2026-11-12 设置页分类化（A 方案）：SettingsView 拆成分类子页 —— UIApplication.shared 随
+#   「关于」迁到 Settings/SettingsAboutView.swift、#Preview 的 LyricOffsetStore.shared 随
+#   「歌词显示」迁到 Settings/SettingsLyricsView.swift；两处都是原有站点搬家，计数不变（TOTAL 21）。
 
 QQPlayer/ContentView.swift	1
 QQPlayer/Mac/MacDesktopWindowsManager.swift	3
@@ -257,7 +260,8 @@ QQPlayer/Views/Player/LyricsView.swift	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1
 QQPlayer/Views/Playlists/PlaylistDetailScreen+CustomCover.swift	2
 QQPlayer/Views/Utility/EQSettingsView.swift	1
-QQPlayer/Views/Utility/SettingsView.swift	2
+QQPlayer/Views/Utility/Settings/SettingsAboutView.swift	1
+QQPlayer/Views/Utility/Settings/SettingsLyricsView.swift	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
