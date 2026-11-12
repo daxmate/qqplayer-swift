@@ -2,6 +2,14 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.6] - 2026-11-12
+
+### 🐛 修复
+
+- 修复推荐页在下歌或刮削元数据后推荐缓存整体失效、列表清空重来的问题：曲库变化时先用同一次请求的旧结果垫底，再在后台重新生成并平滑替换；手动刷新仍强制重算。
+
+[1.1.6]: https://github.com/daxmate/qqplayer-swift/compare/v1.1.5...v1.1.6
+
 ## [1.1.5] - 2026-11-11
 
 ### 🚀 性能
