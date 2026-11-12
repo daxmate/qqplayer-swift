@@ -40,7 +40,7 @@ jobs:
     #   + 金丝雀（工具链出现 AppIntentsTesting 即失败，提醒接回 scheme/CI）。
     #   测试文件本身**不允许删除或静默降级**。
     timeout-minutes: 90
-    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -212,7 +212,7 @@ jobs:
   # 协议桩）⇒ 不拉依赖、不起模拟器，冷跑约 45s（实测：闭包解析 9 轮 + 编译 66 文件 + 500 断言）。
   local-harness:
     name: Local sync harness (swiftc, no simulator)
-    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -231,7 +231,7 @@ jobs:
     # ② sidebar 与交通灯重叠 ③ 扫描从不执行（isIndexing 未置 true）→ 库永远为空。
     # 其中图标类问题可用产物断言抓住：AppIcon.icns / Assets.car 必须在 app 里。
     # 编译级验证无法覆盖布局/行为，macOS 单测 target 后续补齐。
-    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
+    runs-on: macos-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
