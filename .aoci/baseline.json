@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-12T00:58:08Z",
+  "updated_at": "2026-11-12T01:09:25Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -2186,9 +2186,9 @@
     },
     "QQPlayer/Services/RecommendationEngine.swift": {
       "role": "index",
-      "sha256": "5d40c13bc3dfbb6c51d27b8cdd32893f81a2ad269d95ac65ae9aba2434377c93",
-      "size": 24022,
-      "normalized_sha256": "5d40c13bc3dfbb6c51d27b8cdd32893f81a2ad269d95ac65ae9aba2434377c93"
+      "sha256": "abe9c0fa7f54d82c2297fc35f433ebff6db75296dd06d38d18a349bffc9b88e0",
+      "size": 24239,
+      "normalized_sha256": "abe9c0fa7f54d82c2297fc35f433ebff6db75296dd06d38d18a349bffc9b88e0"
     },
     "QQPlayer/Services/RecommendationModelManager.swift": {
       "role": "index",
@@ -2210,15 +2210,15 @@
     },
     "QQPlayer/Services/RecommendationRequest.swift": {
       "role": "index",
-      "sha256": "33c69cb4733b130f8a5a8e40e9edb6d20a0c9bb5d5586589be554ee87fb9f521",
-      "size": 17018,
-      "normalized_sha256": "33c69cb4733b130f8a5a8e40e9edb6d20a0c9bb5d5586589be554ee87fb9f521"
+      "sha256": "30640a87e00d8c1c5a71da9b0bdbfb23b2ee0d835f014b9cc736f17252b4d625",
+      "size": 17237,
+      "normalized_sha256": "30640a87e00d8c1c5a71da9b0bdbfb23b2ee0d835f014b9cc736f17252b4d625"
     },
     "QQPlayer/Services/RecommendationResultCache.swift": {
       "role": "index",
-      "sha256": "2f7a631427d5ff1cf5cd8abed7046b04a9c368c941655f70ccb0f6f9b1e9e020",
-      "size": 12313,
-      "normalized_sha256": "2f7a631427d5ff1cf5cd8abed7046b04a9c368c941655f70ccb0f6f9b1e9e020"
+      "sha256": "a9d355141ada45b7a4583e2fd06ac151e342ffccaa9d50dbb77ad38ba42c0a6f",
+      "size": 12561,
+      "normalized_sha256": "a9d355141ada45b7a4583e2fd06ac151e342ffccaa9d50dbb77ad38ba42c0a6f"
     },
     "QQPlayer/Services/RecommendationStore.swift": {
       "role": "index",
@@ -2228,9 +2228,9 @@
     },
     "QQPlayer/Services/RecommendationTypes.swift": {
       "role": "index",
-      "sha256": "1ddd2eb7f9c03f8e6d2a26970fc6ac3dc58779bf9c478961e0de9d9966816079",
-      "size": 17456,
-      "normalized_sha256": "1ddd2eb7f9c03f8e6d2a26970fc6ac3dc58779bf9c478961e0de9d9966816079"
+      "sha256": "dbcfd47a168e2ed262664c1fa4f403c2e05b2cc1425e4f9cbafd42e6d57b1e27",
+      "size": 22499,
+      "normalized_sha256": "dbcfd47a168e2ed262664c1fa4f403c2e05b2cc1425e4f9cbafd42e6d57b1e27"
     },
     "QQPlayer/Services/SFBAudioEngineManager+Decoder.swift": {
       "role": "index",
@@ -4172,15 +4172,15 @@
     },
     "QQPlayerTests/RecommendationResultCacheTests.swift": {
       "role": "index",
-      "sha256": "7490d8e5b6e01db6fc300ff00cdcf32082003deea527343a46517df390a80e8a",
-      "size": 9973,
-      "normalized_sha256": "7490d8e5b6e01db6fc300ff00cdcf32082003deea527343a46517df390a80e8a"
+      "sha256": "e9ba3ffd30a54b997940593a8a6342e42cb5ee88ace9871da68f11750bab9452",
+      "size": 10943,
+      "normalized_sha256": "e9ba3ffd30a54b997940593a8a6342e42cb5ee88ace9871da68f11750bab9452"
     },
     "QQPlayerTests/RecommendationTests.swift": {
       "role": "index",
-      "sha256": "41c825bd0554c8d2d70f68ad1401548651fe01dc2830c4bdab5116d3a6b5a5f9",
-      "size": 21498,
-      "normalized_sha256": "41c825bd0554c8d2d70f68ad1401548651fe01dc2830c4bdab5116d3a6b5a5f9"
+      "sha256": "fd4cdbc3f9c65666aa0a269d663a2d0ae3353c5cadde33c3d54a233d66a71446",
+      "size": 27665,
+      "normalized_sha256": "fd4cdbc3f9c65666aa0a269d663a2d0ae3353c5cadde33c3d54a233d66a71446"
     },
     "QQPlayerTests/ReinstallLibraryPurgeTests.swift": {
       "role": "index",
@@ -4736,9 +4736,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "b2750ee5016f3aefb8b3da7da6b908cd16db7f8c7ae39db7501c1b5f333cd61f",
-      "size": 350409,
-      "normalized_sha256": "b2750ee5016f3aefb8b3da7da6b908cd16db7f8c7ae39db7501c1b5f333cd61f"
+      "sha256": "bf26927865db4c2a755adf8a34c98d536eca1b85d2914df83f9d3cf216b3cc11",
+      "size": 351078,
+      "normalized_sha256": "bf26927865db4c2a755adf8a34c98d536eca1b85d2914df83f9d3cf216b3cc11"
     },
     "aoci.meta.txt": {
       "role": "index",
