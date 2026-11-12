@@ -375,6 +375,145 @@ struct RecommendationFilterTests {
     }
 }
 
+// MARK: - 年代标签（解析 / 标题判定 / 召回接线）
+
+/// 记录查询词的桩：证明「年代标签绝不进在线搜索」（actor 收口，避免并发召回下的数据竞争）。
+private actor QueryRecorder {
+    private(set) var queries: [String] = []
+
+    func record(_ query: String) {
+        queries.append(query)
+    }
+}
+
+private final class QueryRecordingProvider: OnlineSearchProviding, @unchecked Sendable {
+    let source: RecommendationSource
+    private let recorder = QueryRecorder()
+    private let songs: [String: [RecommendationRemoteSong]]
+
+    init(source: RecommendationSource = .netease, songs: [String: [RecommendationRemoteSong]] = [:]) {
+        self.source = source
+        self.songs = songs
+    }
+
+    func recordedQueries() async -> [String] {
+        await recorder.queries
+    }
+
+    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        await recorder.record(query)
+        return Array((songs[query] ?? []).prefix(limit))
+    }
+}
+
+@Suite("推荐质量：年代标签")
+struct RecommendationDecadeLabelTests {
+    @Test("年代标签解析：整串匹配，不误杀标题中段")
+    func parsesDecadeLabels() {
+        #expect(RecommendationDecadeLabel.parse("1990s") == 1990)
+        #expect(RecommendationDecadeLabel.parse("1990年代") == 1990)
+        #expect(RecommendationDecadeLabel.parse("90s") == 1990)
+        #expect(RecommendationDecadeLabel.parse("1990") == 1990)
+        #expect(RecommendationDecadeLabel.parse(" 1990S ") == 1990)
+        #expect(RecommendationDecadeLabel.parse("1990's") == 1990)
+        #expect(RecommendationDecadeLabel.parse("(1990s)") == 1990)
+        #expect(RecommendationDecadeLabel.parse("【1990s】") == 1990)
+        #expect(RecommendationDecadeLabel.parse("2000s") == 2000)
+        #expect(RecommendationDecadeLabel.parse("2020s") == 2020)
+        #expect(RecommendationDecadeLabel.parse("80s") == 1980)
+        #expect(RecommendationDecadeLabel.parse("90年代") == 1990)
+        #expect(RecommendationDecadeLabel.parse("1990 年") == 1990)
+
+        #expect(RecommendationDecadeLabel.parse("1990s Love Song") == nil)
+        #expect(RecommendationDecadeLabel.parse("Summer of 1990s") == nil)
+        #expect(RecommendationDecadeLabel.parse("夏日1990") == nil)
+        #expect(RecommendationDecadeLabel.parse("90") == nil)
+        #expect(RecommendationDecadeLabel.parse("Creep") == nil)
+        #expect(RecommendationDecadeLabel.parse("") == nil)
+        #expect(RecommendationDecadeLabel.parse("1800s") == nil)
+    }
+
+    @Test("纯年代标题判定：年代/年份整串 → true，正常歌名 → false")
+    func flagsDecadeOnlyTitles() {
+        let decadeTitles = [
+            "1990s", "1990's", "1990S", "2000s", "2020s", "1990", "2000",
+            "90s", "80s", "1990年代", "90年代", "1990 年", " (1990s) ",
+        ]
+        for title in decadeTitles {
+            #expect(RecommendationCandidateFilter.isDecadeOnlyTitle(title), "应判定为年代标题：\(title)")
+            // 截图里的脏结果：专辑也等于年代（非空），旧规则因此漏网。
+            #expect(
+                RecommendationCandidateFilter.isLikelyNonSong(remote(title, "Axis Neptune", album: title)),
+                "应剔除年代结果：\(title)"
+            )
+        }
+        for title in ["1990s Love Song", "Summer of 1990s", "夏日1990", "晴天", "Creep"] {
+            #expect(!RecommendationCandidateFilter.isDecadeOnlyTitle(title), "不应判定为年代标题：\(title)")
+        }
+    }
+
+    @Test("年代意图展开为画像艺人，画像没有艺人则丢弃")
+    func resolvesDecadeIntentToProfileArtists() {
+        var profile = makeProfile(artists: [("someone", 10)])
+        profile.decadeArtists = [1990: ["Jay", "Faye", "Third"]]
+
+        let resolved = RecommendationIntentBuilder.resolved(
+            [RecommendationIntent(query: "1990s", kind: .decade)],
+            profile: profile
+        )
+        #expect(resolved.map(\.query) == ["Jay", "Faye"])
+        #expect(resolved.allSatisfy { $0.kind == .decade && $0.decade == 1990 })
+        #expect(!resolved.contains { RecommendationDecadeLabel.parse($0.query) != nil })
+
+        let empty = RecommendationIntentBuilder.resolved(
+            [RecommendationIntent(query: "1990s", kind: .decade)],
+            profile: makeProfile()
+        )
+        #expect(empty.isEmpty)
+    }
+
+    @Test("kind 缺失/为 artist 的年代 query 同样按年代处理")
+    func resolvesDecadeQueryRegardlessOfKind() {
+        var profile = makeProfile()
+        profile.decadeArtists = [2000: ["Jay"]]
+        let artistKind = RecommendationIntentBuilder.resolved(
+            [RecommendationIntent(query: "2000s", kind: .artist, artist: "2000s")],
+            profile: profile
+        )
+        #expect(artistKind == [RecommendationIntent(query: "Jay", kind: .decade, artist: "Jay", decade: 2000)])
+
+        let keywordKind = RecommendationIntentBuilder.resolved(
+            [RecommendationIntent(query: "90年代", kind: .keyword)],
+            profile: makeProfile()
+        )
+        #expect(keywordKind.isEmpty)
+    }
+
+    @Test("引擎召回：年代意图只搜画像艺人，结果里没有年代数字")
+    func engineNeverSearchesDecadeLabel() async {
+        var profile = makeProfile(artists: [("someone", 10)])
+        profile.decadeArtists = [1990: ["Axis Neptune"]]
+        let provider = QueryRecordingProvider(
+            songs: [
+                "Axis Neptune": [remote("Real Song", "Axis Neptune", album: "Album")],
+                "1990s": [remote("1990s", "Axis Neptune", album: "1990s")],
+            ]
+        )
+        let engine = RecommendationEngine(providers: [provider])
+        let result = await engine.recommend(
+            profile: profile,
+            count: 5,
+            intents: [RecommendationIntent(query: "1990s", kind: .decade)]
+        )
+        guard case let .success(list) = result else {
+            Issue.record("推荐应成功")
+            return
+        }
+        #expect(await provider.recordedQueries() == ["Axis Neptune"])
+        #expect(list.map(\.title) == ["Real Song"])
+    }
+}
+
 @Suite("推荐质量：重排与多样性")
 struct RecommendationRankingQualityTests {
     @Test("相关性重排：高亲和艺人排到前面，而不是来源顺序")

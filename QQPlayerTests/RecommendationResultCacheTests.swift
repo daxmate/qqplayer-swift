@@ -231,6 +231,29 @@ struct RecommendationResultCacheTests {
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 
+    @Test("旧脏缓存（schemaVersion 1）→ miss 且删除")
+    func legacySchemaMismatch() throws {
+        let clock = TestClock(Date(timeIntervalSince1970: 1_700_000_000))
+        let (cache, directory) = makeCache(clock)
+        let key = makeKey()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("\(key.sha256).json")
+        let entry = RecommendationCacheEntry(
+            schemaVersion: 1,
+            createdAt: clock.now,
+            lastAccessedAt: clock.now,
+            hitCount: 0,
+            planSource: .localModel,
+            keySummary: RecommendationCacheKeySummary(input: key),
+            candidates: [makeCandidate("1990s")],
+            requestedArtist: nil
+        )
+        try JSONEncoder().encode(entry).write(to: url)
+
+        #expect(cache.load(key) == nil)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
     @Test("手动刷新：invalidate 后同键 miss")
     func invalidate() {
         let clock = TestClock(Date(timeIntervalSince1970: 1_700_000_000))
