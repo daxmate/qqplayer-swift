@@ -755,10 +755,53 @@ enum SyncOutcomeContract {
         "answeredPullEntries",
     ]
 
-    /// 两端账目文件：必须**持有** tally（写死路径是刻意的：搬走 = 契约失效，得显式改这里）。
-    static let ledgerPaths = [
-        "QQPlayer/Sync/SyncDataSyncCoordinator.swift",
+    /// 生产码里允许出现 `var tally = SyncOutcomeTally()` 的**精确文件集合**（2026-11-12）。
+    ///
+    /// 口径比「白名单包含」更严：集合必须**逐项相等**——多一处（第二处账目 / 偷偷新建账目）
+    /// 与少一处（声明搬走却没更新契约）都会红。
+    static let tallyDeclarationPaths: Set<String> = [
+        // 局部聚合（缺身份键明细按实体分组，借用 tally 的分桶；不是账目）
+        "QQPlayer/Sync/SyncChangeLogPeer.swift",
+        // Mac「同步数据」账目（2026-11-12 因协调器 600 行结构预算从
+        // SyncDataSyncCoordinator.swift 拆出，声明搬到这里）
+        "QQPlayer/Sync/SyncDataSyncReport.swift",
+        // iOS 被动同步账目
         "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+    ]
+
+    /// 一个「账目单元」= 声明文件 + 允许写它的文件（声明文件本身或其扩展）。
+    ///
+    /// 2026-11-12（T1）：Mac 账目因行数预算拆成 `SyncDataSyncReport`（声明）+
+    /// `SyncDataSyncCoordinator(+Ledger)`（写）——单元身份从「一个文件」变成「一组文件」，
+    /// 判据强度不变：声明必须在声明文件里，写入必须落在本单元的文件里。
+    struct LedgerUnit: Equatable {
+        /// 用于报错的人话名字（Mac 数据同步 / iOS 被动同步）。
+        let name: String
+        /// 必须声明 `var tally = SyncOutcomeTally()` 的文件。
+        let declarationPath: String
+        /// 允许出现 `.tally.` 写入的文件（声明文件 ∪ 其扩展）。
+        let writerPaths: [String]
+    }
+
+    /// 两端账目单元（写死路径是刻意的：搬家 = 契约失效，得显式改这里）。
+    static let ledgerUnits: [LedgerUnit] = [
+        LedgerUnit(
+            name: "Mac 数据同步账目（SyncDataSyncReport.tally）",
+            declarationPath: "QQPlayer/Sync/SyncDataSyncReport.swift",
+            writerPaths: [
+                "QQPlayer/Sync/SyncDataSyncReport.swift",
+                "QQPlayer/Sync/SyncDataSyncCoordinator.swift",
+                "QQPlayer/Sync/SyncDataSyncCoordinator+Ledger.swift",
+            ]
+        ),
+        LedgerUnit(
+            name: "iOS 被动同步账目（IOSPassiveDataSyncSummary.tally）",
+            declarationPath: "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+            writerPaths: [
+                "QQPlayer/Services/IOSPassiveSyncCenter.swift",
+                "QQPlayer/Services/IOSPassiveSyncCenter+DataSync.swift",
+            ]
+        ),
     ]
 
     /// 纯函数：一份生产源码里违禁的计数写法（空 = 该文件合规）。
@@ -801,38 +844,82 @@ extension SyncOutcomeContract {
         var violations: [String] = []
         /// 白名单文件是否真的在定义账目（false = 白名单空转，必须失败）
         var tallyDefinesSlots = false
-        /// 两端账目里真的持有 tally 的文件（数量不足 = 收口没接上）
-        var ledgersHoldingTally: [String] = []
+        /// 生产码里声明了 `var tally = SyncOutcomeTally()` 的文件（**精确集合**判据用）。
+        var tallyDeclaringFiles: [String] = []
+        /// 真「持有 tally + 在单元内写入」的账目单元名（按 `ledgerUnits` 顺序；缺一即红）。
+        var ledgerUnitsHoldingTally: [String] = []
     }
 
     /// 生产码全量扫描（文件系统访问只在这里；fail-closed 由调用方断言 `scannedFiles`）。
     static func scan(repoRoot: URL) -> ScanResult {
         var result = ScanResult()
+        // 单元判据要跨文件看（声明文件 + 其扩展），先收全量源码再判。
+        var sources: [String: String] = [:]
         for url in SyncWiringContract.swiftSources(repoRoot: repoRoot, at: productionRoot) {
-            let relativePath = url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            // 路径归一（2026-11-12）：worktree 可能在 /tmp（符号链接到 /private/tmp）——
+            // #filePath 与 URL 解析结果一侧带 /private、一侧不带，先取真实路径再算相对路径。
+            let rootPath = repoRoot.resolvingSymlinksInPath().path
+            let fullPath = url.resolvingSymlinksInPath().path
+            let relativePath = fullPath.hasPrefix(rootPath + "/")
+                ? String(fullPath.dropFirst(rootPath.count + 1))
+                : fullPath
             result.scannedFiles += 1
             guard let source = try? String(contentsOf: url, encoding: .utf8) else {
                 result.violations.append("\(relativePath)：读取失败（fail-closed，不跳过）")
                 continue
+            }
+            sources[relativePath] = source
+            if declaresTally(source) {
+                result.tallyDeclaringFiles.append(relativePath)
             }
             if relativePath == tallyDefinitionPath {
                 result.tallyDefinesSlots = source.contains("enum SyncRowOutcome")
                     && source.contains("struct SyncOutcomeTally")
                     && slotNames.prefix(8).allSatisfy { source.contains("var \($0): Int") }
             }
-            if ledgerPaths.contains(relativePath), ledgerHoldsTally(source) {
-                result.ledgersHoldingTally.append(relativePath)
-            }
             result.violations += violations(inSource: source, relativePath: relativePath)
                 .map { "\(relativePath) → \($0)" }
+        }
+        // 账目单元：声明必须在声明文件里，写入必须落在单元内（声明文件 ∪ 其扩展）——
+        // 跨文件是 2026-11-12 行数预算拆分的既有事实，判据强度不变（写入不得跑出单元）。
+        for unit in ledgerUnits {
+            guard let declaration = sources[unit.declarationPath] else {
+                result.violations.append("\(unit.declarationPath)：账目声明文件不存在（fail-closed）")
+                continue
+            }
+            guard unitHoldsTally(declaration: declaration, sources: sources, unit: unit) else { continue }
+            result.ledgerUnitsHoldingTally.append(unit.name)
         }
         return result
     }
 
-    /// 一份账目源码是否真的「持有 tally + 往它写」（两条都在才算）：只有读数、没有
-    /// `tally` 字段的旧写法会漏这一条。
-    static func ledgerHoldsTally(_ source: String) -> Bool {
-        source.contains("var tally = SyncOutcomeTally()") && source.contains(".tally.")
+    /// 一个账目单元是否真的「持有 tally + 在单元内往它写」。
+    /// 只有读数、没有 `tally` 字段的旧写法会漏这一条；写在单元外的文件里也算没接上。
+    static func unitHoldsTally(
+        declaration: String,
+        sources: [String: String],
+        unit: LedgerUnit
+    ) -> Bool {
+        guard declaresTally(declaration) else { return false }
+        return unit.writerPaths.compactMap { sources[$0] }.contains { $0.contains(".tally.") }
+    }
+
+    /// 源码是否真的**声明**了 `var tally = SyncOutcomeTally()`。
+    /// 逐行判（注释里提到不算）：文档注释 / 说明文本里的同名字面量不得被当成账目声明。
+    static func declaresTally(_ source: String) -> Bool {
+        source.split(separator: "\n").contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return trimmed.hasPrefix("var tally = SyncOutcomeTally()")
+        }
+    }
+    /// 精确集合判据（纯函数，供扫描与自证共用）：多出来的声明文件（= 未登记账目）。
+    static func unexpectedTallyDeclarations(_ files: Set<String>) -> Set<String> {
+        files.subtracting(tallyDeclarationPaths)
+    }
+
+    /// 精确集合判据：契约登记了、生产码里却没有声明的文件（声明搬走 / 改名 = 契约空转）。
+    static func missingTallyDeclarations(_ files: Set<String>) -> Set<String> {
+        tallyDeclarationPaths.subtracting(files)
     }
 }
 
@@ -841,7 +928,7 @@ extension SyncOutcomeContract {
 struct SyncOutcomeContractTests {
     static let repoRoot = SyncWiringContractTests.repoRoot
 
-    @Test("结果账目：生产码里只有一处计数定义（白名单 = tally 文件；别处不得分类 += / =）")
+    @Test("结果账目：计数定义只有一处；tally 持有文件集合必须精确相等；两端账目单元都要接上")
     func productionHasSingleOutcomeTally() {
         let result = SyncOutcomeContract.scan(repoRoot: Self.repoRoot)
         #expect(result.scannedFiles > 50, "生产码一个 .swift 都没扫到 = 契约空转：扫到 \(result.scannedFiles)")
@@ -852,17 +939,30 @@ struct SyncOutcomeContractTests {
             说明契约的空转保护失效（tally 被改名 / 搬走 / 槽位名改了）。
             """
         )
+        // ① 全局精确集合：`var tally = SyncOutcomeTally()` 的出现文件必须**逐个相等**
+        //    （多一处 = 偷偷新建账目；少一处 = 声明搬走却没更新契约）。
+        let declared = Set(result.tallyDeclaringFiles)
         #expect(
-            result.ledgersHoldingTally.count == SyncOutcomeContract.ledgerPaths.count,
+            declared == SyncOutcomeContract.tallyDeclarationPaths,
+            """
+            持有 tally 的文件集合与契约不一致：
+            多出 \(declared.subtracting(SyncOutcomeContract.tallyDeclarationPaths).sorted())、
+            缺少 \(SyncOutcomeContract.tallyDeclarationPaths.subtracting(declared).sorted())
+            """
+        )
+        // ② 两端账目单元都必须「声明 + 单元内写入」（2026-11-12：Mac 单元 = Report + Coordinator(+Ledger)）。
+        let expectedUnits = SyncOutcomeContract.ledgerUnits.map(\.name)
+        #expect(
+            result.ledgerUnitsHoldingTally == expectedUnits,
             """
             两端账目没有都持有 tally（L6 收口断了）：
-            缺 \(SyncOutcomeContract.ledgerPaths.filter { !result.ledgersHoldingTally.contains($0) })
+            期望 \(expectedUnits)、实际 \(result.ledgerUnitsHoldingTally)
             """
         )
         #expect(
             result.violations.isEmpty,
             """
-            生产码里出现了第二处「同步数据结果计数」（唯一账目 = SyncOutcomeTally，
+            生产码里出现了第二处「同步数据结果计数」（唯一实现 = SyncOutcomeTally，
             \(SyncOutcomeContract.tallyDefinitionPath)；Mac 账目 = SyncDataSyncReport.tally、
             iOS 账目 = IOSPassiveDataSyncSummary.tally）：
             \(result.violations.joined(separator: "\n"))
@@ -942,6 +1042,47 @@ struct SyncOutcomeContractTests {
         )
     }
 
+    // MARK: 精确集合 / 账目单元 自证（2026-11-12 T1）
+
+    @Test("合成：tally 声明「多一处 / 少一处」都必须被抓到（精确集合判据自证）")
+    func syntheticTallyDeclarationSetIsExact() {
+        let base = SyncOutcomeContract.tallyDeclarationPaths
+        let extra = base.union(["QQPlayer/Sync/EvilLedger.swift"])
+        #expect(
+            SyncOutcomeContract.unexpectedTallyDeclarations(extra) == ["QQPlayer/Sync/EvilLedger.swift"],
+            "多一处声明必须被抓到（第二处账目）"
+        )
+        let missing = base.subtracting(["QQPlayer/Sync/SyncDataSyncReport.swift"])
+        #expect(
+            SyncOutcomeContract.missingTallyDeclarations(missing) == ["QQPlayer/Sync/SyncDataSyncReport.swift"],
+            "声明搬走但契约没更新必须被抓到（否则契约空转）"
+        )
+        #expect(SyncOutcomeContract.unexpectedTallyDeclarations(base).isEmpty)
+        #expect(SyncOutcomeContract.missingTallyDeclarations(base).isEmpty)
+    }
+
+    @Test("账目单元：声明在声明文件 + 写入落在单元内才算接上；写到单元外 = 没接上")
+    func syntheticLedgerUnitHoldsTally() {
+        let unit = SyncOutcomeContract.ledgerUnits[0]
+        let declaration = "var tally = SyncOutcomeTally()"
+        let good: [String: String] = [
+            unit.declarationPath: declaration,
+            unit.writerPaths[2]: "reportValue.tally.accumulate(.applied, count: 1)",
+        ]
+        #expect(SyncOutcomeContract.unitHoldsTally(declaration: declaration, sources: good, unit: unit))
+
+        let orphanWrites: [String: String] = [
+            unit.declarationPath: declaration,
+            "QQPlayer/Sync/OtherLedger.swift": "x.tally.accumulate(.applied, count: 1)",
+        ]
+        #expect(
+            !SyncOutcomeContract.unitHoldsTally(declaration: declaration, sources: orphanWrites, unit: unit),
+            "写入跑出账目单元 = 单元没接上（不能靠别处文件代写）"
+        )
+
+        let noWrites: [String: String] = [unit.declarationPath: declaration]
+        #expect(!SyncOutcomeContract.unitHoldsTally(declaration: declaration, sources: noWrites, unit: unit))
+    }
     // MARK: INV-8 / INV-9（③，2026-11-09）：挂起重放触发点 / iOS 显式不支持重置
 
     @Test("INV-8：挂起行的两个重放触发点都必须挂在歌曲入库路径上（删任一处 = 挂起行永久积压）")
@@ -981,8 +1122,14 @@ struct SyncOutcomeContractTests {
             "QQPlayer/Sync/SyncChangeLogStore.swift",
         ]
         var offenders: [String] = []
+        // 路径归一（2026-11-12）：worktree 在 /tmp（→ /private/tmp）时 #filePath 与解析路径
+        // 前缀不一致，会让白名单全部失配（本地全量误报的同一根因）。
+        let rootPath = Self.repoRoot.resolvingSymlinksInPath().path
         for url in sources {
-            let relativePath = url.path.replacingOccurrences(of: Self.repoRoot.path + "/", with: "")
+            let fullPath = url.resolvingSymlinksInPath().path
+            let relativePath = fullPath.hasPrefix(rootPath + "/")
+                ? String(fullPath.dropFirst(rootPath.count + 1))
+                : fullPath
             guard !allowed.contains(relativePath) else { continue }
             guard let source = try? String(contentsOf: url, encoding: .utf8) else {
                 offenders.append("\(relativePath)（读取失败，fail-closed）")
