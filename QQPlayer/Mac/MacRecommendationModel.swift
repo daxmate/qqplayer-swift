@@ -22,15 +22,15 @@ final class MacRecommendationModel {
         case failed(String)
     }
 
-    private(set) var phase: Phase = .idle
-    private(set) var candidates: [RecommendedCandidate] = []
+    var phase: Phase = .idle
+    var candidates: [RecommendedCandidate] = []
     private(set) var lastGeneratedAt: Date?
     /// 最近一次生成用的检索计划来源（规则 / 本地模型），页脚展示用。
-    private(set) var planSource: RecommendationPlanSource = .rule
+    var planSource: RecommendationPlanSource = .rule
     /// 当前生效的指令原话（只用于 chip 展示；历史不展示）。
     private(set) var activeRequestText: String?
     /// 本轮点名的艺人（展示名）：结果不足时页面据此说明「只找到 N 首 X 的歌」。
-    private(set) var requestedArtist: String?
+    var requestedArtist: String?
 
     /// 打开 App 时判断 24h（P1 不做定时器，见任务包 F）。
     static let refreshInterval: TimeInterval = 24 * 3600
@@ -40,24 +40,26 @@ final class MacRecommendationModel {
     /// 缓存条目的生成时间（命中时展示；未命中为 nil）。
     private(set) var cacheCreatedAt: Date?
 
-    private let blacklistURL: URL?
+    let blacklistURL: URL?
     private let historyURL: URL?
-    private let clock: () -> Date
+    let clock: () -> Date
     /// 缓存命中编排（exact / stale 垫底 / miss）+ 后台重算代次控制。
     private let flow: RecommendationCacheFlow
-    private var blacklist: RecommendationBlacklist
+    var blacklist: RecommendationBlacklist
     private var isGenerating = false
     /// 最近一次请求的缓存键（「不再推荐」时清掉，避免下次命中把已拉黑的歌带回来）。
-    private var lastCacheKey: RecommendationCacheKeyInput?
+    var lastCacheKey: RecommendationCacheKeyInput?
 
     // MARK: P2 会话池（15 首 / 换一批）
 
     /// 会话池（换一批只推进游标，不重新请求网络）。
-    private var session: RecallSession?
+    var session: RecallSession?
     /// 池里还剩多少首可推（UI 页脚状态）。
-    private(set) var batchRemaining = 0
+    var batchRemaining = 0
     /// 池不足一批、正在增量查询（UI「补充中」）。
     private(set) var isRefilling = false
+    /// 本次计算是否为「补池」（true = 追加到现有会话，不重建池）。
+    var isRefillingSession = false
     /// 当前是否有会话池（决定「换一批 / 已看完」文案）。
     var hasBatchSession: Bool { session != nil }
 
@@ -93,11 +95,15 @@ final class MacRecommendationModel {
         useLocalModel: Bool = true
     ) async {
         guard !isGenerating else { return }
-        // 换一批优先走会话游标（不整轮重算、不重新请求）。
+        // 换一批：池里还有 ≥15 → 直接推进游标（不重算、不重新请求）。
         if advanceBatchIfAvailable() { return }
-        // 池已耗尽：增量查询（排除最近推过，换一轮候选）。
-        if !candidates.isEmpty { isRefilling = true }
-        defer { isRefilling = false }
+        // 池剩余 <15 或已耗尽 → 增量查询补池；补满一批前不出残批。
+        isRefilling = true
+        isRefillingSession = session != nil
+        defer {
+            isRefilling = false
+            isRefillingSession = false
+        }
         if let text = activeRequestText {
             await submit(text, count: count, rounds: rounds, useLocalModel: useLocalModel, bypassCache: true)
         } else {
@@ -122,8 +128,10 @@ final class MacRecommendationModel {
         }
         cacheHit = false
         cacheCreatedAt = nil
-        session = nil
-        batchRemaining = 0
+        if !isRefillingSession {
+            session = nil
+            batchRemaining = 0
+        }
         defer { isGenerating = false }
 
         #if canImport(MLXLLM) && arch(arm64) && os(macOS)
@@ -197,7 +205,11 @@ final class MacRecommendationModel {
 
             switch result {
             case let .success(list):
-                let batch = makeBatch(from: list, count: count)
+                let batch = applyPool(list, count: count)
+                if batch.isEmpty, isRefillingSession {
+                    phase = .loaded
+                    return
+                }
                 candidates = batch
                 blacklist.markRecommended(batch, at: clock())
                 _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
@@ -272,8 +284,10 @@ final class MacRecommendationModel {
         cacheHit = false
         cacheCreatedAt = nil
         requestedArtist = nil
-        session = nil
-        batchRemaining = 0
+        if !isRefillingSession {
+            session = nil
+            batchRemaining = 0
+        }
         defer { isGenerating = false }
 
         guard let input = await RecommendationDataSource.loadInput(now: clock(), blacklist: blacklist) else {
@@ -326,7 +340,11 @@ final class MacRecommendationModel {
 
         switch result {
         case let .success(list):
-            let batch = makeBatch(from: list, count: count)
+            let batch = applyPool(list, count: count)
+            if batch.isEmpty, isRefillingSession {
+                phase = .loaded
+                return
+            }
             candidates = batch
             lastGeneratedAt = clock()
             phase = .loaded
@@ -336,56 +354,6 @@ final class MacRecommendationModel {
         case let .failure(error):
             phase = .failed(error.localizedDescription)
         }
-    }
-
-    // MARK: - 会话池（P2：15 首 / 换一批）
-
-    /// 推进到下一批；池耗尽 / 无会话 → false（调用方走增量重算）。
-    @discardableResult
-    private func advanceBatchIfAvailable() -> Bool {
-        guard var session else { return false }
-        if session.state == .exhausted {
-            batchRemaining = 0
-            return false
-        }
-        let batch = session.nextBatch()
-        self.session = session
-        batchRemaining = session.remaining
-        guard !batch.isEmpty else { return false }
-        candidates = batch
-        phase = .loaded
-        blacklist.markRecommended(batch, at: clock())
-        _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
-        if let key = lastCacheKey {
-            storeCache(key, planSource: planSource, candidates: batch, requestedArtist: requestedArtist)
-        }
-        return true
-    }
-
-    /// 用一轮召回结果建池并取首批（池不足时退回截断列表，不假装成功）。
-    private func makeBatch(from pool: [RecommendedCandidate], count: Int) -> [RecommendedCandidate] {
-        var session = RecallSession(pool: pool)
-        let batch = session.nextBatch()
-        self.session = session
-        batchRemaining = session.remaining
-        if batch.isEmpty {
-            self.session = nil
-            return Array(pool.prefix(count))
-        }
-        return batch
-    }
-
-    /// 召回排除集：最近 7 天推过（软黑名单，跨会话）。
-    private var excludedTrackKeys: Set<String> {
-        blacklist.activeRecentKeys(at: clock())
-    }
-
-    /// P2 池构建引擎（iTunes 主源链；同艺人 ≤4、同专辑 ≤2）。
-    private func poolEngine() -> RecommendationEngine {
-        RecommendationEngine(
-            maxSongsPerArtist: RecommendationBatchPolicy.maxSongsPerArtist,
-            maxSongsPerAlbum: RecommendationBatchPolicy.maxSongsPerAlbum
-        )
     }
 
     // MARK: - 结果缓存
@@ -430,7 +398,7 @@ final class MacRecommendationModel {
     }
 
     /// 成功后写缓存（空结果 / 失败结果不写）。
-    private func storeCache(
+    func storeCache(
         _ key: RecommendationCacheKeyInput,
         planSource: RecommendationPlanSource,
         candidates: [RecommendedCandidate],

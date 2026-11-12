@@ -100,8 +100,9 @@ struct RecallSession: Sendable, Equatable {
         }
     }
 
+    /// 与引擎排除集 / 软黑名单同口径（`RecommendationKey.normalize`），保证 seen 可直接喂回 `excludedTrackKeys`。
     static func key(_ candidate: RecommendedCandidate) -> String {
-        RecommendationNormalization.dedupeKey(title: candidate.title, artist: candidate.artist)
+        RecommendationKey.normalize(title: candidate.title, artist: candidate.artist)
     }
 
     static func artistKey(_ candidate: RecommendedCandidate) -> String {
