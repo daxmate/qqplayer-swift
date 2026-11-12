@@ -938,6 +938,8 @@
 "sync_run_probe_value" = "链路速度 %.1f MB/s";
 "sync_run_phase_disconnected" = "未连接";
 "sync_run_phase_idle" = "可以开始同步";
+"sync_run_phase_fetching_manifest" = "正在获取设备清单…";
+"sync_run_error_manifest_timeout" = "获取设备清单超时（对端 %d 秒内未返回清单，可能正在整理曲库）";
 "sync_run_progress_planning" = "正在与设备对账…";
 "sync_run_progress_push" = "正在推送 %d/%d";
 "sync_run_progress_pull" = "正在接收 %d/%d";

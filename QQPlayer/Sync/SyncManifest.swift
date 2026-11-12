@@ -58,10 +58,17 @@ struct SyncManifestRequest: Codable, Equatable, Sendable {
     /// 请求方已知的 相对路径 → content_hash（增量请求预留）。
     /// v1 恒 nil（请求全量）；M3-3b 需要"只回变更"时再启用，响应端可据此裁剪。
     var knownHashes: [String: String]?
+    /// 端到端关联 id（**只用于日志关联**，不参与判定；老端不带 = nil）。
+    var rid: String?
 
-    init(collection: SyncCollection = .all, knownHashes: [String: String]? = nil) {
+    init(
+        collection: SyncCollection = .all,
+        knownHashes: [String: String]? = nil,
+        rid: String? = nil
+    ) {
         self.collection = collection
         self.knownHashes = knownHashes
+        self.rid = rid
     }
 }
 
@@ -71,10 +78,13 @@ struct SyncManifestResponse: Codable, Equatable, Sendable {
     var entries: [ManifestEntry]
     /// 对端曲库根显示名（诊断/UI 用；不参与对账）。
     var rootName: String?
+    /// 回显请求的关联 id（**只用于日志关联**；对端没带 / 老端 = nil）。
+    var rid: String?
 
-    init(entries: [ManifestEntry], rootName: String? = nil) {
+    init(entries: [ManifestEntry], rootName: String? = nil, rid: String? = nil) {
         self.entries = entries
         self.rootName = rootName
+        self.rid = rid
     }
 }
 

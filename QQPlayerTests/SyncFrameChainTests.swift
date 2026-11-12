@@ -83,7 +83,7 @@ struct SyncFrameChainTests {
         // 后挂接的 peer；生产触发点：编排计划完成即 `manifestPeer = nil`
         // （SyncCollectionSyncCoordinator 计划完成 / 失败 / 超时三处）。
         var peer: SyncManifestPeer? = SyncManifestPeer(session: fixture.clientSession)
-        peer?.localManifestProvider = { _ in [] }
+        peer?.localManifestProvider = { _, _ in [] }
         #expect(peer != nil)
         peer = nil
 

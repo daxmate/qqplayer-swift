@@ -116,6 +116,16 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
     var manifestPeer: SyncManifestPeer?
     /// 计划态到点检查的待触发闭包（S4：可取消，不留待触发的 20s 闭包）。
     private var manifestTimeoutItem: DispatchWorkItem?
+    /// 等清单期间的重发闭包（每 3s 一次，总时长仍受 `peerManifestTimeout` 约束）。
+    private var manifestResendItem: DispatchWorkItem?
+    /// 本编排已重发清单请求的次数（诊断）。
+    var manifestRequestAttempt = 0
+    /// 清单请求重发间隔（秒）：防丢帧/装配竞态，总超时不延长。
+    static let manifestResendInterval: TimeInterval = 3
+    /// 进入计划态（发出首个清单请求）的时刻：超时/重发日志据此报「已等待秒数」。
+    private var planningStartedAt: Date?
+    /// 本轮清单请求的关联 id（线上随载荷下发；两端日志对齐用）。
+    private var manifestRequestID: String?
     var pushController: SyncLibraryPushController?
     var pullController: SyncLibraryPullController?
 
@@ -196,6 +206,9 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
 
         lock.lock()
         stage = .planning
+        planningStartedAt = Date()
+        // 关联 id：本轮所有清单请求（含重发）共用一个，两端日志据此对齐（rid 走线上载荷）。
+        manifestRequestID = "m-" + UUID().uuidString.prefix(8)
         reportValue.didRequestPeerManifest = true
         lock.unlock()
         // M6 修复（2026-09-12）：计划态必须**上报**（不只是置内部 stage）。
@@ -222,11 +235,20 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         schedulePeerManifestTimeout()
         do {
             // 方向敏感：upload 恒 `.all`（本端展开选择）；download 让对端先按集合收口
-            try peer.requestManifest(collection: selection.remoteRequestCollection(for: direction))
+            lock.lock()
+            let rid = manifestRequestID
+            lock.unlock()
+            try peer.requestManifest(
+                collection: selection.remoteRequestCollection(for: direction),
+                rid: rid
+            )
         } catch {
             failPlanning("请求 manifest 失败：\(error)")
             throw error
         }
+        // 首个请求已发出：在**总超时不变**的前提下每 3s 重发，直到收到响应 / 收尾。
+        // 防丢帧与「对端 provider 尚未装配」的竞态；响应到达即取消（见 cancel）。
+        schedulePeerManifestResend()
     }
 
     /// 计划阶段「等对端清单」的超时兜底（`configuration.peerManifestTimeout` `<= 0` = 不启用）。
@@ -241,7 +263,12 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         guard seconds > 0 else { return }
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            self.failPlanningWhileWaitingForManifest("等待设备清单超时（请确认 iPhone 上的 QQPlayer 在前台并已连接）")
+            // 文案只讲「清单没来」这一件事实：连接状态由面板绿点表达，不在这条错误里
+            // 甩锅连接（真机上绿点已亮、连接是通的，旧文案会把用户引去排连接问题）。
+            self.logManifestWaitTimeout(seconds: seconds)
+            self.failPlanningWhileWaitingForManifest(
+                "sync_run_error_manifest_timeout".localized(with: Int(seconds))
+            )
         }
         lock.lock()
         manifestTimeoutItem = item
@@ -249,14 +276,81 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         manifestTimeoutQueue.asyncAfter(deadline: .now() + seconds, execute: item)
     }
 
+    /// 超时兜底日志：attempts / collection / 已等待秒数。
+    /// 真机再遇清单超时，这一行就能区分「请求没发出去 / 对端没应 / 对端在整理曲库」。
+    private func logManifestWaitTimeout(seconds: TimeInterval) {
+        lock.lock()
+        let attempts = manifestRequestAttempt + 1
+        let collection = selection.remoteRequestCollection(for: directionValue)
+        let startedAt = planningStartedAt
+        let rid = manifestRequestID
+        lock.unlock()
+        let waited = startedAt.map { Int(Date().timeIntervalSince($0).rounded()) } ?? Int(seconds)
+        AppLog.warn(.sync, "⏱️ manifest 超时：rid=\(rid ?? "-") attempts=\(attempts)"
+            + " collection=\(collection.kind.rawValue) ids=\(collection.ids.count)"
+            + " waited=\(waited)s limit=\(Int(seconds))s")
+    }
+
     /// 取消**尚未触发**的到点检查（S4：每次编排后不再留一个最多 `peerManifestTimeout`
     /// （默认 20s）的待触发闭包）。幂等；锁外调用。
     func cancelPeerManifestTimeout() {
         lock.lock()
         let item = manifestTimeoutItem
+        let resend = manifestResendItem
         manifestTimeoutItem = nil
+        manifestResendItem = nil
+        manifestRequestAttempt = 0
+        planningStartedAt = nil
+        manifestRequestID = nil
         lock.unlock()
         item?.cancel()
+        resend?.cancel()
+    }
+
+    /// 等清单期间每 `manifestResendInterval` 秒重发一次请求（幂等；总超时不变）。
+    ///
+    /// 背景：真机「绿点亮了、数据同步也成功，但上传清单等 20s 超时」——丢帧或对端 provider
+    /// 尚未装配时，单发一次就得等满 20s。重发让「晚到的装配」也能在 ~3s 内恢复，
+    /// 且不改变用户可感知的最长等待（仍是 `peerManifestTimeout`）。
+    private func schedulePeerManifestResend() {
+        lock.lock()
+        guard stage == .planning else {
+            lock.unlock()
+            return
+        }
+        manifestResendItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            self?.resendManifestIfStillWaiting()
+        }
+        manifestResendItem = item
+        lock.unlock()
+        manifestTimeoutQueue.asyncAfter(deadline: .now() + Self.manifestResendInterval, execute: item)
+    }
+
+    /// 仍处于「等对端清单」→ 重发一次并续排下一轮；否则静默退出。
+    private func resendManifestIfStillWaiting() {
+        lock.lock()
+        guard stage == .planning, let peer = manifestPeer else {
+            lock.unlock()
+            return
+        }
+        manifestRequestAttempt += 1
+        let attempt = manifestRequestAttempt
+        let collection = selection.remoteRequestCollection(for: directionValue)
+        let startedAt = planningStartedAt
+        let ridValue = manifestRequestID
+        lock.unlock()
+        let waited = startedAt.map { Int(Date().timeIntervalSince($0).rounded()) } ?? 0
+        let context = "rid=\(ridValue ?? "-") attempts=\(attempt)"
+            + " collection=\(collection.kind.rawValue) ids=\(collection.ids.count) waited=\(waited)s"
+
+        do {
+            try peer.requestManifest(collection: collection, rid: ridValue)
+            AppLog.info(.sync, "📨 manifest 请求重发 \(context)（仍未收到应答）")
+        } catch {
+            AppLog.warn(.sync, "⚠️ manifest 请求重发 \(context) 失败：\(error)")
+        }
+        schedulePeerManifestResend()
     }
 
     /// 仅当**仍在等对端清单**时落失败：判定（`stage == .planning`）与置终态在**同一次持锁内**
@@ -279,10 +373,14 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         manifestPeer = nil
         let item = manifestTimeoutItem
         manifestTimeoutItem = nil
+        // 超时收尾：重发轮询一并停掉（否则失败后还会多排一轮空转）。
+        let resend = manifestResendItem
+        manifestResendItem = nil
         lock.unlock()
         peer?.onManifestReceived = nil
         peer?.onDecodeFailure = nil
         item?.cancel()
+        resend?.cancel()
         emit(state: .failed(reason))
     }
 

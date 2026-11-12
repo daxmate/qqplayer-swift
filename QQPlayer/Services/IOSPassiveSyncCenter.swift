@@ -146,6 +146,12 @@
     final class IOSPassiveSyncCenter {
         static let shared = IOSPassiveSyncCenter()
 
+        /// 本机全库清单自检的专用串行队列（qos=utility）：不占会话线程，也不与用户点击的同步抢主线程。
+        private static let manifestDiagnosticQueue = DispatchQueue(
+            label: "com.qqplayer.sync.manifestDiagnostic",
+            qos: .utility
+        )
+
         /// 连接状态
         var state: IOSPassiveSyncState = .idle
         /// 接收账目（`onFileLanded` / `onBatchCompleted` 驱动）
@@ -311,6 +317,14 @@
                 return
             }
             summary = host.summary
+            // T2 本机诊断（只读、只打日志）：会话 ready 后量一次「全库清单要多久、多少条没指纹」。
+            // 与用户是否点同步无关；独立后台队列，不占会话线程（用同一 provider 路径 = 与应答同口径）。
+            let diagnosticHost = host
+            Self.manifestDiagnosticQueue.async {
+                let stats = diagnosticHost.manifestDiagnostics()
+                AppLog.info(.sync, "🩺 本端全库清单诊断 entries=\(stats.entries)"
+                    + " files=\(stats.files) missingHash=\(stats.missingHash) ms=\(stats.ms)")
+            }
             // 记下待装配数据同步端的会话：前置门若未开，索引终态后由
             // `refreshDataSyncAttachment()` 用这个会话补装。
             dataSyncSession = session

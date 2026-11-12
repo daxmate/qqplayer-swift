@@ -27,10 +27,15 @@ final class SyncManifestPeer: @unchecked Sendable {
     }
 
     private let session: SyncPeerSession
+    /// 最近一次请求的关联 id / 发出时刻（收到响应时算往返耗时；仅诊断）。
+    private let lock = NSLock()
+    private var pendingRequestRID: String?
+    private var pendingRequestStartedAt: Date?
 
     /// 本地 manifest 提供者：收到请求 → 返回本地（已过滤）条目。
     /// M3-3b 接入 = 扫描曲库 + SyncManifestGenerator.generate + collection.filter。
-    var localManifestProvider: (@Sendable (SyncCollection) -> [ManifestEntry])?
+    /// 第二参数 = 请求的关联 id（只用于日志对齐；provider 不参与协议）。
+    var localManifestProvider: (@Sendable (SyncCollection, String?) -> [ManifestEntry])?
     /// 本地曲库根显示名（响应附带的诊断字段）。
     var localRootName: (@Sendable () -> String?)?
     /// 收到对端 manifest 响应（M3-3b 接 SyncManifestReconciler）。
@@ -61,10 +66,17 @@ final class SyncManifestPeer: @unchecked Sendable {
     // MARK: 对外 API
 
     /// 主动请求对端 manifest（M3-3b 在 ready 后调用）。
-    func requestManifest(collection: SyncCollection = .all) throws {
-        let request = SyncManifestRequest(collection: collection)
+    /// - Parameter rid: 关联 id（只用于两端日志对齐；对端会原样回显）。
+    func requestManifest(collection: SyncCollection = .all, rid: String? = nil) throws {
+        let request = SyncManifestRequest(collection: collection, rid: rid)
         let payload = try SyncManifestCodec.encode(request)
+        lock.lock()
+        pendingRequestRID = rid
+        pendingRequestStartedAt = Date()
+        lock.unlock()
         try session.sendApplicationFrame(type: .manifestRequest, payload: payload)
+        AppLog.info(.sync, "📨 manifest 请求 rid=\(rid ?? "-") kind=\(collection.kind.rawValue)"
+            + " ids=\(collection.ids.count) bytes=\(payload.count)")
     }
 
     // MARK: 帧入口（会话 onApplicationFrame 转发）
@@ -95,13 +107,20 @@ final class SyncManifestPeer: @unchecked Sendable {
             onProviderUnavailable?()
             return
         }
+        let started = Date()
+        AppLog.info(.sync, "📥 manifest 请求 rid=\(request.rid ?? "-")"
+            + " kind=\(request.collection.kind.rawValue) ids=\(request.collection.ids.count)")
         let response = SyncManifestResponse(
-            entries: provider(request.collection),
-            rootName: localRootName?()
+            entries: provider(request.collection, request.rid),
+            rootName: localRootName?(),
+            rid: request.rid
         )
         do {
             let payload = try SyncManifestCodec.encode(response)
             try session.sendApplicationFrame(type: .manifestResponse, payload: payload)
+            AppLog.info(.sync, "📤 manifest 应答 rid=\(response.rid ?? "-")"
+                + " entries=\(response.entries.count) bytes=\(payload.count) "
+                + "ms=\(Int(Date().timeIntervalSince(started) * 1000))")
         } catch {
             onDecodeFailure?(.invalidPayload("manifest_request 应答失败：\(error)"))
         }
@@ -115,6 +134,17 @@ final class SyncManifestPeer: @unchecked Sendable {
             onDecodeFailure?(.invalidPayload("manifest_response 解码失败：\(error)"))
             return
         }
+        // 收到响应：用发出时刻算往返耗时（rid 对齐两端日志；老端不回显 rid 也能靠时刻定位）。
+        lock.lock()
+        let sentAt = pendingRequestStartedAt
+        let pendingRID = pendingRequestRID
+        pendingRequestStartedAt = nil
+        pendingRequestRID = nil
+        lock.unlock()
+        let rid = response.rid ?? pendingRID
+        let rtt = sentAt.map { Int(Date().timeIntervalSince($0) * 1000) } ?? -1
+        AppLog.info(.sync, "📥 manifest 应答 rid=\(rid ?? "-") entries=\(response.entries.count)"
+            + " rttMs=\(rtt)")
         onManifestReceived?(response)
     }
 

@@ -1259,6 +1259,8 @@
 "sync_run_probe_value" = "鏈路速度 %.1f MB/s";
 "sync_run_phase_disconnected" = "未連線";
 "sync_run_phase_idle" = "可以開始同步";
+"sync_run_phase_fetching_manifest" = "正在取得裝置檔案清單…";
+"sync_run_error_manifest_timeout" = "取得裝置檔案清單逾時（對端 %d 秒內未回傳清單，可能正在整理曲庫）";
 "sync_run_progress_planning" = "正在與裝置核對…";
 "sync_run_progress_push" = "正在推送 %d/%d";
 "sync_run_progress_pull" = "正在接收 %d/%d";

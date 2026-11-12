@@ -250,7 +250,7 @@ struct SyncManifestReconcileTests {
             entry("dir/b.flac", hash: "h-b", stableId: "s-b"),
         ]
         let requestedBox = ManifestRequestListBox()
-        harness.hostPeer.localManifestProvider = { collection in
+        harness.hostPeer.localManifestProvider = { collection, _ in
             requestedBox.values.append(collection)
             return hostEntries
         }
@@ -270,7 +270,7 @@ struct SyncManifestReconcileTests {
     @Test("会话往返：反向（host 请求 client 曲库 manifest）也通")
     func peerRoundtripReverse() throws {
         let harness = makeHarness()
-        harness.clientPeer.localManifestProvider = { _ in [self.entry("phone.flac", hash: "h-p")] }
+        harness.clientPeer.localManifestProvider = { _, _ in [self.entry("phone.flac", hash: "h-p")] }
         let receivedBox = ManifestListBox()
         harness.hostPeer.onManifestReceived = { receivedBox.values.append($0) }
 
@@ -297,7 +297,7 @@ struct SyncManifestReconcileTests {
     @Test("会话往返：对账闭环——远端 manifest 到本地后直接出 toFetch 决策")
     func peerRoundtripFeedsReconcile() throws {
         let harness = makeHarness()
-        harness.hostPeer.localManifestProvider = { _ in
+        harness.hostPeer.localManifestProvider = { _, _ in
             [
                 self.entry("same.flac", hash: "h-s"),
                 self.entry("new.flac", hash: "h-n"),

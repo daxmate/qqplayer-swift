@@ -178,6 +178,12 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         return receiver != nil
     }
 
+    /// 本端全库清单的自检统计（只读：不发帧、不改状态）。
+    /// 调用方负责丢到后台队列——它会真扫一遍曲库（与回答 manifest 请求同一条路径）。
+    func manifestDiagnostics() -> (entries: Int, files: Int, missingHash: Int, ms: Int) {
+        provider.manifestStats()
+    }
+
     /// 当前账目快照。
     var summary: SyncLibraryPassiveSummary {
         lock.lock()

@@ -930,6 +930,8 @@
 "sync_run_probe_value" = "Скорость канала %.1f МБ/с";
 "sync_run_phase_disconnected" = "Нет подключения";
 "sync_run_phase_idle" = "Готово к синхронизации";
+"sync_run_phase_fetching_manifest" = "Получаем список файлов устройства…";
+"sync_run_error_manifest_timeout" = "Не удалось получить список файлов (устройство не ответило за %d с — возможно, оно ещё упорядочивает библиотеку).";
 "sync_run_progress_planning" = "Сверка с устройством…";
 "sync_run_progress_push" = "Отправка %d/%d";
 "sync_run_progress_pull" = "Получение %d/%d";

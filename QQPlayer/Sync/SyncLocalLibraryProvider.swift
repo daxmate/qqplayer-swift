@@ -214,8 +214,8 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
 
         let peer = SyncManifestPeer(session: session)
         peer.localRootName = { [weak self] in self?.descriptor.rootName }
-        peer.localManifestProvider = { [weak self] collection in
-            self?.manifest(collection: collection) ?? []
+        peer.localManifestProvider = { [weak self] collection, rid in
+            self?.manifest(collection: collection, rid: rid) ?? []
         }
         peer.onProviderUnavailable = { [weak self] in self?.onProviderUnavailable?() }
 
@@ -262,13 +262,44 @@ final class SyncLocalLibraryProvider: @unchecked Sendable {
     ///   `.playlists` 集合会向 descriptor 求值，`.all` / `.tracks` 零 DB 查询。
     func manifest(
         collection: SyncCollection,
-        members: SyncCollectionMembers? = nil
+        members: SyncCollectionMembers? = nil,
+        rid: String? = nil
     ) -> [ManifestEntry] {
-        let library = SyncManifestGenerator.generate(files: descriptor.sourceFiles())
-        return collection.filter(
+        let built = buildManifest(collection: collection, members: members)
+        // T2 清单时延观测（只读诊断，不参与判定）：慢在扫描 / 哈希兜底 / 过滤的哪一段一眼可见。
+        // `missingHash` = 本次喂给生成器的文件里没有 content_hash 的条数（旧实现会为它们现算 SHA-256）。
+        AppLog.info(.sync, "⏱️ 本端 manifest rid=\(rid ?? "-") kind=\(collection.kind.rawValue)"
+            + " ids=\(collection.ids.count) entries=\(built.entries.count)"
+            + " files=\(built.files) missingHash=\(built.missingHash)"
+            + " ms=\(built.ms)")
+        return built.entries
+    }
+
+    /// 本端全库 manifest 的**诊断统计**（只读：不发帧、不改状态；调用方负责丢后台队列）。
+    /// 用途：会话 ready 后量一次「全库清单要多久、多少条没指纹」，不依赖用户点同步。
+    func manifestStats(collection: SyncCollection = .all) -> (entries: Int, files: Int, missingHash: Int, ms: Int) {
+        let built = buildManifest(collection: collection, members: nil)
+        return (built.entries.count, built.files, built.missingHash, built.ms)
+    }
+
+    /// manifest 生成主体（应答与诊断共用一条路径，避免两套口径）。
+    /// - Returns: 过滤后条目 + 喂给生成器的文件数 / 其中缺指纹数 + 耗时（ms）。
+    private func buildManifest(
+        collection: SyncCollection,
+        members: SyncCollectionMembers?
+    ) -> (entries: [ManifestEntry], files: Int, missingHash: Int, ms: Int) {
+        let started = Date()
+        let files = descriptor.sourceFiles()
+        // 缺指纹 = 本端没有 content_hash（旧实现会在这些文件上现算 SHA-256，正是清单变慢的来源）。
+        let missingHash = files.reduce(0) {
+            $1.contentHash?.isEmpty == false ? $0 : $0 + 1
+        }
+        let library = SyncManifestGenerator.generate(files: files)
+        let entries = collection.filter(
             library + descriptor.lyricsEntries(),
             members: members ?? resolvedMembers(for: collection)
         )
+        return (entries, files.count, missingHash, Int(Date().timeIntervalSince(started) * 1000))
     }
 
     /// 集合 → 歌单成员表（T7b）：**只有 `.playlists` 的非空选择需要 DB 展开**。

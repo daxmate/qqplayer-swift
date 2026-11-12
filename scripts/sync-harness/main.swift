@@ -135,6 +135,7 @@ func sampleLyrics(_ text: String) -> Lyrics {
     )
 }
 
+
 func makeHarness(
     sourceFiles: [(String, Data)] = [],
     targetFiles: [(String, Data)] = [],
@@ -2875,7 +2876,10 @@ do {
     }
     let reason = failureReason(scenario.coordinator.state)
     check(reason != nil, "有界等待内落到终态 .failed（不无限停在计划态）")
-    check(reason?.contains("超时") == true, "失败原因含「超时」：\(reason ?? "nil")")
+    // 锚在本地化 key 上（措辞随语言变；文案在 Resources/*.lproj）。
+    let expectedReason = "sync_run_error_manifest_timeout"
+        .localized(with: Int(configuration.peerManifestTimeout))
+    checkEqual(reason ?? "", expectedReason, "失败原因是「获取设备清单超时」（不再甩锅连接状态）")
     scenario.deviceHost.detach()
 } catch {
     check(false, "㊶ 抛错：\(error)")

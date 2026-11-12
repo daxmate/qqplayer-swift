@@ -935,6 +935,8 @@
 "sync_run_probe_value" = "Link speed %.1f MB/s";
 "sync_run_phase_disconnected" = "Not connected";
 "sync_run_phase_idle" = "Ready to sync";
+"sync_run_phase_fetching_manifest" = "Getting the device’s file list…";
+"sync_run_error_manifest_timeout" = "Timed out getting the device’s file list (no response within %d s — the device may still be tidying its library).";
 "sync_run_progress_planning" = "Checking what's missing…";
 "sync_run_progress_push" = "Sending %d/%d";
 "sync_run_progress_pull" = "Receiving %d/%d";

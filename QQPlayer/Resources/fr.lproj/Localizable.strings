@@ -933,6 +933,8 @@
 "sync_run_probe_value" = "Débit du lien %.1f Mo/s";
 "sync_run_phase_disconnected" = "Non connecté";
 "sync_run_phase_idle" = "Prêt à synchroniser";
+"sync_run_phase_fetching_manifest" = "Récupération de la liste des fichiers de l’appareil…";
+"sync_run_error_manifest_timeout" = "Délai dépassé pour la liste des fichiers (aucune réponse en %d s — l’appareil range peut-être encore sa bibliothèque).";
 "sync_run_progress_planning" = "Comparaison en cours…";
 "sync_run_progress_push" = "Envoi %d/%d";
 "sync_run_progress_pull" = "Réception %d/%d";

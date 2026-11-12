@@ -112,7 +112,11 @@ extension MacSyncRunSection {
         switch model.phase {
         case .disconnected: return "sync_run_phase_disconnected".localized
         case .idle: return "sync_run_phase_idle".localized
-        case .planning: return "sync_run_progress_planning".localized
+        // 清单 1s 内回来 ⇒ `isWaitingForPeerManifest` 始终 false，一次都不出现等待文案。
+        case .planning:
+            return model.isWaitingForPeerManifest
+                ? "sync_run_phase_fetching_manifest".localized
+                : "sync_run_progress_planning".localized
         case .pushing, .pulling: return progressText
         case .done: return "sync_run_progress_done".localized
         case .failed: return model.failureText ?? ""
