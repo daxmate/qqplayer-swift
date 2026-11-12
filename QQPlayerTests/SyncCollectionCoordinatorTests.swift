@@ -21,8 +21,10 @@
 //  应答路径同构。
 //
 //  ⚠️ 本文件**不断言墙钟耗时**（CI 并行饥饿下会假红）：等待一律「轮询到条件成立 +
-//  宽松上限（≤10s）」，断言的是**契约**（状态 / 失败原因内容 / 账目），不是「多久
+//  宽松上限（≤60s）」，断言的是**契约**（状态 / 失败原因内容 / 账目），不是「多久
 //  内完成」。超时值注入得极小（相对默认 20s）只为让用例有界、跑得快。
+//  失败文案一律**锚在本地化 key**（`"sync_run_error_manifest_timeout".localized(with:)`）
+//  上：CI 跑 en 环境，硬编码中文措辞必红。
 //
 
 import Foundation
@@ -76,7 +78,10 @@ struct SyncCollectionCoordinatorTests {
     /// 注入会把「请求刚发出仍在计划态」这条即时读取变成耗时断言 → 假红）。
     private static let tinyTimeout: TimeInterval = 2.0
     /// 轮询上限（宽松；不是耗时断言）。
-    private static let waitLimit: TimeInterval = 10
+    /// 取值 60s：CI 同批用例实测有 187s 级的整体饥饿，超时回调跑在 `.utility` 专用队列上，
+    /// 饥饿时可被整体推迟十几秒（实测 :262 曾在 10s 上限内始终没落终态）。
+    /// 上限只是「别无限等」的保险丝，条件本身才是契约。
+    private static let waitLimit: TimeInterval = 60
 
     // MARK: 夹具
 
@@ -195,7 +200,7 @@ struct SyncCollectionCoordinatorTests {
 
     // MARK: 等待 / 状态助手
 
-    /// 有界轮询到条件成立（宽松上限 10s，须大于 `tinyTimeout`）。**不是耗时断言**：
+    /// 有界轮询到条件成立（宽松上限 60s，须大于 `tinyTimeout`）。**不是耗时断言**：
     /// 条件本身才是契约。
     @discardableResult
     private func waitUntil(_ condition: () -> Bool) -> Bool {
@@ -260,8 +265,14 @@ struct SyncCollectionCoordinatorTests {
 
         // 有界等待到终态（上限宽松；条件是「落终态」而非「多久内落」）
         #expect(waitUntil { SyncCollectionSyncState.isTerminal(coordinator.state) })
+        // 失败原因**锚在本地化 key 上**（与生产同源）：措辞随语言变（CI 是 en 环境，
+        // 硬编码中文「超时」在 CI 必红、本地 zh 无法复现）。断言强度不降：要求与生产
+        // 同一 key + 同一实参渲染出的文本**逐字相等**（= 不是空、不是其它无关文案）。
+        let expectedReason = "sync_run_error_manifest_timeout"
+            .localized(with: Int(configuration.peerManifestTimeout))
+        #expect(expectedReason.isEmpty == false, "本地化 key 渲染为空 = 断言本身失效")
         let reason = failureReason(coordinator.state)
-        #expect(reason?.contains("超时") == true, "失败原因含「超时」：\(reason ?? "nil")")
+        #expect(reason == expectedReason, "失败原因是清单超时文案：\(reason ?? "nil")")
     }
 
     // MARK: ③ 到点检查不得覆盖已应答编排

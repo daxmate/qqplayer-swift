@@ -1296,7 +1296,15 @@ struct SyncDataSyncCoreTests {
             type: .changeLogPush,
             payload: try JSONEncoder().encode(late)
         )
-        #expect(phases.values.filter { $0 == .finished }.count == 1, "收尾只发生一次")
+        // `report.isFinished` 与 `onStateChange(.finished)` **不在同一个临界区**：
+        // finish() 先持锁置 isFinished，解锁后还要取消定时器 / 落诊断，最后才回调
+        // onStateChange —— CI 高负载下这段间隙足够长，上面那个 while 一退出就计数会读到 0
+        // （实测 CI 报 count → 0）。先有界等到 .finished 真的被上报，再断言「只报一次」。
+        let phaseDeadline = Date().addingTimeInterval(60)
+        while !phases.values.contains(.finished), Date() < phaseDeadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(phases.values.filter { $0 == .finished }.count == 1, "收尾只发生一次（实际：\(phases.values)")
         #expect(coordinator.report.failureMessage == firstFailure, "迟到帧不得冲掉首次结论")
     }
 
