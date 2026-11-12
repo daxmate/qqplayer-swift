@@ -108,6 +108,95 @@ struct RecommendationDiversityTests {
         #expect(outcome.relaxed.contains(.artists))
     }
 
+    @Test("60 首池 / 10 艺人 × 6 首：连出三批 15，不补池、不重复、不漏池")
+    func batchesKeepUsingWholePool() {
+        let pool = (0 ..< 10).flatMap { artist in
+            (1 ... 6).map { p3Candidate("S\(artist)-\($0)", "Artist \(artist)", year: nil) }
+        }
+        var session = RecallSession(pool: pool)
+
+        let first = session.nextBatch()
+        let second = session.nextBatch()
+        #expect(first.count == 15)
+        #expect(second.count == 15)
+        #expect(session.remaining == 30)
+        #expect(session.state == .ready)
+
+        let third = session.nextBatch()
+        #expect(third.count == 15)
+        let keys = Set((first + second + third).map { RecommendationKey.normalize(title: $0.title, artist: $0.artist) })
+        #expect(keys.count == 45)
+    }
+
+    @Test("替换轮不得突破「同专辑 ≤2」硬上限")
+    func repairRespectsAlbumCap() {
+        var pool: [RecommendedCandidate] = []
+        for artist in ["A", "B", "C", "D"] {
+            for index in 1 ... 4 {
+                pool.append(p3Candidate("\(artist)-\(index)", artist, album: "Shared", year: nil))
+            }
+        }
+        for artist in ["E", "F", "G", "H", "I", "J"] {
+            for index in 1 ... 3 {
+                pool.append(p3Candidate("\(artist)-\(index)", artist, album: "Shared", year: nil))
+            }
+        }
+        for index in 1 ... 3 {
+            pool.append(p3Candidate("K-\(index)", "K", album: "Other", year: nil))
+        }
+
+        let outcome = RecommendationBatchDiversity.select(pool)
+        let shared = outcome.candidates.filter { $0.album == "Shared" }.count
+        #expect(shared <= RecommendationBatchPolicy.maxSongsPerAlbum)
+        // 池里只有 K 能补位，仍凑不满 8 个艺人 → 必须标记 artists。
+        #expect(outcome.relaxed.contains(.artists))
+    }
+
+    @Test("替换轮把 decade 推过 9 首时必须标记 decade")
+    func repairMarksDecadeOverflow() {
+        var pool: [RecommendedCandidate] = []
+        for artist in ["A", "B", "C"] {
+            for index in 1 ... 3 {
+                pool.append(p3Candidate("\(artist)-\(index)", artist, album: "\(artist)-\(index)", year: 2004))
+            }
+        }
+        for index in 1 ... 6 {
+            pool.append(p3Candidate("D-\(index)", "D", album: "D-\(index)", year: 2024))
+        }
+        for artist in ["E", "F", "G", "H"] {
+            pool.append(p3Candidate("\(artist)-1", artist, album: "\(artist)-1", year: 2004))
+        }
+
+        let outcome = RecommendationBatchDiversity.select(pool)
+        let oldDecade = outcome.candidates.filter { $0.year == 2004 }.count
+        #expect(outcome.candidates.count == 15)
+        #expect(oldDecade > RecommendationBatchPolicy.maxSongsPerDecade)
+        #expect(outcome.relaxed.contains(.decade))
+        #expect(!outcome.relaxed.contains(.genre))
+    }
+
+    @Test("替换轮把 genre 推过 9 首时必须标记 genre")
+    func repairMarksGenreOverflow() {
+        var pool: [RecommendedCandidate] = []
+        for artist in ["A", "B", "C"] {
+            for index in 1 ... 3 {
+                pool.append(p3Candidate("\(artist)-\(index)", artist, album: "\(artist)-\(index)", year: nil, genre: "Rock"))
+            }
+        }
+        for index in 1 ... 6 {
+            pool.append(p3Candidate("D-\(index)", "D", album: "D-\(index)", year: nil))
+        }
+        for artist in ["E", "F", "G", "H"] {
+            pool.append(p3Candidate("\(artist)-1", artist, album: "\(artist)-1", year: nil, genre: "Rock"))
+        }
+
+        let outcome = RecommendationBatchDiversity.select(pool)
+        let rock = outcome.candidates.filter { $0.genre == "Rock" }.count
+        #expect(outcome.candidates.count == 15)
+        #expect(rock > RecommendationBatchPolicy.maxSongsPerGenre)
+        #expect(outcome.relaxed.contains(.genre))
+    }
+
     @Test("会话池透传多样性报告：15 首 / 8 艺人 / 无放宽")
     func sessionExposesReport() {
         let pool = (0 ..< 12).flatMap { artist in

@@ -23,6 +23,7 @@ extension MacRecommendationModel {
         self.session = session
         batchRemaining = session.remaining
         guard !batch.isEmpty else { return false }
+        logDiversity(session.lastBatchDiversity)
         candidates = batch
         phase = .loaded
         startReasonRefresh(for: batch)

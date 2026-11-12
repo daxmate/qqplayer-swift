@@ -35,7 +35,6 @@ struct RecallSession: Sendable, Equatable {
     }
 
     private(set) var pool: [RecommendedCandidate]
-    private(set) var cursor: Int
     private(set) var seen: Set<String>
     let batchSize: Int
     let maxPerArtist: Int
@@ -50,7 +49,6 @@ struct RecallSession: Sendable, Equatable {
         maxPerAlbum: Int = RecommendationBatchPolicy.maxSongsPerAlbum
     ) {
         self.pool = pool
-        self.cursor = 0
         self.seen = []
         self.batchSize = max(1, batchSize)
         self.maxPerArtist = max(1, maxPerArtist)
@@ -74,12 +72,11 @@ struct RecallSession: Sendable, Equatable {
     /// 选择口径在 `RecommendationBatchDiversity`（纯函数）：艺人 ≤4 / 专辑 ≤2 是硬上限，
     /// 不同艺人 ≥8、同 decade / 同 genre ≤9 是目标；池不够时放宽并写进 `lastBatchDiversity`。
     mutating func nextBatch() -> [RecommendedCandidate] {
-        while cursor < pool.count, seen.contains(Self.key(pool[cursor])) {
-            cursor += 1
-        }
-        let eligible = cursor < pool.count ? Array(pool[cursor...]) : []
+        // 口径：在「本轮还没推过」的候选里按池顺序（= 排名顺序）选一批。
+        // ⚠️ 不能用「游标后缀 + 只推进到扫过的位置」：多样性替换会从池后段取新艺人，
+        // 中间没被选中的候选会被游标跨过去却仍算 remaining（漏池、池利用率骤降）。
+        let eligible = pool.filter { !seen.contains(Self.key($0)) }
         let outcome = RecommendationBatchDiversity.select(eligible, limits: diversityLimits)
-        cursor = min(pool.count, cursor + outcome.consumed)
         for candidate in outcome.candidates {
             seen.insert(Self.key(candidate))
         }

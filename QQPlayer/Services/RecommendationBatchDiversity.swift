@@ -44,8 +44,6 @@ enum RecommendationBatchDiversity {
 
     struct Outcome: Sendable, Equatable {
         var candidates: [RecommendedCandidate]
-        /// 本次应推进的游标条数（含被跳过的条目，语义与 P2 一致）。
-        var consumed: Int
         /// 被放宽的目标（空 = 全部满足）。
         var relaxed: [Relaxation]
 
@@ -57,6 +55,8 @@ enum RecommendationBatchDiversity {
         let target = max(1, limits.batchSize)
         var state = State(limits: limits)
         var picked: [Int] = []
+        /// 已经进过批次的候选（含被替换掉的），替换轮不得再把它捞回来。
+        var used = Set<Int>()
         var skippedBySeason: [Int] = []
         var index = 0
 
@@ -72,9 +72,8 @@ enum RecommendationBatchDiversity {
             }
             state.take(candidate)
             picked.append(position)
+            used.insert(position)
         }
-        var consumed = index
-
         // 第二轮：批次不满 → 放宽 decade / genre 收尾（池不够时的**已标记**放宽）。
         if picked.count < target {
             for position in skippedBySeason where picked.count < target {
@@ -82,18 +81,18 @@ enum RecommendationBatchDiversity {
                 guard state.admitsHard(candidate) else { continue }
                 state.take(candidate, relaxingSeason: true)
                 picked.append(position)
+                used.insert(position)
             }
         }
 
         // 第三轮：不同艺人不足 → 用池里「还没出现过的艺人」替换重复艺人的末位曲目。
-        var cursor = consumed
+        // 只替换、不把没选中的候选推进垃圾桶；硬上限（艺人 / 专辑）在替换时同样成立。
         while state.distinctArtists < limits.minDistinctArtists, !picked.isEmpty {
-            guard let incoming = nextNewArtist(from: eligible, after: cursor, state: state) else { break }
+            guard let incoming = nextNewArtist(from: eligible, used: used, state: state) else { break }
             guard let victim = picked.lastIndex(where: { state.canReplace(eligible[$0]) }) else { break }
             state.replace(out: eligible[picked[victim]], with: eligible[incoming])
             picked[victim] = incoming
-            cursor = incoming + 1
-            consumed = max(consumed, incoming + 1)
+            used.insert(incoming)
         }
         if !picked.isEmpty, state.distinctArtists < limits.minDistinctArtists {
             state.relaxed.insert(.artists)
@@ -101,7 +100,6 @@ enum RecommendationBatchDiversity {
 
         return Outcome(
             candidates: picked.map { eligible[$0] },
-            consumed: consumed,
             relaxed: Relaxation.allCases.filter { state.relaxed.contains($0) }
         )
     }
@@ -175,6 +173,14 @@ enum RecommendationBatchDiversity {
 
         mutating func replace(out removed: RecommendedCandidate, with added: RecommendedCandidate) {
             decrement(removed)
+            // 替换同样受软上限约束：超了必须留下标记（放宽绝不静默）。
+            if let decade = added.year.map({ RecommendationScorer.decadeBucket(for: $0) }),
+               (decadeCounts[decade] ?? 0) >= limits.maxPerDecade {
+                relaxed.insert(.decade)
+            }
+            if let genre = Self.genreKey(added), (genreCounts[genre] ?? 0) >= limits.maxPerGenre {
+                relaxed.insert(.genre)
+            }
             artistCounts[artistKey(added), default: 0] += 1
             albumCounts[albumKey(added), default: 0] += 1
             if let decade = added.year.map({ RecommendationScorer.decadeBucket(for: $0) }) {
@@ -213,18 +219,21 @@ enum RecommendationBatchDiversity {
         }
     }
 
-    /// 从 `start` 起找第一条「艺人尚未出现」的候选（跳过已选中的下标）。
+    /// 找一条「艺人尚未出现」的候选：优先不突破硬上限（艺人 / 专辑）也不突破季节软上限的；
+    /// 只有全都超季节上限时才退而求其次（由 `replace` 落放宽标记）。
     private static func nextNewArtist(
         from eligible: [RecommendedCandidate],
-        after start: Int,
+        used: Set<Int>,
         state: State
     ) -> Int? {
-        var index = start
-        while index < eligible.count {
-            let key = state.artistKey(eligible[index])
-            if state.artistCounts[key] == nil { return index }
-            index += 1
+        var seasonOverflow: Int?
+        for index in eligible.indices where !used.contains(index) {
+            let candidate = eligible[index]
+            guard state.admitsHard(candidate) else { continue }
+            guard state.artistCounts[state.artistKey(candidate)] == nil else { continue }
+            if state.admitsSeason(candidate) { return index }
+            if seasonOverflow == nil { seasonOverflow = index }
         }
-        return nil
+        return seasonOverflow
     }
 }
