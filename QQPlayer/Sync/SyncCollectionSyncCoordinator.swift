@@ -92,6 +92,14 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         qos: .utility
     )
 
+    /// 等清单期间的「重发」定时：**独立串行队列**，与超时定时分开排队。
+    /// 重发要做真实帧发送（可能阻塞在会话写路径 / 对端不回读上）；与超时同队列时
+    /// 一次卡住的发送就会把「到点判定」一起推后 —— 终态必须有界，重发只许「多发几次请求」。
+    private let manifestResendQueue = DispatchQueue(
+        label: "qqplayer.sync.collection.manifest-resend",
+        qos: .utility
+    )
+
     /// 观测：一次编排运行的诊断记录（纯观测；不参与任何判定）。
     /// nil = 未接入观测（行为与接入前完全一致）。
     var diag: SyncDiagAttempt?
@@ -265,10 +273,13 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
             guard let self else { return }
             // 文案只讲「清单没来」这一件事实：连接状态由面板绿点表达，不在这条错误里
             // 甩锅连接（真机上绿点已亮、连接是通的，旧文案会把用户引去排连接问题）。
-            self.logManifestWaitTimeout(seconds: seconds)
+            // ⚠️ 顺序：**先落终态，再写诊断日志**。日志是纯观测，不得挡在终态前面——
+            // AppLog 落盘会抢全局 writeLock（CI / 大量并发日志时能阻塞数秒），
+            // 2026-11-12 就因此把「2s 超时」拖成数十秒，等清单超时用例直接红。
             self.failPlanningWhileWaitingForManifest(
                 "sync_run_error_manifest_timeout".localized(with: Int(seconds))
             )
+            self.logManifestWaitTimeout(seconds: seconds)
         }
         lock.lock()
         manifestTimeoutItem = item
@@ -324,7 +335,7 @@ final class SyncCollectionSyncCoordinator: @unchecked Sendable {
         }
         manifestResendItem = item
         lock.unlock()
-        manifestTimeoutQueue.asyncAfter(deadline: .now() + Self.manifestResendInterval, execute: item)
+        manifestResendQueue.asyncAfter(deadline: .now() + Self.manifestResendInterval, execute: item)
     }
 
     /// 仍处于「等对端清单」→ 重发一次并续排下一轮；否则静默退出。

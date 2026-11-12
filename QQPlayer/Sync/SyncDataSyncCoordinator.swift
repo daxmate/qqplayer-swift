@@ -494,8 +494,12 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         lock.unlock()
         cancelTimeout()
         cancelRetry()
-        emitFrameDiagIfNeeded()
+        // ⚠️ 顺序：**收尾回调先于诊断落盘**。`report.isFinished` 在锁内已经翻页，
+        // 观察者（UI / 测试）一看到「已收尾」就必须能拿到 `.finished` 阶段；
+        // 诊断落盘会抢 AppLog 写锁（并发日志多时能阻塞数秒），插在中间会让
+        // 「已收尾但阶段回调还没来」的窗口拉到秒级（2026-11-12 迟到帧用例因此红）。
         onStateChange?(.finished)
+        emitFrameDiagIfNeeded()
     }
 
     /// SYNCDIAG kind=frame（INV-37）：本轮 pull 往返 + 链路事实落盘。
