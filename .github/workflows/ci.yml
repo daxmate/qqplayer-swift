@@ -16,6 +16,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# runner 选型（安全口径）：qqplayer-swift 是公开仓库，pull_request 一律走 GitHub 托管
+# runner；只有 push 到 main 才走自托管（xmini）。否则任何人开 PR 都能在本机执行代码。
 jobs:
   swift:
     name: Swift (swiftlint + swiftformat + xcodebuild test)
@@ -38,7 +40,7 @@ jobs:
     #   + 金丝雀（工具链出现 AppIntentsTesting 即失败，提醒接回 scheme/CI）。
     #   测试文件本身**不允许删除或静默降级**。
     timeout-minutes: 90
-    runs-on: macos-latest
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +61,20 @@ jobs:
           SWIFTFORMAT_VERSION: 0.62.1
         run: |
           set -euo pipefail
+          # 自托管（xmini）runner 已预装 lint 工具：只校验版本，不重装。
+          # 缺失或版本不符一律失败退出——既不「差不多就先用」，也不静默跳过。
+          if [ "${RUNNER_ENVIRONMENT:-github-hosted}" = "self-hosted" ]; then
+            command -v swiftlint >/dev/null 2>&1 || { echo "❌ 自托管 runner 缺少 swiftlint（需 ${SWIFTLINT_VERSION}）"; exit 1; }
+            command -v swiftformat >/dev/null 2>&1 || { echo "❌ 自托管 runner 缺少 swiftformat（需 ${SWIFTFORMAT_VERSION}）"; exit 1; }
+            SL_ACTUAL="$(swiftlint version)"
+            [ "$SL_ACTUAL" = "$SWIFTLINT_VERSION" ] \
+              || { echo "❌ swiftlint 版本不是 $SWIFTLINT_VERSION，实际：$SL_ACTUAL"; exit 1; }
+            SF_ACTUAL="$(swiftformat --version)"
+            [ "$SF_ACTUAL" = "$SWIFTFORMAT_VERSION" ] \
+              || { echo "❌ swiftformat 版本不是 $SWIFTFORMAT_VERSION，实际：$SF_ACTUAL"; exit 1; }
+            echo "✅ 自托管 runner lint 工具版本校验通过：swiftlint $SL_ACTUAL / swiftformat $SF_ACTUAL"
+            exit 0
+          fi
           BIN="$RUNNER_TEMP/lintbin"
           mkdir -p "$BIN"
 
@@ -193,7 +209,7 @@ jobs:
   # 协议桩）⇒ 不拉依赖、不起模拟器，冷跑约 45s（实测：闭包解析 9 轮 + 编译 66 文件 + 500 断言）。
   local-harness:
     name: Local sync harness (swiftc, no simulator)
-    runs-on: macos-latest
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -212,7 +228,7 @@ jobs:
     # ② sidebar 与交通灯重叠 ③ 扫描从不执行（isIndexing 未置 true）→ 库永远为空。
     # 其中图标类问题可用产物断言抓住：AppIcon.icns / Assets.car 必须在 app 里。
     # 编译级验证无法覆盖布局/行为，macOS 单测 target 后续补齐。
-    runs-on: macos-latest
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
