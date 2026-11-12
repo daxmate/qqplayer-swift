@@ -98,6 +98,8 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 因为落盘发生在终态后 800ms，彼时可能已断线拿不到分桶 key。
     private var runPeerID: String?
     private var runPeerName: String?
+    /// 在跑的探针（强持有到回调；非发布状态）。
+    private var probeRunner: SyncProbeRunner?
     /// 本次运行**绑定的会话身份**（启动时快照）。
     /// 对端重连会让 host 让位到新会话 —— 此时 `isConnected` 仍为 true（新会话已连上），
     /// 只有会话身份变了，所以「断开就取消」的分支看不见这件事（任务包 §3 D）。
@@ -294,6 +296,26 @@ final class MacSyncRunViewModel: ObservableObject {
         // 内存回环下 `start()` 可能已在本调用内跑到终态 → 补一次状态同步（幂等）。
         handleState(coordinator.state, from: coordinator)
         refreshAvailability()
+    }
+
+    /// T2 测速：对着当前 ready 会话跑一次合成探针。
+    ///
+    /// - 不写任何 `@Published`（棘轮：本文件发布面只减不增）——结果由调用方（面板局部
+    ///   `@State`）展示；探针总值同时写进 `SyncProbeStore`，供 `kind=frame` 诊断行落盘。
+    /// - 探针失败/超时/对端不支持 → `completion(nil)`，**不影响**同步可用性。
+    func runProbe(completion: @escaping (Double?) -> Void) {
+        guard let session = hostCenter.activeSession, session.isReady else {
+            completion(nil)
+            return
+        }
+        let runner = SyncProbeRunner(session: session)
+        probeRunner = runner // 持有到回调（runner 内部对 self 弱引用）
+        runner.start { [weak self] value in
+            Task { @MainActor in
+                self?.probeRunner = nil
+                completion(value)
+            }
+        }
     }
 
     /// 取消进行中的同步。

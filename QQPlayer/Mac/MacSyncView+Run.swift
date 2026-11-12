@@ -52,6 +52,11 @@ extension MacSyncRunSection {
                 Spacer()
             }
 
+            // T2 测速（局部 @State，不进 view model 的发布面）
+            SyncProbeRowView { completion in
+                model.runProbe(completion: completion)
+            }
+
             if model.phase.isBusy {
                 ProgressView(value: model.progress.isDeterminate ? model.progress.fraction : nil)
                 Text(progressText)

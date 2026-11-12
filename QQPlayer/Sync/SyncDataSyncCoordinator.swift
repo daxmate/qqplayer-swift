@@ -509,6 +509,10 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         facts.pullRecv = reportValue.pullRecv
         facts.pullLate = reportValue.pullLate
         lock.unlock()
+        // T2 探针实测（进程内最近一次成功值；没测到 → nil → 日志写 -1，绝不编造）
+        if let probe = SyncProbeStore.shared.lastMBps {
+            facts.probeMBps = probe
+        }
         diag.setFacts(facts)
         diag.finish()
     }

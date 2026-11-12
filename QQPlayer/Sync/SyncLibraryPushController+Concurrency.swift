@@ -73,10 +73,11 @@ extension SyncLibraryPushController {
             self?.handleNegotiatedConcurrency(declared)
         }
         sender.onCompletion = { [weak self] outcome in
-            self?.handleSendOutcome(outcome, fileID: fileID)
+            self?.handleSendOutcome(outcome, fileID: fileID, sender: sender)
         }
         senders[fileID] = sender
         dispatchedPaths[fileID] = pending.entry.relativePath
+        inFlightPushes[fileID] = pending
         peakConcurrency = max(peakConcurrency, senders.count)
         lock.unlock()
         do {
@@ -84,12 +85,14 @@ extension SyncLibraryPushController {
                 fileURL: pending.fileURL,
                 fileID: fileID,
                 name: pending.entry.transferName,
+                startOffset: pending.startOffset,
                 precomputedSHA256: pending.sha256Hex
             )
         } catch {
             lock.lock()
             senders[fileID] = nil
             dispatchedPaths[fileID] = nil
+            inFlightPushes[fileID] = nil
             lock.unlock()
             appendFailure(
                 SyncPushFailure(
@@ -99,6 +102,11 @@ extension SyncLibraryPushController {
                 )
             )
         }
+    }
+
+    private func isChecksumMismatch(_ error: SyncFileTransferError) -> Bool {
+        if case .checksumMismatch = error { return true }
+        return false
     }
 
     /// 对端声明并发文件数（本文件第一条 meta ack 到达时回调）：旧端不声明 → 保持串行。
@@ -124,10 +132,12 @@ extension SyncLibraryPushController {
         return slot
     }
 
-    func handleSendOutcome(_ outcome: SyncFileSender.Outcome, fileID: String) {
+    func handleSendOutcome(_ outcome: SyncFileSender.Outcome, fileID: String,
+                           sender: SyncFileSender? = nil) {
         lock.lock()
         senders[fileID] = nil
         let path = dispatchedPaths.removeValue(forKey: fileID)
+        let pending = inFlightPushes.removeValue(forKey: fileID)
         lock.unlock()
         switch outcome {
         case .succeeded:
@@ -138,12 +148,29 @@ extension SyncLibraryPushController {
                 onFilePushed?(path)
             }
         case let .failed(error):
+            // 同批次续传：对端最后确认的字节数 > 0 → 以它为起点重试一次（不跨会话持久化）。
+            // 仍不符（如对端没有 .part）→ 第二次失败按终态记账，绝不无限重试。
+            let resumeOffset = sender?.lastAckOffset ?? 0
+            // 校验不符 = .part 已被接收端删除，从 offset 续没有意义 → 不重试。
+            let resumable = !isChecksumMismatch(error)
+            if let pending, resumable, pending.retryCount < 1, resumeOffset > 0,
+               resumeOffset < pending.entry.size {
+                var retry = pending
+                retry.startOffset = resumeOffset
+                retry.retryCount += 1
+                lock.lock()
+                queue.insert(retry, at: 0)
+                lock.unlock()
+                pump()
+                return
+            }
             if let path {
                 appendFailure(
                     SyncPushFailure(
                         relativePath: path,
                         reason: SyncPushFailureReason.sendFailed,
-                        detail: "\(error)"
+                        detail: "\(error)",
+                        resumeOffset: resumeOffset > 0 ? resumeOffset : nil
                     )
                 )
             }

@@ -204,6 +204,8 @@ final class SyncLibraryPushController: @unchecked Sendable {
     var senders: [String: SyncFileSender] = [:]
     /// fileID → 相对路径（fileAck 只带 fileID，终态回填账目要用）。
     var dispatchedPaths: [String: String] = [:]
+    /// fileID → 在途条目（断点续传重试要用原始 fileURL / 声明，不能只留路径）。
+    var inFlightPushes: [String: PendingPush] = [:]
 
     /// 并发杠杆（注入点：并发度 / 全局在途上限）。必须在任何一次 `send` 之前设置。
     var concurrencyPolicy = SyncTransferConcurrencyPolicy.default
@@ -242,6 +244,10 @@ final class SyncLibraryPushController: @unchecked Sendable {
         /// 省一次全文件重读；同时保证**声明里的 sha 与 file_meta 里的 sha 恒为同一个值**
         /// （否则两处在不同时刻各算一次，理论上会漂移）。
         var sha256Hex: String { entry.sha256Hex }
+        /// 断点续传起点（同批次重试用：对端最后确认的字节数；**不跨会话持久化**）。
+        var startOffset: Int64 = 0
+        /// 本文件在同批次内已重试次数（1 = 只在中断后重试一次，防死循环）。
+        var retryCount: Int = 0
     }
 
     init(

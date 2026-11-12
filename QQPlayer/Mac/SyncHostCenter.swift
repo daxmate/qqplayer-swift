@@ -273,6 +273,8 @@ final class SyncHostCenter {
             libraryHost = host
             libraryHostSession = session
             activeSession = session
+            // T2 测速：会话 ready 且距上次探针 > 10 分钟 → 后台跑一次（失败静默，不影响同步）。
+            SyncProbeScheduler.maybeAutoProbe(session: session)
             // 连接就绪 → 后台自动跑一次「同步数据」（用户 2026-09-15 拍板：触发时机 = 连接后自动）。
             // 放在这里而不是面板 view model 里：面板没打开时也要跑（否则又变成“点过的才同步”）。
             MacDataSyncAutoRunner.shared.sessionDidBecomeReady(session, libraryRoot: libraryRootProvider())

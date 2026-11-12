@@ -1255,6 +1255,8 @@
 "sync_run_download" = "從 iPhone 下載";
 "sync_run_download_help" = "以 iPhone 的清單為準，把本機缺的歌拉回來";
 "sync_run_cancel" = "取消";
+"sync_run_probe" = "測速";
+"sync_run_probe_value" = "鏈路速度 %.1f MB/s";
 "sync_run_phase_disconnected" = "未連線";
 "sync_run_phase_idle" = "可以開始同步";
 "sync_run_progress_planning" = "正在與裝置核對…";

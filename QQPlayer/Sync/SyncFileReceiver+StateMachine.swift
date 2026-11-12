@@ -29,7 +29,7 @@ extension SyncFileReceiver {
             // 关旧 handle，保留 .part，按新 meta 重对齐。文件级并发下只影响这一个 fileID。
             closeHandle(current)
             active = nil
-        } else if actives.count >= maxConcurrentFiles {
+        } else if actives.values.filter({ !$0.isProbe }).count >= maxConcurrentFiles {
             // 在途文件数已满 → 不再接新文件。正常协商下发送端按我们的声明派发，不会超派；
             // 触发只可能是对端没读声明（旧端并发双传）→ 明确拒绝，避免句柄/内存超量。
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .protocolError))]
@@ -38,6 +38,11 @@ extension SyncFileReceiver {
         // 参数合法性（v1 校验集：非法 → protocolError 中止）
         guard isValidMeta(meta) else {
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .protocolError))]
+        }
+
+        // 探针分支（T2 测速）：不进曲库目录、不占并发槽、不发 .finish（不登记 peer state / 台账）。
+        if SyncProbe.isProbeFileID(meta.fileID) {
+            return startProbeLocked(meta)
         }
 
         let fm = FileManager.default
@@ -81,9 +86,9 @@ extension SyncFileReceiver {
         // 断点对齐：offset 永远对齐**声明**块边界（半块残留先 truncate，见下方统一对齐分支）
         let alignedPart = alignDown(rawPart, to: meta.chunkSize)
 
-        // 无 .part 且 startOffset > 0：没有可续的数据源 → resumeMismatch
+        // 无 .part 且 startOffset > 0：没有可续的数据源 → resumeMismatch（真实进度 = 0）
         guard rawPart > 0 || meta.startOffset == 0 else {
-            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .resumeMismatch)),
+            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: alignedPart, error: .resumeMismatch)),
                     .finish(.failed(.resumeMismatch(meta.fileID)))]
         }
 
@@ -91,8 +96,9 @@ extension SyncFileReceiver {
             // 从头收：删除任何残留 .part（规格 3.2：删除重建）
             try? fm.removeItem(at: partURL)
         } else if alignedPart != meta.startOffset {
-            // .part 对齐后仍与续传起点不符（对端进度记忆与本地不一致）→ resumeMismatch
-            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .resumeMismatch)),
+            // .part 对齐后仍与续传起点不符（对端进度记忆与本地不一致）→ resumeMismatch。
+            // 回**真实**对齐进度（旧实现写死 0，发送端拿不到对端实际收到多少，只能全量重传）。
+            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: alignedPart, error: .resumeMismatch)),
                     .finish(.failed(.resumeMismatch(meta.fileID)))]
         }
         // 续写前统一对齐：.part 尾部若有半块残留（异常中断在写块中途）→ truncate 到
@@ -148,6 +154,31 @@ extension SyncFileReceiver {
             let code = errorCode(for: error)
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: code)),
                     .finish(.failed(localError(code, fileID: meta.fileID)))]
+        }
+    }
+
+    /// 探针 meta：写**临时目录**、不占并发槽、不登记曲库——收齐/中止即删（T2 测速）。
+    private func startProbeLocked(_ meta: FileMetaPayload) -> [Action] {
+        let fm = FileManager.default
+        let dir = probeDirectory
+        let safeID = meta.fileID.replacingOccurrences(of: "/", with: "_")
+        let partURL = dir.appendingPathComponent(safeID + ".part")
+        do {
+            if !fm.fileExists(atPath: dir.path) {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+            try? fm.removeItem(at: partURL)
+            let handle = try openPartForAppending(partURL)
+            active = Active(fileID: meta.fileID, name: meta.name, totalSize: meta.totalSize,
+                            chunkSize: meta.chunkSize, sha256Hex: meta.sha256Hex.lowercased(),
+                            finalURL: partURL, partURL: partURL, startOffset: 0, startedAt: Date(),
+                            handle: handle, received: 0, chunksReceived: 0, wireBytes: 0,
+                            slot: lowestFreeSlotLocked(), concurrencyObserved: 0, isProbe: true)
+            return [.sendAck(metaAck(fileID: meta.fileID, receivedBytes: 0))]
+        } catch {
+            try? fm.removeItem(at: partURL)
+            let code = errorCode(for: error)
+            return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: code))]
         }
     }
 
@@ -232,6 +263,12 @@ extension SyncFileReceiver {
             // 收齐：关文件 → 整文件 SHA-256 → 匹配改名 / 不匹配删 .part
             closeHandle(advanced)
             active = nil
+            // 探针收齐：立即删除临时载荷，**不发 .finish**（不进曲库 / peer state / 台账）。
+            if advanced.isProbe {
+                try? FileManager.default.removeItem(at: advanced.partURL)
+                return [.sendAck(ack(fileID: advanced.fileID,
+                                     receivedBytes: advanced.totalSize, done: true))]
+            }
             return completePartLocked(PartCompletionContext(fileID: advanced.fileID,
                                                             totalSize: advanced.totalSize,
                                                             sha256Hex: advanced.sha256Hex,

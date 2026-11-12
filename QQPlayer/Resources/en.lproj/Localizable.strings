@@ -931,6 +931,8 @@
 "sync_run_download" = "Download from iPhone";
 "sync_run_download_help" = "Bring songs from your iPhone to this Mac (the iPhone list is the source of truth)";
 "sync_run_cancel" = "Cancel";
+"sync_run_probe" = "Measure speed";
+"sync_run_probe_value" = "Link speed %.1f MB/s";
 "sync_run_phase_disconnected" = "Not connected";
 "sync_run_phase_idle" = "Ready to sync";
 "sync_run_progress_planning" = "Checking what's missing…";

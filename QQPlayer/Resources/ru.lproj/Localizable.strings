@@ -926,6 +926,8 @@
 "sync_run_download" = "Скачать с iPhone";
 "sync_run_download_help" = "Перенести песни с iPhone на этот Mac (список iPhone — источник истины)";
 "sync_run_cancel" = "Отмена";
+"sync_run_probe" = "Измерить скорость";
+"sync_run_probe_value" = "Скорость канала %.1f МБ/с";
 "sync_run_phase_disconnected" = "Нет подключения";
 "sync_run_phase_idle" = "Готово к синхронизации";
 "sync_run_progress_planning" = "Сверка с устройством…";

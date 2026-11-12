@@ -147,6 +147,9 @@ struct SyncPushFailure: Equatable, Sendable {
     var reason: String
     /// 附加上下文（错误摘要；无则 nil）
     var detail: String?
+    /// 断点续传起点（对端最后确认的字节数；无 / 0 / 未测 → nil）。
+    /// 仅**本轮**诊断用，不跨会话持久化。
+    var resumeOffset: Int64?
 }
 
 /// 推送链路失败原因（本地字符串常量，跨版本可加不可改）。

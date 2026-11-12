@@ -420,6 +420,125 @@ struct SyncFileTransferTests {
         }
         #expect(!sender.isActive)
     }
+
+    // MARK: T2 探针（合成 4 MiB 测速）
+
+    @Test("探针纯函数：MB/s 口径（1024²）、非法输入 nil、10 分钟节流")
+    func probePureFunctions() {
+        #expect(SyncProbe.megabytesPerSecond(bytes: 4 * 1024 * 1024, seconds: 1) == 4)
+        #expect(SyncProbe.megabytesPerSecond(bytes: 2 * 1024 * 1024, seconds: 0.5) == 4)
+        #expect(SyncProbe.megabytesPerSecond(bytes: 0, seconds: 1) == nil)
+        #expect(SyncProbe.megabytesPerSecond(bytes: 1024, seconds: 0) == nil)
+        #expect(SyncProbe.isProbeFileID(SyncProbe.fileIDPrefix + "x"))
+        #expect(!SyncProbe.isProbeFileID("t1"))
+        #expect(SyncProbe.shouldAutoProbe(lastProbeAt: nil))
+        #expect(!SyncProbe.shouldAutoProbe(lastProbeAt: Date(), now: Date()))
+        #expect(SyncProbe.shouldAutoProbe(lastProbeAt: Date().addingTimeInterval(-601)))
+    }
+
+    @Test("探针：对端声明 probeCapable → 收齐后临时目录即删、曲库零残留、不发 finish")
+    func probeLandsInTemporaryDirectory() throws {
+        let srcDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: srcDir) }
+        let payload = Data(count: Int(SyncProbe.payloadBytes))
+        let sourceURL = srcDir.appendingPathComponent("probe-src.bin")
+        try payload.write(to: sourceURL)
+
+        let fixture = SessionFixture.pairedHandshake()
+        let libraryDir = try makeTempDir()
+        let probeDir = try makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: libraryDir)
+            try? FileManager.default.removeItem(at: probeDir)
+        }
+
+        let box = TransferBox()
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: libraryDir)
+        receiver.probeDirectory = probeDir
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.windowOverride = SyncProbe.window
+        sender.onCompletion = { box.senderOutcome = $0 }
+
+        let fileID = SyncProbe.fileIDPrefix + UUID().uuidString
+        try sender.send(fileURL: sourceURL, fileID: fileID, name: SyncProbe.fileName)
+
+        #expect(box.senderOutcome == .succeeded)
+        // 探针**不产生 finish**（不进 peer state / 台账）
+        #expect(box.receiverOutcome == nil)
+        #expect(box.acks.last?.done == true)
+        // 曲库目录零残留；探针目录也收齐即删
+        #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: probeDir.path).isEmpty)
+        // 计时口径可用（首块发出 → 末块 ack）
+        #expect((sender.lastTransferSeconds ?? -1) >= 0)
+    }
+
+    @Test("探针门控：旧端不声明 probeCapable → 一个块都不发、两边零文件")
+    func probeGatedForLegacyPeer() throws {
+        let srcDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: srcDir) }
+        let sourceURL = srcDir.appendingPathComponent("probe-src.bin")
+        try Data(count: 4096).write(to: sourceURL)
+
+        let fixture = SessionFixture.pairedHandshake()
+        let libraryDir = try makeTempDir()
+        let probeDir = try makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: libraryDir)
+            try? FileManager.default.removeItem(at: probeDir)
+        }
+
+        let box = TransferBox()
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: libraryDir)
+        receiver.probeDirectory = probeDir
+        receiver.capabilityOverride = .legacy
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.windowOverride = SyncProbe.window
+        sender.onCompletion = { box.senderOutcome = $0 }
+
+        let fileID = SyncProbe.fileIDPrefix + UUID().uuidString
+        try sender.send(fileURL: sourceURL, fileID: fileID, name: SyncProbe.fileName)
+
+        #expect(box.senderOutcome == .failed(.probeUnsupported(fileID)))
+        #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 0)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: probeDir.path).isEmpty)
+    }
+
+    @Test("续传：resumeMismatch 的 ack 回真实对齐进度，发送端记住该起点")
+    func resumeMismatchReportsAlignedProgress() throws {
+        let chunkSize = Int(SyncFileTransfer.chunkSize)
+        let source = pseudoRandomData(chunkSize * 3)
+        let srcDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: srcDir) }
+        let sourceURL = try writeSource(source, into: srcDir)
+
+        let fixture = SessionFixture.pairedHandshake()
+        let receiverDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: receiverDir) }
+        // 预置 .part：2 个整块已收
+        let partURL = receiverDir.appendingPathComponent("song.bin.part")
+        try source.prefix(chunkSize * 2).write(to: partURL)
+
+        let box = TransferBox()
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: receiverDir)
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.onCompletion = { box.senderOutcome = $0 }
+
+        // 请求从第 3 块续传，但对端只有 2 块 → resumeMismatch，ack 应回 2 块的进度
+        try sender.send(fileURL: sourceURL, fileID: "resume-t2", name: "song.bin",
+                        startOffset: Int64(chunkSize * 3))
+
+        #expect(box.senderOutcome == .failed(.resumeMismatch("resume-t2")))
+        #expect(box.acks.contains { $0.error == .resumeMismatch && $0.receivedBytes == Int64(chunkSize * 2) })
+        #expect(sender.lastAckOffset == Int64(chunkSize * 2))
+    }
 }
 
 /// 测试侧 Sendable 盒子（2026-09-20 会话回调收口）：`onCompletion` / `onAckSent` 是 `@Sendable`

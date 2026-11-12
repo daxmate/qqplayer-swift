@@ -61,6 +61,15 @@ final class SyncFileSender: @unchecked Sendable {
 
     /// 跨文件共享的全局在途字节预算（nil = 不限：单文件路径 / 既有测试不注入）。
     var budget: SyncTransferBudget?
+
+    /// 窗口硬上限覆盖（探针用 2；nil = 按对端声明与 `maxInFlight` 取小）。
+    var windowOverride: Int?
+
+    /// 最近一轮终态时对端**最后确认的字节数**（断点续传起点；无 ack → 0）。
+    private(set) var lastAckOffset: Int64 = 0
+
+    /// 最近一轮**成功**传输的耗时（首块发出 → 终态 ack，单调时钟；失败 → nil）。
+    private(set) var lastTransferSeconds: TimeInterval?
     /// 本文件第一条 ack（= 应答 file_meta 那条）到达时报告对端声明的并发文件数（nil = 旧端）。
     var onConcurrencyNegotiated: (@Sendable (Int?) -> Void)?
     /// 计时日志里的并发度 / 槽位（nil = 不打印，保持既有单文件日志形状）。
@@ -71,44 +80,10 @@ final class SyncFileSender: @unchecked Sendable {
     // MARK: 当前传输（锁保护）
 
     /// 已发出但未确认的块（窗口占位；`end` = 该块末字节的绝对偏移）。
-    struct SentChunk {
-        let offset: Int64, length: Int64
-        var end: Int64 { offset + length }
-    }
+    typealias SentChunk = SyncSenderSentChunk
 
-    struct Active {
-        let fileID: String
-        let fileURL: URL
-        let totalSize: Int64
-        let name: String
-        /// 本轮**声明**的块大小（= file_meta.chunkSize；读块用它，不读常量）
-        let chunkSize: Int64
-        /// 本轮起点（> 0 = 断点续传）/ 开始时刻（诊断）
-        let startOffset: Int64
-        let startedAt: Date
-        var handle: FileHandle?
-        /// 最近一次**推进**的 ack 的 receivedBytes（重复/滞后 ack 的判定基线）
-        var lastAckBytes: Int64?
-        /// 下一个要发的字节偏移（严格有序、连续；窗口内可多块在途）
-        var nextOffset: Int64
-        /// 在途未确认的块（按发送顺序；窗口占用 = `inFlight.count`）
-        var inFlight: [SentChunk]
-        /// 窗口深度（1 = 停等 / 旧对端；应答 file_meta 的 ack 协商后可能 > 1）
-        var window: Int
-        /// 在途块数峰值（诊断：判断窗口是否真的打满）
-        var inFlightMax: Int
-        /// file_chunk 载荷累计字节（诊断：看 base64 的 33% 膨胀）
-        var wireBytes: Int
-        /// 是否走二进制块载荷（对端在 ack 里声明才开）
-        var binaryChunks: Bool
-        /// 已发出的块数（诊断用）
-        var chunksSent: Int
-        /// 首块/末块发出时刻 + 对应往返（秒；只留首末两次，不逐块刷屏）
-        var firstChunkSentAt: Date?
-        var lastChunkSentAt: Date?
-        var firstChunkWait: TimeInterval?
-        var lastChunkWait: TimeInterval?
-    }
+    /// 本轮状态（定义见 `SyncFileSender+Active.swift`；类型别名保持调用点不变）。
+    typealias Active = SyncSenderActive
 
     var active: Active?
     private var ackDeadlineItem: (any SyncScheduledDeadline)? // 已排定的 ack 超时（nil = 没在等）
@@ -220,7 +195,8 @@ final class SyncFileSender: @unchecked Sendable {
                               nextOffset: startOffset, inFlight: [],
                               window: 1, // 协商前按停等发（= 旧端行为）；meta ack 后再放大
                               inFlightMax: 0, wireBytes: 0, binaryChunks: false,
-                              chunksSent: 0, firstChunkSentAt: nil, lastChunkSentAt: nil,
+                              chunksSent: 0, firstChunkSentAt: nil, firstChunkSentUptime: nil,
+                              lastChunkSentAt: nil,
                               firstChunkWait: nil, lastChunkWait: nil)
         lock.lock()
         active = transfer
@@ -301,7 +277,13 @@ final class SyncFileSender: @unchecked Sendable {
         guard ack.fileID == current.fileID else { return [] } // 别的传输的 ack 与本轮无关
 
         // ack.error → 失败（resumeMismatch 保留给调用方做 startOffset=0 重试决策）
+        if let failure = probeGatingFailure(ack, fileID: current.fileID) {
+            return terminateLocked(failure, current: current)
+        }
+
         guard ack.error == .none else {
+            // resumeMismatch 的 ack 带对端**真实**进度 → 记下来供调用方决定重试起点。
+            if ack.error == .resumeMismatch { current.lastAckBytes = ack.receivedBytes }
             return terminateLocked(localError(ack.error, fileID: current.fileID), current: current)
         }
         // done → 成功（receivedBytes 必须与声明一致）
@@ -338,7 +320,7 @@ final class SyncFileSender: @unchecked Sendable {
         current.inFlight.removeAll { $0.end <= ack.receivedBytes }
         // 能力协商（应答 file_meta 的那条 ack 才带；旧端不带 → 保持停等 / base64）
         if let advertised = ack.maxInFlight {
-            current.window = min(max(advertised, 1), SyncFileTransfer.maxInFlight)
+            current.window = min(max(advertised, 1), windowOverride ?? SyncFileTransfer.maxInFlight)
         }
         if let binary = ack.binaryChunks {
             current.binaryChunks = binary
@@ -461,8 +443,7 @@ final class SyncFileSender: @unchecked Sendable {
         current.chunksSent += 1
         current.wireBytes += payload.count
         let now = Date()
-        if current.firstChunkSentAt == nil { current.firstChunkSentAt = now }
-        current.lastChunkSentAt = now
+        current.noteChunkSent(at: now)
         active = current
         return .send(payload: payload, flags: flags)
     }
@@ -515,6 +496,11 @@ final class SyncFileSender: @unchecked Sendable {
         active = nil
         cancelAckDeadlineLocked()
         try? current.handle?.close()
+        // 断点续传载体 + 成功轮耗时（首块发出 → 终态 ack，单调时钟）
+        lastAckOffset = current.lastAckBytes ?? 0
+        if error == nil, let first = current.firstChunkSentUptime {
+            lastTransferSeconds = max(0, ProcessInfo.processInfo.systemUptime - first)
+        }
         let metrics = metricsLocked(current, succeeded: error == nil, error: error)
         guard let error else {
             return [.log(metrics), .finish(.succeeded)]

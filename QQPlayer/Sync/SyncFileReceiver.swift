@@ -71,6 +71,8 @@ final class SyncFileReceiver: @unchecked Sendable {
     /// 能力协商注入（**测试用**：模拟不声明能力的旧对端；nil = 生产默认 `.current`）。
     /// 发送端据此决定「窗口深度」与「二进制块 vs base64 JSON」——两条回退分支都要能真跑。
     var capabilityOverride: SyncFileTransferCapabilities?
+    /// 探针落盘目录（默认系统临时目录；测试可注入以断言「不落曲库目录」）。
+    var probeDirectory: URL = FileManager.default.temporaryDirectory
 
     // MARK: 会话槽位链式挂接
 
@@ -104,6 +106,8 @@ final class SyncFileReceiver: @unchecked Sendable {
         let slot: Int
         /// 本文件在途期间观察到的并发文件数峰值（计时行的 conc=）
         var concurrencyObserved: Int
+        /// 合成探针（T2 测速）：临时目录 + 不计并发槽 + 收齐即删、不发 `.finish`。
+        var isProbe = false
     }
 
     /// 入站块：JSON 载荷带**显式 offset**（可容忍幂等重传）；二进制载荷（flags bit1）
@@ -202,6 +206,12 @@ final class SyncFileReceiver: @unchecked Sendable {
                 guard let current = self.active else { continue }
                 self.active = nil
                 self.closeHandle(current)
+                if current.isProbe {
+                    // 探针中止：删除临时载荷，且**不发 .finish**（不污染曲库/台账/同步结论）。
+                    try? FileManager.default.removeItem(at: current.partURL)
+                    self.actives[key] = nil
+                    continue
+                }
                 let error = makeError(current.fileID)
                 actions.append(.log(self.metrics(current, succeeded: false, error: error)))
                 actions.append(.finish(.failed(error)))
@@ -308,6 +318,7 @@ final class SyncFileReceiver: @unchecked Sendable {
             }
             self.active = nil
             self.closeHandle(current)
+            if current.isProbe { try? FileManager.default.removeItem(at: current.partURL) }
             let error = SyncFileTransferError.protocolError(fileID, reason)
             return [.sendAck(self.ack(fileID: fileID, receivedBytes: current.received, error: .protocolError)),
                     .log(self.metrics(current, succeeded: false, error: error)),
@@ -325,10 +336,10 @@ final class SyncFileReceiver: @unchecked Sendable {
     func ack(fileID: String, receivedBytes: Int64, done: Bool = false,
              error: FileTransferErrorCode = .none,
              maxInFlight: Int? = nil, binaryChunks: Bool? = nil,
-             maxConcurrentFiles: Int? = nil) -> FileAckPayload {
+             maxConcurrentFiles: Int? = nil, probeCapable: Bool? = nil) -> FileAckPayload {
         FileAckPayload(fileID: fileID, receivedBytes: receivedBytes, done: done, error: error,
                        maxInFlight: maxInFlight, binaryChunks: binaryChunks,
-                       maxConcurrentFiles: maxConcurrentFiles)
+                       maxConcurrentFiles: maxConcurrentFiles, probeCapable: probeCapable)
     }
 
     /// 应答 file_meta 的 ack：**唯一的**能力协商点（窗口深度 + 二进制块）。
@@ -344,7 +355,8 @@ final class SyncFileReceiver: @unchecked Sendable {
         }
         return ack(fileID: fileID, receivedBytes: receivedBytes,
                    maxInFlight: capabilities.maxInFlight, binaryChunks: capabilities.binaryChunks,
-                   maxConcurrentFiles: declaredConcurrency)
+                   maxConcurrentFiles: declaredConcurrency,
+                   probeCapable: capabilities.probeCapable)
     }
 
     // MARK: 计时诊断（锁内取快照）

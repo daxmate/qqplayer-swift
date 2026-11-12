@@ -170,6 +170,9 @@ struct FileAckPayload: Codable, Equatable, Sendable {
     /// 接收端可同时推进的文件数（**能力协商**，只在应答 file_meta 那条 ack 里带）。
     /// nil = 对端不声明（旧端）→ 发送端回退串行（一次只派一个文件，行为与现在完全一致）。
     var maxConcurrentFiles: Int?
+    /// 接收端是否支持**合成探针**（T2 测速：4 MiB 临时文件，不进曲库）。
+    /// nil = 旧端（不声明）→ 发送端**绝不发探针**（旧端会把它当普通文件落盘）。
+    var probeCapable: Bool?
 }
 
 /// 接收端能力声明（`FileAckPayload` 的两个协商字段打包；测试注入 / 生产默认值共用）。
@@ -178,16 +181,19 @@ struct SyncFileTransferCapabilities: Equatable, Sendable {
     var binaryChunks: Bool?
     /// 可同时推进的文件数（nil = 旧端 → 串行）。
     var maxConcurrentFiles: Int?
+    /// 合成探针支持（nil = 旧端 → 发送端不发探针）。
+    var probeCapable: Bool?
 
-    /// 生产默认：窗口 8 + 二进制块 + 4 文件并发。
+    /// 生产默认：窗口 8 + 二进制块 + 4 文件并发 + 探针可用。
     static let current = SyncFileTransferCapabilities(
         maxInFlight: SyncFileTransfer.maxInFlight,
         binaryChunks: true,
-        maxConcurrentFiles: SyncFileTransfer.maxConcurrentFiles
+        maxConcurrentFiles: SyncFileTransfer.maxConcurrentFiles,
+        probeCapable: true
     )
-    /// 旧端（不声明任何能力）：发送端据此回退停等 + base64 + 串行。
+    /// 旧端（不声明任何能力）：发送端据此回退停等 + base64 + 串行 + 不发探针。
     static let legacy = SyncFileTransferCapabilities(
-        maxInFlight: nil, binaryChunks: nil, maxConcurrentFiles: nil
+        maxInFlight: nil, binaryChunks: nil, maxConcurrentFiles: nil, probeCapable: nil
     )
 }
 
@@ -227,6 +233,8 @@ enum SyncFileTransferError: Error, Equatable, Sendable {
     case checksumMismatch(String)
     /// 接收端断点状态与请求不符（附 fileID；调用方可改 startOffset=0 重试一次）
     case resumeMismatch(String)
+    /// 对端不声明探针能力（旧端）→ 探针自身中止；**与同步结论无关**。
+    case probeUnsupported(String)
     /// 协议违例（对端 protocolError / 本地检出），附 fileID + 原因
     case protocolError(String, String)
 }

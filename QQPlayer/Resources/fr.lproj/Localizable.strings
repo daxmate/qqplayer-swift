@@ -929,6 +929,8 @@
 "sync_run_download" = "Télécharger depuis l'iPhone";
 "sync_run_download_help" = "Rapatrier sur ce Mac les morceaux présents sur l'iPhone";
 "sync_run_cancel" = "Annuler";
+"sync_run_probe" = "Mesurer le débit";
+"sync_run_probe_value" = "Débit du lien %.1f Mo/s";
 "sync_run_phase_disconnected" = "Non connecté";
 "sync_run_phase_idle" = "Prêt à synchroniser";
 "sync_run_progress_planning" = "Comparaison en cours…";

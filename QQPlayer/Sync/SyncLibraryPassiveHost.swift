@@ -325,7 +325,8 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
             return id
         case let .protocolError(id, _):
             return id
-        case .sessionNotReady, .fileUnavailable, .transferInProgress, .invalidArgument, .sendFailed:
+        case .sessionNotReady, .fileUnavailable, .transferInProgress, .invalidArgument, .sendFailed,
+             .probeUnsupported:
             return nil
         }
     }

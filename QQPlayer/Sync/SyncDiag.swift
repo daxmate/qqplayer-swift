@@ -109,6 +109,7 @@ struct SyncDiagLinkFacts: Equatable, Sendable {
         if addr != "-1" { out.addr = addr }
         if interface != "-1" { out.interface = interface }
         if link != "unknown" { out.link = link }
+        if let probeMBps { out.probeMBps = probeMBps }
         return out
     }
 
