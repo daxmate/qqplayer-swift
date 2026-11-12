@@ -379,6 +379,14 @@ final class SyncDiagAttempt: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// 整体写入链路事实（含 pull 计数）：用于「本轮收尾」一次性落账
+    /// （与 `setLinkFacts` 的增量合并区分：计数必须能被真实值覆盖，包括 0）。
+    func setFacts(_ facts: SyncDiagLinkFacts) {
+        lock.lock()
+        linkFacts = facts
+        lock.unlock()
+    }
+
     /// 挂接链路事实的实时来源（连接就绪后才有 `currentPath`）。
     func setLinkFactsProvider(_ provider: @escaping @Sendable () -> SyncDiagLinkFacts) {
         lock.lock()

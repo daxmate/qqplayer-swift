@@ -111,6 +111,8 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
     private var answerWindow: TimeInterval = 20
     /// 本次 pull 的请求标识（诊断 / 去重；应答原样回带，**不参与接受判定**）。
     private var pullRequestID = ""
+    /// 当前这次 pull 请求是否已计过一次应答（应答批会触发多个回调，只算一次）。
+    var pullAnswerCounted = false
     /// SYNCDIAG `kind=frame` 观测行（INV-37：链路事实必须落盘；只观测不判定）。
     private var frameDiag: SyncDiagAttempt?
 
@@ -281,6 +283,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         awaitingNotReadyRetry = false
         reportValue.pullAttempts = 1
         pullRequestID = Self.makePullRequestID(attempt: 1)
+        pullAnswerCounted = false
         reportValue.pullSent += 1
         let window = answerWindow
         let requestID = pullRequestID
@@ -427,6 +430,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         reportValue.waitingKey = nil
         reportValue.retryCountdownSeconds = nil
         pullRequestID = Self.makePullRequestID(attempt: pullAttempt)
+        pullAnswerCounted = false
         reportValue.pullSent += 1
         retryItem = nil
         let attempt = pullAttempt
@@ -505,7 +509,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         facts.pullRecv = reportValue.pullRecv
         facts.pullLate = reportValue.pullLate
         lock.unlock()
-        diag.setLinkFacts(facts)
+        diag.setFacts(facts)
         diag.finish()
     }
 

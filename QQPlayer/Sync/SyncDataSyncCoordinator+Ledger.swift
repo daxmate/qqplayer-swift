@@ -27,6 +27,10 @@ extension SyncDataSyncCoordinator {
     /// 收尾后才到 = 迟到（`pullLate`），否则 = 正常收到（`pullRecv`）。两种都照常
     /// 累加账目（数据已由 peer 落库）；`finish` 本身幂等，不会二次收尾。
     func notePullAnswerLocked(wasFinished: Bool) {
+        // 一次 pull 请求的应答可能触发**多个**回调（applied / 挂起 / 未定位…）：
+        // 计数口径 = 每个请求一次（否则 pullRecv / pullLate 会被回调数放大）。
+        guard !pullAnswerCounted else { return }
+        pullAnswerCounted = true
         if wasFinished {
             reportValue.pullLate += 1
         } else {
