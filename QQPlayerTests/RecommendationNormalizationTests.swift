@@ -4,7 +4,8 @@
 //
 //  推荐 v2 P1 自证测试：
 //  1. 归一化（繁→简 / 版本尾缀 / feat. 拆分 / 标点 / 幂等 / 空串 / 去重键）
-//  2. 准入闸（六个条件各一条「该拒」+ 一条「该留」，且只走 isLikelyNonSong 一个入口）
+//  2. 准入闸（每个条件各一条「该拒」+ 一条「该留」，且只走 isLikelyNonSong 一个入口；
+//     歌曲 ID 缺失按 2026-11-12 口径只 flagged、不拒绝——单列回归用例）
 //
 //  注意：套件名不能叫 RecommendationNormalizationTests —— 那个名字已被
 //  QQPlayerTests/RecommendationTests.swift 占用（同 module 重名 = 编译失败）。
@@ -120,10 +121,13 @@ struct RecommendationAdmissionGateTests {
         )
     }
 
-    @Test("条件 1：歌曲 ID 非空")
-    func requiresSongID() {
-        #expect(RecommendationCandidateFilter.admissionRejection(for: song("晴天", "周杰伦", songID: nil)) == .missingSongID)
-        #expect(RecommendationCandidateFilter.isLikelyNonSong(song("晴天", "周杰伦", songID: nil)))
+    @Test("歌曲 ID 缺失不拒（只 flagged）")
+    func missingSongIDIsNotARejection() {
+        // 2026-11-12 口径：歌曲海源全量无 id，id 的用途是相似召回 / 去重，不是单曲身份判据。
+        #expect(RecommendationCandidateFilter.admissionRejection(for: song("晴天", "周杰伦", songID: nil)) == nil)
+        #expect(!RecommendationCandidateFilter.isLikelyNonSong(song("晴天", "周杰伦", songID: nil)))
+        // 枚举 rawValue 已发布到日志：保留不动（历史日志可对照）。
+        #expect(RecommendationAdmissionRejection.missingSongID.rawValue == "missing_song_id")
         #expect(RecommendationCandidateFilter.admissionRejection(for: song("晴天", "周杰伦", songID: 42)) == nil)
         #expect(!RecommendationCandidateFilter.isLikelyNonSong(song("晴天", "周杰伦", songID: 42)))
     }

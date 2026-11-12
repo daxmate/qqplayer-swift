@@ -117,6 +117,8 @@ struct RecommendationEngine: Sendable {
         var gateStats: [RecommendationGateStat] = []
         /// 观测（P1）：准入闸拒绝原因计数（原因 rawValue → 次数）。
         var rejectionCounts: [String: Int] = [:]
+        /// 观测（P1）：**只计数不拒绝**的标记（维度 rawValue → 次数，目前只有 missing_song_id）。
+        var flaggedCounts: [String: Int] = [:]
     }
 
     private struct SourceOutcome: Sendable {
@@ -138,6 +140,7 @@ struct RecommendationEngine: Sendable {
         var rejectedByArtist = 0
         var gateStats: [String: (inCount: Int, outCount: Int)] = [:]
         var rejectionCounts: [String: Int] = [:]
+        var flaggedCounts: [String: Int] = [:]
         var sourceStats: [RecommendationSource: (ok: Int, failed: Int, songs: Int)] = [:]
 
         // 观测（P1）：每道闸的进/出。候选按序过闸，前面的闸不过就不会走到后面的闸（漏斗口径）。
@@ -165,6 +168,10 @@ struct RecommendationEngine: Sendable {
             let hasFields = !song.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && !artistKey.isEmpty
             guard passGate("fields", hasFields) else { return }
+            // 歌曲 ID 缺失只是 flagged（不拒绝）：歌曲海源全量无 id，该字段不是「是不是单曲」的判据。
+            if song.songID == nil {
+                flaggedCounts[RecommendationAdmissionRejection.missingSongID.rawValue, default: 0] += 1
+            }
             // 点名艺人是硬约束：主艺人不在点名集合内直接剔除（标题命中也不算）。
             if let artistConstraint {
                 guard passGate("artist_constraint", artistConstraint.matches(artist: song.artist)) else {
@@ -272,7 +279,8 @@ struct RecommendationEngine: Sendable {
             allFailed: allFailed,
             sourceStats: sortedSourceStats(sourceStats),
             gateStats: sortedGateStats(gateStats),
-            rejectionCounts: rejectionCounts
+            rejectionCounts: rejectionCounts,
+            flaggedCounts: flaggedCounts
         )
     }
 

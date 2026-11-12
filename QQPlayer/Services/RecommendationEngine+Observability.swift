@@ -46,7 +46,7 @@ extension RecommendationEngine {
 
     /// 一次推荐一条结构化 summary（AppLog.info）；明细走 AppLog.debug。
     ///
-    /// 字段固定、可 grep：request / intents / sources / gates / rejects / final / ms / planner。
+    /// 字段固定、可 grep：request / intents / sources / gates / rejects / flagged / final / ms / planner。
     /// 打点只在管线边界（gather / select），**不绑定具体在线源实现**（P2 换源后字段不变）。
     func logRunSummary(
         context: RecommendationRunContext,
@@ -67,12 +67,17 @@ extension RecommendationEngine {
             .sorted { $0.key < $1.key }
             .map { "\($0.key):\($0.value)" }
             .joined(separator: ",")
+        let flagged = (gathered?.flaggedCounts ?? [:])
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key):\($0.value)" }
+            .joined(separator: ",")
         let sanitizedRequest = Self.singleLine(context.requestText, limit: 160)
 
         AppLog.info(
             .general,
             "🎵 推荐摘要 | request=\(sanitizedRequest) | intents=\(kinds) | sources=\(sources.isEmpty ? "none" : sources)"
                 + " | gates=\(gates.isEmpty ? "none" : gates) | rejects=\(rejects.isEmpty ? "none" : rejects)"
+                + " | flagged=\(flagged.isEmpty ? "none" : flagged)"
                 + " | final=\(finalCount)/\(max(1, targetCount)) | ms=\(durationMs)"
                 + " | planner=\(context.planSource?.rawValue ?? "unknown")"
         )
