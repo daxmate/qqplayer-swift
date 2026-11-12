@@ -161,7 +161,7 @@ struct RecommendationResultCacheTests {
         #expect(cache.entryCount() == 0)
     }
 
-    @Test("TTL 24h 过期 → miss 且删除文件")
+    @Test("TTL 24h 过期 → 精确 miss，但条目保留为 stale 候选")
     func ttlExpiry() {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let clock = TestClock(start)
@@ -172,7 +172,8 @@ struct RecommendationResultCacheTests {
 
         clock.now = start.addingTimeInterval(RecommendationResultCache.ttl + 1)
         #expect(cache.load(key) == nil)
-        #expect(cache.entryCount() == 0)
+        #expect(cache.entryCount() == 1)
+        #expect(cache.loadStale(baseKey: key.baseKey, now: clock.now)?.candidates.first?.title == "a")
     }
 
     @Test("LRU：写第 21 条时淘汰最久未访问")
@@ -223,6 +224,7 @@ struct RecommendationResultCacheTests {
             planSource: .rule,
             keySummary: RecommendationCacheKeySummary(input: key),
             candidates: [makeCandidate("a")],
+            baseKey: key.baseKey,
             requestedArtist: nil
         )
         try encoder.encode(entry).write(to: url)
@@ -246,6 +248,7 @@ struct RecommendationResultCacheTests {
             planSource: .localModel,
             keySummary: RecommendationCacheKeySummary(input: key),
             candidates: [makeCandidate("1990s")],
+            baseKey: key.baseKey,
             requestedArtist: nil
         )
         try JSONEncoder().encode(entry).write(to: url)
@@ -291,5 +294,105 @@ struct RecommendationResultCacheTests {
         let after = makeKey(library: "lib-after")
         #expect(cache.store(before, planSource: .rule, candidates: [makeCandidate("a")]))
         #expect(cache.load(after) == nil)
+    }
+}
+
+// MARK: - stale 索引
+
+@Suite("推荐缓存 stale 索引")
+struct RecommendationStaleCacheTests {
+    @Test("指纹 / 画像变化 → 精确 miss，但 stale 命中返回旧候选")
+    func staleAfterFingerprintChange() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let clock = TestClock(start)
+        let (cache, _) = makeCache(clock)
+        let before = makeKey(profile: "artists=a", library: "lib-before")
+        let after = makeKey(profile: "artists=b", library: "lib-after")
+        #expect(cache.store(before, planSource: .rule, candidates: [makeCandidate("old")]))
+
+        #expect(cache.load(after) == nil)
+        let stale = cache.loadStale(baseKey: after.baseKey, now: start.addingTimeInterval(3600))
+        #expect(stale?.candidates.map { $0.title } == ["old"])
+        #expect(stale?.isStale == true)
+        #expect(stale?.createdAt == start)
+    }
+
+    @Test("stale 超过 7 天 → 不命中")
+    func staleExpired() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let clock = TestClock(start)
+        let (cache, _) = makeCache(clock)
+        let key = makeKey()
+        #expect(cache.store(key, planSource: .rule, candidates: [makeCandidate("a")]))
+
+        let expired = start.addingTimeInterval(RecommendationResultCache.staleMaxAge + 1)
+        #expect(cache.loadStale(baseKey: key.baseKey, now: expired) == nil)
+        // 7 天内仍可命中
+        let fresh = start.addingTimeInterval(RecommendationResultCache.staleMaxAge - 1)
+        #expect(cache.loadStale(baseKey: key.baseKey, now: fresh) != nil)
+    }
+
+    @Test("invalidate → 精确与同 baseKey 的 stale 兄弟条目一起清掉")
+    func invalidateRemovesStaleSiblings() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let clock = TestClock(start)
+        let (cache, _) = makeCache(clock)
+        let before = makeKey(library: "lib-before")
+        let after = makeKey(library: "lib-after")
+        #expect(cache.store(before, planSource: .rule, candidates: [makeCandidate("old")]))
+        #expect(cache.loadStale(baseKey: after.baseKey, now: start) != nil)
+
+        cache.invalidate(after)
+        #expect(cache.loadStale(baseKey: after.baseKey, now: start) == nil)
+        #expect(cache.entryCount() == 0)
+    }
+
+    @Test("不同请求（rawText / planner / 模型 / locale）不串 stale")
+    func staleIsolation() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let clock = TestClock(start)
+        let (cache, _) = makeCache(clock)
+        #expect(cache.store(makeKey(rawText: "周杰伦"), planSource: .rule, candidates: [makeCandidate("周杰伦")]))
+
+        for other in [
+            makeKey(rawText: "五月天"),
+            makeKey(rawText: "周杰伦", planner: .localModel),
+            makeKey(rawText: "周杰伦", model: "qwen-4b"),
+            makeKey(rawText: "周杰伦", locale: "en"),
+        ] {
+            #expect(cache.loadStale(baseKey: other.baseKey, now: start) == nil)
+        }
+    }
+
+    @Test("同 baseKey 多条 → 取最新 createdAt，并刷新命中计数")
+    func newestStaleWins() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let clock = TestClock(start)
+        let (cache, _) = makeCache(clock)
+        #expect(cache.store(makeKey(library: "lib-1"), planSource: .rule, candidates: [makeCandidate("older")]))
+
+        clock.now = start.addingTimeInterval(600)
+        #expect(cache.store(makeKey(library: "lib-2"), planSource: .rule, candidates: [makeCandidate("newer")]))
+
+        let stale = cache.loadStale(baseKey: makeKey(library: "lib-3").baseKey, now: clock.now)
+        #expect(stale?.candidates.map { $0.title } == ["newer"])
+        #expect(stale?.hitCount == 1)
+    }
+
+    @Test("LRU 仍为 20 条：被淘汰的条目 stale 也不再命中（设计边界）")
+    func lruBoundsStale() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let clock = TestClock(start)
+        let (cache, _) = makeCache(clock)
+        let survivor = makeKey(rawText: "keep")
+        #expect(cache.store(survivor, planSource: .rule, candidates: [makeCandidate("keep")]))
+
+        for index in 0 ..< RecommendationResultCache.maxEntryCount {
+            clock.now = start.addingTimeInterval(TimeInterval(index + 1))
+            #expect(cache.store(makeKey(rawText: "q\(index)"), planSource: .rule, candidates: [makeCandidate("t\(index)")]))
+        }
+
+        #expect(cache.entryCount() == RecommendationResultCache.maxEntryCount)
+        #expect(cache.loadStale(baseKey: survivor.baseKey, now: clock.now) == nil)
     }
 }

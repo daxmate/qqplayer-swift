@@ -43,7 +43,8 @@ final class MacRecommendationModel {
     private let blacklistURL: URL?
     private let historyURL: URL?
     private let clock: () -> Date
-    private let cache: RecommendationResultCache?
+    /// 缓存命中编排（exact / stale 垫底 / miss）+ 后台重算代次控制。
+    private let flow: RecommendationCacheFlow
     private var blacklist: RecommendationBlacklist
     private var isGenerating = false
     /// 最近一次请求的缓存键（「不再推荐」时清掉，避免下次命中把已拉黑的歌带回来）。
@@ -58,7 +59,10 @@ final class MacRecommendationModel {
         self.blacklistURL = blacklistURL
         self.historyURL = historyURL
         self.clock = clock
-        cache = cacheDirectoryURL.map { RecommendationResultCache(directory: $0, clock: clock) }
+        flow = RecommendationCacheFlow(
+            cache: cacheDirectoryURL.map { RecommendationResultCache(directory: $0, clock: clock) },
+            clock: clock
+        )
         blacklist = RecommendationBlacklistStore.load(from: blacklistURL)
     }
 
@@ -95,7 +99,10 @@ final class MacRecommendationModel {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isGenerating else { return }
         isGenerating = true
-        phase = .loading
+        let token = flow.beginRequest()
+        if candidates.isEmpty {
+            phase = .loading
+        }
         cacheHit = false
         cacheCreatedAt = nil
         defer { isGenerating = false }
@@ -123,10 +130,27 @@ final class MacRecommendationModel {
                 modelIdentity: RecommendationPlannerFactory.localModelIdentity() ?? "none"
             )
             lastCacheKey = key
-            if bypassCache {
-                cache?.invalidate(key)
-            } else if applyCacheHit(key, requestText: trimmed) {
+            switch flow.lookup(key, bypassCache: bypassCache) {
+            case let .exact(hit):
+                applyCacheHit(hit, requestText: trimmed)
                 return
+            case let .stale(hit):
+                // 列表优先：先用旧候选垫底，后台重算完成后平滑替换。
+                applyCacheHit(hit, requestText: trimmed)
+                startChatRefresh(
+                    token: token,
+                    key: key,
+                    context: ChatRefreshContext(
+                        planner: planner,
+                        profile: profile,
+                        count: count,
+                        text: trimmed,
+                        rounds: rounds
+                    )
+                )
+                return
+            case .miss:
+                phase = .loading
             }
 
             let history = RecommendationRequestHistoryStore.load(from: historyURL, limit: rounds)
@@ -198,7 +222,9 @@ final class MacRecommendationModel {
         RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
         candidates.removeAll { $0.id == candidate.id }
         if let lastCacheKey {
-            cache?.invalidate(lastCacheKey)
+            // 在途后台重算先作废：否则它算完会把刚拉黑的歌带回来。
+            _ = flow.beginRequest()
+            flow.invalidate(lastCacheKey)
         }
     }
 
@@ -211,7 +237,10 @@ final class MacRecommendationModel {
     private func generate(count: Int, bypassCache: Bool = false) async {
         guard !isGenerating else { return }
         isGenerating = true
-        phase = .loading
+        let token = flow.beginRequest()
+        if candidates.isEmpty {
+            phase = .loading
+        }
         cacheHit = false
         cacheCreatedAt = nil
         requestedArtist = nil
@@ -233,10 +262,23 @@ final class MacRecommendationModel {
             modelIdentity: selection.modelIdentity
         )
         lastCacheKey = key
-        if bypassCache {
-            cache?.invalidate(key)
-        } else if applyCacheHit(key, requestText: nil) {
+        switch flow.lookup(key, bypassCache: bypassCache) {
+        case let .exact(hit):
+            applyCacheHit(hit, requestText: nil)
             return
+        case let .stale(hit):
+            // 列表优先：先用旧候选垫底，后台重算完成后平滑替换。
+            applyCacheHit(hit, requestText: nil)
+            startProfileRefresh(
+                token: token,
+                key: key,
+                selection: selection,
+                profile: profile,
+                count: count
+            )
+            return
+        case .miss:
+            phase = .loading
         }
 
         let plan = await selection.planner.makePlan(for: profile)
@@ -283,9 +325,8 @@ final class MacRecommendationModel {
         )
     }
 
-    /// 命中即落状态并返回 true（planner / 召回引擎都不启动）。
-    private func applyCacheHit(_ key: RecommendationCacheKeyInput, requestText: String?) -> Bool {
-        guard let cache, let hit = cache.load(key) else { return false }
+    /// 命中即落状态（planner / 召回引擎都不启动）；stale 命中随后由调用方安排后台重算。
+    private func applyCacheHit(_ hit: RecommendationCacheHit, requestText: String?) {
         candidates = hit.candidates
         planSource = hit.planSource
         lastGeneratedAt = hit.createdAt
@@ -296,7 +337,6 @@ final class MacRecommendationModel {
         }
         requestedArtist = hit.requestedArtist
         phase = .loaded
-        return true
     }
 
     /// 成功后写缓存（空结果 / 失败结果不写）。
@@ -306,11 +346,137 @@ final class MacRecommendationModel {
         candidates: [RecommendedCandidate],
         requestedArtist: String? = nil
     ) {
-        _ = cache?.store(
-            key,
-            planSource: planSource,
-            candidates: candidates,
-            requestedArtist: requestedArtist
+        flow.store(
+            RecommendationRecompute(
+                candidates: candidates,
+                planSource: planSource,
+                requestedArtist: requestedArtist
+            ),
+            key: key
         )
+    }
+
+    // MARK: - 后台重算（stale 垫底后的平滑替换）
+
+    /// 指令推荐重算的输入（planner + 请求上下文）。
+    private struct ChatRefreshContext {
+        var planner: any RecommendationRequestPlanning
+        var profile: TasteProfile
+        var count: Int
+        var text: String
+        var rounds: Int
+    }
+
+    /// 画像推荐：stale 命中后先返回，后台跑 planner + 召回，完成后替换候选并写回新键。
+    private func startProfileRefresh(
+        token: Int,
+        key: RecommendationCacheKeyInput,
+        selection: RecommendationPlannerSelection,
+        profile: TasteProfile,
+        count: Int
+    ) {
+        flow.startBackgroundRefresh(
+            token: token,
+            key: key,
+            currentCandidates: candidates
+        ) { [weak self] in
+            await self?.computeProfileRecompute(selection: selection, profile: profile, count: count)
+        } apply: { [weak self] recompute, changed in
+            self?.applyRecompute(recompute, changed: changed, requestText: nil, chat: nil)
+        }
+    }
+
+    /// 指令推荐：同上，只是重算走 chat planner（解析 + 召回）。
+    private func startChatRefresh(
+        token: Int,
+        key: RecommendationCacheKeyInput,
+        context: ChatRefreshContext
+    ) {
+        flow.startBackgroundRefresh(
+            token: token,
+            key: key,
+            currentCandidates: candidates
+        ) { [weak self] in
+            await self?.computeChatRecompute(context: context)
+        } apply: { [weak self] recompute, changed in
+            self?.applyRecompute(
+                recompute,
+                changed: changed,
+                requestText: context.text,
+                chat: (text: context.text, rounds: context.rounds)
+            )
+        }
+    }
+
+    private func computeProfileRecompute(
+        selection: RecommendationPlannerSelection,
+        profile: TasteProfile,
+        count: Int
+    ) async -> RecommendationRecompute? {
+        let plan = await selection.planner.makePlan(for: profile)
+        if Task.isCancelled { return nil }
+        let result = await RecommendationEngine().recommend(
+            profile: profile,
+            count: count,
+            intents: plan.intents
+        )
+        if Task.isCancelled { return nil }
+        guard case let .success(list) = result else { return nil }
+        return RecommendationRecompute(candidates: list, planSource: plan.source, requestedArtist: nil)
+    }
+
+    private func computeChatRecompute(context: ChatRefreshContext) async -> RecommendationRecompute? {
+        let history = RecommendationRequestHistoryStore.load(from: historyURL, limit: context.rounds)
+        let planned = await context.planner.makeRequest(
+            text: context.text,
+            history: history.entries,
+            profile: context.profile
+        )
+        if Task.isCancelled { return nil }
+        guard case let .success(request) = planned else { return nil }
+        let result = await RecommendationEngine().recommend(
+            request: request,
+            profile: context.profile,
+            count: context.count
+        )
+        if Task.isCancelled { return nil }
+        guard case let .success(list) = result else { return nil }
+        let artist = request.referenceArtists
+            .map { RecommendationKey.displayPrimaryArtist($0) }
+            .first { !$0.isEmpty }
+        return RecommendationRecompute(candidates: list, planSource: .localModel, requestedArtist: artist)
+    }
+
+    /// 后台重算落状态：序列相同则不重设候选（避免 UI 抖动），缓存已由 flow 写回。
+    private func applyRecompute(
+        _ recompute: RecommendationRecompute,
+        changed: Bool,
+        requestText: String?,
+        chat: (text: String, rounds: Int)?
+    ) {
+        if changed {
+            candidates = recompute.candidates
+        }
+        planSource = recompute.planSource
+        requestedArtist = recompute.requestedArtist
+        lastGeneratedAt = clock()
+        cacheHit = false
+        cacheCreatedAt = nil
+        if let requestText {
+            activeRequestText = requestText
+        }
+        phase = .loaded
+        if let chat {
+            var updated = RecommendationRequestHistoryStore.load(from: historyURL, limit: chat.rounds)
+            updated.append(
+                RecommendationRequestHistoryEntry(
+                    requestText: chat.text,
+                    results: RecommendationRequestHistory.results(from: recompute.candidates),
+                    createdAt: clock()
+                ),
+                limit: chat.rounds
+            )
+            _ = RecommendationRequestHistoryStore.save(updated, to: historyURL, limit: chat.rounds)
+        }
     }
 }
