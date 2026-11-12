@@ -65,9 +65,16 @@ final class MacSyncRunViewModel: ObservableObject {
     @Published private(set) var didDisconnectWhileRunning = false
     /// 用户选定的同步方向（T10：面板第一屏；未选 = nil → 不能开始）。
     @Published private(set) var direction: SyncTransferDirection?
-    /// 是否**真的**在等对端清单（`.planning` 超过 `manifestWaitHintDelay` 才置位）。
-    /// 清单 1s 内就回来时这一位始终 false ⇒ 面板一次都不出现「等待」文案。
-    @Published private(set) var isWaitingForPeerManifest = false
+    /// 是否**真的**在等对端清单（`.planning` 持续超过 `manifestWaitHintDelay` 才为 true）。
+    /// 清单 1s 内就回来时本属性始终 false ⇒ 面板一次都不出现「等待」文案。
+    ///
+    /// ⚠️ **非 `@Published`**：棘轮要求本文件 `@Published` 计数 ≤ 基线（见
+    /// `ObservationMigrationContractTests`）。本属性只做纯派生，重绘由**既有** `now`
+    /// 的每秒 tick 驱动（连接期间一直在跑，`.planning` 必然已连接）。
+    var isWaitingForPeerManifest: Bool {
+        guard phase == .planning, let startedAt = manifestWaitStartedAt else { return false }
+        return Date().timeIntervalSince(startedAt) >= Self.manifestWaitHintDelay
+    }
 
     // MARK: 同步目标（批 B2）
 
@@ -197,7 +204,7 @@ final class MacSyncRunViewModel: ObservableObject {
         if isConnected { startTicking() } else { stopTicking() }
     }
 
-    /// 页面消失：停掉计时与延迟任务（协调器不取消——同步应在后台继续跑）。
+    /// 页面消失：停掉计时并撤销等待提示（协调器不取消——同步应在后台继续跑）。
     func onDisappear() {
         stopTicking()
         clearManifestWaitHint()
@@ -333,7 +340,7 @@ final class MacSyncRunViewModel: ObservableObject {
         guard coordinator === source else { return }
         phase = SyncUIPhase.resolve(isConnected: isConnected, state: state)
         if phase == .planning {
-            scheduleManifestWaitHintIfNeeded()
+            markManifestWaitStartedIfNeeded()
         } else {
             clearManifestWaitHint()
         }
@@ -360,32 +367,23 @@ final class MacSyncRunViewModel: ObservableObject {
         refreshProgress(for: source)
     }
 
-    /// 等清单提示的延迟闭包（清单 1s 内回来 = 一次都不显示）。
-    private var manifestWaitHintItem: DispatchWorkItem?
+    /// 进入 `.planning` 的时刻（nil = 没在等）。**非发布面**：等待文案的重绘由 `now` 的
+    /// 每秒 tick 驱动（见 `isWaitingForPeerManifest`）。
+    private var manifestWaitStartedAt: Date?
     /// 本次运行是否已收到对端清单（收到 = 之后不再显示「正在获取设备清单」）。
     private var didReceivePeerManifest = false
     /// 「真的在等」的判定阈值（秒）：低于它视为瞬时对账，面板不出现等待文案。
     static let manifestWaitHintDelay: TimeInterval = 1
 
-    /// 进入 `.planning` 后延迟置位等待提示；已在等待 / 已排好则不重复排。
-    private func scheduleManifestWaitHintIfNeeded() {
-        guard !didReceivePeerManifest, manifestWaitHintItem == nil, !isWaitingForPeerManifest else { return }
-        let item = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            manifestWaitHintItem = nil
-            // 到点时已不在计划态（清单已回 / 已失败 / 已取消）⇒ 不置位。
-            guard phase == .planning else { return }
-            isWaitingForPeerManifest = true
-        }
-        manifestWaitHintItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.manifestWaitHintDelay, execute: item)
+    /// 进入 `.planning` 时记下开始等待的时刻（已在等 / 已收到清单则不重复记）。
+    private func markManifestWaitStartedIfNeeded() {
+        guard !didReceivePeerManifest, manifestWaitStartedAt == nil else { return }
+        manifestWaitStartedAt = Date()
     }
 
     /// 撤销等待提示（清单到手 / 离开计划态 / 页面消失 / 新一轮开始）。
     private func clearManifestWaitHint() {
-        manifestWaitHintItem?.cancel()
-        manifestWaitHintItem = nil
-        if isWaitingForPeerManifest { isWaitingForPeerManifest = false }
+        manifestWaitStartedAt = nil
     }
 
     /// 监听中心状态变化（连接 / 断开 / 开关）。
