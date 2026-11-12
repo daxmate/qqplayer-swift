@@ -97,6 +97,35 @@ def top_level_names(text: str) -> set[str]:
     return {m.group(1) for m in _TOP_DECL_RE.finditer(text)}
 
 
+def drop_orphan_companions(start: list[str], blacklist_set: set[str]) -> tuple[list[str], list[str]]:
+    """起点文件里的伴生扩展（`X+Foo.swift`）若基文件 `X.swift` 已在黑名单 → 不当起点收编。
+
+    为什么：Swift 的 `extension X` 自身**没有顶层声明**，基类型被黑名单排除后它编不进命令行
+    （会报「找不到提供者」）；它之所以被自动发现，只是因为落在 `QQPlayer/Sync/*.swift`
+    这类起点 glob 里。基文件已判定「harness 用不了」（真依赖 / 需桩），伴生扩展同理。
+    （T1 把 `SyncDataSyncCoordinator` 拆出 `+Ledger.swift` 后 CI 因此变红。）
+
+    兜底：若**别处的编译文件**真的引用了该扩展里的符号，解析器下一轮仍会把缺口点名
+    （不会静默漏编）——本规则只阻止「把孤儿扩展当起点」，不做任何裁掉代码的事。
+
+    返回 (保留的起点, 被跳过的伴生文件)。
+    """
+    kept: list[str] = []
+    dropped: list[str] = []
+    for path in start:
+        directory, name = os.path.split(path)
+        stem, ext = os.path.splitext(name)
+        if "+" not in stem:
+            kept.append(path)
+            continue
+        base_path = os.path.join(directory, stem.split("+", 1)[0] + ext)
+        if base_path in blacklist_set:
+            dropped.append(path)
+        else:
+            kept.append(path)
+    return kept, dropped
+
+
 def load_blacklist(root: str, path: str) -> list[str]:
     abs_path = os.path.join(root, path)
     if not os.path.isfile(abs_path):
@@ -199,6 +228,11 @@ def main() -> int:
     blacklist_set = set(blacklist)
     pool = [p for p in rel_swift_files(root, POOL_GLOBS) if p not in blacklist_set]
     start = [p for p in rel_swift_files(root, START_GLOBS) if p not in blacklist_set]
+    # 伴生扩展随基文件的黑名单一起跳过（基文件已被排除，孤儿扩展没有编译意义）
+    start, dropped_companions = drop_orphan_companions(start, blacklist_set)
+    if dropped_companions:
+        warn(f"ℹ️ 伴生扩展随基文件黑名单跳过（{len(dropped_companions)} 个）："
+             + "、".join(dropped_companions))
 
     cache_path = os.path.join(build_dir, "closure-cache.json")
     key = closure_cache_key(root, pool, args.blacklist, blacklist)
