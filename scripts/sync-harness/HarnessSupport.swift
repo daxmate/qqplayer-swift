@@ -238,6 +238,104 @@ struct DeferredSessionFixture {
     }
 }
 
+// MARK: - 虚拟时钟截止时间调度器（harness 专用）
+
+/// 虚拟时钟调度器：把「超时何时到点」交给用例**显式推进**的虚拟时间。
+///
+/// 为什么（2026-11-12 CI 假红）：㊾ 的超时用例原先接真实 GCD 定时器 + `Thread.sleep` 猜时间
+/// （ackTimeout 0.25/0.3s，每轮 sleep 0.12s）。慢机上一轮 sleep 会被拖过 0.3s ⇒ 末块 ack
+/// 还躺在回环发件箱里没投递，发送端就判「无进展超时」（run 43231886485 attempt 1 实测：
+/// `send ❌ fileID=slow ... 无进展超时（0.3s）`，而 `receive ✅ fileID=slow chunks=4` 只差
+/// 最后一条 done ack）。生产语义没错，错的是断言把「慢」写成了对真实调度的假设。
+///
+/// 现在：用例 `advance(by:)` 推进虚拟时钟 —— ack 一直在前进 ⇒ 截止时间不断被取消重挂 ⇒
+/// 虚拟时间走多久都不触发；真停滞 ⇒ 越过截止时刻立刻触发。两条用例共用同一套语义，
+/// 与 runner 的线程调度彻底解耦（同 `QQPlayerTests/ManualDeadlineScheduler` 的思路；
+/// 那份在测试 target、harness 直编不到，故此处独立一份 —— 形状契约只扫 `QQPlayer/Sync`，
+/// 不受影响）。
+final class VirtualDeadlineScheduler: SyncDeadlineScheduling, @unchecked Sendable {
+    private final class Item: @unchecked Sendable {
+        let id: Int
+        let due: TimeInterval
+        let action: @Sendable () -> Void
+
+        init(id: Int, due: TimeInterval, action: @escaping @Sendable () -> Void) {
+            self.id = id
+            self.due = due
+            self.action = action
+        }
+    }
+
+    private let lock = NSLock()
+    private var now: TimeInterval = 0
+    private var nextID = 0
+    private var pending: [Item] = []
+    private var fireCount = 0
+
+    /// 当前挂着的截止时间数（断言「等待期间确实挂着超时」「终止后不残留」）。
+    var pendingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return pending.count
+    }
+
+    /// 累计触发的截止时间数（断言「慢但前进全程一次都没触发」）。
+    var firedCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return fireCount
+    }
+
+    func schedule(after delay: TimeInterval, _ action: @escaping @Sendable () -> Void) -> any SyncScheduledDeadline {
+        lock.lock()
+        nextID += 1
+        let id = nextID
+        pending.append(Item(id: id, due: now + max(0, delay), action: action))
+        lock.unlock()
+        return Handle(id: id) { [weak self] id in self?.cancel(id) }
+    }
+
+    private func cancel(_ id: Int) {
+        lock.lock()
+        pending.removeAll { $0.id == id }
+        lock.unlock()
+    }
+
+    /// 推进虚拟时钟 `delta` 秒，按到期顺序触发所有已到点的截止时间。
+    ///
+    /// 先摘出再执行（与真实调度一致：到点即离开挂起表，执行期间 `cancel()` 语义不变；
+    /// 触发期间新排定的工作项留到下一次 `advance`）。
+    /// - Returns: 本轮实际触发数（用例据此断言「确实挂着超时」「没到点不触发」）。
+    @discardableResult
+    func advance(by delta: TimeInterval) -> Int {
+        lock.lock()
+        now += max(0, delta)
+        let due = pending.filter { $0.due <= now }.sorted { $0.due < $1.due }
+        pending.removeAll { $0.due <= now }
+        fireCount += due.count
+        lock.unlock()
+        for item in due {
+            item.action()
+        }
+        return due.count
+    }
+
+    /// 排定的截止时间句柄（`cancel()` = 从挂起表摘除；幂等）。
+    private final class Handle: SyncScheduledDeadline, @unchecked Sendable {
+        private let id: Int
+        private let onCancel: @Sendable (Int) -> Void
+
+        init(id: Int, onCancel: @escaping @Sendable (Int) -> Void) {
+            self.id = id
+            self.onCancel = onCancel
+        }
+
+        func cancel() {
+            onCancel(id)
+        }
+    }
+}
+
 // MARK: - R3a 曲库事实桩（选择集展开器注入）
 
 /// 内存曲库事实（歌单 → 曲目 → content_hash/相对路径）：harness 里模拟 Mac 侧 DB。

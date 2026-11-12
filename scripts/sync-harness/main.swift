@@ -3981,14 +3981,21 @@ do {
     let source = silentData(0x94, count: Int(SyncFileTransfer.chunkSize) * 10)
     let sourceURL = try writeFile("stall.bin", in: try tempRoot("tw-stall-src"), data: source)
     let outcomes = LockedBox<[SyncFileSender.Outcome]>([])
-    let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.25)
+    // 超时判定走虚拟时钟：只在用例 advance() 越过 ackTimeout 时触发，不等真实定时器。
+    // 真实定时器在 CI 慢机上何时落地不可预期（2026-11-12 run 43231886485 attempt 1 假红即由此而来）。
+    let deadlines = VirtualDeadlineScheduler()
+    let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.25,
+                                deadlineScheduler: deadlines)
     sender.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
 
     try sender.send(fileURL: sourceURL, fileID: "stall", name: "stall.bin")
     fixture.hostChannel.flushAll() // meta + 首块 → 接收端
     fixture.clientChannel.flushAll() // meta ack（打开窗口）+ 首块 ack
     check(sender.isActive, "㊾ 无进展：窗口已打开、正在等 ack")
-    Thread.sleep(forTimeInterval: 0.8)
+    checkEqual(deadlines.pendingCount, 1, "㊾ 无进展：挂着恰好一个 ack 截止时间")
+    checkEqual(deadlines.advance(by: 0.2), 0, "㊾ 无进展：未到 ackTimeout 不触发")
+    checkEqual(outcomes.value.count, 0, "㊾ 无进展：未到点前仍在等 ack")
+    checkEqual(deadlines.advance(by: 0.05), 1, "㊾ 无进展：越过 ackTimeout 立即触发")
     checkEqual(outcomes.value.count, 1, "㊾ 无进展超时：Outcome 只触发一次")
     var timedOut = false
     if case let .failed(.protocolError(id, reason))? = outcomes.value.first {
@@ -3996,6 +4003,7 @@ do {
     }
     check(timedOut, "㊾ 无进展超时：protocolError 且原因点名「无进展」")
     check(!sender.isActive, "㊾ 无进展超时：状态已清（可重试）")
+    checkEqual(deadlines.pendingCount, 0, "㊾ 无进展超时：截止时间已取消（不残留）")
 } catch {
     check(false, "㊾ 无进展超时抛错：\(error)")
 }
@@ -4007,18 +4015,27 @@ do {
     let receiver = SyncFileReceiver(session: fixture.clientSession, directory: try tempRoot("tw-slow-rx"))
     let source = silentData(0x96, count: Int(SyncFileTransfer.chunkSize) * 4)
     let sourceURL = try writeFile("slow.bin", in: try tempRoot("tw-slow-src"), data: source)
+    let chunks = 4 // source = 4 × chunkSize
     let outcomes = LockedBox<[SyncFileSender.Outcome]>([])
-    let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.3)
+    // 虚拟时钟：ack 间隔 0.12s（< ackTimeout 0.3s）由用例显式推进，不 sleep、不等真实定时器。
+    let deadlines = VirtualDeadlineScheduler()
+    let sender = SyncFileSender(session: fixture.hostSession, ackTimeout: 0.3,
+                                deadlineScheduler: deadlines)
     sender.onCompletion = { outcome in outcomes.mutate { $0.append(outcome) } }
 
     try sender.send(fileURL: sourceURL, fileID: "slow", name: "slow.bin")
+    // 每轮：虚拟时钟走 0.12s（一条 ack 的慢往返）→ 再投递恰好一条 ack。
+    // 一直在推进 ⇒ 截止时间不断被取消重挂 ⇒ 虚拟时间再久也不该触发（这就是「慢但前进」）。
+    // 轮次上限按「必须完成的 ack 数」推导（块数 ×2 余量），不按时间推 —— 慢机快机一致。
     var rounds = 0
-    while outcomes.value.isEmpty, rounds < 40 {
+    while outcomes.value.isEmpty, rounds < chunks * 2 + 8 {
+        deadlines.advance(by: 0.12)
         fixture.hostChannel.flushAll() // 窗口补出来的块 → 接收端
         fixture.clientChannel.flush(1) // 每轮只放一条 ack：慢，但一直在推进
-        Thread.sleep(forTimeInterval: 0.12)
         rounds += 1
     }
+    checkEqual(deadlines.firedCount, 0, "㊾ 慢但前进：截止时间一次都没触发（进度持续刷新）")
+    checkEqual(deadlines.pendingCount, 0, "㊾ 慢但前进：成功后不残留截止时间")
     check(receiver.isActive || outcomes.value == [.succeeded], "㊾ 慢但前进：接收端已收尾")
     checkEqual(outcomes.value, [.succeeded], "㊾ 慢但前进：不误判无进展超时")
 } catch {
