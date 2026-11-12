@@ -497,13 +497,52 @@ struct SyncFileTransferTests {
         #expect((sender.lastTransferSeconds ?? -1) >= 0)
     }
 
-    @Test("探针门控：旧端不声明 probeCapable → 一个块都不发、两边零文件")
+    @Test("探针门控：旧端 hello 无 probeCapable → 发第一帧之前中止（零帧、两边零文件）")
     func probeGatedForLegacyPeer() throws {
         let srcDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: srcDir) }
         let sourceURL = srcDir.appendingPathComponent("probe-src.bin")
         try Data(count: 4096).write(to: sourceURL)
 
+        let fixture = SessionFixture.pairedHandshake()
+        // 模拟旧版对端：hello 里没有 probeCapable（nil）。旧端收到 probe meta 会在**曲库**
+        // 落 `__qqprobe__.part` 并留悬挂 active，所以必须在发帧之前拦住。
+        var legacyHello = fixture.hostSession.peerHelloValue
+        legacyHello?.probeCapable = nil
+        fixture.hostSession.peerHelloValue = legacyHello
+        #expect(!fixture.hostSession.peerProbeCapable)
+
+        let libraryDir = try makeTempDir()
+        let probeDir = try makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: libraryDir)
+            try? FileManager.default.removeItem(at: probeDir)
+        }
+
+        let box = TransferBox()
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: libraryDir)
+        receiver.probeDirectory = probeDir
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
+        let sender = SyncFileSender(session: fixture.hostSession)
+        sender.windowOverride = SyncProbe.window
+        sender.onCompletion = { box.senderOutcome = $0 }
+
+        let fileID = SyncProbe.fileIDPrefix + UUID().uuidString
+
+        // 前置抛错（不是走 ack 失败）：连 file_meta 都没发出去
+        #expect(throws: SyncFileTransferError.probeUnsupported(fileID)) {
+            try sender.send(fileURL: sourceURL, fileID: fileID, name: SyncProbe.fileName)
+        }
+        #expect(fixture.hostChannel.sentLog.isEmpty)
+        #expect(box.acks.isEmpty)
+        #expect(box.senderOutcome == nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: probeDir.path).isEmpty)
+    }
+
+    @Test("探针接收端：本端 capability=legacy 收到 probe meta → 回 probeUnsupported、零文件")
+    func probeReceiverRefusesWhenLegacy() throws {
         let fixture = SessionFixture.pairedHandshake()
         let libraryDir = try makeTempDir()
         let probeDir = try makeTempDir()
@@ -515,20 +554,23 @@ struct SyncFileTransferTests {
         let box = TransferBox()
         let receiver = SyncFileReceiver(session: fixture.clientSession, directory: libraryDir)
         receiver.probeDirectory = probeDir
-        receiver.capabilityOverride = .legacy
+        receiver.capabilityOverride = .legacy // 模拟旧接收端能力声明
         receiver.onCompletion = { box.receiverOutcome = $0 }
         receiver.onAckSent = { box.acks.append($0) }
-        let sender = SyncFileSender(session: fixture.hostSession)
-        sender.windowOverride = SyncProbe.window
-        sender.onCompletion = { box.senderOutcome = $0 }
 
         let fileID = SyncProbe.fileIDPrefix + UUID().uuidString
-        try sender.send(fileURL: sourceURL, fileID: fileID, name: SyncProbe.fileName)
+        let meta = FileMetaPayload(fileID: fileID, name: SyncProbe.fileName, totalSize: 4096,
+                                   chunkSize: 1024, sha256Hex: String(repeating: "0", count: 64))
+        receiver.handleInboundFrame(SyncFrame(type: .fileMeta,
+                                              payload: try SyncFilePayloadCodec.encode(meta)))
 
-        #expect(box.senderOutcome == .failed(.probeUnsupported(fileID)))
-        #expect(countFrames(ofType: .fileChunk, in: fixture.hostChannel.sentLog) == 0)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
+        #expect(box.acks.count == 1)
+        #expect(box.acks.last?.fileID == fileID)
+        #expect(box.acks.last?.error == .probeUnsupported)
+        #expect(box.receiverOutcome == nil)
+        #expect(receiver.activeFileID == nil)
         #expect(try FileManager.default.contentsOfDirectory(atPath: probeDir.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
     }
 
     @Test("续传：resumeMismatch 的 ack 回真实对齐进度，发送端记住该起点")

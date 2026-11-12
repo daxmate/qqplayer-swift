@@ -151,6 +151,12 @@ final class SyncFileSender: @unchecked Sendable {
         guard session.isReady else {
             throw SyncFileTransferError.sessionNotReady
         }
+        // 探针：握手阶段就判对端能力。旧端没有 probe 分支，收到 meta 就会在曲库目录建
+        // `.part`（并留悬挂 active）⇒ 非 true 时**一个帧都不发**（连 meta 都不发）。
+        // meta ack 里的 probeCapable 门控保留作防御性二次校验。
+        if SyncProbe.isProbeFileID(fileID), !session.peerProbeCapable {
+            throw SyncFileTransferError.probeUnsupported(fileID)
+        }
         let resolvedName = name ?? fileURL.lastPathComponent
         guard !resolvedName.isEmpty, !resolvedName.contains("/"), !resolvedName.contains("\\") else {
             throw SyncFileTransferError.invalidArgument("name 非法：\(resolvedName)")

@@ -79,6 +79,12 @@ struct SyncHello: Codable, Equatable, Sendable {
     /// 旧端无该字段 → 解码得 nil（合成的 Codable 用 decodeIfPresent），语义 = 不带名。
     var name: String?
 
+    /// 签名方是否支持**合成探针**（T2 测速；nil = 旧端 / 未声明）。
+    /// 与 `name` 同模式：**纯能力声明、不进签名输入**，旧端解码得 nil（语义 = 不支持）。
+    /// 为什么要放在握手里：旧接收端没有 probe 分支，会把 `__qqprobe__` 当普通文件在曲库里
+    /// 落 `.part`；只靠 meta ack 门控已经太晚（meta 本身就会触发对端落文件）。
+    var probeCapable: Bool?
+
     /// ephemeral 公钥 raw（解码失败返回 nil）
     var ephemeralPublicKeyRaw: Data? {
         Data(base64Encoded: ephemeralPublicKey)
@@ -107,7 +113,8 @@ enum SyncHandshake {
         identity: SyncIdentity,
         peerDeviceID: String,
         ephemeralPublicKeyRaw: Data,
-        name: String? = nil
+        name: String? = nil,
+        probeCapable: Bool? = nil
     ) throws -> SyncHello {
         guard ephemeralPublicKeyRaw.count == 32 else {
             throw SyncHandshakeError.invalidKeyData
@@ -124,7 +131,8 @@ enum SyncHandshake {
             peerDeviceID: peerDeviceID,
             ephemeralPublicKey: ephemeralPublicKeyRaw.base64EncodedString(),
             signature: signature.base64EncodedString(),
-            name: name
+            name: name,
+            probeCapable: probeCapable
         )
     }
 

@@ -46,6 +46,7 @@ extension SyncFileSender {
         case .resumeMismatch: return .resumeMismatch(fileID)
         case .cancelled: return .cancelled(fileID)
         case .protocolError: return .protocolError(fileID, "对端协议中止")
+        case .probeUnsupported: return .probeUnsupported(fileID)
         }
     }
 

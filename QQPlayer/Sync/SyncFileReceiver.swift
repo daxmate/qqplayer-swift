@@ -74,6 +74,9 @@ final class SyncFileReceiver: @unchecked Sendable {
     /// 探针落盘目录（默认系统临时目录；测试可注入以断言「不落曲库目录」）。
     var probeDirectory: URL = FileManager.default.temporaryDirectory
 
+    /// 本端声明的能力（注入覆盖优先）：探针分支与 `metaAck` 用**同一个**判据。
+    var localCapabilities: SyncFileTransferCapabilities { capabilityOverride ?? .current }
+
     // MARK: 会话槽位链式挂接
 
     private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
@@ -345,7 +348,7 @@ final class SyncFileReceiver: @unchecked Sendable {
     /// 应答 file_meta 的 ack：**唯一的**能力协商点（窗口深度 + 二进制块）。
     /// 旧发送端会把这两个可选字段当未知键忽略 ⇒ 自动回退停等 + base64。
     func metaAck(fileID: String, receivedBytes: Int64) -> FileAckPayload {
-        let capabilities = capabilityOverride ?? .current
+        let capabilities = localCapabilities
         // 并发文件数：注入的 override 优先（模拟旧端 → nil ⇒ 对端串行），否则用本端上限
         let declaredConcurrency: Int?
         if let override = capabilityOverride {

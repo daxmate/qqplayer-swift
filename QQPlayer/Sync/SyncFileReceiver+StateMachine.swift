@@ -42,6 +42,11 @@ extension SyncFileReceiver {
 
         // 探针分支（T2 测速）：不进曲库目录、不占并发槽、不发 .finish（不登记 peer state / 台账）。
         if SyncProbe.isProbeFileID(meta.fileID) {
+            // 本端不支持探针（模拟旧端 / 能力被关）→ 明确回绝：**不建目录、不建 .part、
+            // 不登记 active**（否则空 .part 会留在 probeDirectory / 曲库）。
+            guard localCapabilities.probeCapable == true else {
+                return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: .probeUnsupported))]
+            }
             return startProbeLocked(meta)
         }
 
@@ -415,6 +420,7 @@ extension SyncFileReceiver {
         case .resumeMismatch: return .resumeMismatch(fileID)
         case .cancelled: return .cancelled(fileID)
         case .protocolError: return .protocolError(fileID, "接收端协议中止")
+        case .probeUnsupported: return .probeUnsupported(fileID)
         }
     }
 

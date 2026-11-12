@@ -206,6 +206,9 @@ enum FileTransferErrorCode: String, Codable, Equatable, Sendable {
     case resumeMismatch
     case cancelled
     case protocolError
+    /// 对端不支持合成探针（旧端 / 能力关闭）。**只在探针链路出现**，普通文件永不使用；
+    /// 旧发送端从不会发探针 ⇒ 不会收到本码。
+    case probeUnsupported
 }
 
 /// 文件传输本端错误。与 FileTransferErrorCode 区分：本类型保留本地上下文

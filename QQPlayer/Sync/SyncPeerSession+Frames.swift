@@ -117,7 +117,8 @@ extension SyncPeerSession {
                 identity: localIdentity,
                 peerDeviceID: hello.deviceID,
                 ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation,
-                name: config.clientDisplayName
+                name: config.clientDisplayName,
+                probeCapable: SyncFileTransferCapabilities.current.probeCapable
             )
             var effects = [Effect.send(try encodedHandshakeFrame(myHello))]
             if knownPublicKey != nil {

@@ -60,6 +60,10 @@ final class SyncPeerSession: @unchecked Sendable {
     var myEphemeralPrivateKey: Curve25519.KeyAgreement.PrivateKey?
     var peerHelloValue: SyncHello?
 
+    /// 对端在 hello 里声明的探针能力（nil / 旧端 / 未声明 → false）。
+    /// 发送端据此在**发第一个帧之前**决定要不要发探针（旧端会在曲库落 .part）。
+    var peerProbeCapable: Bool { peerHelloValue?.probeCapable == true }
+
     /// 链路事实（INV-37）：转发底层通道的实测值（取不到 = 全未知）。
     var linkFacts: SyncDiagLinkFacts { transport?.linkFacts ?? .unknown }
     var pendingPairRequest: PairRequest?
@@ -157,7 +161,8 @@ final class SyncPeerSession: @unchecked Sendable {
                     identity: localIdentity,
                     peerDeviceID: peerBinding,
                     ephemeralPublicKeyRaw: ephemeral.publicKey.rawRepresentation,
-                    name: config.clientDisplayName
+                    name: config.clientDisplayName,
+                    probeCapable: SyncFileTransferCapabilities.current.probeCapable
                 )
                 effects.append(.send(try encodedHandshakeFrame(hello)))
                 scheduleDeadlineLocked()
