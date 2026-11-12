@@ -190,15 +190,73 @@ final class SyncProbeRunner: @unchecked Sendable {
             completion?(mbps)
         }
     }
+
+    /// 兜底（任何提前释放路径）：取消在途发送 + 删除临时载荷，绝不留下孤儿文件/回调。
+    /// 正常路径 `finish` 已清空这两个字段，此处是幂等的空操作。
+    deinit {
+        lock.lock()
+        let sender = self.sender
+        let url = payloadURL
+        self.sender = nil
+        self.payloadURL = nil
+        lock.unlock()
+        sender?.cancel()
+        if let url { try? FileManager.default.removeItem(at: url) }
+    }
 }
 
-/// 会话 ready 后的自动探针入口（10 分钟节流；失败静默，不影响同步）。
-enum SyncProbeScheduler {
-    /// 若距上次探针超过 10 分钟 → 后台跑一次并写 `SyncProbeStore`。
-    static func maybeAutoProbe(session: SyncPeerSession) {
+/// 探针调度（**单飞 + 强持有**）：自动探针与手动探针互斥，同一时刻最多一条。
+///
+/// 为什么必须由调度器持有 runner：`SyncProbeRunner` 内部对 self 全是 weak（onCompletion /
+/// asyncAfter），`SyncFileSender` 的会话处理器也是 weak，session 不持有 sender ——
+/// 裸局部变量 start 后立刻 dealloc ⇒ 探针永不完成、`probeMBps` 恒 -1、临时载荷残留、
+/// 节流时间戳也不落（每次 ready 都重试）。故持有到 completion 为止。
+final class SyncProbeScheduler: @unchecked Sendable {
+    static let shared = SyncProbeScheduler()
+
+    /// 测试接缝：默认真 runner（`payloadBytes` / 超时可注入）。
+    var makeRunner: (SyncPeerSession) -> SyncProbeRunner = { SyncProbeRunner(session: $0) }
+
+    private let lock = NSLock()
+    private var activeRunner: SyncProbeRunner?
+
+    /// 是否已有探针在跑（单飞判据）。
+    var isProbing: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return activeRunner != nil
+    }
+
+    /// 跑一次探针；已有探针在跑 → 直接返回 false（互斥，跳过本次）。
+    /// - Parameter completion: MB/s（失败/超时/不支持 → nil），必然回调一次。
+    @discardableResult
+    func run(session: SyncPeerSession, completion: @escaping (Double?) -> Void) -> Bool {
+        lock.lock()
+        guard activeRunner == nil else {
+            lock.unlock()
+            return false
+        }
+        let runner = makeRunner(session)
+        activeRunner = runner // 强持有到 completion（或 start 同步失败时的 release）
+        lock.unlock()
+
+        runner.start { [weak self, weak runner] value in
+            if let runner { self?.release(runner) }
+            completion(value)
+        }
+        return true
+    }
+
+    /// 会话 ready 后的自动探针（10 分钟节流 + 单飞；失败静默，不影响同步）。
+    func maybeAutoProbe(session: SyncPeerSession) {
         guard session.isReady else { return }
         guard SyncProbe.shouldAutoProbe(lastProbeAt: SyncProbeStore.shared.lastAttemptAt) else { return }
-        let runner = SyncProbeRunner(session: session)
-        runner.start { _ in }
+        run(session: session) { _ in }
+    }
+
+    private func release(_ runner: SyncProbeRunner) {
+        lock.lock()
+        if activeRunner === runner { activeRunner = nil }
+        lock.unlock()
     }
 }

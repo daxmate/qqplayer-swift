@@ -421,6 +421,28 @@ struct SyncFileTransferTests {
         #expect(!sender.isActive)
     }
 
+    // MARK: T2 探针调度（P1 回归守卫）
+
+    @Test("探针调度器持有 activeRunner：自动探针不得裸造局部 runner")
+    func probeSchedulerHoldsRunner() throws {
+        // 为什么是源码形状断言而不是行为断言：真行为要真会话，而探针在内存回环下**同步完成**，
+        // 观测不到「完成前仍被持有」的窗口；这里锁的是缺陷形态本身（局部变量 start 后失引用）。
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("QQPlayer/Sync/SyncProbe.swift"),
+                                encoding: .utf8)
+        #expect(source.contains("private var activeRunner: SyncProbeRunner?"))
+        #expect(source.contains("activeRunner = runner"))
+        #expect(source.contains("if activeRunner === runner { activeRunner = nil }"))
+        #expect(source.contains("func release(_ runner: SyncProbeRunner)"))
+
+        let autoBody = source.components(separatedBy: "func maybeAutoProbe").dropFirst().first ?? ""
+        #expect(!autoBody.isEmpty, "找不到 maybeAutoProbe（守护空转）")
+        #expect(!autoBody.contains("let runner = SyncProbeRunner("), "自动探针又裸造局部 runner（P1 回归）")
+        #expect(autoBody.contains("run(session: session)"), "自动探针未走单飞持有入口")
+    }
+
     // MARK: T2 探针（合成 4 MiB 测速）
 
     @Test("探针纯函数：MB/s 口径（1024²）、非法输入 nil、10 分钟节流")

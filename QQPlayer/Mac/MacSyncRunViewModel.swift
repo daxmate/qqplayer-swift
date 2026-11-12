@@ -98,8 +98,6 @@ final class MacSyncRunViewModel: ObservableObject {
     /// 因为落盘发生在终态后 800ms，彼时可能已断线拿不到分桶 key。
     private var runPeerID: String?
     private var runPeerName: String?
-    /// 在跑的探针（强持有到回调；非发布状态）。
-    private var probeRunner: SyncProbeRunner?
     /// 本次运行**绑定的会话身份**（启动时快照）。
     /// 对端重连会让 host 让位到新会话 —— 此时 `isConnected` 仍为 true（新会话已连上），
     /// 只有会话身份变了，所以「断开就取消」的分支看不见这件事（任务包 §3 D）。
@@ -308,14 +306,11 @@ final class MacSyncRunViewModel: ObservableObject {
             completion(nil)
             return
         }
-        let runner = SyncProbeRunner(session: session)
-        probeRunner = runner // 持有到回调（runner 内部对 self 弱引用）
-        runner.start { [weak self] value in
-            Task { @MainActor in
-                self?.probeRunner = nil
-                completion(value)
-            }
+        // 经调度器单飞：已有自动/手动探针在跑 → 直接放弃本次（不并发两条探针）。
+        let started = SyncProbeScheduler.shared.run(session: session) { value in
+            Task { @MainActor in completion(value) }
         }
+        if !started { completion(nil) }
     }
 
     /// 取消进行中的同步。
