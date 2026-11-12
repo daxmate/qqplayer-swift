@@ -91,6 +91,12 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
     private var libraryResponder: SyncPeerLibraryResponder?
     private var priorAppHandler: (@Sendable (SyncFrame) -> Void)?
     private var priorClosedHandler: (@Sendable (SyncSessionCloseReason) -> Void)?
+    /// 接线会话（`detach()` 还原槽位用；attach 时写入）。
+    private var attachedSession: SyncPeerSession?
+    /// 装配时的槽位代次（见 `SyncPeerSession.applicationFrameSlotGeneration`）：
+    /// 只有槽位仍是本类那一层才还原，否则会拆掉后装的包装层 / 分发链。
+    private var installedAppGeneration: UInt64?
+    private var installedClosedGeneration: UInt64?
 
     // 锁保护状态
     private var claims = SyncPushClaimTable()
@@ -216,29 +222,39 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
             catalogProvider: peerLibraryProvider
         )
 
+        // 槽位原值在锁内一次取走：后续包装层用的是这两个局部常量（强捕获，见下）。
         lock.lock()
         self.receiver = receiver
         self.libraryResponder = libraryResponder
-        priorAppHandler = session.onApplicationFrame
-        priorClosedHandler = session.onClosed
+        let priorApp = session.onApplicationFrame
+        let priorClosed = session.onClosed
+        priorAppHandler = priorApp
+        priorClosedHandler = priorClosed
+        attachedSession = session
         lock.unlock()
 
+        // ⚠️ `prior` 必须**强捕获**：本类被释放后弱 self == nil，旧写法
+        // `self?.priorAppHandler?` 既不转发也不报错 → 整条转发链静默断掉（2026-11-12 真机）。
+        // 只强捕获 prior，不强捕获 self（否则会话闭包 ↔ 本类成环）。
         session.onApplicationFrame = { [weak self] frame in
-            guard let self else {
-                return
+            if let self {
+                if frame.type == .libraryPushAnnounce {
+                    self.handleAnnounce(frame)
+                }
+            } else {
+                AppLog.debug(.sync, "🧩 SyncLibraryPassiveHost 包装层已释放，仅转发 type=\(frame.type)")
             }
-            if frame.type == .libraryPushAnnounce {
-                self.handleAnnounce(frame)
-            }
-            self.priorAppHandler?(frame)
+            priorApp?(frame)
         }
         session.onClosed = { [weak self] reason in
-            guard let self else {
-                return
+            if let self {
+                self.handleSessionClosed()
             }
-            self.handleSessionClosed()
-            self.priorClosedHandler?(reason)
+            priorClosed?(reason)
         }
+        // 槽位代次在装完之后取（赋值本身会 +1）：detach 时据此判断能否安全还原。
+        installedAppGeneration = session.applicationFrameSlotGeneration
+        installedClosedGeneration = session.closedSlotGeneration
         return true
     }
 
@@ -252,7 +268,23 @@ final class SyncLibraryPassiveHost: @unchecked Sendable {
         self.receiver = nil
         self.libraryResponder = nil
         claims = SyncPushClaimTable()
+        // 槽位还原（2026-11-12）：此前只清自身字段不还槽位，会话闭包里留下一个
+        // 「self 已释放」的包装层（旧写法 self?.prior 会整层静默吞帧）。
+        let session = attachedSession
+        let appGeneration = installedAppGeneration
+        let closedGeneration = installedClosedGeneration
+        let priorApp = priorAppHandler
+        let priorClosed = priorClosedHandler
+        attachedSession = nil
+        installedAppGeneration = nil
+        installedClosedGeneration = nil
         lock.unlock()
+        if let session, let appGeneration, session.applicationFrameSlotGeneration == appGeneration {
+            session.onApplicationFrame = priorApp
+        }
+        if let session, let closedGeneration, session.closedSlotGeneration == closedGeneration {
+            session.onClosed = priorClosed
+        }
         receiver?.cancel()
         libraryResponder?.detach()
         lyricsReceiver.cancel()

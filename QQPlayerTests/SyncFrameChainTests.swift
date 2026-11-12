@@ -160,6 +160,55 @@ struct SyncFrameChainTests {
         #expect(recorder.receivedFrames.count == 1)
     }
 
+    // MARK: - 🧩 帧链：轻量应答端停用 / 释放不得剪断链路（2026-11-12 真机 bug）
+
+    /// 真机时间线：门控期装 `SyncChangeLogNotReadyResponder` → 门开时 `deactivate()` +
+    /// `dataSyncNotReadyResponder = nil`（IOSPassiveSyncCenter+DataSync）→ 槽位闭包变成
+    /// `self == nil` 的死壳。旧写法 `self?.priorAppHandler?(frame)` 在 self 为 nil 时
+    /// **既不转发也不报错**，此后 manifest / 文件帧在 iPhone 端静默消失（Mac 端 20s 超时）。
+    ///
+    /// 修复前必红：旧代码下「更早挂接的 handler 收到 1 帧」为 0 帧。
+    @Test("🧩 帧链：轻量应答端 deactivate + 释放后，更早挂接的 handler 仍收到 manifest 请求")
+    func notReadyResponderReleaseDoesNotCutChain() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let recorder = SyncEventRecorder()
+        fixture.clientSession.onApplicationFrame = { frame in recorder.recordFrame(frame) }
+
+        var responder: SyncChangeLogNotReadyResponder? = SyncChangeLogNotReadyResponder(session: fixture.clientSession)
+        #expect(responder != nil)
+        responder?.deactivate()
+        responder = nil
+
+        try fixture.hostSession.sendApplicationFrame(type: .manifestRequest, payload: Data("{}".utf8))
+
+        #expect(recorder.receivedFrames.count == 1)
+        #expect(recorder.receivedFrames.first?.type == .manifestRequest)
+    }
+
+    /// 停用后既不得再应答 notReady（否则与真实应答端各回一条），也不得吞掉帧。
+    @Test("🧩 帧链：deactivate() 后轻量应答端不再拦截帧（不回 notReady，帧继续下行）")
+    func deactivatedResponderStopsIntercepting() throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let downstream = SyncEventRecorder()
+        fixture.clientSession.onApplicationFrame = { frame in downstream.recordFrame(frame) }
+
+        let responder = SyncChangeLogNotReadyResponder(session: fixture.clientSession)
+        responder.deactivate()
+
+        // notReady 以 change_log_push 回到发起端（host）。
+        let initiator = SyncEventRecorder()
+        fixture.hostSession.onApplicationFrame = { frame in initiator.recordFrame(frame) }
+
+        try fixture.hostSession.sendApplicationFrame(
+            type: .changeLogPull,
+            payload: try JSONEncoder().encode(SyncChangeLogPullRequest(cursor: 1))
+        )
+
+        #expect(responder.notReadyAnswers == 0)
+        #expect(initiator.receivedFrames.isEmpty)
+        #expect(downstream.receivedFrames.count == 1)
+    }
+
     // MARK: - 🟡F2：QR nonce TTL 与清理入口
 
     /// 修复前必红：旧 registry 没有任何时间概念，301s 后 `matchingNonce` 仍返回该 nonce

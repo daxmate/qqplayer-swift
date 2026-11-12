@@ -434,15 +434,19 @@ final class SyncLibraryPullController: @unchecked Sendable {
     // MARK: 结果帧 → 收尾
 
     private func attachResultHandler() {
-        priorAppHandler = session.onApplicationFrame
+        // ⚠️ `prior` 必须**强捕获**：本类被释放后弱 self == nil，旧写法
+        // `self?.priorAppHandler?` 既不转发也不报错 → 整条转发链静默断掉（2026-11-12 真机）。
+        let priorApp = session.onApplicationFrame
+        priorAppHandler = priorApp
         session.onApplicationFrame = { [weak self] frame in
-            guard let self else {
-                return
+            if let self {
+                if frame.type == .syncFetchResult {
+                    self.handleFetchResult(frame)
+                }
+            } else {
+                AppLog.debug(.sync, "🧩 SyncLibraryPullController 包装层已释放，仅转发 type=\(frame.type)")
             }
-            if frame.type == .syncFetchResult {
-                self.handleFetchResult(frame)
-            }
-            self.priorAppHandler?(frame)
+            priorApp?(frame)
         }
     }
 

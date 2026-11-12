@@ -432,23 +432,29 @@ final class SyncFileReceiver: @unchecked Sendable {
     // MARK: 会话槽位挂接（链式：先己后彼；结束用开关静默，不拆链）
 
     private func attachHandlers() {
-        priorAppHandler = session.onApplicationFrame
-        priorClosedHandler = session.onClosed
+        // ⚠️ `prior` 必须**强捕获**（局部常量），不得写成 `self?.priorAppHandler?`：
+        // 本类被释放后弱 self == nil，旧写法既不转发也不报错 → 整条转发链静默断掉
+        // （2026-11-12 真机：iPhone 端换装数据同步端后 manifest 帧全部消失）。
+        // 只强捕获 prior，不强捕获 self（否则会话闭包 ↔ 本类成环）。
+        let priorApp = session.onApplicationFrame
+        let priorClosed = session.onClosed
+        priorAppHandler = priorApp
+        priorClosedHandler = priorClosed
         session.onApplicationFrame = { [weak self] frame in
-            guard let self, self.forwardingEnabled else {
-                self?.priorAppHandler?(frame)
-                return
+            if let self {
+                if self.forwardingEnabled {
+                    self.handleInboundFrame(frame)
+                }
+            } else {
+                AppLog.debug(.sync, "🧩 SyncFileReceiver 包装层已释放，仅转发 type=\(frame.type)")
             }
-            self.handleInboundFrame(frame)
-            self.priorAppHandler?(frame)
+            priorApp?(frame)
         }
         session.onClosed = { [weak self] reason in
-            guard let self, self.forwardingEnabled else {
-                self?.priorClosedHandler?(reason)
-                return
+            if let self, self.forwardingEnabled {
+                self.handleSessionClosed(reason)
             }
-            self.handleSessionClosed(reason)
-            self.priorClosedHandler?(reason)
+            priorClosed?(reason)
         }
     }
 }

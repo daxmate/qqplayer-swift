@@ -4312,6 +4312,77 @@ do {
     check(false, "㊿ 直驱接收端抛错：\(error)")
 }
 
+section("S51 帧转发链：轻量应答端停用 + 释放后不得剪断链路（2026-11-12 真机 bug 回归）")
+do {
+    // 真机时间线复刻：会话就绪 → 挂真实 manifest 应答端（能应答）→ 装门控轻量应答端 →
+    // 门开时 deactivate + 释放 → 换装真身 → 对端再发 manifest 请求。
+    // 旧代码在「释放」那一步把槽位闭包变成 self == nil 的死壳，其后的帧全部静默消失
+    // （Mac 端 20s 超时，iPhone 端 0 行日志）。
+    let fixture = SessionFixture.pairedHandshake()
+    let deviceSession = fixture.hostSession   // 被动端（iPhone）
+    let macSession = fixture.clientSession    // 主动端（Mac）
+
+    // 更早挂接的接收者（真机上 = 被动端更下层的 handler）：用来证明链路没被剪断。
+    let baseFrames = LockedBox<[SyncFrameType]>([])
+    deviceSession.onApplicationFrame = { frame in baseFrames.mutate { $0.append(frame.type) } }
+
+    // 被动端真实 manifest 应答端（与生产同一类，不是桩）。
+    let deviceManifest = SyncManifestPeer(session: deviceSession)
+    deviceManifest.localManifestProvider = { _, _ in
+        [ManifestEntry(
+            relativePath: "Album/01 Song.flac",
+            size: 12,
+            mtimeMs: 1,
+            contentHash: String(repeating: "a", count: 64),
+            stableId: "s1"
+        )]
+    }
+
+    // Mac 侧：请求 + 收响应。
+    let macFrames = LockedBox<[SyncFrameType]>([])
+    macSession.onApplicationFrame = { frame in macFrames.mutate { $0.append(frame.type) } }
+    let macManifest = SyncManifestPeer(session: macSession)
+    let responses = LockedBox<[SyncManifestResponse]>([])
+    macManifest.onManifestReceived = { response in responses.mutate { $0.append(response) } }
+
+    // ① 门控期：装轻量应答端（生产：installNotReadyResponderIfNeeded）
+    var notReadyResponder: SyncChangeLogNotReadyResponder? = SyncChangeLogNotReadyResponder(session: deviceSession)
+    check(notReadyResponder != nil, "S51 ① 门控轻量应答端已装配")
+    try macSession.sendApplicationFrame(
+        type: .changeLogPull,
+        payload: try JSONEncoder().encode(SyncChangeLogPullRequest(cursor: 5))
+    )
+    // 门控期必须立刻回一条 change_log_push（notReady），不能沉默等 20s：
+    check(macFrames.value.contains(.changeLogPush), "S51 ① 门控期：轻量应答端立刻回了 notReady（不沉默）")
+
+    // ② 门开：停用 + 释放（生产 = IOSPassiveSyncCenter+DataSync 第 89-90 行）
+    notReadyResponder?.deactivate()
+    notReadyResponder = nil
+
+    // ③ 换装真身：SyncChangeLogPeer 需要真实 DB，这里用同形包装层代替——
+    //    装配方式与它一致（把当前槽位包起来，strong prior）。
+    let realBodyFrames = LockedBox<[SyncFrameType]>([])
+    let priorApp = deviceSession.onApplicationFrame
+    deviceSession.onApplicationFrame = { frame in
+        realBodyFrames.mutate { $0.append(frame.type) }
+        priorApp?(frame)
+    }
+
+    // ④ 换装后：Mac 再请求 manifest → 必须收到应答（旧代码：这里 0 应答）
+    responses.mutate { $0.removeAll() }
+    baseFrames.mutate { $0.removeAll() }
+    realBodyFrames.mutate { $0.removeAll() }
+    try macManifest.requestManifest(collection: .all, rid: "m-chain")
+
+    checkEqual(responses.value.count, 1, "S51 ④ 换装后：manifest 请求仍被应答（旧代码：静默消失 → 0 应答）")
+    checkEqual(responses.value.first?.entries.count ?? -1, 1, "S51 ④ 应答内容完整（entries=1）")
+    check(realBodyFrames.value.contains(.manifestRequest), "S51 ④ 请求到达换装的真身")
+    check(baseFrames.value.contains(.manifestRequest), "S51 ④ 请求穿透到更早挂接的 handler（链未断）")
+    check(!realBodyFrames.value.contains(.manifestResponse), "S51 ④ 响应不被本端真身误收")
+} catch {
+    check(false, "S51 帧转发链场景抛错：\(error)")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

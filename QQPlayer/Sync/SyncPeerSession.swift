@@ -42,9 +42,22 @@ final class SyncPeerSession: @unchecked Sendable {
     /// 阶段变化回调（含 .closed；在状态迁移线程同步触发，UI 层自行跳主线程）
     var onStateChange: (@Sendable (SyncSessionPhase) -> Void)?
     /// 关闭回调（仅一次，携带原因）
-    var onClosed: (@Sendable (SyncSessionCloseReason) -> Void)?
+    var onClosed: (@Sendable (SyncSessionCloseReason) -> Void)? {
+        didSet { closedSlotGeneration &+= 1 }
+    }
+
     /// ready 后业务帧回调（file_meta/file_chunk/file_ack，payload 已解密；M2b 接入点。nil = 忽略）
-    var onApplicationFrame: (@Sendable (SyncFrame) -> Void)?
+    var onApplicationFrame: (@Sendable (SyncFrame) -> Void)? {
+        didSet { applicationFrameSlotGeneration &+= 1 }
+    }
+
+    /// 槽位「代次」：每给槽位赋一次值 +1（读槽位不计数）。
+    ///
+    /// 用途（2026-11-12 帧链修复）：包装层停用/拆除时要判断「槽位里是否仍是**我**装的那一层」。
+    /// 只有代次相等才敢把槽位还原成 `prior`——否则会把**后装**的包装层 / 分发链整层摘掉，
+    /// 那比不还更糟。闭包无法比较身份，故用赋值次数当代次。
+    private(set) var applicationFrameSlotGeneration: UInt64 = 0
+    private(set) var closedSlotGeneration: UInt64 = 0
     /// Host 侧待批准配对回调（验签后触发；UI 弹窗后调 approvePairing/rejectPairing）
     var pairApprovalHandler: (@Sendable (SyncPeerSession, PendingPairRequest) -> Void)?
 
@@ -451,7 +464,14 @@ final class SyncPeerSession: @unchecked Sendable {
                 // 观测：结构化汇总行（已渲染；这里只落盘）。
                 AppLog.info(.sync, line)
             case let .notifyAppFrame(frame):
-                onApplicationFrame?(frame)
+                // 观测（2026-11-12 真机 bug）：帧已到会话层却没有接收者 = 无人处理，对端只会看到超时。
+                // 此前这里是**静默**丢弃，两端日志都查不到痕迹（iPhone 端零记录 / Mac 端 20s 超时）。
+                // 只补日志，不改判定：槽位 nil 仍按原语义丢弃。
+                if let handler = onApplicationFrame {
+                    handler(frame)
+                } else {
+                    AppLog.warn(.sync, "🧩 帧被丢弃 type=\(frame.type) slotNil=true")
+                }
             }
         }
         // 握手超时兜底（2026-09-12 审计 🟡T4）：进入 ready 之前的等待阶段必须始终挂着超时——
