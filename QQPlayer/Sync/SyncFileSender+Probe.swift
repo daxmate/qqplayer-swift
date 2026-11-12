@@ -10,7 +10,12 @@ import Foundation
 extension SyncFileSender {
     /// 探针能力门控（**唯一入口**）：对端没在 meta ack 里声明 `probeCapable` → 中止。
     /// 旧端会把 probe 当普通文件落盘，故必须在发块之前拦住。
-    func probeGatingFailure(_ ack: FileAckPayload, fileID: String) -> SyncFileTransferError? {
+    ///
+    /// `chunksSent == 0` 是「这条 ack 是 meta 应答」的判据：能力字段只在 meta ack 里带，
+    /// 后续块的 ack 不带（若逐条判定会在第一块 ack 上误杀）。
+    func probeGatingFailure(_ ack: FileAckPayload, fileID: String,
+                            chunksSent: Int) -> SyncFileTransferError? {
+        guard chunksSent == 0 else { return nil }
         guard SyncProbe.isProbeFileID(fileID), ack.probeCapable != true else { return nil }
         return .probeUnsupported(fileID)
     }

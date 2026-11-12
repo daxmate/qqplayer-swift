@@ -277,7 +277,7 @@ final class SyncFileSender: @unchecked Sendable {
         guard ack.fileID == current.fileID else { return [] } // 别的传输的 ack 与本轮无关
 
         // ack.error → 失败（resumeMismatch 保留给调用方做 startOffset=0 重试决策）
-        if let failure = probeGatingFailure(ack, fileID: current.fileID) {
+        if let failure = probeGatingFailure(ack, fileID: current.fileID, chunksSent: current.chunksSent) {
             return terminateLocked(failure, current: current)
         }
 
