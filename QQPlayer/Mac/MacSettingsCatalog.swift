@@ -299,6 +299,13 @@ enum MacSettingsCatalog {
         aliases: ["对话上下文", "上下文", "轮数", "追问", "chat", "context", "rounds"]
     )
 
+    static let recommendationArtistRelation = Item(
+        id: "settings.recommendation.artistRelation",
+        category: .recommendations,
+        titleKey: "recommendation_artist_relation_title",
+        aliases: ["相关艺人", "艺人关系", "扩展", "musicbrainz", "related artist", "artist relation"]
+    )
+
     static let aboutVersion = Item(
         id: "settings.about.version",
         category: .about,
@@ -347,6 +354,7 @@ enum MacSettingsCatalog {
         recommendationUseLocalModel,
         recommendationKeepLoaded,
         recommendationChatRounds,
+        recommendationArtistRelation,
         aboutVersion,
         aboutAppName,
         aboutGitHub,

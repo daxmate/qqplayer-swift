@@ -1176,3 +1176,7 @@
 "recommendation_chat_invalid_output" = "The local model returned an unreadable result. Try again.";
 "recommendation_chat_timeout" = "The local model timed out. Try again.";
 "recommendation_reason_request" = "Matches your request: %@";
+
+// MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_artist_relation_title" = "Expand related artists via MusicBrainz";
+"recommendation_artist_relation_footer" = "Adds candidates from artists related to your top artists (up to 2 queries per run, 3 artists each). Failures are skipped silently and never block recommendations.";

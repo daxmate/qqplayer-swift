@@ -302,6 +302,9 @@ struct DeleteSettings: Codable {
     var recommendationKeepModelLoaded: Bool = false
     /// 指令输入的后台上下文轮数（0–9；只用于理解追问，界面不显示）。
     var recommendationChatRounds: Int = DeleteSettings.defaultRecommendationChatRounds
+    /// P4：MusicBrainz 艺人关系扩展（默认关 = 召回与 P3 完全一致、零额外请求）。
+    /// 旧设置文件没有该 key 时必须解码为 false（见 init(from:)），不得整份解码失败。
+    var recommendationArtistRelationExpansion: Bool = false
 
     /// 推荐条数默认值 / 边界（唯一口径）。
     static let defaultRecommendationCount = 15
@@ -408,6 +411,10 @@ struct DeleteSettings: Codable {
             try container.decodeIfPresent(Int.self, forKey: .recommendationChatRounds)
                 ?? Self.defaultRecommendationChatRounds
         )
+        // 艺人关系扩展（P4）：旧设置文件无 key → 关（decodeIfPresent 兜底，绝不解码失败）。
+        recommendationArtistRelationExpansion = try container.decodeIfPresent(
+            Bool.self, forKey: .recommendationArtistRelationExpansion
+        ) ?? false
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

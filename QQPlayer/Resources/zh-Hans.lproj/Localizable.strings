@@ -1179,3 +1179,7 @@
 "recommendation_chat_invalid_output" = "本地模型返回了无法解析的结果，请重试。";
 "recommendation_chat_timeout" = "本地模型响应超时，请重试。";
 "recommendation_reason_request" = "符合你的要求：%@";
+
+// MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_artist_relation_title" = "用 MusicBrainz 扩展相关艺人";
+"recommendation_artist_relation_footer" = "按艺人关系补充候选：每个艺人意图最多 3 位相关艺人，整轮最多 2 次查询。失败自动跳过，不影响推荐结果。";

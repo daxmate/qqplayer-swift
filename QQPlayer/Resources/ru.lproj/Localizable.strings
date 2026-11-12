@@ -1171,3 +1171,7 @@
 "recommendation_chat_invalid_output" = "Локальная модель вернула нечитаемый результат. Повторите попытку.";
 "recommendation_chat_timeout" = "Локальная модель не ответила вовремя. Повторите попытку.";
 "recommendation_reason_request" = "Соответствует запросу: %@";
+
+// MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_artist_relation_title" = "Расширять похожих исполнителей через MusicBrainz";
+"recommendation_artist_relation_footer" = "Добавляет кандидатов от исполнителей, связанных с вашими топовыми: до 3 артистов на намерение и не более 2 запросов за генерацию. Ошибки пропускаются и не влияют на рекомендации.";

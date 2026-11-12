@@ -75,6 +75,21 @@ struct MacRecommendationSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Toggle(
+                    "recommendation_artist_relation_title".localized,
+                    isOn: $settings.recommendationArtistRelationExpansion
+                )
+                .settingsAnchor(MacSettingsCatalog.recommendationArtistRelation)
+                .onChange(of: settings.recommendationArtistRelationExpansion) { _, _ in
+                    settings.save()
+                }
+            } footer: {
+                Text("recommendation_artist_relation_footer".localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear {
