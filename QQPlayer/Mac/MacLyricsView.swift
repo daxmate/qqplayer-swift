@@ -86,6 +86,8 @@ struct MacLyricsView: View {
                 // 仅跟唱模式下歌词区可聚焦（普通态键盘/焦点行为不变）
                 .focusable(karaoke.isKaraokeOn)
                 .focused($lyricsFocused)
+                // 只去掉视觉焦点环，焦点本身保留（跟唱键盘 ↑/↓ 操作依赖）
+                .focusEffectDisabled()
             // 对齐 iOS LyricsView：跟唱控制条常驻底部，无论歌词状态（加载中/纯文本/无歌词）都显示
             if karaoke.isKaraokeOn {
                 Divider()
