@@ -50,6 +50,12 @@ enum MusicBrainzClientError: Error {
 
 struct MusicBrainzClient: @unchecked Sendable {
     static let apiBase = URL(string: "https://musicbrainz.org/ws/2/recording")!
+    /// P4：artist 实体端点（关系查询：先 query 定位 MBID，再取 artist-rels）。
+    static let artistBase = URL(string: "https://musicbrainz.org/ws/2/artist")!
+    /// MB 限流要求的最小请求间隔（1 req/s）
+    static let requestInterval: TimeInterval = 1
+    /// MB 请求头（UA 必填；Accept JSON）。P4 艺人关系查询与既有搜索共用。
+    static let jsonHeaders = ["User-Agent": userAgent, "Accept": "application/json"]
     static let coverArtArchiveFront = "https://coverartarchive.org/release/{mbid}/front"
     static let itunesSearch = URL(string: "https://itunes.apple.com/search")!
     static let userAgent = "QQPlayer/1.0 (https://github.com/daxmate/qqplayer)"
@@ -64,15 +70,24 @@ struct MusicBrainzClient: @unchecked Sendable {
     /// CAA 结果缓存（同 release MBID 只查一次；含负缓存）。class box 引用语义：
     /// struct 值拷贝间共享缓存，且请求方法无需标 mutating。
     private let caaCache = MusicBrainzCAACacheBox()
+    /// P4：艺人关系缓存（24h 进程内；跨实例共享，测试可注入独立实例）。
+    /// 非 private：P4 网络方法在同类型的扩展文件里（MusicBrainzClient+ArtistRelation.swift）。
+    let relationCache: MusicBrainzRelationCache
+    /// P4：时钟（关系缓存 TTL 判定；测试可注入）。同上，扩展文件需要读取。
+    let now: () -> Date
 
     init(
         sleep: @escaping (TimeInterval) async throws -> Void = {
             try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000))
         },
-        protocolClasses: [AnyClass]? = nil
+        protocolClasses: [AnyClass]? = nil,
+        relationCache: MusicBrainzRelationCache = .shared,
+        now: @escaping () -> Date = { Date() }
     ) {
         self.sleep = sleep
         self.protocolClasses = protocolClasses
+        self.relationCache = relationCache
+        self.now = now
     }
 
     /// 单次 MB 搜索最大候选数（web SEARCH_LIMIT = 20）
@@ -234,7 +249,7 @@ struct MusicBrainzClient: @unchecked Sendable {
     // MARK: - 候选字段提取（全部尽力取值，失败 → nil/空串，绝不 throw）
 
     /// 宽松取字符串：字符串原样；数字 → stringValue（MB 部分字段可能是数字）
-    private static func stringValue(_ value: Any?) -> String? {
+    static func stringValue(_ value: Any?) -> String? {
         if let text = value as? String {
             return text
         }
@@ -333,7 +348,7 @@ struct MusicBrainzClient: @unchecked Sendable {
     }
 
     /// artist 匹配归一化（web _norm）：小写 + 去 \W_（保留字母/数字/CJK）
-    private static func normalizedArtist(_ value: String) -> String {
+    static func normalizedArtist(_ value: String) -> String {
         value.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
@@ -459,7 +474,7 @@ struct MusicBrainzClient: @unchecked Sendable {
     }
 
     /// GET JSON：非 2xx → throw（调用方按 web 语义转空/降级）
-    private func getJSON(url: URL, headers: [String: String] = [:]) async throws -> [String: Any] {
+    func getJSON(url: URL, headers: [String: String] = [:]) async throws -> [String: Any] {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         for (key, value) in headers {

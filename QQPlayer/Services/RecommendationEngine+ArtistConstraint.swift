@@ -84,6 +84,7 @@ extension RecommendationEngine {
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
         await runBudget?.beginRun()
         chainAudit?.reset()
+        await artistRelation?.beginRun()
         let context = RecommendationRunContext(
             requestText: request.rawText.isEmpty ? request.keywords.joined(separator: ",") : request.rawText,
             planSource: planSource

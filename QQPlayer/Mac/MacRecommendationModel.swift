@@ -369,6 +369,11 @@ final class MacRecommendationModel {
 
     // MARK: - 结果缓存
 
+    /// P4：艺人关系扩展开关（进缓存键：开关变化不复用旧池）。
+    private var artistRelationExpansionEnabled: Bool {
+        DeleteSettings.load().recommendationArtistRelationExpansion
+    }
+
     /// 缓存键：请求原话 + 画像摘要 + 曲库指纹 + planner/模型身份 + locale。
     ///
     /// 说明：chat 指令的解析结果（referenceArtists 等）是模型的非确定输出，放进键会让同句
@@ -387,7 +392,9 @@ final class MacRecommendationModel {
             planner: planSource,
             modelIdentity: modelIdentity,
             localeIdentifier: Locale.current.identifier,
-            sourceVersion: RecommendationSourceChain.sourceVersion,
+            sourceVersion: RecommendationSourceChain.cacheVersion(
+                artistRelationExpansion: artistRelationExpansionEnabled
+            ),
             blacklistVersion: blacklist.recentVersion
         )
     }
@@ -485,7 +492,7 @@ final class MacRecommendationModel {
     ) async -> RecommendationRecompute? {
         let plan = await selection.planner.makePlan(for: profile)
         if Task.isCancelled { return nil }
-        let result = await RecommendationEngine().recommend(
+        let result = await RecommendationEngine.configured().recommend(
             profile: profile,
             count: count,
             intents: plan.intents,
@@ -505,7 +512,7 @@ final class MacRecommendationModel {
         )
         if Task.isCancelled { return nil }
         guard case let .success(request) = planned else { return nil }
-        let result = await RecommendationEngine().recommend(
+        let result = await RecommendationEngine.configured().recommend(
             request: request,
             profile: context.profile,
             count: context.count,

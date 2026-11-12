@@ -37,6 +37,8 @@ struct RecommendationEngine: Sendable {
     var similarRecallEnabled: Bool = true
     /// 最多对几个艺人意图做相似召回（限制请求放大）。
     var maxSimilarProbes: Int = 3
+    /// P4：MusicBrainz 艺人关系扩展（nil = 关：零额外请求，召回行为与 P3 完全一致）。
+    var artistRelation: RecommendationArtistRelation?
 
     /// 默认 = P2 主源降级链（iTunes tw → us → MusicBrainz → 网易云）；
     /// 测试注入 providers 时预算 / 诊断不接线（行为与 P1 相同）。
@@ -85,6 +87,7 @@ struct RecommendationEngine: Sendable {
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
         await runBudget?.beginRun()
         chainAudit?.reset()
+        await artistRelation?.beginRun()
         let context = RecommendationRunContext(
             requestText: intents.map(\.query).joined(separator: ","),
             planSource: planSource
@@ -295,6 +298,25 @@ struct RecommendationEngine: Sendable {
                         accept(song, providerSource: outcome.source, intent: similarIntent)
                     }
                 }
+            }
+        }
+
+        // P4：可选艺人关系扩展（默认关 = 零请求）。点名硬约束下不做扩展：
+        // 扩展结果会被 artist_constraint 闸全量剔除，纯属浪费请求。
+        if let artistRelation, artistConstraint == nil {
+            let related = await relatedArtistSongs(
+                intents: resolvedIntents,
+                limit: perIntentLimit,
+                expansion: artistRelation
+            )
+            for produced in related {
+                accept(produced.song, providerSource: .musicbrainz, intent: produced.intent)
+            }
+            if !related.isEmpty {
+                AppLog.debug(
+                    .general,
+                    "🎵 推荐艺人关系扩展：召回 \(related.count) 条（\(artistRelation.budget.summary)）"
+                )
             }
         }
 

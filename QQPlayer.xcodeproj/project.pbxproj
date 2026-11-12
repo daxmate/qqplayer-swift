@@ -229,6 +229,7 @@
 		9D8F6045A5DC472691D7107B /* RecommendationNormalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */; };
 		2224766B90A441F7A4F15F17 /* RecommendationP2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30019A55756540D187D62983 /* RecommendationP2Tests.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* RecommendationP3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* RecommendationP3Tests.swift */; };
+		A1B2C3D4E5F60718293A4B5E /* RecommendationP4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5F /* RecommendationP4Tests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -505,6 +506,7 @@
 		CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationNormalizationTests.swift; sourceTree = "<group>"; };
 		30019A55756540D187D62983 /* RecommendationP2Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationP2Tests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* RecommendationP3Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationP3Tests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5F /* RecommendationP4Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationP4Tests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -858,6 +860,7 @@
 				Services/MP4EmptyCovrStripper.swift,
 				Services/MacTableScrollGeometry.swift,
 				Services/MusicBrainzClient.swift,
+				"Services/MusicBrainzClient+ArtistRelation.swift",
 				Services/MusicDirectoryScanner.swift,
 				Services/MusicFolderResolver.swift,
 				Services/NeteaseLyricsProvider.swift,
@@ -894,6 +897,7 @@
 				Services/ReclaimPurgeService.swift,
 				Services/ReclaimRestoreService.swift,
 				Services/RecommendationArtistConstraint.swift,
+				Services/RecommendationArtistRelation.swift,
 				Services/RecommendationCacheFlow.swift,
 				"Services/RecommendationEngine+ArtistConstraint.swift",
 				"Services/RecommendationEngine+Observability.swift",
@@ -1401,6 +1405,7 @@
 				CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */,
 				30019A55756540D187D62983 /* RecommendationP2Tests.swift */,
 				A1B2C3D4E5F60718293A4B5D /* RecommendationP3Tests.swift */,
+				A1B2C3D4E5F60718293A4B5F /* RecommendationP4Tests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1929,6 +1934,7 @@
 				9D8F6045A5DC472691D7107B /* RecommendationNormalizationTests.swift in Sources */,
 				2224766B90A441F7A4F15F17 /* RecommendationP2Tests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* RecommendationP3Tests.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5E /* RecommendationP4Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

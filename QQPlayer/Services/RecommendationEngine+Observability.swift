@@ -72,6 +72,8 @@ extension RecommendationEngine {
             .map { "\($0.key):\($0.value)" }
             .joined(separator: ",")
         let sanitizedRequest = Self.singleLine(context.requestText, limit: 160)
+        // P4：艺人关系扩展（off 也打点，字段位置固定便于历史对照）。
+        let artistRel = artistRelation.map { "on:\($0.budget.summary)" } ?? "off:queries:0:artists:0"
 
         AppLog.info(
             .general,
@@ -81,6 +83,7 @@ extension RecommendationEngine {
                 + " | final=\(finalCount)/\(max(1, targetCount)) | ms=\(durationMs)"
                 + " | planner=\(context.planSource?.rawValue ?? "unknown")"
                 + " | chain=\(chainAudit?.summary ?? "none")"
+                + " | artistRel=\(artistRel)"
         )
     }
 

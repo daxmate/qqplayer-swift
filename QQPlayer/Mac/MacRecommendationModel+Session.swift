@@ -94,6 +94,8 @@ extension MacRecommendationModel {
         )
         engine.maxSongsPerIntent = 20
         engine.maxSourceShare = 1.0
+        // P4：艺人关系扩展（设置关 = nil，召回行为与 P3 完全一致）。
+        engine.artistRelation = RecommendationArtistRelation.fromSettings()
         return engine
     }
 

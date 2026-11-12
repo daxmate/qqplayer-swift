@@ -489,6 +489,12 @@ enum RecommendationSourceChain {
     /// 源版本：进缓存键（链路 / 阈值变化 → 缓存失效）。
     static let sourceVersion = "p2-itunes-chain-1"
 
+    /// P4：缓存键版本——艺人关系扩展开关会改变召回集合，开 / 关各自独立缓存
+    /// （关时字符串与 P3 完全一致，旧缓存继续有效）。
+    static func cacheVersion(artistRelationExpansion: Bool) -> String {
+        artistRelationExpansion ? sourceVersion + "+artistrel" : sourceVersion
+    }
+
     /// 生产默认链：iTunes(tw) → iTunes(us) → MusicBrainz → 网易云(search)。
     ///
     /// 阈值：链是**每意图调用一次**，因此只做「非空即通过」（tw/us/MB = 1）；
