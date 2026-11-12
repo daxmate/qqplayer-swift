@@ -14,14 +14,18 @@ import Foundation
 struct RecommendationBlacklist: Codable, Equatable, Sendable {
     var trackKeys: Set<String> = []
     var artists: Set<String> = []
+    /// 「最近推过」软黑名单：归一化单曲键 → 最近一次推荐时间（epoch 秒）。
+    /// 与会永久生效的「不再推荐」区分：只在 7 天窗口内跳过（`RecommendationBatchPolicy.recentBlacklistWindow`）。
+    var recentTrackKeys: [String: Double] = [:]
 
     static let empty = RecommendationBlacklist()
 
     init() {}
 
-    init(trackKeys: Set<String>, artists: Set<String>) {
+    init(trackKeys: Set<String>, artists: Set<String>, recentTrackKeys: [String: Double] = [:]) {
         self.trackKeys = trackKeys
         self.artists = artists
+        self.recentTrackKeys = recentTrackKeys
     }
 
     /// 加入一条「不再推荐」。
@@ -43,15 +47,50 @@ struct RecommendationBlacklist: Codable, Equatable, Sendable {
         trackKeys.isEmpty && artists.isEmpty
     }
 
+    // MARK: 软黑名单（P2：最近推过 7 天）
+
+    /// 记录一批已推荐曲目（写入前先清理过期条目，文件不无限增长）。
+    mutating func markRecommended(_ candidates: [RecommendedCandidate], at date: Date) {
+        pruneRecent(before: date.addingTimeInterval(-RecommendationBatchPolicy.recentBlacklistWindow))
+        for candidate in candidates {
+            recentTrackKeys[RecommendationKey.normalize(title: candidate.title, artist: candidate.artist)] = date.timeIntervalSince1970
+        }
+    }
+
+    /// 最近推过（窗口内）→ true。
+    func wasRecentlyRecommended(title: String, artist: String, at date: Date) -> Bool {
+        let key = RecommendationKey.normalize(title: title, artist: artist)
+        guard let timestamp = recentTrackKeys[key] else { return false }
+        return date.timeIntervalSince1970 - timestamp < RecommendationBatchPolicy.recentBlacklistWindow
+    }
+
+    /// 窗口内仍生效的软黑名单键（作为召回排除集）。
+    func activeRecentKeys(at date: Date) -> Set<String> {
+        let cutoff = date.timeIntervalSince1970 - RecommendationBatchPolicy.recentBlacklistWindow
+        return Set(recentTrackKeys.filter { $0.value >= cutoff }.keys)
+    }
+
+    /// 缓存键用的软黑名单版本（内容变化 → 版本变化；与具体时间无关的稳定字符串）。
+    var recentVersion: String {
+        recentTrackKeys.keys.sorted().joined(separator: "|")
+    }
+
+    private mutating func pruneRecent(before cutoff: Date) {
+        let cutoffSeconds = cutoff.timeIntervalSince1970
+        recentTrackKeys = recentTrackKeys.filter { $0.value >= cutoffSeconds }
+    }
+
     // MARK: Codable（排序输出，避免 Set 顺序导致文件抖动）
 
     private enum CodingKeys: String, CodingKey {
         case trackKeys
         case artists
+        case recentTrackKeys
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        recentTrackKeys = try container.decodeIfPresent([String: Double].self, forKey: .recentTrackKeys) ?? [:]
         trackKeys = Set(try container.decodeIfPresent([String].self, forKey: .trackKeys) ?? [])
         artists = Set(try container.decodeIfPresent([String].self, forKey: .artists) ?? [])
     }
@@ -60,6 +99,7 @@ struct RecommendationBlacklist: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(trackKeys.sorted(), forKey: .trackKeys)
         try container.encode(artists.sorted(), forKey: .artists)
+        try container.encode(recentTrackKeys, forKey: .recentTrackKeys)
     }
 }
 

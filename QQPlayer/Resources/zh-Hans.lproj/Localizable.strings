@@ -1123,6 +1123,9 @@
 /* Local AI recommendations (P1) */
 "recommendations" = "为你推荐";
 "recommendation_refresh" = "换一批";
+"recommendation_batch_refilling" = "补充中…";
+"recommendation_batch_remaining" = "本批还有 %d 首";
+"recommendation_batch_exhausted" = "本批已看完";
 "recommendation_loading" = "正在生成推荐…";
 "recommendation_empty" = "暂时没有新的可推荐歌曲，稍后再试试";
 "recommendation_error_all_sources" = "在线源都连不上，请检查网络后重试";

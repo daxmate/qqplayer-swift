@@ -304,7 +304,7 @@ struct DeleteSettings: Codable {
     var recommendationChatRounds: Int = DeleteSettings.defaultRecommendationChatRounds
 
     /// 推荐条数默认值 / 边界（唯一口径）。
-    static let defaultRecommendationCount = 20
+    static let defaultRecommendationCount = 15
     static let recommendationCountRange = 1 ... 50
 
     /// 指令输入上下文轮数默认值 / 边界（唯一口径）。

@@ -1118,6 +1118,9 @@
 /* Local AI recommendations (P1) */
 "recommendations" = "Pour vous";
 "recommendation_refresh" = "Nouvelle sélection";
+"recommendation_batch_refilling" = "Chargement…";
+"recommendation_batch_remaining" = "%d autres dans cette sélection";
+"recommendation_batch_exhausted" = "Fin de cette sélection";
 "recommendation_loading" = "Génération des recommandations…";
 "recommendation_empty" = "Aucun nouveau morceau à recommander pour le moment. Réessayez plus tard.";
 "recommendation_error_all_sources" = "Impossible de joindre les sources en ligne. Vérifiez votre réseau et réessayez.";

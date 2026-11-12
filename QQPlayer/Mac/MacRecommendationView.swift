@@ -168,14 +168,13 @@ struct MacRecommendationView: View {
             if model.cacheHit, let cachedAt = model.cacheCreatedAt {
                 Text("recommendation_footer_cache".localized(with: cacheAgeText(cachedAt)))
             }
+            batchStatusText
             Spacer()
-            if model.cacheHit {
-                Button("recommendation_refresh".localized) {
-                    Task { await refresh() }
-                }
-                .buttonStyle(.link)
-                .disabled(model.phase == .loading)
+            Button("recommendation_refresh".localized) {
+                Task { await refresh() }
             }
+            .buttonStyle(.link)
+            .disabled(model.phase == .loading || model.isRefilling)
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
@@ -184,6 +183,20 @@ struct MacRecommendationView: View {
     }
 
     /// 缓存时间的相对文案（分钟 / 小时两档，够用且不引第三方格式化）。
+    /// 批次状态：补充中 / 还有下一批 / 本批已看完（不静默）。
+    @ViewBuilder
+    private var batchStatusText: some View {
+        if model.isRefilling {
+            Text("recommendation_batch_refilling".localized)
+        } else if model.hasBatchSession {
+            if model.batchRemaining > 0 {
+                Text("recommendation_batch_remaining".localized(with: model.batchRemaining))
+            } else {
+                Text("recommendation_batch_exhausted".localized)
+            }
+        }
+    }
+
     private func cacheAgeText(_ date: Date) -> String {
         let minutes = max(0, Int(Date().timeIntervalSince(date) / 60))
         if minutes < 60 {

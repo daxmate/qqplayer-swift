@@ -37,6 +37,10 @@ struct RecommendationCacheKeyInput: Equatable {
     var planner: RecommendationPlanSource
     var modelIdentity: String
     var localeIdentifier: String
+    /// 召回源版本（P2：主源 / 降级链升级必须让旧缓存失效）。
+    var sourceVersion: String = ""
+    /// 软黑名单版本（最近推过集合变化 → 旧结果可能重复）。
+    var blacklistVersion: String = ""
 
     /// stale 索引键：只含「请求身份」（原话 + planner + 模型 + locale），**不含**画像摘要 / 曲库指纹。
     /// 曲库或画像变化时精确键失效，但仍能按它找回同一次请求的旧候选。
@@ -62,6 +66,8 @@ struct RecommendationCacheKeyInput: Equatable {
             "planner:\(planner.rawValue)",
             "model:\(modelIdentity.lowercased())",
             "locale:\(localeIdentifier.lowercased())",
+            "source:\(sourceVersion.lowercased())",
+            "blacklist:\(blacklistVersion.lowercased())",
         ].joined(separator: "\n")
     }
 

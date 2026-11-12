@@ -1115,6 +1115,9 @@
 /* Local AI recommendations (P1) */
 "recommendations" = "Для вас";
 "recommendation_refresh" = "Новая подборка";
+"recommendation_batch_refilling" = "Догрузка…";
+"recommendation_batch_remaining" = "Ещё %d в подборке";
+"recommendation_batch_exhausted" = "Подборка закончилась";
 "recommendation_loading" = "Формируем рекомендации…";
 "recommendation_empty" = "Сейчас нет новых песен для рекомендаций. Попробуйте позже.";
 "recommendation_error_all_sources" = "Не удалось подключиться к онлайн-источникам. Проверьте сеть и повторите попытку.";

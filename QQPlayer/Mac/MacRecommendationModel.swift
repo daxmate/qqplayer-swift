@@ -50,6 +50,17 @@ final class MacRecommendationModel {
     /// 最近一次请求的缓存键（「不再推荐」时清掉，避免下次命中把已拉黑的歌带回来）。
     private var lastCacheKey: RecommendationCacheKeyInput?
 
+    // MARK: P2 会话池（15 首 / 换一批）
+
+    /// 会话池（换一批只推进游标，不重新请求网络）。
+    private var session: RecallSession?
+    /// 池里还剩多少首可推（UI 页脚状态）。
+    private(set) var batchRemaining = 0
+    /// 池不足一批、正在增量查询（UI「补充中」）。
+    private(set) var isRefilling = false
+    /// 当前是否有会话池（决定「换一批 / 已看完」文案）。
+    var hasBatchSession: Bool { session != nil }
+
     init(
         blacklistURL: URL? = RecommendationBlacklistStore.defaultURL(),
         historyURL: URL? = RecommendationRequestHistoryStore.defaultURL(),
@@ -81,6 +92,12 @@ final class MacRecommendationModel {
         rounds: Int = DeleteSettings.defaultRecommendationChatRounds,
         useLocalModel: Bool = true
     ) async {
+        guard !isGenerating else { return }
+        // 换一批优先走会话游标（不整轮重算、不重新请求）。
+        if advanceBatchIfAvailable() { return }
+        // 池已耗尽：增量查询（排除最近推过，换一轮候选）。
+        if !candidates.isEmpty { isRefilling = true }
+        defer { isRefilling = false }
         if let text = activeRequestText {
             await submit(text, count: count, rounds: rounds, useLocalModel: useLocalModel, bypassCache: true)
         } else {
@@ -105,6 +122,8 @@ final class MacRecommendationModel {
         }
         cacheHit = false
         cacheCreatedAt = nil
+        session = nil
+        batchRemaining = 0
         defer { isGenerating = false }
 
         #if canImport(MLXLLM) && arch(arm64) && os(macOS)
@@ -166,17 +185,22 @@ final class MacRecommendationModel {
                 return
             }
 
-            let result = await RecommendationEngine().recommend(
+            let poolTarget = max(RecommendationBatchPolicy.poolTarget, count * 4)
+            let result = await poolEngine().recommend(
                 request: request,
                 profile: profile,
-                count: count,
-                planSource: .localModel
+                count: poolTarget,
+                planSource: .localModel,
+                excludedTrackKeys: excludedTrackKeys
             )
             if Task.isCancelled { return }
 
             switch result {
             case let .success(list):
-                candidates = list
+                let batch = makeBatch(from: list, count: count)
+                candidates = batch
+                blacklist.markRecommended(batch, at: clock())
+                _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
                 activeRequestText = trimmed
                 requestedArtist = request.referenceArtists
                     .map { RecommendationKey.displayPrimaryArtist($0) }
@@ -187,7 +211,7 @@ final class MacRecommendationModel {
                 storeCache(
                     key,
                     planSource: .localModel,
-                    candidates: list,
+                    candidates: batch,
                     requestedArtist: requestedArtist
                 )
                 var updated = history
@@ -214,6 +238,8 @@ final class MacRecommendationModel {
     func clearRequest(count: Int) async {
         activeRequestText = nil
         requestedArtist = nil
+        session = nil
+        batchRemaining = 0
         await generate(count: count)
     }
 
@@ -221,6 +247,7 @@ final class MacRecommendationModel {
     func dismiss(_ candidate: RecommendedCandidate) {
         blacklist.add(title: candidate.title, artist: candidate.artist)
         RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
+        session?.markSeen([candidate])
         candidates.removeAll { $0.id == candidate.id }
         if let lastCacheKey {
             // 在途后台重算先作废：否则它算完会把刚拉黑的歌带回来。
@@ -245,6 +272,8 @@ final class MacRecommendationModel {
         cacheHit = false
         cacheCreatedAt = nil
         requestedArtist = nil
+        session = nil
+        batchRemaining = 0
         defer { isGenerating = false }
 
         guard let input = await RecommendationDataSource.loadInput(now: clock(), blacklist: blacklist) else {
@@ -285,23 +314,78 @@ final class MacRecommendationModel {
         let plan = await selection.planner.makePlan(for: profile)
         if Task.isCancelled { return }
         planSource = plan.source
-        let result = await RecommendationEngine().recommend(
+        let poolTarget = max(RecommendationBatchPolicy.poolTarget, count * 4)
+        let result = await poolEngine().recommend(
             profile: profile,
-            count: count,
+            count: poolTarget,
             intents: plan.intents,
-            planSource: plan.source
+            planSource: plan.source,
+            excludedTrackKeys: excludedTrackKeys
         )
         if Task.isCancelled { return }
 
         switch result {
         case let .success(list):
-            candidates = list
+            let batch = makeBatch(from: list, count: count)
+            candidates = batch
             lastGeneratedAt = clock()
             phase = .loaded
-            storeCache(key, planSource: plan.source, candidates: list)
+            blacklist.markRecommended(batch, at: clock())
+            _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
+            storeCache(key, planSource: plan.source, candidates: batch)
         case let .failure(error):
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: - 会话池（P2：15 首 / 换一批）
+
+    /// 推进到下一批；池耗尽 / 无会话 → false（调用方走增量重算）。
+    @discardableResult
+    private func advanceBatchIfAvailable() -> Bool {
+        guard var session else { return false }
+        if session.state == .exhausted {
+            batchRemaining = 0
+            return false
+        }
+        let batch = session.nextBatch()
+        self.session = session
+        batchRemaining = session.remaining
+        guard !batch.isEmpty else { return false }
+        candidates = batch
+        phase = .loaded
+        blacklist.markRecommended(batch, at: clock())
+        _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
+        if let key = lastCacheKey {
+            storeCache(key, planSource: planSource, candidates: batch, requestedArtist: requestedArtist)
+        }
+        return true
+    }
+
+    /// 用一轮召回结果建池并取首批（池不足时退回截断列表，不假装成功）。
+    private func makeBatch(from pool: [RecommendedCandidate], count: Int) -> [RecommendedCandidate] {
+        var session = RecallSession(pool: pool)
+        let batch = session.nextBatch()
+        self.session = session
+        batchRemaining = session.remaining
+        if batch.isEmpty {
+            self.session = nil
+            return Array(pool.prefix(count))
+        }
+        return batch
+    }
+
+    /// 召回排除集：最近 7 天推过（软黑名单，跨会话）。
+    private var excludedTrackKeys: Set<String> {
+        blacklist.activeRecentKeys(at: clock())
+    }
+
+    /// P2 池构建引擎（iTunes 主源链；同艺人 ≤4、同专辑 ≤2）。
+    private func poolEngine() -> RecommendationEngine {
+        RecommendationEngine(
+            maxSongsPerArtist: RecommendationBatchPolicy.maxSongsPerArtist,
+            maxSongsPerAlbum: RecommendationBatchPolicy.maxSongsPerAlbum
+        )
     }
 
     // MARK: - 结果缓存
@@ -323,13 +407,17 @@ final class MacRecommendationModel {
             libraryFingerprint: libraryFingerprint,
             planner: planSource,
             modelIdentity: modelIdentity,
-            localeIdentifier: Locale.current.identifier
+            localeIdentifier: Locale.current.identifier,
+            sourceVersion: RecommendationSourceChain.sourceVersion,
+            blacklistVersion: blacklist.recentVersion
         )
     }
 
     /// 命中即落状态（planner / 召回引擎都不启动）；stale 命中随后由调用方安排后台重算。
     private func applyCacheHit(_ hit: RecommendationCacheHit, requestText: String?) {
         candidates = hit.candidates
+        session = nil
+        batchRemaining = 0
         planSource = hit.planSource
         lastGeneratedAt = hit.createdAt
         cacheHit = true
@@ -460,6 +548,8 @@ final class MacRecommendationModel {
     ) {
         if changed {
             candidates = recompute.candidates
+            session = nil
+            batchRemaining = 0
         }
         planSource = recompute.planSource
         requestedArtist = recompute.requestedArtist

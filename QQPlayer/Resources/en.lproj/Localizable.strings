@@ -1120,6 +1120,9 @@
 /* Local AI recommendations (P1) */
 "recommendations" = "For You";
 "recommendation_refresh" = "New batch";
+"recommendation_batch_refilling" = "Loading more…";
+"recommendation_batch_remaining" = "%d more in this pool";
+"recommendation_batch_exhausted" = "End of this batch";
 "recommendation_loading" = "Building recommendations…";
 "recommendation_empty" = "No new songs to recommend right now. Try again later.";
 "recommendation_error_all_sources" = "Couldn't reach the online sources. Check your network and try again.";

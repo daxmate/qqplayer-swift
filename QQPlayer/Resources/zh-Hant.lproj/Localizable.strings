@@ -1444,6 +1444,9 @@
 /* Local AI recommendations (P1) */
 "recommendations" = "為你推薦";
 "recommendation_refresh" = "換一批";
+"recommendation_batch_refilling" = "補充中…";
+"recommendation_batch_remaining" = "本批還有 %d 首";
+"recommendation_batch_exhausted" = "本批已看完";
 "recommendation_loading" = "正在產生推薦…";
 "recommendation_empty" = "暫時沒有新的可推薦歌曲，稍後再試試";
 "recommendation_error_all_sources" = "線上來源都連不上，請檢查網路後重試";
