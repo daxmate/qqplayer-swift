@@ -226,6 +226,7 @@
 		768820480E634D43A9EF1313 /* SyncFileConcurrencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AEDB6058BE04727A434B174 /* SyncFileConcurrencyTests.swift */; };
 		8F404014E66B419C8A9DD999 /* RecommendationCacheFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D638CCF89F4C6FA73020B7 /* RecommendationCacheFlowTests.swift */; };
 		3A8AAC8711874DB091FF75C3 /* SyncFrameChainShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8906D8C3AB41FE954D38A6 /* SyncFrameChainShapeContractTests.swift */; };
+		9D8F6045A5DC472691D7107B /* RecommendationNormalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -499,6 +500,7 @@
 		3AEDB6058BE04727A434B174 /* SyncFileConcurrencyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFileConcurrencyTests.swift; sourceTree = "<group>"; };
 		F9D638CCF89F4C6FA73020B7 /* RecommendationCacheFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationCacheFlowTests.swift; sourceTree = "<group>"; };
 		5C8906D8C3AB41FE954D38A6 /* SyncFrameChainShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameChainShapeContractTests.swift; sourceTree = "<group>"; };
+		CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationNormalizationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -883,8 +885,11 @@
 				Services/RecommendationArtistConstraint.swift,
 				Services/RecommendationCacheFlow.swift,
 				"Services/RecommendationEngine+ArtistConstraint.swift",
+				"Services/RecommendationEngine+Observability.swift",
 				Services/RecommendationEngine.swift,
+				Services/RecommendationNormalization.swift,
 				Services/RecommendationProfile.swift,
+				Services/RecommendationProviders.swift,
 				Services/RecommendationResultCache.swift,
 				Services/RecommendationStore.swift,
 				Services/RecommendationTypes.swift,
@@ -1376,6 +1381,7 @@
 				3AEDB6058BE04727A434B174 /* SyncFileConcurrencyTests.swift */,
 				F9D638CCF89F4C6FA73020B7 /* RecommendationCacheFlowTests.swift */,
 				5C8906D8C3AB41FE954D38A6 /* SyncFrameChainShapeContractTests.swift */,
+				CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1901,6 +1907,7 @@
 				768820480E634D43A9EF1313 /* SyncFileConcurrencyTests.swift in Sources */,
 				8F404014E66B419C8A9DD999 /* RecommendationCacheFlowTests.swift in Sources */,
 				3A8AAC8711874DB091FF75C3 /* SyncFrameChainShapeContractTests.swift in Sources */,
+				9D8F6045A5DC472691D7107B /* RecommendationNormalizationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

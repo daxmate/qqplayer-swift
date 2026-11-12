@@ -169,7 +169,8 @@ final class MacRecommendationModel {
             let result = await RecommendationEngine().recommend(
                 request: request,
                 profile: profile,
-                count: count
+                count: count,
+                planSource: .localModel
             )
             if Task.isCancelled { return }
 
@@ -287,7 +288,8 @@ final class MacRecommendationModel {
         let result = await RecommendationEngine().recommend(
             profile: profile,
             count: count,
-            intents: plan.intents
+            intents: plan.intents,
+            planSource: plan.source
         )
         if Task.isCancelled { return }
 
@@ -418,7 +420,8 @@ final class MacRecommendationModel {
         let result = await RecommendationEngine().recommend(
             profile: profile,
             count: count,
-            intents: plan.intents
+            intents: plan.intents,
+            planSource: plan.source
         )
         if Task.isCancelled { return nil }
         guard case let .success(list) = result else { return nil }
@@ -437,7 +440,8 @@ final class MacRecommendationModel {
         let result = await RecommendationEngine().recommend(
             request: request,
             profile: context.profile,
-            count: context.count
+            count: context.count,
+            planSource: .localModel
         )
         if Task.isCancelled { return nil }
         guard case let .success(list) = result else { return nil }

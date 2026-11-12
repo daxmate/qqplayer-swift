@@ -78,12 +78,35 @@ extension RecommendationEngine {
     func recommend(
         request: RecommendationUserRequest,
         profile: TasteProfile,
-        count: Int
+        count: Int,
+        planSource: RecommendationPlanSource? = nil
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
-        guard !request.isEmpty else { return .failure(.emptyRequest) }
+        let context = RecommendationRunContext(
+            requestText: request.rawText.isEmpty ? request.keywords.joined(separator: ",") : request.rawText,
+            planSource: planSource
+        )
+        guard !request.isEmpty else {
+            logRunSummary(
+                context: context, intents: [], gathered: nil,
+                finalCount: 0, targetCount: count
+            )
+            return .failure(.emptyRequest)
+        }
         let intents = RecommendationIntentBuilder.intents(from: request, profile: profile)
-        guard !intents.isEmpty else { return .failure(.emptyRequest) }
-        guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
+        guard !intents.isEmpty else {
+            logRunSummary(
+                context: context, intents: [], gathered: nil,
+                finalCount: 0, targetCount: count
+            )
+            return .failure(.emptyRequest)
+        }
+        guard !providers.isEmpty else {
+            logRunSummary(
+                context: context, intents: intents, gathered: nil,
+                finalCount: 0, targetCount: count
+            )
+            return .failure(.allSourcesFailed)
+        }
 
         let excluded = Set(
             request.excludeArtists
@@ -98,6 +121,10 @@ extension RecommendationEngine {
             artistConstraint: artistConstraint
         )
         if gathered.items.isEmpty {
+            logRunSummary(
+                context: context, intents: intents, gathered: gathered,
+                finalCount: 0, targetCount: count
+            )
             if gathered.allFailed { return .failure(.allSourcesFailed) }
             AppLog.info(.general, "🎵 推荐结果：点名艺人 \(artistConstraint?.displayName ?? "无") 无匹配候选，返回 0 条")
             return .success([])
@@ -121,6 +148,10 @@ extension RecommendationEngine {
         AppLog.info(
             .general,
             "🎵 推荐结果：\(picked.count)/\(max(1, count)) 条（点名艺人 \(artistConstraint?.displayName ?? "无")）"
+        )
+        logRunSummary(
+            context: context, intents: intents, gathered: gathered,
+            finalCount: picked.count, targetCount: count
         )
         return .success(picked)
     }

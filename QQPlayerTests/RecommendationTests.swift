@@ -51,7 +51,8 @@ private func makeProfile(
 }
 
 private func remote(_ title: String, _ artist: String, album: String? = nil, year: Int? = nil) -> RecommendationRemoteSong {
-    RecommendationRemoteSong(title: title, artist: artist, album: album, year: year)
+    // P1 准入闸要求「歌曲 ID 非空」：夹具默认给一个 id（需要 nil 的用例单独显式构造）。
+    RecommendationRemoteSong(title: title, artist: artist, album: album, year: year, songID: 1)
 }
 
 // MARK: - 归一化
@@ -614,7 +615,8 @@ struct RecommendationSimilarFallbackTests {
     func similarAddsCandidates() async {
         var provider = MockSimilarProvider()
         provider.songs = ["a": [seed("SeedA", "a", id: 1)]]
-        provider.similar = [RecommendationRemoteSong(title: "Sim", artist: "Someone", album: nil, year: nil)]
+        // P1 准入闸要求歌曲 ID 非空：相似候选同样要给 id（nil 会被闸 1 剔除）。
+        provider.similar = [RecommendationRemoteSong(title: "Sim", artist: "Someone", album: nil, year: nil, songID: 9)]
         let engine = RecommendationEngine(providers: [provider])
         let profile = makeProfile(artists: [("a", 10)])
         guard case let .success(list) = await engine.recommend(profile: profile, count: 5) else {

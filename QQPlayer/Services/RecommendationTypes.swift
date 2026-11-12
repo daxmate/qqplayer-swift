@@ -471,10 +471,31 @@ enum RecommendationIntentBuilder {
 
 // MARK: - 非单曲过滤
 
+/// 准入闸的拒绝原因（P1 观测口径：每道闸的 in/out 与命中原因都要能计数）。
+///
+/// rawValue 进日志，**一经发布不得改动**（改 = 历史日志无法对照）。
+enum RecommendationAdmissionRejection: String, CaseIterable, Sendable {
+    /// 歌曲 ID 为空（拿不到可播放身份）。
+    case missingSongID = "missing_song_id"
+    /// 时长不在 30s…10min 窗口内（缺失不算）。
+    case durationOutOfRange = "duration_out_of_range"
+    /// 艺人是泛称（群星 / Various Artists / 未知 …）。
+    case genericArtist = "generic_artist"
+    /// 标题为空。
+    case emptyTitle = "empty_title"
+    /// 标题带歌单 / 合辑 / 串烧 / 榜单标记。
+    case playlistMarker = "playlist_marker"
+    /// 标题整串就是年代 / 年份标签。
+    case decadeOnlyTitle = "decade_only_title"
+    /// 标题与专辑名相同（榜单 / 合辑占位行）。
+    case titleEqualsAlbum = "title_equals_album"
+}
+
 /// 歌单 / 合辑 / 串烧识别（搜索结果是网页索引，混进歌单是常态）。
 ///
-/// 依据：标题特征词 + 艺人字段为群星/VA + 时长异常（≥10 分钟）+ 纯年代标题。
-/// 保守取值：宁放过可疑单曲，也不把正常歌错杀。
+/// 依据（按序判定，见 `admissionRejection(for:)`）：歌曲 ID 非空 + 时长窗口
+/// 30s…10min + 艺人非泛称 + 标题非空/非标记/非纯年代 + 标题 ≠ 专辑名。
+/// 取值从「宁放过」收紧为「宁严」：可疑条目剔掉，宁可少推也不错推（设计定稿 §4）。
 enum RecommendationCandidateFilter {
     static let playlistMarkers: [String] = [
         "歌单", "精选", "合辑", "合集", "串烧", "榜单", "排行", "循环",
@@ -490,20 +511,51 @@ enum RecommendationCandidateFilter {
     /// 单曲时长上限（毫秒）：超过 10 分钟基本是串烧 / 合辑。
     static let maxDurationMs = 10 * 60 * 1000
 
-    static func isLikelyNonSong(_ song: RecommendationRemoteSong) -> Bool {
-        let rawArtist = song.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if genericArtists.contains(rawArtist) { return true }
-        let primary = RecommendationKey.primaryArtist(song.artist).lowercased()
-        if genericArtists.contains(primary) { return true }
-        if let duration = song.durationMs, duration >= maxDurationMs { return true }
+    /// 单曲时长下限（毫秒）：短于 30 秒基本是试听片段 / 提示音，不是完整单曲。
+    static let minDurationMs = 30 * 1000
 
+    /// **唯一对外入口**：候选是否需要被准入闸剔除。
+    ///
+    /// 内部改为条件式顺序判定，逐条给出可枚举原因（供观测打点计数），
+    /// 但只允许从这里进闸——不允许再写第二个判断入口。
+    static func isLikelyNonSong(_ song: RecommendationRemoteSong) -> Bool {
+        admissionRejection(for: song) != nil
+    }
+
+    /// 顺序判定并返回**第一个**不满足的准入条件（nil = 通过）。
+    ///
+    /// 仅供打点计数与单测使用；生产判定入口仍是 `isLikelyNonSong`。
+    /// 条件全部只能收紧：原有「泛称艺人 / 超长 / 纯年代 / 歌单标记 / 空标题」规则逐条保留。
+    static func admissionRejection(for song: RecommendationRemoteSong) -> RecommendationAdmissionRejection? {
+        // 1. 歌曲 ID 非空（可播放身份）。
+        guard song.songID != nil else { return .missingSongID }
+
+        // 2. 时长窗口 30s ≤ 时长 ≤ 10min；时长缺失沿用既有语义（不拦）。
+        if let duration = song.durationMs, duration < minDurationMs || duration > maxDurationMs {
+            return .durationOutOfRange
+        }
+
+        // 3. 艺人非泛称（群星 / Various Artists / 未知 …）。
+        let rawArtist = song.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if genericArtists.contains(rawArtist) { return .genericArtist }
+        let primary = RecommendationKey.primaryArtist(song.artist).lowercased()
+        if genericArtists.contains(primary) { return .genericArtist }
+
+        // 4. 标题非空、非歌单 / 合辑 / 串烧标记。
         let title = song.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !title.isEmpty else { return true }
-        if playlistMarkers.contains(where: { title.contains($0) }) { return true }
+        guard !title.isEmpty else { return .emptyTitle }
+        if playlistMarkers.contains(where: { title.contains($0) }) { return .playlistMarker }
         // 标题整串就是年代 / 年份（`1990s` / `2000s` / `90年代` / `1990`）：在线源会把年代
         // 标签当歌名返回，专辑字段往往也填成 `1990s`——与专辑是否为空无关，一律剔除。
-        if isDecadeOnlyTitle(song.title) { return true }
-        return false
+        if isDecadeOnlyTitle(song.title) { return .decadeOnlyTitle }
+
+        // 5. 标题 ≠ 专辑名（同串 = 榜单 / 合辑占位行；比较走归一化口径，不做字符串硬比）。
+        if let album = song.album, !album.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let titleToken = RecommendationKey.comparisonToken(song.title)
+            let albumToken = RecommendationKey.comparisonToken(album)
+            if !titleToken.isEmpty, titleToken == albumToken { return .titleEqualsAlbum }
+        }
+        return nil
     }
 
     /// 标题整串是否为纯年代标签（判定口径见 `RecommendationDecadeLabel`，不误杀标题中段含年代的歌）。

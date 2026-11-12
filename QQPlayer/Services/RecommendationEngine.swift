@@ -14,120 +14,6 @@
 
 import Foundation
 
-// MARK: - 在线召回契约
-
-/// 在线源返回的歌曲（两源归一后的最小字段；年份/专辑给不出就是 nil，不编造）。
-struct RecommendationRemoteSong: Sendable, Equatable {
-    var title: String
-    var artist: String
-    var album: String?
-    var year: Int?
-    /// 在线源歌曲 ID（相似歌曲召回用；给不出就是 nil）。
-    var songID: Int?
-    /// 时长（毫秒；歌单 / 串烧过滤用；给不出就是 nil）。
-    var durationMs: Int?
-
-    init(
-        title: String,
-        artist: String,
-        album: String? = nil,
-        year: Int? = nil,
-        songID: Int? = nil,
-        durationMs: Int? = nil
-    ) {
-        self.title = title
-        self.artist = artist
-        self.album = album
-        self.year = year
-        self.songID = songID
-        self.durationMs = durationMs
-    }
-}
-
-/// 在线搜索 seam（生产适配既有客户端，测试注入桩；不新增第二套搜索实现）。
-protocol OnlineSearchProviding: Sendable {
-    var source: RecommendationSource { get }
-    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong]
-}
-
-/// 网易云适配器（复用 `NeteaseOnlineClient.search`，不改客户端）。
-struct NeteaseSearchProvider: OnlineSearchProviding, SimilarSongProviding {
-    var client: NeteaseOnlineClient = .shared
-
-    var source: RecommendationSource { .netease }
-
-    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
-        let songs = try await client.search(query: query, limit: limit)
-        return songs.map {
-            RecommendationRemoteSong(
-                title: $0.title, artist: $0.artist, album: $0.album, year: nil,
-                songID: $0.id, durationMs: $0.durationMs
-            )
-        }
-    }
-
-    /// 相似歌曲（网易云 eapi）；不可用时抛错，由引擎降级到同艺人热歌。
-    func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong] {
-        let songs = try await client.similarSongs(songID: songID, limit: limit)
-        return songs.map {
-            RecommendationRemoteSong(
-                title: $0.title, artist: $0.artist, album: $0.album, year: nil,
-                songID: $0.id, durationMs: $0.durationMs
-            )
-        }
-    }
-}
-
-/// 歌曲海适配器。
-///
-/// `GequhaiClient.search` 的既有语义是「失败返回 [] 不抛」，这里保持原语义；
-/// `@unchecked Sendable` 的理由：客户端是值类型 + URLSession，搜索路径无共享可变状态，
-/// 下载/扫码路径（Quark cookie）不经过本适配器。
-final class GequhaiSearchProvider: OnlineSearchProviding, @unchecked Sendable {
-    private let client: GequhaiClient
-
-    init(client: GequhaiClient = GequhaiClient()) {
-        self.client = client
-    }
-
-    var source: RecommendationSource { .gequhai }
-
-    func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
-        let songs = await client.search(query: query, limit: limit)
-        return songs.map {
-            RecommendationRemoteSong(title: $0.title, artist: $0.artist, album: nil, year: nil)
-        }
-    }
-}
-
-// MARK: - 错误
-
-enum RecommendationError: LocalizedError, Equatable {
-    /// 所有在线源都失败（网络断 / 双源同时不可用）。
-    case allSourcesFailed
-    /// 指令输入没有解析出任何有效条件（提示用户换个说法，不退回画像推荐）。
-    case emptyRequest
-
-    var errorDescription: String? {
-        switch self {
-        case .allSourcesFailed:
-            return "recommendation_error_all_sources".localized
-        case .emptyRequest:
-            return "recommendation_empty_request".localized
-        }
-    }
-}
-
-// MARK: - 相似歌曲召回契约
-
-/// 可选能力：支持「相似歌曲」的在线源（当前只有网易云）。
-///
-/// 接口不可用（匿名态未登录 / 改版）时必须抛错或返回空；引擎运行时探测后整轮降级，
-/// 绝不阻塞主召回链路。
-protocol SimilarSongProviding: Sendable {
-    func similarSongs(songID: Int, limit: Int) async throws -> [RecommendationRemoteSong]
-}
-
 // MARK: - 引擎
 
 /// 规则推荐引擎（无状态、可注入 providers；测试用桩，不打真实网络）。
@@ -168,22 +54,49 @@ struct RecommendationEngine: Sendable {
     }
 
     /// P2：意图由 planner（规则 / 本地模型）注入；召回、打分、理由逻辑不变。
+    ///
+    /// P1 观测：一次推荐产出一条 summary（管线边界打点，不绑定具体在线源）。
     func recommend(
         profile: TasteProfile,
         count: Int,
-        intents: [RecommendationIntent]
+        intents: [RecommendationIntent],
+        planSource: RecommendationPlanSource? = nil
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
-        guard !providers.isEmpty else { return .failure(.allSourcesFailed) }
-        guard !intents.isEmpty else { return .success([]) }
+        let context = RecommendationRunContext(
+            requestText: intents.map(\.query).joined(separator: ","),
+            planSource: planSource
+        )
+        if providers.isEmpty {
+            logRunSummary(
+                context: context, intents: intents, gathered: nil,
+                finalCount: 0, targetCount: count
+            )
+            return .failure(.allSourcesFailed)
+        }
+        guard !intents.isEmpty else {
+            logRunSummary(
+                context: context, intents: [], gathered: nil,
+                finalCount: 0, targetCount: count
+            )
+            return .success([])
+        }
 
         let gathered = await gather(profile: profile, intents: intents)
         if gathered.items.isEmpty {
+            logRunSummary(
+                context: context, intents: intents, gathered: gathered,
+                finalCount: 0, targetCount: count
+            )
             // 一个成功响应都没有、且有失败尝试 → 明确错误，不假装「没找到」。
             return gathered.allFailed ? .failure(.allSourcesFailed) : .success([])
         }
 
         let ranked = rank(gathered.items, profile: profile)
         let picked = select(ranked, count: count, profile: profile)
+        logRunSummary(
+            context: context, intents: intents, gathered: gathered,
+            finalCount: picked.count, targetCount: count
+        )
         return .success(picked)
     }
 
@@ -198,6 +111,12 @@ struct RecommendationEngine: Sendable {
     struct GatherResult: Sendable {
         var items: [GatheredItem]
         var allFailed: Bool
+        /// 观测（P1）：每源 成功 / 失败 / 条数。
+        var sourceStats: [RecommendationSourceStat] = []
+        /// 观测（P1）：每道闸的 in/out，顺序见 gateOrder。
+        var gateStats: [RecommendationGateStat] = []
+        /// 观测（P1）：准入闸拒绝原因计数（原因 rawValue → 次数）。
+        var rejectionCounts: [String: Int] = [:]
     }
 
     private struct SourceOutcome: Sendable {
@@ -217,31 +136,67 @@ struct RecommendationEngine: Sendable {
         var failedAttempts = 0
         var succeededSources = 0
         var rejectedByArtist = 0
+        var gateStats: [String: (inCount: Int, outCount: Int)] = [:]
+        var rejectionCounts: [String: Int] = [:]
+        var sourceStats: [RecommendationSource: (ok: Int, failed: Int, songs: Int)] = [:]
+
+        // 观测（P1）：每道闸的进/出。候选按序过闸，前面的闸不过就不会走到后面的闸（漏斗口径）。
+        func passGate(_ name: String, _ passes: Bool) -> Bool {
+            var stat = gateStats[name] ?? (inCount: 0, outCount: 0)
+            stat.inCount += 1
+            if !passes { stat.outCount += 1 }
+            gateStats[name] = stat
+            return passes
+        }
+
+        func recordSource(_ outcome: SourceOutcome) {
+            var stat = sourceStats[outcome.source] ?? (ok: 0, failed: 0, songs: 0)
+            if outcome.failed {
+                stat.failed += 1
+            } else {
+                stat.ok += 1
+                stat.songs += outcome.songs.count
+            }
+            sourceStats[outcome.source] = stat
+        }
 
         func accept(_ song: RecommendationRemoteSong, source: RecommendationSource, intent: RecommendationIntent) {
-            guard !song.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             let artistKey = RecommendationKey.primaryArtist(song.artist)
-            guard !artistKey.isEmpty else { return }
+            let hasFields = !song.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !artistKey.isEmpty
+            guard passGate("fields", hasFields) else { return }
             // 点名艺人是硬约束：主艺人不在点名集合内直接剔除（标题命中也不算）。
-            if let artistConstraint, !artistConstraint.matches(artist: song.artist) {
-                rejectedByArtist += 1
+            if let artistConstraint {
+                guard passGate("artist_constraint", artistConstraint.matches(artist: song.artist)) else {
+                    rejectedByArtist += 1
+                    return
+                }
+            }
+            // 准入闸：唯一判定入口 isLikelyNonSong 的原因版本（顺序判定，宁严）。
+            if let reason = RecommendationCandidateFilter.admissionRejection(for: song) {
+                _ = passGate("admission", false)
+                rejectionCounts[reason.rawValue, default: 0] += 1
                 return
             }
+            _ = passGate("admission", true)
+
             let key = RecommendationKey.normalize(title: song.title, artist: song.artist)
-            guard !profile.libraryKeys.contains(key),
-                  !profile.blacklistTracks.contains(key),
-                  !profile.blacklistArtists.contains(artistKey),
-                  !excludedArtists.contains(artistKey)
-            else { return }
-            guard !RecommendationCandidateFilter.isLikelyNonSong(song) else { return }
+            guard passGate("library", !profile.libraryKeys.contains(key)) else { return }
+            guard passGate(
+                "blacklist",
+                !profile.blacklistTracks.contains(key) && !profile.blacklistArtists.contains(artistKey)
+            ) else { return }
+            guard passGate("excluded_artists", !excludedArtists.contains(artistKey)) else { return }
 
             if let existing = indexByKey[key] {
+                _ = passGate("dedupe", false)
                 // 同曲两源都召回：保留可靠度更高的源。
                 if source.reliability > items[existing].source.reliability {
                     items[existing].source = source
                 }
                 return
             }
+            _ = passGate("dedupe", true)
             indexByKey[key] = items.count
             items.append(GatheredItem(song: song, source: source, intent: intent))
         }
@@ -252,8 +207,13 @@ struct RecommendationEngine: Sendable {
             let before = items.count
             let outcomes = await searchAll(query: intent.query, limit: perIntentLimit)
             for outcome in outcomes {
+                recordSource(outcome)
                 if outcome.failed {
                     failedAttempts += 1
+                    AppLog.debug(
+                        .general,
+                        "🎵 推荐召回失败：\(outcome.source.rawValue) [\(intent.kind.rawValue)] \(intent.query)"
+                    )
                     continue
                 }
                 succeededSources += 1
@@ -263,7 +223,7 @@ struct RecommendationEngine: Sendable {
             }
             AppLog.debug(
                 .general,
-                "🎵 推荐召回：[\(intent.kind.rawValue)] \(intent.query) 新增 \(items.count - before) 条"
+                "🎵 推荐召回： [\(intent.kind.rawValue)] \(intent.query) 新增 \(items.count - before) 条"
             )
         }
 
@@ -276,6 +236,9 @@ struct RecommendationEngine: Sendable {
                 guard let seed = seedSongID(for: intent, in: items) else { continue }
                 probes += 1
                 let outcomes = await similarAll(songID: seed, limit: perIntentLimit)
+                for outcome in outcomes {
+                    recordSource(outcome)
+                }
                 let usable = outcomes.filter { !$0.failed && !$0.songs.isEmpty }
                 guard !usable.isEmpty else {
                     similarUnavailable = true
@@ -304,7 +267,13 @@ struct RecommendationEngine: Sendable {
         }
 
         let allFailed = succeededSources == 0 && failedAttempts > 0
-        return GatherResult(items: items, allFailed: allFailed)
+        return GatherResult(
+            items: items,
+            allFailed: allFailed,
+            sourceStats: sortedSourceStats(sourceStats),
+            gateStats: sortedGateStats(gateStats),
+            rejectionCounts: rejectionCounts
+        )
     }
 
     private func seedSongID(for intent: RecommendationIntent, in items: [GatheredItem]) -> Int? {
