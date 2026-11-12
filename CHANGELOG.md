@@ -2,6 +2,14 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.8] - 2026-11-12
+
+### 🐛 修复
+
+- macOS 跟唱模式下歌词区会显示系统焦点框（一圈灰色细线），影响观感。现在歌词区仍然接收键盘焦点（字母键、上下句快捷键照常工作），但不再绘制焦点框。
+
+[1.1.8]: https://github.com/daxmate/qqplayer-swift/compare/v1.1.7...v1.1.8
+
 ## [1.1.7] - 2026-11-12
 
 ### 🐛 修复
