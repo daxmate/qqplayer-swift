@@ -151,6 +151,74 @@ enum RecommendationKey {
     }
 }
 
+// MARK: - 年代标签
+
+/// 年代标签的**唯一**解析口径：请求层 / 计划层（消费端）/ 结果过滤层共用，禁止第二份实现。
+///
+/// 只认「整串就是年代」的标签（允许前后空白与包裹括号）：
+/// `1990s` / `1990's` / `1990S` / `(1990s)` / `1990年代` / `90s` / `90年代` / `1990` / `1990 年`。
+/// 标题中段含年代（`1990s Love Song` / `夏日1990`）一律返回 nil——那里是歌名，不是年代标签。
+enum RecommendationDecadeLabel {
+    /// 4 位年份的合法区间（与请求解析层的年代校验保持一致）。
+    static let validYears = 1900 ... 2030
+
+    /// 标签 → 十年桶起点（`1997` / `1990s` / `90s` → 1990）；不是纯年代标签 → nil。
+    static func parse(_ raw: String) -> Int? {
+        var text = raw.precomposedStringWithCompatibilityMapping.lowercased()
+        // 弯引号归一到直引号后再去掉 `'`：`1990's` 与 `1990s` 同一口径。
+        text = text.replacingOccurrences(of: "\u{2019}", with: "'")
+        text = text.replacingOccurrences(of: "\u{2018}", with: "'")
+        text = text.replacingOccurrences(of: "'", with: "")
+        // 纯标签不依赖空白（`1990 年` / `1990 s` 都归一成紧凑文本）。
+        text = text.split(whereSeparator: \.isWhitespace).joined()
+        text = strippingWrappingBrackets(text)
+        guard !text.isEmpty else { return nil }
+
+        var digits = Substring(text)
+        var hasSuffix = false
+        // 「年代」优先于单字后缀，避免 `1990年代` 只吃掉 `代`。
+        for suffix in ["年代", "s", "年"] where digits.hasSuffix(suffix) {
+            digits = digits.dropLast(suffix.count)
+            hasSuffix = true
+            break
+        }
+        guard digits.allSatisfy({ ("0" ... "9").contains($0) }), let value = Int(digits) else { return nil }
+
+        switch digits.count {
+        case 4:
+            // 纯四位年份（`1990` / `1995`）按十年取整；超出合法区间不算年代标签。
+            return decadeStart(forYear: value)
+        case 2:
+            // 两位年代必须带后缀（`90s` / `90年代`）；裸 `90` 这类数字不算。
+            guard hasSuffix else { return nil }
+            let year = value >= 30 ? 1900 + value : 2000 + value
+            return validYears.contains(year) ? decadeStart(forYear: year) : nil
+        default:
+            return nil
+        }
+    }
+
+    /// 年份 → 十年桶起点；超出合法区间 → nil（不编造年代）。
+    static func decadeStart(forYear year: Int) -> Int? {
+        guard validYears.contains(year) else { return nil }
+        return (year / 10) * 10
+    }
+
+    /// 去掉最多两层包裹括号（`(1990s)` / `【1990s】`），其余字符原样保留。
+    private static func strippingWrappingBrackets(_ text: String) -> String {
+        let pairs: [Character: Character] = [
+            "(": ")", "[": "]", "【": "】", "（": "）", "《": "》", "\"": "\"",
+        ]
+        var current = text
+        for _ in 0 ..< 2 {
+            guard let first = current.first, let last = current.last, first != last else { return current }
+            guard pairs[first] == last else { return current }
+            current = String(current.dropFirst().dropLast())
+        }
+        return current
+    }
+}
+
 // MARK: - 候选
 
 /// 一条推荐候选（召回 → 去重 → 打分后的展示模型）。
@@ -370,6 +438,35 @@ enum RecommendationIntentBuilder {
 
         return Array(intents.prefix(maxTotalIntents))
     }
+
+    /// 召回前统一解析意图（纯函数）：纯年代标签（任何 kind）一律展开为画像里该年代的
+    /// 代表艺人；画像没有该年代艺人就丢弃，**绝不**把 `1990s` 这类标签送进在线搜索。
+    ///
+    /// 计划层（本地模型）仍按 kind=decade + `1990s` 输出，解析只在消费端做，prompt 契约不变。
+    static func resolved(_ intents: [RecommendationIntent], profile: TasteProfile) -> [RecommendationIntent] {
+        var resolved: [RecommendationIntent] = []
+        var seen = Set<String>()
+
+        func append(_ intent: RecommendationIntent) {
+            guard seen.insert(intent.priorityKey).inserted else { return }
+            resolved.append(intent)
+        }
+
+        for intent in intents {
+            // 相似召回只借 query 做标签、用歌曲 id 召回，不参与年代展开。
+            guard intent.kind != .similar, let decade = RecommendationDecadeLabel.parse(intent.query) else {
+                append(intent)
+                continue
+            }
+            let artists = profile.decadeArtists[decade] ?? []
+            for name in artists.prefix(maxArtistsPerBucket) {
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                append(RecommendationIntent(query: trimmed, kind: .decade, artist: trimmed, decade: decade))
+            }
+        }
+        return resolved
+    }
 }
 
 // MARK: - 非单曲过滤
@@ -403,11 +500,14 @@ enum RecommendationCandidateFilter {
         let title = song.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !title.isEmpty else { return true }
         if playlistMarkers.contains(where: { title.contains($0) }) { return true }
-        // 「1990s Golden Decade」这类：纯年代开场 + 无专辑信息。
-        let albumEmpty = song.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
-        if albumEmpty, title.range(of: "^(19|20)\\d{2}s?\\b", options: .regularExpression) != nil {
-            return true
-        }
+        // 标题整串就是年代 / 年份（`1990s` / `2000s` / `90年代` / `1990`）：在线源会把年代
+        // 标签当歌名返回，专辑字段往往也填成 `1990s`——与专辑是否为空无关，一律剔除。
+        if isDecadeOnlyTitle(song.title) { return true }
         return false
+    }
+
+    /// 标题整串是否为纯年代标签（判定口径见 `RecommendationDecadeLabel`，不误杀标题中段含年代的歌）。
+    static func isDecadeOnlyTitle(_ title: String) -> Bool {
+        RecommendationDecadeLabel.parse(title) != nil
     }
 }

@@ -172,8 +172,7 @@ enum RecommendationRequestParser {
         var seen = Set<Int>()
         var result: [Int] = []
         for value in values ?? [] {
-            guard let year = year(of: value), (1900 ... 2030).contains(year) else { continue }
-            let decade = (year / 10) * 10
+            guard let decade = decadeStart(of: value) else { continue }
             guard seen.insert(decade).inserted else { continue }
             result.append(decade)
             if result.count >= maxItems { break }
@@ -181,12 +180,14 @@ enum RecommendationRequestParser {
         return result
     }
 
-    private static func year(of value: DecadeValue) -> Int? {
+    /// 单个年代值 → 十年桶起点：文本走共享年代标签解析（`1990s` / `90年代` / `1990 年`
+    /// 与结果过滤同一口径），数字走同一套区间校验，不再各写一套前缀截取。
+    private static func decadeStart(of value: DecadeValue) -> Int? {
         switch value {
         case let .number(year):
-            return year
+            return RecommendationDecadeLabel.decadeStart(forYear: year)
         case let .text(raw):
-            return Int(raw.prefix { $0.isNumber })
+            return RecommendationDecadeLabel.parse(raw)
         }
     }
 

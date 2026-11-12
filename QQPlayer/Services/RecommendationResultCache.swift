@@ -148,7 +148,11 @@ struct RecommendationCacheHit: Equatable, Sendable {
 // MARK: - 存储
 
 struct RecommendationResultCache {
-    static let schemaVersion = 1
+    /// 缓存格式版本：不匹配即 miss。
+    ///
+    /// v2（2026-11-12）：年代意图不再直接搜泛词 + 结果增加「纯年代标题」硬过滤，
+    /// v1 缓存里残留的 `1990s` / `2000s` 脏结果必须整体失效。
+    static let schemaVersion = 2
     static let ttl: TimeInterval = 24 * 3600
     static let maxEntryCount = 20
     static let directoryComponent = "Cache/Recommendations"

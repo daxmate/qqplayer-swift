@@ -246,7 +246,9 @@ struct RecommendationEngine: Sendable {
             items.append(GatheredItem(song: song, source: source, intent: intent))
         }
 
-        for intent in intents {
+        // 年代标签先解析成画像艺人：召回层永远拿不到「1990s」这种泛词 query。
+        let resolvedIntents = RecommendationIntentBuilder.resolved(intents, profile: profile)
+        for intent in resolvedIntents {
             let before = items.count
             let outcomes = await searchAll(query: intent.query, limit: perIntentLimit)
             for outcome in outcomes {
@@ -269,7 +271,7 @@ struct RecommendationEngine: Sendable {
         if similarRecallEnabled {
             var probes = 0
             var similarUnavailable = false
-            for intent in intents where intent.kind == .artist {
+            for intent in resolvedIntents where intent.kind == .artist {
                 guard probes < maxSimilarProbes, !similarUnavailable else { break }
                 guard let seed = seedSongID(for: intent, in: items) else { continue }
                 probes += 1
