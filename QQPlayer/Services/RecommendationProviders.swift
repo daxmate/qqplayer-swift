@@ -124,6 +124,15 @@ enum RecommendationError: LocalizedError, Equatable {
     }
 }
 
+// MARK: - 艺人路径契约
+
+/// 可选能力：按**艺人名**召回（iTunes 走 artistId → lookup；关键词意图不经过这里）。
+///
+/// 引擎只在 `intent.kind == .artist` 时优先调用；未实现该协议或调用失败时回落到普通 `search`。
+protocol ArtistSearchProviding: Sendable {
+    func searchArtist(_ name: String, limit: Int) async throws -> [RecommendationRemoteSong]
+}
+
 // MARK: - 相似歌曲召回契约
 
 /// 可选能力：支持「相似歌曲」的在线源（当前只有网易云）。

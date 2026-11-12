@@ -108,7 +108,7 @@ extension RecommendationEngine {
 
     /// 观测：闸的固定顺序（日志字段稳定、可 grep；顺序 = 判定顺序）。
     static let gateOrder = [
-        "fields", "artist_constraint", "admission", "library", "blacklist", "excluded_artists", "dedupe",
+        "fields", "artist_constraint", "admission", "library", "blacklist", "excluded_artists", "recent", "dedupe",
     ]
 
     func sortedGateStats(_ raw: [String: (inCount: Int, outCount: Int)]) -> [RecommendationGateStat] {

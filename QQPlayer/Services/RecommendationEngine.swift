@@ -240,7 +240,11 @@ struct RecommendationEngine: Sendable {
         let resolvedIntents = RecommendationIntentBuilder.resolved(intents, profile: profile)
         for intent in resolvedIntents {
             let before = items.count
-            let outcomes = await searchAll(query: intent.query, limit: perIntentLimit)
+            let outcomes = await searchAll(
+                query: intent.query,
+                limit: perIntentLimit,
+                artistName: intent.kind == .artist ? (intent.artist ?? intent.query) : nil
+            )
             for outcome in outcomes {
                 recordSource(outcome)
                 if outcome.failed {
@@ -322,13 +326,19 @@ struct RecommendationEngine: Sendable {
         return sameArtist?.song.songID
     }
 
-    private func searchAll(query: String, limit: Int) async -> [SourceOutcome] {
+    private func searchAll(query: String, limit: Int, artistName: String? = nil) async -> [SourceOutcome] {
         let providers = self.providers
         return await withTaskGroup(of: SourceOutcome.self) { group in
             for provider in providers {
                 group.addTask {
                     do {
-                        let songs = try await provider.search(query: query, limit: limit)
+                        // 艺人意图优先走 artist 路径（iTunes artistId→lookup）；不支持则回落普通 search。
+                        let songs: [RecommendationRemoteSong]
+                        if let artistName, let artistProvider = provider as? any ArtistSearchProviding {
+                            songs = try await artistProvider.searchArtist(artistName, limit: limit)
+                        } else {
+                            songs = try await provider.search(query: query, limit: limit)
+                        }
                         return SourceOutcome(source: provider.source, songs: songs, failed: false)
                     } catch {
                         return SourceOutcome(source: provider.source, songs: [], failed: true)

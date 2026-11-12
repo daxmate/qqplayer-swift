@@ -128,16 +128,16 @@ actor ITunesRecommendationGate {
         artistMisses[Self.artistKey(term: term, storefront: storefront)] = now()
     }
 
-    func songs(artistID: Int, storefront: String, limit: Int) -> Lookup<[RecommendationRemoteSong]> {
-        let key = Self.songsKey(artistID: artistID, storefront: storefront, limit: limit)
+    func songs(artistID: Int, storefront: String) -> Lookup<[RecommendationRemoteSong]> {
+        let key = Self.songsKey(artistID: artistID, storefront: storefront)
         guard let entry = songLists[key], now().timeIntervalSince(entry.storedAt) < cacheTTL else {
             return .unknown
         }
         return .hit(entry.value)
     }
 
-    func storeSongs(_ songs: [RecommendationRemoteSong], artistID: Int, storefront: String, limit: Int) {
-        songLists[Self.songsKey(artistID: artistID, storefront: storefront, limit: limit)] = CacheEntry(
+    func storeSongs(_ songs: [RecommendationRemoteSong], artistID: Int, storefront: String) {
+        songLists[Self.songsKey(artistID: artistID, storefront: storefront)] = CacheEntry(
             storedAt: now(),
             value: songs
         )
@@ -147,8 +147,8 @@ actor ITunesRecommendationGate {
         "artist|\(storefront)|\(term.lowercased())"
     }
 
-    private static func songsKey(artistID: Int, storefront: String, limit: Int) -> String {
-        "songs|\(storefront)|\(artistID)|\(limit)"
+    private static func songsKey(artistID: Int, storefront: String) -> String {
+        "songs|\(storefront)|\(artistID)"
     }
 }
 
@@ -169,10 +169,28 @@ struct ITunesRecommendationProvider: OnlineSearchProviding {
 
     var source: RecommendationSource { .itunes }
 
+    /// 关键词 / 情绪 / 年代意图：iTunes song search 结果直接映射（不解析 artistId、不做艺人碟）。
     func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { throw ITunesRecommendationError.emptyQuery }
-        let fetchLimit = max(limit, 40)
+        guard await budget.consumeITunesCall() else {
+            throw ITunesRecommendationError.budgetExhausted
+        }
+        await gate.awaitTurn()
+        let results = try await client.rawSearch(
+            term: term,
+            entity: "song",
+            storefront: storefront,
+            limit: ITunesScrapeClient.recommendationLimit
+        )
+        return results.compactMap(Self.song(from:))
+    }
+
+    /// 艺人意图：search 取 artistId → lookup 该艺人歌曲（跨店区由降级链负责）。
+    func searchArtist(_ name: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        let term = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { throw ITunesRecommendationError.emptyQuery }
+        let fetchLimit = max(limit, 20)
 
         switch await gate.artistID(term: term, storefront: storefront) {
         case let .hit(id):
@@ -202,9 +220,9 @@ struct ITunesRecommendationProvider: OnlineSearchProviding {
     }
 
     private func songs(artistID: Int, limit: Int) async throws -> [RecommendationRemoteSong] {
-        switch await gate.songs(artistID: artistID, storefront: storefront, limit: limit) {
+        switch await gate.songs(artistID: artistID, storefront: storefront) {
         case let .hit(songs):
-            return songs
+            return Array(songs.prefix(limit))
         case .miss, .unknown:
             break
         }
@@ -219,8 +237,8 @@ struct ITunesRecommendationProvider: OnlineSearchProviding {
             limit: ITunesScrapeClient.recommendationLimit
         )
         let mapped = results.compactMap(Self.song(from:))
-        await gate.storeSongs(mapped, artistID: artistID, storefront: storefront, limit: limit)
-        return mapped
+        await gate.storeSongs(mapped, artistID: artistID, storefront: storefront)
+        return Array(mapped.prefix(limit))
     }
 
     /// search 结果里取首个非空 artistId（iTunes 的 artistId 是稳定数字）。
@@ -368,14 +386,24 @@ final class RecommendationChainAudit: @unchecked Sendable {
 }
 
 /// 降级链 provider：引擎每意图调用一次，内部按级尝试；结果带真实来源。
-struct RecommendationDegradingProvider: OnlineSearchProviding {
+struct RecommendationDegradingProvider: OnlineSearchProviding, ArtistSearchProviding {
     var steps: [RecommendationChainStep]
     var budget: RecommendationRunBudget = .shared
     var audit: RecommendationChainAudit?
 
     var source: RecommendationSource { steps.first?.provider.source ?? .itunes }
 
+    /// 关键词意图：逐级走普通 search（iTunes 级为 song search）。
     func search(query: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        try await perform(query: query, limit: limit, artistMode: false)
+    }
+
+    /// 艺人意图：逐级优先 artist 路径（iTunes 级 search→artistId→lookup）。
+    func searchArtist(_ name: String, limit: Int) async throws -> [RecommendationRemoteSong] {
+        try await perform(query: name, limit: limit, artistMode: true)
+    }
+
+    private func perform(query: String, limit: Int, artistMode: Bool) async throws -> [RecommendationRemoteSong] {
         var lastError: Error?
         for (index, step) in steps.enumerated() {
             if index > 0 {
@@ -391,7 +419,7 @@ struct RecommendationDegradingProvider: OnlineSearchProviding {
             }
 
             do {
-                let songs = try await step.provider.search(query: query, limit: limit)
+                let songs = try await fetchSongs(from: step, query: query, limit: limit, artistMode: artistMode)
                 let passes = songs.count >= step.minimumCandidates
                     && (step.minimumCandidates > 0 || !songs.isEmpty)
                 audit?.recordAttempt(step.kind, songs: songs.count, failed: !passes)
@@ -417,6 +445,18 @@ struct RecommendationDegradingProvider: OnlineSearchProviding {
         }
         if let lastError { throw lastError }
         return []
+    }
+
+    private func fetchSongs(
+        from step: RecommendationChainStep,
+        query: String,
+        limit: Int,
+        artistMode: Bool
+    ) async throws -> [RecommendationRemoteSong] {
+        if artistMode, let artistProvider = step.provider as? any ArtistSearchProviding {
+            return try await artistProvider.searchArtist(query, limit: limit)
+        }
+        return try await step.provider.search(query: query, limit: limit)
     }
 
     private static func reason(for error: Error?) -> String {
@@ -451,7 +491,8 @@ enum RecommendationSourceChain {
 
     /// 生产默认链：iTunes(tw) → iTunes(us) → MusicBrainz → 网易云(search)。
     ///
-    /// 阈值：前两级 <30 视为池不足；MB <8 视为相关性不足；网易云最后兜底（0 门槛，结果标降级）。
+    /// 阈值：链是**每意图调用一次**，因此只做「非空即通过」（tw/us/MB = 1）；
+    /// 池级 ≥60 / 每批相关性留给整轮 gather 与日志判断。网易云最后兜底（0 门槛，结果标降级）。
     static func defaultProvider(
         budget: RecommendationRunBudget,
         audit: RecommendationChainAudit
@@ -461,19 +502,19 @@ enum RecommendationSourceChain {
                 RecommendationChainStep(
                     kind: .itunesTW,
                     provider: ITunesRecommendationProvider(storefront: "tw", budget: budget),
-                    minimumCandidates: 30,
+                    minimumCandidates: 1,
                     degradedReason: nil
                 ),
                 RecommendationChainStep(
                     kind: .itunesUS,
                     provider: ITunesRecommendationProvider(storefront: "us", budget: budget),
-                    minimumCandidates: 30,
+                    minimumCandidates: 1,
                     degradedReason: "itunes_us_fallback"
                 ),
                 RecommendationChainStep(
                     kind: .musicbrainz,
                     provider: MusicBrainzSearchProvider(),
-                    minimumCandidates: 8,
+                    minimumCandidates: 1,
                     degradedReason: "musicbrainz_fallback"
                 ),
                 RecommendationChainStep(
