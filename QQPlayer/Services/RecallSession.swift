@@ -22,12 +22,26 @@ struct RecallSession: Sendable, Equatable {
         case exhausted
     }
 
+    /// 单批多样性报告（P3：放宽了的多样性目标绝不静默）。
+    struct BatchDiversityReport: Sendable, Equatable {
+        /// 本批不同艺人个数。
+        var distinctArtists: Int = 0
+        /// 被放宽的目标（空 = 全部满足）。
+        var relaxed: [RecommendationBatchDiversity.Relaxation] = []
+
+        var isRelaxed: Bool { !relaxed.isEmpty }
+        /// 日志 token：`diversity_relaxed=decade,genre`（未放宽为空串）。
+        var logToken: String { relaxed.map(\.rawValue).joined(separator: ",") }
+    }
+
     private(set) var pool: [RecommendedCandidate]
     private(set) var cursor: Int
     private(set) var seen: Set<String>
     let batchSize: Int
     let maxPerArtist: Int
     let maxPerAlbum: Int
+    /// 最近一批的多样性结果（`nextBatch()` 写入）。
+    private(set) var lastBatchDiversity = BatchDiversityReport()
 
     init(
         pool: [RecommendedCandidate] = [],
@@ -55,29 +69,37 @@ struct RecallSession: Sendable, Equatable {
         return remaining < batchSize ? .needsRefill : .ready
     }
 
-    /// 取下一批：推进游标、标记 seen、应用同批上限。
+    /// 取下一批：推进游标、标记 seen、应用同批上限 + 多样性目标（P3）。
+    ///
+    /// 选择口径在 `RecommendationBatchDiversity`（纯函数）：艺人 ≤4 / 专辑 ≤2 是硬上限，
+    /// 不同艺人 ≥8、同 decade / 同 genre ≤9 是目标；池不够时放宽并写进 `lastBatchDiversity`。
     mutating func nextBatch() -> [RecommendedCandidate] {
-        var picked: [RecommendedCandidate] = []
-        var artistCounts: [String: Int] = [:]
-        var albumCounts: [String: Int] = [:]
-        while picked.count < batchSize, cursor < pool.count {
-            let candidate = pool[cursor]
+        while cursor < pool.count, seen.contains(Self.key(pool[cursor])) {
             cursor += 1
-            let key = Self.key(candidate)
-            guard !seen.contains(key) else { continue }
-
-            let artist = Self.artistKey(candidate)
-            let album = Self.albumKey(candidate)
-            guard artistCounts[artist, default: 0] < maxPerArtist,
-                  albumCounts[album, default: 0] < maxPerAlbum else {
-                continue
-            }
-            artistCounts[artist, default: 0] += 1
-            albumCounts[album, default: 0] += 1
-            seen.insert(key)
-            picked.append(candidate)
         }
-        return picked
+        let eligible = cursor < pool.count ? Array(pool[cursor...]) : []
+        let outcome = RecommendationBatchDiversity.select(eligible, limits: diversityLimits)
+        cursor = min(pool.count, cursor + outcome.consumed)
+        for candidate in outcome.candidates {
+            seen.insert(Self.key(candidate))
+        }
+        lastBatchDiversity = BatchDiversityReport(
+            distinctArtists: Set(outcome.candidates.map(Self.artistKey)).count,
+            relaxed: outcome.relaxed
+        )
+        return outcome.candidates
+    }
+
+    /// 单批多样性口径（batchSize / 上限可注入，保持 P2 的可配置性）。
+    private var diversityLimits: RecommendationBatchDiversity.Limits {
+        RecommendationBatchDiversity.Limits(
+            batchSize: batchSize,
+            maxPerArtist: maxPerArtist,
+            maxPerAlbum: maxPerAlbum,
+            minDistinctArtists: min(RecommendationBatchPolicy.minDistinctArtists, batchSize),
+            maxPerDecade: RecommendationBatchPolicy.maxSongsPerDecade,
+            maxPerGenre: RecommendationBatchPolicy.maxSongsPerGenre
+        )
     }
 
     /// 取一整批；不足 `minimum` 且池未耗尽时 **不消费**（游标 / seen 原样保留），返回 nil。

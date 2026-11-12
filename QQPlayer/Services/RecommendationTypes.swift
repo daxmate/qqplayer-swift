@@ -55,6 +55,12 @@ enum RecommendationBatchPolicy {
     static let maxSongsPerArtist = 4
     /// 同专辑上限。
     static let maxSongsPerAlbum = 2
+    /// 单批至少多少个不同艺人（15 首 ≥ 8 个）。
+    static let minDistinctArtists = 8
+    /// 同一十年代上限（15 首的 60%，池不足时放宽并标记）。
+    static let maxSongsPerDecade = 9
+    /// 同一曲风上限（15 首的 60%；缺 genre 的条目不参与该约束）。
+    static let maxSongsPerGenre = 9
     /// 跨会话「最近推过」软黑名单窗口（7 天）。
     static let recentBlacklistWindow: TimeInterval = 7 * 24 * 3600
 }
@@ -255,6 +261,8 @@ struct RecommendedCandidate: Identifiable, Codable, Equatable, Sendable {
     var score: Double = 0
     /// 推荐理由（已本地化的成品文案；P1 由规则产出，P3 由模型产出）。
     var reasons: [String] = []
+    /// 召回意图里的曲风（仅 `kind == .genre` 的意图给得出；缺省 = 不参与批次曲风上限）。
+    var genre: String?
 
     var id: String {
         "\(RecommendationKey.normalize(title: title, artist: artist))#\(source.rawValue)"

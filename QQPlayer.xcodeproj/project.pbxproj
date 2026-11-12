@@ -228,6 +228,7 @@
 		3A8AAC8711874DB091FF75C3 /* SyncFrameChainShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8906D8C3AB41FE954D38A6 /* SyncFrameChainShapeContractTests.swift */; };
 		9D8F6045A5DC472691D7107B /* RecommendationNormalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */; };
 		2224766B90A441F7A4F15F17 /* RecommendationP2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30019A55756540D187D62983 /* RecommendationP2Tests.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* RecommendationP3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* RecommendationP3Tests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -503,6 +504,7 @@
 		5C8906D8C3AB41FE954D38A6 /* SyncFrameChainShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncFrameChainShapeContractTests.swift; sourceTree = "<group>"; };
 		CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationNormalizationTests.swift; sourceTree = "<group>"; };
 		30019A55756540D187D62983 /* RecommendationP2Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationP2Tests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* RecommendationP3Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationP3Tests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1020,6 +1022,10 @@
 				Mac/MacRecommendationSettingsView.swift,
 				Mac/RecommendationPlannerFactory.swift,
 				Mac/MLXRecommendationPlanner.swift,
+				Services/RecommendationBatchDiversity.swift,
+				Services/RecommendationReasonParser.swift,
+				Services/RecommendationReasonPrompt.swift,
+				Services/RecommendationReasons.swift,
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};
@@ -1390,6 +1396,7 @@
 				5C8906D8C3AB41FE954D38A6 /* SyncFrameChainShapeContractTests.swift */,
 				CF28F521DD4E4A109F8650AF /* RecommendationNormalizationTests.swift */,
 				30019A55756540D187D62983 /* RecommendationP2Tests.swift */,
+				A1B2C3D4E5F60718293A4B5D /* RecommendationP3Tests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1917,6 +1924,7 @@
 				3A8AAC8711874DB091FF75C3 /* SyncFrameChainShapeContractTests.swift in Sources */,
 				9D8F6045A5DC472691D7107B /* RecommendationNormalizationTests.swift in Sources */,
 				2224766B90A441F7A4F15F17 /* RecommendationP2Tests.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* RecommendationP3Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

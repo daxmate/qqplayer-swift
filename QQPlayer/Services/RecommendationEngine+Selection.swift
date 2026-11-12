@@ -54,6 +54,8 @@ extension RecommendationEngine {
             )
             candidate.score = item.score
             candidate.reasons = reasons
+            // P3：曲风只用来约束批次多样性（缺 genre 的条目不参与该约束）。
+            candidate.genre = item.item.intent.kind == .genre ? item.item.intent.genre : nil
             picked.append(candidate)
         }
 
