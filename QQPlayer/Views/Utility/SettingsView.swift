@@ -49,8 +49,12 @@ struct SettingsView: View {
                             tint: .orange
                         )
                     }
+                }
 
-                    // S2 M1-UI：局域网同步设置（Client 侧：主机列表/扫码/手输配对）
+                // S2 M1-UI：局域网同步设置（Client 侧：主机列表/扫码/手输配对）
+                // 2026-11-12 复核补回：原 Section 的 header / footer 文案（sync_settings /
+                // sync_settings_footer）是页面说明信息，拆分类时不能丢。
+                Section {
                     NavigationLink(destination: SyncSettingsView()) {
                         SettingsCategoryRow(
                             title: "sync_settings".localized,
@@ -58,6 +62,12 @@ struct SettingsView: View {
                             tint: .green
                         )
                     }
+                } header: {
+                    Text("sync_settings".localized)
+                } footer: {
+                    Text("sync_settings_footer".localized)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 Section {
