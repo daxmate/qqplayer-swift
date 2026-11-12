@@ -529,12 +529,16 @@ struct SyncFileTransferTests {
         sender.onCompletion = { box.senderOutcome = $0 }
 
         let fileID = SyncProbe.fileIDPrefix + UUID().uuidString
+        // 握手帧已经在流里（fixture 建会话时就发过）⇒ 只能比「send 前后有无新增」，
+        // 不能假设 sentLog 为空。
+        let sentBefore = fixture.hostChannel.sentLog.count
 
         // 前置抛错（不是走 ack 失败）：连 file_meta 都没发出去
         #expect(throws: SyncFileTransferError.probeUnsupported(fileID)) {
             try sender.send(fileURL: sourceURL, fileID: fileID, name: SyncProbe.fileName)
         }
-        #expect(fixture.hostChannel.sentLog.isEmpty)
+        #expect(fixture.hostChannel.sentLog.count == sentBefore)
+        #expect(countFrames(ofType: .fileMeta, in: fixture.hostChannel.sentLog) == 0)
         #expect(box.acks.isEmpty)
         #expect(box.senderOutcome == nil)
         #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
