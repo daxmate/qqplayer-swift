@@ -1135,6 +1135,7 @@
 "recommendation_artist_shortfall_filled" = "%@ has only %d songs, added %d from similar artists";
 "recommendation_reason_era" = "Matches your %d decade";
 "recommendation_reason_trend" = "Trending in your recent plays: %@";
+"recommendation_reason_chart_hot" = "Trending on Apple Music charts";
 "recommendation_reason_new" = "Not in your library yet";
 
 // MARK: - 本地 AI 推荐 P2（模型管理）

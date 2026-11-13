@@ -1133,6 +1133,7 @@
 "recommendation_artist_shortfall_filled" = "%@ n'a que %d morceaux, %d ajoutés d'artistes similaires";
 "recommendation_reason_era" = "Correspond à votre décennie %d";
 "recommendation_reason_trend" = "Tendance dans vos écoutes récentes : %@";
+"recommendation_reason_chart_hot" = "Tendance dans les charts Apple Music";
 "recommendation_reason_new" = "Pas encore dans votre bibliothèque";
 
 // MARK: - 本地 AI 推荐 P2（模型管理）

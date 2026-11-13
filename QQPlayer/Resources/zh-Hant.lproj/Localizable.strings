@@ -1459,6 +1459,7 @@
 "recommendation_artist_shortfall_filled" = "%@ 的歌只有 %d 首，補了 %d 首相似藝人";
 "recommendation_reason_era" = "符合你愛聽的 %d 年代";
 "recommendation_reason_trend" = "最近常聽 %@";
+"recommendation_reason_chart_hot" = "近期熱門";
 "recommendation_reason_new" = "音樂庫還沒有";
 
 // MARK: - 本地 AI 推荐 P2（模型管理）

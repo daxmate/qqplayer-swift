@@ -43,6 +43,8 @@ struct RecommendationEngine: Sendable {
     var namedArtistRelationFallback: RecommendationArtistRelation?
     /// 点名场景的相似补位比例（0...0.5，默认 0.30）：相似名额 = round(target × share)。
     var relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
+    /// 榜单热度客户端（nil = 不取榜单，热度恒为中性 0.5；测试默认 nil，生产由 `configured()` 接线）。
+    var chartClient: AppleMusicChartClient?
 
     /// 默认 = P2 主源降级链（iTunes tw → us → MusicBrainz → 网易云）；
     /// 测试注入 providers 时预算 / 诊断不接线（行为与 P1 相同）。
@@ -121,7 +123,10 @@ struct RecommendationEngine: Sendable {
             return gathered.allFailed ? .failure(.allSourcesFailed) : .success([])
         }
 
-        let ranked = rank(gathered.items, profile: profile)
+        // 热度只取一次（跨意图共享）：客户端自带 run 级 memo + 6 小时缓存，失败静默为空榜单。
+        let chartIndex = await currentChartIndex()
+        logChartPopularity(index: chartIndex, items: gathered.items)
+        let ranked = rank(gathered.items, profile: profile, chartIndex: chartIndex)
         let picked = select(ranked, count: count, profile: profile)
         logRunSummary(
             context: context, intents: intents, gathered: gathered,
@@ -420,37 +425,24 @@ struct RecommendationEngine: Sendable {
         }
     }
 
-    // MARK: 重排
-
-    struct RankedItem: Sendable {
-        var item: GatheredItem
-        var score: Double
+    /// 本次推荐看到的榜单索引（无客户端 → 空索引，热度全部 0.5）。
+    private func currentChartIndex() async -> ChartPopularityIndex {
+        guard let chartClient else { return .empty }
+        return await chartClient.index()
     }
 
-    func rank(_ items: [GatheredItem], profile: TasteProfile) -> [RankedItem] {
-        items.map { item in
-            let key = RecommendationKey.normalize(title: item.song.title, artist: item.song.artist)
-            let score = RecommendationScorer.score(
-                RecommendationScoreInput(
-                    artist: item.song.artist,
-                    year: item.song.year,
-                    source: item.source,
-                    isKnownTrack: profile.playedKeys.contains(key)
-                ),
-                profile: profile
-            )
-            return RankedItem(item: item, score: score.total + intentBoost(item.intent))
-        }
-        .sorted { lhs, rhs in
-            if lhs.score == rhs.score {
-                return lhs.item.song.title.localizedStandardCompare(rhs.item.song.title) == .orderedAscending
+    /// 批次观测：榜单覆盖 + 命中率（判断热度分是否真的在起作用，不绑定具体抓取结果）。
+    private func logChartPopularity(index: ChartPopularityIndex, items: [GatheredItem]) {
+        let hits = items.reduce(into: 0) { count, item in
+            if index.isChartHit(songID: item.song.songID, title: item.song.title, artist: item.song.artist) {
+                count += 1
             }
-            return lhs.score > rhs.score
         }
+        AppLog.info(.general, "🎵 榜单热度：tw=\(index.twCount) us=\(index.usCount) 命中=\(hits)/\(items.count)")
     }
 
     /// 意图置信度加成：相似 > 同艺人 > 年代 > 曲风（越具体越靠前）。
-    private func intentBoost(_ intent: RecommendationIntent) -> Double {
+    func intentBoost(_ intent: RecommendationIntent) -> Double {
         switch intent.kind {
         case .similar: return 0.08
         case .artist: return 0.06

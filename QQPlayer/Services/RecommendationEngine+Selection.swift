@@ -61,11 +61,19 @@ extension RecommendationEngine {
             sourceCounts[item.item.source, default: 0] += 1
             usedKeys.insert(key(item))
 
-            let reasons = reasonsFor(
+            var reasons = reasonsFor(
                 item.item,
                 previousPrimary: previousPrimary,
                 artistConstraint: artistConstraint
             )
+            // 榜单命中：追加「近期热门」并保证它落在 UI 展示的前两条里（规则理由上限仍为 2 条）。
+            if item.isChartHit {
+                let chartReason = "recommendation_reason_chart_hot".localized
+                if !reasons.contains(chartReason) {
+                    if reasons.count >= 2 { reasons.removeLast() }
+                    reasons.append(chartReason)
+                }
+            }
             previousPrimary = reasons.first
 
             var candidate = RecommendedCandidate(

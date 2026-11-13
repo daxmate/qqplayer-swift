@@ -233,6 +233,7 @@
 		90D168DA8E3F4F1692C5CE8F /* RecommendationArtistMixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C25D3B90904D21AFD3586A /* RecommendationArtistMixTests.swift */; };
 		BD6B0C74BFA74F47B5E1309F /* SyncTransferTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55CA2865DF8448DB4CAA6EE /* SyncTransferTimingTests.swift */; };
 		9D15B8B27BFE4CE8A66B8412 /* SyncRxKeepaliveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */; };
+		8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -513,6 +514,7 @@
 		88C25D3B90904D21AFD3586A /* RecommendationArtistMixTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationArtistMixTests.swift; sourceTree = "<group>"; };
 		B55CA2865DF8448DB4CAA6EE /* SyncTransferTimingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferTimingTests.swift; sourceTree = "<group>"; };
 		035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncRxKeepaliveTests.swift; sourceTree = "<group>"; };
+		35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationChartPopularityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -764,9 +766,13 @@
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
+				Services/AppleMusicChartClient.swift,
+				Services/ChartPopularityIndex.swift,
 				Services/RecommendationArtistMix.swift,
 				Services/RecallSession.swift,
+				"Services/RecommendationEngine+Ranking.swift",
 				"Services/RecommendationEngine+Selection.swift",
+				Services/RecommendationScoring.swift,
 				Services/RecommendationSourceChain.swift,
 				"Services/AppCoordinator+Siri.swift",
 				Services/AppLog.swift,
@@ -1420,6 +1426,7 @@
 				88C25D3B90904D21AFD3586A /* RecommendationArtistMixTests.swift */,
 				B55CA2865DF8448DB4CAA6EE /* SyncTransferTimingTests.swift */,
 				035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */,
+				35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1952,6 +1959,7 @@
 				90D168DA8E3F4F1692C5CE8F /* RecommendationArtistMixTests.swift in Sources */,
 				BD6B0C74BFA74F47B5E1309F /* SyncTransferTimingTests.swift in Sources */,
 				9D15B8B27BFE4CE8A66B8412 /* SyncRxKeepaliveTests.swift in Sources */,
+				8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

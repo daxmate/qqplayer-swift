@@ -1138,6 +1138,7 @@
 "recommendation_artist_shortfall_filled" = "%@ 的歌只有 %d 首，补了 %d 首相似艺人";
 "recommendation_reason_era" = "符合你爱听的 %d 年代";
 "recommendation_reason_trend" = "最近常听 %@";
+"recommendation_reason_chart_hot" = "近期热门";
 "recommendation_reason_new" = "曲库还没有";
 
 // MARK: - 本地 AI 推荐 P2（模型管理）

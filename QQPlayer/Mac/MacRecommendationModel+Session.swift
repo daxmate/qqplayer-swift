@@ -124,6 +124,8 @@ extension MacRecommendationModel {
         engine.artistRelation = RecommendationArtistRelation.fromSettings()
         // 点名场景：即使设置为关也启用相似补位（查询失败静默降级为纯本人）。
         engine.namedArtistRelationFallback = RecommendationArtistRelation()
+        // 榜单热度：Apple Music tw/us 日榜（6 小时缓存；失败静默降级为中性 0.5）。
+        engine.chartClient = AppleMusicChartClient()
         return engine
     }
 

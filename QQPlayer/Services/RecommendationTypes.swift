@@ -280,6 +280,8 @@ struct RecommendationScoreInput: Sendable, Equatable {
     var source: RecommendationSource
     /// 是否已在本曲库 / 播放历史里（引擎已过滤库内，这里只影响 novelty 权重）。
     var isKnownTrack: Bool = false
+    /// 榜单热度（0.5 = 中性 / 未上榜；1.0 = 榜一）。默认值保持旧调用兼容。
+    var popularity: Double = 0.5
 }
 
 /// 打分结果（分量留档便于 P2 对照模型输出）。
@@ -291,90 +293,8 @@ struct RecommendationScore: Sendable, Equatable {
     var freshness: Double
     var sourceReliability: Double
     var novelty: Double
-}
-
-/// 权重集中处（P2 替换为模型分数时只改这里）。
-enum RecommendationWeights {
-    static let artistAffinity = 0.45
-    static let eraMatch = 0.20
-    static let freshness = 0.10
-    static let sourceReliability = 0.10
-    static let novelty = 0.15
-
-    /// 无年代 / 无漂移数据时的中性分。
-    static let neutral = 0.5
-    /// 已播过（但不在库）的单曲 novelty 分。
-    static let repeatedTrackNovelty = 0.4
-}
-
-/// 规则打分（纯函数）：艺人亲和 0.45 / 年代 0.20 / 近期漂移 0.10 /
-/// 源可靠度 0.10 / 新鲜度 0.15。
-enum RecommendationScorer {
-    static func score(_ input: RecommendationScoreInput, profile: TasteProfile) -> RecommendationScore {
-        let artistKey = RecommendationKey.primaryArtist(input.artist)
-
-        let maxArtistWeight = profile.topArtists.first?.weight ?? 0
-        let artistWeight = profile.weight(forArtist: artistKey)
-        let artistAffinity = maxArtistWeight > 0 ? min(1, artistWeight / maxArtistWeight) : 0
-
-        let eraMatch = eraScore(year: input.year, profile: profile)
-        let freshness = freshnessScore(artistKey: artistKey, profile: profile)
-        let sourceReliability = input.source.reliability
-        let novelty = input.isKnownTrack ? RecommendationWeights.repeatedTrackNovelty : 1.0
-
-        let total = artistAffinity * RecommendationWeights.artistAffinity
-            + eraMatch * RecommendationWeights.eraMatch
-            + freshness * RecommendationWeights.freshness
-            + sourceReliability * RecommendationWeights.sourceReliability
-            + novelty * RecommendationWeights.novelty
-
-        var reasons: [String] = []
-        if artistAffinity >= 0.5 {
-            reasons.append("recommendation_reason_artist".localized(with: RecommendationKey.displayPrimaryArtist(input.artist)))
-        }
-        if eraMatch >= 0.6, let year = input.year {
-            let decade = decadeBucket(for: year)
-            reasons.append("recommendation_reason_era".localized(with: decade))
-        }
-        if freshness >= 0.6 {
-            reasons.append("recommendation_reason_trend".localized(with: RecommendationKey.displayPrimaryArtist(input.artist)))
-        }
-        if !input.isKnownTrack {
-            reasons.append("recommendation_reason_new".localized)
-        }
-
-        return RecommendationScore(
-            total: total,
-            reasons: reasons,
-            artistAffinity: artistAffinity,
-            eraMatch: eraMatch,
-            freshness: freshness,
-            sourceReliability: sourceReliability,
-            novelty: novelty
-        )
-    }
-
-    /// 年份 → 十年桶（1998 → 1990）。
-    static func decadeBucket(for year: Int) -> Int {
-        (year / 10) * 10
-    }
-
-    private static func eraScore(year: Int?, profile: TasteProfile) -> Double {
-        guard let year, !profile.decadeShare.isEmpty else { return RecommendationWeights.neutral }
-        let bucket = decadeBucket(for: year)
-        guard let share = profile.decadeShare[bucket] else { return 0 }
-        let maxShare = profile.decadeShare.values.max() ?? 0
-        return maxShare > 0 ? min(1, share / maxShare) : RecommendationWeights.neutral
-    }
-
-    private static func freshnessScore(artistKey: String, profile: TasteProfile) -> Double {
-        // 没有任何漂移数据（新库 / 历史太短）→ 中性，不惩罚。
-        guard !profile.recentArtistDrift.isEmpty else { return RecommendationWeights.neutral }
-        let drift = profile.recentArtistDrift[artistKey] ?? 0
-        let maxPositive = profile.recentArtistDrift.values.filter { $0 > 0 }.max() ?? 0
-        guard maxPositive > 0, drift > 0 else { return 0 }
-        return min(1, drift / maxPositive)
-    }
+    /// 榜单热度分量（无榜单时恒为 0.5）。
+    var popularity: Double
 }
 
 // MARK: - 检索意图

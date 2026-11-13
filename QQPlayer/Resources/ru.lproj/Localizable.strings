@@ -1130,6 +1130,7 @@
 "recommendation_artist_shortfall_filled" = "У исполнителя %@ всего %d песен, добавлено %d похожих";
 "recommendation_reason_era" = "Совпадает с вашим десятилетием %d";
 "recommendation_reason_trend" = "В тренде ваших недавних прослушиваний: %@";
+"recommendation_reason_chart_hot" = "В трендах Apple Music";
 "recommendation_reason_new" = "Пока нет в вашей библиотеке";
 
 // MARK: - 本地 AI 推荐 P2（模型管理）

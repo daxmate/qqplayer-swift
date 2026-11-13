@@ -183,6 +183,7 @@ extension RecommendationEngine {
     static func configured(_ settings: DeleteSettings = .load()) -> RecommendationEngine {
         var engine = RecommendationEngine()
         engine.artistRelation = RecommendationArtistRelation.fromSettings(settings)
+        engine.chartClient = AppleMusicChartClient()
         return engine
     }
 
