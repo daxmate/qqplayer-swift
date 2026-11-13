@@ -235,6 +235,7 @@
 		9D15B8B27BFE4CE8A66B8412 /* SyncRxKeepaliveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */; };
 		8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */; };
 		C9C4C30339284EFC98FAD8DF /* PlayerVolumeModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */; };
+		CB596AD1E93946CF91E54E2A /* SearchQueryTrimTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67343AE317744B6EAC69B3BB /* SearchQueryTrimTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -517,6 +518,7 @@
 		035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncRxKeepaliveTests.swift; sourceTree = "<group>"; };
 		35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationChartPopularityTests.swift; sourceTree = "<group>"; };
 		38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerVolumeModelTests.swift; sourceTree = "<group>"; };
+		67343AE317744B6EAC69B3BB /* SearchQueryTrimTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchQueryTrimTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -939,6 +941,7 @@
 				"Services/SFBAudioEngineManager+Playback.swift",
 				"Services/SFBAudioEngineManager+Queue.swift",
 				Services/ScrapeSource.swift,
+				Services/SearchQuery.swift,
 				Services/SimplifiedTraditionalMap.swift,
 				Services/SmartPlaylistSourceResolver.swift,
 				Services/SmartPlaylistStore.swift,
@@ -1438,6 +1441,7 @@
 				035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */,
 				35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */,
 				38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */,
+				67343AE317744B6EAC69B3BB /* SearchQueryTrimTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1972,6 +1976,7 @@
 				9D15B8B27BFE4CE8A66B8412 /* SyncRxKeepaliveTests.swift in Sources */,
 				8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */,
 				C9C4C30339284EFC98FAD8DF /* PlayerVolumeModelTests.swift in Sources */,
+				CB596AD1E93946CF91E54E2A /* SearchQueryTrimTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

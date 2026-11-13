@@ -92,7 +92,7 @@ extension MacSearchAnythingLayer {
 
     @MainActor
     private func performSearch() async {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = SearchQuery.trimmed(query)
         guard !q.isEmpty else {
             searchSeq += 1
             localSongs = []

@@ -26,7 +26,8 @@ struct SearchView: View {
         // Cancel any existing search task
         searchTask?.cancel()
 
-        guard !query.isEmpty else {
+        // 空查询判据在 trim 之后（只有空格的输入 → 和空串一样置空结果，不是整库）
+        guard !SearchQuery.isEmpty(query) else {
             searchResults = SearchResults()
             isSearching = false
             return
@@ -35,10 +36,8 @@ struct SearchView: View {
         isSearching = true
 
         searchTask = Task {
-            // Normalize query for better matching
-            let normalizedQuery = query
-                .lowercased()
-                .folding(options: .diacriticInsensitive, locale: .current)
+            // 归一唯一入口（与 macOS MacLibraryView+Content 同一份实现）：trim → 大小写 / 变音折叠
+            let normalizedQuery = SearchQuery.normalized(query)
 
             // Run database queries on background thread
             let results = await Task.detached(priority: .userInitiated) {

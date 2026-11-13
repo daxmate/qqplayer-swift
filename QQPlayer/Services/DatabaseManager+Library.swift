@@ -5,6 +5,9 @@
 //  库搜索：LIKE 通配符转义与简繁字形变体召回、候选粗筛 + Levenshtein 相似度排序，
 //  以及曲名归一 / 相似度工具（private extension String，仅本片使用）。
 //
+//  ⚠️ 查询串归一（首尾空白 / 空查询判据）的唯一入口是 `SearchQuery`（Services/SearchQuery.swift）：
+//  本片每个 search* 入口都先 trim、空白查询直接返回空数组——**不要**在调用点各写一份 trim。
+//
 //  2026-09-21 结构拆分（纯搬家，无逻辑变更）。同族文件：
 //    · DatabaseManager+LibraryCRUD.swift       — 歌手 / 专辑 CRUD、显示名缓存
 //    · DatabaseManager+LibraryMigrations.swift — 存量修复迁移（归名 / 拆合唱 / 合并分裂专辑 / 孤儿清理）
@@ -14,11 +17,14 @@ import Foundation
 
 extension DatabaseManager {
     func searchArtists(query: String, limit: Int = 20) throws -> [Artist] {
+        // 空查询（含只有空白）→ 空结果：搜索语义的唯一判据在 SearchQuery（trim 之后）
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
             // 简繁归一：query 生成两种字形变体（当前方向转换 + 反向转换），
             // 简体 UI 下输"周杰伦"也能匹配库里"周傑倫"（反之对称）
             return try Artist
-                .filter(self.likeAny(Column("name"), variants: ArtistNameNormalizer.searchVariants(of: query)))
+                .filter(self.likeAny(Column("name"), variants: ArtistNameNormalizer.searchVariants(of: trimmedQuery)))
                 .order(Column("name"))
                 .limit(limit)
                 .fetchAll(db)
@@ -26,11 +32,14 @@ extension DatabaseManager {
     }
 
     func searchAlbums(query: String, limit: Int = 30) throws -> [Album] {
+        // 空查询（含只有空白）→ 空结果：搜索语义的唯一判据在 SearchQuery（trim 之后）
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
             // D8：与其它搜索共用同一转义入口（用户输 `%`/`_` 不再命中整库）；
             // 简繁字形变体：库里专辑名 tag 原文不动，简中输入也要搜到繁体专辑名（反之对称）
             return try Album
-                .filter(self.likeAny(Column("title"), variants: DisplayScriptNormalizer.searchVariants(of: query)))
+                .filter(self.likeAny(Column("title"), variants: DisplayScriptNormalizer.searchVariants(of: trimmedQuery)))
                 .order(Column("title"))
                 .limit(limit)
                 .fetchAll(db)
@@ -66,11 +75,12 @@ extension DatabaseManager {
     }
 
     private func rankedTrackSearch(in db: Database, query: String, limit: Int?) throws -> [Track] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = SearchQuery.trimmed(query)
         if trimmed.isEmpty {
-            var request = Track.order(Column("title"))
-            if let limit { request = request.limit(limit) }
-            return try request.fetchAll(db)
+            // 空查询（含只有空白）= 无结果，**不是**「整库」——
+            // 旧实现在这里返回按标题排序的全部曲目，导致「搜索框只有一个空格 → 满屏歌」。
+            // 空查询的 UI 行为（置空 / 空状态）由调用方按 trim 后的判据处理。
+            return []
         }
 
         // 简繁字形变体：库里曲名 tag 原文不动，简中输入也要搜到繁体曲名的曲子（反之对称）
@@ -124,34 +134,42 @@ extension DatabaseManager {
     }
 
     func searchTracks(query: String) throws -> [Track] {
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
-            try self.rankedTrackSearch(in: db, query: query, limit: nil)
+            try self.rankedTrackSearch(in: db, query: trimmedQuery, limit: nil)
         }
     }
 
     func searchAlbums(query: String) throws -> [Album] {
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
             // 简繁字形变体（同 searchAlbums(query:limit:)，唯一入口 likeAny）
             return try Album
-                .filter(self.likeAny(Column("title"), variants: DisplayScriptNormalizer.searchVariants(of: query)))
+                .filter(self.likeAny(Column("title"), variants: DisplayScriptNormalizer.searchVariants(of: trimmedQuery)))
                 .order(Column("title"))
                 .fetchAll(db)
         }
     }
 
     func searchArtists(query: String) throws -> [Artist] {
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
             // 简繁归一：与 searchArtists(query:limit:) 一致，query 生成两种字形变体
             return try Artist
-                .filter(self.likeAny(Column("name"), variants: ArtistNameNormalizer.searchVariants(of: query)))
+                .filter(self.likeAny(Column("name"), variants: ArtistNameNormalizer.searchVariants(of: trimmedQuery)))
                 .order(Column("name"))
                 .fetchAll(db)
         }
     }
 
     func searchPlaylists(query: String) throws -> [Playlist] {
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
-            let searchPattern = self.likePattern(for: query)
+            let searchPattern = self.likePattern(for: trimmedQuery)
             return try Playlist
                 .filter(Column("title").like(searchPattern, escape: "\\"))
                 .order(Column("title"))
@@ -160,8 +178,10 @@ extension DatabaseManager {
     }
 
     func searchTracks(query: String, limit: Int = 50) throws -> [Track] {
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
-            try self.rankedTrackSearch(in: db, query: query, limit: limit)
+            try self.rankedTrackSearch(in: db, query: trimmedQuery, limit: limit)
         }
     }
 }

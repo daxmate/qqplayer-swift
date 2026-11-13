@@ -136,16 +136,15 @@ extension MacLibraryView {
     func performSearch(query: String) {
         searchTask?.cancel()
 
-        guard !query.isEmpty else {
+        // 空查询判据在 trim 之后（只有空格的输入 → 和空串一样置空结果，不是整库）
+        guard !SearchQuery.isEmpty(query) else {
             searchResults = MacSearchResults()
             return
         }
 
         searchTask = Task {
-            // Normalize query for better matching (same as iOS SearchView).
-            let normalizedQuery = query
-                .lowercased()
-                .folding(options: .diacriticInsensitive, locale: .current)
+            // 归一唯一入口（与 iOS SearchView 同一份实现）：trim → 大小写 / 变音折叠
+            let normalizedQuery = SearchQuery.normalized(query)
 
             // Run database queries off the main thread.
             let results = await Task.detached(priority: .userInitiated) {
