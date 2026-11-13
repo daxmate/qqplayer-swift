@@ -158,10 +158,9 @@ struct RecallSession: Sendable, Equatable {
         RecommendationNormalization.normalizeArtist(candidate.artist)
     }
 
-    static func albumKey(_ candidate: RecommendedCandidate) -> String {
-        guard let album = candidate.album, !album.isEmpty else {
-            return "no-album#\(artistKey(candidate))"
-        }
+    /// 同专辑归并键；专辑缺失 → nil（不参与专辑上限，无专辑曲目不得互相压掉）。
+    static func albumKey(_ candidate: RecommendedCandidate) -> String? {
+        guard let album = candidate.album, !album.isEmpty else { return nil }
         return RecommendationNormalization.normalizeTitle(album)
     }
 }

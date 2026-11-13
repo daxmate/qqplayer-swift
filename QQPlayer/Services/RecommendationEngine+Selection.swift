@@ -40,10 +40,11 @@ extension RecommendationEngine {
             guard !usedKeys.contains(key(item)) else { return false }
             let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
             if artistCounts[artistKey, default: 0] >= perArtistCap { return false }
-            if let maxSongsPerAlbum {
-                let albumKey = Self.albumKey(album: item.item.song.album, artist: item.item.song.artist)
+            if let maxSongsPerAlbum,
+               let albumKey = Self.albumKey(album: item.item.song.album) {
                 if albumCounts[albumKey, default: 0] >= maxSongsPerAlbum { return false }
             }
+
             if let intentCap, intentCounts[item.item.intent.priorityKey, default: 0] >= intentCap { return false }
             if let sourceCap, sourceCounts[item.item.source, default: 0] >= sourceCap { return false }
             return true
@@ -52,7 +53,10 @@ extension RecommendationEngine {
         func take(_ item: RankedItem) {
             let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
             artistCounts[artistKey, default: 0] += 1
-            albumCounts[Self.albumKey(album: item.item.song.album, artist: item.item.song.artist), default: 0] += 1
+            if let albumKey = Self.albumKey(album: item.item.song.album) {
+                albumCounts[albumKey, default: 0] += 1
+            }
+
             intentCounts[item.item.intent.priorityKey, default: 0] += 1
             sourceCounts[item.item.source, default: 0] += 1
             usedKeys.insert(key(item))
@@ -112,6 +116,22 @@ extension RecommendationEngine {
                     }
                 }
             }
+            // 反方向补位：本人段不足时用相似条目补满 target（总数优先，此时候选不足才是真的少）。
+            // 补位行仍带 relatedTo 标记，不得被当成点名人本人的歌。
+            if picked.count < target {
+                for pass in 0 ..< 2 {
+                    for item in ranked where !artistConstraint.matches(artist: item.item.song.artist) {
+                        guard picked.count < target else { break }
+                        guard admits(
+                            item,
+                            intentCap: pass == 0 ? perIntentCap : nil,
+                            sourceCap: pass == 0 ? perSourceCap : nil
+                        ) else { continue }
+                        take(item)
+                        relatedPicked += 1
+                    }
+                }
+            }
             // 展示顺序：本人行在前、相似补位行在后（补位行可能因凑满被排到直采之后）。
             return picked.filter { $0.relatedTo == nil } + picked.filter { $0.relatedTo != nil }
         }
@@ -132,11 +152,12 @@ extension RecommendationEngine {
         return picked
     }
 
-    /// 同专辑归并键（专辑给不出时按艺人分桶，避免把无专辑曲目互相压掉）。
-    private static func albumKey(album: String?, artist: String) -> String {
-        guard let album, !album.isEmpty else {
-            return "no-album#" + RecommendationKey.primaryArtist(artist)
-        }
+    /// 同专辑归并键；专辑缺失（空串，或降级源恒为 nil）→ nil = 不参与专辑上限。
+    ///
+    /// 不能伪造「无专辑」分桶：那样同一艺人的无专辑曲目会互相压到上限首数，
+    /// 点名场景下直接把本人段砍到 2 首。
+    private static func albumKey(album: String?) -> String? {
+        guard let album, !album.isEmpty else { return nil }
         return RecommendationNormalization.normalizeTitle(album)
     }
 

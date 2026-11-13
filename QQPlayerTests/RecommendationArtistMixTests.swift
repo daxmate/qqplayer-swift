@@ -65,8 +65,8 @@ private struct MixRelatedRecall: RelatedArtistRecallProviding {
     }
 }
 
-private func mixSong(_ title: String, _ artist: String) -> RecommendationRemoteSong {
-    RecommendationRemoteSong(title: title, artist: artist, year: 2004, songID: nil)
+private func mixSong(_ title: String, _ artist: String, album: String? = nil) -> RecommendationRemoteSong {
+    RecommendationRemoteSong(title: title, artist: artist, album: album, year: 2004, songID: nil)
 }
 
 private func mixCandidate(_ title: String, _ artist: String, relatedTo: String? = nil) -> RecommendedCandidate {
@@ -101,7 +101,8 @@ private func mixEngine(
     direct: [RecommendationRemoteSong],
     relatedByArtist: [String: [RecommendationRemoteSong]] = [:],
     share: Double = DeleteSettings.defaultRelatedArtistShare,
-    log: MixCallLog? = nil
+    log: MixCallLog? = nil,
+    albumCap: Int? = nil
 ) -> RecommendationEngine {
     var provider = MixProvider()
     provider.songs = ["孙燕姿": direct]
@@ -109,7 +110,7 @@ private func mixEngine(
         providers: [provider],
         perIntentLimit: 40,
         maxSongsPerArtist: 10_000,
-        maxSongsPerAlbum: nil
+        maxSongsPerAlbum: albumCap
     )
     engine.maxSongsPerIntent = 40
     engine.maxSourceShare = 1
@@ -231,11 +232,11 @@ struct RecommendationArtistMixQuotaTests {
         }
     }
 
-    @Test("本人不足 10：相似仍 ≤5，总数 = 实际可得（不凑数）")
-    func relatedCapWhenDirectShort() async {
+    @Test("本人不足 10：相似往回补满 target（3 本人 + 12 相似 = 15）")
+    func relatedBackfillsWhenDirectShort() async {
         let engine = mixEngine(
             direct: sunyanzi(3),
-            relatedByArtist: ["方大同": relatedSongs(10, "方大同")]
+            relatedByArtist: ["方大同": relatedSongs(20, "方大同")]
         )
         let result = await engine.recommend(
             request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
@@ -246,8 +247,27 @@ struct RecommendationArtistMixQuotaTests {
         case let .success(list):
             let direct = RecommendationArtistMix.directCount(in: list)
             #expect(direct == 3)
-            #expect(list.count - direct == 5)
-            #expect(list.count == 8)
+            #expect(list.count - direct == 12)
+            #expect(list.count == 15)
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("两段都不够：3 本人 + 2 相似 = 5，如实少给不凑数")
+    func bothSegmentsShortReportsHonestly() async {
+        let engine = mixEngine(
+            direct: sunyanzi(3),
+            relatedByArtist: ["方大同": relatedSongs(2, "方大同")]
+        )
+        let result = await engine.recommend(
+            request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
+            profile: TasteProfile(),
+            count: 15
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 5)
         case let .failure(error):
             Issue.record("不应失败：\(error)")
         }
@@ -556,5 +576,111 @@ struct RecommendationArtistMixSettingsTests {
             from: Data(#"{"relatedArtistShare":0.9}"#.utf8)
         )
         #expect(decoded.relatedArtistShare == 0.5)
+    }
+}
+
+// MARK: - 补位与专辑上限
+
+@Suite("点名艺人混合：双向补位与专辑上限")
+struct RecommendationArtistMixFillTests {
+    @Test("本人只有 4 首：相似补满到 15（4 本人 / 11 相似）")
+    func fourDirectBackfillsToFifteen() async {
+        let engine = mixEngine(
+            direct: sunyanzi(4),
+            relatedByArtist: ["方大同": relatedSongs(20, "方大同")]
+        )
+        let result = await engine.recommend(
+            request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
+            profile: TasteProfile(),
+            count: 15
+        )
+        switch result {
+        case let .success(list):
+            let direct = RecommendationArtistMix.directCount(in: list)
+            #expect(direct == 4)
+            #expect(list.count == 15)
+            #expect(list.count - direct == 11)
+            // 补位行仍必须带来源标记，不能冒充本人的歌。
+            #expect(list.filter { $0.relatedTo != nil }.allSatisfy { $0.relatedTo == "孙燕姿" })
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("无专辑曲目不受专辑上限压制：同艺人 6 首可全进")
+    func noAlbumSongsBypassAlbumCap() async {
+        let songs = (1 ... 6).map { mixSong("N\($0)", "孙燕姿", album: nil) }
+        let engine = mixEngine(direct: songs, share: 0, albumCap: 2)
+        let result = await engine.recommend(
+            request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
+            profile: TasteProfile(),
+            count: 6
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 6)
+            #expect(RecommendationArtistMix.directCount(in: list) == 6)
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("有专辑的同专辑仍按上限压到 2 首")
+    func realAlbumStillCapped() async {
+        let songs = (1 ... 6).map { mixSong("A\($0)", "孙燕姿", album: "同名专辑") }
+        let engine = mixEngine(direct: songs, share: 0, albumCap: 2)
+        let result = await engine.recommend(
+            request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
+            profile: TasteProfile(),
+            count: 6
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 2)
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("批次层同样放行无专辑曲目：6 首同艺人全进")
+    func batchAllowsSongsWithoutAlbum() {
+        let pool = (1 ... 6).map { index in
+            RecommendedCandidate(
+                title: "B\(index)",
+                artist: "孙燕姿",
+                album: nil,
+                year: nil,
+                source: .netease
+            )
+        }
+        var session = RecallSession(
+            pool: pool,
+            maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: true),
+            minDistinctArtists: 1,
+            quota: RecallSession.Quota(direct: 6, related: 0)
+        )
+        let batch = session.nextBatch()
+        #expect(batch.count == 6)
+    }
+
+    @Test("批次层：同专辑仍压到 2 首")
+    func batchStillCapsRealAlbum() {
+        let pool = (1 ... 6).map { index in
+            RecommendedCandidate(
+                title: "C\(index)",
+                artist: "孙燕姿",
+                album: "同名专辑",
+                year: nil,
+                source: .netease
+            )
+        }
+        var session = RecallSession(
+            pool: pool,
+            maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: true),
+            minDistinctArtists: 1,
+            quota: RecallSession.Quota(direct: 6, related: 0)
+        )
+        let batch = session.nextBatch()
+        #expect(batch.count == 2)
     }
 }

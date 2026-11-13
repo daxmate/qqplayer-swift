@@ -139,17 +139,16 @@ enum RecommendationBatchDiversity {
             RecommendationNormalization.normalizeArtist(candidate.artist)
         }
 
-        func albumKey(_ candidate: RecommendedCandidate) -> String {
-            guard let album = candidate.album, !album.isEmpty else {
-                return "no-album#" + artistKey(candidate)
-            }
+        /// 同专辑归并键；专辑缺失（空串或降级源 nil）→ nil = 不参与专辑上限，避免无专辑曲目互相压掉。
+        func albumKey(_ candidate: RecommendedCandidate) -> String? {
+            guard let album = candidate.album, !album.isEmpty else { return nil }
             return RecommendationNormalization.normalizeTitle(album)
         }
 
         /// 硬上限：同艺人 / 同专辑。
         func admitsHard(_ candidate: RecommendedCandidate) -> Bool {
             if (artistCounts[artistKey(candidate)] ?? 0) >= limits.maxPerArtist { return false }
-            if (albumCounts[albumKey(candidate)] ?? 0) >= limits.maxPerAlbum { return false }
+            if let key = albumKey(candidate), (albumCounts[key] ?? 0) >= limits.maxPerAlbum { return false }
             return true
         }
 
@@ -186,7 +185,7 @@ enum RecommendationBatchDiversity {
                 }
             }
             artistCounts[artistKey(candidate), default: 0] += 1
-            albumCounts[albumKey(candidate), default: 0] += 1
+            if let key = albumKey(candidate) { albumCounts[key, default: 0] += 1 }
             if candidate.relatedTo != nil {
                 relatedCount += 1
             } else {
@@ -216,7 +215,7 @@ enum RecommendationBatchDiversity {
                 relaxed.insert(.genre)
             }
             artistCounts[artistKey(added), default: 0] += 1
-            albumCounts[albumKey(added), default: 0] += 1
+            if let key = albumKey(added) { albumCounts[key, default: 0] += 1 }
             if let decade = added.year.map({ RecommendationScorer.decadeBucket(for: $0) }) {
                 decadeCounts[decade, default: 0] += 1
             }
@@ -232,7 +231,7 @@ enum RecommendationBatchDiversity {
                 directCount = max(0, directCount - 1)
             }
             Self.drop(&artistCounts, key: artistKey(candidate))
-            Self.drop(&albumCounts, key: albumKey(candidate))
+            if let key = albumKey(candidate) { Self.drop(&albumCounts, key: key) }
             if let decade = candidate.year.map({ RecommendationScorer.decadeBucket(for: $0) }) {
                 Self.drop(&decadeCounts, key: decade)
             }
