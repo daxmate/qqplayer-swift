@@ -1218,3 +1218,4 @@
 "source_lastfm" = "Last.fm";
 "recommendation_itunes_lookup_title" = "Дополнение метаданных iTunes";
 "recommendation_itunes_lookup_footer" = "Один запрос к iTunes для лучших кандидатов: каноническое название, альбом, год, длительность; 0 — выключено. Результаты кэшируются на 7 дней, ограничение ~20 запросов/мин, ошибки пропускаются.";
+"recommendation_lastfm_enable" = "Включить дополнение Last.fm (нужен доступ к last.fm)";

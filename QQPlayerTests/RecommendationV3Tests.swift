@@ -118,11 +118,26 @@ struct RecommendationLibraryMatcherTests {
         ("Love-Story", "Taylor Swift"),
     ]
 
+    /// 网易云 simiSong 会混 Live / 翻唱：中文标题同样要归一到同一个键。
+    private static let sameChineseSong: [(String, String)] = [
+        ("忘情水", "刘德华"),
+        ("忘情水(Live)", "刘德华"),
+        ("忘情水 (Live)", "刘德华"),
+        ("忘情水 - Live", "刘德华"),
+        ("忘情水（现场版）", "刘德华"),
+    ]
+
     @Test("版本后缀 / 大小写 / 全半角 / 标点差异 → 同一个键")
     func sameSongKeys() {
         let keys = Self.sameSong.map { RecommendationLibraryMatcher.key(title: $0.0, artist: $0.1) }
         #expect(Set(keys).count == 1)
         #expect(keys.first == "lovestory#taylorswift")
+    }
+
+    @Test("中文 Live / 现场版写法 → 同一个键（simiSong 混版本能压住）")
+    func sameChineseSongKeys() {
+        let keys = Self.sameChineseSong.map { RecommendationLibraryMatcher.key(title: $0.0, artist: $0.1) }
+        #expect(Set(keys).count == 1)
     }
 
     @Test("不同歌曲 / 不同艺人 → 不同键")
@@ -574,5 +589,124 @@ struct RecommendationMetadataNormalizerTests {
         let calls = await provider.callCount()
         #expect(calls == 1)
         #expect(second.hits == 1)
+    }
+}
+
+// MARK: - 网易云相似歌曲（B 通道主源）
+
+@Suite("推荐 v3：网易云相似歌曲 → 相似艺人")
+struct NeteaseSimilarArtistTests {
+    private func song(_ title: String, _ artist: String, id: Int) -> NeteaseOnlineSong {
+        NeteaseOnlineSong(
+            id: id,
+            title: title,
+            artist: artist,
+            album: nil,
+            coverURL: nil,
+            durationMs: nil,
+            level: "exhigh",
+            popularity: nil
+        )
+    }
+
+    @Test("聚合：按出现次数排序、去掉种子本人、同次数按首次出现顺序")
+    func aggregate() {
+        let songs = [
+            song("一路上有你", "张学友", id: 1),
+            song("爱如潮水", "张信哲", id: 2),
+            song("忘情水", "刘德华", id: 3),
+            song("过火", "张信哲", id: 4),
+            song("一剪梅", "费玉清", id: 5),
+            song("吻别", "张学友", id: 6),
+        ]
+        let artists = NeteaseSimilarArtistSource.aggregateArtists(
+            from: songs,
+            excluding: "张学友",
+            limit: 5
+        )
+        // 张信哲出现 2 次排第一；张学友（种子）被剔除。
+        #expect(artists.map(\.name) == ["张信哲", "刘德华", "费玉清"])
+    }
+
+    @Test("聚合：limit 截断 + 多歌手字段按逗号/顿号拆分，& 不拆")
+    func aggregateLimitAndSplit() {
+        let songs = [
+            song("A", "张信哲、刘德华", id: 1),
+            song("B", "Simon & Garfunkel", id: 2),
+        ]
+        let artists = NeteaseSimilarArtistSource.aggregateArtists(from: songs, excluding: "张学友", limit: 2)
+        #expect(artists.map(\.name) == ["张信哲", "刘德华"])
+        #expect(NeteaseSimilarArtistSource.splitArtists("Simon & Garfunkel") == ["Simon & Garfunkel"])
+    }
+
+    @Test("limit = 0：不返回任何相似艺人")
+    func aggregateLimitZero() {
+        let songs = [song("A", "张信哲", id: 1)]
+        #expect(NeteaseSimilarArtistSource.aggregateArtists(from: songs, excluding: "张学友", limit: 0).isEmpty)
+    }
+
+    @Test("similarSongs：请求带 songid + UA/Referer，解析 songs 字段")
+    func similarSongsParsing() async throws {
+        let transport = MockNetworkTransport(
+            dataHandler: { request in
+                let url = request.url?.absoluteString ?? ""
+                #expect(url.contains("simiSong"))
+                #expect(url.contains("songid=190449"))
+                #expect(request.value(forHTTPHeaderField: "Referer") == "https://music.163.com/")
+                let json = """
+                {"songs":[{"id":1,"name":"一路上有你","artists":[{"name":"张学友"}],"album":{"name":"真爱","picUrl":"http://p1.music.126.net/a.jpg"},"duration":260000,"popularity":95}]}
+                """
+                return (Data(json.utf8), MockNetworkTransport.httpResponse())
+            },
+            redirectHandler: { _ in (statusCode: 200, headers: [:], body: Data()) },
+            downloadHandler: { _, _ in }
+        )
+        let client = NeteaseOnlineClient(transport: transport)
+        let songs = try await client.similarSongsPublic(songID: 190_449, limit: 20)
+        #expect(songs.count == 1)
+        #expect(songs.first?.title == "一路上有你")
+        #expect(songs.first?.artist == "张学友")
+        #expect(songs.first?.coverURL?.scheme == "https")
+        #expect(songs.first?.popularity == 0.95)
+    }
+
+    @Test("similarSongs：HTTP 非 200 → 抛错（调用方静默降级）")
+    func similarSongsHTTPError() async {
+        let transport = MockNetworkTransport(
+            dataHandler: { _ in (Data(), MockNetworkTransport.httpResponse(status: 503)) },
+            redirectHandler: { _ in (statusCode: 200, headers: [:], body: Data()) },
+            downloadHandler: { _, _ in }
+        )
+        let client = NeteaseOnlineClient(transport: transport)
+        await #expect(throws: NeteaseOnlineError.self) {
+            _ = try await client.similarSongsPublic(songID: 1, limit: 5)
+        }
+    }
+}
+
+// MARK: - Last.fm 默认关闭
+
+@Suite("推荐 v3：Last.fm 默认关闭（大陆不可直连）")
+struct RecommendationLastFMSettingTests {
+    @Test("默认关闭：新设置 lastFMEnabled = false")
+    func defaultOff() {
+        #expect(RecommendationV3Settings().lastFMEnabled == false)
+    }
+
+    @Test("旧设置文件缺 key → 解码为 false（不因升级误开）")
+    func decodesMissingAsOff() throws {
+        let json = #"{"weightLibrary":0.35,"weightPlay":0.4,"weightFavorite":0.15,"weightRecency":0.1,"quotaSeed":0.5,"quotaSimilar":0.3,"quotaExplore":0.2}"#
+        let decoded = try JSONDecoder().decode(RecommendationV3Settings.self, from: Data(json.utf8))
+        #expect(decoded.lastFMEnabled == false)
+        #expect(decoded.itunesLookupLimit == RecommendationV3Settings.defaultITunesLookupLimit)
+    }
+
+    @Test("开关可编码往返")
+    func roundTrip() throws {
+        var settings = RecommendationV3Settings()
+        settings.lastFMEnabled = true
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(RecommendationV3Settings.self, from: data)
+        #expect(decoded.lastFMEnabled == true)
     }
 }

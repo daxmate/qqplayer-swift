@@ -320,6 +320,13 @@ enum MacSettingsCatalog {
         aliases: ["风格探索", "探索", "explore", "quota"]
     )
 
+    static let recommendationLastFMToggle = Item(
+        id: "settings.recommendation.lastFMEnabled",
+        category: .recommendations,
+        titleKey: "recommendation_lastfm_enable",
+        aliases: ["Last.fm", "lastfm", "可选增强", "相似艺人"]
+    )
+
     static let recommendationITunesLookup = Item(
         id: "settings.recommendation.itunesLookup",
         category: .recommendations,
@@ -406,6 +413,7 @@ enum MacSettingsCatalog {
         recommendationQuotaSeed,
         recommendationQuotaSimilar,
         recommendationQuotaExplore,
+        recommendationLastFMToggle,
         recommendationLastFMKey,
         recommendationITunesLookup,
         recommendationChatRounds,

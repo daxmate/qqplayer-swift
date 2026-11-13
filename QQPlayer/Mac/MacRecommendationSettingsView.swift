@@ -111,6 +111,13 @@ struct MacRecommendationSettingsView: View {
 
     private var lastFMSection: some View {
         Section {
+            Toggle(isOn: $settings.recommendationV3.lastFMEnabled) {
+                Text("recommendation_lastfm_enable".localized)
+            }
+            .settingsAnchor(MacSettingsCatalog.recommendationLastFMToggle)
+            .onChange(of: settings.recommendationV3.lastFMEnabled) { _, _ in
+                settings.save()
+            }
             HStack {
                 SecureField("recommendation_lastfm_placeholder".localized, text: $lastFMKeyDraft)
                     .textFieldStyle(.roundedBorder)

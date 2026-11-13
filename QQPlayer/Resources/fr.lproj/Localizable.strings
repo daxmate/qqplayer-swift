@@ -1221,3 +1221,4 @@
 "source_lastfm" = "Last.fm";
 "recommendation_itunes_lookup_title" = "Complétion des métadonnées iTunes";
 "recommendation_itunes_lookup_footer" = "Effectue une recherche iTunes pour les meilleurs candidats afin de compléter le titre, l'album, l'année et la durée ; 0 désactive. Résultats en cache 7 jours, débit limité à ~20 req/min ; les échecs sont ignorés.";
+"recommendation_lastfm_enable" = "Activer le renfort Last.fm (accès à last.fm requis)";

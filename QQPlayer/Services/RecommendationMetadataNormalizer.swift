@@ -24,6 +24,7 @@ struct RecommendationNormalizedMetadata: Sendable, Equatable {
     var year: Int?
     var durationMs: Int?
     var previewURL: URL?
+    var artworkURL: URL?
 }
 
 /// 元数据查询缓存 + 全局限速（actor：跨轮复用，同曲不重复打网络）。
@@ -104,7 +105,8 @@ struct RecommendationMetadataNormalizer: Sendable {
                 album: best.album,
                 year: best.year,
                 durationMs: best.durationMs,
-                previewURL: best.previewURL
+                previewURL: best.previewURL,
+                artworkURL: best.artworkURL
             )
             await cache.store(key, value: metadata, now: now())
             result[offset] = apply(metadata, to: candidate)
@@ -149,6 +151,7 @@ struct RecommendationMetadataNormalizer: Sendable {
         if copy.song.year == nil { copy.song.year = metadata.year }
         if copy.song.durationMs == nil { copy.song.durationMs = metadata.durationMs }
         if copy.song.previewURL == nil { copy.song.previewURL = metadata.previewURL }
+        if copy.song.artworkURL == nil { copy.song.artworkURL = metadata.artworkURL }
         if copy.context.year == nil { copy.context.year = metadata.year }
         return copy
     }

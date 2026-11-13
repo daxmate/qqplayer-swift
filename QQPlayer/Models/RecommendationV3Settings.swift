@@ -26,6 +26,12 @@ struct RecommendationV3Settings: Codable, Sendable, Equatable {
     /// iTunes 元数据标准化：每轮最多查询条数（0 = 关闭；iTunes 约 20 req/min）。
     var itunesLookupLimit: Int = RecommendationV3Settings.defaultITunesLookupLimit
 
+    /// Last.fm 可选增强（大陆不可直连；默认关 = A/B 通道只用国内源）。
+    var lastFMEnabled: Bool = false
+
+    /// Last.fm 单次请求超时（1.5s）：失败静默跳过，绝不拖慢主链路。
+    static let lastFMTimeout: TimeInterval = 1.5
+
     static let defaultITunesLookupLimit = 8
     static let itunesLookupLimitRange = 0 ... 30
 
@@ -55,6 +61,7 @@ struct RecommendationV3Settings: Codable, Sendable, Equatable {
             try container.decodeIfPresent(Int.self, forKey: .itunesLookupLimit)
                 ?? Self.defaultITunesLookupLimit
         )
+        lastFMEnabled = try container.decodeIfPresent(Bool.self, forKey: .lastFMEnabled) ?? false
         normalizeWeights()
         normalizeQuotas()
     }

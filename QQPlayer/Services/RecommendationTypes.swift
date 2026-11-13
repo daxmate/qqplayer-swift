@@ -266,6 +266,10 @@ struct RecommendedCandidate: Identifiable, Codable, Equatable, Sendable {
     var reasons: [String] = []
     /// 召回意图里的曲风（仅 `kind == .genre` 的意图给得出；缺省 = 不参与批次曲风上限）。
     var genre: String?
+    /// 试听地址（在线源 / iTunes 给得出才有；nil = 不可试听）。
+    var previewURL: URL?
+    /// 封面地址（在线源 / iTunes 给得出才有；UI 自行决定是否展示）。
+    var artworkURL: URL?
     /// 相似补位来源（nil = 本人匹配行；非 nil = 该点名艺人的相关艺人）。
     var relatedTo: String?
     /// v3 召回通道（nil = 旧引擎 / 缓存老数据）。

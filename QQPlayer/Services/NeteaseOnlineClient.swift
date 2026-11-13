@@ -229,6 +229,34 @@ struct NeteaseOnlineClient: Sendable {
         return try await artistTopSongs(artistID: artist.id, limit: limit)
     }
 
+    // MARK: - 相似歌曲（公开 API /api/discovery/simiSong；B 通道相似艺人主源）
+
+    /// 相似歌曲（公开接口；无需登录、无需 key，带 UA + Referer 即可）。
+    /// 与上面的 eapi 版 `similarSongs` 区分：eapi 匿名态常不可用，这里走公开 REST。
+    /// 实测（2026-11-13）：`吻别(id=190449)` → 一路上有你 / 爱如潮水 / 忘情水 / 一剪梅 / 过火。
+    /// 结果会混 Live / 翻唱；调用方按归一化键去重 + 单艺人 / 单专辑上限压制。
+    /// 失败抛 `NeteaseOnlineError`（调用方静默降级）。
+    func similarSongsPublic(songID: Int, limit: Int = 20) async throws -> [NeteaseOnlineSong] {
+        guard songID > 0 else { return [] }
+        let bounded = max(1, min(50, limit))
+        guard let url = URL(string: "https://music.163.com/api/discovery/simiSong?songid=\(songID)&limit=\(bounded)&offset=0")
+        else { return [] }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+        request.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+            forHTTPHeaderField: "User-Agent"
+        )
+        request.timeoutInterval = 8
+        let (data, http) = try await transport.data(for: request)
+        guard http.statusCode == 200 else { throw NeteaseOnlineError.httpError(http.statusCode) }
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let songs = root["songs"] as? [[String: Any]]
+        else { return [] }
+        return songs.prefix(bounded).compactMap { mapTopSong($0) }
+    }
+
     /// `/api/artist/top/song` 的 `songs` 条目（字段比 cloudsearch 少，全部容错）。
     private func mapTopSong(_ song: [String: Any]) -> NeteaseOnlineSong? {
         guard let id = song["id"] as? Int,
@@ -239,7 +267,8 @@ struct NeteaseOnlineClient: Sendable {
         let album = (song["al"] as? [String: Any]) ?? (song["album"] as? [String: Any])
         let cover = (album?["picUrl"] as? String).flatMap(NeteaseOnlineLogic.toHttpsURL)
         let duration = (song["dt"] as? Int) ?? (song["duration"] as? Int)
-        let pop = song["pop"] as? Double
+        // 艺人热歌接口给 `pop`（0…100）；公开 simiSong 接口给 `popularity`（0…100）。
+        let pop = ((song["pop"] as? NSNumber) ?? (song["popularity"] as? NSNumber))?.doubleValue
         return NeteaseOnlineSong(
             id: id,
             title: name,

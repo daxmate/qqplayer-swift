@@ -19,7 +19,7 @@ enum RecommendationLibraryMatcher {
     // MARK: - 版本后缀
 
     private static let bracketSuffix = try! NSRegularExpression(
-        pattern: #"(?i)\s*[\(\[](?:live[^\)\]]*|remaster(?:ed)?[^\)\]]*|feat\.[^\)\]]*|ft\.[^\)\]]*|with [^\)\]]*|bonus track[^\)\]]*|deluxe[^\)\]]*|album version[^\)\]]*|single version[^\)\]]*)[\)\]]\s*$"#
+        pattern: #"(?i)\s*[\(\[](?:live[^\)\]]*|remaster(?:ed)?[^\)\]]*|feat\.[^\)\]]*|ft\.[^\)\]]*|with [^\)\]]*|bonus track[^\)\]]*|deluxe[^\)\]]*|album version[^\)\]]*|single version[^\)\]]*|现场[^\)\]]*|演唱会[^\)\]]*)[\)\]]\s*$"#
     )
 
     private static let dashSuffix = try! NSRegularExpression(
@@ -32,7 +32,9 @@ enum RecommendationLibraryMatcher {
 
     /// 剥离标题版本后缀（最多 4 轮，覆盖「(Live) - Remastered 2011」这类叠加写法）。
     static func stripTitleSuffixes(_ raw: String) -> String {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 先做宽度折叠：中文全角括号「（）」也要能被 ASCII 模式命中（网易云常写「忘情水（现场版）」）。
+        var text = raw.folding(options: [.widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         for _ in 0 ..< 4 {
             let before = text
             text = replace(bracketSuffix, in: text)

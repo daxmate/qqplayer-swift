@@ -74,12 +74,17 @@ struct LastFMClient: Sendable {
     var transport: any NetworkTransport
     var keyProvider: any LastFMKeyProviding
 
+    /// 单次请求超时（大陆不可直连：必须让失败尽快结束，不阻塞主链路）。
+    var timeout: TimeInterval = 1.5
+
     init(
         transport: any NetworkTransport = URLSessionNetworkTransport(),
-        keyProvider: any LastFMKeyProviding = KeychainLastFMKeyStore()
+        keyProvider: any LastFMKeyProviding = KeychainLastFMKeyStore(),
+        timeout: TimeInterval = 1.5
     ) {
         self.transport = transport
         self.keyProvider = keyProvider
+        self.timeout = timeout
     }
 
     static let endpoint = URL(string: "https://ws.audioscrobbler.com/2.0/")!
@@ -142,7 +147,9 @@ struct LastFMClient: Sendable {
             .map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let url = components?.url else { return nil }
         do {
-            let (data, http) = try await transport.data(for: URLRequest(url: url))
+            var request = URLRequest(url: url)
+            request.timeoutInterval = timeout
+            let (data, http) = try await transport.data(for: request)
             guard http.statusCode == 200 else { return nil }
             return try JSONSerialization.jsonObject(with: data) as? [String: Any]
         } catch {

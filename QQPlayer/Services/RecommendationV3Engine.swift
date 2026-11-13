@@ -32,6 +32,84 @@ struct MusicBrainzSimilarArtistSource: SimilarArtistProviding {
     }
 }
 
+/// B 通道主源：网易云相似歌曲 → 聚合艺人。
+///
+/// 链路：种子艺人热歌最热 1 首 → `/api/discovery/simiSong` → 相似歌曲里的艺人。
+/// Last.fm 只作可选增强（设置开关默认关，大陆不可直连）；MusicBrainz 是最后兜底。
+/// 实测（2026-11-13）：`吻别` → 一路上有你 / 爱如潮水 / 忘情水 / 一剪梅 / 过火。
+struct NeteaseSimilarArtistSource: SimilarArtistProviding {
+    var netease: NeteaseOnlineClient
+    var lastFM: LastFMClient?
+    var fallback: (any SimilarArtistProviding)?
+
+    /// 单次最多聚合的相似歌曲条数（simiSong 默认 50 条足够覆盖）。
+    static let similarSongLimit = 50
+
+    func similarArtists(to artist: String, limit: Int) async -> [LastFMArtist] {
+        let names = await neteaseSimilarArtists(to: artist, limit: limit)
+        if !names.isEmpty { return names }
+        if let lastFM {
+            let related = await lastFM.similarArtists(artist: artist, limit: limit)
+            if !related.isEmpty { return related }
+        }
+        if let fallback {
+            return await fallback.similarArtists(to: artist, limit: limit)
+        }
+        return []
+    }
+
+    /// 相似歌曲里按出现次数聚合成「相似艺人」（去掉种子本人）。
+    private func neteaseSimilarArtists(to artist: String, limit: Int) async -> [LastFMArtist] {
+        guard limit > 0 else { return [] }
+        guard let topSongs = try? await netease.artistTopSongs(artistName: artist, limit: 5),
+              let hottest = topSongs.first
+        else { return [] }
+        guard let songs = try? await netease.similarSongsPublic(songID: hottest.id, limit: Self.similarSongLimit),
+              !songs.isEmpty
+        else { return [] }
+
+        return Self.aggregateArtists(from: songs, excluding: artist, limit: limit)
+    }
+
+    /// 纯聚合（可单测）：按出现次数排序，同次数按首次出现顺序；去掉种子本人。
+    static func aggregateArtists(
+        from songs: [NeteaseOnlineSong],
+        excluding seedArtist: String,
+        limit: Int
+    ) -> [LastFMArtist] {
+        guard limit > 0 else { return [] }
+        let seedKey = RecommendationLibraryMatcher.artistKey(seedArtist)
+        var counts: [String: Int] = [:]
+        var display: [String: String] = [:]
+        var order: [String] = []
+        for song in songs {
+            for name in splitArtists(song.artist) {
+                let key = RecommendationLibraryMatcher.artistKey(name)
+                guard !key.isEmpty, key != seedKey else { continue }
+                if counts[key] == nil {
+                    order.append(key)
+                    display[key] = name
+                }
+                counts[key, default: 0] += 1
+            }
+        }
+        let ranked = order.sorted { lhs, rhs in
+            let lc = counts[lhs, default: 0]
+            let rc = counts[rhs, default: 0]
+            if lc != rc { return lc > rc }
+            return (order.firstIndex(of: lhs) ?? 0) < (order.firstIndex(of: rhs) ?? 0)
+        }
+        return ranked.prefix(limit).compactMap { key in display[key].map { LastFMArtist(name: $0, match: nil) } }
+    }
+
+    /// 网易云多歌手字段是逗号 / 顿号连接（`&` 不切，保护 Simon & Garfunkel）。
+    static func splitArtists(_ raw: String) -> [String] {
+        raw.split(whereSeparator: { $0 == "," || $0 == "，" || $0 == "、" || $0 == "/" })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
 struct RecommendationV3Engine: Sendable {
     /// 在线搜索源（复用现有降级链；测试注入桩）。
     var providers: [any OnlineSearchProviding]
@@ -83,10 +161,18 @@ struct RecommendationV3Engine: Sendable {
     static func configured(_ settings: DeleteSettings = .load()) -> RecommendationV3Engine {
         let budget = RecommendationRunBudget(maxITunesCalls: settings.recommendationV3.itunesLookupLimit)
         let iTunes = ITunesRecommendationProvider(storefront: "us", budget: budget)
+        // Last.fm 在大陆不可直连：默认关闭，只有用户在设置里显式打开才建客户端。
+        let lastFM: LastFMClient? = settings.recommendationV3.lastFMEnabled
+            ? LastFMClient(timeout: RecommendationV3Settings.lastFMTimeout)
+            : nil
         var engine = RecommendationV3Engine(
-            lastFM: LastFMClient(),
+            lastFM: lastFM,
             netease: .shared,
-            similarArtistSource: MusicBrainzSimilarArtistSource(),
+            similarArtistSource: NeteaseSimilarArtistSource(
+                netease: .shared,
+                lastFM: lastFM,
+                fallback: MusicBrainzSimilarArtistSource()
+            ),
             metadataNormalizer: RecommendationMetadataNormalizer(
                 provider: iTunes,
                 maxLookups: settings.recommendationV3.itunesLookupLimit
@@ -176,6 +262,8 @@ struct RecommendationV3Engine: Sendable {
             source: candidate.song.source ?? .netease
         )
         result.score = candidate.score
+        result.previewURL = candidate.song.previewURL
+        result.artworkURL = candidate.song.artworkURL
         result.genre = candidate.context.genre
         result.channel = candidate.context.channel
         result.seedArtist = candidate.context.seedArtist
@@ -303,16 +391,13 @@ struct RecommendationV3Engine: Sendable {
     /// 艺人热歌：中文歌手优先网易云（实测 Last.fm 中文曲名映射脏），西文歌手优先 Last.fm。
     /// 两者都失败再降级通用搜索。
     private func artistTopSongs(artist: String) async -> [RecommendationRemoteSong] {
-        if isCJKArtist(artist) {
-            if let songs = await neteaseTopSongs(artist: artist) { return songs }
-            if let songs = await lastFMTopSongs(artist: artist) { return songs }
-        } else {
-            if let songs = await lastFMTopSongs(artist: artist) { return songs }
-            // 西文：iTunes Search（链内 tw/us 优先）在通用搜索里，先于网易云。
-            let generic = await search(query: artist, limit: perSourceLimit)
-            if !generic.isEmpty { return generic }
-            if let songs = await neteaseTopSongs(artist: artist) { return songs }
-        }
+        // A 通道：网易云艺人热歌是唯一主源（大陆可直连、中文曲名干净）。
+        if let songs = await neteaseTopSongs(artist: artist) { return songs }
+        // Last.fm 仅作可选增强：开关默认关，打开且艺人非 CJK 时才补一手。
+        if !isCJKArtist(artist), let songs = await lastFMTopSongs(artist: artist) { return songs }
+        // 兜底：既有在线降级链（iTunes tw/us → MusicBrainz → 网易云搜索）。
+        let generic = await search(query: artist, limit: perSourceLimit)
+        return generic
         return await search(query: artist, limit: perSourceLimit)
     }
 
@@ -347,6 +432,7 @@ struct RecommendationV3Engine: Sendable {
                 album: song.album,
                 songID: song.id,
                 durationMs: song.durationMs,
+                artworkURL: song.coverURL,
                 source: .netease,
                 popularity: song.popularity
             )
@@ -366,12 +452,14 @@ struct RecommendationV3Engine: Sendable {
 
     /// 相似艺人：Last.fm → MusicBrainz。
     private func similarArtists(to artist: String, limit: Int) async -> [LastFMArtist] {
+        // B 通道主源：网易云相似歌曲聚合艺人（大陆可直连）。
+        if let similarArtistSource {
+            let related = await similarArtistSource.similarArtists(to: artist, limit: limit)
+            if !related.isEmpty { return related }
+        }
         if let lastFM {
             let related = await lastFM.similarArtists(artist: artist, limit: limit)
             if !related.isEmpty { return related }
-        }
-        if let similarArtistSource {
-            return await similarArtistSource.similarArtists(to: artist, limit: limit)
         }
         return []
     }

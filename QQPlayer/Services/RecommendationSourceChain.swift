@@ -275,6 +275,8 @@ struct ITunesRecommendationProvider: OnlineSearchProviding, ArtistSearchProvidin
             duration = nil
         }
         let preview = (dict["previewUrl"] as? String).flatMap { URL(string: $0) }
+        let artwork = ((dict["artworkUrl100"] as? String) ?? (dict["artworkUrl60"] as? String))
+            .flatMap { URL(string: $0) }
         let trackID: Int?
         if let number = dict["trackId"] as? NSNumber {
             trackID = number.intValue
@@ -289,6 +291,7 @@ struct ITunesRecommendationProvider: OnlineSearchProviding, ArtistSearchProvidin
             songID: trackID,
             durationMs: duration,
             previewURL: preview,
+            artworkURL: artwork,
             source: .itunes
         )
     }

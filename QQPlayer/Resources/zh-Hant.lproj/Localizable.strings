@@ -1547,3 +1547,4 @@
 "source_lastfm" = "Last.fm";
 "recommendation_itunes_lookup_title" = "iTunes 中繼資料補齊";
 "recommendation_itunes_lookup_footer" = "對高分候選做一次 iTunes 查詢，補齊標準曲名 / 專輯 / 年份 / 長度；0 = 關閉。同曲結果快取 7 天，依 iTunes 限速約 20 次/分鐘排隊，失敗自動跳過。";
+"recommendation_lastfm_enable" = "啟用 Last.fm 增強（需要能連線 last.fm）";
