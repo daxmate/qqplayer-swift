@@ -5,6 +5,9 @@
 ## User settings
 xcuserdata/
 
+## Xcode Cloud 本地生成（含机器相关 manifest，不入库也不入索引）
+QQPlayer.xcodeproj/xcshareddata/xcodecloud/
+
 ## compatibility with Xcode 8 and earlier (ignoring not required starting Xcode 9)
 *.xcscmblueprint
 *.xccheckout
