@@ -47,6 +47,18 @@ struct MacManualPlaylistDetailView: View {
             content
         }
         .onAppear { loadTracks() }
+        // 侧栏切换自建歌单时，宿主在同一位置复用同类型 View → View identity 不变，
+        // onAppear 不会再次触发，@State 里的曲目与标题会停在上一份歌单。
+        // 因此在 playlist.id 变化时显式重置状态并重新读库。
+        .onChange(of: playlist.id) { _, _ in
+            currentTitle = playlist.title
+            tracks = []
+            isLoading = true
+            showRenameAlert = false
+            showDeleteConfirm = false
+            renameText = ""
+            loadTracks()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .playlistsChanged)) { _ in
             loadTracks()
         }
@@ -72,12 +84,6 @@ struct MacManualPlaylistDetailView: View {
 
     private var header: some View {
         HStack(spacing: DesignTokens.space12) {
-            Button(action: onExit) {
-                Label(Localized.back, systemImage: "chevron.left")
-            }
-            .buttonStyle(.borderless)
-            .help(Localized.back)
-
             MacArtworkThumbnail(
                 track: MacArtworkResolver.representativeTrack(forPlaylist: playlist),
                 size: 48,
@@ -161,6 +167,8 @@ struct MacManualPlaylistDetailView: View {
     }
 
     private func loadTracks() {
+        // 切歌单期间旧曲目不得留在屏幕上；DB 读是同步的，读完即置回 false
+        isLoading = true
         do {
             let items = try LibraryReads.playlistItems(playlistId: playlist.id ?? 0)
             let stableIds = items.map { $0.trackStableId }
