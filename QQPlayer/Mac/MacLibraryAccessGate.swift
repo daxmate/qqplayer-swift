@@ -54,7 +54,7 @@ struct MacLibraryAccessGate<Content: View>: View {
         VStack(spacing: DesignTokens.space16) {
             Spacer(minLength: DesignTokens.space24)
 
-            Image(systemName: "folder.badge.key")
+            Image(systemName: "folder.badge.gearshape")
                 .font(.system(size: DesignTokens.font44, weight: .regular))
                 .foregroundColor(appAccentColor)
 
