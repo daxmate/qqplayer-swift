@@ -633,6 +633,43 @@ struct UIAccentContractTests {
         #expect(result.hits.count == UIAccentContract.retiredColorFieldRule.whitelist.count,
                 "旧字段白名单条目没全部命中（代码改了 → 条目要同步改）：\(result.hits)")
     }
+
+    // MARK: 强调色实时生效（2026-11-13）
+
+    /// 回归守卫：强调色注入点必须走 `AccentInjector`（在**被观察的 View body** 内求值）。
+    ///
+    /// 被守住的 bug：旧写法在 App/Scene body 与浮窗装配里直接求值
+    /// `MacAppearance.currentAccentColor`（静态计算属性，读 `DeleteSettings`，本身不可观察）。
+    /// 那些 body 没有可观察依赖 ⇒ 换色后不重新求值 ⇒ 环境值/ tint 仍是启动时那份，
+    /// 只有自带 `.onReceive(.qqplayerSettingsDidChange)` 的视图变色（用户看到的
+    /// 「只有部分 UI 变色」）。这是**语义**错误，编译器、`Color.accentColor` 规则、
+    /// 截图都抓不到，只能守源码形状。
+    ///
+    /// 注：`AccentStore` 的 refresh 行为测试需要 macOS 单测 target，本仓库当前没有
+    /// （见 QQPlayerTests/README-macos-test-target.md，QQPlayerTests 只编 iOS）；
+    /// 故这里只做可在 CI 真跑的源码形状守卫。
+    @Test("强调色注入点走 AccentInjector（App 根 / Settings / 浮窗，不得直读静态值）")
+    func accentInjectionGoesThroughInjector() {
+        let injectionFiles = [
+            "QQPlayer/QQPlayerMacApp.swift",
+            "QQPlayer/Mac/MacDesktopWindowsManager.swift",
+            "QQPlayer/Mac/MacVisualizerView.swift",
+        ].map { Self.repoRoot.appendingPathComponent($0) }
+
+        let staleReads = Self.linesContaining(#"MacAppearance.currentAccentColor"#, in: injectionFiles)
+        #expect(staleReads.isEmpty,
+                "注入点又直接读静态强调色（不可观察，换色后不重新求值；改走 AccentInjector / 环境值）：\n\(staleReads.joined(separator: "\n"))")
+
+        // WindowGroup 与 Settings 是两个独立场景根，各自都要有自己的注入器。
+        let sceneRoot = Self.repoRoot.appendingPathComponent("QQPlayer/QQPlayerMacApp.swift")
+        let injectors = Self.linesContaining(#"AccentInjector\s*\{"#, in: [sceneRoot])
+        #expect(injectors.count == 2, "WindowGroup / Settings 两个场景根都要走 AccentInjector，实际：\(injectors)")
+
+        // 浮窗手工 hosting 不继承场景环境，同样要显式注入。
+        let panelRoot = Self.repoRoot.appendingPathComponent("QQPlayer/Mac/MacDesktopWindowsManager.swift")
+        #expect(!Self.linesContaining(#"AccentInjector\s*\{"#, in: [panelRoot]).isEmpty,
+                "桌面浮窗（迷你窗）装配丢了 AccentInjector：强调色不会跟随设置")
+    }
 }
 
 // MARK: - 几何 / 排版令牌测试（B2a 2026-09-15）
