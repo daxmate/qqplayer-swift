@@ -411,9 +411,9 @@ PlayerWidget/                 # iOS 主屏幕小组件
 Share/                        # iOS 分享扩展
 SiriIntentsExtension/         # iOS Siri 意图扩展
 QQPlayerTests/                # Swift Testing 单测（含 Fixtures/Mock 辅助文件；用例数口径见「测试与 CI」）
-QQPlayerSiriTests/            # Siri 集成测试（需 Xcode 27 SDK，CI 已豁免）
+QQPlayerSiriTests/            # Siri 集成测试（UI test bundle，需 Xcode 27 SDK，已接入 CI）
 scripts/                      # 工程工具（build-app.sh 统一入口 → xcbuild.sh / add-test-file.py / gen-zh-hant.py /
-                              #   pbxproj-membership.py / run-local-sync-tests.sh / siri-tests-guard.py / sync-harness / git-hooks）
+                              #   pbxproj-membership.py / run-local-sync-tests.sh / sync-harness / git-hooks）
 .env.template                 # 可选 API Key 模板（复制为 .env）
 .github/workflows/ci.yml      # CI：lint/format + iOS 单测 + macOS 构建与资源断言（含编译警告零容忍）
 LICENSE / NOTICE.md / PRIVACY.md

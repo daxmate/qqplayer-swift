@@ -21,24 +21,16 @@ concurrency:
 jobs:
   swift:
     name: Swift (swiftlint + swiftformat + xcodebuild test)
-    # 单元测试（Swift Testing，QQPlayerTests target）+ lint/format 检查。
+    # 单元测试（Swift Testing，QQPlayerTests target）+ Siri/AppIntents 集成测试
+    # （QQPlayerSiriTests，UI test bundle）+ lint/format 检查。
     # 配置在仓库根 .swiftlint.yml / .swiftformat，swiftlint/swiftformat 自动发现。
     #
-    # ⚠️ QQPlayerSiriTests 不参与本 job，且**在本地也无法编译**（可核查证据）：
-    #   该 target 的 4 个文件都 `import AppIntentsTesting`
-    #     （BaseTestCase.swift:12 / EntityQueryTests.swift:9 /
-    #       IntentExecutionTests.swift:9 / SpotlightTests.swift:10），
-    #   而 Xcode 26.6 的 iPhoneSimulator26.5.sdk **不提供 AppIntentsTesting 框架**：
+    # QQPlayerSiriTests 自 2026-11-13 起正式接回 CI（此前因工具链缺 AppIntentsTesting
+    # 无法编译，只有一套结构级豁免守护；豁免设施已随本次接回一并删除）：
+    #   Xcode 27 的 iPhoneSimulator 平台已提供该框架，可核查：
     #     $ ls /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/
-    #       → XCTest.framework  XCUIAutomation.framework  Testing.framework（无 AppIntentsTesting）
-    #     $ find /Applications/Xcode.app -iname "*AppIntentsTesting*"
-    #       → 无输出
-    #   因此它既不在任何 scheme 的 Testables 里（QQPlayer.xcscheme 唯一 Testable = QQPlayerTests），
-    #   也无法被 xcodebuild 编译——不是「本 job 偷懒」，而是当前工具链硬限制。
-    #   为不让这条线静默烂掉，下一个 step 跑 scripts/siri-tests-guard.py：
-    #   结构级守护（文件齐备 + 测试字符串索引的 intent/entity/enum 名仍可解析）
-    #   + 金丝雀（工具链出现 AppIntentsTesting 即失败，提醒接回 scheme/CI）。
-    #   测试文件本身**不允许删除或静默降级**。
+    #       → AppIntentsTesting.framework  XCTest.framework  XCUIAutomation.framework  Testing.framework
+    #   该 target 已在 QQPlayer.xcscheme 的 Testables 里，由下面 Test step 一并编译运行。
     timeout-minutes: 90
     runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
     steps:
@@ -110,9 +102,6 @@ jobs:
           "$BIN/swiftlint" version
           "$BIN/swiftformat" --version
 
-      - name: Guard Siri/AppIntents test line (structural)
-        run: python3 scripts/siri-tests-guard.py
-
       # 真机探测判据自测（纯 stdlib、不需真机）：防止有人把判据改回「只认 tunnelState=connected」
       # 而重新引入「可达设备误报未连接」——那是 2026-09-20 只能绕开探测手工安装的事故根因。
       - name: Device detection self-test
@@ -171,6 +160,7 @@ jobs:
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -derivedDataPath build/DerivedData \
             -only-testing:QQPlayerTests \
+            -only-testing:QQPlayerSiriTests \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-ios.log
 
       # 编译警告零容忍（2026-09-08 用户立规矩）：源码警告（路径含 /QQPlayer/ 或 /QQPlayerTests/）
@@ -190,7 +180,7 @@ jobs:
           fi
           WARN="$(grep -E 'warning:' /tmp/xcodebuild-ios.log \
             | grep -v 'Metadata extraction skipped' \
-            | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
+            | grep -E '/(QQPlayer|QQPlayerTests|QQPlayerSiriTests)/|\(in target' \
             | sort -u || true)"
           if [ -n "$WARN" ]; then
             echo "❌ 检测到编译警告（零容忍纪律，须当场清零）："
