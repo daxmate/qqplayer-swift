@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-13T08:50:37Z",
+  "updated_at": "2026-11-13T09:33:04Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "CHANGELOG.md": {
       "role": "index",
-      "sha256": "98692cd45fe3b7a8a0d3ed02e355d9aeaa752ca5c6212bd750ec0c5ba8d6e0ae",
-      "size": 5842,
-      "normalized_sha256": "98692cd45fe3b7a8a0d3ed02e355d9aeaa752ca5c6212bd750ec0c5ba8d6e0ae"
+      "sha256": "953f6ffc2a9aff919d178107e6db52bd442ef4fff447820f1957ec2128a38624",
+      "size": 5995,
+      "normalized_sha256": "953f6ffc2a9aff919d178107e6db52bd442ef4fff447820f1957ec2128a38624"
     },
     "LICENSE": {
       "role": "index",
@@ -656,9 +656,9 @@
     },
     "QQPlayer/Mac/MacLibraryAccessGate.swift": {
       "role": "index",
-      "sha256": "88dd7c1b3fe8fdb26fb8532af88ee2e6c3fde0d276e4c47d85fcae264d96237b",
-      "size": 8078,
-      "normalized_sha256": "88dd7c1b3fe8fdb26fb8532af88ee2e6c3fde0d276e4c47d85fcae264d96237b"
+      "sha256": "a0f14519769fd1a3fb62e503cda5c5ae5ef2d70fc0781b7ee6e80c6ee221fd65",
+      "size": 8619,
+      "normalized_sha256": "a0f14519769fd1a3fb62e503cda5c5ae5ef2d70fc0781b7ee6e80c6ee221fd65"
     },
     "QQPlayer/Mac/MacLibraryRoot.swift": {
       "role": "index",
@@ -704,9 +704,9 @@
     },
     "QQPlayer/Mac/MacLibraryView.swift": {
       "role": "index",
-      "sha256": "baf0ee4a07a3632e146fe044fe81185a18643c2b4ea9e7005960a0f56a5addbd",
-      "size": 19163,
-      "normalized_sha256": "baf0ee4a07a3632e146fe044fe81185a18643c2b4ea9e7005960a0f56a5addbd"
+      "sha256": "3c1c7340c4a231634319d0908385a22989fa112959fb4f6bb6c97c33cb2a0be9",
+      "size": 19423,
+      "normalized_sha256": "3c1c7340c4a231634319d0908385a22989fa112959fb4f6bb6c97c33cb2a0be9"
     },
     "QQPlayer/Mac/MacLyricsResendAutoRunner.swift": {
       "role": "index",
@@ -1202,9 +1202,9 @@
     },
     "QQPlayer/QQPlayerMacApp.swift": {
       "role": "index",
-      "sha256": "654584a009eeb0520183dd776a7c241e829132c8c7352098cde145892f4d50ab",
-      "size": 10704,
-      "normalized_sha256": "654584a009eeb0520183dd776a7c241e829132c8c7352098cde145892f4d50ab"
+      "sha256": "7c79235991b6d82e6ec57d064a0bed354e6dc98afdcfe53b6b5101533d7c4d0d",
+      "size": 15701,
+      "normalized_sha256": "7c79235991b6d82e6ec57d064a0bed354e6dc98afdcfe53b6b5101533d7c4d0d"
     },
     "QQPlayer/Resources/SimplifiedToTraditional.tsv": {
       "role": "index",
@@ -5126,9 +5126,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "67f4d6796a0d8bf32022f171777577f0d198e2353db82edf58b3d7aa4cbede0b",
-      "size": 391731,
-      "normalized_sha256": "67f4d6796a0d8bf32022f171777577f0d198e2353db82edf58b3d7aa4cbede0b"
+      "sha256": "e1e701ec0e446d7aa77daf9763b2f5bf03a9e02f5ff7f5c52162cfc25e4e1176",
+      "size": 392136,
+      "normalized_sha256": "e1e701ec0e446d7aa77daf9763b2f5bf03a9e02f5ff7f5c52162cfc25e4e1176"
     },
     "aoci.meta.txt": {
       "role": "index",
