@@ -21,12 +21,15 @@ import Foundation
 /// 文件级并发的两个杠杆（可注入；生产默认值见 `SyncFileTransfer`）。
 struct SyncTransferConcurrencyPolicy: Equatable, Sendable {
     /// 同时推进的文件数上限（本端意愿；实际取 `min(本值, 对端声明, 待传队列)`）。
+    ///
+    /// 默认值 = `SyncFileTransfer.senderMaxConcurrentFiles`（2026-11-13 起为 1）：
+    /// 所有文件共用一条 TCP 连接、一个接收窗口，并发只会排队，实测反而更慢。
     var maxConcurrentFiles: Int
     /// 全局在途字节上限（跨文件共享）。
     var inFlightByteLimit: Int
 
     init(
-        maxConcurrentFiles: Int = SyncFileTransfer.maxConcurrentFiles,
+        maxConcurrentFiles: Int = SyncFileTransfer.senderMaxConcurrentFiles,
         inFlightByteLimit: Int = SyncFileTransfer.inFlightByteLimit
     ) {
         self.maxConcurrentFiles = max(1, maxConcurrentFiles)
