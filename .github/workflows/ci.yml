@@ -389,6 +389,18 @@ jobs:
           rt_info = next((v for v in runtimes.values() if v.get("runtimeIdentifier") == runtime_id), None) or {}
           label = "iOS %s (%s)" % (rt_info.get("version", "?"), rt_info.get("build", "?"))
 
+          # 2026-11-13 实测（Xcode 27.2 + iOS 27.2 运行时）：QQPlayerSiriTests 真跑全绿（13 用例 / 9 skip / 0 失败）。
+          # 「扫 dyld 缓存找 PropertyContainerElementV15valueExpression」判据不可靠（该符号不在缓存字符串表里，27.2 下却完全可跑），
+          # 改为按运行时版本放行：Xcode 有 AppIntentsTesting + 运行时 >= 27.2 即可用；真跑失败由测试本身报红。
+          try:
+              _rt_ver = tuple(int(x) for x in str(rt_info.get("version", "0")).split(".")[:2])
+          except Exception:
+              _rt_ver = (0, 0)
+          if _rt_ver >= (27, 2):
+              emit(compatible="true", device=device, runtime=label)
+              print("✅ 运行时兼容（%s ≥ iOS 27.2），继续执行 QQPlayerSiriTests" % label)
+              sys.exit(0)
+
           roots = []
           bundle = rt_info.get("runtimeBundlePath") or ""
           if bundle:
@@ -458,7 +470,7 @@ jobs:
             -scheme QQPlayerSiri \
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -derivedDataPath build/DerivedDataSiri \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-siri.log
+            2>&1 | tee /tmp/xcodebuild-siri.log   # 不能加 CODE_SIGNING_ALLOWED=NO：跳过重签名会让 AppIntentsTesting 报 803（Customer build）
 
       # 编译警告零容忍：口径与 Swift job 一致，target 名单换成 QQPlayer / QQPlayerSiriTests。
       # if: always()（构建失败时也把警告一并报出来，不被单一红灯掩盖）。
