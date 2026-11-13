@@ -108,8 +108,6 @@
 		B01A8A177CE44A4484B46943 /* CloudFileAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D697F84D4C3D44EB8CE908CC /* CloudFileAvailabilityTests.swift */; };
 		B1A000000000000000000002 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 2312D6192E6090E4007F756D /* GRDB */; };
 		B1A000000000000000000003 /* SFBAudioEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 230D66362E894889007C642A /* SFBAudioEngine */; };
-		B1A0000000000000000000C4 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = B1A0000000000000000000C2 /* MLXLLM */; };
-		B1A0000000000000000000C5 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = B1A0000000000000000000C3 /* MLXLMCommon */; };
 		B1A000000000000000000016 /* en in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000010 /* en */; };
 		B1A000000000000000000017 /* zh-Hans in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000011 /* zh-Hans */; };
 		B1A000000000000000000018 /* zh-Hant in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000012 /* zh-Hant */; };
@@ -236,6 +234,7 @@
 		8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */; };
 		C9C4C30339284EFC98FAD8DF /* PlayerVolumeModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */; };
 		CB596AD1E93946CF91E54E2A /* SearchQueryTrimTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67343AE317744B6EAC69B3BB /* SearchQueryTrimTests.swift */; };
+		988AF099472643ACB3A6EBD3 /* RecommendationV3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7A503B4D304BF4B20ECA5E /* RecommendationV3Tests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -519,6 +518,7 @@
 		35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationChartPopularityTests.swift; sourceTree = "<group>"; };
 		38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerVolumeModelTests.swift; sourceTree = "<group>"; };
 		67343AE317744B6EAC69B3BB /* SearchQueryTrimTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchQueryTrimTests.swift; sourceTree = "<group>"; };
+		BD7A503B4D304BF4B20ECA5E /* RecommendationV3Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationV3Tests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -617,11 +617,10 @@
 				QQPlayerMacApp.swift,
 				Mac/MacRecommendationSettingsView.swift,
 				Mac/RecommendationPlannerFactory.swift,
-				Mac/MLXRecommendationPlanner.swift,
-				Mac/MLXRecommendationReasonProvider.swift,
 				"Mac/MacRecommendationModel+Reasons.swift",
 				Mac/AccentInjector.swift,
 				Models/AccentStore.swift,
+				"Mac/MacRecommendationModel+Downloaded.swift",
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
 		};
@@ -1053,17 +1052,25 @@
 				Views/Utility/HintCardView.swift,
 				Views/Utility/WhatsNewView.swift,
 				Services/RecommendationPlanning.swift,
-				Services/RecommendationModelManager.swift,
 				Services/RecommendationRequest.swift,
 				Mac/MacRecommendationSettingsView.swift,
 				Mac/RecommendationPlannerFactory.swift,
-				Mac/MLXRecommendationPlanner.swift,
-				Mac/MLXRecommendationReasonProvider.swift,
 				"Mac/MacRecommendationModel+Reasons.swift",
 				Services/RecommendationBatchDiversity.swift,
 				Services/RecommendationReasonParser.swift,
 				Services/RecommendationReasonPrompt.swift,
 				Services/RecommendationReasons.swift,
+				Models/RecommendationV3Settings.swift,
+				Services/RecommendationV3Types.swift,
+				Services/RecommendationLibraryMatcher.swift,
+				Services/RecommendationProfileV3.swift,
+				Services/RecommendationRankerV3.swift,
+				Services/RecommendationReasonV3.swift,
+				Services/RecommendationV3Engine.swift,
+				Services/RecommendationV3DataSource.swift,
+				Services/LastFMClient.swift,
+				"Services/RecommendationRequest+Rule.swift",
+				"Mac/MacRecommendationModel+Downloaded.swift",
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};
@@ -1160,8 +1167,6 @@
 			files = (
 				B1A000000000000000000002 /* GRDB in Frameworks */,
 				B1A000000000000000000003 /* SFBAudioEngine in Frameworks */,
-				B1A0000000000000000000C4 /* MLXLLM in Frameworks */,
-				B1A0000000000000000000C5 /* MLXLMCommon in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1442,6 +1447,7 @@
 				35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */,
 				38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */,
 				67343AE317744B6EAC69B3BB /* SearchQueryTrimTests.swift */,
+				BD7A503B4D304BF4B20ECA5E /* RecommendationV3Tests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1606,8 +1612,6 @@
 			packageProductDependencies = (
 				2312D6192E6090E4007F756D /* GRDB */,
 				230D66362E894889007C642A /* SFBAudioEngine */,
-				B1A0000000000000000000C2 /* MLXLLM */,
-				B1A0000000000000000000C3 /* MLXLMCommon */,
 			);
 			productName = QQPlayerMac;
 			productReference = B1A000000000000000000001 /* QQPlayer.app */;
@@ -1660,7 +1664,6 @@
 			packageReferences = (
 				2312D6182E6090E4007F756D /* XCRemoteSwiftPackageReference "GRDB" */,
 				230D66352E894889007C642A /* XCRemoteSwiftPackageReference "SFBAudioEngine" */,
-				B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2312D60D2E6090E2007F756D /* Products */;
@@ -1977,6 +1980,7 @@
 				8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */,
 				C9C4C30339284EFC98FAD8DF /* PlayerVolumeModelTests.swift in Sources */,
 				CB596AD1E93946CF91E54E2A /* SearchQueryTrimTests.swift in Sources */,
+				988AF099472643ACB3A6EBD3 /* RecommendationV3Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2625,14 +2629,6 @@
 				minimumVersion = 6.29.2;
 			};
 		};
-		B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples.git";
-			requirement = {
-				kind = exactVersion;
-				version = 2.29.1;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2650,16 +2646,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2312D6182E6090E4007F756D /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
-		};
-		B1A0000000000000000000C2 /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLLM;
-		};
-		B1A0000000000000000000C3 /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B1A0000000000000000000C1 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLMCommon;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

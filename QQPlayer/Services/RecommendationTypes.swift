@@ -20,6 +20,7 @@ enum RecommendationSource: String, CaseIterable, Codable, Sendable {
     case musicbrainz
     case netease
     case gequhai
+    case lastfm
 
     /// 源可靠度（打分权重 `sourceReliability` 的输入）：
     /// iTunes 官方 Search API 元数据最全；MusicBrainz 是社区库；网易云 eapi 稳定；歌曲海是 HTML 解析。
@@ -29,6 +30,7 @@ enum RecommendationSource: String, CaseIterable, Codable, Sendable {
         case .musicbrainz: return 0.8
         case .netease: return 1.0
         case .gequhai: return 0.6
+        case .lastfm: return 0.9
         }
     }
 
@@ -39,6 +41,7 @@ enum RecommendationSource: String, CaseIterable, Codable, Sendable {
         case .musicbrainz: return "source_musicbrainz"
         case .netease: return "source_netease"
         case .gequhai: return "source_gequhai"
+        case .lastfm: return "source_lastfm"
         }
     }
 }
@@ -265,6 +268,12 @@ struct RecommendedCandidate: Identifiable, Codable, Equatable, Sendable {
     var genre: String?
     /// 相似补位来源（nil = 本人匹配行；非 nil = 该点名艺人的相关艺人）。
     var relatedTo: String?
+    /// v3 召回通道（nil = 旧引擎 / 缓存老数据）。
+    var channel: RecommendationChannel?
+    /// v3 召回用的种子艺人（B 通道 = 被相似的种子）。
+    var seedArtist: String?
+    /// v3 语种标签（nil = 未判定）。
+    var language: RecommendationLanguage?
 
     var id: String {
         "\(RecommendationKey.normalize(title: title, artist: artist))#\(source.rawValue)"

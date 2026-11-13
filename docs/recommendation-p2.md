@@ -1,6 +1,7 @@
-# 本地 AI 推荐 P2：Mac 内嵌 MLX 模型
+# 本地 AI 推荐 P2：Mac 内嵌 MLX 模型（已退役，存档）
 
-> 状态：**MLX SPM 依赖已接入**（mlx-swift-examples exact 2.29.1，仅 QQPlayerMac）；Mac Debug / Release 构建成功、iOS 不受影响，见 §9。
+> 状态：**2026-11-13 推荐 v3 起已整体移除**（MLX SPM 依赖、模型下载/校验/删除、模型设置全部删除；planner 恒为规则实现）。本文仅作历史存档，不再代表当前实现；当前实现见 `RecommendationV3Engine` 与 `RecommendationProfileV3`。
+
 > 未接入期间：Mac / iOS 均按规则 planner 运行，功能不退化；模型管理 UI 已可用（下载 / 校验 / 删除）。
 
 ## 1. 架构

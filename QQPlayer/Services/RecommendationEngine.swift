@@ -538,6 +538,12 @@ enum RecommendationDataSource {
                     let artists = try Artist.fetchAll(db)
                     let albums = try Album.fetchAll(db)
                     let plays = try PlayHistoryEntry.fetchAll(db)
+                    let favorites = try Favorite.fetchAll(db)
+                    let playlistItems = try PlaylistItem.fetchAll(db)
+                    let favoriteIds = Set(favorites.map(\.trackStableId))
+                    let playlistIds = Set(playlistItems.map(\.trackStableId))
+                    var playCounts: [String: Int] = [:]
+                    for play in plays { playCounts[play.trackStableId, default: 0] += 1 }
 
                     let artistNames = Dictionary(
                         artists.compactMap { artist in artist.id.map { ($0, artist.name) } },
@@ -557,7 +563,11 @@ enum RecommendationDataSource {
                             album: album?.title,
                             year: album?.year,
                             durationMs: track.durationMs,
-                            genre: track.genre
+                            genre: track.genre,
+                            addedAt: track.modificationDate.map { Date(timeIntervalSince1970: Double($0) / 1_000_000) },
+                            isFavorite: favoriteIds.contains(track.stableId),
+                            isInPlaylist: playlistIds.contains(track.stableId),
+                            playCount: playCounts[track.stableId] ?? 0
                         )
                     }
 

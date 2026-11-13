@@ -96,7 +96,7 @@ enum MacSettingsCatalog {
             case .scraping: return ["刮削", "补全", "标签", "scraping", "scrape", "tag"]
             case .shortcuts: return ["快捷键", "热键", "键位", "shortcut", "hotkey"]
             case .sync: return ["同步", "局域网同步", "配对", "sync", "pair"]
-            case .recommendations: return ["推荐", "本地模型", "AI", "recommendation", "model", "mlx"]
+            case .recommendations: return ["推荐", "口味", "AI", "recommendation", "profile"]
             case .appearance: return ["界面", "外观", "主题", "配色", "appearance", "theme"]
             case .about: return ["关于", "版本", "about", "version"]
             }
@@ -271,25 +271,60 @@ enum MacSettingsCatalog {
         aliases: ["强调色", "配色", "颜色", "accent", "color"]
     )
 
-    static let recommendationModel = Item(
-        id: "settings.recommendation.model",
+    static let recommendationWeightLibrary = Item(
+        id: "settings.recommendation.weight.library",
         category: .recommendations,
-        titleKey: "recommendation_model_title",
-        aliases: ["推荐模型", "本地模型", "模型", "model", "mlx", "qwen"]
+        titleKey: "recommendation_weight_library",
+        aliases: ["曲库权重", "画像权重", "library weight", "profile"]
     )
 
-    static let recommendationUseLocalModel = Item(
-        id: "settings.recommendation.useLocalModel",
+    static let recommendationWeightPlay = Item(
+        id: "settings.recommendation.weight.play",
         category: .recommendations,
-        titleKey: "recommendation_use_local_model",
-        aliases: ["本地模型", "AI 推荐", "local model", "ai"]
+        titleKey: "recommendation_weight_play",
+        aliases: ["播放权重", "常听", "play weight"]
     )
 
-    static let recommendationKeepLoaded = Item(
-        id: "settings.recommendation.keepLoaded",
+    static let recommendationWeightFavorite = Item(
+        id: "settings.recommendation.weight.favorite",
         category: .recommendations,
-        titleKey: "recommendation_model_keep_loaded",
-        aliases: ["常驻", "内存", "keep loaded", "memory"]
+        titleKey: "recommendation_weight_favorite",
+        aliases: ["收藏权重", "歌单", "favorite weight"]
+    )
+
+    static let recommendationWeightRecency = Item(
+        id: "settings.recommendation.weight.recency",
+        category: .recommendations,
+        titleKey: "recommendation_weight_recency",
+        aliases: ["新鲜度", "最近加入", "recency"]
+    )
+
+    static let recommendationQuotaSeed = Item(
+        id: "settings.recommendation.quota.seed",
+        category: .recommendations,
+        titleKey: "recommendation_quota_seed",
+        aliases: ["种子艺人", "配额", "quota", "seed"]
+    )
+
+    static let recommendationQuotaSimilar = Item(
+        id: "settings.recommendation.quota.similar",
+        category: .recommendations,
+        titleKey: "recommendation_quota_similar",
+        aliases: ["相似艺人", "配额", "similar", "quota"]
+    )
+
+    static let recommendationQuotaExplore = Item(
+        id: "settings.recommendation.quota.explore",
+        category: .recommendations,
+        titleKey: "recommendation_quota_explore",
+        aliases: ["风格探索", "探索", "explore", "quota"]
+    )
+
+    static let recommendationLastFMKey = Item(
+        id: "settings.recommendation.lastfm",
+        category: .recommendations,
+        titleKey: "recommendation_lastfm_title",
+        aliases: ["Last.fm", "lastfm", "API key", "密钥"]
     )
 
     static let recommendationChatRounds = Item(
@@ -357,9 +392,14 @@ enum MacSettingsCatalog {
         scrapingBatchEnabled,
         appearanceTheme,
         appearanceAccentColor,
-        recommendationModel,
-        recommendationUseLocalModel,
-        recommendationKeepLoaded,
+        recommendationWeightLibrary,
+        recommendationWeightPlay,
+        recommendationWeightFavorite,
+        recommendationWeightRecency,
+        recommendationQuotaSeed,
+        recommendationQuotaSimilar,
+        recommendationQuotaExplore,
+        recommendationLastFMKey,
         recommendationChatRounds,
         recommendationRelatedShare,
         recommendationArtistRelation,

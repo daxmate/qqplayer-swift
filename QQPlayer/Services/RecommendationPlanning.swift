@@ -10,7 +10,7 @@
 //  - `RuleRecommendationPlanner`：包装 P1 的 `RecommendationIntentBuilder`，行为保持不变。
 //  - `FallbackRecommendationPlanner`：模型失败 / 空结果时 100% 回退规则，不向 UI 抛错。
 //
-//  ⚠️ 本文件是纯逻辑层：iOS / macOS 共享，只依赖 Foundation，不引入 MLX / 平台 API。
+//  ⚠️ 本文件是纯逻辑层：iOS / macOS 共享，只依赖 Foundation，不引入平台 API。
 //
 
 import Foundation

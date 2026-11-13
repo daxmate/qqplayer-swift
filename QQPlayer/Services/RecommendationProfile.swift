@@ -33,6 +33,11 @@ struct RecommendationProfileInput: Sendable {
         var year: Int?
         var durationMs: Int?
         var genre: String?
+        /// 加入曲库时间（文件修改时间兜底；都没有 = nil）。
+        var addedAt: Date?
+        var isFavorite: Bool = false
+        var isInPlaylist: Bool = false
+        var playCount: Int = 0
     }
 
     var plays: [Play] = []

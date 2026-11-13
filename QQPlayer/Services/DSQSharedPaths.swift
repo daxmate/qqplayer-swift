@@ -200,7 +200,7 @@ struct DSQSharedResolver {
 
 /// 跨 App 共享的模型目录命名约定（QQPlayer 目前只有推荐模型）。
 enum DSQSharedModelCatalog {
-    /// 推荐模型（MLX）的 kind 目录名。
+    /// 模型 kind 目录名（仅旧目录迁移兼容；v3 起 App 不再下载模型）。
     static let recommendationKind = "Recommendation"
     /// 当前模型目录布局版本。
     static let currentVersion = "v1"

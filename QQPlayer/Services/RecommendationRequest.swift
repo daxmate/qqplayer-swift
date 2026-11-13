@@ -9,7 +9,7 @@
 //  - `RecommendationRequestHistory`：后台多轮上下文（只留最近 N 轮，界面不显示）。
 //  - `RecommendationChatAvailability`：指令输入是否可用（模型未就绪必须禁用，禁止规则回退）。
 //
-//  ⚠️ 本文件只依赖 Foundation，不引入 MLX / 平台 API；推理在 Mac 层。
+//  ⚠️ 本文件只依赖 Foundation，不引入平台 API。
 //
 
 import Foundation
@@ -76,7 +76,7 @@ protocol RecommendationRequestPlanning: Sendable {
 
 /// 指令解析 / 生成错误。UI 直接展示 `localizedDescription`。
 enum RecommendationRequestError: Error, Equatable, LocalizedError {
-    /// 本地模型文件不完整 / 不支持 MLX / 用户关闭了本地模型。
+    /// 模型未就绪（v3 起规则解析永远可用；该错误仅保留旧缓存 / 旧路径兼容）。
     case modelNotReady
     /// 模型输出不是可解析 JSON，或结构不符。
     case invalidOutput
@@ -290,29 +290,6 @@ enum RecommendationRequestHistoryStore {
             return false
         }
     }
-}
-
-// MARK: - 可用性
-
-/// 指令输入状态（纯函数；模型未就绪时**不得**回退规则解析）。
-enum RecommendationChatAvailability: Equatable, Sendable {
-    case available
-    /// 模型文件不完整 / 当前机器不支持 MLX。
-    case modelNotReady
-    /// 用户在设置里关掉了「推荐使用本地模型」。
-    case disabledBySettings
-
-    static func resolve(
-        mlxSupported: Bool,
-        useLocalModel: Bool,
-        modelReady: Bool
-    ) -> RecommendationChatAvailability {
-        guard mlxSupported else { return .modelNotReady }
-        guard useLocalModel else { return .disabledBySettings }
-        return modelReady ? .available : .modelNotReady
-    }
-
-    var canSubmit: Bool { self == .available }
 }
 
 // MARK: - 意图

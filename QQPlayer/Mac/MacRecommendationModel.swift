@@ -24,6 +24,10 @@ final class MacRecommendationModel {
 
     var phase: Phase = .idle
     var candidates: [RecommendedCandidate] = []
+    /// 曲库归一化键（已下载标记；生成时刷新，下载面板关闭后再刷一次）。
+    var downloadedKeys: Set<String> = []
+    /// 最近一次生成用的画像输入（后台重算复用，避免二次 DB 读）。
+    private var lastProfileInput: RecommendationProfileInput?
     private(set) var lastGeneratedAt: Date?
     /// 最近一次生成用的检索计划来源（规则 / 本地模型），页脚展示用。
     var planSource: RecommendationPlanSource = .rule
@@ -61,7 +65,7 @@ final class MacRecommendationModel {
 
     // MARK: P3 模型理由（首屏规则 → 异步替换）
 
-    /// 理由来源（nil = 按设置解析：本地模型就绪用 MLX，否则规则；单测可注入桩）。
+    /// 理由来源（nil = 按设置解析：v3 起恒为模板规则；单测可注入桩）。
     var reasonProvider: (any RecommendationReasonProviding)?
     /// 在跑的理由刷新任务（换批 / 新一批时取消）。
     var reasonTask: Task<Void, Never>?
@@ -100,8 +104,7 @@ final class MacRecommendationModel {
     /// 「换一批」/ 页脚「刷新」：手动动作，**强制绕过缓存并覆盖**。
     func refresh(
         count: Int,
-        rounds: Int = DeleteSettings.defaultRecommendationChatRounds,
-        useLocalModel: Bool = true
+        rounds: Int = DeleteSettings.defaultRecommendationChatRounds
     ) async {
         guard !isGenerating else { return }
         // 换一批：池里还有 ≥15 → 直接推进游标（不重算、不重新请求）。
@@ -114,18 +117,17 @@ final class MacRecommendationModel {
             isRefillingSession = false
         }
         if let text = activeRequestText {
-            await submit(text, count: count, rounds: rounds, useLocalModel: useLocalModel, bypassCache: true)
+            await submit(text, count: count, rounds: rounds, bypassCache: true)
         } else {
             await generate(count: count, bypassCache: true)
         }
     }
 
-    /// 指令输入：只走本地模型；模型未就绪直接失败，绝不回退规则解析。
+    /// 指令输入：v3 起走规则解析（`RuleRecommendationRequestPlanner`），无模型依赖。
     func submit(
         _ text: String,
         count: Int,
         rounds: Int,
-        useLocalModel: Bool,
         bypassCache: Bool = false
     ) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -143,122 +145,116 @@ final class MacRecommendationModel {
         }
         defer { isGenerating = false }
 
-        #if canImport(MLXLLM) && arch(arm64) && os(macOS)
-            guard RecommendationPlannerFactory.chatAvailability(useLocalModel: useLocalModel) == .available,
-                  let planner = RecommendationPlannerFactory.makeChatPlanner()
-            else {
-                phase = .failed(RecommendationRequestError.modelNotReady.localizedDescription)
-                return
-            }
+        guard let planner = RecommendationPlannerFactory.makeChatPlanner() else {
+            phase = .failed(RecommendationRequestError.emptyRequest.localizedDescription)
+            return
+        }
 
-            guard let input = await RecommendationDataSource.loadInput(now: clock(), blacklist: blacklist) else {
-                phase = .failed("recommendation_error_load_failed".localized)
-                return
-            }
-            if Task.isCancelled { return }
+        guard let input = await RecommendationDataSource.loadInput(now: clock(), blacklist: blacklist) else {
+            phase = .failed("recommendation_error_load_failed".localized)
+            return
+        }
+        if Task.isCancelled { return }
 
-            let profile = RecommendationProfileBuilder.build(input)
-            let key = cacheKey(
-                rawText: trimmed,
-                profile: profile,
-                libraryFingerprint: input.libraryFingerprint,
-                planSource: .localModel,
-                modelIdentity: RecommendationPlannerFactory.localModelIdentity() ?? "none"
-            )
-            lastCacheKey = key
-            switch flow.lookup(key, bypassCache: bypassCache) {
-            case let .exact(hit):
-                applyCacheHit(hit, requestText: trimmed)
-                return
-            case let .stale(hit):
-                // 列表优先：先用旧候选垫底，后台重算完成后平滑替换。
-                applyCacheHit(hit, requestText: trimmed)
-                startChatRefresh(
-                    token: token,
-                    key: key,
-                    context: ChatRefreshContext(
-                        planner: planner,
-                        profile: profile,
-                        count: count,
-                        text: trimmed,
-                        rounds: rounds
-                    )
-                )
-                return
-            case .miss:
-                phase = .loading
-            }
-
-            let history = RecommendationRequestHistoryStore.load(from: historyURL, limit: rounds)
-            let planned = await planner.makeRequest(text: trimmed, history: history.entries, profile: profile)
-            if Task.isCancelled { return }
-
-            let request: RecommendationUserRequest
-            switch planned {
-            case let .success(value):
-                request = value
-            case let .failure(error):
-                phase = .failed(error.localizedDescription)
-                return
-            }
-
-            let poolTarget = max(RecommendationBatchPolicy.poolTarget, count * 4)
-            let result = await poolEngine().recommend(
-                request: request,
-                profile: profile,
-                count: poolTarget,
-                planSource: .localModel,
-                excludedTrackKeys: excludedTrackKeys
-            )
-            if Task.isCancelled { return }
-
-            switch result {
-            case let .success(list):
-                let batch = applyPool(
-                    list,
+        let profile = RecommendationProfileBuilder.build(input)
+        let key = cacheKey(
+            rawText: trimmed,
+            profile: profile,
+            libraryFingerprint: input.libraryFingerprint,
+            planSource: .rule,
+            modelIdentity: "none"
+        )
+        lastCacheKey = key
+        switch flow.lookup(key, bypassCache: bypassCache) {
+        case let .exact(hit):
+            applyCacheHit(hit, requestText: trimmed)
+            return
+        case let .stale(hit):
+            // 列表优先：先用旧候选垫底，后台重算完成后平滑替换。
+            applyCacheHit(hit, requestText: trimmed)
+            startChatRefresh(
+                token: token,
+                key: key,
+                context: ChatRefreshContext(
+                    planner: planner,
+                    profile: profile,
                     count: count,
-                    namedArtist: RecommendationArtistMix.isNamedArtistRequest(request),
-                    relatedArtistShare: DeleteSettings.load().relatedArtistShare
+                    text: trimmed,
+                    rounds: rounds
                 )
-                if batch.isEmpty, isRefillingSession {
-                    phase = .loaded
-                    return
-                }
-                candidates = batch
-                startReasonRefresh(for: batch)
-                blacklist.markRecommended(batch, at: clock())
-                _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
-                activeRequestText = trimmed
-                requestedArtist = request.referenceArtists
-                    .map { RecommendationKey.displayPrimaryArtist($0) }
-                    .first { !$0.isEmpty }
-                lastGeneratedAt = clock()
-                planSource = .localModel
+            )
+            return
+        case .miss:
+            phase = .loading
+        }
+
+        let history = RecommendationRequestHistoryStore.load(from: historyURL, limit: rounds)
+        let planned = await planner.makeRequest(text: trimmed, history: history.entries, profile: profile)
+        if Task.isCancelled { return }
+
+        let request: RecommendationUserRequest
+        switch planned {
+        case let .success(value):
+            request = value
+        case let .failure(error):
+            phase = .failed(error.localizedDescription)
+            return
+        }
+
+        let poolTarget = max(RecommendationBatchPolicy.poolTarget, count * 4)
+        let result = await poolEngine().recommend(
+            request: request,
+            profile: profile,
+            count: poolTarget,
+            planSource: .rule,
+            excludedTrackKeys: excludedTrackKeys
+        )
+        if Task.isCancelled { return }
+
+        switch result {
+        case let .success(list):
+            let batch = applyPool(
+                list,
+                count: count,
+                namedArtist: RecommendationArtistMix.isNamedArtistRequest(request),
+                relatedArtistShare: DeleteSettings.load().relatedArtistShare
+            )
+            if batch.isEmpty, isRefillingSession {
                 phase = .loaded
-                storeCache(
-                    key,
-                    planSource: .localModel,
-                    candidates: batch,
-                    requestedArtist: requestedArtist
-                )
-                var updated = history
-                updated.append(
-                    RecommendationRequestHistoryEntry(
-                        requestText: trimmed,
-                        results: RecommendationRequestHistory.results(from: list),
-                        createdAt: clock()
-                    ),
-                    limit: rounds
-                )
-                _ = RecommendationRequestHistoryStore.save(updated, to: historyURL, limit: rounds)
-            case let .failure(error):
-                requestedArtist = nil
-                phase = .failed(error.localizedDescription)
+                return
             }
-        #else
+            candidates = batch
+            startReasonRefresh(for: batch)
+            blacklist.markRecommended(batch, at: clock())
+            _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
+            activeRequestText = trimmed
+            requestedArtist = request.referenceArtists
+                .map { RecommendationKey.displayPrimaryArtist($0) }
+                .first { !$0.isEmpty }
+            lastGeneratedAt = clock()
+            planSource = .rule
+            phase = .loaded
+            storeCache(
+                key,
+                planSource: .rule,
+                candidates: batch,
+                requestedArtist: requestedArtist
+            )
+            var updated = history
+            updated.append(
+                RecommendationRequestHistoryEntry(
+                    requestText: trimmed,
+                    results: RecommendationRequestHistory.results(from: list),
+                    createdAt: clock()
+                ),
+                limit: rounds
+            )
+            _ = RecommendationRequestHistoryStore.save(updated, to: historyURL, limit: rounds)
+        case let .failure(error):
             requestedArtist = nil
-            phase = .failed(RecommendationRequestError.modelNotReady.localizedDescription)
-        #endif
+            phase = .failed(error.localizedDescription)
+        }
+
     }
 
     /// 清除当前指令，回到画像推荐。
@@ -312,7 +308,18 @@ final class MacRecommendationModel {
         if Task.isCancelled { return }
 
         let profile = RecommendationProfileBuilder.build(input)
-        let selection = RecommendationPlannerFactory.selection(settings: DeleteSettings.load())
+        let settings = DeleteSettings.load()
+        let profileV3 = RecommendationProfileV3Builder.build(
+            RecommendationProfileV3Input(legacy: input),
+            weights: settings.recommendationProfileWeights
+        )
+        downloadedKeys = profileV3.libraryKeys
+        lastProfileInput = input
+        if let reason = profileV3.emptyReason {
+            phase = .failed(reason.localizationKey.localized)
+            return
+        }
+        let selection = RecommendationPlannerFactory.selection(settings: settings)
         let key = cacheKey(
             rawText: "",
             profile: profile,
@@ -340,15 +347,11 @@ final class MacRecommendationModel {
             phase = .loading
         }
 
-        let plan = await selection.planner.makePlan(for: profile)
-        if Task.isCancelled { return }
-        planSource = plan.source
+        planSource = .rule
         let poolTarget = max(RecommendationBatchPolicy.poolTarget, count * 4)
-        let result = await poolEngine().recommend(
-            profile: profile,
+        let result = await RecommendationV3Engine.configured(settings).recommend(
+            profile: profileV3,
             count: poolTarget,
-            intents: plan.intents,
-            planSource: plan.source,
             excludedTrackKeys: excludedTrackKeys
         )
         if Task.isCancelled { return }
@@ -366,7 +369,7 @@ final class MacRecommendationModel {
             startReasonRefresh(for: batch)
             blacklist.markRecommended(batch, at: clock())
             _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
-            storeCache(key, planSource: plan.source, candidates: batch)
+            storeCache(key, planSource: .rule, candidates: batch)
         case let .failure(error):
             phase = .failed(error.localizedDescription)
         }
@@ -491,21 +494,23 @@ final class MacRecommendationModel {
     }
 
     private func computeProfileRecompute(
-        selection: RecommendationPlannerSelection,
-        profile: TasteProfile,
+        selection _: RecommendationPlannerSelection,
+        profile _: TasteProfile,
         count: Int
     ) async -> RecommendationRecompute? {
-        let plan = await selection.planner.makePlan(for: profile)
-        if Task.isCancelled { return nil }
-        let result = await RecommendationEngine.configured().recommend(
-            profile: profile,
+        guard let input = lastProfileInput else { return nil }
+        let profileV3 = RecommendationProfileV3Builder.build(
+            RecommendationProfileV3Input(legacy: input),
+            weights: DeleteSettings.load().recommendationProfileWeights
+        )
+        let result = await RecommendationV3Engine.configured().recommend(
+            profile: profileV3,
             count: count,
-            intents: plan.intents,
-            planSource: plan.source
+            excludedTrackKeys: excludedTrackKeys
         )
         if Task.isCancelled { return nil }
         guard case let .success(list) = result else { return nil }
-        return RecommendationRecompute(candidates: list, planSource: plan.source, requestedArtist: nil)
+        return RecommendationRecompute(candidates: list, planSource: .rule, requestedArtist: nil)
     }
 
     private func computeChatRecompute(context: ChatRefreshContext) async -> RecommendationRecompute? {
@@ -521,14 +526,14 @@ final class MacRecommendationModel {
             request: request,
             profile: context.profile,
             count: context.count,
-            planSource: .localModel
+            planSource: .rule
         )
         if Task.isCancelled { return nil }
         guard case let .success(list) = result else { return nil }
         let artist = request.referenceArtists
             .map { RecommendationKey.displayPrimaryArtist($0) }
             .first { !$0.isEmpty }
-        return RecommendationRecompute(candidates: list, planSource: .localModel, requestedArtist: artist)
+        return RecommendationRecompute(candidates: list, planSource: .rule, requestedArtist: artist)
     }
 
     /// 后台重算落状态：序列相同则不重设候选（避免 UI 抖动），缓存已由 flow 写回。

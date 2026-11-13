@@ -18,6 +18,8 @@ struct MacRecommendationView: View {
     @State private var query = ""
     @State private var hoveredRowID: String?
     @Environment(\.openSettings) private var openSettings
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）。
+    @Environment(\.appAccentColor) private var accentColor
 
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
@@ -37,7 +39,9 @@ struct MacRecommendationView: View {
                 autoRefresh: settings.recommendationAutoRefresh
             )
         }
-        .sheet(item: $downloadTarget) { candidate in
+        .sheet(item: $downloadTarget, onDismiss: {
+            Task { await model.refreshDownloadedKeys() }
+        }) { candidate in
             MacOnlineSearchView(initialQuery: model.searchQuery(for: candidate))
         }
     }
@@ -62,13 +66,8 @@ struct MacRecommendationView: View {
 
     // MARK: - 指令输入
 
-    private var chatAvailability: RecommendationChatAvailability {
-        RecommendationPlannerFactory.chatAvailability(useLocalModel: settings.recommendationUseLocalModel)
-    }
-
     private var canSubmit: Bool {
-        chatAvailability.canSubmit
-            && model.phase != .loading
+        model.phase != .loading
             && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -78,7 +77,7 @@ struct MacRecommendationView: View {
                 TextField("recommendation_chat_placeholder".localized, text: $query)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { submit() }
-                    .disabled(chatAvailability != .available || model.phase == .loading)
+                    .disabled(model.phase == .loading)
 
                 Button {
                     submit()
@@ -93,19 +92,6 @@ struct MacRecommendationView: View {
                 .buttonStyle(.borderless)
                 .disabled(!canSubmit)
                 .help("recommendation_chat_send".localized)
-            }
-
-            if chatAvailability != .available {
-                HStack(spacing: DesignTokens.space8) {
-                    Text("recommendation_chat_model_not_ready".localized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("recommendation_chat_go_to_settings".localized) {
-                        openRecommendationSettings()
-                    }
-                    .buttonStyle(.link)
-                    .font(.caption)
-                }
             }
 
             if let text = model.activeRequestText {
@@ -141,24 +127,13 @@ struct MacRecommendationView: View {
     private func submit() {
         guard canSubmit else { return }
         let text = query
-        Task { await model.submit(text, count: settings.recommendationCount, rounds: settings.recommendationChatRounds, useLocalModel: settings.recommendationUseLocalModel) }
+        Task { await model.submit(text, count: settings.recommendationCount, rounds: settings.recommendationChatRounds) }
     }
 
     private func refresh() async {
         await model.refresh(
             count: settings.recommendationCount,
-            rounds: settings.recommendationChatRounds,
-            useLocalModel: settings.recommendationUseLocalModel
-        )
-    }
-
-    private func openRecommendationSettings() {
-        openSettings()
-        MacSettingsRouter.open(
-            .init(
-                category: .recommendations,
-                itemID: MacSettingsCatalog.recommendationModel.id
-            )
+            rounds: settings.recommendationChatRounds
         )
     }
 
@@ -264,11 +239,24 @@ struct MacRecommendationView: View {
 
     private func row(_ candidate: RecommendedCandidate) -> some View {
         let isHovered = hoveredRowID == candidate.id
+        let isDownloaded = model.isDownloaded(candidate)
         return HStack(alignment: .top, spacing: DesignTokens.space12) {
             VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                Text(DisplayScriptNormalizer.display(candidate.title))
-                    .font(.body)
-                    .lineLimit(1)
+                HStack(spacing: DesignTokens.space6) {
+                    Text(DisplayScriptNormalizer.display(candidate.title))
+                        .font(.body)
+                        .lineLimit(1)
+                    if isDownloaded {
+                        Text("recommendation_downloaded_badge".localized)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, DesignTokens.space6)
+                            .padding(.vertical, 1)
+                            .background(accentColor.opacity(0.16), in: Capsule())
+                            .foregroundStyle(accentColor)
+                            .accessibilityLabel("recommendation_downloaded_badge".localized)
+                    }
+                }
+                .foregroundStyle(isDownloaded ? accentColor : Color.primary)
                 Text(subtitle(for: candidate))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -281,10 +269,12 @@ struct MacRecommendationView: View {
             Spacer(minLength: DesignTokens.space8)
             // 行内动作按钮：悬停整行才显示（opacity 占位，不跳动布局）
             HStack(spacing: DesignTokens.space8) {
-                Button("recommendation_download".localized) {
-                    downloadTarget = candidate
+                if !isDownloaded {
+                    Button("recommendation_download".localized) {
+                        downloadTarget = candidate
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
                 Button("recommendation_dismiss".localized) {
                     model.dismiss(candidate)
                 }

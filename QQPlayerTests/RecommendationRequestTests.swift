@@ -4,7 +4,7 @@
 //
 //  本地 AI 推荐：指令输入纯逻辑单测（解析 / 历史裁剪 / 设置 clamp / 引擎召回 / 可用性）。
 //
-//  只测共享层：模型推理（MLX）不在单测范围，模型缺失路径用纯函数覆盖。
+//  只测共享层：模型推理不在单测范围（v3 起已无本地模型）。
 //
 
 import Foundation
@@ -370,45 +370,6 @@ struct RecommendationRequestEngineTests {
         case let .failure(error):
             Issue.record("不应失败：\(error)")
         }
-    }
-}
-
-// MARK: - 可用性
-
-@Suite("推荐指令：模型可用性")
-struct RecommendationChatAvailabilityTests {
-    @Test("模型未就绪：禁用提交，且不是 available（不走规则回退）")
-    func modelNotReadyDisablesSubmit() {
-        let availability = RecommendationChatAvailability.resolve(
-            mlxSupported: true,
-            useLocalModel: true,
-            modelReady: false
-        )
-        #expect(availability == .modelNotReady)
-        #expect(!availability.canSubmit)
-    }
-
-    @Test("关闭本地模型 / 不支持 MLX：同样禁用")
-    func disabledStates() {
-        #expect(RecommendationChatAvailability.resolve(
-            mlxSupported: true,
-            useLocalModel: false,
-            modelReady: true
-        ) == .disabledBySettings)
-        #expect(RecommendationChatAvailability.resolve(
-            mlxSupported: false,
-            useLocalModel: true,
-            modelReady: true
-        ) == .modelNotReady)
-    }
-
-    @Test("模型就绪 + 开关开启：唯一可提交状态")
-    func availableOnlyWhenReady() {
-        #expect(RecommendationChatAvailability.resolve(
-            mlxSupported: true,
-            useLocalModel: true,
-            modelReady: true
-        ).canSubmit)
     }
 }
 

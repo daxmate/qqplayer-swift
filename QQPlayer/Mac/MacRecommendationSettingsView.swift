@@ -2,202 +2,241 @@
 //  MacRecommendationSettingsView.swift
 //  QQPlayer
 //
-//  本地 AI 推荐 P2：macOS「设置 → 推荐」分类。
+//  推荐 v3：macOS「设置 → 推荐」分类。
 //
-//  - 模型卡片：repo 名 / 体积 / 状态 / 下载 / 进度 / 取消 / 删除。
-//  - 开关：推荐使用本地模型（默认开）、模型常驻内存（默认关）。
-//  - Intel Mac / 依赖不可用：明确提示，推荐自动走规则。
+//  - 口味画像权重（曲库 / 播放 / 收藏 / 新鲜度；写入时归一到和 1）。
+//  - 三通道配额（种子艺人 / 相似艺人 / 风格探索；写入时归一到和 1）。
+//  - Last.fm API key（钥匙串存储；界面只显示是否已保存，不回显明文）。
+//  - 指令上下文轮数 / 相似艺人比例 / MusicBrainz 关系扩展（沿用 v2 设置）。
 //
-//  模型文件不进 bundle：下载目标见 RecommendationModelManager。
-//  视图层不直连任何单例（planner 生命周期由 RecommendationPlannerFactory 负责）。
+//  视图层不直连任何单例（数据读写全走 DeleteSettings / Keychain 封装）。
 //
 
 import SwiftUI
 
 struct MacRecommendationSettingsView: View {
     @State private var settings = DeleteSettings.load()
-    @State private var manager = RecommendationModelManager()
-
-    private var mlxAvailable: Bool {
-        #if canImport(MLXLLM) && arch(arm64) && os(macOS)
-            return true
-        #else
-            return false
-        #endif
-    }
+    @State private var lastFMKeySaved = KeychainLastFMKeyStore().apiKey() != nil
+    @State private var lastFMKeyDraft = ""
+    @State private var lastFMKeyStatus: String?
 
     var body: some View {
         Form {
-            Section {
-                modelCard
-            } header: {
-                Text("recommendation_model_title".localized)
-            } footer: {
-                Text(mlxAvailable ? "recommendation_model_footer".localized : "recommendation_model_unsupported".localized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Toggle("recommendation_use_local_model".localized, isOn: $settings.recommendationUseLocalModel)
-                    .settingsAnchor(MacSettingsCatalog.recommendationUseLocalModel)
-                    .onChange(of: settings.recommendationUseLocalModel) { _, _ in
-                        settings.save()
-                    }
-                Toggle("recommendation_model_keep_loaded".localized, isOn: $settings.recommendationKeepModelLoaded)
-                    .settingsAnchor(MacSettingsCatalog.recommendationKeepLoaded)
-                    .onChange(of: settings.recommendationKeepModelLoaded) { _, _ in
-                        settings.save()
-                    }
-            } footer: {
-                Text("recommendation_model_keep_loaded_footer".localized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Stepper(value: $settings.recommendationChatRounds, in: DeleteSettings.recommendationChatRoundsRange) {
-                    HStack {
-                        Text("recommendation_chat_rounds_title".localized)
-                        Spacer()
-                        Text("\(settings.recommendationChatRounds)")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                }
-                .settingsAnchor(MacSettingsCatalog.recommendationChatRounds)
-                .onChange(of: settings.recommendationChatRounds) { _, newValue in
-                    settings.recommendationChatRounds = DeleteSettings.clampRecommendationChatRounds(newValue)
-                    settings.save()
-                }
-            } footer: {
-                Text("recommendation_chat_rounds_footer".localized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Stepper(
-                    value: $settings.relatedArtistShare,
-                    in: DeleteSettings.relatedArtistShareRange,
-                    step: DeleteSettings.relatedArtistShareStep
-                ) {
-                    HStack {
-                        Text("recommendation_related_share_title".localized)
-                        Spacer()
-                        Text("\(Int((settings.relatedArtistShare * 100).rounded()))%")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                }
-                .settingsAnchor(MacSettingsCatalog.recommendationRelatedShare)
-                .onChange(of: settings.relatedArtistShare) { _, newValue in
-                    settings.relatedArtistShare = DeleteSettings.clampRelatedArtistShare(newValue)
-                    settings.save()
-                }
-            } footer: {
-                Text("recommendation_related_share_footer".localized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Toggle(
-                    "recommendation_artist_relation_title".localized,
-                    isOn: $settings.recommendationArtistRelationExpansion
-                )
-                .settingsAnchor(MacSettingsCatalog.recommendationArtistRelation)
-                .onChange(of: settings.recommendationArtistRelationExpansion) { _, _ in
-                    settings.save()
-                }
-            } footer: {
-                Text("recommendation_artist_relation_footer".localized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            profileWeightsSection
+            channelQuotaSection
+            lastFMSection
+            requestSection
+            relatedArtistSection
+            artistRelationSection
         }
         .formStyle(.grouped)
         .onAppear {
-            manager.refreshState()
+            settings = DeleteSettings.load()
+            lastFMKeySaved = KeychainLastFMKeyStore().apiKey() != nil
         }
     }
 
-    // MARK: - 模型卡片
+    // MARK: - 口味画像
 
-    private var modelCard: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(manager.modelId)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                Spacer()
-                Text(statusText)
-                    .font(.caption)
-                    .foregroundStyle(statusColor)
-            }
-
-            Text(sizeText)
+    private var profileWeightsSection: some View {
+        Section {
+            weightRow("recommendation_weight_library", value: $settings.recommendationV3.weightLibrary)
+                .settingsAnchor(MacSettingsCatalog.recommendationWeightLibrary)
+            weightRow("recommendation_weight_play", value: $settings.recommendationV3.weightPlay)
+                .settingsAnchor(MacSettingsCatalog.recommendationWeightPlay)
+            weightRow("recommendation_weight_favorite", value: $settings.recommendationV3.weightFavorite)
+                .settingsAnchor(MacSettingsCatalog.recommendationWeightFavorite)
+            weightRow("recommendation_weight_recency", value: $settings.recommendationV3.weightRecency)
+                .settingsAnchor(MacSettingsCatalog.recommendationWeightRecency)
+        } header: {
+            Text("recommendation_weights_title".localized)
+        } footer: {
+            Text("recommendation_weights_footer".localized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
 
-            switch manager.state {
-            case let .downloading(progress):
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                HStack {
-                    Text(verbatim: "\(Int(progress * 100))%")
+    private func weightRow(_ titleKey: String, value: Binding<Double>) -> some View {
+        HStack {
+            Text(titleKey.localized)
+            Slider(value: value, in: 0 ... 1, step: RecommendationProfileWeights.valueStep) { editing in
+                guard !editing else { return }
+                settings.recommendationV3.normalizeWeights()
+                settings.save()
+            }
+            Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 44, alignment: .trailing)
+        }
+    }
+
+    // MARK: - 通道配额
+
+    private var channelQuotaSection: some View {
+        Section {
+            quotaRow("recommendation_quota_seed", value: $settings.recommendationV3.quotaSeed)
+                .settingsAnchor(MacSettingsCatalog.recommendationQuotaSeed)
+            quotaRow("recommendation_quota_similar", value: $settings.recommendationV3.quotaSimilar)
+                .settingsAnchor(MacSettingsCatalog.recommendationQuotaSimilar)
+            quotaRow("recommendation_quota_explore", value: $settings.recommendationV3.quotaExplore)
+                .settingsAnchor(MacSettingsCatalog.recommendationQuotaExplore)
+        } header: {
+            Text("recommendation_quotas_title".localized)
+        } footer: {
+            Text("recommendation_quotas_footer".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func quotaRow(_ titleKey: String, value: Binding<Double>) -> some View {
+        HStack {
+            Text(titleKey.localized)
+            Slider(value: value, in: 0 ... 1, step: RecommendationChannelQuotas.valueStep) { editing in
+                guard !editing else { return }
+                settings.recommendationV3.normalizeQuotas()
+                settings.save()
+            }
+            Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 44, alignment: .trailing)
+        }
+    }
+
+    // MARK: - Last.fm
+
+    private var lastFMSection: some View {
+        Section {
+            HStack {
+                SecureField("recommendation_lastfm_placeholder".localized, text: $lastFMKeyDraft)
+                    .textFieldStyle(.roundedBorder)
+                Button("recommendation_lastfm_save".localized) {
+                    saveLastFMKey()
+                }
+                .buttonStyle(.bordered)
+                .disabled(lastFMKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if lastFMKeySaved {
+                    Text("recommendation_lastfm_saved".localized)
                         .font(.caption)
-                        .monospacedDigit()
-                    Spacer()
-                    Button("recommendation_model_cancel".localized) {
-                        manager.cancel()
-                    }
-                }
-            case .ready, .loading:
-                HStack {
-                    Spacer()
-                    Button("recommendation_model_delete".localized, role: .destructive) {
-                        Task { await manager.delete() }
-                    }
-                }
-            case .notDownloaded, .failed:
-                HStack {
-                    Spacer()
-                    Button("recommendation_model_download".localized) {
-                        manager.download()
-                    }
-                    .disabled(!mlxAvailable)
+                        .foregroundStyle(.secondary)
                 }
             }
-        }
-        .padding(.vertical, DesignTokens.space4)
-        .settingsAnchor(MacSettingsCatalog.recommendationModel)
-    }
-
-    private var statusText: String {
-        switch manager.state {
-        case .notDownloaded: return "recommendation_model_status_not_downloaded".localized
-        case .downloading: return "recommendation_model_status_downloading".localized
-        case .ready: return "recommendation_model_status_ready".localized
-        case .loading: return "recommendation_model_status_loading".localized
-        case let .failed(message): return message
-        }
-    }
-
-    private var statusColor: Color {
-        switch manager.state {
-        case .ready: return .green
-        case .failed: return .red
-        default: return .secondary
+            .settingsAnchor(MacSettingsCatalog.recommendationLastFMKey)
+            if lastFMKeySaved {
+                Button("recommendation_lastfm_clear".localized, role: .destructive) {
+                    clearLastFMKey()
+                }
+                .buttonStyle(.borderless)
+            }
+            if let lastFMKeyStatus {
+                Text(lastFMKeyStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("recommendation_lastfm_title".localized)
+        } footer: {
+            Text("recommendation_lastfm_footer".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var sizeText: String {
-        guard manager.totalBytes > 0 else {
-            return "recommendation_model_size_unknown".localized
+    private func saveLastFMKey() {
+        let key = lastFMKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        do {
+            try KeychainLastFMKeyStore().save(key)
+            lastFMKeySaved = true
+            lastFMKeyDraft = ""
+            lastFMKeyStatus = "recommendation_lastfm_saved_hint".localized
+        } catch {
+            lastFMKeyStatus = "recommendation_lastfm_save_failed".localized
         }
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(manager.totalBytes))
+    }
+
+    private func clearLastFMKey() {
+        do {
+            try KeychainLastFMKeyStore().save("")
+            lastFMKeySaved = false
+            lastFMKeyStatus = "recommendation_lastfm_cleared".localized
+        } catch {
+            lastFMKeyStatus = "recommendation_lastfm_save_failed".localized
+        }
+    }
+
+    // MARK: - 指令
+
+    private var requestSection: some View {
+        Section {
+            Stepper(value: $settings.recommendationChatRounds, in: DeleteSettings.recommendationChatRoundsRange) {
+                HStack {
+                    Text("recommendation_chat_rounds_title".localized)
+                    Spacer()
+                    Text("\(settings.recommendationChatRounds)")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .settingsAnchor(MacSettingsCatalog.recommendationChatRounds)
+            .onChange(of: settings.recommendationChatRounds) { _, newValue in
+                settings.recommendationChatRounds = DeleteSettings.clampRecommendationChatRounds(newValue)
+                settings.save()
+            }
+        } footer: {
+            Text("recommendation_chat_rounds_footer".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - 相似艺人比例
+
+    private var relatedArtistSection: some View {
+        Section {
+            HStack {
+                Text("recommendation_related_share_title".localized)
+                Spacer()
+                Text("\(Int((settings.relatedArtistShare * 100).rounded()))%")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(
+                value: $settings.relatedArtistShare,
+                in: DeleteSettings.relatedArtistShareRange,
+                step: DeleteSettings.relatedArtistShareStep
+            )
+            .settingsAnchor(MacSettingsCatalog.recommendationRelatedShare)
+            .onChange(of: settings.relatedArtistShare) { _, newValue in
+                settings.relatedArtistShare = DeleteSettings.clampRelatedArtistShare(newValue)
+                settings.save()
+            }
+        } footer: {
+            Text("recommendation_related_share_footer".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - MusicBrainz 关系扩展
+
+    private var artistRelationSection: some View {
+        Section {
+            Toggle(
+                "recommendation_artist_relation_title".localized,
+                isOn: $settings.recommendationArtistRelationExpansion
+            )
+            .settingsAnchor(MacSettingsCatalog.recommendationArtistRelation)
+            .onChange(of: settings.recommendationArtistRelationExpansion) { _, _ in
+                settings.save()
+            }
+        } footer: {
+            Text("recommendation_artist_relation_footer".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }

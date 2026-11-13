@@ -296,12 +296,12 @@ struct DeleteSettings: Codable {
     var recommendationCount: Int = DeleteSettings.defaultRecommendationCount
     /// 打开 App 时是否按 24h 自动刷新（P1 只存值，不做定时器）。
     var recommendationAutoRefresh: Bool = true
-    /// 推荐检索计划是否优先使用本地模型（P2；默认开，模型未就绪自动回退规则）。
-    var recommendationUseLocalModel: Bool = true
-    /// 本地模型是否常驻内存（P2；默认关 = 用完卸载）。
-    var recommendationKeepModelLoaded: Bool = false
     /// 指令输入的后台上下文轮数（0–9；只用于理解追问，界面不显示）。
     var recommendationChatRounds: Int = DeleteSettings.defaultRecommendationChatRounds
+
+    // MARK: - 推荐 v3（口味画像权重 / 通道配额 / Last.fm）
+    var recommendationV3 = RecommendationV3Settings()
+
     /// P4：MusicBrainz 艺人关系扩展（默认关 = 召回与 P3 完全一致、零额外请求）。
     /// 旧设置文件没有该 key 时必须解码为 false（见 init(from:)），不得整份解码失败。
     var recommendationArtistRelationExpansion: Bool = false
@@ -416,16 +416,13 @@ struct DeleteSettings: Codable {
             ?? Self.defaultRecommendationCount
         recommendationCount = Self.clampRecommendationCount(storedRecommendationCount)
         recommendationAutoRefresh = try container.decodeIfPresent(Bool.self, forKey: .recommendationAutoRefresh) ?? true
-        recommendationUseLocalModel = try container.decodeIfPresent(
-            Bool.self, forKey: .recommendationUseLocalModel
-        ) ?? true
-        recommendationKeepModelLoaded = try container.decodeIfPresent(
-            Bool.self, forKey: .recommendationKeepModelLoaded
-        ) ?? false
         recommendationChatRounds = Self.clampRecommendationChatRounds(
             try container.decodeIfPresent(Int.self, forKey: .recommendationChatRounds)
                 ?? Self.defaultRecommendationChatRounds
         )
+        recommendationV3 = try container.decodeIfPresent(
+            RecommendationV3Settings.self, forKey: .recommendationV3
+        ) ?? RecommendationV3Settings()
         // 艺人关系扩展（P4）：旧设置文件无 key → 关（decodeIfPresent 兜底，绝不解码失败）。
         recommendationArtistRelationExpansion = try container.decodeIfPresent(
             Bool.self, forKey: .recommendationArtistRelationExpansion

@@ -10,7 +10,7 @@
 //  - 校验铁律：条数匹配、非空、长度上限、只许出现输入里的名字、不得带 JSON 残片/引号；
 //    任一条不合格就**逐条**回落规则理由，整批失败则全用规则理由（功能不退化）。
 //
-//  ⚠️ 纯逻辑层：iOS / macOS 共享，只依赖 Foundation，不引入 MLX / 平台 API。
+//  ⚠️ 纯逻辑层：iOS / macOS 共享，只依赖 Foundation，不引入平台 API。
 //
 
 import Foundation
