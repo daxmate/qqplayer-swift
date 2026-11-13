@@ -109,6 +109,28 @@ enum MacKeyboardShortcuts {
         ) {
             Task { @MainActor in await PlayerEngine.shared.nextTrack() }
         },
+        // ---- 音量（2026-11-13 App 级音量）----
+        // 用 ⌘↑ / ⌘↓ 而不是裸 ↑/↓：裸方向键是列表、滑杆、歌词的自然导航键，而本监听
+        // 一旦匹配就消费事件（handle 返回 nil），占用会直接吃掉列表键盘操作。
+        // 静音用裸 M（与裸字母键 R/F/G/A/B 同一族）；⌘M 是系统「最小化」，不能占。
+        MacShortcutDef(
+            id: "volumeUp", labelKey: "shortcut_volume_up",
+            defaultCombo: MacShortcutLogic.volumeUpDefaultCombo
+        ) {
+            PlayerEngine.shared.adjustVolume(by: PlayerVolumeModel.step)
+        },
+        MacShortcutDef(
+            id: "volumeDown", labelKey: "shortcut_volume_down",
+            defaultCombo: MacShortcutLogic.volumeDownDefaultCombo
+        ) {
+            PlayerEngine.shared.adjustVolume(by: -PlayerVolumeModel.step)
+        },
+        MacShortcutDef(
+            id: "muteToggle", labelKey: "shortcut_mute",
+            defaultCombo: MacShortcutLogic.muteToggleDefaultCombo
+        ) {
+            PlayerEngine.shared.toggleMute()
+        },
         MacShortcutDef(
             id: "cyclePlayMode", labelKey: "shortcut_cycle_play_mode",
             defaultCombo: ShortcutCombo(keyCode: 15, flags: 0, display: "R")

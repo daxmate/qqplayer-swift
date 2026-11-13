@@ -1180,3 +1180,13 @@
 "recommendation_related_share_footer" = "При указании исполнителя — максимальная доля похожих исполнителей в подборке.";
 "recommendation_artist_relation_title" = "Расширять похожих исполнителей через MusicBrainz";
 "recommendation_artist_relation_footer" = "Добавляет кандидатов от исполнителей, связанных с вашими топовыми: до 3 артистов на намерение и не более 2 запросов за генерацию. Ошибки пропускаются и не влияют на рекомендации.";
+/* App volume (macOS player bar) */
+"volume" = "Громкость";
+"volume_up" = "Увеличить громкость";
+"volume_down" = "Уменьшить громкость";
+"mute" = "Без звука";
+"unmute" = "Включить звук";
+"volume_percent_format" = "Громкость %d%%";
+"shortcut_volume_up" = "Увеличить громкость";
+"shortcut_volume_down" = "Уменьшить громкость";
+"shortcut_mute" = "Без звука";

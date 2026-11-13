@@ -153,6 +153,17 @@ class PlayerEngine: NSObject {
         @ObservationIgnored var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     #endif
     @ObservationIgnored var isInBackground = false
+    #if os(macOS)
+        /// App 级音量模型（macOS 专用；iOS 的音量由系统控制，不参与）。
+        /// 读：播放条 / 快捷键 / 菜单；写：只允许 PlayerEngine+Volume+Mac.swift 经 storeVolumeModel
+        /// ——Swift 的 `private(set)` 只管到文件作用域，跨文件的唯一写入口靠这一条通道守住。
+        private(set) var volumeModel = PlayerVolumeModel()
+
+        /// 音量模型的唯一写入点（PlayerEngine+Volume+Mac 的 commitVolume 调用）。
+        func storeVolumeModel(_ model: PlayerVolumeModel) {
+            volumeModel = model
+        }
+    #endif
     @ObservationIgnored var hasSetupRemoteCommands = false
     @ObservationIgnored nonisolated(unsafe) var hasSetupAudioSessionNotifications = false
     @ObservationIgnored var backgroundCheckTimer: Timer?
@@ -214,6 +225,11 @@ class PlayerEngine: NSObject {
         // Don't set up remote commands immediately - defer until first playback
         // setupRemoteCommands()
         setupPeriodicStateSaving()
+        #if os(macOS)
+            // App 级音量：启动即恢复已存值（引擎图由 ensureMacAudioEngineSetup 首播时建立，
+            // 届时 reapplyStoredVolume() 再写回混音器）。
+            volumeModel = PlayerVolumePersistence.load()
+        #endif
     }
 
     // MARK: - Playback Control

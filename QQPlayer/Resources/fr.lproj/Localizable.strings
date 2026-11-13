@@ -1183,3 +1183,13 @@
 "recommendation_related_share_footer" = "Lorsque vous nommez un artiste, part maximale de chaque lot pouvant provenir d'artistes similaires.";
 "recommendation_artist_relation_title" = "Étendre les artistes liés via MusicBrainz";
 "recommendation_artist_relation_footer" = "Ajoute des candidats issus d’artistes liés à vos artistes favoris : 3 artistes par intention et 2 requêtes maximum par génération. Les échecs sont ignorés et ne bloquent pas les recommandations.";
+/* App volume (macOS player bar) */
+"volume" = "Volume";
+"volume_up" = "Augmenter le volume";
+"volume_down" = "Baisser le volume";
+"mute" = "Couper le son";
+"unmute" = "Rétablir le son";
+"volume_percent_format" = "Volume %d%%";
+"shortcut_volume_up" = "Augmenter le volume";
+"shortcut_volume_down" = "Baisser le volume";
+"shortcut_mute" = "Couper le son";

@@ -123,6 +123,23 @@ enum MacShortcutLogic {
     static let prevLineDefaultCombo = ShortcutCombo(keyCode: 126, flags: 0, display: "↑")
     static let nextLineDefaultCombo = ShortcutCombo(keyCode: 125, flags: 0, display: "↓")
 
+    // MARK: - App 级音量快捷键（2026-11-13）
+
+    /// 音量 ± / 静音的默认组合（⌘↑ = 126+command、⌘↓ = 125+command、M = 46 无修饰）。
+    /// 单一定义：`MacKeyboardShortcuts.allDefs` 与单测共用，避免两处手写漂移。
+    /// 选 ⌘↑/⌘↓ 而非裸 ↑/↓：裸方向键是列表 / 滑杆 / 歌词的导航键，而监听命中即消费事件。
+    static let volumeUpDefaultCombo = ShortcutCombo(
+        keyCode: 126,
+        flags: ShortcutModifier.command,
+        display: "⌘↑"
+    )
+    static let volumeDownDefaultCombo = ShortcutCombo(
+        keyCode: 125,
+        flags: ShortcutModifier.command,
+        display: "⌘↓"
+    )
+    static let muteToggleDefaultCombo = ShortcutCombo(keyCode: 46, flags: 0, display: "M")
+
     /// 条件生效判定（纯逻辑）：`requiresKaraoke` 的快捷键只在跟唱模式开启时消费事件。
     /// handle(_:) 命中组合后先过此处——不满足则**放行**（return event），否则 App 级
     /// 监听会吃掉跟唱外场景的方向键（列表 / 歌词滚动导航）。缺省快捷键恒生效。
@@ -132,11 +149,13 @@ enum MacShortcutLogic {
 
     // MARK: - 键盘自动重复策略（2026-09-12 审计 B4 · M1）
 
-    /// 允许「长按连发」（`NSEvent.isARepeat`）的快捷键 id：seek 类与跟唱跳句类希望重复
-    /// （按住 ←/→ 连续快退/快进；跟唱内按住 ↑/↓ 连续跳句——与 seek 同类，逐句跳是
-    /// 用户预期）。其余全是 toggle / 轮换类——播放暂停、收藏、跟唱、AB 循环、播放顺序
-    /// 轮换——重复会来回抖动、反复写库。
-    static let repeatableShortcutIds: Set<String> = ["seekBack", "seekForward", "prevLine", "nextLine"]
+    /// 允许「长按连发」（`NSEvent.isARepeat`）的快捷键 id：seek 类、跟唱跳句类与音量类
+    /// 希望重复（按住 ←/→ 连续快退/快进；跟唱内按住 ↑/↓ 连续跳句；按住 ⌘↑/⌘↓ 连续加减
+    /// 音量——与系统音量键手感一致，5% 一档逐档走）。其余全是 toggle / 轮换类——播放暂停、
+    /// 收藏、跟唱、AB 循环、播放顺序轮换、静音——重复会来回抖动、反复写库。
+    static let repeatableShortcutIds: Set<String> = [
+        "seekBack", "seekForward", "prevLine", "nextLine", "volumeUp", "volumeDown",
+    ]
 
     /// 收到一次按键事件后是否应执行 action：非重复事件一律执行；
     /// 自动重复事件仅 repeatable 类执行（其余仍由监听消费，不冒泡给响应链）。

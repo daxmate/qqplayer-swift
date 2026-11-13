@@ -20,6 +20,18 @@ struct QQPlayerMacApp: App {
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     @State private var deleteSettings = DeleteSettings.load()
 
+    /// 「静音」菜单项的勾选状态 ⇄ 引擎：勾选即静音，动作走与播放条/快捷键同一个 toggleMute 入口。
+    @MainActor
+    private static var muteBinding: Binding<Bool> {
+        Binding(
+            get: { PlayerEngine.shared.isMuted },
+            set: { isMuted in
+                guard isMuted != PlayerEngine.shared.isMuted else { return }
+                PlayerEngine.shared.toggleMute()
+            }
+        )
+    }
+
     init() {
         // 诊断基建：stderr + stdout 重定向落盘（print 走 stdout，Swift fatal 走 stderr），
         // 运行时报错/业务日志可离线读取（~/Library/Logs/QQPlayerMac/{stdout,stderr}.log）
@@ -151,6 +163,19 @@ struct QQPlayerMacApp: App {
                     Text("search_any_menu".localized)
                 }
                 .keyboardShortcut("k", modifiers: .command)
+            }
+            // 播放（App 级音量，2026-11-13）：动作与播放条 / 全局快捷键共用 PlayerEngine 入口。
+            // 菜单项故意不挂 .keyboardShortcut —— 组合键由 MacKeyboardShortcuts 的 NSEvent
+            // 监听统一消费（匹配即 return nil）；两处都挂会让 ⌘↑ 一次加两档。
+            CommandMenu("player_controls".localized) {
+                Button("volume_up".localized) {
+                    PlayerEngine.shared.adjustVolume(by: PlayerVolumeModel.step)
+                }
+                Button("volume_down".localized) {
+                    PlayerEngine.shared.adjustVolume(by: -PlayerVolumeModel.step)
+                }
+                Divider()
+                Toggle("mute".localized, isOn: Self.muteBinding)
             }
         }
     }

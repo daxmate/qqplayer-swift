@@ -399,6 +399,10 @@
                 || !audioEngine.attachedNodes.contains(eqManager.currentEQNode!) {
                 eqManager.setAudioEngine(audioEngine)
             }
+            // App 级音量：setup 是「启动 / 引擎重建」的单一挂点，先把已存音量写回混音器
+            // （放在幂等 early-return 之前——新引擎实例即使 format 相同也必须重新应用）。
+            reapplyStoredVolume()
+
             // 幂等跳过：只有「同 format **且同引擎实例**」才跳过（connect 是同步重操作，
             // 每次调用都等音频线程；但引擎换过就必须重连）
             if Self.macEngineGraphFormat == format, Self.macEngineGraphOwner === audioEngine {

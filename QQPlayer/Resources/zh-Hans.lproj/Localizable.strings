@@ -1188,3 +1188,13 @@
 "recommendation_related_share_footer" = "点名艺人时，批次中最多有多少比例来自相似艺人";
 "recommendation_artist_relation_title" = "用 MusicBrainz 扩展相关艺人";
 "recommendation_artist_relation_footer" = "按艺人关系补充候选：每个艺人意图最多 3 位相关艺人，整轮最多 2 次查询。失败自动跳过，不影响推荐结果。";
+/* App 级音量（macOS 播放条） */
+"volume" = "音量";
+"volume_up" = "增大音量";
+"volume_down" = "减小音量";
+"mute" = "静音";
+"unmute" = "取消静音";
+"volume_percent_format" = "音量 %d%%";
+"shortcut_volume_up" = "增大音量";
+"shortcut_volume_down" = "减小音量";
+"shortcut_mute" = "静音";

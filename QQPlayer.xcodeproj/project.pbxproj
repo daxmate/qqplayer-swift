@@ -234,6 +234,7 @@
 		BD6B0C74BFA74F47B5E1309F /* SyncTransferTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55CA2865DF8448DB4CAA6EE /* SyncTransferTimingTests.swift */; };
 		9D15B8B27BFE4CE8A66B8412 /* SyncRxKeepaliveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */; };
 		8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */; };
+		C9C4C30339284EFC98FAD8DF /* PlayerVolumeModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -515,6 +516,7 @@
 		B55CA2865DF8448DB4CAA6EE /* SyncTransferTimingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTransferTimingTests.swift; sourceTree = "<group>"; };
 		035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncRxKeepaliveTests.swift; sourceTree = "<group>"; };
 		35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationChartPopularityTests.swift; sourceTree = "<group>"; };
+		38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerVolumeModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -605,6 +607,7 @@
 				"Mac/MacTrackListView+LocateScroll.swift",
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
+				Mac/MacVolumeControl.swift,
 				Mac/SyncDataPane.swift,
 				Mac/SyncDevicePane.swift,
 				Mac/SyncHostCenter.swift,
@@ -753,6 +756,7 @@
 				"Mac/MacTrackListView+LocateScroll.swift",
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
+				Mac/MacVolumeControl.swift,
 				Mac/SyncDataPane.swift,
 				Mac/SyncDevicePane.swift,
 				Mac/SyncHostCenter.swift,
@@ -899,6 +903,8 @@
 				"Services/PlayerEngine+PlaybackControl.swift",
 				"Services/PlayerEngine+Queue.swift",
 				"Services/PlayerEngine+SFB.swift",
+				"Services/PlayerEngine+Volume+Mac.swift",
+				Services/PlayerVolumeModel.swift,
 				Services/PlayHistoryRecorder.swift,
 				"Services/QuarkClient+CookieHTTP.swift",
 				"Services/QuarkClient+Share.swift",
@@ -1427,6 +1433,7 @@
 				B55CA2865DF8448DB4CAA6EE /* SyncTransferTimingTests.swift */,
 				035BC06DD299475EB438873E /* SyncRxKeepaliveTests.swift */,
 				35CE7D3AB76649D78C994839 /* RecommendationChartPopularityTests.swift */,
+				38B1D8CB38184C358B250BD1 /* PlayerVolumeModelTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -1960,6 +1967,7 @@
 				BD6B0C74BFA74F47B5E1309F /* SyncTransferTimingTests.swift in Sources */,
 				9D15B8B27BFE4CE8A66B8412 /* SyncRxKeepaliveTests.swift in Sources */,
 				8BEAB56573394DE3A8DBF96F /* RecommendationChartPopularityTests.swift in Sources */,
+				C9C4C30339284EFC98FAD8DF /* PlayerVolumeModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

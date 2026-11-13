@@ -163,9 +163,12 @@ struct MacShortcutBindingTests {
 /// `toggleFavorite` 来回写库、`cyclePlayMode` 直接轮转一圈。决策上收 MacShortcutLogic
 /// （无 AppKit 可单测）；`MacKeyboardShortcuts.handle` 只转调。
 struct MacShortcutRepeatPolicyTests {
-    @Test("只有 seek 类与跟唱跳句类允许长按连发")
-    func repeatableIdsAreSeeksAndKaraokeLines() {
-        #expect(MacShortcutLogic.repeatableShortcutIds == ["seekBack", "seekForward", "prevLine", "nextLine"])
+    @Test("只有 seek 类、跟唱跳句类与音量 ± 允许长按连发")
+    func repeatableIdsAreSeeksKaraokeLinesAndVolume() {
+        #expect(
+            MacShortcutLogic.repeatableShortcutIds
+                == ["seekBack", "seekForward", "prevLine", "nextLine", "volumeUp", "volumeDown"]
+        )
     }
 
     @Test("非重复事件一律执行（与修复前行为一致）")
@@ -185,7 +188,7 @@ struct MacShortcutRepeatPolicyTests {
     @Test("自动重复：toggle / 轮换类一律不执行（防抖动与反复写库）")
     func repeatSkipsToggles() {
         for id in ["playPause", "toggleFavorite", "cyclePlayMode", "toggleKaraoke",
-                   "abToggle", "abEnd", "nextTrack", "previousTrack"] {
+                   "abToggle", "abEnd", "nextTrack", "previousTrack", "muteToggle"] {
             #expect(!MacShortcutLogic.shouldRunAction(id: id, isARepeat: true))
         }
     }

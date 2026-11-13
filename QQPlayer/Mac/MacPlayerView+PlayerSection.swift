@@ -119,6 +119,11 @@ extension MacPlayerView {
                 .foregroundColor(isPlayOrderActive ? appAccentColor : .secondary)
                 .help(playOrderTitle)
 
+                Divider().frame(height: 24)
+
+                // App 级音量（音量数学在 PlayerVolumeModel，见 PlayerEngine+Volume+Mac）
+                MacVolumeControl()
+
                 // 当前曲目收藏（红心）
                 Button {
                     guard let track else { return }
