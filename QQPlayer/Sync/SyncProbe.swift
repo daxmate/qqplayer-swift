@@ -13,6 +13,23 @@
 //  为什么复用文件通道而不是新帧：探针只要「首块发出 → 末块 ack」的时间，块/ack/窗口
 //  逻辑已经存在；新增帧类型要动协议版本与两端解码，收益为零。
 //
+//  **热身 + 多次取最好（2026-11-13 用户拍板第二版）**
+//
+//  为什么热身：iPhone 在 Wi-Fi 上省电时会「睡着」——第一份载荷要去唤醒射频、触发速率
+//  爬升（rate adaptation），单发一次测到的是**冷启动最差值**，不是用户持续同步时拿到的
+//  速度。用户原话：「测试的时候你需要多长时间的热身就在热身之后再测嘛！」
+//
+//  实测依据（2026-11-13 10:12:41–10:13:12，同一链路连发 19 条 8 MiB 探针，MB/s）：
+//    4.76 3.86 7.19 12.64 17.24 17.09 20.89 20.36 21.39
+//    20.46 20.51 26.58 22.22 29.20 30.30 26.32 26.76 30.53 22.92 35.09
+//  → 前 ~10 秒持续爬升，之后稳定在 20–35 MB/s（与真实传歌 25–42 MB/s 一致）。
+//  所以热身 = 块间不留空闲地连发，直到 6 秒 **或** 6 个 8 MiB（≈48 MiB，覆盖爬升段）；
+//  随后连测 2 次取**最快**的那次——峰值代表链路实际能力，均值会被一次抖动拖低。
+//  （两个上限取先到者：慢链路靠 6 秒够、快链路靠 6 次够，都不至于把探针拖长。）
+//
+//  流程：热身（结果全部丢弃）→ 测量 N 次 → 取最快 → 报 MB/s。
+//  预算：整轮硬上限 30 秒（热身 + 测量一起），单个 pass 仍用 20 秒超时。
+//
 //  纪律（见 docs/sync-slo.md / T2 任务包）：
 //  - **能力门控**：只有对端 meta ack 声明 `probeCapable == true` 才发块（旧端收到探针
 //    会被当普通文件落盘）。门控在 `SyncFileSender.processAckLocked` 里，唯一入口。
@@ -32,8 +49,16 @@ enum SyncProbe {
     static let fileIDPrefix = "probe:"
     /// 传输名（只用于日志/诊断；接收端探针分支不落曲库）。
     static let fileName = "__qqprobe__"
-    /// 硬超时上限（秒）：探针不能拖住会话收尾。
+    /// 单个 pass（一份 8 MiB 载荷）的超时上限（秒）；整轮另有 `totalTimeout` 兜底。
     static let timeout: TimeInterval = 20
+    /// 整轮探针（热身 + 测量）硬上限（秒）：探针不能拖住会话收尾。
+    static let totalTimeout: TimeInterval = 30
+    /// 热身停止判据之一：已耗时到这么长（秒）。
+    static let warmupSeconds: TimeInterval = 6
+    /// 热身停止判据之二：已发这么多个 pass（先到先停）。
+    static let warmupMaxPasses = 6
+    /// 测量阶段连发次数；取成功次里最快的一次作为结果。
+    static let measurePasses = 2
     /// 自动探针最小间隔（秒）。
     static let autoInterval: TimeInterval = 10 * 60
 
@@ -52,6 +77,22 @@ enum SyncProbe {
     static func shouldAutoProbe(lastProbeAt: Date?, now: Date = Date()) -> Bool {
         guard let lastProbeAt else { return true }
         return now.timeIntervalSince(lastProbeAt) >= autoInterval
+    }
+
+    /// 热身是否该停：时间到 **或** 次数到（先到先停，两者都未到 → 继续热身）。
+    /// 纯函数：判据只吃输入，便于单测；非法耗时（负数 / 非有限）不算「时间到」。
+    static func shouldStopWarmup(elapsed: TimeInterval,
+                                 passes: Int,
+                                 seconds: TimeInterval = warmupSeconds,
+                                 maxPasses: Int = warmupMaxPasses) -> Bool {
+        if passes >= maxPasses { return true }
+        guard elapsed.isFinite else { return false }
+        return elapsed >= seconds
+    }
+
+    /// 多轮取最快：失败（nil）与非正 / 非有限值一律跳过；全失败 → nil（绝不编造值）。
+    static func bestRate(_ rates: [Double?]) -> Double? {
+        rates.compactMap { $0 }.filter { $0.isFinite && $0 > 0 }.max()
     }
 }
 
@@ -92,7 +133,11 @@ final class SyncProbeStore: @unchecked Sendable {
 final class SyncProbeRunner: @unchecked Sendable {
     private let session: SyncPeerSession
     private let payloadBytes: Int64
-    private let timeout: TimeInterval
+    private let passTimeout: TimeInterval
+    private let totalTimeout: TimeInterval
+    private let warmupSeconds: TimeInterval
+    private let warmupMaxPasses: Int
+    private let measurePasses: Int
     private let queue = DispatchQueue(label: "com.qqplayer.sync.probe")
     private let lock = NSLock()
 
@@ -101,15 +146,39 @@ final class SyncProbeRunner: @unchecked Sendable {
     private var finished = false
     private var completion: ((Double?) -> Void)?
 
+    // MARK: 相位状态（只在串行 queue 上读写：start 之后所有 pass 推进都在这条队列）
+
+    private enum Phase { case warmup, measurement }
+
+    private var phase: Phase = .warmup
+    /// 已完成的 warmup pass 数（成功失败都算，只用于停止判据）。
+    private var warmupPasses = 0
+    private var warmupSuccesses = 0
+    private var warmupStartedUptime: TimeInterval = 0
+    /// 当前是否有 pass 在途（串行队列上的状态机位，防重复记账）。
+    private var passInFlight = false
+    /// 单 pass 超时令牌：只有最新令牌能取消当前 pass（老定时器静默作废）。
+    private var passToken = 0
+    /// 测量阶段各次结果（失败记 nil）。
+    private var measured: [Double?] = []
+
     init(session: SyncPeerSession,
          payloadBytes: Int64 = SyncProbe.payloadBytes,
-         timeout: TimeInterval = SyncProbe.timeout) {
+         passTimeout: TimeInterval = SyncProbe.timeout,
+         totalTimeout: TimeInterval = SyncProbe.totalTimeout,
+         warmupSeconds: TimeInterval = SyncProbe.warmupSeconds,
+         warmupMaxPasses: Int = SyncProbe.warmupMaxPasses,
+         measurePasses: Int = SyncProbe.measurePasses) {
         self.session = session
         self.payloadBytes = payloadBytes
-        self.timeout = timeout
+        self.passTimeout = passTimeout
+        self.totalTimeout = totalTimeout
+        self.warmupSeconds = warmupSeconds
+        self.warmupMaxPasses = warmupMaxPasses
+        self.measurePasses = measurePasses
     }
 
-    /// 跑一次探针；`completion` 收到 MB/s（失败/超时/不支持 → nil），只回调一次。
+    /// 跑一轮探针（热身 → 测量）；completion 收到 MB/s（失败/超时/不支持 → nil），只回调一次。
     func start(completion: @escaping (Double?) -> Void) {
         lock.lock()
         guard !finished, sender == nil else {
@@ -122,6 +191,7 @@ final class SyncProbeRunner: @unchecked Sendable {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("qqp-probe-\(UUID().uuidString).bin")
         do {
+            // 载荷只写一次：热身与测量的每个 pass 复用同一个文件（不同 fileID）。
             try Self.writePayload(to: url, bytes: payloadBytes)
         } catch {
             finish(nil)
@@ -130,17 +200,14 @@ final class SyncProbeRunner: @unchecked Sendable {
 
         let sender = SyncFileSender(session: session)
         // 不降窗（2026-11-13 用户拍板）：探针与真实传输走同一套窗口逻辑
-        // （`min(对端声明 maxInFlight, SyncFileTransfer.maxInFlight)`），否则测出来的只是
+        // （min(对端声明 maxInFlight, SyncFileTransfer.maxInFlight)），否则测出来的只是
         // 「2 个 ack 往返的链路极限」，比用户实速低好几倍。
         sender.onCompletion = { [weak self, weak sender] outcome in
             guard let self else { return }
-            switch outcome {
-            case .succeeded:
-                self.finish(SyncProbe.megabytesPerSecond(bytes: self.payloadBytes,
-                                                         seconds: sender?.lastTransferSeconds ?? -1))
-            case .failed:
-                self.finish(nil)
-            }
+            // 回调可能在 sender.send 内**同步**到达（内存回环）：投回串行队列，
+            // 既避免叠栈递归，也保证 pass 推进只有一个执行者。
+            let seconds = sender?.lastTransferSeconds
+            self.queue.async { self.handlePassOutcome(outcome, seconds: seconds) }
         }
 
         lock.lock()
@@ -148,14 +215,7 @@ final class SyncProbeRunner: @unchecked Sendable {
         self.payloadURL = url
         lock.unlock()
 
-        scheduleTimeout()
-        do {
-            try sender.send(fileURL: url,
-                            fileID: SyncProbe.fileIDPrefix + UUID().uuidString,
-                            name: SyncProbe.fileName)
-        } catch {
-            finish(nil)
-        }
+        queue.async { [weak self] in self?.begin() }
     }
 
     // MARK: 内部
@@ -168,14 +228,19 @@ final class SyncProbeRunner: @unchecked Sendable {
         try data.write(to: url, options: .atomic)
     }
 
-    private func scheduleTimeout() {
-        queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
-            guard let self else { return }
-            self.lock.lock()
-            let sender = self.sender
-            self.lock.unlock()
-            sender?.cancel()
+    /// 整轮硬上限：到点直接按失败收尾（含在途 pass）。
+    private func armTotalTimeout() {
+        queue.asyncAfter(deadline: .now() + totalTimeout) { [weak self] in
+            guard let self, !self.isFinished else { return }
             self.finish(nil)
+        }
+    }
+
+    /// 单 pass 超时：只作废令牌匹配的那一次；cancel 会回调 .failed → 本 pass 记失败。
+    private func armPassTimeout(_ token: Int) {
+        queue.asyncAfter(deadline: .now() + passTimeout) { [weak self] in
+            guard let self, !self.isFinished, self.passInFlight, self.passToken == token else { return }
+            self.sender?.cancel()
         }
     }
 
@@ -187,15 +252,115 @@ final class SyncProbeRunner: @unchecked Sendable {
         }
         finished = true
         let completion = self.completion
+        let sender = self.sender
         let url = payloadURL
-        sender = nil
+        self.sender = nil
         payloadURL = nil
         lock.unlock()
 
+        // 兜底路径（总超时 / 提前收尾）：在途 pass 一并停；它的回调会被 finished 拦掉。
+        sender?.cancel()
         if let url { try? FileManager.default.removeItem(at: url) }
         SyncProbeStore.shared.record(mbps)
         if let mbps = mbps, !mbps.isFinite { completion?(nil) } else {
             completion?(mbps)
+        }
+    }
+
+    // MARK: 相位推进（全部在 queue 上：串行执行 ⇒ 无需为状态机加锁）
+
+    private var isFinished: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return finished
+    }
+
+    private func begin() {
+        guard !isFinished else { return }
+        warmupStartedUptime = ProcessInfo.processInfo.systemUptime
+        armTotalTimeout()
+        sendPass()
+    }
+
+    /// 发一个 8 MiB pass：热身与测量共用同一条路径（同一个 sender、同一个载荷文件）。
+    /// pass 之间**不留空闲** —— 上一 pass 的终态回调里直接发下一 pass。
+    private func sendPass() {
+        guard !isFinished else { return }
+        guard let sender, let url = payloadURL else {
+            finish(nil)
+            return
+        }
+        passToken &+= 1
+        passInFlight = true
+        armPassTimeout(passToken)
+        do {
+            try sender.send(fileURL: url,
+                            fileID: SyncProbe.fileIDPrefix + UUID().uuidString,
+                            name: SyncProbe.fileName)
+        } catch {
+            // 同步失败（会话不可用 / 参数非法）：本 pass 记失败，判据照常推进。
+            passInFlight = false
+            queue.async { [weak self] in
+                guard let self else { return }
+                self.record(nil)
+                self.advance()
+            }
+        }
+    }
+
+    private func handlePassOutcome(_ outcome: SyncFileSender.Outcome, seconds: TimeInterval?) {
+        guard !isFinished, passInFlight else { return }
+        passInFlight = false
+        switch outcome {
+        case .succeeded:
+            // 分母只用**这一次** pass 的耗时（首块发出 → 末块 ack）。
+            record(SyncProbe.megabytesPerSecond(bytes: payloadBytes, seconds: seconds ?? -1))
+        case .failed:
+            record(nil)
+        }
+        advance()
+    }
+
+    /// 记一次 pass 结果：热身只记计数（速率全部丢弃），测量收进候选集。
+    private func record(_ mbps: Double?) {
+        switch phase {
+        case .warmup:
+            warmupPasses += 1
+            if mbps != nil { warmupSuccesses += 1 }
+        case .measurement:
+            measured.append(mbps)
+        }
+    }
+
+    /// 决定下一步：继续热身 / 转测量 / 再测一次 / 收尾。
+    private func advance() {
+        guard !isFinished else { return }
+        switch phase {
+        case .warmup:
+            let elapsed = ProcessInfo.processInfo.systemUptime - warmupStartedUptime
+            let stop = SyncProbe.shouldStopWarmup(elapsed: elapsed,
+                                                  passes: warmupPasses,
+                                                  seconds: warmupSeconds,
+                                                  maxPasses: warmupMaxPasses)
+            guard stop else {
+                sendPass()
+                return
+            }
+            // 热身一次都没成 = 链路根本没起来，测下去只会拿到必然失败的值。
+            guard warmupSuccesses > 0 else {
+                finish(nil)
+                return
+            }
+            phase = .measurement
+            measured = []
+            sendPass()
+        case .measurement:
+            guard measured.count < measurePasses else {
+                // 取最快：峰值代表链路实际能力（均值会被一次抖动拖低）；全失败 → nil。
+                finish(SyncProbe.bestRate(measured))
+                return
+            }
+            sendPass()
         }
     }
 

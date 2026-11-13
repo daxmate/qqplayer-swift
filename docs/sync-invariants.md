@@ -448,6 +448,19 @@
   `inv37LinkFactsMergeAndOrder`（顺序固定、实测覆盖缺省）、`inv37EndpointAddressParsing`（具名服务 = `-1`）。
 - **反向验证**：删掉 `fields.append(contentsOf: linkFacts.fields)` → 三类行用例必须红 → 精确还原 → 复跑绿。
 
+### INV-38　测速值必须是**稳态**口径：先热身、再连测取最快，且分母只用被选中那次 pass
+
+- **不变量**：`probeMBps` = 「热身之后的峰值」；热身 pass 的速率一律丢弃，测量取成功次里最快
+  的一次，`MB/s = 该次 bytes / 该次耗时`（不得拿整轮总耗时当分母，也不得取均值）。
+- **为什么**：iPhone Wi-Fi 省电唤醒 + 速率爬升让「单发一次」测到冷启动最差值（2026-11-13 实测
+  19 条：4.8 → 12.6 → 21 → 30 → 35 MB/s，前 ~10 秒持续爬升，之后稳定 20–35；真实传歌 25–42）。
+- **现有守护**：✅ 已收（2026-11-13）——`SyncProbe.shouldStopWarmup(elapsed:passes:)`（≤6 秒或
+  ≤6 个 pass 先到先停）与 `SyncProbe.bestRate(_:)` 为纯函数；`SyncProbeRunner` 的相位状态机
+  只在串行队列推进（热身 → 测量 → 取最快），整轮 30 秒硬上限、单 pass 20 秒；单测
+  `probeWarmupStopCriterion` / `probeBestRate` / `probeWarmupThenMeasure`。
+- **反向验证**：把 `bestRate` 改成取 `.first` 或把热身结果并入候选 → `probeBestRate` /
+  `probeWarmupThenMeasure` 必须红。
+
 ## 9. 判断标准（新增能力时怎么自检）
 
 新加一个同步实体 / 一个跨端能力时，**逐条回答这 8 个问题**，任一题答不出就是空格：

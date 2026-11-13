@@ -462,6 +462,75 @@ struct SyncFileTransferTests {
         #expect(SyncProbe.shouldAutoProbe(lastProbeAt: Date().addingTimeInterval(-601)))
     }
 
+    @Test("探针热身判据：时间到 / 次数到 / 两者都未到")
+    func probeWarmupStopCriterion() {
+        // 判据 = 先到先停；常量一律按 SyncProbe 引用（不写死 6 秒 / 6 次）。
+        // 1) 两者都未到 → 继续热身
+        #expect(!SyncProbe.shouldStopWarmup(elapsed: 0, passes: 0))
+        #expect(!SyncProbe.shouldStopWarmup(elapsed: SyncProbe.warmupSeconds / 2,
+                                            passes: SyncProbe.warmupMaxPasses - 1))
+        // 2) 时间到（次数未到）→ 停：慢链路靠 6 秒兜底
+        #expect(SyncProbe.shouldStopWarmup(elapsed: SyncProbe.warmupSeconds, passes: 1))
+        #expect(SyncProbe.shouldStopWarmup(elapsed: SyncProbe.warmupSeconds * 2, passes: 0))
+        // 3) 次数到（时间未到）→ 停：快链路靠次数兜底
+        #expect(SyncProbe.shouldStopWarmup(elapsed: 0, passes: SyncProbe.warmupMaxPasses))
+        // 4) 两者都到
+        #expect(SyncProbe.shouldStopWarmup(elapsed: SyncProbe.warmupSeconds * 2,
+                                           passes: SyncProbe.warmupMaxPasses * 2))
+        // 5) 非法耗时不算「时间到」（绝不因为 NaN / 负数提前收场）
+        #expect(!SyncProbe.shouldStopWarmup(elapsed: Double.nan, passes: 0))
+        #expect(!SyncProbe.shouldStopWarmup(elapsed: -1, passes: 0))
+    }
+
+    @Test("探针多轮取最快：失败（nil）与非正值跳过，全失败 → nil")
+    func probeBestRate() {
+        #expect(SyncProbe.bestRate([]) == nil)
+        #expect(SyncProbe.bestRate([nil, nil]) == nil)
+        #expect(SyncProbe.bestRate([nil, 12, 31.5, 20]) == 31.5)
+        // 0 / 负数 / 非有限值都不是有效速率（口径与 megabytesPerSecond 一致）。
+        #expect(SyncProbe.bestRate([0, -3, Double.nan, Double.infinity]) == nil)
+        #expect(SyncProbe.bestRate([0, -3, Double.nan, 8, Double.infinity]) == 8)
+    }
+
+    @Test("探针流程：热身（不计结果）→ 连测 measurePasses 次，报最快一次且零残留")
+    func probeWarmupThenMeasure() async throws {
+        let fixture = SessionFixture.pairedHandshake()
+        let libraryDir = try makeTempDir()
+        let probeDir = try makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: libraryDir)
+            try? FileManager.default.removeItem(at: probeDir)
+        }
+
+        let box = TransferBox()
+        let receiver = SyncFileReceiver(session: fixture.clientSession, directory: libraryDir)
+        receiver.probeDirectory = probeDir
+        receiver.onCompletion = { box.receiverOutcome = $0 }
+        receiver.onAckSent = { box.acks.append($0) }
+
+        // 用 1 个块当载荷 + 只跑 1 个热身 pass：验证「热身 → 测量」的流程本身，
+        // 不验证 8 MiB / 6 秒的实测量级（那是真机口径，见 SyncProbe 头注释）。
+        let runner = SyncProbeRunner(session: fixture.hostSession,
+                                     payloadBytes: SyncFileTransfer.chunkSize,
+                                     warmupSeconds: 0,
+                                     warmupMaxPasses: 1,
+                                     measurePasses: SyncProbe.measurePasses)
+        let mbps = await withCheckedContinuation { (continuation: CheckedContinuation<Double?, Never>) in
+            runner.start { continuation.resume(returning: $0) }
+        }
+
+        // 结果：成功且为正（回环下必然拿到一个有效 MB/s），且只回调一次（continuation 只 resume 一次不会崩）。
+        #expect(mbps != nil, "热身 + 测量都成功却报了 nil")
+        #expect((mbps ?? -1) > 0)
+        // 探针**不产生 finish**（不进 peer state / 台账）
+        #expect(box.receiverOutcome == nil)
+        // 1 个热身 pass + measurePasses 个测量 pass，每个 pass 都有 done ack
+        #expect(box.acks.filter { $0.done }.count == 1 + SyncProbe.measurePasses)
+        // 曲库零残留；探针临时目录收齐即删
+        #expect(try FileManager.default.contentsOfDirectory(atPath: libraryDir.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: probeDir.path).isEmpty)
+    }
+
     @Test("探针：对端声明 probeCapable → 收齐后临时目录即删、曲库零残留、不发 finish")
     func probeLandsInTemporaryDirectory() throws {
         let srcDir = try makeTempDir()
