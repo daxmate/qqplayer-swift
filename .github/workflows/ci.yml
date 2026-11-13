@@ -50,7 +50,7 @@ jobs:
       - name: Install pinned lint tools
         env:
           SWIFTLINT_VERSION: 0.65.1
-          SWIFTFORMAT_VERSION: 0.62.1
+          SWIFTFORMAT_VERSION: 0.63.1
         run: |
           set -euo pipefail
           # 自托管（xmini）runner 已预装 lint 工具：只校验版本，不重装。
