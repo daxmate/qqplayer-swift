@@ -237,9 +237,18 @@ protocol SyncPeerTransport: AnyObject {
     /// 链路事实（INV-37）：真实通道按 `NWConnection.currentPath` 实测；
     /// 内存回环 / 测试通道取默认值（全未知）。
     var linkFacts: SyncDiagLinkFacts { get }
+    /// 通道的串行队列（收帧 / 发帧都在它上面跑）。
+    ///
+    /// 用途：接收端 keep-alive pacer 跟着会话队列跑（`SyncRxKeepalivePacer`），
+    /// 而不是自己另起一条队列跟收帧抢时序。拿不到真实队列（内存回环 / 测试夹具）
+    /// 时返回 nil ⇒ pacer 不启用。
+    var serialQueue: DispatchQueue? { get }
 }
 
 extension SyncPeerTransport {
     /// 默认：拿不到真实通道事实 → 全未知（**不编造**）。
     var linkFacts: SyncDiagLinkFacts { .unknown }
+
+    /// 默认：没有串行队列（内存回环 / 测试通道）⇒ 依赖它的 pacer 不启用。
+    var serialQueue: DispatchQueue? { nil }
 }

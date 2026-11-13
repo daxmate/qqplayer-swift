@@ -154,7 +154,9 @@ extension SyncFileReceiver {
                 }
             }
             // 起始 ack 是本轮**唯一**的能力协商点（窗口深度 + 二进制块）
-            return [.sendAck(metaAck(fileID: meta.fileID, receivedBytes: received))]
+            // + 开始上行 keep-alive（收文件期间把对端无线钉在唤醒态，见 SyncRxKeepalive）
+            return [.keepalive(.start(fileID: meta.fileID)),
+                    .sendAck(metaAck(fileID: meta.fileID, receivedBytes: received))]
         } catch {
             let code = errorCode(for: error)
             return [.sendAck(ack(fileID: meta.fileID, receivedBytes: 0, error: code)),
@@ -179,7 +181,9 @@ extension SyncFileReceiver {
                             finalURL: partURL, partURL: partURL, startOffset: 0, startedAt: Date(),
                             handle: handle, received: 0, chunksReceived: 0, wireBytes: 0,
                             slot: lowestFreeSlotLocked(), concurrencyObserved: 0, isProbe: true)
-            return [.sendAck(metaAck(fileID: meta.fileID, receivedBytes: 0))]
+            // 探针也是「在收文件」：同样需要上行 keep-alive（否则测速本身就带着省电惩罚）
+            return [.keepalive(.start(fileID: meta.fileID)),
+                    .sendAck(metaAck(fileID: meta.fileID, receivedBytes: 0))]
         } catch {
             try? fm.removeItem(at: partURL)
             let code = errorCode(for: error)

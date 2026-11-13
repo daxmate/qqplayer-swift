@@ -4400,6 +4400,66 @@ do {
     check(false, "S51 帧转发链场景抛错：\(error)")
 }
 
+// MARK: - S52 接收端上行 keep-alive 判据（Sync/SyncRxKeepalive.swift）
+//
+// 为什么要它：Mac → iPhone 上传被压到 6MB/s（RTT 反推 70ms vs ping6 8–40ms），
+// 差别只在「发往手机时要等手机无线的省电唤醒窗口」。接收端在收文件期间持续发
+// 既有 `.ping` 帧把无线钉在唤醒态；这里锁住节奏判据（发太密 = 添乱，发太稀 = 无效）。
+//
+// 只测纯函数：真实 30ms 节奏涉及定时器时序，等墙上时间必然 flaky。
+do {
+    print("▶︎ S52 接收端 keep-alive 判据")
+
+    // 未到间隔（刚 ping 过 5ms）→ 不发
+    check(!SyncRxKeepalive.shouldPing(now: 10.005, lastChunkAt: 9.0,
+                                      lastPingAt: 10.0, interval: 0.03),
+          "S52 未到间隔不发 ping")
+    // 到间隔 → 发。⚠️ 取样点别取 10.0 + 0.03：0.03 不可二进制表示，10.03 - 10.0 =
+    // 0.0299999…（< 0.03）→ 那是在测浮点不是测判据（本次首跑就因此红过一次）。边界两侧取样。
+    check(SyncRxKeepalive.shouldPing(now: 10.031, lastChunkAt: 9.0,
+                                     lastPingAt: 10.0, interval: 0.03),
+          "S52 到间隔发 ping")
+    check(!SyncRxKeepalive.shouldPing(now: 10.029, lastChunkAt: 9.0,
+                                      lastPingAt: 10.0, interval: 0.03),
+          "S52 差 1ms 到间隔不发 ping")
+    // 数据刚来过（5ms 前）→ 无线已被数据帧唤醒，补 ping 是纯开销
+    check(!SyncRxKeepalive.shouldPing(now: 10.03, lastChunkAt: 10.025,
+                                      lastPingAt: 9.0, interval: 0.03),
+          "S52 数据正在流动时不补 ping")
+    // 坏参数（interval <= 0）不许变成忙等
+    check(!SyncRxKeepalive.shouldPing(now: 10, lastChunkAt: 0, lastPingAt: 0, interval: 0),
+          "S52 interval=0 不发（不忙等）")
+
+    // idle < 500ms → 继续；>= 500ms → 停
+    check(!SyncRxKeepalive.shouldStop(idleFor: 0.499, idleTimeout: 0.5), "S52 空闲 499ms 不停")
+    check(SyncRxKeepalive.shouldStop(idleFor: 0.5, idleTimeout: 0.5), "S52 空闲 500ms 停")
+    check(SyncRxKeepalive.shouldStop(idleFor: 3, idleTimeout: 0.5), "S52 空闲超时后停")
+
+    // 任务包定案值：改动必须同步改测试（节奏 / 闲置窗 / 硬上限）
+    check(SyncRxKeepalive.isEnabled, "S52 默认启用")
+    checkEqual(SyncRxKeepalive.interval, 0.03, "S52 间隔 = 30ms")
+    checkEqual(SyncRxKeepalive.idleTimeout, 0.5, "S52 闲置窗 = 500ms")
+    checkEqual(SyncRxKeepalive.maxLifetime, 120, "S52 硬上限 = 120s")
+    checkEqual(SyncRxKeepalivePacer.pingFrameBytes, 38, "S52 单帧 38B（10B 头 + nonce12 + tag16）")
+
+    // pacer 启停（无墙上时间等待）：有串行队列才起；无队列 = 不启用（回环/夹具不受影响）
+    let pacerQueue = DispatchQueue(label: "qqplayer.harness.rx-keepalive")
+    let pacer = SyncRxKeepalivePacer(queueProvider: { pacerQueue }, sendPing: {})
+    check(!pacer.isRunning, "S52 pacer 初始未运行")
+    pacer.start(fileID: "s52-file")
+    check(pacer.isRunning, "S52 start 后有串行队列即运行")
+    pacer.start(fileID: "s52-file-2")
+    check(pacer.isRunning, "S52 并发第二文件沿用同一 pacer（幂等）")
+    pacer.stop(reason: .done)
+    check(!pacer.isRunning, "S52 stop 后停止")
+    pacer.stop(reason: .idle)
+    check(!pacer.isRunning, "S52 二次 stop 幂等")
+
+    let inertPacer = SyncRxKeepalivePacer(queueProvider: { nil }, sendPing: {})
+    inertPacer.start(fileID: "s52-noqueue")
+    check(!inertPacer.isRunning, "S52 无串行队列时不启用（内存回环/夹具零影响）")
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

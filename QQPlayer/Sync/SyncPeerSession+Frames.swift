@@ -306,7 +306,9 @@ extension SyncPeerSession {
         switch frame.type {
         case .ping:
             // v1 不做心跳（任务定案：断连即清）：ping 忽略不回复，避免
-            // 单 type 回显造成 ping-pong 死循环；keepalive 语义留 M4 引入
+            // 单 type 回显造成 ping-pong 死循环。
+            // 2026-11-13：ping 现在被接收端用作**单向**上行 keep-alive（`SyncRxKeepalive`
+            // ——收文件期间把本端无线钉在唤醒态），仍然只发不回，语义不变。
             return []
         case .bye:
             return closeEffectsLocked(.receivedBye)

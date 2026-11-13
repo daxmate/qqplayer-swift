@@ -71,6 +71,9 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
             remoteEndpoint: path?.remoteEndpoint ?? connection.endpoint
         )
     }
+    /// 会话串行队列（收帧 / 发帧 / 接收端 keep-alive pacer 都在这条队列上）。
+    var serialQueue: DispatchQueue? { queue }
+
     /// 收帧循环进行中（防重入）
     private var receiving = false
     private var closed = false

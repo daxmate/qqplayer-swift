@@ -109,6 +109,10 @@ final class SyncFileReceiver: @unchecked Sendable {
     /// 探针落盘目录（默认系统临时目录；测试可注入以断言「不落曲库目录」）。
     var probeDirectory: URL = FileManager.default.temporaryDirectory
 
+    /// 接收端上行 keep-alive（收文件期间每 ~30ms 一个 `.ping`，把手机无线钉在唤醒态）。
+    /// 见 `SyncRxKeepalive.swift` 文件头（实测数据 / 帧开销 / 生命周期）。
+    private let keepalive: SyncRxKeepalivePacer
+
     /// 本端声明的能力（注入覆盖优先）：探针分支与 `metaAck` 用**同一个**判据。
     var localCapabilities: SyncFileTransferCapabilities { capabilityOverride ?? .current }
 
@@ -220,7 +224,17 @@ final class SyncFileReceiver: @unchecked Sendable {
     init(session: SyncPeerSession, directory: URL) {
         self.session = session
         self.directory = directory
+        // pacer 跟会话串行队列；队列在 start 时才解析（transport 可能晚于本对象就位），
+        // 拿不到队列（内存回环 / 测试夹具）⇒ pacer 不启用，行为与改动前一致。
+        keepalive = SyncRxKeepalivePacer(
+            queueProvider: { [weak session] in session?.transport?.serialQueue },
+            sendPing: { [weak session] in try session?.sendPing() }
+        )
         attachHandlers()
+    }
+
+    deinit {
+        keepalive.stop(reason: .done)
     }
 
     // MARK: 对外 API
@@ -275,6 +289,9 @@ final class SyncFileReceiver: @unchecked Sendable {
                 return self.processMetaLocked(meta)
             }
         case .fileChunk:
+            // 上行 keep-alive：任何一块到账都算「对端还在发」→ 刷新空闲计时（无锁路径，
+            // 不进状态机；未在收文件时是空操作）。
+            keepalive.touch()
             // flags bit1 = 原始二进制载荷（协商后）；否则是 base64 JSON（旧格式，始终兼容）
             if frame.flags.contains(.binaryChunk) {
                 guard let decoded = SyncFileChunkCodec.decodeBinary(frame.payload) else {
@@ -442,6 +459,16 @@ final class SyncFileReceiver: @unchecked Sendable {
         case sendAck(FileAckPayload)
         case log(SyncTransferMetrics)
         case finish(Outcome)
+        /// 接收端 keep-alive 的启停（锁外执行；见 `KeepaliveAction`）
+        case keepalive(KeepaliveAction)
+    }
+
+    /// keep-alive 动作（锁内只收集、锁外执行；pacer 自己另有锁，但「锁内只迁移状态」
+    /// 的纪律不破）。停止不在这里：收尾后统一由 `runLocked` 的 `concluded && !isActive`
+    /// 判定（并发收多文件时不能因为一个文件收完就停）。
+    enum KeepaliveAction {
+        /// 开始接收一个文件（幂等：并发多文件沿用同一 pacer）
+        case start(fileID: String)
     }
 
     /// 锁内跑状态机，锁外执行效果（发 ack / 日志 / 用户回调）。所有路径的 ack 发送都在锁外，
@@ -450,8 +477,13 @@ final class SyncFileReceiver: @unchecked Sendable {
         lock.lock()
         let actions = body()
         lock.unlock()
+        var concluded = false
         for action in actions {
             switch action {
+            case let .keepalive(keepaliveAction):
+                switch keepaliveAction {
+                case let .start(fileID): keepalive.start(fileID: fileID)
+                }
             case let .sendAck(ack):
                 // 诊断：造 ack → 编码 / 加密 / 入通道（这一段是「我们自己发得慢」的那部分）。
                 let ackStartedAt = SyncTransferTiming.now()
@@ -460,8 +492,14 @@ final class SyncFileReceiver: @unchecked Sendable {
             case let .log(metrics):
                 SyncConnectDiag.log(metrics.logLine)
             case let .finish(outcome):
+                concluded = true
                 onCompletion?(outcome)
             }
+        }
+        // 收尾要不要停 keep-alive：**等全部在途文件都结束**才停（并发收多文件时其他
+        // 文件还在走）；`isActive` 另取一次锁，故必须在锁外判定。
+        if concluded, !isActive {
+            keepalive.stop(reason: .done)
         }
     }
 
