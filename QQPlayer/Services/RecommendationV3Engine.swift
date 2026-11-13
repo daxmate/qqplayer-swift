@@ -42,8 +42,10 @@ struct NeteaseSimilarArtistSource: SimilarArtistProviding {
     var lastFM: LastFMClient?
     var fallback: (any SimilarArtistProviding)?
 
-    /// 单次最多聚合的相似歌曲条数（simiSong 默认 50 条足够覆盖）。
+    /// 单次最多聚合的相似歌曲条数（simiSong 实际只回 5–10 条，50 足够覆盖）。
     static let similarSongLimit = 50
+    /// 取种子艺人最热几首做相似种子（1 首不稳，实测 3 首聚合质量明显更好）。
+    static let seedSongCount = 3
 
     func similarArtists(to artist: String, limit: Int) async -> [LastFMArtist] {
         let names = await neteaseSimilarArtists(to: artist, limit: limit)
@@ -58,16 +60,26 @@ struct NeteaseSimilarArtistSource: SimilarArtistProviding {
         return []
     }
 
-    /// 相似歌曲里按出现次数聚合成「相似艺人」（去掉种子本人）。
+    /// 凭多首热歌取相似歌曲再聚合艺人（单首种子太不稳：实测「偷心」只出 5 条且跑偏）。
     private func neteaseSimilarArtists(to artist: String, limit: Int) async -> [LastFMArtist] {
         guard limit > 0 else { return [] }
-        guard let topSongs = try? await netease.artistTopSongs(artistName: artist, limit: 5),
-              let hottest = topSongs.first
+        guard let topSongs = try? await netease.artistTopSongs(artistName: artist, limit: Self.seedSongCount),
+              !topSongs.isEmpty
         else { return [] }
-        guard let songs = try? await netease.similarSongsPublic(songID: hottest.id, limit: Self.similarSongLimit),
-              !songs.isEmpty
-        else { return [] }
-
+        let songIDs = topSongs.prefix(Self.seedSongCount).map(\.id)
+        // 并发取相似歌曲（每首约 300ms），按种子顺序合并，保证结果稳定。
+        var batches: [(Int, [NeteaseOnlineSong])] = []
+        await withTaskGroup(of: (Int, [NeteaseOnlineSong]).self) { group in
+            for (index, id) in songIDs.enumerated() {
+                group.addTask {
+                    let songs = (try? await netease.similarSongsPublic(songID: id, limit: Self.similarSongLimit)) ?? []
+                    return (index, songs)
+                }
+            }
+            for await batch in group { batches.append(batch) }
+        }
+        let songs = batches.sorted { $0.0 < $1.0 }.flatMap(\.1)
+        guard !songs.isEmpty else { return [] }
         return Self.aggregateArtists(from: songs, excluding: artist, limit: limit)
     }
 
@@ -388,16 +400,14 @@ struct RecommendationV3Engine: Sendable {
 
     // MARK: - 来源适配（降级链）
 
-    /// 艺人热歌：中文歌手优先网易云（实测 Last.fm 中文曲名映射脏），西文歌手优先 Last.fm。
-    /// 两者都失败再降级通用搜索。
+    /// 艺人热歌：网易云为唯一主源（Last.fm 大陆不可直连、中文曲名映射脏），
+    /// 失败再降级既有在线链（iTunes → MusicBrainz → 网易云搜索）。
     private func artistTopSongs(artist: String) async -> [RecommendationRemoteSong] {
         // A 通道：网易云艺人热歌是唯一主源（大陆可直连、中文曲名干净）。
         if let songs = await neteaseTopSongs(artist: artist) { return songs }
         // Last.fm 仅作可选增强：开关默认关，打开且艺人非 CJK 时才补一手。
         if !isCJKArtist(artist), let songs = await lastFMTopSongs(artist: artist) { return songs }
         // 兜底：既有在线降级链（iTunes tw/us → MusicBrainz → 网易云搜索）。
-        let generic = await search(query: artist, limit: perSourceLimit)
-        return generic
         return await search(query: artist, limit: perSourceLimit)
     }
 
