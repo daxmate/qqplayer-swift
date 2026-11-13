@@ -102,6 +102,19 @@ enum RecommendationBatchDiversity {
             }
         }
 
+        // 第二轮 c（点名配额）：本人段不足 → 相似条目补满 target。
+        // 相似段此时可**超过** `maxRelated`：总数优先，只在这里放宽，且补位行仍带 `relatedTo`。
+        if picked.count < target, limits.maxRelated != nil {
+            for position in eligible.indices where picked.count < target {
+                guard !used.contains(position) else { continue }
+                let candidate = eligible[position]
+                guard candidate.relatedTo != nil, state.admitsHard(candidate) else { continue }
+                state.take(candidate, relaxingSeason: true)
+                picked.append(position)
+                used.insert(position)
+            }
+        }
+
         // 第三轮：不同艺人不足 → 用池里「还没出现过的艺人」替换重复艺人的末位曲目。
         // 只替换、不把没选中的候选推进垃圾桶；硬上限（艺人 / 专辑）在替换时同样成立。
         while state.distinctArtists < limits.minDistinctArtists, !picked.isEmpty {

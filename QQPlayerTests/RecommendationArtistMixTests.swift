@@ -683,4 +683,40 @@ struct RecommendationArtistMixFillTests {
         let batch = session.nextBatch()
         #expect(batch.count == 2)
     }
+
+    @Test("批次补位：本人 4 + 相似充足 → 15（4 本人 / 11 相似）")
+    func batchRelatedBackfillsShortDirect() {
+        let direct = (1 ... 4).map { mixCandidate(String(format: "S%02d", $0), "孙燕姿") }
+        let related = (1 ... 20).map { mixCandidate("R\($0)", "方大同", relatedTo: "孙燕姿") }
+        var session = RecallSession(
+            pool: direct + related,
+            maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: true),
+            minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: true),
+            quota: RecallSession.Quota(direct: 10, related: 5)
+        )
+        let batch = session.nextBatch()
+        let directCount = batch.filter { $0.relatedTo == nil }.count
+        #expect(batch.count == 15)
+        #expect(directCount == 4)
+        #expect(batch.count - directCount == 11)
+        // 补位行必须仍带来源标记。
+        #expect(batch.filter { $0.relatedTo != nil }.allSatisfy { $0.relatedTo == "孙燕姿" })
+    }
+
+    @Test("批次补位：本人 20 + 相似 2 → 15（13 本人 / 2 相似）")
+    func batchDirectBackfillsShortRelated() {
+        let direct = (1 ... 20).map { mixCandidate(String(format: "S%02d", $0), "孙燕姿") }
+        let related = (1 ... 2).map { mixCandidate("R\($0)", "方大同", relatedTo: "孙燕姿") }
+        var session = RecallSession(
+            pool: direct + related,
+            maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: true),
+            minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: true),
+            quota: RecallSession.Quota(direct: 10, related: 5)
+        )
+        let batch = session.nextBatch()
+        let directCount = batch.filter { $0.relatedTo == nil }.count
+        #expect(batch.count == 15)
+        #expect(directCount == 13)
+        #expect(batch.count - directCount == 2)
+    }
 }
