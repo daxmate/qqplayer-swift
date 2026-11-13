@@ -52,9 +52,12 @@ extension DatabaseManager {
     }
 
     func searchPlaylists(query: String, limit: Int = 15) throws -> [Playlist] {
+        // 查询串归一唯一入口在 SearchQuery：先 trim，空白查询（含只有空格）= 空结果
+        let trimmedQuery = SearchQuery.trimmed(query)
+        guard !trimmedQuery.isEmpty else { return [] }
         return try read { db in
             // D8：与其他搜索共用同一转义入口
-            let pattern = self.likePattern(for: query)
+            let pattern = self.likePattern(for: trimmedQuery)
             return try Playlist
                 .filter(Column("title").like(pattern, escape: "\\"))
                 .order(Column("title"))
