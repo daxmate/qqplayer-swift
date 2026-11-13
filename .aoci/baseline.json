@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-13T02:10:02Z",
+  "updated_at": "2026-11-13T02:30:05Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -3002,9 +3002,9 @@
     },
     "QQPlayer/Sync/SyncProbe.swift": {
       "role": "index",
-      "sha256": "7d2da4b6d9fd5662e4fe4fdaf441efd87563d1594ddf8a6cc677a4ce9422dd94",
-      "size": 10905,
-      "normalized_sha256": "7d2da4b6d9fd5662e4fe4fdaf441efd87563d1594ddf8a6cc677a4ce9422dd94"
+      "sha256": "f548a61d9decf5525fa6d9c5e5f60f60d427faaa46c9487d46beb4bd2babe1f7",
+      "size": 19023,
+      "normalized_sha256": "f548a61d9decf5525fa6d9c5e5f60f60d427faaa46c9487d46beb4bd2babe1f7"
     },
     "QQPlayer/Sync/SyncPullRetryPolicy.swift": {
       "role": "index",
@@ -4580,9 +4580,9 @@
     },
     "QQPlayerTests/SyncFileTransferTests.swift": {
       "role": "index",
-      "sha256": "421ef63c73ff97d51ad0da0d89f3b3b0f391a39f0e7ba63f63d86e55f467ff43",
-      "size": 32889,
-      "normalized_sha256": "421ef63c73ff97d51ad0da0d89f3b3b0f391a39f0e7ba63f63d86e55f467ff43"
+      "sha256": "611fb7387a94178cb70abf02853856a115b2b627a7f01153fa6a5d50fae679c6",
+      "size": 37055,
+      "normalized_sha256": "611fb7387a94178cb70abf02853856a115b2b627a7f01153fa6a5d50fae679c6"
     },
     "QQPlayerTests/SyncFrameChainShapeContractTests.swift": {
       "role": "index",
@@ -4928,9 +4928,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "2ed9d15c72b895515e72bb901b3cee113580fa8e0188aa39b82aa39077015856",
-      "size": 375212,
-      "normalized_sha256": "2ed9d15c72b895515e72bb901b3cee113580fa8e0188aa39b82aa39077015856"
+      "sha256": "d082ef7d3c423057c27c5c91be2342b2f180f344554e8fc93dff9323b284b1fa",
+      "size": 375504,
+      "normalized_sha256": "d082ef7d3c423057c27c5c91be2342b2f180f344554e8fc93dff9323b284b1fa"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -4988,9 +4988,9 @@
     },
     "docs/sync-invariants.md": {
       "role": "index",
-      "sha256": "ebd50f35ef895e749fb921fa9f292b4af29f643aec3589202a31581dfa43429c",
-      "size": 46135,
-      "normalized_sha256": "ebd50f35ef895e749fb921fa9f292b4af29f643aec3589202a31581dfa43429c"
+      "sha256": "b2521ab40f00f402d8103ebce2bc50aeb4a9192fe14f9105da9bfc97dea1885b",
+      "size": 47314,
+      "normalized_sha256": "b2521ab40f00f402d8103ebce2bc50aeb4a9192fe14f9105da9bfc97dea1885b"
     },
     "docs/sync-matrix.md": {
       "role": "index",
@@ -5000,9 +5000,9 @@
     },
     "docs/sync-slo.md": {
       "role": "index",
-      "sha256": "1f7ad3e21d94ec1e49bca35163b58b50261d76dc2c6a51520fe83229883de737",
-      "size": 4042,
-      "normalized_sha256": "1f7ad3e21d94ec1e49bca35163b58b50261d76dc2c6a51520fe83229883de737"
+      "sha256": "92ef40c65d3c73135e3a0952219ba7bd701cd8d9111c803485bf77ae6b71d692",
+      "size": 4420,
+      "normalized_sha256": "92ef40c65d3c73135e3a0952219ba7bd701cd8d9111c803485bf77ae6b71d692"
     },
     "docs/ui-design-tokens.md": {
       "role": "index",
