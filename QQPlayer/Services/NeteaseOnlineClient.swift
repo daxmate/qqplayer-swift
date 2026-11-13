@@ -32,6 +32,8 @@ struct NeteaseOnlineSong: Codable, Equatable, Identifiable, Sendable {
     let coverURL: URL?          // https 化封面（ATS：web _to_https 对齐）
     let durationMs: Int?
     let level: String           // 音质等级（web DEFAULT_LEVEL "exhigh"）
+    /// 热度（0…1；艺人热歌接口的 `pop`/100；其他来源给不出 = nil）。
+    var popularity: Double?
 
     /// 展示用 mm:ss 时长
     var durationDisplay: String? {
@@ -197,14 +199,15 @@ struct NeteaseOnlineClient: Sendable {
         }
     }
 
-    // MARK: - 艺人热歌（公开 API /api/artist/{id}；推荐 v3 A 通道降级）
+    // MARK: - 艺人热歌（公开 API /api/artist/top/song；推荐 v3 A 通道主源）
 
-    /// 艺人热歌榜（`hotSongs`，最多 50 首）。艺人 ID 由 `searchArtists` 解析。
-    /// 失败抛错（调用方静默降级到通用搜索）。
+    /// 艺人热歌榜（`songs`，自带 `pop` 热度 0–100；最多 50 首）。
+    /// 实测（2026-11-13）：`GET https://music.163.com/api/artist/top/song?id=<id>` 带 UA 可用；
+    /// 比 Last.fm artist.getTopTracks 的中文曲名映射干净得多，因此中文歌手优先走这里。
     func artistTopSongs(artistID: Int, limit: Int = 20) async throws -> [NeteaseOnlineSong] {
         guard artistID > 0 else { return [] }
         let bounded = max(1, min(50, limit))
-        guard let url = URL(string: "https://music.163.com/api/artist/\(artistID)") else { return [] }
+        guard let url = URL(string: "https://music.163.com/api/artist/top/song?id=\(artistID)") else { return [] }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
@@ -213,12 +216,12 @@ struct NeteaseOnlineClient: Sendable {
         let (data, http) = try await transport.data(for: request)
         guard http.statusCode == 200 else { throw NeteaseOnlineError.httpError(http.statusCode) }
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let songs = root["hotSongs"] as? [[String: Any]]
+              let songs = root["songs"] as? [[String: Any]]
         else { return [] }
-        return songs.prefix(bounded).compactMap { mapHotSong($0) }
+        return songs.prefix(bounded).compactMap { mapTopSong($0) }
     }
 
-    /// 按艺人名取热歌（先 `searchArtists` 对齐名称，再取 hotSongs）。
+    /// 按艺人名取热歌（先 `searchArtists` 对齐名称，再取热歌榜）。
     func artistTopSongs(artistName: String, limit: Int = 20) async throws -> [NeteaseOnlineSong] {
         let name = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return [] }
@@ -226,26 +229,26 @@ struct NeteaseOnlineClient: Sendable {
         return try await artistTopSongs(artistID: artist.id, limit: limit)
     }
 
-    /// `/api/artist/{id}` 的 `hotSongs` 条目（字段比 cloudsearch 少，全部容错）。
-    private func mapHotSong(_ song: [String: Any]) -> NeteaseOnlineSong? {
+    /// `/api/artist/top/song` 的 `songs` 条目（字段比 cloudsearch 少，全部容错）。
+    private func mapTopSong(_ song: [String: Any]) -> NeteaseOnlineSong? {
         guard let id = song["id"] as? Int,
               let name = song["name"] as? String,
               !name.isEmpty
         else { return nil }
-        let artists = (song["artists"] as? [[String: Any]]) ?? (song["ar"] as? [[String: Any]]) ?? []
-        let artist = joinArtists(artists)
-        let album = (song["album"] as? [String: Any]) ?? (song["al"] as? [String: Any])
-        let albumName = album?["name"] as? String
+        let artists = (song["ar"] as? [[String: Any]]) ?? (song["artists"] as? [[String: Any]]) ?? []
+        let album = (song["al"] as? [String: Any]) ?? (song["album"] as? [String: Any])
         let cover = (album?["picUrl"] as? String).flatMap(NeteaseOnlineLogic.toHttpsURL)
-        let duration = (song["duration"] as? Int) ?? (song["dt"] as? Int)
+        let duration = (song["dt"] as? Int) ?? (song["duration"] as? Int)
+        let pop = song["pop"] as? Double
         return NeteaseOnlineSong(
             id: id,
             title: name,
-            artist: artist,
-            album: albumName,
+            artist: joinArtists(artists),
+            album: album?["name"] as? String,
             coverURL: cover,
             durationMs: duration,
-            level: NeteaseOnlineLogic.normalizeLevel(nil)
+            level: NeteaseOnlineLogic.normalizeLevel(nil),
+            popularity: pop.map { $0 / 100 }
         )
     }
 

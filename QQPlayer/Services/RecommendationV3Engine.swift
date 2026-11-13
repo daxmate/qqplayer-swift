@@ -169,7 +169,7 @@ struct RecommendationV3Engine: Sendable {
                         context: RecommendationCandidateContext(
                             channel: .seed,
                             seedArtist: seed.artist,
-                            popularity: popularity(rank: index, count: songs.count),
+                            popularity: song.popularity ?? popularity(rank: index, count: songs.count),
                             language: language,
                             year: song.year,
                             affinity: seed.affinity
@@ -199,7 +199,7 @@ struct RecommendationV3Engine: Sendable {
                                 channel: .similar,
                                 seedArtist: seed.artist,
                                 similarity: related.match,
-                                popularity: popularity(rank: index, count: songs.count),
+                                popularity: song.popularity ?? popularity(rank: index, count: songs.count),
                                 language: language,
                                 year: song.year,
                                 affinity: seed.affinity
@@ -234,7 +234,7 @@ struct RecommendationV3Engine: Sendable {
                         context: RecommendationCandidateContext(
                             channel: .explore,
                             seedArtist: nil,
-                            popularity: popularity(rank: index, count: songs.count),
+                            popularity: song.popularity ?? popularity(rank: index, count: songs.count),
                             language: language,
                             year: song.year,
                             affinity: max(0.2, cluster.share),
@@ -250,38 +250,65 @@ struct RecommendationV3Engine: Sendable {
 
     // MARK: - 来源适配（降级链）
 
-    /// 艺人热歌：Last.fm → 现有在线源。
+    /// 艺人热歌：中文歌手优先网易云（实测 Last.fm 中文曲名映射脏），西文歌手优先 Last.fm。
+    /// 两者都失败再降级通用搜索。
     private func artistTopSongs(artist: String) async -> [RecommendationRemoteSong] {
-        if let lastFM {
-            let tracks = await lastFM.topTracks(artist: artist, limit: perSourceLimit)
-            if !tracks.isEmpty {
-                return tracks.map { track in
-                    RecommendationRemoteSong(
-                        title: track.title,
-                        artist: track.artist.isEmpty ? artist : track.artist,
-                        album: track.album,
-                        durationMs: track.durationMs,
-                        source: .lastfm
-                    )
-                }
-            }
-        }
-        // 无 Last.fm key / 请求失败：降级网易云艺人热歌接口，再降级通用搜索。
-        if let netease,
-           let songs = try? await netease.artistTopSongs(artistName: artist, limit: perSourceLimit),
-           !songs.isEmpty {
-            return songs.map { song in
-                RecommendationRemoteSong(
-                    title: song.title,
-                    artist: song.artist.isEmpty ? artist : song.artist,
-                    album: song.album,
-                    songID: song.id,
-                    durationMs: song.durationMs,
-                    source: .netease
-                )
-            }
+        if isCJKArtist(artist) {
+            if let songs = await neteaseTopSongs(artist: artist) { return songs }
+            if let songs = await lastFMTopSongs(artist: artist) { return songs }
+        } else {
+            if let songs = await lastFMTopSongs(artist: artist) { return songs }
+            if let songs = await neteaseTopSongs(artist: artist) { return songs }
         }
         return await search(query: artist, limit: perSourceLimit)
+    }
+
+    /// Last.fm 艺人的热歌（无 key / 空结果 → nil）。
+    private func lastFMTopSongs(artist: String) async -> [RecommendationRemoteSong]? {
+        guard let lastFM else { return nil }
+        let tracks = await lastFM.topTracks(artist: artist, limit: perSourceLimit)
+        guard !tracks.isEmpty else { return nil }
+        let total = tracks.count
+        return tracks.enumerated().map { index, track in
+            RecommendationRemoteSong(
+                title: track.title,
+                artist: track.artist.isEmpty ? artist : track.artist,
+                album: track.album,
+                durationMs: track.durationMs,
+                source: .lastfm,
+                popularity: popularity(rank: index, count: total)
+            )
+        }
+    }
+
+    /// 网易云艺人热歌（无客户端 / 失败 / 空结果 → nil；`pop` 直接当热度）。
+    private func neteaseTopSongs(artist: String) async -> [RecommendationRemoteSong]? {
+        guard let netease else { return nil }
+        guard let songs = try? await netease.artistTopSongs(artistName: artist, limit: perSourceLimit),
+              !songs.isEmpty
+        else { return nil }
+        return songs.map { song in
+            RecommendationRemoteSong(
+                title: song.title,
+                artist: song.artist.isEmpty ? artist : song.artist,
+                album: song.album,
+                songID: song.id,
+                durationMs: song.durationMs,
+                source: .netease,
+                popularity: song.popularity
+            )
+        }
+    }
+
+    /// 中日韩文字（决定热歌主源：中文优先网易云，西文优先 Last.fm）。
+    private func isCJKArtist(_ name: String) -> Bool {
+        for scalar in name.unicodeScalars {
+            let value = scalar.value
+            if (0x3040 ... 0x30FF).contains(value) || (0x4E00 ... 0x9FFF).contains(value) || (0xAC00 ... 0xD7AF).contains(value) {
+                return true
+            }
+        }
+        return false
     }
 
     /// 相似艺人：Last.fm → MusicBrainz。

@@ -26,6 +26,8 @@ struct RecommendationRemoteSong: Sendable, Equatable {
     var source: RecommendationSource?
     /// 来源质量降级原因（如网易云兜底）；nil = 原级来源。
     var degradedReason: String?
+    /// 来源热度（0…1；网易云 `pop`/100 等；给不出 = nil，排序按名次兜底）。
+    var popularity: Double?
 
     init(
         title: String,
@@ -36,7 +38,8 @@ struct RecommendationRemoteSong: Sendable, Equatable {
         durationMs: Int? = nil,
         previewURL: URL? = nil,
         source: RecommendationSource? = nil,
-        degradedReason: String? = nil
+        degradedReason: String? = nil,
+        popularity: Double? = nil
     ) {
         self.title = title
         self.artist = artist
@@ -47,6 +50,7 @@ struct RecommendationRemoteSong: Sendable, Equatable {
         self.previewURL = previewURL
         self.source = source
         self.degradedReason = degradedReason
+        self.popularity = popularity
     }
 }
 
