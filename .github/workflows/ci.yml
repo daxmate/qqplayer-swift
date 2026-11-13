@@ -146,7 +146,8 @@ jobs:
       - name: Test (xcodebuild test, iOS simulator)
         run: |
           set -o pipefail
-          DEVICE="$(xcrun simctl list devices available | grep -oE 'iPhone [^(]+' | head -1 | sed 's/ *$//')"
+          # 用 UDID 而不是设备名：同名设备（含已删运行时的僵尸设备）会让 xcodebuild 抽错，报 Invalid connectionUUID。
+          DEVICE="$(xcrun simctl list devices available -j | python3 -c 'import json,sys;d=json.load(sys.stdin)["devices"];print(next((x["udid"] for ds in d.values() for x in ds if x.get("name","").startswith("iPhone")),""))')"
           if [ -z "$DEVICE" ]; then
             echo "❌ 无可用 iPhone 模拟器（xcrun simctl list devices available）"
             exit 1
@@ -156,7 +157,7 @@ jobs:
           xcodebuild test \
             -project QQPlayer.xcodeproj \
             -scheme QQPlayer \
-            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -destination "platform=iOS Simulator,id=$DEVICE" \
             -derivedDataPath build/DerivedData \
             -only-testing:QQPlayerTests \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-ios.log
@@ -454,11 +455,10 @@ jobs:
         if: steps.probe.outputs.compatible == 'true'
         run: |
           set -o pipefail
-          # 设备沿用 Swift job 的动态选取口径；probe 已把同一规则选中的设备带过来
-          DEVICE="${{ steps.probe.outputs.device }}"
-          if [ -z "$DEVICE" ]; then
-            DEVICE="$(xcrun simctl list devices available | grep -oE 'iPhone [^(]+' | head -1 | sed 's/ *$//')"
-          fi
+          # probe 输出的是设备名；这里解析成 UDID（按名字会撞同名设备 → Invalid connectionUUID），
+          # 匹配不到就退回第一个可用 iPhone。
+          DEVICE_NAME="${{ steps.probe.outputs.device }}"
+          DEVICE="$(xcrun simctl list devices available -j | python3 -c 'import json,sys;want=sys.argv[1];d=json.load(sys.stdin)["devices"];items=[x for ds in d.values() for x in ds];print(next((x["udid"] for x in items if x.get("name")==want), next((x["udid"] for x in items if x.get("name","").startswith("iPhone")),"")))' "$DEVICE_NAME")"
           if [ -z "$DEVICE" ]; then
             echo "❌ 无可用 iPhone 模拟器（xcrun simctl list devices available）"
             exit 1
@@ -468,7 +468,7 @@ jobs:
           xcodebuild test \
             -project QQPlayer.xcodeproj \
             -scheme QQPlayerSiri \
-            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -destination "platform=iOS Simulator,id=$DEVICE" \
             -derivedDataPath build/DerivedDataSiri \
             2>&1 | tee /tmp/xcodebuild-siri.log   # 不能加 CODE_SIGNING_ALLOWED=NO：跳过重签名会让 AppIntentsTesting 报 803（Customer build）
 
