@@ -250,7 +250,7 @@ struct MacRecommendationView: View {
                         Text("recommendation_downloaded_badge".localized)
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, DesignTokens.space6)
-                            .padding(.vertical, 1)
+                            .padding(.vertical, DesignTokens.space2)
                             .background(accentColor.opacity(0.16), in: Capsule())
                             .foregroundStyle(accentColor)
                             .accessibilityLabel("recommendation_downloaded_badge".localized)

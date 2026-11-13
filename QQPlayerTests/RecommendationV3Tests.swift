@@ -346,7 +346,10 @@ struct RecommendationProfileV3Tests {
         let profile = RecommendationProfileV3Builder.build(RecommendationProfileV3Input(tracks: tracks, now: now))
         #expect(profile.seeds.count == RecommendationProfileV3Builder.maxSeeds)
         #expect(profile.seeds.first?.artist == "Artist 0")
-        #expect(profile.seeds.first?.affinity == 1)
+        // 亲和度是四项加权（库 / 播放 / 收藏 / 最近），权重之和为 1：
+        // 本夹具只有「曲库曲目数」一维满档（播放 0 / 无收藏 / 无加入时间），
+        // 所以排序第一的艺人亲和度 = 库维度权重，而不是 1。
+        #expect(profile.seeds.first?.affinity == RecommendationProfileWeights.defaults.normalized().library)
         let affinities = profile.seeds.map(\.affinity)
         #expect(affinities == affinities.sorted(by: >))
     }

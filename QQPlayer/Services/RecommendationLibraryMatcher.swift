@@ -18,17 +18,29 @@ import Foundation
 enum RecommendationLibraryMatcher {
     // MARK: - 版本后缀
 
-    private static let bracketSuffix = try! NSRegularExpression(
+    private static let bracketSuffix = makeRegex(
         pattern: #"(?i)\s*[\(\[](?:live[^\)\]]*|remaster(?:ed)?[^\)\]]*|feat\.[^\)\]]*|ft\.[^\)\]]*|with [^\)\]]*|bonus track[^\)\]]*|deluxe[^\)\]]*|album version[^\)\]]*|single version[^\)\]]*|现场[^\)\]]*|演唱会[^\)\]]*)[\)\]]\s*$"#
     )
 
-    private static let dashSuffix = try! NSRegularExpression(
+    private static let dashSuffix = makeRegex(
         pattern: #"(?i)\s+-\s*(?:live\b.*|remastered?\b.*|\d{4}\s*remaster.*)$"#
     )
 
-    private static let featSuffix = try! NSRegularExpression(
+    private static let featSuffix = makeRegex(
         pattern: #"(?i)\s+(?:feat\.|ft\.|featuring)\s+.*$"#
     )
+
+    /// 编译一个字面量正则。
+    ///
+    /// 不用 try!：DangerousOperatorContract 把 try! 视为「一崩了之」，模式写坏时
+    /// 要给可定位诊断（带模式串）。内置模式均有单测覆盖，编译失败 = 编程错误。
+    private static func makeRegex(pattern: String) -> NSRegularExpression {
+        do {
+            return try NSRegularExpression(pattern: pattern)
+        } catch {
+            preconditionFailure("内置正则模式必须可编译（编程错误）：\(pattern) — \(error)")
+        }
+    }
 
     /// 剥离标题版本后缀（最多 4 轮，覆盖「(Live) - Remastered 2011」这类叠加写法）。
     static func stripTitleSuffixes(_ raw: String) -> String {

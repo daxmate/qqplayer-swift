@@ -115,7 +115,12 @@ struct RecommendationMetadataNormalizer: Sendable {
         return (result, hits)
     }
 
-    /// 只接受「标题归一化后一致 + 艺人一致」的命中（宁缺勿错）。
+    /// 只接受「艺人一致」的命中（宁缺勿错）：
+    ///   1. 标题键 + 艺人键都一致 → 直接用；
+    ///   2. 标题键一致 + 艺人键互相包含（feat. / 多艺人写法差异）→ 用；
+    ///   3. 标题键**不同** + 艺人一致 + 该艺人只有唯一候选标题 → 视为「错名纠正」
+    ///      （来源写了别名 / 错名，例：Last.fm 的 Ageless Tale → 她来听我的演唱会）。
+    ///      唯一性判据是关键：同一艺人回来多首都算不准，宁可放弃也不改名（防把 A 歌改成 B 歌）。
     private func bestMatch(
         for candidate: RecommendationV3Candidate,
         in matches: [RecommendationRemoteSong]
@@ -128,11 +133,24 @@ struct RecommendationMetadataNormalizer: Sendable {
         }
         if let first = exact.first { return first }
         // 艺人写法差异（feat. / 多艺人）：标题一致 + 艺人键互相包含也算。
-        return matches.first { match in
-            let matchArtist = RecommendationLibraryMatcher.artistKey(match.artist)
-            guard RecommendationLibraryMatcher.titleKey(match.title) == titleKey else { return false }
-            return !matchArtist.isEmpty && (matchArtist.contains(artistKey) || artistKey.contains(matchArtist))
+        if let loose = matches.first(where: { match in
+            RecommendationLibraryMatcher.titleKey(match.title) == titleKey
+                && artistKeysIntersect(artistKey, match.artist)
+        }) {
+            return loose
         }
+        // 错名纠正：艺人一致且回来只有一种标题时，才敢替换标题。
+        let sameArtist = matches.filter { artistKeysIntersect(artistKey, $0.artist) }
+        let distinctTitles = Set(sameArtist.map { RecommendationLibraryMatcher.titleKey($0.title) })
+        guard distinctTitles.count == 1, let only = sameArtist.first else { return nil }
+        return only
+    }
+
+    /// 艺人键非空且互相包含（多艺人写法差异）。
+    private func artistKeysIntersect(_ mine: String, _ other: String) -> Bool {
+        let otherKey = RecommendationLibraryMatcher.artistKey(other)
+        guard !mine.isEmpty, !otherKey.isEmpty else { return false }
+        return otherKey.contains(mine) || mine.contains(otherKey)
     }
 
     private func apply(

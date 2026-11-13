@@ -34,15 +34,24 @@ struct RuleRecommendationRequestPlanner: RecommendationRequestPlanning {
 }
 
 enum RuleRecommendationTextParser {
-    private static let decadeDigits = try! NSRegularExpression(
+    private static let decadeDigits = makeRegex(
         pattern: #"((?:19|20)\d{2})\s*(?:年代|s)?"#
     )
-    private static let decadeShort = try! NSRegularExpression(
+    private static let decadeShort = makeRegex(
         pattern: #"([1-9])\s*0\s*年代"#
     )
-    private static let referencePattern = try! NSRegularExpression(
+    private static let referencePattern = makeRegex(
         pattern: #"(?:和|跟|像|类似|同)\s*([^，。,.!?！？、\s]{1,20}?)\s*(?:类似|一样|差不多|风格)"#
     )
+
+    /// 编译一个字面量正则（不用 try!：模式写坏时给可定位诊断，见 DangerousOperatorContract）。
+    private static func makeRegex(pattern: String) -> NSRegularExpression {
+        do {
+            return try NSRegularExpression(pattern: pattern)
+        } catch {
+            preconditionFailure("内置正则模式必须可编译（编程错误）：\(pattern) — \(error)")
+        }
+    }
 
     /// 年代起点（十年；去重升序）。
     static func decades(in text: String) -> [Int] {
