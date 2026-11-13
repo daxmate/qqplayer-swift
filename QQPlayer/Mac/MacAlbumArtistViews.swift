@@ -419,9 +419,7 @@ struct MacPlaylistListView: View {
     private func detail(for target: MacPlaylistDetailTarget) -> some View {
         switch target {
         case .smart(let kind):
-            MacSmartPlaylistDetailView(kind: kind) {
-                detailTarget = nil
-            }
+            MacSmartPlaylistDetailView(kind: kind)
         case .manual(let playlist):
             MacManualPlaylistDetailView(
                 playlist: playlist,

@@ -35,9 +35,7 @@ extension MacLibraryView {
                 MacRecommendationView()
             case let .smartPlaylist(kind):
                 // 自动歌单详情：复用既有 `MacSmartPlaylistDetailView`（不另立第二份实现）
-                MacSmartPlaylistDetailView(kind: kind) {
-                    selection = .section(.tracks)
-                }
+                MacSmartPlaylistDetailView(kind: kind)
             case let .userPlaylist(id):
                 // 用户歌单详情：复用既有 `MacManualPlaylistDetailView`；
                 // 快照里找不到该 id（删除瞬间）时给出空态，不崩、不留白

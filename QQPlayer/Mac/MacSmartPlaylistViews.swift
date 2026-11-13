@@ -159,13 +159,11 @@ private struct MacSmartCardStripWidthKey: PreferenceKey {
 // MARK: - Detail content (in-column, 2026-09-05)
 
 /// Inline detail for one automatic playlist, displayed in the content column
-/// (no popup sheet). A leading back button returns to the playlists page. The
-/// decades kind first shows the bucket list; tapping a bucket swaps the content
-/// to that decade's tracks (back returns to the bucket list).
+/// (no popup sheet). The decades kind first shows the bucket list; tapping a
+/// bucket swaps the content to that decade's tracks (back returns to the bucket
+/// list). Root level shows no back button — 侧栏本身就是出口。
 struct MacSmartPlaylistDetailView: View {
     let kind: SmartPlaylistKind
-    /// Pop one level: decade bucket → bucket list; root → playlists home page.
-    let onBack: () -> Void
 
     @Environment(PlayerEngine.self) private var player
 
@@ -185,6 +183,18 @@ struct MacSmartPlaylistDetailView: View {
             content
         }
         .onAppear { loadData() }
+        // 宿主（MacLibraryView+Content / MacAlbumArtistViews）在侧栏切换自动歌单时
+        // 复用同类型 View → identity 不变 → onAppear 不会重触发，曲目会停在上一份
+        // 歌单。这里显式跟随 kind：先清掉上一份的状态（含年代桶选中态与取数结果），
+        // 再交给 loadData() 重载。
+        .onChange(of: kind) { _, _ in
+            selectedBucket = nil
+            bucketTracks = []
+            tracks = []
+            buckets = []
+            loadError = nil
+            loadData()
+        }
         .onDisappear { loadTask?.cancel() }
         // 刮削保存/批量刮削/重扫后：自动歌单曲目与年代分组都要重算
         // （2026-09-06：单曲刮削后自动歌单不刷新修复；decade 详情内也重载）
@@ -200,17 +210,16 @@ struct MacSmartPlaylistDetailView: View {
 
     private var header: some View {
         HStack(spacing: DesignTokens.space10) {
-            Button {
-                if selectedBucket != nil {
+            // 只在年代桶内显示返回（回桶列表）；根级不再有返回——侧栏切换即出口
+            if selectedBucket != nil {
+                Button {
                     selectedBucket = nil
-                } else {
-                    onBack()
+                } label: {
+                    Label(Localized.back, systemImage: "chevron.left")
                 }
-            } label: {
-                Label(Localized.back, systemImage: "chevron.left")
+                .buttonStyle(.borderless)
+                .help(Localized.back)
             }
-            .buttonStyle(.borderless)
-            .help(Localized.back)
             Text(title)
                 .font(.title2)
                 .fontWeight(.bold)
