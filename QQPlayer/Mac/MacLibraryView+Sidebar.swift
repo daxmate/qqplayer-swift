@@ -15,6 +15,22 @@ import SwiftUI
 extension MacLibraryView {
     // MARK: - Sidebar
 
+    /// 侧栏行：图标显式跟 App 强调色（`Label(_:systemImage:)` 的图标不吃 `.tint`），
+    /// 文字保持系统前景色。选中行整行交给系统高亮 —— 不给它覆盖前景色，
+    /// 否则选中态的对比色会被强调色顶掉。不引入 `.listRowBackground` 自绘。
+    private func sidebarRow(_ title: String, systemImage: String, isSelected: Bool) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            if isSelected {
+                Image(systemName: systemImage)
+            } else {
+                Image(systemName: systemImage)
+                    .foregroundStyle(appAccentColor)
+            }
+        }
+    }
+
     /// 分片：跨文件可见（原 private）
     var sidebar: some View {
         VStack(spacing: DesignTokens.space0) {
@@ -22,18 +38,27 @@ extension MacLibraryView {
             List(selection: $selection) {
                 // 一级分区（歌曲 / 我喜欢 / 专辑 / 艺术家）
                 ForEach(MacLibrarySection.allCases) { item in
-                    Label(item.title, systemImage: item.icon)
-                        .tag(MacLibrarySelection.section(item))
+                    sidebarRow(
+                        item.title,
+                        systemImage: item.icon,
+                        isSelected: selection == .section(item)
+                    )
+                    .tag(MacLibrarySelection.section(item))
                 }
                 // 本地 AI 推荐（P1）：规则推荐页，入口放在一级分区之下
-                Label("recommendations".localized, systemImage: "sparkles")
-                    .tag(MacLibrarySelection.recommendations)
+                sidebarRow(
+                    "recommendations".localized,
+                    systemImage: "sparkles",
+                    isSelected: selection == .recommendations
+                )
+                .tag(MacLibrarySelection.recommendations)
                 // 智能列表（自动歌单）：条目与顺序全部来自 `SmartPlaylistKind` 单一事实源
                 Section {
                     ForEach(SmartPlaylistKind.allCases) { kind in
-                        Label(
+                        sidebarRow(
                             Localized.smartPlaylistTitle(kind),
-                            systemImage: MacSmartPlaylistUILogic.iconName(for: kind)
+                            systemImage: MacSmartPlaylistUILogic.iconName(for: kind),
+                            isSelected: selection == .smartPlaylist(kind)
                         )
                         .tag(MacLibrarySelection.smartPlaylist(kind))
                     }
@@ -44,8 +69,12 @@ extension MacLibraryView {
                 Section {
                     ForEach(playlists, id: \.id) { playlist in
                         if let id = playlist.id {
-                            Label(playlist.title, systemImage: "list.bullet.rectangle")
-                                .tag(MacLibrarySelection.userPlaylist(id))
+                            sidebarRow(
+                                playlist.title,
+                                systemImage: "list.bullet.rectangle",
+                                isSelected: selection == .userPlaylist(id)
+                            )
+                            .tag(MacLibrarySelection.userPlaylist(id))
                         }
                     }
                 } header: {

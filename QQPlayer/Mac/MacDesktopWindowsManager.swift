@@ -201,25 +201,23 @@ final class DesktopWindowsManager {
         switch kind {
         case .mini:
             // 迷你窗控件（播放键/歌词点亮态）跟随 App 强调色：NSPanel 内容不继承
-            // App 场景注入，accent 在此显式注入（设置改动经 refreshPanelRootViews 重建）
-            // ——值取 MacAppearance.currentAccentColor（与主窗同一读取入口，M2）。
-            let accent = MacAppearance.currentAccentColor
-            MacMiniPlayerView()
-                // 本类是浮窗的装配点：手工 NSHostingView 不继承 App 场景环境（与上方强调色同因），
-                // 视图读的 `@Environment(DesktopWindowsManager.self)` 必须在此显式注入，
-                // 否则进迷你模式即运行时致命错（编译与单测都发现不了）。
-                .environment(self)
-                .environment(\.appAccentColor, accent)
-                // 播放引擎（批 6-6）：浮窗视图读 `@Environment(PlayerEngine.self)`，
-                // 手工 hosting 不继承场景环境 ⇒ 必须在此显式注入。
-                .environment(PlayerEngine.shared)
-                // App 级无状态入口容器（2026-10-10 修复）：迷你窗封面 `MacArtworkThumbnail`
-                // 读 `@Environment(AppServices.self)`（批 6-5 起），它由 `MacMiniPlayerView`
-                // 承载 ⇒ 手工 hosting 不继承场景环境、子视图的依赖同样到不了这里，必须显式注入，
-                // 否则点迷你按钮即 EXC_BREAKPOINT（运行时致命错，编译与单测都发现不了）。
-                // 装配写法与主窗/Settings 场景根一致（`QQPlayerMacApp.swift`）。
-                .environment(AppServices.live)
-                .tint(accent)
+            // App 场景注入 → 用与主窗同一个 `AccentInjector`（同源 store，换色即时跟随）。
+            AccentInjector {
+                MacMiniPlayerView()
+                    // 本类是浮窗的装配点：手工 NSHostingView 不继承 App 场景环境（与上方强调色同因），
+                    // 视图读的 `@Environment(DesktopWindowsManager.self)` 必须在此显式注入，
+                    // 否则进迷你模式即运行时致命错（编译与单测都发现不了）。
+                    .environment(self)
+                    // 播放引擎（批 6-6）：浮窗视图读 `@Environment(PlayerEngine.self)`，
+                    // 手工 hosting 不继承场景环境 ⇒ 必须在此显式注入。
+                    .environment(PlayerEngine.shared)
+                    // App 级无状态入口容器（2026-10-10 修复）：迷你窗封面 `MacArtworkThumbnail`
+                    // 读 `@Environment(AppServices.self)`（批 6-5 起），它由 `MacMiniPlayerView`
+                    // 承载 ⇒ 手工 hosting 不继承场景环境、子视图的依赖同样到不了这里，必须显式注入，
+                    // 否则点迷你按钮即 EXC_BREAKPOINT（运行时致命错，编译与单测都发现不了）。
+                    // 装配写法与主窗/Settings 场景根一致（`QQPlayerMacApp.swift`）。
+                    .environment(AppServices.live)
+            }
         case .lyric:
             MacDesktopLyricView()
                 // 批 6-6：桌面歌词窗读 `@Environment(PlayerEngine.self)`（playbackTime 驱动行定位）

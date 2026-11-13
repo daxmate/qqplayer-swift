@@ -86,17 +86,17 @@ struct QQPlayerMacApp: App {
     var body: some Scene {
         WindowGroup {
             // MAS 批 2B：未授权曲库根时整窗换成授权引导（不进空库主页）。
-            MacLibraryAccessGate {
-                MacLibraryView()
+            // 强调色：`AccentInjector` 在被观察的 body 内求值注入 `.tint` 与
+            // `\.appAccentColor`（旧写法在 App body 里读静态值，换色后不重新求值 ——
+            // 是「只有部分 UI 变色」的根因，2026-11-13 修复）。
+            AccentInjector {
+                MacLibraryAccessGate {
+                    MacLibraryView()
+                }
             }
             // macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar 内容会延伸到
             // 标题栏区域、第一行与交通灯重叠。强制工具栏背景不透明后内容从标题栏下方开始。
             .toolbarBackground(.visible, for: .windowToolbar)
-            // 强调色：对齐 web 版 ACCENT_OPTIONS 预设，设置页切换后全局生效。
-            // 值一律取 `MacAppearance.currentAccentColor`（唯一读取入口，M2）。
-            .tint(MacAppearance.currentAccentColor)
-            // App 强调色环境值（Color.accentColor 在 macOS 跟随系统而非 App tint）
-            .environment(\.appAccentColor, MacAppearance.currentAccentColor)
             // 视图层单例收口（「下降预算」批 3a）：App 级叶子 store 的**唯一装配点**。
             // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
             // 新增一个对象 = 在此与 `Settings` 根各登记一行。
@@ -132,27 +132,28 @@ struct QQPlayerMacApp: App {
         // 设置：系统 Settings scene → App 菜单自动出现「Settings…」(⌘,)，
         // 打开独立设置窗口（macOS 惯例；主窗口 toolbar 不放设置按钮）
         Settings {
-            MacSettingsView()
-                .tint(MacAppearance.currentAccentColor)
-                // MAS 批 2B：设置页要读曲库根授权状态（独立场景，不继承主窗环境）。
-                .environment(MacLibraryRootAccess.shared)
-                .environment(\.appAccentColor, MacAppearance.currentAccentColor)
-                // 同 WindowGroup 根：Settings 是独立场景，不继承主窗环境（批 3a）。
-                .environment(MacSearchAnythingState.shared)
-                .environment(MacLibraryFactsStore.shared)
-                .environment(DesktopWindowsManager.shared)
-                .environment(EQManager.shared)
-                .environment(MacSpectrumAnalyzer.shared)
-                .environment(LibraryIndexer.shared)
-                .environment(AppCoordinator.shared)
-                .environment(AppServices.live)
-                // 播放引擎（批 6-6）：Settings 是独立场景，不继承主窗环境
-                .environment(PlayerEngine.shared)
-                .environment(KaraokeController.shared)
-                // 同步三件（批 6-8）：Settings 是独立场景，不继承主窗环境（同上一行原因）
-                .environment(SyncHostCenter.shared)
-                .environment(SyncWiringFactsStore.shared)
-                .environment(MacLyricsResendFactsStore.shared)
+            // 强调色同主窗：走 `AccentInjector`（在可观察 body 内注入，换色即时生效）。
+            AccentInjector {
+                MacSettingsView()
+            }
+            // MAS 批 2B：设置页要读曲库根授权状态（独立场景，不继承主窗环境）。
+            .environment(MacLibraryRootAccess.shared)
+            // 同 WindowGroup 根：Settings 是独立场景，不继承主窗环境（批 3a）。
+            .environment(MacSearchAnythingState.shared)
+            .environment(MacLibraryFactsStore.shared)
+            .environment(DesktopWindowsManager.shared)
+            .environment(EQManager.shared)
+            .environment(MacSpectrumAnalyzer.shared)
+            .environment(LibraryIndexer.shared)
+            .environment(AppCoordinator.shared)
+            .environment(AppServices.live)
+            // 播放引擎（批 6-6）：Settings 是独立场景，不继承主窗环境
+            .environment(PlayerEngine.shared)
+            .environment(KaraokeController.shared)
+            // 同步三件（批 6-8）：Settings 是独立场景，不继承主窗环境（同上一行原因）
+            .environment(SyncHostCenter.shared)
+            .environment(SyncWiringFactsStore.shared)
+            .environment(MacLyricsResendFactsStore.shared)
         }
         // search anything（C 组②）：⌘K 唤起全屏搜索层（web SearchAnything 快捷键同键）
         .commands {

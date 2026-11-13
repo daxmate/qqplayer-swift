@@ -15,8 +15,9 @@ import UniformTypeIdentifiers
 struct MacLibraryView: View {
     /// 分片：跨文件可见（原 private）
     @Environment(AppCoordinator.self) var appCoordinator
-    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
-    @Environment(\.appAccentColor) private var appAccentColor
+    /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）。
+    /// 分片：跨文件可见（侧栏图标着色在 `MacLibraryView+Sidebar.swift`）。
+    @Environment(\.appAccentColor) var appAccentColor
     /// 官方打开设置窗口的入口（macOS 14+ `OpenSettingsAction`；替代已失效的私有 selector）。
     /// 分片：跨文件可见（原 private）
     @Environment(\.openSettings) var openSettings

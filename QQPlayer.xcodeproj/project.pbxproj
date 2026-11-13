@@ -618,6 +618,8 @@
 				Mac/MLXRecommendationPlanner.swift,
 				Mac/MLXRecommendationReasonProvider.swift,
 				"Mac/MacRecommendationModel+Reasons.swift",
+				Mac/AccentInjector.swift,
+				Models/AccentStore.swift,
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
 		};
@@ -673,6 +675,7 @@
 				Helpers/EnvironmentLoader.swift,
 				Helpers/LocalizationHelper.swift,
 				Helpers/ObjCExceptionCatcher.m,
+				Mac/AccentInjector.swift,
 				Mac/MacAlbumArtistViews.swift,
 				Mac/MacAppearance.swift,
 				Mac/MacArtworkThumbnail.swift,
@@ -762,6 +765,7 @@
 				Mac/SyncHostCenter.swift,
 				Mac/SyncProbeRowView.swift,
 				Mac/SyncTracksPane.swift,
+				Models/AccentStore.swift,
 				Models/AppearanceTheme.swift,
 				Models/AppNotifications.swift,
 				Models/DatabaseModels.swift,

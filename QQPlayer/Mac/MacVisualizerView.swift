@@ -11,9 +11,10 @@ import SwiftUI
 
 /// 播放页频谱条（数据源 MacSpectrumAnalyzer.shared；未激活且无冻结帧时不绘制；暂停 = 冻结最后一帧）。
 /// 颜色跟随设置强调色（web 版强调色语义）：`Color.accentColor` 在 macOS 上跟随
-/// 系统强调色而非 App tint，故读 `MacAppearance.currentAccentColor`（唯一读取入口；
-/// 2026-09-05 改为直读 MacAppearance，2026-09-15 M2 收口为 currentAccentColor，
-/// 不再自读 `DeleteSettings.accentColorName`）。
+/// 系统强调色而非 App tint，故读 App 根注入的 `\.appAccentColor` 环境值
+/// （2026-09-05 改为直读 MacAppearance，2026-09-15 M2 收口为 currentAccentColor；
+/// 2026-11-13 改为读环境值——刷新由 `AccentInjector` 的可观察 store 负责，
+/// 本视图不再自带 `.onReceive(.qqplayerSettingsDidChange)` 第二条刷新路径）。
 ///
 /// ⚠️ 重绘驱动（2026-09-12 修「播放中频谱条恒为最低高度、贴成一条虚线」）：
 /// 2026-09-08 曾把数据订阅换成「直读 levels + TimelineView(.animation) 驱动」，
@@ -32,25 +33,26 @@ import SwiftUI
 struct MacVisualizerView: View {
     /// 频谱分析器（Mac 组合根注入；按属性追踪驱动重绘）
     @Environment(MacSpectrumAnalyzer.self) private var analyzer
-    /// 当前强调色（唯一读取入口 MacAppearance.currentAccentColor；设置页改动经
-    /// qqplayerSettingsDidChange 刷新）
-    @State private var accentColor: Color = MacAppearance.currentAccentColor
+    /// 当前强调色：统一读 App 根注入的环境值（由 `AccentInjector` 提供，换色即时跟随）。
+    /// 不要再自读 `MacAppearance.currentAccentColor` + 自带 onReceive——那是第二条刷新路径。
+    @Environment(\.appAccentColor) private var appAccentColor
 
     var body: some View {
         Group {
             if analyzer.isActive || analyzer.isFrozen {
                 let levels = analyzer.levels
+                // ⚠️ 强调色同样必须在 body 求值期读取并作为参数传进渲染闭包：
+                // Canvas 渲染闭包不在 body 求值范围内，那里读环境值 / `@Observable` 属性
+                // 都不登记依赖 ⇒ 换色后不重绘（与 `levels` 同一条纪律）。
+                let accent = appAccentColor
                 Canvas { context, size in
-                    drawBars(levels: levels, in: &context, size: size)
+                    drawBars(levels: levels, accent: accent, in: &context, size: size)
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
-            accentColor = MacAppearance.currentAccentColor
-        }
     }
 
-    private func drawBars(levels: [Float], in context: inout GraphicsContext, size: CGSize) {
+    private func drawBars(levels: [Float], accent: Color, in context: inout GraphicsContext, size: CGSize) {
         guard !levels.isEmpty, size.width > 0, size.height > 0 else { return }
 
         let spacing: CGFloat = 2
@@ -63,7 +65,7 @@ struct MacVisualizerView: View {
             let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
             // 能量越高越实；静态低亮避免视觉噪点
             let opacity = 0.35 + 0.65 * min(1, Double(level) * 1.4)
-            context.fill(path, with: .color(accentColor.opacity(opacity)))
+            context.fill(path, with: .color(accent.opacity(opacity)))
         }
     }
 }
