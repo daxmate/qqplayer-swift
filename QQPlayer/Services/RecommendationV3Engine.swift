@@ -36,6 +36,8 @@ struct RecommendationV3Engine: Sendable {
     /// 在线搜索源（复用现有降级链；测试注入桩）。
     var providers: [any OnlineSearchProviding]
     var lastFM: LastFMClient?
+    /// 网易云客户端（A 通道降级：艺人热歌接口；nil = 只用通用搜索）。
+    var netease: NeteaseOnlineClient?
     var similarArtistSource: (any SimilarArtistProviding)?
     var quotas: RecommendationChannelQuotas = .defaults
     var perSourceLimit: Int = 10
@@ -50,6 +52,7 @@ struct RecommendationV3Engine: Sendable {
     init(
         providers: [any OnlineSearchProviding]? = nil,
         lastFM: LastFMClient? = nil,
+        netease: NeteaseOnlineClient? = nil,
         similarArtistSource: (any SimilarArtistProviding)? = nil
     ) {
         if let providers {
@@ -60,6 +63,7 @@ struct RecommendationV3Engine: Sendable {
             self.providers = [RecommendationSourceChain.defaultProvider(budget: budget, audit: audit)]
         }
         self.lastFM = lastFM
+        self.netease = netease
         self.similarArtistSource = similarArtistSource
     }
 
@@ -67,6 +71,7 @@ struct RecommendationV3Engine: Sendable {
     static func configured(_ settings: DeleteSettings = .load()) -> RecommendationV3Engine {
         var engine = RecommendationV3Engine(
             lastFM: LastFMClient(),
+            netease: .shared,
             similarArtistSource: MusicBrainzSimilarArtistSource()
         )
         engine.quotas = settings.recommendationChannelQuotas
@@ -259,6 +264,21 @@ struct RecommendationV3Engine: Sendable {
                         source: .lastfm
                     )
                 }
+            }
+        }
+        // 无 Last.fm key / 请求失败：降级网易云艺人热歌接口，再降级通用搜索。
+        if let netease,
+           let songs = try? await netease.artistTopSongs(artistName: artist, limit: perSourceLimit),
+           !songs.isEmpty {
+            return songs.map { song in
+                RecommendationRemoteSong(
+                    title: song.title,
+                    artist: song.artist.isEmpty ? artist : song.artist,
+                    album: song.album,
+                    songID: song.id,
+                    durationMs: song.durationMs,
+                    source: .netease
+                )
             }
         }
         return await search(query: artist, limit: perSourceLimit)

@@ -197,6 +197,58 @@ struct NeteaseOnlineClient: Sendable {
         }
     }
 
+    // MARK: - 艺人热歌（公开 API /api/artist/{id}；推荐 v3 A 通道降级）
+
+    /// 艺人热歌榜（`hotSongs`，最多 50 首）。艺人 ID 由 `searchArtists` 解析。
+    /// 失败抛错（调用方静默降级到通用搜索）。
+    func artistTopSongs(artistID: Int, limit: Int = 20) async throws -> [NeteaseOnlineSong] {
+        guard artistID > 0 else { return [] }
+        let bounded = max(1, min(50, limit))
+        guard let url = URL(string: "https://music.163.com/api/artist/\(artistID)") else { return [] }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 12
+        let (data, http) = try await transport.data(for: request)
+        guard http.statusCode == 200 else { throw NeteaseOnlineError.httpError(http.statusCode) }
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let songs = root["hotSongs"] as? [[String: Any]]
+        else { return [] }
+        return songs.prefix(bounded).compactMap { mapHotSong($0) }
+    }
+
+    /// 按艺人名取热歌（先 `searchArtists` 对齐名称，再取 hotSongs）。
+    func artistTopSongs(artistName: String, limit: Int = 20) async throws -> [NeteaseOnlineSong] {
+        let name = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return [] }
+        guard let artist = try await searchArtists(query: name, limit: 1).first else { return [] }
+        return try await artistTopSongs(artistID: artist.id, limit: limit)
+    }
+
+    /// `/api/artist/{id}` 的 `hotSongs` 条目（字段比 cloudsearch 少，全部容错）。
+    private func mapHotSong(_ song: [String: Any]) -> NeteaseOnlineSong? {
+        guard let id = song["id"] as? Int,
+              let name = song["name"] as? String,
+              !name.isEmpty
+        else { return nil }
+        let artists = (song["artists"] as? [[String: Any]]) ?? (song["ar"] as? [[String: Any]]) ?? []
+        let artist = joinArtists(artists)
+        let album = (song["album"] as? [String: Any]) ?? (song["al"] as? [String: Any])
+        let albumName = album?["name"] as? String
+        let cover = (album?["picUrl"] as? String).flatMap(NeteaseOnlineLogic.toHttpsURL)
+        let duration = (song["duration"] as? Int) ?? (song["dt"] as? Int)
+        return NeteaseOnlineSong(
+            id: id,
+            title: name,
+            artist: artist,
+            album: albumName,
+            coverURL: cover,
+            durationMs: duration,
+            level: NeteaseOnlineLogic.normalizeLevel(nil)
+        )
+    }
+
     private func cookieHeader() -> String {
         requestHeaderItems().map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
     }
