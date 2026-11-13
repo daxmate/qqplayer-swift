@@ -77,6 +77,31 @@ struct MacRecommendationSettingsView: View {
             }
 
             Section {
+                Stepper(
+                    value: $settings.relatedArtistShare,
+                    in: DeleteSettings.relatedArtistShareRange,
+                    step: DeleteSettings.relatedArtistShareStep
+                ) {
+                    HStack {
+                        Text("recommendation_related_share_title".localized)
+                        Spacer()
+                        Text("\(Int((settings.relatedArtistShare * 100).rounded()))%")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .settingsAnchor(MacSettingsCatalog.recommendationRelatedShare)
+                .onChange(of: settings.relatedArtistShare) { _, newValue in
+                    settings.relatedArtistShare = DeleteSettings.clampRelatedArtistShare(newValue)
+                    settings.save()
+                }
+            } footer: {
+                Text("recommendation_related_share_footer".localized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle(
                     "recommendation_artist_relation_title".localized,
                     isOn: $settings.recommendationArtistRelationExpansion

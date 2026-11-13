@@ -305,6 +305,8 @@ struct DeleteSettings: Codable {
     /// P4：MusicBrainz 艺人关系扩展（默认关 = 召回与 P3 完全一致、零额外请求）。
     /// 旧设置文件没有该 key 时必须解码为 false（见 init(from:)），不得整份解码失败。
     var recommendationArtistRelationExpansion: Bool = false
+    /// 点名艺人时相似补位在批次中的最大占比（0...0.5，默认 0.30；UI 按 5% 步进）。
+    var relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
 
     /// 推荐条数默认值 / 边界（唯一口径）。
     static let defaultRecommendationCount = 15
@@ -321,6 +323,19 @@ struct DeleteSettings: Codable {
 
     static func clampRecommendationChatRounds(_ value: Int) -> Int {
         min(recommendationChatRoundsRange.upperBound, max(recommendationChatRoundsRange.lowerBound, value))
+    }
+
+    /// 相似补位比例默认值 / 边界 / 步进（唯一口径）。
+    static let defaultRelatedArtistShare = 0.30
+    static let relatedArtistShareRange = 0.0 ... 0.5
+    static let relatedArtistShareStep = 0.05
+
+    /// 比例归一：先夹 0...0.5，再按 5% 步进取整（浮点误差按两位小数收口）。
+    static func clampRelatedArtistShare(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultRelatedArtistShare }
+        let clamped = min(relatedArtistShareRange.upperBound, max(relatedArtistShareRange.lowerBound, value))
+        let steps = (clamped / relatedArtistShareStep).rounded()
+        return (steps * relatedArtistShareStep * 100).rounded() / 100
     }
 
     // Home screen section visibility & order
@@ -415,6 +430,11 @@ struct DeleteSettings: Codable {
         recommendationArtistRelationExpansion = try container.decodeIfPresent(
             Bool.self, forKey: .recommendationArtistRelationExpansion
         ) ?? false
+        // 相似补位比例：旧设置文件无 key → 0.30（decodeIfPresent 兜底 + 读取即归一）。
+        relatedArtistShare = Self.clampRelatedArtistShare(
+            try container.decodeIfPresent(Double.self, forKey: .relatedArtistShare)
+                ?? Self.defaultRelatedArtistShare
+        )
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

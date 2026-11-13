@@ -1183,5 +1183,7 @@
 "recommendation_reason_request" = "符合你的要求：%@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_related_share_title" = "相似艺人比例";
+"recommendation_related_share_footer" = "点名艺人时，批次中最多有多少比例来自相似艺人";
 "recommendation_artist_relation_title" = "用 MusicBrainz 扩展相关艺人";
 "recommendation_artist_relation_footer" = "按艺人关系补充候选：每个艺人意图最多 3 位相关艺人，整轮最多 2 次查询。失败自动跳过，不影响推荐结果。";

@@ -41,6 +41,8 @@ struct RecommendationEngine: Sendable {
     var artistRelation: RecommendationArtistRelation?
     /// 点名场景的关系扩展兜底（设置为关也启用，用于相似补位）；nil = 不自动启用（测试默认）。
     var namedArtistRelationFallback: RecommendationArtistRelation?
+    /// 点名场景的相似补位比例（0...0.5，默认 0.30）：相似名额 = round(target × share)。
+    var relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
 
     /// 默认 = P2 主源降级链（iTunes tw → us → MusicBrainz → 网易云）；
     /// 测试注入 providers 时预算 / 诊断不接线（行为与 P1 相同）。

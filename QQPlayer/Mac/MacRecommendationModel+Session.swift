@@ -42,7 +42,8 @@ extension MacRecommendationModel {
     func applyPool(
         _ pool: [RecommendedCandidate],
         count: Int,
-        namedArtist: Bool = false
+        namedArtist: Bool = false,
+        relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
     ) -> [RecommendedCandidate] {
         let target = min(max(1, count), RecommendationBatchPolicy.batchSize)
         var working: RecallSession
@@ -51,11 +52,16 @@ extension MacRecommendationModel {
             working = existing
             added = working.append(pool: pool)
         } else {
-            // 点名艺人：该艺人可占满整批（相似补位在召回层已限 ≤ 批次 1/3）。
+            // 点名艺人：本人 / 相似按比例取满（share=0 = 纯本人），本人可占满自己那一段。
+            let share = RecommendationArtistMix.quota(
+                displayTarget: RecommendationBatchPolicy.batchSize,
+                share: relatedArtistShare
+            )
             working = RecallSession(
                 pool: pool,
                 maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: namedArtist),
-                minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: namedArtist)
+                minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: namedArtist),
+                quota: namedArtist ? RecallSession.Quota(direct: share.direct, related: share.related) : nil
             )
         }
 
@@ -113,6 +119,7 @@ extension MacRecommendationModel {
         )
         engine.maxSongsPerIntent = 20
         engine.maxSourceShare = 1.0
+        engine.relatedArtistShare = DeleteSettings.load().relatedArtistShare
         // P4：艺人关系扩展（设置关 = nil，召回行为与 P3 完全一致）。
         engine.artistRelation = RecommendationArtistRelation.fromSettings()
         // 点名场景：即使设置为关也启用相似补位（查询失败静默降级为纯本人）。

@@ -31,6 +31,10 @@ enum RecommendationBatchDiversity {
         var minDistinctArtists: Int
         var maxPerDecade: Int
         var maxPerGenre: Int
+        /// 点名批次配额（nil = 不启用）：第一轮本人最多 N 首、相似最多 M 首；
+        /// 相似段任何情况下都不超过 M，本人段在第二阶段可超 N 用来凑满批次。
+        var maxDirect: Int?
+        var maxRelated: Int?
 
         static let standard = Limits(
             batchSize: RecommendationBatchPolicy.batchSize,
@@ -65,7 +69,7 @@ enum RecommendationBatchDiversity {
             let candidate = eligible[index]
             let position = index
             index += 1
-            guard state.admitsHard(candidate) else { continue }
+            guard state.admitsHard(candidate), state.admitsQuota(candidate, strictDirect: true) else { continue }
             guard state.admitsSeason(candidate) else {
                 skippedBySeason.append(position)
                 continue
@@ -78,7 +82,20 @@ enum RecommendationBatchDiversity {
         if picked.count < target {
             for position in skippedBySeason where picked.count < target {
                 let candidate = eligible[position]
-                guard state.admitsHard(candidate) else { continue }
+                guard state.admitsHard(candidate), state.admitsQuota(candidate, strictDirect: true) else { continue }
+                state.take(candidate, relaxingSeason: true)
+                picked.append(position)
+                used.insert(position)
+            }
+        }
+
+        // 第二轮 b（点名配额）：某段候选不足 → 由另一段补位（本人优先；相似段仍受名额）。
+        if picked.count < target, limits.maxDirect != nil || limits.maxRelated != nil {
+            for position in eligible.indices where picked.count < target {
+                guard !used.contains(position) else { continue }
+                let candidate = eligible[position]
+                guard state.admitsHard(candidate),
+                      state.admitsQuota(candidate, strictDirect: false) else { continue }
                 state.take(candidate, relaxingSeason: true)
                 picked.append(position)
                 used.insert(position)
@@ -112,6 +129,8 @@ enum RecommendationBatchDiversity {
         var albumCounts: [String: Int] = [:]
         var decadeCounts: [Int: Int] = [:]
         var genreCounts: [String: Int] = [:]
+        var directCount = 0
+        var relatedCount = 0
         var relaxed = Set<Relaxation>()
 
         var distinctArtists: Int { artistCounts.count }
@@ -132,6 +151,16 @@ enum RecommendationBatchDiversity {
             if (artistCounts[artistKey(candidate)] ?? 0) >= limits.maxPerArtist { return false }
             if (albumCounts[albumKey(candidate)] ?? 0) >= limits.maxPerAlbum { return false }
             return true
+        }
+
+        /// 点名配额：相似段永不超过 `maxRelated`；本人段只在 `strictDirect` 阶段受 `maxDirect` 限制。
+        func admitsQuota(_ candidate: RecommendedCandidate, strictDirect: Bool) -> Bool {
+            if candidate.relatedTo != nil {
+                guard let maxRelated = limits.maxRelated else { return true }
+                return relatedCount < maxRelated
+            }
+            guard strictDirect, let maxDirect = limits.maxDirect else { return true }
+            return directCount < maxDirect
         }
 
         /// 软上限：同 decade / 同 genre（缺数据的维度不参与）。
@@ -158,6 +187,11 @@ enum RecommendationBatchDiversity {
             }
             artistCounts[artistKey(candidate), default: 0] += 1
             albumCounts[albumKey(candidate), default: 0] += 1
+            if candidate.relatedTo != nil {
+                relatedCount += 1
+            } else {
+                directCount += 1
+            }
             if let decade = candidate.year.map({ RecommendationScorer.decadeBucket(for: $0) }) {
                 decadeCounts[decade, default: 0] += 1
             }
@@ -192,6 +226,11 @@ enum RecommendationBatchDiversity {
         }
 
         private mutating func decrement(_ candidate: RecommendedCandidate) {
+            if candidate.relatedTo != nil {
+                relatedCount = max(0, relatedCount - 1)
+            } else {
+                directCount = max(0, directCount - 1)
+            }
             Self.drop(&artistCounts, key: artistKey(candidate))
             Self.drop(&albumCounts, key: albumKey(candidate))
             if let decade = candidate.year.map({ RecommendationScorer.decadeBucket(for: $0) }) {

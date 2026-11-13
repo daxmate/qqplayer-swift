@@ -34,6 +34,12 @@ struct RecallSession: Sendable, Equatable {
         var logToken: String { relaxed.map(\.rawValue).joined(separator: ",") }
     }
 
+    /// 单批配额（点名艺人：本人 / 相似各多少；nil = 不启用，按原多样性规则选）。
+    struct Quota: Sendable, Equatable {
+        var direct: Int
+        var related: Int
+    }
+
     private(set) var pool: [RecommendedCandidate]
     private(set) var seen: Set<String>
     let batchSize: Int
@@ -41,6 +47,8 @@ struct RecallSession: Sendable, Equatable {
     let maxPerAlbum: Int
     /// 单批「不同艺人」目标（点名艺人批次传 1：整批同艺人属预期，不算放宽）。
     let minDistinctArtists: Int
+    /// 单批配额（nil = 不启用）：两段池子都够时按此比例取满。
+    let quota: Quota?
     /// 最近一批的多样性结果（`nextBatch()` 写入）。
     private(set) var lastBatchDiversity = BatchDiversityReport()
 
@@ -49,7 +57,8 @@ struct RecallSession: Sendable, Equatable {
         batchSize: Int = RecommendationBatchPolicy.batchSize,
         maxPerArtist: Int = RecommendationBatchPolicy.maxSongsPerArtist,
         maxPerAlbum: Int = RecommendationBatchPolicy.maxSongsPerAlbum,
-        minDistinctArtists: Int = RecommendationBatchPolicy.minDistinctArtists
+        minDistinctArtists: Int = RecommendationBatchPolicy.minDistinctArtists,
+        quota: Quota? = nil
     ) {
         self.pool = pool
         self.seen = []
@@ -57,6 +66,7 @@ struct RecallSession: Sendable, Equatable {
         self.maxPerArtist = max(1, maxPerArtist)
         self.maxPerAlbum = max(1, maxPerAlbum)
         self.minDistinctArtists = minDistinctArtists
+        self.quota = quota
     }
 
     /// 池里还没被消费/标记的候选数。
@@ -99,7 +109,9 @@ struct RecallSession: Sendable, Equatable {
             maxPerAlbum: maxPerAlbum,
             minDistinctArtists: min(minDistinctArtists, batchSize),
             maxPerDecade: RecommendationBatchPolicy.maxSongsPerDecade,
-            maxPerGenre: RecommendationBatchPolicy.maxSongsPerGenre
+            maxPerGenre: RecommendationBatchPolicy.maxSongsPerGenre,
+            maxDirect: quota?.direct,
+            maxRelated: quota?.related
         )
     }
 

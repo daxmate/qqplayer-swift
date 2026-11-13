@@ -1175,5 +1175,7 @@
 "recommendation_reason_request" = "Соответствует запросу: %@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_related_share_title" = "Доля похожих исполнителей";
+"recommendation_related_share_footer" = "При указании исполнителя — максимальная доля похожих исполнителей в подборке.";
 "recommendation_artist_relation_title" = "Расширять похожих исполнителей через MusicBrainz";
 "recommendation_artist_relation_footer" = "Добавляет кандидатов от исполнителей, связанных с вашими топовыми: до 3 артистов на намерение и не более 2 запросов за генерацию. Ошибки пропускаются и не влияют на рекомендации.";

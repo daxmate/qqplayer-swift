@@ -4,9 +4,10 @@
 //
 //  推荐：「点名艺人 = 本人为主 + 相似补位」的纯逻辑口径。
 //
-//  - `relatedCap`：相似补位上限按**用户可见批次**（15）的 1/3 计算，池容量不放宽它；
+//  - `quota`：相似名额 = round(target × share)（默认 30%，15 → 5），本人名额 = target − 相似；
+//    某段不足时由另一段补位（本人优先），相似段永不超过名额；
 //  - `directCount` / `shortfallNotice`：不足提示用**本人匹配数**（不是整批数量）；
-//  - `batchMaxPerArtist`：点名批次允许该艺人占满整批（相似补位已在召回层限 ≤ 1/3 批次）。
+//  - `batchMaxPerArtist`：点名批次允许该艺人占满本人那一段（整批同艺人不算多样性放宽）。
 //
 //  ⚠️ 本文件只依赖 Foundation：不碰网络与 UI，可直接单测。
 //
@@ -22,12 +23,15 @@ enum RecommendationArtistMix {
         }
     }
 
-    /// 相似补位上限：`target / 3`，target 取用户可见批次（15 → 5）。
+    /// 名额换算：相似 = round(target × share)，本人 = target − 相似（2026-11-13 用户口径：固定比例）。
     ///
-    /// 池构建时传入的是池容量（60）：直接按 60/3 会让一批 15 首里塞进 20 首相似歌，
-    /// 所以额度按 `min(target, batchSize)` 计算。
-    static func relatedCap(displayTarget: Int) -> Int {
-        max(0, min(max(0, displayTarget), RecommendationBatchPolicy.batchSize) / 3)
+    /// 例：target 15、share 0.30 → 10 / 5；share 0 → 15 / 0；share 0.50 → 7 / 8（7.5 四舍五入）。
+    /// 两段都够时按此比例取满；某段不足时由另一段补位（本人优先），相似段永不超过名额。
+    static func quota(displayTarget: Int, share: Double) -> (direct: Int, related: Int) {
+        let target = max(0, displayTarget)
+        let ratio = min(1, max(0, share.isFinite ? share : 0))
+        let related = min(target, Int((Double(target) * ratio).rounded()))
+        return (target - related, related)
     }
 
     /// 本人行判定：相似补位行带 `relatedTo` 标记（来源的唯一判据）。

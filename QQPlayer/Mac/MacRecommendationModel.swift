@@ -217,7 +217,8 @@ final class MacRecommendationModel {
                 let batch = applyPool(
                     list,
                     count: count,
-                    namedArtist: RecommendationArtistMix.isNamedArtistRequest(request)
+                    namedArtist: RecommendationArtistMix.isNamedArtistRequest(request),
+                    relatedArtistShare: DeleteSettings.load().relatedArtistShare
                 )
                 if batch.isEmpty, isRefillingSession {
                     phase = .loaded

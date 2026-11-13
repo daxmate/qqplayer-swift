@@ -1178,5 +1178,7 @@
 "recommendation_reason_request" = "Correspond à votre demande : %@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_related_share_title" = "Part d'artistes similaires";
+"recommendation_related_share_footer" = "Lorsque vous nommez un artiste, part maximale de chaque lot pouvant provenir d'artistes similaires.";
 "recommendation_artist_relation_title" = "Étendre les artistes liés via MusicBrainz";
 "recommendation_artist_relation_footer" = "Ajoute des candidats issus d’artistes liés à vos artistes favoris : 3 artistes par intention et 2 requêtes maximum par génération. Les échecs sont ignorés et ne bloquent pas les recommandations.";

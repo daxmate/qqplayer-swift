@@ -1504,5 +1504,7 @@
 "recommendation_reason_request" = "符合你的要求：%@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_related_share_title" = "相似藝人比例";
+"recommendation_related_share_footer" = "點名藝人時，批次中最多有多少比例來自相似藝人";
 "recommendation_artist_relation_title" = "用 MusicBrainz 擴充相關藝人";
 "recommendation_artist_relation_footer" = "依藝人關係補充候選：每個藝人意圖最多 3 位相關藝人，整輪最多 2 次查詢。失敗自動跳過，不影響推薦結果。";

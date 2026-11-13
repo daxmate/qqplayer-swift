@@ -79,12 +79,12 @@ extension RecommendationEngine {
             picked.append(candidate)
         }
 
-        // 点名艺人：本人优先填满（不受每意图上限），本人不足才用相似补位（≤ 批次 1/3）。
+        // 点名艺人：本人 / 相似按固定比例取满（share=0 = 纯本人）；某段不足由另一段补位（本人优先）。
         if let artistConstraint {
-            let relatedCap = RecommendationArtistMix.relatedCap(displayTarget: target)
+            let quota = RecommendationArtistMix.quota(displayTarget: target, share: relatedArtistShare)
             for pass in 0 ..< 2 {
                 for item in ranked where artistConstraint.matches(artist: item.item.song.artist) {
-                    guard picked.count < target else { break }
+                    guard picked.count < quota.direct else { break }
                     guard admits(item, intentCap: nil, sourceCap: pass == 0 ? perSourceCap : nil) else { continue }
                     take(item)
                 }
@@ -92,7 +92,7 @@ extension RecommendationEngine {
             var relatedPicked = 0
             for pass in 0 ..< 2 {
                 for item in ranked where !artistConstraint.matches(artist: item.item.song.artist) {
-                    guard picked.count < target, relatedPicked < relatedCap else { break }
+                    guard picked.count < target, relatedPicked < quota.related else { break }
                     guard admits(
                         item,
                         intentCap: pass == 0 ? perIntentCap : nil,
@@ -102,7 +102,18 @@ extension RecommendationEngine {
                     relatedPicked += 1
                 }
             }
-            return picked
+            // 本人优先补位：相似段不足时用本人凑满 target（相似段不再超过名额）。
+            if picked.count < target {
+                for pass in 0 ..< 2 {
+                    for item in ranked where artistConstraint.matches(artist: item.item.song.artist) {
+                        guard picked.count < target else { break }
+                        guard admits(item, intentCap: nil, sourceCap: pass == 0 ? perSourceCap : nil) else { continue }
+                        take(item)
+                    }
+                }
+            }
+            // 展示顺序：本人行在前、相似补位行在后（补位行可能因凑满被排到直采之后）。
+            return picked.filter { $0.relatedTo == nil } + picked.filter { $0.relatedTo != nil }
         }
 
         // 第一轮守多样性上限；条数不够时第二轮放宽意图 / 来源上限（艺人上限始终保留）。
