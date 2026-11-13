@@ -39,6 +39,8 @@ struct RecallSession: Sendable, Equatable {
     let batchSize: Int
     let maxPerArtist: Int
     let maxPerAlbum: Int
+    /// 单批「不同艺人」目标（点名艺人批次传 1：整批同艺人属预期，不算放宽）。
+    let minDistinctArtists: Int
     /// 最近一批的多样性结果（`nextBatch()` 写入）。
     private(set) var lastBatchDiversity = BatchDiversityReport()
 
@@ -46,13 +48,15 @@ struct RecallSession: Sendable, Equatable {
         pool: [RecommendedCandidate] = [],
         batchSize: Int = RecommendationBatchPolicy.batchSize,
         maxPerArtist: Int = RecommendationBatchPolicy.maxSongsPerArtist,
-        maxPerAlbum: Int = RecommendationBatchPolicy.maxSongsPerAlbum
+        maxPerAlbum: Int = RecommendationBatchPolicy.maxSongsPerAlbum,
+        minDistinctArtists: Int = RecommendationBatchPolicy.minDistinctArtists
     ) {
         self.pool = pool
         self.seen = []
         self.batchSize = max(1, batchSize)
         self.maxPerArtist = max(1, maxPerArtist)
         self.maxPerAlbum = max(1, maxPerAlbum)
+        self.minDistinctArtists = minDistinctArtists
     }
 
     /// 池里还没被消费/标记的候选数。
@@ -93,7 +97,7 @@ struct RecallSession: Sendable, Equatable {
             batchSize: batchSize,
             maxPerArtist: maxPerArtist,
             maxPerAlbum: maxPerAlbum,
-            minDistinctArtists: min(RecommendationBatchPolicy.minDistinctArtists, batchSize),
+            minDistinctArtists: min(minDistinctArtists, batchSize),
             maxPerDecade: RecommendationBatchPolicy.maxSongsPerDecade,
             maxPerGenre: RecommendationBatchPolicy.maxSongsPerGenre
         )

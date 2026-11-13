@@ -39,6 +39,8 @@ struct RecommendationEngine: Sendable {
     var maxSimilarProbes: Int = 3
     /// P4：MusicBrainz 艺人关系扩展（nil = 关：零额外请求，召回行为与 P3 完全一致）。
     var artistRelation: RecommendationArtistRelation?
+    /// 点名场景的关系扩展兜底（设置为关也启用，用于相似补位）；nil = 不自动启用（测试默认）。
+    var namedArtistRelationFallback: RecommendationArtistRelation?
 
     /// 默认 = P2 主源降级链（iTunes tw → us → MusicBrainz → 网易云）；
     /// 测试注入 providers 时预算 / 诊断不接线（行为与 P1 相同）。
@@ -132,6 +134,8 @@ struct RecommendationEngine: Sendable {
         var song: RecommendationRemoteSong
         var source: RecommendationSource
         var intent: RecommendationIntent
+        /// 相似补位来源（nil = 本人匹配行）：点名场景里「相关艺人」召回的行带此标记。
+        var relatedTo: String?
     }
 
     struct GatherResult: Sendable {
@@ -190,7 +194,12 @@ struct RecommendationEngine: Sendable {
             sourceStats[outcome.source] = stat
         }
 
-        func accept(_ song: RecommendationRemoteSong, providerSource: RecommendationSource, intent: RecommendationIntent) {
+        func accept(
+            _ song: RecommendationRemoteSong,
+            providerSource: RecommendationSource,
+            intent: RecommendationIntent,
+            relatedTo: String? = nil
+        ) {
             // 降级链结果自带真实来源（song.source）；provider 的 source 只是原级归属。
             let source = song.source ?? providerSource
             let artistKey = RecommendationKey.primaryArtist(song.artist)
@@ -202,7 +211,8 @@ struct RecommendationEngine: Sendable {
                 flaggedCounts[RecommendationAdmissionRejection.missingSongID.rawValue, default: 0] += 1
             }
             // 点名艺人是硬约束：主艺人不在点名集合内直接剔除（标题命中也不算）。
-            if let artistConstraint {
+            // 相似补位行（relatedTo != nil）是被点名艺人的「相关艺人」，放行但不计本人。
+            if let artistConstraint, relatedTo == nil {
                 guard passGate("artist_constraint", artistConstraint.matches(artist: song.artist)) else {
                     rejectedByArtist += 1
                     return
@@ -236,7 +246,7 @@ struct RecommendationEngine: Sendable {
             }
             _ = passGate("dedupe", true)
             indexByKey[key] = items.count
-            items.append(GatheredItem(song: song, source: source, intent: intent))
+            items.append(GatheredItem(song: song, source: source, intent: intent, relatedTo: relatedTo))
         }
 
         // 年代标签先解析成画像艺人：召回层永远拿不到「1990s」这种泛词 query。
@@ -301,21 +311,31 @@ struct RecommendationEngine: Sendable {
             }
         }
 
-        // P4：可选艺人关系扩展（默认关 = 零请求）。点名硬约束下不做扩展：
-        // 扩展结果会被 artist_constraint 闸全量剔除，纯属浪费请求。
-        if let artistRelation, artistConstraint == nil {
+        // P4：可选艺人关系扩展（默认关 = 零请求）。
+        // 点名场景即使设置为关也启用（相似补位）：结果带 relatedTo 标记、不被硬约束闸剔除。
+        let expansion = artistRelation ?? (artistConstraint == nil ? nil : namedArtistRelationFallback)
+        if let expansion {
             let related = await relatedArtistSongs(
                 intents: resolvedIntents,
                 limit: perIntentLimit,
-                expansion: artistRelation
+                expansion: expansion
             )
             for produced in related {
-                accept(produced.song, providerSource: .musicbrainz, intent: produced.intent)
+                // 相关艺人自己就是点名艺人时不打标记（仍按本人行算）。
+                let relatedTo = artistConstraint.flatMap {
+                    $0.matches(artist: produced.song.artist) ? nil : $0.displayName
+                }
+                accept(
+                    produced.song,
+                    providerSource: .musicbrainz,
+                    intent: produced.intent,
+                    relatedTo: relatedTo
+                )
             }
             if !related.isEmpty {
                 AppLog.debug(
                     .general,
-                    "🎵 推荐艺人关系扩展：召回 \(related.count) 条（\(artistRelation.budget.summary)）"
+                    "🎵 推荐艺人关系扩展：召回 \(related.count) 条（\(expansion.budget.summary)）"
                 )
             }
         }
@@ -445,6 +465,10 @@ struct RecommendationEngine: Sendable {
     ) -> [String] {
         var reasons: [String] = []
         let display = RecommendationKey.displayPrimaryArtist(item.intent.artist ?? item.song.artist)
+        // 相似补位行必须明示来源：用歌本身的艺人（= 相关艺人），绝不说成点名艺人。
+        let relatedArtist = item.relatedTo == nil
+            ? nil
+            : RecommendationKey.displayPrimaryArtist(item.song.artist)
 
         switch item.intent.kind {
         case .artist:
@@ -455,7 +479,9 @@ struct RecommendationEngine: Sendable {
                 reasons.append("recommendation_reason_artist".localized(with: display))
             }
         case .similar:
-            if !display.isEmpty {
+            if let relatedArtist, !relatedArtist.isEmpty {
+                reasons.append("recommendation_reason_related_artist".localized(with: relatedArtist))
+            } else if !display.isEmpty {
                 reasons.append("recommendation_reason_similar_artist".localized(with: display))
             }
         case .decade:
@@ -489,7 +515,9 @@ struct RecommendationEngine: Sendable {
 
         // 点名艺人理由可以相邻重复：整份列表本来就都是「你点名的艺人」。
         let requestedArtistReason = "recommendation_reason_requested_artist".localized
-        if let previousPrimary, unique.first == previousPrimary, unique.first != requestedArtistReason {
+        // 来源标记行（点名本人 / 相似补位）不受相邻去重影响：否则连续同艺人会把来源盖掉。
+        if let previousPrimary, unique.first == previousPrimary, unique.first != requestedArtistReason,
+           relatedArtist == nil {
             if unique.count > 1 {
                 unique.removeFirst()
             } else {

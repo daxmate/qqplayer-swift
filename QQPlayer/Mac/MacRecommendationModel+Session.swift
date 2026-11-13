@@ -39,7 +39,11 @@ extension MacRecommendationModel {
     ///
     /// 规则：补池后不足一批且仍有剩余 → 不返回残批（等下一次补池）；
     /// 只有「补池后为空或已耗尽」才允许返回剩余。
-    func applyPool(_ pool: [RecommendedCandidate], count: Int) -> [RecommendedCandidate] {
+    func applyPool(
+        _ pool: [RecommendedCandidate],
+        count: Int,
+        namedArtist: Bool = false
+    ) -> [RecommendedCandidate] {
         let target = min(max(1, count), RecommendationBatchPolicy.batchSize)
         var working: RecallSession
         var added = 0
@@ -47,7 +51,12 @@ extension MacRecommendationModel {
             working = existing
             added = working.append(pool: pool)
         } else {
-            working = RecallSession(pool: pool)
+            // 点名艺人：该艺人可占满整批（相似补位在召回层已限 ≤ 批次 1/3）。
+            working = RecallSession(
+                pool: pool,
+                maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: namedArtist),
+                minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: namedArtist)
+            )
         }
 
         if let batch = working.takeFullBatchOrNil(minimum: target) {
@@ -73,6 +82,16 @@ extension MacRecommendationModel {
         return []
     }
 
+    /// 本人匹配数（点名场景）：当前展示批次里直接命中点名艺人的条数（不是整批数量）。
+    var directArtistMatchCount: Int {
+        RecommendationArtistMix.directCount(in: candidates)
+    }
+
+    /// 相似补位条数（点名场景）。
+    var relatedArtistMatchCount: Int {
+        max(0, candidates.count - directArtistMatchCount)
+    }
+
     /// 召回排除集：会话内 seen ∪ 最近 7 天软黑名单（跨会话）。
     var excludedTrackKeys: Set<String> {
         blacklist.activeRecentKeys(at: clock()).union(session?.seen ?? [])
@@ -96,6 +115,8 @@ extension MacRecommendationModel {
         engine.maxSourceShare = 1.0
         // P4：艺人关系扩展（设置关 = nil，召回行为与 P3 完全一致）。
         engine.artistRelation = RecommendationArtistRelation.fromSettings()
+        // 点名场景：即使设置为关也启用相似补位（查询失败静默降级为纯本人）。
+        engine.namedArtistRelationFallback = RecommendationArtistRelation()
         return engine
     }
 

@@ -5,6 +5,8 @@
 //  推荐 P1/P2：N 选（同艺人 / 同专辑 / 意图 / 来源上限 + 多样性放宽）。
 //  从 RecommendationEngine.swift 拆出：加 P2 专辑上限后文件触及 600 行结构预算，本次只搬家。
 //
+//  点名艺人（artistConstraint）走独立口径：本人优先填满、相似补位 ≤ 批次 1/3（见 select 的点名分支）。
+//
 
 import Foundation
 
@@ -28,15 +30,32 @@ extension RecommendationEngine {
         var picked: [RecommendedCandidate] = []
         var previousPrimary: String?
 
+        func key(_ item: RankedItem) -> String {
+            RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
+                + "#" + item.item.source.rawValue
+        }
+
+        /// 上限判定的**唯一入口**：`intentCap` / `sourceCap` 传 nil = 本轮不限制该上限。
+        func admits(_ item: RankedItem, intentCap: Int?, sourceCap: Int?) -> Bool {
+            guard !usedKeys.contains(key(item)) else { return false }
+            let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
+            if artistCounts[artistKey, default: 0] >= perArtistCap { return false }
+            if let maxSongsPerAlbum {
+                let albumKey = Self.albumKey(album: item.item.song.album, artist: item.item.song.artist)
+                if albumCounts[albumKey, default: 0] >= maxSongsPerAlbum { return false }
+            }
+            if let intentCap, intentCounts[item.item.intent.priorityKey, default: 0] >= intentCap { return false }
+            if let sourceCap, sourceCounts[item.item.source, default: 0] >= sourceCap { return false }
+            return true
+        }
+
         func take(_ item: RankedItem) {
             let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
-            let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
-                + "#" + item.item.source.rawValue
             artistCounts[artistKey, default: 0] += 1
             albumCounts[Self.albumKey(album: item.item.song.album, artist: item.item.song.artist), default: 0] += 1
             intentCounts[item.item.intent.priorityKey, default: 0] += 1
             sourceCounts[item.item.source, default: 0] += 1
-            usedKeys.insert(key)
+            usedKeys.insert(key(item))
 
             let reasons = reasonsFor(
                 item.item,
@@ -50,7 +69,8 @@ extension RecommendationEngine {
                 artist: item.item.song.artist,
                 album: item.item.song.album,
                 year: item.item.song.year,
-                source: item.item.source
+                source: item.item.source,
+                relatedTo: item.item.relatedTo
             )
             candidate.score = item.score
             candidate.reasons = reasons
@@ -59,23 +79,41 @@ extension RecommendationEngine {
             picked.append(candidate)
         }
 
+        // 点名艺人：本人优先填满（不受每意图上限），本人不足才用相似补位（≤ 批次 1/3）。
+        if let artistConstraint {
+            let relatedCap = RecommendationArtistMix.relatedCap(displayTarget: target)
+            for pass in 0 ..< 2 {
+                for item in ranked where artistConstraint.matches(artist: item.item.song.artist) {
+                    guard picked.count < target else { break }
+                    guard admits(item, intentCap: nil, sourceCap: pass == 0 ? perSourceCap : nil) else { continue }
+                    take(item)
+                }
+            }
+            var relatedPicked = 0
+            for pass in 0 ..< 2 {
+                for item in ranked where !artistConstraint.matches(artist: item.item.song.artist) {
+                    guard picked.count < target, relatedPicked < relatedCap else { break }
+                    guard admits(
+                        item,
+                        intentCap: pass == 0 ? perIntentCap : nil,
+                        sourceCap: pass == 0 ? perSourceCap : nil
+                    ) else { continue }
+                    take(item)
+                    relatedPicked += 1
+                }
+            }
+            return picked
+        }
+
         // 第一轮守多样性上限；条数不够时第二轮放宽意图 / 来源上限（艺人上限始终保留）。
         for pass in 0 ..< 2 {
             for item in ranked {
                 guard picked.count < target else { break }
-                let key = RecommendationKey.normalize(title: item.item.song.title, artist: item.item.song.artist)
-                    + "#" + item.item.source.rawValue
-                guard !usedKeys.contains(key) else { continue }
-                let artistKey = RecommendationKey.primaryArtist(item.item.song.artist)
-                if artistCounts[artistKey, default: 0] >= perArtistCap { continue }
-                if let maxSongsPerAlbum,
-                   albumCounts[Self.albumKey(album: item.item.song.album, artist: item.item.song.artist), default: 0] >= maxSongsPerAlbum {
-                    continue
-                }
-                if pass == 0 {
-                    if intentCounts[item.item.intent.priorityKey, default: 0] >= perIntentCap { continue }
-                    if sourceCounts[item.item.source, default: 0] >= perSourceCap { continue }
-                }
+                guard admits(
+                    item,
+                    intentCap: pass == 0 ? perIntentCap : nil,
+                    sourceCap: pass == 0 ? perSourceCap : nil
+                ) else { continue }
                 take(item)
             }
         }
@@ -84,7 +122,7 @@ extension RecommendationEngine {
     }
 
     /// 同专辑归并键（专辑给不出时按艺人分桶，避免把无专辑曲目互相压掉）。
-    static func albumKey(album: String?, artist: String) -> String {
+    private static func albumKey(album: String?, artist: String) -> String {
         guard let album, !album.isEmpty else {
             return "no-album#" + RecommendationKey.primaryArtist(artist)
         }

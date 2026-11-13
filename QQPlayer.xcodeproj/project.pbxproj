@@ -758,6 +758,7 @@
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
+				Services/RecommendationArtistMix.swift,
 				Services/RecallSession.swift,
 				"Services/RecommendationEngine+Selection.swift",
 				Services/RecommendationSourceChain.swift,

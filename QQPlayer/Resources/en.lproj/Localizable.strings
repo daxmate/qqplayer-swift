@@ -1132,6 +1132,7 @@
 "recommendation_reason_artist" = "You often play %@";
 "recommendation_reason_requested_artist" = "Requested artist";
 "recommendation_artist_shortfall" = "Only found %d songs by %@";
+"recommendation_artist_shortfall_filled" = "%@ has only %d songs, added %d from similar artists";
 "recommendation_reason_era" = "Matches your %d decade";
 "recommendation_reason_trend" = "Trending in your recent plays: %@";
 "recommendation_reason_new" = "Not in your library yet";
@@ -1159,6 +1160,7 @@
 "recommendation_cache_age_minutes" = "%d min ago";
 "recommendation_cache_age_hours" = "%d hr ago";
 "recommendation_reason_similar_artist" = "Similar to %@";
+"recommendation_reason_related_artist" = "Similar artist: %@";
 "recommendation_reason_genre" = "Same genre: %@";
 "recommendation_reason_matched_taste" = "Matches your taste";
 

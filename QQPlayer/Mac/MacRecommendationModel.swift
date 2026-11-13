@@ -214,7 +214,11 @@ final class MacRecommendationModel {
 
             switch result {
             case let .success(list):
-                let batch = applyPool(list, count: count)
+                let batch = applyPool(
+                    list,
+                    count: count,
+                    namedArtist: RecommendationArtistMix.isNamedArtistRequest(request)
+                )
                 if batch.isEmpty, isRefillingSession {
                     phase = .loaded
                     return

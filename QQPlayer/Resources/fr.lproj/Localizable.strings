@@ -1130,6 +1130,7 @@
 "recommendation_reason_artist" = "Vous écoutez souvent %@";
 "recommendation_reason_requested_artist" = "Artiste demandé";
 "recommendation_artist_shortfall" = "Seulement %d morceaux de %@ trouvés";
+"recommendation_artist_shortfall_filled" = "%@ n'a que %d morceaux, %d ajoutés d'artistes similaires";
 "recommendation_reason_era" = "Correspond à votre décennie %d";
 "recommendation_reason_trend" = "Tendance dans vos écoutes récentes : %@";
 "recommendation_reason_new" = "Pas encore dans votre bibliothèque";
@@ -1157,6 +1158,7 @@
 "recommendation_cache_age_minutes" = "il y a %d min";
 "recommendation_cache_age_hours" = "il y a %d h";
 "recommendation_reason_similar_artist" = "Semblable à %@";
+"recommendation_reason_related_artist" = "Artiste similaire : %@";
 "recommendation_reason_genre" = "Même genre : %@";
 "recommendation_reason_matched_taste" = "Correspond à vos goûts";
 

@@ -336,12 +336,19 @@ extension RecommendationIntentBuilder {
             append(RecommendationIntent(query: artist, kind: .artist, artist: artist))
         }
 
+        // 点名艺人：画像派生的关键词 / 年代意图不再追加（否则点名会被画像稀释）；
+        // 用户自己写进原话里的关键词 / 情绪词保留。
+        let namedArtist = RecommendationArtistMix.isNamedArtistRequest(request)
+
         var keywordCount = 0
         for keyword in request.keywords + request.moods {
             guard keywordCount < Self.maxKeywordIntents else { break }
+            guard !namedArtist || Self.isUserWritten(keyword, in: request.rawText) else { continue }
             keywordCount += 1
             append(RecommendationIntent(query: keyword, kind: .keyword))
         }
+
+        guard !namedArtist else { return prioritized(intents, request: request) }
 
         for decade in request.decades.prefix(maxDecadeIntents) {
             let artists = profile.decadeArtists[decade] ?? []
@@ -351,6 +358,13 @@ extension RecommendationIntentBuilder {
         }
 
         return prioritized(intents, request: request)
+    }
+
+    /// 关键词是否出自用户原话（点名场景只保留用户自己写的词，丢弃画像派生项）。
+    static func isUserWritten(_ keyword: String, in rawText: String) -> Bool {
+        let word = RecommendationKey.comparisonToken(keyword)
+        guard !word.isEmpty else { return false }
+        return RecommendationKey.comparisonToken(rawText).contains(word)
     }
 
     // MARK: 显式艺人优先

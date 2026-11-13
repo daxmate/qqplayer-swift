@@ -263,6 +263,8 @@ struct RecommendedCandidate: Identifiable, Codable, Equatable, Sendable {
     var reasons: [String] = []
     /// 召回意图里的曲风（仅 `kind == .genre` 的意图给得出；缺省 = 不参与批次曲风上限）。
     var genre: String?
+    /// 相似补位来源（nil = 本人匹配行；非 nil = 该点名艺人的相关艺人）。
+    var relatedTo: String?
 
     var id: String {
         "\(RecommendationKey.normalize(title: title, artist: artist))#\(source.rawValue)"

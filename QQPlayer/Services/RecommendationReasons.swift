@@ -81,6 +81,8 @@ enum RecommendationReasonBinder {
         var updated = candidates
         var replaced = 0
         for index in updated.indices {
+            // 相似补位行保留规则理由里的「相似艺人：X」来源标记，绝不被模型理由盖掉。
+            guard updated[index].relatedTo == nil else { continue }
             let key = RecommendationKey.normalize(title: updated[index].title, artist: updated[index].artist)
             guard let reasons = modelReasons[key], !reasons.isEmpty else { continue }
             updated[index].reasons = reasons

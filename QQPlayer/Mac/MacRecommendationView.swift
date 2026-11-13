@@ -243,12 +243,15 @@ struct MacRecommendationView: View {
         .listStyle(.inset)
     }
 
-    /// 点名艺人结果不足时如实说明（不静默填充画像项）。
+    /// 点名艺人结果不足时如实说明（用**本人匹配数**，不拿整批数量冒充）。
     private var artistShortfallNotice: String? {
-        guard let artist = model.requestedArtist,
-              model.candidates.count < settings.recommendationCount
-        else { return nil }
-        return "recommendation_artist_shortfall".localized(with: model.candidates.count, artist)
+        guard let artist = model.requestedArtist else { return nil }
+        return RecommendationArtistMix.shortfallNotice(
+            artist: artist,
+            directCount: model.directArtistMatchCount,
+            relatedCount: model.relatedArtistMatchCount,
+            target: min(settings.recommendationCount, RecommendationBatchPolicy.batchSize)
+        )
     }
 
     /// 结果标题：有指令 = 按你的要求；否则 = 为你推荐（不展示任何历史消息）。

@@ -1456,6 +1456,7 @@
 "recommendation_reason_artist" = "常聽 %@";
 "recommendation_reason_requested_artist" = "你點名的藝人";
 "recommendation_artist_shortfall" = "只找到 %d 首 %@ 的歌";
+"recommendation_artist_shortfall_filled" = "%@ 的歌只有 %d 首，補了 %d 首相似藝人";
 "recommendation_reason_era" = "符合你愛聽的 %d 年代";
 "recommendation_reason_trend" = "最近常聽 %@";
 "recommendation_reason_new" = "音樂庫還沒有";
@@ -1483,6 +1484,7 @@
 "recommendation_cache_age_minutes" = "%d 分鐘前";
 "recommendation_cache_age_hours" = "%d 小時前";
 "recommendation_reason_similar_artist" = "與你喜歡的 %@ 相似";
+"recommendation_reason_related_artist" = "相似藝人：%@";
 "recommendation_reason_genre" = "同曲風：%@";
 "recommendation_reason_matched_taste" = "與你口味相近";
 
