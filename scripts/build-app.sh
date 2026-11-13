@@ -200,12 +200,21 @@ build_macos() {
     x86_64) archs="x86_64" ;;
     universal) archs="arm64 x86_64" ;;
   esac
+  # x86_64（Intel）产物使用预烘焙圆角的 AppIconRounded：低版本 macOS 不会给 App 图标
+  # 自动截圆角，Intel 包必须把圆角烘进 icns。arm64 / universal 保持 AppIcon 方角、交给
+  # 系统蒙版（universal 不启用：两个架构共用一份 icns，系统二次蒙版的效果不确定）。
+  local icon_arg=""
+  if [ "$ARCH" = "x86_64" ]; then
+    icon_arg="ASSETCATALOG_COMPILER_APPICON_NAME=AppIconRounded"
+    echo "ℹ️  x86_64 产物使用预烘焙圆角图标：AppIconRounded"
+  fi
   if [ -n "$archs" ]; then
     echo "ℹ️  覆盖构建设置：ARCHS=${archs} ONLY_ACTIVE_ARCH=NO"
+    # shellcheck disable=SC2086  # 空串时必须展开为零个参数，arm64 / universal 才保持原样
     scripts/xcbuild.sh build -project "$PROJECT" -scheme "$MAC_SCHEME" \
       -destination "$MAC_DEST" \
       -configuration "$CONFIG" \
-      ARCHS="$archs" ONLY_ACTIVE_ARCH=NO
+      ARCHS="$archs" ONLY_ACTIVE_ARCH=NO ${icon_arg}
   else
     scripts/xcbuild.sh build -project "$PROJECT" -scheme "$MAC_SCHEME" \
       -destination "$MAC_DEST" \
