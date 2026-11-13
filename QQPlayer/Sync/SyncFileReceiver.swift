@@ -35,6 +35,41 @@
 
 import Foundation
 
+/// 诊断：单块处理的分段计时（只在 file_chunk 路径创建；**同一线程顺序读写**，
+/// 因为一帧的处理链始终在通道串行队列上：handleInboundFrame → 锁内状态机 → 锁外发 ack）。
+final class SyncChunkTimingBox: @unchecked Sendable {
+    /// 进入 handleInboundFrame 的时刻（单调时钟秒）
+    let entryAt: Double
+    /// 本帧 payload 字节数（= 文件字节 + 加密 tag + fileID 前缀；不含 10B 帧头）
+    let bytes: Int
+    /// 拿到 receiver 锁的时刻（nil = 还没进状态机：坏块 / 协议错误提前返回）
+    var lockAt: Double?
+    /// 写盘耗时（毫秒）
+    var writeMs: Double = 0
+    /// 造 ack → 加密 → 入通道的耗时（毫秒）
+    var ackEnqueueMs: Double = 0
+    /// 本文件已收块序号（1 起；0 = 本次回调没处理到块）
+    var index: Int = 0
+
+    init(entryAt: Double, bytes: Int) {
+        self.entryAt = entryAt
+        self.bytes = bytes
+    }
+
+    /// 单行明细（nil = 这次回调没处理块，不该记 chunk 行）。
+    func line() -> String? {
+        guard index > 0 else { return nil }
+        let preMs = SyncTransferTiming.deltaMs(from: entryAt, to: lockAt ?? entryAt)
+        return SyncTransferTiming.chunkLine(
+            idx: index,
+            bytes: bytes,
+            preMs: preMs,
+            writeMs: writeMs,
+            ackEnqueueMs: ackEnqueueMs
+        )
+    }
+}
+
 /// 文件接收端（一个 receiver 常驻一个会话，可顺序服务多轮传输）。
 final class SyncFileReceiver: @unchecked Sendable {
     /// 一轮传输的本地结论（每轮恰一次，锁外触发）。
@@ -247,11 +282,13 @@ final class SyncFileReceiver: @unchecked Sendable {
                     abortAllCorruptChunk()
                     return
                 }
-                runLocked { [decoded] in
+                let timing = SyncChunkTimingBox(entryAt: SyncTransferTiming.now(), bytes: frame.payload.count)
+                runLocked(timing) { [decoded] in
                     self.activeKey = decoded.fileID
                     return self.processChunkLocked(.sequential(fileID: decoded.fileID, data: decoded.data),
-                                                   wireBytes: frame.payload.count)
+                                                   wireBytes: frame.payload.count, timing: timing)
                 }
+                logChunkTiming(timing)
                 return
             }
             guard let chunk = try? SyncFilePayloadCodec.decode(FileChunkPayload.self, from: frame.payload) else {
@@ -263,10 +300,12 @@ final class SyncFileReceiver: @unchecked Sendable {
                 }
                 return
             }
-            runLocked { [chunk] in
+            let timing = SyncChunkTimingBox(entryAt: SyncTransferTiming.now(), bytes: frame.payload.count)
+            runLocked(timing) { [chunk] in
                 self.activeKey = chunk.fileID
-                return self.processChunkLocked(.positioned(chunk), wireBytes: frame.payload.count)
+                return self.processChunkLocked(.positioned(chunk), wireBytes: frame.payload.count, timing: timing)
             }
+            logChunkTiming(timing)
         case .fileAck:
             // 接收端不收 ack：忽略（有测试锁定该行为）
             break
@@ -407,20 +446,29 @@ final class SyncFileReceiver: @unchecked Sendable {
 
     /// 锁内跑状态机，锁外执行效果（发 ack / 日志 / 用户回调）。所有路径的 ack 发送都在锁外，
     /// 保证同步回环下对端 ack 重入本对象不死锁。
-    private func runLocked(_ body: () -> [Action]) {
+    private func runLocked(_ timing: SyncChunkTimingBox? = nil, _ body: () -> [Action]) {
         lock.lock()
         let actions = body()
         lock.unlock()
         for action in actions {
             switch action {
             case let .sendAck(ack):
+                // 诊断：造 ack → 编码 / 加密 / 入通道（这一段是「我们自己发得慢」的那部分）。
+                let ackStartedAt = SyncTransferTiming.now()
                 sendAck(ack)
+                timing?.ackEnqueueMs = SyncTransferTiming.deltaMs(from: ackStartedAt, to: SyncTransferTiming.now())
             case let .log(metrics):
                 SyncConnectDiag.log(metrics.logLine)
             case let .finish(outcome):
                 onCompletion?(outcome)
             }
         }
+    }
+
+    /// 诊断：单块分段计时一行（锁外拼串；无块处理 / 窗口外一律不写）。
+    private func logChunkTiming(_ timing: SyncChunkTimingBox) {
+        guard SyncConnectDiag.isTransferTracing, let line = timing.line() else { return }
+        SyncConnectDiag.log(line)
     }
 
     private func sendAck(_ ack: FileAckPayload) {

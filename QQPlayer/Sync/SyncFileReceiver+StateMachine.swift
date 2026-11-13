@@ -191,7 +191,9 @@ extension SyncFileReceiver {
     /// - Parameters:
     ///   - chunk: 入站块（JSON 显式 offset / 二进制按序隐式定位）
     ///   - wireBytes: 该帧 payload 的实际字节数（诊断用）
-    func processChunkLocked(_ chunk: InboundChunk, wireBytes: Int) -> [Action] {
+    func processChunkLocked(_ chunk: InboundChunk, wireBytes: Int,
+                            timing: SyncChunkTimingBox? = nil) -> [Action] {
+        timing?.lockAt = SyncTransferTiming.now()
         let fileID: String
         switch chunk {
         case let .positioned(payload): fileID = payload.fileID
@@ -246,6 +248,7 @@ extension SyncFileReceiver {
             return abort
         }
 
+        let writeStartedAt = SyncTransferTiming.now()
         do {
             try current.handle?.write(contentsOf: data)
         } catch {
@@ -258,9 +261,11 @@ extension SyncFileReceiver {
                     .finish(.failed(error))]
         }
 
+        timing?.writeMs = SyncTransferTiming.deltaMs(from: writeStartedAt, to: SyncTransferTiming.now())
         var advanced = current
         advanced.received += byteCount
         advanced.chunksReceived += 1
+        timing?.index = advanced.chunksReceived
         advanced.wireBytes += wireBytes
         active = advanced
 

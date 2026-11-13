@@ -68,6 +68,9 @@ final class SyncPeerSession: @unchecked Sendable {
     private var frameDecoder = SyncFrameDecoder()
 
     // 状态/握手内部态（锁保护；帧处理器在 extension 文件直接读写）
+    /// 诊断：本次入站回调内所有帧的解密耗时合计（毫秒；handleInboundData 每次清零，
+    /// processReadyFrameLocked 累加——同一把锁内，单线程）。
+    var inboundDecryptMs: Double = 0
     var phaseValue: SyncSessionPhase = .idle
     var closeReasonValue: SyncSessionCloseReason = .userCancelled
     var myEphemeralPrivateKey: Curve25519.KeyAgreement.PrivateKey?
@@ -191,22 +194,30 @@ final class SyncPeerSession: @unchecked Sendable {
     func handleInboundData(_ data: Data) {
         lock.lock()
         var effects: [Effect] = []
+        // 诊断（分段计时）：锁内只算数，出锁后再拼串落盘（不在锁内做字符串/IO）。
+        var timing: SyncInboundTiming?
         defer {
             lock.unlock()
+            if let timing { timing.emitLine() }
             flush(effects)
         }
         guard phaseValue != .closed, phaseValue != .idle else { return }
         let frames: [SyncFrame]
+        let parseStartedAt = SyncTransferTiming.now()
+        inboundDecryptMs = 0
         do {
             frames = try frameDecoder.feed(data)
         } catch {
             effects.append(contentsOf: closeEffectsLocked(.protocolViolation("帧解码失败：\(error)")))
             return
         }
+        let parseMs = SyncTransferTiming.deltaMs(from: parseStartedAt, to: SyncTransferTiming.now())
         for frame in frames {
             guard phaseValue != .closed else { break }
             effects.append(contentsOf: processFrameLocked(frame))
         }
+        timing = SyncInboundTiming(frames: frames.count, bytes: data.count,
+                                   parseMs: parseMs, decryptMs: inboundDecryptMs)
     }
 
     /// 通道断开（EOF/失败/cancel）。会话已关闭时幂等忽略；
@@ -259,6 +270,10 @@ final class SyncPeerSession: @unchecked Sendable {
             .libraryPushAnnounce, .peerLibraryRequest, .peerLibraryResponse,
         ].contains(type) else {
             throw SyncFrameError.invalidType(type.rawValue)
+        }
+        // 诊断：文件帧在本端发出 → 刷新「传输活跃窗口」（逐帧 tx 明细只在窗口内落盘）。
+        if type == .fileMeta || type == .fileChunk || type == .fileAck {
+            SyncConnectDiag.touchTransferTrace()
         }
         try sendEncryptedFrame(type: type, payload: payload, extraFlags: extraFlags)
     }

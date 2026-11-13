@@ -291,6 +291,8 @@ extension SyncPeerSession {
             return closeEffectsLocked(.protocolViolation("会话密钥未就绪"))
         }
         let plaintext: Data
+        // 诊断：解密分段（ChaChaPoly open）。累加到本次入站回调的合计，锁外拼串落盘。
+        let decryptStartedAt = SyncTransferTiming.now()
         do {
             plaintext = try cipher.open(
                 frame.payload,
@@ -300,6 +302,7 @@ extension SyncPeerSession {
         } catch {
             return closeEffectsLocked(.handshakeFailed(mapError(error)))
         }
+        inboundDecryptMs += SyncTransferTiming.deltaMs(from: decryptStartedAt, to: SyncTransferTiming.now())
         switch frame.type {
         case .ping:
             // v1 不做心跳（任务定案：断连即清）：ping 忽略不回复，避免
@@ -310,6 +313,10 @@ extension SyncPeerSession {
         case .fileMeta, .fileChunk, .fileAck, .changeLogPull, .changeLogPush,
              .manifestRequest, .manifestResponse, .syncFetchRequest, .syncFetchResult,
              .libraryPushAnnounce, .peerLibraryRequest, .peerLibraryResponse:
+            // 诊断：文件帧在流动 → 刷新「传输活跃窗口」（逐帧 rx/tx 明细只在窗口内落盘）。
+            if [.fileMeta, .fileChunk, .fileAck].contains(frame.type) {
+                SyncConnectDiag.touchTransferTrace()
+            }
             // 保留加密位以外的 flags（bit1 = 二进制块载荷）：文件传输层靠它区分
             // 「原始二进制 file_chunk」与「base64 JSON file_chunk」；加密位在分发时已无意义。
             let delivered = SyncFrame(type: frame.type,

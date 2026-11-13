@@ -36,6 +36,7 @@
 
 import Foundation
 import Network
+import os
 
 enum SyncConnectDiag {
     /// 总开关（需要静默时置 false）。
@@ -58,6 +59,30 @@ enum SyncConnectDiag {
             // macOS：走既有 stdout 重定向（print 即落到 stdout.log；无额外文件 IO）
             print(line, terminator: "")
         #endif
+    }
+
+    // MARK: 传输活跃窗口（逐帧明细门控，2026-11-13）
+
+    /// 「正在传文件」的时间窗（单调时钟秒）：收到/发出 file_* 帧时刷新。
+    ///
+    /// 为什么用时间窗而不是 begin/end 配对：配对要在收发的**每条**退出路径上都减一次
+    /// （完成 / 失败 / 取消 / 会话关闭 / 中止），漏一条就永久打开刷屏；时间窗自失效，
+    /// 只在真正有文件帧流动的这段时间里逐帧落盘。
+    private static let transferTraceUntil = OSAllocatedUnfairLock(initialState: TimeInterval(0))
+
+    /// 传输窗口长度（秒）：远大于单块往返（实测 0.15–1.4s），又短到不会跨到下一次同步。
+    private static let transferTraceWindow: TimeInterval = 30
+
+    /// 标记「此刻有文件帧在走」（file_* 帧收发处调用；只延窗口，幂等）。
+    static func touchTransferTrace() {
+        let until = ProcessInfo.processInfo.systemUptime + transferTraceWindow
+        transferTraceUntil.withLock { $0 = until }
+    }
+
+    /// 逐帧收发明细是否该落盘（窗口外一律不写，避免握手/曲库帧刷屏）。
+    static var isTransferTracing: Bool {
+        let now = ProcessInfo.processInfo.systemUptime
+        return transferTraceUntil.withLock { now < $0 }
     }
 
     private static func timestamp() -> String {

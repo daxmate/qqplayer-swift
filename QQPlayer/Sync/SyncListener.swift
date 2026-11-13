@@ -77,6 +77,12 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
     /// 是否已 notify 关闭（幂等）
     private var notifiedClosed = false
 
+    /// 诊断：入站回调序号（串行队列上自增）与上次回调到达时刻（单调时钟秒）。
+    private var rxSeq = 0
+    private var rxLastArrivedAt: Double?
+    /// 诊断：出站帧序号（串行队列上自增）。
+    private var txSeq = 0
+
     init(connection: NWConnection, queue: DispatchQueue) {
         self.connection = connection
         self.queue = queue
@@ -121,13 +127,18 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
     private func receiveNext() {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else { return }
+            // 诊断（分段计时）：回调到达时刻。与进入串行队列的时刻相减 = qdelay，
+            // 用来区分「socket 上没数据」和「我们的队列忙 / 被别的活占着」。
+            let arrivedAt = SyncTransferTiming.now()
             self.queue.async {
                 guard !self.closed else { return }
+                let dequeuedAt = SyncTransferTiming.now()
                 if error != nil {
                     self.notifyChannelClosed()
                     return
                 }
                 if let data, !data.isEmpty {
+                    self.noteInboundDiag(bytes: data.count, arrivedAt: arrivedAt, dequeuedAt: dequeuedAt)
                     self.session?.handleInboundData(data)
                 }
                 if isComplete {
@@ -154,15 +165,44 @@ final class NWPeerChannel: SyncPeerTransport, @unchecked Sendable {
     // MARK: SyncPeerTransport
 
     func sendFrameBytes(_ data: Data) {
+        // 诊断（分段计时）：入队（调用方线程）→ 出队（串行队列）→ contentProcessed。
+        // 后两段即任务包要的「我们自己发得慢（q）」与「内核 / 网卡排队（kern）」。
+        let enqueuedAt = SyncTransferTiming.now()
         queue.async { [weak self] in
             guard let self, !self.closed else { return }
+            let sendCallAt = SyncTransferTiming.now()
+            self.txSeq += 1
+            let seq = self.txSeq
+            let byteCount = data.count
+            let queueMs = SyncTransferTiming.deltaMs(from: enqueuedAt, to: sendCallAt)
             self.connection.send(content: data, completion: .contentProcessed { [weak self] error in
+                // 观测放在早退之前：出错也要知道这一帧到底什么时候交给内核。
+                if SyncConnectDiag.isTransferTracing {
+                    let kernelMs = SyncTransferTiming.deltaMs(from: sendCallAt, to: SyncTransferTiming.now())
+                    SyncConnectDiag.log(SyncTransferTiming.outboundLine(
+                        seq: seq, bytes: byteCount, queueDelayMs: queueMs, kernelMs: kernelMs
+                    ))
+                }
                 guard let self, error != nil else { return }
                 self.queue.async {
                     self.notifyChannelClosed()
                 }
             })
         }
+    }
+
+    /// 诊断：入站回调一行明细（dt = 距上次回调，qdelay = 回调 → 串行队列执行）。
+    /// 只在传输活跃窗口内落盘；计数字段只在串行队列上读写，无锁。
+    private func noteInboundDiag(bytes: Int, arrivedAt: Double, dequeuedAt: Double) {
+        rxSeq += 1
+        let sinceLast = rxLastArrivedAt.map { SyncTransferTiming.deltaMs(from: $0, to: arrivedAt) }
+        rxLastArrivedAt = arrivedAt
+        guard SyncConnectDiag.isTransferTracing else { return }
+        SyncConnectDiag.log(SyncTransferTiming.receiveLine(
+            seq: rxSeq, bytes: bytes,
+            sinceLastMs: sinceLast,
+            queueDelayMs: SyncTransferTiming.deltaMs(from: arrivedAt, to: dequeuedAt)
+        ))
     }
 
     func closeTransport() {

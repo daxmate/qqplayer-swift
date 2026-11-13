@@ -293,6 +293,8 @@ final class SyncFileSender: @unchecked Sendable {
             if ack.error == .resumeMismatch { current.lastAckBytes = ack.receivedBytes }
             return terminateLocked(localError(ack.error, fileID: current.fileID), current: current)
         }
+        // 诊断：本 ack 覆盖的块 → 每块一行往返（锁内只存数值，出锁后由 perform 统一落盘）
+        collectChunkRoundTripsLocked(ackedThrough: ack.receivedBytes, at: SyncTransferTiming.now())
         // done → 成功（receivedBytes 必须与声明一致）
         if ack.done {
             guard ack.receivedBytes == current.totalSize else {
@@ -444,7 +446,8 @@ final class SyncFileSender: @unchecked Sendable {
             return .stop
         }
         current.handle = handle
-        current.inFlight.append(SentChunk(offset: offset, length: length))
+        current.inFlight.append(SentChunk(offset: offset, length: length, index: current.chunksSent + 1,
+                                          sentUptime: SyncTransferTiming.now()))
         current.nextOffset = offset + length
         current.inFlightMax = max(current.inFlightMax, current.inFlight.count)
         current.chunksSent += 1
@@ -530,32 +533,11 @@ final class SyncFileSender: @unchecked Sendable {
         return [.log(metricsLocked(current, succeeded: false, error: error)), .finish(.failed(error))]
     }
 
-    // MARK: 锁 + 效果执行
+    /// 诊断：尚未落盘的「本块往返」样本（锁内追加、锁外 flush 后清空）。
+    var pendingChunkRoundTrips: [SyncChunkRoundTrip] = []
 
-    private enum Action {
-        case log(SyncTransferMetrics)
-        case finish(Outcome)
-    }
-
-    /// 锁内跑状态机，锁外执行效果（发块 / 日志 / 用户回调）。
-    private func runLocked(_ body: () -> [Action]) {
-        lock.lock()
-        let actions = body()
-        lock.unlock()
-        perform(actions)
-    }
-
-    /// 执行效果（锁外；顺序 = 生产顺序：先记日志，再用户回调）。
-    private func perform(_ actions: [Action]) {
-        for action in actions {
-            switch action {
-            case let .log(metrics):
-                SyncConnectDiag.log(metrics.logLine)
-            case let .finish(outcome):
-                onCompletion?(outcome)
-            }
-        }
-    }
+    // MARK: 锁 + 效果执行（runLocked / perform / Action 已拆到 SyncFileSender+Effects.swift：
+    //      主文件行数已顶到结构预算棘轮上限，拆出后行为不变）
 
     /// 发一块（锁外）。返回非 nil = 已终止本轮的待执行效果（发帧失败）。
     private func sendChunk(_ payload: Data, flags: SyncFrameFlags) -> [Action]? {

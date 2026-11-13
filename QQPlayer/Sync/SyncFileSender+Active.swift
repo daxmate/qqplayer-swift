@@ -10,6 +10,9 @@ import Foundation
 /// 已发出但未确认的块（窗口占位；`end` = 该块末字节的绝对偏移）。
 struct SyncSenderSentChunk {
     let offset: Int64, length: Int64
+    /// 诊断：本轮块序号（1 起，单调）与发出时刻（单调时钟秒）
+    let index: Int
+    let sentUptime: Double
     var end: Int64 { offset + length }
 }
 
