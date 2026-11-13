@@ -23,7 +23,7 @@ enum MacSmartPlaylistUILogic {
     static func iconName(for kind: SmartPlaylistKind) -> String {
         switch kind {
         case .recentAdded: return "clock"
-        case .recentPlayed: return "history"
+        case .recentPlayed: return "clock.arrow.circlepath"
         case .topPlayed: return "flame"
         case .decades: return "calendar"
         }

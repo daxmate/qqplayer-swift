@@ -8,15 +8,29 @@
 //
 
 import Testing
+import UIKit
 
 @testable import QQPlayer
 
 struct SmartPlaylistUILogicTests {
     @Test func iconMappingCoversAllKinds() {
         #expect(SmartPlaylistUILogic.iconName(for: .recentAdded) == "clock")
-        #expect(SmartPlaylistUILogic.iconName(for: .recentPlayed) == "history")
+        #expect(SmartPlaylistUILogic.iconName(for: .recentPlayed) == "clock.arrow.circlepath")
         #expect(SmartPlaylistUILogic.iconName(for: .topPlayed) == "flame")
         #expect(SmartPlaylistUILogic.iconName(for: .decades) == "calendar")
+    }
+
+    /// 守卫：iconName 必须是真实存在的 SF Symbol。
+    /// 用 UIImage(systemName:) 解析失败时 Image(systemName:) 会渲染成空白，
+    /// 图标名笔误在视觉上几乎无法发现（曾经的 "history" 即非合法符号）。
+    @Test func iconNamesResolveToRealSymbols() {
+        for kind in SmartPlaylistKind.allCases {
+            let name = SmartPlaylistUILogic.iconName(for: kind)
+            #expect(
+                UIImage(systemName: name) != nil,
+                "SmartPlaylistKind.\(kind) 的图标名 \(name) 不是合法 SF Symbol"
+            )
+        }
     }
 
     @Test func cardSubtitleUsesSongsFormatForTrackKinds() {
