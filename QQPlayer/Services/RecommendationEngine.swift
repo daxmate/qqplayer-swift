@@ -314,9 +314,10 @@ struct RecommendationEngine: Sendable {
         }
 
         // P4：可选艺人关系扩展（默认关 = 零请求）。
-        // 点名场景即使设置为关也启用（相似补位）：结果带 relatedTo 标记、不被硬约束闸剔除。
+        // 点名场景即使设置为关也启用（相似补位）：结果带 relatedTo 标记、不被硬约束闸剔除；
+        // 比例 0（纯本人）时不召回相似，避免无谓的 MB / 源请求。
         let expansion = artistRelation ?? (artistConstraint == nil ? nil : namedArtistRelationFallback)
-        if let expansion {
+        if let expansion, artistConstraint == nil || relatedArtistShare > 0 {
             let related = await relatedArtistSongs(
                 intents: resolvedIntents,
                 limit: perIntentLimit,

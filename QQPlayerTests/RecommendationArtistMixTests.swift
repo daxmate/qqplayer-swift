@@ -29,11 +29,31 @@ private struct MixProvider: OnlineSearchProviding, ArtistAliasProviding {
     }
 }
 
+/// MB 关系查询调用记录（验证 share=0 时「不召回相似」）。
+private final class MixCallLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String] = []
+
+    func record(_ value: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        items.append(value)
+    }
+
+    var calls: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return items
+    }
+}
+
 private struct MixRelationSource: ArtistRelatedArtistProviding {
     var names: [String]
+    var log: MixCallLog?
 
     func relatedArtists(for artistName: String, limit: Int) async throws -> [String] {
-        Array(names.prefix(limit))
+        log?.record(artistName)
+        return Array(names.prefix(limit))
     }
 }
 
@@ -80,7 +100,8 @@ private func mixRequest(
 private func mixEngine(
     direct: [RecommendationRemoteSong],
     relatedByArtist: [String: [RecommendationRemoteSong]] = [:],
-    share: Double = DeleteSettings.defaultRelatedArtistShare
+    share: Double = DeleteSettings.defaultRelatedArtistShare,
+    log: MixCallLog? = nil
 ) -> RecommendationEngine {
     var provider = MixProvider()
     provider.songs = ["孙燕姿": direct]
@@ -96,7 +117,7 @@ private func mixEngine(
     engine.relatedArtistShare = share
     if !relatedByArtist.isEmpty {
         engine.artistRelation = RecommendationArtistRelation(
-            client: MixRelationSource(names: Array(relatedByArtist.keys).sorted()),
+            client: MixRelationSource(names: Array(relatedByArtist.keys).sorted(), log: log),
             recall: MixRelatedRecall(songsByArtist: relatedByArtist),
             budget: RecommendationArtistRelationBudget()
         )
@@ -271,6 +292,92 @@ struct RecommendationArtistMixQuotaTests {
         let pool = RecommendationArtistMix.quota(displayTarget: 60, share: 0.30)
         #expect(pool.direct == 42)
         #expect(pool.related == 18)
+
+        let twenty = RecommendationArtistMix.quota(displayTarget: 20, share: 0.30)
+        #expect(twenty.direct == 14)
+        #expect(twenty.related == 6)
+
+        let zeroTarget = RecommendationArtistMix.quota(displayTarget: 0, share: 0.30)
+        #expect(zeroTarget.direct == 0)
+        #expect(zeroTarget.related == 0)
+    }
+
+    @Test("share=0：不召回相似（连 MB 关系查询都不发）")
+    func shareZeroSkipsRelatedRecall() async {
+        let log = MixCallLog()
+        let engine = mixEngine(
+            direct: sunyanzi(20),
+            relatedByArtist: ["方大同": relatedSongs(8, "方大同")],
+            share: 0,
+            log: log
+        )
+        let result = await engine.recommend(
+            request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
+            profile: TasteProfile(),
+            count: 15
+        )
+        switch result {
+        case let .success(list):
+            #expect(list.count == 15)
+            #expect(RecommendationArtistMix.directCount(in: list) == 15)
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+        #expect(log.calls.isEmpty)
+    }
+
+    @Test("share=0.5：同一请求改成 50% → 本人 7 + 相似 8（比例随设置变）")
+    func shareHalfSplitsSevenEight() async {
+        let engine = mixEngine(
+            direct: sunyanzi(20),
+            relatedByArtist: ["方大同": relatedSongs(10, "方大同")],
+            share: 0.5
+        )
+        let result = await engine.recommend(
+            request: mixRequest(artists: ["孙燕姿"], rawText: "推荐一些孙燕姿的歌"),
+            profile: TasteProfile(),
+            count: 15
+        )
+        switch result {
+        case let .success(list):
+            let direct = RecommendationArtistMix.directCount(in: list)
+            #expect(direct == 7)
+            #expect(list.count - direct == 8)
+            #expect(list.count == 15)
+        case let .failure(error):
+            Issue.record("不应失败：\(error)")
+        }
+    }
+
+    @Test("批次比例随设置变化：30% → 10/5，50% → 7/8")
+    func batchRatioFollowsShare() {
+        let direct = (1 ... 20).map { mixCandidate(String(format: "S%02d", $0), "孙燕姿") }
+        let related = (1 ... 12).map { mixCandidate("R\($0)", "方大同", relatedTo: "孙燕姿") }
+        let pool = direct + related
+
+        func split(_ share: Double) -> (direct: Int, related: Int) {
+            let quota = RecommendationArtistMix.quota(
+                displayTarget: RecommendationBatchPolicy.batchSize,
+                share: share
+            )
+            var session = RecallSession(
+                pool: pool,
+                maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: true),
+                minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: true),
+                quota: RecallSession.Quota(direct: quota.direct, related: quota.related)
+            )
+            let batch = session.nextBatch()
+            let directCount = batch.filter { $0.relatedTo == nil }.count
+            return (directCount, batch.count - directCount)
+        }
+
+        let thirty = split(0.30)
+        #expect(thirty.direct == 10)
+        #expect(thirty.related == 5)
+
+        let fifty = split(0.50)
+        #expect(fifty.direct == 7)
+        #expect(fifty.related == 8)
     }
 
     @Test("share=0：引擎产出纯本人（相似段名额 0）")
