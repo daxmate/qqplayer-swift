@@ -34,6 +34,9 @@ struct MacLibraryAccessGate<Content: View>: View {
     }
 
     var body: some View {
+        // ⚠️ 不要在这个 Group 上再加 `.frame(minWidth:)`：外层 frame 就是窗口最小尺寸，
+        // 760×520 曾把内层三栏（min 1100×720）压住 → 窗口能缩到三栏内容被裁。
+        // 最小尺寸只由各自内容声明：已授权走 MacLibraryView 的 min，未授权走 setupView 的 min。
         Group {
             if access.state == .granted {
                 content()
@@ -41,7 +44,6 @@ struct MacLibraryAccessGate<Content: View>: View {
                 setupView
             }
         }
-        .frame(minWidth: 760, minHeight: 520)
         .task { refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             refresh()
@@ -101,6 +103,8 @@ struct MacLibraryAccessGate<Content: View>: View {
         }
         .padding(DesignTokens.space24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 引导页只有单列内容：给它自己的最小尺寸（比三栏主界面小），窗口在未授权态可缩得更小。
+        .frame(minWidth: MacMainWindowMetrics.setupMinWidth, minHeight: MacMainWindowMetrics.setupMinHeight)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 

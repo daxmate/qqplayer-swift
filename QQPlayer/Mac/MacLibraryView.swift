@@ -133,7 +133,9 @@ struct MacLibraryView: View {
             )
         }
         .navigationTitle("QQPlayer")
-        .frame(minWidth: 1000, minHeight: 640)
+        // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小
+        // 由这里决定，scene 侧配 `.windowResizability(.contentMinSize)` 才生效。
+        .frame(minWidth: MacMainWindowMetrics.minWidth, minHeight: MacMainWindowMetrics.minHeight)
         .toolbar {
             // 迷你模式入口（v2：主窗 ⇄ 迷你互斥，仅主窗态可见此按钮；
             // 可见性 = 设置「迷你窗与桌面歌词」分类开关）

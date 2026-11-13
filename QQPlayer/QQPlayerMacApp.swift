@@ -5,13 +5,95 @@
 //  QQPlayerApp.swift as its @main; this file must stay out of the iOS
 //  QQPlayer target to avoid duplicate @main declarations.
 //
+import AppKit
 import SwiftUI
 
+/// Mac 主窗尺寸的唯一事实源（**只此一处**）。
+///
+/// 为什么集中：最小尺寸原先散在三处且互相打架 —— `MacLibraryView` 要 1000×640、
+/// `MacLibraryAccessGate` 外层却给整窗 760×520，而 scene 上既无 `.windowResizability`
+/// 也无 `.defaultSize`。外层 flexible frame 把窗口最小尺寸压到 760，内层三栏溢出后被
+/// 窗口裁掉（左栏标签、右栏播放器控制条被切）——「设了 1000 却不生效」的形态。
+enum MacMainWindowMetrics {
+    /// 已授权（三栏主界面）的最小内容尺寸：sidebar 180 + content 320 之外，
+    /// detail 播放页还要放得下封面/控制条，toolbar 也不能开始挤叠。
+    static let minWidth: CGFloat = 1100
+    static let minHeight: CGFloat = 720
+    /// 首次启动（无历史 frame）时的窗口尺寸：比最小尺寸留出余量。
+    static let defaultWidth: CGFloat = 1280
+    static let defaultHeight: CGFloat = 800
+    /// 未授权引导页的最小尺寸：只有单列内容，不需要按三栏宽度占屏。
+    static let setupMinWidth: CGFloat = 820
+    static let setupMinHeight: CGFloat = 560
+}
+
 /// 迷你模式点 Dock 图标 → 回主窗（收起迷你窗/歌词窗；主窗态下幂等无副作用）。
+@MainActor
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // 启动兜底：AppKit 会按上次保存的 frame 恢复窗口，历史上被拖到过小的用户会
+        // 一直「继承」那个小窗；`.windowResizability(.contentMinSize)` 只约束之后的
+        // 拖拽，管不到已恢复的 frame，所以这里主动撑一次。
+        Self.clampLaunchMainWindowIfNeeded()
+
+        // 启动瞬间 SwiftUI 常常还没把主窗建出来（WindowGroup 异步装配），直接取窗口会落空；
+        // 所以主路径是「窗口成为 key」时再兜一次 —— 幂等：尺寸够大就直接返回。
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { note in
+            guard let window = note.object as? NSWindow else { return }
+            MainActor.assumeIsolated {
+                MacAppDelegate.clampTitleMainWindowIfNeeded(window)
+            }
+        }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         DesktopWindowsManager.shared.showMainWindow()
         return true
+    }
+
+    /// 启动时的主窗兜底：此刻通常只有主窗，但标题可能还没设上（未授权引导页没有
+    /// navigationTitle）→ 判据与 `DesktopWindowsManager.findMainWindow` 对齐：
+    /// 标题「QQPlayer」优先，退化为第一个可成为主窗的非 panel 窗口。
+    /// 迷你窗 / 歌词窗 / 桌面浮窗都是 `NSPanel`，被 `!($0 is NSPanel)` 天然排除。
+    private static func clampLaunchMainWindowIfNeeded() {
+        guard let window = NSApp.windows.first(where: { !($0 is NSPanel) && $0.title == "QQPlayer" })
+            ?? NSApp.windows.first(where: { !($0 is NSPanel) && $0.canBecomeMain })
+        else { return }
+        clampToMinimumSize(window)
+    }
+
+    /// became-key 路径：只认标题「QQPlayer」的主窗。不能退化到 `canBecomeMain` ——
+    /// 设置窗也是普通窗口、也能成为 key，退化会把它撑到三栏主界面的最小尺寸。
+    private static func clampTitleMainWindowIfNeeded(_ window: NSWindow) {
+        guard !(window is NSPanel), window.title == "QQPlayer" else { return }
+        clampToMinimumSize(window)
+    }
+
+    /// 只放大不缩小：内容小于 `MacMainWindowMetrics.minWidth/minHeight` 时撑到最小尺寸；
+    /// 已够大直接返回（重复触发无副作用）。
+    private static func clampToMinimumSize(_ window: NSWindow) {
+        let minContentSize = NSSize(
+            width: MacMainWindowMetrics.minWidth,
+            height: MacMainWindowMetrics.minHeight
+        )
+        let contentRect = window.contentRect(forFrameRect: window.frame)
+        guard contentRect.width < minContentSize.width || contentRect.height < minContentSize.height else {
+            return
+        }
+
+        let targetContentSize = NSSize(
+            width: max(contentRect.width, minContentSize.width),
+            height: max(contentRect.height, minContentSize.height)
+        )
+        var targetFrame = window.frameRect(forContentRect: NSRect(origin: .zero, size: targetContentSize))
+        // 锚点：保持左上角不动（标题栏位置不跳），只向右下扩。
+        targetFrame.origin.x = window.frame.minX
+        targetFrame.origin.y = window.frame.maxY - targetFrame.height
+        window.setFrame(targetFrame, display: true)
     }
 }
 
@@ -129,6 +211,11 @@ struct QQPlayerMacApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
+        // 窗口最小尺寸由内容决定（三栏主界面 = MacMainWindowMetrics.minWidth×minHeight）。
+        // 少了这条，macOS 只在首次给 defaultSize，之后用户能一路拖到内容被裁。
+        .windowResizability(.contentMinSize)
+        // 首次启动（无历史 frame）的窗口尺寸；有历史 frame 时由 MacAppDelegate 启动兜底修正。
+        .defaultSize(width: MacMainWindowMetrics.defaultWidth, height: MacMainWindowMetrics.defaultHeight)
         // 设置：系统 Settings scene → App 菜单自动出现「Settings…」(⌘,)，
         // 打开独立设置窗口（macOS 惯例；主窗口 toolbar 不放设置按钮）
         Settings {
