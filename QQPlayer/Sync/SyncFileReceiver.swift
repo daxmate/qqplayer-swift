@@ -221,12 +221,14 @@ final class SyncFileReceiver: @unchecked Sendable {
 
     // MARK: init
 
-    init(session: SyncPeerSession, directory: URL) {
+    /// - Parameter keepalive: 上行 keep-alive pacer；nil = 按会话队列现建（生产唯一用法）。
+    ///   测试注入用于断言「哪种入站帧会把 pacer 拉起来」（夹具没有真实串行队列，默认 pacer 不会启动）。
+    init(session: SyncPeerSession, directory: URL, keepalive: SyncRxKeepalivePacer? = nil) {
         self.session = session
         self.directory = directory
         // pacer 跟会话串行队列；队列在 start 时才解析（transport 可能晚于本对象就位），
         // 拿不到队列（内存回环 / 测试夹具）⇒ pacer 不启用，行为与改动前一致。
-        keepalive = SyncRxKeepalivePacer(
+        self.keepalive = keepalive ?? SyncRxKeepalivePacer(
             queueProvider: { [weak session] in session?.transport?.serialQueue },
             sendPing: { [weak session] in try session?.sendPing() }
         )
@@ -327,7 +329,14 @@ final class SyncFileReceiver: @unchecked Sendable {
             // 接收端不收 ack：忽略（有测试锁定该行为）
             break
         default:
-            break
+            // 上行 keep-alive **提前启动**（2026-11-13 真机：只在 file_meta 启动时，空闲 3.5 分钟后
+            // 首块 ackWaitFirst 仍有 212–287ms——meta↔ack 那程无线还没热起来）。
+            // 信号来源与「为什么不用更早的 manifest 帧」见 `SyncRxKeepalive.startReason(for:)`；
+            // 门控：只有这条信号能启动 pacer，仅仅是连着、没有传输的空闲会话永远收不到它。
+            // 信号到了却没有 chunk（对端放弃 / 全部已一致 / 会话关闭）→ 500ms idle 自停。
+            if let reason = SyncRxKeepalive.startReason(for: frame.type) {
+                runLocked { [.keepalive(.start(fileID: "", reason: reason))] }
+            }
         }
     }
 
@@ -468,7 +477,8 @@ final class SyncFileReceiver: @unchecked Sendable {
     /// 判定（并发收多文件时不能因为一个文件收完就停）。
     enum KeepaliveAction {
         /// 开始接收一个文件（幂等：并发多文件沿用同一 pacer）
-        case start(fileID: String)
+        /// - reason: 启动来源（`push_announce` = 声明帧提前启动 / `file_meta` = 兜底）
+        case start(fileID: String, reason: SyncRxKeepalivePacer.StartReason = .fileMeta)
     }
 
     /// 锁内跑状态机，锁外执行效果（发 ack / 日志 / 用户回调）。所有路径的 ack 发送都在锁外，
@@ -482,7 +492,7 @@ final class SyncFileReceiver: @unchecked Sendable {
             switch action {
             case let .keepalive(keepaliveAction):
                 switch keepaliveAction {
-                case let .start(fileID): keepalive.start(fileID: fileID)
+                case let .start(fileID, reason): keepalive.start(fileID: fileID, reason: reason)
                 }
             case let .sendAck(ack):
                 // 诊断：造 ack → 编码 / 加密 / 入通道（这一段是「我们自己发得慢」的那部分）。

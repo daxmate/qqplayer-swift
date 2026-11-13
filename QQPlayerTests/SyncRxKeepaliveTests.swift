@@ -55,7 +55,9 @@ struct SyncRxKeepaliveTests {
 
     @Test func constantsMatchAgreedCadence() {
         #expect(SyncRxKeepalive.isEnabled)
-        #expect(SyncRxKeepalive.interval == 0.03)
+        #expect(SyncRxKeepalive.interval == 0.010)
+        #expect(SyncRxKeepalive.prewarmCount == 12)
+        #expect(SyncRxKeepalive.prewarmInterval == 0.004)
         #expect(SyncRxKeepalive.idleTimeout == 0.5)
         #expect(SyncRxKeepalive.maxLifetime == 120)
         // 单帧 38B（10B 帧头 + nonce 12 + tag 16）
@@ -79,6 +81,59 @@ struct SyncRxKeepaliveTests {
         #expect(!pacer.isRunning)
         pacer.stop(reason: .idle) // 二次 stop 幂等，不抛不炸
         #expect(!pacer.isRunning)
+    }
+
+    // MARK: 预热节奏（纯函数 plan()）
+
+    @Test func prewarmSendsFramesEvenRightAfterChunk() {
+        // 预热期不看 chunk 时刻：刚有数据也要发（预热就是为「文件还没来」的窗口服务的）
+        let plan = SyncRxKeepalive.plan(now: 100, lastChunkAt: 100, lastPingAt: 100,
+                                        prewarmRemaining: 3)
+        #expect(plan.sendPing)
+        #expect(plan.prewarmRemaining == 2)
+        #expect(plan.nextInterval == 0.004)
+    }
+
+    @Test func prewarmSwitchesBackToSteadyIntervalOnLastFrame() {
+        let plan = SyncRxKeepalive.plan(now: 100, lastChunkAt: 100, lastPingAt: 100,
+                                        prewarmRemaining: 1)
+        #expect(plan.sendPing)
+        #expect(plan.prewarmRemaining == 0)
+        #expect(plan.nextInterval == SyncRxKeepalive.interval)
+    }
+
+    @Test func steadyStateUsesTenMillisecondCadence() {
+        #expect(!SyncRxKeepalive.plan(now: 10.005, lastChunkAt: 9.0, lastPingAt: 10.0,
+                                      prewarmRemaining: 0).sendPing)
+        #expect(SyncRxKeepalive.plan(now: 10.011, lastChunkAt: 9.0, lastPingAt: 10.0,
+                                     prewarmRemaining: 0).sendPing)
+    }
+
+    @Test func badPrewarmIntervalDoesNotSpin() {
+        let plan = SyncRxKeepalive.plan(now: 10, lastChunkAt: 10, lastPingAt: 10,
+                                        prewarmRemaining: 2, prewarmInterval: 0)
+        #expect(plan.nextInterval == SyncRxKeepalive.interval)
+    }
+
+    // MARK: 启动信号（只认推送声明）
+
+    @Test func onlyPushAnnounceStartsEarly() {
+        #expect(SyncRxKeepalive.startReason(for: .libraryPushAnnounce) == .pushAnnounce)
+        #expect(SyncRxKeepalive.startReason(for: .ping) == nil)
+        #expect(SyncRxKeepalive.startReason(for: .manifestRequest) == nil)
+        #expect(SyncRxKeepalive.startReason(for: .manifestResponse) == nil)
+        #expect(SyncRxKeepalive.startReason(for: .fileChunk) == nil)
+    }
+
+    @Test func disabledPacerDoesNotStart() {
+        let pacer = SyncRxKeepalivePacer(
+            queueProvider: { DispatchQueue(label: "qqplayer.test.rx-keepalive.off") },
+            sendPing: {},
+            enabled: false
+        )
+        pacer.start(fileID: "f-off")
+        #expect(!pacer.isRunning)
+        #expect(pacer.pingCount == 0)
     }
 
     @Test func pacerInertWithoutSerialQueue() {

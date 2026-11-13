@@ -4437,7 +4437,7 @@ do {
 
     // 任务包定案值：改动必须同步改测试（节奏 / 闲置窗 / 硬上限）
     check(SyncRxKeepalive.isEnabled, "S52 默认启用")
-    checkEqual(SyncRxKeepalive.interval, 0.03, "S52 间隔 = 30ms")
+    checkEqual(SyncRxKeepalive.interval, 0.010, "S52 稳态间隔 = 10ms")
     checkEqual(SyncRxKeepalive.idleTimeout, 0.5, "S52 闲置窗 = 500ms")
     checkEqual(SyncRxKeepalive.maxLifetime, 120, "S52 硬上限 = 120s")
     checkEqual(SyncRxKeepalivePacer.pingFrameBytes, 38, "S52 单帧 38B（10B 头 + nonce12 + tag16）")
@@ -4458,6 +4458,97 @@ do {
     let inertPacer = SyncRxKeepalivePacer(queueProvider: { nil }, sendPing: {})
     inertPacer.start(fileID: "s52-noqueue")
     check(!inertPacer.isRunning, "S52 无串行队列时不启用（内存回环/夹具零影响）")
+}
+
+// MARK: - S53 上行 keep-alive 预热 + 提前启动（Sync/SyncRxKeepalive.swift）
+//
+// 为什么加：2026-11-13 真机——只在 file_meta 启动时，空闲 3.5 分钟后开传的首块
+// ackWaitFirst 仍 212–287ms（无线在 meta↔ack 那程还没热起来）；预热把无线提前拉醒、
+// 稳态压到 10ms 后，紧接热测 ackWaitFirst 134ms、吞吐 21.49MB/s。
+// 这里锁住：预热参数与节奏、稳态 10ms、启动信号门控（空闲会话不发）、禁用不发。
+// 节奏用纯函数 plan() 验证，**不等墙上时间**（30ms/10ms 定时器时序必然 flaky）。
+do {
+    print("▶︎ S53 keep-alive 预热与启动门控")
+
+    // 任务包定案值
+    checkEqual(SyncRxKeepalive.prewarmCount, 12, "S53 预热帧数 = 12")
+    checkEqual(SyncRxKeepalive.prewarmInterval, 0.004, "S53 预热间隔 = 4ms（12 帧 ≈ 48ms）")
+    checkEqual(SyncRxKeepalive.interval, 0.010, "S53 稳态间隔 = 10ms")
+
+    // 预热节奏：12 帧全发；预热期即便「数据刚来过」也照发；前 11 拍 4ms、末拍切回 10ms
+    var remaining = SyncRxKeepalive.prewarmCount
+    var prewarmSends = 0
+    var prewarmIntervals: [TimeInterval] = []
+    while remaining > 0 {
+        let plan = SyncRxKeepalive.plan(now: 100, lastChunkAt: 100, lastPingAt: 100,
+                                        prewarmRemaining: remaining)
+        if plan.sendPing { prewarmSends += 1 }
+        prewarmIntervals.append(plan.nextInterval)
+        remaining = plan.prewarmRemaining
+    }
+    checkEqual(prewarmSends, 12, "S53 预热期连发 12 帧（chunk 刚来过也照发）")
+    checkEqual(prewarmIntervals.filter { $0 == 0.004 }.count, 11, "S53 预热前 11 拍 4ms")
+    checkEqual(prewarmIntervals.last ?? -1, 0.010, "S53 预热末拍切回 10ms 稳态")
+
+    // 稳态：10ms 节拍；数据本身在唤醒无线（5ms 前有 chunk）时不补 ping
+    // ⚠️ 取样点别取 10.0 + 0.010 整：浮点边界会在测「判据」还是「浮点」之间漂（同 S52 的教训）
+    let steadyWait = SyncRxKeepalive.plan(now: 10.005, lastChunkAt: 9.0, lastPingAt: 10.0,
+                                          prewarmRemaining: 0)
+    check(!steadyWait.sendPing, "S53 稳态未到 10ms 不发")
+    checkEqual(steadyWait.nextInterval, 0.010, "S53 稳态下一拍 = 10ms")
+    check(SyncRxKeepalive.plan(now: 10.011, lastChunkAt: 9.0, lastPingAt: 10.0,
+                               prewarmRemaining: 0).sendPing, "S53 稳态到 10ms 发")
+    check(!SyncRxKeepalive.plan(now: 10.02, lastChunkAt: 10.015, lastPingAt: 9.0,
+                                prewarmRemaining: 0).sendPing, "S53 数据刚来过 → 稳态不补 ping")
+    // 坏参数不许忙等
+    checkEqual(SyncRxKeepalive.plan(now: 10, lastChunkAt: 10, lastPingAt: 10,
+                                    prewarmRemaining: 2, prewarmInterval: 0).nextInterval,
+               0.010, "S53 prewarmInterval=0 → 退回稳态节拍（不忙等）")
+
+    // 启动信号：只有推送声明（帧 14）算「即将有文件要传」
+    checkEqual(SyncRxKeepalive.startReason(for: .libraryPushAnnounce), .pushAnnounce,
+               "S53 推送声明（帧 14）是提前启动信号")
+    check(SyncRxKeepalive.startReason(for: .ping) == nil, "S53 ping 不算启动信号")
+    check(SyncRxKeepalive.startReason(for: .manifestRequest) == nil,
+          "S53 manifest_request 不算（推送/拉取两轮都有）")
+    check(SyncRxKeepalive.startReason(for: .manifestResponse) == nil,
+          "S53 manifest_response 不算（拉取轮也有）")
+    check(SyncRxKeepalive.startReason(for: .fileChunk) == nil, "S53 file_chunk 不算（已经在传了）")
+    check(SyncRxKeepalive.startReason(for: .fileAck) == nil, "S53 file_ack 不算")
+    check(SyncRxKeepalive.startReason(for: .peerLibraryResponse) == nil, "S53 曲库清单响应不算")
+
+    // 门控落地（真实 receiver，注入 pacer 绕过「夹具无串行队列」）：
+    // 空闲会话的帧不启动，推送声明才启动
+    let gateFixture = SessionFixture.pairedHandshake()
+    let gateDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("s53-keepalive-gate", isDirectory: true)
+    try? FileManager.default.createDirectory(at: gateDir, withIntermediateDirectories: true)
+    let gateQueue = DispatchQueue(label: "qqplayer.harness.s53-keepalive")
+    let gatePacer = SyncRxKeepalivePacer(queueProvider: { gateQueue }, sendPing: {},
+                                         prewarmCount: 0)
+    let gateReceiver = SyncFileReceiver(session: gateFixture.clientSession, directory: gateDir,
+                                        keepalive: gatePacer)
+    gateReceiver.handleInboundFrame(SyncFrame(type: .ping))
+    gateReceiver.handleInboundFrame(SyncFrame(type: .peerLibraryResponse))
+    gateReceiver.handleInboundFrame(SyncFrame(type: .manifestRequest))
+    check(!gatePacer.isRunning, "S53 只是连着（ping/清单/manifest 帧）→ pacer 不启动，不发 ping")
+    gateReceiver.handleInboundFrame(SyncFrame(type: .libraryPushAnnounce))
+    check(gatePacer.isRunning, "S53 推送声明帧到达 → pacer 提前启动")
+    gatePacer.stop(reason: .done)
+    check(!gatePacer.isRunning, "S53 done 停止条件不变（stop 后不跑）")
+
+    // A/B 开关仍在：enabled=false 时 start 直接返回（不发任何 ping）
+    let disabledPacer = SyncRxKeepalivePacer(queueProvider: { gateQueue }, sendPing: {},
+                                             enabled: false)
+    disabledPacer.start(fileID: "s53-disabled")
+    check(!disabledPacer.isRunning, "S53 isEnabled=false 不启动（A/B 开关保留）")
+    checkEqual(disabledPacer.pingCount, 0, "S53 禁用时不发 ping")
+
+    // 停止条件不变：idle 窗 500ms、硬上限 120s（预热不改变这两条）
+    checkEqual(SyncRxKeepalive.idleTimeout, 0.5, "S53 idle 窗仍 500ms")
+    checkEqual(SyncRxKeepalive.maxLifetime, 120, "S53 硬上限仍 120s")
+    check(SyncRxKeepalive.shouldStop(idleFor: 0.5, idleTimeout: SyncRxKeepalive.idleTimeout),
+          "S53 500ms 无 chunk 仍自停（预热不会拖住停止）")
 }
 
 // MARK: - 汇总
