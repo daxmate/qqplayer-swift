@@ -1221,3 +1221,5 @@
 "recommendation_lastfm_cleared" = "Removed.";
 "recommendation_lastfm_save_failed" = "Could not write to the keychain. Try again.";
 "source_lastfm" = "Last.fm";
+"recommendation_itunes_lookup_title" = "iTunes metadata lookups";
+"recommendation_itunes_lookup_footer" = "Runs one iTunes lookup for top-scoring candidates to fill canonical title / album / year / duration; 0 disables. Results are cached for 7 days and queued at iTunes' ~20 req/min limit; failures are skipped.";

@@ -320,6 +320,13 @@ enum MacSettingsCatalog {
         aliases: ["风格探索", "探索", "explore", "quota"]
     )
 
+    static let recommendationITunesLookup = Item(
+        id: "settings.recommendation.itunesLookup",
+        category: .recommendations,
+        titleKey: "recommendation_itunes_lookup_title",
+        aliases: ["iTunes", "元数据", "标准化", "metadata", "lookup"]
+    )
+
     static let recommendationLastFMKey = Item(
         id: "settings.recommendation.lastfm",
         category: .recommendations,
@@ -400,6 +407,7 @@ enum MacSettingsCatalog {
         recommendationQuotaSimilar,
         recommendationQuotaExplore,
         recommendationLastFMKey,
+        recommendationITunesLookup,
         recommendationChatRounds,
         recommendationRelatedShare,
         recommendationArtistRelation,

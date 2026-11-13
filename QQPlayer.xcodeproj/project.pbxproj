@@ -1061,6 +1061,7 @@
 				Services/RecommendationReasonPrompt.swift,
 				Services/RecommendationReasons.swift,
 				Models/RecommendationV3Settings.swift,
+				Services/RecommendationMetadataNormalizer.swift,
 				Services/RecommendationV3Types.swift,
 				Services/RecommendationLibraryMatcher.swift,
 				Services/RecommendationProfileV3.swift,

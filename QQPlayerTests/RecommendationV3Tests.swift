@@ -455,3 +455,124 @@ struct RecommendationV3LocalizationTests {
         }
     }
 }
+
+// MARK: - iTunes 元数据标准化
+
+@Suite("推荐 v3：iTunes 元数据标准化")
+struct RecommendationMetadataNormalizerTests {
+    /// 记录调用次数的桩 provider（actor 保证并发安全）。
+    actor StubProvider: OnlineSearchProviding {
+        nonisolated var source: RecommendationSource { .itunes }
+        private let results: [RecommendationRemoteSong]
+        private var calls = 0
+
+        init(results: [RecommendationRemoteSong]) {
+            self.results = results
+        }
+
+        func search(query _: String, limit _: Int) async throws -> [RecommendationRemoteSong] {
+            calls += 1
+            return results
+        }
+
+        func callCount() -> Int { calls }
+    }
+
+    private func profile() -> RecommendationTasteProfileV3 {
+        var profile = RecommendationTasteProfileV3()
+        profile.seeds = [RecommendationSeedArtist(artist: "张学友", affinity: 1, libraryCount: 10, playCount: 10, representativeTitles: [])]
+        return profile
+    }
+
+    private func candidate(_ title: String, _ artist: String) -> RecommendationV3Candidate {
+        RecommendationV3Candidate(
+            song: RecommendationRemoteSong(title: title, artist: artist, source: .lastfm),
+            context: RecommendationCandidateContext(channel: .seed, seedArtist: artist, affinity: 1)
+        )
+    }
+
+    @Test("错名纠正：归一化键不同 → 用 iTunes 标准曲名，并补齐年份/专辑/时长")
+    func correctsDirtyTitle() async {
+        let provider = StubProvider(results: [
+            RecommendationRemoteSong(
+                title: "她来听我的演唱会",
+                artist: "张学友",
+                album: "走过1999",
+                year: 1999,
+                durationMs: 260_000
+            ),
+        ])
+        let normalizer = RecommendationMetadataNormalizer(
+            provider: provider,
+            cache: RecommendationMetadataCache(),
+            maxLookups: 5
+        )
+        let dirty = candidate("Ageless Tale", "张学友")
+        let output = await normalizer.normalize([dirty], profile: profile())
+        #expect(output.hits == 1)
+        #expect(output.candidates.first?.song.title == "她来听我的演唱会")
+        #expect(output.candidates.first?.song.year == 1999)
+        #expect(output.candidates.first?.song.album == "走过1999")
+        #expect(output.candidates.first?.song.durationMs == 260_000)
+    }
+
+    @Test("同曲版本差异（Live）不覆盖原曲名")
+    func keepsVersionTitle() async {
+        let provider = StubProvider(results: [
+            RecommendationRemoteSong(title: "慢慢", artist: "张学友", year: 2001),
+        ])
+        let normalizer = RecommendationMetadataNormalizer(
+            provider: provider,
+            cache: RecommendationMetadataCache(),
+            maxLookups: 5
+        )
+        let live = candidate("慢慢 (Live)", "张学友")
+        let output = await normalizer.normalize([live], profile: profile())
+        #expect(output.candidates.first?.song.title == "慢慢 (Live)")
+        #expect(output.candidates.first?.song.year == 2001)
+    }
+
+    @Test("艺人不一致 → 不采纳（宁缺勿错）")
+    func rejectsArtistMismatch() async {
+        let provider = StubProvider(results: [
+            RecommendationRemoteSong(title: "Ageless Tale", artist: "Someone Else", year: 2020),
+        ])
+        let normalizer = RecommendationMetadataNormalizer(
+            provider: provider,
+            cache: RecommendationMetadataCache(),
+            maxLookups: 5
+        )
+        let dirty = candidate("Ageless Tale", "张学友")
+        let output = await normalizer.normalize([dirty], profile: profile())
+        #expect(output.hits == 0)
+        #expect(output.candidates.first?.song.year == nil)
+    }
+
+    @Test("maxLookups = 0：完全跳过，不发请求")
+    func disabled() async {
+        let provider = StubProvider(results: [RecommendationRemoteSong(title: "X", artist: "张学友")])
+        let normalizer = RecommendationMetadataNormalizer(
+            provider: provider,
+            cache: RecommendationMetadataCache(),
+            maxLookups: 0
+        )
+        _ = await normalizer.normalize([candidate("X", "张学友")], profile: profile())
+        let calls = await provider.callCount()
+        #expect(calls == 0)
+    }
+
+    @Test("缓存命中：同曲第二轮不再请求")
+    func cacheHit() async {
+        let provider = StubProvider(results: [RecommendationRemoteSong(title: "她来听我的演唱会", artist: "张学友", year: 1999)])
+        let normalizer = RecommendationMetadataNormalizer(
+            provider: provider,
+            cache: RecommendationMetadataCache(),
+            maxLookups: 5
+        )
+        _ = await normalizer.normalize([candidate("Ageless Tale", "张学友")], profile: profile())
+        let second = await normalizer.normalize([candidate("Ageless Tale", "张学友")], profile: profile())
+        let calls = await provider.callCount()
+        #expect(calls == 1)
+        #expect(second.hits == 1)
+    }
+}

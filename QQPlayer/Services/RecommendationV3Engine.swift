@@ -36,9 +36,15 @@ struct RecommendationV3Engine: Sendable {
     /// 在线搜索源（复用现有降级链；测试注入桩）。
     var providers: [any OnlineSearchProviding]
     var lastFM: LastFMClient?
-    /// 网易云客户端（A 通道降级：艺人热歌接口；nil = 只用通用搜索）。
+    /// 网易云客户端（A 通道中文歌手主源：艺人热歌接口；nil = 只用通用搜索）。
     var netease: NeteaseOnlineClient?
     var similarArtistSource: (any SimilarArtistProviding)?
+    /// iTunes 元数据标准化（B；nil = 跳过）。
+    var metadataNormalizer: RecommendationMetadataNormalizer?
+    /// iTunes 调用预算（与标准化共用；每轮 beginRun 重置）。
+    var itunesBudget: RecommendationRunBudget?
+    /// 榜单热度参照（C；只当热度，不当相似源）。
+    var chartClient: AppleMusicChartClient?
     var quotas: RecommendationChannelQuotas = .defaults
     var perSourceLimit: Int = 10
     /// A 通道最多探测多少个种子艺人。
@@ -53,7 +59,10 @@ struct RecommendationV3Engine: Sendable {
         providers: [any OnlineSearchProviding]? = nil,
         lastFM: LastFMClient? = nil,
         netease: NeteaseOnlineClient? = nil,
-        similarArtistSource: (any SimilarArtistProviding)? = nil
+        similarArtistSource: (any SimilarArtistProviding)? = nil,
+        metadataNormalizer: RecommendationMetadataNormalizer? = nil,
+        itunesBudget: RecommendationRunBudget? = nil,
+        chartClient: AppleMusicChartClient? = nil
     ) {
         if let providers {
             self.providers = providers
@@ -65,14 +74,25 @@ struct RecommendationV3Engine: Sendable {
         self.lastFM = lastFM
         self.netease = netease
         self.similarArtistSource = similarArtistSource
+        self.metadataNormalizer = metadataNormalizer
+        self.itunesBudget = itunesBudget
+        self.chartClient = chartClient
     }
 
     /// 生产接线（Settings 读取配额）。
     static func configured(_ settings: DeleteSettings = .load()) -> RecommendationV3Engine {
+        let budget = RecommendationRunBudget(maxITunesCalls: settings.recommendationV3.itunesLookupLimit)
+        let iTunes = ITunesRecommendationProvider(storefront: "us", budget: budget)
         var engine = RecommendationV3Engine(
             lastFM: LastFMClient(),
             netease: .shared,
-            similarArtistSource: MusicBrainzSimilarArtistSource()
+            similarArtistSource: MusicBrainzSimilarArtistSource(),
+            metadataNormalizer: RecommendationMetadataNormalizer(
+                provider: iTunes,
+                maxLookups: settings.recommendationV3.itunesLookupLimit
+            ),
+            itunesBudget: budget,
+            chartClient: AppleMusicChartClient()
         )
         engine.quotas = settings.recommendationChannelQuotas
         return engine
@@ -87,11 +107,21 @@ struct RecommendationV3Engine: Sendable {
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
         guard !profile.isEmpty else { return .success([]) }
         let target = max(1, count)
+        await itunesBudget?.beginRun(maxITunesCalls: metadataNormalizer?.maxLookups ?? 0)
 
         var pool: [RecommendationV3Candidate] = []
         pool.append(contentsOf: await recallSeedChannel(profile: profile))
         pool.append(contentsOf: await recallSimilarChannel(profile: profile))
-        pool.append(contentsOf: await recallExploreChannel(profile: profile))
+        let chartIndex = await chartClient?.index()
+        pool.append(contentsOf: await recallExploreChannel(profile: profile, chartIndex: chartIndex))
+
+        // iTunes 元数据标准化：只补高分段（缓存 + 限速 + 预算内），失败不阻塞。
+        var metadataHits = 0
+        if let metadataNormalizer {
+            let normalized = await metadataNormalizer.normalize(pool, profile: profile)
+            pool = normalized.candidates
+            metadataHits = normalized.hits
+        }
 
         var effectiveProfile = profile
         effectiveProfile.libraryKeys.formUnion(excludedTrackKeys)
@@ -102,7 +132,7 @@ struct RecommendationV3Engine: Sendable {
         let picked = select(ranked, allocation: allocation, total: target)
         AppLog.info(
             .general,
-            "reco=v3 seeds=\(profile.seeds.count) clusters=\(profile.clusters.count) pooled=\(pool.count) ranked=\(ranked.count) picked=\(picked.count) alloc=\(allocation.seed)/\(allocation.similar)/\(allocation.explore)"
+            "reco=v3 seeds=\(profile.seeds.count) clusters=\(profile.clusters.count) pooled=\(pool.count) normalized=\(metadataHits) ranked=\(ranked.count) picked=\(picked.count) alloc=\(allocation.seed)/\(allocation.similar)/\(allocation.explore)"
         )
         return .success(picked.map { convert($0) })
     }
@@ -214,7 +244,10 @@ struct RecommendationV3Engine: Sendable {
     }
 
     /// C：风格探索（同簇的其他艺人；不跨语种）。
-    private func recallExploreChannel(profile: RecommendationTasteProfileV3) async -> [RecommendationV3Candidate] {
+    private func recallExploreChannel(
+        profile: RecommendationTasteProfileV3,
+        chartIndex: ChartPopularityIndex?
+    ) async -> [RecommendationV3Candidate] {
         let seedArtists = Set(profile.seeds.map { RecommendationLibraryMatcher.artistKey($0.artist) })
         var out: [RecommendationV3Candidate] = []
         for cluster in profile.clusters.prefix(maxClusters) {
@@ -234,7 +267,12 @@ struct RecommendationV3Engine: Sendable {
                         context: RecommendationCandidateContext(
                             channel: .explore,
                             seedArtist: nil,
-                            popularity: song.popularity ?? popularity(rank: index, count: songs.count),
+                            popularity: explorePopularity(
+                                song: song,
+                                rank: index,
+                                count: songs.count,
+                                chartIndex: chartIndex
+                            ),
                             language: language,
                             year: song.year,
                             affinity: max(0.2, cluster.share),
@@ -248,6 +286,18 @@ struct RecommendationV3Engine: Sendable {
         return out
     }
 
+    /// 探索通道热度：来源热度 / 榜单热度取高者，再退回名次归一（C：榜单只当热度参照）。
+    private func explorePopularity(
+        song: RecommendationRemoteSong,
+        rank: Int,
+        count: Int,
+        chartIndex: ChartPopularityIndex?
+    ) -> Double {
+        let chart = chartIndex?.popularity(songID: song.songID, title: song.title, artist: song.artist)
+        let ranked = popularity(rank: rank, count: count)
+        return [song.popularity ?? 0, chart ?? 0, ranked].max() ?? ranked
+    }
+
     // MARK: - 来源适配（降级链）
 
     /// 艺人热歌：中文歌手优先网易云（实测 Last.fm 中文曲名映射脏），西文歌手优先 Last.fm。
@@ -258,6 +308,9 @@ struct RecommendationV3Engine: Sendable {
             if let songs = await lastFMTopSongs(artist: artist) { return songs }
         } else {
             if let songs = await lastFMTopSongs(artist: artist) { return songs }
+            // 西文：iTunes Search（链内 tw/us 优先）在通用搜索里，先于网易云。
+            let generic = await search(query: artist, limit: perSourceLimit)
+            if !generic.isEmpty { return generic }
             if let songs = await neteaseTopSongs(artist: artist) { return songs }
         }
         return await search(query: artist, limit: perSourceLimit)

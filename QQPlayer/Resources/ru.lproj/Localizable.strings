@@ -1216,3 +1216,5 @@
 "recommendation_lastfm_cleared" = "Удалён.";
 "recommendation_lastfm_save_failed" = "Не удалось записать в связку ключей. Повторите.";
 "source_lastfm" = "Last.fm";
+"recommendation_itunes_lookup_title" = "Дополнение метаданных iTunes";
+"recommendation_itunes_lookup_footer" = "Один запрос к iTunes для лучших кандидатов: каноническое название, альбом, год, длительность; 0 — выключено. Результаты кэшируются на 7 дней, ограничение ~20 запросов/мин, ошибки пропускаются.";

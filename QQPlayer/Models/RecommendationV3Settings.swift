@@ -23,6 +23,16 @@ struct RecommendationV3Settings: Codable, Sendable, Equatable {
     var quotaSimilar: Double = RecommendationChannelQuotas.defaults.similar
     var quotaExplore: Double = RecommendationChannelQuotas.defaults.explore
 
+    /// iTunes 元数据标准化：每轮最多查询条数（0 = 关闭；iTunes 约 20 req/min）。
+    var itunesLookupLimit: Int = RecommendationV3Settings.defaultITunesLookupLimit
+
+    static let defaultITunesLookupLimit = 8
+    static let itunesLookupLimitRange = 0 ... 30
+
+    static func clampITunesLookupLimit(_ value: Int) -> Int {
+        min(itunesLookupLimitRange.upperBound, max(itunesLookupLimitRange.lowerBound, value))
+    }
+
     init() {}
 
     init(from decoder: Decoder) throws {
@@ -41,6 +51,10 @@ struct RecommendationV3Settings: Codable, Sendable, Equatable {
             ?? RecommendationChannelQuotas.defaults.similar
         quotaExplore = try container.decodeIfPresent(Double.self, forKey: .quotaExplore)
             ?? RecommendationChannelQuotas.defaults.explore
+        itunesLookupLimit = Self.clampITunesLookupLimit(
+            try container.decodeIfPresent(Int.self, forKey: .itunesLookupLimit)
+                ?? Self.defaultITunesLookupLimit
+        )
         normalizeWeights()
         normalizeQuotas()
     }

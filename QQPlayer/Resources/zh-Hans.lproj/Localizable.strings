@@ -1224,3 +1224,5 @@
 "recommendation_lastfm_cleared" = "已移除。";
 "recommendation_lastfm_save_failed" = "写入钥匙串失败，请重试。";
 "source_lastfm" = "Last.fm";
+"recommendation_itunes_lookup_title" = "iTunes 元数据补全";
+"recommendation_itunes_lookup_footer" = "对高分候选做一次 iTunes 查询，补齐标准曲名 / 专辑 / 年份 / 时长；0 = 关闭。同曲结果缓存 7 天，按 iTunes 限速约 20 次/分钟排队，失败自动跳过。";

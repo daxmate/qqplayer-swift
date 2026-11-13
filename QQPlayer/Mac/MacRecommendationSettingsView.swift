@@ -25,6 +25,7 @@ struct MacRecommendationSettingsView: View {
             profileWeightsSection
             channelQuotaSection
             lastFMSection
+            iTunesSection
             requestSection
             relatedArtistSection
             artistRelationSection
@@ -165,6 +166,34 @@ struct MacRecommendationSettingsView: View {
             lastFMKeyStatus = "recommendation_lastfm_cleared".localized
         } catch {
             lastFMKeyStatus = "recommendation_lastfm_save_failed".localized
+        }
+    }
+
+    // MARK: - iTunes 元数据标准化
+
+    private var iTunesSection: some View {
+        Section {
+            Stepper(
+                value: $settings.recommendationV3.itunesLookupLimit,
+                in: RecommendationV3Settings.itunesLookupLimitRange
+            ) {
+                HStack {
+                    Text("recommendation_itunes_lookup_title".localized)
+                    Spacer()
+                    Text("\(settings.recommendationV3.itunesLookupLimit)")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .settingsAnchor(MacSettingsCatalog.recommendationITunesLookup)
+            .onChange(of: settings.recommendationV3.itunesLookupLimit) { _, newValue in
+                settings.recommendationV3.itunesLookupLimit = RecommendationV3Settings.clampITunesLookupLimit(newValue)
+                settings.save()
+            }
+        } footer: {
+            Text("recommendation_itunes_lookup_footer".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
