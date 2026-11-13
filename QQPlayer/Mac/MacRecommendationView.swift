@@ -16,6 +16,7 @@ struct MacRecommendationView: View {
     @State private var settings = DeleteSettings.load()
     @State private var downloadTarget: RecommendedCandidate?
     @State private var query = ""
+    @State private var hoveredRowID: String?
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -262,7 +263,8 @@ struct MacRecommendationView: View {
     }
 
     private func row(_ candidate: RecommendedCandidate) -> some View {
-        HStack(alignment: .top, spacing: DesignTokens.space12) {
+        let isHovered = hoveredRowID == candidate.id
+        return HStack(alignment: .top, spacing: DesignTokens.space12) {
             VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 Text(DisplayScriptNormalizer.display(candidate.title))
                     .font(.body)
@@ -277,16 +279,23 @@ struct MacRecommendationView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: DesignTokens.space8)
-            Button("recommendation_download".localized) {
-                downloadTarget = candidate
+            // 行内动作按钮：悬停整行才显示（opacity 占位，不跳动布局）
+            HStack(spacing: DesignTokens.space8) {
+                Button("recommendation_download".localized) {
+                    downloadTarget = candidate
+                }
+                .buttonStyle(.bordered)
+                Button("recommendation_dismiss".localized) {
+                    model.dismiss(candidate)
+                }
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.bordered)
-            Button("recommendation_dismiss".localized) {
-                model.dismiss(candidate)
-            }
-            .buttonStyle(.borderless)
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
+            .animation(.easeOut(duration: 0.12), value: isHovered)
         }
         .padding(.vertical, DesignTokens.space4)
+        .onHover { hoveredRowID = $0 ? candidate.id : nil }
     }
 
     private func subtitle(for candidate: RecommendedCandidate) -> String {
