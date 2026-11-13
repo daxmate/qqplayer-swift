@@ -21,20 +21,6 @@
                ReferencedContainer = "container:QQPlayer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "7E57AB1E0000000000000002"
-               BuildableName = "QQPlayerSiriTests.xctest"
-               BlueprintName = "QQPlayerSiriTests"
-               ReferencedContainer = "container:QQPlayer.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -51,16 +37,6 @@
                BlueprintIdentifier = "AC4D23167CDF8A94F2CA6D89"
                BuildableName = "QQPlayerTests.xctest"
                BlueprintName = "QQPlayerTests"
-               ReferencedContainer = "container:QQPlayer.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "7E57AB1E0000000000000002"
-               BuildableName = "QQPlayerSiriTests.xctest"
-               BlueprintName = "QQPlayerSiriTests"
                ReferencedContainer = "container:QQPlayer.xcodeproj">
             </BuildableReference>
          </TestableReference>

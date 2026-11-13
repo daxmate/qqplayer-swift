@@ -21,16 +21,15 @@ concurrency:
 jobs:
   swift:
     name: Swift (swiftlint + swiftformat + xcodebuild test)
-    # 单元测试（Swift Testing，QQPlayerTests target）+ Siri/AppIntents 集成测试
-    # （QQPlayerSiriTests，UI test bundle）+ lint/format 检查。
+    # 单元测试（Swift Testing，QQPlayerTests target）+ lint/format 检查。
     # 配置在仓库根 .swiftlint.yml / .swiftformat，swiftlint/swiftformat 自动发现。
     #
-    # QQPlayerSiriTests 自 2026-11-13 起正式接回 CI（此前因工具链缺 AppIntentsTesting
-    # 无法编译，只有一套结构级豁免守护；豁免设施已随本次接回一并删除）：
-    #   Xcode 27 的 iPhoneSimulator 平台已提供该框架，可核查：
-    #     $ ls /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/
-    #       → AppIntentsTesting.framework  XCTest.framework  XCUIAutomation.framework  Testing.framework
-    #   该 target 已在 QQPlayer.xcscheme 的 Testables 里，由下面 Test step 一并编译运行。
+    # QQPlayerSiriTests（Siri/AppIntents 集成测试 bundle）**不在本 job**，见下方独立 job
+    # 「Siri tests (self-hosted, runtime-gated)」。原因（2026-11-13 实测）：
+    # Xcode 27.2 的 AppIntentsTesting.framework 依赖 iOS 27.2 模拟器运行时提供的
+    # AppIntentsTypeSupport 符号（PropertyContainerElementV15valueExpression）；
+    # 运行时版本不匹配时 dlopen 失败、bundle 整体崩，GitHub 托管 runner 更是连框架都没有。
+    # 硬塞进本 job ⇒ PR 一律编译红（且托管 runner 无该框架）。
     timeout-minutes: 90
     runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
     steps:
@@ -160,7 +159,6 @@ jobs:
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -derivedDataPath build/DerivedData \
             -only-testing:QQPlayerTests \
-            -only-testing:QQPlayerSiriTests \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-ios.log
 
       # 编译警告零容忍（2026-09-08 用户立规矩）：源码警告（路径含 /QQPlayer/ 或 /QQPlayerTests/）
@@ -180,7 +178,7 @@ jobs:
           fi
           WARN="$(grep -E 'warning:' /tmp/xcodebuild-ios.log \
             | grep -v 'Metadata extraction skipped' \
-            | grep -E '/(QQPlayer|QQPlayerTests|QQPlayerSiriTests)/|\(in target' \
+            | grep -E '/(QQPlayer|QQPlayerTests)/|\(in target' \
             | sort -u || true)"
           if [ -n "$WARN" ]; then
             echo "❌ 检测到编译警告（零容忍纪律，须当场清零）："
@@ -303,3 +301,183 @@ jobs:
           test -f "$APP/Contents/Resources/AppIcon.icns" || { echo "❌ AppIcon.icns 缺失——AppIcon.appiconset 无 mac 条目或 target 缺 ASSETCATALOG_COMPILER_APPICON_NAME"; exit 1; }
           test -f "$APP/Contents/Resources/Assets.car" || { echo "❌ Assets.car 缺失——Assets.xcassets 未进 QQPlayerMac target 资源阶段"; exit 1; }
           echo "✅ AppIcon.icns + Assets.car 均在产物中"
+
+  # Siri/AppIntents 集成测试（QQPlayerSiriTests）· 独立 job · 运行时门控
+  #
+  # 为什么拆出来：Xcode 27.2 的 AppIntentsTesting.framework 依赖模拟器运行时提供的
+  # AppIntentsTypeSupport 符号（PropertyContainerElementV15valueExpression）。运行时版本
+  # 落后（本机 iOS 27.0 / 24A434）时 dlopen 直接 "Symbol not found"、整个 bundle 崩；
+  # 挂在 app scheme 上会连累单元测试 job。GitHub 托管 runner 上更是连该 framework 都没有
+  # （编译阶段就红，PR 全阻塞）→ 本 job 只在 push main 的自托管 runner 上跑。
+  #
+  # 门控：探测「Xcode 有 AppIntentsTesting.framework」+「目标模拟器运行时的
+  # AppIntentsTypeSupport 导出该符号」。不兼容 → ::warning 写清原因与实际版本号后
+  # 正常结束（exit 0），不静默；兼容 → 才真正 xcodebuild test。
+  siri:
+    name: Siri tests (self-hosted, runtime-gated)
+    # PR 一律不跑：托管 runner 无 AppIntentsTesting.framework，且 PR 不该占自托管机器。
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'qqplayer-macos' || 'macos-latest' }}
+    timeout-minutes: 60
+    # 自托管 runner 的 _work / build/ 跨 run 保留（Swift job 同理），故不配 SPM 缓存步骤。
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Probe simulator runtime compatibility
+        id: probe
+        run: |
+          python3 - <<'PROBE'
+          import glob
+          import json
+          import os
+          import subprocess
+          import sys
+
+          SYMBOL = "PropertyContainerElementV15valueExpression"
+          GITHUB_OUTPUT = os.environ.get("GITHUB_OUTPUT")
+
+
+          def run(cmd):
+              return subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+
+          def emit(**kv):
+              if not GITHUB_OUTPUT:
+                  return
+              with open(GITHUB_OUTPUT, "a", encoding="utf-8") as f:
+                  for k, v in kv.items():
+                      f.write("%s=%s\n" % (k, v))
+
+
+          def skip(reason):
+              print("::warning title=Siri tests skipped::" + reason)
+              print("⏭  Siri tests 跳过：" + reason)
+              emit(compatible="false")
+              sys.exit(0)
+
+
+          xcode_ver = run("xcodebuild -version 2>/dev/null | head -1").stdout.strip().removeprefix("Xcode ") or "unknown Xcode"
+          dev_dir = run("xcode-select -p").stdout.strip()
+          fw = os.path.join(
+              dev_dir,
+              "Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/AppIntentsTesting.framework",
+          )
+          if not os.path.isdir(fw):
+              skip("%s 未提供 AppIntentsTesting.framework（GitHub 托管 runner 无此框架，本 job 只应在自托管 runner 上跑）" % xcode_ver)
+
+          try:
+              devices = json.loads(run("xcrun simctl list devices available -j").stdout)["devices"]
+          except Exception as exc:
+              skip("无法读取模拟器列表（xcrun simctl list devices available -j）：%s" % exc)
+
+          device = None
+          runtime_id = None
+          for rt, items in devices.items():
+              for item in items:
+                  if str(item.get("name", "")).startswith("iPhone"):
+                      device, runtime_id = item["name"], rt
+                      break
+              if device:
+                  break
+          if not device:
+              skip("没有可用的 iPhone 模拟器（xcrun simctl list devices available）")
+
+          try:
+              runtimes = json.loads(run("xcrun simctl runtime list -j").stdout)
+          except Exception:
+              runtimes = {}
+          rt_info = next((v for v in runtimes.values() if v.get("runtimeIdentifier") == runtime_id), None) or {}
+          label = "iOS %s (%s)" % (rt_info.get("version", "?"), rt_info.get("build", "?"))
+
+          roots = []
+          bundle = rt_info.get("runtimeBundlePath") or ""
+          if bundle:
+              roots.append(os.path.join(bundle, "Contents/Resources/RuntimeRoot"))
+          mount = rt_info.get("mountPath") or ""
+          if mount:
+              roots += glob.glob(os.path.join(mount, "Library/Developer/CoreSimulator/Profiles/Runtimes/*.simruntime/Contents/Resources/RuntimeRoot"))
+          roots += glob.glob("/Library/Developer/CoreSimulator/Profiles/Runtimes/*.simruntime/Contents/Resources/RuntimeRoot")
+          root = next((r for r in roots if os.path.isdir(r)), None)
+          if not root:
+              skip("找不到 %s 的 RuntimeRoot，无法核对 AppIntentsTypeSupport（Xcode %s）" % (label, xcode_ver))
+
+          # 符号核对：框架目录自带 Mach-O 时用 nm 读导出表；运行时把系统框架放进 dyld 共享缓存时
+          # （本机 iOS 27.0 实测：framework 里只有 Info.plist），改为在缓存里搜符号串。
+          binary = os.path.join(root, "System/Library/Frameworks/AppIntentsTypeSupport.framework/AppIntentsTypeSupport")
+          if os.path.isfile(binary):
+              method = "nm -gU AppIntentsTypeSupport"
+              found = SYMBOL in run("nm -gU '%s' 2>/dev/null" % binary).stdout
+          else:
+              caches = [
+                  p
+                  for p in glob.glob(os.path.join(root, "System/Library/Caches/com.apple.dyld/dyld_sim_shared_cache_*"))
+                  if not p.endswith((".atlas", ".map"))
+              ]
+              if not caches:
+                  skip("%s 既无 AppIntentsTypeSupport 二进制、也无 dyld 共享缓存（Xcode %s）" % (label, xcode_ver))
+              method = "dyld shared cache symbol scan"
+              found = False
+              for cache in caches:
+                  if run("LC_ALL=C grep -a -q -F '%s' '%s'" % (SYMBOL, cache)).returncode == 0:
+                      found = True
+                      break
+
+          print("Xcode: %s" % xcode_ver)
+          print("目标运行时: %s / %s" % (label, runtime_id))
+          print("候选模拟器: %s" % device)
+          print("符号核对: %s → %s" % (method, "命中" if found else "缺失"))
+
+          if not found:
+              skip(
+                  "Xcode %s 的 AppIntentsTesting 需要 AppIntentsTypeSupport.%s（%s），"
+                  "但 %s 运行时未导出该符号（%s）→ 装对应版本的模拟器运行时即可自动启用"
+                  % (xcode_ver, SYMBOL, method, label, runtime_id)
+              )
+
+          emit(compatible="true", device=device, runtime=label)
+          print("✅ 运行时兼容，继续执行 QQPlayerSiriTests")
+          PROBE
+
+      - name: Test (xcodebuild test, QQPlayerSiri scheme, iOS simulator)
+        if: steps.probe.outputs.compatible == 'true'
+        run: |
+          set -o pipefail
+          # 设备沿用 Swift job 的动态选取口径；probe 已把同一规则选中的设备带过来
+          DEVICE="${{ steps.probe.outputs.device }}"
+          if [ -z "$DEVICE" ]; then
+            DEVICE="$(xcrun simctl list devices available | grep -oE 'iPhone [^(]+' | head -1 | sed 's/ *$//')"
+          fi
+          if [ -z "$DEVICE" ]; then
+            echo "❌ 无可用 iPhone 模拟器（xcrun simctl list devices available）"
+            exit 1
+          fi
+          echo "Using simulator: $DEVICE"
+          # tee 落盘供下一步零容忍警告检测；pipefail 保证 xcodebuild 失败不被管道吞掉
+          xcodebuild test \
+            -project QQPlayer.xcodeproj \
+            -scheme QQPlayerSiri \
+            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -derivedDataPath build/DerivedDataSiri \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild-siri.log
+
+      # 编译警告零容忍：口径与 Swift job 一致，target 名单换成 QQPlayer / QQPlayerSiriTests。
+      # if: always()（构建失败时也把警告一并报出来，不被单一红灯掩盖）。
+      - name: Check zero warnings (source + target-level)
+        if: always() && steps.probe.outputs.compatible == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -f /tmp/xcodebuild-siri.log ]; then
+            echo "⚠️ 未产出构建日志（前置步骤未跑到编译）——本步骤跳过，构建失败本身已由前置步骤报红"
+            exit 0
+          fi
+          WARN="$(grep -E 'warning:' /tmp/xcodebuild-siri.log \
+            | grep -v 'Metadata extraction skipped' \
+            | grep -E '/(QQPlayer|QQPlayerSiriTests)/|\(in target' \
+            | sort -u || true)"
+          if [ -n "$WARN" ]; then
+            echo "❌ 检测到编译警告（零容忍纪律，须当场清零）："
+            printf '%s\n' "$WARN"
+            echo "提示：Debug 增量编译会掩盖存量警告，本地请用 Release + 全 target 全量编译核对"
+            exit 1
+          fi
+          echo "✅ 无源码/工程级编译警告"
