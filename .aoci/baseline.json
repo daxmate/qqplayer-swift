@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-13T02:30:05Z",
+  "updated_at": "2026-11-13T04:08:38Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -17,9 +17,9 @@
     },
     ".github/workflows/ci.yml": {
       "role": "index",
-      "sha256": "a1347eb970c837fc9e7899ac81813e356f8ab0eebc56ffdac51cf6db61bd8949",
-      "size": 26140,
-      "normalized_sha256": "a1347eb970c837fc9e7899ac81813e356f8ab0eebc56ffdac51cf6db61bd8949"
+      "sha256": "8f9d144c7d8b59e0b0fdab85a0e9185368a66514f83282e57ddf286447fc2c4d",
+      "size": 27599,
+      "normalized_sha256": "8f9d144c7d8b59e0b0fdab85a0e9185368a66514f83282e57ddf286447fc2c4d"
     },
     ".gitignore": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "9b4abead2e25c821c2df29359fbc70268fd507d862fbb14692f1021a800bc56a",
-      "size": 179700,
-      "normalized_sha256": "9b4abead2e25c821c2df29359fbc70268fd507d862fbb14692f1021a800bc56a"
+      "sha256": "0389cc3faa5ff517c31eda33ebe91d9e3965ac9c1a12d4af196b5d469774f9ad",
+      "size": 180886,
+      "normalized_sha256": "0389cc3faa5ff517c31eda33ebe91d9e3965ac9c1a12d4af196b5d469774f9ad"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -2444,9 +2444,9 @@
     },
     "QQPlayer/Services/SyncConnectDiag.swift": {
       "role": "index",
-      "sha256": "2ddb09919a5eccacf81fc6a68c20de52d78322737b6b5b3758f4809f1ee55fb6",
-      "size": 6213,
-      "normalized_sha256": "2ddb09919a5eccacf81fc6a68c20de52d78322737b6b5b3758f4809f1ee55fb6"
+      "sha256": "d5f3bc69b23794c48b11c2b8d193bad4992bc1fd64bbd0bb222a60ebc6eeb34b",
+      "size": 7540,
+      "normalized_sha256": "d5f3bc69b23794c48b11c2b8d193bad4992bc1fd64bbd0bb222a60ebc6eeb34b"
     },
     "QQPlayer/Services/SyncDeviceListModel.swift": {
       "role": "index",
@@ -2768,21 +2768,27 @@
     },
     "QQPlayer/Sync/SyncFileReceiver+StateMachine.swift": {
       "role": "index",
-      "sha256": "0675a8a824fba686b9a626715c30887c316ce83323abb15e5b3277d8f561adf1",
-      "size": 22701,
-      "normalized_sha256": "0675a8a824fba686b9a626715c30887c316ce83323abb15e5b3277d8f561adf1"
+      "sha256": "47aadd7f13f52007a0d3904bdb1ab6f97ee645c54d06280630acec8319040089",
+      "size": 23380,
+      "normalized_sha256": "47aadd7f13f52007a0d3904bdb1ab6f97ee645c54d06280630acec8319040089"
     },
     "QQPlayer/Sync/SyncFileReceiver.swift": {
       "role": "index",
-      "sha256": "238d86266bd09924e11a3b5391ad4ed1bf08590b5a8eb2e67f1fd5d8ac814bfa",
-      "size": 22259,
-      "normalized_sha256": "238d86266bd09924e11a3b5391ad4ed1bf08590b5a8eb2e67f1fd5d8ac814bfa"
+      "sha256": "82e9819597cbcbb4e41ad4873856407df03fb90475e17059a3a3d73f1c837b67",
+      "size": 26757,
+      "normalized_sha256": "82e9819597cbcbb4e41ad4873856407df03fb90475e17059a3a3d73f1c837b67"
     },
     "QQPlayer/Sync/SyncFileSender+Active.swift": {
       "role": "index",
-      "sha256": "c60128b5f1cb8764e209ce1b128bcd0fd23fc574555259758dda73025ed78c55",
-      "size": 2227,
-      "normalized_sha256": "c60128b5f1cb8764e209ce1b128bcd0fd23fc574555259758dda73025ed78c55"
+      "sha256": "66da6350811f008967f63eb5ebcf737660dbd26eb5c5f222250e594ec0b423a2",
+      "size": 2362,
+      "normalized_sha256": "66da6350811f008967f63eb5ebcf737660dbd26eb5c5f222250e594ec0b423a2"
+    },
+    "QQPlayer/Sync/SyncFileSender+Effects.swift": {
+      "role": "index",
+      "sha256": "5807f326a293e62294cd8dc8d9c4884d298a3cfb2138813b519927993a11ecb6",
+      "size": 1480,
+      "normalized_sha256": "5807f326a293e62294cd8dc8d9c4884d298a3cfb2138813b519927993a11ecb6"
     },
     "QQPlayer/Sync/SyncFileSender+Metrics.swift": {
       "role": "index",
@@ -2796,11 +2802,17 @@
       "size": 1402,
       "normalized_sha256": "64f06f745f2c94b9bbb9c4c25bd7a6ac03d41e4d847bbabe9d0522d8dde625a1"
     },
+    "QQPlayer/Sync/SyncFileSender+Timing.swift": {
+      "role": "index",
+      "sha256": "155cc555856ac1da435c6e8667625937154c7f8d61a86f0bb63b4287e147dac5",
+      "size": 2647,
+      "normalized_sha256": "155cc555856ac1da435c6e8667625937154c7f8d61a86f0bb63b4287e147dac5"
+    },
     "QQPlayer/Sync/SyncFileSender.swift": {
       "role": "index",
-      "sha256": "0e0e030e3fa9fa6cc96d5671bb29a2f1a0d4fc6f9be516ef0c67cfe272f51b23",
-      "size": 29000,
-      "normalized_sha256": "0e0e030e3fa9fa6cc96d5671bb29a2f1a0d4fc6f9be516ef0c67cfe272f51b23"
+      "sha256": "be5da74396806f3f8238abb4e5b2b5d9efd5178dbb3f557d7281b21633ddf48b",
+      "size": 28916,
+      "normalized_sha256": "be5da74396806f3f8238abb4e5b2b5d9efd5178dbb3f557d7281b21633ddf48b"
     },
     "QQPlayer/Sync/SyncFileTransferModels.swift": {
       "role": "index",
@@ -2876,9 +2888,9 @@
     },
     "QQPlayer/Sync/SyncListener.swift": {
       "role": "index",
-      "sha256": "0130973f9fadefc924f82a3e136f42690715a778af72c2a221a80b21323e8cae",
-      "size": 13550,
-      "normalized_sha256": "0130973f9fadefc924f82a3e136f42690715a778af72c2a221a80b21323e8cae"
+      "sha256": "f89a3ac8b27ccdd2bcbb9db1a74349bf96074335643f30fd0fc3b9da23b98081",
+      "size": 16158,
+      "normalized_sha256": "f89a3ac8b27ccdd2bcbb9db1a74349bf96074335643f30fd0fc3b9da23b98081"
     },
     "QQPlayer/Sync/SyncLocalLibraryProvider.swift": {
       "role": "index",
@@ -2978,15 +2990,15 @@
     },
     "QQPlayer/Sync/SyncPeerSession+Frames.swift": {
       "role": "index",
-      "sha256": "70d860a625ca452839d9d6fa7db0214b17c13d10aca31768dd060adc60fa9e6d",
-      "size": 18550,
-      "normalized_sha256": "70d860a625ca452839d9d6fa7db0214b17c13d10aca31768dd060adc60fa9e6d"
+      "sha256": "3bca800b15cf8a729b00194f684ce078fd6b6be83f618b28259e5deacf74aac7",
+      "size": 19283,
+      "normalized_sha256": "3bca800b15cf8a729b00194f684ce078fd6b6be83f618b28259e5deacf74aac7"
     },
     "QQPlayer/Sync/SyncPeerSession.swift": {
       "role": "index",
-      "sha256": "5c6c22d964652e45f0afbc6f1429521b25a6052e2a241166c6b4779ec640f43b",
-      "size": 21270,
-      "normalized_sha256": "5c6c22d964652e45f0afbc6f1429521b25a6052e2a241166c6b4779ec640f43b"
+      "sha256": "3fc8d44c209b2e442bf9d225df6631a16c4cb3a3d6a2435b5f01c9652b7968b5",
+      "size": 22303,
+      "normalized_sha256": "3fc8d44c209b2e442bf9d225df6631a16c4cb3a3d6a2435b5f01c9652b7968b5"
     },
     "QQPlayer/Sync/SyncPlaybackCarryPeer.swift": {
       "role": "index",
@@ -3018,17 +3030,29 @@
       "size": 2990,
       "normalized_sha256": "979f53ad7e858bf0c4407b126d6c98678f6c8428e80f1b729072e44ebffd1bf9"
     },
+    "QQPlayer/Sync/SyncRxKeepalive.swift": {
+      "role": "index",
+      "sha256": "0324f3a4a178bede9e4a3eeb870d868c62a6ed148811a43071ca769c728e8771",
+      "size": 9892,
+      "normalized_sha256": "0324f3a4a178bede9e4a3eeb870d868c62a6ed148811a43071ca769c728e8771"
+    },
     "QQPlayer/Sync/SyncSessionModels.swift": {
       "role": "index",
-      "sha256": "c4a4897eeed4fae824188edc185155d321ee314d8af237dab76f596acf33dd7a",
-      "size": 9658,
-      "normalized_sha256": "c4a4897eeed4fae824188edc185155d321ee314d8af237dab76f596acf33dd7a"
+      "sha256": "4037573a3cdbe6382ac6bb772a535180b3a57b888568f005181a364b6e172813",
+      "size": 10190,
+      "normalized_sha256": "4037573a3cdbe6382ac6bb772a535180b3a57b888568f005181a364b6e172813"
     },
     "QQPlayer/Sync/SyncTransferConcurrency.swift": {
       "role": "index",
       "sha256": "93d3ecb2921d7e87524454afcf0cf7cb612ad1408d3c51f54cf789a7d85ce5e4",
       "size": 4098,
       "normalized_sha256": "93d3ecb2921d7e87524454afcf0cf7cb612ad1408d3c51f54cf789a7d85ce5e4"
+    },
+    "QQPlayer/Sync/SyncTransferTiming.swift": {
+      "role": "index",
+      "sha256": "8685770e913dda8cb9b9ab4dc0ed7a606c552d8d7d5a71d82793c947dcb4d058",
+      "size": 6392,
+      "normalized_sha256": "8685770e913dda8cb9b9ab4dc0ed7a606c552d8d7d5a71d82793c947dcb4d058"
     },
     "QQPlayer/Sync/SyncWiringSelfCheck.swift": {
       "role": "index",
@@ -4746,6 +4770,12 @@
       "size": 11260,
       "normalized_sha256": "f9a789d827e31d440083d9dde7110c8b31a693b2d759a362257a435499b8db70"
     },
+    "QQPlayerTests/SyncRxKeepaliveTests.swift": {
+      "role": "index",
+      "sha256": "df7c9a86ea18f242f3ad263c1fd4969d5cfddc6fbaa30288064d9e5adaf3bd7a",
+      "size": 3874,
+      "normalized_sha256": "df7c9a86ea18f242f3ad263c1fd4969d5cfddc6fbaa30288064d9e5adaf3bd7a"
+    },
     "QQPlayerTests/SyncSelectionStoreTests.swift": {
       "role": "index",
       "sha256": "b76d7720c5e89a228f0bb1c502a8d8d91403adb388029ac66aff104896e7bf7c",
@@ -4763,6 +4793,12 @@
       "sha256": "d8db16af624219777b5224d4c851fe0c74f0defccdadb71a3b1cad7c3c443354",
       "size": 27909,
       "normalized_sha256": "d8db16af624219777b5224d4c851fe0c74f0defccdadb71a3b1cad7c3c443354"
+    },
+    "QQPlayerTests/SyncTransferTimingTests.swift": {
+      "role": "index",
+      "sha256": "d69370b1d6d081db3e980de6ec803dfa20ffe22879ec12fc756c2be360fa0ef9",
+      "size": 3568,
+      "normalized_sha256": "d69370b1d6d081db3e980de6ec803dfa20ffe22879ec12fc756c2be360fa0ef9"
     },
     "QQPlayerTests/SyncUIDirectionContentTests.swift": {
       "role": "index",
@@ -4928,9 +4964,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "d082ef7d3c423057c27c5c91be2342b2f180f344554e8fc93dff9323b284b1fa",
-      "size": 375504,
-      "normalized_sha256": "d082ef7d3c423057c27c5c91be2342b2f180f344554e8fc93dff9323b284b1fa"
+      "sha256": "0300b9fad476c21cedcf07fdc04571197acecb9f153f20d390ff4fa095b203a6",
+      "size": 379272,
+      "normalized_sha256": "0300b9fad476c21cedcf07fdc04571197acecb9f153f20d390ff4fa095b203a6"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5168,9 +5204,9 @@
     },
     "scripts/sync-harness/main.swift": {
       "role": "index",
-      "sha256": "cf228c5eebcb5978dbedcfedad4547133d3ef1e5c59a7987c0a61a63f23798f0",
-      "size": 211531,
-      "normalized_sha256": "cf228c5eebcb5978dbedcfedad4547133d3ef1e5c59a7987c0a61a63f23798f0"
+      "sha256": "1415e04dd87ccce69455cfafbd86f5ac61fed9c8b1090b0a315ae89a4ff58b05",
+      "size": 215193,
+      "normalized_sha256": "1415e04dd87ccce69455cfafbd86f5ac61fed9c8b1090b0a315ae89a4ff58b05"
     },
     "scripts/xcbuild.sh": {
       "role": "index",
