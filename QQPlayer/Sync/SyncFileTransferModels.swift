@@ -170,7 +170,7 @@ struct FileAckPayload: Codable, Equatable, Sendable {
     /// 接收端可同时推进的文件数（**能力协商**，只在应答 file_meta 那条 ack 里带）。
     /// nil = 对端不声明（旧端）→ 发送端回退串行（一次只派一个文件，行为与现在完全一致）。
     var maxConcurrentFiles: Int?
-    /// 接收端是否支持**合成探针**（T2 测速：4 MiB 临时文件，不进曲库）。
+    /// 接收端是否支持**合成探针**（T2 测速：8 MiB 临时文件，不进曲库）。
     /// nil = 旧端（不声明）→ 发送端**绝不发探针**（旧端会把它当普通文件落盘）。
     var probeCapable: Bool?
 }

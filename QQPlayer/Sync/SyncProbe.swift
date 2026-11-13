@@ -2,7 +2,13 @@
 //  SyncProbe.swift
 //  QQPlayer
 //
-//  T2 合成探针（测速）：用既有文件传输通道发一个 4 MiB 临时载荷，测「链路极限」。
+//  T2 合成探针（测速）：用既有文件传输通道发一个 8 MiB 临时载荷，报告「用户实际会拿到的速度」。
+//
+//  口径（2026-11-13 用户拍板）：探针 = **真实传输的缩小复刻**——同样的块大小（1 MiB）、
+//  同样的窗口协商（`min(对端声明 maxInFlight, SyncFileTransfer.maxInFlight)`，不降窗）、
+//  同样的 ack 推进逻辑，只是文件更小（8 MiB = 8 × 1 MiB = 一个满窗）。所以它报出来的
+//  MB/s 就是用户在相同网络下同步歌曲会拿到的速度；旧口径（4 MiB + 强制 window=2）只有
+//  2 个 ack 往返，RTT 一抖就把结果压到实速的几分之一（实测 25 MB/s 的链路只报 4 MB/s）。
 //
 //  为什么复用文件通道而不是新帧：探针只要「首块发出 → 末块 ack」的时间，块/ack/窗口
 //  逻辑已经存在；新增帧类型要动协议版本与两端解码，收益为零。
@@ -18,14 +24,14 @@ import Foundation
 
 /// 探针常量与纯函数（可单测；不含 IO）。
 enum SyncProbe {
-    /// 载荷大小（4 MiB，按 1024² 字节）。
-    static let payloadBytes: Int64 = 4 * 1024 * 1024
+    /// 载荷大小（8 MiB，按 1024² 字节）：8 × 1 MiB 块 = 一个满窗口（`maxInFlight` = 8），
+    /// 能测到稳态吞吐，而不是只有一两次 ack 往返的瞬时采样。
+    /// 超时余量：20s 硬超时对应 0.4 MB/s 下限（0.6 MB/s 的慢链路约 13s 收工）。
+    static let payloadBytes: Int64 = 8 * 1024 * 1024
     /// 保留 fileID 前缀（接收端据此走探针分支）。
     static let fileIDPrefix = "probe:"
     /// 传输名（只用于日志/诊断；接收端探针分支不落曲库）。
     static let fileName = "__qqprobe__"
-    /// 探针窗口（不放大到 maxInFlight：测的是链路极限，不是吞吐调参）。
-    static let window = 2
     /// 硬超时上限（秒）：探针不能拖住会话收尾。
     static let timeout: TimeInterval = 20
     /// 自动探针最小间隔（秒）。
@@ -123,7 +129,9 @@ final class SyncProbeRunner: @unchecked Sendable {
         }
 
         let sender = SyncFileSender(session: session)
-        sender.windowOverride = SyncProbe.window
+        // 不降窗（2026-11-13 用户拍板）：探针与真实传输走同一套窗口逻辑
+        // （`min(对端声明 maxInFlight, SyncFileTransfer.maxInFlight)`），否则测出来的只是
+        // 「2 个 ack 往返的链路极限」，比用户实速低好几倍。
         sender.onCompletion = { [weak self, weak sender] outcome in
             guard let self else { return }
             switch outcome {

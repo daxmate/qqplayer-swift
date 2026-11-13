@@ -443,10 +443,14 @@ struct SyncFileTransferTests {
         #expect(autoBody.contains("run(session: session)"), "自动探针未走单飞持有入口")
     }
 
-    // MARK: T2 探针（合成 4 MiB 测速）
+    // MARK: T2 探针（合成 8 MiB 测速，按真实传输窗口发送）
 
     @Test("探针纯函数：MB/s 口径（1024²）、非法输入 nil、10 分钟节流")
     func probePureFunctions() {
+        // 载荷口径（2026-11-13 用户拍板）：8 MiB = 8 块 1 MiB = 一个满窗（`maxInFlight` = 8），
+        // 探针因此测到稳态吞吐，而不是两次 ack 往返的瞬时值。
+        #expect(SyncProbe.payloadBytes == 8 * SyncFileTransfer.chunkSize)
+        #expect(SyncProbe.payloadBytes == Int64(SyncFileTransfer.maxInFlight) * SyncFileTransfer.chunkSize)
         #expect(SyncProbe.megabytesPerSecond(bytes: 4 * 1024 * 1024, seconds: 1) == 4)
         #expect(SyncProbe.megabytesPerSecond(bytes: 2 * 1024 * 1024, seconds: 0.5) == 4)
         #expect(SyncProbe.megabytesPerSecond(bytes: 0, seconds: 1) == nil)
@@ -480,7 +484,7 @@ struct SyncFileTransferTests {
         receiver.onCompletion = { box.receiverOutcome = $0 }
         receiver.onAckSent = { box.acks.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.windowOverride = SyncProbe.window
+        // 探针不降窗（2026-11-13）：这里也不注入 windowOverride，与生产路径保持一致。
         sender.onCompletion = { box.senderOutcome = $0 }
 
         let fileID = SyncProbe.fileIDPrefix + UUID().uuidString
@@ -525,7 +529,6 @@ struct SyncFileTransferTests {
         receiver.onCompletion = { box.receiverOutcome = $0 }
         receiver.onAckSent = { box.acks.append($0) }
         let sender = SyncFileSender(session: fixture.hostSession)
-        sender.windowOverride = SyncProbe.window
         sender.onCompletion = { box.senderOutcome = $0 }
 
         let fileID = SyncProbe.fileIDPrefix + UUID().uuidString

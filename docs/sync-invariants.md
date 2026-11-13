@@ -439,7 +439,8 @@
   - `SYNCDIAG` 三类行（`kind=conn|frame|run`）末尾追加固定 8 字段（顺序固定）：
     `addr` / `if` / `link` / `importing` / `pullSent` / `pullRecv` / `pullLate` / `probeMBps`；
     既有字段一个不删（向后兼容既有解析）。
-  - 取值口径：**取不到写 `-1` / `unknown`，不许编造**；`probeMBps` 未测 = `-1`（probe 属 T2）。
+  - 取值口径：**取不到写 `-1` / `unknown`，不许编造**；`probeMBps` 未测/失败 = `-1`
+    （probe 已落地：8 MiB 载荷 + 真实传输窗口，报的是用户实际速率，不是链路极限采样）。
   - 来源：`SyncDiagLinkFacts`（唯一构造点）← `NWPeerChannel.linkFacts`（`currentPath` +
     `remoteEndpoint`）← `SyncPeerSession.linkFacts`；内存回环 / 测试通道默认全未知。
   - `kind=frame` 行在 `SyncDataSyncCoordinator` 每轮收尾落一行（pull 往返 + 链路事实）。

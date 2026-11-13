@@ -62,7 +62,8 @@ final class SyncFileSender: @unchecked Sendable {
     /// 跨文件共享的全局在途字节预算（nil = 不限：单文件路径 / 既有测试不注入）。
     var budget: SyncTransferBudget?
 
-    /// 窗口硬上限覆盖（探针用 2；nil = 按对端声明与 `maxInFlight` 取小）。
+    /// 窗口硬上限覆盖（**测试接缝**：强制把窗口压到 N；默认 nil = 按对端声明与 `maxInFlight` 取小）。
+    /// 生产路径不用它——探针也走真实窗口（2026-11-13 起），否则测速会比实速低好几倍。
     var windowOverride: Int?
 
     /// 最近一轮终态时对端**最后确认的字节数**（断点续传起点；无 ack → 0）。
