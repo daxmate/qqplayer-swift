@@ -270,7 +270,7 @@ QQPlayer/Views/Utility/SyncSettingsView.swift	3
 #   = 棘轮上限，只能减不能增。
 # TOTAL: 20
 # MIGRATABLE TOTAL = 可迁预算（= TOTAL − 系统单例 10 − 合法装配点 3 − `#Preview` 脚手架 6）= 进度只看这一行。
-#   当代分解（并入 6-8 基线后按实测重算）：21 = 系统单例 11 + 已登记装配点 3 + #Preview 脚手架 6 + 待迁 1
+#   当代分解（并入 6-8 基线后按实测重算）：20 = 系统单例 10 + 已登记装配点 3 + #Preview 脚手架 6 + 待迁 1
 #   逐条点名剩余可迁（实测 1 处）：`QQPlayer/Mac/MacSyncView.swift:79` 的 `hostCenter ?? .shared`
 #     （View init 是非隔离上下文、读不到环境值；6-8 已把该类其余 3 处收口，这处属热点自身残留）
 # MIGRATABLE TOTAL: 1
