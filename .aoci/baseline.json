@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-14T16:07:24Z",
+  "updated_at": "2026-11-14T16:21:16Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -5120,9 +5120,9 @@
     },
     "README.md": {
       "role": "index",
-      "sha256": "8d47b129152eaba2c954be18c8cfc062ac84fbf05876341fd417aa223a72ba19",
-      "size": 39837,
-      "normalized_sha256": "8d47b129152eaba2c954be18c8cfc062ac84fbf05876341fd417aa223a72ba19"
+      "sha256": "c3385a851b5f74fea3b43c9d7e407464e210ff0d8a2ef26fa5049e694f65cf9e",
+      "size": 39701,
+      "normalized_sha256": "c3385a851b5f74fea3b43c9d7e407464e210ff0d8a2ef26fa5049e694f65cf9e"
     },
     "Share/Base.lproj/MainInterface.storyboard": {
       "role": "index",
@@ -5174,9 +5174,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "b3696858a6cb6263373baa1f2da91f1106976b68bfaa1f8034455901de5b25ac",
-      "size": 400200,
-      "normalized_sha256": "b3696858a6cb6263373baa1f2da91f1106976b68bfaa1f8034455901de5b25ac"
+      "sha256": "204e69e9706c7bacf4372593bb52af114018bc142180a7390ab77df86556e60c",
+      "size": 400214,
+      "normalized_sha256": "204e69e9706c7bacf4372593bb52af114018bc142180a7390ab77df86556e60c"
     },
     "aoci.meta.txt": {
       "role": "index",
