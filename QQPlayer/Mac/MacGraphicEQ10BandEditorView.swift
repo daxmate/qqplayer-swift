@@ -13,6 +13,7 @@ import SwiftUI
 struct MacGraphicEQ10BandEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(EQManager.self) private var eqManager
+    @Environment(\.appAccentColor) private var appAccentColor
 
     @State private var gains: [Double] = Array(repeating: 0.0, count: BuiltinEQPresets.bands10.count)
 
@@ -45,7 +46,7 @@ struct MacGraphicEQ10BandEditorView: View {
                                 in: minGain ... maxGain,
                                 step: gainStep
                             )
-                            .tint(.blue)
+                            .tint(appAccentColor)
                             .onChange(of: gains[index]) { _, _ in
                                 applyChanges()
                             }
@@ -120,6 +121,8 @@ struct MacGraphicEQ10BandEditorView: View {
 
 /// 10 段增益曲线图（只读展示，参考 ParametricEQGraphView 的绘制思路）
 private struct MacGraphicEQ10BandGraphView: View {
+    @Environment(\.appAccentColor) private var appAccentColor
+
     let gains: [Double]
     let minGain: Double
     let maxGain: Double
@@ -184,12 +187,12 @@ private struct MacGraphicEQ10BandGraphView: View {
                         path.addLine(to: point)
                     }
                 }
-                .stroke(Color.blue.opacity(0.85), lineWidth: 2)
+                .stroke(appAccentColor.opacity(0.85), lineWidth: 2)
 
                 // 频点节点
                 ForEach(Array(mapped.enumerated()), id: \.offset) { _, point in
                     Circle()
-                        .fill(Color.blue)
+                        .fill(appAccentColor)
                         .frame(width: 8, height: 8)
                         .position(point)
                 }

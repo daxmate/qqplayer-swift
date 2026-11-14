@@ -10,6 +10,7 @@ import SwiftUI
 struct EQSettingsView: View {
     @Environment(EQManager.self) private var eqManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appAccentColor) private var appAccentColor
 
     @State private var showingImport = false
     @State private var showingCreateManual = false
@@ -30,7 +31,7 @@ struct EQSettingsView: View {
             // EQ Enable/Disable
             Section {
                 Toggle(Localized.enableEqualizer, isOn: $eqManager.isEnabled)
-                    .tint(.blue)
+                    .tint(appAccentColor)
             } footer: {
                 Text(Localized.enableDisableEqDescription)
                     .font(.caption)
@@ -64,7 +65,7 @@ struct EQSettingsView: View {
 
                             if eqManager.currentPreset?.id == preset.id {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(appAccentColor)
                                     .font(.system(size: DesignTokens.font20))
                             }
                         }
@@ -91,7 +92,7 @@ struct EQSettingsView: View {
                             Button(Localized.eqExport) {
                                 exportPreset(preset)
                             }
-                            .tint(.blue)
+                            .tint(appAccentColor)
                         }
                     }
                 } else {
@@ -123,14 +124,14 @@ struct EQSettingsView: View {
 
                                 Text(Localized.importedGraphicEQ)
                                     .font(.caption)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(appAccentColor)
                             }
 
                             Spacer()
 
                             if eqManager.currentPreset?.id == preset.id {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(appAccentColor)
                                     .font(.system(size: DesignTokens.font20))
                             }
                         }
@@ -148,7 +149,7 @@ struct EQSettingsView: View {
                             Button(Localized.eqExport) {
                                 exportPreset(preset)
                             }
-                            .tint(.blue)
+                            .tint(appAccentColor)
                         }
                     }
                 } else {
@@ -166,7 +167,7 @@ struct EQSettingsView: View {
                 Button(Localized.importGraphicEQFile) {
                     showingImport = true
                 }
-                .foregroundColor(.blue)
+                .foregroundColor(appAccentColor)
             }
 
             // Global Gain (only show when EQ is enabled)
@@ -181,7 +182,7 @@ struct EQSettingsView: View {
                         }
 
                         Slider(value: $eqManager.globalGain, in: -30 ... 30, step: 0.5)
-                            .tint(.blue)
+                            .tint(appAccentColor)
                     }
                 } header: {
                     Text(Localized.globalSettings)
@@ -254,7 +255,7 @@ struct EQSettingsView: View {
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DesignTokens.space8)
-                .background(isSelected ? Color.blue : Color(.systemGray6))
+                .background(isSelected ? appAccentColor : Color(.systemGray6))
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(DesignTokens.radius8)
         }

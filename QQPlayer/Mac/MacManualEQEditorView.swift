@@ -99,6 +99,7 @@ struct MacCreateManualEQView: View {
 struct MacManualEQEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(EQManager.self) private var eqManager
+    @Environment(\.appAccentColor) private var appAccentColor
 
     let preset: EQPreset
     @State private var bandFrequencies: [Double] = []
@@ -192,7 +193,7 @@ struct MacManualEQEditorView: View {
                                     .foregroundColor(.secondary)
                             }
                             Slider(value: $bandGains[selectedBandIndex], in: minGain ... maxGain, step: 0.1)
-                                .tint(.blue)
+                                .tint(appAccentColor)
 
                             HStack {
                                 Text(Localized.eqQ)
@@ -423,6 +424,8 @@ struct MacManualEQEditorView: View {
 // MARK: - Parametric EQ graph
 
 private struct MacParametricEQGraphView: View {
+    @Environment(\.appAccentColor) private var appAccentColor
+
     @Binding var frequencies: [Double]
     @Binding var gains: [Double]
     @Binding var selectedBandIndex: Int?
@@ -470,11 +473,11 @@ private struct MacParametricEQGraphView: View {
                         path.addLine(to: point.point)
                     }
                 }
-                .stroke(Color.blue.opacity(0.85), lineWidth: 2)
+                .stroke(appAccentColor.opacity(0.85), lineWidth: 2)
 
                 ForEach(points, id: \.index) { item in
                     Circle()
-                        .fill(selectedBandIndex == item.index ? Color.orange : Color.blue)
+                        .fill(selectedBandIndex == item.index ? Color.orange : appAccentColor)
                         .frame(width: selectedBandIndex == item.index ? 14 : 12, height: selectedBandIndex == item.index ? 14 : 12)
                         .position(item.point)
                         .gesture(
