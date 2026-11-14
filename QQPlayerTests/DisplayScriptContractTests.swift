@@ -95,7 +95,7 @@ enum DisplayScriptContract {
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel.swift", lineSnippet: "let artist = RecommendationKey.displayPrimaryArtist(candidate.artist)", reason: "在线搜索预填词 = 查询字面量（转字形会降低命中率）"),
         WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel.swift", lineSnippet: "return artist.isEmpty ? candidate.title", reason: "在线搜索预填词 = 查询字面量（转字形会降低命中率）"),
         // 推荐页：已下载判定用的归一化键 = 匹配键（转字形会让简繁写法不同的同一首歌匹配失败）
-        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel+Downloaded.swift", lineSnippet: "let key = RecommendationLibraryMatcher.key(title: candidate.title, artist: candidate.artist)", reason: "已下载判定 = 曲库匹配键（与 RecommendationProfileV3 的库键同口径），不是显示值"),
+        WhitelistEntry(fileSuffix: "QQPlayer/Mac/MacRecommendationModel+Downloaded.swift", lineSnippet: "downloadedIndex.isDownloaded(title: candidate.title, artist: candidate.artist)", reason: "已下载判定 = 曲库匹配键（与 RecommendationProfileV3 的库键同口径），不是显示值"),
     ]
 
     /// 一次扫描的结果
