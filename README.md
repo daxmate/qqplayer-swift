@@ -25,6 +25,24 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 ---
 
+## 截图 📸
+
+<p align="center">
+  <img src="assets/screenshots/macos-player.webp" width="32%" alt="macOS 播放页：曲库、封面与实时频谱">
+  <img src="assets/screenshots/macos-lyrics.webp" width="32%" alt="macOS 桌面歌词与迷你模式">
+  <img src="assets/screenshots/macos-settings.webp" width="32%" alt="macOS 设置">
+</p>
+<p align="center">
+  <img src="assets/screenshots/ios-player.webp" width="23%" alt="iPhone 播放页">
+  <img src="assets/screenshots/ios-lyrics.webp" width="23%" alt="iPhone 歌词">
+  <img src="assets/screenshots/ios-karaoke.webp" width="23%" alt="iPhone 跟唱练习">
+  <img src="assets/screenshots/ios-library.webp" width="23%" alt="iPhone 曲库">
+</p>
+
+> 截图取自 <https://www.daxmate.cn/products/qqplayer>（macOS 版与 iPhone 版实机界面）。
+
+---
+
 ## 功能 ✨
 
 ### 🎧 双平台共享（Core）
@@ -414,6 +432,7 @@ Share/                        # iOS 分享扩展
 SiriIntentsExtension/         # iOS Siri 意图扩展
 QQPlayerTests/                # Swift Testing 单测（含 Fixtures/Mock 辅助文件；用例数口径见「测试与 CI」）
 QQPlayerSiriTests/            # Siri 集成测试（UI test bundle，独立 job，模拟器运行时版本匹配时自动执行）
+assets/screenshots/           # README 截图（WebP，取自产品页）
 scripts/                      # 工程工具（build-app.sh 统一入口 → xcbuild.sh / bump-version.sh / preflight.sh /
                               #   add-test-file.py / pbxproj-membership.py / check-structural-budget.sh / gen-zh-hant.py /
                               #   run-local-sync-tests.sh / run-dsq-shared-tests.sh / sync-harness / dsq-shared / git-hooks）
