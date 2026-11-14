@@ -217,6 +217,14 @@ struct SearchView: View {
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
+                // 搜索结果也是库数据快照：删除 / 改名 / 导入后若正在搜索就重跑查询，
+                // 否则已删曲目会残留在结果里（2026-11-14 用户反馈删歌后搜索结果不刷新）。
+                // 对齐 Mac：MacLibraryView 订阅同一通知后重跑 performSearch。
+                let query = debouncedSearchText
+                guard !SearchQuery.isEmpty(query) else { return }
+                performSearch(query: query)
+            }
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isSearchFocused = true
