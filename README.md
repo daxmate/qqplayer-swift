@@ -21,6 +21,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 - **iOS 与 macOS 共享同一套 Core 逻辑**（数据库、播放引擎、歌词 / 跟唱、均衡器、元数据解析、本地化），两平台行为一致、同步演进。
 - 仓库：<https://github.com/daxmate/qqplayer-swift>（原 qqplayer-ios，2026-08-30 更名）
+- 版号口径：仓库项目级版号随仓库迭代（当前 **1.4.0 (77)**，见 [CHANGELOG.md](CHANGELOG.md)），iOS 与 macOS 同源共用；App Store 上架版本按商店节奏单独发布（当前 1.0.0）。
 
 ---
 
@@ -292,7 +293,7 @@ QQPlayerApp.swift（iOS 入口）      QQPlayerMacApp.swift（macOS 入口）
 ## 安装与构建 🚀
 
 ### 环境要求
-- **Xcode** 16+（推荐 Xcode 26+；项目使用 folder-synchronized groups 与 Swift 6 严格并发）。CI 不锁定 Xcode 版本——`ci.yml` 跑 `macos-latest` runner 的默认 Xcode（当前 26.x）。
+- **Xcode** 16+（推荐 Xcode 26+；项目使用 folder-synchronized groups 与 Swift 6 严格并发）。CI 不锁定 Xcode 版本：推送到 `main` 时四个 job 跑在自托管 runner `qqplayer-macos`（用该机安装的 Xcode）；PR 与 `workflow_dispatch` 跑 GitHub 托管 `macos-latest` 的默认 Xcode。CI 已移除 `actions/cache` 步骤（自托管上归档下载会撞 100s 超时，卡死 Set up job）。
 - **Git**
 - iOS 端：有效的 Apple 开发者账号（CarPlay / Siri 能力签名）与真机
 - 依赖已锁定：`QQPlayer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` 已入库，SPM 版本可复现构建
@@ -413,10 +414,14 @@ Share/                        # iOS 分享扩展
 SiriIntentsExtension/         # iOS Siri 意图扩展
 QQPlayerTests/                # Swift Testing 单测（含 Fixtures/Mock 辅助文件；用例数口径见「测试与 CI」）
 QQPlayerSiriTests/            # Siri 集成测试（UI test bundle，独立 job，模拟器运行时版本匹配时自动执行）
-scripts/                      # 工程工具（build-app.sh 统一入口 → xcbuild.sh / add-test-file.py / gen-zh-hant.py /
-                              #   pbxproj-membership.py / run-local-sync-tests.sh / sync-harness / git-hooks）
+scripts/                      # 工程工具（build-app.sh 统一入口 → xcbuild.sh / bump-version.sh / preflight.sh /
+                              #   add-test-file.py / pbxproj-membership.py / check-structural-budget.sh / gen-zh-hant.py /
+                              #   run-local-sync-tests.sh / run-dsq-shared-tests.sh / sync-harness / dsq-shared / git-hooks）
 .env.template                 # 可选 API Key 模板（复制为 .env）
 .github/workflows/ci.yml      # CI：lint/format + iOS 单测 + macOS 构建与资源断言（含编译警告零容忍）
+aoci.txt / aoci.meta.txt / aoci.code.txt
+                              # AOCI 仓库认知索引（工具生成，随功能改动刷新）
+.aoci/                        # AOCI 治理资产（config / baseline / ledger）
 LICENSE / NOTICE.md / PRIVACY.md
 ```
 
