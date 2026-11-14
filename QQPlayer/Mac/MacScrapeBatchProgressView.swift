@@ -5,7 +5,7 @@
 //  批量刮削进度 sheet（两入口复用：曲库右键多选 paths 模式 / 设置「刮削」里
 //  library 模式，E1 刮削批 2026-09）。跑批用 ScrapeBatchService.runBatch 固定签名。
 //
-//  布局：模式说明（paths 刮选中文件 / library 整库补 year+genre）+ 逐首结果
+//  布局：模式说明（paths 刮选中文件 / library 整库补缺失标签）+ 逐首结果
 //  滚动列表（文件名 + written 写成的字段 / skipped、failed + reason）+ 进度计数
 //  （batch_running + 进度条）+ 取消（running 中）+ 汇总（written/skipped/failed
 //  计数 + truncated「仅前 100 首」提示）。

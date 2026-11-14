@@ -696,7 +696,7 @@
 "scraping_batch_run_library" = "Fill Library (Tags & Covers)";
 "scraping_batch_until" = "Up to 100 tracks per run, one request every ~1s.";
 "batch_mode_library" = "Fills missing tag info (including covers) across the library";
-"batch_mode_paths" = "Scrapes the selected tracks (high-confidence matches only)";
+"batch_mode_paths" = "Scrapes the selected tracks using the first candidate and all available fields";
 "batch_cancel_help" = "Stop the batch; completed tracks are kept";
 "source_netease" = "NetEase";
 "source_itunes" = "Apple Music";

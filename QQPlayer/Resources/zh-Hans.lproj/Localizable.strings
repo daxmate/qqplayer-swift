@@ -699,7 +699,7 @@
 "scraping_batch_run_library" = "一键补全整库（标签+封面）";
 "scraping_batch_until" = "单批最多 100 首，逐首间隔约 1 秒。";
 "batch_mode_library" = "为整库补全缺失的标签信息（含封面）";
-"batch_mode_paths" = "为选中的曲目刮削（仅高置信匹配）";
+"batch_mode_paths" = "为选中的曲目刮削（按第一个候选写入全部可获取字段）";
 "batch_cancel_help" = "停止批量刮削；已完成的曲目保留";
 "source_netease" = "网易云";
 "source_itunes" = "Apple Music";

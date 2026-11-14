@@ -4,7 +4,6 @@
 //
 //  ScrapeLogic（web routers/tags.py + tag_scraper.scrape 纯逻辑移植，E1-S2）防回归测试：
 //  - mergedCandidates：按 source_order 保序合并 / 空源跳过 / 未知源忽略
-//  - isHighConfidence：空→false、唯一→true、文件无 artist→true、归一化匹配判定
 //  - searchQuery：title 优先 / 文件名 stem 回落 / 去扩展名
 //  - 字段映射唯一入口（2026-11-14）：fieldValues(from:) 全字段映射 + 空值归一；
 //    makeTagWriteRequest 有值才写 + renameTemplate 透传
@@ -124,53 +123,6 @@ struct ScrapeLogicTests {
         #expect(ScrapeSource.resolvedOrder(from: ["netease", "musicbrainz"]) == [.netease, .musicbrainz, .itunes])
         #expect(ScrapeSource.resolvedOrder(from: ["musicbrainz", "qqmusic", "netease"]) == [.musicbrainz, .netease, .itunes])
         #expect(ScrapeSource.resolvedOrder(from: []) == [.netease, .itunes, .musicbrainz])
-    }
-
-    // MARK: - isHighConfidence
-
-    @Test("isHighConfidence：候选空 → false（无论文件 artist 是否有）")
-    func highConfidenceEmptyCandidates() {
-        #expect(!ScrapeLogic.isHighConfidence(candidates: [], fileArtist: nil))
-        #expect(!ScrapeLogic.isHighConfidence(candidates: [], fileArtist: "Some Artist"))
-    }
-
-    @Test("isHighConfidence：候选唯一 → true（即使 artist 与文件不符——唯一候选直接采用）")
-    func highConfidenceSingleCandidate() {
-        let candidates = [Self.candidate(artist: "Different Artist")]
-        #expect(ScrapeLogic.isHighConfidence(candidates: candidates, fileArtist: "File Artist"))
-        #expect(ScrapeLogic.isHighConfidence(candidates: candidates, fileArtist: nil))
-    }
-
-    @Test("isHighConfidence：多候选但文件 artist 为空 → true（取首候选）")
-    func highConfidenceNoFileArtist() {
-        let candidates = [
-            Self.candidate(artist: "Taylor Swift"),
-            Self.candidate(id: "id-2", artist: "Katy Perry"),
-        ]
-        #expect(ScrapeLogic.isHighConfidence(candidates: candidates, fileArtist: nil))
-        #expect(ScrapeLogic.isHighConfidence(candidates: candidates, fileArtist: ""))
-    }
-
-    @Test("isHighConfidence：多候选 → 首候选 artist 与文件 artist 归一化匹配判定")
-    func highConfidenceArtistMatchDecides() {
-        let matched = [
-            Self.candidate(artist: "Taylor Swift"),
-            Self.candidate(id: "id-2", artist: "Katy Perry"),
-        ]
-        #expect(ScrapeLogic.isHighConfidence(candidates: matched, fileArtist: "taylor swift"))
-
-        let mismatched = [
-            Self.candidate(artist: "Ed Sheeran"),
-            Self.candidate(id: "id-2", artist: "Katy Perry"),
-        ]
-        #expect(!ScrapeLogic.isHighConfidence(candidates: mismatched, fileArtist: "Taylor Swift"))
-
-        // 首候选 artist 缺失（nil）→ 归一化空 → 不匹配
-        let missingArtist = [
-            Self.candidate(artist: nil),
-            Self.candidate(id: "id-2", artist: "Katy Perry"),
-        ]
-        #expect(!ScrapeLogic.isHighConfidence(candidates: missingArtist, fileArtist: "Taylor Swift"))
     }
 
     // MARK: - searchQuery

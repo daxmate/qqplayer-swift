@@ -12,7 +12,7 @@
 //    「一键补全整库（标签+封面）」按钮 + 限流说明，点击弹批量进度 sheet
 //    （MacScrapeBatchProgressView library 模式）
 //  - 存储：DeleteSettings scraping namespace（renameTemplate/sourceOrder/
-//    batchEnabled），改动即 save() → .qqplayerSettingsDidChange 双向同步
+//    autoAfterDownload/batchEnabled），改动即 save() → .qqplayerSettingsDidChange 双向同步
 //  - 本地化 key ×5（en/zh-Hans/zh-Hant/fr/ru）
 //
 //  QQPlayerMac target only。

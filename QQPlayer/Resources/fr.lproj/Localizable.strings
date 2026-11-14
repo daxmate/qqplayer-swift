@@ -694,7 +694,7 @@
 "scraping_batch_run_library" = "Compléter la bibliothèque (étiquettes + pochettes)";
 "scraping_batch_until" = "Jusqu'à 100 pistes par lot, une requête toutes les ~1 s.";
 "batch_mode_library" = "Complète les informations d'étiquettes disponibles (pochettes incluses) de la bibliothèque";
-"batch_mode_paths" = "Scrape les pistes sélectionnées (correspondances de haute confiance uniquement)";
+"batch_mode_paths" = "Scrape les pistes sélectionnées avec le premier résultat et tous les champs disponibles";
 "batch_cancel_help" = "Arrêter le lot ; les pistes terminées sont conservées";
 "source_netease" = "NetEase";
 "source_itunes" = "Apple Music";

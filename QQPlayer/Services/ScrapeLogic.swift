@@ -2,8 +2,8 @@
 //  ScrapeLogic.swift
 //  QQPlayer
 //
-//  刮削编排纯逻辑（web 版 tag_scraper.scrape + routers/tags.py 的候选合并/高置信度
-//  判定移植，E1 刮削批 2026-09）。纯函数，全部可单测，无网络。
+//  刮削编排纯逻辑（web 版 tag_scraper.scrape + routers/tags.py 的候选合并移植，
+//  E1 刮削批 2026-09）。纯函数，全部可单测，无网络。
 //
 //  语义（2026-11-14 用户新口径：不再有高置信度门槛、不再按模式分字段集）：
 //  - scrape 请求构造：query = 文件 title，title 空 → 文件名 stem（不含扩展名）；
@@ -13,8 +13,8 @@
 //  - **字段映射唯一入口**：fieldValues(from:) 把候选全字段映射成 ScrapeFieldValues，
 //    makeTagWriteRequest(values:renameTemplate:) 组装写标签请求。自动刮削（下载完成后）
 //    与批量刮削**必须**共用这两个函数，禁止各写一份字段映射。
-//  - 高置信度判定（isHighConfidence）保留给历史调用/文档，但**自动刮削与批量刮削
-//    都不再使用**：按源优先级合并后的第一个候选直接写，错了由用户手工重刮。
+//  - 自动刮削与批量刮削都取按源优先级合并后的**第一个候选直接写**（无高置信度
+//    门槛，错了由用户手工重刮）。
 //  - 批量上限 100（超出取前 100，truncated）；每首之间 sleep（MB 限流，web 0.8s
 //    + MB 查询自身 1s/阶段；批量粒度由调用方控制，本逻辑只提供常数）
 
@@ -39,27 +39,11 @@ enum ScrapeLogic {
         return merged
     }
 
-    /// 高置信度判定（web _is_high_confidence，paths 模式自动写入门槛）：
-    /// 候选空 → false；候选数 == 1 → true；文件 artist 空 → true（取首候选）；
-    /// 否则首候选 artist 与文件 artist 归一化匹配 → true。
-    static func isHighConfidence(candidates: [ScrapeCandidate], fileArtist: String?) -> Bool {
-        if candidates.isEmpty {
-            return false
-        }
-        if candidates.count == 1 {
-            return true
-        }
-        let artist = fileArtist ?? ""
-        if artist.isEmpty {
-            return true
-        }
-        return MusicBrainzClient.artistMatches(candidates[0].artist ?? "", artist)
-    }
-
     /// 封面图片格式判据（**唯一入口**）：只接受 JPEG / PNG（魔数）。
     ///
     /// 供两处共用，**禁止**在别处再写第二份魔数判断：
-    ///  · 「候选封面下载」`MacTagEditorView+Scrape.downloadCoverData`（web tag_editor.fetch_cover 语义）；
+    ///  · 「候选封面下载」`ScrapeCoverLoader.loadCoverData`（web tag_editor.fetch_cover 语义；
+    ///    单曲点选 / 下载后自动刮削 / 批量刮削三条链路共用）；
     ///  · 「从本地选择图片…」`MacTagEditorView+Scrape.chooseLocalCoverImage`（B1，2026-10-10）。
     /// 空数据 / 其它格式（GIF / 文本 / 截断）一律拒。
     static func validateCoverData(_ data: Data) -> Bool {

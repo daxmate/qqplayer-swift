@@ -152,13 +152,22 @@ enum MacAutoScrapeWorker {
         do {
             let result = try TagWriterService.writeTags(to: url, request: request)
             if result.renamed {
-                // DB 写操作唯一入口是 @MainActor 的 AppCoordinator → 从后台 hop 回主线程
-                try? await MainActor.run {
-                    try AppCoordinator.shared.moveTrack(from: job.path, to: result.finalURL.path)
+                // DB 写操作唯一入口是 @MainActor 的 AppCoordinator → 从后台 hop 回主线程。
+                // 迁移失败仍继续单文件入库（processExternalFile 会按新路径补行），但必须留日志：
+                // 否则旧行可能悬空，真机上无法定位（单曲保存同路径会向用户报错，后台链路只能落日志）。
+                do {
+                    try await MainActor.run {
+                        try AppCoordinator.shared.moveTrack(from: job.path, to: result.finalURL.path)
+                    }
+                } catch {
+                    log(.warn, "改名后 DB 引用迁移失败（继续按新路径入库）\(fileName) → \(result.finalURL.lastPathComponent): \(error)")
                 }
             }
             // 7. 单文件入库（刷新 DB / 封面缓存）→ 列表刷新信号
-            _ = await LibraryIndexer.shared.processExternalFile(result.finalURL)
+            let indexed = await LibraryIndexer.shared.processExternalFile(result.finalURL)
+            if !indexed {
+                log(.warn, "写入成功但单文件入库未通过（等待列表刷新兜底）\(result.finalURL.lastPathComponent)")
+            }
             NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
 
             let fields = values.writtenFieldNames(coverWritten: wroteCover).joined(separator: ",")

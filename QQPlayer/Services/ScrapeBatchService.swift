@@ -236,7 +236,7 @@ enum ScrapeBatchService {
     typealias ScrapeSourceCallback = @MainActor @Sendable (ScrapeSource, [ScrapeCandidate]) -> Void
 
     /// 三源流式刮削：各源并发跑，**每源完成即按完成顺序回调一次**（不攒到最后）。
-    /// 回调切到 MainActor。批量（runBatch）不用——批量仍等全部源合并后判定高置信度。
+    /// 回调切到 MainActor。批量（runBatch）不用——批量仍等全部源合并后取第一个候选。
     static func scrapeSourcesStreaming(
         query: String,
         artist: String,

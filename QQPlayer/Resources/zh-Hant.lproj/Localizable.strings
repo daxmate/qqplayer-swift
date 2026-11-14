@@ -1020,7 +1020,7 @@
 "scraping_batch_run_library" = "一鍵補齊整座曲庫（標籤+封面）";
 "scraping_batch_until" = "單批最多 100 首，逐首間隔約 1 秒。";
 "batch_mode_library" = "為整座曲庫補齊缺少的標籤資訊（含封面）";
-"batch_mode_paths" = "為選中的曲目刮削（僅高可信度匹配）";
+"batch_mode_paths" = "為選中的曲目刮削（依第一個候選寫入全部可取得欄位）";
 "batch_cancel_help" = "停止批次刮削；已完成的曲目保留";
 "source_netease" = "網易雲";
 "source_itunes" = "Apple Music";
