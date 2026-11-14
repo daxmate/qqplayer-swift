@@ -165,6 +165,9 @@ extension MacOnlineSearchView {
                     url: url,
                     headers: info.headers,
                     suggestedFileName: info.fileName,
+                    // 自动刮削的检索线索：搜索结果已知的歌名/艺人（设置开关默认关）
+                    scrapeTitle: song.title,
+                    scrapeArtist: song.artist,
                     progress: { done, total in
                         // 进度回调可能在后台线程 → hop 主线程落 @State（B2）
                         let p: Double? = total > 0 ? Double(done) / Double(total) : nil

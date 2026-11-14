@@ -693,10 +693,12 @@
 "scraping_rename_preview" = "预览";
 "scraping_source_order" = "源优先级";
 "scraping_batch_enabled" = "批量刮削";
-"scraping_batch_enabled_hint" = "默认关闭。开启后可一键为整库补全缺失的年份与流派。";
-"scraping_batch_run_library" = "一键补全整库（年份+流派）";
+"scraping_auto_after_download" = "下载完成后自动刮削";
+"scraping_auto_after_download_hint" = "默认关闭。开启后，在线下载完成的歌曲会在后台自动使用第一个候选填写标签（含封面）并按重命名模板改名；结果不理想可在刮削面板手工重刮。";
+"scraping_batch_enabled_hint" = "默认关闭。开启后可一键为整库补全可获取的标签信息（含封面）。";
+"scraping_batch_run_library" = "一键补全整库（标签+封面）";
 "scraping_batch_until" = "单批最多 100 首，逐首间隔约 1 秒。";
-"batch_mode_library" = "为整库补全缺失的年份与流派";
+"batch_mode_library" = "为整库补全缺失的标签信息（含封面）";
 "batch_mode_paths" = "为选中的曲目刮削（仅高置信匹配）";
 "batch_cancel_help" = "停止批量刮削；已完成的曲目保留";
 "source_netease" = "网易云";

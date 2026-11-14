@@ -5,8 +5,9 @@
 //  DeleteSettings 刮削三字段（E1-S4）decode 兜底防回归：
 //  - 旧数据（JSON 缺新 key）→ 默认值：scrapingRenameTemplate = "{artist} - {title}"、
 //    scrapingSourceOrder = ScrapeSource.defaultOrder = [netease, itunes, musicbrainz]、
-//    scrapingBatchEnabled = false
+//    scrapingBatchEnabled = false、scrapingAutoAfterDownload = false
 //  - 显式值 round-trip（encode → decode 不丢）
+//  - 下载完成后自动刮削开关（2026-11-14）：默认关 + 旧 JSON 缺 key 解码为 false
 //
 
 import Foundation
@@ -26,6 +27,7 @@ struct DeleteSettingsScrapingTests {
         #expect(settings.scrapingSourceOrder == ScrapeSource.defaultOrder.map(\.rawValue))
         #expect(settings.scrapingSourceOrder == ["netease", "itunes", "musicbrainz"])
         #expect(settings.scrapingBatchEnabled == false)
+        #expect(settings.scrapingAutoAfterDownload == false)
     }
 
     @Test("显式存值 round-trip：encode → decode 值不丢")
@@ -34,6 +36,7 @@ struct DeleteSettingsScrapingTests {
         original.scrapingRenameTemplate = "{track} - {title}"
         original.scrapingSourceOrder = ["musicbrainz", "netease"]
         original.scrapingBatchEnabled = true
+        original.scrapingAutoAfterDownload = true
 
         let data = try encoder.encode(original)
         let decoded = try decoder.decode(DeleteSettings.self, from: data)
@@ -41,6 +44,7 @@ struct DeleteSettingsScrapingTests {
         #expect(decoded.scrapingRenameTemplate == "{track} - {title}")
         #expect(decoded.scrapingSourceOrder == ["musicbrainz", "netease"])
         #expect(decoded.scrapingBatchEnabled == true)
+        #expect(decoded.scrapingAutoAfterDownload == true)
     }
 
     @Test("部分缺 key 的 JSON（只存了模板）→ 其它两字段回落默认")
@@ -52,6 +56,15 @@ struct DeleteSettingsScrapingTests {
         #expect(settings.scrapingRenameTemplate == "{album}/{artist} - {title}")
         #expect(settings.scrapingSourceOrder == ScrapeSource.defaultOrder.map(\.rawValue))
         #expect(settings.scrapingBatchEnabled == false)
+        #expect(settings.scrapingAutoAfterDownload == false)
+    }
+
+    @Test("旧 JSON 只存了批量开关（无自动刮削 key）→ 自动刮削解码为 false")
+    func legacyJSONWithoutAutoScrapeKeyDefaultsOff() throws {
+        let json = #"{"scrapingBatchEnabled": true}"#
+        let settings = try decoder.decode(DeleteSettings.self, from: Data(json.utf8))
+        #expect(settings.scrapingBatchEnabled == true)
+        #expect(settings.scrapingAutoAfterDownload == false)
     }
 }
 

@@ -688,10 +688,12 @@
 "scraping_rename_preview" = "Aperçu";
 "scraping_source_order" = "Ordre des sources";
 "scraping_batch_enabled" = "Scraping par lot";
-"scraping_batch_enabled_hint" = "Désactivé par défaut. Une fois activé, vous pouvez compléter les années et genres manquants de toute la bibliothèque.";
-"scraping_batch_run_library" = "Compléter la bibliothèque (année + genre)";
+"scraping_auto_after_download" = "Scraper automatiquement après téléchargement";
+"scraping_auto_after_download_hint" = "Désactivé par défaut. Une fois activé, les titres téléchargés sont scrapés en arrière-plan avec le premier résultat (étiquettes + pochette) et renommés selon le modèle. Si le résultat ne convient pas, relancez le scraping dans l'éditeur de tags.";
+"scraping_batch_enabled_hint" = "Désactivé par défaut. Une fois activé, vous pouvez compléter en un passage les informations d'étiquettes disponibles (pochettes incluses) de toute la bibliothèque.";
+"scraping_batch_run_library" = "Compléter la bibliothèque (étiquettes + pochettes)";
 "scraping_batch_until" = "Jusqu'à 100 pistes par lot, une requête toutes les ~1 s.";
-"batch_mode_library" = "Complète les années et genres manquants de la bibliothèque";
+"batch_mode_library" = "Complète les informations d'étiquettes disponibles (pochettes incluses) de la bibliothèque";
 "batch_mode_paths" = "Scrape les pistes sélectionnées (correspondances de haute confiance uniquement)";
 "batch_cancel_help" = "Arrêter le lot ; les pistes terminées sont conservées";
 "source_netease" = "NetEase";

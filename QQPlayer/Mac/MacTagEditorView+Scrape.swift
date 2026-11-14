@@ -250,7 +250,8 @@ extension MacTagEditorView {
         let taskKey = "coverDownload"
         activeTasks[taskKey]?.cancel()
         activeTasks[taskKey] = Task {
-            let data = try? await Self.downloadCoverData(from: url)
+            // 下载 + 校验的唯一入口（ScrapeCoverLoader）；nil = 失败/格式非法
+            let data = await ScrapeCoverLoader.loadCoverData(from: url)
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 if let data {
@@ -261,20 +262,6 @@ extension MacTagEditorView {
                 }
             }
         }
-    }
-
-    /// 封面下载（JPEG/PNG 校验，web tag_editor.fetch_cover 语义）。
-    /// 格式判据复用唯一入口 `ScrapeLogic.validateCoverData`（与「从本地选择图片」共用）。
-    private static func downloadCoverData(from url: URL) async throws -> Data? {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.setValue("QQPlayer/1.0 (https://github.com/daxmate/qqplayer)", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode),
-              ScrapeLogic.validateCoverData(data) else {
-            return nil
-        }
-        return data
     }
 
     // MARK: - 本地指定封面（单曲；B1，2026-10-10）

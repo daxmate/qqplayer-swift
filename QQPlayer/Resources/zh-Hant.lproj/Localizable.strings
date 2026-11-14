@@ -1014,10 +1014,12 @@
 "scraping_rename_preview" = "預覽";
 "scraping_source_order" = "來源優先順序";
 "scraping_batch_enabled" = "批次刮削";
-"scraping_batch_enabled_hint" = "預設關閉。開啟後可一鍵為整座曲庫補齊缺少的年份與流派。";
-"scraping_batch_run_library" = "一鍵補齊整座曲庫（年份+流派）";
+"scraping_auto_after_download" = "下載完成後自動刮削";
+"scraping_auto_after_download_hint" = "預設關閉。開啟後，線上完成下載的歌曲會在背景自動使用第一個候選填寫標籤（含封面）並依重新命名範本改名；結果不理想可在刮削面板手動重刮。";
+"scraping_batch_enabled_hint" = "預設關閉。開啟後可一鍵為整座曲庫補齊可取得的標籤資訊（含封面）。";
+"scraping_batch_run_library" = "一鍵補齊整座曲庫（標籤+封面）";
 "scraping_batch_until" = "單批最多 100 首，逐首間隔約 1 秒。";
-"batch_mode_library" = "為整座曲庫補齊缺少的年份與流派";
+"batch_mode_library" = "為整座曲庫補齊缺少的標籤資訊（含封面）";
 "batch_mode_paths" = "為選中的曲目刮削（僅高可信度匹配）";
 "batch_cancel_help" = "停止批次刮削；已完成的曲目保留";
 "source_netease" = "網易雲";

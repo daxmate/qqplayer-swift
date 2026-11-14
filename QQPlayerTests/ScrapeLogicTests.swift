@@ -6,6 +6,8 @@
 //  - mergedCandidates：按 source_order 保序合并 / 空源跳过 / 未知源忽略
 //  - isHighConfidence：空→false、唯一→true、文件无 artist→true、归一化匹配判定
 //  - searchQuery：title 优先 / 文件名 stem 回落 / 去扩展名
+//  - 字段映射唯一入口（2026-11-14）：fieldValues(from:) 全字段映射 + 空值归一；
+//    makeTagWriteRequest 有值才写 + renameTemplate 透传
 //  纯函数，无网络。
 //
 
@@ -186,6 +188,92 @@ struct ScrapeLogicTests {
         #expect(ScrapeLogic.searchQuery(title: nil, fileName: "/music/album/01 intro.flac") == "01 intro")
         #expect(ScrapeLogic.searchQuery(title: nil, fileName: "noext") == "noext")
         #expect(ScrapeLogic.searchQuery(title: nil, fileName: "archive.tar.gz") == "archive.tar")
+    }
+
+    // MARK: - 字段映射唯一入口（fieldValues / makeTagWriteRequest，2026-11-14）
+
+    @Test("fieldValues：候选全部可用字段都映射进来（含 albumArtist/track/封面地址）")
+    func fieldValuesMapsEveryField() {
+        let cover = URL(string: "https://example.com/cover.jpg")
+        let candidate = ScrapeCandidate(
+            source: "musicbrainz",
+            id: "mb-1",
+            title: "晴天",
+            artist: "周杰伦",
+            album: "叶惠美",
+            coverURL: cover,
+            year: 2003,
+            genre: "Pop",
+            track: 3,
+            albumArtist: "周杰伦",
+            durationMs: 269_000
+        )
+
+        let values = ScrapeLogic.fieldValues(from: candidate)
+
+        #expect(values.title == "晴天")
+        #expect(values.artist == "周杰伦")
+        #expect(values.album == "叶惠美")
+        #expect(values.albumArtist == "周杰伦")
+        #expect(values.genre == "Pop")
+        #expect(values.year == 2003)
+        #expect(values.trackNumber == 3)
+        #expect(values.coverURL == cover)
+        #expect(!values.isEmpty)
+    }
+
+    @Test("fieldValues：空串 / 纯空白归一为 nil；全空候选 isEmpty")
+    func fieldValuesNormalizesBlankStrings() {
+        let candidate = ScrapeCandidate(
+            source: "netease",
+            id: nil,
+            title: "   ",
+            artist: "",
+            album: " \n ",
+            coverURL: nil,
+            year: nil,
+            genre: "",
+            track: nil,
+            albumArtist: "  ",
+            durationMs: nil
+        )
+
+        let values = ScrapeLogic.fieldValues(from: candidate)
+        #expect(values.title == nil)
+        #expect(values.artist == nil)
+        #expect(values.album == nil)
+        #expect(values.albumArtist == nil)
+        #expect(values.genre == nil)
+        #expect(values.isEmpty)
+    }
+
+    @Test("makeTagWriteRequest：有值才写（nil 字段保持 nil）+ renameTemplate 透传")
+    func makeTagWriteRequestCarriesValuesAndTemplate() {
+        let values = ScrapeFieldValues(
+            title: "Title",
+            artist: nil,
+            album: "Album",
+            albumArtist: nil,
+            genre: "Rock",
+            year: 1999,
+            trackNumber: 2,
+            coverURL: nil
+        )
+
+        let request = ScrapeLogic.makeTagWriteRequest(values: values, renameTemplate: "{artist} - {title}")
+        #expect(request.title == "Title")
+        #expect(request.artist == nil)
+        #expect(request.album == "Album")
+        #expect(request.albumArtist == nil)
+        #expect(request.genre == "Rock")
+        #expect(request.year == 1999)
+        #expect(request.trackNumber == 2)
+        // 封面数据由调用方异步补（唯一入口不碰网络）、改名模板原样透传
+        #expect(request.coverData == nil)
+        #expect(request.renameTemplate == "{artist} - {title}")
+
+        // 批量语义：模板 nil = 不改名
+        #expect(ScrapeLogic.makeTagWriteRequest(values: values, renameTemplate: nil).renameTemplate == nil)
     }
 
     // MARK: - validateCoverData（封面格式唯一判据；B1 2026-10-10）

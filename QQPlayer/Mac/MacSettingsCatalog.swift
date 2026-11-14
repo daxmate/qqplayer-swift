@@ -250,6 +250,13 @@ enum MacSettingsCatalog {
         aliases: ["源优先级", "优先级", "刮削源", "顺序", "source", "priority"]
     )
 
+    static let scrapingAutoAfterDownload = Item(
+        id: "settings.scraping.autoAfterDownload",
+        category: .scraping,
+        titleKey: "scraping_auto_after_download",
+        aliases: ["自动", "下载", "刮削", "下载完成后自动刮削", "auto", "download", "scrape"]
+    )
+
     static let scrapingBatchEnabled = Item(
         id: "settings.scraping.batchEnabled",
         category: .scraping,
@@ -403,6 +410,7 @@ enum MacSettingsCatalog {
         downloadMaxSpeed,
         scrapingRenameTemplate,
         scrapingSourceOrder,
+        scrapingAutoAfterDownload,
         scrapingBatchEnabled,
         appearanceTheme,
         appearanceAccentColor,

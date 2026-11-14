@@ -690,10 +690,12 @@
 "scraping_rename_preview" = "Preview";
 "scraping_source_order" = "Source Order";
 "scraping_batch_enabled" = "Batch Scraping";
-"scraping_batch_enabled_hint" = "Off by default. When on, you can fill missing year & genre for the whole library in one pass.";
-"scraping_batch_run_library" = "Fill Library (Year & Genre)";
+"scraping_auto_after_download" = "Auto-scrape after download";
+"scraping_auto_after_download_hint" = "Off by default. When on, songs that finished downloading are scraped in the background using the first candidate (tags + cover) and renamed with the rename template. If the result isn't right, re-scrape manually in the tag editor.";
+"scraping_batch_enabled_hint" = "Off by default. When on, you can fill the whole library's available tag info (including covers) in one pass.";
+"scraping_batch_run_library" = "Fill Library (Tags & Covers)";
 "scraping_batch_until" = "Up to 100 tracks per run, one request every ~1s.";
-"batch_mode_library" = "Fills missing year & genre across the library";
+"batch_mode_library" = "Fills missing tag info (including covers) across the library";
 "batch_mode_paths" = "Scrapes the selected tracks (high-confidence matches only)";
 "batch_cancel_help" = "Stop the batch; completed tracks are kept";
 "source_netease" = "NetEase";

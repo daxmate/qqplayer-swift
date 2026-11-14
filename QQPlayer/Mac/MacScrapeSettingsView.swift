@@ -6,8 +6,10 @@
 //  - 重命名模板：文本输入 + 占位符提示（{artist}/{title}/{album}/{track}/{year}，
 //    '/' = 子目录）+ 实时预览（取库中首曲渲染，web renamePreview 语义）
 //  - 源优先级：netease/musicbrainz 上下移排序（持久化 scrapingSourceOrder）
+//  - 下载完成后自动刮削开关：auto_after_download 默认关（老用户升级后不自动改文件）；
+//    开启后在线下载落盘即在后台用第一个候选写标签并按模板改名（MacAutoScrapeService）
 //  - 批量刮削开关：batch_enabled 默认关（关时仅开关+解释）；开 → 显示
-//    「一键补全整库 year+genre」按钮 + 限流说明，点击弹批量进度 sheet
+//    「一键补全整库（标签+封面）」按钮 + 限流说明，点击弹批量进度 sheet
 //    （MacScrapeBatchProgressView library 模式）
 //  - 存储：DeleteSettings scraping namespace（renameTemplate/sourceOrder/
 //    batchEnabled），改动即 save() → .qqplayerSettingsDidChange 双向同步
@@ -73,6 +75,16 @@ struct MacScrapeSettingsView: View {
             } header: {
                 Text("scraping_source_order".localized)
                     .settingsAnchor(MacSettingsCatalog.scrapingSourceOrder)
+            }
+
+            // 下载完成后自动刮削（默认关；开关即存，随 .qqplayerSettingsDidChange 重读）
+            Section {
+                Toggle("scraping_auto_after_download".localized, isOn: autoScrapeBinding)
+                    .settingsAnchor(MacSettingsCatalog.scrapingAutoAfterDownload)
+            } footer: {
+                Text("scraping_auto_after_download_hint".localized)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             // 批量刮削（web「批量刮削」组：开关默认关 + 开启后一键整库按钮）
@@ -173,6 +185,19 @@ struct MacScrapeSettingsView: View {
     }
 
     // MARK: - 源优先级（上下移，持久化 scrapingSourceOrder）
+
+    /// 下载完成后自动刮削（默认关；改动即 save()）
+    private var autoScrapeBinding: Binding<Bool> {
+        Binding(
+            get: { deleteSettings.scrapingAutoAfterDownload },
+            set: { newValue in
+                var settings = deleteSettings
+                settings.scrapingAutoAfterDownload = newValue
+                settings.save()
+                deleteSettings = settings
+            }
+        )
+    }
 
     private var batchEnabledBinding: Binding<Bool> {
         Binding(

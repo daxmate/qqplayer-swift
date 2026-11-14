@@ -277,6 +277,9 @@ struct DeleteSettings: Codable {
     var scrapingSourceOrder: [String] = ScrapeSource.defaultOrder.map(\.rawValue)
     /// 批量刮削开关（web scraping.batch_enabled；默认关，关时批量入口隐藏+服务拒接）
     var scrapingBatchEnabled: Bool = false
+    /// 下载完成后自动刮削（2026-11-14 用户拍板；**默认关**——老用户升级后不自动改文件）。
+    /// 开启后在线下载落盘即后台用第一个候选写标签（含封面）并按重命名模板改名。
+    var scrapingAutoAfterDownload: Bool = false
 
     // MARK: - 跨端续播（播放位置）
 
@@ -405,6 +408,10 @@ struct DeleteSettings: Codable {
         scrapingSourceOrder = try container.decodeIfPresent([String].self, forKey: .scrapingSourceOrder)
             ?? ScrapeSource.defaultOrder.map(\.rawValue)
         scrapingBatchEnabled = try container.decodeIfPresent(Bool.self, forKey: .scrapingBatchEnabled) ?? false
+        // 旧设置文件没有此 key → 默认关（绝不解码失败；不自动改动老用户的文件）
+        scrapingAutoAfterDownload = try container.decodeIfPresent(
+            Bool.self, forKey: .scrapingAutoAfterDownload
+        ) ?? false
         // 跨端续播开关：旧设置文件（无此 key）必须是「关」——decodeIfPresent 兜底，绝不解码失败。
         syncPlaybackPositionEnabled = try container.decodeIfPresent(
             Bool.self, forKey: .syncPlaybackPositionEnabled

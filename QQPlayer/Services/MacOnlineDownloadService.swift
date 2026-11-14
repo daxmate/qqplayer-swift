@@ -16,6 +16,8 @@
 //  - download(song:)（网易云）完成后发 LibraryFolderContentChanged → FSEvents/索引
 //    自动收录（与 B3 导入同链路）；downloadDirect 不自动刷新——刷新由调用方按场景
 //    决定（歌曲海 UI 落盘后自行 post LibraryFolderContentChanged）
+//  - 落盘成功后（通知已发完）追加「下载完成后自动刮削」入队（MacAutoScrapeService，
+//    fire-and-forget）：开关默认关 → 零副作用；绝不影响本方法的返回值与成功判定。
 //  QQPlayerMac target only 的 UI 使用；本文件只依赖共享层（iOS 侧编译无害，
 //  纯逻辑随 iOS 测试兜底回归，照 MacImportNaming/MacFolderWatchPolicy 先例）。
 //
@@ -132,6 +134,14 @@ enum MacOnlineDownloadService {
         )
         NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
 
+        // 6. 下载完成后自动刮削（fire-and-forget；开关默认关 → 零副作用。
+        // 必须在既有通知之后：自动刮削是补充动作，不改变下载成功判定/通知时序）
+        MacAutoScrapeService.enqueueDownloadedFile(
+            path: path,
+            title: song.title,
+            artist: song.artist
+        )
+
         return path
     }
 
@@ -145,13 +155,19 @@ enum MacOnlineDownloadService {
     /// - .part 流式下载成功后原子改名（FSEvents 不会收到半截文件）
     /// - 下载 headers 原样透传（夸克直链签名绑定 UA/Cookie/Referer，缺失会 412）
     /// - 完成不自动刷新——调用方按需 post LibraryFolderContentChanged
+    /// - 落盘成功后若给了 scrapeTitle / scrapeArtist → 追加「下载完成后自动刮削」入队
+    ///   （fire-and-forget；开关默认关，且不改返回值与落盘语义）
     /// - Parameters:
+    ///   - scrapeTitle: 调用方已知的歌曲名（无 → nil）
+    ///   - scrapeArtist: 调用方已知的艺人（无 → nil）
     ///   - progress: 下载进度回调 (completed, total) 字节数（默认 nil 不回调）
     /// - Returns: 最终落盘文件路径。
     static func downloadDirect(
         url: URL,
         headers: [String: String],
         suggestedFileName: String,
+        scrapeTitle: String? = nil,
+        scrapeArtist: String? = nil,
         progress: (@Sendable (Int64, Int64) -> Void)? = nil,
         fileManager: FileManager = .default
     ) async throws -> String {
@@ -161,7 +177,7 @@ enum MacOnlineDownloadService {
             AppLog.error(.general, "❌ [直链下载] 文件名清洗后为空 suggestedFileName=\(suggestedFileName)")
             throw NeteaseOnlineError.downloadFailed("invalid file name: \(suggestedFileName)")
         }
-        return try await persistDownload(
+        let path = try await persistDownload(
             fileName: cleaned,
             url: url,
             headers: headers,
@@ -170,6 +186,15 @@ enum MacOnlineDownloadService {
             logPrefix: "直链下载",
             progress: progress
         )
+        // 落盘成功 → 自动刮削入队（调用方给了歌曲信息才入队；通知时序仍由调用方决定）
+        if scrapeTitle != nil || scrapeArtist != nil {
+            MacAutoScrapeService.enqueueDownloadedFile(
+                path: path,
+                title: scrapeTitle,
+                artist: scrapeArtist
+            )
+        }
+        return path
     }
 
     /// 落盘通用段（download(song:) 步骤 2-4 抽取，downloadDirect 共用）：
