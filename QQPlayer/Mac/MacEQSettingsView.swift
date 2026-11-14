@@ -14,6 +14,7 @@ import SwiftUI
 struct MacEQSettingsView: View {
     @Environment(EQManager.self) private var eqManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appAccentColor) private var appAccentColor
 
     @State private var showingImport = false
     @State private var showingCreateManual = false
@@ -102,7 +103,7 @@ struct MacEQSettingsView: View {
         @Bindable var eqManager = eqManager
         return Section {
             Toggle(Localized.enableEqualizer, isOn: $eqManager.isEnabled)
-                .tint(.blue)
+                .tint(appAccentColor)
         } footer: {
             Text(Localized.enableDisableEqDescription)
                 .font(.caption)
@@ -161,7 +162,7 @@ struct MacEQSettingsView: View {
                     presetRow(
                         preset: preset,
                         subtitle: Localized.importedGraphicEQ,
-                        subtitleColor: .blue
+                        subtitleColor: appAccentColor
                     ) {
                         applyImportedPreset(preset)
                     }
@@ -181,7 +182,7 @@ struct MacEQSettingsView: View {
             Button(Localized.importGraphicEQFile) {
                 showingImport = true
             }
-            .foregroundColor(.blue)
+            .foregroundColor(appAccentColor)
         }
     }
 
@@ -197,7 +198,7 @@ struct MacEQSettingsView: View {
                 }
 
                 Slider(value: $eqManager.globalGain, in: -30 ... 30, step: 0.5)
-                    .tint(.blue)
+                    .tint(appAccentColor)
             }
         } header: {
             Text(Localized.globalSettings)
@@ -245,7 +246,7 @@ struct MacEQSettingsView: View {
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DesignTokens.space8)
-                .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
+                .background(isSelected ? appAccentColor : Color.gray.opacity(0.15))
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(DesignTokens.radius8)
         }
@@ -278,7 +279,7 @@ struct MacEQSettingsView: View {
 
                     if eqManager.currentPreset?.id == preset.id {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(appAccentColor)
                             .font(.system(size: DesignTokens.font18))
                     }
                 }

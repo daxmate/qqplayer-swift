@@ -124,6 +124,7 @@ struct MacSettingsView: View {
 /// 播放分类：音频（EQ 入口）、播放控制（睡眠定时按钮开关）。
 private struct MacPlaybackSettingsView: View {
     @Binding var showEQSettings: Bool
+    @Environment(\.appAccentColor) private var appAccentColor
 
     @State private var deleteSettings = DeleteSettings.load()
 
@@ -135,7 +136,7 @@ private struct MacPlaybackSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "slider.horizontal.3")
-                            .foregroundColor(.blue)
+                            .foregroundColor(appAccentColor)
                             .font(.system(size: DesignTokens.font16))
                         Text(Localized.graphicEqualizer)
                             .foregroundColor(.primary)
