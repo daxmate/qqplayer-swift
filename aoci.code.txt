@@ -3,17 +3,16 @@
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/===
 .env.template[FC4T]: F:Spotify 与 Discogs 第三方 API 凭据的占位模板，供复制为 .env 后填入真实密钥 | R:- | A:- | S:真实 .env 由 .gitignore 排除，禁止提交填入真实密钥的文件
 .gitattributes[FV3T]: F:仓库级 Git 文本属性，* text=auto 统一按 LF 归一化文本文件 | R:- | A:- | S:-
-.gitignore[FV4S]: F:Git 忽略清单：Xcode/SwiftPM 产物、密钥文件、.worktrees/、docs/、__pycache__ | R:- | A:- | S:.worktrees/ 忽略嵌套 worktree 仓库，docs/ 忽略本地产物，二者均不入库；Xcode Cloud 本地产物（xcodecloud/）同样排除
+.gitignore[FV4S]: F:Git 忽略清单：Xcode/SwiftPM 产物、密钥文件、.worktrees/、docs/、__pycache__、/AGENTS.md | R:- | A:- | S:AGENTS.md 只本机保留不入库；.worktrees/、docs/、xcodecloud/ 亦不入库
 .swiftformat[FQ4T]: F:SwiftFormat 配置，--disable all 白名单模式只启用格式类规则（缩进、import 排序、尾逗号等），不碰结构与逻辑 | R:code:.swiftlint.yml | A:- | S:Swift 6.0、indent 4；trailingCommas 与 .swiftlint.yml 的 trailing_comma 规则冲突，故 lint 侧禁用该规则
 .swiftlint.yml[FQ5T]: F:SwiftLint 配置，保守口径：禁用结构性/命名/强制解包类规则，只保留纯质量问题检查 | R:code:.swiftformat | A:- | S:刻意保留既有短变量风格；Discogs API 契约字段（masterID/masterUrl）导致 inclusive_language 被禁用
-AGENTS.md[SG4S]: F:项目给 Coding Agent 的常驻指令：工作区、记忆、红线与交付纪律，含 AOCI 索引说明区块 | R:- | A:- | S:<!-- aoci:begin -->…<!-- aoci:end --> 区块由 AOCI 工具生成与维护，禁止手工编辑其内容
 ANALYSIS.md[SD5S]: F:2026-08-29 只读架构分析：技术栈、轻 MVVM 架构、15 个 Service 职责、数据模型与歌词/播放引擎要点 | R:- | A:- | S:快照式分析（基于当时单 commit），统计与结论会随代码演进而过期，引用前须复核现状
 LICENSE[SG3L]: F:GNU GPL-3.0 许可证全文，本仓库整体遵循该许可 | R:code:NOTICE.md | A:- | S:-
 NOTICE.md[SG6T]: F:来源声明：QQPlayer 是 Cosmos Music Player 的 GPL-3.0 衍生作品，列明上游作者与本地修改范围 | R:code:LICENSE | A:- | S:上游已就 GPLv3 §7 书面同意（2026-09-14）允许经 App Store 分发，但不免除源码公开义务
 PRIVACY.md[SG6S]: F:中英双语隐私政策：不收集个人数据；音乐文件仅本地/iCloud；歌词请求会向第三方发送曲名与艺术家 | R:- | A:- | S:歌词功能联网向网易云音乐与 LRCLIB 发送歌曲标题与歌手名（政策已披露），新增联网或数据功能须同步更新本政策
 PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 entitlements，App Group group.com.daxmate.qqplayer.ios | R:code:PlayerWidget/PlayerWidget.entitlements | A:- | S:App Group 必须与主 App 一致，否则 Widget 扩展无法访问共享容器
 QQPlayerMac-Info.plist[FN5T]: F:macOS target 的 Info.plist 补充片段：用显式 plist 承载数组型键 NSBonjourServices（_qqplayer-sync._tcp） | R:code:QQPlayer/Info.plist,code:QQPlayer/Sync/SyncListener.swift,code:QQPlayer/Sync/SyncBrowser.swift | A:NSBonjourServices | S:INFOPLIST_KEY_NSBonjourServices 不被 Xcode 支持，须显式 plist 合并；服务类型三处必须一致
-README.md[SZ7L]: F:项目总览：平台矩阵、双端功能清单、局域网配对与同步、技术架构、测试与构建（CI 四 job）、版本号与升版；含标签刮削与下载后自动刮削 | R:code:docs/logging.md, code:scripts/build-app.sh | A:- | S:功能矩阵与实际 target 能力必须同步更新；批量刮削取首候选写全字段且不改名；下载后自动刮削默认关
+README.md[SZ7L]: F:项目总览：平台矩阵与仓库版号口径（1.4.0 (77)，与 App Store 1.0.0 分离）、双端功能清单、局域网配对与同步、技术架构、目录与脚本清单、测试与构建（CI 四 job）；含标签刮削与下载后自动刮削 | R:code:docs/logging.md,code:scripts/build-app.sh | A:- | S:功能矩阵须与 target 能力同步；CI main 走自托管 qqplayer-macos、PR 走 macos-latest；批量刮削取首候选写全字段且不改名，下载后自动刮削默认关
 QQPlayerMac.entitlements[FS8T]: F:macOS 授权：App Group B6FA37AYT5.dsqcommon（共享资源根）＋ network.client；未声明 App Sandbox（非沙盒，便于共享根与旧路径 symlink） | R:code:QQPlayer/Services/DSQSharedPaths.swift, code:QQPlayer/QQPlayer.entitlements | A:com.apple.security.application-groups | S:App Group ID 必须与 DSQSharedLocations.appGroupIdentifier 一致；删 network.client → 在线搜索/模型下载全断
 CHANGELOG.md[SV6S]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚡改进 / 🐛修复 / 🔧工程，1.1.4 起收录，最新 1.4.0 | R:- | A:- | S:发版时与版本号同批更新；开发中的条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
 
@@ -972,7 +971,7 @@ preflight.sh[XQ7S]: F:推送前本地预检脚本：quick（静态检查）/ ful
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/git-hooks/===
 pre-commit[XQ6S]: F:提交前钩子：swiftformat/swiftlint 加编译警告零容忍加 target 成员检查 | R:code:scripts/git-hooks/pre-push | A:- | S:构建一律走 scripts/xcbuild.sh 禁裸 xcodebuild；环境问题可 SKIP_WARNING_CHECK=1 绕过 CI 兜底
-pre-push[XQ6S]: F:推送前门禁：main 禁 merge 提交加 swiftformat/swiftlint 加成员归属加非 main 分支拦截 | R:code:scripts/git-hooks/pre-commit | A:- | S:只允许直推 main 推候选分支不可绕过（QQPLAYER_ALLOW_BRANCH_PUSH 例外已拆）；不跑编译测试
+pre-push[XQ6S]: F:推送前门禁：main 禁 merge 提交加 swiftformat/swiftlint 加 target 成员归属加非 main 分支拦截 | R:code:scripts/git-hooks/pre-commit | A:- | S:只允许直推 main，候选分支不可绕过（ALLOW_BRANCH_PUSH 例外已拆）；口径依据指本机工作区 ~/.openclaw/coding/AGENTS.md；不跑编译测试
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/sync-harness/===
 GRDBShim.swift[TN4T]: F:harness 专用最小 GRDB 模块桩（两个 Record 协议）不参与 App target | R:- | A:- | S:只给出同名空协议即可编译未改动的生产源码；单独编为 module GRDB 后 link

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-14T14:28:40Z",
+  "updated_at": "2026-11-14T16:02:13Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -23,9 +23,9 @@
     },
     ".gitignore": {
       "role": "index",
-      "sha256": "0bb39ef09363254e7b5c7856e2ad04b03cf1550c8a584e75e2f9238b268becb9",
-      "size": 2692,
-      "normalized_sha256": "0bb39ef09363254e7b5c7856e2ad04b03cf1550c8a584e75e2f9238b268becb9"
+      "sha256": "574ca37dee8a9d5d9b4ce30908ab24370f2dcb047c1431da350305a459bc8b6a",
+      "size": 2814,
+      "normalized_sha256": "574ca37dee8a9d5d9b4ce30908ab24370f2dcb047c1431da350305a459bc8b6a"
     },
     ".swiftformat": {
       "role": "index",
@@ -5120,9 +5120,9 @@
     },
     "README.md": {
       "role": "index",
-      "sha256": "ec9f37b97d6a50732b8438da0ad261ae7774f17437bfe367fef71ebd7bdc61e5",
-      "size": 38162,
-      "normalized_sha256": "ec9f37b97d6a50732b8438da0ad261ae7774f17437bfe367fef71ebd7bdc61e5"
+      "sha256": "9a3ace9c83ce026f11749877384dd5b7471704286ae9ce98c4bfa6160a2f6d0c",
+      "size": 38950,
+      "normalized_sha256": "9a3ace9c83ce026f11749877384dd5b7471704286ae9ce98c4bfa6160a2f6d0c"
     },
     "Share/Base.lproj/MainInterface.storyboard": {
       "role": "index",
@@ -5174,9 +5174,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "0b732ba7d3fcef044336bc9f947cab9272d7fdfb58eb793a6ad9ac32dbf3cd9d",
-      "size": 400230,
-      "normalized_sha256": "0b732ba7d3fcef044336bc9f947cab9272d7fdfb58eb793a6ad9ac32dbf3cd9d"
+      "sha256": "369514ceedb5db01b1d84c55124b10993a10e26c1ec606f2172a2f4955418b8e",
+      "size": 400099,
+      "normalized_sha256": "369514ceedb5db01b1d84c55124b10993a10e26c1ec606f2172a2f4955418b8e"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5348,9 +5348,9 @@
     },
     "scripts/git-hooks/pre-push": {
       "role": "index",
-      "sha256": "0d572ac417e09c39712cf6d2319a51f332c623b3b1edbc1cb6c0eea6a83ca38f",
-      "size": 5590,
-      "normalized_sha256": "0d572ac417e09c39712cf6d2319a51f332c623b3b1edbc1cb6c0eea6a83ca38f"
+      "sha256": "00df47c33a3deab2fee9f44b4373bbc2e9043e4a39ce2cf8efb4267c20642a2b",
+      "size": 5619,
+      "normalized_sha256": "00df47c33a3deab2fee9f44b4373bbc2e9043e4a39ce2cf8efb4267c20642a2b"
     },
     "scripts/git-hooks/pre-push-branch-guard-test.sh": {
       "role": "observe",
