@@ -36,8 +36,8 @@ import AppKit
 import SwiftUI
 
 struct MacTagEditorView: View {
-    /// 分片：跨文件可见（原 private）
-    @Environment(PlayerEngine.self) var playerEngine
+    /// 播放上下文跟随已收口到 `AppCoordinator.followRenamedTrack`（2026-11-14），
+    /// 本视图不再直连 PlayerEngine（原 `@Environment(PlayerEngine.self) var playerEngine` 一并删除）。
     /// 分片：跨文件可见（原 private）
     @Environment(AppCoordinator.self) var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）

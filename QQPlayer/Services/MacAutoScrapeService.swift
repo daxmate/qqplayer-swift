@@ -27,7 +27,13 @@
 //  → 三源检索 + 按设置源顺序合并 → 取第一个候选 → 字段映射（唯一入口
 //  ScrapeLogic.fieldValues / makeTagWriteRequest）+ 封面（唯一入口 ScrapeCoverLoader）
 //  → TagWriterService 写标签并按模板改名 → moveTrack 迁移 DB 引用
-//  → LibraryIndexer 单文件入库 → 发 LibraryFolderContentChanged。
+//  → LibraryIndexer 单文件入库 → **主线程跟随播放上下文 + 发 LibraryNeedsRefresh**。
+//
+//  刷新口径（2026-11-14 用户追加）：「自动刮削完成后，要刷新一下界面」——
+//  写入标签 / 改名 / 入库完成后，曲库列表、歌单/专辑/艺人视图、正在播放条（标题/封面）
+//  都要立刻跟随，不能等整库重扫或手动刷新。
+//  实现 = 与标签保存路径**同一个入口**（`AppCoordinator.followRenamedTrack` + LibraryNeedsRefresh 通知），
+//  不再发 LibraryFolderContentChanged（那个信号会让 MacLibraryView 起一次整库重扫）。
 //
 
 import Foundation
@@ -113,6 +119,10 @@ enum MacAutoScrapeWorker {
             log(.info, "等待索引超时（继续刮削）\(fileName)")
         }
 
+        // 1b. 写标签**之前**抓旧 stableId：写完后 stableId 可能变化，播放上下文
+        //     （正在播放条 / 播放队列）要靠它找到旧行做替换。取不到（未入库）→ 后续跳过跟随。
+        let oldStableId = (try? LibraryReads.track(path: job.path))?.stableId
+
         // 2. 读现有标签；检索词 = 下载时已知 title → 文件 title → 文件名 stem
         let metadata = try? await AudioMetadataParser.parseMetadata(from: url)
         let queryTitle = firstNonBlank(job.knownTitle, metadata?.title)
@@ -163,18 +173,30 @@ enum MacAutoScrapeWorker {
                     log(.warn, "改名后 DB 引用迁移失败（继续按新路径入库）\(fileName) → \(result.finalURL.lastPathComponent): \(error)")
                 }
             }
-            // 7. 单文件入库（刷新 DB / 封面缓存）→ 列表刷新信号
+            // 7. 单文件入库（刷新 DB / 封面缓存）
             let indexed = await LibraryIndexer.shared.processExternalFile(result.finalURL)
             if !indexed {
                 log(.warn, "写入成功但单文件入库未通过（等待列表刷新兜底）\(result.finalURL.lastPathComponent)")
             }
-            NotificationCenter.default.post(name: .libraryFolderContentChanged, object: nil)
+            // 8. 主线程收尾（统一在这里 hop 一次，与标签保存路径同口径）：
+            //    ① 播放上下文跟随——**改名与未改名都要调**：未改名时标题/歌手/封面也要跟随；
+            //       stableId 相同时该调用是幂等 no-op。
+            //    ② 补发 LibraryNeedsRefresh：所有列表容器（主库/歌单详情/专辑卡/艺人页/搜索结果）重拉。
+            //    不再发 LibraryFolderContentChanged：单文件已由上面入过库，文件夹变化另有 FSEvents
+            //    （MacFolderMonitor → 同通知）覆盖；那条会让列表等一次**整库重扫**。
+            await MainActor.run {
+                if let oldStableId, let fresh = try? LibraryReads.track(path: result.finalURL.path) {
+                    AppCoordinator.shared.followRenamedTrack(oldStableId: oldStableId, newTrack: fresh)
+                }
+                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
+            }
 
             let fields = values.writtenFieldNames(coverWritten: wroteCover).joined(separator: ",")
             log(
                 .info,
                 "完成 \(fileName) → \(result.finalURL.lastPathComponent) 源=\(candidate.source) "
                     + "字段=[\(fields)] 封面=\(wroteCover ? "是" : "否") 改名=\(result.renamed ? "是" : "否")"
+                    + " 刷新=已发"
             )
         } catch {
             log(.error, "写入失败（不影响下载结果）\(fileName): \(error)")

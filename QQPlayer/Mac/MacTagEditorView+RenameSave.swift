@@ -159,7 +159,7 @@ extension MacTagEditorView {
     private func finishSaveSuccess(renamed: Bool, oldStableId: String, migrated: Track?, finalPath: String) {
         saving = false
         if renamed, let migrated {
-            followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: migrated)
+            appCoordinator.followRenamedTrack(oldStableId: oldStableId, newTrack: migrated)
         }
         // 单文件入库同步：保存只改了文件，DB 里的标签与封面缓存仍是旧值 → 列表不刷新
         // （旧实现只发 LibraryFolderContentChanged，要等整库重扫扫到这首歌才更新）。
@@ -172,7 +172,7 @@ extension MacTagEditorView {
             // 未改名时播放页标题/歌手也立即跟随（改名场景已在上面用 migrated 处理，
             // 此处按 oldStableId 匹配为幂等 no-op）
             if let fresh = try? LibraryReads.track(path: finalPath) {
-                followRenamedTrackInPlayback(oldStableId: oldStableId, newTrack: fresh)
+                appCoordinator.followRenamedTrack(oldStableId: oldStableId, newTrack: fresh)
             }
             // 兜底补发（processExternalFile 提前返回/指纹未变时也保证列表刷新）
             NotificationCenter.default.post(
@@ -208,26 +208,5 @@ extension MacTagEditorView {
             let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             saveError = "tag_editor_db_migrate_failed".localized(with: detail)
         }
-    }
-
-    /// 播放队列路径跟随（web「改名后目标歌曲路径跟随，不打断播放」语义）：编辑对象若在播放队列/正在播放 → 用迁移后的新 Track 替换（含新 stableId），
-    /// 不调 loadTrack/playTrack —— 已加载的音频继续播，下次切到它用新路径加载。
-    @MainActor
-    private func followRenamedTrackInPlayback(oldStableId: String, newTrack: Track) {
-        let player = playerEngine
-        if player.currentTrack?.stableId == oldStableId {
-            player.currentTrack = newTrack
-        }
-        if player.playbackQueue.contains(where: { $0.stableId == oldStableId }) {
-            player.playbackQueue = player.playbackQueue.map {
-                $0.stableId == oldStableId ? newTrack : $0
-            }
-        }
-        if player.originalQueue.contains(oldStableId) {
-            player.originalQueue = player.originalQueue.map {
-                $0 == oldStableId ? newTrack.stableId : $0
-            }
-        }
-        player.normalizeIndexAndTrack()
     }
 }

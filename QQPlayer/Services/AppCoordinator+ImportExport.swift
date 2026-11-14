@@ -190,6 +190,33 @@ extension AppCoordinator {
         try databaseManager.moveTrack(from: oldPath, to: newPath)
     }
 
+    /// 曲目改名 / 重刮后让**播放上下文跟随**（唯一入口，2026-11-14 收口）。
+    ///
+    /// 正在播放的曲目、播放队列、原始队列里出现旧 `stableId` 的位置一律替换成新 `Track`；
+    /// 用替换而不是 `loadTrack/playTrack`——已加载的音频继续播、不打断用户，
+    /// 下次切到这一首时用新路径加载。
+    ///
+    /// **幂等**：旧 id 与新 Track 的 id 相同、或三个上下文里都没有旧 id ⇒ no-op。
+    /// 未改名的重刮/保存也走本入口（标题/歌手/封面同样要跟随），靠幂等性复用同一次调用。
+    ///
+    /// 调用方：标签保存（`MacTagEditorView.save`）、下载后自动刮削（`MacAutoScrapeWorker`）。
+    func followRenamedTrack(oldStableId: String, newTrack: Track) {
+        if playerEngine.currentTrack?.stableId == oldStableId {
+            playerEngine.currentTrack = newTrack
+        }
+        if playerEngine.playbackQueue.contains(where: { $0.stableId == oldStableId }) {
+            playerEngine.playbackQueue = playerEngine.playbackQueue.map {
+                $0.stableId == oldStableId ? newTrack : $0
+            }
+        }
+        if playerEngine.originalQueue.contains(oldStableId) {
+            playerEngine.originalQueue = playerEngine.originalQueue.map {
+                $0 == oldStableId ? newTrack.stableId : $0
+            }
+        }
+        playerEngine.normalizeIndexAndTrack()
+    }
+
     func updatePlaylistAccessed(playlistId: Int64) throws {
         try databaseManager.updatePlaylistAccessed(playlistId: playlistId)
     }
