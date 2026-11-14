@@ -207,12 +207,11 @@
 #+	UIApplication	QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 #+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistCardView.swift	1
 #+	WidgetCenter	QQPlayer/Views/Playlists/PlaylistDetailScreen+CustomCover.swift	2
-#+	URLSession	QQPlayer/Mac/MacTagEditorView+Scrape.swift	1
 #+	URLSession	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
 #+	NSWorkspace	QQPlayer/Mac/MacSettingsView.swift	1
 #+	NSWorkspace	QQPlayer/Views/Artists/ArtistDetailScreen.swift	1
 
-# SYSTEM-SINGLETON TOTAL: 11
+# SYSTEM-SINGLETON TOTAL: 10
 
 # ═══ 登记区 B：合法装配点（运行期组合根；**只登记，不放宽扫描口径**）════════════════════════
 #   与登记区 A 的区别（**用前缀 + 各自合计行区分，语义不同故分开**）：
@@ -249,12 +248,14 @@
 # 2026-11-12 设置页分类化（A 方案）：SettingsView 拆成分类子页 —— UIApplication.shared 随
 #   「关于」迁到 Settings/SettingsAboutView.swift、#Preview 的 LyricOffsetStore.shared 随
 #   「歌词显示」迁到 Settings/SettingsLyricsView.swift；两处都是原有站点搬家，计数不变（TOTAL 21）。
+#
+# 2026-11-14 自动刮削（517b973）：封面下载收口到 ScrapeCoverLoader，MacTagEditorView+Scrape.swift
+#   不再直连 URLSession ⇒ 该文件计数 1 → 0 删行；登记区 A 同条删除；系统单例 11 → 10、TOTAL 21 → 20。
 
 QQPlayer/ContentView.swift	1
 QQPlayer/Mac/MacDesktopWindowsManager.swift	3
 QQPlayer/Mac/MacSettingsView.swift	1
 QQPlayer/Mac/MacSyncView.swift	1
-QQPlayer/Mac/MacTagEditorView+Scrape.swift	1
 QQPlayer/Views/Artists/ArtistDetailScreen.swift	3
 QQPlayer/Views/Player/LyricsView.swift	1
 QQPlayer/Views/Playlists/PlaylistCardView.swift	1
@@ -265,10 +266,10 @@ QQPlayer/Views/Utility/Settings/SettingsLyricsView.swift	1
 QQPlayer/Views/Utility/SyncQRScannerView.swift	1
 QQPlayer/Views/Utility/SyncSettingsView.swift	3
 
-# TOTAL = 视图层直连总数（**含**全部已登记条目：系统单例 11 + 合法装配点 3 + `#Preview` 脚手架 6）
+# TOTAL = 视图层直连总数（**含**全部已登记条目：系统单例 10 + 合法装配点 3 + `#Preview` 脚手架 6）
 #   = 棘轮上限，只能减不能增。
-# TOTAL: 21
-# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 系统单例 11 − 合法装配点 3 − `#Preview` 脚手架 6）= 进度只看这一行。
+# TOTAL: 20
+# MIGRATABLE TOTAL = 可迁预算（= TOTAL − 系统单例 10 − 合法装配点 3 − `#Preview` 脚手架 6）= 进度只看这一行。
 #   当代分解（并入 6-8 基线后按实测重算）：21 = 系统单例 11 + 已登记装配点 3 + #Preview 脚手架 6 + 待迁 1
 #   逐条点名剩余可迁（实测 1 处）：`QQPlayer/Mac/MacSyncView.swift:79` 的 `hostCenter ?? .shared`
 #     （View init 是非隔离上下文、读不到环境值；6-8 已把该类其余 3 处收口，这处属热点自身残留）
