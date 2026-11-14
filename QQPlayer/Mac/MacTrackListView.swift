@@ -48,7 +48,6 @@ private struct BatchScrapeRequest: Identifiable {
 }
 
 struct MacTrackListView: View {
-    @Environment(AppCoordinator.self) private var appCoordinator
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     let tracks: [Track]
@@ -70,25 +69,11 @@ struct MacTrackListView: View {
     /// 曲库卡片事实缓存（审计 M2：body 里的同步全量 DB 查询→缓存/异步）
     @Environment(MacLibraryFactsStore.self) private var facts
     @State private var selectedRows = Set<String>()
-    @State private var favoriteIds: Set<String> = []
-    @State private var playlists: [Playlist] = []
-    @State private var showNewPlaylistAlert = false
-    @State private var newPlaylistName = ""
-    @State private var pendingTracks: [Track] = []
-    /// 单曲编辑/刮削（右键菜单第 8 项）——.sheet(item:) 直接驱动，见文件头注释
-    @State private var tagEditorTrack: Track?
     /// 批量刮削（右键多选 >1）——.sheet(item:) 直接驱动，见文件头注释
     @State private var batchScrapeRequest: BatchScrapeRequest?
-    /// 移到废纸篓（web 版「移到废纸篓」对齐，2026-09-02 A4）：确认弹窗状态
-    @State private var showTrashConfirm = false
-    @State private var pendingTrashTracks: [Track] = []
-    @State private var trashFailureAlert: String?
-    /// 批量移到废纸篓的执行任务句柄（可取消：进度条上的取消按钮）
-    @State private var trashTask: Task<Void, Never>?
-    /// 批量删除进度（nil = 无进行中的批次）；磁盘/DB 在全局执行器上跑，回主线程落表
-    @State private var trashProgress: TrackDeletionService.Progress?
-    /// 播放器（删除当前播放曲目时切下一首/停止）
-    @Environment(PlayerEngine.self) private var player
+    /// 曲目右键菜单状态：菜单内容 / 弹窗 / 删除执行都在 MacTrackContextMenu.swift
+    /// （曲库与两个搜索面共用同一份实现），这里只持有状态
+    @State private var menu = MacTrackMenuModel()
     /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
     /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
@@ -114,25 +99,18 @@ struct MacTrackListView: View {
                 Divider()
                 table
             }
-            .alert("create_new_playlist".localized, isPresented: $showNewPlaylistAlert) {
-                TextField("playlist_name_placeholder".localized, text: $newPlaylistName)
-                Button("create".localized) { createPlaylistAndAdd() }
-                Button("cancel".localized, role: .cancel) {}
-            }
-            .alert(Localized.moveToTrash, isPresented: $showTrashConfirm) {
-                Button(Localized.moveToTrash, role: .destructive) { movePendingTracksToTrash() }
-                Button("cancel".localized, role: .cancel) {}
-            } message: {
-                Text(trashConfirmMessage)
-            }
-            .alert(Localized.moveToTrash, isPresented: trashFailureBinding) {
-                Button("ok".localized, role: .cancel) { trashFailureAlert = nil }
-            } message: {
-                Text(trashFailureAlert ?? "")
+            // 右键菜单弹窗宿主（新建歌单 / 编辑标签 / 删除确认）——与两个搜索面同一份实现
+            .macTrackMenu(menu) { deletedIds in
+                // 本地即时移除（不等父级通知链）：当前列表立即消失，序号重排
+                // （父级 reloadLibrary 随后全量重拉对齐歌单/专辑等其它视图）
+                selectedRows.removeAll()
+                guard !deletedIds.isEmpty else { return }
+                displayedRows.removeAll { deletedIds.contains($0.id) }
+                for (index, row) in displayedRows.enumerated() {
+                    row.displayIndex = index + 1
+                }
             }
             .onAppear {
-                reloadFavorites()
-                reloadPlaylists()
                 syncDisplayedRows()
             }
             .onChange(of: sortOrder) { _, newSort in
@@ -146,16 +124,7 @@ struct MacTrackListView: View {
                 // 必须用 onChange 传入的 newTracks（新数据）重建。
                 syncDisplayedRows(tracks: newTracks)
             }
-            .onReceive(NotificationCenter.default.publisher(for: .favoritesChanged)) { _ in
-                reloadFavorites()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .playlistsChanged)) { _ in
-                reloadPlaylists()
-            }
-            // 标签编辑/刮削 sheet（单曲右键第 8 项）与批量刮削 sheet（多选右键）
-            .sheet(item: $tagEditorTrack) { track in
-                MacTagEditorView(track: track)
-            }
+            // 批量刮削 sheet（多选右键；单曲编辑 sheet 在 .macTrackMenu 宿主里）
             .sheet(item: $batchScrapeRequest) { request in
                 MacScrapeBatchProgressView(paths: request.paths, libraryMode: false)
             }
@@ -178,16 +147,16 @@ struct MacTrackListView: View {
             Spacer()
             // 批量删除进度 + 取消（审计 H1：修复前磁盘/DB 逐首同步跑在主线程、
             // 窗口卡死且无法取消——现在执行在后台，主线程只显示进度并允许取消）
-            if let trashProgress {
+            if let progress = menu.trashProgress {
                 HStack(spacing: DesignTokens.space8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("\(trashProgress.done)/\(trashProgress.total)")
+                    Text("\(progress.done)/\(progress.total)")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundColor(.secondary)
                     Button("cancel".localized) {
-                        trashTask?.cancel()
+                        menu.trashTask?.cancel()
                     }
                     .controlSize(.small)
                 }
@@ -250,11 +219,11 @@ struct MacTrackListView: View {
                     } label: {
                         Label("context_batch_scrape".localized, systemImage: "tag")
                     }
-                    Menu(Localized.addToPlaylist) { addToPlaylistMenu(for: tracks) }
+                    Menu(Localized.addToPlaylist) { MacAddToPlaylistMenu(tracks: tracks, model: menu) }
                     Divider()
                     Button(role: .destructive) {
                         presentAfterMenuDismisses {
-                            requestTrash(tracks)
+                            menu.requestTrash(tracks)
                         }
                     } label: {
                         Label(Localized.moveToTrash, systemImage: "trash")
@@ -262,7 +231,16 @@ struct MacTrackListView: View {
                 }
             } else if let id = selectedIDs.first,
                       let row = displayedRows.first(where: { $0.id == id }) {
-                contextMenuItems(row.track)
+                // 单选：与两个搜索面同一份菜单实现（MacTrackContextMenu.swift）
+                MacTrackContextMenuContent(
+                    track: row.track,
+                    model: menu,
+                    playlistId: playlistId,
+                    onPlay: { play(row.track) },
+                    onPlayNext: onPlayNext,
+                    onShowArtist: onShowArtist,
+                    onShowAlbum: onShowAlbum
+                )
             }
         } primaryAction: { selectedIDs in
             if let id = selectedIDs.first,
@@ -322,260 +300,7 @@ struct MacTrackListView: View {
         displayedRows = sorted
     }
 
-    // MARK: - Context menu（web 版 7 项对齐：播放/下一首播放/收藏/加歌单/进歌手/进专辑/歌单内移除）
-
-    @ViewBuilder
-    private func contextMenuItems(_ track: Track) -> some View {
-        Button("play".localized) {
-            play(track)
-        }
-
-        if let onPlayNext {
-            Button("play_next".localized) {
-                onPlayNext(track)
-            }
-        }
-
-        Divider()
-
-        let isFavorite = favoriteIds.contains(track.stableId)
-        Button {
-            try? appCoordinator.toggleFavorite(trackStableId: track.stableId)
-        } label: {
-            Label(isFavorite ? Localized.removeFromLikedSongs : Localized.addToLikedSongs,
-                  systemImage: "heart.fill")
-        }
-
-        if let playlistId {
-            Divider()
-            Button("playlist_manage_remove_from_playlist".localized, role: .destructive) {
-                try? appCoordinator.removeFromPlaylist(playlistId: playlistId, trackStableId: track.stableId)
-                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
-            }
-        }
-
-        Divider()
-        Menu(Localized.addToPlaylist) { addToPlaylistMenu(for: [track]) }
-
-        if let onShowArtist {
-            Divider()
-            Button("show_artist".localized) {
-                presentAfterMenuDismisses {
-                    onShowArtist(track)
-                }
-            }
-        }
-        if let onShowAlbum {
-            Button("show_album".localized) {
-                presentAfterMenuDismisses {
-                    onShowAlbum(track)
-                }
-            }
-        }
-
-        // 编辑标签/刮削（web 版对齐，第 8 项）：单曲编辑弹窗（自动刮削+表单+保存改名）
-        Divider()
-        Button {
-            presentAfterMenuDismisses {
-                tagEditorTrack = track
-            }
-        } label: {
-            Label("context_edit_tags".localized, systemImage: "tag")
-        }
-
-        // 移到废纸篓（web 版对齐，全场景）：send2trash 语义 = 系统废纸篓可恢复，
-        // deleteTrack 同时清理歌单/收藏引用（歌单内删除后从歌单消失属预期）
-        Divider()
-        Button(role: .destructive) {
-            presentAfterMenuDismisses {
-                requestTrash([track])
-            }
-        } label: {
-            Label(Localized.moveToTrash, systemImage: "trash")
-        }
-    }
-
-    // MARK: - 添加到歌单（歌单选择菜单唯一实现：单选 / 多选共用）
-
-    /// 菜单内容（唯一实现由 MacTrackListViewPlaylistMenuContractTests 守护）：
-    /// 列歌单（整批逐首添加，循环后统一 post 一次）+ 新建歌单。
-    @ViewBuilder
-    private func addToPlaylistMenu(for tracks: [Track]) -> some View {
-        ForEach(playlists, id: \.id) { playlist in
-            Button(playlist.title) {
-                // 整批逐首加入（addToPlaylist 自带「已在歌单 → 跳过」判据）
-                tracks.forEach { try? appCoordinator.addToPlaylist(playlistId: playlist.id ?? 0, trackStableId: $0.stableId) }
-                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
-            }
-        }
-        Divider()
-        Button("create_new_playlist".localized) {
-            presentAfterMenuDismisses {
-                pendingTracks = tracks
-                newPlaylistName = ""
-                showNewPlaylistAlert = true
-            }
-        }
-    }
-
-    // MARK: - Move to Trash（web 版「移到废纸篓」对齐：send2trash 语义 = 系统废纸篓可恢复）
-
-    private var trashConfirmMessage: String {
-        if pendingTrashTracks.count == 1, let title = pendingTrashTracks.first?.displayTitle {
-            return Localized.moveToTrashConfirm(title)
-        }
-        return Localized.moveToTrashConfirm(count: pendingTrashTracks.count)
-    }
-
-    /// 失败提示（成功数 > 0 时列表仍刷新，失败项保留在原库）
-    private var trashFailureBinding: Binding<Bool> {
-        Binding(
-            get: { trashFailureAlert != nil },
-            set: { if !$0 { trashFailureAlert = nil } }
-        )
-    }
-
-    private func requestTrash(_ tracks: [Track]) {
-        guard !tracks.isEmpty else { return }
-        pendingTrashTracks = tracks
-        showTrashConfirm = true
-    }
-
-    private func movePendingTracksToTrash() {
-        let tracks = pendingTrashTracks
-        guard !tracks.isEmpty else { return }
-        pendingTrashTracks = []
-
-        // 整批 stableId：沿用修复前语义（本地即时移除 + 播放队列联动都按整批算，
-        // 失败项随后由 LibraryNeedsRefresh 重载回列表）
-        let items = tracks.map {
-            TrackDeletionService.Item(stableId: $0.stableId, title: $0.title, path: $0.path)
-        }
-        let deletedStableIds = Set(items.map(\.stableId))
-
-        // 重入保护：上一批仍在跑时先取消它（避免两次批次交错写同一批状态）
-        trashTask?.cancel()
-        trashProgress = TrackDeletionService.Progress(done: 0, total: items.count)
-        trashTask = Task { @MainActor in
-            // 磁盘 trash + DB 删除走 TrackDeletionService（唯一删除入口，nonisolated async → 全局执行器）：
-            // 修复前整批在主 actor 上同步执行，多选数百首/iCloud dataless 文件会把窗口
-            // 卡死数十秒且无法取消（审计 H1）。主线程只负责落 @State 与发通知。
-            let outcome = await TrackDeletionService.trash(
-                items: items,
-                environment: .live(
-                    log: { MacTrashLogger.log($0) },
-                    isCancelled: { Task.isCancelled },
-                    libraryRoot: MacLibraryRoot.resolvedRootURL
-                ),
-                onProgress: { done, total in
-                    DispatchQueue.main.async {
-                        trashProgress = TrackDeletionService.Progress(done: done, total: total)
-                    }
-                }
-            )
-            let failedCount = outcome.failed
-            let deletedAny = outcome.deletedAny
-            trashProgress = nil
-            trashTask = nil
-
-            // 通知先发（UI 立即刷新），播放队列联动后置（SFB 引擎切歌/加载可能耗时，
-            // 若 await 在通知前，加载慢会拖住曲库刷新——用户 2026-09-02 反馈删除不刷新）
-            selectedRows.removeAll()
-
-            // 本地即时移除（不等父级通知链）：当前列表立即消失，序号重排
-            // （父级 reloadLibrary 随后全量重拉对齐歌单/专辑等其它视图）
-            if !deletedStableIds.isEmpty {
-                displayedRows.removeAll { deletedStableIds.contains($0.id) }
-                for (index, row) in displayedRows.enumerated() {
-                    row.displayIndex = index + 1
-                }
-            }
-
-            if deletedAny {
-                // 先刷新全库（tracks/歌单），再刷新收藏列表——顺序相关：
-                // reloadLibrary 先重拉 tracks，reloadLikedTracks 才能用新数据过滤
-                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
-                NotificationCenter.default.post(name: .playlistsChanged, object: nil)
-                NotificationCenter.default.post(name: .favoritesChanged, object: nil)
-            } else if failedCount > 0 {
-                // 全部失败（文件仍在）：也发一次 LibraryNeedsRefresh，让曲库列表与 DB 对齐
-                NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
-            }
-            if failedCount > 0 {
-                trashFailureAlert = Localized.moveToTrashFailed(count: failedCount)
-            }
-
-            // 播放队列联动（不阻塞上面通知）
-            await handleDeletedTracksInPlayback(deletedStableIds)
-        }
-    }
-
-    /// 播放队列联动（web removeSongsFromQueue 对齐）：从队列移除被删曲目；
-    /// 正在播放的被删曲目 → 队列仍有歌则自动续播原位置的下一首，否则停止。
-    /// 走 PlayerEngine 公开 API（playbackQueue/currentTrack 可写 + playTrack/pause），不绕引擎内部。
-    @MainActor
-    private func handleDeletedTracksInPlayback(_ deletedStableIds: Set<String>) async {
-        guard !deletedStableIds.isEmpty else { return }
-
-        let remaining = player.playbackQueue.filter { !deletedStableIds.contains($0.stableId) }
-        let currentWasDeleted = player.currentTrack.map { deletedStableIds.contains($0.stableId) } ?? false
-
-        if currentWasDeleted {
-            if remaining.isEmpty {
-                // 没有可续播的曲目：停止并清空当前曲目
-                player.playbackQueue = []
-                player.pause()
-                player.currentTrack = nil
-                return
-            }
-            // 原队列中被删曲目的下标 → remaining 里同位置的项 = 其后第一个存活曲目
-            // （下标越界循环到队首）。rem 保持原相对顺序，前面的删项只会让下标前移
-            let deletedIndex = player.playbackQueue.firstIndex {
-                deletedStableIds.contains($0.stableId)
-            } ?? 0
-            let next = remaining[deletedIndex % remaining.count]
-            player.playbackQueue = remaining
-            player.originalQueue.removeAll { deletedStableIds.contains($0) }
-            if player.isPlaying {
-                // 正在播放被删曲目 → 自动续播下一首（对齐 web）
-                await player.playTrack(next, queue: remaining)
-            } else {
-                // 暂停/停止状态删当前曲 → 清引用不自动播
-                player.pause()
-                player.currentTrack = nil
-            }
-        } else if remaining.count != player.playbackQueue.count {
-            // 只删了队列里的后续曲目：替换队列并修正 index
-            player.playbackQueue = remaining
-            player.originalQueue.removeAll { deletedStableIds.contains($0) }
-            player.normalizeIndexAndTrack()
-        }
-    }
-
     // MARK: - Data helpers
-
-    private func reloadFavorites() {
-        favoriteIds = Set((try? appCoordinator.getFavorites()) ?? [])
-    }
-
-    private func reloadPlaylists() {
-        playlists = (try? LibraryReads.playlists()) ?? []
-    }
-
-    private func createPlaylistAndAdd() {
-        let title = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, !pendingTracks.isEmpty else { return }
-        do {
-            let playlist = try appCoordinator.createPlaylist(title: title)
-            let playlistId = playlist.id ?? 0
-            for track in pendingTracks {
-                try appCoordinator.addToPlaylist(playlistId: playlistId, trackStableId: track.stableId)
-            }
-            NotificationCenter.default.post(name: .playlistsChanged, object: nil)
-        } catch {
-            AppLog.error(.ui, "❌ MacTrackListView createPlaylistAndAdd failed: \(error)")
-        }
-    }
 
     private func albumTitle(for track: Track) -> String {
         // 审计 M2：以前每个可见行每帧一次 `Album.fetchOne` → 读缓存（预取已就位）
@@ -590,9 +315,8 @@ struct MacTrackListView: View {
     /// 所有从右键菜单触发的弹窗统一延迟到菜单完全收起后再呈现（~0.15s 无感）。
     /// 注：白框根因另有其因（.sheet(isPresented:) 的 item 竞态，2026-09-08 已改
     /// .sheet(item:)）；此延迟仍保留——菜单 tracking 冲突独立存在，两类叠加才致“永久卡”。
+    /// 实现收口在 MacTrackContextMenu.swift（与搜索面同一份），此处只保留调用名。
     private func presentAfterMenuDismisses(_ action: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            action()
-        }
+        presentAfterTrackMenuDismisses(action)
     }
 }

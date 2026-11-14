@@ -199,7 +199,11 @@ struct MacLibraryView: View {
                     onPlayArtist: playArtist,
                     onPlayAlbum: playAlbum,
                     onOpenSettings: openSettingsRow,
-                    artistNameResolver: { resolveArtistName(for: $0) }
+                    artistNameResolver: { resolveArtistName(for: $0) },
+                    // 曲目右键菜单与曲库同一套（同一份实现），回调也走同一批入口
+                    onPlayNext: { player.insertNext($0) },
+                    onShowArtist: showArtist(for:),
+                    onShowAlbum: showAlbum(for:)
                 )
                 .transition(.opacity)
             }
@@ -299,6 +303,11 @@ struct MacLibraryView: View {
             // iOS 同款标准通知：曲目删除/移动后整库重载（与 PlaylistsChanged 双通道，
             // 2026-09-02 A4 用户反馈删除后曲库不刷新——deleteTrack 后必须重拉 tracks）
             reloadLibrary()
+            // 搜索结果也是库数据快照：删除/改名后正在搜索就重跑，避免结果里留下已删曲目
+            // （2026-11-14 搜索面接入右键菜单后，需要与曲库同样的刷新语义）
+            if !debouncedSearchText.isEmpty {
+                performSearch(query: debouncedSearchText)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryFoldersChanged)) { _ in
             // 设置页「音乐库」添加/移除文件夹后重扫曲库（reconcile 自动清理旧目录曲目）。

@@ -67,6 +67,10 @@ struct MacSearchResultsView: View {
     let onPlayAlbum: (Album, [Track]) -> Void
     let onPlayArtist: (Artist, [Track]) -> Void
     let onOpenPlaylist: (Playlist) -> Void
+    /// 曲目右键「下一首播放 / 进歌手 / 进专辑」：与曲库同一套菜单项，回调由宿主提供
+    let onPlayNext: (Track) -> Void
+    let onShowArtist: (Track) -> Void
+    let onShowAlbum: (Track) -> Void
 
     @State private var selectedAlbum: Album?
     @State private var selectedArtist: Artist?
@@ -74,13 +78,17 @@ struct MacSearchResultsView: View {
     @State private var artistTracks: [Track] = []
     @State private var showAlbumSheet = false
     @State private var showArtistSheet = false
+    /// 歌曲行的选中态：macOS 惯例「单击选中高亮、双击播放」（List 原生 selection + primaryAction）
+    @State private var selectedSongIds = Set<String>()
+    /// 曲目右键菜单状态（与曲库 / ⌘K 浮层同一份实现，见 MacTrackContextMenu.swift）
+    @State private var menu = MacTrackMenuModel()
 
     var body: some View {
         Group {
             if results.isEmpty {
                 emptyView
             } else {
-                List {
+                List(selection: $selectedSongIds) {
                     if !results.songs.isEmpty {
                         Section("search_section_songs".localized) {
                             ForEach(results.songs, id: \.stableId) { track in
@@ -88,9 +96,9 @@ struct MacSearchResultsView: View {
                                     track: track,
                                     artistName: artistNameResolver(track),
                                     isActive: track.stableId == activeTrackId,
-                                    isPlaying: isPlaying,
-                                    onPlay: { onPlaySong(track, results.songs) }
+                                    isPlaying: isPlaying
                                 )
+                                .tag(track.stableId)
                             }
                         }
                     }
@@ -119,6 +127,27 @@ struct MacSearchResultsView: View {
                         }
                     }
                 }
+                // 歌曲行：单击选中高亮（List 原生 selection），双击播放（primaryAction）；
+                // 右键菜单与曲库同一份实现（菜单项 / 动作语义完全一致）
+                .contextMenu(forSelectionType: String.self) { selectedIDs in
+                    if let id = selectedIDs.first,
+                       let track = results.songs.first(where: { $0.stableId == id }) {
+                        MacTrackContextMenuContent(
+                            track: track,
+                            model: menu,
+                            onPlay: { onPlaySong(track, results.songs) },
+                            onPlayNext: onPlayNext,
+                            onShowArtist: onShowArtist,
+                            onShowAlbum: onShowAlbum
+                        )
+                    }
+                } primaryAction: { selectedIDs in
+                    if let id = selectedIDs.first,
+                       let track = results.songs.first(where: { $0.stableId == id }) {
+                        onPlaySong(track, results.songs)
+                    }
+                }
+                .macTrackMenu(menu)
             }
         }
         .sheet(isPresented: $showAlbumSheet) {
@@ -187,41 +216,41 @@ private struct MacSearchSongRow: View {
     let artistName: String?
     let isActive: Bool
     let isPlaying: Bool
-    let onPlay: () -> Void
 
+    // 单击选中 / 双击播放交给 List 原生 selection + primaryAction；
+    // 行内不再是 Button（否则点击会直接播放，且吞掉选中手势）
     var body: some View {
-        Button(action: onPlay) {
-            HStack(spacing: DesignTokens.space8) {
-                Group {
-                    if isActive {
-                        Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                            .foregroundColor(appAccentColor)
-                    } else {
-                        Image(systemName: "music.note")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .frame(width: 16)
-
-                Text(track.displayTitle)
-                    .lineLimit(1)
-                    .fontWeight(isActive ? .semibold : .regular)
-
-                Spacer()
-
-                if let artistName, !artistName.isEmpty {
-                    Text(artistName)
+        HStack(spacing: DesignTokens.space8) {
+            Group {
+                if isActive {
+                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
+                        .foregroundColor(appAccentColor)
+                } else {
+                    Image(systemName: "music.note")
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
                 }
-
-                Text(MacTimeFormat.format(duration(for: track)))
-                    .foregroundColor(.secondary)
-                    .monospacedDigit()
             }
-            .contentShape(Rectangle())
+            .frame(width: 16)
+
+            Text(track.displayTitle)
+                .lineLimit(1)
+                .fontWeight(isActive ? .semibold : .regular)
+
+            Spacer()
+
+            if let artistName, !artistName.isEmpty {
+                Text(artistName)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Text(MacTimeFormat.format(duration(for: track)))
+                .foregroundColor(.secondary)
+                .monospacedDigit()
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        // 去掉 Button 后仍保留可读语义：标题 + 歌手 + 时长合并成一行朗读
+        .accessibilityElement(children: .combine)
     }
 
     private func duration(for track: Track) -> TimeInterval {

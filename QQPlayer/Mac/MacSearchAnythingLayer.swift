@@ -33,6 +33,10 @@ struct MacSearchAnythingLayer: View {
     let onPlayAlbum: (Album, [Track]) -> Void
     let onOpenSettings: (MacSettingsCatalog.Match) -> Void
     let artistNameResolver: (Track) -> String?
+    /// 曲目右键「下一首播放 / 进歌手 / 进专辑」：与曲库同一套菜单项，回调由宿主提供
+    var onPlayNext: (Track) -> Void = { _ in }
+    var onShowArtist: (Track) -> Void = { _ in }
+    var onShowAlbum: (Track) -> Void = { _ in }
 
     // 2026-09-18 批 1：@ObservedObject → 普通 let；2026-09-19 批 3a：直连 `.shared` → 组合根环境注入。
     /// 分片：跨文件可见（原 private）
@@ -71,6 +75,15 @@ struct MacSearchAnythingLayer: View {
     /// 在线行下载进度（song.id → 0-1 或 nil=不确定；B2 进度圆环）
     /// 分片：跨文件可见（原 private）
     @State var downloadProgress: [Int: Double?] = [:]
+    /// 本地歌曲行选中态：浮层不是 List，选中高亮自己维护（单击选中、双击播放）
+    /// 分片：跨文件可见（原 private）
+    @State var selectedSongId: String?
+    /// 曲目右键菜单状态（与曲库 / 侧栏检索同一份实现，见 MacTrackContextMenu.swift）
+    /// 分片：跨文件可见（原 private）
+    @State var menu = MacTrackMenuModel()
+    /// App 强调色（选中高亮用；macOS 上 Color.accentColor 跟随系统而非 App tint）
+    /// 分片：跨文件可见（原 private）
+    @Environment(\.appAccentColor) var appAccentColor
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -137,6 +150,13 @@ struct MacSearchAnythingLayer: View {
         .overlay(RoundedRectangle(cornerRadius: DesignTokens.radius12).strokeBorder(Color.gray.opacity(0.25), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius12))
+        // 曲目右键菜单的弹窗宿主（与曲库 / 侧栏检索同一份实现）
+        .macTrackMenu(menu)
+        // 删除 / 改名 / 收藏等操作后曲库重载：正在搜索就重跑一次，避免结果里留下已删曲目
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
+            guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            scheduleSearch()
+        }
         // ⚠️ Esc 不在这里处理：`.onExitCommand` 依赖键盘事件沿响应链走到浮层，而浮层弹出后
         // 第一响应者是输入框的 field editor（NSTextView），Esc 先被它按「取消编辑」吃掉，
         // `cancelOperation:` 到不了浮层 → 实测「Esc 基本收不起来」。唯一入口 = 下面的

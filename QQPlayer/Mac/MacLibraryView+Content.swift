@@ -25,7 +25,11 @@ extension MacLibraryView {
                 onPlaySong: playSearchSongs,
                 onPlayAlbum: playAlbum,
                 onPlayArtist: playArtist,
-                onOpenPlaylist: openPlaylist
+                onOpenPlaylist: openPlaylist,
+                // 搜索面歌曲右键菜单与曲库同一套（同一份实现），回调也走同一批入口
+                onPlayNext: { player.insertNext($0) },
+                onShowArtist: showArtist(for:),
+                onShowAlbum: showAlbum(for:)
             )
         } else {
             switch selection {
@@ -185,7 +189,8 @@ extension MacLibraryView {
     }
 
     /// 歌曲右键「进歌手」：切到歌手分组并打开对应歌手详情
-    private func showArtist(for track: Track) {
+    /// 分片：跨文件可见（原 private）——搜索面右键菜单与曲库共用同一批动作入口
+    func showArtist(for track: Track) {
         guard let artistId = track.artistId else { return }
         do {
             artistTracks = try LibraryReads.tracks(artistId: artistId)
@@ -199,7 +204,8 @@ extension MacLibraryView {
     }
 
     /// 歌曲右键「进专辑」：切到专辑分组并打开对应专辑详情
-    private func showAlbum(for track: Track) {
+    /// 分片：跨文件可见（原 private）
+    func showAlbum(for track: Track) {
         guard let albumId = track.albumId else { return }
         do {
             albumTracks = try LibraryReads.tracks(albumId: albumId)
