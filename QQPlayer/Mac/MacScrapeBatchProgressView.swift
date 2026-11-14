@@ -179,13 +179,17 @@ struct MacScrapeBatchProgressView: View {
         return result.reason.isEmpty ? "—" : result.reason
     }
 
+    /// 字段名 → 本地化文案（2026-11-14：批量改写全部可用字段，新增 track/albumArtist/cover）
     private func fieldLocalizedName(_ field: String) -> String {
         switch field {
         case "title": return "title".localized
         case "artist": return "artist".localized
         case "album": return "album".localized
+        case "albumArtist": return "tag_editor_field_album_artist".localized
         case "year": return "tag_editor_field_year".localized
         case "genre": return "tag_editor_field_genre".localized
+        case "track": return "tag_editor_field_track".localized
+        case "cover": return "tag_editor_cover".localized
         default: return field
         }
     }

@@ -3,38 +3,36 @@
 //  QQPlayer
 //
 //  批量刮削编排服务（web 版 app/routers/tags.py 的 scrape-batch 语义移植，
-//  E1 刮削批 2026-09）。骨架：S4（UI 批）实现，依赖 S1 TagWriterService + S2 源。
+//  E1 刮削批 2026-09；2026-11-14 按用户新口径改造）。
 //
-//  语义对齐 web（/api/tags/scrape-batch）：
-//  - 两种模式：
-//    paths：对指定文件刮削，高置信度自动写入 title/artist/album/year/genre
-//      （覆盖现有值；不写封面/track/album_artist）
-//    library：整库只处理 year 为空 或 genre 为空 的曲目，只补 year/genre
+//  语义（2026-11-14 用户拍板，取代此前的「高置信度 + 分模式字段集」）：
+//  - 两种模式只差**目标集**，写入字段集合完全一致：
+//    paths：对调用方指定的文件刮削；
+//    library：只处理 year 为空 或 genre 为空 的曲目（getTracksMissingYearOrGenre）
+//  - **不再有高置信度门槛**：按源优先级合并后的第一个候选直接写（候选不唯一 /
+//    艺人不匹配都照写），错了由用户手工重刮。
+//  - **写入候选全部可用字段**：title/artist/album/albumArtist/year/genre/track +
+//    封面（候选有 coverURL 时下载校验后写；下载失败只记日志，不中断该文件）。
+//    字段映射唯一入口 = ScrapeLogic.fieldValues(from:) / makeTagWriteRequest(...)。
 //  - 开关：batchEnabled（设置 scraping.batch_enabled，默认关）→ 关时服务直接
 //    拒绝（throw ScrapeBatchError.disabled「批量刮削未开启」；UI 层负责在设置
 //    关时先提示不调 runBatch，服务层双保险）
 //  - 单批最多 100 首（超出取前 100，truncated=true）；逐首间隔 batchSleepSeconds
 //    防限流（Task.sleep 可取消）
 //  - 单文件三态结果 written/skipped/failed（带 reason），单文件失败不中断整批；
-//    skipped 原因：文件不存在 / 无候选 / （paths 模式）候选不唯一且非高置信 /
-//    （library 模式）候选无 year/genre / 格式不支持（预检 ext ∈
-//    TagWriterService.writableExtensions，不进写流程也不发网络请求）
-//  - 高置信度判定与字段集见 ScrapeLogic
+//    skipped 原因：文件不存在 / 格式不支持（预检 ext ∈ TagWriterService.writableExtensions，
+//    不进写流程也不发网络请求）/ 无候选 / 候选无任何可写字段
 //  - 可取消（Task cancellation 检查点）：每文件处理开始/结束检查；逐首 sleep
-//    用 try await Task.sleep；MB 查询内部吞错（catch 返回 []，含取消）→ 因此
+//    用 try await Task.sleep；源查询内部吞错（catch 返回 []，含取消）→ 因此
 //    每文件刮削完必须再查 Task.isCancelled，取消则 throw CancellationError，
 //    绝不许把取消当 skipped 写下去
 //  - 批量写完后统一触发一次 LibraryFolderContentChanged 刷新（不走逐首）
 //
-//  可测性：给定「候选 + fileArtist + 模式 + 文件状态」的写入决策抽成纯 static
-//  函数 decideWrite（本文件唯一值得单测的新逻辑），runBatch 只负责取数/执行/
-//  进度回传，不做网络/文件 IO 单测。
+//  可测性：给定「候选 + 文件状态」的写入决策抽成纯 static 函数 decideWrite
+//  （本文件唯一值得单测的新逻辑），runBatch 只负责取数/执行/进度回传。
 //
-//  ⚠️ 批量写入恒不改名（renameTemplate = nil）：web 批量会把文件按设置模板
-//  改名，Mac 端拍板批量只写标签不碰文件名（避免批量改名风暴），单曲编辑
-//  （MacTagEditorView）才处理改名。
-//
-//  ⚠️ 批量不写封面/track/album_artist（web BATCH_WRITABLE_FIELDS 对齐，避免刮错）。
+//  ⚠️ 批量写入恒不改名（renameTemplate = nil）：批量改名会引发改名风暴（用户拍板）；
+//  只有「下载完成后自动刮削」与单曲编辑（MacTagEditorView）才按设置模板改名。
 
 import Foundation
 
@@ -72,48 +70,34 @@ enum ScrapeBatchService {
         static let fileMissing = "文件不存在"
         static let unsupportedFormat = "格式不支持"
         static let noCandidates = "无候选"
-        /// paths 模式：候选 >1 且首候选 artist 与文件 artist 不归一化匹配
-        static let notHighConfidence = "候选不唯一"
-        /// library 模式：首候选无 year 也无 genre
-        static let noYearGenre = "候选无 year/genre"
-        /// paths 模式：首候选在 BATCH_WRITABLE_FIELDS 内无有效值
+        /// 首候选在所有可写字段上都没有有效值（含封面地址）
         static let noWritableFields = "候选无有效字段"
     }
 
     // MARK: - 写入决策（纯逻辑，可单测）
 
-    /// 决策要写入的字段值（nil = 该字段不写，保留文件原值）
-    struct ScrapeWriteValues: Equatable {
-        var title: String?
-        var artist: String?
-        var album: String?
-        var year: Int?
-        var genre: String?
-
-        var isEmpty: Bool {
-            let titleNonEmpty = title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            let artistNonEmpty = artist?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            let albumNonEmpty = album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            let genreNonEmpty = genre?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            return !titleNonEmpty && !artistNonEmpty && !albumNonEmpty && year == nil && !genreNonEmpty
-        }
-    }
-
+    /// 写/跳过两态；写入值 = 字段映射唯一入口产出的 ScrapeFieldValues
+    /// （nil 字段 = 不写，保留文件原值）
     enum WriteDecision: Equatable {
-        case write(ScrapeWriteValues)
+        case write(ScrapeFieldValues)
         case skip(reason: String)
     }
 
-    /// 给定「候选 + 文件状态 + 模式」→ 写入决策（web _process_batch_file 决策段移植）。
+    /// 给定「候选 + 文件状态」→ 写入决策（原 web _process_batch_file 决策段，
+    /// 2026-11-14 起按用户新口径简化）。
     ///
     /// 纯函数：无网络、无文件 IO。runBatch 预检（文件不存在/格式不支持）与
     /// 本函数同源判定（SkipReason 常量共享），预检不通过时不发起网络请求。
+    ///
+    /// ⚠️ 两种模式**写入字段完全一致**（候选全部可用字段），也不再判高置信度。
+    /// `libraryMode` / `fileArtist` 保留在签名里，只为了让调用点与测试显式表达模式、
+    /// 并锁住「艺人不再参与门槛」这条口径；判定逻辑不读取它们。
     /// - Parameters:
-    ///   - libraryMode: true = library 模式（只补 year/genre、不判高置信）
+    ///   - libraryMode: true = library 模式（只影响 runBatch 的目标集，不影响字段集）
     ///   - fileExists: 文件是否在磁盘上（false → skip「文件不存在」）
     ///   - formatSupported: 扩展名是否可写（false → skip「格式不支持」）
-    ///   - candidates: 已按 source_order 合并的双源候选（netease + musicbrainz）
-    ///   - fileArtist: 文件当前 artist 标签（paths 模式高置信判定用）
+    ///   - candidates: 已按 source_order 合并的三源候选
+    ///   - fileArtist: 文件当前 artist 标签（历史高置信判定入参；现不参与判定）
     static func decideWrite(
         libraryMode: Bool,
         fileExists: Bool,
@@ -127,47 +111,24 @@ enum ScrapeBatchService {
         guard formatSupported else {
             return .skip(reason: SkipReason.unsupportedFormat)
         }
-        guard !candidates.isEmpty else {
+        // 只取按源优先级合并后的第一个候选（用户口径：不做高置信度门槛，
+        // 写错由用户手工重刮）
+        guard let first = candidates.first else {
             return .skip(reason: SkipReason.noCandidates)
         }
-        // paths 模式高置信门禁；library 模式不判（web 对齐）
-        if !libraryMode && !ScrapeLogic.isHighConfidence(candidates: candidates, fileArtist: fileArtist) {
-            return .skip(reason: SkipReason.notHighConfidence)
-        }
-
-        // 只取首候选（web candidates[0]）
-        let first = candidates[0]
-        if libraryMode {
-            // 只补 year/genre（候选有值才写）
-            var values = ScrapeWriteValues()
-            values.year = first.year
-            if let genre = first.genre?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !genre.isEmpty {
-                values.genre = genre
-            }
-            if values.year == nil && values.genre == nil {
-                return .skip(reason: SkipReason.noYearGenre)
-            }
-            return .write(values)
-        }
-
-        // paths 模式：BATCH_WRITABLE_FIELDS 有值才写（覆盖现有值）
-        var values = ScrapeWriteValues()
-        values.title = trimmed(first.title)
-        values.artist = trimmed(first.artist)
-        values.album = trimmed(first.album)
-        values.year = first.year
-        values.genre = trimmed(first.genre)
-        if values.isEmpty {
+        let values = ScrapeLogic.fieldValues(from: first)
+        guard !values.isEmpty else {
             return .skip(reason: SkipReason.noWritableFields)
         }
         return .write(values)
     }
 
-    private static func trimmed(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+    // MARK: - 批量写入请求（唯一构造点）
+
+    /// 批量写入请求：字段映射走 ScrapeLogic 唯一入口，**恒不改名**（renameTemplate = nil）。
+    /// 单独成函数是为了让「批量不改名」这条口径有可断言的落点（不要各调用点自己拼 request）。
+    static func makeBatchWriteRequest(values: ScrapeFieldValues) -> TagWriteRequest {
+        ScrapeLogic.makeTagWriteRequest(values: values, renameTemplate: nil)
     }
 
     // MARK: - runBatch
@@ -375,7 +336,7 @@ enum ScrapeBatchService {
             return skippedResult(path: path, reason: SkipReason.unsupportedFormat)
         }
 
-        // 读文件当前标签（artist 供高置信判定 / title 供 query；解析失败容错为 nil
+        // 读文件当前标签（artist 供检索加分 / title 供 query；解析失败容错为 nil
         // ——web extract_tags 异常回落 None 语义）
         let fileArtist: String?
         let fileTitle: String?
@@ -408,28 +369,35 @@ enum ScrapeBatchService {
         case .skip(let reason):
             return skippedResult(path: path, reason: reason, candidateCount: candidates.count)
         case .write(let values):
-            return writeFile(path: path, values: values, candidateCount: candidates.count)
+            return await writeFile(path: path, values: values, candidateCount: candidates.count)
         }
     }
 
-    /// 执行写标签（paths/library 统一入口）。写失败 → failed 结果（不中断整批）。
-    private static func writeFile(path: String, values: ScrapeWriteValues, candidateCount: Int) -> ScrapeBatchResult {
+    /// 执行写标签（paths/library 统一入口）。
+    /// 字段映射走唯一入口 ScrapeLogic.makeTagWriteRequest（批量恒 renameTemplate=nil）；
+    /// 封面走唯一入口 ScrapeCoverLoader（失败只记日志，不影响该文件其余字段）。
+    /// 写失败 → failed 结果（不中断整批）。
+    private static func writeFile(
+        path: String,
+        values: ScrapeFieldValues,
+        candidateCount: Int
+    ) async -> ScrapeBatchResult {
         let url = URL(fileURLWithPath: path)
-        var request = TagWriteRequest()
         // 批量恒不改名（Mac 端拍板，见文件头 ⚠️）
-        request.renameTemplate = nil
-        // 只写决策字段；nil/空 = 保留文件原值（TagWriterService 语义）
-        request.title = values.title
-        request.artist = values.artist
-        request.album = values.album
-        request.year = values.year
-        if let genre = values.genre?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !genre.isEmpty {
-            request.genre = genre
+        var request = makeBatchWriteRequest(values: values)
+        var wroteCover = false
+        if let coverURL = values.coverURL {
+            if let data = await ScrapeCoverLoader.loadCoverData(from: coverURL) {
+                request.coverData = data
+                wroteCover = true
+            } else {
+                AppLog.warn(.general, "⚠️ [批量刮削] 封面下载失败（跳过封面，继续写其余字段） "
+                    + "\(url.lastPathComponent) url=\(coverURL.absoluteString)")
+            }
         }
         do {
             _ = try TagWriterService.writeTags(to: url, request: request)
-            let written = writtenFieldNames(values)
+            let written = values.writtenFieldNames(coverWritten: wroteCover)
             return ScrapeBatchResult(
                 path: path,
                 status: "written",
@@ -448,17 +416,6 @@ enum ScrapeBatchService {
                 candidateCount: candidateCount
             )
         }
-    }
-
-    /// 写了的字段名（web sorted(write) 字典序对齐）
-    private static func writtenFieldNames(_ values: ScrapeWriteValues) -> [String] {
-        var fields: [String] = []
-        if values.title != nil { fields.append("title") }
-        if values.artist != nil { fields.append("artist") }
-        if values.album != nil { fields.append("album") }
-        if values.year != nil { fields.append("year") }
-        if values.genre != nil { fields.append("genre") }
-        return fields.sorted()
     }
 
     private static func skippedResult(path: String, reason: String, candidateCount: Int = 0) -> ScrapeBatchResult {
