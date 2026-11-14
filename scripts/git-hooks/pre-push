@@ -30,7 +30,7 @@ while read -r _local_ref local_sha remote_ref remote_sha; do
   if [ "$remote_ref" != "refs/heads/main" ]; then
     echo "❌ 拒绝推送非 main 分支：$remote_ref"
     echo ""
-    echo "   口径依据：AGENTS.md 顶部①「交付口径」（自验通过 → 合入本地 main → 直推 main；禁发 PR、禁推候选分支）"
+    echo "   口径依据：工作区 ~/.openclaw/coding/AGENTS.md 顶部①「交付口径」（自验通过 → 合入本地 main → 直推 main；禁发 PR、禁推候选分支）"
     echo "             + PROJECT_RULES/qqplayer-swift.md「交付流程」"
     echo "   危害：推候选分支 = PR 流程的前置步骤，会绕过「本地自验 → 合入本地 main → 直推 main」的口径。"
     echo ""

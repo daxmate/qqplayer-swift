@@ -113,3 +113,6 @@ docs/
 
 # Python 工具脚本的字节码缓存（2026-09-15：check-target-membership 等）
 __pycache__/
+
+# AOCI 认知协议入口（aoci init 生成）：只在本机使用，不入库（2026-11-14 用户决定）
+/AGENTS.md
