@@ -14,14 +14,14 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 ## 平台矩阵
 
-| 平台 | 形态 | 版本 | 系统要求 |
-|------|------|------|----------|
-| 📱 iOS | App Store「QQPlayer」（iPhone / iPad，付费买断·无内购） | **1.0.0** | iOS 18.5+ |
-| 🖥️ macOS | QQPlayer 原生应用（仓库内 target，自行构建） | 随仓库迭代 | macOS 14.0+ |
+| 平台 | 形态 | 系统要求 |
+|------|------|----------|
+| 📱 iOS | App Store「QQPlayer」（iPhone / iPad，付费买断·无内购） | iOS 18.5+ |
+| 🖥️ macOS | QQPlayer 原生应用（仓库内 target，自行构建） | macOS 14.0+ |
 
 - **iOS 与 macOS 共享同一套 Core 逻辑**（数据库、播放引擎、歌词 / 跟唱、均衡器、元数据解析、本地化），两平台行为一致、同步演进。
 - 仓库：<https://github.com/daxmate/qqplayer-swift>（原 qqplayer-ios，2026-08-30 更名）
-- 版号口径：仓库项目级版号随仓库迭代（当前 **1.4.0 (77)**，见 [CHANGELOG.md](CHANGELOG.md)），iOS 与 macOS 同源共用；App Store 上架版本按商店节奏单独发布（当前 1.0.0）。
+- 版号口径：仓库版号随仓库迭代（见 [CHANGELOG.md](CHANGELOG.md) 与 git tag），iOS 与 macOS 同源共用；App Store 上架版本按商店节奏单独发布。
 
 ---
 
@@ -370,7 +370,7 @@ cd qqplayer-swift
 
 - 版本号真源是项目级：`QQPlayer.xcodeproj/project.pbxproj` 里项目级 Debug/Release 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`；`QQPlayerMac` 另有 target 级同名覆盖（代码里写死），必须跟着一起升
 - iOS 与 macOS 必须同步：任一侧改动都要同步升（CI 有 iOS/macOS 版本一致性检查，不一致直接红）
-- 升版用 `./scripts/bump-version.sh <marketing> <build>`（例：`./scripts/bump-version.sh 1.2.0 63`）：脚本改项目级，并把值等于旧版的 target 级覆盖一并跟随；与旧版无关的覆盖（如 `QQPlayerSiriTests` 的 `1.0/1`）保持不动，最后打印每个 target 的实际取值
+- 升版用 `./scripts/bump-version.sh <marketing> <build>`：脚本改项目级，并把值等于旧版的 target 级覆盖一并跟随；与旧版无关的覆盖（如测试 target 的独立覆盖）保持不动，最后打印每个 target 的实际取值
 
 ### 🔑 环境变量（全部可选）
 
