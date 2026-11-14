@@ -670,6 +670,44 @@ struct UIAccentContractTests {
         #expect(!Self.linesContaining(#"AccentInjector\s*\{"#, in: [panelRoot]).isEmpty,
                 "桌面浮窗（迷你窗）装配丢了 AccentInjector：强调色不会跟随设置")
     }
+
+    // MARK: 设置页侧栏图标跟随强调色（2026-11-14）
+
+    /// 回归守卫：设置窗左侧分类导航的图标必须跟 App 强调色。
+    ///
+    /// 被守住的 bug：侧栏行原本是裸 `Label(category.title, systemImage: category.icon)`——
+    /// `Label(_:systemImage:)` 的图标**不吃 `.tint`**（App 根注入的 `.tint` 对它无效），
+    /// 图标恒为系统强调色（蓝），把 App 强调色改成 teal 等之后左栏仍是蓝的。
+    /// 正确形状与曲库侧栏（`MacLibraryView+Sidebar`）一致：未选中行显式
+    /// `.foregroundStyle(appAccentColor)`，选中行不给前景色、交给系统高亮给对比色。
+    /// 纯视觉语义：行为测试测不到、截图不是本仓库的验收手段 ⇒ 只能守源码形状。
+    @Test("设置页侧栏图标走 appAccentColor（裸 Label 的图标不吃 .tint，恒为系统蓝）")
+    func settingsSidebarIconsFollowAppAccent() {
+        let file = Self.repoRoot.appendingPathComponent("QQPlayer/Mac/MacSettingsView.swift")
+
+        // ① 裸 `Label(_:systemImage:)` 不得复活（注释行由 linesContaining 排除）
+        let bareLabels = Self.linesContaining(#"Label\(category\.title,\s*systemImage:"#, in: [file])
+        #expect(bareLabels.isEmpty,
+                "设置页侧栏又写回裸 Label(_:systemImage:)（图标不吃 .tint ⇒ 恒为系统蓝）：\n\(bareLabels.joined(separator: "\n"))")
+
+        // ② 图标必须显式跟强调色：同一行或紧随的修饰链上出现 .foregroundStyle(appAccentColor)
+        let iconLines = Self.linesContaining(#"Image\(systemName:\s*category\.icon\)"#, in: [file])
+        #expect(!iconLines.isEmpty, "没找到侧栏图标构造（Image(systemName: category.icon)）= 规则空转（模式或文件写错了）：\(iconLines)")
+
+        let source = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+        let lines = source.components(separatedBy: .newlines)
+        let tinted = iconLines.contains { entry in
+            guard let numberRange = entry.range(of: #":\d+: "#, options: .regularExpression),
+                  let lineNumber = Int(entry[numberRange].dropFirst().dropLast(2)),
+                  lines.indices.contains(lineNumber - 1)
+            else { return false }
+            // 修饰符可能换行写（仓库既有写法），故连看紧随的两行
+            let chain = lines[(lineNumber - 1)...].prefix(3).joined(separator: " ")
+            return chain.range(of: #"\.foregroundStyle\(appAccentColor\)"#, options: .regularExpression) != nil
+        }
+        #expect(tinted,
+                "侧栏图标没跟 appAccentColor（未选中行应 .foregroundStyle(appAccentColor)；裸 Label / 系统色 ⇒ 恒为系统蓝）：\n\(iconLines.joined(separator: "\n"))")
+    }
 }
 
 // MARK: - 几何 / 排版令牌测试（B2a 2026-09-15）

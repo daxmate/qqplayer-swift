@@ -12,6 +12,9 @@ import AppKit
 import SwiftUI
 
 struct MacSettingsView: View {
+    /// 分类图标的上色来源（根场景已由 AccentInjector 注入，换色即时生效）
+    @Environment(\.appAccentColor) private var appAccentColor
+
     @State private var selectedCategory: MacSettingsCatalog.Category = .playback
     @State private var deleteSettings = DeleteSettings.load()
     @State private var showEQSettings = false
@@ -26,8 +29,20 @@ struct MacSettingsView: View {
         // 分类名单 = MacSettingsCatalog.Category（唯一注册表，⌘K 搜同一份）
         HStack(spacing: DesignTokens.space0) {
             List(MacSettingsCatalog.Category.allCases, id: \.self, selection: $selectedCategory) { category in
-                Label(category.title, systemImage: category.icon)
-                    .tag(category)
+                // `Label(_:systemImage:)` 的图标不吃 `.tint`（恒为系统强调色＝蓝），
+                // 故与曲库侧栏同一做法：未选中行图标显式跟 App 强调色，选中行交给系统高亮
+                // （不覆盖前景色，否则选中态的对比色会被强调色顶掉）。
+                Label {
+                    Text(category.title)
+                } icon: {
+                    if category == selectedCategory {
+                        Image(systemName: category.icon)
+                    } else {
+                        Image(systemName: category.icon)
+                            .foregroundStyle(appAccentColor)
+                    }
+                }
+                .tag(category)
             }
             .listStyle(.sidebar)
             .frame(width: 220)
