@@ -2,6 +2,15 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.3] - 2026-11-14
+
+### 🐛 修复
+
+- iOS 搜索结果页删除歌曲后列表不刷新：删除后自动重跑当前查询，已删曲目不再残留在结果里（与 macOS 行为对齐）。
+- macOS 设置页与 EQ 界面中硬编码的蓝色改为跟随 App 强调色：设置页 EQ 入口、均衡器开关 / 滑杆 / 导入按钮 / 预设选中态，以及图形均衡器与参数均衡器的曲线（描边与末点）。
+
+[1.3.3]: https://github.com/daxmate/qqplayer-swift/compare/v1.3.2...v1.3.3
+
 ## [1.3.2] - 2026-11-14
 
 ### ⚡ 改进
