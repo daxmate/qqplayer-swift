@@ -24,8 +24,10 @@ final class MacRecommendationModel {
 
     var phase: Phase = .idle
     var candidates: [RecommendedCandidate] = []
-    /// 曲库归一化键（已下载标记；生成时刷新，下载面板关闭后再刷一次）。
-    var downloadedKeys: Set<String> = []
+    /// 已下载判定状态（曲库键 + 可注入读取器；生成时赋值，下载落库/面板关闭后再刷）。
+    var downloadedIndex = RecommendationDownloadedIndex()
+    /// 合并突发刷新通知的待执行任务（连续 `.trackFound` / `.libraryNeedsRefresh` 只读一次曲库）。
+    @ObservationIgnored var downloadedKeysRefreshTask: Task<Void, Never>?
     /// 最近一次生成用的画像输入（后台重算复用，避免二次 DB 读）。
     private var lastProfileInput: RecommendationProfileInput?
     private(set) var lastGeneratedAt: Date?
@@ -313,7 +315,7 @@ final class MacRecommendationModel {
             RecommendationProfileV3Input(legacy: input),
             weights: settings.recommendationProfileWeights
         )
-        downloadedKeys = profileV3.libraryKeys
+        downloadedIndex.replaceKeys(profileV3.libraryKeys)
         lastProfileInput = input
         if let reason = profileV3.emptyReason {
             phase = .failed(reason.localizationKey.localized)

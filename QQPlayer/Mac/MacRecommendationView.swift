@@ -40,9 +40,18 @@ struct MacRecommendationView: View {
             )
         }
         .sheet(item: $downloadTarget, onDismiss: {
+            // 兜底：关闭面板时先刷一次（此刻可能尚未落库，靠下面两条通知补齐）。
             Task { await model.refreshDownloadedKeys() }
         }) { candidate in
             MacOnlineSearchView(initialQuery: model.searchQuery(for: candidate))
+        }
+        // 下载 → 文件落盘 → LibraryIndexer 入库 → trackFound 通知：下载真正完成的信号。
+        .onReceive(NotificationCenter.default.publisher(for: .trackFound)) { _ in
+            model.scheduleDownloadedKeysRefresh()
+        }
+        // 扫描收尾 / 元数据刷新 / 清理等批量曲库写入。
+        .onReceive(NotificationCenter.default.publisher(for: .libraryNeedsRefresh)) { _ in
+            model.scheduleDownloadedKeysRefresh()
         }
     }
 
