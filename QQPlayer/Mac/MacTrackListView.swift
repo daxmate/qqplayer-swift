@@ -99,7 +99,6 @@ struct MacTrackListView: View {
     /// 曲库卡片事实缓存（审计 M2：body 里的同步全量 DB 查询→缓存/异步）
     @Environment(MacLibraryFactsStore.self) private var facts
     /// 收藏切换（行尾 ♥）：走全项目唯一入口 AppCoordinator.toggleFavorite
-    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var selectedRows = Set<String>()
     /// 批量刮削（右键多选 >1）——.sheet(item:) 直接驱动，见文件头注释
     @State private var batchScrapeRequest: BatchScrapeRequest?
@@ -115,6 +114,8 @@ struct MacTrackListView: View {
     @State private var displayedRows: [MacTrackTableRow] = []
     /// 呈现模式（列表 / 专辑网格）：只影响呈现层，重启保持上次选择
     @AppStorage("macTrackListViewMode") private var viewMode: MacTrackListMode = .list
+    /// 分组维度（专辑 / 艺人 / A–Z）：仅 grouped 模式使用，重启保持上次选择
+    @AppStorage("macTrackListGroupDimension") private var groupDimension: MacTrackGroupDimension = .album
     /// 专辑网格分组缓存（tracks 变化 / 进入网格时重建，body 只读缓存）
     @State private var albumGroups: [MacAlbumGroup] = []
     /// 从网格点进某张专辑后的筛选键（nil = 不筛选；面包屑可清除）
@@ -142,6 +143,8 @@ struct MacTrackListView: View {
                 Divider()
                 if viewMode == .albums {
                     albumGrid
+                } else if viewMode == .grouped {
+                    groupedList
                 } else {
                     table
                 }
@@ -223,6 +226,9 @@ struct MacTrackListView: View {
                     }
                     .controlSize(.small)
                 }
+            }
+            if viewMode == .grouped {
+                MacTrackGroupDimensionPicker(dimension: $groupDimension)
             }
             viewModePicker
         }
@@ -396,8 +402,8 @@ struct MacTrackListView: View {
     }
 
     private func locateActiveTrack() {
-        // 网格没有「行」可定位 → 先切回列表再定位（list 模式行为不变）
-        if viewMode != .list {
+        // 网格没有「行」可定位 → 先切回列表再定位；grouped 自带行，留在本模式内定位
+        if viewMode == .albums {
             viewMode = .list
         }
         locateRequestID += 1
@@ -437,28 +443,13 @@ struct MacTrackListView: View {
         }
     }
 
-    /// 行尾收藏按钮：状态读既有收藏数据源（MacTrackMenuModel.favoriteIds，
-    /// .favoritesChanged 时由 .macTrackMenu 宿主重载），动作走唯一入口 toggleFavorite。
+    /// 行尾收藏按钮：状态读 MacTrackMenuModel.favoriteIds（.favoritesChanged 由
+    /// .macTrackMenu 宿主重载）；本体是共享实现 MacTrackFavoriteButton（禁止双实现）。
     @ViewBuilder
     private func favoriteToggle(for row: MacTrackTableRow) -> some View {
         let isFavorite = menu.favoriteIds.contains(row.track.stableId)
         if isFavorite || hoveredTrackId == row.id {
-            Button {
-                toggleFavorite(row.track)
-            } label: {
-                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                    .foregroundColor(isFavorite ? appAccentColor : .secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isFavorite ? Localized.removeFromLikedSongs : Localized.addToLikedSongs)
-        }
-    }
-
-    private func toggleFavorite(_ track: Track) {
-        do {
-            try appCoordinator.toggleFavorite(trackStableId: track.stableId)
-        } catch {
-            AppLog.error(.general, "❌ Track list favorite toggle failed: \(error.localizedDescription)")
+            MacTrackFavoriteButton(track: row.track, isFavorite: isFavorite)
         }
     }
 
@@ -515,6 +506,9 @@ struct MacTrackListView: View {
             Image(systemName: "square.grid.2x2")
                 .tag(MacTrackListMode.albums)
                 .accessibilityLabel(Localized.albums)
+            Image(systemName: "list.bullet.indent")
+                .tag(MacTrackListMode.grouped)
+                .accessibilityLabel(Text("\(Localized.album) / \(Localized.artist) / A–Z"))
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -526,6 +520,17 @@ struct MacTrackListView: View {
         MacTrackAlbumGridView(groups: albumGroups) { group in
             openAlbum(group)
         }
+    }
+
+    /// 分组折叠列表（grouped 模式）：归组纯函数 / 折叠状态 / 行交互都在 MacTrackGroupedView.swift
+    private var groupedList: some View {
+        MacTrackGroupedListView(
+            tracks: displayedRows.map(\.track), dimension: groupDimension,
+            activeTrackId: activeTrackId, favoriteIds: menu.favoriteIds,
+            locateRequestID: locateRequestID, albumTitle: { albumTitle(for: $0) },
+            artistName: { artistName(for: $0) },
+            onPlay: { track, queue in onPlay(track, queue); onSelect(track) }
+        )
     }
 
     /// 专辑筛选面包屑（专辑名 + 清除）：文案直接用专辑名字符串，不新增本地化 key

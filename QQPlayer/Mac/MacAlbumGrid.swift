@@ -19,6 +19,8 @@ import SwiftUI
 enum MacTrackListMode: String {
     case list
     case albums
+    /// 分组折叠列表（2026-11-16 C：专辑 / 艺人 / A–Z 三种分组维度）
+    case grouped
 }
 
 /// 专辑筛选键：只按显示口径（专辑标题 + 艺人）匹配，不依赖 Album 模型。
