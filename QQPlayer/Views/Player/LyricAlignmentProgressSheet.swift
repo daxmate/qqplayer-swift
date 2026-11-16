@@ -65,15 +65,21 @@ struct LyricAlignmentProgressSheet: View {
     private func finishedContent(_ report: LyricAlignmentReport) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.space12) {
             if LyricAlignmentController.isLowMatch(report) {
-                // 低匹配率不自动回退（已写入）：给一行说明 + 一键恢复原时间轴。
+                // 低质不自动回退（已写入）：给一行说明 + 一键恢复原时间轴。
                 Text("lyrics.align.result.lowMatch".localized(with: percent(for: report)))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("lyrics.align.result.success".localized(with: report.matchedCount, report.lineCount))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "lyrics.align.result.success".localized(
+                        with: percent(for: report),
+                        report.matchedCount,
+                        report.lineCount
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             }
 
             if let revertFailureMessage {
@@ -141,7 +147,7 @@ struct LyricAlignmentProgressSheet: View {
     }
 
     private func percent(for report: LyricAlignmentReport) -> Int {
-        Int((LyricAlignmentController.matchRate(for: report) * 100).rounded())
+        Int((report.coverage * 100).rounded())
     }
 }
 

@@ -1265,8 +1265,8 @@
 "lyrics.align.phase.aligning" = "Alignement des lignes de paroles…";
 "lyrics.align.cancel" = "Annuler";
 "lyrics.align.close" = "Fermer";
-"lyrics.align.result.success" = "%d lignes alignées sur %d";
-"lyrics.align.result.lowMatch" = "Taux de correspondance faible (%d%%) ; appliqué. Vous pouvez restaurer les paroles d'origine depuis le menu.";
+"lyrics.align.result.success" = "Couverture de reconnaissance %d%% (%d lignes alignées sur %d)";
+"lyrics.align.result.lowMatch" = "Trop peu de paroles utilisables (couverture de reconnaissance %d%%) ; appliqué. Vous pouvez restaurer les paroles d'origine depuis le menu.";
 "lyrics.align.result.revert" = "Restaurer la chronologie d'origine";
 "lyrics.align.error.unsupported" = "L'alignement automatique nécessite iOS/macOS 26 ou ultérieur";
 "lyrics.align.error.audio" = "Impossible de lire le fichier audio";

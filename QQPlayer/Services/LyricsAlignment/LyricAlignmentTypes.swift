@@ -35,12 +35,22 @@ struct LyricAlignmentReport: Equatable, Sendable {
     let lineCount: Int
     /// 被 ASR 直接命中的行数。
     let matchedCount: Int
+    /// 命中字符数（分母见 `characterCount`）。
+    let matchedCharacters: Int
+    /// 参与对齐的歌词有效字符总数（归一化后）。
+    let characterCount: Int
     /// 匹配行「ASR 时间 − 原时间」的中位数（秒）；无先验匹配行时为 0。
     let medianOffset: TimeInterval
     /// 实际使用的识别语言标识（如 zh / ja / en）。
     let localeIdentifier: String
-    /// 需要提示调用方的告警（低匹配率、先验样本不足等）。
+    /// 需要提示调用方的告警（覆盖率偏低、先验样本不足等）。
     let warnings: [String]
+
+    /// 识别覆盖率（0…1）：命中字符数 / 歌词有效字符总数；无字符时为 0。
+    var coverage: Double {
+        guard characterCount > 0 else { return 0 }
+        return Double(matchedCharacters) / Double(characterCount)
+    }
 }
 
 /// 对齐失败原因（底层网络/IO 错误不在此列：那些原样抛出）。

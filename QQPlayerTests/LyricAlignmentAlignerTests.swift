@@ -148,4 +148,69 @@ struct LyricAlignmentAlignerTests {
             )
         }
     }
+
+    @Test("统计字段：命中字符数与字符总数随对齐结果给出")
+    func coverageFields() throws {
+        let lines = [line("第一句歌词", 0), line("第二句歌词", 2)]
+        let tokens = [token("第一句歌词", 0.2, 1.8), token("第二句歌词", 2.2, 3.8)]
+
+        let result = try LyricAlignmentAligner.align(
+            lines: lines,
+            tokens: tokens,
+            duration: 10,
+            simplifyChinese: false
+        )
+
+        #expect(result.matchedCharacters == 10)
+        #expect(result.characterCount == 10)
+        #expect(result.matchedCharacters <= result.characterCount)
+    }
+
+    @Test("告警：锚点不足（<3 行）时报告覆盖率偏低")
+    func warnsWhenTooFewAnchors() throws {
+        let lines = [
+            line("甲乙丙丁戊己庚辛壬癸", 0),
+            line("子丑寅卯辰巳午未申酉", 2),
+            line("天地玄黄宇宙洪荒日月", 4),
+            line("金木水火土风雨雷电霜", 6),
+        ]
+        let tokens = [token("甲乙丙丁戊己庚辛壬癸", 0.1, 1.9)]
+
+        let result = try LyricAlignmentAligner.align(
+            lines: lines,
+            tokens: tokens,
+            duration: 20,
+            simplifyChinese: false
+        )
+
+        #expect(result.matchedCount == 1)
+        #expect(result.warnings.contains { $0.contains("低质判据触发") })
+    }
+
+    @Test("告警：覆盖率与锚点都够时不提示低质")
+    func noWarningWhenCoverageAndAnchorsPass() throws {
+        let lines = [
+            line("甲乙丙丁戊己庚辛壬癸", 0),
+            line("子丑寅卯辰巳午未申酉", 2),
+            line("天地玄黄宇宙洪荒日月", 4),
+            line("金木水火土风雨雷电霜", 6),
+            line("东南西北中春夏秋冬寒", 8),
+        ]
+        let tokens = [
+            token("甲乙丙丁戊己庚辛壬癸", 0.1, 1.9),
+            token("子丑寅卯辰巳午未申酉", 2.1, 3.9),
+            token("天地玄黄宇宙洪荒日月", 4.1, 5.9),
+        ]
+
+        let result = try LyricAlignmentAligner.align(
+            lines: lines,
+            tokens: tokens,
+            duration: 20,
+            simplifyChinese: false
+        )
+
+        #expect(result.matchedCount == 3)
+        #expect(abs(Double(result.matchedCharacters) / Double(result.characterCount) - 0.6) < 0.0001)
+        #expect(!result.warnings.contains { $0.contains("低质判据触发") })
+    }
 }

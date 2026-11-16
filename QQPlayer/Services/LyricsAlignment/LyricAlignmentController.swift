@@ -42,8 +42,10 @@ final class LyricAlignmentController {
 
     static let shared = LyricAlignmentController()
 
-    /// 低匹配率阈值：报告匹配率低于它时提示「已应用，可恢复原时间轴」。
-    static let lowMatchRate = 0.5
+    /// 低质判据（覆盖率下限）：与 `LyricAlignmentAligner` 共用同一常量，避免两个真相。
+    static let lowCoverage = LyricAlignmentAligner.lowCoverage
+    /// 低质判据（锚点数下限）：命中行少于它视为可用歌词太少。
+    static let minAnchors = LyricAlignmentAligner.minAnchors
 
     /// 视图观察的唯一状态。
     private(set) var state: State = .idle
@@ -183,14 +185,14 @@ final class LyricAlignmentController {
         return .failed(message: "lyrics.align.error.generic".localized)
     }
 
-    /// 匹配率（0…1）；无歌词行时按 0。
+    /// 识别覆盖率（0…1）；无歌词字符时按 0。
     static func matchRate(for report: LyricAlignmentReport) -> Double {
-        guard report.lineCount > 0 else { return 0 }
-        return Double(report.matchedCount) / Double(report.lineCount)
+        report.coverage
     }
 
+    /// 低质：锚点不足 **或** 覆盖率不足（任一成立即提示可恢复原时间轴）。
     static func isLowMatch(_ report: LyricAlignmentReport) -> Bool {
-        matchRate(for: report) < lowMatchRate
+        report.matchedCount < minAnchors || report.coverage < lowCoverage
     }
 
     /// 默认刷新：清该歌歌词内存缓存（对齐/恢复后必须重取）+ 广播通知让播放页重载。

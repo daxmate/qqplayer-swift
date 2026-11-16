@@ -33,14 +33,29 @@ struct LyricAlignmentAligner {
     struct Result: Equatable, Sendable {
         let lines: [AlignedLyricLine]
         let matchedCount: Int
+        /// 命中字符数（分母见 `characterCount`）。
+        let matchedCharacters: Int
+        /// 参与对齐的歌词有效字符总数。
+        let characterCount: Int
         let medianOffset: TimeInterval
         let warnings: [String]
+    }
+
+    /// 低质告警的统计口径（避免把一堆裸参数传给 `warnings`）。
+    private struct WarningStats {
+        let lineCount: Int
+        let matchedCount: Int
+        let coverage: Double
     }
 
     // MARK: - 阈值（与 docs/lyrics-alignment.md 同步）
 
     /// 行相似度门槛：命中字符数 / 行字符数。
     static let matchThreshold = 0.6
+    /// 低质判据（覆盖率下限）：识别覆盖率低于它即视为歌词可用内容太少。
+    static let lowCoverage = 0.45
+    /// 低质判据（锚点数下限）：命中行少于它即视为可用歌词太少。
+    static let minAnchors = 3
     /// 允许参与锚点的最短行（1 字符行另判，见 matchLine）。
     static let minAnchorCharacters = 2
     /// 时间先验窄带半径（秒）：只允许落在期望时间 ±8s 内。
@@ -187,13 +202,21 @@ struct LyricAlignmentAligner {
             previousEnd = end
         }
 
+        let matchedCharacterTotal = matchedCharacters.reduce(0, +)
+        let characterTotal = lineCharacterCounts.reduce(0, +)
+        let warningStats = WarningStats(
+            lineCount: lines.count,
+            matchedCount: matchedCount,
+            coverage: characterTotal > 0 ? Double(matchedCharacterTotal) / Double(characterTotal) : 0
+        )
         return Result(
             lines: aligned,
             matchedCount: matchedCount,
+            matchedCharacters: matchedCharacterTotal,
+            characterCount: characterTotal,
             medianOffset: medianOffset,
             warnings: warnings(
-                lines: lines,
-                matchedCount: matchedCount,
+                stats: warningStats,
                 offsets: offsets,
                 usesConstantOffset: usesConstantOffset,
                 mad: mad
@@ -426,16 +449,17 @@ struct LyricAlignmentAligner {
     }
 
     private static func warnings(
-        lines: [LineInput],
-        matchedCount: Int,
+        stats: WarningStats,
         offsets: [TimeInterval],
         usesConstantOffset: Bool,
         mad: TimeInterval
     ) -> [String] {
         var warnings: [String] = []
-        if Double(matchedCount) / Double(max(lines.count, 1)) < 0.5 {
+        if stats.matchedCount < minAnchors || stats.coverage < lowCoverage {
+            let percent = Int((stats.coverage * 100).rounded())
             warnings.append(
-                "匹配率偏低（" + String(matchedCount) + "/" + String(lines.count) + "）：歌词可能与音频不对应"
+                "低质判据触发（识别覆盖率 " + String(percent) + "%，命中 "
+                    + String(stats.matchedCount) + "/" + String(stats.lineCount) + " 行）：歌词可能与音频不对应"
             )
         }
         if !offsets.isEmpty, !usesConstantOffset {

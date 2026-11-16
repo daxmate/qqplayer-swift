@@ -1270,8 +1270,8 @@
 "lyrics.align.phase.aligning" = "正在对齐歌词行…";
 "lyrics.align.cancel" = "取消";
 "lyrics.align.close" = "关闭";
-"lyrics.align.result.success" = "已对齐 %d/%d 行";
-"lyrics.align.result.lowMatch" = "匹配率偏低（%d%%），已应用；可在菜单里恢复原歌词";
+"lyrics.align.result.success" = "识别覆盖率 %d%%（已对齐 %d/%d 行）";
+"lyrics.align.result.lowMatch" = "可用歌词太少（识别覆盖率 %d%%），已应用；可在菜单里恢复原歌词";
 "lyrics.align.result.revert" = "恢复原时间轴";
 "lyrics.align.error.unsupported" = "当前系统不支持歌词自动对齐（需要 iOS/macOS 26 及以上）";
 "lyrics.align.error.audio" = "音频文件无法读取";

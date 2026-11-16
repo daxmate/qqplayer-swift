@@ -91,10 +91,18 @@ struct LyricAlignmentControllerTests {
         )
     }
 
-    private func makeReport(lineCount: Int = 4, matchedCount: Int = 3) -> LyricAlignmentReport {
+    /// 构造报告：默认按「每行 10 个有效字符、命中行整行命中」换算字符统计。
+    private func makeReport(
+        lineCount: Int = 4,
+        matchedCount: Int = 3,
+        matchedCharacters: Int? = nil,
+        characterCount: Int? = nil
+    ) -> LyricAlignmentReport {
         LyricAlignmentReport(
             lineCount: lineCount,
             matchedCount: matchedCount,
+            matchedCharacters: matchedCharacters ?? matchedCount * 10,
+            characterCount: characterCount ?? lineCount * 10,
             medianOffset: 0.2,
             localeIdentifier: "zh",
             warnings: []
@@ -241,11 +249,56 @@ struct LyricAlignmentControllerTests {
         #expect(LyricAlignmentController.phase(for: 1) == .aligning)
     }
 
-    @Test("低匹配率阈值：< 50% 才算低")
-    func lowMatchRateBoundary() {
-        #expect(LyricAlignmentController.isLowMatch(makeReport(lineCount: 4, matchedCount: 1)))
-        #expect(!LyricAlignmentController.isLowMatch(makeReport(lineCount: 4, matchedCount: 2)))
-        #expect(!LyricAlignmentController.isLowMatch(makeReport(lineCount: 4, matchedCount: 4)))
-        #expect(LyricAlignmentController.isLowMatch(makeReport(lineCount: 0, matchedCount: 0)))
+    @Test("低质判据：长行密集、行命中率低但覆盖率够 → 不判低质")
+    func lowQualityAllowsDenseLongLines() {
+        // 真实场景（起风了）：45 行只命中 21 行（46.7%），但覆盖率 0.61、逐行偏差 ≤0.88s。
+        let report = makeReport(
+            lineCount: 45,
+            matchedCount: 21,
+            matchedCharacters: 610,
+            characterCount: 1000
+        )
+        #expect(abs(LyricAlignmentController.matchRate(for: report) - 0.61) < 0.0001)
+        #expect(!LyricAlignmentController.isLowMatch(report))
+    }
+
+    @Test("低质判据：锚点不足（<3 行）即判低质，即使覆盖率很高")
+    func lowQualityRejectsTooFewAnchors() {
+        let report = makeReport(
+            lineCount: 10,
+            matchedCount: 2,
+            matchedCharacters: 950,
+            characterCount: 1000
+        )
+        #expect(LyricAlignmentController.isLowMatch(report))
+    }
+
+    @Test("低质判据：覆盖率不足（<45%）即判低质，即使锚点够")
+    func lowQualityRejectsLowCoverage() {
+        let report = makeReport(
+            lineCount: 10,
+            matchedCount: 8,
+            matchedCharacters: 400,
+            characterCount: 1000
+        )
+        #expect(LyricAlignmentController.isLowMatch(report))
+    }
+
+    @Test("覆盖率边界：0.45 与 3 锚点均不判低质；字符数为 0 按低质")
+    func coverageBoundary() {
+        let atThreshold = makeReport(
+            lineCount: 10,
+            matchedCount: 3,
+            matchedCharacters: 450,
+            characterCount: 1000
+        )
+        #expect(abs(atThreshold.coverage - 0.45) < 0.0001)
+        #expect(!LyricAlignmentController.isLowMatch(atThreshold))
+        #expect(LyricAlignmentController.isLowMatch(makeReport(
+            lineCount: 4,
+            matchedCount: 3,
+            matchedCharacters: 0,
+            characterCount: 0
+        )))
     }
 }

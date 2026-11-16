@@ -1262,8 +1262,8 @@
 "lyrics.align.phase.aligning" = "Выравнивание строк текста…";
 "lyrics.align.cancel" = "Отмена";
 "lyrics.align.close" = "Закрыть";
-"lyrics.align.result.success" = "Выровнено строк: %d из %d";
-"lyrics.align.result.lowMatch" = "Низкая точность совпадений (%d%%); изменения применены. Исходный текст можно вернуть в меню.";
+"lyrics.align.result.success" = "Покрытие распознавания %d%% (выровнено строк: %d из %d)";
+"lyrics.align.result.lowMatch" = "Слишком мало пригодного текста (покрытие распознавания %d%%); изменения применены. Исходный текст можно вернуть в меню.";
 "lyrics.align.result.revert" = "Восстановить исходный тайминг";
 "lyrics.align.error.unsupported" = "Автоматическое выравнивание требует iOS/macOS 26 или новее";
 "lyrics.align.error.audio" = "Не удаётся прочитать аудиофайл";

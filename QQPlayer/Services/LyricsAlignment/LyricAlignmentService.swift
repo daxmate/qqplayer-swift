@@ -120,6 +120,8 @@ actor LyricAlignmentService {
         return LyricAlignmentReport(
             lineCount: lines.count,
             matchedCount: outcome.matchedCount,
+            matchedCharacters: outcome.matchedCharacters,
+            characterCount: outcome.characterCount,
             medianOffset: outcome.medianOffset,
             localeIdentifier: locale.identifier,
             warnings: outcome.warnings

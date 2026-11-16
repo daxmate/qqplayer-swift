@@ -1267,8 +1267,8 @@
 "lyrics.align.phase.aligning" = "Aligning lyric lines…";
 "lyrics.align.cancel" = "Cancel";
 "lyrics.align.close" = "Close";
-"lyrics.align.result.success" = "Aligned %d of %d lines";
-"lyrics.align.result.lowMatch" = "Low match rate (%d%%); applied. You can restore the original lyrics from the menu.";
+"lyrics.align.result.success" = "Recognition coverage %d%% (aligned %d of %d lines)";
+"lyrics.align.result.lowMatch" = "Too few usable lyrics (recognition coverage %d%%); applied. You can restore the original lyrics from the menu.";
 "lyrics.align.result.revert" = "Restore original timeline";
 "lyrics.align.error.unsupported" = "Automatic lyric alignment requires iOS/macOS 26 or later";
 "lyrics.align.error.audio" = "The audio file can't be read";

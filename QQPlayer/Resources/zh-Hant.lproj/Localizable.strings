@@ -1591,8 +1591,8 @@
 "lyrics.align.phase.aligning" = "正在對齊歌詞行…";
 "lyrics.align.cancel" = "取消";
 "lyrics.align.close" = "關閉";
-"lyrics.align.result.success" = "已對齊 %d/%d 行";
-"lyrics.align.result.lowMatch" = "匹配率偏低（%d%%），已套用；可在選單裡恢復原歌詞";
+"lyrics.align.result.success" = "辨識覆蓋率 %d%%（已對齊 %d/%d 行）";
+"lyrics.align.result.lowMatch" = "可用歌詞太少（辨識覆蓋率 %d%%），已套用；可在選單裡恢復原歌詞";
 "lyrics.align.result.revert" = "恢復原時間軸";
 "lyrics.align.error.unsupported" = "目前系統不支援歌詞自動對齊（需要 iOS/macOS 26 以上）";
 "lyrics.align.error.audio" = "音訊檔案無法讀取";
