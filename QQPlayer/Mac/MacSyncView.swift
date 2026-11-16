@@ -261,12 +261,10 @@ struct MacSyncRunSection: View {
         }
     }
 
-    /// 置顶标题行：左「同步」标题、右「设备…」按钮（P1a：设备入口从顶层页外移）。
-    /// 标题复用既有 key（`sync_run_panel_title` = 「同步」），不新增同义键。
+    /// 置顶单行：左「歌曲/数据」流分段、右「设备…」按钮；行内不再重复「同步」标题（sheet 标题已有）。
     private var titleRow: some View {
         HStack(spacing: DesignTokens.space12) {
-            Text("sync_run_panel_title".localized)
-                .font(.headline)
+            SyncFlowPicker(flow: $flow)
             Spacer(minLength: DesignTokens.space0)
             devicesButton
         }
@@ -303,18 +301,13 @@ struct MacSyncRunSection: View {
         .help("sync_devices_button".localized)
     }
 
-    /// 置顶行：标题行 + 「同步」页流分段固定在内容区顶部，不随下方 `Form` 滚动
+    /// 置顶行：单行头部固定在内容区顶部，不随下方 `Form` 滚动
     /// （用户 2026-09-29：「最上面的 tab 需要永远置顶，不滚动」）。
-    /// P1a：顶层「设备 / 同步」分段已撤 ⇒ 只剩标题行 + `SyncFlowPicker` 两行。
-    /// picker 唯一实现见 `SyncFlowPicker`（`SyncTracksPane.swift`）。
+    /// 只剩一行头部（流分段 + 设备入口）；picker 唯一实现见 `SyncFlowPicker`（`SyncTracksPane.swift`）。
     /// 背景 + 分隔线对齐 macOS 原生分组外观（`.bar` 随明暗外观自适应）。
     private var pinnedHeader: some View {
         VStack(spacing: DesignTokens.space0) {
             titleRow
-            Divider()
-            SyncFlowPicker(flow: $flow)
-                .padding(.horizontal, DesignTokens.space20)
-                .padding(.vertical, DesignTokens.space12)
             Divider()
         }
         .background(.bar)
