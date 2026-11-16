@@ -64,7 +64,9 @@ enum DisplayScriptLanguageOverride {
     /// App 支持的 UI 语言（= 仓库内已本地化的语言，小写规范化形式）。
     /// 扩展包没有本地化资源，不能用 `Bundle.main.localizations` 判定，故显式列出；
     /// 表外语言（含垃圾值，如 "xx"）一律视为无效 → 回退系统语言。
-    static let supportedLanguages: Set<String> = ["en", "fr", "ru", "zh-hans", "zh-hant"]
+    static let supportedLanguages: Set<String> = [
+        "en", "fr", "ru", "zh-hans", "zh-hant", "ja", "ko", "es",
+    ]
 
     /// 校验 stored 语言：空 / 空白 / 不支持（如 "xx"）→ nil。
     /// 带地区后缀的合法语言（zh-Hans-CN / fr-CA 等）按前缀落到支持的语言上，
