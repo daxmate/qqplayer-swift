@@ -46,7 +46,7 @@
 
 /* General UI strings */
 "all_songs" = "Todas las canciones";
-"liked_songs" = "Canciones que te gustan";
+"liked_songs" = "Favoritos";
 "add_songs" = "Abrir archivos";
 "import_music_files" = "Importar archivos de música";
 "ok" = "OK";
@@ -73,7 +73,7 @@
 /* Artist/Album/Track Info */
 "no_artists_found" = "No se encontraron artistas";
 "artists_will_appear" = "Los artistas aparecerán aquí cuando añadas música a tu biblioteca";
-"fetching_artist_info" = "Obteniendo información del artista...";
+"fetching_artist_info" = "Obteniendo información del artista…";
 "no_albums_found" = "No se encontraron álbumes";
 "albums_will_appear" = "Los álbumes aparecerán aquí cuando añadas música a tu biblioteca";
 "artist" = "Artista";
@@ -85,7 +85,7 @@
 "wrong_artist" = "¿Artista equivocado?";
 "data_provided_by" = "Datos proporcionados por %@";
 "open_spotify" = "ABRIR SPOTIFY";
-"loading_artist" = "Cargando artista...";
+"loading_artist" = "Cargando artista…";
 
 /* Player */
 "playing_queue" = "Cola de reproducción";
@@ -104,7 +104,7 @@
 
 /* Context Menu Actions */
 "show_artist_page" = "Ver página del artista";
-"add_to_playlist_ellipsis" = "Añadir a la lista...";
+"add_to_playlist_ellipsis" = "Añadir a la lista…";
 "delete_file" = "Eliminar archivo";
 "delete_file_confirmation" = "¿Seguro que quieres eliminar «%@»? Esta acción no se puede deshacer.";
 
@@ -289,12 +289,12 @@
 "reset_to_flat" = "Restablecer a plano";
 
 /* Imported GraphicEQ Presets */
-"imported_presets" = "Ajustes importados";
-"no_presets_imported" = "No hay ajustes importados";
+"imported_presets" = "Preajustes importados";
+"no_presets_imported" = "No hay preajustes importados";
 "import_graphiceq_description" = "Importa archivos .txt de GraphicEQ para empezar";
 "imported_graphiceq" = "GraphicEQ importado";
 "import_graphiceq_file" = "Importar archivo GraphicEQ";
-"eq_imported_preset" = "Ajuste importado";
+"eq_imported_preset" = "Preajuste importado";
 
 /* General EQ Settings */
 "global_settings" = "Ajustes globales";
@@ -304,10 +304,10 @@
 "import_graphiceq_format_description" = "Importa archivos .txt de GraphicEQ con el formato:";
 "frequency_gain_pair_description" = "Cada par representa la frecuencia (Hz) y la ganancia (dB)";
 "export" = "Exportar";
-"preset_info" = "Información del ajuste";
+"preset_info" = "Información del preajuste";
 "eq_copied" = "Copiado";
 "eq_delete_confirm_message" = "¿Seguro que quieres eliminar «%@»? Esta acción no se puede deshacer.";
-"eq_delete_confirm_title" = "¿Eliminar el ajuste?";
+"eq_delete_confirm_title" = "¿Eliminar el preajuste?";
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "Importar GraphicEQ";
@@ -364,7 +364,7 @@
 "add_to_queue" = "Añadir a la cola";
 
 /* Track action feedback toast */
-"toast_play_next" = "A continuación";
+"toast_play_next" = "Reproduciendo a continuación";
 "toast_added_to_queue" = "Añadido a la cola";
 /* Feature guide */
 "feature_guide" = "Funciones y gestos";
@@ -456,9 +456,9 @@
 "Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "Crea una mezcla de tu biblioteca de QQPlayer según un ambiente o descripción y empieza a reproducirla.";
 "Toggle Favorite" = "Alternar favorito";
 "Favorite Current Song" = "Marcar canción actual como favorita";
-"Adds the currently playing QQPlayer song to Liked Songs." = "Añade la canción que suena en QQPlayer a Canciones que te gustan.";
-"%@ is already in your Liked Songs." = "%@ ya está en Canciones que te gustan.";
-"Added %@ to your Liked Songs." = "Se añadió %@ a Canciones que te gustan.";
+"Adds the currently playing QQPlayer song to Liked Songs." = "Añade la canción que suena en QQPlayer a Favoritos.";
+"%@ is already in your Liked Songs." = "%@ ya está en Favoritos.";
+"Added %@ to your Liked Songs." = "Se añadió %@ a Favoritos.";
 "There isn't a song playing in QQPlayer right now." = "No hay ninguna canción reproduciéndose en QQPlayer ahora mismo.";
 "Add to Queue" = "Añadir a la cola";
 "Play Playlist" = "Reproducir lista";
@@ -506,7 +506,7 @@
 "%@ playlist" = "lista %@";
 "playlist %@" = "lista %@";
 "^[%lld song](inflect: true)" = "^[%lld canción](inflect: true)";
-"Warmup Audio Queue Result" = "Resultado del calentamiento de audio";
+"Warmup Audio Queue Result" = "Resultado del calentamiento de la cola de audio";
 
 /* Snippet cards */
 "Play next" = "Reproducir a continuación";
@@ -623,14 +623,14 @@
 
 /* C-group online search & download (web /api/online/* parity) */
 "online_search_title" = "Búsqueda y descarga en línea";
-"online_search_placeholder" = "Buscar en NetEase Cloud Music...";
+"online_search_placeholder" = "Buscar en NetEase Cloud Music…";
 "online_search_idle_hint" = "Busca canciones en línea y descárgalas en tu biblioteca. Los archivos se guardan en tu carpeta de música predeterminada y aparecen automáticamente.";
-"online_search_loading" = "Buscando...";
+"online_search_loading" = "Buscando…";
 "online_search_no_results" = "No hay resultados en línea";
 "online_search_failed" = "La búsqueda falló. Inténtalo de nuevo.";
 "online_search_retry" = "Reintentar";
 "online_download" = "Descargar";
-"online_downloading" = "Descargando...";
+"online_downloading" = "Descargando…";
 "online_downloaded" = "Descargado";
 "online_download_failed" = "Falló la descarga";
 "online_download_failed_prefix" = "Falló la descarga: %@";
@@ -757,7 +757,7 @@
 "mini_window_button_hint" = "Añade un botón de modo mini a la barra de herramientas de la ventana principal. Al hacer clic, se oculta la ventana principal y se abre el mini reproductor con la letra de escritorio.";
 "mini_lyrics_enabled" = "Mostrar letra de escritorio en modo mini";
 "enter_mini_mode" = "Modo mini";
-"desktop_lyric_font_size" = "Tamaño de letra de la letra de escritorio";
+"desktop_lyric_font_size" = "Tamaño de letra en el escritorio";
 "desktop_lyric_translation_hint" = "La línea de traducción de la letra de escritorio sigue el interruptor «Mostrar traducción» de la categoría Letras.";
 "mini_restore" = "Volver a la ventana principal";
 /* Desktop windows (E3) */
@@ -836,7 +836,7 @@
 "sync_manual_id_invalid" = "No es un ID de dispositivo válido (52 caracteres)";
 "sync_invalid_id_title" = "ID de dispositivo no válido";
 "sync_invalid_id_message" = "Comprueba el ID que se muestra en el Mac e inténtalo de nuevo.";
-"sync_failure_invalid_payload" = "Esto no es una carga de vinculación válida.";
+"sync_failure_invalid_payload" = "No es un código de vinculación válido.";
 "sync_failure_invalid_device_id" = "El ID de dispositivo de este código no es válido.";
 "sync_failure_invalid_public_key" = "La clave de seguridad de este código no es válida.";
 "sync_failure_fingerprint_mismatch" = "El ID de dispositivo no coincide con su clave de seguridad.";
@@ -1281,4 +1281,4 @@
 
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "Idioma";
-"language_follow_system" = "Seguir el sistema";
+"language_follow_system" = "Seguir al sistema";

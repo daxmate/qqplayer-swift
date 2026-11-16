@@ -455,7 +455,7 @@
 "Generate Mix" = "ミックスを生成";
 "Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "気分や説明に合うミックスをQQPlayerライブラリから作成して再生します。";
 "Toggle Favorite" = "お気に入りを切り替え";
-"Favorite Current Song" = "再生中の曲をお気に入りに";
+"Favorite Current Song" = "再生中の曲をお気に入りに追加";
 "Adds the currently playing QQPlayer song to Liked Songs." = "再生中のQQPlayerの曲をお気に入りに追加します。";
 "%@ is already in your Liked Songs." = "%@はすでにお気に入りにあります。";
 "Added %@ to your Liked Songs." = "%@をお気に入りに追加しました。";
@@ -644,7 +644,7 @@
 "quark_login_refresh" = "QRコードを更新";
 "quark_login_error" = "サインイン状態のエラーです。もう一度お試しください。";
 "quark_login_required_hint" = "ダウンロードにはQuarkへのサインインが必要です（スキャンパネルが開いています。サインイン後に自動で再試行します）。";
-"quark_login_success" = "%@としてサインイン中";
+"quark_login_success" = "%@でサインインしました";
 "quark_login_retrying" = "ダウンロードを再試行中…";
 
 /* Online search history (B5: added to en) */
@@ -1281,4 +1281,4 @@
 
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "言語";
-"language_follow_system" = "システム設定";
+"language_follow_system" = "システム設定に合わせる";

@@ -997,7 +997,7 @@
 "sync_run_data_unresolved_hint" = "%d개 항목은 이 Mac의 곡과 일치하지 않아 적용되지 않았습니다.";
 "sync_run_data_ambiguous_identity_hint" = "%d개 항목은 이 Mac의 같은 경로에 여러 곡이 일치해 적용되지 않았습니다.";
 "sync_run_data_unsupported_hint" = "재생 위치 변경 %d건이 적용되지 않았습니다(기기 간 이어 듣기가 꺼져 있거나 받은 위치가 다른 곡의 것입니다).";
-"sync_run_data_skipped_parent" = "종속 항목 없음";
+"sync_run_data_skipped_parent" = "종속 항목 누락";
 "sync_run_data_skipped_parent_hint" = "변경 %d건은 종속 항목이 이 기기에 아직 없어 건너뛰었습니다(재생목록 구조가 동기화되지 않았거나 참조된 곡에 로컬 레코드가 없음).";
 "sync_run_data_missing_identity_hint" = "%d개 항목은 곡 지문 없이 전송되어 다른 기기에서 일치시킬 수 없습니다.";
 "sync_run_data_apply_failed" = "적용 실패";
@@ -1128,7 +1128,7 @@
 "recommendation_error_load_failed" = "로컬 라이브러리를 읽을 수 없었습니다.";
 "recommendation_download" = "다운로드";
 "recommendation_dismiss" = "관심 없음";
-"recommendation_reason_artist" = "자주 재생하는 항목: %@";
+"recommendation_reason_artist" = "자주 재생하는 아티스트: %@";
 "recommendation_reason_requested_artist" = "요청한 아티스트";
 "recommendation_artist_shortfall" = "%@의 곡을 %d개만 찾았습니다";
 "recommendation_artist_shortfall_filled" = "%@은(는) %d곡뿐이라 비슷한 아티스트에서 %d곡을 추가했습니다";
@@ -1281,4 +1281,4 @@
 
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "언어";
-"language_follow_system" = "시스템 설정";
+"language_follow_system" = "시스템 설정 따르기";
