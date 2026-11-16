@@ -30,27 +30,11 @@ extension MacSyncRunSection {
     @ViewBuilder
     var runSection: some View {
         Section {
-            HStack(spacing: DesignTokens.space12) {
-                if model.phase.isBusy {
-                    Button("sync_run_cancel".localized, role: .destructive) {
-                        model.cancelSync()
-                    }
-                } else {
-                    // T10：方向已在第一屏选定 → 这里是**一个**按方向命名的开始键
-                    // （两个独立方向键会在「已选下载却点上传」时自相矛盾）。
-                    Button(startButtonTitle) {
-                        model.startSync()
-                    }
-                    .disabled(!model.startAvailability.canStart)
-                    .help(startButtonHelp)
-                }
-
-                Text(phaseText)
-                    .font(.callout)
-                    .foregroundStyle(model.failureText == nil ? Color.secondary : Color.red)
-
-                Spacer()
-            }
+            // 2026-11-16 P0：开始 / 取消键移到固定执行底栏（`syncActionBar`）——
+            // 挤在可滚动 `Form` 里的执行控件会被 sheet 底边裁切，且全屏只允许一处按钮。
+            Text(phaseText)
+                .font(.callout)
+                .foregroundStyle(model.failureText == nil ? Color.secondary : Color.red)
 
             // T2 测速（局部 @State，不进 view model 的发布面）
             SyncProbeRowView { completion in
@@ -77,17 +61,73 @@ extension MacSyncRunSection {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if !model.phase.isBusy, let reason = availabilityHint {
-                Text(reason)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            // 2026-11-16 P0：不可用原因移到固定底栏（按钮旁 `.caption`），此处不再重复。
 
             // 批 B2：目标状态行（「等待 <名字> 上线」/「当前连着 B，你要同步的是 A」+ 一键改用）。
             // 离线时开始键已被 `SyncUIStartGate.targetBlock` 禁用，这里是它的解释（带设备名）。
             SyncTargetStatusBanner(status: syncTargetStatus, onAdoptConnected: adoptConnectedTarget)
         } header: {
             Text("sync_run_execute_section".localized)
+        }
+    }
+
+    // MARK: - 固定执行底栏（2026-11-16 P0）
+
+    /// 固定执行底栏：选择摘要 + 不可用原因 + 开始 / 取消。
+    /// 起因：执行控件原在可滚动 `Form` 的 D 区，被 sheet 底边裁切且摘要/禁用原因不固定在
+    /// 视野内（用户 2026-11-16 截图反馈）。全屏按钮只此一处，语义仍全来自
+    /// `model.startAvailability` / `startButtonTitle` / `startButtonHelp`。
+    @ViewBuilder
+    var syncActionBar: some View {
+        VStack(spacing: DesignTokens.space0) {
+            Divider()
+            HStack(alignment: .center, spacing: DesignTokens.space12) {
+                VStack(alignment: .leading, spacing: DesignTokens.space2) {
+                    Text(actionBarSummaryText)
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .foregroundStyle(content.selectionSummary.isEmpty ? Color.secondary : Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let hint = actionBarHint {
+                        Text(hint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: DesignTokens.space8)
+                if model.phase.isBusy {
+                    Button("sync_run_cancel".localized, role: .destructive) {
+                        model.cancelSync()
+                    }
+                } else {
+                    Button(startButtonTitle) {
+                        model.startSync()
+                    }
+                    .disabled(!model.startAvailability.canStart)
+                    .help(startButtonHelp)
+                }
+            }
+            .padding(.horizontal, DesignTokens.space20)
+            .padding(.vertical, DesignTokens.space12)
+        }
+        .background(.bar)
+    }
+
+    /// 底栏摘要文案：空选择用既有「请先选择…」键，其余三态复用 `selectionTotalText`
+    /// （全曲库 / 歌单 / 单曲），数字与字节格式化均来自 `content.selectionSummary`。
+    private var actionBarSummaryText: String {
+        content.selectionSummary.isEmpty ? "sync_run_reason_empty_selection".localized : selectionTotalText
+    }
+
+    /// 底栏不可用原因：空选择的解释已由摘要位承担（同一句）→ 这里不重复；
+    /// 其余（未配对 / 未连接 / 未选方向 / 曲库不可用）沿用 `availabilityHint`。
+    private var actionBarHint: String? {
+        switch model.startAvailability {
+        case .emptySelection:
+            return nil
+        default:
+            return availabilityHint
         }
     }
 

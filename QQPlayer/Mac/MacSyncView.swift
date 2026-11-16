@@ -166,6 +166,12 @@ struct MacSyncRunSection: View {
                 }
             }
             .formStyle(.grouped)
+
+            // 2026-11-16 P0：执行区（选择摘要 + 开始/取消）固定在底栏，不再随 `Form` 滚动、
+            // 不再被 sheet 底边裁切；「设备」页没有执行区，不挂底栏。
+            if page == .sync {
+                syncActionBar
+            }
         }
         .onAppear {
             model.onAppear()

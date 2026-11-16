@@ -228,6 +228,13 @@ extension MacSyncRunSection {
                                 Text("sync_run_songs_count".localized(with: option.trackCount))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                // 2026-11-16 P0：勾选后行内即时反馈（不新增文案键）。
+                                if content.selectedPlaylistIDs.contains(option.id) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(accentColor)
+                                        .accessibilityHidden(true)
+                                }
                             }
                         }
                         .toggleStyle(.checkbox)
@@ -416,18 +423,13 @@ extension MacSyncRunSection {
         .padding(.vertical, DesignTokens.space2)
     }
 
+    /// 2026-11-16 P0：合计 / 空态文案已上移到固定执行底栏（`syncActionBar`），
+    /// 这里只留「大小下界 / 歌单已失效」这类**辅助提示**，避免与底栏同屏重复。
     @ViewBuilder
     private var selectionTotals: some View {
         let summary = content.selectionSummary
-        VStack(alignment: .leading, spacing: DesignTokens.space2) {
-            if summary.isEmpty {
-                Text("sync_run_selection_empty".localized)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(selectionTotalText)
-                    .font(.callout)
-                    .fontWeight(.medium)
+        if !summary.isEmpty, summary.isBytesPartial || !summary.unknownPlaylistIDs.isEmpty {
+            VStack(alignment: .leading, spacing: DesignTokens.space2) {
                 if summary.isBytesPartial {
                     Text("sync_run_selection_partial_size".localized)
                         .font(.caption)
@@ -439,11 +441,13 @@ extension MacSyncRunSection {
                         .foregroundStyle(.orange)
                 }
             }
+            .padding(.top, DesignTokens.space2)
         }
-        .padding(.top, DesignTokens.space2)
     }
 
-    private var selectionTotalText: String {
+    /// 选择合计文案（底栏唯一渲染来源）：全曲库 / 歌单 / 单曲三态皆走既有键与
+    /// `summary.sizeText`，不另造数字与格式化。
+    var selectionTotalText: String {
         let summary = content.selectionSummary
         if summary.isLibraryWide {
             return "sync_run_selection_total_library".localized(with: summary.trackCount, summary.sizeText)
