@@ -239,6 +239,7 @@
 		C613AFE38DC04AC49FEB8CDC /* RecommendationDownloadedIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EAB6F975F740258BC21EA6 /* RecommendationDownloadedIndexTests.swift */; };
 		3B25B35C89AB4B37A7BD1F5E /* MacAutoScrapeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18BBE6F2CE74626BD096D9E /* MacAutoScrapeServiceTests.swift */; };
 		AB2F1ED43DED4942A340F744 /* AutoScrapeRefreshContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA50E3E34FF4FAF80416399 /* AutoScrapeRefreshContractTests.swift */; };
+		A0054D0307AC4C2FAA979DF5 /* MacTrackDetailModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -527,6 +528,7 @@
 		A9EAB6F975F740258BC21EA6 /* RecommendationDownloadedIndexTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationDownloadedIndexTests.swift; sourceTree = "<group>"; };
 		F18BBE6F2CE74626BD096D9E /* MacAutoScrapeServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacAutoScrapeServiceTests.swift; sourceTree = "<group>"; };
 		1FA50E3E34FF4FAF80416399 /* AutoScrapeRefreshContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoScrapeRefreshContractTests.swift; sourceTree = "<group>"; };
+		801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackDetailModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -631,6 +633,7 @@
 				Mac/AccentInjector.swift,
 				Models/AccentStore.swift,
 				"Mac/MacRecommendationModel+Downloaded.swift",
+				Mac/MacTrackDetailSheet.swift,
 			);
 			target = 2312D60B2E6090E2007F756D /* QQPlayer */;
 		};
@@ -1089,6 +1092,8 @@
 				Services/LastFMClient.swift,
 				"Services/RecommendationRequest+Rule.swift",
 				"Mac/MacRecommendationModel+Downloaded.swift",
+				Mac/MacTrackDetailSheet.swift,
+				Services/MacTrackDetailModel.swift,
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};
@@ -1470,6 +1475,7 @@
 				A9EAB6F975F740258BC21EA6 /* RecommendationDownloadedIndexTests.swift */,
 				F18BBE6F2CE74626BD096D9E /* MacAutoScrapeServiceTests.swift */,
 				1FA50E3E34FF4FAF80416399 /* AutoScrapeRefreshContractTests.swift */,
+				801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2007,6 +2013,7 @@
 				C613AFE38DC04AC49FEB8CDC /* RecommendationDownloadedIndexTests.swift in Sources */,
 				3B25B35C89AB4B37A7BD1F5E /* MacAutoScrapeServiceTests.swift in Sources */,
 				AB2F1ED43DED4942A340F744 /* AutoScrapeRefreshContractTests.swift in Sources */,
+				A0054D0307AC4C2FAA979DF5 /* MacTrackDetailModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

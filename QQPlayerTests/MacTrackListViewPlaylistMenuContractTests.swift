@@ -508,4 +508,61 @@ struct MacTrackListViewPlaylistMenuContractTests {
             "注入第四处调用后必须计到 4，否则「三个宿主」判据是空转"
         )
     }
+
+    // MARK: 契约：「歌曲详情」菜单项只在唯一实现里，且只在单选分支
+
+    @Test("契约 5：「歌曲详情」菜单项全仓只出现一次，且在 MacTrackContextMenu.swift（宿主不得复制）")
+    func songDetailMenuItemIsSingleImplementation() throws {
+        let menuCode = try PlaylistMenuShapeContract.strippedCode(
+            relativePath: PlaylistMenuShapeContract.menuFile
+        )
+        #expect(
+            PlaylistMenuShapeContract.occurrences(of: "Localized.songDetail", in: menuCode) == 1,
+            "「歌曲详情」菜单项应在唯一实现里恰好 1 处"
+        )
+
+        let hosts: [String] = [
+            PlaylistMenuShapeContract.macTrackListView,
+            PlaylistMenuShapeContract.searchResultsView,
+            PlaylistMenuShapeContract.searchAnythingLayer,
+        ]
+        for host in hosts {
+            let code = try PlaylistMenuShapeContract.strippedCode(relativePath: host)
+            #expect(
+                !code.contains("Localized.songDetail"),
+                "宿主不得复制「歌曲详情」菜单项：\(host)"
+            )
+        }
+    }
+
+    @Test("契约 6：「歌曲详情」sheet 宿主 == 菜单唯一实现；⌘I 走同一 model.detailTrack")
+    func songDetailSheetHostedOnceAndShortcutUsesSameState() throws {
+        let menuCode = try PlaylistMenuShapeContract.strippedCode(
+            relativePath: PlaylistMenuShapeContract.menuFile
+        )
+        #expect(
+            PlaylistMenuShapeContract.occurrences(of: "MacTrackDetailSheet(track:", in: menuCode) == 1,
+            "详情 sheet 只应由右键菜单的唯一实现挂载一次"
+        )
+        #expect(
+            PlaylistMenuShapeContract.occurrences(of: "model.detailTrack = track", in: menuCode) == 1,
+            "菜单项通过 model.detailTrack 请求打开详情"
+        )
+
+        // ⌘I：曲库列表用同一菜单状态打开详情（不新建第二套 sheet 宿主）
+        let listCode = try PlaylistMenuShapeContract.strippedCode(
+            relativePath: PlaylistMenuShapeContract.macTrackListView
+        )
+        #expect(listCode.contains("menu.detailTrack = row.track"), "⌘I 必须复用 menu.detailTrack")
+        #expect(
+            PlaylistMenuShapeContract.occurrences(of: "MacTrackDetailSheet(track:", in: listCode) == 0,
+            "曲库列表不得再挂第二份详情 sheet"
+        )
+
+        // 多选分支（count > 1）不得出现该菜单项：单选/多选是两个分支
+        #expect(
+            listCode.contains("selectedRows.count == 1"),
+            "⌘I 只对单选生效（多选无「选中曲目」语义）"
+        )
+    }
 }

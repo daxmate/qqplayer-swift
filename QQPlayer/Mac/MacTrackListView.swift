@@ -251,6 +251,17 @@ struct MacTrackListView: View {
         // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
         // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
         .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false))
+        // ⌘I：打开选中曲目的「歌曲详情」（与右键菜单同一 sheet 宿主：菜单状态 model）。
+        // 用 SwiftUI 键盘快捷键注册（仓库既有做法，见 MacAlbumArtistViews 的
+        // .keyboardShortcut(.return/.cancelAction)）；全局快捷键表 MacKeyboardShortcuts
+        // 的默认组合不含 ⌘I，无冲突。隐藏按钮只承载快捷键，不占布局/不可点。
+        .background(
+            Button("track_detail_title".localized) {
+                openSelectedTrackDetail()
+            }
+            .keyboardShortcut("i", modifiers: .command)
+            .hidden()
+        )
         .onChange(of: locateRequestID) { _, _ in
             // 定位当前播放：选中当前行（滚动由上面的 MacTableLocateScroller 随后触发）
             if let activeTrackId {
@@ -267,6 +278,14 @@ struct MacTrackListView: View {
     private var locateRow: Int? {
         guard let activeTrackId else { return nil }
         return displayedRows.firstIndex { $0.id == activeTrackId }
+    }
+
+    /// 打开选中曲目的歌曲详情（仅单选；多选无「选中曲目」语义 → 静默 no-op）。
+    private func openSelectedTrackDetail() {
+        guard selectedRows.count == 1,
+              let id = selectedRows.first,
+              let row = displayedRows.first(where: { $0.id == id }) else { return }
+        menu.detailTrack = row.track
     }
 
     private func locateActiveTrack() {

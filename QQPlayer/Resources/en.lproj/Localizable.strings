@@ -1228,3 +1228,32 @@
 "sync_devices_button" = "Devices…";
 "sync_empty_title" = "Nothing selected to sync yet";
 "sync_direction_flip" = "Flip sync direction";
+
+// 2026-11-16: macOS song detail sheet (context menu "Song Info")
+"context_song_detail" = "Song Info";
+"track_detail_title" = "Song Info";
+"track_detail_section_scraped" = "Scraped Metadata";
+"track_detail_section_file" = "File & Audio";
+"track_detail_section_playback" = "Playback";
+"track_detail_play_count" = "Play Count";
+"track_detail_last_played" = "Last Played";
+"track_detail_total_played" = "Total Played";
+"track_detail_recent_plays" = "Recent Plays";
+"track_detail_not_scraped" = "Not scraped";
+"track_detail_go_scrape" = "Scrape Now";
+"track_detail_close" = "Close";
+"track_detail_edit_tags" = "Edit Tags";
+"track_detail_never_played" = "Never played";
+"track_detail_unknown" = "Unknown";
+"track_detail_album_artist" = "Album Artist";
+"track_detail_year" = "Year";
+"track_detail_track_number" = "Track / Disc";
+"track_detail_lyrics" = "Lyrics";
+"track_detail_lyrics_available" = "Available";
+"track_detail_lyrics_missing" = "Not available";
+"track_detail_path" = "Path";
+"track_detail_file_size" = "File Size";
+"track_detail_format" = "Format";
+"track_detail_sample_rate" = "Sample Rate";
+"track_detail_bit_depth" = "Bit Depth";
+"track_detail_channels" = "Channels";

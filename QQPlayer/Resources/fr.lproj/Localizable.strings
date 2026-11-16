@@ -1226,3 +1226,32 @@
 "sync_devices_button" = "Appareils…";
 "sync_empty_title" = "Rien à synchroniser pour l'instant";
 "sync_direction_flip" = "Inverser le sens de la synchronisation";
+
+// 2026-11-16 : feuille « Informations sur le morceau » (macOS)
+"context_song_detail" = "Informations sur le morceau";
+"track_detail_title" = "Informations sur le morceau";
+"track_detail_section_scraped" = "Métadonnées récupérées";
+"track_detail_section_file" = "Fichier et audio";
+"track_detail_section_playback" = "Lecture";
+"track_detail_play_count" = "Nombre de lectures";
+"track_detail_last_played" = "Dernière lecture";
+"track_detail_total_played" = "Durée totale écoutée";
+"track_detail_recent_plays" = "Lectures récentes";
+"track_detail_not_scraped" = "Non récupéré";
+"track_detail_go_scrape" = "Récupérer";
+"track_detail_close" = "Fermer";
+"track_detail_edit_tags" = "Modifier les tags";
+"track_detail_never_played" = "Jamais lu";
+"track_detail_unknown" = "Inconnu";
+"track_detail_album_artist" = "Artiste de l'album";
+"track_detail_year" = "Année";
+"track_detail_track_number" = "Piste / Disque";
+"track_detail_lyrics" = "Paroles";
+"track_detail_lyrics_available" = "Disponibles";
+"track_detail_lyrics_missing" = "Indisponibles";
+"track_detail_path" = "Chemin";
+"track_detail_file_size" = "Taille du fichier";
+"track_detail_format" = "Format";
+"track_detail_sample_rate" = "Fréquence d'échantillonnage";
+"track_detail_bit_depth" = "Profondeur de bits";
+"track_detail_channels" = "Canaux";

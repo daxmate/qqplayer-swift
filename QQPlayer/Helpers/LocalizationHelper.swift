@@ -139,6 +139,8 @@ struct Localized {
     static let showArtist = "show_artist".localized
     static let showAlbum = "show_album".localized
     static let locatePlayingTrack = "locate_playing_track".localized
+    /// 歌曲详情（macOS 右键菜单 / ⌘I，2026-11-16）
+    static let songDetail = "context_song_detail".localized
 
     // MARK: - Move to Trash（web 版「移到废纸篓」对齐，macOS 2026-09-02 A4）
     static let moveToTrash = "move_to_trash".localized

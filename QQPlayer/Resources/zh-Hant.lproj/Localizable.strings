@@ -1552,3 +1552,32 @@
 "sync_devices_button" = "裝置…";
 "sync_empty_title" = "尚未選擇要同步的內容";
 "sync_direction_flip" = "切換同步方向";
+
+// 2026-11-16：macOS 歌曲詳情 sheet（右鍵「歌曲詳情」）
+"context_song_detail" = "歌曲詳情";
+"track_detail_title" = "歌曲詳情";
+"track_detail_section_scraped" = "刮削資訊";
+"track_detail_section_file" = "檔案與音訊";
+"track_detail_section_playback" = "播放統計";
+"track_detail_play_count" = "播放次數";
+"track_detail_last_played" = "最近播放";
+"track_detail_total_played" = "累計播放時長";
+"track_detail_recent_plays" = "最近播放記錄";
+"track_detail_not_scraped" = "未刮削";
+"track_detail_go_scrape" = "去刮削";
+"track_detail_close" = "關閉";
+"track_detail_edit_tags" = "編輯標籤";
+"track_detail_never_played" = "從未播放";
+"track_detail_unknown" = "未知";
+"track_detail_album_artist" = "專輯藝人";
+"track_detail_year" = "年份";
+"track_detail_track_number" = "音軌 / 碟號";
+"track_detail_lyrics" = "歌詞";
+"track_detail_lyrics_available" = "已有";
+"track_detail_lyrics_missing" = "暫無";
+"track_detail_path" = "路徑";
+"track_detail_file_size" = "檔案大小";
+"track_detail_format" = "格式";
+"track_detail_sample_rate" = "取樣率";
+"track_detail_bit_depth" = "位深";
+"track_detail_channels" = "聲道";

@@ -32,6 +32,9 @@ final class MacTrackMenuModel {
     /// 编辑标签 / 刮削（.sheet(item:) 驱动，避免 .sheet(isPresented:) 白框竞态）
     var tagEditorTrack: Track?
 
+    /// 歌曲详情 sheet（.sheet(item:) 驱动；只读，数据组装见 MacTrackDetailModel）
+    var detailTrack: Track?
+
     /// 新建歌单
     var showNewPlaylistAlert = false
     var newPlaylistName = ""
@@ -124,6 +127,17 @@ struct MacTrackContextMenuContent: View {
         Divider()
         Menu(Localized.addToPlaylist) {
             MacAddToPlaylistMenu(tracks: [track], model: model)
+        }
+
+        // 歌曲详情（只读 sheet）。多选菜单是另一套分支（MacTrackListView 的
+        // forSelectionType count > 1），本项只出现在单选这一份唯一实现里。
+        Divider()
+        Button {
+            presentAfterTrackMenuDismisses {
+                model.detailTrack = track
+            }
+        } label: {
+            Label(Localized.songDetail, systemImage: "info.circle")
         }
 
         if let onShowArtist {
@@ -234,6 +248,9 @@ struct MacTrackMenuModifier: ViewModifier {
             .sheet(item: tagEditorTrack) { track in
                 MacTagEditorView(track: track)
             }
+            .sheet(item: detailTrack) { track in
+                MacTrackDetailSheet(track: track)
+            }
     }
 
     // MARK: Bindings
@@ -256,6 +273,10 @@ struct MacTrackMenuModifier: ViewModifier {
 
     private var tagEditorTrack: Binding<Track?> {
         Binding(get: { model.tagEditorTrack }, set: { model.tagEditorTrack = $0 })
+    }
+
+    private var detailTrack: Binding<Track?> {
+        Binding(get: { model.detailTrack }, set: { model.detailTrack = $0 })
     }
 
     // MARK: 新建歌单

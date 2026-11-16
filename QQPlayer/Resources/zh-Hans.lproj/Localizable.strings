@@ -1231,3 +1231,32 @@
 "sync_devices_button" = "设备…";
 "sync_empty_title" = "还没有选择要同步的内容";
 "sync_direction_flip" = "切换同步方向";
+
+// 2026-11-16：macOS 歌曲详情 sheet（右键「歌曲详情」）
+"context_song_detail" = "歌曲详情";
+"track_detail_title" = "歌曲详情";
+"track_detail_section_scraped" = "刮削信息";
+"track_detail_section_file" = "文件与音频";
+"track_detail_section_playback" = "播放统计";
+"track_detail_play_count" = "播放次数";
+"track_detail_last_played" = "最近播放";
+"track_detail_total_played" = "累计播放时长";
+"track_detail_recent_plays" = "最近播放记录";
+"track_detail_not_scraped" = "未刮削";
+"track_detail_go_scrape" = "去刮削";
+"track_detail_close" = "关闭";
+"track_detail_edit_tags" = "编辑标签";
+"track_detail_never_played" = "从未播放";
+"track_detail_unknown" = "未知";
+"track_detail_album_artist" = "专辑艺术家";
+"track_detail_year" = "年份";
+"track_detail_track_number" = "音轨 / 碟号";
+"track_detail_lyrics" = "歌词";
+"track_detail_lyrics_available" = "已有";
+"track_detail_lyrics_missing" = "暂无";
+"track_detail_path" = "路径";
+"track_detail_file_size" = "文件大小";
+"track_detail_format" = "格式";
+"track_detail_sample_rate" = "采样率";
+"track_detail_bit_depth" = "位深";
+"track_detail_channels" = "声道";

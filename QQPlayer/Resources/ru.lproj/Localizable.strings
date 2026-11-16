@@ -1223,3 +1223,32 @@
 "sync_devices_button" = "Устройства…";
 "sync_empty_title" = "Пока ничего не выбрано для синхронизации";
 "sync_direction_flip" = "Сменить направление синхронизации";
+
+// 2026-11-16: окно «Сведения о треке» (macOS)
+"context_song_detail" = "Сведения о треке";
+"track_detail_title" = "Сведения о треке";
+"track_detail_section_scraped" = "Метаданные скрапинга";
+"track_detail_section_file" = "Файл и аудио";
+"track_detail_section_playback" = "Статистика прослушиваний";
+"track_detail_play_count" = "Количество прослушиваний";
+"track_detail_last_played" = "Последнее прослушивание";
+"track_detail_total_played" = "Общее время прослушивания";
+"track_detail_recent_plays" = "Недавние прослушивания";
+"track_detail_not_scraped" = "Не скраплено";
+"track_detail_go_scrape" = "Скрапить";
+"track_detail_close" = "Закрыть";
+"track_detail_edit_tags" = "Изменить теги";
+"track_detail_never_played" = "Никогда не проигрывался";
+"track_detail_unknown" = "Неизвестно";
+"track_detail_album_artist" = "Исполнитель альбома";
+"track_detail_year" = "Год";
+"track_detail_track_number" = "Трек / Диск";
+"track_detail_lyrics" = "Текст песни";
+"track_detail_lyrics_available" = "Есть";
+"track_detail_lyrics_missing" = "Нет";
+"track_detail_path" = "Путь";
+"track_detail_file_size" = "Размер файла";
+"track_detail_format" = "Формат";
+"track_detail_sample_rate" = "Частота дискретизации";
+"track_detail_bit_depth" = "Глубина бит";
+"track_detail_channels" = "Каналы";
