@@ -25,7 +25,7 @@
 "albums_count_plural" = "%d albums";
 "created_date" = "Created %@";
 "no_songs_found" = "No songs found";
-"your_music_will_appear_here" = "To add your music:\n\n1. Open the Files app (or tap \'Add Songs\')\n2. Go to \'On My iPhone\' → QQPlayer\n3. Copy your music files into that folder";
+"your_music_will_appear_here" = "To add your music:\n\n1. Open the Files app (or tap \'Open Files\')\n2. Go to \'On My iPhone\' → QQPlayer\n3. Copy your music files into that folder";
 "create_first_playlist" = "Create your first playlist to get started";
 
 /* Smart playlists (automatic playlists) */
