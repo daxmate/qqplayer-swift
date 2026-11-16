@@ -78,4 +78,8 @@ extension Notification.Name {
     /// 同步中心设备列表变化（审计 M4）：SyncHostCenter 的单槽回调不再直接捕获 View 值，
     /// 改为转发这个热点通知，由视图侧（.onReceive）自己重载。
     static let macSyncDevicesChanged = Notification.Name("MacSyncDevicesChanged")
+
+    /// 某首歌的歌词变了（时间轴对齐完成 / 恢复原时间轴）：object = stableId（String）。
+    /// 正在显示的歌词页收到后重取 getLyrics，立即换新。
+    static let lyricsDidChange = Notification.Name("LyricsDidChange")
 }

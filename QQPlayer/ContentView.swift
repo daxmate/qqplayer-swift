@@ -230,6 +230,8 @@ struct SheetModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()
             }
+            // 歌词时间轴对齐进度 / 结果 sheet：全局唯一宿主（菜单入口在任意列表行都能弹）
+            .lyricAlignmentSheet(controller: LyricAlignmentActions.controller)
 
     }
 }

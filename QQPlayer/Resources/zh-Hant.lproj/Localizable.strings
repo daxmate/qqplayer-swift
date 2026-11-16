@@ -1581,3 +1581,24 @@
 "track_detail_sample_rate" = "取樣率";
 "track_detail_bit_depth" = "位深";
 "track_detail_channels" = "聲道";
+
+// MARK: - 歌词时间轴对齐（lyrics.align.*）
+"lyrics.align.action" = "重新對齊歌詞時間軸";
+"lyrics.align.revert" = "恢復原歌詞時間軸";
+"lyrics.align.title" = "對齊歌詞時間軸";
+"lyrics.align.phase.installing" = "正在準備語音辨識資源…";
+"lyrics.align.phase.transcribing" = "正在辨識歌詞時間軸…";
+"lyrics.align.phase.aligning" = "正在對齊歌詞行…";
+"lyrics.align.cancel" = "取消";
+"lyrics.align.close" = "關閉";
+"lyrics.align.result.success" = "已對齊 %d/%d 行";
+"lyrics.align.result.lowMatch" = "匹配率偏低（%d%%），已套用；可在選單裡恢復原歌詞";
+"lyrics.align.result.revert" = "恢復原時間軸";
+"lyrics.align.error.unsupported" = "目前系統不支援歌詞自動對齊（需要 iOS/macOS 26 以上）";
+"lyrics.align.error.audio" = "音訊檔案無法讀取";
+"lyrics.align.error.emptyLyrics" = "沒有可對齊的歌詞";
+"lyrics.align.error.locale" = "辨識語言在目前系統無法使用";
+"lyrics.align.error.assets" = "語音辨識資源下載失敗";
+"lyrics.align.error.failed" = "沒有匹配到任何歌詞行";
+"lyrics.align.error.generic" = "歌詞對齊失敗";
+"lyrics.align.error.revert" = "恢復原歌詞失敗";

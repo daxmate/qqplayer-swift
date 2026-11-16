@@ -1255,3 +1255,24 @@
 "track_detail_sample_rate" = "Fréquence d'échantillonnage";
 "track_detail_bit_depth" = "Profondeur de bits";
 "track_detail_channels" = "Canaux";
+
+// MARK: - 歌词时间轴对齐（lyrics.align.*）
+"lyrics.align.action" = "Réaligner la chronologie des paroles";
+"lyrics.align.revert" = "Restaurer la chronologie d'origine";
+"lyrics.align.title" = "Alignement de la chronologie des paroles";
+"lyrics.align.phase.installing" = "Préparation des ressources de reconnaissance vocale…";
+"lyrics.align.phase.transcribing" = "Transcription des paroles…";
+"lyrics.align.phase.aligning" = "Alignement des lignes de paroles…";
+"lyrics.align.cancel" = "Annuler";
+"lyrics.align.close" = "Fermer";
+"lyrics.align.result.success" = "%d lignes alignées sur %d";
+"lyrics.align.result.lowMatch" = "Taux de correspondance faible (%d%%) ; appliqué. Vous pouvez restaurer les paroles d'origine depuis le menu.";
+"lyrics.align.result.revert" = "Restaurer la chronologie d'origine";
+"lyrics.align.error.unsupported" = "L'alignement automatique nécessite iOS/macOS 26 ou ultérieur";
+"lyrics.align.error.audio" = "Impossible de lire le fichier audio";
+"lyrics.align.error.emptyLyrics" = "Aucune parole à aligner";
+"lyrics.align.error.locale" = "La langue de reconnaissance n'est pas disponible sur ce système";
+"lyrics.align.error.assets" = "Échec du téléchargement des ressources de reconnaissance vocale";
+"lyrics.align.error.failed" = "Aucune ligne de paroles ne correspond à l'audio";
+"lyrics.align.error.generic" = "Échec de l'alignement des paroles";
+"lyrics.align.error.revert" = "Échec de la restauration des paroles d'origine";

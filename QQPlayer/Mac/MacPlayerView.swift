@@ -97,7 +97,10 @@ struct MacPlayerView: View {
                     onToggleExpand: handleLyricsDoubleTap,
                     onLyricsSearch: {
                         showLyricsSearch = true
-                    }
+                    },
+                    // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
+                    onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
+                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil
                 )
                 .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
             }
@@ -141,6 +144,14 @@ struct MacPlayerView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: player.playbackErrorMessage)
         .animation(.easeInOut(duration: 0.25), value: isLyricsFullscreen)
+        // 歌词时间轴对齐进度 / 结果 sheet（主窗口唯一宿主：曲库右键菜单与歌词栏菜单共用）
+        .lyricAlignmentSheet(controller: LyricAlignmentActions.controller)
+        .onReceive(NotificationCenter.default.publisher(for: .lyricsDidChange)) { note in
+            // 对齐 / 恢复原时间轴后：正在放的这首歌立刻重取（task(id:) 不重载）
+            guard let stableId = note.object as? String,
+                  stableId == track?.stableId else { return }
+            reloadLyrics()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .favoritesChanged)) { _ in
             // 收藏在别处变更（列表心形/右键菜单）后同步当前曲目的心形状态
             favoriteIds = Set((try? appCoordinator.getFavorites()) ?? [])
@@ -188,6 +199,43 @@ struct MacPlayerView: View {
                     artworkTrackId = track.stableId
                 }
             }
+        }
+    }
+
+    // MARK: - 歌词时间轴对齐（macOS 26+）
+
+    /// 菜单入口可见性：能力不足时整项隐藏（不是置灰）。
+    private var canAlignLyricsTimeline: Bool {
+        guard let track else { return false }
+        return LyricAlignmentFeature.canOfferAlignment(
+            track: track,
+            fileExists: FileManager.default.fileExists(atPath: track.path)
+        )
+    }
+
+    private var hasAlignedLyricsTimeline: Bool {
+        guard let track else { return false }
+        return LyricAlignmentFeature.isAligned(stableId: track.stableId)
+    }
+
+    /// 取歌词 → 复核判据 → 交给 controller（进度 / 结果 sheet 挂在本视图）。
+    private func startLyricAlignment() {
+        guard let track else { return }
+        Task { await LyricAlignmentActions.startAlignment(for: track) }
+    }
+
+    private func revertLyricAlignment() {
+        guard let track else { return }
+        LyricAlignmentActions.revertAlignment(for: track)
+    }
+
+    /// 重取当前曲目歌词（对齐 / 恢复后由 .lyricsDidChange 触发）。
+    private func reloadLyrics() {
+        guard let track else { return }
+        Task {
+            let updated = await services.lyricsManager.getLyrics(for: track)
+            lyrics = updated
+            karaoke.setLyrics(updated?.syncedLyrics ?? [])
         }
     }
 

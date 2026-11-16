@@ -243,6 +243,8 @@
 		3B25B35C89AB4B37A7BD1F5E /* MacAutoScrapeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18BBE6F2CE74626BD096D9E /* MacAutoScrapeServiceTests.swift */; };
 		AB2F1ED43DED4942A340F744 /* AutoScrapeRefreshContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA50E3E34FF4FAF80416399 /* AutoScrapeRefreshContractTests.swift */; };
 		A0054D0307AC4C2FAA979DF5 /* MacTrackDetailModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */; };
+		C768CB4C2C5D413EA1DCC973 /* LyricAlignmentControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D96FE4186E34670BC8A6B53 /* LyricAlignmentControllerTests.swift */; };
+		DB41659E5C274A368B2300FE /* LyricAlignmentFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC55B79B61A4A8D9986C52A /* LyricAlignmentFeatureTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -535,6 +537,8 @@
 		F18BBE6F2CE74626BD096D9E /* MacAutoScrapeServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacAutoScrapeServiceTests.swift; sourceTree = "<group>"; };
 		1FA50E3E34FF4FAF80416399 /* AutoScrapeRefreshContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoScrapeRefreshContractTests.swift; sourceTree = "<group>"; };
 		801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackDetailModelTests.swift; sourceTree = "<group>"; };
+		0D96FE4186E34670BC8A6B53 /* LyricAlignmentControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentControllerTests.swift; sourceTree = "<group>"; };
+		BFC55B79B61A4A8D9986C52A /* LyricAlignmentFeatureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentFeatureTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -798,6 +802,9 @@
 				Models/WidgetData.swift,
 				Services/AppleMusicChartClient.swift,
 				Services/ChartPopularityIndex.swift,
+				Services/LyricsAlignment/LyricAlignmentActions.swift,
+				Services/LyricsAlignment/LyricAlignmentController.swift,
+				Services/LyricsAlignment/LyricAlignmentFeature.swift,
 				Services/MacAutoScrapeService.swift,
 				Services/RecommendationArtistMix.swift,
 				Services/RecallSession.swift,
@@ -1079,6 +1086,7 @@
 				Sync/SyncTransferTiming.swift,
 				Sync/SyncWiringSelfCheck.swift,
 				Views/Player/KaraokeControlBar.swift,
+				Views/Player/LyricAlignmentProgressSheet.swift,
 				Views/Player/PlayerGestureLogic.swift,
 				Views/Utility/HintCardView.swift,
 				Views/Utility/WhatsNewView.swift,
@@ -1490,6 +1498,8 @@
 				F18BBE6F2CE74626BD096D9E /* MacAutoScrapeServiceTests.swift */,
 				1FA50E3E34FF4FAF80416399 /* AutoScrapeRefreshContractTests.swift */,
 				801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */,
+				0D96FE4186E34670BC8A6B53 /* LyricAlignmentControllerTests.swift */,
+				BFC55B79B61A4A8D9986C52A /* LyricAlignmentFeatureTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2031,6 +2041,8 @@
 				3B25B35C89AB4B37A7BD1F5E /* MacAutoScrapeServiceTests.swift in Sources */,
 				AB2F1ED43DED4942A340F744 /* AutoScrapeRefreshContractTests.swift in Sources */,
 				A0054D0307AC4C2FAA979DF5 /* MacTrackDetailModelTests.swift in Sources */,
+				C768CB4C2C5D413EA1DCC973 /* LyricAlignmentControllerTests.swift in Sources */,
+				DB41659E5C274A368B2300FE /* LyricAlignmentFeatureTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1257,3 +1257,24 @@
 "track_detail_sample_rate" = "Sample Rate";
 "track_detail_bit_depth" = "Bit Depth";
 "track_detail_channels" = "Channels";
+
+// MARK: - 歌词时间轴对齐（lyrics.align.*）
+"lyrics.align.action" = "Re-align lyric timeline";
+"lyrics.align.revert" = "Restore original lyric timeline";
+"lyrics.align.title" = "Aligning lyric timeline";
+"lyrics.align.phase.installing" = "Preparing speech recognition assets…";
+"lyrics.align.phase.transcribing" = "Transcribing lyrics…";
+"lyrics.align.phase.aligning" = "Aligning lyric lines…";
+"lyrics.align.cancel" = "Cancel";
+"lyrics.align.close" = "Close";
+"lyrics.align.result.success" = "Aligned %d of %d lines";
+"lyrics.align.result.lowMatch" = "Low match rate (%d%%); applied. You can restore the original lyrics from the menu.";
+"lyrics.align.result.revert" = "Restore original timeline";
+"lyrics.align.error.unsupported" = "Automatic lyric alignment requires iOS/macOS 26 or later";
+"lyrics.align.error.audio" = "The audio file can't be read";
+"lyrics.align.error.emptyLyrics" = "No lyrics to align";
+"lyrics.align.error.locale" = "The recognition language is unavailable on this system";
+"lyrics.align.error.assets" = "Failed to download speech recognition assets";
+"lyrics.align.error.failed" = "No lyric line matched the audio";
+"lyrics.align.error.generic" = "Lyric alignment failed";
+"lyrics.align.error.revert" = "Failed to restore the original lyrics";

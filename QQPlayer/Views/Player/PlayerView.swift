@@ -235,6 +235,12 @@ struct PlayerView: View {
                 loadLyrics()
                 loadTrackMetadata()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .lyricsDidChange)) { note in
+                // 歌词时间轴对齐 / 恢复原时间轴后：正在放的这首歌立刻重取（不等切歌）。
+                guard let stableId = note.object as? String,
+                      stableId == playerEngine.currentTrack?.stableId else { return }
+                loadLyrics()
+            }
             .onAppear {
                 // 首次进入播放页：触发手势提示气泡（之后永不再现）
                 withAnimation(.easeOut(duration: 0.3)) {

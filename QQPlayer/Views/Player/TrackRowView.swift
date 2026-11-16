@@ -159,6 +159,30 @@ struct TrackRowView: View, @MainActor Equatable {
                         Label(Localized.addToPlaylistEllipsis, systemImage: "rectangle.stack.badge.plus")
                     }
 
+                    // 歌词时间轴对齐（iOS 26+）：能力不足时整项隐藏，不是置灰
+                    let canAlignLyrics = LyricAlignmentFeature.canOfferAlignment(
+                        track: track,
+                        fileExists: FileManager.default.fileExists(atPath: track.path)
+                    )
+                    let hasAlignedLyrics = LyricAlignmentFeature.isAligned(stableId: track.stableId)
+                    if canAlignLyrics || hasAlignedLyrics {
+                        Divider()
+                        if canAlignLyrics {
+                            Button {
+                                startLyricAlignment()
+                            } label: {
+                                Label("lyrics.align.action".localized, systemImage: "waveform.badge.magnifyingglass")
+                            }
+                        }
+                        if hasAlignedLyrics {
+                            Button(role: .destructive) {
+                                revertLyricAlignment()
+                            } label: {
+                                Label("lyrics.align.revert".localized, systemImage: "arrow.uturn.backward")
+                            }
+                        }
+                    }
+
                     Button(action: { showDeleteConfirmation = true }) {
                         Label(Localized.deleteFile, systemImage: "trash")
                     }
@@ -216,5 +240,17 @@ struct TrackRowView: View, @MainActor Equatable {
                 NotificationCenter.default.post(name: .libraryNeedsRefresh, object: nil)
             } catch { AppLog.error(.ui, "❌ Failed to remove from playlist: \(error)") }
         }
+    }
+
+    // MARK: - 歌词时间轴对齐
+
+    /// 取歌词 → 复核判据 → 交给 controller（进度 / 结果 sheet 由根视图统一挂载）。
+    private func startLyricAlignment() {
+        Task { await LyricAlignmentActions.startAlignment(for: track) }
+    }
+
+    /// 恢复原歌词时间轴：删 aligned 产物 + 清缓存 + 通知刷新。
+    private func revertLyricAlignment() {
+        LyricAlignmentActions.revertAlignment(for: track)
     }
 }

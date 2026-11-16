@@ -52,6 +52,7 @@ enum AppNotificationContract {
         ("LibraryScanCriteriaChanged", "libraryScanCriteriaChanged"),
         ("LibraryImportFinished", "libraryImportFinished"),
         ("MacSyncDevicesChanged", "macSyncDevicesChanged"),
+        ("LyricsDidChange", "lyricsDidChange"),
     ]
 
     /// 收口时**删除的死事件**（0 订阅方，审计核实）：不得再出现在源码里，
@@ -618,6 +619,7 @@ struct AppNotificationContractTests {
             case "libraryScanCriteriaChanged": matched = Notification.Name.libraryScanCriteriaChanged.rawValue
             case "libraryImportFinished": matched = Notification.Name.libraryImportFinished.rawValue
             case "macSyncDevicesChanged": matched = Notification.Name.macSyncDevicesChanged.rawValue
+            case "lyricsDidChange": matched = Notification.Name.lyricsDidChange.rawValue
             default:
                 Issue.record("契约清单里出现了未登记的常量：\(property)")
                 continue

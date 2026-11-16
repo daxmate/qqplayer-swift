@@ -129,6 +129,30 @@ struct MacTrackContextMenuContent: View {
             MacAddToPlaylistMenu(tracks: [track], model: model)
         }
 
+        // 歌词时间轴对齐（macOS 26+）：能力不足时整项隐藏，不是置灰
+        let canAlignLyrics = LyricAlignmentFeature.canOfferAlignment(
+            track: track,
+            fileExists: FileManager.default.fileExists(atPath: track.path)
+        )
+        let hasAlignedLyrics = LyricAlignmentFeature.isAligned(stableId: track.stableId)
+        if canAlignLyrics || hasAlignedLyrics {
+            Divider()
+            if canAlignLyrics {
+                Button {
+                    startLyricAlignment()
+                } label: {
+                    Label("lyrics.align.action".localized, systemImage: "waveform.badge.magnifyingglass")
+                }
+            }
+            if hasAlignedLyrics {
+                Button(role: .destructive) {
+                    revertLyricAlignment()
+                } label: {
+                    Label("lyrics.align.revert".localized, systemImage: "arrow.uturn.backward")
+                }
+            }
+        }
+
         // 歌曲详情（只读 sheet）。多选菜单是另一套分支（MacTrackListView 的
         // forSelectionType count > 1），本项只出现在单选这一份唯一实现里。
         Divider()
@@ -175,6 +199,19 @@ struct MacTrackContextMenuContent: View {
         } label: {
             Label(Localized.moveToTrash, systemImage: "trash")
         }
+    }
+}
+
+extension MacTrackContextMenuContent {
+    /// 动作收在 LyricAlignmentActions（视图层不直连单例）；
+    /// 进度 / 结果 sheet 由 MacPlayerView 统一弹。
+    private func startLyricAlignment() {
+        let track = self.track
+        Task { await LyricAlignmentActions.startAlignment(for: track) }
+    }
+
+    private func revertLyricAlignment() {
+        LyricAlignmentActions.revertAlignment(for: track)
     }
 }
 

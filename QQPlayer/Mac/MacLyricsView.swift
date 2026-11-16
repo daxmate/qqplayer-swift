@@ -26,6 +26,10 @@ struct MacLyricsView: View {
     let onToggleExpand: () -> Void
     /// 歌词搜索入口（播放页 sheet 弹出 MacLyricsSearchView）
     let onLyricsSearch: () -> Void
+    /// 歌词时间轴对齐入口（nil = 不显示；可见性由宿主按 canAlign / isAligned 决定）
+    var onAlignTimeline: (() -> Void)?
+    /// 恢复原歌词时间轴（nil = 不显示）
+    var onRevertTimeline: (() -> Void)?
 
     /// 分片：跨文件可见（原 private）
     @Environment(KaraokeController.self) var karaoke
@@ -203,6 +207,30 @@ struct MacLyricsView: View {
             .buttonStyle(.plain)
             .foregroundColor(.secondary)
             .help("lyrics_search_title".localized)
+
+            // 歌词时间轴对齐（macOS 26+）：与搜索入口同排，进度 sheet 由播放页宿主统一弹
+            if onAlignTimeline != nil || onRevertTimeline != nil {
+                Menu {
+                    if let onAlignTimeline {
+                        Button(action: onAlignTimeline) {
+                            Label("lyrics.align.action".localized, systemImage: "waveform.badge.magnifyingglass")
+                        }
+                    }
+                    if let onRevertTimeline {
+                        Button(role: .destructive, action: onRevertTimeline) {
+                            Label("lyrics.align.revert".localized, systemImage: "arrow.uturn.backward")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: DesignTokens.font14, weight: .semibold))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .foregroundColor(.secondary)
+                .help("lyrics.align.action".localized)
+            }
             // 无关闭按钮：歌词常驻显示（2026-09-02 用户拍板：歌词是本 APP 第一重要功能）
         }
         .padding(.horizontal, DesignTokens.space16)

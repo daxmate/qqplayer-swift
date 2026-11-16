@@ -1252,3 +1252,24 @@
 "track_detail_sample_rate" = "Частота дискретизации";
 "track_detail_bit_depth" = "Глубина бит";
 "track_detail_channels" = "Каналы";
+
+// MARK: - 歌词时间轴对齐（lyrics.align.*）
+"lyrics.align.action" = "Выровнять тайминг текста заново";
+"lyrics.align.revert" = "Восстановить исходный тайминг текста";
+"lyrics.align.title" = "Выравнивание тайминга текста";
+"lyrics.align.phase.installing" = "Подготовка ресурсов распознавания речи…";
+"lyrics.align.phase.transcribing" = "Распознавание текста…";
+"lyrics.align.phase.aligning" = "Выравнивание строк текста…";
+"lyrics.align.cancel" = "Отмена";
+"lyrics.align.close" = "Закрыть";
+"lyrics.align.result.success" = "Выровнено строк: %d из %d";
+"lyrics.align.result.lowMatch" = "Низкая точность совпадений (%d%%); изменения применены. Исходный текст можно вернуть в меню.";
+"lyrics.align.result.revert" = "Восстановить исходный тайминг";
+"lyrics.align.error.unsupported" = "Автоматическое выравнивание требует iOS/macOS 26 или новее";
+"lyrics.align.error.audio" = "Не удаётся прочитать аудиофайл";
+"lyrics.align.error.emptyLyrics" = "Нет текста для выравнивания";
+"lyrics.align.error.locale" = "Язык распознавания недоступен в этой системе";
+"lyrics.align.error.assets" = "Не удалось скачать ресурсы распознавания речи";
+"lyrics.align.error.failed" = "Ни одна строка текста не совпала с аудио";
+"lyrics.align.error.generic" = "Не удалось выровнять текст";
+"lyrics.align.error.revert" = "Не удалось восстановить исходный текст";

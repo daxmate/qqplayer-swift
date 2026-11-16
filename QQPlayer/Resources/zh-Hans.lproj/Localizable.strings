@@ -1260,3 +1260,24 @@
 "track_detail_sample_rate" = "采样率";
 "track_detail_bit_depth" = "位深";
 "track_detail_channels" = "声道";
+
+// MARK: - 歌词时间轴对齐（lyrics.align.*）
+"lyrics.align.action" = "重新对齐歌词时间轴";
+"lyrics.align.revert" = "恢复原歌词时间轴";
+"lyrics.align.title" = "对齐歌词时间轴";
+"lyrics.align.phase.installing" = "正在准备语音识别资源…";
+"lyrics.align.phase.transcribing" = "正在识别歌词时间轴…";
+"lyrics.align.phase.aligning" = "正在对齐歌词行…";
+"lyrics.align.cancel" = "取消";
+"lyrics.align.close" = "关闭";
+"lyrics.align.result.success" = "已对齐 %d/%d 行";
+"lyrics.align.result.lowMatch" = "匹配率偏低（%d%%），已应用；可在菜单里恢复原歌词";
+"lyrics.align.result.revert" = "恢复原时间轴";
+"lyrics.align.error.unsupported" = "当前系统不支持歌词自动对齐（需要 iOS/macOS 26 及以上）";
+"lyrics.align.error.audio" = "音频文件无法读取";
+"lyrics.align.error.emptyLyrics" = "没有可对齐的歌词";
+"lyrics.align.error.locale" = "识别语言在当前系统不可用";
+"lyrics.align.error.assets" = "语音识别资源下载失败";
+"lyrics.align.error.failed" = "没有匹配到任何歌词行";
+"lyrics.align.error.generic" = "歌词对齐失败";
+"lyrics.align.error.revert" = "恢复原歌词失败";

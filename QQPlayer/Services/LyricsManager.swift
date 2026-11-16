@@ -95,6 +95,15 @@ actor LyricsManager {
         cacheRecency.append(trackId)
     }
 
+    /// 单曲歌词失效（时间轴对齐 / 恢复原时间轴后调用）：
+    /// 只丢这一首的内存缓存，下次 getLyrics 按新优先级重新取
+    /// （aligned 产物在内存缓存之前被读取，所以必须让它重走一遍链路）。
+    func invalidateLyrics(forStableId stableId: String) {
+        cache.removeValue(forKey: stableId)
+        cacheRecency.removeAll { $0 == stableId }
+        AppLog.info(.general, "🗑️ Lyrics cache invalidated for: \(stableId)")
+    }
+
     /// 丢弃内存缓存（磁盘缓存不动；下次命中磁盘后懒加载）
     func clearMemoryCache() {
         cache.removeAll()
