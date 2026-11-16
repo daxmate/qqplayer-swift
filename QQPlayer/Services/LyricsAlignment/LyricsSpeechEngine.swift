@@ -26,15 +26,20 @@ protocol LyricsSpeechEngine: Sendable {
 /// 关键约束（探针实测，见 docs/lyrics-alignment.md）：
 /// - 必须 attributeOptions 含 .audioTimeRange，否则 run 没有时间；
 /// - 不能把 mp3/aac 直接喂 analyzer（约 80s 处 _GenericObjCError），
-///   统一先转 16k 单声道 Float32 PCM；
+///   也不能把 PCM 逐块塞进 AsyncStream（Apple 内部 preRunRecognition 处
+///   EXC_BREAKPOINT，macOS 26.6 实测必崩）；统一先转 16k 单声道 Int16 WAV，
+///   再交给 `start(inputAudioFile:finishAfterFile:)`；
 /// - 首次使用某语言要自动下载模型（20–40s，需联网）。
 @available(iOS 26.0, macOS 26.0, *)
 struct AppleSpeechLyricsEngine: LyricsSpeechEngine {
-    /// 分析采样率：16k 单声道是 SpeechAnalyzer 的稳定格式。
-    static let analysisSampleRate: Double = 16_000
-
-    /// 模型安装进度占整体进度的比例上限（0…0.15）。
+    /// 模型资产安装占用的进度区间（0…assetProgressShare）。
     private static let assetProgressShare = 0.15
+    /// 转临时 WAV 占用的进度区间（0.15…0.25）。
+    private static let conversionProgressShare = 0.10
+    /// 识别阶段起点（0.25…0.9）。
+    private static let recognitionProgressStart = 0.25
+    /// 识别阶段占用的进度区间。
+    private static let recognitionProgressShare = 0.65
 
     func transcribe(
         fileURL: URL,
@@ -57,97 +62,78 @@ struct AppleSpeechLyricsEngine: LyricsSpeechEngine {
         // 2. 模型资产：没装就装（进度 0…0.15）。
         try await installAssetsIfNeeded(for: transcriber, progress: progress)
 
-        // 3. 音频 → 16k 单声道 PCM 的转换器。
-        let audioFile: AVAudioFile
+        // 3. 源音频 → 临时 16k 单声道 Int16 WAV（进度 0.15…0.25）。
+        //    逐块喂 PCM 会让 Speech 在内部崩（不可捕获）或挂住，必须走文件；
+        //    解码用 AVAssetReader（AVAudioFile 逐块读真实歌曲会 -39 / nilError）。
+        let converted: LyricsAlignmentAudioFile
         do {
-            audioFile = try AVAudioFile(forReading: fileURL)
+            converted = try await LyricsAlignmentAudioFile.makeTemporaryWav(from: fileURL) { fraction in
+                progress(Self.assetProgressShare + fraction * Self.conversionProgressShare)
+            }
+        } catch is CancellationError {
+            throw LyricAlignmentError.cancelled
         } catch {
             throw LyricAlignmentError.audioUnreadable
         }
-        guard let analysisFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Self.analysisSampleRate,
-            channels: 1,
-            interleaved: false
-        ), let converter = AVAudioConverter(from: audioFile.processingFormat, to: analysisFormat) else {
+        defer { converted.remove() }
+        try Task.checkCancellation()
+
+        // 4. 读回临时 WAV，交给分析器自己按文件推进（进度 0.25…0.9）。
+        let audioFile: AVAudioFile
+        do {
+            audioFile = try AVAudioFile(forReading: converted.url)
+        } catch {
             throw LyricAlignmentError.audioUnreadable
         }
+        let duration = Double(audioFile.length) / max(audioFile.processingFormat.sampleRate, 1)
 
-        // 4. 转写：分析器吃 AsyncStream<AnalyzerInput>，结果流单独收集。
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream(bufferingPolicy: .unbounded)
-
-        let collector = Task { () -> [AsrToken] in
-            var tokens: [AsrToken] = []
-            do {
-                for try await result in transcriber.results {
-                    let attributed = result.text
-                    for run in attributed.runs {
-                        guard let timeRange = run.audioTimeRange else { continue }
-                        let text = String(attributed[run.range].characters)
-                        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                            continue
-                        }
-                        tokens.append(
-                            AsrToken(
-                                text: text,
-                                start: timeRange.start.seconds,
-                                end: timeRange.end.seconds
-                            )
-                        )
-                    }
-                }
-            } catch {
-                // 取消或收尾异常：已产出的 run 仍是有效结果，保留半成品。
-                AppLog.warn(.general, "🎤 Speech results ended early: " + String(describing: error))
-            }
-            return tokens
-        }
-
-        let producer = Task { () -> LyricAlignmentError? in
-            do {
-                try Self.pump(
-                    file: audioFile,
-                    converter: converter,
-                    analysisFormat: analysisFormat,
-                    continuation: continuation,
-                    progress: { value in
-                        progress(Self.assetProgressShare + value * (1 - Self.assetProgressShare))
-                    }
-                )
-            } catch is CancellationError {
-                continuation.finish()
-                return LyricAlignmentError.cancelled
-            } catch {
-                continuation.finish()
-                AppLog.warn(.general, "🎤 Audio conversion failed: " + String(describing: error))
-                return LyricAlignmentError.audioUnreadable
-            }
-            continuation.finish()
-            return nil
-        }
-
+        var tokens: [AsrToken] = []
         do {
             try await withTaskCancellationHandler {
-                try await analyzer.start(inputSequence: stream)
+                try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
             } onCancel: {
                 Task { await analyzer.cancelAndFinishNow() }
             }
-        } catch {
-            producer.cancel()
+
+            for try await result in transcriber.results {
+                try Task.checkCancellation()
+                let attributed = result.text
+                for run in attributed.runs {
+                    guard let timeRange = run.audioTimeRange else { continue }
+                    let text = String(attributed[run.range].characters)
+                    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        continue
+                    }
+                    tokens.append(
+                        AsrToken(
+                            text: text,
+                            start: timeRange.start.seconds,
+                            end: timeRange.end.seconds
+                        )
+                    )
+                }
+                if duration > 0, let recognizedEnd = tokens.last?.end {
+                    let fraction = min(max(recognizedEnd / duration, 0), 1)
+                    progress(Self.recognitionProgressStart + fraction * Self.recognitionProgressShare)
+                }
+            }
+        } catch is CancellationError {
             await analyzer.cancelAndFinishNow()
-            let tokens = await collector.value
-            throw Task.isCancelled ? LyricAlignmentError.cancelled : Self.startFailure(error, tokens: tokens)
+            throw LyricAlignmentError.cancelled
+        } catch {
+            await analyzer.cancelAndFinishNow()
+            if Task.isCancelled {
+                throw LyricAlignmentError.cancelled
+            }
+            // 取消或收尾异常：已产出的 run 仍是有效结果，保留半成品。
+            if tokens.isEmpty {
+                throw Self.startFailure(error, tokens: tokens)
+            }
+            AppLog.warn(.general, "🎤 Speech results ended early: " + String(describing: error))
         }
 
-        let producerFailure = await producer.value
-        let tokens = await collector.value
-        if Task.isCancelled {
-            throw LyricAlignmentError.cancelled
-        }
-        if let producerFailure {
-            throw producerFailure
-        }
+        try Task.checkCancellation()
         progress(1)
         return tokens
     }
@@ -181,74 +167,6 @@ struct AppleSpeechLyricsEngine: LyricsSpeechEngine {
             throw LyricAlignmentError.assetInstallFailed
         }
         progress(share)
-    }
-
-    // MARK: - 音频泵
-
-    /// 逐块读文件 → 转 16k 单声道 → 塞进 analyzer 的输入流。
-    private static func pump(
-        file: AVAudioFile,
-        converter: AVAudioConverter,
-        analysisFormat: AVAudioFormat,
-        continuation: AsyncStream<AnalyzerInput>.Continuation,
-        progress: (Double) -> Void
-    ) throws {
-        let inputFormat = file.processingFormat
-        let chunkFrames = AVAudioFrameCount(max(inputFormat.sampleRate, 1))
-        let capacity = AVAudioFrameCount(
-            Double(chunkFrames) * analysisFormat.sampleRate / max(inputFormat.sampleRate, 1)
-        ) + 64
-        let totalFrames = Double(max(file.length, 1))
-        var sampleOffset: Int64 = 0
-
-        while true {
-            try Task.checkCancellation()
-            guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: chunkFrames) else {
-                throw LyricAlignmentError.audioUnreadable
-            }
-            do {
-                try file.read(into: inputBuffer, frameCount: chunkFrames)
-            } catch {
-                throw LyricAlignmentError.audioUnreadable
-            }
-            if inputBuffer.frameLength == 0 { break }
-
-            var provided = false
-            conversionLoop: while true {
-                guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: analysisFormat, frameCapacity: capacity) else {
-                    throw LyricAlignmentError.audioUnreadable
-                }
-                var conversionError: NSError?
-                let status = converter.convert(to: outputBuffer, error: &conversionError) { _, statusPointer in
-                    if provided {
-                        statusPointer.pointee = .noDataNow
-                        return nil
-                    }
-                    provided = true
-                    statusPointer.pointee = .haveData
-                    return inputBuffer
-                }
-                if let conversionError {
-                    AppLog.warn(.general, "🎤 AVAudioConverter: " + conversionError.localizedDescription)
-                    throw LyricAlignmentError.audioUnreadable
-                }
-                if outputBuffer.frameLength > 0 {
-                    let startTime = CMTime(
-                        value: sampleOffset,
-                        timescale: CMTimeScale(analysisFormat.sampleRate)
-                    )
-                    continuation.yield(AnalyzerInput(buffer: outputBuffer, bufferStartTime: startTime))
-                    sampleOffset += Int64(outputBuffer.frameLength)
-                }
-                switch status {
-                case .haveData:
-                    if outputBuffer.frameLength == 0 { break conversionLoop }
-                default:
-                    break conversionLoop
-                }
-            }
-            progress(min(Double(file.framePosition) / totalFrames, 1))
-        }
     }
 
     // MARK: - 错误归类

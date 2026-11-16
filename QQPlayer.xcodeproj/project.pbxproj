@@ -245,6 +245,7 @@
 		A0054D0307AC4C2FAA979DF5 /* MacTrackDetailModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */; };
 		C768CB4C2C5D413EA1DCC973 /* LyricAlignmentControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D96FE4186E34670BC8A6B53 /* LyricAlignmentControllerTests.swift */; };
 		DB41659E5C274A368B2300FE /* LyricAlignmentFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC55B79B61A4A8D9986C52A /* LyricAlignmentFeatureTests.swift */; };
+		1E20ABE426DC4DE583CC8036 /* LyricsAlignmentAudioFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 854CD95BE2EF424CB59F7B3D /* LyricsAlignmentAudioFileTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -539,6 +540,7 @@
 		801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacTrackDetailModelTests.swift; sourceTree = "<group>"; };
 		0D96FE4186E34670BC8A6B53 /* LyricAlignmentControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentControllerTests.swift; sourceTree = "<group>"; };
 		BFC55B79B61A4A8D9986C52A /* LyricAlignmentFeatureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentFeatureTests.swift; sourceTree = "<group>"; };
+		854CD95BE2EF424CB59F7B3D /* LyricsAlignmentAudioFileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsAlignmentAudioFileTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -824,6 +826,7 @@
 				Services/LyricsAlignment/LyricAlignmentService.swift,
 				Services/LyricsAlignment/LyricAlignmentTextNormalizer.swift,
 				Services/LyricsAlignment/LyricAlignmentTypes.swift,
+				Services/LyricsAlignment/LyricsAlignmentAudioFile.swift,
 				Services/LyricsAlignment/LyricsSpeechEngine.swift,
 				Services/AppCoordinator.swift,
 				"Services/AppCoordinator+iCloud.swift",
@@ -1500,6 +1503,7 @@
 				801A961DED6949DD9634E657 /* MacTrackDetailModelTests.swift */,
 				0D96FE4186E34670BC8A6B53 /* LyricAlignmentControllerTests.swift */,
 				BFC55B79B61A4A8D9986C52A /* LyricAlignmentFeatureTests.swift */,
+				854CD95BE2EF424CB59F7B3D /* LyricsAlignmentAudioFileTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2043,6 +2047,7 @@
 				A0054D0307AC4C2FAA979DF5 /* MacTrackDetailModelTests.swift in Sources */,
 				C768CB4C2C5D413EA1DCC973 /* LyricAlignmentControllerTests.swift in Sources */,
 				DB41659E5C274A368B2300FE /* LyricAlignmentFeatureTests.swift in Sources */,
+				1E20ABE426DC4DE583CC8036 /* LyricsAlignmentAudioFileTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
