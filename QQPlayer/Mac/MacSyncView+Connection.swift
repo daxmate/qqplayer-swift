@@ -126,7 +126,7 @@ extension MacSyncRunSection {
             model.selectDirection(model.direction == .upload ? .download : .upload)
         } label: {
             Image(systemName: directionSymbol)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: DesignTokens.font13, weight: .semibold))
                 .foregroundStyle(model.direction == nil ? Color.secondary : accentColor)
                 .frame(width: DesignTokens.space24, height: DesignTokens.space24)
                 .contentShape(Rectangle())
