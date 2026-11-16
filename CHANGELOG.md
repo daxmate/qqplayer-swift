@@ -2,6 +2,17 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.6.0] - 2026-11-16
+
+### ✨ 新增
+
+- **macOS 曲目「歌曲详情」**：曲目右键菜单新增「歌曲详情」（仅单选出现，也可按 `⌘I`），弹出只读详情面板——封面、刮削信息（艺术家 / 专辑 / 专辑艺术家 / 年份 / 流派 / 音轨·碟号 / 时长 / 歌词预览）、文件与音频（路径 / 大小 / 格式 / 采样率 / 位深 / 声道），以及播放统计（总播放次数、最近播放时间、累计播放时长、最近 10 次播放记录）。
+- 未刮削曲目（专辑 · 年份 · 流派皆空）在详情里显示「未刮削」提示与「去刮削」入口；右上「编辑标签」直接进既有标签编辑器。
+- 播放统计取自 `play_history` 聚合，聚合读法只有一份实现（`DatabaseManager.playHistorySummary`）；详情数据组装入口 `MacTrackDetailModel` 放 Services（不依赖 AppKit），由 iOS 测试 target 覆盖口径测试（新增 7 例）+ 菜单形状契约 2 例。
+- zh-Hans / zh-Hant / en / fr / ru 五个 `Localizable.strings` 同步补详情面板文案键（各 27 键）。
+
+[1.6.0]: https://github.com/daxmate/qqplayer-swift/compare/v1.5.0...v1.6.0
+
 ## [1.5.0] - 2026-11-16
 
 ### ✨ 新增
