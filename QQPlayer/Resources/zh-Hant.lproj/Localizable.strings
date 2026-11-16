@@ -1602,3 +1602,7 @@
 "lyrics.align.error.failed" = "沒有匹配到任何歌詞行";
 "lyrics.align.error.generic" = "歌詞對齊失敗";
 "lyrics.align.error.revert" = "恢復原歌詞失敗";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "語言";
+"language_follow_system" = "跟隨系統";

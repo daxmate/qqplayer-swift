@@ -1278,3 +1278,7 @@
 "lyrics.align.error.failed" = "音声に一致する歌詞の行がありませんでした";
 "lyrics.align.error.generic" = "歌詞の整列に失敗しました";
 "lyrics.align.error.revert" = "元の歌詞に戻せませんでした";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "言語";
+"language_follow_system" = "システム設定";

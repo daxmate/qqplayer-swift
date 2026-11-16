@@ -13,6 +13,8 @@ struct ContentView: View {
     @State private var showPlaylistManagement = false
     @State private var showSettings = false
     @State private var settings = DeleteSettings.load()
+    /// 语言选择（设置 → 外观 → 语言）：变化时重建主内容视图树
+    @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
 
     var body: some View {
         mainContent
@@ -38,7 +40,8 @@ struct ContentView: View {
                 showTutorial: $showTutorial,
                 showWhatsNew: $showWhatsNew,
                 showPlaylistManagement: $showPlaylistManagement,
-                showSettings: $showSettings
+                showSettings: $showSettings,
+                appLanguageRaw: appLanguageRaw
             ))
     }
 
@@ -68,6 +71,10 @@ struct ContentView: View {
             settings = DeleteSettings.load()
             AppearanceResolver.apply(forceDark: settings.forceDarkMode)
         }
+        // 语言热切换：重建主内容视图树，并让日期/数字格式一起切。
+        // 放在 SheetModifier 之下的 mainContent 上——挂在窗口根会连正在显示的设置 sheet 一起销毁。
+        .id(appLanguageRaw.isEmpty ? "system" : appLanguageRaw)
+        .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
     }
 
     @Sendable private func refreshLibrary() async {
@@ -196,6 +203,8 @@ struct SheetModifier: ViewModifier {
     @Binding var showWhatsNew: Bool
     @Binding var showPlaylistManagement: Bool
     @Binding var showSettings: Bool
+    /// 语言选择（由 ContentView 的 @AppStorage 传入：变化即重算本 modifier）
+    let appLanguageRaw: String
     @Environment(AppServices.self) private var services
     @State private var settings = DeleteSettings.load()
 
@@ -225,6 +234,9 @@ struct SheetModifier: ViewModifier {
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
+                    // 语言切换后设置页正文同步换语言（sheet 本身保持展开，不连带销毁）
+                    .id(appLanguageRaw.isEmpty ? "system" : appLanguageRaw)
+                    .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
                     .accentColor(accentColor)
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in

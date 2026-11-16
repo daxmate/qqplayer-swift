@@ -1278,3 +1278,7 @@
 "lyrics.align.error.failed" = "Ninguna línea de la letra coincidió con el audio";
 "lyrics.align.error.generic" = "Falló la alineación de letras";
 "lyrics.align.error.revert" = "No se pudieron restaurar las letras originales";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "Idioma";
+"language_follow_system" = "Seguir el sistema";

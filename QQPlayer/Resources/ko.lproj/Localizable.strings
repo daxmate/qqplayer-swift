@@ -1278,3 +1278,7 @@
 "lyrics.align.error.failed" = "오디오와 일치하는 가사 줄이 없습니다";
 "lyrics.align.error.generic" = "가사 정렬 실패";
 "lyrics.align.error.revert" = "원래 가사 복원 실패";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "언어";
+"language_follow_system" = "시스템 설정";

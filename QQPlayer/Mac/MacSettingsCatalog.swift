@@ -278,6 +278,13 @@ enum MacSettingsCatalog {
         aliases: ["强调色", "配色", "颜色", "accent", "color"]
     )
 
+    static let appearanceLanguage = Item(
+        id: "settings.appearance.language",
+        category: .appearance,
+        titleKey: "language",
+        aliases: ["语言", "語言", "语言选择", "language", "言語", "언어", "idioma"]
+    )
+
     static let recommendationWeightLibrary = Item(
         id: "settings.recommendation.weight.library",
         category: .recommendations,
@@ -414,6 +421,7 @@ enum MacSettingsCatalog {
         scrapingBatchEnabled,
         appearanceTheme,
         appearanceAccentColor,
+        appearanceLanguage,
         recommendationWeightLibrary,
         recommendationWeightPlay,
         recommendationWeightFavorite,

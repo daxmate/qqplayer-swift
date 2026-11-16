@@ -101,6 +101,12 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 struct QQPlayerMacApp: App {
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     @State private var deleteSettings = DeleteSettings.load()
+    /// 语言选择（设置 → 外观 → 语言）：变化时主窗内容重建、菜单文案随 body 重算
+    @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
+    /// 语言切换用的视图标识（空字符串 = 跟随系统）
+    private var appLanguageIdentity: String {
+        appLanguageRaw.isEmpty ? "system" : appLanguageRaw
+    }
 
     /// 「静音」菜单项的勾选状态 ⇄ 引擎：勾选即静音，动作走与播放条/快捷键同一个 toggleMute 入口。
     @MainActor
@@ -174,6 +180,9 @@ struct QQPlayerMacApp: App {
             AccentInjector {
                 MacLibraryAccessGate {
                     MacLibraryView()
+                        // 语言热切换：重建主窗内容 + 同步日期/数字 Locale（播放态在 PlayerEngine 单例，不受影响）
+                        .id(appLanguageIdentity)
+                        .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
                 }
             }
             // macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar 内容会延伸到
@@ -222,6 +231,8 @@ struct QQPlayerMacApp: App {
             // 强调色同主窗：走 `AccentInjector`（在可观察 body 内注入，换色即时生效）。
             AccentInjector {
                 MacSettingsView()
+                    // 设置窗独立场景：同样按语言重建（分类选中态在 MacSettingsView 内部保留，见其 .id 位置）
+                    .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
             }
             // MAS 批 2B：设置页要读曲库根授权状态（独立场景，不继承主窗环境）。
             .environment(MacLibraryRootAccess.shared)

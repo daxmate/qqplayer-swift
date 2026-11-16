@@ -1273,3 +1273,7 @@
 "lyrics.align.error.failed" = "Ни одна строка текста не совпала с аудио";
 "lyrics.align.error.generic" = "Не удалось выровнять текст";
 "lyrics.align.error.revert" = "Не удалось восстановить исходный текст";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "Язык";
+"language_follow_system" = "Как в системе";

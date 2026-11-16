@@ -11,9 +11,20 @@ import SwiftUI
 
 struct SettingsAppearanceView: View {
     @State private var deleteSettings = DeleteSettings.load()
+    /// 语言选择（App 内热切换；跟随系统 = 空字符串）
+    @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
 
     var body: some View {
         Form {
+            Section(Localized.language) {
+                Picker(Localized.language, selection: languageBinding) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
             Section(Localized.appearance) {
                 Toggle(Localized.minimalistLibraryIcons, isOn: $deleteSettings.minimalistIcons)
                     .onChange(of: deleteSettings.minimalistIcons) { _, _ in
@@ -81,6 +92,17 @@ struct SettingsAppearanceView: View {
         }
         .navigationTitle(Localized.appearance)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// 语言选择绑定：写持久化（含 AppleLanguages），AppStorage 触发本页重绘。
+    private var languageBinding: Binding<AppLanguage> {
+        Binding(
+            get: { AppLanguage(rawValue: appLanguageRaw) ?? .system },
+            set: { language in
+                AppLanguage.apply(language)
+                appLanguageRaw = language.storageValue
+            }
+        )
     }
 }
 

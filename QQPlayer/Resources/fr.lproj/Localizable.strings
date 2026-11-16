@@ -1276,3 +1276,7 @@
 "lyrics.align.error.failed" = "Aucune ligne de paroles ne correspond à l'audio";
 "lyrics.align.error.generic" = "Échec de l'alignement des paroles";
 "lyrics.align.error.revert" = "Échec de la restauration des paroles d'origine";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "Langue";
+"language_follow_system" = "Suivre le système";

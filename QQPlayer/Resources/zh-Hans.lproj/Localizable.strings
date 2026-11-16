@@ -152,7 +152,7 @@
 /* Settings categories (web 版左导航分类对齐) */
 /* Appearance theme */
 "settings_category_playback" = "播放";
-"settings_category_appearance" = "界面";
+"settings_category_appearance" = "外观";
 "settings_category_about" = "关于";
 "settings_category_lyrics" = "歌词";
 "lyrics_display" = "显示";
@@ -1281,3 +1281,7 @@
 "lyrics.align.error.failed" = "没有匹配到任何歌词行";
 "lyrics.align.error.generic" = "歌词对齐失败";
 "lyrics.align.error.revert" = "恢复原歌词失败";
+
+/* Language selection (设置 → 外观 → 语言) */
+"language" = "语言";
+"language_follow_system" = "跟随系统";

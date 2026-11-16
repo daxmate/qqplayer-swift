@@ -704,6 +704,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Assets.xcassets,
+				Helpers/AppLanguage.swift,
 				Helpers/EnvironmentLoader.swift,
 				Helpers/LocalizationHelper.swift,
 				Helpers/ObjCExceptionCatcher.m,

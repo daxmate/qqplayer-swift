@@ -18,6 +18,8 @@ struct MacSettingsView: View {
     @State private var selectedCategory: MacSettingsCatalog.Category = .playback
     @State private var deleteSettings = DeleteSettings.load()
     @State private var showEQSettings = false
+    /// 语言选择（设置 → 外观 → 语言）：变化时重建右侧内容区
+    @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
     /// ⌘K 深链待滚动锚点（切分类后内容才建好 → 延后一次布局再滚）
     @State private var pendingScrollID: String?
     /// 当前短暂高亮的锚点 id（约 1.5s 后自动熄灭；环境值注入给 .settingsAnchor）
@@ -77,6 +79,8 @@ struct MacSettingsView: View {
                         MacAboutSettingsView()
                     }
                 }
+                // 语言热切换：只重建右侧内容区（左侧分类选中态保留），并同步日期/数字 Locale
+                .id(appLanguageRaw.isEmpty ? "system" : appLanguageRaw)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .environment(\.macSettingsHighlightedID, highlightedID)
                 .onChange(of: pendingScrollID) { _, anchorID in
@@ -261,6 +265,8 @@ private struct MacAppearanceSettingsView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
     @State private var deleteSettings = DeleteSettings.load()
+    /// 语言选择（App 内热切换；跟随系统 = 空字符串）
+    @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
 
     /// 当前生效主题（含旧数据迁移推导），Picker 绑定。
     private var theme: AppearanceTheme {
@@ -272,6 +278,16 @@ private struct MacAppearanceSettingsView: View {
 
     var body: some View {
         Form {
+            Section(Localized.language) {
+                Picker(Localized.language, selection: languageBinding) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+                .settingsAnchor(MacSettingsCatalog.appearanceLanguage)
+            }
+
             Section(Localized.appearanceTheme) {
                 Picker(Localized.appearanceTheme, selection: themeBinding) {
                     Text(Localized.themeSystem).tag(AppearanceTheme.system)
@@ -297,6 +313,17 @@ private struct MacAppearanceSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
+    }
+
+    /// 语言选择绑定：写持久化（含 AppleLanguages），AppStorage 触发本页重绘。
+    private var languageBinding: Binding<AppLanguage> {
+        Binding(
+            get: { AppLanguage(rawValue: appLanguageRaw) ?? .system },
+            set: { language in
+                AppLanguage.apply(language)
+                appLanguageRaw = language.storageValue
+            }
+        )
     }
 
     private var themeBinding: Binding<AppearanceTheme> {
