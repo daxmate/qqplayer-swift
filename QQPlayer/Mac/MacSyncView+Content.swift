@@ -317,12 +317,15 @@ extension MacSyncRunSection {
     }
 
     /// 下钻入口：切到单曲级 + 把该来源设为当前来源（已勾选的歌全部保留）。
+    /// 2026-11-16：链接样式改强调色（`accentColor`）——跟随用户在设置里选的强调色，
+    /// 不再固定系统链接蓝。
     private func pickTracksButton(_ ref: SyncBrowseSourceRef) -> some View {
         Button("sync_run_pick_tracks".localized) {
             content.pickTracks(in: ref)
         }
-        .buttonStyle(.link)
+        .buttonStyle(.plain)
         .font(.caption)
+        .foregroundStyle(accentColor)
     }
 
     private func playlistBinding(_ id: String) -> Binding<Bool> {

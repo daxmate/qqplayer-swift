@@ -32,26 +32,17 @@ extension MacSyncRunSection {
         Section {
             // 2026-11-16 P0：开始 / 取消键移到固定执行底栏（`syncActionBar`）——
             // 挤在可滚动 `Form` 里的执行控件会被 sheet 底边裁切，且全屏只允许一处按钮。
-            Text(phaseText)
-                .font(.callout)
-                .foregroundStyle(model.failureText == nil ? Color.secondary : Color.red)
+            // 2026-11-16：忙时进度 / 当前文件在固定底栏（`syncActionBar`）显示，这里不再重复
+            // 阶段文案；完成 / 失败 / 空闲说明仍留 D 区。
+            if !model.phase.isBusy {
+                Text(phaseText)
+                    .font(.callout)
+                    .foregroundStyle(model.failureText == nil ? Color.secondary : Color.red)
+            }
 
             // T2 测速（局部 @State，不进 view model 的发布面）
             SyncProbeRowView { completion in
                 model.runProbe(completion: completion)
-            }
-
-            if model.phase.isBusy {
-                ProgressView(value: model.progress.isDeterminate ? model.progress.fraction : nil)
-                Text(progressText)
-                    .font(.callout)
-                if let path = model.progress.currentPath {
-                    Text(path)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
             }
 
             if let failure = model.failureText, !model.phase.isBusy {
@@ -73,26 +64,49 @@ extension MacSyncRunSection {
 
     // MARK: - 固定执行底栏（2026-11-16 P0）
 
-    /// 固定执行底栏：选择摘要 + 不可用原因 + 开始 / 取消。
+    /// 固定执行底栏：选择摘要 / 进行中进度 + 不可用原因 + 开始 / 取消。
     /// 起因：执行控件原在可滚动 `Form` 的 D 区，被 sheet 底边裁切且摘要/禁用原因不固定在
     /// 视野内（用户 2026-11-16 截图反馈）。全屏按钮只此一处，语义仍全来自
     /// `model.startAvailability` / `startButtonTitle` / `startButtonHelp`。
+    /// 2026-11-16：进度 / 当前文件从可滚动 D 区搬到这里（用户要求进状态栏，滚动也看得到），
+    /// D 区只留完成 / 失败说明。
     @ViewBuilder
     var syncActionBar: some View {
         VStack(spacing: DesignTokens.space0) {
             Divider()
+            // 忙时底栏兼作状态栏：进度条只在进行中出现（空闲态底栏与 P0 完全一致）。
+            if model.phase.isBusy {
+                ProgressView(value: model.progress.isDeterminate ? model.progress.fraction : nil)
+                    .progressViewStyle(.linear)
+                    .padding(.horizontal, DesignTokens.space20)
+                    .padding(.top, DesignTokens.space8)
+            }
             HStack(alignment: .center, spacing: DesignTokens.space12) {
                 VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                    Text(actionBarSummaryText)
-                        .font(.callout)
-                        .fontWeight(.medium)
-                        .foregroundStyle(content.selectionSummary.isEmpty ? Color.secondary : Color.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let hint = actionBarHint {
-                        Text(hint)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    if model.phase.isBusy {
+                        Text(progressText)
+                            .font(.callout)
+                            .fontWeight(.medium)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let path = model.progress.currentPath {
+                            Text(path)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    } else {
+                        Text(actionBarSummaryText)
+                            .font(.callout)
+                            .fontWeight(.medium)
+                            .foregroundStyle(content.selectionSummary.isEmpty ? Color.secondary : Color.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let hint = actionBarHint {
+                            Text(hint)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
                 Spacer(minLength: DesignTokens.space8)
