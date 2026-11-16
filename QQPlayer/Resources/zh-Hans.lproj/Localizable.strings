@@ -907,6 +907,8 @@
 "sync_source_all_library" = "全部曲库";
 "sync_source_smart_group" = "自动歌单";
 "sync_run_pick_tracks" = "挑选歌曲";
+"sync_run_smart_selected" = "已选 %d/%d";
+"sync_run_smart_snapshot_badge" = "快照";
 "sync_run_library_row_title" = "整个曲库";
 "sync_run_library_row_hint" = "曲库里的全部歌曲，选中前会先让你确认。";
 "sync_run_library_row_detail" = "%d 首 · 约 %@";

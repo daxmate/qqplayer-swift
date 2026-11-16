@@ -57,6 +57,10 @@ final class MacSyncContentModel: ObservableObject {
     /// 单曲级搜索词（View 绑定；去抖到期后调用 `applySearch()`）。
     @Published var trackQuery = ""
 
+    /// 智能源勾选的可见提示（nil = 无提示）。目前只有「源 0 首 → 没东西可快照」
+    /// 一种（复用既有空列表文案，不新增键）。
+    @Published private(set) var smartSourceNotice: String?
+
     /// 内容来源清单（全部曲库 / 收藏 / 自动歌单 / 真实歌单；顺序由
     /// `SyncBrowseSourceCatalog.ordered` 收口，View 不再自己排序）。
     @Published private(set) var browseSources: [SyncBrowseSourceOption] = []
@@ -121,8 +125,17 @@ final class MacSyncContentModel: ObservableObject {
     /// 当前选择集模式（三级）。
     var selectionMode: SyncUISelectionMode { SyncUISelectionMode.mode(for: selection) }
 
-    /// 已选歌单标识（歌单级多选态）。
+    /// 已选歌单标识（歌单级多选态；bundle 形态只含**真实歌单**）。
     var selectedPlaylistIDs: Set<String> { Set(selection.playlistIDs ?? []) }
+
+    /// 已勾选的智能源快照（源标识 → 勾选当时的相对路径；非 bundle 形态为空）。
+    var smartSnapshots: [String: [String]] { selection.smartSnapshots ?? [:] }
+
+    /// 某智能源是否整组已勾选（= 快照存在）。
+    func isSmartSourceSelected(_ sourceID: String) -> Bool { smartSnapshots[sourceID] != nil }
+
+    /// 某智能源已选快照条数（行内「已选 n/N」的 n；N 是该源**当前**曲目数）。
+    func smartSnapshotCount(forSource sourceID: String) -> Int { smartSnapshots[sourceID]?.count ?? 0 }
 
     /// 已选相对路径（单曲级多选态）。
     var selectedTrackPaths: Set<String> { Set(selection.relativePaths ?? []) }
@@ -191,23 +204,74 @@ final class MacSyncContentModel: ObservableObject {
     /// 切到单曲级（保留已勾选的单曲）。
     func setTracksMode() { setMode(.tracks) }
 
-    /// 勾选 / 取消勾选一个歌单。
+    /// 勾选 / 取消勾选一个歌单（智能源快照原样保留）。
     func togglePlaylist(_ id: String) {
         var picks = selectedPlaylistIDs
         if picks.contains(id) { picks.remove(id) } else { picks.insert(id) }
-        applyPicks(mode: .playlists, playlistIDs: picks, trackPaths: selectedTrackPaths)
+        applyPicks(
+            mode: .playlists,
+            playlistIDs: picks,
+            trackPaths: selectedTrackPaths,
+            smartSnapshots: smartSnapshots
+        )
+    }
+
+    /// 勾选 / 取消勾选一个智能源（P1b 口径：**整组勾选 = 快照**）。
+    ///
+    /// - 勾选：走**现有**取数链路（`MacSyncLocalContentProvider.trackPage` 分页取该来源
+    ///   当前曲目的相对路径）→ 写入快照；不跟随源后续变化（用户 2026-11-16 拍板）。
+    /// - 取消：删该源快照；两个集合都空 → 回落空选择。
+    /// - 源 0 首：**不写入** + 行内可见提示（复用既有「没有找到歌曲」文案，不新增键）。
+    func toggleSmartSource(_ ref: SyncBrowseSourceRef) {
+        // 智能源行只在本端（上传方向）出现；对端没有该来源 → 不给它造快照
+        guard source == .local, ref.kind == .smart else { return }
+        if isSmartSourceSelected(ref.id) {
+            smartSourceNotice = nil
+            apply(selection.removingSmartSnapshot(sourceID: ref.id))
+            return
+        }
+        let paths = currentRelativePaths(of: ref)
+        guard !paths.isEmpty else {
+            smartSourceNotice = "sync_run_tracks_empty".localized
+            return
+        }
+        smartSourceNotice = nil
+        apply(selection.settingSmartSnapshot(sourceID: ref.id, paths: paths))
+    }
+
+    /// 该来源**当前**曲目全集（按既有分页链路逐页取；不新写 SQL / 网络）。
+    private func currentRelativePaths(of source: SyncBrowseSourceRef) -> [String] {
+        var paths: [String] = []
+        var offset = 0
+        while true {
+            let page = local.trackPage(source: source, query: "", offset: offset)
+            paths.append(contentsOf: page.options.map(\.relativePath))
+            guard page.hasMore, !page.options.isEmpty else { break }
+            offset += page.options.count
+        }
+        return paths
     }
 
     /// 勾选 / 取消勾选一首歌。
     func toggleTrack(_ relativePath: String) {
         var picks = selectedTrackPaths
         if picks.contains(relativePath) { picks.remove(relativePath) } else { picks.insert(relativePath) }
-        applyPicks(mode: .tracks, playlistIDs: selectedPlaylistIDs, trackPaths: picks)
+        applyPicks(
+            mode: .tracks,
+            playlistIDs: selectedPlaylistIDs,
+            trackPaths: picks,
+            smartSnapshots: smartSnapshots
+        )
     }
 
     /// 手动指定单曲集合（替换整个单曲级选择）。
     func setManualTracks(_ relativePaths: [String]) {
-        applyPicks(mode: .tracks, playlistIDs: selectedPlaylistIDs, trackPaths: Set(relativePaths))
+        applyPicks(
+            mode: .tracks,
+            playlistIDs: selectedPlaylistIDs,
+            trackPaths: Set(relativePaths),
+            smartSnapshots: smartSnapshots
+        )
     }
 
     /// 清空选择（不推不拉）。
@@ -385,6 +449,7 @@ final class MacSyncContentModel: ObservableObject {
         tracksState = .idle
         summaryState = .idle
         selectionSummary = .empty
+        smartSourceNotice = nil
     }
 
     private func hostDidChange() {
@@ -563,13 +628,34 @@ final class MacSyncContentModel: ObservableObject {
     // MARK: - 内部：选择集写入口
 
     private func setMode(_ mode: SyncUISelectionMode) {
-        applyPicks(mode: mode, playlistIDs: selectedPlaylistIDs, trackPaths: selectedTrackPaths)
+        applyPicks(
+            mode: mode,
+            playlistIDs: selectedPlaylistIDs,
+            trackPaths: selectedTrackPaths,
+            smartSnapshots: smartSnapshots
+        )
     }
 
-    /// 唯一的选择集写入口：算选择集 → 持久化 → 重算摘要。
+    /// 唯一的选择集写入口（池子形态）：算选择集 → 转给 `apply(_:)`。
+    private func applyPicks(
+        mode: SyncUISelectionMode,
+        playlistIDs: Set<String>,
+        trackPaths: Set<String>,
+        smartSnapshots: [String: [String]]
+    ) {
+        apply(
+            SyncUISelectionMode.selection(
+                mode: mode,
+                playlistIDs: playlistIDs,
+                trackPaths: trackPaths,
+                smartSnapshots: smartSnapshots
+            )
+        )
+    }
+
+    /// 唯一的选择集写入口（已算好的选择集，如智能源快照转移）：持久化 → 重算摘要。
     /// 持久化只在**非空**时发生（空选择不覆盖上次勾选：中途切模式不会把存档清空）。
-    private func applyPicks(mode: SyncUISelectionMode, playlistIDs: Set<String>, trackPaths: Set<String>) {
-        let next = SyncUISelectionMode.selection(mode: mode, playlistIDs: playlistIDs, trackPaths: trackPaths)
+    private func apply(_ next: SyncCollectionSelection) {
         selection = next
         if !next.isEmptySelection { selectionStore.save(next) }
         estimateSelection()
@@ -581,6 +667,7 @@ final class MacSyncContentModel: ObservableObject {
     /// 语义随方向变（本端 slug vs 对端 slug），跨会话恢复会指向另一端的标识空间。
     /// 存档写入保持（`SyncSelectionStore` 契约不变），留给「连方向一起记住」的后续迭代。
     private func clearSelection(persist: Bool) {
+        smartSourceNotice = nil
         selection = .playlists([])
         if persist { selectionStore.save(.playlists([])) }
         estimateSelection()

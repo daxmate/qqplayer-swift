@@ -1228,6 +1228,8 @@
 "sync_source_all_library" = "整個媒體庫";
 "sync_source_smart_group" = "自動歌單";
 "sync_run_pick_tracks" = "挑選歌曲";
+"sync_run_smart_selected" = "已選 %d/%d";
+"sync_run_smart_snapshot_badge" = "快照";
 "sync_run_library_row_title" = "整個媒體庫";
 "sync_run_library_row_hint" = "媒體庫裡的全部歌曲，選取前會先請你確認。";
 "sync_run_library_row_detail" = "%d 首 · 約 %@";

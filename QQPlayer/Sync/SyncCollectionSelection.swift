@@ -58,6 +58,16 @@ enum SyncCollectionSelection: Equatable, Sendable {
     case playlists([String])
     /// 显式相对路径集合（对账键口径；R1b-2 既有语义，保持不变）
     case relativePaths([String])
+    /// 歌单级「并存」形态（P1b，2026-11-16）：真实歌单 ∪ 智能源快照。
+    ///
+    /// - `playlists`：真实歌单标识（含 `@favorites`），语义同 `.playlists`；
+    ///   **`@smart:*` 一律不得进这里**（智能源只能落 `smartSnapshots`）。
+    /// - `smartSnapshots`：键 = `@smart:*` 来源标识，值 = 该源在**勾选当时**展开的
+    ///   相对路径（已规范化 / 去重 / 升序）。
+    ///
+    /// 快照语义（用户 2026-11-16 拍板）：勾上的那一刻定版，智能源之后的动态变化
+    /// **不跟随**——否则「勾了最近添加」会在下一次同步时悄悄把新歌也带上。
+    case playlistBundle(playlists: [String], smartSnapshots: [String: [String]])
 
     /// 「收藏」的保留歌单标识（决策 9：收藏视为特殊歌单，走同一套展开规则）。
     /// 以 `@` 开头，与真实歌单 slug（字母/数字/连字符）不可能撞名。
@@ -89,16 +99,78 @@ enum SyncCollectionSelection: Equatable, Sendable {
         return out.sorted()
     }
 
+    /// 是否智能源标识（`@smart:*`；保留命名空间，不是真实歌单）。
+    ///
+    /// 前缀字面量只有一份：`SyncBrowseSourceRef.smartPrefix`（这里不重复写）。
+    static func isSmartSourceID(_ id: String) -> Bool {
+        id.hasPrefix(SyncBrowseSourceRef.smartPrefix)
+    }
+
+    /// 智能源标识的形态校验：`@smart:` 前缀 + 余下部分非空 + 其余同歌单标识规则。
+    static func isValidSmartSourceID(_ id: String) -> Bool {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isSmartSourceID(trimmed), isValidPlaylistID(trimmed) else { return false }
+        return !trimmed.dropFirst(SyncBrowseSourceRef.smartPrefix.count).isEmpty
+    }
+
+    /// bundle 里的「歌单标识」校验：真实歌单 / 收藏，**拒绝** `@smart:*`
+    /// （智能源只能进 `smartSnapshots`）。`.playlists` 的校验口径**不变**（读兼容）。
+    static func isValidBundlePlaylistID(_ id: String) -> Bool {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        return isValidPlaylistID(trimmed) && !isSmartSourceID(trimmed)
+    }
+
+    /// 规范化 bundle 的歌单标识：同 `normalizePlaylistIDs`，额外拒绝 `@smart:*`。
+    static func normalizeBundlePlaylistIDs(_ raw: [String]) -> [String] {
+        var seen: Set<String> = []
+        var out: [String] = []
+        for id in raw {
+            let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard isValidBundlePlaylistID(trimmed) else { continue }
+            guard seen.insert(trimmed).inserted else { continue }
+            out.append(trimmed)
+        }
+        return out.sorted()
+    }
+
+    /// 规范化快照表：键必须是合法 `@smart:*`；值走**既有**相对路径规范化
+    /// （`SyncFetchRequest.normalize`：丢非法 / 去重 / 升序）——不另写第二份规则。
+    /// 空列表整键丢弃（空快照 = 没勾，与「空选择 = 不推不拉」同口径）。
+    static func normalizeSmartSnapshots(_ raw: [String: [String]]) -> [String: [String]] {
+        var out: [String: [String]] = [:]
+        for (sourceID, paths) in raw {
+            let key = sourceID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard isValidSmartSourceID(key) else { continue }
+            let normalized = SyncFetchRequest.normalize(paths)
+            guard !normalized.isEmpty else { continue }
+            out[key] = normalized
+        }
+        return out
+    }
+
     /// 是否「库级」选择（不过滤）。
     var isLibraryWide: Bool {
         if case .all = self { return true }
         return false
     }
 
-    /// 规范化后的歌单标识（非 `.playlists` → nil）。
+    /// 规范化后的歌单标识（`.playlists` / `.playlistBundle` 的**真实歌单**部分；
+    /// 其余 → nil）。bundle 只给真实歌单：智能源标识不在其中（它们在快照表里）。
     var playlistIDs: [String]? {
-        guard case let .playlists(raw) = self else { return nil }
-        return SyncCollectionSelection.normalizePlaylistIDs(raw)
+        switch self {
+        case let .playlists(raw):
+            return SyncCollectionSelection.normalizePlaylistIDs(raw)
+        case let .playlistBundle(playlists, _):
+            return SyncCollectionSelection.normalizeBundlePlaylistIDs(playlists)
+        case .all, .relativePaths:
+            return nil
+        }
+    }
+
+    /// 规范化后的智能源快照表（非 `.playlistBundle` → nil）。
+    var smartSnapshots: [String: [String]]? {
+        guard case let .playlistBundle(_, snapshots) = self else { return nil }
+        return SyncCollectionSelection.normalizeSmartSnapshots(snapshots)
     }
 
     /// 规范化后的相对路径（非 `.relativePaths` → nil）。
@@ -117,6 +189,9 @@ enum SyncCollectionSelection: Equatable, Sendable {
             return SyncCollectionSelection.normalizePlaylistIDs(raw).isEmpty
         case let .relativePaths(raw):
             return SyncFetchRequest.normalize(raw).isEmpty
+        case let .playlistBundle(playlists, snapshots):
+            return SyncCollectionSelection.normalizeBundlePlaylistIDs(playlists).isEmpty
+                && SyncCollectionSelection.normalizeSmartSnapshots(snapshots).isEmpty
         }
     }
 
@@ -129,7 +204,56 @@ enum SyncCollectionSelection: Equatable, Sendable {
             return .playlists(SyncCollectionSelection.normalizePlaylistIDs(raw))
         case let .relativePaths(raw):
             return .relativePaths(SyncFetchRequest.normalize(raw))
+        case let .playlistBundle(playlists, snapshots):
+            return .playlistBundle(
+                playlists: SyncCollectionSelection.normalizeBundlePlaylistIDs(playlists),
+                smartSnapshots: SyncCollectionSelection.normalizeSmartSnapshots(snapshots)
+            )
         }
+    }
+
+    // MARK: 纯转移（P1b：智能源勾选 / 取消，零 IO）
+
+    /// 勾选智能源：把**当时**展开的相对路径写入快照，真实歌单原样保留。
+    ///
+    /// - 空路径（源 0 首）→ **不写入**，原样返回（调用方按未勾选处理并给可见反馈）；
+    /// - 已有同源快照 → 整体替换（再次勾选 = 重新取当时曲目，不做并集累加）；
+    /// - `self` 为 `.playlists` 时迁移成 `.playlistBundle`；`.all` / `.relativePaths`
+    ///   与歌单模式互斥（调用方不应走到），按「只保留该快照」保守处理。
+    func settingSmartSnapshot(sourceID: String, paths: [String]) -> SyncCollectionSelection {
+        let key = sourceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard SyncCollectionSelection.isValidSmartSourceID(key) else { return self }
+        let normalizedPaths = SyncFetchRequest.normalize(paths)
+        guard !normalizedPaths.isEmpty else { return self }
+
+        var playlists: [String] = []
+        var snapshots: [String: [String]] = [:]
+        switch self {
+        case let .playlistBundle(rawPlaylists, rawSnapshots):
+            playlists = SyncCollectionSelection.normalizeBundlePlaylistIDs(rawPlaylists)
+            snapshots = SyncCollectionSelection.normalizeSmartSnapshots(rawSnapshots)
+        case let .playlists(raw):
+            playlists = SyncCollectionSelection.normalizeBundlePlaylistIDs(raw)
+        case .all, .relativePaths:
+            break
+        }
+        snapshots[key] = normalizedPaths
+        return .playlistBundle(playlists: playlists, smartSnapshots: snapshots)
+    }
+
+    /// 取消勾选智能源：删该源快照；两个集合都空时回落 `.playlists([])`（= 空选择，
+    /// 不推不拉）。非 bundle 形态没有可删的快照 → 原样返回。
+    func removingSmartSnapshot(sourceID: String) -> SyncCollectionSelection {
+        let key = sourceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard case let .playlistBundle(rawPlaylists, rawSnapshots) = self else { return self }
+        var snapshots = SyncCollectionSelection.normalizeSmartSnapshots(rawSnapshots)
+        snapshots.removeValue(forKey: key)
+        let playlists = SyncCollectionSelection.normalizeBundlePlaylistIDs(rawPlaylists)
+        // 快照空了就退回既有 `.playlists` 形态（不让空快照表在存档里常驻）
+        guard !snapshots.isEmpty else {
+            return playlists.isEmpty ? .playlists([]) : .playlists(playlists)
+        }
+        return .playlistBundle(playlists: playlists, smartSnapshots: snapshots)
     }
 }
 
@@ -235,6 +359,8 @@ enum SyncCollectionExpander {
     /// - `.all` → `isLibraryWide`（不展开；调用方用本端全量 manifest）
     /// - 空选择集 → `isEmptySelection`（不推不拉）
     /// - `.playlists(ids)` → 逐歌单取曲目事实；未知歌单忽略并计入 `unknownPlaylistIDs`
+    /// - `.playlistBundle` → 歌单展开 ∪ 智能源快照（同一 `relativePath` 去重，
+    ///   **歌单展开优先**；未知歌单 / 查不到的路径照旧记账）
     /// - `.relativePaths(paths)` → 逐路径取曲目事实；查不到计入 `unresolved`
     static func expand(
         selection: SyncCollectionSelection,
@@ -265,6 +391,50 @@ enum SyncCollectionExpander {
                 }
                 for track in tracks {
                     builder.add(track: track, playlistID: playlistID, facts: facts)
+                }
+            }
+            return builder.build()
+
+        case let .playlistBundle(rawPlaylists, rawSnapshots):
+            let ids = SyncCollectionSelection.normalizeBundlePlaylistIDs(rawPlaylists)
+            // 非法标识（含 `@smart:*`——它们只能落快照表）：忽略但记账，与 .playlists 同口径
+            let invalidIDs = rawPlaylists
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !SyncCollectionSelection.isValidBundlePlaylistID($0) }
+            let snapshots = SyncCollectionSelection.normalizeSmartSnapshots(rawSnapshots)
+            guard !ids.isEmpty || !snapshots.isEmpty else {
+                return SyncCollectionExpansion(
+                    isEmptySelection: true,
+                    unknownPlaylistIDs: Array(Set(invalidIDs)).sorted()
+                )
+            }
+            var builder = Builder()
+            builder.unknownPlaylistIDs = invalidIDs
+            // ① 真实歌单先展开（同路径 first wins → 歌单展开结果为准）
+            for playlistID in ids {
+                guard let tracks = facts.tracks(inPlaylist: playlistID) else {
+                    builder.unknownPlaylistIDs.append(playlistID)
+                    continue
+                }
+                for track in tracks {
+                    builder.add(track: track, playlistID: playlistID, facts: facts)
+                }
+            }
+            // ② 快照路径：按 path 取事实（查不到 = 本端已无此文件 → unresolved，不伪造）
+            for sourceID in snapshots.keys.sorted() {
+                for path in snapshots[sourceID] ?? [] {
+                    guard let track = facts.track(atRelativePath: path) else {
+                        builder.unresolved.append(
+                            SyncCollectionUnresolvedTrack(
+                                stableId: "",
+                                relativePath: path,
+                                playlistID: sourceID,
+                                reason: SyncCollectionUnresolvedReason.unknownPath
+                            )
+                        )
+                        continue
+                    }
+                    builder.add(track: track, playlistID: sourceID, facts: facts)
                 }
             }
             return builder.build()
@@ -428,7 +598,11 @@ extension SyncCollectionSelection {
             return .all
         case let (.playlists(raw), .download):
             return .playlists(SyncCollectionSelection.normalizePlaylistIDs(raw))
-        case (.playlists, .upload), (.relativePaths, _):
+        case let (.playlistBundle(rawPlaylists, _), .download):
+            // 快照是**本端**（上传侧）口径，对端表达不了 → 只按真实歌单收口；
+            // 歌单为空时回空集合（fail-closed：绝不因为表达不了就放大成全库）。
+            return .playlists(SyncCollectionSelection.normalizeBundlePlaylistIDs(rawPlaylists))
+        case (.playlists, .upload), (.playlistBundle, .upload), (.relativePaths, _):
             return .all
         }
     }
@@ -458,9 +632,9 @@ enum SyncExpectedPlanner {
         switch (selection, direction) {
         case (.all, .upload):
             return .localManifest
-        case (.playlists, .upload), (.relativePaths, .upload):
+        case (.playlists, .upload), (.playlistBundle, .upload), (.relativePaths, .upload):
             return .expansion
-        case (.all, .download), (.playlists, .download):
+        case (.all, .download), (.playlists, .download), (.playlistBundle, .download):
             return .remoteManifest
         case (.relativePaths, .download):
             return .selectionPaths

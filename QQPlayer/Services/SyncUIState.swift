@@ -274,24 +274,33 @@ enum SyncUISelectionMode: String, Equatable, Sendable, CaseIterable {
     /// 单曲级
     case tracks
 
-    /// 模式 + 两级勾选池 → 选择集（唯一映射；勾选池跨模式保留，切模式不丢另一级的勾选）。
+    /// 模式 + 两级勾选池 + 智能源快照 → 选择集（唯一映射；勾选池跨模式保留，
+    /// 切模式不丢另一级的勾选）。
+    ///
+    /// `smartSnapshots` 为空时产物与既有实现**逐字相同**（`.playlists`）；非空才升级成
+    /// `.playlistBundle`（P1b：智能源整组勾选 = 快照）。
     static func selection(
         mode: SyncUISelectionMode,
         playlistIDs: Set<String>,
-        trackPaths: Set<String>
+        trackPaths: Set<String>,
+        smartSnapshots: [String: [String]] = [:]
     ) -> SyncCollectionSelection {
         switch mode {
         case .library: return .all
-        case .playlists: return .playlists(playlistIDs.sorted())
+        case .playlists:
+            let ids = playlistIDs.sorted()
+            guard !smartSnapshots.isEmpty else { return .playlists(ids) }
+            return .playlistBundle(playlists: ids, smartSnapshots: smartSnapshots)
         case .tracks: return .relativePaths(trackPaths.sorted())
         }
     }
 
     /// 选择集 → 模式（载入上次存档时用）。
+    /// `.playlistBundle` 落在歌单级（快照行只在歌单模式出现）。
     static func mode(for selection: SyncCollectionSelection) -> SyncUISelectionMode {
         switch selection {
         case .all: return .library
-        case .playlists: return .playlists
+        case .playlists, .playlistBundle: return .playlists
         case .relativePaths: return .tracks
         }
     }
@@ -378,6 +387,51 @@ enum SyncUISelectionSummarizer {
                 trackCount: trackCount,
                 totalBytes: bytes,
                 isBytesPartial: missing || !unknown.isEmpty,
+                isEmpty: false,
+                unknownPlaylistIDs: unknown.sorted()
+            )
+
+        case let .playlistBundle(rawPlaylists, rawSnapshots):
+            // 口径（P1b 2.4）：`playlistCount` 只数**真实歌单**（不含智能源）；
+            // `trackCount` / `totalBytes` = 歌单部分 ∪ 快照部分。
+            // 快照内部在规范化时已去重；跨「歌单展开」与「快照」的重叠需要歌单成员
+            // 路径集（本函数只拿选项汇总，判不了）→ 数字按**上界**累加，真正下发的
+            // 条目由展开器按 relativePath 去重（2.2 唯一去重口径）。
+            let ids = SyncCollectionSelection.normalizeBundlePlaylistIDs(rawPlaylists)
+            let snapshots = SyncCollectionSelection.normalizeSmartSnapshots(rawSnapshots)
+            guard !ids.isEmpty || !snapshots.isEmpty else { return .empty }
+            let byID = Dictionary(playlists.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            var trackCount = 0
+            var bytes: Int64 = 0
+            var partial = false
+            var unknown: [String] = []
+            for id in ids {
+                guard let option = byID[id] else {
+                    unknown.append(id)
+                    continue
+                }
+                trackCount += option.trackCount
+                bytes += option.totalBytes
+                if option.missingSizeCount > 0 { partial = true }
+            }
+            let byPath = Dictionary(tracks.map { ($0.relativePath, $0) }, uniquingKeysWith: { first, _ in first })
+            for sourceID in snapshots.keys.sorted() {
+                let paths = snapshots[sourceID] ?? []
+                trackCount += paths.count
+                for path in paths {
+                    guard let option = byPath[path], let size = option.fileSize, size > 0 else {
+                        partial = true
+                        continue
+                    }
+                    bytes += size
+                }
+            }
+            return SyncUISelectionSummary(
+                isLibraryWide: false,
+                playlistCount: ids.count,
+                trackCount: trackCount,
+                totalBytes: bytes,
+                isBytesPartial: partial || !unknown.isEmpty,
                 isEmpty: false,
                 unknownPlaylistIDs: unknown.sorted()
             )

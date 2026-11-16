@@ -649,3 +649,113 @@ struct SyncUIInterruptionTests {
         )
     }
 }
+
+// MARK: - P1b：bundle（智能源快照）合计口径（2026-11-16）
+
+@Suite("P1b 选择集合计（bundle）")
+struct SyncUIBundleSummaryTests {
+    private let playlists = [
+        SyncUIPlaylistOption(id: "rock", title: "Rock", trackCount: 10, totalBytes: 1_000, missingSizeCount: 0),
+        SyncUIPlaylistOption(id: "jazz", title: "Jazz", trackCount: 4, totalBytes: 400, missingSizeCount: 2),
+    ]
+    private let tracks = [
+        SyncUITrackOption(relativePath: "a.m4a", title: "A", artistName: nil, fileSize: 100),
+        SyncUITrackOption(relativePath: "b.m4a", title: "B", artistName: nil, fileSize: 200),
+        SyncUITrackOption(relativePath: "c.m4a", title: "C", artistName: nil, fileSize: nil),
+    ]
+
+    @Test("bundle 合计：playlistCount 只数真实歌单；曲目 / 字节 = 歌单 ∪ 快照")
+    func bundleSummary() {
+        let summary = SyncUISelectionSummarizer.make(
+            selection: .playlistBundle(
+                playlists: ["rock"],
+                smartSnapshots: ["@smart:recentAdded": ["a.m4a", "c.m4a"]]
+            ),
+            playlists: playlists,
+            tracks: tracks,
+            library: SyncUILibraryFacts(trackCount: 100, totalBytes: 10_000)
+        )
+        #expect(!summary.isLibraryWide)
+        #expect(!summary.isEmpty)
+        // 智能源不计入歌单数
+        #expect(summary.playlistCount == 1)
+        // 10（rock）+ 2（快照）
+        #expect(summary.trackCount == 12)
+        // 1000 + 100（a.m4a；c.m4a 大小未知 → 计入下界标记）
+        #expect(summary.totalBytes == 1_100)
+        #expect(summary.isBytesPartial)
+        #expect(summary.unknownPlaylistIDs.isEmpty)
+    }
+
+    @Test("只有智能源：playlistCount = 0；大小全已知 → 不是下界")
+    func bundleSnapshotOnly() {
+        let summary = SyncUISelectionSummarizer.make(
+            selection: .playlistBundle(
+                playlists: [],
+                smartSnapshots: ["@smart:topPlayed": ["a.m4a", "b.m4a"]]
+            ),
+            playlists: playlists,
+            tracks: tracks,
+            library: .empty
+        )
+        #expect(summary.playlistCount == 0)
+        #expect(summary.trackCount == 2)
+        #expect(summary.totalBytes == 300)
+        #expect(!summary.isBytesPartial)
+        #expect(!summary.isEmpty)
+    }
+
+    @Test("bundle 未知歌单照旧记账；歌单缺尺寸 → 下界")
+    func bundleUnknownPlaylist() {
+        let summary = SyncUISelectionSummarizer.make(
+            selection: .playlistBundle(
+                playlists: ["rock", "jazz", "ghost"],
+                smartSnapshots: ["@smart:recentAdded": ["a.m4a"]]
+            ),
+            playlists: playlists,
+            tracks: tracks,
+            library: .empty
+        )
+        #expect(summary.playlistCount == 3)
+        #expect(summary.trackCount == 15)
+        #expect(summary.totalBytes == 1_500)
+        #expect(summary.isBytesPartial)
+        #expect(summary.unknownPlaylistIDs == ["ghost"])
+    }
+}
+
+// MARK: - P1b：选择集模式映射（bundle）
+
+@Suite("P1b 选择集模式（bundle）")
+struct SyncUISelectionModeBundleTests {
+    @Test("bundle ↔ 歌单级；快照为空时不升级成 bundle（旧路径逐字不变）")
+    func modeMapping() {
+        #expect(
+            SyncUISelectionMode.mode(for: .playlistBundle(playlists: ["rock"], smartSnapshots: [:]))
+                == .playlists
+        )
+        #expect(
+            SyncUISelectionMode.selection(mode: .playlists, playlistIDs: ["rock"], trackPaths: [])
+                == .playlists(["rock"])
+        )
+        #expect(
+            SyncUISelectionMode.selection(
+                mode: .playlists,
+                playlistIDs: ["rock"],
+                trackPaths: [],
+                smartSnapshots: ["@smart:recentAdded": ["a.m4a"]]
+            )
+                == .playlistBundle(playlists: ["rock"], smartSnapshots: ["@smart:recentAdded": ["a.m4a"]])
+        )
+        // 单曲级不受快照影响（快照只在歌单模式出现）
+        #expect(
+            SyncUISelectionMode.selection(
+                mode: .tracks,
+                playlistIDs: ["rock"],
+                trackPaths: ["a.m4a"],
+                smartSnapshots: ["@smart:recentAdded": ["a.m4a"]]
+            )
+                == .relativePaths(["a.m4a"])
+        )
+    }
+}

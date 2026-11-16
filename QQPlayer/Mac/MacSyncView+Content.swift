@@ -209,9 +209,11 @@ extension MacSyncRunSection {
 
     /// 自动歌单来源（最近添加 / 最近播放 / 常听排行）。
     ///
-    /// 这里**不给整单勾选**：自动歌单是动态集合，而「整单同步」的展开口径本期只覆盖
-    /// 收藏 / 真实歌单（`@smart:*` 不在展开器的识别范围内）——与其放一个勾了不同步的
-    /// 复选框，不如只提供明确可用的「挑选歌曲」入口。
+    /// P1b（2026-11-16）起**允许整组勾选**，语义是**快照**：勾上的那一刻把该源当时的
+    /// 曲目展开成相对路径存进 `SyncCollectionSelection.playlistBundle`，之后源的动态
+    /// 变化**不跟随**（用户拍板：动态 → 快照）。行内「已选 n/N」的 n = 快照条数、
+    /// N = 该源当前曲目数，两者不等就说明源变了而快照没变；「快照」徽标提示这份选择
+    /// 已定版。仍保留「挑选歌曲」入口（要精挑细选就走单曲级）。
     private var smartSources: [SyncBrowseSourceOption] {
         content.browseSources.filter(\.isSmart)
     }
@@ -226,16 +228,27 @@ extension MacSyncRunSection {
                     .foregroundStyle(.secondary)
                 ForEach(sources) { option in
                     HStack(spacing: DesignTokens.space8) {
-                        Image(systemName: smartIconName(option))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 16)
-                        Text(option.title)
+                        Toggle(isOn: smartSourceBinding(option.ref)) {
+                            HStack(spacing: DesignTokens.space8) {
+                                Image(systemName: smartIconName(option))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 16)
+                                Text(option.title)
+                                Text("smart_songs_count".localized(with: option.trackCount))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                smartSnapshotBadge(option)
+                            }
+                        }
+                        .toggleStyle(.checkbox)
                         Spacer(minLength: DesignTokens.space0)
-                        Text("smart_songs_count".localized(with: option.trackCount))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                         pickTracksButton(option.ref)
                     }
+                }
+                if let notice = content.smartSourceNotice {
+                    Text(notice)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -282,6 +295,39 @@ extension MacSyncRunSection {
     private func smartIconName(_ option: SyncBrowseSourceOption) -> String {
         guard let kind = option.ref.smartKind else { return "music.note.list" }
         return MacSmartPlaylistUILogic.iconName(for: kind.smartPlaylistKind)
+    }
+
+    /// 智能源整组勾选的绑定（同款 checkbox；勾上 = 按当时曲目写快照）。
+    private func smartSourceBinding(_ ref: SyncBrowseSourceRef) -> Binding<Bool> {
+        Binding(
+            get: { content.isSmartSourceSelected(ref.id) },
+            set: { isOn in
+                guard isOn != content.isSmartSourceSelected(ref.id) else { return }
+                content.toggleSmartSource(ref)
+            }
+        )
+    }
+
+    /// 已选快照徽标：勾上才显示「已选 n/N」+「快照」。
+    /// n/N 不等 = 源后来变了而快照没变（这正是「不跟随」的可见凭据）。
+    @ViewBuilder
+    private func smartSnapshotBadge(_ option: SyncBrowseSourceOption) -> some View {
+        if content.isSmartSourceSelected(option.id) {
+            Text(
+                "sync_run_smart_selected".localized(
+                    with: content.smartSnapshotCount(forSource: option.id),
+                    option.trackCount
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(accentColor)
+            Text("sync_run_smart_snapshot_badge".localized)
+                .font(.caption2)
+                .padding(.horizontal, DesignTokens.space6)
+                .padding(.vertical, DesignTokens.space2)
+                .background(Color.gray.opacity(0.14), in: Capsule())
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// 下钻入口：切到单曲级 + 把该来源设为当前来源（已勾选的歌全部保留）。

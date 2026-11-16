@@ -27,6 +27,9 @@ import Foundation
 /// 同步选择集读写（UserDefaults JSON）。
 struct SyncSelectionStore {
     /// 存档键（v1 单主机会话；将来多主机再按主机 ID 分键）。
+    ///
+    /// ⚠️ 键名里的 `v1` 是**键的**版本（P1b 存档格式已升到 payload 内 `version = 2`）：
+    /// 改键名会让已有用户的选择集凭空消失，而 v1 存档本来就按「无 kind / 旧 kind」兼容。
     static let defaultKey = "sync.collectionSelection.v1"
 
     private let defaults: UserDefaults
@@ -64,14 +67,21 @@ struct SyncSelectionStore {
     /// 显式 kind 字符串 + 版本号让存档格式可控、可演进（未知 kind/版本 → 空选择）。
     private struct StoredSelection: Codable {
         /// 存档格式版本（结构变更时递增；未知版本按空选择处理）。
-        static let currentVersion = 1
+        /// - v1：`all` / `playlists` / `relativePaths`
+        /// - v2（P1b 2026-11-16）：新增 `playlistBundle` + `smartSnapshots`；v1 存档照旧可读
+        static let currentVersion = 2
+        /// 旧存档里有的最小版本号（更小的值 = 损坏/臆造 → 空选择）。
+        static let minVersion = 1
         static let kindAll = "all"
         static let kindPlaylists = "playlists"
         static let kindRelativePaths = "relativePaths"
+        static let kindPlaylistBundle = "playlistBundle"
 
         var version: Int
         var kind: String
         var values: [String]
+        /// `playlistBundle` 的智能源快照表（v2 新增；其余 kind / v1 存档无此字段）。
+        var smartSnapshots: [String: [String]]?
 
         init(_ selection: SyncCollectionSelection) {
             version = Self.currentVersion
@@ -85,13 +95,19 @@ struct SyncSelectionStore {
             case let .relativePaths(paths):
                 kind = Self.kindRelativePaths
                 values = paths
+            case let .playlistBundle(playlists, snapshots):
+                kind = Self.kindPlaylistBundle
+                values = playlists
+                smartSnapshots = snapshots
             }
         }
 
         /// 存档 → 选择集。未知版本 / 未知 kind → **空选择**（保守：宁可不同步，
         /// 也不把未知形态猜成某个选择集）。
         var selection: SyncCollectionSelection {
-            guard version == Self.currentVersion else { return .playlists([]) }
+            guard (Self.minVersion ... Self.currentVersion).contains(version) else {
+                return .playlists([])
+            }
             switch kind {
             case Self.kindAll:
                 return .all
@@ -99,6 +115,12 @@ struct SyncSelectionStore {
                 return .playlists(values)
             case Self.kindRelativePaths:
                 return .relativePaths(values)
+            case Self.kindPlaylistBundle:
+                // bundle 是 v2 形态：v1 存档里出现 = 臆造 → 空选择；缺快照字段 = 损坏
+                guard version >= 2, let snapshots = smartSnapshots else { return .playlists([]) }
+                return SyncCollectionSelection
+                    .playlistBundle(playlists: values, smartSnapshots: snapshots)
+                    .normalized
             default:
                 return .playlists([])
             }

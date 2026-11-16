@@ -551,3 +551,174 @@ struct SyncCollectionDiffPlannerTests {
         #expect(upload.alreadyPresent.isEmpty)
     }
 }
+
+// MARK: - ④ P1b：智能源整组勾选 = 快照（2026-11-16）
+
+@Suite("P1b 智能源快照（playlistBundle）")
+struct SyncCollectionBundleTests {
+    @Test("bundle 规范化：歌单去非法；@smart:* 只进快照表，不进歌单")
+    func normalizeBundle() {
+        let bundle = SyncCollectionSelection.playlistBundle(
+            playlists: [" b ", "@smart:recentAdded", "a", "a", ""],
+            smartSnapshots: [
+                " @smart:recentAdded ": [
+                    "Album/b.flac",
+                    "../escape.flac",
+                    "Album/a.flac",
+                    "Album/a.flac",
+                ],
+                "@smart:recentPlayed": [],
+                "not-a-smart-id": ["Album/c.flac"],
+            ]
+        ).normalized
+
+        #expect(bundle.playlistIDs == ["a", "b"])
+        #expect(bundle.smartSnapshots == ["@smart:recentAdded": ["Album/a.flac", "Album/b.flac"]])
+        // 空快照 / 非 @smart: 键整键丢弃（空快照 = 没勾）
+        #expect(bundle.smartSnapshots?.count == 1)
+    }
+
+    @Test("校验：@smart:* 不是合法 bundle 歌单标识；.playlists 口径保持不变")
+    func smartIDRejectedAsPlaylistID() {
+        #expect(!SyncCollectionSelection.isValidBundlePlaylistID("@smart:recentAdded"))
+        #expect(SyncCollectionSelection.isValidBundlePlaylistID("@favorites"))
+        #expect(SyncCollectionSelection.isValidBundlePlaylistID("rock"))
+        // 读兼容：旧 .playlists 的形态校验不变
+        #expect(SyncCollectionSelection.isValidPlaylistID("@smart:recentAdded"))
+        #expect(
+            SyncCollectionSelection.normalizePlaylistIDs(["@smart:recentAdded"])
+                == ["@smart:recentAdded"]
+        )
+        // 快照键必须带后缀
+        #expect(!SyncCollectionSelection.isValidSmartSourceID("@smart:"))
+        #expect(SyncCollectionSelection.isValidSmartSourceID("@smart:topPlayed"))
+    }
+
+    @Test("bundle 空判定 / 库级判定：非全库；两者皆空才算空选择")
+    func bundleEmptiness() {
+        let empty = SyncCollectionSelection.playlistBundle(playlists: [], smartSnapshots: [:])
+        #expect(empty.isEmptySelection)
+        #expect(!empty.isLibraryWide)
+        #expect(
+            !SyncCollectionSelection.playlistBundle(playlists: ["rock"], smartSnapshots: [:])
+                .isEmptySelection
+        )
+        #expect(
+            !SyncCollectionSelection
+                .playlistBundle(playlists: [], smartSnapshots: ["@smart:recentAdded": ["A.flac"]])
+                .isEmptySelection
+        )
+        // 快照里全是非法路径 → 规范化后为空 → 与「没勾」同义
+        #expect(
+            SyncCollectionSelection
+                .playlistBundle(playlists: [], smartSnapshots: ["@smart:recentAdded": ["../x.flac"]])
+                .isEmptySelection
+        )
+    }
+
+    @Test("展开：歌单 ∪ 快照按 relativePath 去重（歌单展开优先）+ 未知歌单 / 失效路径记账")
+    func expandBundleUnion() {
+        var facts = MemoryFacts()
+        facts.playlistTracks["p1"] = [
+            SyncCollectionTrackFact(stableId: "s1", relativePath: "Album/one.flac", contentHash: hashA),
+        ]
+        facts.playlistTracks["p2"] = [
+            SyncCollectionTrackFact(stableId: "s2", relativePath: "Album/two.flac", contentHash: hashB),
+        ]
+        // 同一条路径，快照侧给一个不同的指纹：去重要以歌单展开结果为准
+        facts.trackByPath["Album/one.flac"] = SyncCollectionTrackFact(
+            stableId: "s1",
+            relativePath: "Album/one.flac",
+            contentHash: hashB
+        )
+        facts.trackByPath["Album/three.flac"] = SyncCollectionTrackFact(
+            stableId: "s3",
+            relativePath: "Album/three.flac",
+            contentHash: hashPush
+        )
+
+        let expansion = SyncCollectionExpander.expand(
+            selection: .playlistBundle(
+                playlists: ["p1", "p2", "ghost"],
+                smartSnapshots: [
+                    "@smart:recentAdded": [
+                        "Album/one.flac",
+                        "Album/three.flac",
+                        "Album/gone.flac",
+                        "Album/three.flac",
+                    ],
+                ]
+            ),
+            facts: facts
+        )
+
+        #expect(!expansion.isEmptySelection)
+        #expect(!expansion.isLibraryWide)
+        #expect(
+            expansion.relativePaths
+                == ["Album/one.flac", "Album/three.flac", "Album/two.flac"]
+        )
+        #expect(expansion.entries.filter { $0.relativePath == "Album/one.flac" }.count == 1)
+        #expect(expansion.entries.first { $0.relativePath == "Album/one.flac" }?.contentHash == hashA)
+        #expect(expansion.unknownPlaylistIDs == ["ghost"])
+        #expect(expansion.unresolved.map(\.relativePath) == ["Album/gone.flac"])
+        #expect(expansion.unresolved.first?.playlistID == "@smart:recentAdded")
+    }
+
+    @Test("快照转移：空快照不写入 / 勾上迁移成 bundle / 取消后回落既有形态")
+    func snapshotTransitions() {
+        // 空路径（源 0 首）→ 原样返回，不写空快照
+        #expect(
+            SyncCollectionSelection.playlists(["rock"])
+                .settingSmartSnapshot(sourceID: "@smart:recentAdded", paths: [])
+                == .playlists(["rock"])
+        )
+        // 非智能源标识 → 原样返回
+        #expect(
+            SyncCollectionSelection.playlists([])
+                .settingSmartSnapshot(sourceID: "rock", paths: ["A.flac"])
+                == .playlists([])
+        )
+
+        // .playlists → bundle：真实歌单保留，@smart:* 被挪进快照表
+        let migrated = SyncCollectionSelection.playlists(["rock", "@smart:recentAdded"])
+            .settingSmartSnapshot(
+                sourceID: "@smart:recentAdded",
+                paths: [" Album/b.flac ", "Album/a.flac", "Album/a.flac"]
+            )
+        #expect(migrated.playlistIDs == ["rock"])
+        #expect(migrated.smartSnapshots == ["@smart:recentAdded": ["Album/a.flac", "Album/b.flac"]])
+        #expect(!migrated.isEmptySelection)
+
+        // 取消：歌单还在 → 退回 .playlists（不留空快照表）
+        #expect(
+            migrated.removingSmartSnapshot(sourceID: "@smart:recentAdded") == .playlists(["rock"])
+        )
+        // 取消后两者皆空 → .playlists([])（空选择 = 不推不拉）
+        let emptied = SyncCollectionSelection
+            .playlistBundle(playlists: [], smartSnapshots: ["@smart:recentAdded": ["A.flac"]])
+            .removingSmartSnapshot(sourceID: "@smart:recentAdded")
+        #expect(emptied == .playlists([]))
+        #expect(emptied.isEmptySelection)
+    }
+
+    @Test("方向映射：bundle 上传走本端展开；下载只按真实歌单收口（快照不放大成对端全库）")
+    func bundleDirectionMapping() {
+        let bundle = SyncCollectionSelection.playlistBundle(
+            playlists: ["rock"],
+            smartSnapshots: ["@smart:recentAdded": ["A.flac"]]
+        )
+        #expect(SyncExpectedPlanner.source(selection: bundle, direction: .upload) == .expansion)
+        #expect(bundle.remoteRequestCollection(for: .upload) == .all)
+        #expect(bundle.remoteRequestCollection(for: .download) == .playlists(["rock"]))
+        // 只有快照、没有歌单：下载方向回空歌单集合（fail-closed，绝不放大成全库）
+        let snapshotOnly = SyncCollectionSelection.playlistBundle(
+            playlists: [],
+            smartSnapshots: ["@smart:recentAdded": ["A.flac"]]
+        )
+        #expect(snapshotOnly.remoteRequestCollection(for: .download) == .playlists([]))
+        #expect(
+            SyncExpectedPlanner.source(selection: snapshotOnly, direction: .download) == .remoteManifest
+        )
+    }
+}

@@ -902,6 +902,8 @@
 "sync_source_all_library" = "Bibliothèque entière";
 "sync_source_smart_group" = "Playlists intelligentes";
 "sync_run_pick_tracks" = "Sélectionner des morceaux";
+"sync_run_smart_selected" = "%d sur %d sélectionnés";
+"sync_run_smart_snapshot_badge" = "Instantané";
 "sync_run_library_row_title" = "Toute la bibliothèque";
 "sync_run_library_row_hint" = "Tous les morceaux de votre bibliothèque. Une confirmation vous sera demandée.";
 "sync_run_library_row_detail" = "%d morceaux · environ %@";
