@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-16T01:41:59Z",
+  "updated_at": "2026-11-16T02:08:22Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "0b0c4b85d8bcfaa8546aede458bd47ec1b8e0c1e06b47869cdba3fd9c17c7376",
-      "size": 185080,
-      "normalized_sha256": "0b0c4b85d8bcfaa8546aede458bd47ec1b8e0c1e06b47869cdba3fd9c17c7376"
+      "sha256": "770890f88dfd65418254e20597fb64eba69173f37945c83ea70640631282bd40",
+      "size": 185279,
+      "normalized_sha256": "770890f88dfd65418254e20597fb64eba69173f37945c83ea70640631282bd40"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -948,11 +948,17 @@
       "size": 4118,
       "normalized_sha256": "2f3019c13fd6bc7f3d6b6f78826de7c4572da1099ef34da003ebd33f7c1e75ac"
     },
+    "QQPlayer/Mac/MacSyncContentModel+SmartSnapshot.swift": {
+      "role": "index",
+      "sha256": "f70104cde6975610f7508b6b7302dfb9b3c6996ce9656a2ba5e2c6f12bdaad95",
+      "size": 4057,
+      "normalized_sha256": "f70104cde6975610f7508b6b7302dfb9b3c6996ce9656a2ba5e2c6f12bdaad95"
+    },
     "QQPlayer/Mac/MacSyncContentModel.swift": {
       "role": "index",
-      "sha256": "b560f3c1606788c780592b09690731247d8e0d6cef5ca3087d04e476afa10c35",
-      "size": 28841,
-      "normalized_sha256": "b560f3c1606788c780592b09690731247d8e0d6cef5ca3087d04e476afa10c35"
+      "sha256": "5c578f90369b1573cc9fc15428d87373bde0481c8cfe93cd29373256e7c2ec28",
+      "size": 25078,
+      "normalized_sha256": "5c578f90369b1573cc9fc15428d87373bde0481c8cfe93cd29373256e7c2ec28"
     },
     "QQPlayer/Mac/MacSyncCoordinatorFactory.swift": {
       "role": "index",
@@ -1010,9 +1016,9 @@
     },
     "QQPlayer/Mac/MacSyncView+Content.swift": {
       "role": "index",
-      "sha256": "06bf8fd43a053c5e95d47285489bde8b6230fe7e6548ffa3a8c415540073b643",
-      "size": 23274,
-      "normalized_sha256": "06bf8fd43a053c5e95d47285489bde8b6230fe7e6548ffa3a8c415540073b643"
+      "sha256": "e31f90cd7743c9ea41e6f38d7f27d4409eca51a15259777d2f0e70e21adde904",
+      "size": 23286,
+      "normalized_sha256": "e31f90cd7743c9ea41e6f38d7f27d4409eca51a15259777d2f0e70e21adde904"
     },
     "QQPlayer/Mac/MacSyncView+Run.swift": {
       "role": "index",
@@ -1022,9 +1028,9 @@
     },
     "QQPlayer/Mac/MacSyncView.swift": {
       "role": "index",
-      "sha256": "d6829b1990c54520d57587a59635f67c22b72e742691e35e4dfd89f3a8f61f6d",
-      "size": 24709,
-      "normalized_sha256": "d6829b1990c54520d57587a59635f67c22b72e742691e35e4dfd89f3a8f61f6d"
+      "sha256": "a1ea944b309da798d4dae9559cf3b5f2d71a187b09780372f2601468d19b88bf",
+      "size": 24974,
+      "normalized_sha256": "a1ea944b309da798d4dae9559cf3b5f2d71a187b09780372f2601468d19b88bf"
     },
     "QQPlayer/Mac/MacTagEditorCandidateRow.swift": {
       "role": "index",
@@ -2646,11 +2652,17 @@
       "size": 13371,
       "normalized_sha256": "06eb81e13c8759b62c31aeef68f1e52bda6ac84bc974875abc00641a5519a9fe"
     },
+    "QQPlayer/Services/SyncUIState+BundleSummary.swift": {
+      "role": "index",
+      "sha256": "06ea1e136a692441bb8bfd5a7308684d01c61035c1a6d79b247cbe6d2aeb70a8",
+      "size": 6918,
+      "normalized_sha256": "06ea1e136a692441bb8bfd5a7308684d01c61035c1a6d79b247cbe6d2aeb70a8"
+    },
     "QQPlayer/Services/SyncUIState.swift": {
       "role": "index",
-      "sha256": "59169b858eedeaba08a599460fdbae7a147a5fae0a67999e8874833e1a4eaf08",
-      "size": 26344,
-      "normalized_sha256": "59169b858eedeaba08a599460fdbae7a147a5fae0a67999e8874833e1a4eaf08"
+      "sha256": "6b6f4aca301c357adc1e50dc96ef4274c11ef84ce164a7505cb6069322dcb856",
+      "size": 19879,
+      "normalized_sha256": "6b6f4aca301c357adc1e50dc96ef4274c11ef84ce164a7505cb6069322dcb856"
     },
     "QQPlayer/Services/TagRenameLogic.swift": {
       "role": "index",
@@ -2808,11 +2820,17 @@
       "size": 4018,
       "normalized_sha256": "4d5fa21ac7554de4359ca13cfd1df59c6f2b1b36add1f9e1eb37cc3910691864"
     },
+    "QQPlayer/Sync/SyncCollectionSelection+Bundle.swift": {
+      "role": "index",
+      "sha256": "9cdd61f23b87f739662b2faf1aa9e8841ecd672a015e6940a1462cdb6fcbc9d7",
+      "size": 7695,
+      "normalized_sha256": "9cdd61f23b87f739662b2faf1aa9e8841ecd672a015e6940a1462cdb6fcbc9d7"
+    },
     "QQPlayer/Sync/SyncCollectionSelection.swift": {
       "role": "index",
-      "sha256": "94f344949a79970b75e2e97733b9596b8d5b791aea46aab2aabba4f8c4d32143",
-      "size": 33023,
-      "normalized_sha256": "94f344949a79970b75e2e97733b9596b8d5b791aea46aab2aabba4f8c4d32143"
+      "sha256": "6b72b3ed7a46b6e83a76909e75020389fa47fc690ca1e941bec36de0fbd73199",
+      "size": 25907,
+      "normalized_sha256": "6b72b3ed7a46b6e83a76909e75020389fa47fc690ca1e941bec36de0fbd73199"
     },
     "QQPlayer/Sync/SyncCollectionSyncCoordinator+Execution.swift": {
       "role": "index",
@@ -4988,9 +5006,9 @@
     },
     "QQPlayerTests/SyncSelectionStoreTests.swift": {
       "role": "index",
-      "sha256": "61de7dde5c883939aa8eba36539210713eb73cc71dd25e481454a6e086524aa2",
-      "size": 9631,
-      "normalized_sha256": "61de7dde5c883939aa8eba36539210713eb73cc71dd25e481454a6e086524aa2"
+      "sha256": "1fa4cb4f3d7e8c28201be71fe3458fc5a732724b958321093beec4743ec93a0f",
+      "size": 9761,
+      "normalized_sha256": "1fa4cb4f3d7e8c28201be71fe3458fc5a732724b958321093beec4743ec93a0f"
     },
     "QQPlayerTests/SyncTransferDirectionTests.swift": {
       "role": "index",
@@ -5174,9 +5192,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "28b2b87529fd373e85146ef3e281de202f5980ade2fe335bc057558f49436f78",
-      "size": 402344,
-      "normalized_sha256": "28b2b87529fd373e85146ef3e281de202f5980ade2fe335bc057558f49436f78"
+      "sha256": "62b176697b770a07214e888dc5c7c842519a1323e10a5e68b88c02566b24e925",
+      "size": 404762,
+      "normalized_sha256": "62b176697b770a07214e888dc5c7c842519a1323e10a5e68b88c02566b24e925"
     },
     "aoci.meta.txt": {
       "role": "index",
