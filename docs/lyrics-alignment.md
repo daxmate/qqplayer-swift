@@ -55,8 +55,15 @@
 
 - `SpeechAnalyzer` 需要 **iOS 26 / macOS 26**；更低版本抛 `unsupportedSystem`，**不崩**，功能不可用。
 - 首次使用某语言要下载模型（20–40s，需联网，进度回调 0…0.15）；模型不可用 → `assetInstallFailed`。
-- 音频不能直接喂 analyzer：内部统一 `AVAudioFile → AVAudioConverter → 16k 单声道 Float32`，
-  `bufferStartTime` 用累计样本数 / 16000，保证时间轴从 0 起。
+- 音频**必须落文件**再喂 analyzer：内部统一 `AVURLAsset + AVAssetReader
+  （outputSettings = 16k/1ch/Int16 LPCM）→ 16k 单声道 Int16 WAV`
+  （`NSTemporaryDirectory()/lyric-align-<UUID>.wav`，用完即删），
+  再走 `start(inputAudioFile:finishAfterFile:)`。
+  ⚠️ 别用 `AVAudioFile` 逐块读源音频：真实 4 分钟 mp3 上 macOS 27.2 抛
+  `-39 eofErr`、macOS 26.6 抛 `_GenericObjCError.nilError`（短音频能过，长音频必挂）。
+  ⚠️ 把 PCM 逐块塞进 `AsyncStream<AnalyzerInput>` 会在 macOS 26.6 上于
+  `Speech.SpeechRecognizerWorker.preRunRecognition()` 崩 `EXC_BREAKPOINT`（不可捕获），
+  2026-11-16 已实测证伪旧方案。
 
 ## 已知限制
 
