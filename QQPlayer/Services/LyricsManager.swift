@@ -124,6 +124,15 @@ actor LyricsManager {
             return manual
         }
 
+        // aligned 歌词（时间轴自动对齐结果）优先于普通缓存/网络，低于手动指定：
+        // 对齐后即使内存里还躺着旧歌词也必须换新，故放在内存缓存之前。
+        // 磁盘读失败不致命（记日志后继续走原链路），不删任何既有优先级。
+        if let aligned = loadAlignedLyrics(forStableId: track.stableId) {
+            cacheLyrics(aligned, for: track.stableId)
+            AppLog.info(.general, "📝 Using aligned lyrics for: \(track.title)")
+            return aligned
+        }
+
         // Check memory cache first
         if let cached = cache[track.stableId] {
             markCacheAccess(track.stableId)
@@ -330,6 +339,21 @@ actor LyricsManager {
                 manualOverrides[trackId] = lyrics
                 cacheLyrics(lyrics, for: trackId)
             }
+        }
+    }
+
+    // MARK: - Aligned Lyrics（时间轴自动对齐结果）
+
+    /// 读 aligned 歌词库（对齐结果的唯一落库位置）。
+    /// 命中即返回；磁盘读失败只记日志、返回 nil，让调用方继续走原链路。
+    private func loadAlignedLyrics(forStableId stableId: String) -> Lyrics? {
+        let store = AlignedLyricsStore.shared
+        guard store.contains(forStableId: stableId) else { return nil }
+        do {
+            return try store.read(forStableId: stableId)
+        } catch {
+            AppLog.warn(.general, "⚠️ aligned lyrics read failed for \(stableId): \(error)")
+            return nil
         }
     }
 

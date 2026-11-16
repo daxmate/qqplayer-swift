@@ -148,6 +148,9 @@
 		E6C1DB0A33E7465C8C77A131 /* SyncQRCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB16C6D1F5F499DB836D594 /* SyncQRCodecTests.swift */; };
 		E90C7A42116E48608F2F5069 /* MacShortcutLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF62B63461AC4CDA88AFAB60 /* MacShortcutLogicTests.swift */; };
 		EE49A8EDD4423396C78DABE2 /* StableIdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6793C3A51095FE68378E031D /* StableIdTests.swift */; };
+		A1B2C3D4E5F60718293A4002 /* LyricAlignmentTextNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4001 /* LyricAlignmentTextNormalizerTests.swift */; };
+		A1B2C3D4E5F60718293A4004 /* LyricAlignmentAlignerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4003 /* LyricAlignmentAlignerTests.swift */; };
+		A1B2C3D4E5F60718293A4006 /* LyricAlignmentServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4005 /* LyricAlignmentServiceTests.swift */; };
 		F1BB63FBDDBA0BCECD86FF7F /* LyricsSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BACA99F9A82CD834AFABADD /* LyricsSearchTests.swift */; };
 		F2C512CF67BF40C09103E579 /* MacLibraryFactsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EB0161F3694363B9982316 /* MacLibraryFactsStoreTests.swift */; };
 		F460286C1B4948A2B5F6A603 /* SyncTransferDirectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1021697B8D2D4D09B03F5E48 /* SyncTransferDirectionTests.swift */; };
@@ -355,6 +358,9 @@
 		63393694A2E147DEA008B193 /* SyncUIDirectionContentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIDirectionContentTests.swift; sourceTree = "<group>"; };
 		6451820FE00C4C7595BF21A2 /* SyncUIStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncUIStateTests.swift; sourceTree = "<group>"; };
 		6793C3A51095FE68378E031D /* StableIdTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StableIdTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4001 /* LyricAlignmentTextNormalizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentTextNormalizerTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4003 /* LyricAlignmentAlignerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentAlignerTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4005 /* LyricAlignmentServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricAlignmentServiceTests.swift; sourceTree = "<group>"; };
 		68D205D9CFB244729C6A74EE /* LocalDeviceNameTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalDeviceNameTests.swift; sourceTree = "<group>"; };
 		6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackAsyncGuardsTests.swift; sourceTree = "<group>"; };
 		6C4DA91270EB4FC2A4AF992C /* SpotifyAPITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyAPITests.swift; sourceTree = "<group>"; };
@@ -807,6 +813,11 @@
 				Resources/SimplifiedToTraditional.tsv,
 				Resources/TraditionalToSimplified.tsv,
 				Services/AlignedLyricsStore.swift,
+				Services/LyricsAlignment/LyricAlignmentAligner.swift,
+				Services/LyricsAlignment/LyricAlignmentService.swift,
+				Services/LyricsAlignment/LyricAlignmentTextNormalizer.swift,
+				Services/LyricsAlignment/LyricAlignmentTypes.swift,
+				Services/LyricsAlignment/LyricsSpeechEngine.swift,
 				Services/AppCoordinator.swift,
 				"Services/AppCoordinator+iCloud.swift",
 				"Services/AppCoordinator+ImportExport.swift",
@@ -1262,6 +1273,9 @@
 			isa = PBXGroup;
 			children = (
 				6793C3A51095FE68378E031D /* StableIdTests.swift */,
+				A1B2C3D4E5F60718293A4001 /* LyricAlignmentTextNormalizerTests.swift */,
+				A1B2C3D4E5F60718293A4003 /* LyricAlignmentAlignerTests.swift */,
+				A1B2C3D4E5F60718293A4005 /* LyricAlignmentServiceTests.swift */,
 				A19C99C3D410D8854B01C0CF /* IdentifiedRowTests.swift */,
 				95D963241E1B89FFA0906475 /* EQFrequencyTests.swift */,
 				071C4A9B25AFB9B772D8625E /* FormatInfoTests.swift */,
@@ -1800,6 +1814,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				EE49A8EDD4423396C78DABE2 /* StableIdTests.swift in Sources */,
+				A1B2C3D4E5F60718293A4002 /* LyricAlignmentTextNormalizerTests.swift in Sources */,
+				A1B2C3D4E5F60718293A4004 /* LyricAlignmentAlignerTests.swift in Sources */,
+				A1B2C3D4E5F60718293A4006 /* LyricAlignmentServiceTests.swift in Sources */,
 				23D82A5DA49496D9E0370887 /* IdentifiedRowTests.swift in Sources */,
 				5C3389AA47637899080AFA31 /* EQFrequencyTests.swift in Sources */,
 				50455E615D9FAE84C741EB6E /* FormatInfoTests.swift in Sources */,
