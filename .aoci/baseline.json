@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-16T11:34:33Z",
+  "updated_at": "2026-11-16T12:53:11Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -1256,9 +1256,9 @@
     },
     "QQPlayer/Resources/en.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "0554dbd10951e55b377fafe89fc49f262c7d303fe66ac2017d139536695a47ce",
-      "size": 69847,
-      "normalized_sha256": "0554dbd10951e55b377fafe89fc49f262c7d303fe66ac2017d139536695a47ce"
+      "sha256": "53056538aa61863aee105e39987bf516d2a33a553434404ecffeb394e02afe28",
+      "size": 69903,
+      "normalized_sha256": "53056538aa61863aee105e39987bf516d2a33a553434404ecffeb394e02afe28"
     },
     "QQPlayer/Resources/fr.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1280,9 +1280,9 @@
     },
     "QQPlayer/Resources/fr.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "e4ee0ce582e832c955270c2a5f32d6eb36eb5f763974be2e32026ea8c179c097",
-      "size": 78753,
-      "normalized_sha256": "e4ee0ce582e832c955270c2a5f32d6eb36eb5f763974be2e32026ea8c179c097"
+      "sha256": "e0c3557b2f996e05b618c86e090d4710ddf642fd8cec4dc11c8979e4f71d67c5",
+      "size": 78820,
+      "normalized_sha256": "e0c3557b2f996e05b618c86e090d4710ddf642fd8cec4dc11c8979e4f71d67c5"
     },
     "QQPlayer/Resources/ru.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1304,9 +1304,9 @@
     },
     "QQPlayer/Resources/ru.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "e74d12782f111c4ab6ed0099efe7a1a75a3624a8f056ede4f9a91cff8a5830b1",
-      "size": 102583,
-      "normalized_sha256": "e74d12782f111c4ab6ed0099efe7a1a75a3624a8f056ede4f9a91cff8a5830b1"
+      "sha256": "35d1f9a1a41f10a646810bf60ed6314e738ea1ee5d0594cb0feb364b4547e553",
+      "size": 102685,
+      "normalized_sha256": "35d1f9a1a41f10a646810bf60ed6314e738ea1ee5d0594cb0feb364b4547e553"
     },
     "QQPlayer/Resources/zh-Hans.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1328,9 +1328,9 @@
     },
     "QQPlayer/Resources/zh-Hans.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "ec7baf226debb6c8c48a8bb99dde59686f9464fde634fffc8e62d7755fbbbb39",
-      "size": 68840,
-      "normalized_sha256": "ec7baf226debb6c8c48a8bb99dde59686f9464fde634fffc8e62d7755fbbbb39"
+      "sha256": "9815e1539d76eb2c0432ff6c16cd11ed33893467fbd88330cc68897068727e6a",
+      "size": 68885,
+      "normalized_sha256": "9815e1539d76eb2c0432ff6c16cd11ed33893467fbd88330cc68897068727e6a"
     },
     "QQPlayer/Resources/zh-Hant.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1352,9 +1352,9 @@
     },
     "QQPlayer/Resources/zh-Hant.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "5c65e09a06b22367a45ffdf18d5e4a29b31b97b142272d52f5a05918002b3a8d",
-      "size": 69347,
-      "normalized_sha256": "5c65e09a06b22367a45ffdf18d5e4a29b31b97b142272d52f5a05918002b3a8d"
+      "sha256": "b53703c0d0d6296837ca9468e0c01bae1304901e151de7a9761f3ca6531577ed",
+      "size": 69392,
+      "normalized_sha256": "b53703c0d0d6296837ca9468e0c01bae1304901e151de7a9761f3ca6531577ed"
     },
     "QQPlayer/Services/AlignedLyricsStore.swift": {
       "role": "index",
@@ -1928,15 +1928,15 @@
     },
     "QQPlayer/Services/LyricsAlignment/LyricAlignmentAligner.swift": {
       "role": "index",
-      "sha256": "97370977716c810d08e8f1999566e95c5e426566d99a975a3509499b1528e491",
-      "size": 18302,
-      "normalized_sha256": "97370977716c810d08e8f1999566e95c5e426566d99a975a3509499b1528e491"
+      "sha256": "6c4898d44537f0c6f0a9810a98452cf75c199ec3de4dc9a5713b86ed1c6a6633",
+      "size": 19513,
+      "normalized_sha256": "6c4898d44537f0c6f0a9810a98452cf75c199ec3de4dc9a5713b86ed1c6a6633"
     },
     "QQPlayer/Services/LyricsAlignment/LyricAlignmentController.swift": {
       "role": "index",
-      "sha256": "b161fd1277452d1fec316a745fe06ac277abd548670f0e9740475b107bca9067",
-      "size": 8168,
-      "normalized_sha256": "b161fd1277452d1fec316a745fe06ac277abd548670f0e9740475b107bca9067"
+      "sha256": "8dc87a90b125f78ee97d5eddd9de71650bc776e0ec89a48ecf0bc8611affef38",
+      "size": 8401,
+      "normalized_sha256": "8dc87a90b125f78ee97d5eddd9de71650bc776e0ec89a48ecf0bc8611affef38"
     },
     "QQPlayer/Services/LyricsAlignment/LyricAlignmentFeature.swift": {
       "role": "index",
@@ -1946,9 +1946,9 @@
     },
     "QQPlayer/Services/LyricsAlignment/LyricAlignmentService.swift": {
       "role": "index",
-      "sha256": "df055c2b226204df92afc12290bf4395a4ec8e135a0489b3d29236ff7667debd",
-      "size": 8301,
-      "normalized_sha256": "df055c2b226204df92afc12290bf4395a4ec8e135a0489b3d29236ff7667debd"
+      "sha256": "53147c7da3808bca3ed02034315c69236d7a863d13c12474d57ad850bb406955",
+      "size": 8411,
+      "normalized_sha256": "53147c7da3808bca3ed02034315c69236d7a863d13c12474d57ad850bb406955"
     },
     "QQPlayer/Services/LyricsAlignment/LyricAlignmentTextNormalizer.swift": {
       "role": "index",
@@ -1958,9 +1958,9 @@
     },
     "QQPlayer/Services/LyricsAlignment/LyricAlignmentTypes.swift": {
       "role": "index",
-      "sha256": "e90ec45e49e390726faa2a5983f637089a2834d23aeb478e73bf251cc5201172",
-      "size": 2297,
-      "normalized_sha256": "e90ec45e49e390726faa2a5983f637089a2834d23aeb478e73bf251cc5201172"
+      "sha256": "69e438502613bd67d71410d9c6ca48fc68492cfb5df9cc746d276189e7e26005",
+      "size": 2741,
+      "normalized_sha256": "69e438502613bd67d71410d9c6ca48fc68492cfb5df9cc746d276189e7e26005"
     },
     "QQPlayer/Services/LyricsAlignment/LyricsAlignmentAudioFile.swift": {
       "role": "index",
@@ -3476,9 +3476,9 @@
     },
     "QQPlayer/Views/Player/LyricAlignmentProgressSheet.swift": {
       "role": "index",
-      "sha256": "0ffbe7b863147f49d23866d9e4cf97f10778ec12b38f62d7abfe093480a71a5e",
-      "size": 6471,
-      "normalized_sha256": "0ffbe7b863147f49d23866d9e4cf97f10778ec12b38f62d7abfe093480a71a5e"
+      "sha256": "42653301e26ef9b563f846be4596ca5b84a1954fb07ccc0633c10c3c1eaf72cf",
+      "size": 6579,
+      "normalized_sha256": "42653301e26ef9b563f846be4596ca5b84a1954fb07ccc0633c10c3c1eaf72cf"
     },
     "QQPlayer/Views/Player/LyricsSearchView.swift": {
       "role": "index",
@@ -4268,15 +4268,15 @@
     },
     "QQPlayerTests/LyricAlignmentAlignerTests.swift": {
       "role": "index",
-      "sha256": "679cb10df1e160942295f609864a73578cdcbbdc8240a6ef9ff803044277f635",
-      "size": 5416,
-      "normalized_sha256": "679cb10df1e160942295f609864a73578cdcbbdc8240a6ef9ff803044277f635"
+      "sha256": "4046c53c60d56f01eb24386ec8fbb0c6090a00c8709fd78fe37439d0b2eb86eb",
+      "size": 7862,
+      "normalized_sha256": "4046c53c60d56f01eb24386ec8fbb0c6090a00c8709fd78fe37439d0b2eb86eb"
     },
     "QQPlayerTests/LyricAlignmentControllerTests.swift": {
       "role": "index",
-      "sha256": "0aa126eb2316676c70533914f646fbe4b62b47bcee14ccbcd0617f3190f77204",
-      "size": 9551,
-      "normalized_sha256": "0aa126eb2316676c70533914f646fbe4b62b47bcee14ccbcd0617f3190f77204"
+      "sha256": "e4954cd06aff826e112cdeab019860344adc2914c252d4a8e87eba3deec48d28",
+      "size": 11347,
+      "normalized_sha256": "e4954cd06aff826e112cdeab019860344adc2914c252d4a8e87eba3deec48d28"
     },
     "QQPlayerTests/LyricAlignmentFeatureTests.swift": {
       "role": "index",
@@ -5306,9 +5306,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "2651823df76c823a5c993d6abb31f0b261bd8fb034c8514c9e28a5c33b4a000d",
-      "size": 418257,
-      "normalized_sha256": "2651823df76c823a5c993d6abb31f0b261bd8fb034c8514c9e28a5c33b4a000d"
+      "sha256": "f781a9eddcf622ea5eb50f91fa777feede8fc66244489649ca6ab9214a14226f",
+      "size": 418942,
+      "normalized_sha256": "f781a9eddcf622ea5eb50f91fa777feede8fc66244489649ca6ab9214a14226f"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5354,9 +5354,9 @@
     },
     "docs/lyrics-alignment.md": {
       "role": "index",
-      "sha256": "a3d03c0060fb81021dfc2db2369fe2c03e499881e00d83197279eadb6060a694",
-      "size": 5144,
-      "normalized_sha256": "a3d03c0060fb81021dfc2db2369fe2c03e499881e00d83197279eadb6060a694"
+      "sha256": "755d697c3fbb89e7ef15a9402f51e67c20a0c2acd58b43f20a55821efc61e87b",
+      "size": 5358,
+      "normalized_sha256": "755d697c3fbb89e7ef15a9402f51e67c20a0c2acd58b43f20a55821efc61e87b"
     },
     "docs/preflight.md": {
       "role": "index",
