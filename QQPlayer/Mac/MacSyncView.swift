@@ -25,7 +25,7 @@
 //  做法 = **父 = 唯一观察者**：三个 ViewModel 仍是 `ObservableObject`（`@Observable` 迁移尚未
 //  覆盖），子视图不得写 `@ObservedObject` / `@StateObject`（`ObservationMigrationContractTests`
 //  是按 (文件, 标记) 的棘轮：新增即红）⇒ 子 struct 只收**值输入 + 回调 / 绑定**，父 body
-//  重算 ⇒ 子拿到新值即重绘。四区本体**仍留在分区文件**（`+Connection` / `+Content` / `+Run`），
+//  重算 ⇒ 子拿到新值即重绘。分区本体**仍留在分区文件**（`+Connection` / `+Content` / `+Run`），
 //  由父读值构建后作为内容输入交给 `SyncTracksPane` 组合（不复制任何分区实现）。
 //
 //  ⚠️ 状态归属：两页的**全部 `@State` / `@StateObject` 都留在本文件**（唯一观察者），
@@ -348,12 +348,12 @@ struct MacSyncRunSection: View {
         )
     }
 
-    /// 传歌流（`SyncTracksPane`）——四区本体仍由分区文件构建，本处只做组合。
+    /// 传歌流（`SyncTracksPane`）——三区（方向 / 内容选择 / 结果）本体仍由分区文件构建，
+    /// 本处只做组合；D 执行区 2026-11-16 已删。
     var tracksPane: some View {
         SyncTracksPane(
             directionSection: directionSection,
             selectionSection: selectionSection,
-            runSection: runSection,
             resultSection: resultSection
         )
     }

@@ -9,8 +9,9 @@
 //  ⚠️ 2026-09-29：该分段控件由 `SyncPage` 内部**上移为置顶行**（提取为 `SyncFlowPicker`，
 //  由 `MacSyncView` 装配，见 `MacSyncView.pinnedHeader`）——`SyncPage` 退化为纯内容 switch，
 //  **本文件 `SyncFlowPicker` 是全项目唯一构建「传歌 / 播放数据」picker 的地方**。
-//   · 传歌流（`SyncTracksPane`）= 方向区 + 内容选择区 + 执行区 + 结果区（A 连接状态区已随设备
-//     语义迁到「设备」页，见 `SyncDevicePane.swift`；R3「设备只讲一次」）
+//   · 传歌流（`SyncTracksPane`）= 方向区 + 内容选择区 + 结果区（三区；2026-11-16 D 执行区
+//     整段删除——测速并入「设备」页本次同步目标，见 `SyncDevicePane.swift`）。
+//     A 连接状态区已随设备语义迁到「设备」页（R3「设备只讲一次」）
 //   · 播放数据流（`SyncDataPane`，见 `SyncDataPane.swift`）= 原 F 数据同步区（含跨端续播开关；R6）
 //
 //  纪律：本文件只做分流与组合；两个流各自的分区本体/绑定/动作**沿用既有实现**，语义零改变。
@@ -23,7 +24,7 @@
 //  子拿到新值即重绘）。本文件内**零** `@ObservedObject` / `@StateObject` / `@EnvironmentObject`。
 //
 //  ⚠️ 分区本体仍留在 `MacSyncRunSection` 的分区文件里（`+Connection` 方向区 / `+Content`
-//  内容区 / `+Run` 执行区与结果区）—— 它们仍以**父的成员**身份被构建（父读值、父持有绑定），
+//  内容区 / `+Run` 结果区）—— 它们仍以**父的成员**身份被构建（父读值、父持有绑定），
 //  再作为**内容输入**交给 `SyncTracksPane` 组合（唯一职责 = 组合，不复制任何分区实现）。
 //
 //  可见性：`SyncPage` / `SyncFlowPicker` / `SyncTracksPane` 为 internal（被 `MacSyncView.swift` 装配）。
@@ -69,15 +70,15 @@ struct SyncFlowPicker: View {
     }
 }
 
-/// 传歌流：方向 / 内容选择 / 执行 / 结果（B C D E 四区，原样复用，语义不变）。
-/// 四个分区本体由 `MacSyncRunSection`（及其分区文件）构建后作为内容输入传入——本类型只做组合。
-struct SyncTracksPane<Direction: View, Selection: View, Run: View, Result: View>: View {
+/// 传歌流：方向 / 内容选择 / 结果（三区，原样复用，语义不变）。
+/// 2026-11-16：D 执行区已整段删除（测速并入「设备」页本次同步目标；阶段行 / 目标状态行
+/// 撤掉——目标状态行设备页已有；失败原因由固定底栏显示），本类型只剩三区。
+/// 三个分区本体由 `MacSyncRunSection`（及其分区文件）构建后作为内容输入传入——本类型只做组合。
+struct SyncTracksPane<Direction: View, Selection: View, Result: View>: View {
     /// B 方向区（`MacSyncView+Connection.swift`）。
     let directionSection: Direction
     /// C 内容选择区（`MacSyncView+Content.swift`）。
     let selectionSection: Selection
-    /// D 执行区（`MacSyncView+Run.swift`）。
-    let runSection: Run
     /// E 结果区（`MacSyncView+Run.swift`）。
     let resultSection: Result
 
@@ -85,7 +86,6 @@ struct SyncTracksPane<Direction: View, Selection: View, Run: View, Result: View>
         Group {
             directionSection
             selectionSection
-            runSection
             resultSection
         }
     }

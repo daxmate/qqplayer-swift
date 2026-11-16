@@ -923,7 +923,6 @@
 "sync_run_selection_total_playlists" = "%d playlists · %d morceaux · environ %@";
 "sync_run_selection_total_tracks" = "%d morceaux · environ %@";
 "sync_run_selection_total_library" = "Bibliothèque entière · %d morceaux · environ %@";
-"sync_run_execute_section" = "Synchronisation";
 "sync_run_start" = "Démarrer la synchronisation";
 
 /* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
@@ -935,14 +934,10 @@
 "sync_run_cancel" = "Annuler";
 "sync_run_probe" = "Mesurer le débit";
 "sync_run_probe_value" = "Débit du lien %.1f Mo/s";
-"sync_run_phase_disconnected" = "Non connecté";
-"sync_run_phase_idle" = "Prêt à synchroniser";
-"sync_run_phase_fetching_manifest" = "Récupération de la liste des fichiers de l’appareil…";
 "sync_run_error_manifest_timeout" = "Délai dépassé pour la liste des fichiers (aucune réponse en %d s — l’appareil range peut-être encore sa bibliothèque).";
 "sync_run_progress_planning" = "Comparaison en cours…";
 "sync_run_progress_push" = "Envoi %d/%d";
 "sync_run_progress_pull" = "Réception %d/%d";
-"sync_run_progress_done" = "Synchronisation terminée";
 "sync_run_interrupted" = "L'appareil s'est déconnecté : la synchronisation s'est arrêtée.";
 "sync_run_cancelled" = "Synchronisation annulée.";
 "sync_run_reason_not_paired" = "Appairez d'abord votre iPhone (scannez le code QR ci-dessous).";

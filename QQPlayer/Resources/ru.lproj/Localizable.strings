@@ -920,7 +920,6 @@
 "sync_run_selection_total_playlists" = "%d плейлистов · %d песен · около %@";
 "sync_run_selection_total_tracks" = "%d песен · около %@";
 "sync_run_selection_total_library" = "Вся медиатека · %d песен · около %@";
-"sync_run_execute_section" = "Синхронизация";
 "sync_run_start" = "Начать синхронизацию";
 
 /* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
@@ -932,14 +931,10 @@
 "sync_run_cancel" = "Отмена";
 "sync_run_probe" = "Измерить скорость";
 "sync_run_probe_value" = "Скорость канала %.1f МБ/с";
-"sync_run_phase_disconnected" = "Нет подключения";
-"sync_run_phase_idle" = "Готово к синхронизации";
-"sync_run_phase_fetching_manifest" = "Получаем список файлов устройства…";
 "sync_run_error_manifest_timeout" = "Не удалось получить список файлов (устройство не ответило за %d с — возможно, оно ещё упорядочивает библиотеку).";
 "sync_run_progress_planning" = "Сверка с устройством…";
 "sync_run_progress_push" = "Отправка %d/%d";
 "sync_run_progress_pull" = "Получение %d/%d";
-"sync_run_progress_done" = "Синхронизация завершена";
 "sync_run_interrupted" = "Устройство отключилось, синхронизация остановлена.";
 "sync_run_cancelled" = "Синхронизация отменена.";
 "sync_run_reason_not_paired" = "Сначала сопрягите iPhone (отсканируйте QR-код ниже).";

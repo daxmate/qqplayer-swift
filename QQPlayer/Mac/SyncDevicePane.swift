@@ -9,7 +9,7 @@
 //   · 本机身份与二维码（`identitySection`：本机名字 + Device ID + 二维码 + 刷新）
 //   · 连接状态（`connectionSection`：已连对端行的状态/时长 + 「允许局域网连接」开关 + 监听提示）
 //   · 已配对设备（`pairedDevicesSection`：在线态 / 最后在线 / 撤销配对）
-//   · 本次同步目标（`deviceTargetSection`：单选真控件 + 目标状态行）
+//   · 本次同步目标（`deviceTargetSection`：单选真控件 + 目标状态行 + 测速行）
 //
 //  ⚠️ R3「设备只讲一次」：设备信息与配对操作**只出现在本页**，「同步」页不重复
 //  （拆分前 A 连接状态区在同步四区之首，本批随设备语义整体迁到本页）。
@@ -319,7 +319,7 @@ struct SyncDevicePane: View {
         return "sync_last_seen_format".localized(with: lastSeen.formatted(.relative(presentation: .named)))
     }
 
-    // MARK: - d 本次同步目标（批 B2：真控件 + 期望目标/闸门语义）
+    // MARK: - d 本次同步目标（批 B2：真控件 + 期望目标/闸门语义；2026-11-16 收编测速行）
 
     @ViewBuilder
     private var deviceTargetSection: some View {
@@ -334,6 +334,11 @@ struct SyncDevicePane: View {
                 SyncTargetStatusBanner(status: syncTargetStatus, onAdoptConnected: onAdoptConnected)
                 ForEach(rows) { row in
                     deviceTargetRow(row)
+                }
+                // 2026-11-16：测速原在传歌流 D 区，D 区删除后搬到这里——
+                // 目标相关诊断就放在目标区（`SyncProbeRowView` 本体未改，零复制）。
+                SyncProbeRowView { completion in
+                    model.runProbe(completion: completion)
                 }
             }
         } header: {

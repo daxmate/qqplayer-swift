@@ -2,11 +2,12 @@
 //  MacSyncView+Run.swift
 //  QQPlayer
 //
-//  `MacSyncRunSection` 的 D 执行区 / E 结果区
+//  `MacSyncRunSection` 的 E 结果区 + 固定执行底栏
 //  （2026-09-19 从 `MacSyncView.swift` 纯搬家，零行为/UI 变化；
 //   2026-09-25 结果区改「默认只显示结论行 + 详情折叠」，E2 对齐歌词补发区并入 E 的详情；
-//   2026-09-26 批 B1 把 F 数据同步区整体迁到 `SyncDataPane.swift`——本文件只剩 D / E）：
-//  开始与阶段/进度上屏、最近一次结果（结论行 + 折叠详情）。
+//   2026-09-26 批 B1 把 F 数据同步区整体迁到 `SyncDataPane.swift`；
+//   2026-11-16 D 执行区整段删除——本文件只剩 E 结果区 + 固定底栏）：
+//  底栏（摘要 / 进度 / 失败原因 / 开始取消）、最近一次结果（结论行 + 折叠详情）。
 //
 //  ⚠️ 可见性 / 结构变化（批 B1 → 批 D）：`conclusionLine` / `metric`（现为
 //  `SyncConclusionLine` / `SyncMetric`）与目标状态行（`SyncTargetStatusBanner`，见
@@ -25,51 +26,15 @@
 import SwiftUI
 
 extension MacSyncRunSection {
-    // MARK: - D 执行区
-
-    @ViewBuilder
-    var runSection: some View {
-        Section {
-            // 2026-11-16 P0：开始 / 取消键移到固定执行底栏（`syncActionBar`）——
-            // 挤在可滚动 `Form` 里的执行控件会被 sheet 底边裁切，且全屏只允许一处按钮。
-            // 2026-11-16：忙时进度 / 当前文件在固定底栏（`syncActionBar`）显示，这里不再重复
-            // 阶段文案；完成 / 失败 / 空闲说明仍留 D 区。
-            if !model.phase.isBusy {
-                Text(phaseText)
-                    .font(.callout)
-                    .foregroundStyle(model.failureText == nil ? Color.secondary : Color.red)
-            }
-
-            // T2 测速（局部 @State，不进 view model 的发布面）
-            SyncProbeRowView { completion in
-                model.runProbe(completion: completion)
-            }
-
-            if let failure = model.failureText, !model.phase.isBusy {
-                Text(failure)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            // 2026-11-16 P0：不可用原因移到固定底栏（按钮旁 `.caption`），此处不再重复。
-
-            // 批 B2：目标状态行（「等待 <名字> 上线」/「当前连着 B，你要同步的是 A」+ 一键改用）。
-            // 离线时开始键已被 `SyncUIStartGate.targetBlock` 禁用，这里是它的解释（带设备名）。
-            SyncTargetStatusBanner(status: syncTargetStatus, onAdoptConnected: adoptConnectedTarget)
-        } header: {
-            Text("sync_run_execute_section".localized)
-        }
-    }
-
     // MARK: - 固定执行底栏（2026-11-16 P0）
 
     /// 固定执行底栏：选择摘要 / 进行中进度 + 不可用原因 + 开始 / 取消。
     /// 起因：执行控件原在可滚动 `Form` 的 D 区，被 sheet 底边裁切且摘要/禁用原因不固定在
     /// 视野内（用户 2026-11-16 截图反馈）。全屏按钮只此一处，语义仍全来自
     /// `model.startAvailability` / `startButtonTitle` / `startButtonHelp`。
-    /// 2026-11-16：进度 / 当前文件从可滚动 D 区搬到这里（用户要求进状态栏，滚动也看得到），
-    /// D 区只留完成 / 失败说明。
+    /// 2026-11-16：进度 / 当前文件从可滚动 D 区搬到这里（用户要求进状态栏，滚动也看得到）。
+    /// 2026-11-16：D 区已删——阶段行 / 测速 / 目标状态行撤掉（测速进「设备」页本次同步目标、
+    /// 目标状态行设备页已有），失败原因由本底栏显示。
     @ViewBuilder
     var syncActionBar: some View {
         VStack(spacing: DesignTokens.space0) {
@@ -101,6 +66,14 @@ extension MacSyncRunSection {
                             .fontWeight(.medium)
                             .foregroundStyle(content.selectionSummary.isEmpty ? Color.secondary : Color.primary)
                             .fixedSize(horizontal: false, vertical: true)
+                        // 失败原因原在传歌流 D 区（2026-11-16 已整段删除）——改由本底栏承担：
+                        // 失败必须一直可见，不进折叠、不静默。
+                        if let failure = model.failureText {
+                            Text(failure)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if let hint = actionBarHint {
                             Text(hint)
                                 .font(.caption)
@@ -158,22 +131,6 @@ extension MacSyncRunSection {
         switch model.direction {
         case .some(.download): return "sync_run_download_help".localized
         default: return "sync_run_upload_help".localized
-        }
-    }
-
-    /// 阶段文案（非失败态）。
-    private var phaseText: String {
-        switch model.phase {
-        case .disconnected: return "sync_run_phase_disconnected".localized
-        case .idle: return "sync_run_phase_idle".localized
-        // 清单 1s 内回来 ⇒ `isWaitingForPeerManifest` 始终 false，一次都不出现等待文案。
-        case .planning:
-            return model.isWaitingForPeerManifest
-                ? "sync_run_phase_fetching_manifest".localized
-                : "sync_run_progress_planning".localized
-        case .pushing, .pulling: return progressText
-        case .done: return "sync_run_progress_done".localized
-        case .failed: return model.failureText ?? ""
         }
     }
 

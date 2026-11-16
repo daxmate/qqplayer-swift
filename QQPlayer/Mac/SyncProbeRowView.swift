@@ -2,7 +2,7 @@
 //  SyncProbeRowView.swift
 //  QQPlayer
 //
-//  T2 测速行（Mac 同步面板 D 执行区）：一个「测速」按钮 + 一个结果数值。
+//  T2 测速行（设备页「本次同步目标」区）：一个「测速」按钮 + 一个结果数值。
 //
 //  为什么自成一个 View：`MacSyncRunViewModel` 的 `@Published` 面有棘轮（基线 8，只减不增），
 //  探针结果属于**面板局部状态**，用 `@State` 持有即可，不进 view model 的发布面。

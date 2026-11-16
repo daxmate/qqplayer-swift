@@ -925,7 +925,6 @@
 "sync_run_selection_total_playlists" = "%d playlists · %d songs · about %@";
 "sync_run_selection_total_tracks" = "%d songs · about %@";
 "sync_run_selection_total_library" = "Entire library · %d songs · about %@";
-"sync_run_execute_section" = "Sync";
 "sync_run_start" = "Start Sync";
 
 /* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
@@ -937,14 +936,10 @@
 "sync_run_cancel" = "Cancel";
 "sync_run_probe" = "Measure speed";
 "sync_run_probe_value" = "Link speed %.1f MB/s";
-"sync_run_phase_disconnected" = "Not connected";
-"sync_run_phase_idle" = "Ready to sync";
-"sync_run_phase_fetching_manifest" = "Getting the device’s file list…";
 "sync_run_error_manifest_timeout" = "Timed out getting the device’s file list (no response within %d s — the device may still be tidying its library).";
 "sync_run_progress_planning" = "Checking what's missing…";
 "sync_run_progress_push" = "Sending %d/%d";
 "sync_run_progress_pull" = "Receiving %d/%d";
-"sync_run_progress_done" = "Sync complete";
 "sync_run_interrupted" = "The device disconnected, so the sync stopped.";
 "sync_run_cancelled" = "Sync cancelled.";
 "sync_run_reason_not_paired" = "Pair your iPhone first (scan the QR code below).";
