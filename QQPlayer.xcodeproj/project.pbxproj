@@ -113,6 +113,9 @@
 		B1A000000000000000000018 /* zh-Hant in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000012 /* zh-Hant */; };
 		B1A000000000000000000019 /* fr in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000013 /* fr */; };
 		B1A00000000000000000001A /* ru in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000014 /* ru */; };
+		B1A00000000000000000001D /* ja in Resources */ = {isa = PBXBuildFile; fileRef = B1A000000000000000000015 /* ja */; };
+		B1A00000000000000000001E /* ko in Resources */ = {isa = PBXBuildFile; fileRef = B1A00000000000000000001B /* ko */; };
+		B1A00000000000000000001F /* es in Resources */ = {isa = PBXBuildFile; fileRef = B1A00000000000000000001C /* es */; };
 		B1C108FAF1AB4B1DBB94FE9B /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0399BDBD88CA4F6C9D2D731E /* WhatsNewTests.swift */; };
 		B314F6033C3E4B1684A9F418 /* MP4EmptyCovrStripperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49BB9355B73D45668502AE0A /* MP4EmptyCovrStripperTests.swift */; };
 		B4858B95EB1A40EB9411630F /* SyncLibrarySyncE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EDD51D26A7A4199963039A0 /* SyncLibrarySyncE2ETests.swift */; };
@@ -408,6 +411,9 @@
 		B1A000000000000000000012 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "QQPlayer/Resources/zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		B1A000000000000000000013 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = QQPlayer/Resources/fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B1A000000000000000000014 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = QQPlayer/Resources/ru.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B1A000000000000000000015 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = QQPlayer/Resources/ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B1A00000000000000000001B /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = QQPlayer/Resources/ko.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B1A00000000000000000001C /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = QQPlayer/Resources/es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B2AA1B790B624C0DB6AC599A /* TestAudioFixtures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestAudioFixtures.swift; sourceTree = "<group>"; };
 		B2AE1DBB52BD462D8FAA704D /* SmartPlaylistUILogicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartPlaylistUILogicTests.swift; sourceTree = "<group>"; };
 		B3D6AB77FF37407094D82C17 /* SyncDeviceListModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncDeviceListModelTests.swift; sourceTree = "<group>"; };
@@ -1276,6 +1282,9 @@
 				B1A000000000000000000012 /* zh-Hant */,
 				B1A000000000000000000013 /* fr */,
 				B1A000000000000000000014 /* ru */,
+				B1A000000000000000000015 /* ja */,
+				B1A00000000000000000001B /* ko */,
+				B1A00000000000000000001C /* es */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -1710,7 +1719,10 @@
 			knownRegions = (
 				en,
 				Base,
+				es,
 				fr,
+				ja,
+				ko,
 				ru,
 				"zh-Hans",
 				"zh-Hant",
@@ -1789,6 +1801,9 @@
 				B1A000000000000000000018 /* zh-Hant in Resources */,
 				B1A000000000000000000019 /* fr in Resources */,
 				B1A00000000000000000001A /* ru in Resources */,
+				B1A00000000000000000001D /* ja in Resources */,
+					B1A00000000000000000001E /* ko in Resources */,
+					B1A00000000000000000001F /* es in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

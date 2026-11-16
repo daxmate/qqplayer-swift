@@ -1,0 +1,9 @@
+/*
+  InfoPlist.strings (日本語)
+  QQPlayer
+
+  Info.plist の権限ダイアログをローカライズします（QQPlayer/Info.plist）。
+*/
+
+"NSCameraUsageDescription" = "所有しているQQPlayerデバイスとペアリングして同期するためにQRコードをスキャンします（許可したペアリングのみ）。";
+"NSLocalNetworkUsageDescription" = "同じローカルネットワーク上のQQPlayerデバイス（Mac/Windows/NAS）を検出して接続し、音楽ライブラリをペアリング・同期するために使用します。";

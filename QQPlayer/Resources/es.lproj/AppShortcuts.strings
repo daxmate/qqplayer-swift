@@ -1,0 +1,20 @@
+/*
+  AppShortcuts.strings (Español)
+  QQPlayer
+
+  Frases de invocación de Siri para los App Shortcuts declarados en QQPlayerAppShortcuts.swift. Las claves coinciden exactamente con las frases en inglés; ${applicationName} es el nombre de la app.
+*/
+
+"Resume playback in ${applicationName}" = "Reanuda la reproducción en ${applicationName}";
+"Resume my music in ${applicationName}" = "Reanuda mi música en ${applicationName}";
+"Continue playing in ${applicationName}" = "Continúa la reproducción en ${applicationName}";
+
+"Like this song in ${applicationName}" = "Marca esta canción como favorita en ${applicationName}";
+"Add this song to favorites in ${applicationName}" = "Añade esta canción a favoritos en ${applicationName}";
+"Add this song to my favorites in ${applicationName}" = "Añade esta canción a mis favoritos en ${applicationName}";
+"Add this song to Liked Songs in ${applicationName}" = "Añade esta canción a Canciones que te gustan en ${applicationName}";
+"Add the current song to favorites in ${applicationName}" = "Añade la canción actual a favoritos en ${applicationName}";
+
+"Make me a mix in ${applicationName}" = "Créame una mezcla en ${applicationName}";
+"Generate a mix in ${applicationName}" = "Genera una mezcla en ${applicationName}";
+"Play me something new in ${applicationName}" = "Ponme algo nuevo en ${applicationName}";

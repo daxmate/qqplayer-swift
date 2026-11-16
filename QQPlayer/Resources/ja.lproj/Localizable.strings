@@ -1,0 +1,1280 @@
+/* Playlist related strings */
+"playlists" = "プレイリスト";
+"no_playlists_yet" = "プレイリストはまだありません";
+"create_playlists_instruction" = "ライブラリから曲を追加してプレイリストを作成します";
+"add_to_playlist" = "プレイリストに追加";
+"create_new_playlist" = "新規プレイリストを作成";
+"create_playlist" = "プレイリストを作成";
+"playlist_name_placeholder" = "プレイリスト名";
+"enter_playlist_name" = "新しいプレイリストの名前を入力してください";
+"delete_playlist" = "プレイリストを削除";
+"delete_playlist_confirmation" = "「%@」を削除してもよろしいですか？この操作は取り消せません。";
+"delete" = "削除";
+"cancel" = "キャンセル";
+"create" = "作成";
+"done" = "完了";
+"edit" = "編集";
+"edit_playlist" = "プレイリストを編集";
+"save" = "保存";
+"enter_new_name" = "プレイリストの新しい名前を入力してください";
+"manage_playlists" = "プレイリストを管理";
+"playlist" = "プレイリスト";
+"songs_count_singular" = "%d曲";
+"songs_count_plural" = "%d曲";
+"albums_count_singular" = "%dアルバム";
+"albums_count_plural" = "%dアルバム";
+"created_date" = "%@に作成";
+"no_songs_found" = "曲が見つかりません";
+"your_music_will_appear_here" = "音楽を追加するには:\n\n1. 「ファイル」App を開きます（または「ファイルを開く」をタップします）\n2. 「このiPhone内」→ QQPlayer に移動します\n3. そのフォルダに音楽ファイルをコピーします";
+"create_first_playlist" = "最初のプレイリストを作成して始めましょう";
+
+/* Smart playlists (automatic playlists) */
+"smart_recent_added" = "最近追加した項目";
+"smart_recent_played" = "最近再生した項目";
+"smart_top_played" = "よく再生する曲";
+"smart_decades" = "年代";
+"smart_songs_count" = "%d曲";
+"smart_decade_count" = "%d年代";
+"smart_empty_recent_played" = "まだ再生履歴がありません。曲を再生するとここに表示されます。";
+"smart_empty_top_played" = "まだ再生履歴がありません。曲を再生するとここに表示されます。";
+"smart_empty_decade" = "この年代の曲はありません";
+"smart_load_failed" = "このプレイリストを読み込めませんでした";
+
+"mac_sidebar_smart_playlists" = "スマートプレイリスト";
+
+"mac_sidebar_my_playlists" = "マイプレイリスト";
+
+/* General UI strings */
+"all_songs" = "すべての曲";
+"liked_songs" = "お気に入りの曲";
+"add_songs" = "ファイルを開く";
+"import_music_files" = "音楽ファイルを読み込む";
+"ok" = "OK";
+"settings" = "設定";
+"retry" = "再試行";
+"open_settings" = "設定を開く";
+"continue" = "続ける";
+"back" = "戻る";
+"get_started" = "はじめる";
+"im_signed_in" = "サインイン済みです";
+"its_enabled" = "有効になっています";
+
+/* Library and Navigation */
+"library" = "ライブラリ";
+"artists" = "アーティスト";
+"albums" = "アルバム";
+"search" = "検索";
+"browse" = "ブラウズ";
+"songs" = "曲";
+"processing" = "処理中";
+"waiting" = "待機中";
+"and_more" = "他%d件";
+
+/* Artist/Album/Track Info */
+"no_artists_found" = "アーティストが見つかりません";
+"artists_will_appear" = "ライブラリに音楽を追加すると、ここにアーティストが表示されます";
+"fetching_artist_info" = "アーティスト情報を取得中...";
+"no_albums_found" = "アルバムが見つかりません";
+"albums_will_appear" = "ライブラリに音楽を追加すると、ここにアルバムが表示されます";
+"artist" = "アーティスト";
+"album" = "アルバム";
+"track_number" = "%d";
+"disc_number" = "ディスク %d";
+"play" = "再生";
+"shuffle" = "シャッフル";
+"wrong_artist" = "アーティストが違いますか？";
+"data_provided_by" = "データ提供: %@";
+"open_spotify" = "SPOTIFYを開く";
+"loading_artist" = "アーティストを読み込み中...";
+
+/* Player */
+"playing_queue" = "再生キュー";
+"no_songs_in_queue" = "キューに曲がありません";
+"queue_shuffle_disabled_hint" = "シャッフル中は並べ替えできません";
+"queue_remove_from_queue" = "キューから削除";
+"no_track_selected" = "曲が選択されていません";
+"playback_error_generic" = "この曲を再生できません。ファイルが存在しないか、対応していない形式です。";
+"playback_error_dsd_unsupported" = "このDSDファイルを再生できません。より低いDSDレート（DSD64）を試すか、FLACに変換してください。";
+
+/* Search */
+"search_your_music_library" = "ライブラリ内を検索";
+"find_songs_artists_albums_playlists" = "曲、アーティスト、アルバム、プレイリストを検索";
+"no_results_found" = "結果が見つかりません";
+"try_different_keywords" = "別のキーワードで検索してください";
+
+/* Context Menu Actions */
+"show_artist_page" = "アーティストページを表示";
+"add_to_playlist_ellipsis" = "プレイリストに追加...";
+"delete_file" = "ファイルを削除";
+"delete_file_confirmation" = "「%@」を削除してもよろしいですか？この操作は取り消せません。";
+
+/* Settings */
+
+/* Music library folders (设置 → 音乐库) */
+"settings_category_library" = "音楽ライブラリ";
+"library_root" = "ライブラリの場所";
+"library_root_default_suffix" = "（デフォルト）";
+"library_root_change" = "変更…";
+"library_root_change_prompt" = "音楽ライブラリを保存するフォルダを選択してください";
+"library_root_reset" = "デフォルトに戻す";
+"library_root_changed" = "ライブラリの場所を更新しました";
+"library_root_unavailable_hint" = "指定したライブラリの場所を利用できないため、デフォルトに戻しました。";
+"library_root_copy_title" = "ライブラリの内容をコピーしますか？";
+"library_root_copy_message" = "以前のライブラリ（%@）から曲と設定を新しい場所（%@）にコピーしますか？元のファイルは残ります。";
+"library_root_copy_confirm" = "コピー";
+"library_root_copy_decline" = "コピーしない";
+"library_root_copy_progress" = "コピー中… %d/%d";
+"library_root_copy_result" = "%d件コピー、%d件スキップ、%d件失敗";
+"library_file_types" = "ファイル形式";
+"library_file_types_footer" = "選択した形式のみがスキャンされます。形式を無効にすると、次回のスキャンでその曲がライブラリから削除されます（ファイルはディスク上に残り、再度有効にすると戻ります）。少なくとも1つの形式は有効にしておく必要があります。";
+
+/* Drag & drop import (web 版拖拽对齐, B 组) */
+"drag_import_hint" = "ここに音声ファイルをドロップして読み込みます";
+"drag_import_success_count" = "%d件読み込みました";
+"drag_import_none" = "音声ファイルは読み込まれませんでした";
+"drag_import_skipped_count" = "未対応のファイルを%d件スキップしました";
+"drag_import_partial_count" = "%1$d件読み込み、%2$d件スキップ";
+
+/* Import result summary (import panel must report failure, not "already in library") */
+"import_result_separator" = "、";
+"import_result_added_one" = "1曲を読み込みました";
+"import_result_added_many" = "%d曲を読み込みました";
+"import_result_updated_many" = "%d曲を更新しました";
+"import_result_present_many" = "%d曲はライブラリにあります";
+"import_result_excluded_many" = "%d曲をライブラリから除外しました";
+"import_result_failed_many" = "%d件失敗";
+
+/* Track list context menu (A3) */
+"show_artist" = "アーティストへ移動";
+"show_album" = "アルバムへ移動";
+"locate_playing_track" = "再生中の曲を表示";
+
+/* Settings categories (web 版左导航分类对齐) */
+/* Appearance theme */
+"settings_category_playback" = "再生";
+"settings_category_appearance" = "外観";
+"settings_category_about" = "情報";
+"settings_category_lyrics" = "歌詞";
+"lyrics_display" = "表示";
+"lyrics_font_size" = "歌詞の文字サイズ";
+"lyrics_show_translation" = "翻訳を表示";
+"lyrics_show_roman" = "ローマ字表記を表示";
+"lyrics_calibration" = "調整";
+"lyrics_offset" = "歌詞の遅延";
+"lyrics_offset_reset" = "リセット";
+"lyrics_offset_hint" = "正の値にすると歌詞が遅れて表示されます（音声より後に表示）。ハイライトが歌に合うまで調整してください。";
+"visualizer_enabled" = "プレイヤーのスペクトラム表示";
+
+"appearance_theme" = "テーマ";
+"theme_system" = "システム設定に合わせる";
+"theme_dark" = "ダーク";
+"theme_light" = "ライト";
+"accent_color" = "アクセントカラー";
+"accent_orange" = "オレンジ";
+"accent_blue" = "ブルー";
+"accent_green" = "グリーン";
+"accent_purple" = "パープル";
+"accent_pink" = "ピンク";
+"accent_teal" = "ティール";
+"appearance" = "外観";
+"information" = "情報";
+"minimalist_library_icons" = "ライブラリのアイコンをシンプルに";
+"force_dark_mode" = "ダークモードを強制";
+"version" = "バージョン";
+"app_name" = "App名";
+"qqplayer" = "QQPlayer";
+"github_repository" = "GitHubリポジトリ";
+"use_simple_icons" = "ライブラリの各セクションで色付き背景のないシンプルなアイコンを使用します。";
+"override_system_appearance" = "システムの外観設定を上書きし、常にダークモードを使用します。";
+"background_color" = "背景色";
+"choose_color_theme" = "すべての画面の背景エフェクトに使用するカラーテーマを選択します。";
+"library_section" = "ライブラリ";
+"home_sections" = "ホームのセクション";
+"choose_visible_sections" = "ホーム画面に表示するセクションを選択します";
+"remove_from_library_only" = "ライブラリからのみ削除";
+"remove_from_library_only_description" = "有効にすると、曲を削除してもライブラリから取り除かれるだけになります。元のファイルは完全には削除されず、アプリの再確保領域に移動してライブラリに表示されなくなります。";
+"player_controls" = "プレイヤー操作";
+"show_sleep_timer_button" = "スリープタイマーボタンを表示";
+"show_sleep_timer_button_description" = "プレイヤーの歌詞ボタンをスリープタイマーボタンに置き換えます。";
+
+/* Liked Songs Actions */
+"add_to_liked_songs" = "お気に入りに追加";
+"remove_from_liked_songs" = "お気に入りから削除";
+
+/* Search Categories */
+"all" = "すべて";
+
+/* Tutorial/Onboarding */
+"welcome_to_qqplayer" = "QQPlayerへようこそ";
+"if_signed_in_continue" = "サインイン済みの場合は続行できます";
+"add_your_music" = "音楽を追加";
+"how_to_add_music" = "このデバイスのQQPlayerフォルダに音楽ファイルを追加します（「ファイル」App → 「このiPhone内」 → QQPlayer）:";
+"open_files_app" = "「ファイル」Appを開く";
+"navigate_to_on_my_iphone" = "「このiPhone内」へ移動";
+"find_qqplayer_folder" = "QQPlayerフォルダを探す";
+"add_your_music_instruction" = "音楽を追加";
+
+/* Tutorial Instructions */
+"find_open_files_app" = "デバイスで「ファイル」Appを開きます";
+"tap_on_my_iphone_sidebar" = "サイドバーで「このiPhone内」を選び、QQPlayerフォルダを開きます";
+"look_for_qqplayer_folder" = "「QQPlayer」フォルダを見つけて開きます";
+"copy_music_files" = "FLACまたはMP3ファイルをこのフォルダにコピーします";
+
+/* Library Processing */
+"found_tracks" = "%d曲を検出";
+"processing_colon" = "🎵 処理中:";
+"waiting_colon" = "⏳ 待機中:";
+"percent_complete" = "%d%%";
+
+/* Subtitles and descriptions */
+"songs_count" = "%d曲";
+"your_favorites" = "お気に入り";
+"your_playlists" = "あなたのプレイリスト";
+"browse_by_artist" = "アーティスト別に探す";
+"browse_by_album" = "アルバム別に探す";
+"unknown_album" = "不明なアルバム";
+"unknown_artist" = "不明なアーティスト";
+
+/* Sync result messages */
+"sync_no_new_tracks" = "新しい曲は見つかりません";
+"sync_one_new_track" = "新しい曲を1曲検出";
+"sync_multiple_new_tracks" = "新しい曲を%d曲検出";
+"sync_one_track_deleted" = "1曲を削除しました";
+"sync_multiple_tracks_deleted" = "%d曲を削除しました";
+"sync_no_changes" = "ライブラリは最新です";
+"sync_pull_no_paired_desktop" = "ペアリングされたデスクトップがありません — このデバイスのライブラリを更新しました";
+
+/* Equalizer strings */
+"equalizer" = "イコライザー";
+"graphic_equalizer" = "グラフィックイコライザー";
+"enable_equalizer" = "イコライザーを有効にする";
+"enable_disable_eq_description" = "グラフィックイコライザーを有効または無効にします";
+
+/* Common EQ Presets */
+"preset_common" = "よく使うプリセット";
+"preset_flat" = "フラット";
+"preset_pop" = "ポップ";
+"preset_rock" = "ロック";
+"preset_jazz" = "ジャズ";
+"preset_classical" = "クラシック";
+"preset_bass" = "低音強調";
+"preset_vocal" = "ボーカル";
+"preset_custom" = "カスタム";
+"eq_custom_title" = "カスタム10バンドEQ";
+
+/* Manual EQ Presets */
+"manual_eq_presets" = "手動16バンドプリセット";
+"no_manual_presets_created" = "手動プリセットはまだありません";
+"create_manual_eq_description" = "スライダーで調整できるカスタム16バンドイコライザープリセットを作成します";
+"create_manual_16band_eq" = "手動16バンドEQを作成";
+"manual_16band_eq" = "手動16バンドEQ";
+"manual_16band_description" = "標準ISO周波数の16バンドイコライザーを手動で調整できます";
+"adjust_bands_after_creation" = "作成後はすべての周波数帯域を調整できます";
+"frequency_bands" = "周波数帯域";
+"edit_equalizer" = "イコライザーを編集";
+"eq_add_band" = "バンドを追加";
+"eq_band_number" = "バンド %d";
+"eq_bands" = "バンド";
+"eq_bands_count" = "%d / %d バンド";
+"eq_create_manual" = "手動EQを作成";
+"eq_create_manual_description" = "最大16バンドを完全に編集できるパラメトリックEQプリセットを作成します。";
+"eq_edit_bands_hint" = "作成後は各バンドの周波数、ゲイン、Qを編集できます。";
+"eq_frequency" = "周波数";
+"eq_gain" = "ゲイン";
+"eq_manual_parametric" = "手動パラメトリックEQ";
+"eq_parametric_editor" = "パラメトリックエディタ";
+"eq_q" = "Q";
+"eq_remove_band" = "バンドを削除";
+"eq_selected_band" = "選択中のバンド";
+"reset_to_flat" = "フラットに戻す";
+
+/* Imported GraphicEQ Presets */
+"imported_presets" = "読み込んだプリセット";
+"no_presets_imported" = "読み込んだプリセットはありません";
+"import_graphiceq_description" = "GraphicEQの.txtファイルを読み込んで始めましょう";
+"imported_graphiceq" = "GraphicEQを読み込みました";
+"import_graphiceq_file" = "GraphicEQファイルを読み込む";
+"eq_imported_preset" = "読み込んだプリセット";
+
+/* General EQ Settings */
+"global_settings" = "全体設定";
+"global_gain" = "全体ゲイン";
+"global_gain_description" = "EQ処理後の全体の音量レベルを調整します";
+"about_graphiceq_format" = "GraphicEQ形式について";
+"import_graphiceq_format_description" = "次の形式でGraphicEQの.txtファイルを読み込みます:";
+"frequency_gain_pair_description" = "各ペアは周波数（Hz）とゲイン（dB）を表します";
+"export" = "書き出す";
+"preset_info" = "プリセット情報";
+"eq_copied" = "コピーしました";
+"eq_delete_confirm_message" = "「%@」を削除してもよろしいですか？この操作は取り消せません。";
+"eq_delete_confirm_title" = "プリセットを削除しますか？";
+
+/* GraphicEQ Import View */
+"import_graphiceq" = "GraphicEQを読み込む";
+"preset_name" = "プリセット名";
+"enter_preset_name" = "プリセット名を入力";
+"import_methods" = "読み込み方法";
+"import_from_txt_file" = ".txtファイルから読み込む";
+"paste_graphiceq_text" = "GraphicEQのテキストを貼り付け";
+"error" = "エラー";
+"format_info" = "形式の情報";
+"expected_graphiceq_format" = "期待されるGraphicEQ形式:";
+"frequency_gain_pair" = "各ペア: 周波数（Hz） ゲイン（dB）";
+
+/* Text Import View */
+"paste_graphiceq" = "GraphicEQを貼り付け";
+"paste_graphiceq_text_section" = "GraphicEQのテキストを貼り付け";
+"example" = "例";
+"import" = "読み込む";
+
+/* Error Messages */
+"failed_to_import" = "読み込みに失敗しました: %@";
+"file_import_failed" = "ファイルの読み込みに失敗しました: %@";
+"failed_to_create" = "作成に失敗しました: %@";
+"failed_to_export" = "プリセットの書き出しに失敗しました";
+"failed_to_delete" = "プリセットの削除に失敗しました";
+"failed_to_save" = "変更の保存に失敗しました";
+
+/* EQ Band Information */
+"band_count_info" = "%dバンド（%dから削減）";
+"bands_reduced_description" = "GraphicEQのバンド数がiOSの上限を超えています。システムが周波数の平均化により%dバンドを%dバンドに自動変換します。";
+"bands_limited_warning" = "⚠️ GraphicEQを%dバンドから%dバンドに削減しました（iOSの上限）";
+
+/* Audio Settings */
+"audio_settings" = "オーディオ";
+"dsd_playback_mode" = "DSD再生モード";
+"dsd_playback_mode_description" = "DSD音声ファイル（DSF/DFF）の再生方法を選択します";
+"dsd_mode_auto" = "自動（DACを検出）";
+"dsd_mode_pcm" = "PCM変換";
+"dsd_mode_dop" = "DoP（DSD over PCM）";
+"dsd_mode_auto_description" = "外付けDACを自動検出し、利用可能ならDoPを使用します。それ以外はPCMに変換します。";
+"dsd_mode_pcm_description" = "常にDSDをPCMに変換して再生します（すべてのデバイスに対応）";
+"dsd_mode_dop_description" = "常にDoPエンコードを使用します（DSD対応の外付けDACが必要）";
+
+/* Sort Options */
+"sort_date_newest" = "追加日（新しい順）";
+"sort_date_oldest" = "追加日（古い順）";
+"sort_name_az" = "名前（A-Z）";
+"sort_name_za" = "名前（Z-A）";
+"sort_size_largest" = "サイズ（大きい順）";
+"sort_size_smallest" = "サイズ（小さい順）";
+
+/* Queue Actions */
+"play_next" = "次に再生";
+"add_to_queue" = "キューに追加";
+
+/* Track action feedback toast */
+"toast_play_next" = "次に再生";
+"toast_added_to_queue" = "キューに追加しました";
+/* Feature guide */
+"feature_guide" = "機能とジェスチャ";
+"feature_guide_section_player" = "プレイヤー画面";
+"feature_guide_section_lyrics" = "歌詞とカラオケ";
+"feature_guide_section_controls" = "再生コントロール";
+"feature_guide_section_smart" = "スマートプレイリスト";
+"feature_guide_section_misc" = "その他";
+"feature_guide_swipe_artwork_title" = "アートワークをスワイプして曲を切り替え";
+"feature_guide_swipe_artwork_detail" = "アートワークを左右にスワイプして前／次の曲へ移動します";
+"feature_guide_pull_to_close_title" = "下に引いてプレイヤーを閉じる";
+"feature_guide_pull_to_close_detail" = "アートワークを下にドラッグしてプレイヤーを閉じます";
+"feature_guide_expand_controls_title" = "コントロールを広げる";
+"feature_guide_expand_controls_detail" = "コントロール領域を上にスワイプすると、再生順／キュー／スリープタイマー／歌詞／AirPlayのボタンが表示されます。下にスワイプすると折りたたみます。";
+"feature_guide_open_full_lyrics_title" = "全画面の歌詞を開く";
+"feature_guide_open_full_lyrics_detail" = "ミニ歌詞をタップするか、左にスワイプします";
+"feature_guide_search_lyrics_title" = "特定の歌詞を検索";
+"feature_guide_search_lyrics_detail" = "ミニ歌詞を右にスワイプすると歌詞検索が開きます。結果を選んで手動で割り当てるか、自動に戻せます。";
+"feature_guide_karaoke_start_title" = "ダブルタップでカラオケを開始";
+"feature_guide_karaoke_start_detail" = "全画面の歌詞のどこかをダブルタップするとカラオケが始まります（速度／ABリピート／1行リピート）";
+"feature_guide_karaoke_controls_title" = "カラオケ操作";
+"feature_guide_karaoke_controls_detail" = "歌詞の行をタップするとその行に移動します。ABをタップして現在の行を開始位置に設定し、次に行をタップして終了位置を設定します（開始位置より前の場合は自動的に入れ替わります）。バーには速度と1行リピートの操作もあります。";
+"feature_guide_karaoke_exit_title" = "カラオケを終了";
+"feature_guide_karaoke_exit_detail" = "もう一度どこかをダブルタップすると終了します。全画面の歌詞ページを離れた場合も自動的に終了します。";
+"feature_guide_order_modes_title" = "4つの再生順モード";
+"feature_guide_order_modes_detail" = "順番 → シャッフル → 全曲リピート → 1曲リピート。アイコンをタップして切り替えます";
+"feature_guide_smart_source_title" = "スマートプレイリストの作成元";
+"feature_guide_smart_source_detail" = "ライブラリと再生履歴から自動的に生成されます: 最近追加した項目、最近再生した項目、よく再生する曲、年代";
+"feature_guide_smart_where_title" = "見つけ方";
+"feature_guide_smart_where_detail" = "プレイリスト画面の上部にスマートプレイリストのカードを固定表示します";
+"feature_guide_eq_title" = "EQイコライザー";
+"feature_guide_eq_detail" = "設定 → オーディオ → グラフィックイコライザー。Graphic EQプリセットの読み込みと手動調整に対応。";
+"feature_guide_dark_mode_title" = "ダークモードの切り替え";
+"feature_guide_dark_mode_detail" = "設定 → 外観 → ダークモードを強制でシステムの外観を上書きできます";
+"feature_guide_import_title" = "音楽ファイルの読み込み";
+"feature_guide_import_detail" = "このデバイスのQQPlayerフォルダに音楽ファイルを入れます（「ファイル」App → 「このiPhone内」 → QQPlayer）。ライブラリの「ファイルを開く」をタップしてもかまいません。";
+
+
+/* Sleep Timer */
+"sleep_timer" = "スリープタイマー";
+"sleep_timer_off" = "スリープタイマーはオフ";
+"sleep_timer_15_minutes" = "15分";
+"sleep_timer_30_minutes" = "30分";
+"sleep_timer_45_minutes" = "45分";
+"sleep_timer_60_minutes" = "60分";
+/* Contextual hints (first-use bubbles) */
+"hint_dismiss" = "閉じる";
+"hint_playback_title" = "プレイヤー画面のジェスチャ";
+"hint_playback_line1" = "ミニ歌詞をタップするか、どこでも左にスワイプ: 全画面の歌詞";
+"hint_playback_line2" = "どこでも右にスワイプ: 歌詞の検索／手動割り当て";
+"hint_playback_line3" = "上にスワイプ: コントロールを表示。下にスワイプ: コントロールを隠す／プレイヤーを閉じる";
+"hint_full_lyrics_title" = "全画面の歌詞";
+"hint_full_lyrics_line1" = "どこかをダブルタップするとカラオケを開始（速度／ABリピート／1行リピート）";
+"hint_full_lyrics_line2" = "右にスワイプしてプレイヤーに戻る";
+
+"back_to_current_line" = "現在の行に戻る";
+"hint_search_title" = "歌詞検索";
+"hint_search_line1" = "左にスワイプしてプレイヤーに戻る";
+"hint_search_mac_line1" = "結果をクリックして歌詞として適用します";
+
+"cancel_sleep_timer" = "スリープタイマーを解除";
+
+/* Bulk Selection */
+"select" = "選択";
+"select_all" = "すべて選択";
+"bulk_actions" = "アクション";
+"add_to_liked" = "お気に入りに追加";
+"remove_from_liked" = "お気に入りから削除";
+"delete_files" = "ファイルを削除";
+"delete_files_confirmation" = "ファイルを削除";
+"selected_count_singular" = "%d件を選択";
+"selected_count_plural" = "%d件を選択";
+"delete_files_confirmation_message" = "%d件のファイルを削除してもよろしいですか？この操作は取り消せません。";
+
+/* ============================================================
+   App Intents (Siri / Shortcuts) — added in the Siri
+   modernization pass. Keys are the English source strings.
+   ============================================================ */
+
+/* Intent titles & descriptions */
+"Resume Playback" = "再生を再開";
+"Resumes playing your music where you left off." = "前回停止した位置から音楽の再生を再開します。";
+"Audio" = "オーディオ";
+"Play Music" = "音楽を再生";
+"Plays a song, album, artist or playlist from your QQPlayer library." = "QQPlayerライブラリの曲、アルバム、アーティスト、プレイリストを再生します。";
+"Playback" = "再生";
+"Add to Playlist" = "プレイリストに追加";
+"Generate Mix" = "ミックスを生成";
+"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "気分や説明に合うミックスをQQPlayerライブラリから作成して再生します。";
+"Toggle Favorite" = "お気に入りを切り替え";
+"Favorite Current Song" = "再生中の曲をお気に入りに";
+"Adds the currently playing QQPlayer song to Liked Songs." = "再生中のQQPlayerの曲をお気に入りに追加します。";
+"%@ is already in your Liked Songs." = "%@はすでにお気に入りにあります。";
+"Added %@ to your Liked Songs." = "%@をお気に入りに追加しました。";
+"There isn't a song playing in QQPlayer right now." = "現在QQPlayerで再生中の曲はありません。";
+"Add to Queue" = "キューに追加";
+"Play Playlist" = "プレイリストを再生";
+"Save Mix as Playlist" = "ミックスをプレイリストとして保存";
+"Song Card" = "曲のカード";
+"Playlist Card" = "プレイリストのカード";
+"Mix Card" = "ミックスのカード";
+
+/* Parameter titles & prompts */
+"Track" = "曲";
+"Play Next" = "次に再生";
+"Playlist" = "プレイリスト";
+"Description" = "説明";
+"What kind of mix do you want?" = "どんなミックスにしますか？";
+
+/* Dialogs */
+"Added %@ to your favorites." = "%@をお気に入りに追加しました。";
+"Removed %@ from your favorites." = "%@をお気に入りから削除しました。";
+"Added %@ to %@." = "%1$@を%2$@に追加しました。";
+"Added" = "追加しました";
+"Playing your mix: %@." = "ミックスを再生中: %@";
+"Now playing" = "再生中";
+
+/* Errors */
+"There's no music in your QQPlayer library yet." = "QQPlayerライブラリにはまだ音楽がありません。";
+"No matching music was found in your library." = "ライブラリに一致する音楽が見つかりませんでした。";
+"You can only take that action on individual songs." = "その操作は個別の曲にのみ実行できます。";
+"That song is already in this playlist." = "その曲はすでにこのプレイリストにあります。";
+"Playback failed. Please try again in the app." = "再生に失敗しました。アプリでもう一度お試しください。";
+"Your library is empty, so there's nothing to build a mix from." = "ライブラリが空のため、ミックスを作成できません。";
+"That mix isn't available anymore. Ask for a new one." = "そのミックスは利用できなくなりました。新しいミックスをリクエストしてください。";
+
+/* Enum case labels */
+"Shuffle" = "シャッフル";
+"Repeat" = "リピート";
+"Next" = "次へ";
+"Last" = "前へ";
+"Like" = "高評価";
+"Dislike" = "低評価";
+"Unset" = "未設定";
+
+/* Entity display representations */
+"%@ by %@" = "%2$@の%1$@";
+"album %@" = "アルバム「%@」";
+"%@ playlist" = "%@のプレイリスト";
+"playlist %@" = "プレイリスト「%@」";
+"^[%lld song](inflect: true)" = "%lld曲";
+"Warmup Audio Queue Result" = "オーディオキューのウォームアップ結果";
+
+/* Snippet cards */
+"Play next" = "次に再生";
+"Add to queue" = "キューに追加";
+"Remove from favorites" = "お気に入りから削除";
+"Add to favorites" = "お気に入りに追加";
+"Play playlist" = "プレイリストを再生";
+"^[%lld song](inflect: true) · %lld min" = "%lld曲 · %lld分";
+"Saved" = "保存しました";
+"Save" = "保存";
+"Save mix as playlist" = "ミックスをプレイリストとして保存";
+
+/* AI playlist generation (in-app) */
+"ai_playlist_title" = "AIプレイリスト";
+"ai_playlist_description" = "作りたいプレイリストを説明してください。オンデバイスAIがライブラリから合う曲を選びます。";
+"ai_playlist_placeholder" = "ゆったりした夜、エネルギッシュなワークアウト、アーティスト名…";
+"ai_playlist_generate" = "生成";
+"ai_playlist_generating" = "生成中…";
+"ai_playlist_failed" = "プレイリストを生成できませんでした。別の説明をお試しください。";
+"ai_playlist_button" = "AIでプレイリストを作成";
+
+"ai_playlist_created_title" = "プレイリストを作成しました";
+"ai_playlist_created_message" = "「%@」を%d曲で作成しました。";
+
+/* Playback order */
+"play_order_sequential" = "順番";
+"play_order_shuffle" = "シャッフル";
+"play_order_repeat_all" = "全曲リピート";
+"play_order_repeat_one" = "1曲リピート";
+
+/* What's New */
+"whats_new_title" = "新機能";
+"whats_new_item_hints" = "初回ヒント: プレイヤーや歌詞画面を開くと、バブルで隠れたジェスチャを案内します";
+"whats_new_item_guide" = "機能とジェスチャガイド: 設定内の完全なマニュアルをいつでも参照できます";
+"whats_new_item_announcement" = "新機能ポップアップ: 更新のたびに起動時に新着内容を表示します";
+
+// MARK: - macOS (QQPlayerMac)
+"title" = "タイトル";
+"duration" = "時間";
+"close" = "閉じる";
+"refresh_library" = "ライブラリを更新";
+"indexing_progress" = "インデックス作成中… %d曲";
+"library_empty" = "ライブラリは空です";
+"library_empty_hint" = "左下の「ライブラリを更新」をクリックして ~/Music/QQPlayer をスキャンします";
+"load_library_failed" = "ライブラリの読み込みに失敗しました: %@";
+"album_load_failed" = "このアルバムを開けませんでした: %@";
+"artist_load_failed" = "このアーティストを開けませんでした: %@";
+"playlist_create_failed" = "プレイリストを作成できませんでした: %@";
+"not_playing" = "停止中";
+"karaoke_mode_help" = "カラオケモード（速度／1行リピート／ABリピート）";
+"lyrics" = "歌詞";
+"lyrics_loading" = "歌詞を読み込み中…";
+"instrumental_no_lyrics" = "インストゥルメンタル（歌詞なし）";
+"no_lyrics" = "歌詞がありません";
+
+/* Karaoke, mini lyrics & lyrics search (B5: added to en) */
+"karaoke_play" = "再生";
+"karaoke_pause" = "一時停止";
+"karaoke_previous_line" = "前の行";
+"karaoke_next_line" = "次の行";
+"karaoke_single_line_loop" = "1行リピート";
+"karaoke_ab_loop" = "ABリピート";
+"karaoke_ab_loop_hint" = "タップして現在の行を開始位置に設定し、歌詞の行をタップして終了位置を設定します。もう一度タップすると終了します。";
+"karaoke_ab_end_hint" = "歌詞をタップしてABの終了位置を設定";
+"karaoke_speed_label" = "速度 %.1f";
+"lyrics_mini_loading" = "歌詞を読み込み中…";
+"lyrics_mini_none" = "歌詞がありません";
+"lyrics_search_title" = "歌詞検索";
+"lyrics_search_close" = "歌詞検索を閉じる";
+"lyrics_search_song_title" = "曲名";
+"lyrics_search_artist" = "アーティスト（任意）";
+"lyrics_search_button" = "検索";
+"lyrics_search_manual_active" = "歌詞を手動で設定済み";
+"lyrics_search_restore_auto" = "自動に戻す";
+"lyrics_search_searching" = "検索中…";
+"lyrics_search_no_results" = "歌詞が見つかりません。別の曲名かアーティストで試してください。";
+"lyrics_search_translation_badge" = "T";
+"lyrics_search_has_translation" = "中国語の翻訳を含む";
+"lyrics_search_enter_title" = "曲名を入力";
+"lyrics_search_apply_failed" = "適用できませんでした。もう一度お試しください。";
+"lyrics_empty_loading_title" = "歌詞を読み込み中";
+"lyrics_empty_loading_subtitle" = "メタデータとオンラインソースから取得中";
+"lyrics_empty_instrumental_title" = "インストゥルメンタル";
+"lyrics_empty_instrumental_subtitle" = "この曲には歌詞がありません";
+"lyrics_empty_not_found_title" = "歌詞がありません";
+"lyrics_empty_not_found_subtitle" = "この曲の歌詞が見つかりません";
+"track_count" = "%d曲";
+"search_placeholder" = "ライブラリを検索";
+"search_clear" = "検索をクリア";
+"search_no_results" = "結果が見つかりません";
+"search_no_results_hint" = "別のキーワードをお試しください";
+"search_section_songs" = "曲";
+"search_section_albums" = "アルバム";
+"search_section_artists" = "アーティスト";
+"search_section_playlists" = "プレイリスト";
+
+// MARK: - Playlist management (macOS)
+"playlist_manage_play_all" = "すべて再生";
+"playlist_manage_rename" = "名前を変更";
+"playlist_manage_remove_from_playlist" = "プレイリストから削除";
+"playlist_manage_empty" = "このプレイリストは空です";
+
+/* Playlist cover (B5: added to en) */
+"playlist_cover" = "プレイリストのカバー";
+"change_cover_image" = "カバー画像を変更";
+"remove_custom_cover" = "カスタムカバーを削除";
+
+// MARK: - Move to Trash (macOS)
+"move_to_trash" = "ゴミ箱に移動";
+"move_to_trash_confirm_single" = "「%@」をゴミ箱に移動しますか？ゴミ箱から復元できます。";
+"move_to_trash_confirm_multi" = "%d曲をゴミ箱に移動しますか？ゴミ箱から復元できます。";
+"move_to_trash_failed_count" = "%d曲をゴミ箱に移動できませんでした";
+"clear_selection_help" = "選択を解除";
+
+/* C-group online search & download (web /api/online/* parity) */
+"online_search_title" = "オンライン検索とダウンロード";
+"online_search_placeholder" = "NetEase Cloud Musicで検索...";
+"online_search_idle_hint" = "オンラインの曲を検索してライブラリにダウンロードします。ファイルは既定の音楽フォルダに保存され、自動的に表示されます。";
+"online_search_loading" = "検索中...";
+"online_search_no_results" = "オンラインの結果がありません";
+"online_search_failed" = "検索に失敗しました。もう一度お試しください。";
+"online_search_retry" = "再試行";
+"online_download" = "ダウンロード";
+"online_downloading" = "ダウンロード中...";
+"online_downloaded" = "ダウンロード済み";
+"online_download_failed" = "ダウンロードに失敗しました";
+"online_download_failed_prefix" = "ダウンロードに失敗しました: %@";
+
+/* E2 batch 2b: SongSea source + Quark scan login (web OnlineSearch/QuarkLoginModal parity) */
+"online_search_source_hint" = "ソース: NetEase Cloud Music または SongSea（Gequhai）";
+"quark_login_title" = "Quarkにサインイン";
+"quark_login_scan_hint" = "Quarkアプリを開いてスキャンしてサインインします";
+"quark_login_countdown" = "QRコードの有効期限は%d秒";
+"quark_login_expired" = "QRコードの有効期限が切れました";
+"quark_login_refresh" = "QRコードを更新";
+"quark_login_error" = "サインイン状態のエラーです。もう一度お試しください。";
+"quark_login_required_hint" = "ダウンロードにはQuarkへのサインインが必要です（スキャンパネルが開いています。サインイン後に自動で再試行します）。";
+"quark_login_success" = "%@としてサインイン中";
+"quark_login_retrying" = "ダウンロードを再試行中…";
+
+/* Online search history (B5: added to en) */
+"online_search_history_title" = "最近の検索";
+"online_search_clear_history" = "クリア";
+"online_search_history_delete_help" = "この項目を削除";
+
+
+/* C-group: search anything + settings download (web SearchAnything/settings parity) */
+"settings_category_download" = "ダウンロード";
+"settings_download_quality" = "ダウンロード品質";
+"settings_download_hint" = "オンラインダウンロードの既定の品質です。ファイルは音楽フォルダ（既定: ~/Music/QQPlayer）に保存され、ライブラリに自動的に表示されます。";
+
+/* Download settings (B5: added to en) */
+"settings_download_quark_quality" = "SongSeaの品質";
+"settings_download_engine" = "ダウンロードエンジン";
+"settings_download_engine_builtin" = "内蔵";
+"settings_download_engine_aria2" = "aria2";
+"settings_download_engine_hint" = "内蔵 = 直接ダウンロード、aria2 = aria2に委譲";
+"settings_download_aria2_rpc" = "aria2 RPCアドレス";
+"settings_download_aria2_secret" = "aria2シークレット";
+"settings_download_aria2_secret_placeholder" = "RPCシークレットを入力（任意）";
+"settings_download_max_speed" = "速度制限（MB/s）";
+"settings_download_max_speed_hint" = "0 = 無制限";
+"settings_quality_standard" = "128 kbps";
+"settings_quality_exhigh" = "320 kbps";
+"settings_quality_lossless" = "ロスレス";
+"settings_quality_hires" = "ハイレゾ";
+"search_any_menu" = "なんでも検索";
+"search_any_placeholder" = "曲、アーティスト、アルバム、設定を検索…";
+"search_any_loading" = "検索中…";
+"search_any_no_results" = "一致する結果がありません";
+"search_any_empty_hint" = "入力してローカルとオンラインの曲（ライブラリへダウンロード）、アーティスト、アルバム、設定を検索します。";
+"search_badge_song" = "曲";
+"search_badge_online" = "オンライン";
+"search_badge_artist" = "アーティスト";
+"search_badge_album" = "アルバム";
+"search_badge_setting" = "設定";
+/* Scraping & Tag Editor (E1-S4) */
+"settings_category_scraping" = "スクレイピング";
+"scraping_rename_template" = "名前変更テンプレート";
+"scraping_rename_template_hint" = "プレースホルダー: {artist} {title} {album} {track} {year}。「/」でサブフォルダを作成します";
+"scraping_rename_preview" = "プレビュー";
+"scraping_source_order" = "ソースの順序";
+"scraping_batch_enabled" = "一括スクレイピング";
+"scraping_auto_after_download" = "ダウンロード後に自動スクレイピング";
+"scraping_auto_after_download_hint" = "既定ではオフです。オンにすると、ダウンロードが完了した曲は最初の候補（タグ＋カバー）でバックグラウンドでスクレイピングされ、名前変更テンプレートでリネームされます。結果が正しくない場合は、タグエディタで手動で再スクレイピングしてください。";
+"scraping_batch_enabled_hint" = "既定ではオフです。オンにすると、ライブラリ全体の利用可能なタグ情報（カバーを含む）を一度に補完できます。";
+"scraping_batch_run_library" = "ライブラリを補完（タグとカバー）";
+"scraping_batch_until" = "1回最大100曲、約1秒ごとに1リクエスト。";
+"batch_mode_library" = "ライブラリ全体で不足しているタグ情報（カバーを含む）を補完します";
+"batch_mode_paths" = "選択した曲を最初の候補と利用可能なすべてのフィールドでスクレイピングします";
+"batch_cancel_help" = "バッチを停止します。完了した曲は保持されます";
+"source_netease" = "NetEase";
+"source_itunes" = "Apple Music";
+"source_gequhai" = "SongSea";
+"source_musicbrainz" = "MusicBrainz";
+"tag_editor_title" = "タグ編集／スクレイピング";
+"tag_editor_scraping" = "候補を検索中…";
+"tag_editor_scrape_again" = "再スクレイピング";
+"tag_editor_no_candidates" = "候補が見つかりません";
+"tag_editor_cover" = "カバー";
+"tag_editor_cover_download_failed" = "カバーのダウンロードに失敗しました";
+"tag_editor_remove_cover" = "カバーを削除";
+"tag_editor_choose_local_cover" = "画像を選択…";
+"tag_editor_choose_local_cover_help" = "このMacからJPEGまたはPNGファイルを選択します";
+"tag_editor_local_cover_invalid" = "有効なJPEGまたはPNG画像ではありません";
+"tag_editor_rename_files" = "保存後にファイル名を変更";
+"tag_editor_field_year" = "年";
+"tag_editor_field_genre" = "ジャンル";
+"tag_editor_field_track" = "トラック番号";
+"tag_editor_field_album_artist" = "アルバムアーティスト";
+"tag_editor_saved" = "タグを保存しました";
+"tag_editor_save_failed" = "保存に失敗しました";
+"tag_editor_format_unsupported" = "この形式はタグの書き込みに対応していません";
+"tag_editor_db_migrate_failed" = "タグは保存しましたが、ライブラリを更新できませんでした: %@";
+"context_edit_tags" = "タグ編集／スクレイピング";
+"context_batch_scrape" = "一括スクレイピング…";
+"batch_running" = "%d曲をスクレイピング中…";
+"batch_summary" = "完了: %d件書き込み、%d件スキップ、%d件失敗";
+"batch_truncated" = "最初の100曲のみ処理しました";
+"batch_disabled_hint" = "一括スクレイピングは無効です。設定 > スクレイピングで有効にしてください。";
+/* Shortcuts settings (E4) */
+"settings_category_shortcuts" = "ショートカット";
+"shortcut_play_pause" = "再生／一時停止";
+"shortcut_seek_back" = "10秒戻る";
+"shortcut_seek_forward" = "10秒進む";
+"shortcut_prev_track" = "前の曲";
+"shortcut_next_track" = "次の曲";
+"shortcut_cycle_play_mode" = "再生モードを切り替え";
+"shortcut_toggle_favorite" = "お気に入りを切り替え";
+"shortcut_speed_down" = "速度を下げる";
+"shortcut_speed_up" = "速度を上げる";
+"shortcut_toggle_karaoke" = "カラオケモード";
+"shortcut_prev_line" = "前の行";
+"shortcut_next_line" = "次の行";
+"shortcut_ab_toggle" = "ABリピート";
+"shortcut_ab_end" = "AB終了点を設定";
+"shortcuts_record" = "記録";
+"shortcuts_cancel" = "キャンセル";
+"shortcuts_reset" = "リセット";
+"shortcuts_reset_help" = "既定のショートカットに戻す";
+"shortcuts_recording" = "新しいショートカットを押してください…（Escでキャンセル）";
+"shortcuts_conflict" = "競合: %@で使用済みです";
+"shortcuts_footer_hint" = "ショートカットをクリックして新しい組み合わせを記録します。テキスト入力欄でのタイピングは記録されません。";
+
+/* E3 Desktop windows (mini player + desktop lyric) */
+"settings_category_desktop_lyric" = "ミニプレイヤーとデスクトップ歌詞";
+"mini_window_button_enabled" = "ミニウィンドウボタンを表示";
+"mini_window_button_hint" = "メインウィンドウのツールバーにミニモードボタンを追加します。クリックするとメインウィンドウが隠れ、デスクトップ歌詞付きのミニプレイヤーが開きます。";
+"mini_lyrics_enabled" = "ミニモードでデスクトップ歌詞を表示";
+"enter_mini_mode" = "ミニモード";
+"desktop_lyric_font_size" = "デスクトップ歌詞の文字サイズ";
+"desktop_lyric_translation_hint" = "デスクトップ歌詞の翻訳行は、歌詞カテゴリの「翻訳を表示」スイッチに従います。";
+"mini_restore" = "メインウィンドウに戻る";
+/* Desktop windows (E3) */
+"mini_window_no_track" = "再生中の曲はありません";
+
+/* S2 Sync pairing (M1-UI) */
+"settings_category_sync" = "同期";
+"sync_settings" = "同期";
+"sync_settings_entry" = "同期";
+"sync_settings_footer" = "MacとiPhoneをペアリングして音楽ライブラリを同期します。ペアリングはローカルネットワーク内でのみ行われます。";
+"sync_identity_section" = "識別情報とQRコード";
+"sync_identity_footer" = "iPhoneのQQPlayerでこのコードをスキャンして、このMacをホストとしてペアリングします。";
+"sync_this_device" = "このデバイス";
+"sync_this_device_section" = "このデバイス";
+"sync_device_id" = "デバイスID";
+"sync_device_id_short" = "ID %@";
+"sync_device_name" = "デバイス名";
+"sync_device_name_placeholder" = "例: 私のiPhone";
+"sync_device_name_hint" = "空欄にするとシステムのデバイス名を使用します。この名前はローカルネットワーク同期に使われます。";
+"sync_qr_scan_hint" = "iPhoneで: 設定 → 同期 → ホストを追加 → QRコードをスキャン、このコードに向けてください。更新すると毎回新しいコードが表示されます。";
+"sync_refresh_qr" = "コードを更新";
+"sync_paired_devices" = "ペアリング済みデバイス";
+"sync_paired_hosts" = "ペアリング済みホスト";
+"sync_no_paired_devices" = "ペアリング済みのデバイスはまだありません。";
+"sync_no_paired_hosts" = "ペアリング済みのホストはまだありません。";
+"sync_add_host" = "ホストを追加";
+"sync_add_host_footer" = "ご自身のQQPlayer Macとペアリングします。ペアリング完了前にMac側で承認を求められます。";
+"sync_unpair" = "ペアリング解除";
+"sync_unpair_confirm_title" = "このデバイスのペアリングを解除しますか？";
+"sync_unpair_confirm_message" = "%@を削除しますか？同期するには再度ペアリングが必要です。";
+"sync_role_host" = "ホスト";
+"sync_role_client" = "iPhone";
+"sync_unknown_device" = "不明なデバイス";
+"sync_paired_at_format" = "%@にペアリング";
+"sync_last_seen_format" = "最終確認 %@";
+"sync_source_qr" = "QRコードをスキャン";
+"sync_source_manual" = "手動入力";
+"sync_replacement_badge" = "既存のペアリングを置き換えます";
+"sync_approve" = "承認";
+"sync_reject" = "拒否";
+
+"sync_devices_section" = "デバイス";
+"sync_devices_footer" = "選択したデバイスがこの同期の対象です。デバイスがオンラインと表示されるのは、そのデバイスでQQPlayerを開いている間だけです（設定 → 同期）。";
+"sync_devices_empty" = "ペアリング済みのモバイルデバイスはありません。携帯のQQPlayerで上のQRコードをスキャンしてペアリングしてください。";
+"sync_devices_target_badge" = "同期先";
+"sync_device_status_online" = "オンライン";
+"sync_device_status_offline" = "オフライン";
+"sync_device_offline_hint" = "そのデバイスでQQPlayerを開きます → 設定 → 同期。";
+"sync_target_waiting" = "%@がオンラインになるのを待っています。";
+"sync_target_mismatch_format" = "%@に接続していますが、同期先は%@です。";
+"sync_target_switch" = "%@に切り替え";
+"sync_scan_qr" = "QRコードをスキャン";
+"sync_manual_input" = "IDを手動で入力";
+"sync_scan_hint" = "Macの同期画面に表示されたQRコードにカメラを向けてください。";
+"sync_scan_subhint" = "コードにはMacの名前とセキュリティ指紋が含まれます。確認するまで何も送信されません。";
+"sync_camera_denied" = "ペアリングコードをスキャンするにはカメラへのアクセスが必要です。続行するには設定で許可してください。";
+"sync_camera_unavailable" = "カメラを利用できません";
+"sync_open_settings" = "設定を開く";
+"sync_confirm_pair_title" = "ペアリングを確認";
+"sync_confirm_pair_caption" = "このデバイスとペアリングしています";
+"sync_confirm_pair" = "確認";
+"sync_pubkey_pending_hint" = "このデバイスのセキュリティキーは初回接続時に完了します。";
+"sync_added_title" = "デバイスを追加しました";
+"sync_added_awaiting_host" = "%@を追加しました。Macで承認されるとペアリングが完了します。";
+"sync_manual_added_awaiting_host" = "%@を追加しました。Macで承認されるとペアリングが完了し、デバイス情報は初回接続時に完了します。";
+"sync_scan_failed_title" = "ペアリングコードではありません";
+"sync_invalid_qr_message" = "このQRコードは有効なQQPlayerのペアリングコードではありません。";
+"sync_expired_title" = "ペアリングコードの有効期限切れ";
+"sync_expired_message" = "Macでコードを更新してから、もう一度スキャンしてください。";
+"sync_store_failed_title" = "保存できませんでした";
+"sync_scan_again" = "再スキャン";
+"sync_manual_hint" = "Macの設定で同期を開き、デバイスIDをすべて入力してください。ハイフンやスペースはあってもかまいません。";
+"sync_manual_placeholder" = "XXXXXXX-XXXXXXX-XXXXXXX";
+"sync_manual_continue" = "続ける";
+"sync_manual_id_valid" = "有効なデバイスID";
+"sync_manual_id_invalid" = "有効なデバイスIDではありません（52文字）";
+"sync_invalid_id_title" = "無効なデバイスID";
+"sync_invalid_id_message" = "Macに表示されたIDを確認してもう一度お試しください。";
+"sync_failure_invalid_payload" = "有効なペアリングデータではありません。";
+"sync_failure_invalid_device_id" = "このコードのデバイスIDが有効ではありません。";
+"sync_failure_invalid_public_key" = "このコードのセキュリティキーが有効ではありません。";
+"sync_failure_fingerprint_mismatch" = "デバイスIDとセキュリティキーが一致しません。";
+"sync_failure_not_awaiting" = "確認待ちのペアリングはありません。";
+"sync_client_identity_footer" = "このIDはこのiPhoneをMacに識別させるものです。デバイス名はMacの同期デバイス一覧に表示されます。";
+"sync_load_failed_title" = "同期エラー";
+"sync_pairing_request_header" = "ペアリングリクエスト";
+"sync_identity_missing_error" = "このMacの同期IDを読み込めませんでした。もう一度お試しください。";
+"sync_connect_browsing" = "Macを探しています…";
+"sync_connect_connecting_host" = "%@に接続中…";
+"sync_connect_waiting_approval" = "Macでの承認を待っています…";
+"sync_connect_paired_title" = "ペアリング済み";
+"sync_connect_paired_message" = "%@とペアリングしました。";
+"sync_connect_host_not_found_title" = "Macが見つかりません";
+"sync_connect_host_not_found_message" = "Mac %@が見つかりません。Macの同期画面が開いていること、両方のデバイスが同じネットワークにあることを確認してください。";
+"sync_connect_host_not_found_message_none" = "ペアリングするMacが見つかりません。Macの同期画面が開いていること、両方のデバイスが同じネットワークにあることを確認してください。";
+"sync_connect_rejected_title" = "ペアリング拒否";
+"sync_connect_rejected_message" = "Macがこのペアリングリクエストを拒否しました。";
+"sync_connect_rejected_message_detail" = "ペアリングが拒否されました: %@";
+"sync_connect_timed_out_title" = "承認がタイムアウトしました";
+"sync_connect_timed_out_message" = "Macが時間内に承認しませんでした。同期画面が開いていることを確認して、もう一度お試しください。";
+"sync_connect_failed_title" = "接続に失敗しました";
+"sync_connect_failed_message" = "Macに接続できませんでした。両方のデバイスが同じネットワークにあることを確認して、もう一度お試しください。";
+"sync_connect_failed_message_detail" = "接続に失敗しました: %@";
+"sync_connect_missing_candidate" = "このQRコードにはセキュリティデータがありません。もう一度スキャンしてください。";
+"sync_connect_retry" = "再試行";
+
+// MARK: - 局域网同步 · iOS 被动端状态（M6 T4/T5）
+"sync_passive_section" = "同期を受信中";
+"sync_passive_footer" = "このiPhoneがMacに応答し、Macから送られる曲を受信します。接続するにはMacで同期を開いてください。";
+"sync_passive_state_idle" = "未接続";
+"sync_passive_state_unpaired" = "ペアリングされたMacがありません";
+"sync_passive_state_searching" = "Macを探しています…";
+"sync_passive_state_connecting" = "%@に接続中…";
+"sync_passive_state_connected" = "%@に接続済み";
+"sync_passive_fail_identity" = "このiPhoneの同期IDを読み込めませんでした。";
+"sync_passive_fail_not_found" = "このネットワーク上で%@が見つかりません。";
+"sync_passive_fail_not_found_generic" = "このネットワーク上でMacが見つかりません。";
+"sync_passive_fail_timeout" = "Macが時間内に応答しませんでした。";
+"sync_passive_fail_rejected" = "Macが接続を拒否しました。";
+"sync_passive_fail_connection" = "接続に失敗しました。";
+"sync_passive_detail" = "詳細: %@";
+"sync_passive_progress_received" = "%d件のファイルを受信しました";
+"sync_passive_progress_batch" = "前回のバッチ: %d件";
+"sync_passive_progress_failures" = "%d件失敗";
+"sync_passive_reconnect" = "再接続";
+"sync_passive_reason_transfer" = "転送に失敗しました";
+"sync_passive_reason_path" = "無効なパス";
+"sync_passive_reason_save" = "ファイルを保存できませんでした";
+"sync_passive_reason_other" = "失敗";
+
+/* ── M6 T3（2026-09-11）同步操作区（连接状态 / 内容选择 / 执行 / 结果）字段 ── */
+"sync_run_connection_section" = "接続";
+"sync_run_connected_for" = "%@に接続しました";
+"sync_run_not_paired_hint" = "ペアリングされたデバイスはまだありません。下のQRコードをiPhoneのQQPlayerでスキャンしてください。";
+"sync_run_not_connected_hint" = "iPhoneで: QQPlayer → 設定 → 同期、で接続します。";
+"sync_run_allow_lan" = "ローカルネットワーク上のデバイスの接続を許可";
+"sync_run_listener_off_hint" = "待ち受けがオフのため、このMacは検出・同期できません。";
+"sync_run_selection_section" = "同期する内容";
+"sync_run_selection_footer" = "同期は曲を追加・更新するだけで、削除は行いません。";
+"sync_run_mode_library" = "ライブラリ全体";
+"sync_run_mode_playlists" = "プレイリスト";
+"sync_run_mode_tracks" = "曲";
+"sync_source_label" = "ソース";
+"sync_source_all_library" = "ライブラリ全体";
+"sync_source_smart_group" = "スマートプレイリスト";
+"sync_run_pick_tracks" = "曲を選択";
+"sync_run_smart_selected" = "%d / %d 選択中";
+"sync_run_smart_snapshot_badge" = "スナップショット";
+"sync_run_library_row_title" = "ライブラリ全体";
+"sync_run_library_row_hint" = "ライブラリのすべての曲。最初に確認が表示されます。";
+"sync_run_library_row_detail" = "%d曲 · 約%@";
+"sync_run_library_confirm_title" = "ライブラリ全体を同期しますか？";
+"sync_run_library_confirm_action" = "すべて同期";
+"sync_run_library_confirm_message" = "他のデバイスにまだない曲を含め、%d曲で約%@を送信します。時間がかかり、多くのストレージを使用する場合があります。続行しますか？";
+"sync_run_playlists_empty" = "プレイリストはまだありません。";
+"sync_run_favorites" = "お気に入り";
+"sync_run_songs_count" = "%d曲";
+"sync_run_track_search_placeholder" = "曲を検索";
+"sync_run_tracks_loading" = "読み込み中…";
+"sync_run_tracks_empty" = "曲が見つかりません。";
+"sync_run_tracks_load_more" = "さらに読み込む";
+"sync_run_selection_empty" = "まだ何も選択されていません。";
+"sync_run_selection_partial_size" = "サイズはおおよその見積もりです（まだ読み込まれていない曲があります）。";
+"sync_run_unknown_playlists" = "選択したプレイリストのうち%d件は存在しません。";
+"sync_run_selection_total_playlists" = "%dプレイリスト · %d曲 · 約%@";
+"sync_run_selection_total_tracks" = "%d曲 · 約%@";
+"sync_run_selection_total_library" = "ライブラリ全体 · %d曲 · 約%@";
+"sync_run_start" = "同期を開始";
+
+/* M6：两个方向是用户显式选择的独立操作（2026-09-11 拍板） */
+"sync_run_panel_title" = "同期";
+"sync_run_upload" = "iPhoneにアップロード";
+"sync_run_upload_help" = "このMacにある曲をiPhoneに送ります（足りない曲が送られます）";
+"sync_run_download" = "iPhoneからダウンロード";
+"sync_run_download_help" = "iPhoneからこのMacに曲を持ってきます（iPhoneの一覧が正となります）";
+"sync_run_cancel" = "キャンセル";
+"sync_run_probe" = "速度を測定";
+"sync_run_probe_value" = "リンク速度 %.1f MB/s";
+"sync_run_error_manifest_timeout" = "デバイスのファイル一覧の取得がタイムアウトしました（%d秒以内に応答なし。デバイスがまだライブラリを整理中の可能性があります）。";
+"sync_run_progress_planning" = "不足分を確認中…";
+"sync_run_progress_push" = "送信中 %d/%d";
+"sync_run_progress_pull" = "受信中 %d/%d";
+"sync_run_interrupted" = "デバイスが切断されたため、同期を停止しました。";
+"sync_run_cancelled" = "同期をキャンセルしました。";
+"sync_run_reason_not_paired" = "先にiPhoneをペアリングしてください（下のQRコードをスキャン）。";
+"sync_run_reason_not_connected" = "先にiPhoneを接続してください（設定 → 同期）。";
+"sync_run_reason_library_unavailable" = "このMacの音楽フォルダを利用できないため、同期はオフになっています。";
+"sync_run_reason_empty_selection" = "同期するプレイリストまたは曲を選択してください。";
+"sync_run_reason_already_running" = "同期はすでに進行中です。キャンセルするか、完了までお待ちください。";
+"sync_run_reason_unavailable" = "ファイルを利用できません";
+"sync_run_result_section" = "前回の結果";
+"sync_run_result_none" = "まだ同期は実行されていません。";
+"sync_run_result_pushed" = "送信";
+"sync_run_result_pulled" = "受信";
+"sync_run_result_skipped" = "最新の状態です";
+"sync_run_result_failed" = "失敗";
+"sync_run_result_failures_header" = "失敗した項目（%d）";
+"sync_run_result_unresolved" = "%d曲はまだフィンガープリントがなく、スキップされました。";
+"sync_run_result_empty_selection" = "何も選択されていないため、何も転送されませんでした。";
+"sync_run_result_peer_identical" = "他のデバイスとすでに同一です — 転送するものはありません（%d件スキップ）:";
+"sync_run_result_no_deletion" = "同期はどちらのデバイスからも曲を削除しません。";
+"sync_run_result_last_run_prefix" = "前回の同期: %@";
+"sync_run_result_last_run_device" = "デバイス: %@";
+
+// 2026-09-25 结果区默认折叠：结论行 + 「详情」DisclosureGroup
+"sync_result_detail" = "詳細";
+"sync_result_nothing_new" = "同期するものはありません";
+
+// S2-T12（2026-09-13）独立「同步数据」区（收藏 / 播放历史 / 歌单结构；与文件传输无关）
+// Batch B1 (2026-09-26): top-level two pages + segmented flows (songs / playback data)
+"sync_flow_tracks" = "曲の転送";
+"sync_run_data_section" = "再生データ";
+"sync_run_data_description" = "お気に入り、再生履歴、プレイリストを単独で同期します。曲は転送されません。";
+// Cross-device resume switch (2026-09-14): off by default; turning it on only allows exchange for now
+"sync_run_playback_position_toggle" = "デバイス間の再生位置の引き継ぎ";
+"sync_run_playback_position_help" = "既定ではオフです。このデバイスは再生位置を送信も受信もしません。オンにすると、2台のデバイスが位置を交換します。このデバイスが現在位置を送信し、もう一方の位置も受け入れるため、同じ曲を続きから再生できます。";
+"sync_run_data_button" = "データを同期";
+"sync_run_data_help" = "iPhoneとお気に入り、再生履歴、プレイリストを統合します";
+"sync_run_data_cancel" = "キャンセル";
+"sync_run_data_phase_pushing" = "変更を送信中…";
+"sync_run_data_phase_pulling" = "変更を受信中…";
+"sync_data_pull_peer_preparing" = "iPhoneがライブラリを整理中です…";
+"sync_data_pull_peer_preparing_countdown" = "もう一方のデバイスがライブラリを整理中です。%d秒後に自動で再試行します";
+"sync_data_pull_peer_importing_countdown" = "もう一方のデバイスがライブラリを読み込み中です。%d秒後に自動で再試行します";
+"sync_data_pull_retrying_no_answer" = "まだ応答がありません。再試行中…";
+"sync_data_pull_no_answer_timeout" = "何度か試しましたが、もう一方のデバイスから応答がありません。ライブラリの整理中か、前のバッチを処理中の可能性があります。後でもう一度お試しください。";
+"sync_data_pull_not_ready_timeout" = "iPhoneはまだライブラリを整理中です（インデックス作成が未完了）。後でもう一度お試しください。";
+"sync_run_data_result_sent" = "送信";
+"sync_run_data_result_applied" = "適用済み";
+"sync_run_data_result_pending" = "保留中";
+"sync_run_data_result_skipped" = "削除はスキップ";
+"sync_run_data_result_unresolved" = "未解決";
+"sync_run_data_ambiguous_identity" = "IDの競合";
+"sync_run_data_result_missing_identity" = "フィンガープリントなし";
+"sync_run_data_unsupported" = "未対応";
+"sync_run_data_pending_hint" = "%d件が、このMacにまだない曲を待っています。";
+"sync_run_data_unresolved_hint" = "%d件はこのMacの曲と一致しなかったため、適用されませんでした。";
+"sync_run_data_ambiguous_identity_hint" = "%d件はこのMacの同じパスに複数の曲が一致したため、適用されませんでした。";
+"sync_run_data_unsupported_hint" = "%d件の再生位置の変更は適用されませんでした（デバイス間の引き継ぎがオフ、または受信した位置が別の曲のものです）。";
+"sync_run_data_skipped_parent" = "依存関係が不足";
+"sync_run_data_skipped_parent_hint" = "%d件の変更は、依存先がこのデバイスにまだないためスキップされました（プレイリスト構成が未同期、または参照先の曲にローカルレコードがありません）。";
+"sync_run_data_missing_identity_hint" = "%d件は曲のフィンガープリントなしで送信されたため、もう一方のデバイスで照合できません。";
+"sync_run_data_apply_failed" = "適用に失敗しました";
+"sync_run_data_apply_failed_hint" = "%d件の変更を適用できませんでした（データが読み取れないか、このデバイスに書き込めませんでした）。";
+"sync_run_data_future_timestamp" = "時刻が進んでいる";
+"sync_run_data_future_timestamp_hint" = "%d件の変更は、タイムスタンプがこのMacの時計より5分以上進んでいるため適用されませんでした（もう一方のデバイスの時計が誤っている可能性があります）。";
+"sync_run_data_entity_breakdown" = "種類別の内訳";
+"sync_run_data_entity_row" = "%1$@ · %2$@";
+"sync_run_data_entity_favorite" = "お気に入り";
+"sync_run_data_entity_play_history" = "再生履歴";
+"sync_run_data_entity_playlist" = "プレイリスト";
+"sync_run_data_entity_playlist_item" = "プレイリストの曲";
+"sync_run_data_entity_playback_position" = "再生位置";
+"sync_run_data_result_none" = "データ同期はまだ実行されていません。";
+"sync_run_data_cancelled" = "データ同期をキャンセルしました。";
+"sync_run_data_disconnected" = "デバイスが切断されたため、データ同期を停止しました。";
+"sync_run_data_reason_not_connected" = "先にiPhoneを接続してください（設定 → 同期）。";
+"sync_run_data_reason_already_running" = "データ同期はすでに実行中です。";
+"sync_run_data_reset_button" = "最初から再同期（カーソルをリセット）";
+"sync_run_data_reset_help" = "このデバイスとの再生データの同期位置をリセットし、次回は最初からやり直します";
+"sync_run_data_reset_confirm_title" = "最初から再同期しますか？";
+"sync_run_data_reset_confirm_message" = "このデバイスとの同期位置をリセットします。次回のデータ同期ではすべての再生データを再取得します。";
+"sync_run_data_reset_confirm_action" = "リセットして再同期";
+"sync_run_data_reset_done" = "同期位置をリセットしました。すべてを取得するにはデータ同期を再度実行してください。";
+"sync_run_data_reset_failed" = "同期位置をリセットできませんでした。もう一度お試しください。";
+"sync_run_data_footer" = "統合はどちらのデバイスでもお気に入り、再生履歴、プレイリストを削除しません。";
+"sync_run_data_identity_footer" = "2台のデバイスで曲のフィンガープリントが異なる場合、曲を照合できず、その項目は適用されません。両方のデバイスで最新バージョンを使用していることを確認してください。それでも一致しない場合は「最初から再同期」を使用してください。";
+
+// L5 wiring self-check (2026-09-15): are the capabilities this device declares actually attached?
+// Shown only when there is at least one gap (no gaps = nothing displayed).
+"sync_wiring_gap_label" = "接続チェック: 宣言された%d件の機能が接続されていません";
+"sync_wiring_gap_hint" = "このデバイスはこれらの機能を宣言していますが接続されていません: %@。その方向のデータは同期されません（詳細はログ）。";
+"sync_wiring_probe_change_log_peer" = "再生データのエンドポイント（フレーム 8/9）";
+"sync_wiring_probe_library_passive_host" = "ファイル受信";
+"sync_wiring_probe_playback_position_sink" = "再生位置の受信先";
+"sync_wiring_probe_playback_carry" = "曲と一緒に送られる再生位置";
+"sync_wiring_probe_data_sync_entry" = "データ同期の入口";
+"sync_wiring_probe_overwrite_ledger" = "ファイル上書きの確認";
+
+// T10（2026-09-12）方向优先 · 内容源随方向切换
+"sync_run_direction_section" = "同期の方向";
+"sync_run_direction_upload" = "%@に送信";
+"sync_run_direction_upload_detail" = "このMacから%@に曲を送ります。";
+"sync_run_direction_download" = "%@から取得";
+"sync_run_direction_download_detail" = "%@からこのMacに曲を持ってきます。";
+"sync_run_direction_footer" = "先に方向を選んでください。下の一覧にそのデバイスの内容が表示されます。";
+"sync_run_direction_hint" = "上で同期の方向を選ぶと、同期できる内容が表示されます。";
+"sync_run_direction_download_target" = "iPhone";
+"sync_run_reason_no_direction" = "先に同期の方向を選んでください。";
+"sync_run_selection_section_local" = "同期する内容 · このMac";
+"sync_run_selection_section_peer" = "同期する内容 · iPhone";
+"sync_run_peer_needs_connection" = "先にiPhoneを接続してください（設定 → 同期）。";
+"sync_run_library_row_title_peer" = "%@のすべて";
+"sync_run_library_confirm_message_download" = "iPhoneから%d曲で約%@をダウンロードします。時間がかかり、多くのストレージを使用する場合があります。続行しますか？";
+"sync_run_playlists_loading" = "プレイリストを読み込み中…";
+"sync_peer_summary" = "%@のライブラリ · %d曲 · 約%@";
+"sync_peer_summary_loading" = "iPhoneのライブラリを読み込み中…";
+"sync_peer_summary_unknown" = "%@のライブラリサイズを取得できません。";
+"sync_peer_retry" = "再試行";
+"sync_peer_error_not_connected" = "iPhoneに接続されていません。";
+"sync_peer_error_library_unavailable" = "このMacの音楽フォルダを利用できません。";
+"sync_peer_error_session" = "接続が終了しました。再接続してもう一度お試しください。";
+"sync_peer_error_timeout" = "iPhoneが時間内に応答しませんでした。";
+"sync_peer_error_cancelled" = "リクエストをキャンセルしました。";
+"sync_peer_error_other" = "iPhoneの内容を読み込めませんでした。";
+
+// F2 对齐歌词补发（2026-09-16）：丢弃 / 待补发 / 保留本端 的披露文案
+"sync_lyrics_section" = "整列済みの歌詞";
+"sync_lyrics_discarded" = "%d件の整列済み歌詞を破棄しました";
+"sync_lyrics_discarded_hint" = "一致する曲がまだこのデバイスにないため、これらの歌詞は破棄されました。次回の同期で自動的に再送されます。";
+"sync_lyrics_pending_resend" = "送信待ちの整列済み歌詞 %d件";
+"sync_lyrics_pending_resend_hint" = "これらの歌詞は今回の配信が確認されませんでした。次回の接続で自動的に再試行します。";
+"sync_lyrics_kept_local" = "このデバイスの歌詞を保持";
+
+// INV-22 另一半（2026-09-16）：歌单自定义封面读取失败的披露文案
+"sync_cover_section" = "プレイリストのカバー";
+"sync_cover_unavailable" = "%d件のプレイリストカバーを読み取れません";
+"sync_cover_unavailable_hint" = "これらのプレイリストのカスタムカバーファイルをこのデバイスで読み取れないため（ファイルが削除されたかパスが無効）、代わりに自動生成のカバーを表示しています。";
+"playlist_cover_unavailable" = "カスタムカバーファイルを読み取れません。自動生成のカバーを表示しています。";
+
+/* ── Reclaim area (2026-09-29) ── */
+"reclaim_area" = "再確保領域";
+"reclaim_area_description" = "「ライブラリからのみ削除」で削除した曲は再確保領域に移動します（ライブラリには表示されません）。ここで復元するか、完全に削除できます。";
+"reclaim_area_empty" = "再確保領域は空です";
+"reclaim_area_summary" = "%d件 · %@";
+"reclaim_restore" = "復元";
+"reclaim_restore_selected" = "選択項目を復元（%d）";
+"reclaim_delete_selected" = "選択項目を完全に削除（%d）";
+"reclaim_purge_all" = "再確保領域を空にする";
+"reclaim_purge_confirm_title" = "完全に削除しますか？";
+"reclaim_purge_confirm_message" = "%d件（%@）を完全に削除します。この操作は取り消せません。";
+"reclaim_purge_all_confirm_message" = "再確保領域の%d件（%@）をすべて完全に削除します。この操作は取り消せません。";
+"reclaim_restore_result" = "%d件復元、%d件スキップ";
+"reclaim_purge_result" = "%d件を完全に削除し、%@を解放しました";
+"reclaim_operation_failed" = "%d件失敗";
+"reclaim_select_all" = "すべて選択";
+"reclaim_deselect_all" = "すべて選択解除";
+"reclaim_not_restorable" = "復元できません";
+
+/* MAS 批 2B（2026-10-29）：曲库根授权 + 旧库导入 */
+"library_access_section" = "フォルダアクセス";
+"library_access_section_footer" = "macOSでは、このアプリは選択した音楽フォルダのみ読み取れます。ライブラリを移動した後は再度アクセスを許可してください。";
+"library_access_state_granted" = "音楽フォルダへのアクセスが許可されています";
+"library_access_state_needed" = "許可が必要です";
+"library_access_authorize" = "ライブラリフォルダを選択…";
+"library_access_gate_title" = "音楽フォルダへのアクセスを許可";
+"library_access_gate_body" = "macOSでは、このアプリは選択したフォルダのみ読み取れます。続行するには音楽ライブラリのフォルダを選択してください。";
+"library_access_gate_default" = "既定の場所: %@";
+"library_access_grant_failed" = "フォルダの許可を保存できませんでした: %@";
+"library_import_legacy" = "以前のバージョンからデータベースを読み込む…";
+"library_import_legacy_prompt" = "Application Support内のQQPlayerMacフォルダを選択してください";
+"library_import_legacy_done" = "%d件のファイルを読み込みました。ライブラリが更新されない場合はQQPlayerを再起動してください。";
+"library_import_legacy_failed" = "読み込みに失敗しました: %@（以前のデータベースは変更されていません）";
+"library_import_legacy_missing" = "選択したフォルダにqqplayer.dbが見つかりません";
+"library_import_legacy_backup" = "既存のデータベースを%@としてバックアップしました";
+"library_import_legacy_hint" = "以前の（サンドボックス化されていない）バージョンのデータベースが見つかり、読み込めます。";
+"library_import_legacy_confirm" = "現在のデータベースが置き換わります（バックアップは自動で作成されます）。その後QQPlayerを再起動してください。続行しますか？";
+
+/* Local AI recommendations (P1) */
+"recommendations" = "あなた向け";
+"recommendation_refresh" = "新しいバッチ";
+"recommendation_batch_refilling" = "さらに読み込み中…";
+"recommendation_batch_remaining" = "このプールにあと%d件";
+"recommendation_batch_exhausted" = "このバッチの最後です";
+"recommendation_loading" = "おすすめを作成中…";
+"recommendation_empty" = "今おすすめできる新しい曲はありません。後でもう一度お試しください。";
+"recommendation_error_all_sources" = "オンラインソースに接続できませんでした。ネットワークを確認してもう一度お試しください。";
+"recommendation_error_load_failed" = "ローカルライブラリを読み取れませんでした。";
+"recommendation_download" = "ダウンロード";
+"recommendation_dismiss" = "興味なし";
+"recommendation_reason_artist" = "よく再生する: %@";
+"recommendation_reason_requested_artist" = "リクエストされたアーティスト";
+"recommendation_artist_shortfall" = "%@の曲は%d曲しか見つかりませんでした";
+"recommendation_artist_shortfall_filled" = "%@は%d曲のみのため、似たアーティストから%d曲を追加しました";
+"recommendation_reason_era" = "あなたの%d年代に一致";
+"recommendation_reason_trend" = "最近の再生で人気: %@";
+"recommendation_reason_chart_hot" = "Apple Musicのチャートで人気";
+"recommendation_reason_new" = "ライブラリにはまだありません";
+
+// MARK: - 推荐 v3（通道 / 画像 / 配额 / Last.fm）
+"settings_category_recommendation" = "おすすめ";
+"recommendation_source_rule" = "ルールベース";
+"recommendation_source_local_model" = "ローカルモデル";
+"recommendation_footer_source" = "%@が生成";
+"recommendation_footer_cache" = "キャッシュ済み · %@";
+"recommendation_cache_age_minutes" = "%d分前";
+"recommendation_cache_age_hours" = "%d時間前";
+"recommendation_reason_similar_artist" = "%@に似ている";
+"recommendation_reason_related_artist" = "似たアーティスト: %@";
+"recommendation_reason_genre" = "同じジャンル: %@";
+"recommendation_reason_matched_taste" = "あなたの好みに一致";
+
+// MARK: - 本地 AI 推荐：指令输入（2026-11-04）
+"recommendation_chat_placeholder" = "聴きたい音楽を説明してください…";
+"recommendation_chat_send" = "送信";
+"recommendation_chat_model_not_ready" = "ローカルモデルの準備ができていません。設定でダウンロードするとリクエストを利用できます。";
+"recommendation_chat_go_to_settings" = "設定を開く";
+"recommendation_chat_clear" = "リクエストをクリア";
+"recommendation_chat_results_title" = "リクエストに基づく";
+"recommendation_results_for_you" = "あなた向け";
+"recommendation_chat_rounds_title" = "コンテキスト保持数";
+"recommendation_chat_rounds_footer" = "追加のリクエストを理解するためだけに使われ、アプリ内に表示されることはありません。";
+"recommendation_empty_request" = "そのリクエストを理解できませんでした。別の言い方でお試しください。";
+"recommendation_chat_invalid_output" = "ローカルモデルが読み取れない結果を返しました。もう一度お試しください。";
+"recommendation_chat_timeout" = "ローカルモデルがタイムアウトしました。もう一度お試しください。";
+"recommendation_reason_request" = "リクエストに一致: %@";
+
+// MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
+"recommendation_related_share_title" = "似たアーティストの割合";
+"recommendation_related_share_footer" = "アーティストを指定したとき、各バッチで似たアーティストから取得できる最大割合です。";
+"recommendation_artist_relation_title" = "MusicBrainzで関連アーティストを拡張";
+"recommendation_artist_relation_footer" = "よく聴くアーティストに関連するアーティストから候補を追加します（1回につき最大2クエリ、各3アーティスト）。失敗は通知せずスキップし、おすすめを妨げません。";
+/* App volume (macOS player bar) */
+"volume" = "音量";
+"volume_up" = "音量を上げる";
+"volume_down" = "音量を下げる";
+"mute" = "ミュート";
+"unmute" = "ミュート解除";
+"volume_percent_format" = "音量 %d%%";
+"shortcut_volume_up" = "音量を上げる";
+"shortcut_volume_down" = "音量を下げる";
+"shortcut_mute" = "ミュート";
+
+"recommendation_channel_seed" = "お気に入りのアーティスト";
+"recommendation_channel_similar" = "似たアーティスト";
+"recommendation_channel_explore" = "スタイルの発見";
+"recommendation_channel_request" = "あなたのリクエスト";
+"recommendation_v3_reason_seed" = "よく聴く%@のヒット曲です";
+"recommendation_v3_reason_similar" = "%@風の1曲: %@";
+"recommendation_v3_reason_explore" = "%@ · %@ · %@、よく聴くスタイル";
+"recommendation_v3_decade" = "%d秒";
+"recommendation_decade_unknown" = "不明な年代";
+"recommendation_language_zh_hans" = "中国語";
+"recommendation_language_zh_hant" = "中国語（繁体字）";
+"recommendation_language_ja" = "日本語";
+"recommendation_language_ko" = "韓国語";
+"recommendation_language_latin" = "洋楽";
+"recommendation_language_unknown" = "不明な言語";
+"recommendation_profile_empty_library" = "ライブラリが空です。先に曲を追加してください。";
+"recommendation_profile_no_artist" = "曲にアーティスト情報がないため、おすすめを作成できません。";
+"recommendation_downloaded_badge" = "ダウンロード済み";
+"recommendation_weights_title" = "好みプロファイルの重み";
+"recommendation_weights_footer" = "4つの重みは100%に正規化されます。ライブラリ = アーティストの曲数、再生 = 総再生回数、お気に入り = お気に入りまたはプレイリスト内、新しさ = 最近追加。";
+"recommendation_weight_library" = "ライブラリ占有率";
+"recommendation_weight_play" = "再生回数";
+"recommendation_weight_favorite" = "お気に入り／プレイリスト";
+"recommendation_weight_recency" = "最近追加";
+"recommendation_quotas_title" = "おすすめの配分";
+"recommendation_quotas_footer" = "3つの配分は100%に正規化されます: お気に入りアーティストのヒット曲／似たアーティストのヒット曲／同スタイルの発見。";
+"recommendation_quota_seed" = "お気に入りのアーティスト";
+"recommendation_quota_similar" = "似たアーティスト";
+"recommendation_quota_explore" = "スタイルの発見";
+"recommendation_lastfm_title" = "Last.fm";
+"recommendation_lastfm_footer" = "APIキーを設定すると、Last.fmからアーティストのヒット曲と似たアーティストを取得します。空欄の場合は内蔵ソースのみを使用します。キーはシステムのキーチェーンに保存され、アップロードもログ出力もされません。";
+"recommendation_lastfm_placeholder" = "Last.fmのAPIキーを貼り付け";
+"recommendation_lastfm_save" = "保存";
+"recommendation_lastfm_clear" = "キーを削除";
+"recommendation_lastfm_saved" = "保存しました";
+"recommendation_lastfm_saved_hint" = "システムのキーチェーンに保存されました。";
+"recommendation_lastfm_cleared" = "削除しました。";
+"recommendation_lastfm_save_failed" = "キーチェーンに書き込めませんでした。もう一度お試しください。";
+"source_lastfm" = "Last.fm";
+"recommendation_itunes_lookup_title" = "iTunesメタデータの照会";
+"recommendation_itunes_lookup_footer" = "上位候補にiTunesの照会を1回実行し、正式なタイトル／アルバム／年／再生時間を補完します。0で無効。結果は7日間キャッシュされ、iTunesの約20リクエスト/分の制限に合わせてキュー処理されます。失敗はスキップされます。";
+"recommendation_lastfm_enable" = "Last.fmブーストを有効にする（last.fmへのアクセスが必要）";
+
+// 2026-11-16 P1a: devices entry moved out / direction capsule card / empty-state guide
+"sync_devices_button" = "デバイス…";
+"sync_empty_title" = "同期するものがまだ選択されていません";
+"sync_direction_flip" = "同期の方向を反転";
+
+// 2026-11-16: macOS song detail sheet (context menu "Song Info")
+"context_song_detail" = "曲の情報";
+"track_detail_title" = "曲の情報";
+"track_detail_section_scraped" = "取得したメタデータ";
+"track_detail_section_file" = "ファイルとオーディオ";
+"track_detail_section_playback" = "再生";
+"track_detail_play_count" = "再生回数";
+"track_detail_last_played" = "最終再生";
+"track_detail_total_played" = "総再生時間";
+"track_detail_recent_plays" = "最近の再生";
+"track_detail_not_scraped" = "未取得";
+"track_detail_go_scrape" = "今すぐスクレイピング";
+"track_detail_close" = "閉じる";
+"track_detail_edit_tags" = "タグを編集";
+"track_detail_never_played" = "再生履歴なし";
+"track_detail_unknown" = "不明";
+"track_detail_album_artist" = "アルバムアーティスト";
+"track_detail_year" = "年";
+"track_detail_track_number" = "トラック／ディスク";
+"track_detail_lyrics" = "歌詞";
+"track_detail_lyrics_available" = "利用可能";
+"track_detail_lyrics_missing" = "利用不可";
+"track_detail_path" = "パス";
+"track_detail_file_size" = "ファイルサイズ";
+"track_detail_format" = "形式";
+"track_detail_sample_rate" = "サンプルレート";
+"track_detail_bit_depth" = "ビット深度";
+"track_detail_channels" = "チャンネル";
+
+// MARK: - 歌词时间轴对齐（lyrics.align.*）
+"lyrics.align.action" = "歌詞タイムラインを再調整";
+"lyrics.align.revert" = "元の歌詞タイムラインに戻す";
+"lyrics.align.title" = "歌詞タイムラインを調整中";
+"lyrics.align.phase.installing" = "音声認識アセットを準備中…";
+"lyrics.align.phase.transcribing" = "歌詞を文字起こし中…";
+"lyrics.align.phase.aligning" = "歌詞の行を整列中…";
+"lyrics.align.cancel" = "キャンセル";
+"lyrics.align.close" = "閉じる";
+"lyrics.align.result.success" = "認識カバー率 %d%%（%d / %d行を整列）";
+"lyrics.align.result.lowMatch" = "使用可能な歌詞が少なすぎます（認識カバー率 %d%%）。適用しました。メニューから元の歌詞に戻せます。";
+"lyrics.align.result.revert" = "元のタイムラインに戻す";
+"lyrics.align.error.unsupported" = "自動歌詞整列にはiOS/macOS 26以降が必要です";
+"lyrics.align.error.audio" = "音声ファイルを読み取れません";
+"lyrics.align.error.emptyLyrics" = "整列する歌詞がありません";
+"lyrics.align.error.locale" = "このシステムでは認識言語を利用できません";
+"lyrics.align.error.assets" = "音声認識アセットのダウンロードに失敗しました";
+"lyrics.align.error.failed" = "音声に一致する歌詞の行がありませんでした";
+"lyrics.align.error.generic" = "歌詞の整列に失敗しました";
+"lyrics.align.error.revert" = "元の歌詞に戻せませんでした";

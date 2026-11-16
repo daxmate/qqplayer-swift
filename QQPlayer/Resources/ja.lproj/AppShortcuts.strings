@@ -1,0 +1,20 @@
+/*
+  AppShortcuts.strings (日本語)
+  QQPlayer
+
+  QQPlayerAppShortcuts.swift で宣言されたApp Shortcuts用のSiri呼び出しフレーズです。キーは英語のフレーズと完全に一致させ、${applicationName}はアプリ名のプレースホルダーです。
+*/
+
+"Resume playback in ${applicationName}" = "${applicationName}で再生を再開";
+"Resume my music in ${applicationName}" = "${applicationName}で音楽を再開";
+"Continue playing in ${applicationName}" = "${applicationName}で再生を続ける";
+
+"Like this song in ${applicationName}" = "${applicationName}でこの曲にいいね";
+"Add this song to favorites in ${applicationName}" = "${applicationName}でこの曲をお気に入りに追加";
+"Add this song to my favorites in ${applicationName}" = "${applicationName}でこの曲を自分のお気に入りに追加";
+"Add this song to Liked Songs in ${applicationName}" = "${applicationName}でこの曲をお気に入りの曲に追加";
+"Add the current song to favorites in ${applicationName}" = "${applicationName}で再生中の曲をお気に入りに追加";
+
+"Make me a mix in ${applicationName}" = "${applicationName}でミックスを作って";
+"Generate a mix in ${applicationName}" = "${applicationName}でミックスを生成";
+"Play me something new in ${applicationName}" = "${applicationName}で新しい曲を再生して";

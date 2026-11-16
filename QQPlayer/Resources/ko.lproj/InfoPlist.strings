@@ -1,0 +1,9 @@
+/*
+  InfoPlist.strings (한국어)
+  QQPlayer
+
+  Info.plist의 권한 대화상자를 현지화합니다(QQPlayer/Info.plist).
+*/
+
+"NSCameraUsageDescription" = "본인의 QQPlayer 기기와 페어링하여 동기화하려면 QR 코드를 스캔합니다(승인한 페어링에만 사용).";
+"NSLocalNetworkUsageDescription" = "같은 로컬 네트워크의 QQPlayer 기기(Mac/Windows/NAS)를 찾아 연결하여 음악 라이브러리를 페어링하고 동기화하는 데 사용됩니다.";

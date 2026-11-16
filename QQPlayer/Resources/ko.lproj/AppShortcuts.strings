@@ -1,0 +1,20 @@
+/*
+  AppShortcuts.strings (한국어)
+  QQPlayer
+
+  QQPlayerAppShortcuts.swift에 선언된 App Shortcuts용 Siri 호출 문구입니다. 키는 영어 문구와 정확히 일치해야 하며 ${applicationName}은 앱 이름 자리 표시자입니다.
+*/
+
+"Resume playback in ${applicationName}" = "${applicationName}에서 재생 재개해 줘";
+"Resume my music in ${applicationName}" = "${applicationName}에서 내 음악 재생해 줘";
+"Continue playing in ${applicationName}" = "${applicationName}에서 계속 재생해 줘";
+
+"Like this song in ${applicationName}" = "${applicationName}에서 이 곡 좋아요 해 줘";
+"Add this song to favorites in ${applicationName}" = "${applicationName}에서 이 곡을 즐겨찾기에 추가해 줘";
+"Add this song to my favorites in ${applicationName}" = "${applicationName}에서 이 곡을 내 즐겨찾기에 추가해 줘";
+"Add this song to Liked Songs in ${applicationName}" = "${applicationName}에서 이 곡을 좋아하는 곡에 추가해 줘";
+"Add the current song to favorites in ${applicationName}" = "${applicationName}에서 현재 곡을 즐겨찾기에 추가해 줘";
+
+"Make me a mix in ${applicationName}" = "${applicationName}에서 믹스 만들어 줘";
+"Generate a mix in ${applicationName}" = "${applicationName}에서 믹스 생성해 줘";
+"Play me something new in ${applicationName}" = "${applicationName}에서 새로운 곡 들려줘";
