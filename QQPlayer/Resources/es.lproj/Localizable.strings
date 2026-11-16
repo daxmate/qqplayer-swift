@@ -8,7 +8,7 @@
 "playlist_name_placeholder" = "Nombre de la lista";
 "enter_playlist_name" = "Escribe un nombre para tu nueva lista";
 "delete_playlist" = "Eliminar lista";
-"delete_playlist_confirmation" = "¿Seguro que quieres eliminar '%@'? Esta acción no se puede deshacer.";
+"delete_playlist_confirmation" = "¿Seguro que quieres eliminar «%@»? Esta acción no se puede deshacer.";
 "delete" = "Eliminar";
 "cancel" = "Cancelar";
 "create" = "Crear";
@@ -25,7 +25,7 @@
 "albums_count_plural" = "%d álbumes";
 "created_date" = "Creada el %@";
 "no_songs_found" = "No se encontraron canciones";
-"your_music_will_appear_here" = "Para añadir tu música:\n\n1. Abre la app Archivos (o toca 'Abrir archivos')\n2. Ve a 'En mi iPhone' → QQPlayer\n3. Copia tus archivos de música en esa carpeta";
+"your_music_will_appear_here" = "Para añadir tu música:\n\n1. Abre la app Archivos (o toca «Abrir archivos»)\n2. Ve a «En mi iPhone» → QQPlayer\n3. Copia tus archivos de música en esa carpeta";
 "create_first_playlist" = "Crea tu primera lista para empezar";
 
 /* Smart playlists (automatic playlists) */
@@ -106,7 +106,7 @@
 "show_artist_page" = "Ver página del artista";
 "add_to_playlist_ellipsis" = "Añadir a la lista...";
 "delete_file" = "Eliminar archivo";
-"delete_file_confirmation" = "¿Seguro que quieres eliminar '%@'? Esta acción no se puede deshacer.";
+"delete_file_confirmation" = "¿Seguro que quieres eliminar «%@»? Esta acción no se puede deshacer.";
 
 /* Settings */
 
@@ -198,8 +198,8 @@
 "show_sleep_timer_button_description" = "Sustituye el botón de letras del reproductor por un botón de temporizador.";
 
 /* Liked Songs Actions */
-"add_to_liked_songs" = "Añadir a favoritas";
-"remove_from_liked_songs" = "Quitar de favoritas";
+"add_to_liked_songs" = "Añadir a favoritos";
+"remove_from_liked_songs" = "Quitar de favoritos";
 
 /* Search Categories */
 "all" = "Todo";
@@ -208,16 +208,16 @@
 "welcome_to_qqplayer" = "Bienvenido a QQPlayer";
 "if_signed_in_continue" = "Si ya iniciaste sesión, puedes continuar";
 "add_your_music" = "Añade tu música";
-"how_to_add_music" = "Añade archivos de música a la carpeta QQPlayer de este dispositivo (app Archivos → 'En mi iPhone' → QQPlayer):";
+"how_to_add_music" = "Añade archivos de música a la carpeta QQPlayer de este dispositivo (app Archivos → «En mi iPhone» → QQPlayer):";
 "open_files_app" = "Abrir app Archivos";
-"navigate_to_on_my_iphone" = "Ve a 'En mi iPhone'";
+"navigate_to_on_my_iphone" = "Ve a «En mi iPhone»";
 "find_qqplayer_folder" = "Busca la carpeta QQPlayer";
 "add_your_music_instruction" = "Añade tu música";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "Busca y abre la app Archivos en tu dispositivo";
-"tap_on_my_iphone_sidebar" = "Elige 'En mi iPhone' en la barra lateral y luego la carpeta QQPlayer";
-"look_for_qqplayer_folder" = "Busca la carpeta 'QQPlayer' y ábrela";
+"tap_on_my_iphone_sidebar" = "Elige «En mi iPhone» en la barra lateral y luego la carpeta QQPlayer";
+"look_for_qqplayer_folder" = "Busca la carpeta «QQPlayer» y ábrela";
 "copy_music_files" = "Copia tus archivos FLAC o MP3 en esta carpeta";
 
 /* Library Processing */
@@ -306,7 +306,7 @@
 "export" = "Exportar";
 "preset_info" = "Información del ajuste";
 "eq_copied" = "Copiado";
-"eq_delete_confirm_message" = "¿Seguro que quieres eliminar '%@'? Esta acción no se puede deshacer.";
+"eq_delete_confirm_message" = "¿Seguro que quieres eliminar «%@»? Esta acción no se puede deshacer.";
 "eq_delete_confirm_title" = "¿Eliminar el ajuste?";
 
 /* GraphicEQ Import View */
@@ -400,7 +400,7 @@
 "feature_guide_dark_mode_title" = "Alternar modo oscuro";
 "feature_guide_dark_mode_detail" = "Ajustes → Apariencia → Forzar modo oscuro para omitir la apariencia del sistema";
 "feature_guide_import_title" = "Importar archivos de música";
-"feature_guide_import_detail" = "Coloca archivos de música en la carpeta QQPlayer de este dispositivo (app Archivos → 'En mi iPhone' → QQPlayer) o toca Abrir archivos en la biblioteca";
+"feature_guide_import_detail" = "Coloca archivos de música en la carpeta QQPlayer de este dispositivo (app Archivos → «En mi iPhone» → QQPlayer) o toca Abrir archivos en la biblioteca";
 
 
 /* Sleep Timer */
@@ -431,8 +431,8 @@
 "select" = "Seleccionar";
 "select_all" = "Seleccionar todo";
 "bulk_actions" = "Acciones";
-"add_to_liked" = "Añadir a favoritas";
-"remove_from_liked" = "Quitar de favoritas";
+"add_to_liked" = "Añadir a favoritos";
+"remove_from_liked" = "Quitar de favoritos";
 "delete_files" = "Eliminar archivos";
 "delete_files_confirmation" = "Eliminar archivos";
 "selected_count_singular" = "%d seleccionado(s)";
@@ -726,7 +726,7 @@
 "batch_running" = "Extrayendo %d pistas…";
 "batch_summary" = "Listo: %d escritos, %d omitidos, %d fallidos";
 "batch_truncated" = "Solo se procesaron las primeras 100 pistas";
-"batch_disabled_hint" = "La extracción por lotes está desactivada. Actívala en Ajustes > Extracción.";
+"batch_disabled_hint" = "La extracción por lotes está desactivada. Actívala en Ajustes → Extracción.";
 /* Shortcuts settings (E4) */
 "settings_category_shortcuts" = "Atajos";
 "shortcut_play_pause" = "Reproducir / Pausar";
@@ -777,7 +777,7 @@
 "sync_device_name" = "Nombre del dispositivo";
 "sync_device_name_placeholder" = "Por ejemplo: Mi iPhone";
 "sync_device_name_hint" = "Déjalo en blanco para usar el nombre del sistema. Este nombre se usa para la sincronización en red local.";
-"sync_qr_scan_hint" = "En tu iPhone: Ajustes → Sincronización → Añadir host → Escanear código QR y apunta a este código. «Actualizar» muestra un código nuevo cada vez.";
+"sync_qr_scan_hint" = "En tu iPhone: Ajustes → Sincronización → Añadir host → Escanear código QR y enfoca este código. «Actualizar» muestra un código nuevo cada vez.";
 "sync_refresh_qr" = "Actualizar código";
 "sync_paired_devices" = "Dispositivos vinculados";
 "sync_paired_hosts" = "Hosts vinculados";
@@ -957,7 +957,7 @@
 "sync_run_result_failures_header" = "Elementos fallidos (%d)";
 "sync_run_result_unresolved" = "%d canciones aún no tienen huella y se omitieron.";
 "sync_run_result_empty_selection" = "No se seleccionó nada, así que no se transfirió nada.";
-"sync_run_result_peer_identical" = "Ya son idénticas en el otro dispositivo: nada que transferir (%d omitidas):";
+"sync_run_result_peer_identical" = "Ya todo es idéntico en el otro dispositivo: nada que transferir (%d omitidos):";
 "sync_run_result_no_deletion" = "La sincronización nunca elimina canciones en ninguno de los dispositivos.";
 "sync_run_result_last_run_prefix" = "Última sincronización: %@";
 "sync_run_result_last_run_device" = "Dispositivo: %@";

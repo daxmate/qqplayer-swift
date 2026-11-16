@@ -73,7 +73,7 @@
 /* Artist/Album/Track Info */
 "no_artists_found" = "아티스트를 찾을 수 없습니다";
 "artists_will_appear" = "라이브러리에 음악을 추가하면 여기에 아티스트가 표시됩니다";
-"fetching_artist_info" = "아티스트 정보를 가져오는 중...";
+"fetching_artist_info" = "아티스트 정보를 가져오는 중…";
 "no_albums_found" = "앨범을 찾을 수 없습니다";
 "albums_will_appear" = "라이브러리에 음악을 추가하면 여기에 앨범이 표시됩니다";
 "artist" = "아티스트";
@@ -85,7 +85,7 @@
 "wrong_artist" = "아티스트가 다른가요?";
 "data_provided_by" = "데이터 제공: %@";
 "open_spotify" = "SPOTIFY 열기";
-"loading_artist" = "아티스트를 불러오는 중...";
+"loading_artist" = "아티스트를 불러오는 중…";
 
 /* Player */
 "playing_queue" = "재생 대기열";
@@ -104,7 +104,7 @@
 
 /* Context Menu Actions */
 "show_artist_page" = "아티스트 페이지 보기";
-"add_to_playlist_ellipsis" = "재생목록에 추가...";
+"add_to_playlist_ellipsis" = "재생목록에 추가…";
 "delete_file" = "파일 삭제";
 "delete_file_confirmation" = "'%@'을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.";
 
@@ -192,10 +192,10 @@
 "home_sections" = "홈 섹션";
 "choose_visible_sections" = "홈 화면에 표시할 섹션을 선택하세요";
 "remove_from_library_only" = "라이브러리에서만 제거";
-"remove_from_library_only_description" = "켜면 곡을 삭제해도 라이브러리에서만 제거됩니다. 원본 파일은 완전히 삭제되지 않고 앱의 정리 영역으로 이동하며 라이브러리에 더 이상 표시되지 않습니다.";
+"remove_from_library_only_description" = "켜면 곡을 삭제해도 라이브러리에서만 제거됩니다. 원본 파일은 완전히 삭제되지 않고 앱의 복원 영역으로 이동하며 라이브러리에 더 이상 표시되지 않습니다.";
 "player_controls" = "플레이어 컨트롤";
-"show_sleep_timer_button" = "절전 타이머 버튼 표시";
-"show_sleep_timer_button_description" = "플레이어의 가사 버튼을 절전 타이머 버튼으로 바꿉니다.";
+"show_sleep_timer_button" = "수면 타이머 버튼 표시";
+"show_sleep_timer_button_description" = "플레이어의 가사 버튼을 수면 타이머 버튼으로 바꿉니다.";
 
 /* Liked Songs Actions */
 "add_to_liked_songs" = "좋아하는 곡에 추가";
@@ -378,7 +378,7 @@
 "feature_guide_pull_to_close_title" = "아래로 당겨 플레이어 닫기";
 "feature_guide_pull_to_close_detail" = "아트워크를 아래로 끌어 플레이어를 닫습니다";
 "feature_guide_expand_controls_title" = "컨트롤 더 보기";
-"feature_guide_expand_controls_detail" = "컨트롤 영역을 위로 밀면 더 많은 버튼(재생 순서 / 대기열 / 절전 타이머 / 가사 / AirPlay)이 나타나고, 아래로 밀면 접힙니다.";
+"feature_guide_expand_controls_detail" = "컨트롤 영역을 위로 밀면 더 많은 버튼(재생 순서 / 대기열 / 수면 타이머 / 가사 / AirPlay)이 나타나고, 아래로 밀면 접힙니다.";
 "feature_guide_open_full_lyrics_title" = "전체 화면 가사 열기";
 "feature_guide_open_full_lyrics_detail" = "미니 가사를 누르거나 왼쪽으로 밉니다";
 "feature_guide_search_lyrics_title" = "특정 가사 검색";
@@ -404,8 +404,8 @@
 
 
 /* Sleep Timer */
-"sleep_timer" = "절전 타이머";
-"sleep_timer_off" = "절전 타이머 꺼짐";
+"sleep_timer" = "수면 타이머";
+"sleep_timer_off" = "수면 타이머 꺼짐";
 "sleep_timer_15_minutes" = "15분";
 "sleep_timer_30_minutes" = "30분";
 "sleep_timer_45_minutes" = "45분";
@@ -425,7 +425,7 @@
 "hint_search_line1" = "왼쪽으로 밀어 플레이어로 돌아가기";
 "hint_search_mac_line1" = "결과를 클릭하면 가사로 적용됩니다";
 
-"cancel_sleep_timer" = "절전 타이머 취소";
+"cancel_sleep_timer" = "수면 타이머 취소";
 
 /* Bulk Selection */
 "select" = "선택";
@@ -623,14 +623,14 @@
 
 /* C-group online search & download (web /api/online/* parity) */
 "online_search_title" = "온라인 검색 및 다운로드";
-"online_search_placeholder" = "NetEase Cloud Music에서 검색...";
+"online_search_placeholder" = "NetEase Cloud Music에서 검색…";
 "online_search_idle_hint" = "온라인 곡을 검색하여 라이브러리에 다운로드합니다. 파일은 기본 음악 폴더에 저장되고 자동으로 표시됩니다.";
-"online_search_loading" = "검색 중...";
+"online_search_loading" = "검색 중…";
 "online_search_no_results" = "온라인 검색 결과 없음";
 "online_search_failed" = "검색하지 못했습니다. 다시 시도해 주세요.";
 "online_search_retry" = "다시 시도";
 "online_download" = "다운로드";
-"online_downloading" = "다운로드 중...";
+"online_downloading" = "다운로드 중…";
 "online_downloaded" = "다운로드됨";
 "online_download_failed" = "다운로드 실패";
 "online_download_failed_prefix" = "다운로드 실패: %@";
@@ -726,7 +726,7 @@
 "batch_running" = "트랙 %d개 스크래핑 중…";
 "batch_summary" = "완료: %d개 기록, %d개 건너뜀, %d개 실패";
 "batch_truncated" = "처음 100개 트랙만 처리했습니다";
-"batch_disabled_hint" = "일괄 스크래핑이 비활성화되어 있습니다. 설정 > 스크래핑에서 활성화하세요.";
+"batch_disabled_hint" = "일괄 스크래핑이 비활성화되어 있습니다. 설정 → 스크래핑에서 활성화하세요.";
 /* Shortcuts settings (E4) */
 "settings_category_shortcuts" = "단축키";
 "shortcut_play_pause" = "재생 / 일시 정지";
@@ -777,7 +777,7 @@
 "sync_device_name" = "기기 이름";
 "sync_device_name_placeholder" = "예: 내 iPhone";
 "sync_device_name_hint" = "비워 두면 시스템 기기 이름을 사용합니다. 이 이름은 로컬 네트워크 동기화에 사용됩니다.";
-"sync_qr_scan_hint" = "iPhone에서: 설정 → 동기화 → 호스트 추가 → QR 코드 스캔에서 이 코드를 비추세요. 새로 고침하면 매번 새 코드가 표시됩니다.";
+"sync_qr_scan_hint" = "iPhone에서 설정 → 동기화 → 호스트 추가 → 'QR 코드 스캔'을 선택한 뒤 이 코드를 스캔하세요. 새로 고침하면 매번 새 코드가 표시됩니다.";
 "sync_refresh_qr" = "코드 새로 고침";
 "sync_paired_devices" = "페어링된 기기";
 "sync_paired_hosts" = "페어링된 호스트";
@@ -892,7 +892,7 @@
 "sync_run_connection_section" = "연결";
 "sync_run_connected_for" = "%@ 연결됨";
 "sync_run_not_paired_hint" = "아직 페어링된 기기가 없습니다. 아래 QR 코드를 iPhone의 QQPlayer로 스캔하세요.";
-"sync_run_not_connected_hint" = "iPhone에서: QQPlayer → 설정 → 동기화에서 연결합니다.";
+"sync_run_not_connected_hint" = "iPhone에서 QQPlayer → 설정 → 동기화 순서로 열어 연결하세요.";
 "sync_run_allow_lan" = "로컬 네트워크의 기기 연결 허용";
 "sync_run_listener_off_hint" = "수신이 꺼져 있어 이 Mac을 찾거나 동기화할 수 없습니다.";
 "sync_run_selection_section" = "동기화할 항목";
@@ -996,7 +996,7 @@
 "sync_run_data_pending_hint" = "%d개 항목이 이 Mac에 아직 없는 곡을 기다리고 있습니다.";
 "sync_run_data_unresolved_hint" = "%d개 항목은 이 Mac의 곡과 일치하지 않아 적용되지 않았습니다.";
 "sync_run_data_ambiguous_identity_hint" = "%d개 항목은 이 Mac의 같은 경로에 여러 곡이 일치해 적용되지 않았습니다.";
-"sync_run_data_unsupported_hint" = "재생 위치 변경 %d건이 적용되지 않았습니다(기기 간 이어 듣기가 꺼져 있거나 받은 위치가 다른 트랙의 것입니다).";
+"sync_run_data_unsupported_hint" = "재생 위치 변경 %d건이 적용되지 않았습니다(기기 간 이어 듣기가 꺼져 있거나 받은 위치가 다른 곡의 것입니다).";
 "sync_run_data_skipped_parent" = "종속 항목 없음";
 "sync_run_data_skipped_parent_hint" = "변경 %d건은 종속 항목이 이 기기에 아직 없어 건너뛰었습니다(재생목록 구조가 동기화되지 않았거나 참조된 곡에 로컬 레코드가 없음).";
 "sync_run_data_missing_identity_hint" = "%d개 항목은 곡 지문 없이 전송되어 다른 기기에서 일치시킬 수 없습니다.";
@@ -1079,17 +1079,17 @@
 "playlist_cover_unavailable" = "사용자 지정 커버 파일을 읽을 수 없습니다. 자동 생성 커버를 표시합니다.";
 
 /* ── Reclaim area (2026-09-29) ── */
-"reclaim_area" = "정리 영역";
-"reclaim_area_description" = "'라이브러리에서만 제거'로 삭제한 트랙은 정리 영역으로 이동합니다(라이브러리에 더 이상 표시되지 않음). 여기서 복원하거나 영구 삭제할 수 있습니다.";
-"reclaim_area_empty" = "정리 영역이 비어 있습니다";
+"reclaim_area" = "복원 영역";
+"reclaim_area_description" = "'라이브러리에서만 제거'로 삭제한 트랙은 복원 영역으로 이동합니다(라이브러리에 더 이상 표시되지 않음). 여기서 복원하거나 영구 삭제할 수 있습니다.";
+"reclaim_area_empty" = "복원 영역이 비어 있습니다";
 "reclaim_area_summary" = "%d개 · %@";
 "reclaim_restore" = "복원";
 "reclaim_restore_selected" = "선택 항목 복원(%d)";
 "reclaim_delete_selected" = "선택 항목 영구 삭제(%d)";
-"reclaim_purge_all" = "정리 영역 비우기";
+"reclaim_purge_all" = "복원 영역 비우기";
 "reclaim_purge_confirm_title" = "영구 삭제할까요?";
 "reclaim_purge_confirm_message" = "%d개(%@)를 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.";
-"reclaim_purge_all_confirm_message" = "정리 영역의 %d개(%@)를 모두 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.";
+"reclaim_purge_all_confirm_message" = "복원 영역의 %d개(%@)를 모두 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.";
 "reclaim_restore_result" = "%d개 복원, %d개 건너뜀";
 "reclaim_purge_result" = "%d개를 영구 삭제하고 %@을(를) 확보했습니다";
 "reclaim_operation_failed" = "%d개 실패";
