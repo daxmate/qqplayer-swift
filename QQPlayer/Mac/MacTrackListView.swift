@@ -9,6 +9,8 @@
 //  （List + onTapGesture 与选中手势冲突导致双击失效，教训：平台基础交互交给
 //  原生控件）。保留：列头原生排序（sortOrder）、右键菜单补全（contextMenu
 //  forSelectionType）、定位当前播放（选中 + 尽量滚动可见）、播放队列跟随排序。
+//  2026-11-16 视觉增强：行内封面缩略图 / 时长列 / 当前播放行高亮 / 悬停收藏
+//  （只改呈现，单击选中·双击播放·列头排序·右键菜单等交互契约不变）。
 //
 
 import AppKit
@@ -24,15 +26,23 @@ private final class MacTrackTableRow: NSObject, Identifiable {
     let track: Track
     /// 当前列表显示序号（随排序同步刷新；非 @objc——不参与排序比较）
     var displayIndex: Int = 0
-    /// 排序/显示字段：@objc 存储属性（title/artist）
+    /// 排序/显示字段：@objc 存储属性（title/artist/durationMs）。
+    /// ⚠️ 必须是存储属性：计算属性能过编译，但 Table 排序运行期 fatal（见文件头注释）。
     @objc let title: String
     @objc let artistName: String
+    /// 时长排序键（毫秒；未知 = -1，让未知排在最短之前）
+    @objc let durationMs: Int
+    /// 时长展示文案（m:ss；未知为空串）——只用于显示，不参与排序
+    let durationText: String
 
     init(id: String, track: Track, artistName: String) {
         self.id = id
         self.track = track
         self.title = track.title
         self.artistName = artistName
+        let milliseconds = track.durationMs ?? -1
+        self.durationMs = milliseconds
+        self.durationText = milliseconds > 0 ? MacTimeFormat.format(Double(milliseconds) / 1000) : ""
     }
 }
 
@@ -45,6 +55,26 @@ private final class MacTrackTableRow: NSObject, Identifiable {
 private struct BatchScrapeRequest: Identifiable {
     let id = UUID()
     let paths: [String]
+}
+
+/// 歌曲列表的视觉量值（集中声明，避免魔法数字散进各列；改尺寸只改这一处）。
+private enum MacTrackListMetrics {
+    /// 行内封面边长（任务要求 34；若真机确认行高不足导致裁切，把这里改成 22 即可回退）
+    static let artworkSize: CGFloat = 34
+    /// 封面圆角（DesignTokens 圆角档位里的 4）
+    static let artworkCornerRadius: CGFloat = DesignTokens.radius4
+    /// 封面列宽 = 封面 34 + 左右各 6
+    static let artworkColumnWidth: CGFloat = 46
+    /// 序号列宽（固定窄列）
+    static let indexColumnWidth: CGFloat = 40
+    /// 时长列宽（固定，不可拉伸）
+    static let durationColumnWidth: CGFloat = 56
+    /// 行尾操作列宽（悬停 ♥ 槽位）
+    static let actionColumnWidth: CGFloat = 40
+    /// 当前播放行底色不透明度（accent 8%）
+    static let activeRowTintOpacity: Double = 0.08
+    /// 专辑列在 secondary 基础上压暗一档
+    static let albumSecondaryOpacity: Double = 0.85
 }
 
 struct MacTrackListView: View {
@@ -68,12 +98,16 @@ struct MacTrackListView: View {
 
     /// 曲库卡片事实缓存（审计 M2：body 里的同步全量 DB 查询→缓存/异步）
     @Environment(MacLibraryFactsStore.self) private var facts
+    /// 收藏切换（行尾 ♥）：走全项目唯一入口 AppCoordinator.toggleFavorite
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var selectedRows = Set<String>()
     /// 批量刮削（右键多选 >1）——.sheet(item:) 直接驱动，见文件头注释
     @State private var batchScrapeRequest: BatchScrapeRequest?
     /// 曲目右键菜单状态：菜单内容 / 弹窗 / 删除执行都在 MacTrackContextMenu.swift
     /// （曲库与两个搜索面共用同一份实现），这里只持有状态
     @State private var menu = MacTrackMenuModel()
+    /// 当前悬停行：由父视图唯一持有，单元格只上报（不把 hover 状态散进各格 @State）
+    @State private var hoveredTrackId: String?
     /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
     /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
@@ -171,36 +205,79 @@ struct MacTrackListView: View {
     private var table: some View {
         Table(displayedRows, selection: $selectedRows, sortOrder: $sortOrder) {
             TableColumn("#") { row in
-                if row.track.stableId == activeTrackId {
-                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                        .foregroundColor(appAccentColor)
-                } else {
-                    // 显示列表序号（1 起，随排序同步），不显示专辑 trackNo
-                    Text("\(row.displayIndex)")
+                cellChrome(row) {
+                    if row.track.stableId == activeTrackId {
+                        Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
+                            .foregroundColor(appAccentColor)
+                    } else {
+                        // 显示列表序号（1 起，随排序同步），不显示专辑 trackNo
+                        Text("\(row.displayIndex)")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .width(MacTrackListMetrics.indexColumnWidth)
+
+            // 行内封面：无列头、不可排序；加载统一走 MacArtworkThumbnail（全项目唯一入口）
+            TableColumn("") { row in
+                cellChrome(row) {
+                    MacArtworkThumbnail(
+                        track: row.track,
+                        size: MacTrackListMetrics.artworkSize,
+                        cornerRadius: MacTrackListMetrics.artworkCornerRadius
+                    )
+                }
+            }
+            .width(MacTrackListMetrics.artworkColumnWidth)
+
+            TableColumn("title".localized, value: \.title) { row in
+                cellChrome(row) {
+                    Text(row.track.displayTitle)
+                        .fontWeight(row.track.stableId == activeTrackId ? .semibold : .medium)
+                        .foregroundColor(row.track.stableId == activeTrackId ? appAccentColor : .primary)
+                        .lineLimit(1)
+                }
+            }
+            .width(min: 160, ideal: 300, max: .infinity)
+
+            TableColumn("artist".localized, value: \.artistName) { row in
+                cellChrome(row) {
+                    Text(row.artistName)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .width(min: 90, ideal: 140, max: 260)
+
+            TableColumn("album".localized) { row in
+                cellChrome(row) {
+                    Text(albumTitle(for: row.track))
+                        .foregroundColor(.secondary.opacity(MacTrackListMetrics.albumSecondaryOpacity))
+                        .lineLimit(1)
+                }
+            }
+            .width(min: 90, ideal: 180, max: 320)
+
+            // 2026-09-06 用户拍板曾去掉时长列（播放区进度条已有时长信息）；
+            // 2026-11-16 视觉增强按新需求恢复：右对齐 + 等宽数字 + 固定 56 不可拉伸。
+            // 排序值取 @objc 存储属性 durationMs（数值排序，未知 -1 靠前）。
+            TableColumn("duration".localized, value: \.durationMs) { row in
+                cellChrome(row, alignment: .trailing) {
+                    Text(row.durationText)
+                        .font(.caption)
+                        .monospacedDigit()
                         .foregroundColor(.secondary)
                 }
             }
-            .width(40)
+            .width(MacTrackListMetrics.durationColumnWidth)
 
-            TableColumn("title".localized, value: \.title) { row in
-                Text(row.track.displayTitle)
-                    .fontWeight(row.track.stableId == activeTrackId ? .semibold : .regular)
-                    .lineLimit(1)
+            // 行尾悬停操作：♥ 收藏切换（动作 = AppCoordinator.toggleFavorite）
+            TableColumn("") { row in
+                cellChrome(row, alignment: .trailing) {
+                    favoriteToggle(for: row)
+                }
             }
-
-            TableColumn("artist".localized, value: \.artistName) { row in
-                Text(row.artistName)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            TableColumn("album".localized) { row in
-                Text(albumTitle(for: row.track))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-            // 2026-09-06 用户拍板：不显示时长列（播放区进度条已有时长信息，
-            // 列表行去掉更简洁）——同时移除 durationMs 排序字段/辅助方法
+            .width(MacTrackListMetrics.actionColumnWidth)
         }
         // macOS 惯例：单击选中、双击播放（Table primaryAction 原生实现，
         // AppKit NSTableView 底层；勿改手势模拟）
@@ -290,6 +367,65 @@ struct MacTrackListView: View {
 
     private func locateActiveTrack() {
         locateRequestID += 1
+    }
+
+    // MARK: - 行内视觉（2026-11-16 视觉增强）
+
+    /// 单元格公共外壳：铺满单元格 + 当前播放行底色 + 悬停上报。
+    /// Table 没有「整行背景」API，整行底色只能逐格铺（每格都铺满，行内才连续）；
+    /// 若某版本出现格间断带，先看这里的 frame 是否被列宽挤掉。
+    private func cellChrome<Content: View>(
+        _ row: MacTrackTableRow,
+        alignment: Alignment = .leading,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+            .background(activeRowTint(for: row))
+            .onHover { inside in
+                reportHover(row.id, inside: inside)
+            }
+    }
+
+    private func activeRowTint(for row: MacTrackTableRow) -> Color {
+        row.track.stableId == activeTrackId
+            ? appAccentColor.opacity(MacTrackListMetrics.activeRowTintOpacity)
+            : .clear
+    }
+
+    /// 悬停上报：单元格各有独立 hover 区，父视图只认唯一「当前悬停行」。
+    /// 离开时仅在「仍是本行」时清除——相邻格 enter/exit 先后顺序不同也不会误清新行。
+    private func reportHover(_ id: String, inside: Bool) {
+        if inside {
+            hoveredTrackId = id
+        } else if hoveredTrackId == id {
+            hoveredTrackId = nil
+        }
+    }
+
+    /// 行尾收藏按钮：状态读既有收藏数据源（MacTrackMenuModel.favoriteIds，
+    /// .favoritesChanged 时由 .macTrackMenu 宿主重载），动作走唯一入口 toggleFavorite。
+    @ViewBuilder
+    private func favoriteToggle(for row: MacTrackTableRow) -> some View {
+        let isFavorite = menu.favoriteIds.contains(row.track.stableId)
+        if isFavorite || hoveredTrackId == row.id {
+            Button {
+                toggleFavorite(row.track)
+            } label: {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .foregroundColor(isFavorite ? appAccentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isFavorite ? Localized.removeFromLikedSongs : Localized.addToLikedSongs)
+        }
+    }
+
+    private func toggleFavorite(_ track: Track) {
+        do {
+            try appCoordinator.toggleFavorite(trackStableId: track.stableId)
+        } catch {
+            AppLog.error(.general, "❌ Track list favorite toggle failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Playback
