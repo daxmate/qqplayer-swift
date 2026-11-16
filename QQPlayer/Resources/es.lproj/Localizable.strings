@@ -251,7 +251,7 @@
 "enable_disable_eq_description" = "Activa o desactiva el ecualizador gráfico";
 
 /* Common EQ Presets */
-"preset_common" = "Ajustes predefinidos";
+"preset_common" = "Preajustes";
 "preset_flat" = "Plano";
 "preset_pop" = "Pop";
 "preset_rock" = "Rock";
@@ -263,9 +263,9 @@
 "eq_custom_title" = "EQ de 10 bandas personalizado";
 
 /* Manual EQ Presets */
-"manual_eq_presets" = "Ajustes manuales de 16 bandas";
-"no_manual_presets_created" = "No hay ajustes manuales creados";
-"create_manual_eq_description" = "Crea un ajuste personalizado de ecualizador de 16 bandas con deslizadores ajustables";
+"manual_eq_presets" = "Preajustes manuales de 16 bandas";
+"no_manual_presets_created" = "No hay preajustes manuales creados";
+"create_manual_eq_description" = "Crea un preajuste personalizado de ecualizador de 16 bandas con deslizadores ajustables";
 "create_manual_16band_eq" = "Crear EQ manual de 16 bandas";
 "manual_16band_eq" = "EQ manual de 16 bandas";
 "manual_16band_description" = "Crea un ecualizador de 16 bandas con frecuencias ISO estándar que puedes ajustar manualmente";
@@ -277,7 +277,7 @@
 "eq_bands" = "Bandas";
 "eq_bands_count" = "%d / %d bandas";
 "eq_create_manual" = "Crear EQ manual";
-"eq_create_manual_description" = "Crea un ajuste de EQ paramétrico con hasta 16 bandas totalmente editables.";
+"eq_create_manual_description" = "Crea un preajuste de EQ paramétrico con hasta 16 bandas totalmente editables.";
 "eq_edit_bands_hint" = "Puedes editar la frecuencia, la ganancia y la Q de cada banda después de crearla.";
 "eq_frequency" = "Frecuencia";
 "eq_gain" = "Ganancia";
@@ -311,8 +311,8 @@
 
 /* GraphicEQ Import View */
 "import_graphiceq" = "Importar GraphicEQ";
-"preset_name" = "Nombre del ajuste";
-"enter_preset_name" = "Escribe el nombre del ajuste";
+"preset_name" = "Nombre del preajuste";
+"enter_preset_name" = "Escribe el nombre del preajuste";
 "import_methods" = "Métodos de importación";
 "import_from_txt_file" = "Importar desde archivo .txt";
 "paste_graphiceq_text" = "Pegar texto de GraphicEQ";
@@ -331,8 +331,8 @@
 "failed_to_import" = "No se pudo importar: %@";
 "file_import_failed" = "Falló la importación del archivo: %@";
 "failed_to_create" = "No se pudo crear: %@";
-"failed_to_export" = "No se pudo exportar el ajuste";
-"failed_to_delete" = "No se pudo eliminar el ajuste";
+"failed_to_export" = "No se pudo exportar el preajuste";
+"failed_to_delete" = "No se pudo eliminar el preajuste";
 "failed_to_save" = "No se pudieron guardar los cambios";
 
 /* EQ Band Information */
@@ -396,7 +396,7 @@
 "feature_guide_smart_where_title" = "Dónde encontrarlas";
 "feature_guide_smart_where_detail" = "Fija tarjetas de listas inteligentes en la parte superior de la página de listas";
 "feature_guide_eq_title" = "Ecualizador EQ";
-"feature_guide_eq_detail" = "Ajustes → Audio → Ecualizador gráfico, con importación de ajustes Graphic EQ y ajuste manual";
+"feature_guide_eq_detail" = "Ajustes → Audio → Ecualizador gráfico, con importación de preajustes Graphic EQ y preajuste manual";
 "feature_guide_dark_mode_title" = "Alternar modo oscuro";
 "feature_guide_dark_mode_detail" = "Ajustes → Apariencia → Forzar modo oscuro para omitir la apariencia del sistema";
 "feature_guide_import_title" = "Importar archivos de música";
