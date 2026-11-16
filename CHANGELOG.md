@@ -2,6 +2,24 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.7.0] - 2026-11-16
+
+### ✨ 新增
+
+- **歌词时间轴自动对齐**：下载来的 LRC 时间戳与音频对不上时，用 Apple `SpeechAnalyzer` 识别人声（iOS/macOS 26+），再用字符级单调 DP 把每一行歌词重新钉到真实演唱时间；结果写 `lyrics-aligned` 库并随局域网同步，展示优先级「手动 > 自动对齐 > 内存/磁盘缓存 > 网络」，曲目菜单可一键恢复原歌词。
+- **对齐音频管线**：任意源格式先经 `AVAssetReader` 解码为 16 kHz 单声道 PCM 临时 WAV，再交给识别器；进度按「资产 / 转码 / 识别」三段，临时文件在成功、失败、取消三种路径都删除。
+
+### 🐛 修复
+
+- **macOS 点「重新对齐歌词时间轴」必崩**（`SpeechRecognizerWorker.preRunRecognition()` 处 SIGTRAP）：不再把 PCM 逐块塞进 `AsyncStream<AnalyzerInput>`，改为落临时 WAV 后 `start(inputAudioFile:finishAfterFile:)`。直接喂 mp3/aac 也会失败（26.x 抛 `_GenericObjCError`、27.2 抛 `-39 eofErr`），故解码一律走 `AVAssetReader`。
+
+### ⚙️ 改进
+
+- **低质判据改为字符覆盖率**：从「命中行数 / 总行数 < 50%」改为「识别覆盖率 < 45% 或命中行 < 3 行」，长行密集的中文歌不再被误判（实测某 45 行歌词命中 21 行、覆盖率 0.61、时间全部落在 2 秒内，旧判据却判低质）；结果面板直接显示识别覆盖率与已对齐行数。
+- 对齐结果面板、低匹配提示与相关文案在 en / fr / ru / zh-Hans / zh-Hant 五语种同步更新。
+
+[1.7.0]: https://github.com/daxmate/qqplayer-swift/compare/v1.6.0...v1.7.0
+
 ## [1.6.0] - 2026-11-16
 
 ### ✨ 新增
