@@ -2,13 +2,15 @@
 //  MacSyncView.swift
 //  QQPlayer
 //
-//  局域网同步（S2/M6；2026-09-26 批 B1「拆 Pane + 顶层两页」）macOS **同步中心主体**
-//  （QQPlayerMac target only）：同步中心内容区主体（自带 `Form` 壳 + 置顶的顶层页分段控件）。
+//  局域网同步（S2/M6；2026-11-16 P1a「设备入口外移」）macOS **同步中心主体**
+//  （QQPlayerMac target only）：同步中心内容区主体（自带 `Form` 壳 + 置顶标题行）。
 //
-//  顶层两页（用户 2026-09-26 拍板；分段控件切换，**同一时刻只渲染一页**）：
-//   · 「设备」（低频/配置）：待批准请求 · 本机身份与二维码 · 连接状态（含「允许局域网连接」开关）·
-//     已配对设备列表（在线态 / 最后在线 / 撤销配对）· 本次同步目标
-//   · 「同步」：顶部分段切换「传歌 / 播放数据」，两流**永不共用一屏**（跨端续播开关归本页）
+//  P1a 信息架构（用户 2026-11-16 拍板，**推翻** 2026-09-26 的「设备 / 同步」顶层两页）：
+//   · 内容区**恒为「同步」页**（传歌 / 播放数据两流），不再有顶层页分段控件；
+//   · 设备面（待批准请求 · 身份与二维码 · 连接状态 · 已配对设备 · 本次同步目标）从顶层页
+//     外移成右上角「设备…」按钮 + Popover，内容仍复用唯一一份 `devicePane`
+//     （有未批准配对请求时按钮挂红点）；
+//   · 未选内容时内容区顶部给「空态引导卡」（同步全曲库 / 挑几首歌），不再走进死胡同。
 //
 //  拆法（批 B1 硬约束 R1「拆 View 不拆模型」）：一个状态模型 + 三份呈现 ——
 //  `SyncHostCenter` 与各 ViewModel（`MacSyncRunViewModel` / `MacSyncContentModel` /
@@ -43,9 +45,11 @@
 import AppKit
 import SwiftUI
 
-/// 同步中心顶层页（2026-09-26 批 B1；分段控件切换，同一时刻只渲染一页）。
+/// 同步中心入口默认页（2026-09-26 批 B1 引入；**2026-11-16 P1a 起不再是页切换**）。
+/// P1a 把设备面外移成「设备…」Popover ⇒ 内容区恒为「同步」页；本枚举只作为两个入口
+/// `initialPage` 的**兼容入参**保留（调用点不必改），不再驱动任何页切换。
 enum MacSyncPage: Hashable {
-    /// 设备页（低频/配置：待批准请求 / 身份与二维码 / 连接状态 / 已配对设备 / 局域网开关）。
+    /// 设备面（现为「设备…」Popover 的内容：待批准请求 / 身份与二维码 / 连接状态 / 已配对设备 / 局域网开关）。
     case device
     /// 同步页（分段切「传歌 / 播放数据」）。
     case sync
@@ -79,10 +83,10 @@ struct MacSyncRunSection: View {
     /// F2 对齐歌词补发轮的事实（连接就绪自动跑的那一轮；nil = 本次连接还没跑过）。
     @Environment(MacLyricsResendFactsStore.self) var lyricsFacts
 
-    // MARK: - 顶层页与流（2026-09-26 批 B1）
+    // MARK: - 置顶行与流（P1a：设备面已外移成 Popover）
 
-    /// 当前顶层页（设备 / 同步）。初值由入口给定（设置页 = 设备；工具栏面板 = 同步）。
-    @State var page: MacSyncPage
+    /// 「设备…」Popover 开关（设备 / 配对面唯一入口）。
+    @State var showsDevicePopover = false
     /// 「同步」页当前流（传歌 / 播放数据）。
     @State var flow: MacSyncFlow = .tracks
 
@@ -143,35 +147,27 @@ struct MacSyncRunSection: View {
         let center = hostCenter ?? .shared
         let contentModel = MacSyncContentModel(hostCenter: center)
         injectedHostCenter = hostCenter
-        _page = State(initialValue: initialPage)
+        // P1a：`initialPage` 只作兼容入参（设备面已外移），内容区恒为「同步」页。
+        _ = initialPage
         _content = StateObject(wrappedValue: contentModel)
         _model = StateObject(wrappedValue: MacSyncRunViewModel(hostCenter: center, content: contentModel))
         _dataModel = StateObject(wrappedValue: MacSyncDataViewModel(hostCenter: center))
     }
 
     var body: some View {
-        // 2026-09-29：`Form` 壳由 `MacSyncCenterView` 下移到这里，分段控件才能固定
+        // 2026-09-29：`Form` 壳由 `MacSyncCenterView` 下移到这里，置顶行才能固定
         // 在内容区顶部（`VStack` 内先放置顶行、再放独立滚动的 `Form`）。全部 `@State`
-        // 仍留在本类型（唯一观察者），页切换不卸载观察者。
+        // 仍留在本类型（唯一观察者）；P1a 起只有一页，设备面走 Popover、不卸载观察者。
         VStack(spacing: DesignTokens.space0) {
             pinnedHeader
             Form {
-                Group {
-                    switch page {
-                    case .device:
-                        devicePane
-                    case .sync:
-                        syncPage
-                    }
-                }
+                syncPage
             }
             .formStyle(.grouped)
 
             // 2026-11-16 P0：执行区（选择摘要 + 开始/取消）固定在底栏，不再随 `Form` 滚动、
-            // 不再被 sheet 底边裁切；「设备」页没有执行区，不挂底栏。
-            if page == .sync {
-                syncActionBar
-            }
+            // 不再被 sheet 底边裁切。P1a 起内容区恒为「同步」页 ⇒ 底栏恒在（无设备页）。
+            syncActionBar
         }
         .onAppear {
             model.onAppear()
@@ -262,33 +258,60 @@ struct MacSyncRunSection: View {
         }
     }
 
-    /// 顶层页分段控件（设备 / 同步）。文案复用既有 key（`sync_devices_section` / `sync_run_panel_title`）。
-    private var pagePicker: some View {
-        Picker("", selection: $page) {
-            Text("sync_devices_section".localized).tag(MacSyncPage.device)
-            Text("sync_run_panel_title".localized).tag(MacSyncPage.sync)
+    /// 置顶标题行：左「同步」标题、右「设备…」按钮（P1a：设备入口从顶层页外移）。
+    /// 标题复用既有 key（`sync_run_panel_title` = 「同步」），不新增同义键。
+    private var titleRow: some View {
+        HStack(spacing: DesignTokens.space12) {
+            Text("sync_run_panel_title".localized)
+                .font(.headline)
+            Spacer(minLength: DesignTokens.space0)
+            devicesButton
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        .padding(.horizontal, DesignTokens.space20)
+        .padding(.vertical, DesignTokens.space12)
     }
 
-    /// 置顶行：顶层页分段固定在内容区顶部，不随下方 `Form` 滚动
+    /// 「设备…」按钮：设备 / 配对面的唯一入口 —— Popover 内容就是唯一实现 `devicePane`
+    /// （不复制第二份设备面）。有未批准配对请求时按钮右上角挂红点，状态源是
+    /// `hostCenter.pendingCard`（与设备面板同一份，不新订阅、不另存状态）。
+    private var devicesButton: some View {
+        let hasPending = hostCenter.pendingCard != nil
+        return Button {
+            showsDevicePopover.toggle()
+        } label: {
+            Text("sync_devices_button".localized)
+                .overlay(alignment: .topTrailing) {
+                    if hasPending {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 6, height: 6)
+                            .offset(x: DesignTokens.space6, y: -DesignTokens.space4)
+                            .accessibilityHidden(true)
+                    }
+                }
+        }
+        .popover(isPresented: $showsDevicePopover, arrowEdge: .bottom) {
+            Form {
+                devicePane
+            }
+            .formStyle(.grouped)
+            .frame(width: 520, height: 560)
+        }
+        .help("sync_devices_button".localized)
+    }
+
+    /// 置顶行：标题行 + 「同步」页流分段固定在内容区顶部，不随下方 `Form` 滚动
     /// （用户 2026-09-29：「最上面的 tab 需要永远置顶，不滚动」）。
-    /// 同日追加：「歌曲 / 数据」这一行也要一起置顶 ⇒ 顶层页分段 + （仅「同步」页的）
-    /// `SyncFlowPicker` 流分段两行都固定在顶部；「设备」页只显示顶层页分段（流分段是「同步」页专属，
-    /// 不常显）。picker 唯一实现见 `SyncFlowPicker`（`SyncTracksPane.swift`）。
+    /// P1a：顶层「设备 / 同步」分段已撤 ⇒ 只剩标题行 + `SyncFlowPicker` 两行。
+    /// picker 唯一实现见 `SyncFlowPicker`（`SyncTracksPane.swift`）。
     /// 背景 + 分隔线对齐 macOS 原生分组外观（`.bar` 随明暗外观自适应）。
     private var pinnedHeader: some View {
         VStack(spacing: DesignTokens.space0) {
-            pagePicker
+            titleRow
+            Divider()
+            SyncFlowPicker(flow: $flow)
                 .padding(.horizontal, DesignTokens.space20)
                 .padding(.vertical, DesignTokens.space12)
-            if page == .sync {
-                Divider()
-                SyncFlowPicker(flow: $flow)
-                    .padding(.horizontal, DesignTokens.space20)
-                    .padding(.vertical, DesignTokens.space12)
-            }
             Divider()
         }
         .background(.bar)

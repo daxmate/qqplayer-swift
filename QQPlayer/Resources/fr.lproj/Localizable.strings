@@ -1224,3 +1224,10 @@
 "recommendation_itunes_lookup_title" = "Complétion des métadonnées iTunes";
 "recommendation_itunes_lookup_footer" = "Effectue une recherche iTunes pour les meilleurs candidats afin de compléter le titre, l'album, l'année et la durée ; 0 désactive. Résultats en cache 7 jours, débit limité à ~20 req/min ; les échecs sont ignorés.";
 "recommendation_lastfm_enable" = "Activer le renfort Last.fm (accès à last.fm requis)";
+
+// 2026-11-16 P1a : entrée « Appareils » déplacée / carte de direction / guide d'état vide
+"sync_devices_button" = "Appareils…";
+"sync_empty_title" = "Rien à synchroniser pour l'instant";
+"sync_empty_library_action" = "Synchroniser toute la bibliothèque";
+"sync_empty_tracks_action" = "Choisir des morceaux";
+"sync_direction_flip" = "Inverser le sens de la synchronisation";

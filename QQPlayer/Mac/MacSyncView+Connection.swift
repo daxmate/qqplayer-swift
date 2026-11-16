@@ -19,23 +19,131 @@ import SwiftUI
 extension MacSyncRunSection {
     // MARK: - B 方向区（T10：面板第一屏）
 
+    /// 方向卡（P1a 2026-11-16）：`[ 本机 Mac ]  ⇄  [ 目标设备 ]` 胶囊卡，替掉原来的两行 radio。
+    /// 箭头朝向 = 当前方向（上传 → 指向右侧设备；下载 ← 指向左侧本机；未选 = 双向箭头）。
+    /// 唯一事实源仍是 `model.direction` + `model.selectDirection(_:)`——本文件不存第二份方向；
+    /// 同步进行中 / 没有本次同步目标时整卡禁用，并在卡下说明原因（不做「点了没反应」）。
     @ViewBuilder
     var directionSection: some View {
         Section {
-            directionRow(
-                .upload,
-                title: "sync_run_direction_upload".localized(with: targetDeviceName),
-                detail: "sync_run_direction_upload_detail".localized(with: targetDeviceName)
-            )
-            directionRow(
-                .download,
-                title: "sync_run_direction_download".localized(with: targetDeviceName),
-                detail: "sync_run_direction_download_detail".localized(with: targetDeviceName)
-            )
+            directionCard
+                .disabled(directionDisabledReason != nil)
         } header: {
             Text("sync_run_direction_section".localized)
         } footer: {
-            Text("sync_run_direction_footer".localized)
+            Text(directionFooterText)
+        }
+    }
+
+    /// 卡下方唯一一句说明：可操作时讲当前方向的语义（既有 `_detail` 文案），
+    /// 不可操作时讲原因。不新写一套方向解释。
+    private var directionFooterText: String {
+        if let reason = directionDisabledReason {
+            return reason
+        }
+        switch model.direction {
+        case .upload:
+            return "sync_run_direction_upload_detail".localized(with: targetDeviceName)
+        case .download:
+            return "sync_run_direction_download_detail".localized(with: targetDeviceName)
+        case nil:
+            return "sync_run_direction_footer".localized
+        }
+    }
+
+    /// 方向不可改的原因（nil = 可改）：同步进行中 / 还没有本次同步目标。
+    /// 文案全部复用既有 key，不新增同义句。
+    private var directionDisabledReason: String? {
+        if model.phase.isBusy {
+            return "sync_run_reason_already_running".localized
+        }
+        if syncTargetStatus.target == nil {
+            return "sync_run_reason_not_connected".localized
+        }
+        return nil
+    }
+
+    /// 胶囊卡本体：左端点 = 本机 Mac（上传的来源），右端点 = 目标设备（下载的来源）。
+    private var directionCard: some View {
+        HStack(spacing: DesignTokens.space10) {
+            directionEndpoint(.upload, title: hostName, systemImage: "laptopcomputer")
+            flipButton
+            directionEndpoint(.download, title: targetDeviceName, systemImage: "iphone")
+        }
+        .padding(.vertical, DesignTokens.space4)
+    }
+
+    /// 端点胶囊（真控件）：点它 = 「从这一端取内容」（左 = 上传 / 右 = 下载）。
+    private func directionEndpoint(
+        _ direction: SyncTransferDirection,
+        title: String,
+        systemImage: String
+    ) -> some View {
+        let selected = model.direction == direction
+        return Button {
+            model.selectDirection(direction)
+        } label: {
+            HStack(spacing: DesignTokens.space6) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(selected ? accentColor : Color.secondary)
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .fontWeight(selected ? .semibold : .regular)
+            }
+            .padding(.horizontal, DesignTokens.space12)
+            .padding(.vertical, DesignTokens.space6)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.radius10)
+                    .fill(selected ? accentColor.opacity(0.12) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.radius10)
+                    .strokeBorder(selected ? accentColor.opacity(0.45) : Color.secondary.opacity(0.25))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // 端点本身的文字是设备名 → 朗读文案复用既有方向标题键（避免只念设备名听不出方向）。
+        .accessibilityLabel(directionAccessibilityLabel(direction))
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    /// 端点朗读文案复用既有方向标题键（「上传到 %@」/「从 %@ 下载」），不新造说法。
+    private func directionAccessibilityLabel(_ direction: SyncTransferDirection) -> String {
+        switch direction {
+        case .upload:
+            return "sync_run_direction_upload".localized(with: targetDeviceName)
+        case .download:
+            return "sync_run_direction_download".localized(with: targetDeviceName)
+        }
+    }
+
+    /// 中间箭头：点一下在「上传 / 下载」间翻转（未选方向时先落到「上传」）。
+    private var flipButton: some View {
+        Button {
+            model.selectDirection(model.direction == .upload ? .download : .upload)
+        } label: {
+            Image(systemName: directionSymbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(model.direction == nil ? Color.secondary : accentColor)
+                .frame(width: DesignTokens.space24, height: DesignTokens.space24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("sync_direction_flip".localized)
+    }
+
+    /// 箭头朝向 = 当前方向（上传指向设备；下载指向本机；未选 = 双向）。
+    private var directionSymbol: String {
+        switch model.direction {
+        case .upload:
+            return "arrow.right"
+        case .download:
+            return "arrow.left"
+        case nil:
+            return "arrow.left.arrow.right"
         }
     }
 
@@ -50,43 +158,6 @@ extension MacSyncRunSection {
             return "sync_run_direction_download_target".localized
         }
         return name
-    }
-
-    /// 方向行（单选；选中态用勾 + 底色，与内容区的「全曲库」行同一视觉语言）。
-    /// 批 C：外壳从裸 `onTapGesture` 改为**真控件**（`Button` + `.isSelected` 无障碍 trait，
-    /// 可键盘焦点/激活），范式与批 B2 `SyncDevicePane.deviceTargetRow` 一致；视觉逐字不变。
-    private func directionRow(
-        _ direction: SyncTransferDirection,
-        title: String,
-        detail: String
-    ) -> some View {
-        let selected = model.direction == direction
-        return Button {
-            model.selectDirection(direction)
-        } label: {
-            HStack(alignment: .top, spacing: DesignTokens.space10) {
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? accentColor : Color.secondary)
-                VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                    Text(title)
-                        .fontWeight(selected ? .medium : .regular)
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: DesignTokens.space0)
-            }
-            .padding(.vertical, DesignTokens.space4)
-            .padding(.horizontal, DesignTokens.space6)
-            .background(
-                RoundedRectangle(cornerRadius: DesignTokens.radius6)
-                    .fill(selected ? accentColor.opacity(0.12) : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        // 行内文字已含标题/说明 → 不再重复加 `.accessibilityHint`（避免双重朗读）。
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
 }

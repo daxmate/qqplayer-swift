@@ -1226,3 +1226,10 @@
 "recommendation_itunes_lookup_title" = "iTunes metadata lookups";
 "recommendation_itunes_lookup_footer" = "Runs one iTunes lookup for top-scoring candidates to fill canonical title / album / year / duration; 0 disables. Results are cached for 7 days and queued at iTunes' ~20 req/min limit; failures are skipped.";
 "recommendation_lastfm_enable" = "Enable Last.fm boost (requires access to last.fm)";
+
+// 2026-11-16 P1a: devices entry moved out / direction capsule card / empty-state guide
+"sync_devices_button" = "Devices…";
+"sync_empty_title" = "Nothing selected to sync yet";
+"sync_empty_library_action" = "Sync Entire Library";
+"sync_empty_tracks_action" = "Pick Songs";
+"sync_direction_flip" = "Flip sync direction";

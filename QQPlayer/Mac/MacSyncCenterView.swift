@@ -32,8 +32,9 @@ import SwiftUI
 
 /// macOS 同步中心（设置页「同步」分类 + 工具栏同步面板共用）。
 struct MacSyncCenterView: View {
-    /// 默认顶层页（2026-09-26 批 B1）：设置页传 `.device`，工具栏面板传 `.sync`。
-    var initialPage: MacSyncPage = .device
+    /// 默认入口页（2026-09-26 批 B1）：**P1a 起恒为「同步」页**（设备面已外移成 Popover），
+    /// 两个入口的显式传参保留为兼容入参、不再切页。
+    var initialPage: MacSyncPage = .sync
     /// S2 接线：App 级 Host 监听中心（**同一个 shared 实例**，生命周期不归本视图）。
     /// 2026-09-20 批 6-8：迁 `@Observable` ⇒ 组合根环境注入；这里只把它转交给内容视图
     /// （`MacSyncRunSection` 的 init 读不到环境值，用它建三个 view model）。

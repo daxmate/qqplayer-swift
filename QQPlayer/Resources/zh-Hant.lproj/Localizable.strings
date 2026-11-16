@@ -1550,3 +1550,10 @@
 "recommendation_itunes_lookup_title" = "iTunes 中繼資料補齊";
 "recommendation_itunes_lookup_footer" = "對高分候選做一次 iTunes 查詢，補齊標準曲名 / 專輯 / 年份 / 長度；0 = 關閉。同曲結果快取 7 天，依 iTunes 限速約 20 次/分鐘排隊，失敗自動跳過。";
 "recommendation_lastfm_enable" = "啟用 Last.fm 增強（需要能連線 last.fm）";
+
+// 2026-11-16 P1a：裝置入口外移 / 方向膠囊卡 / 空狀態引導
+"sync_devices_button" = "裝置…";
+"sync_empty_title" = "尚未選擇要同步的內容";
+"sync_empty_library_action" = "同步整個媒體庫";
+"sync_empty_tracks_action" = "挑幾首歌";
+"sync_direction_flip" = "切換同步方向";

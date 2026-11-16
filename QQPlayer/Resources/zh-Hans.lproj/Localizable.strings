@@ -1229,3 +1229,10 @@
 "recommendation_itunes_lookup_title" = "iTunes 元数据补全";
 "recommendation_itunes_lookup_footer" = "对高分候选做一次 iTunes 查询，补齐标准曲名 / 专辑 / 年份 / 时长；0 = 关闭。同曲结果缓存 7 天，按 iTunes 限速约 20 次/分钟排队，失败自动跳过。";
 "recommendation_lastfm_enable" = "启用 Last.fm 增强（需要能访问 last.fm）";
+
+// 2026-11-16 P1a：设备入口外移 / 方向胶囊卡 / 空态引导
+"sync_devices_button" = "设备…";
+"sync_empty_title" = "还没有选择要同步的内容";
+"sync_empty_library_action" = "同步全曲库";
+"sync_empty_tracks_action" = "挑几首歌";
+"sync_direction_flip" = "切换同步方向";
