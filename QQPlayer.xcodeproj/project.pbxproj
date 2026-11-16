@@ -571,6 +571,7 @@
 			membershipExceptions = (
 				Info.plist,
 				Mac/MacAlbumArtistViews.swift,
+				Mac/MacAlbumGrid.swift,
 				Mac/MacAppearance.swift,
 				Mac/MacArtworkThumbnail.swift,
 				Mac/MacDesktopWindowsManager.swift,
@@ -726,6 +727,7 @@
 				Helpers/ObjCExceptionCatcher.m,
 				Mac/AccentInjector.swift,
 				Mac/MacAlbumArtistViews.swift,
+				Mac/MacAlbumGrid.swift,
 				Mac/MacAppearance.swift,
 				Mac/MacArtworkThumbnail.swift,
 				Mac/MacDesktopWindowsManager.swift,

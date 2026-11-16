@@ -113,6 +113,12 @@ struct MacTrackListView: View {
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
     /// 当前显示的排序后行（播放队列跟随，与 Table 显示一致）
     @State private var displayedRows: [MacTrackTableRow] = []
+    /// 呈现模式（列表 / 专辑网格）：只影响呈现层，重启保持上次选择
+    @AppStorage("macTrackListViewMode") private var viewMode: MacTrackListMode = .list
+    /// 专辑网格分组缓存（tracks 变化 / 进入网格时重建，body 只读缓存）
+    @State private var albumGroups: [MacAlbumGroup] = []
+    /// 从网格点进某张专辑后的筛选键（nil = 不筛选；面包屑可清除）
+    @State private var albumFilter: MacAlbumFilterKey?
 
     var body: some View {
         if tracks.isEmpty {
@@ -130,8 +136,15 @@ struct MacTrackListView: View {
         } else {
             VStack(spacing: DesignTokens.space0) {
                 toolbarRow
+                if let filter = albumFilter {
+                    albumFilterBar(filter)
+                }
                 Divider()
-                table
+                if viewMode == .albums {
+                    albumGrid
+                } else {
+                    table
+                }
             }
             // 右键菜单弹窗宿主（新建歌单 / 编辑标签 / 删除确认）——与两个搜索面同一份实现
             .macTrackMenu(menu) { deletedIds in
@@ -145,18 +158,34 @@ struct MacTrackListView: View {
                 }
             }
             .onAppear {
-                syncDisplayedRows()
+                syncDisplayedRows(album: albumFilter)
+                rebuildAlbumGroups()
+            }
+            .onChange(of: viewMode) { _, newMode in
+                // 网格是全库总览：进入网格即退出专辑筛选（列表模式行为不变）
+                if newMode == .albums {
+                    albumFilter = nil
+                    rebuildAlbumGroups()
+                }
             }
             .onChange(of: sortOrder) { _, newSort in
                 // 用 onChange 传入的新排序重建，不用旧闭包捕获的 self.sortOrder
-                syncDisplayedRows(sort: newSort)
+                syncDisplayedRows(sort: newSort, album: albumFilter)
             }
             .onChange(of: tracks) { _, newTracks in
                 // 关键修复（2026-09-03 现场探针定位）：onChange 闭包捕获的是变化前的
                 // 旧 self，读 self.tracks 会拿到删除前的旧数组 → 用旧数据重建会把刚
                 // 删掉的行“复活”，且后续重载不再触发 onChange，幽灵行直到重启才消失。
                 // 必须用 onChange 传入的 newTracks（新数据）重建。
-                syncDisplayedRows(tracks: newTracks)
+                // 筛选的专辑整张被删 / 改名 → 自动清除筛选，避免停在空列表
+                var filter = albumFilter
+                if let current = filter,
+                   !newTracks.contains(where: { albumFilterKey(for: $0) == current }) {
+                    albumFilter = nil
+                    filter = nil
+                }
+                rebuildAlbumGroups(for: newTracks)
+                syncDisplayedRows(tracks: newTracks, album: filter)
             }
             // 批量刮削 sheet（多选右键；单曲编辑 sheet 在 .macTrackMenu 宿主里）
             .sheet(item: $batchScrapeRequest) { request in
@@ -195,6 +224,7 @@ struct MacTrackListView: View {
                     .controlSize(.small)
                 }
             }
+            viewModePicker
         }
         .padding(.horizontal, DesignTokens.space12)
         .padding(.vertical, DesignTokens.space4)
@@ -366,6 +396,10 @@ struct MacTrackListView: View {
     }
 
     private func locateActiveTrack() {
+        // 网格没有「行」可定位 → 先切回列表再定位（list 模式行为不变）
+        if viewMode != .list {
+            viewMode = .list
+        }
         locateRequestID += 1
     }
 
@@ -442,9 +476,16 @@ struct MacTrackListView: View {
     /// 旧数据，导致刚删除的行被旧数组重建复活（2026-09-03 现场探针定位的幽灵行根因）。
     private func syncDisplayedRows(
         tracks freshTracks: [Track]? = nil,
-        sort freshSort: [SortDescriptor<MacTrackTableRow>]? = nil
+        sort freshSort: [SortDescriptor<MacTrackTableRow>]? = nil,
+        album filter: MacAlbumFilterKey?
     ) {
-        let sourceTracks = freshTracks ?? tracks
+        let candidates = freshTracks ?? tracks
+        let sourceTracks: [Track]
+        if let filter {
+            sourceTracks = candidates.filter { albumFilterKey(for: $0) == filter }
+        } else {
+            sourceTracks = candidates
+        }
         let sourceSort = freshSort ?? sortOrder
         let sorted = sourceTracks
             .map { MacTrackTableRow(id: $0.stableId, track: $0, artistName: artistNameResolver($0) ?? "") }
@@ -461,6 +502,81 @@ struct MacTrackListView: View {
         // 审计 M2：以前每个可见行每帧一次 `Album.fetchOne` → 读缓存（预取已就位）
         // 专辑列是显示文本 → 按 UI 语言归一字形（facts 内部仍是原始值，排序/匹配不受影响）
         DisplayScriptNormalizer.display(facts.albumTitle(forTrack: track))
+    }
+
+    // MARK: - 视图模式（列表 / 专辑网格，2026-11-16）
+
+    /// 列表 / 专辑网格 切换（分段控件；图标用 SF Symbols，无障碍标签复用现有 key）
+    private var viewModePicker: some View {
+        Picker("", selection: $viewMode) {
+            Image(systemName: "list.bullet")
+                .tag(MacTrackListMode.list)
+                .accessibilityLabel(Localized.songs)
+            Image(systemName: "square.grid.2x2")
+                .tag(MacTrackListMode.albums)
+                .accessibilityLabel(Localized.albums)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+    }
+
+    /// 专辑封面网格（albums 模式）：分组走缓存，body 不重算
+    private var albumGrid: some View {
+        MacTrackAlbumGridView(groups: albumGroups) { group in
+            openAlbum(group)
+        }
+    }
+
+    /// 专辑筛选面包屑（专辑名 + 清除）：文案直接用专辑名字符串，不新增本地化 key
+    private func albumFilterBar(_ filter: MacAlbumFilterKey) -> some View {
+        HStack(spacing: DesignTokens.space8) {
+            Image(systemName: "square.grid.2x2")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(filter.albumTitle)
+                .font(.callout)
+                .lineLimit(1)
+            Button {
+                albumFilter = nil
+                syncDisplayedRows(album: nil)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Localized.cancel)
+            Spacer()
+        }
+        .padding(.horizontal, DesignTokens.space12)
+        .padding(.vertical, DesignTokens.space4)
+    }
+
+    /// 点专辑卡：只显示这张专辑的曲目并切回列表（sortOrder 原样保留）
+    private func openAlbum(_ group: MacAlbumGroup) {
+        albumFilter = group.key
+        viewMode = .list
+        // 显式传筛选键：不依赖 @State 写入与读取的时序
+        syncDisplayedRows(album: group.key)
+    }
+
+    /// 行内艺人显示口径（artist 列 / 专辑归组 / 筛选共用）
+    private func artistName(for track: Track) -> String {
+        artistNameResolver(track) ?? ""
+    }
+
+    /// 专辑筛选键：与专辑列同一口径（facts 标题 + 字形归一 + 艺人解析）
+    private func albumFilterKey(for track: Track) -> MacAlbumFilterKey {
+        MacAlbumFilterKey(albumTitle: albumTitle(for: track), artistName: artistName(for: track))
+    }
+
+    /// 重建专辑网格分组缓存（tracks 变化 / 进入网格时重建，body 只读缓存）
+    private func rebuildAlbumGroups(for freshTracks: [Track]? = nil) {
+        albumGroups = MacAlbumGrouping.groups(
+            from: freshTracks ?? tracks,
+            albumTitle: { albumTitle(for: $0) },
+            artistName: { artistName(for: $0) }
+        )
     }
 
     // MARK: - Context-menu modal 延迟呈现（macOS SwiftUI 已知 bug workaround）
