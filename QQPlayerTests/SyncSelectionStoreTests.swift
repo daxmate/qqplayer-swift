@@ -168,7 +168,8 @@ struct SyncSelectionStoreTests {
         #expect(store.load() == .all)
 
         writeRaw(#"{"version":1,"kind":"playlists","values":["rock","@favorites"]}"#, to: defaults)
-        #expect(store.load() == .playlists(["@favorites", "rock"]))
+        // `load()` 按存档原序返回（归一只在 `save`）→ 断言用序无关口径（`playlistIDs` 走规范化）。
+        #expect(store.load().playlistIDs == ["@favorites", "rock"])
 
         writeRaw(#"{"version":1,"kind":"relativePaths","values":["Album/a.flac"]}"#, to: defaults)
         #expect(store.load() == .relativePaths(["Album/a.flac"]))

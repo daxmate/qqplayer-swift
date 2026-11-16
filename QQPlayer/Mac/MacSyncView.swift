@@ -89,6 +89,9 @@ struct MacSyncRunSection: View {
     @State var showsDevicePopover = false
     /// 「同步」页当前流（传歌 / 播放数据）。
     @State var flow: MacSyncFlow = .tracks
+    /// 智能源勾选的行内提示（nil = 无提示）。P1b：由 `toggleSmartSource` 返回、
+    /// 视图自己持有——不进 `MacSyncContentModel` 的发布状态（迁移棘轮：不新增 @Published）。
+    @State var smartSourceNotice: String?
 
     // MARK: - 设备页状态（原 `MacSyncCenterView`；拆分后仍由本类型持有 = 唯一观察者）
 

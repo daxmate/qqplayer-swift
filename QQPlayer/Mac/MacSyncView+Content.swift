@@ -245,7 +245,7 @@ extension MacSyncRunSection {
                         pickTracksButton(option.ref)
                     }
                 }
-                if let notice = content.smartSourceNotice {
+                if let notice = smartSourceNotice {
                     Text(notice)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -303,7 +303,7 @@ extension MacSyncRunSection {
             get: { content.isSmartSourceSelected(ref.id) },
             set: { isOn in
                 guard isOn != content.isSmartSourceSelected(ref.id) else { return }
-                content.toggleSmartSource(ref)
+                smartSourceNotice = content.toggleSmartSource(ref)
             }
         )
     }
