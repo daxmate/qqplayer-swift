@@ -57,30 +57,16 @@ extension MacSyncRunSection {
 
     // MARK: - 空态引导（P1a：未选内容时给行动入口，替掉死胡同）
 
-    /// 已选方向、但还没选任何内容时的引导卡（内容区顶部）。
-    /// ⚠️ 只做**导航**：两个按钮都走现有路径 ——
-    /// ① 「同步全曲库」= 现有 `modeBinding`（同一份二次确认，不新写确认框）；
-    /// ② 「挑几首歌」= 现有模式切换（搜索框在 `trackList` 里已有）。
+    /// 已选方向、但还没选任何内容时的提示卡（内容区顶部）。
+    /// ⚠️ 空态只给标题提示，行动入口就是下面的模式选择器（不再放按钮，避免与三模式重复）。
     /// 不新增任何统计数字、不显示假数据；未选方向时仍走上面的方向引导，不被本卡覆盖。
     @ViewBuilder
     private var emptySelectionGuide: some View {
         if content.selectionSummary.isEmpty {
-            VStack(alignment: .leading, spacing: DesignTokens.space10) {
-                Label("sync_empty_title".localized, systemImage: "tray")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: DesignTokens.space10) {
-                    Button("sync_empty_library_action".localized) {
-                        modeBinding.wrappedValue = .library
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button("sync_empty_tracks_action".localized) {
-                        modeBinding.wrappedValue = .tracks
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-            .padding(.vertical, DesignTokens.space4)
+            Label("sync_empty_title".localized, systemImage: "tray")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, DesignTokens.space4)
         }
     }
 

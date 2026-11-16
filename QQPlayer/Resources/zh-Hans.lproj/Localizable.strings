@@ -1235,6 +1235,4 @@
 // 2026-11-16 P1a：设备入口外移 / 方向胶囊卡 / 空态引导
 "sync_devices_button" = "设备…";
 "sync_empty_title" = "还没有选择要同步的内容";
-"sync_empty_library_action" = "同步全曲库";
-"sync_empty_tracks_action" = "挑几首歌";
 "sync_direction_flip" = "切换同步方向";

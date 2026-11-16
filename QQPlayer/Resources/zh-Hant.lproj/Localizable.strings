@@ -1556,6 +1556,4 @@
 // 2026-11-16 P1a：裝置入口外移 / 方向膠囊卡 / 空狀態引導
 "sync_devices_button" = "裝置…";
 "sync_empty_title" = "尚未選擇要同步的內容";
-"sync_empty_library_action" = "同步整個媒體庫";
-"sync_empty_tracks_action" = "挑幾首歌";
 "sync_direction_flip" = "切換同步方向";

@@ -1232,6 +1232,4 @@
 // 2026-11-16 P1a: devices entry moved out / direction capsule card / empty-state guide
 "sync_devices_button" = "Devices…";
 "sync_empty_title" = "Nothing selected to sync yet";
-"sync_empty_library_action" = "Sync Entire Library";
-"sync_empty_tracks_action" = "Pick Songs";
 "sync_direction_flip" = "Flip sync direction";

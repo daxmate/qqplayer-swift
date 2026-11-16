@@ -1230,6 +1230,4 @@
 // 2026-11-16 P1a : entrée « Appareils » déplacée / carte de direction / guide d'état vide
 "sync_devices_button" = "Appareils…";
 "sync_empty_title" = "Rien à synchroniser pour l'instant";
-"sync_empty_library_action" = "Synchroniser toute la bibliothèque";
-"sync_empty_tracks_action" = "Choisir des morceaux";
 "sync_direction_flip" = "Inverser le sens de la synchronisation";
