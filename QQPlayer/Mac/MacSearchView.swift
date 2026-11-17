@@ -227,9 +227,9 @@ private struct MacSearchSongRow: View {
                 .overlay(alignment: .bottomTrailing) {
                     if isActive {
                         Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: DesignTokens.font9, weight: .semibold))
                             .foregroundColor(appAccentColor)
-                            .padding(2)
+                            .padding(DesignTokens.space2)
                             .background(Circle().fill(Color(nsColor: .windowBackgroundColor)))
                             .offset(x: 3, y: 3)
                     }
