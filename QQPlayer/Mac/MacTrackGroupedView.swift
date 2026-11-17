@@ -116,7 +116,7 @@ enum MacTrackGrouping {
         var order: [String] = []
         var buckets: [String: [Track]] = [:]
         for track in tracks {
-            let letter = initialLetter(of: track.title)
+            let letter = initialLetter(of: track.displayTitle)
             if buckets[letter] == nil {
                 buckets[letter] = []
                 order.append(letter)
@@ -312,7 +312,7 @@ struct MacTrackGroupedListView: View {
                 cornerRadius: DesignTokens.radius4
             )
             VStack(alignment: .leading, spacing: DesignTokens.space2) {
-                Text(track.title)
+                Text(track.displayTitle)
                     .font(.callout)
                     .foregroundColor(isActive ? appAccentColor : .primary)
                     .lineLimit(1)
