@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-17T12:28:09Z",
+  "updated_at": "2026-11-17T13:31:46Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -752,9 +752,9 @@
     },
     "QQPlayer/Mac/MacLyricsView+SyncedLyrics.swift": {
       "role": "index",
-      "sha256": "7f825164cf416d6a1c66555175c00850d6de32bfd3df475cfc0e91c6ecc661e9",
-      "size": 16715,
-      "normalized_sha256": "7f825164cf416d6a1c66555175c00850d6de32bfd3df475cfc0e91c6ecc661e9"
+      "sha256": "bb135d5203703a0363af73b168eaf29f3dea7c055c8616759b0832948f8c5823",
+      "size": 18453,
+      "normalized_sha256": "bb135d5203703a0363af73b168eaf29f3dea7c055c8616759b0832948f8c5823"
     },
     "QQPlayer/Mac/MacLyricsView.swift": {
       "role": "index",
@@ -5420,9 +5420,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "603207d88e9ffad2b5ad7807028d2ef6833c7a53ad7e8a4386d64608734748ea",
-      "size": 424426,
-      "normalized_sha256": "603207d88e9ffad2b5ad7807028d2ef6833c7a53ad7e8a4386d64608734748ea"
+      "sha256": "069ac3260984cc56a454b5c7f10f09eb5657ff1347d4eba5d6e3a131fd72b2b2",
+      "size": 424559,
+      "normalized_sha256": "069ac3260984cc56a454b5c7f10f09eb5657ff1347d4eba5d6e3a131fd72b2b2"
     },
     "aoci.meta.txt": {
       "role": "index",
