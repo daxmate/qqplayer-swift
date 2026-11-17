@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-17T13:56:38Z",
+  "updated_at": "2026-11-17T14:13:25Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -806,15 +806,15 @@
     },
     "QQPlayer/Mac/MacPlayerView+PlayerSection.swift": {
       "role": "index",
-      "sha256": "2ae6a39d8bbb82af4704c7521b276d0087939aa45fd6c5826bd1dbc01329fa42",
-      "size": 11623,
-      "normalized_sha256": "2ae6a39d8bbb82af4704c7521b276d0087939aa45fd6c5826bd1dbc01329fa42"
+      "sha256": "f1d619dbc89b15d4be3fc98af4d7a49ebb3bbf75b523c586ecb05efd6b97d5e3",
+      "size": 13467,
+      "normalized_sha256": "f1d619dbc89b15d4be3fc98af4d7a49ebb3bbf75b523c586ecb05efd6b97d5e3"
     },
     "QQPlayer/Mac/MacPlayerView.swift": {
       "role": "index",
-      "sha256": "6df694871022bee6bfd2baa2bc7c21acc174e791c1c3857f646a705848a1cae1",
-      "size": 15134,
-      "normalized_sha256": "6df694871022bee6bfd2baa2bc7c21acc174e791c1c3857f646a705848a1cae1"
+      "sha256": "ebb0f3156728341d7f361ff27249f384063e6044f65b0112a9ef38ada44981e5",
+      "size": 15328,
+      "normalized_sha256": "ebb0f3156728341d7f361ff27249f384063e6044f65b0112a9ef38ada44981e5"
     },
     "QQPlayer/Mac/MacPlaylistDetailSheet.swift": {
       "role": "index",
@@ -1130,9 +1130,9 @@
     },
     "QQPlayer/Mac/MacVolumeControl.swift": {
       "role": "index",
-      "sha256": "5f3ffe70f65e2cffafe7ef829ed34eb9901b9b39958006b1a6943db8ee5b6b23",
-      "size": 2064,
-      "normalized_sha256": "5f3ffe70f65e2cffafe7ef829ed34eb9901b9b39958006b1a6943db8ee5b6b23"
+      "sha256": "2c3537097daf7bd30dcaaf3b8a876e1cfecb0bce73d057c108d082ea15e38f25",
+      "size": 2459,
+      "normalized_sha256": "2c3537097daf7bd30dcaaf3b8a876e1cfecb0bce73d057c108d082ea15e38f25"
     },
     "QQPlayer/Mac/RecommendationPlannerFactory.swift": {
       "role": "index",
@@ -5420,9 +5420,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "70d51a72d356fec64a53c9299fbddb2cc0566c3e5906b543aaedc3b70a96235c",
-      "size": 424616,
-      "normalized_sha256": "70d51a72d356fec64a53c9299fbddb2cc0566c3e5906b543aaedc3b70a96235c"
+      "sha256": "0718b317442e6c5070b3e20944ad160f9cba32c8fd136a3bbbe570d41d83c9bc",
+      "size": 424984,
+      "normalized_sha256": "0718b317442e6c5070b3e20944ad160f9cba32c8fd136a3bbbe570d41d83c9bc"
     },
     "aoci.meta.txt": {
       "role": "index",
