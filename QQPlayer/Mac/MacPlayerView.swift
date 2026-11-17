@@ -70,6 +70,10 @@ struct MacPlayerView: View {
     private static let lyricsPanelHeightKey = "QQPlayer.lyricsPanelHeight"
     /// 分隔条拖动坐标系：固定在播放页容器上，避免分隔条自身位移污染 translation（拖动抖动）
     private static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
+    /// 分隔条视觉细条高度（pt）
+    private static let lyricsResizeBarHeight: CGFloat = 6
+    /// 分隔条可拖命中区高度（pt）：视觉仍 6pt 细条，上下各外扩 6pt 便于抓取（2026-11-17 用户反馈太窄）
+    private static let lyricsResizeHitHeight: CGFloat = 18
 
     /// 播放区是否隐藏/歌词是否撑满：跟唱或放大（决策上收 MacPlaybackGate，有测试）
     private var isLyricsFullscreen: Bool {
@@ -255,42 +259,48 @@ struct MacPlayerView: View {
     }
 
     /// 播放区与歌词区之间的可拖分隔条（仅普通态显示；跟唱/放大时歌词撑满无分隔）
+    ///
+    /// 命中区（18pt）大于视觉细条（6pt）：2026-11-17 用户反馈原 6pt 命中区
+    /// 「鼠标稍微偏离一点就拖不动」，视觉不变，只是上下各多出 6pt 可抓取范围。
     private func lyricsResizeHandle(containerHeight: CGFloat) -> some View {
-        Rectangle()
-            .fill(Color.gray.opacity(0.12))
-            .frame(height: 6)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeUpDown.set()
-                } else {
-                    NSCursor.arrow.set()
-                }
+        ZStack {
+            Rectangle()
+                .fill(Color.gray.opacity(0.12))
+                .frame(height: Self.lyricsResizeBarHeight)
+        }
+        .frame(height: Self.lyricsResizeHitHeight)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                NSCursor.resizeUpDown.set()
+            } else {
+                NSCursor.arrow.set()
             }
-            .gesture(
-                DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.lyricsResizeCoordinateSpace))
-                    .onChanged { value in
-                        if dragStartPanelHeight == nil {
-                            dragStartPanelHeight = lyricsPanelHeight
-                        }
-                        // 向上拖 = 歌词变高；clamp 数学上收 MacPlaybackGate（有测试）
-                        let start = dragStartPanelHeight ?? lyricsPanelHeight
-                        lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
-                            start: start,
-                            translation: value.translation.height,
-                            containerHeight: containerHeight
-                        )
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.lyricsResizeCoordinateSpace))
+                .onChanged { value in
+                    if dragStartPanelHeight == nil {
+                        dragStartPanelHeight = lyricsPanelHeight
                     }
-                    .onEnded { _ in
-                        // 保留拖动结束时的当前高度，只做 clamp（不再回弹到起始高度）
-                        lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
-                            lyricsPanelHeight,
-                            containerHeight: containerHeight
-                        )
-                        dragStartPanelHeight = nil
-                        UserDefaults.standard.set(Double(lyricsPanelHeight), forKey: Self.lyricsPanelHeightKey)
-                    }
-            )
+                    // 向上拖 = 歌词变高；clamp 数学上收 MacPlaybackGate（有测试）
+                    let start = dragStartPanelHeight ?? lyricsPanelHeight
+                    lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
+                        start: start,
+                        translation: value.translation.height,
+                        containerHeight: containerHeight
+                    )
+                }
+                .onEnded { _ in
+                    // 保留拖动结束时的当前高度，只做 clamp（不再回弹到起始高度）
+                    lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
+                        lyricsPanelHeight,
+                        containerHeight: containerHeight
+                    )
+                    dragStartPanelHeight = nil
+                    UserDefaults.standard.set(Double(lyricsPanelHeight), forKey: Self.lyricsPanelHeightKey)
+                }
+        )
     }
 
     // MARK: - Playback order
