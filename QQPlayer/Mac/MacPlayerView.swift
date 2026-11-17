@@ -68,6 +68,9 @@ struct MacPlayerView: View {
     @State private var dragStartPanelHeight: CGFloat?
     /// 歌词面板高度持久化 key
     private static let lyricsPanelHeightKey = "QQPlayer.lyricsPanelHeight"
+    /// 播放区可用宽度（窄面板降档用；由 `playerSection` 背景几何量一次，2026-11-17）。
+    /// 分片：跨文件可见
+    @State var playerSectionWidth: CGFloat = 0
     /// 分隔条拖动坐标系：固定在播放页容器上，避免分隔条自身位移污染 translation（拖动抖动）
     private static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
     /// 分隔条视觉细条高度（pt）

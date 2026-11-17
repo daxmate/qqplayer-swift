@@ -12,6 +12,12 @@ import SwiftUI
 struct MacVolumeControl: View {
     @Environment(PlayerEngine.self) private var player
 
+    /// 音量滑杆最大宽度：窄面板降档时由调用方收窄（2026-11-17 修播放区元素被裁）；
+    /// 空间不足时滑杆可继续压缩到 `minSliderWidth`，不再把整行撑出可视区。
+    var sliderMaxWidth: CGFloat = DesignTokens.space100
+    /// 音量滑杆最小可压缩宽度
+    private static let minSliderWidth: CGFloat = 44
+
     var body: some View {
         HStack(spacing: DesignTokens.space8) {
             Button {
@@ -26,7 +32,7 @@ struct MacVolumeControl: View {
             .accessibilityLabel(player.isMuted ? "unmute".localized : "mute".localized)
 
             Slider(value: volumeBinding, in: 0 ... 1)
-                .frame(width: DesignTokens.space100)
+                .frame(minWidth: Self.minSliderWidth, maxWidth: sliderMaxWidth)
                 .help("volume_percent_format".localized(with: volumePercent))
                 .accessibilityLabel("volume".localized)
                 .accessibilityValue("volume_percent_format".localized(with: volumePercent))

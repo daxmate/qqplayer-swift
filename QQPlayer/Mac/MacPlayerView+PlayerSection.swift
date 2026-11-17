@@ -82,8 +82,8 @@ extension MacPlayerView {
             }
             .frame(maxWidth: 420)
 
-            // Controls
-            HStack(spacing: DesignTokens.space24) {
+            // Controls：窄面板自动降档（2026-11-17 用户报缩窗后播放元素被裁出可视区）
+            HStack(spacing: transportControlsSpacing) {
                 Button(action: onPrevious) {
                     Image(systemName: "backward.fill")
                         .font(.system(size: DesignTokens.font22))
@@ -122,7 +122,7 @@ extension MacPlayerView {
                 Divider().frame(height: 24)
 
                 // App 级音量（音量数学在 PlayerVolumeModel，见 PlayerEngine+Volume+Mac）
-                MacVolumeControl()
+                MacVolumeControl(sliderMaxWidth: volumeSliderMaxWidth)
 
                 // 当前曲目收藏（红心）
                 Button {
@@ -193,7 +193,8 @@ extension MacPlayerView {
             // SFB 曲目 Opus/OGG/DSD 无 tap 数据源，自动隐藏；跟唱大画面时本区隐藏）
             if visualizerEnabled {
                 MacVisualizerView()
-                    .frame(width: 420, height: 44)
+                    .frame(maxWidth: 420)
+                    .frame(height: 44)
                     .padding(.top, DesignTokens.space2)
             }
 
@@ -202,6 +203,15 @@ extension MacPlayerView {
         .padding(.top, DesignTokens.space24)
         .padding(.horizontal, DesignTokens.space32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 播放区宽度上报：窄面板降档（控制行间距 / 音量滑杆宽度）的依据
+        .background(
+            GeometryReader { geometry in
+                Color.clear.preference(key: PlayerSectionWidthKey.self, value: geometry.size.width)
+            }
+        )
+        .onPreferenceChange(PlayerSectionWidthKey.self) { width in
+            playerSectionWidth = width
+        }
         .onChange(of: player.isPlaying) { _, _ in
             updateSpectrumTap()
         }
@@ -268,5 +278,35 @@ extension MacPlayerView {
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
         sleepTimerEndDate = nil
+    }
+
+    // MARK: - 窄面板降档（2026-11-17 用户报：缩窗后播放元素被裁出可视区）
+
+    /// 面板窄于此宽度时控制行降档：间距 24 → 8（图标本身不缩，只有间距与音量滑杆让位）
+    private static let playerSectionCompactWidth: CGFloat = 640
+    /// 面板再窄于此宽度时音量滑杆再收一档
+    private static let playerSectionTightWidth: CGFloat = 520
+
+    /// 播放控制行间距：常规 24 / 紧凑 8
+    private var transportControlsSpacing: CGFloat {
+        playerSectionWidth > 0 && playerSectionWidth < Self.playerSectionCompactWidth
+            ? DesignTokens.space8
+            : DesignTokens.space24
+    }
+
+    /// 音量滑杆宽度上限：常规 100 / 窄面板 48（内部还可压缩到 44）
+    private var volumeSliderMaxWidth: CGFloat {
+        playerSectionWidth > 0 && playerSectionWidth < Self.playerSectionTightWidth
+            ? DesignTokens.space48
+            : DesignTokens.space100
+    }
+}
+
+/// 播放区宽度上报（PreferenceKey 而非各控件各挂 GeometryReader）
+private struct PlayerSectionWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
