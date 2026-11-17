@@ -260,7 +260,7 @@ TraditionalToSimplified.tsv[CL6L]: F:繁体→简体字形映射表（TSV 逐字
 AppIntentVocabulary.plist[FL4T]: F:英文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/QQPlayerApp.swift | A:- | S:IntentName 须为系统 INIntent 类名；词表仅辅助识别，不改 Intent 路由
 AppShortcuts.strings[FL4T]: F:英文 App Shortcuts Siri 调用短语（key 即短语，${applicationName} 为 App 名占位符） | R:code:QQPlayer/Resources/zh-Hans.lproj/AppShortcuts.strings | A:- | S:key 必须与 QQPlayerAppShortcuts.swift 的短语逐字一致，否则 Siri 认不出
 InfoPlist.strings[FL3T]: F:英文 Info.plist 权限文案本地化（相机=扫码配对、本地网络=发现同网设备） | R:code:QQPlayer/Resources/zh-Hans.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致（改单边会静默回退 base 文案）
-Localizable.strings[FL6L]: F:en 界面文案表（1106 键），键集与其余 7 语种逐一相等；含语言选择 language/language_follow_system | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致
+Localizable.strings[FL6L]: F:en 界面文案表（1106 键），键集与其余 7 语种逐一相等；含语言选择 language/language_follow_system | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类，2026-11-17 由 Display 改名），别当重复值修掉
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/fr.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:法文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
@@ -278,7 +278,7 @@ Localizable.strings[FL6L]: F:ru 界面文案表（1106 键），键集与其余 
 AppIntentVocabulary.plist[FL4T]: F:简体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:简体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（${applicationName} 占位符保留）
 InfoPlist.strings[FL3T]: F:简体中文 Info.plist 权限文案本地化（相机扫码配对、本地网络发现设备） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1106 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省
+Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1106 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hant.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:繁体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
