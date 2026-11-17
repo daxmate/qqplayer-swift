@@ -84,6 +84,27 @@ enum MacLibraryRoot {
         }
         return root
     }
+
+    /// 艺人本地照片：`<曲库根>/artists/<艺人名>.jpg|jpeg|png`（存在才返回 URL）。
+    ///
+    /// **纯本地**（不起网络请求）。存在性判定留在本文件——「曲库根的文件存在性判定
+    /// 只在本文件」是既有口径，别处再写一份 = 又一个事实源。
+    /// 文件名由 `MacArtistAvatarStyle.sanitizedFileName` 清洗（去 `/` `:` 等非法字符）；
+    /// 大小写不敏感匹配依赖 macOS 默认文件系统语义，不额外扫描目录。
+    static func artistPhotoURL(forArtistName name: String) -> URL? {
+        let fileName = MacArtistAvatarStyle.sanitizedFileName(for: name)
+        guard !fileName.isEmpty else { return nil }
+        let directory = resolvedRootURL.appendingPathComponent("artists", isDirectory: true)
+        for ext in ["jpg", "jpeg", "png"] {
+            let candidate = directory
+                .appendingPathComponent(fileName)
+                .appendingPathExtension(ext)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        return nil
+    }
 }
 
 // MARK: - 曲库内容搬迁（更换曲库位置时的拷贝）

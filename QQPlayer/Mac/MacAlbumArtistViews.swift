@@ -174,9 +174,13 @@ struct MacArtistListView: View {
             Button {
                 openArtist(artist)
             } label: {
-                HStack {
-                    Image(systemName: "music.mic")
-                        .foregroundColor(.secondary)
+                HStack(spacing: DesignTokens.space12) {
+                    // 三级回退头像：本地照片 → 代表曲目拼贴 → 首字符色块
+                    MacArtistAvatar(
+                        artistName: artist.name,
+                        tracks: facts.artistArtworkTracks(for: artist),
+                        size: 40
+                    )
                     Text(ArtistNameNormalizer.displayName(artist.name))
                         .lineLimit(1)
                     Spacer()
@@ -184,9 +188,14 @@ struct MacArtistListView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                .frame(minHeight: 48)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+        }
+        .task {
+            // 头像代表曲目：一次批量预取（审计 M2：禁止逐行查库）；已查过的 id 不重取
+            await facts.prefetchArtistArtworkTracks(artistIds: artists.compactMap(\.id))
         }
         .alert("error".localized, isPresented: openErrorBinding) {
             Button(Localized.ok, role: .cancel) { openError = nil }
@@ -198,6 +207,7 @@ struct MacArtistListView: View {
                 MacArtistDetailSheet(
                     artist: artist,
                     tracks: artistTracks,
+                    avatarTracks: facts.artistArtworkTracks(for: artist),
                     artistNameResolver: artistNameResolver,
                     onPlay: { onPlayArtist(artist, artistTracks) }
                 )
@@ -230,6 +240,8 @@ struct MacArtistListView: View {
 struct MacArtistDetailSheet: View {
     let artist: Artist
     let tracks: [Track]
+    /// 头像拼贴用的代表曲目（≤4 条有封面曲目；空 → 头像走首字符色块）
+    var avatarTracks: [Track] = []
     let artistNameResolver: (Track) -> String?
     let onPlay: () -> Void
 
@@ -237,7 +249,12 @@ struct MacArtistDetailSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.space12) {
-            HStack {
+            HStack(spacing: DesignTokens.space12) {
+                MacArtistAvatar(
+                    artistName: artist.name,
+                    tracks: avatarTracks,
+                    size: 96
+                )
                 Text(ArtistNameNormalizer.displayName(artist.name))
                     .font(.title2)
                     .fontWeight(.bold)

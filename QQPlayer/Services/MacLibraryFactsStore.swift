@@ -100,6 +100,9 @@ final class MacLibraryFactsStore {
         var albumFacts: (Int64) async -> AlbumFacts
         var artistTrackCount: (Int64) async -> Int
         var playlistFacts: (Int64) async -> PlaylistFacts
+        /// 批量取「每个艺人最多 4 条有封面曲目」（一次查询，按 artistId 分组）。
+        /// 默认空实现：既有测试构造器不用改（`live` 里注入真实实现）。
+        var artistArtworkTracks: ([Int64]) async -> [Int64: [Track]] = { _ in [:] }
 
         static var live: Loader {
             Loader(
@@ -123,15 +126,46 @@ final class MacLibraryFactsStore {
                         try? DatabaseManager.shared.getTrack(byStableId: $0.trackStableId)
                     }
                     return PlaylistFacts(itemCount: items.count, representativeTrack: track)
+                },
+                artistArtworkTracks: { artistIds in
+                    guard !artistIds.isEmpty else { return [:] }
+                    // 一次批量查询覆盖全部入参艺人（禁止逐艺人循环查库）
+                    let tracks = (try? DatabaseManager.shared.getTracksByArtistIds(artistIds)) ?? []
+                    return MacLibraryFactsStore.artistArtworkGroups(tracks: tracks)
                 }
             )
         }
+    }
+
+    /// 每艺人 ≤4 条**有封面**代表曲目（头像拼贴用；只由批量预取写入，读路径只查）。
+    ///
+    /// 成员含义：键存在 = 该艺人已查过（值可能为空数组，表示「确实没有带封面的曲目」，
+    /// 用于避免反复查库）；键不存在 = 还没查过。
+    nonisolated static func artistArtworkGroups(
+        tracks: [Track],
+        artistIds: [Int64] = [],
+        limit: Int = 4
+    ) -> [Int64: [Track]] {
+        var groups: [Int64: [Track]] = [:]
+        for id in artistIds {
+            groups[id] = []
+        }
+        for track in tracks where track.hasEmbeddedArt {
+            guard let artistId = track.artistId else { continue }
+            var list = groups[artistId] ?? []
+            guard list.count < limit else { continue }
+            list.append(track)
+            groups[artistId] = list
+        }
+        return groups
     }
 
     private let loader: Loader
     private var albumFactsById: [Int64: AlbumFacts] = [:]
     private var artistTrackCountById: [Int64: Int] = [:]
     private var playlistFactsById: [Int64: PlaylistFacts] = [:]
+    /// 艺人头像代表曲目（每艺人 ≤4 条；见 `artistArtworkGroups`）
+    private var artistArtworkTracksById: [Int64: [Track]] = [:]
     /// 在途补齐的 key（防同一 id 重复取数）；**只由显式补齐写**，读路径不碰。
     private var inFlight: Set<String> = []
     /// 代号：`invalidate` 递增 → 失效前发出的在途补齐结果丢弃（见 `refill` 的代号收口）
@@ -161,6 +195,16 @@ final class MacLibraryFactsStore {
         artistTrackCountById[id] ?? 0
     }
 
+    /// 头像拼贴用的代表曲目（≤4 条有封面曲目）。**只读缓存**：未预取到 → 空数组 → 头像走首字符色块。
+    func artistArtworkTracks(for artist: Artist) -> [Track] {
+        guard let id = artist.id else { return [] }
+        return artistArtworkTracks(forArtistId: id)
+    }
+
+    func artistArtworkTracks(forArtistId id: Int64) -> [Track] {
+        artistArtworkTracksById[id] ?? []
+    }
+
     func playlistFacts(for playlist: Playlist) -> PlaylistFacts {
         guard let id = playlist.id else { return PlaylistFacts() }
         return playlistFacts(forPlaylistId: id)
@@ -186,7 +230,12 @@ final class MacLibraryFactsStore {
             albumIds: Set(albums.compactMap(\.id) + tracks.compactMap(\.albumId)),
             artistIds: Set(artists.compactMap(\.id)),
             playlistIds: Set(playlists.compactMap(\.id)),
-            onlyMissing: false
+            onlyMissing: false,
+            // 头像代表曲目：同批曲目在内存里一次分组（零额外查询）
+            artistArtworkTracks: Self.artistArtworkGroups(
+                tracks: tracks,
+                artistIds: artists.compactMap(\.id)
+            )
         )
     }
 
@@ -199,6 +248,32 @@ final class MacLibraryFactsStore {
             playlistIds: Set(playlistIds),
             onlyMissing: true
         )
+    }
+
+    /// 艺人列表 `.task` 调用：一次批量补齐「还没查过」的艺人代表曲目。
+    ///
+    /// 性能红线（审计 M2）：**一次** `loader.artistArtworkTracks(claimed)`（内部单条 SQL），
+    /// 绝不逐行查库；已查过的 id（含「确实没有带封面曲目」的空结果）不重取。
+    /// ⚠️ 只许在非渲染期调用（`.task` / 变更通知回调），读路径不调度。
+    func prefetchArtistArtworkTracks(artistIds: [Int64]) async {
+        var claimed: [Int64] = []
+        for id in Set(artistIds).sorted() {
+            guard artistArtworkTracksById[id] == nil else { continue }
+            guard inFlight.insert("artistArtwork-\(id)").inserted else { continue }
+            claimed.append(id)
+        }
+        guard !claimed.isEmpty else { return }
+        defer {
+            claimed.forEach { inFlight.remove("artistArtwork-\($0)") }
+        }
+
+        let generation = self.generation
+        let groups = await loader.artistArtworkTracks(claimed)
+        // 代号收口：取数期间发生过 invalidate → 结果基于过期快照，丢弃（沿用旧值，不闪空）
+        guard generation == self.generation else { return }
+        for id in claimed {
+            artistArtworkTracksById[id] = groups[id] ?? []
+        }
     }
 
     /// 曲库数据变化：递增代号并在途补齐作废。**不清空已发布值**——
@@ -223,7 +298,8 @@ final class MacLibraryFactsStore {
         albumIds: Set<Int64>,
         artistIds: Set<Int64>,
         playlistIds: Set<Int64>,
-        onlyMissing: Bool
+        onlyMissing: Bool,
+        artistArtworkTracks: [Int64: [Track]] = [:]
     ) async {
         var claimedAlbums: [Int64] = []
         var claimedArtists: [Int64] = []
@@ -274,6 +350,9 @@ final class MacLibraryFactsStore {
         }
         for (id, facts) in playlistFacts {
             playlistFactsById[id] = facts
+        }
+        for (id, tracks) in artistArtworkTracks {
+            artistArtworkTracksById[id] = tracks
         }
     }
 }

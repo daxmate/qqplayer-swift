@@ -43,6 +43,8 @@ private enum FactsReadPathContract {
         "albumFacts(forAlbumId",
         "artistTrackCount(for artist:",
         "artistTrackCount(forArtistId",
+        "artistArtworkTracks(for artist:",
+        "artistArtworkTracks(forArtistId",
         "playlistFacts(for playlist:",
         "playlistFacts(forPlaylistId",
         "albumTitle(forTrack",
