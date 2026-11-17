@@ -115,9 +115,33 @@ extension MacLyricsView {
                 .onAppear {
                     guard let activeIndex else { return }
                     lastFollowedIndex = activeIndex
-                    proxy.scrollTo(activeIndex, anchor: .center)
+                    // 首帧滚动：面板高度可能来自窗口尺寸 / 记忆值，当帧布局尚未落定
+                    // → 下一轮主队列再滚（避免首屏高亮行偏出中心，2026-11-17）
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(activeIndex, anchor: .center)
+                    }
+                }
+                // 面板尺寸变化（窗口缩放 / 拖分隔条 / 记忆高度恢复）：把当前行重锚回中心
+                .onChange(of: geometry.size) { _, _ in
+                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
                 }
             }
+        }
+    }
+
+    /// 面板尺寸变化后把当前行重锚回中心（2026-11-17 修复：窗口缩放 / 拖分隔条后高亮行漂出可见区）。
+    ///
+    /// 成因：歌词内容底部占位 = 视口高/2 - 40，面板高度一变内容高度就跟着变，而 `NSScrollView`
+    /// 的 `contentOffset` 不会随内容高度修正 ⇒ 高亮行相对视口漂移，面板变矮时会被挤出可见区。
+    /// 跟随语义与「行变化回中」一致：普通模式阅读态（手动滚动后）不拉回用户位置；跟唱等 AB
+    /// 终点（`ab.b == nil`）时同样暂停。resize 路径不带动画——几何每帧都在变，动画会叠加成抖动。
+    private func reanchorAfterPanelResize(proxy: ScrollViewProxy, activeIndex: Int?) {
+        guard let activeIndex else { return }
+        if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
+        if !karaoke.isKaraokeOn, !isFollowing { return }
+        // 几何变化当帧内容尚未按新尺寸重排：下一轮主队列再滚，才滚到新布局的中心
+        DispatchQueue.main.async {
+            proxy.scrollTo(activeIndex, anchor: .center)
         }
     }
 
