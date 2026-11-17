@@ -27,7 +27,12 @@ enum MacArtworkResolver {
 
 /// 固定尺寸封面缩略图：异步加载 + 占位图标兜底。
 struct MacArtworkThumbnail: View {
-    @Environment(AppServices.self) private var services
+    /// 环境缺失时回退到 App 级单例：非可选 `@Environment(T.self)` 在**未注入**的宿主里
+    /// 会直接 `_assertionFailure`（2026-11-17 预览版崩溃：No Observable object of
+    /// type AppServices found）；所有注入点注入的都是 `AppServices.live` 同一实例，
+    /// 故回退语义等价，只是把 fatal trap 换成可用。
+    @Environment(AppServices.self) private var injectedServices: AppServices?
+    private var services: AppServices { injectedServices ?? AppServices.live }
     let track: Track?
     let size: CGFloat
     var cornerRadius: CGFloat = 8
@@ -97,7 +102,12 @@ struct MacArtworkThumbnailFill: View {
 /// 智能歌单卡片封面：最多 4 张曲目封面 2x2 拼贴（对齐 web 版/iOS 拼贴），
 /// 单曲退化为单图，无图显示占位图标。
 struct MacArtworkCollage: View {
-    @Environment(AppServices.self) private var services
+    /// 环境缺失时回退到 App 级单例：非可选 `@Environment(T.self)` 在**未注入**的宿主里
+    /// 会直接 `_assertionFailure`（2026-11-17 预览版崩溃：No Observable object of
+    /// type AppServices found）；所有注入点注入的都是 `AppServices.live` 同一实例，
+    /// 故回退语义等价，只是把 fatal trap 换成可用。
+    @Environment(AppServices.self) private var injectedServices: AppServices?
+    private var services: AppServices { injectedServices ?? AppServices.live }
     let tracks: [Track]
     let size: CGFloat
     var cornerRadius: CGFloat = 8

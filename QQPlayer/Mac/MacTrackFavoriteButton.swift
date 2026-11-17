@@ -14,7 +14,10 @@
 import SwiftUI
 
 struct MacTrackFavoriteButton: View {
-    @Environment(AppCoordinator.self) private var appCoordinator
+    /// 非可选 `@Environment(T.self)` 在未注入的宿主里会 `_assertionFailure` 崩；
+    /// 宿主注入的正是 `AppCoordinator.shared`，回退语义等价（2026-11-17 崩溃防御）。
+    @Environment(AppCoordinator.self) private var injectedCoordinator: AppCoordinator?
+    private var appCoordinator: AppCoordinator { injectedCoordinator ?? .shared }
     @Environment(\.appAccentColor) private var appAccentColor
 
     let track: Track
