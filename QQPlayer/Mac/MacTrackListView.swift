@@ -251,6 +251,14 @@ struct MacTrackListView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                // 当前播放行的整行底色：写到所在 NSTableRowView 上（跨列连续），
+                // 不再逐格铺（列间距会把底色切成几段）。找不到行视图时没有底色。
+                .background(
+                    MacTableRowHighlight(
+                        isActive: row.track.stableId == activeTrackId,
+                        tint: appAccentColor.opacity(MacTrackListMetrics.activeRowTintOpacity)
+                    )
+                )
             }
             .width(MacTrackListMetrics.indexColumnWidth)
 
@@ -411,9 +419,9 @@ struct MacTrackListView: View {
 
     // MARK: - 行内视觉（2026-11-16 视觉增强）
 
-    /// 单元格公共外壳：铺满单元格 + 当前播放行底色 + 悬停上报。
-    /// Table 没有「整行背景」API，整行底色只能逐格铺（每格都铺满，行内才连续）；
-    /// 若某版本出现格间断带，先看这里的 frame 是否被列宽挤掉。
+    /// 单元格公共外壳：铺满单元格 + 悬停上报。
+    /// 当前播放行的整行底色不在这里铺（逐格 `.background` 会被列间距切成几段），
+    /// 改由序号列挂 `MacTableRowHighlight` 写到所在 `NSTableRowView` 上。
     private func cellChrome<Content: View>(
         _ row: MacTrackTableRow,
         alignment: Alignment = .leading,
@@ -421,16 +429,9 @@ struct MacTrackListView: View {
     ) -> some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
-            .background(activeRowTint(for: row))
             .onHover { inside in
                 reportHover(row.id, inside: inside)
             }
-    }
-
-    private func activeRowTint(for row: MacTrackTableRow) -> Color {
-        row.track.stableId == activeTrackId
-            ? appAccentColor.opacity(MacTrackListMetrics.activeRowTintOpacity)
-            : .clear
     }
 
     /// 悬停上报：单元格各有独立 hover 区，父视图只认唯一「当前悬停行」。
