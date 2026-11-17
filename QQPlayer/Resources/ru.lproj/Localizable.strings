@@ -139,7 +139,7 @@
 "settings_category_appearance" = "Оформление";
 "settings_category_about" = "О программе";
 "settings_category_lyrics" = "Текст";
-"lyrics_display" = "Отображение";
+"lyrics_display" = "Текст песни";
 "lyrics_font_size" = "Размер текста";
 "lyrics_show_translation" = "Показывать перевод";
 "lyrics_show_roman" = "Показывать ромадзи";

@@ -155,7 +155,7 @@
 "settings_category_appearance" = "모양";
 "settings_category_about" = "정보";
 "settings_category_lyrics" = "가사";
-"lyrics_display" = "표시";
+"lyrics_display" = "가사";
 "lyrics_font_size" = "가사 글자 크기";
 "lyrics_show_translation" = "번역 표시";
 "lyrics_show_roman" = "로마자 표기 표시";
