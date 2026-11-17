@@ -24,9 +24,9 @@ extension MacSearchAnythingLayer {
     func songRow(_ track: Track) -> some View {
         let isSelected = selectedSongId == track.stableId
         return HStack(spacing: DesignTokens.space10) {
-            Image(systemName: "music.note")
-                .foregroundColor(.secondary)
-                .frame(width: 14)
+            // 行内封面：复用全项目唯一入口 MacArtworkThumbnail（不新写异步加载 / 缓存），
+            // 与曲库歌曲列表视觉对齐（28pt / radius4）。
+            MacArtworkThumbnail(track: track, size: 28, cornerRadius: DesignTokens.radius4)
             Text(track.displayTitle).lineLimit(1)
             if let artist = artistNameResolver(track) {
                 Text(artist)
@@ -36,7 +36,8 @@ extension MacSearchAnythingLayer {
             Spacer()
         }
         .padding(.horizontal, DesignTokens.space12)
-        .padding(.vertical, DesignTokens.space4)
+        // 28pt 封面撑高行：上下留白 4 → 2，行高只比原图标行略高（不夸张）
+        .padding(.vertical, DesignTokens.space2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.radius4)
