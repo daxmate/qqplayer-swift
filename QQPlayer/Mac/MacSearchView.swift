@@ -221,16 +221,20 @@ private struct MacSearchSongRow: View {
     // 行内不再是 Button（否则点击会直接播放，且吞掉选中手势）
     var body: some View {
         HStack(spacing: DesignTokens.space8) {
-            Group {
-                if isActive {
-                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                        .foregroundColor(appAccentColor)
-                } else {
-                    Image(systemName: "music.note")
-                        .foregroundColor(.secondary)
+            // 行内封面：复用全项目唯一入口 MacArtworkThumbnail（与曲库列表 / ⌘K 浮层对齐）。
+            // 正在播放的行在封面右下角叠一个小喇叭角标，替代原来的整列图标。
+            MacArtworkThumbnail(track: track, size: 28, cornerRadius: DesignTokens.radius4)
+                .overlay(alignment: .bottomTrailing) {
+                    if isActive {
+                        Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(appAccentColor)
+                            .padding(2)
+                            .background(Circle().fill(Color(nsColor: .windowBackgroundColor)))
+                            .offset(x: 3, y: 3)
+                    }
                 }
-            }
-            .frame(width: 16)
+                .frame(width: 28)
 
             Text(track.displayTitle)
                 .lineLimit(1)
