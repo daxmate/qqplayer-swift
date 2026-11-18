@@ -98,7 +98,8 @@ struct MacTrackListView: View {
 
     /// 曲库卡片事实缓存（审计 M2：body 里的同步全量 DB 查询→缓存/异步）
     @Environment(MacLibraryFactsStore.self) private var facts
-    /// 收藏切换（行尾 ♥）：走全项目唯一入口 AppCoordinator.toggleFavorite
+    // 行尾 ♥ 收藏切换唯一入口；行内容 hosting 不继承环境 → 本视图取到后显式传参
+    @Environment(AppCoordinator.self) private var appCoordinator
     @State private var selectedRows = Set<String>()
     /// 批量刮削（右键多选 >1）——.sheet(item:) 直接驱动，见文件头注释
     @State private var batchScrapeRequest: BatchScrapeRequest?
@@ -450,7 +451,7 @@ struct MacTrackListView: View {
     private func favoriteToggle(for row: MacTrackTableRow) -> some View {
         let isFavorite = menu.favoriteIds.contains(row.track.stableId)
         if isFavorite || hoveredTrackId == row.id {
-            MacTrackFavoriteButton(track: row.track, isFavorite: isFavorite)
+            MacTrackFavoriteButton(appCoordinator: appCoordinator, track: row.track, isFavorite: isFavorite)
         }
     }
 

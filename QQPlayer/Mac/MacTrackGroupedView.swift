@@ -190,6 +190,8 @@ struct MacTrackGroupDimensionPicker: View {
 /// 本模式保留双击播放 + 悬停 ♥（详情 / 标签编辑等从 list 模式进入）。
 struct MacTrackGroupedListView: View {
     @Environment(\.appAccentColor) private var appAccentColor
+    /// 收藏切换唯一入口：行尾 ♥ 由宿主取环境后显式传入按钮（按钮本身不读环境，见其文件头）
+    @Environment(AppCoordinator.self) private var appCoordinator
 
     /// 已按当前排序排好的曲目（= 列表 displayedRows 的顺序）
     let tracks: [Track]
@@ -327,7 +329,7 @@ struct MacTrackGroupedListView: View {
                 .monospacedDigit()
                 .foregroundColor(.secondary)
             if isFavorite || isHovered {
-                MacTrackFavoriteButton(track: track, isFavorite: isFavorite)
+                MacTrackFavoriteButton(appCoordinator: appCoordinator, track: track, isFavorite: isFavorite)
             }
         }
         .padding(.horizontal, DesignTokens.space12)

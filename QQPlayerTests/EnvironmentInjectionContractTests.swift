@@ -502,6 +502,35 @@ struct EnvironmentInjectionContractTests {
         // 装配整行缺失 → 顺序契约不管（由契约 (a) 负责）
         #expect(violation("ContentView()\n" + toastLine + "\n") == nil)
     }
+
+    @Test("(d) 行内容 hosting 的共享收藏按钮：AppCoordinator 必须显式传入，禁止读环境（2026-11-18 闪崩）")
+    func rowHostedFavoriteButtonTakesCoordinatorExplicitly() throws {
+        let path = "QQPlayer/Mac/MacTrackFavoriteButton.swift"
+        let source = try EnvironmentInjectionContract.rootSource(path)
+        // 只判代码行：注释里说明「禁止的写法」不算违规。
+        let code = source
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { EnvironmentInjectionContract.stripped(String($0)) }
+            .joined(separator: "\n")
+
+        #expect(
+            code.contains("@Environment(AppCoordinator.self)") == false,
+            """
+            MacTrackFavoriteButton 又改回了 @Environment(AppCoordinator.self)。
+            该视图被放进 Table 行内容 hosting，那里不保证继承外层 SwiftUI 环境 ——
+            2026-11-18 xhome 实测 5 次 Fatal error: No Observable object of type AppCoordinator found。
+            必须保留 `let appCoordinator: AppCoordinator` 由宿主显式传入。
+            """
+        )
+        #expect(
+            code.contains("appCoordinator: AppCoordinator"),
+            """
+            MacTrackFavoriteButton 缺少显式依赖 `appCoordinator: AppCoordinator`。
+            行内容 hosting 拿不到继承环境，AppCoordinator 必须由宿主
+            （MacTrackListView / MacTrackGroupedListView）从自己的环境取到后传参。
+            """
+        )
+    }
 }
 
 @Suite("手工 hosting 根装配契约（NSHostingView 承载的视图 ⟹ 构造方必须自己装配环境）")
