@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-18T00:20:19Z",
+  "updated_at": "2026-11-18T00:41:08Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -1100,15 +1100,15 @@
     },
     "QQPlayer/Mac/MacTrackFavoriteButton.swift": {
       "role": "index",
-      "sha256": "8c6c281765255e8cf6898c6c7d5e39fafdffbc7e631556eb37b7854e31e4d8a1",
-      "size": 1506,
-      "normalized_sha256": "8c6c281765255e8cf6898c6c7d5e39fafdffbc7e631556eb37b7854e31e4d8a1"
+      "sha256": "4d252aa56e8e470d0a355feb163d9e8d294eb9186fec6857235aecea119bd5a8",
+      "size": 2161,
+      "normalized_sha256": "4d252aa56e8e470d0a355feb163d9e8d294eb9186fec6857235aecea119bd5a8"
     },
     "QQPlayer/Mac/MacTrackGroupedView.swift": {
       "role": "index",
-      "sha256": "c54044d5f39321e5f626e1b610cf7ae387486d7eb01ae82a322ba59163bc90af",
-      "size": 16369,
-      "normalized_sha256": "c54044d5f39321e5f626e1b610cf7ae387486d7eb01ae82a322ba59163bc90af"
+      "sha256": "61823f478d2b99857ebc9e7c242ec6a665ccce7c97ce15c6b2ea0db789e75dbb",
+      "size": 16600,
+      "normalized_sha256": "61823f478d2b99857ebc9e7c242ec6a665ccce7c97ce15c6b2ea0db789e75dbb"
     },
     "QQPlayer/Mac/MacTrackListView+LocateScroll.swift": {
       "role": "index",
@@ -1118,9 +1118,9 @@
     },
     "QQPlayer/Mac/MacTrackListView.swift": {
       "role": "index",
-      "sha256": "fbd9cce12d2431b66cb7b0e0bc327509a962473783a291e15e977d6f64070956",
-      "size": 28961,
-      "normalized_sha256": "fbd9cce12d2431b66cb7b0e0bc327509a962473783a291e15e977d6f64070956"
+      "sha256": "addf29327722b7156475d1dde8bc992cfb0b2f2e4c83079a6285d50167d9109c",
+      "size": 29078,
+      "normalized_sha256": "addf29327722b7156475d1dde8bc992cfb0b2f2e4c83079a6285d50167d9109c"
     },
     "QQPlayer/Mac/MacVisualizerView.swift": {
       "role": "index",
@@ -4130,9 +4130,9 @@
     },
     "QQPlayerTests/EnvironmentInjectionContractTests.swift": {
       "role": "index",
-      "sha256": "3b18cc6968b5c8b47f53a362439c0b241e568dd75e512428befebdf0e1a7ea92",
-      "size": 34483,
-      "normalized_sha256": "3b18cc6968b5c8b47f53a362439c0b241e568dd75e512428befebdf0e1a7ea92"
+      "sha256": "8aca67d0134e3a7fb446c8c61bb9d77e0434690dfd52276a99f5dd5483d326e4",
+      "size": 36025,
+      "normalized_sha256": "8aca67d0134e3a7fb446c8c61bb9d77e0434690dfd52276a99f5dd5483d326e4"
     },
     "QQPlayerTests/FavoriteBatchLogicTests.swift": {
       "role": "index",
@@ -5420,9 +5420,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "0fce374476840c4462f1abda564e6af89657de31680906498f31d8143f85454e",
-      "size": 425201,
-      "normalized_sha256": "0fce374476840c4462f1abda564e6af89657de31680906498f31d8143f85454e"
+      "sha256": "6e70ebcb5b063e03fcf0564ebb528e15aec96246dcfd3d4e0ce622ea2588bc8c",
+      "size": 425413,
+      "normalized_sha256": "6e70ebcb5b063e03fcf0564ebb528e15aec96246dcfd3d4e0ce622ea2588bc8c"
     },
     "aoci.meta.txt": {
       "role": "index",
