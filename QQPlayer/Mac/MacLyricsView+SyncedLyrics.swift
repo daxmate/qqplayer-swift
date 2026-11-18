@@ -17,6 +17,12 @@ extension MacLyricsView {
     func syncedView(_ lines: [LyricsLine]) -> some View {
         // 歌词轴时间（音频时间 - offset，web lyricTime 语义）：高亮行与跟唱 tick 同轴
         let activeIndex = LyricTiming.activeLineIndex(time: currentTime - lyricOffset, in: lines)
+        // 拖动分隔条时的顶部补偿（方案 A）：跟随态下补 delta/2，使文字在屏幕上不动
+        let resizePinInset = MacPlaybackGate.lyricsResizePinInset(
+            isResizing: isPanelResizing,
+            isFollowing: isFollowing,
+            heightDelta: panelResizeDelta
+        )
         return GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ZStack {
@@ -63,6 +69,10 @@ extension MacLyricsView {
                             Spacer()
                                 .frame(height: max(geometry.size.height / 2 - 40, 0))
                         }
+                        // 拖动分隔条时的顶部补偿（方案 A；非拖动/非跟随恒为 0）：
+                        // 用 padding 而非撑高 Spacer——面板拖到最矮时 Spacer 会触零截断，
+                        // 负补偿必须能继续把内容上提，否则底部大位移会残留漂移。
+                        .padding(.top, resizePinInset)
                     }
                     // 面板内不禁用滚动：Mac 无 iOS 的手势冲突，用户可手动翻，行变化时回中心
 
@@ -122,8 +132,20 @@ extension MacLyricsView {
                     }
                 }
                 // 面板尺寸变化（窗口缩放 / 拖分隔条 / 记忆高度恢复）：把当前行重锚回中心
+                // 拖动中跳过（补偿占位负责让文字不动），松手后统一重锚一次
                 .onChange(of: geometry.size) { _, _ in
+                    guard !isPanelResizing else { return }
                     reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                }
+                // 松手：补偿占位以 spring 归零，数学上恰好把当前行送到新面板中心
+                // （顶部占位 = 视口高/2 - 40 ⇒ Δ/2 归零 = 屏幕中心上移 Δ/2）。
+                // 兜底：动画结束后再对齐一次，修「拖动期间切句」造成的偏移；正常路径是空操作，
+                // 因此不会和归零动画叠加成两倍位移（2026-11-18）。
+                .onChange(of: isPanelResizing) { wasResizing, resizing in
+                    guard wasResizing, !resizing else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                    }
                 }
             }
         }
@@ -137,6 +159,8 @@ extension MacLyricsView {
     /// 终点（`ab.b == nil`）时同样暂停。resize 路径不带动画——几何每帧都在变，动画会叠加成抖动。
     private func reanchorAfterPanelResize(proxy: ScrollViewProxy, activeIndex: Int?) {
         guard let activeIndex else { return }
+        // 拖动中不重锚：补偿占位负责让文字不动（2026-11-18）
+        guard !isPanelResizing else { return }
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
         if !karaoke.isKaraokeOn, !isFollowing { return }
         // 几何变化当帧内容尚未按新尺寸重排：下一轮主队列再滚，才滚到新布局的中心

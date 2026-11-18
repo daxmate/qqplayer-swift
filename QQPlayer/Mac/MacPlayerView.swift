@@ -66,6 +66,8 @@ struct MacPlayerView: View {
     @State private var lyricsPanelHeight: CGFloat = 330
     /// 分隔条拖动起始高度（拖动中非 nil）
     @State private var dragStartPanelHeight: CGFloat?
+    /// 分隔条拖动中（驱动歌词文字补偿，松手复位；2026-11-18）
+    @State private var isLyricsPanelResizing = false
     /// 歌词面板高度持久化 key
     private static let lyricsPanelHeightKey = "QQPlayer.lyricsPanelHeight"
     /// 播放区可用宽度（窄面板降档用；由 `playerSection` 背景几何量一次，2026-11-17）。
@@ -107,7 +109,10 @@ struct MacPlayerView: View {
                     },
                     // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
                     onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
-                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil
+                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil,
+                    // 拖动分隔条时补正歌词文字（2026-11-18 方案 A）：非拖动时 delta 必为 0
+                    isPanelResizing: isLyricsPanelResizing,
+                    panelResizeDelta: lyricsPanelHeight - (dragStartPanelHeight ?? lyricsPanelHeight)
                 )
                 .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
             }
@@ -286,6 +291,7 @@ struct MacPlayerView: View {
                     if dragStartPanelHeight == nil {
                         dragStartPanelHeight = lyricsPanelHeight
                     }
+                    isLyricsPanelResizing = true
                     // 向上拖 = 歌词变高；clamp 数学上收 MacPlaybackGate（有测试）
                     let start = dragStartPanelHeight ?? lyricsPanelHeight
                     lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
@@ -300,8 +306,12 @@ struct MacPlayerView: View {
                         lyricsPanelHeight,
                         containerHeight: containerHeight
                     )
-                    dragStartPanelHeight = nil
                     UserDefaults.standard.set(Double(lyricsPanelHeight), forKey: Self.lyricsPanelHeightKey)
+                    // 松手：补偿占位与重锚共用一条 spring 收尾，避免先跳再回中（2026-11-18）
+                    withAnimation(MacLyricsView.lyricAnimation) {
+                        isLyricsPanelResizing = false
+                        dragStartPanelHeight = nil
+                    }
                 }
         )
     }

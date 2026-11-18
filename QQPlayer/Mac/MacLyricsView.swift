@@ -31,6 +31,11 @@ struct MacLyricsView: View {
     /// 恢复原歌词时间轴（nil = 不显示）
     var onRevertTimeline: (() -> Void)?
 
+    /// 宿主的分隔条拖动中（2026-11-18 方案 A）；默认 false 保证其它调用点 / 预览不变
+    var isPanelResizing: Bool = false
+    /// 拖动中相对起始高度的净变化（非拖动为 0；向上拖/变高为正）
+    var panelResizeDelta: CGFloat = 0
+
     /// 分片：跨文件可见（原 private）
     @Environment(KaraokeController.self) var karaoke
 
