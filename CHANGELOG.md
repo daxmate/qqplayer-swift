@@ -7,6 +7,7 @@
 ### 🐛 修复
 
 - **iOS 歌词时间轴对齐入口不显示**：iOS 曲库文件夹化后 track.path 存的是相对 Documents/Music 的相对路径，而入口判据与开跑前守卫直接拿裸路径做 fileExists / URL(fileURLWithPath:)，恒判「文件不存在」→ 菜单项被整项隐藏（Mac 存绝对路径，故只在 iOS 复现）。判据与音频加载统一改走 LibraryRoot.absoluteURL(forStoredPath:)，并新增守卫测试禁止裸 track.path 做文件存在性判断。
+- **首次对齐偶发「语音识别资源下载失败」**：原逻辑把「系统正在下载（assetInstallationRequest 返回 nil）」和一次瞬时安装失败都当成终态，第一次必失败、第二次才成功。现改为有界等待 + 重试（500ms 轮询 / 120s 预算），状态与底层错误全部落日志；.unsupported 明确报语言不可用。
 
 ## [1.8.1] - 2026-11-19
 

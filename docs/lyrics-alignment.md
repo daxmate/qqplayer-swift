@@ -55,7 +55,7 @@
 ## 系统门槛
 
 - `SpeechAnalyzer` 需要 **iOS 26 / macOS 26**；更低版本抛 `unsupportedSystem`，**不崩**，功能不可用。
-- 首次使用某语言要下载模型（20–40s，需联网，进度回调 0…0.15）；模型不可用 → `assetInstallFailed`。
+- 首次使用某语言要下载模型（20–40s，慢网更久，需联网，进度回调 0…0.15）；App 会等待并在失败时重试，最长 120s 后报资源失败（500ms 轮询 / 120s 预算，状态与底层错误全部落日志）。`assetInstallationRequest` 返回 nil 只表示系统已在下载 / 排队，**不是失败**；`.unsupported` → `localeUnavailable`，预算耗尽才 → `assetInstallFailed`。
 - 音频**必须落文件**再喂 analyzer：内部统一 `AVURLAsset + AVAssetReader
   （outputSettings = 16k/1ch/Int16 LPCM）→ 16k 单声道 Int16 WAV`
   （`NSTemporaryDirectory()/lyric-align-<UUID>.wav`，用完即删），
