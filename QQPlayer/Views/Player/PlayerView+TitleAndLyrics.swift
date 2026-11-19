@@ -31,6 +31,7 @@ extension PlayerView {
 
             HStack(spacing: UIScreen.main.scale < UIScreen.main.nativeScale ? 16 : 20) {
                 likeButton
+                lyricAlignmentButton
                 addToPlaylistButton
             }
         }
@@ -117,6 +118,36 @@ extension PlayerView {
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
                 .foregroundColor(isFavorite ? .red : .primary)
         }
+    }
+
+    /// 歌词时间轴对齐入口（心形右侧）：无同步歌词 / 不可对齐时灰显，点击只给提示、不开跑。
+    /// 可用性判据的唯一实现在 LyricAlignmentActions（与 startAlignment 的守门同源）。
+    private var lyricAlignmentButton: some View {
+        Button(action: openLyricAlignment) {
+            Image(systemName: "waveform.badge.magnifyingglass")
+                .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
+                .foregroundColor(isLyricAlignmentAvailable ? .primary : .secondary)
+        }
+        .accessibilityLabel("lyrics.align.action".localized)
+    }
+
+    /// 当前曲目能否对齐（视图只读结果；判定在 LyricAlignmentActions）。
+    private var isLyricAlignmentAvailable: Bool {
+        guard let track = playerEngine.currentTrack else { return false }
+        return LyricAlignmentActions.canOfferTimelineAnalysis(for: track, lyrics: currentLyrics)
+    }
+
+    /// 可用 → 走既有对齐流程（进度 / 取消 / 回退都在既有 sheet）；不可用 → 顶部提示。
+    private func openLyricAlignment() {
+        guard let track = playerEngine.currentTrack else { return }
+        // 无同步歌词是主因：按钮已灰显，点击只给一句明确提示，不进对齐流程。
+        // 其余不可用情形（系统不支持 / 文件缺失 / 时长 0）交给 startAlignment 把可读失败文案
+        // 写进既有进度 sheet（不在这里另造一套判定）。
+        guard LyricAlignmentFeature.hasSyncedLyrics(currentLyrics) else {
+            showLyricAlignmentUnavailableHint = true
+            return
+        }
+        Task { await LyricAlignmentActions.startAlignment(for: track) }
     }
 
     private var addToPlaylistButton: some View {

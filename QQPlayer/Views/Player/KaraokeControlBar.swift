@@ -19,6 +19,10 @@ struct KaraokeControlBar: View {
     @Environment(PlayerEngine.self) private var playerEngine
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
+    /// 当前歌曲歌词（与播放页同一份 currentLyrics）：对齐按钮可用性判据的输入。
+    let lyrics: Lyrics?
+    /// 对齐不可用提示（无同步歌词）：短暂显示，不打断跟唱
+    @State private var showAlignmentUnavailableHint = false
 
     /// 当前句 index（AB 单击取 A 点）；还没到第一句时为 nil
     private var currentLineIndex: Int? {
@@ -45,6 +49,15 @@ struct KaraokeControlBar: View {
                     .padding(.vertical, DesignTokens.space4)
                     .background(Capsule().fill(.ultraThinMaterial))
             }
+            if showAlignmentUnavailableHint {
+                Text(Localized.lyricAlignmentNoSyncedLyrics)
+                    .font(.caption2.weight(.medium))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, DesignTokens.space12)
+                    .padding(.vertical, DesignTokens.space4)
+                    .background(Capsule().fill(.ultraThinMaterial))
+                    .transition(.opacity)
+            }
 
             // 播放控制三键：上一句 / 播放暂停 / 下一句（歌词行级，用户 2026-08-29 拍板）
             HStack(spacing: DesignTokens.space24) {
@@ -53,13 +66,21 @@ struct KaraokeControlBar: View {
                 nextLineButton
             }
 
+            // 跟唱模式按钮：倍速 / 单句循环 / AB / 歌词对齐（第 4 键只放图标，避免窄机型挤出）
             HStack(spacing: DesignTokens.space10) {
                 speedButton
                 singleLineLoopButton
                 abButton
+                lyricAlignmentButton
             }
         }
         .padding(.vertical, DesignTokens.space6)
+        .animation(.easeInOut(duration: 0.2), value: showAlignmentUnavailableHint)
+        .task(id: showAlignmentUnavailableHint) {
+            guard showAlignmentUnavailableHint else { return }
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            showAlignmentUnavailableHint = false
+        }
     }
 
     // MARK: - 播放控制（上一句 / 播放暂停 / 下一句）
@@ -173,12 +194,43 @@ struct KaraokeControlBar: View {
         .accessibilityHint(NSLocalizedString("karaoke_ab_loop_hint", value: "Tap once to start at the current line, tap a lyric line to set the end; tap again to exit", comment: ""))
     }
 
+    // MARK: - 歌词对齐
+
+    /// 歌词时间轴对齐（第 4 个模式按钮）：可用性判据与播放页共用 LyricAlignmentActions，不另拼一套。
+    /// 窄机型只放图标 + 44pt 最小可点面积，避免 4 个胶囊把一行挤出/截断。
+    private var lyricAlignmentButton: some View {
+        Button(action: openLyricAlignment) {
+            pill(isHighlighted: false, isDimmed: !isLyricAlignmentAvailable) {
+                Image(systemName: "waveform.badge.magnifyingglass")
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel("lyrics.align.action".localized)
+    }
+
+    /// 当前曲目能否对齐（视图只读结果）。
+    private var isLyricAlignmentAvailable: Bool {
+        guard let track = playerEngine.currentTrack else { return false }
+        return LyricAlignmentActions.canOfferTimelineAnalysis(for: track, lyrics: lyrics)
+    }
+
+    /// 可用 → 既有对齐流程；无同步歌词 → 行内提示（不进对齐流程）。
+    private func openLyricAlignment() {
+        guard let track = playerEngine.currentTrack else { return }
+        guard LyricAlignmentFeature.hasSyncedLyrics(lyrics) else {
+            showAlignmentUnavailableHint = true
+            return
+        }
+        Task { await LyricAlignmentActions.startAlignment(for: track) }
+    }
+
     // MARK: - 胶囊样式
 
-    private func pill<Content: View>(isHighlighted: Bool, @ViewBuilder content: () -> Content) -> some View {
+    private func pill<Content: View>(isHighlighted: Bool, isDimmed: Bool = false, @ViewBuilder content: () -> Content) -> some View {
         content()
             .font(.footnote.weight(.semibold))
-            .foregroundColor(isHighlighted ? accentColor : .primary.opacity(0.85))
+            .foregroundColor(isHighlighted ? accentColor : (isDimmed ? Color.secondary : Color.primary.opacity(0.85)))
             .padding(.horizontal, DesignTokens.space16)
             .padding(.vertical, DesignTokens.space8)
             .background(Capsule().fill(.ultraThinMaterial))
@@ -196,7 +248,7 @@ struct KaraokeControlBar: View {
 // MARK: - Preview
 
 #Preview {
-    KaraokeControlBar()
+    KaraokeControlBar(lyrics: nil)
         .environment(\.appAccentColor, .blue)
         .padding()
 }

@@ -34,6 +34,19 @@ enum LyricAlignmentFeature {
         return true
     }
 
+    /// 播放页 / 跟唱控制条入口的可用性（纯函数）：能提供对齐 + 当前歌词真有同步行。
+    /// 视图只读这个结果决定灰显，不再各自拼判据。
+    static func canOfferTimelineAnalysis(track: Track, fileExists: Bool, lyrics: Lyrics?) -> Bool {
+        guard canOfferAlignment(track: track, fileExists: fileExists) else { return false }
+        return hasSyncedLyrics(lyrics)
+    }
+
+    /// 是否有可对齐的同步歌词：nil（未加载 / 取不到）、纯音乐、空行都算「没有」。
+    static func hasSyncedLyrics(_ lyrics: Lyrics?) -> Bool {
+        guard let lyrics, !lyrics.isInstrumental else { return false }
+        return nonEmptyLineCount(in: lyrics) > 0
+    }
+
     /// 是否已有对齐产物（「已对齐」的唯一事实源 = aligned 歌词库）。
     /// - Parameter store: 测试注入临时目录；生产用 `.shared`。
     static func isAligned(stableId: String, store: AlignedLyricsStore = .shared) -> Bool {

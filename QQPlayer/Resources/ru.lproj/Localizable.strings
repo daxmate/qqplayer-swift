@@ -1277,3 +1277,5 @@
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "Язык";
 "language_follow_system" = "Как в системе";
+"locate_current_track_toast" = "Перешли к текущему треку";
+"lyric_align_no_synced_lyrics" = "У этой песни нет синхронизированного текста";

@@ -1282,3 +1282,5 @@
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "言語";
 "language_follow_system" = "システム設定に合わせる";
+"locate_current_track_toast" = "再生中の曲に移動しました";
+"lyric_align_no_synced_lyrics" = "この曲には同期歌詞がありません";

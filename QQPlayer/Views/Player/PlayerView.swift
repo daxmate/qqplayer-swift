@@ -88,6 +88,8 @@ struct PlayerView: View {
     @State var sleepTimerEndDate: Date?
     /// 首次进入播放页的手势提示气泡
     @State private var showHint = false
+    /// 歌词对齐入口不可用提示（无同步歌词）：2.4 秒后自动收起
+    @State var showLyricAlignmentUnavailableHint = false
     /// AirPlay 路由选择器宿主（常驻层级，见 RoutePickerHost / showAirPlayPicker）
     /// 分片：跨文件可见（原 private）
     @State var routePickerView: AVRoutePickerView?
@@ -185,6 +187,23 @@ struct PlayerView: View {
                 ))
                 .zIndex(10)
             }
+
+            // 歌词对齐入口不可用（无同步歌词）：顶部短暂提示，不打断播放
+            if showLyricAlignmentUnavailableHint {
+                Text(Localized.lyricAlignmentNoSyncedLyrics)
+                    .font(.footnote)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, DesignTokens.space12)
+                    .padding(.vertical, DesignTokens.space8)
+                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                    .padding(.horizontal, DesignTokens.space24)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, DesignTokens.space48)
+                    .allowsHitTesting(false)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(31)
+            }
         }
         // 整页手势与区域 frame 回传共用的坐标空间（见 PlayerView+PageGestures）
         .coordinateSpace(name: PlayerPageCoordinateSpace.name)
@@ -194,6 +213,12 @@ struct PlayerView: View {
         // 歌词页/搜索页的过渡动画改在赋值处显式 withAnimation（与歌词页右滑同款实现）
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .animation(.easeInOut(duration: 0.25), value: playerEngine.playbackErrorMessage)
+        .animation(.easeInOut(duration: 0.2), value: showLyricAlignmentUnavailableHint)
+        .task(id: showLyricAlignmentUnavailableHint) {
+            guard showLyricAlignmentUnavailableHint else { return }
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            showLyricAlignmentUnavailableHint = false
+        }
     }
 
     private var mainContent: some View {

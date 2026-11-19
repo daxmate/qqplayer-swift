@@ -115,6 +115,38 @@ struct LyricAlignmentFeatureTests {
         #expect(!LyricAlignmentFeature.canOfferAlignment(track: noDuration, fileExists: true))
     }
 
+    // MARK: - 入口可用性（播放页 / 跟唱控制条，2026-11-19）
+
+    @Test("无同步歌词（nil / 空行 / 纯音乐）→ 入口不可用")
+    func canOfferTimelineAnalysisRequiresSyncedLyrics() throws {
+        try #require(LyricAlignmentFeature.isSupported, "当前系统不支持时本用例不适用")
+        let audio = try temporaryAudioFile()
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let track = makeTrack(durationMs: 20_000, path: audio.path)
+
+        #expect(!LyricAlignmentFeature.canOfferTimelineAnalysis(track: track, fileExists: true, lyrics: nil))
+        #expect(!LyricAlignmentFeature.canOfferTimelineAnalysis(track: track, fileExists: true, lyrics: makeLyrics(lines: [])))
+        #expect(!LyricAlignmentFeature.canOfferTimelineAnalysis(track: track, fileExists: true, lyrics: makeLyrics(lines: ["", "   "])))
+        #expect(!LyricAlignmentFeature.canOfferTimelineAnalysis(
+            track: track,
+            fileExists: true,
+            lyrics: makeLyrics(lines: ["第一句", "第二句"], isInstrumental: true)
+        ))
+    }
+
+    @Test("有同步歌词 + 判据满足 → 入口可用；文件缺失 / 时长 0 → 不可用")
+    func canOfferTimelineAnalysisMatchesEntryGuards() throws {
+        try #require(LyricAlignmentFeature.isSupported, "当前系统不支持时本用例不适用")
+        let track = makeTrack(durationMs: 20_000, path: "/tmp/qqplayer-not-exists.mp3")
+        let lyrics = makeLyrics(lines: ["第一句", "第二句"])
+
+        #expect(!LyricAlignmentFeature.canOfferTimelineAnalysis(track: track, fileExists: false, lyrics: lyrics))
+        #expect(LyricAlignmentFeature.canOfferTimelineAnalysis(track: track, fileExists: true, lyrics: lyrics))
+
+        let noDuration = makeTrack(durationMs: 0, path: "/tmp/qqplayer-not-exists.mp3")
+        #expect(!LyricAlignmentFeature.canOfferTimelineAnalysis(track: noDuration, fileExists: true, lyrics: lyrics))
+    }
+
     // MARK: - 非空行计数
 
     @Test("非空行计数忽略空白行")

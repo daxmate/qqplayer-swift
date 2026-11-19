@@ -32,7 +32,7 @@ enum AppNotificationContract {
     /// 唯一入口文件（全 App 唯一允许出现 `Notification.Name("…")` 字面量的地方）
     static let entryFileSuffix = "QQPlayer/Models/AppNotifications.swift"
 
-    /// 17 个常量的期望清单：`字符串值 → 常量属性名`（顺序即入口文件里的声明顺序）。
+    /// 18 个常量的期望清单：`字符串值 → 常量属性名`（顺序即入口文件里的声明顺序）。
     /// 少一个 / 多一个 / 拼错名 / 字符串值被改动 → 契约红。
     static let expectedConstants: [(value: String, property: String)] = [
         ("LibraryNeedsRefresh", "libraryNeedsRefresh"),
@@ -43,6 +43,7 @@ enum AppNotificationContract {
         ("NavigateToArtistFromPlayer", "navigateToArtistFromPlayer"),
         ("NavigateToAlbumFromPlayer", "navigateToAlbumFromPlayer"),
         ("MinimizePlayer", "minimizePlayer"),
+        ("LocateCurrentTrack", "locateCurrentTrack"),
         ("CarPlaySceneDidDisconnect", "carPlaySceneDidDisconnect"),
         ("NavigateToPlaylist", "navigateToPlaylist"),
         ("TrackFound", "trackFound"),
@@ -92,7 +93,7 @@ enum AppNotificationContract {
             WhitelistEntry(
                 fileSuffix: entryFileSuffix,
                 lineSnippet: #"Notification.Name(""#,
-                reason: "唯一入口文件本身：17 个常量的字符串值在此定义，字符串值必须与历史字面量逐字相同"
+                reason: "唯一入口文件本身：18 个常量的字符串值在此定义，字符串值必须与历史字面量逐字相同"
             ),
         ]
     )
@@ -620,6 +621,7 @@ struct AppNotificationContractTests {
             case "libraryImportFinished": matched = Notification.Name.libraryImportFinished.rawValue
             case "macSyncDevicesChanged": matched = Notification.Name.macSyncDevicesChanged.rawValue
             case "lyricsDidChange": matched = Notification.Name.lyricsDidChange.rawValue
+            case "locateCurrentTrack": matched = Notification.Name.locateCurrentTrack.rawValue
             default:
                 Issue.record("契约清单里出现了未登记的常量：\(property)")
                 continue

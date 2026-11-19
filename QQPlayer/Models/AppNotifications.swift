@@ -44,6 +44,10 @@ extension Notification.Name {
     /// 收起播放页（全屏播放 → 返回列表）。
     static let minimizePlayer = Notification.Name("MinimizePlayer")
 
+    /// mini 播放条长按 → 曲库「所有歌曲」定位当前播放行。
+    /// 无在播曲目时不发（消费方 LibraryView 还会再兜一次）。
+    static let locateCurrentTrack = Notification.Name("LocateCurrentTrack")
+
     /// CarPlay 场景断开 → 主场景刷新布局：iOS 26 在 CarPlay 断开后可能不刷新主窗口
     /// safe area，导致 safeAreaInset 内容（迷你播放条）残留在错误位置。
     static let carPlaySceneDidDisconnect = Notification.Name("CarPlaySceneDidDisconnect")

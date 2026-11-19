@@ -73,7 +73,7 @@ struct LyricsView: View {
             if karaoke.isKaraokeOn {
                 VStack(spacing: DesignTokens.space0) {
                     Spacer()
-                    KaraokeControlBar()
+                    KaraokeControlBar(lyrics: lyrics)
                         .padding(.bottom, DesignTokens.space12)
                 }
                 .transition(.opacity)

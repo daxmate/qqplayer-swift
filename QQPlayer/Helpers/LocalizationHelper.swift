@@ -65,6 +65,10 @@ struct Localized {
 
     // MARK: - General UI strings
     static var allSongs: String { "all_songs".localized }
+    /// 定位到当前播放后的 toast
+    static var locateCurrentTrackToast: String { "locate_current_track_toast".localized }
+    /// 歌词对齐入口不可用时的提示（无同步歌词）
+    static var lyricAlignmentNoSyncedLyrics: String { "lyric_align_no_synced_lyrics".localized }
     static var likedSongs: String { "liked_songs".localized }
     static var addSongs: String { "add_songs".localized }
     static var importMusicFiles: String { "import_music_files".localized }

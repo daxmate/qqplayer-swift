@@ -1606,3 +1606,5 @@
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "語言";
 "language_follow_system" = "跟隨系統";
+"locate_current_track_toast" = "已定位到目前播放";
+"lyric_align_no_synced_lyrics" = "目前歌曲沒有同步歌詞";

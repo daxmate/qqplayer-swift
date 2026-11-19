@@ -30,6 +30,17 @@ struct LibraryView: View {
     @Environment(IOSPassiveSyncCenter.self) var passiveSync
     /// 分片：跨文件可见（原 private）
     @Environment(LibraryIndexer.self) var libraryIndexer
+    /// 当前播放曲目（mini 播放条长按定位的判据；组合根已注入 PlayerEngine）
+    @Environment(PlayerEngine.self) private var playerEngine
+    /// 「定位到当前播放」：每次请求 +1，NavigationStack 换 id 重建 → 任何深度的栈都先回根
+    /// （SwiftUI 没有公开的「弹到根」API；重建栈是等价做法）
+    @State private var locateNavigationToken = 0
+    /// 本轮定位是否等待换栈后入「所有歌曲」（换完栈由 .task 消费，保证只推一次）
+    @State private var locateRequestPending = false
+    /// 「所有歌曲」入栈开关（仅定位路径使用；首页分区行仍走自己的 NavigationLink）
+    @State private var allSongsToNavigate = false
+    /// 定位目标行（nil = 普通进入所有歌曲：只入栈，不滚动、不 toast）
+    @State private var locateTrackId: String?
     @State private var artistToNavigate: Artist?
     @State private var artistAllTracks: [Track] = []
     @State private var albumToNavigate: Album?
@@ -288,6 +299,10 @@ struct LibraryView: View {
                     AlbumDetailScreen(album: album, allTracks: albumAllTracks)
                 }
             }
+            // 定位当前播放：mini 播放条长按 → 入「所有歌曲」并滚到当前行
+            .navigationDestination(isPresented: $allSongsToNavigate) {
+                AllSongsScreen(tracks: tracks, locateTrackId: locateTrackId)
+            }
         }
         .background(.clear)
         .toolbarBackground(.clear, for: .navigationBar)
@@ -376,6 +391,41 @@ struct LibraryView: View {
                 importMusicFiles(urls)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .locateCurrentTrack)) { _ in
+            handleLocateCurrentTrack()
+        }
+        // 换 id 重建 NavigationStack = 先回到曲库根（深栈也适用），随后由 .task 推入「所有歌曲」
+        .id(locateNavigationToken)
+        .task(id: locateNavigationToken) {
+            guard locateRequestPending else { return }
+            locateRequestPending = false
+            allSongsToNavigate = true
+        }
     }
 
+    /// mini 播放条长按 → 定位当前播放行（A 需求唯一消费点）。
+    private func handleLocateCurrentTrack() {
+        guard LocateCurrentTrackPlan.shouldHandle(
+            currentTrackStableId: playerEngine.currentTrack?.stableId
+        ) else { return }
+        locateTrackId = playerEngine.currentTrack?.stableId
+        allSongsToNavigate = false // 先复位，避免沿用上一次的入栈状态
+        locateRequestPending = true
+        locateNavigationToken += 1
+    }
+
+}
+
+/// 「定位到当前播放」的纯决策（视图只负责触发，规则集中在此，可单测）。
+enum LocateCurrentTrackPlan {
+    /// 没有在播曲目（或 stableId 为空）→ 长按无效：不导航、不 toast、不崩溃。
+    static func shouldHandle(currentTrackStableId: String?) -> Bool {
+        guard let stableId = currentTrackStableId else { return false }
+        return !stableId.isEmpty
+    }
+
+    /// 目标行在「所有歌曲」里的下标（按当前列表顺序）；不在列表 → nil（只入栈，不滚动）。
+    static func targetRowIndex(stableId: String, in trackIds: [String]) -> Int? {
+        trackIds.firstIndex(of: stableId)
+    }
 }

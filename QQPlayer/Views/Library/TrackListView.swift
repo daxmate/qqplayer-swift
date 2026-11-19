@@ -24,12 +24,16 @@ struct TrackListView: View {
     @State private var showBulkDeleteConfirmation = false
     @State private var settings = DeleteSettings.load()
 
-    init(tracks: [Track], playlist: Playlist? = nil, isEditMode: Bool = false, listIdentifier: String? = nil, isLikedSongsScreen: Bool = false) {
+    /// 定位目标行（mini 播放条长按带入；nil = 普通进入，不滚动）
+    let locateTrackId: String?
+
+    init(tracks: [Track], playlist: Playlist? = nil, isEditMode: Bool = false, listIdentifier: String? = nil, isLikedSongsScreen: Bool = false, locateTrackId: String? = nil) {
         self.tracks = tracks
         self.playlist = playlist
         self.isEditMode = isEditMode
         self.listIdentifier = listIdentifier
         self.isLikedSongsScreen = isLikedSongsScreen
+        self.locateTrackId = locateTrackId
     }
 
     // Sorting logic stays here
@@ -144,6 +148,7 @@ struct TrackListView: View {
             isBulkMode: $isBulkMode,
             selectedTracks: $selectedTracks,
             recentlyActedTracks: $recentlyActedTracks,
+            locateTrackId: locateTrackId,
             onEnterBulkMode: { id in enterBulkMode(initialSelection: id) }
         )
         // MARK: - TOOLBAR
@@ -247,6 +252,8 @@ struct TrackListContentView: View {
     @Binding var isBulkMode: Bool
     @Binding var selectedTracks: Set<String>
     @Binding var recentlyActedTracks: Set<String>
+    /// 定位目标行（nil = 不滚动）
+    let locateTrackId: String?
     let onEnterBulkMode: (String?) -> Void
 
     // Only THIS view updates when the song progresses
@@ -320,6 +327,34 @@ struct TrackListContentView: View {
         )
     }
 
+    /// 定位播放行：先把目标行扩进分页窗口，再等一帧布局后滚到垂直居中。
+    /// （新推入页面 / 刚扩出的一页里行还没进视图树，立即 scrollTo 会落空——做法对齐 Mac 端
+    /// `MacTrackGroupedView.locateActiveTrack` 的「等一帧再滚」。）
+    private func revealTrack(_ stableId: String, using proxy: ScrollViewProxy) {
+        guard let index = LocateCurrentTrackPlan.targetRowIndex(
+            stableId: stableId,
+            in: tracks.map(\.stableId)
+        ) else { return }
+
+        let targetLimit = max(displayLimit, index + 1)
+        // 两个 runloop：① 让所有 onAppear 跑完（分页窗口会在那里按页重置）② 让刚扩出的一页完成布局。
+        // 行还不在视图树里时 scrollTo 会落空（同 Mac 端 locateActiveTrack 的「等一帧再滚」）。
+        DispatchQueue.main.async {
+            if targetLimit > displayLimit {
+                displayLimit = min(targetLimit, tracks.count)
+            }
+            DispatchQueue.main.async {
+                withAnimation { proxy.scrollTo(stableId, anchor: .center) }
+            }
+        }
+    }
+
+    /// 有定位目标时才滚动（普通进入「所有歌曲」不会多滚一次）。
+    private func revealTrackIfRequested(using proxy: ScrollViewProxy) {
+        guard let locateTrackId else { return }
+        revealTrack(locateTrackId, using: proxy)
+    }
+
     private func loadNextPageIfNeeded() {
         guard displayLimit < tracks.count else { return }
 
@@ -342,103 +377,107 @@ struct TrackListContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List {
-                ForEach(displayedTracks, id: \.stableId) { track in
-                    ZStack(alignment: .leading) {
-                        HStack(spacing: DesignTokens.space0) {
-                            if isBulkMode {
-                                Image(systemName: selectedTracks.contains(track.stableId) ? "checkmark.circle.fill" : "circle")
-                                    .font(.title2)
-                                    .foregroundColor(selectedTracks.contains(track.stableId) ? accentColor : .secondary)
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { toggleSelection(for: track) }
-                            }
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(displayedTracks, id: \.stableId) { track in
+                        ZStack(alignment: .leading) {
+                            HStack(spacing: DesignTokens.space0) {
+                                if isBulkMode {
+                                    Image(systemName: selectedTracks.contains(track.stableId) ? "checkmark.circle.fill" : "circle")
+                                        .font(.title2)
+                                        .foregroundColor(selectedTracks.contains(track.stableId) ? accentColor : .secondary)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { toggleSelection(for: track) }
+                                }
 
-                            TrackRowView(
-                                track: track,
-                                activeTrackId: playerEngine.currentTrack?.stableId,
-                                isAudioPlaying: playerEngine.isPlaying,
-                                artistName: artistDisplayNameCache[track.stableId] ?? track.artistId.flatMap { artistNameCache[$0] },
-                                onTap: {
-                                    if isBulkMode {
-                                        toggleSelection(for: track)
-                                    } else {
-                                        Task {
-                                            if let playlist = playlist, let playlistId = playlist.id {
-                                                try? appCoordinator.updatePlaylistAccessed(playlistId: playlistId)
-                                                try? appCoordinator.updatePlaylistLastPlayed(playlistId: playlistId)
+                                TrackRowView(
+                                    track: track,
+                                    activeTrackId: playerEngine.currentTrack?.stableId,
+                                    isAudioPlaying: playerEngine.isPlaying,
+                                    artistName: artistDisplayNameCache[track.stableId] ?? track.artistId.flatMap { artistNameCache[$0] },
+                                    onTap: {
+                                        if isBulkMode {
+                                            toggleSelection(for: track)
+                                        } else {
+                                            Task {
+                                                if let playlist = playlist, let playlistId = playlist.id {
+                                                    try? appCoordinator.updatePlaylistAccessed(playlistId: playlistId)
+                                                    try? appCoordinator.updatePlaylistLastPlayed(playlistId: playlistId)
+                                                }
+                                                await appCoordinator.playTrack(track, queue: queueForPlayback(startingAt: track))
                                             }
-                                            await appCoordinator.playTrack(track, queue: queueForPlayback(startingAt: track))
                                         }
-                                    }
-                                },
-                                playlist: playlist,
-                                showDirectDeleteButton: playlist != nil && isEditMode,
-                                onEnterBulkMode: { onEnterBulkMode(track.stableId) }
-                            )
-                            .equatable() // Crucial for performance
-                            .onLongPressGesture(minimumDuration: 0.5) {
-                                if !isBulkMode { onEnterBulkMode(track.stableId) }
+                                    },
+                                    playlist: playlist,
+                                    showDirectDeleteButton: playlist != nil && isEditMode,
+                                    onEnterBulkMode: { onEnterBulkMode(track.stableId) }
+                                )
+                                .equatable() // Crucial for performance
+                                .onLongPressGesture(minimumDuration: 0.5) {
+                                    if !isBulkMode { onEnterBulkMode(track.stableId) }
+                                }
                             }
                         }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        if !isBulkMode && !recentlyActedTracks.contains(track.stableId) {
-                            Button {
-                                playerEngine.insertNext(track)
-                                markAsActed(track.stableId)
-                                actionFeedback.didPlayNext()
-                            } label: { Label(Localized.playNext, systemImage: "text.line.first.and.arrowtriangle.forward") }
-                                .tint(accentColor)
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            if !isBulkMode && !recentlyActedTracks.contains(track.stableId) {
+                                Button {
+                                    playerEngine.insertNext(track)
+                                    markAsActed(track.stableId)
+                                    actionFeedback.didPlayNext()
+                                } label: { Label(Localized.playNext, systemImage: "text.line.first.and.arrowtriangle.forward") }
+                                    .tint(accentColor)
+                            }
                         }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if !isBulkMode && !recentlyActedTracks.contains(track.stableId) {
-                            Button {
-                                playerEngine.addToQueue(track)
-                                markAsActed(track.stableId)
-                                actionFeedback.didAddToQueue()
-                            } label: { Label(Localized.addToQueue, systemImage: "text.append") }
-                                .tint(.blue)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if !isBulkMode && !recentlyActedTracks.contains(track.stableId) {
+                                Button {
+                                    playerEngine.addToQueue(track)
+                                    markAsActed(track.stableId)
+                                    actionFeedback.didAddToQueue()
+                                } label: { Label(Localized.addToQueue, systemImage: "text.append") }
+                                    .tint(.blue)
+                            }
                         }
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.radius12).fill(.ultraThinMaterial).opacity(0.7))
+                        .padding(.horizontal, DesignTokens.space8).padding(.vertical, DesignTokens.space4)
+                        .listRowSeparator(.hidden).listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                     }
-                    .background(RoundedRectangle(cornerRadius: DesignTokens.radius12).fill(.ultraThinMaterial).opacity(0.7))
-                    .padding(.horizontal, DesignTokens.space8).padding(.vertical, DesignTokens.space4)
-                    .listRowSeparator(.hidden).listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
                 }
-            }
-            .listStyle(PlainListStyle())
-            .scrollContentBackground(.hidden)
-            .contentMargins(.bottom, 100, for: .scrollContent)
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                guard displayLimit < tracks.count,
-                      geometry.containerSize.height > 0,
-                      geometry.contentSize.height > geometry.containerSize.height else {
-                    return false
-                }
+                .listStyle(PlainListStyle())
+                .scrollContentBackground(.hidden)
+                .contentMargins(.bottom, 100, for: .scrollContent)
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    guard displayLimit < tracks.count,
+                          geometry.containerSize.height > 0,
+                          geometry.contentSize.height > geometry.containerSize.height else {
+                        return false
+                    }
 
-                let visibleBottom = max(0, geometry.contentOffset.y) + geometry.containerSize.height
-                return visibleBottom >= geometry.contentSize.height - 500
-            } action: { wasNearBottom, isNearBottom in
-                guard isNearBottom, !wasNearBottom else { return }
-                loadNextPageIfNeeded()
-            }
-            .onAppear {
-                displayLimit = min(pageSize, tracks.count)
-                if artistNameCache.isEmpty {
-                    loadArtistNameCache()
+                    let visibleBottom = max(0, geometry.contentOffset.y) + geometry.containerSize.height
+                    return visibleBottom >= geometry.contentSize.height - 500
+                } action: { wasNearBottom, isNearBottom in
+                    guard isNearBottom, !wasNearBottom else { return }
+                    loadNextPageIfNeeded()
                 }
-                updateArtworkWindow()
-            }
-            .onChange(of: trackDisplaySignature) { _, _ in
-                displayLimit = min(pageSize, tracks.count)
-                loadArtistNameCache()
-                updateArtworkWindow()
-            }
-            .onChange(of: displayLimit) { _, _ in
-                updateArtworkWindow()
+                .onAppear {
+                    displayLimit = min(pageSize, tracks.count)
+                    if artistNameCache.isEmpty {
+                        loadArtistNameCache()
+                    }
+                    updateArtworkWindow()
+                }
+                .onChange(of: trackDisplaySignature) { _, _ in
+                    displayLimit = min(pageSize, tracks.count)
+                    loadArtistNameCache()
+                    updateArtworkWindow()
+                }
+                .onChange(of: displayLimit) { _, _ in
+                    updateArtworkWindow()
+                }
+                .onAppear { revealTrackIfRequested(using: proxy) }
+                .onChange(of: locateTrackId) { _, _ in revealTrackIfRequested(using: proxy) }
             }
         }
     }

@@ -1282,3 +1282,5 @@
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "언어";
 "language_follow_system" = "시스템 설정 따르기";
+"locate_current_track_toast" = "현재 재생 중인 곡으로 이동했습니다";
+"lyric_align_no_synced_lyrics" = "이 곡에는 동기화된 가사가 없습니다";

@@ -1282,3 +1282,5 @@
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "Language";
 "language_follow_system" = "Follow System";
+"locate_current_track_toast" = "Jumped to the current track";
+"lyric_align_no_synced_lyrics" = "This song has no synced lyrics";

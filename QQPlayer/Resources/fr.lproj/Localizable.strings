@@ -1280,3 +1280,5 @@
 /* Language selection (设置 → 外观 → 语言) */
 "language" = "Langue";
 "language_follow_system" = "Suivre le système";
+"locate_current_track_toast" = "Allé à la piste en cours";
+"lyric_align_no_synced_lyrics" = "Cette piste n'a pas de paroles synchronisées";

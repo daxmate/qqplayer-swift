@@ -200,9 +200,21 @@ struct MiniPlayerView: View {
                     .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
                     .padding(.horizontal, DesignTokens.space12)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        isExpanded = true
-                    }
+                    // 轻点 = 全屏播放器（原行为）；长按 0.45s = 曲库「所有歌曲」定位当前播放行。
+                    // 用 ExclusiveGesture 而不是 onTapGesture + onLongPressGesture：后者长按松手时
+                    // 还会补发一次 tap，会变成「定位 + 全屏」两个动作一起发生。
+                    .gesture(
+                        ExclusiveGesture(
+                            LongPressGesture(minimumDuration: 0.45),
+                            TapGesture()
+                        )
+                        .onEnded { value in
+                            switch value {
+                            case .first: requestLocateCurrentTrack()
+                            case .second: isExpanded = true
+                            }
+                        }
+                    )
                 }
                 .fullScreenCover(isPresented: $isExpanded) {
                     // 全屏播放页（2026-08-29：sheet 弹窗改全屏覆盖，无圆角/拖动条/背景露出）
@@ -239,6 +251,12 @@ struct MiniPlayerView: View {
                 }
             }
         }
+    }
+
+    /// 长按 mini 播放条 → 请求曲库定位当前播放行（没在播 = 什么都不做）。
+    private func requestLocateCurrentTrack() {
+        guard playerEngine.currentTrack != nil else { return }
+        NotificationCenter.default.post(name: .locateCurrentTrack, object: nil)
     }
 }
 
