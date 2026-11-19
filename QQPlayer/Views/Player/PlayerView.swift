@@ -74,6 +74,9 @@ struct PlayerView: View {
     @State var currentLyrics: Lyrics?
     /// 分片：跨文件可见（原 private）
     @State var isLoadingLyrics = false
+    /// 分片：跨文件可见（原 private）
+    /// 当前曲目是否已有对齐产物（按钮「已对齐过」标记；切歌 / 对齐产物变化时刷新）
+    @State var hasAlignedLyrics = false
     @State private var settings = DeleteSettings.load()
     /// 标题/歌手按钮的元数据缓存（onChange(currentTrack) 时刷新，替代 body 求值中同步 DB 读）
     /// 分片：跨文件可见（原 private）
@@ -89,7 +92,6 @@ struct PlayerView: View {
     /// 首次进入播放页的手势提示气泡
     @State private var showHint = false
     /// 歌词对齐入口不可用提示（无同步歌词）：2.4 秒后自动收起
-    @State var showLyricAlignmentUnavailableHint = false
     /// AirPlay 路由选择器宿主（常驻层级，见 RoutePickerHost / showAirPlayPicker）
     /// 分片：跨文件可见（原 private）
     @State var routePickerView: AVRoutePickerView?
@@ -188,21 +190,30 @@ struct PlayerView: View {
                 .zIndex(10)
             }
 
-            // 歌词对齐入口不可用（无同步歌词）：顶部短暂提示，不打断播放
-            if showLyricAlignmentUnavailableHint {
-                Text(Localized.lyricAlignmentNoSyncedLyrics)
-                    .font(.footnote)
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, DesignTokens.space12)
-                    .padding(.vertical, DesignTokens.space8)
-                    .background(Capsule().fill(Color.black.opacity(0.75)))
-                    .padding(.horizontal, DesignTokens.space24)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, DesignTokens.space48)
-                    .allowsHitTesting(false)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(31)
+            // 歌词对齐入口的即时反馈（准备中 / 已在对齐 / 无同步歌词 / 歌词加载中）：
+            // 顶部短暂提示，不打断播放。跟唱页自带同一行提示，这里让位（避免两条重叠）。
+            if !showLyricsSheet, let notice = LyricAlignmentActions.controller.entryNotice {
+                HStack(spacing: DesignTokens.space8) {
+                    if notice == .preparing {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(.white)
+                            .scaleEffect(0.7)
+                    }
+                    Text(notice.message)
+                        .font(.footnote)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, DesignTokens.space12)
+                .padding(.vertical, DesignTokens.space8)
+                .background(Capsule().fill(Color.black.opacity(0.75)))
+                .padding(.horizontal, DesignTokens.space24)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, DesignTokens.space48)
+                .allowsHitTesting(false)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(31)
             }
         }
         // 整页手势与区域 frame 回传共用的坐标空间（见 PlayerView+PageGestures）
@@ -213,12 +224,7 @@ struct PlayerView: View {
         // 歌词页/搜索页的过渡动画改在赋值处显式 withAnimation（与歌词页右滑同款实现）
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .animation(.easeInOut(duration: 0.25), value: playerEngine.playbackErrorMessage)
-        .animation(.easeInOut(duration: 0.2), value: showLyricAlignmentUnavailableHint)
-        .task(id: showLyricAlignmentUnavailableHint) {
-            guard showLyricAlignmentUnavailableHint else { return }
-            try? await Task.sleep(nanoseconds: 2_400_000_000)
-            showLyricAlignmentUnavailableHint = false
-        }
+        .animation(.easeInOut(duration: 0.2), value: LyricAlignmentActions.controller.entryNotice)
     }
 
     private var mainContent: some View {
@@ -245,6 +251,7 @@ struct PlayerView: View {
                     }
                 }
                 checkFavoriteStatus()
+                refreshAlignedLyricsState()
 
                 // 下拉被中断（来电 / 切后台 / 系统手势）时切歌可能没收到 onEnded：补一次复位（复核 ③）
                 resetInterruptedPull()
@@ -264,6 +271,8 @@ struct PlayerView: View {
                 // 歌词时间轴对齐 / 恢复原时间轴后：正在放的这首歌立刻重取（不等切歌）。
                 guard let stableId = note.object as? String,
                       stableId == playerEngine.currentTrack?.stableId else { return }
+                // 对齐产物变了：歌词重取 + 按钮「已对齐过」标记同步刷新
+                refreshAlignedLyricsState()
                 loadLyrics()
             }
             .onAppear {
@@ -276,6 +285,7 @@ struct PlayerView: View {
                     await loadTracks()
                     checkFavoriteStatus()
                 }
+                refreshAlignedLyricsState()
                 loadLyrics()
                 loadTrackMetadata()
             }
@@ -288,6 +298,9 @@ struct PlayerView: View {
             .sheet(isPresented: $showQueueSheet) {
                 queueSheet
             }
+            // 对齐进度 sheet 的第二个宿主：播放页在 fullScreenCover 里，根视图（ContentView）
+            // 上的 sheet 无法在 cover 之上 present（2026-11-19 修复：点了完全没反应）。
+            .lyricAlignmentSheet(controller: LyricAlignmentActions.controller)
             .onChange(of: showLyricsSheet) { _, isOpen in
                 // 离开全屏歌词界面：退出跟唱模式（用户 2026-08-29 拍板）
                 if !isOpen {

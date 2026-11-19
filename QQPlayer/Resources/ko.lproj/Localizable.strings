@@ -1284,3 +1284,9 @@
 "language_follow_system" = "시스템 설정 따르기";
 "locate_current_track_toast" = "현재 재생 중인 곡으로 이동했습니다";
 "lyric_align_no_synced_lyrics" = "이 곡에는 동기화된 가사가 없습니다";
+
+/* 歌词对齐入口即时反馈（2026-11-19：点击即反馈 + 已对齐标记） */
+"lyrics.align.entry.preparing" = "가사 정렬 준비 중…";
+"lyrics.align.entry.running" = "가사 정렬 중…";
+"lyrics.align.entry.loading" = "가사를 불러오는 중입니다. 잠시만 기다려 주세요";
+"lyrics.align.action.realign" = "가사 타임라인 다시 정렬(정렬됨)";

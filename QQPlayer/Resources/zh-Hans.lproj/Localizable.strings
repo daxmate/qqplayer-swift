@@ -1287,3 +1287,9 @@
 "language_follow_system" = "跟随系统";
 "locate_current_track_toast" = "已定位到当前播放";
 "lyric_align_no_synced_lyrics" = "当前歌曲没有同步歌词";
+
+/* 歌词对齐入口即时反馈（2026-11-19：点击即反馈 + 已对齐标记） */
+"lyrics.align.entry.preparing" = "正在准备对齐…";
+"lyrics.align.entry.running" = "正在对齐中…";
+"lyrics.align.entry.loading" = "歌词加载中，请稍候";
+"lyrics.align.action.realign" = "重新对齐（已对齐过）";

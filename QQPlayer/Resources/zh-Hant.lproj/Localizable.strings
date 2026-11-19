@@ -1608,3 +1608,9 @@
 "language_follow_system" = "跟隨系統";
 "locate_current_track_toast" = "已定位到目前播放";
 "lyric_align_no_synced_lyrics" = "目前歌曲沒有同步歌詞";
+
+/* 歌词对齐入口即时反馈（2026-11-19：点击即反馈 + 已对齐标记） */
+"lyrics.align.entry.preparing" = "正在準備對齊…";
+"lyrics.align.entry.running" = "正在對齊中…";
+"lyrics.align.entry.loading" = "歌詞載入中，請稍候";
+"lyrics.align.action.realign" = "重新對齊（已對齊過）";

@@ -1282,3 +1282,9 @@
 "language_follow_system" = "Suivre le système";
 "locate_current_track_toast" = "Allé à la piste en cours";
 "lyric_align_no_synced_lyrics" = "Cette piste n'a pas de paroles synchronisées";
+
+/* 歌词对齐入口即时反馈（2026-11-19：点击即反馈 + 已对齐标记） */
+"lyrics.align.entry.preparing" = "Préparation de l'alignement…";
+"lyrics.align.entry.running" = "Alignement des paroles en cours…";
+"lyrics.align.entry.loading" = "Chargement des paroles, patientez";
+"lyrics.align.action.realign" = "Réaligner la chronologie (déjà alignée)";

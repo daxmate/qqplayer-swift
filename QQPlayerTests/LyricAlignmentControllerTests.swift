@@ -155,6 +155,42 @@ struct LyricAlignmentControllerTests {
         await task.value
     }
 
+    // MARK: - 入口提示（2026-11-19：点击即反馈）
+
+    @Test("入口提示：写入即可读，起跑后立刻清空（sheet 接管）")
+    func entryNoticeClearedWhenAlignmentStarts() async throws {
+        let service = FakeAlignmentService(report: makeReport(), delayNanoseconds: 300_000_000)
+        let (store, directory) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let controller = LyricAlignmentController(service: service, store: store, onLyricsChanged: { _ in })
+
+        controller.showEntryNotice(.preparing)
+        #expect(controller.entryNotice == .preparing)
+
+        let task = Task { await controller.start(track: makeTrack(), lyrics: makeLyrics()) }
+        try await Task.sleep(nanoseconds: 80_000_000)
+
+        #expect(controller.entryNotice == nil)
+        #expect(controller.presentsSheet)
+
+        controller.cancel()
+        await task.value
+    }
+
+    @Test("入口提示：失败态收口时清空（错误文案交给 sheet）")
+    func entryNoticeClearedOnFailure() throws {
+        let service = FakeAlignmentService(report: makeReport())
+        let (store, directory) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let controller = LyricAlignmentController(service: service, store: store, onLyricsChanged: { _ in })
+
+        controller.showEntryNotice(.lyricsLoading)
+        controller.fail(message: "歌词没取到")
+
+        #expect(controller.entryNotice == nil)
+        #expect(controller.presentsSheet)
+    }
+
     // MARK: - 失败路径
 
     @Test("失败：failed(可读文案)")

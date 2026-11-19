@@ -124,11 +124,12 @@ extension PlayerView {
     /// 可用性判据的唯一实现在 LyricAlignmentActions（与 startAlignment 的守门同源）。
     private var lyricAlignmentButton: some View {
         Button(action: openLyricAlignment) {
-            Image(systemName: "waveform.badge.magnifyingglass")
+            // 已对齐过：换带勾图标（切歌 / 对齐产物变化时刷新，见 refreshAlignedLyricsState）
+            Image(systemName: hasAlignedLyrics ? "waveform.badge.checkmark" : "waveform.badge.magnifyingglass")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
                 .foregroundColor(isLyricAlignmentAvailable ? .primary : .secondary)
         }
-        .accessibilityLabel("lyrics.align.action".localized)
+        .accessibilityLabel(hasAlignedLyrics ? "lyrics.align.action.realign".localized : "lyrics.align.action".localized)
     }
 
     /// 当前曲目能否对齐（视图只读结果；判定在 LyricAlignmentActions）。
@@ -137,17 +138,18 @@ extension PlayerView {
         return LyricAlignmentActions.canOfferTimelineAnalysis(for: track, lyrics: currentLyrics)
     }
 
-    /// 可用 → 走既有对齐流程（进度 / 取消 / 回退都在既有 sheet）；不可用 → 顶部提示。
+    /// 点击：先立刻给可见反馈（准备中 / 已在对齐 / 无同步歌词 / 歌词加载中），
+    /// 可跑才走既有对齐流程（进度 / 取消 / 回退都在既有 sheet）。
+    /// 判据唯一入口 = LyricAlignmentActions.handleEntryTap（不在这里另造一套判定）。
     private func openLyricAlignment() {
         guard let track = playerEngine.currentTrack else { return }
-        // 无同步歌词是主因：按钮已灰显，点击只给一句明确提示，不进对齐流程。
-        // 其余不可用情形（系统不支持 / 文件缺失 / 时长 0）交给 startAlignment 把可读失败文案
-        // 写进既有进度 sheet（不在这里另造一套判定）。
-        guard LyricAlignmentFeature.hasSyncedLyrics(currentLyrics) else {
-            showLyricAlignmentUnavailableHint = true
-            return
-        }
-        Task { await LyricAlignmentActions.startAlignment(for: track) }
+        LyricAlignmentActions.handleEntryTap(for: track, lyrics: currentLyrics, lyricsLoading: isLoadingLyrics)
+    }
+
+    /// 刷新「已对齐过」标记（判据 = LyricAlignmentFeature.isAligned，经 Actions 收口）。
+    /// 触发点：切歌 / 进入播放页 / 对齐产物变化（.lyricsDidChange）。
+    func refreshAlignedLyricsState() {
+        hasAlignedLyrics = LyricAlignmentActions.isAligned(for: playerEngine.currentTrack)
     }
 
     private var addToPlaylistButton: some View {

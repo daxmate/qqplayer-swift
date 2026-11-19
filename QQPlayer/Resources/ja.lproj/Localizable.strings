@@ -1284,3 +1284,9 @@
 "language_follow_system" = "システム設定に合わせる";
 "locate_current_track_toast" = "再生中の曲に移動しました";
 "lyric_align_no_synced_lyrics" = "この曲には同期歌詞がありません";
+
+/* 歌词对齐入口即时反馈（2026-11-19：点击即反馈 + 已对齐标记） */
+"lyrics.align.entry.preparing" = "歌詞の整列を準備中…";
+"lyrics.align.entry.running" = "歌詞を整列中…";
+"lyrics.align.entry.loading" = "歌詞を読み込み中です。しばらくお待ちください";
+"lyrics.align.action.realign" = "歌詞タイムラインを再整列（整列済み）";

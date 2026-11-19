@@ -196,4 +196,47 @@ struct LyricAlignmentFeatureTests {
         #expect(LibraryRoot.absoluteURL(forStoredPath: absolute).path == absolute)
         #expect(LibraryRoot.absolutePath(forStoredPath: absolute) == absolute)
     }
+
+    // MARK: - 入口点击的即时反馈（2026-11-19）
+
+    @Test("入口反馈判定：已在跑 > 歌词加载中 > 无同步歌词 > 准备中")
+    func entryNoticeCoversTapStates() {
+        let track = makeTrack(durationMs: 20_000, path: "/tmp/qqplayer-not-exists.mp3")
+        let lyrics = makeLyrics(lines: ["第一句", "第二句"])
+
+        // 没有曲目：无话可说（也不开跑）
+        #expect(LyricAlignmentFeature.entryNotice(track: nil, lyrics: lyrics, lyricsLoading: false, isRunning: false) == nil)
+        // 已在跑优先于一切：再点不静默
+        #expect(
+            LyricAlignmentFeature.entryNotice(track: track, lyrics: nil, lyricsLoading: true, isRunning: true)
+                == .alreadyRunning
+        )
+        // 歌词没到位且仍在加载 → 加载中
+        #expect(
+            LyricAlignmentFeature.entryNotice(track: track, lyrics: nil, lyricsLoading: true, isRunning: false)
+                == .lyricsLoading
+        )
+        // 歌词没到位但不在加载 / 纯音乐 / 空行 → 无同步歌词
+        #expect(
+            LyricAlignmentFeature.entryNotice(track: track, lyrics: nil, lyricsLoading: false, isRunning: false)
+                == .noSyncedLyrics
+        )
+        #expect(
+            LyricAlignmentFeature.entryNotice(
+                track: track,
+                lyrics: makeLyrics(lines: ["第一句"], isInstrumental: true),
+                lyricsLoading: false,
+                isRunning: false
+            ) == .noSyncedLyrics
+        )
+        #expect(
+            LyricAlignmentFeature.entryNotice(track: track, lyrics: makeLyrics(lines: []), lyricsLoading: false, isRunning: false)
+                == .noSyncedLyrics
+        )
+        // 有同步歌词 → 准备中（随后由进度 sheet 接管）
+        #expect(
+            LyricAlignmentFeature.entryNotice(track: track, lyrics: lyrics, lyricsLoading: false, isRunning: false)
+                == .preparing
+        )
+    }
 }

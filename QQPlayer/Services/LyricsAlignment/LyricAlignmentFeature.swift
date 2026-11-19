@@ -41,6 +41,48 @@ enum LyricAlignmentFeature {
         return hasSyncedLyrics(lyrics)
     }
 
+    /// 入口点击的即时提示（播放页 / 跟唱条共用；文案集中在这里，避免两处入口各写一套）。
+    enum EntryNotice: Equatable {
+        /// 正在取歌词 / 起任务，随后进度 sheet 接管。
+        case preparing
+        /// 对齐已在跑（再点不静默）。
+        case alreadyRunning
+        /// 没有同步歌词（未加载完 / 纯音乐 / 空行）。
+        case noSyncedLyrics
+        /// 歌词仍在加载。
+        case lyricsLoading
+
+        /// 顶部一行提示文案。
+        var message: String {
+            switch self {
+            case .preparing: return "lyrics.align.entry.preparing".localized
+            case .alreadyRunning: return "lyrics.align.entry.running".localized
+            case .noSyncedLyrics: return "lyric_align_no_synced_lyrics".localized
+            case .lyricsLoading: return "lyrics.align.entry.loading".localized
+            }
+        }
+    }
+
+    /// 点击入口时的即时反馈判定（纯函数）：
+    /// - 对齐已在跑 → `.alreadyRunning`
+    /// - 歌词没到位且仍在加载 → `.lyricsLoading`
+    /// - 没有同步歌词（含纯音乐 / 空行）→ `.noSyncedLyrics`
+    /// - 其余 → `.preparing`（交给 startAlignment；系统 / 文件 / 时长不满足时由它把可读失败写进 sheet）
+    ///
+    /// 无当前曲目 → nil（无话可说，也不开跑）。
+    static func entryNotice(
+        track: Track?,
+        lyrics: Lyrics?,
+        lyricsLoading: Bool,
+        isRunning: Bool
+    ) -> EntryNotice? {
+        guard track != nil else { return nil }
+        if isRunning { return .alreadyRunning }
+        if lyrics == nil, lyricsLoading { return .lyricsLoading }
+        guard hasSyncedLyrics(lyrics) else { return .noSyncedLyrics }
+        return .preparing
+    }
+
     /// 是否有可对齐的同步歌词：nil（未加载 / 取不到）、纯音乐、空行都算「没有」。
     static func hasSyncedLyrics(_ lyrics: Lyrics?) -> Bool {
         guard let lyrics, !lyrics.isInstrumental else { return false }

@@ -1279,3 +1279,9 @@
 "language_follow_system" = "Как в системе";
 "locate_current_track_toast" = "Перешли к текущему треку";
 "lyric_align_no_synced_lyrics" = "У этой песни нет синхронизированного текста";
+
+/* 歌词对齐入口即时反馈（2026-11-19：点击即反馈 + 已对齐标记） */
+"lyrics.align.entry.preparing" = "Подготовка выравнивания…";
+"lyrics.align.entry.running" = "Выравнивание текста…";
+"lyrics.align.entry.loading" = "Загрузка текста, подождите";
+"lyrics.align.action.realign" = "Выровнять текст заново (уже выровнен)";

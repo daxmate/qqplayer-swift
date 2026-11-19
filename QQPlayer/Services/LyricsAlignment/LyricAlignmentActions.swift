@@ -30,6 +30,28 @@ enum LyricAlignmentActions {
             && FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path))
     }
 
+    /// 入口点击（播放页 / 跟唱条共用）：先给即时反馈，可跑才真的开跑。
+    /// 判据唯一来源 = `LyricAlignmentFeature.entryNotice`（视图不再各拼一套）。
+    static func handleEntryTap(for track: Track, lyrics: Lyrics?, lyricsLoading: Bool) {
+        let controller = LyricAlignmentController.shared
+        guard let notice = LyricAlignmentFeature.entryNotice(
+            track: track,
+            lyrics: lyrics,
+            lyricsLoading: lyricsLoading,
+            isRunning: controller.isRunning
+        ) else { return }
+        controller.showEntryNotice(notice)
+        // 只有「准备中」才继续开跑；其余提示完即止（不静默、也不进对齐流程）。
+        guard notice == .preparing else { return }
+        Task { await startAlignment(for: track) }
+    }
+
+    /// 当前曲目是否已有对齐产物（按钮「已对齐过」状态刷新；判据仍在 LyricAlignmentFeature）。
+    static func isAligned(for track: Track?) -> Bool {
+        guard let track else { return false }
+        return LyricAlignmentFeature.isAligned(stableId: track.stableId)
+    }
+
     /// 对齐某首歌：歌词取不到 / 判据不满足 → 记一条可读失败文案（sheet 展示）。
     static func startAlignment(for track: Track) async {
         let fileExists = audioFileExists(for: track)

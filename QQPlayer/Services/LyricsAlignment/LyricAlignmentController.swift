@@ -53,6 +53,11 @@ final class LyricAlignmentController {
     /// 当前（或刚完成的）对齐目标曲目：结果页「恢复原时间轴」需要它。
     private(set) var activeStableId: String?
 
+    /// 入口点击的即时提示：sheet 出现（running / failed）或兜底超时后自动清空。
+    /// 播放页与跟唱条共用同一份，视图只读（不再各自持有提示状态）。
+    private(set) var entryNotice: LyricAlignmentFeature.EntryNotice?
+    private var entryNoticeTask: Task<Void, Never>?
+
     private let service: any LyricAlignmentReporting
     private let store: AlignedLyricsStore
     /// 对齐产物变化后的刷新动作（默认：清该歌歌词缓存 + 广播 `.lyricsDidChange`）。
@@ -90,6 +95,28 @@ final class LyricAlignmentController {
         }
     }
 
+    // MARK: - 入口提示
+
+    /// 显示入口提示并排兜底超时：`.preparing` 给 3s（等歌词 / 起任务），其余 2.4s。
+    /// sheet 出现（state 转 running / failed）时由状态转移清掉，不等超时。
+    func showEntryNotice(_ notice: LyricAlignmentFeature.EntryNotice) {
+        entryNoticeTask?.cancel()
+        entryNotice = notice
+        let seconds: Double = notice == .preparing ? 3 : 2.4
+        entryNoticeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.entryNotice = nil
+        }
+    }
+
+    /// 清掉入口提示（sheet 接管 / 状态复位）。
+    private func clearEntryNotice() {
+        entryNoticeTask?.cancel()
+        entryNoticeTask = nil
+        entryNotice = nil
+    }
+
     // MARK: - 动作
 
     /// 开始对齐：成功后写入 aligned 歌词库并触发刷新；取消静默回 idle，其余给可读文案。
@@ -98,6 +125,8 @@ final class LyricAlignmentController {
         runGeneration += 1
         let generation = runGeneration
         activeStableId = track.stableId
+        // sheet 已在路上：入口提示让位（不等 3s 兜底）。
+        clearEntryNotice()
         state = .running(progress: 0, phase: Self.phase(for: 0))
 
         let task = Task { [weak self] in
@@ -128,11 +157,13 @@ final class LyricAlignmentController {
         runGeneration += 1
         runTask?.cancel()
         runTask = nil
+        clearEntryNotice()
         if case .running = state { state = .idle }
     }
 
     /// sheet 被关闭：运行中 = 取消，其余 = 复位。
     func dismiss() {
+        clearEntryNotice()
         if isRunning {
             cancel()
         } else {
@@ -149,6 +180,8 @@ final class LyricAlignmentController {
 
     /// 失败态收口（视图侧展示可读文案）。
     func fail(message: String) {
+        // 失败 sheet 立刻接管：入口提示让位。
+        clearEntryNotice()
         state = .failed(message: message)
     }
 

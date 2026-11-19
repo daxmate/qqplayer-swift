@@ -21,8 +21,10 @@ struct KaraokeControlBar: View {
     @Environment(\.appAccentColor) private var accentColor
     /// 当前歌曲歌词（与播放页同一份 currentLyrics）：对齐按钮可用性判据的输入。
     let lyrics: Lyrics?
-    /// 对齐不可用提示（无同步歌词）：短暂显示，不打断跟唱
-    @State private var showAlignmentUnavailableHint = false
+    /// 歌词是否仍在加载（入口提示要区分「没歌词」与「还没加载完」）。
+    var lyricsLoading = false
+    /// 当前曲目是否已有对齐产物（按钮「已对齐过」标记；切歌 / 对齐产物变化时刷新）
+    @State private var hasAlignedLyrics = false
 
     /// 当前句 index（AB 单击取 A 点）；还没到第一句时为 nil
     private var currentLineIndex: Int? {
@@ -49,14 +51,22 @@ struct KaraokeControlBar: View {
                     .padding(.vertical, DesignTokens.space4)
                     .background(Capsule().fill(.ultraThinMaterial))
             }
-            if showAlignmentUnavailableHint {
-                Text(Localized.lyricAlignmentNoSyncedLyrics)
-                    .font(.caption2.weight(.medium))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, DesignTokens.space12)
-                    .padding(.vertical, DesignTokens.space4)
-                    .background(Capsule().fill(.ultraThinMaterial))
-                    .transition(.opacity)
+            // 对齐入口的即时反馈（与播放页同一份 controller 状态）：短暂显示，不打断跟唱
+            if let notice = LyricAlignmentActions.controller.entryNotice {
+                HStack(spacing: DesignTokens.space6) {
+                    if notice == .preparing {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.6)
+                    }
+                    Text(notice.message)
+                }
+                .font(.caption2.weight(.medium))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, DesignTokens.space12)
+                .padding(.vertical, DesignTokens.space4)
+                .background(Capsule().fill(.ultraThinMaterial))
+                .transition(.opacity)
             }
 
             // 播放控制三键：上一句 / 播放暂停 / 下一句（歌词行级，用户 2026-08-29 拍板）
@@ -75,11 +85,15 @@ struct KaraokeControlBar: View {
             }
         }
         .padding(.vertical, DesignTokens.space6)
-        .animation(.easeInOut(duration: 0.2), value: showAlignmentUnavailableHint)
-        .task(id: showAlignmentUnavailableHint) {
-            guard showAlignmentUnavailableHint else { return }
-            try? await Task.sleep(nanoseconds: 2_400_000_000)
-            showAlignmentUnavailableHint = false
+        .animation(.easeInOut(duration: 0.2), value: LyricAlignmentActions.controller.entryNotice)
+        // 「已对齐过」标记：切歌 / 进入跟唱页 / 对齐产物变化时刷新（不在 body 里每帧查盘）
+        .task(id: playerEngine.currentTrack?.stableId) {
+            refreshAlignedLyricsState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyricsDidChange)) { note in
+            guard let stableId = note.object as? String,
+                  stableId == playerEngine.currentTrack?.stableId else { return }
+            refreshAlignedLyricsState()
         }
     }
 
@@ -201,7 +215,7 @@ struct KaraokeControlBar: View {
     private var lyricAlignmentButton: some View {
         Button(action: openLyricAlignment) {
             pill(isHighlighted: false, isDimmed: !isLyricAlignmentAvailable) {
-                Image(systemName: "waveform.badge.magnifyingglass")
+                Image(systemName: hasAlignedLyrics ? "waveform.badge.checkmark" : "waveform.badge.magnifyingglass")
             }
         }
         .buttonStyle(PlainButtonStyle())
@@ -215,14 +229,16 @@ struct KaraokeControlBar: View {
         return LyricAlignmentActions.canOfferTimelineAnalysis(for: track, lyrics: lyrics)
     }
 
-    /// 可用 → 既有对齐流程；无同步歌词 → 行内提示（不进对齐流程）。
+    /// 点击：先立刻给可见反馈（准备中 / 已在对齐 / 无同步歌词 / 歌词加载中），
+    /// 可跑才走既有对齐流程。判据与开跑都收在 LyricAlignmentActions（与播放页同一套）。
     private func openLyricAlignment() {
         guard let track = playerEngine.currentTrack else { return }
-        guard LyricAlignmentFeature.hasSyncedLyrics(lyrics) else {
-            showAlignmentUnavailableHint = true
-            return
-        }
-        Task { await LyricAlignmentActions.startAlignment(for: track) }
+        LyricAlignmentActions.handleEntryTap(for: track, lyrics: lyrics, lyricsLoading: lyricsLoading)
+    }
+
+    /// 刷新「已对齐过」标记（判据 = LyricAlignmentFeature.isAligned，经 Actions 收口）。
+    private func refreshAlignedLyricsState() {
+        hasAlignedLyrics = LyricAlignmentActions.isAligned(for: playerEngine.currentTrack)
     }
 
     // MARK: - 胶囊样式
