@@ -14,7 +14,7 @@ PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 ent
 QQPlayerMac-Info.plist[FN5T]: F:macOS target 的 Info.plist 补充片段：用显式 plist 承载数组型键 NSBonjourServices（_qqplayer-sync._tcp） | R:code:QQPlayer/Info.plist,code:QQPlayer/Sync/SyncListener.swift,code:QQPlayer/Sync/SyncBrowser.swift | A:NSBonjourServices | S:INFOPLIST_KEY_NSBonjourServices 不被 Xcode 支持，须显式 plist 合并；服务类型三处必须一致
 README.md[SZ7L]: F:项目总览：平台矩阵与版号口径（指向 CHANGELOG 与 git tag，App Store 版本单独发布）、双端功能清单、局域网配对与同步、技术架构、目录与脚本清单、测试与构建（CI 四 job）；含标签刮削与下载后自动刮削；产品页截图（macOS 3 + iPhone 4，WebP） | R:code:docs/logging.md,code:scripts/build-app.sh | A:- | S:功能矩阵须与 target 能力同步；CI main 走自托管 qqplayer-macos、PR 走 macos-latest；批量刮削取首候选写全字段且不改名，下载后自动刮削默认关；图只放 assets/screenshots（docs/ gitignore）
 QQPlayerMac.entitlements[FS8T]: F:macOS 授权：App Group B6FA37AYT5.dsqcommon（共享资源根）＋ network.client；未声明 App Sandbox（非沙盒，便于共享根与旧路径 symlink） | R:code:QQPlayer/Services/DSQSharedPaths.swift, code:QQPlayer/QQPlayer.entitlements | A:com.apple.security.application-groups | S:App Group ID 必须与 DSQSharedLocations.appGroupIdentifier 一致；删 network.client → 在线搜索/模型下载全断
-CHANGELOG.md[SV6M]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚡改进 / 🐛修复 / 🔧工程，1.1.4 起收录，最新 1.8.0（歌曲三视图 / 艺术家头像 / ja·ko·es 多语言 / 当前播放行整行高亮） | R:- | A:- | S:发版时与版本号同批更新；开发中的条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
+CHANGELOG.md[SV6M]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚡改进 / 🐛修复 / 🔧工程，最新 1.8.1（CarPlay 封面首发布门控、macOS 刮削/收藏/歌词分隔条修复） | R:- | A:- | S:发版时与版本号同批更新；开发中的条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/.github/workflows/===
 ci.yml[OQ7L]: F:GitHub Actions CI 四 job：Swift（设备判据自检/lint/format/成员校验/iOS 单测/零警告）、local-harness（同步与 DSQ 脚本）、macOS（构建 Mac 端 + 版号与资源断言）、Siri（运行时门控） | R:code:scripts/xcbuild.sh,code:.swiftlint.yml,code:scripts/run-local-sync-tests.sh,code:scripts/run-dsq-shared-tests.sh | A:jobs Swift,local-harness,macOS,Siri | S:push main 走自托管 qqplayer-macos、PR 回落 macos-latest；siri job 由模拟器运行时版本门控，禁加 CODE_SIGNING_ALLOWED=NO；iOS 测试按 UDID 选设备；不要再加 actions/cache——自托管在前置阶段下载头里所有 uses，慢网必撞 100s 超时卡死 Set up job；警告零容忍
@@ -40,7 +40,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV8L]: F:Xcode 工程文件：target 成员、build settings、资源与 SPM 依赖声明；1.8.0 新增 MacArtistAvatar / MacTableRowHighlight 双登记；2026-11-19 注册 NowPlayingArtworkGateTests | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py
+project.pbxproj[FV8L]: F:Xcode 工程文件：target 成员、build settings、资源与 SPM 依赖声明；1.8.0 新增 MacArtistAvatar / MacTableRowHighlight 双登记；2026-11-19 注册 NowPlayingArtworkGateTests，1.8.1 版号 1.8.1/82 | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
@@ -926,7 +926,7 @@ LyricAlignmentServiceTests.swift[TB6M]: F:对齐服务测试：假引擎端到�
 LyricAlignmentTextNormalizerTests.swift[TG6T]: F:归一化测试：空白/标点/全角/大小写折叠、emoji 与纯符号不参与匹配、NFKC 全角等价半角、繁→简走项目映射表、假名汉字保留 | R:code:QQPlayer/Services/LyricsAlignment/LyricAlignmentTextNormalizer.swift | A:LyricAlignmentTextNormalizerTests | S:繁简用例与 DisplayScriptNormalizer 同源（禁另建映射表）
 LyricsAlignmentAudioFileTests.swift[TH4S]: F:音频转码单测：44.1k 立体声正弦 → 16k 单声道 Int16（帧数/磁盘格式/回读）、remove 幂等、源缺失不留残留 | R:code:QQPlayer/Services/LyricsAlignment/LyricsAlignmentAudioFile.swift | A:LyricsAlignmentAudioFileTests | S:AVAudioFile.processingFormat 恒为 Float32 解交织，断言磁盘格式必须用 fileFormat；套件 .serialized 避免临时文件竞态
 AppLanguageHotSwitchTests.swift[TL8T]: F:钉死语言热切换解析路径：各语种 Bundle 取词、回退路径、8 语种新 key 齐全、Localized 必须是计算属性 | R:code:QQPlayer/Helpers/AppLanguage.swift,code:QQPlayer/Helpers/LocalizationHelper.swift | A:- | S:测试不写 UserDefaults.standard（测试宿主＝App 域，改全局语言会串味其他套件）
-NowPlayingArtworkGateTests.swift[TU6M]: F:NowPlayingArtworkGate 回归用例（Swift Testing 10 例）：缓存命中、等待内返回、超时兜底、迟到补发完整字典、旧曲/旧代际丢弃、A→B→A 不串、占位图可用 | R:code:QQPlayer/Services/NowPlayingArtworkGate.swift,code:QQPlayer/Services/PlaybackModels.swift,code:QQPlayer/Services/PlayerEngine+NowPlaying.swift | A:NowPlayingArtworkGateTests | S:只测纯逻辑，不碰 UI/真机；修复前必红的点写在文件头，用例序号与清单对应，勿改成依赖真机复现
+NowPlayingArtworkGateTests.swift[TU6M]: F:NowPlayingArtworkGate 回归用例（Swift Testing 10 例）：缓存命中、等待内返回、超时兜底、迟到补发完整字典、旧曲/旧代际丢弃、A→B→A 不串、占位图可用 | R:code:QQPlayer/Services/NowPlayingArtworkGate.swift,code:QQPlayer/Services/PlaybackModels.swift,code:QQPlayer/Services/PlayerEngine+NowPlaying.swift | A:NowPlayingArtworkGateTests | S:只测纯逻辑；时序用例故意拉开量级（成功路径 600s 超时、超时路径 600s 假任务），防 CI 主 actor 争用下翻转；勿改成依赖真机复现
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayerTests/Fixtures/===
 README.md[TQ3T]: F:测试夹具目录说明：棘轮基线只减不增、已清理无 target 归属的音频夹具 | R:- | A:- | S:音频夹具唯一来源是 TestAudioFixtures.swift（内嵌 base64）
