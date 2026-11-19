@@ -20,6 +20,53 @@
     import SFBAudioEngine
     import UIKit
     import WidgetKit
+
+    /// 一次发布的完整字段快照。
+    ///
+    /// 为什么单独建模（2026-11-19 CarPlay 封面空白修复）：以前「补发封面」是
+    /// 「读旧字典 + 只改 artwork 键」的局部写；任何一处拿半份字典覆盖，都会把
+    /// title/duration/artwork 一起冲掉。改成「每次发布都从字段快照重建完整字典」，
+    /// 让补发是原子的。
+    struct NowPlayingInfoFields {
+        var title: String
+        var artist: String?
+        var duration: TimeInterval
+        var elapsed: TimeInterval
+        var rate: Double
+        var queueCount: Int
+        var queueIndex: Int?
+        var trackNumber: Int?
+        var artwork: MPMediaItemArtwork?
+    }
+
+    enum NowPlayingInfoBuilder {
+        /// 完整字典：键集合固定，有值的可选字段才追加。
+        /// 测试按这个键集断言，防止再退回「半份字典」。
+        static func dictionary(_ fields: NowPlayingInfoFields) -> [String: Any] {
+            var info: [String: Any] = [
+                MPMediaItemPropertyTitle: fields.title,
+                MPMediaItemPropertyPlaybackDuration: fields.duration,
+                MPNowPlayingInfoPropertyElapsedPlaybackTime: fields.elapsed,
+                MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
+                MPNowPlayingInfoPropertyPlaybackRate: fields.rate,
+                MPNowPlayingInfoPropertyPlaybackQueueCount: fields.queueCount,
+            ]
+            if let artist = fields.artist {
+                info[MPMediaItemPropertyArtist] = artist
+            }
+            if let queueIndex = fields.queueIndex {
+                info[MPNowPlayingInfoPropertyPlaybackQueueIndex] = queueIndex
+            }
+            if let trackNumber = fields.trackNumber {
+                info[MPMediaItemPropertyAlbumTrackNumber] = trackNumber
+            }
+            if let artwork = fields.artwork {
+                info[MPMediaItemPropertyArtwork] = artwork
+            }
+            return info
+        }
+    }
+
     extension PlayerEngine {
         func ensureRemoteCommandsSetup() {
             guard !hasSetupRemoteCommands else { return }
@@ -115,81 +162,48 @@
                 return
             }
 
-            let currentTime = nowPlayingElapsedTime()
-
             // Create comprehensive Now Playing info
             // 展示字段一律走显示层字形（锁屏/控制中心/CarPlay 与 App 内一致）：
             // 数据库里 track.title 原文不动，只改写出的显示值。
-            var info: [String: Any] = [
-                // 车载歌词：CarPlay 连接期间标题位可能是当前歌词行（见 NowPlayingTitleOverlay）
-                MPMediaItemPropertyTitle: NowPlayingTitleOverlay.displayTitle(fallback: track.displayTitle),
-                MPMediaItemPropertyPlaybackDuration: duration,
-                MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
-                MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
-                MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
-                MPNowPlayingInfoPropertyPlaybackQueueCount: playbackQueue.count,
-            ]
-
-            // Add queue position
-            if playbackQueue.indices.contains(currentIndex) {
-                info[MPNowPlayingInfoPropertyPlaybackQueueIndex] = currentIndex
-            }
-
-            if let artistName = cachedArtistName(for: track) {
-                info[MPMediaItemPropertyArtist] = artistName
-            }
-
-            // Add track number
-            if let trackNo = track.trackNo {
-                info[MPMediaItemPropertyAlbumTrackNumber] = trackNo
-            }
-
-            // Add cached artwork
-            if let cachedArtwork = cachedArtwork, cachedArtworkTrackId == track.stableId {
-                info[MPMediaItemPropertyArtwork] = cachedArtwork
-                AppLog.info(.general, "🎨 Added cached artwork to Now Playing info for: \(track.title)")
-            } else {
-                AppLog.warn(.general, "⚠️ No cached artwork available for: \(track.title) (cached: \(cachedArtwork != nil), trackId match: \(cachedArtworkTrackId == track.stableId))")
-            }
+            var fields = NowPlayingInfoFields(
+                title: NowPlayingTitleOverlay.displayTitle(fallback: track.displayTitle),
+                artist: cachedArtistName(for: track),
+                duration: duration,
+                elapsed: nowPlayingElapsedTime(),
+                rate: isPlaying ? 1.0 : 0.0,
+                queueCount: playbackQueue.count,
+                queueIndex: playbackQueue.indices.contains(currentIndex) ? currentIndex : nil,
+                trackNumber: track.trackNo
+            )
 
             // Update with explicit synchronization
             DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
+                guard let self else { return }
 
-                // Re-attach artwork at write time: the artwork loader may have
-                // finished between building `info` above and this block running,
-                // and writing the stale artwork-less dictionary would wipe the
-                // artwork it already set (lock screen loses the cover).
-                var info = info
-                if info[MPMediaItemPropertyArtwork] == nil,
-                   let cachedArtwork = self.cachedArtwork,
-                   self.cachedArtworkTrackId == track.stableId {
-                    info[MPMediaItemPropertyArtwork] = cachedArtwork
-                }
+                let publishStarted = CFAbsoluteTimeGetCurrent()
 
-                // Update Now Playing Info
-                MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-
-                // Trigger CarPlay Now Playing button update
+                // 封面在这一刻定稿：绝不发布「没有 artwork 键」的信息——
+                // CarPlay 多数只在元数据变化时读一次，先发无图信息再补图 = 一路空白。
+                let resolution = self.resolveArtworkForPublication(track: track)
+                fields.artwork = resolution.artwork
+                fields.rate = self.isPlaying ? 1.0 : 0.0
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = NowPlayingInfoBuilder.dictionary(fields)
                 MPNowPlayingInfoCenter.default().playbackState = self.isPlaying ? .playing : .paused
 
-                AppLog.info(.general, "🎛️ Enhanced Control Center update - playing: \(self.isPlaying)")
-                AppLog.info(.general, "🎛️ Title: \(track.title), Time: \(currentTime)")
+                // 真机取证：这张图从哪来 / 多大 / 发布本身多久
+                let publishMilliseconds = (CFAbsoluteTimeGetCurrent() - publishStarted) * 1000
+                let artworkSide = Self.artworkSide(resolution.artwork)
+                AppLog.info(
+                    .general,
+                    "🎛️ NowPlaying publish — artwork=\(resolution.source.rawValue) side=\(artworkSide) "
+                        + "timeout=\(resolution.timedOut) publish=\(String(format: "%.1f", publishMilliseconds))ms "
+                        + "playing=\(self.isPlaying) track=\(track.title)"
+                )
             }
 
-            if cachedArtworkTrackId != track.stableId,
-               artworkLoadTaskTrackId != track.stableId {
-                artworkLoadTask?.cancel()
-                artworkLoadTaskTrackId = track.stableId
-                artworkLoadTask = Task { [weak self] in
-                    await self?.loadAndCacheArtwork(track: track)
-                    await MainActor.run { [weak self] in
-                        guard let self else { return }
-                        if self.artworkLoadTaskTrackId == track.stableId {
-                            self.artworkLoadTask = nil
-                        }
-                    }
-                }
+            // 本曲封面还没解析过 → 起后台任务，完成后走既有补发路径
+            if cachedArtworkTrackId != track.stableId {
+                loadArtworkInBackground(for: track)
             }
         }
 
@@ -293,20 +307,55 @@
             if isPlaying {
                 startPlaybackTimer()
             }
+            // 锁屏文件保护：后台读不到封面时不当成"永久没有"，回前台补一次
+            retryArtworkIfNeeded()
             AppLog.info(.general, "▶️ Resumed UI timers for foreground")
         }
 
         // MARK: - Now Playing Info
 
         func resetNowPlayingCachesForTrackChange() {
+            // 切歌代数 +1：旧曲迟到的封面结果 / 发布回调一律按旧代际丢弃。
+            // 注意：lastResolvedArtwork 故意不清——它是「上一曲封面」，切歌瞬间真图
+            // 未到时用来兜底，保证任何一次发布都带 artwork 键。
+            artworkLoadGeneration += 1
             cachedArtwork = nil
             cachedArtworkTrackId = nil
             artworkLoadTask?.cancel()
             artworkLoadTask = nil
             artworkLoadTaskTrackId = nil
+            artworkRetryTrackId = nil
             cachedNowPlayingArtistTrackId = nil
             cachedNowPlayingArtistName = nil
         }
+
+        /// 首次发布门控：切歌时最多等 500ms 拿真封面，取到就随首次发布一起上屏。
+        /// 超时返回，发布侧用「上一曲封面 / 占位图」兜底——保证任何时刻都带 artwork 键。
+        ///
+        /// 关键点：等待的是既有的 artworkLoadTask，**不新建发布入口、不取消它**；
+        /// 超时后它继续在后台跑，完成后走 updateNowPlayingInfoWithCachedArtwork 补发。
+        func awaitFirstArtworkForCurrentTrack() async {
+            guard let track = currentTrack, cachedArtworkTrackId != track.stableId else { return }
+            let generation = artworkLoadGeneration
+            loadArtworkInBackground(for: track)
+            guard let task = artworkLoadTask else { return }
+
+            let started = CFAbsoluteTimeGetCurrent()
+            let finished = await NowPlayingBoundedWait.run(
+                for: task,
+                timeout: .milliseconds(Self.firstArtworkWaitMilliseconds)
+            )
+            guard generation == artworkLoadGeneration else { return }
+            let waited = Int((CFAbsoluteTimeGetCurrent() - started) * 1000)
+            if finished {
+                AppLog.info(.general, "🎨 首次发布前取到封面 (\(waited)ms) track=\(track.title)")
+            } else {
+                AppLog.warn(.general, "⏱ 首次发布等封面超时 (\(waited)ms)，先用兜底图 track=\(track.title)")
+            }
+        }
+
+        /// 首次发布的封面等待上限（任务要求 400–600ms 之间）。
+        static let firstArtworkWaitMilliseconds = 500
 
         func nowPlayingElapsedTime() -> TimeInterval {
             if usingSFBEngine {
@@ -340,6 +389,8 @@
             guard currentTrack != nil else { return }
 
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+            // 没有曲目信息时不要只写播放进度（半份字典会把锁屏/车机刷成空白）
+            guard info[MPMediaItemPropertyTitle] != nil else { return }
             info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = nowPlayingElapsedTime()
             info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info

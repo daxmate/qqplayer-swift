@@ -270,7 +270,11 @@
                 // Ensure remote commands are set up for Control Center
                 ensureRemoteCommandsSetup()
 
-                // Force immediate Control Center update with new track info and reset timing
+                // Force immediate Control Center update with new track info and reset timing.
+                // 首次发布前有界等封面（≤500ms）：CarPlay 多数只在元数据变化时读一次，
+                // 先发无图信息再补图 = 一路空白。超时则用兜底图先发，真图到位后走补发。
+                await awaitFirstArtworkForCurrentTrack()
+                guard isCurrentLoad(generation) else { return false }
                 lastControlCenterUpdate = 0
                 updateNowPlayingInfoEnhanced()
 

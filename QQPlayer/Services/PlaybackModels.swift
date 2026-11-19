@@ -118,6 +118,20 @@ enum PlaybackTrackGate {
     static func isStillCurrent(trackId: String, currentTrackId: String?) -> Bool {
         trackId == currentTrackId
     }
+
+    /// 带代际的同曲校验（2026-11-19，CarPlay 封面空白修复）。
+    ///
+    /// 只比 trackId 不够：A→B→A 快速切回时，A 第一次的迟到回调会被当成「当前曲的结果」
+    /// 写进缓存（A→B 期间 B 的封面则可能被 A 的迟到结果覆盖）。切歌时递增代数，
+    /// 迟到的结果一律按旧代际丢弃。
+    static func isStillCurrent(
+        trackId: String,
+        generation: Int,
+        currentTrackId: String?,
+        currentGeneration: Int
+    ) -> Bool {
+        trackId == currentTrackId && generation == currentGeneration
+    }
 }
 
 /// 载入失败 → 用户可见文案 key（纯函数，可单测）。

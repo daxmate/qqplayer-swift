@@ -66,3 +66,45 @@ struct CarPlayPlayerPageButtonCache {
         buttons.removeAll()
     }
 }
+
+/// 页头封面加载：首取 + 有界重试（0 / 300ms / 1s），仍未拿到再强制刷新一次。
+///
+/// 为什么不"每 tick 重取"：tick 是 0.5s 一次的 UI 循环，重取会反复解包大文件。
+/// 为什么必须重试：CarPlay 常从后台/锁屏态进入，首取可能撞上文件保护或解包还没完成，
+/// 一次性放弃 = 整首歌页头空白（artworkKey 已置位，之后不再重画）。
+@MainActor
+enum CarPlayPlayerPageArtworkLoader {
+    enum Outcome {
+        case loaded(UIImage)
+        case missing
+        /// 曲目已切走 / 任务被取消：结果不许再上屏
+        case abandoned
+    }
+
+    static let retryDelays: [Duration] = [.zero, .milliseconds(300), .seconds(1)]
+
+    static func load(
+        for track: Track,
+        isStillCurrent: @MainActor () -> Bool
+    ) async -> Outcome {
+        var image: UIImage?
+        for delay in retryDelays {
+            if delay > .zero {
+                try? await Task.sleep(for: delay)
+            }
+            guard !Task.isCancelled, isStillCurrent() else { return .abandoned }
+            image = await ArtworkManager.shared.getArtwork(for: track)
+            guard !Task.isCancelled else { return .abandoned }
+            // 没有内嵌封面 = 确定没有，重试无意义
+            if image != nil || !track.hasEmbeddedArt {
+                break
+            }
+        }
+        guard !Task.isCancelled, isStillCurrent() else { return .abandoned }
+        if image == nil, track.hasEmbeddedArt {
+            image = await ArtworkManager.shared.forceRefreshArtwork(for: track)
+        }
+        guard !Task.isCancelled, isStillCurrent() else { return .abandoned }
+        return image.map(Outcome.loaded) ?? .missing
+    }
+}

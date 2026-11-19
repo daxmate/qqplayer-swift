@@ -171,6 +171,13 @@ class PlayerEngine: NSObject {
     // Artwork caching
     @ObservationIgnored var cachedArtwork: MPMediaItemArtwork?
     @ObservationIgnored var cachedArtworkTrackId: String?
+    /// 最近一次真实解析到的封面（跨切歌保留）。切歌瞬间真图还没到就先用它兜底，
+    /// 保证任何一次 nowPlayingInfo 发布都带 artwork 键（CarPlay 只读一次）。
+    @ObservationIgnored var lastResolvedArtwork: MPMediaItemArtwork?
+    /// 封面解析失败但可重试的曲目（锁屏文件保护 / 读盘失败）：回前台时再试一次。
+    @ObservationIgnored var artworkRetryTrackId: String?
+    /// 切歌代数：迟到的封面结果按代际丢弃，避免串到后一首（见 PlaybackTrackGate）。
+    @ObservationIgnored var artworkLoadGeneration = 0
     @ObservationIgnored var artworkLoadTask: Task<Void, Never>?
     @ObservationIgnored var artworkLoadTaskTrackId: String?
     @ObservationIgnored var cachedNowPlayingArtistTrackId: String?

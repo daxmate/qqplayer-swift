@@ -83,3 +83,13 @@ extension CarPlayPlayerPageController {
         totalText.draw(at: CGPoint(x: rect.maxX - inset - totalWidth, y: textY), withAttributes: attributes)
     }
 }
+
+/// 播放页页头缩略图：封面按 aspect-fill 画进正方形。
+/// 填充规则复用列表页的 drawAspectFill（同一套「封面怎么裁」只有一份实现）。
+@MainActor
+func resizeArtworkForPlayerPage(_ image: UIImage) -> UIImage {
+    let target = CGSize(width: playerPageThumbnailSide, height: playerPageThumbnailSide)
+    return UIGraphicsImageRenderer(size: target).image { _ in
+        drawAspectFill(image, in: CGRect(origin: .zero, size: target))
+    }
+}

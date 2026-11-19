@@ -180,6 +180,11 @@ final class CarPlayPlayerPageController {
     /// 页头缩略图 / 控制键复用缓存（见 CarPlay+PlayerPageCache.swift）
     private var thumbnailCache = CarPlayPlayerPageThumbnailCache()
     private var buttonCache = CarPlayPlayerPageButtonCache()
+    /// 页头已上屏的那次快照里到底有没有图（nil 图也会"已出结果"，
+    /// 真图晚到时必须能识别出「该重画一次」——见 headerNeedsArtwork）
+    private var appliedArtworkHadImage = false
+    /// 封面加载 / 有界重试任务（切歌、停页时取消，避免旧曲结果串到新曲）
+    private var artworkTask: Task<Void, Never>?
 
     init() {
         template = CPListTemplate(title: "lyrics".localized, sections: [])
@@ -192,6 +197,8 @@ final class CarPlayPlayerPageController {
         cancellables.removeAll()
         tickTimer?.invalidate()
         tickTimer = nil
+        artworkTask?.cancel()
+        artworkTask = nil
         clearCarLyricsTitle()
         thumbnailCache.removeAll()
         buttonCache.removeAll()
@@ -262,6 +269,9 @@ final class CarPlayPlayerPageController {
         artwork = nil
         loadedArtworkKey = nil
         appliedArtworkKey = nil
+        appliedArtworkHadImage = false
+        artworkTask?.cancel()
+        artworkTask = nil
         // 旧曲目的缩略图既不该复用，也没必要占内存
         thumbnailCache.removeAll()
         refresh()
@@ -281,14 +291,27 @@ final class CarPlayPlayerPageController {
         }
     }
 
+    /// 页头封面：有界重试（0 / 300ms / 1s）+ 强制刷新一次，细节见
+    /// CarPlayPlayerPageArtworkLoader（与渲染缓存同层）。
     private func loadArtwork(for track: Track) {
         let key = track.stableId
-        Task { @MainActor [weak self] in
-            let image = await ArtworkManager.shared.getArtwork(for: track)
-            guard let self, self.lyricsTrackId == key else { return }
-            self.artwork = image.map { resizeArtworkForPlayerPage($0) }
+        artworkTask?.cancel()
+        artworkTask = Task { @MainActor [weak self] in
+            let outcome = await CarPlayPlayerPageArtworkLoader.load(for: track) { [weak self] in
+                self?.lyricsTrackId == key
+            }
+            guard let self else { return }
+            switch outcome {
+            case .abandoned:
+                return
+            case let .loaded(image):
+                self.artwork = resizeArtworkForPlayerPage(image)
+            case .missing:
+                self.artwork = nil
+            }
             self.loadedArtworkKey = key
             self.refresh()
+            AppLog.info(.general, "🖼️ CarPlay 页头封面：\(self.artwork == nil ? "无" : "已取到") track=\(track.title)")
         }
     }
 
@@ -394,11 +417,16 @@ final class CarPlayPlayerPageController {
         }
     }
 
-    /// 页头是否需要因封面变化重建：封面已出结果、且页头用的还不是这一份
+    /// 页头是否需要因封面变化重建：封面已出结果、且页头用的还不是这一份。
+    ///
+    /// 第二种情况是原来的竞态：首取返回 nil 也算"已出结果"，页头用占位图上了屏、
+    /// appliedArtworkKey 已置位 → 之后真图到了没人再重画（artworkKey 没变），
+    /// 整首歌页头空白。现在只要"上屏那次没图、现在有图"就补画一次。
     private func headerNeedsArtwork(_ header: CarPlayPlayerPageHeader?) -> Bool {
         guard let header, let artworkKey = header.artworkKey else { return false }
         guard loadedArtworkKey == artworkKey else { return false }
-        return appliedArtworkKey != artworkKey
+        if appliedArtworkKey != artworkKey { return true }
+        return !appliedArtworkHadImage && artwork != nil
     }
 
     // MARK: - 上屏
@@ -445,6 +473,7 @@ final class CarPlayPlayerPageController {
             template.listHeader = nil
             appliedHeader = nil
             appliedArtworkKey = nil
+            appliedArtworkHadImage = false
             return
         }
 
@@ -477,6 +506,7 @@ final class CarPlayPlayerPageController {
         appliedHeader = header
         // 封面出结果后才置位：出结果前不置位 → 图到了会重建一次页头；之后不再按 tick 重建
         appliedArtworkKey = artworkSettled ? header.artworkKey : nil
+        appliedArtworkHadImage = image != nil
     }
 
     private var supportsDetailsHeader: Bool {
@@ -554,14 +584,3 @@ final class CarPlayPlayerPageController {
 /// 播放页页头缩略图边长（页头是大图，不能用 CPListItem.maximumImageSize 那个列表尺寸）。
 /// 绘制实现已拆到 CarPlay+PlayerPageThumbnail.swift，两边共用这一个常量。
 let playerPageThumbnailSide = 512.0
-
-/// 播放页页头缩略图：封面按 aspect-fill 画进正方形。
-/// 填充规则复用列表页的 drawAspectFill（同一套「封面怎么裁」只有一份实现）。
-@MainActor
-private func resizeArtworkForPlayerPage(_ image: UIImage) -> UIImage {
-    let side = playerPageThumbnailSide
-    let target = CGSize(width: side, height: side)
-    return UIGraphicsImageRenderer(size: target).image { _ in
-        drawAspectFill(image, in: CGRect(origin: .zero, size: target))
-    }
-}

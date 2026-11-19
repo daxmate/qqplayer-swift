@@ -149,17 +149,26 @@ class ArtworkManager {
         return refreshed
     }
 
-    func getArtwork(for track: Track) async -> ArtworkImage? {
+    /// 封面来源（2026-11-19）：发布日志要能看出这张图是内存命中、磁盘命中还是现场解包，
+    /// 真机排查 CarPlay 空白时按这行区分「没图」还是「图来晚了」。
+    enum ArtworkLoadSource: String {
+        case memory
+        case disk
+        case extract
+    }
+
+    /// 带来源的封面加载：与 `getArtwork(for:)` 同一条链路，只是把命中层级带出来。
+    func getArtworkDetail(for track: Track) async -> (image: ArtworkImage, source: ArtworkLoadSource)? {
         // 1. Check memory cache first (fastest)
         if let cachedImage = memoryCache.object(forKey: track.stableId as NSString) {
-            return cachedImage
+            return (cachedImage, .memory)
         }
 
         // 2. Check disk cache (fast)
         if let diskImage = await loadFromDiskCache(stableId: track.stableId) {
             // Store in memory cache for next time
             cacheImage(diskImage, for: track.stableId)
-            return diskImage
+            return (diskImage, .disk)
         }
 
         // 3. Extract from audio file and cache (slow - should be rare after indexing)
@@ -173,10 +182,14 @@ class ArtworkManager {
             // Store in both caches
             cacheImage(image, for: track.stableId)
             await saveToDiskCache(image: image, stableId: track.stableId)
-            return image
+            return (image, .extract)
         }
 
         return nil
+    }
+
+    func getArtwork(for track: Track) async -> ArtworkImage? {
+        await getArtworkDetail(for: track)?.image
     }
 
     /// Small artwork for list rows and grid cells. Decoding and holding these
