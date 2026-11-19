@@ -38,12 +38,66 @@
 
 import Foundation
 
+/// 文件身份：判断「现在这个路径上的文件还是不是同一个文件」，跨改名/移动稳定。
+///
+/// 存在理由：入队后要等初次索引 + 三源网络检索（实测 6–13s），期间
+/// `LibraryIndexer+RenameNormalize` 可能已按模板改名（`夜曲-周杰伦.mp3` → `周杰伦 - 夜曲.mp3`）。
+/// 仍按下载时的旧路径写标签 → `TagWriterService` 抛 `fileNotReadable`，整次自动刮削静默失败。
+///
+/// 判据（与 TrackFileRenameService.isSameFile 同口径）：
+/// 1. 首选 `URLResourceValues.fileResourceIdentifierKey`（Data）；
+/// 2. 回落 `FileManager.attributesOfItem` 的 `.systemNumber`（st_dev）+ `.systemFileNumber`（st_ino）。
+struct MacAutoScrapeFileIdentity: Sendable, Equatable {
+    private enum Kind: Sendable, Equatable {
+        case resourceIdentifier(Data)
+        case deviceAndInode(device: UInt64, inode: UInt64)
+    }
+
+    private let kind: Kind
+
+    /// 文件存在且能取到身份才返回；否则 nil（调用方按「无法判定」处理）。
+    static func capture(at url: URL, fileManager: FileManager = .default) -> MacAutoScrapeFileIdentity? {
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        if let identifier = (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier,
+           let data = identifier as? Data {
+            return MacAutoScrapeFileIdentity(kind: .resourceIdentifier(data))
+        }
+        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+              let device = (attributes[.systemNumber] as? NSNumber)?.uint64Value,
+              let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
+        else { return nil }
+        return MacAutoScrapeFileIdentity(kind: .deviceAndInode(device: device, inode: inode))
+    }
+
+    /// 给定 URL 现在是否仍是同一个文件（改名/移动不影响；文件不在或取不到身份 → false）。
+    func matches(_ url: URL, fileManager: FileManager = .default) -> Bool {
+        guard let current = MacAutoScrapeFileIdentity.capture(at: url, fileManager: fileManager) else {
+            return false
+        }
+        return current == self
+    }
+}
+
 /// 单次自动刮削任务（值类型，可跨并发域传递）
 struct MacAutoScrapeJob: Sendable {
     let path: String
     /// 下载时已知的歌曲信息（在线搜索结果的 title/artist，比落盘文件名更准）
     let knownTitle: String?
     let knownArtist: String?
+    /// 入队时捕获的文件身份（此刻文件刚下载完、必然存在）；网络检索后据此重新定位被索引改名的文件。
+    let identity: MacAutoScrapeFileIdentity?
+
+    init(
+        path: String,
+        knownTitle: String?,
+        knownArtist: String?,
+        identity: MacAutoScrapeFileIdentity? = nil
+    ) {
+        self.path = path
+        self.knownTitle = knownTitle
+        self.knownArtist = knownArtist
+        self.identity = identity
+    }
 }
 
 enum MacAutoScrapeService {
@@ -68,7 +122,12 @@ enum MacAutoScrapeService {
         let enabled = DeleteSettings.load().scrapingAutoAfterDownload
         let ext = URL(fileURLWithPath: path).pathExtension
         guard shouldEnqueue(enabled: enabled, extension: ext) else { return }
-        let job = MacAutoScrapeJob(path: path, knownTitle: title, knownArtist: artist)
+        let job = MacAutoScrapeJob(
+            path: path,
+            knownTitle: title,
+            knownArtist: artist,
+            identity: MacAutoScrapeFileIdentity.capture(at: URL(fileURLWithPath: path))
+        )
         Task.detached(priority: .utility) {
             await MacAutoScrapeQueue.shared.enqueue(job)
         }
@@ -104,27 +163,56 @@ actor MacAutoScrapeQueue {
 
 /// 单文件自动刮削流水（不抛错：所有失败只落日志，绝不影响下载成功状态）。
 enum MacAutoScrapeWorker {
-    static func process(_ job: MacAutoScrapeJob) async {
-        let url = URL(fileURLWithPath: job.path)
-        let fileName = url.lastPathComponent
+    /// 定位任务文件的**当前**路径（任何改名来源：索引扫掠、手动改名都兜住）。
+    ///
+    /// - 旧路径存在且身份匹配（或无法判定身份）→ 用旧路径；
+    /// - 旧路径不存在 / 已被别的文件占用 → 在同目录枚举，按 identity **唯一**命中返回新路径；
+    /// - 0 或多命中 / 无处可找 → nil（调用方跳过，绝不猜）。
+    static func resolveCurrentURL(for job: MacAutoScrapeJob, fileManager: FileManager = .default) -> URL? {
+        let originalURL = URL(fileURLWithPath: job.path)
+        let identity = job.identity
+        if fileManager.fileExists(atPath: originalURL.path) {
+            if identity == nil || identity?.matches(originalURL, fileManager: fileManager) == true {
+                return originalURL
+            }
+        }
+        guard let identity else { return nil }
 
-        guard FileManager.default.fileExists(atPath: job.path) else {
-            log(.warn, "文件不存在，跳过 \(fileName)")
+        let directory = originalURL.deletingLastPathComponent()
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: []
+        ) else { return nil }
+        let matched = entries.filter { identity.matches($0, fileManager: fileManager) }
+        return matched.count == 1 ? matched[0] : nil
+    }
+
+    static func process(_ job: MacAutoScrapeJob) async {
+        let originalName = URL(fileURLWithPath: job.path).lastPathComponent
+
+        // 0. 先定位文件当前路径：下载落盘到入队之间/之后，索引扫掠可能已按模板改名。
+        guard let currentURL = resolveCurrentURL(for: job) else {
+            log(.warn, "文件已被移走/改名，跳过 \(originalName)")
             return
+        }
+        var fileName = currentURL.lastPathComponent
+        if currentURL.path != job.path {
+            log(.info, "路径已变更（索引改名），改用 \(fileName)（原 \(originalName)）")
         }
 
         // 1. 等文件被初次索引（最多约 3s）。索引慢也继续——不能因索引没到就丢功能。
-        let indexed = await waitForInitialIndex(path: job.path)
+        let indexed = await waitForInitialIndex(path: currentURL.path)
         if !indexed {
             log(.info, "等待索引超时（继续刮削）\(fileName)")
         }
 
         // 1b. 写标签**之前**抓旧 stableId：写完后 stableId 可能变化，播放上下文
         //     （正在播放条 / 播放队列）要靠它找到旧行做替换。取不到（未入库）→ 后续跳过跟随。
-        let oldStableId = (try? LibraryReads.track(path: job.path))?.stableId
+        let oldStableId = (try? LibraryReads.track(path: currentURL.path))?.stableId
 
         // 2. 读现有标签；检索词 = 下载时已知 title → 文件 title → 文件名 stem
-        let metadata = try? await AudioMetadataParser.parseMetadata(from: url)
+        let metadata = try? await AudioMetadataParser.parseMetadata(from: currentURL)
         let queryTitle = firstNonBlank(job.knownTitle, metadata?.title)
         let query = ScrapeLogic.searchQuery(title: queryTitle, fileName: fileName)
         let artist = firstNonBlank(job.knownArtist, metadata?.artist) ?? ""
@@ -158,16 +246,27 @@ enum MacAutoScrapeWorker {
             }
         }
 
+        // 5b. 写前再解析一次：网络检索 + 封面下载要 6–13s，这期间索引扫掠的改名正是
+        //     真机 fileNotReadable 的实际出事窗口。解析不到 → 文件已被移走，跳过（不抛给下载调用方）。
+        guard let writeURL = resolveCurrentURL(for: job) else {
+            log(.warn, "文件已被移走/改名，跳过 \(fileName)")
+            return
+        }
+        if writeURL.path != currentURL.path {
+            log(.info, "路径已变更（索引改名），改用 \(writeURL.lastPathComponent)（原 \(fileName)）")
+        }
+        fileName = writeURL.lastPathComponent
+
         // 6. 写标签 + 按模板改名
         do {
-            let result = try TagWriterService.writeTags(to: url, request: request)
+            let result = try TagWriterService.writeTags(to: writeURL, request: request)
             if result.renamed {
                 // DB 写操作唯一入口是 @MainActor 的 AppCoordinator → 从后台 hop 回主线程。
                 // 迁移失败仍继续单文件入库（processExternalFile 会按新路径补行），但必须留日志：
                 // 否则旧行可能悬空，真机上无法定位（单曲保存同路径会向用户报错，后台链路只能落日志）。
                 do {
                     try await MainActor.run {
-                        try AppCoordinator.shared.moveTrack(from: job.path, to: result.finalURL.path)
+                        try AppCoordinator.shared.moveTrack(from: writeURL.path, to: result.finalURL.path)
                     }
                 } catch {
                     log(.warn, "改名后 DB 引用迁移失败（继续按新路径入库）\(fileName) → \(result.finalURL.lastPathComponent): \(error)")
