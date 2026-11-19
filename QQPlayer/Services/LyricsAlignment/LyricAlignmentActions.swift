@@ -15,7 +15,9 @@ enum LyricAlignmentActions {
 
     /// 对齐某首歌：歌词取不到 / 判据不满足 → 记一条可读失败文案（sheet 展示）。
     static func startAlignment(for track: Track) async {
-        let fileExists = FileManager.default.fileExists(atPath: track.path)
+        // track.path 是存储形态（相对 Documents/Music），必须经 LibraryRoot 解析；空串不解析。
+        let fileExists = !track.path.isEmpty
+            && FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path))
         guard let lyrics = await LyricsManager.shared.getLyrics(for: track),
               LyricAlignmentFeature.canAlign(track: track, lyrics: lyrics, fileExists: fileExists)
         else {

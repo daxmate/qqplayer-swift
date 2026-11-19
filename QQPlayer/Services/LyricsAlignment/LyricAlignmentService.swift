@@ -84,7 +84,9 @@ actor LyricAlignmentService {
         let languageCode = LyricAlignmentLanguageDetector.detectLanguageCode(in: lyricsText)
         let locale = Locale(identifier: languageCode)
 
-        guard !track.path.isEmpty, FileManager.default.fileExists(atPath: track.path) else {
+        // track.path 是存储形态（相对 Documents/Music），存在性判断必须经 LibraryRoot 解析。
+        guard !track.path.isEmpty,
+              FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path)) else {
             throw LyricAlignmentError.audioUnreadable
         }
 
@@ -93,7 +95,7 @@ actor LyricAlignmentService {
         let tokens: [AsrToken]
         do {
             tokens = try await engine.transcribe(
-                fileURL: URL(fileURLWithPath: track.path),
+                fileURL: LibraryRoot.absoluteURL(forStoredPath: track.path),
                 locale: locale
             ) { value in
                 progress(0.05 + value * 0.75)

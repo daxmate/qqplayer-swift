@@ -130,9 +130,11 @@ struct MacTrackContextMenuContent: View {
         }
 
         // 歌词时间轴对齐（macOS 26+）：能力不足时整项隐藏，不是置灰
+        let audioExists = !track.path.isEmpty
+            && FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path))
         let canAlignLyrics = LyricAlignmentFeature.canOfferAlignment(
             track: track,
-            fileExists: FileManager.default.fileExists(atPath: track.path)
+            fileExists: audioExists
         )
         let hasAlignedLyrics = LyricAlignmentFeature.isAligned(stableId: track.stableId)
         if canAlignLyrics || hasAlignedLyrics {

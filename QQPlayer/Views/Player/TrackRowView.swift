@@ -160,9 +160,12 @@ struct TrackRowView: View, @MainActor Equatable {
                     }
 
                     // 歌词时间轴对齐（iOS 26+）：能力不足时整项隐藏，不是置灰
+                    // track.path 是存储形态（相对 Documents/Music），存在性判断必须经 LibraryRoot 解析。
+                    let audioExists = !track.path.isEmpty
+                        && FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path))
                     let canAlignLyrics = LyricAlignmentFeature.canOfferAlignment(
                         track: track,
-                        fileExists: FileManager.default.fileExists(atPath: track.path)
+                        fileExists: audioExists
                     )
                     let hasAlignedLyrics = LyricAlignmentFeature.isAligned(stableId: track.stableId)
                     if canAlignLyrics || hasAlignedLyrics {

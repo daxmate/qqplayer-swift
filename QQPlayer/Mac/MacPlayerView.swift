@@ -219,10 +219,9 @@ struct MacPlayerView: View {
     /// 菜单入口可见性：能力不足时整项隐藏（不是置灰）。
     private var canAlignLyricsTimeline: Bool {
         guard let track else { return false }
-        return LyricAlignmentFeature.canOfferAlignment(
-            track: track,
-            fileExists: FileManager.default.fileExists(atPath: track.path)
-        )
+        let audioExists = !track.path.isEmpty
+            && FileManager.default.fileExists(atPath: LibraryRoot.absolutePath(forStoredPath: track.path))
+        return LyricAlignmentFeature.canOfferAlignment(track: track, fileExists: audioExists)
     }
 
     private var hasAlignedLyricsTimeline: Bool {
