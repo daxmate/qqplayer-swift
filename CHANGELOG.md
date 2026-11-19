@@ -2,6 +2,12 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.2] - 2026-11-19
+
+### 🐛 修复
+
+- **iOS 歌词时间轴对齐入口不显示**：iOS 曲库文件夹化后 track.path 存的是相对 Documents/Music 的相对路径，而入口判据与开跑前守卫直接拿裸路径做 fileExists / URL(fileURLWithPath:)，恒判「文件不存在」→ 菜单项被整项隐藏（Mac 存绝对路径，故只在 iOS 复现）。判据与音频加载统一改走 LibraryRoot.absoluteURL(forStoredPath:)，并新增守卫测试禁止裸 track.path 做文件存在性判断。
+
 ## [1.8.1] - 2026-11-19
 
 ### 🐛 修复
@@ -47,6 +53,7 @@
 - **低质判据改为字符覆盖率**：从「命中行数 / 总行数 < 50%」改为「识别覆盖率 < 45% 或命中行 < 3 行」，长行密集的中文歌不再被误判（实测某 45 行歌词命中 21 行、覆盖率 0.61、时间全部落在 2 秒内，旧判据却判低质）；结果面板直接显示识别覆盖率与已对齐行数。
 - 对齐结果面板、低匹配提示与相关文案在 en / fr / ru / zh-Hans / zh-Hant 五语种同步更新。
 
+[1.8.2]: https://github.com/daxmate/qqplayer-swift/compare/v1.8.1...v1.8.2
 [1.8.0]: https://github.com/daxmate/qqplayer-swift/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/daxmate/qqplayer-swift/compare/v1.6.0...v1.7.0
 
