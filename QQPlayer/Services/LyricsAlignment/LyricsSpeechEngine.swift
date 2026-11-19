@@ -59,7 +59,7 @@ struct AppleSpeechLyricsEngine: LyricsSpeechEngine {
             attributeOptions: [.audioTimeRange]
         )
 
-        // 2. 模型资产：没装就装（进度 0…0.15）。
+        // 2. 模型资产：等待系统下载，必要时申请安装并重试（进度 0…0.15）。
         try await installAssetsIfNeeded(for: transcriber, progress: progress)
 
         // 3. 源音频 → 临时 16k 单声道 Int16 WAV（进度 0.15…0.25）。
@@ -140,33 +140,139 @@ struct AppleSpeechLyricsEngine: LyricsSpeechEngine {
 
     // MARK: - 模型资产
 
+    /// 等待 / 安装语音模型资产（有界等待 + 重试）。
+    /// - `AssetInventory.assetInstallationRequest` 返回 nil = 系统正在下载或已排队，**不是失败**；
+    /// - 单次安装抛错不吞：记日志后等下一轮复查，只有整个预算耗尽才报 `assetInstallFailed`。
     private func installAssetsIfNeeded(
         for transcriber: SpeechTranscriber,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
-        let status = await AssetInventory.status(forModules: [transcriber])
-        if status == .installed {
-            progress(Self.assetProgressShare)
-            return
-        }
-        guard let request = try? await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
-            throw LyricAlignmentError.assetInstallFailed
-        }
         let share = Self.assetProgressShare
-        let reporter = Task { [request] in
+        let startedAt = Date()
+        var attempts = 0
+        var lastStatus: SpeechAssetStatus = .downloading
+        var lastErrorDescription: String?
+        var loggedStatus: SpeechAssetStatus?
+
+        do {
+            while true {
+                try Task.checkCancellation()
+                let status = Self.assetStatus(for: await AssetInventory.status(forModules: [transcriber]))
+                lastStatus = status
+                if status != loggedStatus {
+                    loggedStatus = status
+                    AppLog.info(.general, "🎤 Speech asset status: \(Self.assetStatusName(status))")
+                }
+
+                switch SpeechAssetInstallPlanner.step(for: status) {
+                case .ready:
+                    progress(share)
+                    return
+                case .unsupported:
+                    throw LyricAlignmentError.localeUnavailable
+                case .wait:
+                    break
+                case .install:
+                    attempts += 1
+                    let request: AssetInstallationRequest?
+                    do {
+                        request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber])
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        request = nil
+                        lastErrorDescription = String(describing: error)
+                        AppLog.warn(
+                            .general,
+                            "🎤 Speech asset request failed (attempt \(attempts)): "
+                                + (lastErrorDescription ?? "-")
+                        )
+                    }
+                    if let request {
+                        do {
+                            try await downloadAndInstall(request, share: share, progress: progress)
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            lastErrorDescription = String(describing: error)
+                            AppLog.warn(
+                                .general,
+                                "🎤 Speech asset install failed (attempt \(attempts), "
+                                    + "status \(Self.assetStatusName(lastStatus))): "
+                                    + (lastErrorDescription ?? "-")
+                            )
+                        }
+                    }
+                }
+
+                let elapsed = Date().timeIntervalSince(startedAt)
+                let budget = SpeechAssetInstallPlanner.budget
+                guard SpeechAssetInstallPlanner.hasBudgetRemaining(elapsed: elapsed, budget: budget) else {
+                    AppLog.warn(
+                        .general,
+                        "🎤 Speech asset install gave up after \(attempts) attempt(s), "
+                            + "\(Int(elapsed))s, last status \(Self.assetStatusName(lastStatus)), "
+                            + "last error: \(lastErrorDescription ?? "-")"
+                    )
+                    throw LyricAlignmentError.assetInstallFailed
+                }
+                try await Task.sleep(
+                    nanoseconds: UInt64(SpeechAssetInstallPlanner.pollInterval * 1_000_000_000)
+                )
+            }
+        } catch is CancellationError {
+            throw LyricAlignmentError.cancelled
+        }
+    }
+
+    /// 安装期间把 request.progress 映射到 0…share 上报（沿用原有节流语义）。
+    private func downloadAndInstall(
+        _ request: AssetInstallationRequest,
+        share: Double,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws {
+        let reporter = Task {
             while !Task.isCancelled {
                 let fraction = request.progress.fractionCompleted
                 progress(min(max(fraction, 0), 1) * share)
-                try? await Task.sleep(nanoseconds: 300_000_000)
+                do {
+                    try await Task.sleep(nanoseconds: 300_000_000)
+                } catch {
+                    return
+                }
             }
         }
         defer { reporter.cancel() }
-        do {
-            try await request.downloadAndInstall()
-        } catch {
-            throw LyricAlignmentError.assetInstallFailed
+        try await request.downloadAndInstall()
+    }
+
+    /// SDK 状态 → 自有镜像（Speech 依赖只留在这层，planner 保持纯函数）。
+    private static func assetStatus(for status: AssetInventory.Status) -> SpeechAssetStatus {
+        switch status {
+        case .installed:
+            return .installed
+        case .downloading:
+            return .downloading
+        case .supported:
+            return .supported
+        case .unsupported:
+            return .unsupported
+        @unknown default:
+            return .supported
         }
-        progress(share)
+    }
+
+    private static func assetStatusName(_ status: SpeechAssetStatus) -> String {
+        switch status {
+        case .unsupported:
+            return "unsupported"
+        case .downloading:
+            return "downloading"
+        case .supported:
+            return "supported"
+        case .installed:
+            return "installed"
+        }
     }
 
     // MARK: - 错误归类

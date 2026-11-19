@@ -865,6 +865,7 @@
 				Services/LyricsAlignment/LyricAlignmentTypes.swift,
 				Services/LyricsAlignment/LyricsAlignmentAudioFile.swift,
 				Services/LyricsAlignment/LyricsSpeechEngine.swift,
+				Services/LyricsAlignment/SpeechAssetInstallPlanner.swift,
 				Services/AppCoordinator.swift,
 				"Services/AppCoordinator+iCloud.swift",
 				"Services/AppCoordinator+ImportExport.swift",
