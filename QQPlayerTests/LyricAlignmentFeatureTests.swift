@@ -145,4 +145,23 @@ struct LyricAlignmentFeatureTests {
         try store.delete(forStableId: stableId)
         #expect(!LyricAlignmentFeature.isAligned(stableId: stableId, store: store))
     }
+
+    // MARK: - 存储路径解析（1.8.2 回归：入口判据必须经 LibraryRoot）
+
+    @Test("相对存储路径经 LibraryRoot 解析后落在曲库根（Documents/Music）下")
+    func relativeStoredPathResolvesUnderMusicRoot() {
+        let resolved = LibraryRoot.absoluteURL(forStoredPath: "某专辑/song.mp3")
+        let musicRoot = LibraryRoot.musicRootURL().path
+
+        #expect(resolved.path.hasPrefix(musicRoot + "/"))
+        #expect(resolved.path.hasSuffix("/Documents/Music/某专辑/song.mp3"))
+    }
+
+    @Test("绝对路径经 LibraryRoot 解析保持幂等")
+    func absoluteStoredPathResolutionIsIdempotent() {
+        let absolute = "/tmp/qqplayer-outside/song.flac"
+
+        #expect(LibraryRoot.absoluteURL(forStoredPath: absolute).path == absolute)
+        #expect(LibraryRoot.absolutePath(forStoredPath: absolute) == absolute)
+    }
 }
