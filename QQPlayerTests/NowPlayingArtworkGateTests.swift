@@ -45,8 +45,11 @@ struct NowPlayingArtworkGateTests {
 
     @Test("② 有界等待内返回：等待成功，用刚取到的真封面")
     func arrivesWithinTimeout() async {
+        // 超时给到 10 分钟：这条只验「任务先完成就返回 true」。CI 上 2600+ 用例并行，
+        // 主 actor 可能被占住十几秒；若超时值仍是秒级，放行时两个分支都已到期，
+        // 谁先被调度就随机（2026-11-19 CI 实测 5s 超时比 10ms 任务先赢）。
         let task = Task { _ = try? await Task.sleep(for: .milliseconds(10)) }
-        let finished = await NowPlayingBoundedWait.run(for: task, timeout: .seconds(5))
+        let finished = await NowPlayingBoundedWait.run(for: task, timeout: .seconds(600))
         #expect(finished)
 
         let arrived = FakeArtwork()
@@ -66,9 +69,10 @@ struct NowPlayingArtworkGateTests {
     @Test("③ 超时：先用上一曲封面兜底，不取消后台任务")
     func timesOutUsesPreviousArtwork() async {
         let previous = FakeArtwork()
-        // 加载侧 1s vs 超时 20ms：留 50× 余量，CI 机器再慢也不会翻转判定
-        let task = Task { _ = try? await Task.sleep(for: .seconds(1)) }
-        let finished = await NowPlayingBoundedWait.run(for: task, timeout: .milliseconds(20))
+        // 加载侧 10 分钟 vs 超时 50ms：只有「任务永远完不成」，超时才必然先赢。
+        // 不能用 1s——CI 上主 actor 被占住十几秒时任务早已完成，判定会随机翻转。
+        let task = Task { _ = try? await Task.sleep(for: .seconds(600)) }
+        let finished = await NowPlayingBoundedWait.run(for: task, timeout: .milliseconds(50))
         #expect(finished == false)
 
         let fallback = NowPlayingArtworkGate.decide(
@@ -83,8 +87,8 @@ struct NowPlayingArtworkGateTests {
         #expect(fallback.timedOut)
 
         // 等待超时也**不许取消**加载任务：它还要在后台跑完并补发
-        await task.value
         #expect(task.isCancelled == false)
+        task.cancel()
     }
 
     @Test("③b 超时且没有上一曲：退回占位图（仍然带 artwork）")
