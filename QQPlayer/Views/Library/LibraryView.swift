@@ -400,15 +400,20 @@ struct LibraryView: View {
             guard locateRequestPending else { return }
             locateRequestPending = false
             allSongsToNavigate = true
+            AppLog.info(.ui, "✅ LibraryView: 定位请求入栈「所有歌曲」 token=\(locateNavigationToken)")
         }
     }
 
     /// mini 播放条长按 → 定位当前播放行（A 需求唯一消费点）。
     private func handleLocateCurrentTrack() {
-        guard LocateCurrentTrackPlan.shouldHandle(
-            currentTrackStableId: playerEngine.currentTrack?.stableId
-        ) else { return }
-        locateTrackId = playerEngine.currentTrack?.stableId
+        let currentStableId = playerEngine.currentTrack?.stableId
+        guard LocateCurrentTrackPlan.shouldHandle(currentTrackStableId: currentStableId),
+              let currentStableId else {
+            AppLog.warn(.ui, "⚠️ LibraryView: 收到定位请求但没有在播曲目，忽略")
+            return
+        }
+        AppLog.info(.ui, "✅ LibraryView: 收到定位请求 stableId=\(currentStableId)")
+        locateTrackId = currentStableId
         allSongsToNavigate = false // 先复位，避免沿用上一次的入栈状态
         locateRequestPending = true
         locateNavigationToken += 1
@@ -427,5 +432,23 @@ enum LocateCurrentTrackPlan {
     /// 目标行在「所有歌曲」里的下标（按当前列表顺序）；不在列表 → nil（只入栈，不滚动）。
     static func targetRowIndex(stableId: String, in trackIds: [String]) -> Int? {
         trackIds.firstIndex(of: stableId)
+    }
+
+    /// 定位滚动的下一步。**必须先把目标行扩进数据源、再滚**：同一 runloop 里
+    /// 「扩分页窗口 + scrollTo」时 List 的数据源还没含目标行，scrollTo 静默落空，
+    /// 表现就是「进了所有歌曲页却停在顶部」（2026-11-20 回归的根因）。
+    enum RevealStep: Equatable {
+        /// 目标行不在本列表（队列来自别的列表 / 已被过滤）→ 什么都不做
+        case skip
+        /// 目标行还在分页窗口外 → 先把窗口扩到含它，等数据提交后再滚
+        case expandLimit(Int)
+        /// 目标行已在数据源里 → 可以直接滚
+        case scroll
+    }
+
+    static func revealStep(stableId: String, in trackIds: [String], displayLimit: Int) -> RevealStep {
+        guard let index = targetRowIndex(stableId: stableId, in: trackIds) else { return .skip }
+        let requiredLimit = index + 1
+        return requiredLimit > displayLimit ? .expandLimit(requiredLimit) : .scroll
     }
 }

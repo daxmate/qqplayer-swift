@@ -263,6 +263,8 @@ struct TrackListContentView: View {
     @Environment(ActionFeedbackCenter.self) private var actionFeedback
     @State private var settings = DeleteSettings.load()
     @State private var displayLimit = 50
+    /// 待定位目标行：扩窗口后靠 `.onChange(of: displayLimit)` 接着滚（见 revealPendingRowIfPossible）
+    @State private var pendingRevealId: String?
     @State private var artistNameCache: [Int64: String] = [:]
     @State private var artistDisplayNameCache: [String: String] = [:]
     private let pageSize = 50
@@ -327,24 +329,41 @@ struct TrackListContentView: View {
         )
     }
 
-    /// 定位播放行：先把目标行扩进分页窗口，再等一帧布局后滚到垂直居中。
-    /// （新推入页面 / 刚扩出的一页里行还没进视图树，立即 scrollTo 会落空——做法对齐 Mac 端
-    /// `MacTrackGroupedView.locateActiveTrack` 的「等一帧再滚」。）
+    /// 定位播放行：目标行不在分页窗口里时，先扩窗口，把「滚动」推迟到数据提交之后。
+    /// 反例（2026-11-20 回归）：过去在同一个 runloop 里先 `displayLimit = n` 再 `scrollTo`，
+    /// 此时 List 的数据源还没含目标行 → scrollTo 静默落空，页面停在顶部。
+    /// 现在由 `.onChange(of: displayLimit)` 回收一步，扩窗口与滚动分属两次已提交的更新。
     private func revealTrack(_ stableId: String, using proxy: ScrollViewProxy) {
-        guard let index = LocateCurrentTrackPlan.targetRowIndex(
-            stableId: stableId,
-            in: tracks.map(\.stableId)
-        ) else { return }
+        pendingRevealId = stableId
+        revealPendingRowIfPossible(using: proxy)
+    }
 
-        let targetLimit = max(displayLimit, index + 1)
-        // 两个 runloop：① 让所有 onAppear 跑完（分页窗口会在那里按页重置）② 让刚扩出的一页完成布局。
-        // 行还不在视图树里时 scrollTo 会落空（同 Mac 端 locateActiveTrack 的「等一帧再滚」）。
-        DispatchQueue.main.async {
-            if targetLimit > displayLimit {
-                displayLimit = min(targetLimit, tracks.count)
-            }
+    /// 按「List 数据源是否已包含目标行」决定扩窗口还是滚动（规则唯一实现在 `LocateCurrentTrackPlan`）。
+    private func revealPendingRowIfPossible(using proxy: ScrollViewProxy) {
+        guard let stableId = pendingRevealId else { return }
+
+        switch LocateCurrentTrackPlan.revealStep(
+            stableId: stableId,
+            in: tracks.map(\.stableId),
+            displayLimit: displayLimit
+        ) {
+        case .skip:
+            // 目标不在本列表（队列来自别的列表 / 已被过滤）：不滚、不留悬挂状态
+            AppLog.warn(.ui, "⚠️ TrackList: 定位目标不在列表 stableId=\(stableId)")
+            pendingRevealId = nil
+        case .expandLimit(let limit):
+            // 先把行扩进数据源；滚动留到 onChange(of: displayLimit)（那时数据已提交）
+            AppLog.info(.ui, "✅ TrackList: 定位行在分页窗口外，扩容 displayLimit \(displayLimit) → \(limit)")
+            displayLimit = min(limit, tracks.count)
+        case .scroll:
+            // 走到这里时数据源已含目标行（由 revealStep 保证）；两个 runloop 只等 List 完成
+            // 本次布局，不再依赖「数据恰好在这一跳提交」这种运气。
+            pendingRevealId = nil
+            AppLog.info(.ui, "✅ TrackList: 滚动到定位行 stableId=\(stableId)")
             DispatchQueue.main.async {
-                withAnimation { proxy.scrollTo(stableId, anchor: .center) }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo(stableId, anchor: .center) }
+                }
             }
         }
     }
@@ -475,6 +494,8 @@ struct TrackListContentView: View {
                 }
                 .onChange(of: displayLimit) { _, _ in
                     updateArtworkWindow()
+                    // 扩容后的下一次已提交更新：数据源此时才含目标行，再滚才不会落空
+                    revealPendingRowIfPossible(using: proxy)
                 }
                 .onAppear { revealTrackIfRequested(using: proxy) }
                 .onChange(of: locateTrackId) { _, _ in revealTrackIfRequested(using: proxy) }
