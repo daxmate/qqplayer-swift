@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-19T06:31:11Z",
+  "updated_at": "2026-11-20T10:15:47Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -3518,9 +3518,9 @@
     },
     "QQPlayer/Views/Library/LibraryView.swift": {
       "role": "index",
-      "sha256": "9b699012e73c72c81bd1f84a260a4cd041ad19b60346c87b9d04136151936000",
-      "size": 21143,
-      "normalized_sha256": "9b699012e73c72c81bd1f84a260a4cd041ad19b60346c87b9d04136151936000"
+      "sha256": "41e5c68473d9abf132e71ae281863a2259c26d19de11d4d771279035ba3a7d56",
+      "size": 22520,
+      "normalized_sha256": "41e5c68473d9abf132e71ae281863a2259c26d19de11d4d771279035ba3a7d56"
     },
     "QQPlayer/Views/Library/MusicFilePicker.swift": {
       "role": "index",
@@ -3578,9 +3578,9 @@
     },
     "QQPlayer/Views/Library/TrackListView.swift": {
       "role": "index",
-      "sha256": "091a306052d28e2071ec364817936fa19c5ae7d4970b85f7e34c15e3f6e38484",
-      "size": 22997,
-      "normalized_sha256": "091a306052d28e2071ec364817936fa19c5ae7d4970b85f7e34c15e3f6e38484"
+      "sha256": "de329516f190dff6bfc14527eed3f6e023d427cddb8791fe7c185a2bea09c72e",
+      "size": 24397,
+      "normalized_sha256": "de329516f190dff6bfc14527eed3f6e023d427cddb8791fe7c185a2bea09c72e"
     },
     "QQPlayer/Views/Player/CollapsiblePlayerControls.swift": {
       "role": "index",
@@ -4394,9 +4394,9 @@
     },
     "QQPlayerTests/LocateCurrentTrackPlanTests.swift": {
       "role": "index",
-      "sha256": "d3475b5ec14146788779ebca446aa483881680440dd7d0f602a9fbb0cc76d348",
-      "size": 1681,
-      "normalized_sha256": "d3475b5ec14146788779ebca446aa483881680440dd7d0f602a9fbb0cc76d348"
+      "sha256": "ad2e1c91e0b1fcd354d84933a0acfcd23f7f70aecdf0e1d6d8a4057be8de1013",
+      "size": 3222,
+      "normalized_sha256": "ad2e1c91e0b1fcd354d84933a0acfcd23f7f70aecdf0e1d6d8a4057be8de1013"
     },
     "QQPlayerTests/LyricAlignmentAlignerTests.swift": {
       "role": "index",
@@ -5456,9 +5456,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "cc175dd9a9a2d13c81107b1977be1c9f296771d415394487aa85c547bfa12e3a",
-      "size": 430953,
-      "normalized_sha256": "cc175dd9a9a2d13c81107b1977be1c9f296771d415394487aa85c547bfa12e3a"
+      "sha256": "02fab24c55bc25cf75ae2857a30a0feedc0f5c156b13f6d853ad6e331facd6da",
+      "size": 431177,
+      "normalized_sha256": "02fab24c55bc25cf75ae2857a30a0feedc0f5c156b13f6d853ad6e331facd6da"
     },
     "aoci.meta.txt": {
       "role": "index",
