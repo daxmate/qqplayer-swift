@@ -2,6 +2,18 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.10.0] - 2026-11-21
+
+### ✨ 新增
+
+- **CarPlay 歌单页自动歌单**：车机歌单页顶部新增「自动歌单」区（最近添加 / 最近播放 / 常听排行 / 年代），顺序与 App 内一致；年代可下钻到该年代的曲目。曲目与数量只统计本机可播格式。
+
+### ⚙️ 改进
+
+- **CarPlay 曲目列表显示归一**：收藏 / 歌单 / 歌手 / 专辑 / 自动歌单的曲名统一按当前语言归一字形（与 App 内一致）。
+
+[1.10.0]: https://github.com/daxmate/qqplayer-swift/compare/v1.9.1...v1.10.0
+
 ## [1.9.1] - 2026-11-21
 
 ### ⚙️ 改进
