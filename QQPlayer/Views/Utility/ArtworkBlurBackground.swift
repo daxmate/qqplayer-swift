@@ -18,6 +18,8 @@ struct ArtworkBlurBackground: View {
     let cacheKey: String?
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// 毛玻璃渲染缓存入口（组合根注入；视图层不直连单例）
+    @Environment(AppServices.self) private var services
 
     @State private var current: ArtworkImage?
     @State private var previous: ArtworkImage?
@@ -99,7 +101,7 @@ struct ArtworkBlurBackground: View {
             clear()
             return
         }
-        let rendered = await ArtworkBlurCache.shared.image(for: key, source: artwork)
+        let rendered = await services.artworkBlurCache.image(for: key, source: artwork)
         // 请求期间又切歌了：这次结果作废（下一次 task 会重新取）
         guard cacheKey == key else { return }
         guard let rendered else { return }
