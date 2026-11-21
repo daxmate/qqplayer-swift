@@ -98,6 +98,7 @@ private enum LocateScrollShapeContract {
     static let whitelist: [String] = [
         "QQPlayer/Mac/MacTrackListView+LocateScroll.swift", // 唯一入口：MacTableScroll.centerRow + representable
         "QQPlayer/Mac/MacTrackListView.swift", // 调用点：.background(MacTableLocateScroller(…))
+        "QQPlayer/Mac/MacLyricsView+SyncedLyrics.swift", // 调用点：MacTableScroll.centerRect（歌词高亮行居中）
     ]
 
     /// 仓库根：本文件位于 <repo>/QQPlayerTests/ 下 → 上两级。

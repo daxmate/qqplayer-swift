@@ -67,7 +67,10 @@ struct LyricsCenterMathTests {
         )
         #expect(offset == 700, "可见区是 [40, 400)，中心 220；行中心 920 → 偏移 920 - 220 = 700")
         // 反推：行的位置减偏移 = 220 = 40 + 可见高 360/2
-        #expect(920 - offset == 40 + (400 - 40) / 2)
+        // 注意：右侧必须显式标 CGFloat —— 纯字面量算式会被推断成 Int，
+        // `#expect` 跨类型比较直接为 false（即使数值相等）。
+        let visibleCenter: CGFloat = 40 + (400 - 40) / 2
+        #expect(920 - offset == visibleCenter)
     }
 
     @Test("下内边距同理：可见区中心上移一半")
@@ -79,7 +82,8 @@ struct LyricsCenterMathTests {
             topInset: 0,
             bottomInset: 60
         )
-        #expect(offset == 920 - (400 - 60) / 2)
+        let visibleCenter: CGFloat = 920 - (400 - 60) / 2
+        #expect(offset == visibleCenter)
     }
 
     @Test("内边距吃掉整块视口：不产生负数 / NaN")
