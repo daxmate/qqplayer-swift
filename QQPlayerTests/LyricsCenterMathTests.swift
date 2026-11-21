@@ -56,6 +56,65 @@ struct LyricsCenterMathTests {
         #expect(LyricsCenterMath.centeredOffset(rowCenterY: 10, viewportHeight: 400, contentHeight: 0) == 0)
     }
 
+    @Test("上内边距 40：行仍落在「可见区」中心（不是整块视口中心）")
+    func topInsetShiftsCenter() {
+        let offset = LyricsCenterMath.centeredOffset(
+            rowCenterY: 920,
+            viewportHeight: 400,
+            contentHeight: 2000,
+            topInset: 40,
+            bottomInset: 0
+        )
+        #expect(offset == 700, "可见区是 [40, 400)，中心 220；行中心 920 → 偏移 920 - 220 = 700")
+        // 反推：行的位置减偏移 = 220 = 40 + 可见高 360/2
+        #expect(920 - offset == 40 + (400 - 40) / 2)
+    }
+
+    @Test("下内边距同理：可见区中心上移一半")
+    func bottomInsetShiftsCenter() {
+        let offset = LyricsCenterMath.centeredOffset(
+            rowCenterY: 920,
+            viewportHeight: 400,
+            contentHeight: 2000,
+            topInset: 0,
+            bottomInset: 60
+        )
+        #expect(offset == 920 - (400 - 60) / 2)
+    }
+
+    @Test("内边距吃掉整块视口：不产生负数 / NaN")
+    func insetsLargerThanViewport() {
+        let offset = LyricsCenterMath.centeredOffset(
+            rowCenterY: 920,
+            viewportHeight: 100,
+            contentHeight: 2000,
+            topInset: 80,
+            bottomInset: 80
+        )
+        #expect(offset == 840, "可见高按 0 处理 → 目标 = 920 - 80 - 0")
+    }
+
+    @Test("闭环残差：行在下方为正、上方为负、居中小于阈值")
+    func centeringDeltaSign() {
+        #expect(LyricsCenterMath.centeringDelta(rowMidY: 700, visibleMidY: 500) == 200)
+        #expect(LyricsCenterMath.centeringDelta(rowMidY: 300, visibleMidY: 500) == -200)
+        #expect(LyricsCenterMath.isCentered(delta: 0.4))
+        #expect(!LyricsCenterMath.isCentered(delta: 0.6))
+        #expect(!LyricsCenterMath.isCentered(delta: -0.6))
+    }
+
+    @Test("闭环一次收敛：用残差修正后残差归零（模拟一次迭代）")
+    func singleCorrectionConverges() {
+        var visibleMid: CGFloat = 500
+        let rowMid: CGFloat = 780
+        let delta = LyricsCenterMath.centeringDelta(rowMidY: rowMid, visibleMidY: visibleMid)
+        // 一次「把内容沿 y 轴平移残差」的补正 = 可见区中心随之移动同样的量
+        visibleMid += delta
+        #expect(LyricsCenterMath.isCentered(
+            delta: LyricsCenterMath.centeringDelta(rowMidY: rowMid, visibleMidY: visibleMid)
+        ))
+    }
+
     @Test("居中后再反推：行中心回到视口中心（含首末行）")
     func roundTripCenter() {
         let viewport: CGFloat = 400

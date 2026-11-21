@@ -208,10 +208,12 @@ extension MacLyricsView {
         }
     }
 
-    // MARK: - 居中滚动（精确偏移；公式唯一实现见 LyricsCenterMath）
+    // MARK: - 居中滚动（唯一入口：MacTableScroll.centerRect；几何口径见 LyricsCenterMath）
 
-    /// 把指定歌词行居中。优先按**实测几何**算精确偏移滚 `NSScrollView`（误差可计算、可测），
-    /// 取不到宿主滚动视图时退回 `ScrollViewProxy.scrollTo(anchor: .center)`。
+    /// 把指定歌词行居中。AppKit 偏移与闭环校正全部走唯一滚动入口
+    /// `MacTableScroll.centerRect`（`Mac/MacTrackListView+LocateScroll.swift`，形状契约要求全仓
+    /// 只有那一处写 AppKit 滚动落点与 clip 反射）；本文件只做几何准备。
+    /// 取不到宿主滚动视图 / 行未量到 → 退回 `ScrollViewProxy.scrollTo(anchor: .center)`。
     func centerOnActiveLine(
         _ index: Int?,
         proxy: ScrollViewProxy,
@@ -219,25 +221,27 @@ extension MacLyricsView {
         animated: Bool
     ) {
         guard let index else { return }
-        guard let rect = lyricRowRects[index], lyricContentHeight > 0 else {
+        guard let rect = lyricRowRects[index], lyricContentHeight > 0,
+              let scrollView = lyricsScrollView
+        else {
             proxy.scrollTo(index, anchor: .center)
             return
         }
-        let offset = LyricsCenterMath.centeredOffset(
+        // 视口内边距（安全区/系统注入）计入「可见区中心」口径
+        let insets = scrollView.contentInsets
+        let initialOriginY = LyricsCenterMath.centeredOffset(
             rowCenterY: rect.midY,
             viewportHeight: viewportHeight,
-            contentHeight: lyricContentHeight
+            contentHeight: lyricContentHeight,
+            topInset: insets.top,
+            bottomInset: insets.bottom
         )
-        guard let scrollView = lyricsScrollView, let documentView = scrollView.documentView else {
-            proxy.scrollTo(index, anchor: .center)
-            return
-        }
-        applyScrollOffset(
-            offset,
-            scrollView: scrollView,
-            documentView: documentView,
-            viewportHeight: viewportHeight,
-            animated: animated
+        MacTableScroll.centerRect(
+            rect,
+            initialOriginY: initialOriginY,
+            in: scrollView,
+            animated: animated,
+            duration: MacLyricsView.lyricScrollDuration
         )
     }
 
@@ -251,34 +255,6 @@ extension MacLyricsView {
             guard karaoke.isKaraokeOn || isFollowing else { return }
             if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
             centerOnActiveLine(index, proxy: proxy, viewportHeight: viewportHeight, animated: false)
-        }
-    }
-
-    private func applyScrollOffset(
-        _ offset: CGFloat,
-        scrollView: NSScrollView,
-        documentView: NSView,
-        viewportHeight: CGFloat,
-        animated: Bool
-    ) {
-        let clip = scrollView.contentView
-        let documentHeight = max(documentView.bounds.height, lyricContentHeight)
-        let maxOffset = max(documentHeight - viewportHeight, 0)
-        let clamped = min(max(offset, 0), maxOffset)
-        // flipped 文档视图：origin.y 从内容顶部量起；非 flipped 反过来
-        let y = documentView.isFlipped ? clamped : maxOffset - clamped
-        let point = NSPoint(x: clip.bounds.origin.x, y: y)
-        if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = MacLyricsView.lyricScrollDuration
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                clip.animator().setBoundsOrigin(point)
-            } completionHandler: {
-                scrollView.reflectScrolledClipView(clip)
-            }
-        } else {
-            clip.setBoundsOrigin(point)
-            scrollView.reflectScrolledClipView(clip)
         }
     }
 

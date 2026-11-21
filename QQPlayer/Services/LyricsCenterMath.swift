@@ -36,4 +36,38 @@ enum LyricsCenterMath {
         let target = rowCenterY - viewportHeight / 2
         return min(max(target, 0), maxOffset)
     }
+
+    /// 同上，但把视口上下内边距（`NSScrollView.contentInsets` / 安全区）计入：
+    /// 真正可看见的区域是 `[topInset, viewportHeight - bottomInset]`，
+    /// 其中心在 `topInset + visibleHeight/2`。
+    ///
+    /// 例：视口 400、上内边距 40、行中心 920 → 目标偏移 700（行落在 220 = 可见区中心）。
+    static func centeredOffset(
+        rowCenterY: CGFloat,
+        viewportHeight: CGFloat,
+        contentHeight: CGFloat,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> CGFloat {
+        guard viewportHeight > 0, contentHeight > 0 else { return 0 }
+        let maxOffset = max(contentHeight - viewportHeight, 0)
+        guard maxOffset > 0 else { return 0 }
+        let visibleHeight = max(viewportHeight - topInset - bottomInset, 0)
+        let target = rowCenterY - topInset - visibleHeight / 2
+        return min(max(target, 0), maxOffset)
+    }
+
+    /// **闭环校正**的残差：目标行中心与真实可见区中心之差（同一坐标系下的实测值）。
+    ///
+    /// - 返回值 > 0：行在可见区中心**下方**（同一坐标系 y 轴方向），需要把内容向上顶；
+    /// - 返回值 < 0：行在上方；
+    /// - 绝对值 ≤ 0.5 视为已居中（亚像素，不必再补）。
+    static func centeringDelta(rowMidY: CGFloat, visibleMidY: CGFloat) -> CGFloat {
+        rowMidY - visibleMidY
+    }
+
+    /// 残差是否已经小到不必再校正（亚像素阈值 0.5pt）。
+    static func isCentered(delta: CGFloat, tolerance: CGFloat = 0.5) -> Bool {
+        abs(delta) <= tolerance
+    }
 }
