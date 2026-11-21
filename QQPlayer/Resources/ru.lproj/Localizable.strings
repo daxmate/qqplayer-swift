@@ -737,7 +737,6 @@
 "shortcut_prev_line" = "Предыдущая строка";
 "shortcut_next_line" = "Следующая строка";
 "shortcut_ab_toggle" = "Цикл AB";
-"shortcut_ab_end" = "Задать конец AB";
 "shortcuts_record" = "Записать";
 "shortcuts_cancel" = "Отмена";
 "shortcuts_reset" = "Сбросить";

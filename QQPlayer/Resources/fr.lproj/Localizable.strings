@@ -740,7 +740,6 @@
 "shortcut_prev_line" = "Ligne précédente";
 "shortcut_next_line" = "Ligne suivante";
 "shortcut_ab_toggle" = "Boucle AB";
-"shortcut_ab_end" = "Définir la fin AB";
 "shortcuts_record" = "Enregistrer";
 "shortcuts_cancel" = "Annuler";
 "shortcuts_reset" = "Rétablir";

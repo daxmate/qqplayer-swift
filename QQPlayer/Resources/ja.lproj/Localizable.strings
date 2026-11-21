@@ -742,7 +742,6 @@
 "shortcut_prev_line" = "前の行";
 "shortcut_next_line" = "次の行";
 "shortcut_ab_toggle" = "ABリピート";
-"shortcut_ab_end" = "AB終了点を設定";
 "shortcuts_record" = "記録";
 "shortcuts_cancel" = "キャンセル";
 "shortcuts_reset" = "リセット";

@@ -742,7 +742,6 @@
 "shortcut_prev_line" = "Previous Line";
 "shortcut_next_line" = "Next Line";
 "shortcut_ab_toggle" = "AB Loop";
-"shortcut_ab_end" = "Set AB End Point";
 "shortcuts_record" = "Record";
 "shortcuts_cancel" = "Cancel";
 "shortcuts_reset" = "Reset";

@@ -174,7 +174,7 @@ struct MacShortcutRepeatPolicyTests {
     @Test("非重复事件一律执行（与修复前行为一致）")
     func nonRepeatEventsAllRun() {
         for id in ["playPause", "seekBack", "seekForward", "toggleFavorite", "cyclePlayMode",
-                   "toggleKaraoke", "abToggle", "abEnd"] {
+                   "toggleKaraoke", "abToggle"] {
             #expect(MacShortcutLogic.shouldRunAction(id: id, isARepeat: false))
         }
     }
@@ -188,7 +188,7 @@ struct MacShortcutRepeatPolicyTests {
     @Test("自动重复：toggle / 轮换类一律不执行（防抖动与反复写库）")
     func repeatSkipsToggles() {
         for id in ["playPause", "toggleFavorite", "cyclePlayMode", "toggleKaraoke",
-                   "abToggle", "abEnd", "nextTrack", "previousTrack", "muteToggle"] {
+                   "abToggle", "nextTrack", "previousTrack", "muteToggle"] {
             #expect(!MacShortcutLogic.shouldRunAction(id: id, isARepeat: true))
         }
     }

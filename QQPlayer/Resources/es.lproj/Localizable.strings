@@ -742,7 +742,6 @@
 "shortcut_prev_line" = "Línea anterior";
 "shortcut_next_line" = "Línea siguiente";
 "shortcut_ab_toggle" = "Bucle AB";
-"shortcut_ab_end" = "Fijar punto final del AB";
 "shortcuts_record" = "Grabar";
 "shortcuts_cancel" = "Cancelar";
 "shortcuts_reset" = "Restablecer";

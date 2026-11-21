@@ -745,7 +745,6 @@
 "shortcut_prev_line" = "上一句";
 "shortcut_next_line" = "下一句";
 "shortcut_ab_toggle" = "AB 循环";
-"shortcut_ab_end" = "设 AB 终点";
 "shortcuts_record" = "录制";
 "shortcuts_cancel" = "取消";
 "shortcuts_reset" = "恢复默认";

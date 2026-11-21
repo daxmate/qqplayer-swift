@@ -8,12 +8,12 @@
 //  - 快捷键定义表（id/label/默认组合/action），全部可录制重绑（web「配置表驱动、
 //    全量可录制」语义）；自定义绑定存 DeleteSettings.shortcutBindings，
 //    == 默认组合的绑定不存储（恢复默认 = 删绑定）
-//  - 新增 G 跟唱开关 / A AB 循环开关（当前句=A） / B 等选终点时设当前句为终点
+//  - 新增 G 跟唱开关 / A AB 循环开关（当前句=A；终点由点击另一句歌词锁定）
 //  - 冲突检测：录制新组合与其它快捷键有效组合（含默认）冲突 → 拒绝并提示
 //
 //  既有语义不变：
 //  Space 播放/暂停 · ←/→ ±10s · ⌘←/⌘→ 上一首/下一首 · R 播放顺序轮换 ·
-//  F 收藏/取消当前曲 · [ / ] 倍速降/升档 · G 跟唱开关 · A AB 开关 · B 设 AB 终点
+//  F 收藏/取消当前曲 · [ / ] 倍速降/升档 · G 跟唱开关 · A AB 开关（终点用点击歌词锁定）
 //
 //  平台差异裁剪（沿用 D2）：↑/↓ 音量、⌘↑/⌘↓、M 静音不做（macOS 音量系统管理）；
 //  ⌘K（SearchAnything）与 ⌘,（Settings）由菜单/系统已有，不在本表。
@@ -112,7 +112,7 @@ enum MacKeyboardShortcuts {
         // ---- 音量（2026-11-13 App 级音量）----
         // 用 ⌘↑ / ⌘↓ 而不是裸 ↑/↓：裸方向键是列表、滑杆、歌词的自然导航键，而本监听
         // 一旦匹配就消费事件（handle 返回 nil），占用会直接吃掉列表键盘操作。
-        // 静音用裸 M（与裸字母键 R/F/G/A/B 同一族）；⌘M 是系统「最小化」，不能占。
+        // 静音用裸 M（与裸字母键 R/F/G/A 同一族）；⌘M 是系统「最小化」，不能占。
         MacShortcutDef(
             id: "volumeUp", labelKey: "shortcut_volume_up",
             defaultCombo: MacShortcutLogic.volumeUpDefaultCombo
@@ -157,7 +157,7 @@ enum MacKeyboardShortcuts {
             Self.cycleSpeed(1)
         },
 
-        // ---- 跟唱（E4 新增：G/A/B，语义镜像 KaraokeControlBar 按钮）----
+        // ---- 跟唱（E4 新增：G/A，语义镜像 KaraokeControlBar 按钮）----
         MacShortcutDef(
             id: "toggleKaraoke", labelKey: "shortcut_toggle_karaoke",
             defaultCombo: ShortcutCombo(keyCode: 5, flags: 0, display: "G")
@@ -187,12 +187,6 @@ enum MacKeyboardShortcuts {
             defaultCombo: ShortcutCombo(keyCode: 0, flags: 0, display: "A")
         ) {
             Self.toggleABAtCurrentLine()
-        },
-        MacShortcutDef(
-            id: "abEnd", labelKey: "shortcut_ab_end",
-            defaultCombo: ShortcutCombo(keyCode: 11, flags: 0, display: "B")
-        ) {
-            Self.setABEndAtCurrentLine()
         },
     ]
 
@@ -376,17 +370,5 @@ enum MacKeyboardShortcuts {
         let index = LyricTiming.activeLineIndex(time: player.playbackTime, in: karaoke.currentLines)
         guard let index else { return }
         karaoke.enterABLoop(currentLine: index)
-    }
-
-    /// B：等选终点（abLoop.b == nil）时设当前句为终点（走 clickLine 的 setABEnd 路径；
-    /// 其它状态 B 无动作，避免误触跳句）
-    private static func setABEndAtCurrentLine() {
-        let karaoke = KaraokeController.shared
-        guard karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil else { return }
-        let player = PlayerEngine.shared
-        guard player.currentTrack != nil else { return }
-        let index = LyricTiming.activeLineIndex(time: player.playbackTime, in: karaoke.currentLines)
-        guard let index else { return }
-        karaoke.clickLine(index: index) // 等选终点态 → 仅 setABEnd，不跳句
     }
 }

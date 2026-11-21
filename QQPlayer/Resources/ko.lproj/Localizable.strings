@@ -742,7 +742,6 @@
 "shortcut_prev_line" = "이전 줄";
 "shortcut_next_line" = "다음 줄";
 "shortcut_ab_toggle" = "AB 반복";
-"shortcut_ab_end" = "AB 끝 지점 설정";
 "shortcuts_record" = "기록";
 "shortcuts_cancel" = "취소";
 "shortcuts_reset" = "재설정";
