@@ -58,6 +58,8 @@ struct PlayerProgressSection: View {
     let onProgressBarFrameChange: (CGRect) -> Void
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
+    /// 播放页表面样式（毛玻璃背景下时间戳转浅色）
+    @Environment(\.playerSurfaceStyle) private var surfaceStyle
     let onSeek: (TimeInterval) -> Void
 
     private var fraction: Double {
@@ -83,13 +85,13 @@ struct PlayerProgressSection: View {
             HStack {
                 Text(formatTime(playerEngine.progress.playbackTime))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(surfaceStyle.secondaryText)
 
                 Spacer()
 
                 Text(formatTime(duration))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(surfaceStyle.secondaryText)
             }
         }
         .padding(.horizontal, DesignTokens.space8)
@@ -108,6 +110,8 @@ struct InteractiveProgressBar: View {
     let onSeek: (Double) -> Void
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
+    /// 播放页表面样式（毛玻璃背景下进度底轨用白色低透明度）
+    @Environment(\.playerSurfaceStyle) private var surfaceStyle
 
     @State private var isDragging = false
     @State private var dragProgress: Double = 0
@@ -121,7 +125,7 @@ struct InteractiveProgressBar: View {
             ZStack(alignment: .leading) {
                 // Background track
                 RoundedRectangle(cornerRadius: DesignTokens.radius2)
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(surfaceStyle.progressTrack)
                     .frame(height: 4)
 
                 // Progress fill

@@ -28,7 +28,15 @@ struct MacPlayerView: View {
 
     /// 分片：跨文件可见（原 private）
     @State var artwork: ArtworkImage?
-    @State private var artworkTrackId: String?
+    /// 分片：跨文件可见（MacPlayerView+GlassSurface 用作毛玻璃缓存键）
+    @State var artworkTrackId: String?
+    /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 系统「降低透明度」：开启时回落原背景
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
+    /// 播放信息面板实测上下沿（歌词区拖动坐标空间）：玻璃面板只画不改布局
+    @State var playerInfoTop: CGFloat = 0
+    @State var playerInfoBottom: CGFloat = 0
     /// 分片：跨文件可见（原 private）
     @State var dragTime: TimeInterval?
     /// 分片：跨文件可见（原 private）
@@ -74,14 +82,16 @@ struct MacPlayerView: View {
     /// 分片：跨文件可见
     @State var playerSectionWidth: CGFloat = 0
     /// 分隔条拖动坐标系：固定在播放页容器上，避免分隔条自身位移污染 translation（拖动抖动）
-    private static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
+    /// 分片：跨文件可见（原 private；MacPlayerView+PlayerSection / +GlassSurface 要用）
+    static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
     /// 分隔条视觉细条高度（pt）
     private static let lyricsResizeBarHeight: CGFloat = 6
     /// 分隔条可拖命中区高度（pt）：视觉仍 6pt 细条，上下各外扩 6pt 便于抓取（2026-11-17 用户反馈太窄）
     private static let lyricsResizeHitHeight: CGFloat = 18
 
     /// 播放区是否隐藏/歌词是否撑满：跟唱或放大（决策上收 MacPlaybackGate，有测试）
-    private var isLyricsFullscreen: Bool {
+    /// 分片：跨文件可见（MacPlayerView+GlassSurface 据此隐藏玻璃面板）
+    var isLyricsFullscreen: Bool {
         MacPlaybackGate.shouldExpandLyrics(
             isKaraokeOn: karaoke.isKaraokeOn,
             isLyricsExpanded: lyricsExpanded
@@ -89,34 +99,39 @@ struct MacPlayerView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            VStack(spacing: DesignTokens.space0) {
-                if !MacPlaybackGate.shouldHidePlayerSection(
-                    isKaraokeOn: karaoke.isKaraokeOn,
-                    isLyricsExpanded: lyricsExpanded
-                ) {
-                    playerSection
-                    lyricsResizeHandle(containerHeight: geo.size.height)
+        ZStack {
+            playerBackground
+            glassPanelLayer
+            GeometryReader { geo in
+                VStack(spacing: DesignTokens.space0) {
+                    if !MacPlaybackGate.shouldHidePlayerSection(
+                        isKaraokeOn: karaoke.isKaraokeOn,
+                        isLyricsExpanded: lyricsExpanded
+                    ) {
+                        playerSection
+                        lyricsResizeHandle(containerHeight: geo.size.height)
+                    }
+                    MacLyricsView(
+                        lyrics: lyrics,
+                        currentTime: playbackTime,
+                        isLoading: lyricsLoading,
+                        isFullscreen: isLyricsFullscreen,
+                        onToggleExpand: handleLyricsDoubleTap,
+                        onLyricsSearch: {
+                            showLyricsSearch = true
+                        },
+                        // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
+                        onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
+                        onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil,
+                        // 拖动分隔条时补正歌词文字（2026-11-18 方案 A）：非拖动时 delta 必为 0
+                        isPanelResizing: isLyricsPanelResizing,
+                        panelResizeDelta: lyricsPanelHeight - (dragStartPanelHeight ?? lyricsPanelHeight)
+                    )
+                    .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
                 }
-                MacLyricsView(
-                    lyrics: lyrics,
-                    currentTime: playbackTime,
-                    isLoading: lyricsLoading,
-                    isFullscreen: isLyricsFullscreen,
-                    onToggleExpand: handleLyricsDoubleTap,
-                    onLyricsSearch: {
-                        showLyricsSearch = true
-                    },
-                    // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
-                    onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
-                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil,
-                    // 拖动分隔条时补正歌词文字（2026-11-18 方案 A）：非拖动时 delta 必为 0
-                    isPanelResizing: isLyricsPanelResizing,
-                    panelResizeDelta: lyricsPanelHeight - (dragStartPanelHeight ?? lyricsPanelHeight)
-                )
-                .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
+                .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
+                .environment(\.playerSurfaceStyle, surfaceStyle)
             }
-            .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {

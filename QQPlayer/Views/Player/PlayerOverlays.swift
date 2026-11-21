@@ -8,6 +8,8 @@ struct LyricMiniSection: View {
     let isLoading: Bool
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
+    /// 播放页表面样式（毛玻璃背景下文字转浅色；见 PlayerSurfaceStyle）
+    @Environment(\.playerSurfaceStyle) private var surfaceStyle
 
     /// 当前句 index（syncedLyrics 中）；还没到第一句时返回 0
     private var activeIndex: Int? {
@@ -24,7 +26,7 @@ struct LyricMiniSection: View {
             if isLoading {
                 Text(NSLocalizedString("lyrics_mini_loading", value: "Loading lyrics…", comment: ""))
                     .font(.callout)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(surfaceStyle.secondaryText)
                     .frame(maxWidth: .infinity)
             } else if let lines = lyrics?.syncedLyrics, !lines.isEmpty {
                 let idx = activeIndex ?? 0
@@ -39,13 +41,13 @@ struct LyricMiniSection: View {
                 // 无时间轴歌词：显示第一行
                 Text(DisplayScriptNormalizer.display(String(firstLine)))
                     .font(.callout.weight(.medium))
-                    .foregroundColor(.primary)
+                    .foregroundColor(surfaceStyle.primaryText)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
             } else {
                 Text(NSLocalizedString("lyrics_mini_none", value: "No lyrics", comment: ""))
                     .font(.callout)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(surfaceStyle.secondaryText)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -58,7 +60,7 @@ struct LyricMiniSection: View {
     private func miniLine(_ text: String?, isActive: Bool) -> some View {
         Text(text ?? "")
             .font(isActive ? .body.weight(.semibold) : .subheadline)
-            .foregroundColor(isActive ? accentColor : .secondary)
+            .foregroundColor(isActive ? accentColor : surfaceStyle.lyricInactive)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
     }

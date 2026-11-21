@@ -47,10 +47,17 @@ extension MacPlayerView {
                     .font(.title3)
                     .fontWeight(.semibold)
                     .lineLimit(1)
+                    .foregroundColor(surfaceStyle.primaryText)
                 Text(artistName ?? "")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(surfaceStyle.secondaryText)
                     .lineLimit(1)
+            }
+            // 玻璃面板上沿（歌词区拖动坐标空间）
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.frame(in: .named(MacPlayerView.lyricsResizeCoordinateSpace)).minY
+            } action: { minY in
+                playerInfoTop = minY
             }
 
             // Progress bar
@@ -77,7 +84,7 @@ extension MacPlayerView {
                     Text(MacTimeFormat.format(duration))
                 }
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(surfaceStyle.secondaryText)
                 .monospacedDigit()
             }
             .frame(maxWidth: 420)
@@ -89,6 +96,7 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font22))
                 }
                 .buttonStyle(.plain)
+                .foregroundColor(surfaceStyle.primaryText)
                 .disabled(track == nil)
 
                 Button(action: onPlayPause) {
@@ -96,6 +104,7 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font44))
                 }
                 .buttonStyle(.plain)
+                .foregroundColor(surfaceStyle.primaryText)
                 .disabled(track == nil)
 
                 Button(action: onNext) {
@@ -103,6 +112,7 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font22))
                 }
                 .buttonStyle(.plain)
+                .foregroundColor(surfaceStyle.primaryText)
                 .disabled(track == nil)
 
                 Divider().frame(height: 24)
@@ -116,7 +126,7 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(isPlayOrderActive ? appAccentColor : .secondary)
+                .foregroundColor(isPlayOrderActive ? appAccentColor : surfaceStyle.secondaryText)
                 .help(playOrderTitle)
 
                 Divider().frame(height: 24)
@@ -133,7 +143,7 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(currentTrackIsFavorite ? .pink : .secondary)
+                .foregroundColor(currentTrackIsFavorite ? .pink : surfaceStyle.secondaryText)
                 .disabled(track == nil)
                 .help(currentTrackIsFavorite ? "remove_from_liked_songs".localized : "add_to_liked_songs".localized)
 
@@ -155,7 +165,7 @@ extension MacPlayerView {
                             .font(.system(size: DesignTokens.font16))
                     }
                     .menuStyle(.borderlessButton)
-                    .foregroundColor(sleepTimerEndDate == nil ? .secondary : appAccentColor)
+                    .foregroundColor(sleepTimerEndDate == nil ? surfaceStyle.secondaryText : appAccentColor)
                     .help("sleep_timer".localized)
                 }
 
@@ -171,7 +181,7 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(.secondary)
+                .foregroundColor(surfaceStyle.secondaryText)
                 .disabled(track == nil || player.playbackQueue.isEmpty)
                 .help("playing_queue".localized)
 
@@ -183,10 +193,16 @@ extension MacPlayerView {
                         .font(.system(size: DesignTokens.font16))
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : .secondary)
+                .foregroundColor(karaoke.isKaraokeOn ? appAccentColor : surfaceStyle.secondaryText)
                 .disabled(track == nil)
                 .help("karaoke_mode_help".localized)
 
+            }
+            // 玻璃面板下沿（控制条底部）
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.frame(in: .named(MacPlayerView.lyricsResizeCoordinateSpace)).maxY
+            } action: { maxY in
+                playerInfoBottom = maxY
             }
 
             // 播放页频谱条（D4，web Visualizer 对齐——仅 native 引擎曲目有数据，

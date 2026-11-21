@@ -139,6 +139,9 @@ struct Localized {
     static var githubRepository: String { "github_repository".localized }
     static var useSimpleIcons: String { "use_simple_icons".localized }
     static var overrideSystemAppearance: String { "override_system_appearance".localized }
+    /// 播放页封面毛玻璃背景开关（iOS 设置 → 外观 / macOS 设置 → 外观）
+    static var playerGlassBackground: String { "player_glass_background".localized }
+    static var playerGlassBackgroundFootnote: String { "player_glass_background_footnote".localized }
     static var backgroundColor: String { "background_color".localized }
     static var chooseColorTheme: String { "choose_color_theme".localized }
     static var librarySection: String { "library_section".localized }

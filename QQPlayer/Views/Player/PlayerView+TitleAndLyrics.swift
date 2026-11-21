@@ -36,6 +36,12 @@ extension PlayerView {
             }
         }
         .padding(.horizontal, DesignTokens.space8)
+        // 玻璃面板起点：歌名行顶部（整页坐标系；面板只画不改布局）
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.frame(in: .named(PlayerPageCoordinateSpace.name)).minY
+        } action: { minY in
+            playerInfoTop = minY
+        }
     }
 
     private func titleButton(track: Track) -> some View {
@@ -51,7 +57,7 @@ extension PlayerView {
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                         .multilineTextAlignment(.leading)
-                        .foregroundColor(.primary)
+                        .foregroundColor(surfaceStyle.primaryText)
                 }
                 .buttonStyle(PlainButtonStyle())
             } else {
@@ -61,6 +67,7 @@ extension PlayerView {
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.leading)
+                    .foregroundColor(surfaceStyle.primaryText)
             }
         }
     }
@@ -74,7 +81,7 @@ extension PlayerView {
                 }) {
                     Text(trackArtistDisplayName ?? ArtistNameNormalizer.displayName(artist.name))
                         .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .caption : .subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(surfaceStyle.secondaryText)
                         .lineLimit(1)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -116,7 +123,7 @@ extension PlayerView {
         }) {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
-                .foregroundColor(isFavorite ? .red : .primary)
+                .foregroundColor(isFavorite ? .red : surfaceStyle.primaryText)
         }
     }
 
@@ -127,7 +134,7 @@ extension PlayerView {
             // 已对齐过：换带勾图标（切歌 / 对齐产物变化时刷新，见 refreshAlignedLyricsState）
             Image(systemName: hasAlignedLyrics ? "waveform.badge.checkmark" : "waveform.badge.magnifyingglass")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
-                .foregroundColor(isLyricAlignmentAvailable ? .primary : .secondary)
+                .foregroundColor(isLyricAlignmentAvailable ? surfaceStyle.primaryText : surfaceStyle.secondaryText)
         }
         .accessibilityLabel(hasAlignedLyrics ? "lyrics.align.action.realign".localized : "lyrics.align.action".localized)
     }
@@ -158,7 +165,7 @@ extension PlayerView {
         }) {
             Image(systemName: "plus.circle")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title3 : .title2)
-                .foregroundColor(.primary)
+                .foregroundColor(surfaceStyle.primaryText)
         }
     }
 
@@ -200,11 +207,11 @@ extension PlayerView {
         VStack {
             Image(systemName: "music.note")
                 .font(.system(size: DesignTokens.font60))
-                .foregroundColor(.secondary)
+                .foregroundColor(surfaceStyle.secondaryText)
 
             Text(Localized.noTrackSelected)
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(surfaceStyle.secondaryText)
         }
     }
 

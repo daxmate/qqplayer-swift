@@ -261,6 +261,7 @@
 		D70619E4A5BF4061A5815BAE /* NowPlayingArtworkGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D34E2732CC4449E8A04991E /* NowPlayingArtworkGateTests.swift */; };
 		DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */; };
 		93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */; };
+		94A53BC4B31042EFBEDD0F80 /* PlayerGlassBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106049D0FF8A4AC987FEE14A /* PlayerGlassBackgroundTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -571,6 +572,7 @@
 		1D34E2732CC4449E8A04991E /* NowPlayingArtworkGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NowPlayingArtworkGateTests.swift; sourceTree = "<group>"; };
 		2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackStoredPathGuardTests.swift; sourceTree = "<group>"; };
 		2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpeechAssetInstallPlannerTests.swift; sourceTree = "<group>"; };
+		106049D0FF8A4AC987FEE14A /* PlayerGlassBackgroundTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGlassBackgroundTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -618,6 +620,7 @@
 				Mac/MacOnlineSearchView.swift,
 				Mac/MacOnlineSettingsView.swift,
 				Mac/MacPairApprovalCardView.swift,
+				"Mac/MacPlayerView+GlassSurface.swift",
 				"Mac/MacPlayerView+PlayerSection.swift",
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
@@ -778,6 +781,7 @@
 				Mac/MacOnlineSearchView.swift,
 				Mac/MacOnlineSettingsView.swift,
 				Mac/MacPairApprovalCardView.swift,
+				"Mac/MacPlayerView+GlassSurface.swift",
 				"Mac/MacPlayerView+PlayerSection.swift",
 				Mac/MacPlayerView.swift,
 				Mac/MacPlaylistDetailSheet.swift,
@@ -839,11 +843,13 @@
 				Models/AppNotifications.swift,
 				Models/DatabaseModels.swift,
 				"Models/DisplayText+Models.swift",
+				Models/PlayerGlassSetting.swift,
 				Models/SettingsModels.swift,
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
 				Services/AppleMusicChartClient.swift,
+				Services/ArtworkBlurCache.swift,
 				Services/ChartPopularityIndex.swift,
 				Services/LyricsAlignment/LyricAlignmentActions.swift,
 				Services/LyricsAlignment/LyricAlignmentController.swift,
@@ -1134,7 +1140,9 @@
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/LyricAlignmentProgressSheet.swift,
 				Views/Player/PlayerGestureLogic.swift,
+				Views/Utility/ArtworkBlurBackground.swift,
 				Views/Utility/HintCardView.swift,
+				Views/Utility/PlayerSurfaceStyle.swift,
 				Views/Utility/WhatsNewView.swift,
 				Services/RecommendationPlanning.swift,
 				Services/RecommendationRequest.swift,
@@ -1562,6 +1570,7 @@
 				1D34E2732CC4449E8A04991E /* NowPlayingArtworkGateTests.swift */,
 				2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */,
 				2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */,
+				106049D0FF8A4AC987FEE14A /* PlayerGlassBackgroundTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2124,6 +2133,7 @@
 				D70619E4A5BF4061A5815BAE /* NowPlayingArtworkGateTests.swift in Sources */,
 				DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */,
 				93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */,
+				94A53BC4B31042EFBEDD0F80 /* PlayerGlassBackgroundTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

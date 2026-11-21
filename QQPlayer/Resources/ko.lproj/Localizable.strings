@@ -186,6 +186,8 @@
 "github_repository" = "GitHub 리포지토리";
 "use_simple_icons" = "라이브러리 섹션에서 색상 배경이 없는 단순한 아이콘을 사용합니다.";
 "override_system_appearance" = "시스템 모양 설정을 무시하고 앱을 항상 다크 모드로 사용합니다.";
+"player_glass_background" = "앨범 아트 글래스 배경";
+"player_glass_background_footnote" = "재생 화면 배경에 현재 앨범 아트를 흐리게 표시합니다. 끄면 그라데이션 배경으로 돌아갑니다.";
 "background_color" = "배경 색상";
 "choose_color_theme" = "모든 화면의 배경 효과에 사용할 색상 테마를 선택하세요.";
 "library_section" = "라이브러리";

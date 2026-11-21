@@ -55,6 +55,12 @@ struct PlayerView: View {
     /// 整页手势把「起手在进度条上」的横/纵手势让给 seek（复核 ②；旧实现用控制容器 frame + 写死 60pt，
     /// 随 ② 一并删除，见 PlayerView+PageGestures）
     @State var progressBarFrame: CGRect = .zero
+    /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 系统「降低透明度」：开启时毛玻璃背景回落原渐变背景
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
+    /// 歌名/歌手行顶部在整页坐标系里的 Y（玻璃面板从这里开始；0 = 尚未量到）
+    @State var playerInfoTop: CGFloat = 0
     /// 是否正由「非封面」的下拉跟手驱动宿主 view（onEnded 据此回弹 / 缩回主页）
     @State var isPullingPlayer = false
     /// 分片：跨文件可见（原 private）
@@ -104,7 +110,8 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
-            ScreenSpecificBackgroundView(screen: .player)
+            playerBackground
+            glassPanelLayer
             // 解析下拉移动的宿主 UIView（fullScreenCover 的 hosting view）：
             // 透明背景层，通过 responder 链向上找 UIViewController.view
             // （Task 延迟赋值：避免在视图更新期间修改 @State）
@@ -125,6 +132,7 @@ struct PlayerView: View {
             .opacity(0)
             .allowsHitTesting(false)
             mainContent
+                .environment(\.playerSurfaceStyle, surfaceStyle)
 
             // 播放失败提示（2026-09-12 审计 P8）：载入失败不再静默（"点了不播"）。
             // 文案由引擎统一上报（playbackErrorMessage），5 秒后自动消失。

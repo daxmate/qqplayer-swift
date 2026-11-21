@@ -186,6 +186,8 @@
 "github_repository" = "GitHub 开源仓库";
 "use_simple_icons" = "在媒体库界面中移除图标的彩色背景，使用极简风格。";
 "override_system_appearance" = "无视 iOS 系统外观设置，强制让应用保持深色模式。";
+"player_glass_background" = "封面毛玻璃背景";
+"player_glass_background_footnote" = "播放页用当前封面做模糊背景；关闭后回到渐变背景。";
 "background_color" = "背景颜色";
 "choose_color_theme" = "为所有界面的背景效果选择你喜欢的主题色。";
 "library_section" = "媒体库";
