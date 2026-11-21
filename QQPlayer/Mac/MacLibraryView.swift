@@ -186,6 +186,13 @@ struct MacLibraryView: View {
         .task(id: player.currentTrack?.stableId) {
             await loadWindowArtwork()
         }
+        // 顶部标题栏 / 工具栏跟着玻璃走：macOS 15+ 隐藏工具栏背景，
+        // 全版本再用 AppKit 把 titlebar 透明化；关闭开关即还原（见 MacWindowChrome）
+        .macWindowToolbarBackgroundHidden(isWindowGlassActive)
+        .background {
+            MacWindowChromeTransparency(transparent: isWindowGlassActive)
+                .frame(width: 0, height: 0)
+        }
         .navigationTitle("QQPlayer")
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小
         // 由这里决定，scene 侧配 `.windowResizability(.contentMinSize)` 才生效。
