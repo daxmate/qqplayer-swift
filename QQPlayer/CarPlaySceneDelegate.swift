@@ -404,19 +404,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
                 return
             }
 
-            var artworks: [UIImage] = []
-            var seenStableIds = Set<String>()
-
-            for track in tracks where artworks.count < 4 {
-                guard !seenStableIds.contains(track.stableId) else { continue }
-                seenStableIds.insert(track.stableId)
-
-                if let artwork = await ArtworkManager.shared.getArtwork(for: track) {
-                    artworks.append(artwork)
-                }
-            }
-
-            if let collage = createPlaylistCollageImage(from: artworks) {
+            if let collage = await loadPlaylistCollageArtwork(from: tracks) {
                 item.setImage(collage)
             }
         }
@@ -445,7 +433,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 }
 // Helper function to resize images for CarPlay with aspect-fill cropping
 @MainActor
-private func resizeImageForCarPlay(_ image: UIImage, rounded: Bool = false) -> UIImage {
+func resizeImageForCarPlay(_ image: UIImage, rounded: Bool = false) -> UIImage {
     let maxSize = CPListItem.maximumImageSize
 
     let squareSize = min(maxSize.width, maxSize.height)
@@ -508,7 +496,7 @@ private func loadCustomPlaylistCover(for playlist: Playlist) -> UIImage? {
 }
 
 @MainActor
-private func createPlaylistCollageImage(from artworks: [UIImage]) -> UIImage? {
+func createPlaylistCollageImage(from artworks: [UIImage]) -> UIImage? {
     guard !artworks.isEmpty else { return nil }
 
     let maxSize = CPListItem.maximumImageSize
@@ -533,6 +521,27 @@ private func createPlaylistCollageImage(from artworks: [UIImage]) -> UIImage? {
             drawAspectFill(image, in: CGRect(origin: origin, size: CGSize(width: tileSize, height: tileSize)))
         }
     }
+}
+
+/// 曲目封面拼贴：按顺序取前若干首（按 stableId 去重）的封面拼成 2×2；
+/// 一张都取不到时返回 nil，调用方保留占位图。用户歌单与自动歌单共用本实现。
+@MainActor
+func loadPlaylistCollageArtwork(from tracks: [Track], limit: Int = 4) async -> UIImage? {
+    guard limit > 0 else { return nil }
+
+    var artworks: [UIImage] = []
+    var seenStableIds = Set<String>()
+
+    for track in tracks where artworks.count < limit {
+        guard !seenStableIds.contains(track.stableId) else { continue }
+        seenStableIds.insert(track.stableId)
+
+        if let artwork = await ArtworkManager.shared.getArtwork(for: track) {
+            artworks.append(artwork)
+        }
+    }
+
+    return createPlaylistCollageImage(from: artworks)
 }
 
 @MainActor

@@ -61,4 +61,62 @@ struct SmartPlaylistSectionTests {
         #expect(items.map(\.title) == ["1970s", "未知"])
         #expect(items.map(\.count) == [4, 2])
     }
+
+    // MARK: - coverTracks（自动歌单条目封面取哪些歌）
+
+    private func track(_ stableId: String) -> Track {
+        Track(stableId: stableId, title: stableId, path: "/music/\(stableId).flac")
+    }
+
+    private func ids(_ tracks: [Track]) -> [String] { tracks.map(\.stableId) }
+
+    @Test("coverTracks：三类曲目歌单各取前 4 首，顺序沿用数据层")
+    func coverTracksForTrackKinds() {
+        var snapshot = SmartPlaylistSnapshot()
+        snapshot.kindTracks[.recentAdded] = ["a1", "a2", "a3", "a4", "a5"].map(track)
+        snapshot.kindTracks[.recentPlayed] = ["b1", "b2", "b3", "b4", "b5"].map(track)
+        snapshot.kindTracks[.topPlayed] = ["c1", "c2", "c3", "c4", "c5"].map(track)
+
+        #expect(ids(SmartPlaylistSections.coverTracks(for: .recentAdded, snapshot: snapshot)) == ["a1", "a2", "a3", "a4"])
+        #expect(ids(SmartPlaylistSections.coverTracks(for: .recentPlayed, snapshot: snapshot)) == ["b1", "b2", "b3", "b4"])
+        #expect(ids(SmartPlaylistSections.coverTracks(for: .topPlayed, snapshot: snapshot)) == ["c1", "c2", "c3", "c4"])
+    }
+
+    @Test("coverTracks：曲目不足 4 首时全部返回，空歌单返回空")
+    func coverTracksShortAndEmpty() {
+        var snapshot = SmartPlaylistSnapshot()
+        snapshot.kindTracks[.topPlayed] = ["c1", "c2"].map(track)
+
+        #expect(ids(SmartPlaylistSections.coverTracks(for: .topPlayed, snapshot: snapshot)) == ["c1", "c2"])
+        #expect(SmartPlaylistSections.coverTracks(for: .recentAdded, snapshot: snapshot).isEmpty)
+        #expect(SmartPlaylistSections.coverTracks(for: .decades, snapshot: snapshot).isEmpty)
+    }
+
+    @Test("coverTracks：年代条目按年代顺序摊平有曲目的桶，空桶不参与")
+    func coverTracksForDecades() {
+        var snapshot = SmartPlaylistSnapshot()
+        snapshot.decades = [
+            .init(key: "1950s", title: "1950s", count: 0),
+            .init(key: "1970s", title: "1970s", count: 2),
+            .init(key: "1990s", title: "1990s", count: 3),
+        ]
+        snapshot.decadeTracks["1950s"] = []
+        snapshot.decadeTracks["1970s"] = ["p1", "p2"].map(track)
+        snapshot.decadeTracks["1990s"] = ["n1", "n2", "n3"].map(track)
+
+        #expect(ids(SmartPlaylistSections.coverTracks(for: .decades, snapshot: snapshot)) == ["p1", "p2", "n1", "n2"])
+        #expect(ids(SmartPlaylistSections.coverTracks(forDecadeKey: "1990s", snapshot: snapshot)) == ["n1", "n2", "n3"])
+        #expect(SmartPlaylistSections.coverTracks(forDecadeKey: "1950s", snapshot: snapshot).isEmpty)
+        #expect(SmartPlaylistSections.coverTracks(forDecadeKey: "unknown", snapshot: snapshot).isEmpty)
+    }
+
+    @Test("coverTracks：limit 收窄或为 0 时按约定返回")
+    func coverTracksLimit() {
+        var snapshot = SmartPlaylistSnapshot()
+        snapshot.kindTracks[.recentAdded] = ["a1", "a2", "a3"].map(track)
+
+        #expect(ids(SmartPlaylistSections.coverTracks(for: .recentAdded, snapshot: snapshot, limit: 2)) == ["a1", "a2"])
+        #expect(SmartPlaylistSections.coverTracks(for: .recentAdded, snapshot: snapshot, limit: 0).isEmpty)
+        #expect(SmartPlaylistSections.maxCoverTracks == 4)
+    }
 }

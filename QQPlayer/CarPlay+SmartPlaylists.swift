@@ -14,16 +14,6 @@ import UIKit
 extension CarPlaySceneDelegate {
     // MARK: - Smart playlists（自动歌单）
 
-    /// 自动歌单区的一次性快照：列表行 + 点击后要 push 的曲目。
-    /// 歌单页模板只在连接时建一次，这里顺手把曲目查好（每类 ≤ SmartPlaylistStore.limit），
-    /// 点击二级页不再查库；所有曲目都按本机可播过滤（isCompatible），顺序沿用数据层。
-    struct SmartPlaylistSnapshot {
-        var kindTracks: [SmartPlaylistKind: [Track]] = [:]
-        var decades: [SmartPlaylistDecadeItem] = []
-        var decadeTracks: [String: [Track]] = [:]
-        var items: [SmartPlaylistSectionItem] = []
-    }
-
     func makeSmartPlaylistSnapshot() -> SmartPlaylistSnapshot {
         var snapshot = SmartPlaylistSnapshot()
 
@@ -67,6 +57,12 @@ extension CarPlaySceneDelegate {
 
             let item = CPListItem(text: entry.title, detailText: detailText)
             item.setImage(createPlaceholderImage(systemName: smartPlaylistSymbol(for: entry.kind)))
+            let coverTracks = SmartPlaylistSections.coverTracks(for: entry.kind, snapshot: snapshot)
+            Task { @MainActor in
+                if let collage = await loadPlaylistCollageArtwork(from: coverTracks) {
+                    item.setImage(collage)
+                }
+            }
             item.handler = { [weak self] _, completion in
                 self?.showSmartPlaylist(entry.kind, snapshot: snapshot)
                 completion()
@@ -83,16 +79,22 @@ extension CarPlaySceneDelegate {
                 tracks: snapshot.kindTracks[kind] ?? []
             )
         case .decades:
-            pushDecadeList(snapshot.decades, tracksByKey: snapshot.decadeTracks)
+            pushDecadeList(snapshot)
         }
     }
 
-    private func pushDecadeList(_ decades: [SmartPlaylistDecadeItem], tracksByKey: [String: [Track]]) {
-        let items: [CPListItem] = decades.map { decade in
+    private func pushDecadeList(_ snapshot: SmartPlaylistSnapshot) {
+        let items: [CPListItem] = snapshot.decades.map { decade in
             let item = CPListItem(text: decade.title, detailText: Localized.songsCountOnly(decade.count))
             item.setImage(createPlaceholderImage(systemName: "calendar"))
+            let coverTracks = SmartPlaylistSections.coverTracks(forDecadeKey: decade.key, snapshot: snapshot)
+            Task { @MainActor in
+                if let collage = await loadPlaylistCollageArtwork(from: coverTracks) {
+                    item.setImage(collage)
+                }
+            }
             item.handler = { [weak self] _, completion in
-                self?.pushTrackList(title: decade.title, tracks: tracksByKey[decade.key] ?? [])
+                self?.pushTrackList(title: decade.title, tracks: snapshot.decadeTracks[decade.key] ?? [])
                 completion()
             }
             return item

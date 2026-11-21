@@ -33,6 +33,37 @@ struct SmartPlaylistDecadeItem: Equatable {
 }
 
 enum SmartPlaylistSections {
+    /// 自动歌单条目封面最多拼贴的歌曲数（2×2 拼贴，与用户歌单封面一致）。
+    static let maxCoverTracks = 4
+
+    /// 第一层条目封面取哪些歌：顺序沿用数据层，最多 `limit` 首。
+    /// 年代条目取「有曲目的年代桶」按数据层顺序摊平后的前几首（空桶不参与）。
+    static func coverTracks(
+        for kind: SmartPlaylistKind,
+        snapshot: SmartPlaylistSnapshot,
+        limit: Int = maxCoverTracks
+    ) -> [Track] {
+        guard limit > 0 else { return [] }
+
+        switch kind {
+        case .recentAdded, .recentPlayed, .topPlayed:
+            return Array((snapshot.kindTracks[kind] ?? []).prefix(limit))
+        case .decades:
+            let tracks = snapshot.decades.flatMap { snapshot.decadeTracks[$0.key] ?? [] }
+            return Array(tracks.prefix(limit))
+        }
+    }
+
+    /// 年代二级条目封面取该桶内前 `limit` 首；桶不存在或为空时返回空数组。
+    static func coverTracks(
+        forDecadeKey key: String,
+        snapshot: SmartPlaylistSnapshot,
+        limit: Int = maxCoverTracks
+    ) -> [Track] {
+        guard limit > 0 else { return [] }
+        return Array((snapshot.decadeTracks[key] ?? []).prefix(limit))
+    }
+
     /// 自动歌单区第一层条目。
     ///
     /// - Parameters:
@@ -80,4 +111,15 @@ enum SmartPlaylistSections {
             return SmartPlaylistDecadeItem(key: bucket.key, title: bucket.label, count: count)
         }
     }
+}
+
+/// 自动歌单区的一次性快照：列表行 + 点击后要 push 的曲目。
+/// CarPlay 歌单页模板只在连接时建一次，调用方顺手把曲目查好（每类 ≤ SmartPlaylistStore.limit），
+/// 点击二级页不再查库；所有曲目都按本机可播过滤（isCompatible），顺序沿用数据层。
+/// 纯数据（只有 Track / SmartPlaylistKind），不依赖 CarPlay，QQPlayerTests 可直接构造。
+struct SmartPlaylistSnapshot {
+    var kindTracks: [SmartPlaylistKind: [Track]] = [:]
+    var decades: [SmartPlaylistDecadeItem] = []
+    var decadeTracks: [String: [Track]] = [:]
+    var items: [SmartPlaylistSectionItem] = []
 }
