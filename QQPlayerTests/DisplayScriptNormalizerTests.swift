@@ -39,6 +39,67 @@ struct DisplayScriptNormalizerTests {
         #expect(DisplayScriptNormalizer.direction(for: ["fr", "zh-Hant"]) == .toSimplified) // 只看首位
     }
 
+    // MARK: - App 内语言选择优先（热切换）
+
+    @Test("App 内语言选择优先于 preferredLocalizations")
+    func directionForUIOverride() {
+        // 与系统语言相反时仍按 App 内选择（设置 → 外观 → 语言 热切换的核心语义）
+        #expect(
+            DisplayScriptNormalizer.direction(forUI: "zh-Hans", preferredLocalizations: ["zh-Hant"])
+                == .toSimplified
+        )
+        #expect(
+            DisplayScriptNormalizer.direction(forUI: "zh-Hant", preferredLocalizations: ["zh-Hans"])
+                == .toTraditional
+        )
+        // 非中文选择：一律简体（英文界面也显示简体）
+        for code in ["en", "ja", "ko", "fr", "ru", "es"] {
+            #expect(
+                DisplayScriptNormalizer.direction(forUI: code, preferredLocalizations: ["zh-Hant"])
+                    == .toSimplified,
+                "\(code)"
+            )
+        }
+        // nil / 空串 = 跟随系统 → 回退 preferredLocalizations
+        #expect(
+            DisplayScriptNormalizer.direction(forUI: nil, preferredLocalizations: ["zh-Hant"])
+                == .toTraditional
+        )
+        #expect(
+            DisplayScriptNormalizer.direction(forUI: "", preferredLocalizations: ["zh-TW"])
+                == .toTraditional
+        )
+        #expect(
+            DisplayScriptNormalizer.direction(forUI: nil, preferredLocalizations: ["en"])
+                == .toSimplified
+        )
+        #expect(
+            DisplayScriptNormalizer.direction(forUI: "", preferredLocalizations: [])
+                == .toSimplified
+        )
+    }
+
+    @Test("读 App 内语言选择的 key 与 AppLanguage.storageKey 一致")
+    func appLanguageDefaultsKeyMatchesStorageKey() {
+        #expect(DisplayScriptNormalizer.appLanguageDefaultsKey == AppLanguage.storageKey)
+    }
+
+    @Test("storedLanguageCode：空串 = 跟随系统")
+    func storedLanguageCodeEmptyMeansSystem() throws {
+        let suite = "qqplayer.tests.display-script-hotswitch.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        #expect(DisplayScriptNormalizer.storedLanguageCode(defaults: defaults) == nil)
+
+        defaults.set("", forKey: DisplayScriptNormalizer.appLanguageDefaultsKey)
+        #expect(DisplayScriptNormalizer.storedLanguageCode(defaults: defaults) == nil)
+
+        defaults.set("zh-Hant", forKey: DisplayScriptNormalizer.appLanguageDefaultsKey)
+        #expect(DisplayScriptNormalizer.storedLanguageCode(defaults: defaults) == "zh-Hant")
+    }
+
     // MARK: - 双向转换
 
     @Test("双向转换：人名与专辑名")

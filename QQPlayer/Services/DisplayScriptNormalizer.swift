@@ -32,8 +32,45 @@ enum DisplayScriptNormalizer {
 
     // MARK: - 方向
 
-    /// 当前 UI 语言决定的方向，进程内缓存一次（渲染热路径不重复读 Bundle）。
-    static let current: Direction = direction(for: Bundle.main.preferredLocalizations)
+    /// App 内语言选择的 UserDefaults 键；值必须与 `AppLanguage.storageKey` 一致。
+    /// 本文件同时编进 Siri 扩展 / Mac target（那两个 target 没有 AppLanguage.swift），
+    /// 故这里不能引用 AppLanguage —— 由 `DisplayScriptNormalizerTests` 断言两边一致。
+    static let appLanguageDefaultsKey = "qqplayer.appLanguage"
+
+    /// 启动期的系统语言偏好 = 「跟随系统」时的回退值。
+    /// AppleLanguages 的改动只对下次启动生效，进程内不会变，故可安全缓存；
+    /// 真正需要现算的是上面的 App 内选择（用户可在设置里热切换）。
+    private static let systemPreferredLocalizations = Bundle.main.preferredLocalizations
+
+    /// 当前 UI 语言决定的方向。**每次现算，不能缓存**：
+    /// 设置里切语言后同一进程内必须立刻生效（2026-11-21 修复：此前 static let
+    /// 在启动时锁死，热切换后歌词 / 播放条曲名仍按旧字形显示）。
+    static var current: Direction {
+        direction(
+            forUI: storedLanguageCode(),
+            preferredLocalizations: systemPreferredLocalizations
+        )
+    }
+
+    /// 读 App 内语言选择（nil = 跟随系统）。默认参数便于测试注入独立 UserDefaults。
+    static func storedLanguageCode(defaults: UserDefaults = .standard) -> String? {
+        guard let stored = defaults.string(forKey: appLanguageDefaultsKey),
+              !stored.isEmpty else {
+            return nil
+        }
+        return stored
+    }
+
+    /// 纯函数：App 内语言选择优先（非空即用），nil / 空串 → 回退 preferredLocalizations。
+    static func direction(
+        forUI code: String?,
+        preferredLocalizations: [String]
+    ) -> Direction {
+        if let code, !code.isEmpty {
+            return direction(for: [code])
+        }
+        return direction(for: preferredLocalizations)
+    }
 
     /// 纯函数：由 preferredLocalizations 首位决定方向，便于测试（不依赖宿主语言）。
     /// zh-Hant*/zh-HK/zh-TW/zh-MO → toTraditional；其余（含空列表、未知语言）→ toSimplified。
