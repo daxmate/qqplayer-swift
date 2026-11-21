@@ -9,6 +9,19 @@
 import Foundation
 @preconcurrency import GRDB
 
+/// 歌手显示名缓存条目：值里带着生成时的显示方向，语言热切换后旧方向条目自动 miss。
+/// 抽成独立类型是为了让「按方向失效」这条规则可直接单测（不依赖数据库 / 单例）。
+/// 放在本文件（歌手显示名缓存的唯一使用点）而不是 DatabaseManager.swift，避免主文件顶破行数预算。
+struct ArtistDisplayNameCacheEntry: Equatable {
+    let direction: ArtistNameNormalizer.Direction
+    let name: String
+
+    /// 方向一致才返回缓存值；方向已变（用户切了语言）→ nil，调用方重新归一。
+    func name(matching direction: ArtistNameNormalizer.Direction) -> String? {
+        self.direction == direction ? name : nil
+    }
+}
+
 extension DatabaseManager {
     // MARK: - Artist operations
 
