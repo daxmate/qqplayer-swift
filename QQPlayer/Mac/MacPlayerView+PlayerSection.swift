@@ -52,12 +52,6 @@ extension MacPlayerView {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            // 玻璃面板上沿（歌词区拖动坐标空间）
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.frame(in: .named(MacPlayerView.lyricsResizeCoordinateSpace)).minY
-            } action: { minY in
-                playerInfoTop = minY
-            }
 
             // Progress bar
             VStack(spacing: DesignTokens.space4) {
@@ -194,13 +188,6 @@ extension MacPlayerView {
                 .help("karaoke_mode_help".localized)
 
             }
-            // 玻璃面板下沿（控制条底部）
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.frame(in: .named(MacPlayerView.lyricsResizeCoordinateSpace)).maxY
-            } action: { maxY in
-                playerInfoBottom = maxY
-            }
-
             // 播放页频谱条（D4，web Visualizer 对齐——仅 native 引擎曲目有数据，
             // SFB 曲目 Opus/OGG/DSD 无 tap 数据源，自动隐藏；跟唱大画面时本区隐藏）
             if visualizerEnabled {

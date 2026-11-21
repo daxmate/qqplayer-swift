@@ -90,19 +90,30 @@ extension MacLyricsView {
                         // 负补偿必须能继续把内容上提，否则底部大位移会残留漂移。
                         .padding(.top, resizePinInset)
                     }
+                    // 玻璃模式：内容本身按透明度淡出（不铺任何颜色，见 LyricsGlassEdgeFade）
+                    .modifier(
+                        LyricsGlassEdgeFade(
+                            active: windowGlassActive,
+                            height: fadeHeight(geometry.size.height)
+                        )
+                    )
                     // 面板内不禁用滚动：Mac 无 iOS 的手势冲突，用户可手动翻，行变化时回中心
 
                     // 上下边缘渐隐（面板可矮到 140pt → 渐隐高度随面板收缩）
-                    VStack(spacing: DesignTokens.space0) {
-                        LinearGradient(colors: fadeColors(top: true), startPoint: .top, endPoint: .bottom)
-                            .frame(height: min(150, geometry.size.height * 0.22))
+                    // 玻璃模式不能盖底色（baseColor 不透明 → 顶部成一条白带），改用透明遮罩，
+                    // 即把滚动内容本身淡出（见 edgeFadeMask）。
+                    if !windowGlassActive {
+                        VStack(spacing: DesignTokens.space0) {
+                            LinearGradient(colors: fadeColors(top: true), startPoint: .top, endPoint: .bottom)
+                                .frame(height: fadeHeight(geometry.size.height))
 
-                        Spacer()
+                            Spacer()
 
-                        LinearGradient(colors: fadeColors(top: false), startPoint: .top, endPoint: .bottom)
-                            .frame(height: min(150, geometry.size.height * 0.22))
+                            LinearGradient(colors: fadeColors(top: false), startPoint: .top, endPoint: .bottom)
+                                .frame(height: fadeHeight(geometry.size.height))
+                        }
+                        .allowsHitTesting(false)
                     }
-                    .allowsHitTesting(false)
                 }
                 // 手动滚动暂停跟随后浮出的「回到当前行」按钮（仅普通模式）
                 .overlay(alignment: .bottom) {
@@ -271,7 +282,13 @@ extension MacLyricsView {
         }
     }
 
+    /// 边缘渐隐高度（面板可矮到 140pt → 随面板收缩；与改前同一口径）
+    private func fadeHeight(_ viewportHeight: CGFloat) -> CGFloat {
+        min(150, viewportHeight * 0.22)
+    }
+
     /// 边缘渐隐用的底色色阶（top = 自上而下；bottom = 反向）
+    /// ⚠️ 只用于**关闭玻璃**的旧外观：baseColor 不透明，盖在玻璃上就是一条白带。
     private func fadeColors(top: Bool) -> [Color] {
         let stops = [
             baseColor.opacity(0.95),
@@ -499,6 +516,42 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
             if let endToken { center.removeObserver(endToken) }
             startToken = nil
             endToken = nil
+        }
+    }
+}
+
+// MARK: - 玻璃模式边缘淡出
+
+/// 整窗玻璃下的上下边缘淡出：把滚动内容**本身**按透明度遮罩淡出，
+/// 不铺任何颜色（旧实现用 baseColor 渐变带，盖在玻璃上会显示成顶部/底部白带）。
+/// 关闭玻璃时原样返回内容——旧外观逐像素不变，也不多一次离屏渲染。
+private struct LyricsGlassEdgeFade: ViewModifier {
+    let active: Bool
+    let height: CGFloat
+
+    func body(content: Content) -> some View {
+        if active {
+            content.mask {
+                VStack(spacing: DesignTokens.space0) {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.55), .black.opacity(0.92), .black],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: height)
+
+                    Color.black
+
+                    LinearGradient(
+                        colors: [.black, .black.opacity(0.92), .black.opacity(0.55), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: height)
+                }
+            }
+        } else {
+            content
         }
     }
 }

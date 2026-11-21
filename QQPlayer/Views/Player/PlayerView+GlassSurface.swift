@@ -1,7 +1,7 @@
 //
 //  PlayerView+GlassSurface.swift
 //  QQPlayer
-// target: ios-only（QQPlayer/Mac 之外，Mac 侧见 MacPlayerView+GlassSurface.swift）
+// target: ios-only（Mac 侧不铺卡片：整窗玻璃下播放信息直接浮在窗底上，见 MacPlayerView）
 //
 //  播放页封面毛玻璃背景（iOS）：
 //    1. `surfaceStyle` —— 是否生效的唯一判定（开关 / 封面 / 降低透明度）

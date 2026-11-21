@@ -107,7 +107,10 @@ struct MacLyricsView: View {
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
             header
-            Divider()
+            // 玻璃模式：头部条不铺底色也不画分隔线（整窗只有一层底，出现细线即「分块」）
+            if !windowGlassActive {
+                Divider()
+            }
             content
                 // 仅跟唱模式下歌词区可聚焦（普通态键盘/焦点行为不变）
                 .focusable(karaoke.isKaraokeOn)
@@ -144,14 +147,12 @@ struct MacLyricsView: View {
     }
 
     /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）。
-    /// 整窗毛玻璃生效时改为轻材质底（头部条与本面板共用这个背景 → 一并透明化），
-    /// 让窗底的模糊封面透上来；关闭开关即完全回到原来的纯色 + 辉光。
+    /// 整窗毛玻璃生效时**完全不铺底**（面板与头部条共用这个背景 → 一并透明），
+    /// 歌词直接浮在窗底的模糊封面上；关闭开关即完全回到原来的纯色 + 辉光。
     @ViewBuilder
     private var panelBackground: some View {
         if windowGlassActive {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(Color.white.opacity(0.02))
+            Color.clear
                 .allowsHitTesting(false)
         } else {
             legacyPanelBackground
