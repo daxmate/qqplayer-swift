@@ -2,6 +2,14 @@
 
 本文件记录 QQPlayer 的版本变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.9.1] - 2026-11-21
+
+### ⚙️ 改进
+
+- **跟唱 AB 循环移除 B 键**：A 键以当前句为起点开启循环后，直接点另一句歌词即可锁定 AB 区间，B 键（把当前句设为终点）已无必要——从快捷键表与设置列表移除，B 键空出可自由重绑。
+
+[1.9.1]: https://github.com/daxmate/qqplayer-swift/compare/v1.9.0...v1.9.1
+
 ## [1.9.0] - 2026-11-19
 
 ### ✨ 新增
