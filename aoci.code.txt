@@ -151,7 +151,7 @@ MacGraphicEQ10BandEditorView.swift[AU6M]: F:macOS 10 段图形 EQ 编辑器：�
 MacHelpers.swift[CG5T]: F:macOS 共享小工具：MacTimeFormat.format（m:ss）、NSItemProvider.loadFileURL（拖入 fileURL 异步解析）、Track 的 Identifiable+Hashable conformance、MacTrackRow 非可选稳定行标识 | R:code:QQPlayer/Models/DatabaseModels.swift | A:MacTimeFormat,MacTrackRow | S:表格/列表行标识必须用非可选 stableId（Track.id 可空会让 Table 选中/双击失效）；Track 的 Identifiable/Hashable 扩展只放本文件，隔离 iOS target
 MacImportService.swift[AU6S]: F:macOS 文件拖入导入：把拖入音频复制进曲库根（不移动源、同名加后缀），可选立即加入歌单（无 FK 先插引用），完成后发通知触发重扫 | R:code:QQPlayer/Mac/MacLibraryRoot.swift,code:QQPlayer/Services/MacImportNaming.swift,code:QQPlayer/Services/LibraryFileNaming.swift,code:QQPlayer/Services/AudioMetadataParser.swift | A:MacImportService | S:只收引擎支持格式（MacImportNaming.isImportable 静态白名单，不随文件类型设置裁剪）；导入名走 LibraryFileNaming.canonicalFileName，不可渲染回落源文件名
 MacKaraokeControlBar.swift[AU6M]: F:macOS 跟唱控制条（单行通栏 · accent 实心播放键）：上一句/播放暂停/下一句（歌词行级）、倍速菜单（borderless、隐藏系统指示器）、单句循环、AB 循环（单击切换，等选终点态点歌词设 B） | R:code:QQPlayer/Services/KaraokeController.swift,code:QQPlayer/Views/Player/PlayerGestureLogic.swift,code:QQPlayer/Mac/MacLyricsView.swift,code:QQPlayer/Mac/MacKeyboardShortcuts.swift | A:MacKaraokeControlBar | S:只消费 KaraokeController 状态不做决策；AB 单击切换（不用长按）；等选终点态（abLoop.b==nil）点歌词行即设 B；倍速 Menu 用 menuStyle(.borderlessButton)+menuIndicator(.hidden) 去重复系统下箭头
-MacKeyboardShortcuts.swift[AU7M]: F:App 级键盘快捷键（NSEvent local monitor，表驱动全量可录制重绑）：播放/seek/切歌/音量 ⌘↑↓、M 静音/顺序/收藏/倍速/跟唱 G/A/B；跟唱内 ↑/↓ 跳句；含冲突检测与长按过滤 | R:code:QQPlayer/Services/MacShortcutLogic.swift, code:QQPlayer/Services/KaraokeController.swift, code:QQPlayer/Models/SettingsModels.swift | A:MacKeyboardShortcuts,MacShortcutDef | S:决策（展示文本/有效组合/冲突/长按过滤）全部下沉 MacShortcutLogic 以便单测；音量± 可连发、静音不连发；requiresKaraoke 仅跟唱内消费；文本输入焦点全部放行
+MacKeyboardShortcuts.swift[AU7M]: F:App 级键盘快捷键（NSEvent local monitor，表驱动全量可录制重绑）：播放/seek/切歌/音量 ⌘↑↓、M 静音/顺序/收藏/倍速/跟唱 G/A（AB 循环仅 A 键开启，AB 终点靠点歌词锁定）；跟唱内 ↑/↓ 跳句；含冲突检测与长按过滤 | R:code:QQPlayer/Services/MacShortcutLogic.swift, code:QQPlayer/Services/KaraokeController.swift, code:QQPlayer/Models/SettingsModels.swift | A:MacKeyboardShortcuts,MacShortcutDef | S:决策（展示文本/有效组合/冲突/长按过滤）全部下沉 MacShortcutLogic 以便单测；音量± 可连发、静音不连发；requiresKaraoke 仅跟唱内消费；文本输入焦点全部放行
 MacLibraryRoot.swift[PD7M]: F:macOS「曲库=单一地址」唯一 IO 入口：解析默认/指定根、幂等确保根存在；MacLibraryRootCopy 按相对路径拷贝旧库；artistPhotoURL(forArtistName:) 在 artists/ 按清洗文件名找 jpg|jpeg|png | R:code:QQPlayer/Services/MusicFolderResolver.swift, code:QQPlayer/Models/SettingsModels.swift, code:QQPlayer/Mac/MacLibraryRootAccess.swift, code:QQPlayer/Mac/MacArtistAvatar.swift | A:MacLibraryRoot.copy, MacLibraryRootCopy, MacLibraryRoot.artistPhotoURL | S:指定根不存在时静默回退默认根，不报错；艺人照片文件名必须经 MacArtistAvatarStyle.sanitizedFileName 清洗（去 / : 等非法字符），且不额外扫描目录
 MacLibrarySettingsView.swift[AU7L]: F:设置「音乐库」分类：曲库唯一位置选择（默认 ~/Music/QQPlayer 或自定义）+ 音频格式 chips | R:code:QQPlayer/Models/SettingsModels.swift, code:QQPlayer/Mac/MacLibraryRoot.swift | A:MacLibrarySettingsView.applyRoot, pickRoot, resetToDefault | S:换根只走 MacLibraryRoot 入口，不直接写路径
 MacLibraryView+Content.swift[AU7M]: F:MacLibraryView 内容区与播放动作：歌曲/喜欢/专辑/歌手/歌单四态列表与双击播放，搜索输入经 SearchQuery 归一后下发；检索结果视图注入曲库同款右键菜单回调 | R:code:QQPlayer/Mac/MacLibraryView+Sidebar.swift,code:QQPlayer/Services/PlayerEngine.swift | A:四态内容列表,MacLibraryView | S:纯搬家文件，改动前先确认没有同名实现残留；搜索统一走 SearchQuery；showArtist/showAlbum 跨分片须 internal
@@ -260,31 +260,31 @@ TraditionalToSimplified.tsv[CL6L]: F:繁体→简体字形映射表（TSV 逐字
 AppIntentVocabulary.plist[FL4T]: F:英文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/QQPlayerApp.swift | A:- | S:IntentName 须为系统 INIntent 类名；词表仅辅助识别，不改 Intent 路由
 AppShortcuts.strings[FL4T]: F:英文 App Shortcuts Siri 调用短语（key 即短语，${applicationName} 为 App 名占位符） | R:code:QQPlayer/Resources/zh-Hans.lproj/AppShortcuts.strings | A:- | S:key 必须与 QQPlayerAppShortcuts.swift 的短语逐字一致，否则 Siri 认不出
 InfoPlist.strings[FL3T]: F:英文 Info.plist 权限文案本地化（相机=扫码配对、本地网络=发现同网设备） | R:code:QQPlayer/Resources/zh-Hans.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致（改单边会静默回退 base 文案）
-Localizable.strings[FL6L]: F:en 界面文案表（1112 键），键集与其余 7 语种逐一相等；含语言选择、定位 toast 与对齐入口反馈 4 条 | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类，2026-11-17 由 Display 改名），别当重复值修掉
+Localizable.strings[FL6L]: F:en 界面文案表（1111 键），键集与其余 7 语种逐一相等；含语言选择、定位 toast 与对齐入口反馈 4 条 | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类，2026-11-17 由 Display 改名），别当重复值修掉
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/fr.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:法文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:法文 App Shortcuts Siri 调用短语（key 同英文短语，${applicationName} 占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（仅 value 本地化）
 InfoPlist.strings[FL3T]: F:法文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:fr 界面文案表（1112 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
+Localizable.strings[FL6L]: F:fr 界面文案表（1111 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ru.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:俄文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:俄文 App Shortcuts Siri 调用短语（key 同英文短语，${applicationName} 占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（仅 value 本地化）
 InfoPlist.strings[FL3T]: F:俄文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:ru 界面文案表（1112 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
+Localizable.strings[FL6L]: F:ru 界面文案表（1111 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hans.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:简体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:简体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（${applicationName} 占位符保留）
 InfoPlist.strings[FL3T]: F:简体中文 Info.plist 权限文案本地化（相机扫码配对、本地网络发现设备） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1112 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回
+Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1111 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hant.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:繁体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:繁体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致
 InfoPlist.strings[FL3T]: F:繁体中文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hant 界面文案表（1112 键），键集与 zh-Hans 相等 | R:- | A:- | S:译文手工维护，别整份重跑 gen-zh-hant.py（会覆盖润色）
+Localizable.strings[FL6L]: F:zh-Hant 界面文案表（1111 键），键集与 zh-Hans 相等 | R:- | A:- | S:译文手工维护，别整份重跑 gen-zh-hant.py（会覆盖润色）
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Services/===
 AlignedLyricsStore.swift[PB7M]: F:局域网同步 aligned 歌词库唯一入口（docs/lan-sync-design §6.3）：写/读/删/枚举 + 接收侧安装；一歌一文件裸 Lyrics JSON、键=本端 stableId | R:code:QQPlayer/Sync/SyncAlignedLyrics.swift,code:QQPlayer/Services/LyricsManager.swift,code:QQPlayer/Services/LibraryRoot.swift | A:LyricsStoreKind,AlignedLyricsEntry,read,write,entries,install | S:install 移动原文件而非重编码，保字节原样使两侧 SHA-256 对得上；新位置=LibraryRoot.alignedLyricsDirectoryURL，旧 Documents/lyrics-aligned 只读兜底；只有 aligned 参与同步
@@ -1042,17 +1042,17 @@ SpeechAssetInstallPlanner.swift[IG6S]: F:语音模型资产安装的纯决策层
 AppIntentVocabulary.plist[FL4T]: F:es Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:es Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语用口语形，识别依赖固定结构，不要改成书面体
 InfoPlist.strings[FL5T]: F:es Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，不一致会静默回退基串
-Localizable.strings[FL6L]: F:es 界面文案表（1112 键），中性拉美西语；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:preset 统一 preajuste，Ajustes 专指设置；禁用 vosotros；引号用 «»
+Localizable.strings[FL6L]: F:es 界面文案表（1111 键），中性拉美西语；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:preset 统一 preajuste，Ajustes 专指设置；禁用 vosotros；引号用 «»
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ja.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:ja Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:ja Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语用口语形，与主 UI 敬体不同是刻意的，别统一
 InfoPlist.strings[FL5T]: F:ja Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
-Localizable.strings[FL6L]: F:ja 界面文案表（1112 键），です・ます体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:正文冒号用全角「：」，省略号用「…」；reclaim area 译「復元領域」
+Localizable.strings[FL6L]: F:ja 界面文案表（1111 键），です・ます体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:正文冒号用全角「：」，省略号用「…」；reclaim area 译「復元領域」
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ko.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:ko Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:ko Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语结构与识别绑定，不要改语序
 InfoPlist.strings[FL5T]: F:ko Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
-Localizable.strings[FL6L]: F:ko 界面文案表（1112 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오
+Localizable.strings[FL6L]: F:ko 界面文案表（1111 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오
 
