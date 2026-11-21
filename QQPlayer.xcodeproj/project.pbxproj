@@ -262,6 +262,7 @@
 		DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */; };
 		93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */; };
 		94A53BC4B31042EFBEDD0F80 /* PlayerGlassBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106049D0FF8A4AC987FEE14A /* PlayerGlassBackgroundTests.swift */; };
+		5E25AE66A73B4C619810C394 /* LyricsCenterMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4A51BE6E7A4E5F8262293F /* LyricsCenterMathTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -573,6 +574,7 @@
 		2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackStoredPathGuardTests.swift; sourceTree = "<group>"; };
 		2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpeechAssetInstallPlannerTests.swift; sourceTree = "<group>"; };
 		106049D0FF8A4AC987FEE14A /* PlayerGlassBackgroundTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGlassBackgroundTests.swift; sourceTree = "<group>"; };
+		CB4A51BE6E7A4E5F8262293F /* LyricsCenterMathTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsCenterMathTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -858,6 +860,7 @@
 				Services/LyricsAlignment/LyricAlignmentActions.swift,
 				Services/LyricsAlignment/LyricAlignmentController.swift,
 				Services/LyricsAlignment/LyricAlignmentFeature.swift,
+				Services/LyricsCenterMath.swift,
 				Services/MacAutoScrapeService.swift,
 				Services/RecommendationArtistMix.swift,
 				Services/RecallSession.swift,
@@ -1575,6 +1578,7 @@
 				2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */,
 				2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */,
 				106049D0FF8A4AC987FEE14A /* PlayerGlassBackgroundTests.swift */,
+				CB4A51BE6E7A4E5F8262293F /* LyricsCenterMathTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2138,6 +2142,7 @@
 				DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */,
 				93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */,
 				94A53BC4B31042EFBEDD0F80 /* PlayerGlassBackgroundTests.swift in Sources */,
+				5E25AE66A73B4C619810C394 /* LyricsCenterMathTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

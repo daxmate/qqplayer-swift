@@ -74,9 +74,26 @@ struct MacLyricsView: View {
     /// 分片：跨文件可见（原 private）
     @State var lastFollowedIndex: Int?
 
+    /// 歌词内容坐标系（滚动内容 VStack）：行 frame / 内容高度都在这里量
+    static let lyricsContentSpace = "macLyricsContentSpace"
+    /// 切句滚屏时长（与 `lyricAnimation` 同一时长；AppKit 偏移动画用）
+    static let lyricScrollDuration: TimeInterval = 0.55
+
+    /// 每行在内容坐标系里的 frame（居中偏移的唯一数据源）
+    @State var lyricRowRects: [Int: CGRect] = [:]
+    /// 滚动内容总高（含首尾占位；内容高度变化 = 布局落定信号）
+    @State var lyricContentHeight: CGFloat = 0
+    /// 承载歌词滚动内容的 NSScrollView（由 MacLyricsScrollObserver 回传；精确滚屏用）
+    @State var lyricsScrollView: NSScrollView?
+    /// 布局变化后的补正任务（合并连续变化，动画结束后再对齐一次）
+    @State var recenterTask: Task<Void, Never>?
+
     /// 面板底色（对齐 iOS 的 systemBackground）
     /// 分片：跨文件可见（原 private）
     var baseColor: Color { Color(nsColor: .windowBackgroundColor) }
+
+    /// 整窗毛玻璃是否生效（由 MacLibraryView 顶层注入；见 MacWindowGlass）
+    @Environment(\.macWindowGlassActive) var windowGlassActive
     /// 字号整体缩放系数（对齐 iOS LyricsView 的固定字号体系）
     /// 分片：跨文件可见（原 private）
     var fontScale: CGFloat { CGFloat(fontSize / 15.0) }
@@ -126,8 +143,23 @@ struct MacLyricsView: View {
         )
     }
 
-    /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）
+    /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）。
+    /// 整窗毛玻璃生效时改为轻材质底（头部条与本面板共用这个背景 → 一并透明化），
+    /// 让窗底的模糊封面透上来；关闭开关即完全回到原来的纯色 + 辉光。
+    @ViewBuilder
     private var panelBackground: some View {
+        if windowGlassActive {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Color.white.opacity(0.02))
+                .allowsHitTesting(false)
+        } else {
+            legacyPanelBackground
+        }
+    }
+
+    /// 原面板底色（关闭毛玻璃时逐像素不变）
+    private var legacyPanelBackground: some View {
         ZStack {
             baseColor
 

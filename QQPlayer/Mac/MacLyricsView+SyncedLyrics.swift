@@ -8,6 +8,7 @@
 //
 
 import AppKit
+import QuartzCore
 import SwiftUI
 
 extension MacLyricsView {
@@ -44,14 +45,19 @@ extension MacLyricsView {
                                         isScrollActive = false
                                         lastFollowedIndex = LyricTiming.activeLineIndex(time: currentTime - lyricOffset, in: lines)
                                     }
+                                },
+                                // 宿主 NSScrollView：精确偏移滚屏用（拿不到时退回 ScrollViewProxy）
+                                onScrollViewReady: { scrollView in
+                                    lyricsScrollView = scrollView
                                 }
                             )
                             .frame(width: 0, height: 0)
                             .allowsHitTesting(false)
 
-                            // 上下等距撑开 → 当前行恒在面板垂直中央
+                            // 上下等距撑开 = 视口一半（不再减 40 的魔数：那是半个行高，
+                            // 行高随字号/译文/强调内边距变化 → 首末行系统性偏出中心）
                             Spacer()
-                                .frame(height: max(geometry.size.height / 2 - 40, 0))
+                                .frame(height: geometry.size.height / 2)
 
                             // 保持普通 VStack（非 LazyVStack）：iOS 注释写明 LazyVStack 下
                             // scrollTo 未实例化行有已知失败风险，自动滚动可靠性优先。
@@ -67,8 +73,18 @@ extension MacLyricsView {
                             }
 
                             Spacer()
-                                .frame(height: max(geometry.size.height / 2 - 40, 0))
+                                .frame(height: geometry.size.height / 2)
+                            // 内容总高标记：居中偏移公式的 contentHeight（布局落定信号）
+                            Color.clear
+                                .frame(height: 0)
+                                .onGeometryChange(for: CGFloat.self) { proxy in
+                                    proxy.frame(in: .named(MacLyricsView.lyricsContentSpace)).maxY
+                                } action: { height in
+                                    lyricContentHeight = height
+                                }
                         }
+                        // 行 frame / 内容高度共用的坐标空间（居中偏移的唯一口径）
+                        .coordinateSpace(name: MacLyricsView.lyricsContentSpace)
                         // 拖动分隔条时的顶部补偿（方案 A；非拖动/非跟随恒为 0）：
                         // 用 padding 而非撑高 Spacer——面板拖到最矮时 Spacer 会触零截断，
                         // 负补偿必须能继续把内容上提，否则底部大位移会残留漂移。
@@ -91,9 +107,13 @@ extension MacLyricsView {
                 // 手动滚动暂停跟随后浮出的「回到当前行」按钮（仅普通模式）
                 .overlay(alignment: .bottom) {
                     if !karaoke.isKaraokeOn, !isFollowing {
-                        backToCurrentLineButton(activeIndex: activeIndex, proxy: proxy)
-                            .padding(.bottom, DesignTokens.space12)
-                            .transition(.opacity)
+                        backToCurrentLineButton(
+                            activeIndex: activeIndex,
+                            proxy: proxy,
+                            viewportHeight: geometry.size.height
+                        )
+                        .padding(.bottom, DesignTokens.space12)
+                        .transition(.opacity)
                     }
                 }
                 .onChange(of: activeIndex) { _, newIndex in
@@ -113,14 +133,16 @@ extension MacLyricsView {
                     }
                     // 普通模式手动滚动后暂停跟随：不自动拉回（用户拍板 2026-10-12）
                     if !karaoke.isKaraokeOn, !isFollowing { return }
-                    withAnimation(Self.lyricAnimation) {
-                        proxy.scrollTo(newIndex, anchor: .center)
-                    }
+                    centerOnActiveLine(newIndex, proxy: proxy, viewportHeight: geometry.size.height, animated: true)
+                    // 行高（强调内边距/译文行）在动画里变化 → 落定后按新几何再对一次中
+                    scheduleRecenter(newIndex, proxy: proxy, viewportHeight: geometry.size.height)
                     lastFollowedIndex = newIndex
                 }
                 // 切歌 / 歌词变化：恢复自动跟随（需求 3）
                 .onChange(of: lines) { _, _ in
                     isFollowing = true
+                    // 新歌词的行高要等布局 → 落定后对准当前行（否则停在上一首的偏移）
+                    scheduleRecenter(activeIndex, proxy: proxy, viewportHeight: geometry.size.height)
                 }
                 .onAppear {
                     guard let activeIndex else { return }
@@ -128,14 +150,20 @@ extension MacLyricsView {
                     // 首帧滚动：面板高度可能来自窗口尺寸 / 记忆值，当帧布局尚未落定
                     // → 下一轮主队列再滚（避免首屏高亮行偏出中心，2026-11-17）
                     DispatchQueue.main.async {
-                        proxy.scrollTo(activeIndex, anchor: .center)
+                        centerOnActiveLine(activeIndex, proxy: proxy, viewportHeight: geometry.size.height, animated: false)
                     }
                 }
                 // 面板尺寸变化（窗口缩放 / 拖分隔条 / 记忆高度恢复）：把当前行重锚回中心
                 // 拖动中跳过（补偿占位负责让文字不动），松手后统一重锚一次
                 .onChange(of: geometry.size) { _, _ in
                     guard !isPanelResizing else { return }
-                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex, viewportHeight: geometry.size.height)
+                }
+                // 布局落定信号（字号 / 译文行 / 歌词重新加载 / 强调动画结束后内容高度变化）：
+                // 跟随态下按最新几何再对一次中（无动画）
+                .onChange(of: lyricContentHeight) { _, _ in
+                    guard !isPanelResizing else { return }
+                    scheduleRecenter(activeIndex, proxy: proxy, viewportHeight: geometry.size.height)
                 }
                 // 松手：补偿占位以 spring 归零，数学上恰好把当前行送到新面板中心
                 // （顶部占位 = 视口高/2 - 40 ⇒ Δ/2 归零 = 屏幕中心上移 Δ/2）。
@@ -144,7 +172,7 @@ extension MacLyricsView {
                 .onChange(of: isPanelResizing) { wasResizing, resizing in
                     guard wasResizing, !resizing else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                        reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex, viewportHeight: geometry.size.height)
                     }
                 }
             }
@@ -157,7 +185,7 @@ extension MacLyricsView {
     /// 的 `contentOffset` 不会随内容高度修正 ⇒ 高亮行相对视口漂移，面板变矮时会被挤出可见区。
     /// 跟随语义与「行变化回中」一致：普通模式阅读态（手动滚动后）不拉回用户位置；跟唱等 AB
     /// 终点（`ab.b == nil`）时同样暂停。resize 路径不带动画——几何每帧都在变，动画会叠加成抖动。
-    private func reanchorAfterPanelResize(proxy: ScrollViewProxy, activeIndex: Int?) {
+    private func reanchorAfterPanelResize(proxy: ScrollViewProxy, activeIndex: Int?, viewportHeight: CGFloat) {
         guard let activeIndex else { return }
         // 拖动中不重锚：补偿占位负责让文字不动（2026-11-18）
         guard !isPanelResizing else { return }
@@ -165,7 +193,81 @@ extension MacLyricsView {
         if !karaoke.isKaraokeOn, !isFollowing { return }
         // 几何变化当帧内容尚未按新尺寸重排：下一轮主队列再滚，才滚到新布局的中心
         DispatchQueue.main.async {
-            proxy.scrollTo(activeIndex, anchor: .center)
+            centerOnActiveLine(activeIndex, proxy: proxy, viewportHeight: viewportHeight, animated: false)
+        }
+    }
+
+    // MARK: - 居中滚动（精确偏移；公式唯一实现见 LyricsCenterMath）
+
+    /// 把指定歌词行居中。优先按**实测几何**算精确偏移滚 `NSScrollView`（误差可计算、可测），
+    /// 取不到宿主滚动视图时退回 `ScrollViewProxy.scrollTo(anchor: .center)`。
+    func centerOnActiveLine(
+        _ index: Int?,
+        proxy: ScrollViewProxy,
+        viewportHeight: CGFloat,
+        animated: Bool
+    ) {
+        guard let index else { return }
+        guard let rect = lyricRowRects[index], lyricContentHeight > 0 else {
+            proxy.scrollTo(index, anchor: .center)
+            return
+        }
+        let offset = LyricsCenterMath.centeredOffset(
+            rowCenterY: rect.midY,
+            viewportHeight: viewportHeight,
+            contentHeight: lyricContentHeight
+        )
+        guard let scrollView = lyricsScrollView, let documentView = scrollView.documentView else {
+            proxy.scrollTo(index, anchor: .center)
+            return
+        }
+        applyScrollOffset(
+            offset,
+            scrollView: scrollView,
+            documentView: documentView,
+            viewportHeight: viewportHeight,
+            animated: animated
+        )
+    }
+
+    /// 布局落定后再对一次中：切句时行高（强调内边距/译文行）变化会让本次滚屏动画
+    /// 按旧几何落点；这里等动画结束 + 布局稳定后按**最新**实测几何补一次（无动画）。
+    func scheduleRecenter(_ index: Int?, proxy: ScrollViewProxy, viewportHeight: CGFloat) {
+        recenterTask?.cancel()
+        recenterTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled else { return }
+            guard karaoke.isKaraokeOn || isFollowing else { return }
+            if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
+            centerOnActiveLine(index, proxy: proxy, viewportHeight: viewportHeight, animated: false)
+        }
+    }
+
+    private func applyScrollOffset(
+        _ offset: CGFloat,
+        scrollView: NSScrollView,
+        documentView: NSView,
+        viewportHeight: CGFloat,
+        animated: Bool
+    ) {
+        let clip = scrollView.contentView
+        let documentHeight = max(documentView.bounds.height, lyricContentHeight)
+        let maxOffset = max(documentHeight - viewportHeight, 0)
+        let clamped = min(max(offset, 0), maxOffset)
+        // flipped 文档视图：origin.y 从内容顶部量起；非 flipped 反过来
+        let y = documentView.isFlipped ? clamped : maxOffset - clamped
+        let point = NSPoint(x: clip.bounds.origin.x, y: y)
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = MacLyricsView.lyricScrollDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                clip.animator().setBoundsOrigin(point)
+            } completionHandler: {
+                scrollView.reflectScrolledClipView(clip)
+            }
+        } else {
+            clip.setBoundsOrigin(point)
+            scrollView.reflectScrolledClipView(clip)
         }
     }
 
@@ -250,6 +352,12 @@ extension MacLyricsView {
         .padding(.horizontal, DesignTokens.space32)
         .padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))
         .id(index)
+        // 行 frame（内容坐标系）：高亮行居中的唯一测量口径（强调内边距/译文行变化都会反映到它）
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(MacLyricsView.lyricsContentSpace))
+        } action: { rect in
+            lyricRowRects[index] = rect
+        }
         .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke, reading: reading), anchor: .center)
         .opacity(LyricLineEmphasis.lineOpacity(emphasis, karaoke: isKaraoke, reading: reading))
         // 行强调由播放 tick 驱动的 body 重算得出（不是用户事件）→ 靠 .animation(value:) 触发，
@@ -281,14 +389,10 @@ extension MacLyricsView {
     }
 
     /// 「回到当前行」按钮：恢复自动跟随并立刻把当前行滚回中央（普通模式手动滚动后浮出）
-    private func backToCurrentLineButton(activeIndex: Int?, proxy: ScrollViewProxy) -> some View {
+    private func backToCurrentLineButton(activeIndex: Int?, proxy: ScrollViewProxy, viewportHeight: CGFloat) -> some View {
         Button {
             isFollowing = true
-            if let activeIndex {
-                withAnimation(Self.lyricAnimation) {
-                    proxy.scrollTo(activeIndex, anchor: .center)
-                }
-            }
+            centerOnActiveLine(activeIndex, proxy: proxy, viewportHeight: viewportHeight, animated: true)
         } label: {
             HStack(spacing: DesignTokens.space4) {
                 Image(systemName: "arrow.down.to.line.compact")
@@ -319,9 +423,15 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
     let onUserScroll: () -> Void
     /// 用户手动滚动结束回调（主线程调用；didEndLiveScrollNotification）
     let onUserScrollEnd: () -> Void
+    /// 找到宿主 `NSScrollView` 时回传（精确偏移滚屏用）；找不到 / 析构回传 nil
+    var onScrollViewReady: ((NSScrollView?) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onUserScroll: onUserScroll, onUserScrollEnd: onUserScrollEnd)
+        Coordinator(
+            onUserScroll: onUserScroll,
+            onUserScrollEnd: onUserScrollEnd,
+            onScrollViewReady: onScrollViewReady
+        )
     }
 
     /// 零尺寸占位视图：只当「沿视图树找宿主 NSScrollView」的起点，不绘制、不响应事件
@@ -330,6 +440,7 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.onUserScroll = onUserScroll
         context.coordinator.onUserScrollEnd = onUserScrollEnd
+        context.coordinator.onScrollViewReady = onScrollViewReady
         context.coordinator.attachIfNeeded(from: nsView)
     }
 
@@ -338,12 +449,18 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
     final class Coordinator: @unchecked Sendable {
         var onUserScroll: () -> Void
         var onUserScrollEnd: () -> Void
+        var onScrollViewReady: ((NSScrollView?) -> Void)?
         private weak var scrollView: NSScrollView?
         private var startToken: NSObjectProtocol?
         private var endToken: NSObjectProtocol?
-        init(onUserScroll: @escaping () -> Void, onUserScrollEnd: @escaping () -> Void) {
+        init(
+            onUserScroll: @escaping () -> Void,
+            onUserScrollEnd: @escaping () -> Void,
+            onScrollViewReady: ((NSScrollView?) -> Void)?
+        ) {
             self.onUserScroll = onUserScroll
             self.onUserScrollEnd = onUserScrollEnd
+            self.onScrollViewReady = onScrollViewReady
         }
         deinit { detach() }
 
@@ -356,6 +473,7 @@ struct MacLyricsScrollObserver: NSViewRepresentable {
                       self.scrollView !== sv else { return }
                 self.detach()
                 self.scrollView = sv
+                self.onScrollViewReady?(sv)
                 let center = NotificationCenter.default
                 self.startToken = center.addObserver(
                     forName: NSScrollView.willStartLiveScrollNotification,
