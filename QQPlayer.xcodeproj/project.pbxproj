@@ -151,6 +151,7 @@
 		DA214B1D04F9434D87EF6827 /* SyncLibraryFetchResponderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928958225EDF47E8AB8B5B1A /* SyncLibraryFetchResponderTests.swift */; };
 		DA6D9D12AC8D47B482852CD9 /* PlaybackAsyncGuardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7FBE02E9FD4123AEB21361 /* PlaybackAsyncGuardsTests.swift */; };
 		DA7B0B053EAA4201985D0FE5 /* CarPlayPlayerPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */; };
+		C0C0A11B2E00000000000A01 /* SmartPlaylistSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C0A11B2E00000000000A02 /* SmartPlaylistSectionTests.swift */; };
 		DD25E8BCF490415CAF2818C0 /* InterruptionResumePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D39DE9FAECA4B4799C0FA6D /* InterruptionResumePolicyTests.swift */; };
 		DE811C835A3747DCBDDC515D /* TagWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82493F629B43819C248996 /* TagWriterTests.swift */; };
 		DFCDAB74FA28465E8CC02A66 /* SyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF6AA4889A14C2D997216C1 /* SyncCryptoTests.swift */; };
@@ -338,6 +339,7 @@
 		21702C2548494B02886D5344 /* KaraokeControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KaraokeControllerTests.swift; sourceTree = "<group>"; };
 		2312D60C2E6090E2007F756D /* QQPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QQPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarPlayPlayerPageTests.swift; sourceTree = "<group>"; };
+		C0C0A11B2E00000000000A02 /* SmartPlaylistSectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartPlaylistSectionTests.swift; sourceTree = "<group>"; };
 		239B247B2EE59BEC009F83F1 /* PlayerWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PlayerWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		239B247C2EE59BEC009F83F1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		239B247E2EE59BEC009F83F1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -1022,6 +1024,7 @@
 				Services/SearchQuery.swift,
 				Services/SimplifiedTraditionalMap.swift,
 				Services/SmartPlaylistSourceResolver.swift,
+				Services/SmartPlaylistSections.swift,
 				Services/SmartPlaylistStore.swift,
 				Services/SpotifyAPI.swift,
 				Services/StateManager.swift,
@@ -1466,6 +1469,7 @@
 				199ACBBFFC5344E1ADE48676 /* UIAccentContractTests.swift */,
 				D9C7FE84738A434ABEA1680A /* PlaylistCoverLoadTests.swift */,
 				2334C00FBA584F71A2DBA212 /* CarPlayPlayerPageTests.swift */,
+				C0C0A11B2E00000000000A02 /* SmartPlaylistSectionTests.swift */,
 				74235A3C260E43DE8B44FAD5 /* LyricOffsetStoreTests.swift */,
 				002735D27EE746F1B4513B74 /* PlaybackOrderIconContractTests.swift */,
 				AA7CEC0568BE40BFA28F182F /* AppNotificationContractTests.swift */,
@@ -2027,6 +2031,7 @@
 				2924887127FF4F248C6D9FC7 /* UIAccentContractTests.swift in Sources */,
 				014347DB06B147DCBEA154D8 /* PlaylistCoverLoadTests.swift in Sources */,
 				DA7B0B053EAA4201985D0FE5 /* CarPlayPlayerPageTests.swift in Sources */,
+				C0C0A11B2E00000000000A01 /* SmartPlaylistSectionTests.swift in Sources */,
 				010A16423D5743D1B8AE5D85 /* LyricOffsetStoreTests.swift in Sources */,
 				9F5AE1CE0FDF439F91C09D34 /* PlaybackOrderIconContractTests.swift in Sources */,
 				2F8F4D1BB363439388CEAB3E /* AppNotificationContractTests.swift in Sources */,
