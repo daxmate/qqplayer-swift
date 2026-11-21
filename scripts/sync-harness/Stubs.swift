@@ -247,3 +247,12 @@ enum SmartPlaylistKind: String, CaseIterable, Identifiable {
     case recentAdded, recentPlayed, topPlayed, decades
     var id: String { rawValue }
 }
+
+// MARK: - Notification.Name.qqplayerLanguageDidChange（生产定义在 Models/AppNotifications.swift）
+//
+// 为什么是桩：AppLanguage.apply（语言热切换广播）被自动补入编译集，而通知名是
+// Notification.Name 的 extension 静态成员——闭包解析器只认顶层声明，找不到提供者。
+// harness 不覆盖语言切换路径，这里只需同名同值；契约测试仍以生产常量为准。
+extension Notification.Name {
+    static let qqplayerLanguageDidChange = Notification.Name("QQPlayerLanguageDidChange")
+}

@@ -86,4 +86,9 @@ extension Notification.Name {
     /// 某首歌的歌词变了（时间轴对齐完成 / 恢复原时间轴）：object = stableId（String）。
     /// 正在显示的歌词页收到后重取 getLyrics，立即换新。
     static let lyricsDidChange = Notification.Name("LyricsDidChange")
+
+    /// App 内界面语言变了（设置 → 外观 → 语言热切换）：object = nil。
+    /// 显示字形方向随之改变，订阅方重推已发布的锁屏 / 控制中心文案即可；
+    /// 视图树本身由 @AppStorage(AppLanguage.storageKey) + .id(...) 重建，不靠这条通知。
+    static let qqplayerLanguageDidChange = Notification.Name("QQPlayerLanguageDidChange")
 }

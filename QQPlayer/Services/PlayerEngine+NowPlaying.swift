@@ -365,7 +365,9 @@
         }
 
         private func cachedArtistName(for track: Track) -> String? {
-            if cachedNowPlayingArtistTrackId == track.stableId {
+            let direction = ArtistNameNormalizer.direction
+            if cachedNowPlayingArtistTrackId == track.stableId,
+               cachedNowPlayingArtistDirection == direction {
                 return cachedNowPlayingArtistName
             }
 
@@ -382,6 +384,7 @@
 
             cachedNowPlayingArtistTrackId = track.stableId
             cachedNowPlayingArtistName = artistName
+            cachedNowPlayingArtistDirection = direction
             return artistName
         }
 

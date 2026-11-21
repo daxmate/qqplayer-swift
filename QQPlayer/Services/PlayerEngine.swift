@@ -182,6 +182,8 @@ class PlayerEngine: NSObject {
     @ObservationIgnored var artworkLoadTaskTrackId: String?
     @ObservationIgnored var cachedNowPlayingArtistTrackId: String?
     @ObservationIgnored var cachedNowPlayingArtistName: String?
+    /// 上面缓存值生成时的显示方向；语言热切换后方向不符即视为 miss（不再复用旧字形）。
+    @ObservationIgnored var cachedNowPlayingArtistDirection: ArtistNameNormalizer.Direction?
 
     // Security-scoped resource tracking for external files
     @ObservationIgnored var currentSecurityScopedURL: URL?
@@ -214,6 +216,16 @@ class PlayerEngine: NSObject {
         }
     }
 
+    /// 语言热切换后的 Now Playing 刷新：作废歌手名缓存并按新方向重发。
+    /// 曲名 / 歌词本身是计算属性，视图重建时即新；这里只处理「已经推出去」的元数据。
+    func handleLanguageDidChange() {
+        cachedNowPlayingArtistTrackId = nil
+        cachedNowPlayingArtistName = nil
+        cachedNowPlayingArtistDirection = nil
+        guard currentTrack != nil else { return }
+        updateNowPlayingInfoEnhanced()
+    }
+
     /// 清空播放失败提示（载入开始/成功时调用）。
     func clearPlaybackFailure() {
         playbackErrorClearTask?.cancel()
@@ -232,6 +244,18 @@ class PlayerEngine: NSObject {
         // Don't set up remote commands immediately - defer until first playback
         // setupRemoteCommands()
         setupPeriodicStateSaving()
+        // 语言热切换：显示方向变了，已推送的锁屏 / 控制中心文案要重发一次。
+        notificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .qqplayerLanguageDidChange,
+                object: nil,
+                queue: nil
+            ) { @Sendable [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleLanguageDidChange()
+                }
+            }
+        )
         #if os(macOS)
             // App 级音量：启动即恢复已存值（引擎图由 ensureMacAudioEngineSetup 首播时建立，
             // 届时 reapplyStoredVolume() 再写回混音器）。

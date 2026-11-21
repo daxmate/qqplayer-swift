@@ -233,8 +233,9 @@ extension DatabaseManager {
     }
 
     func getArtistDisplayName(forTrackStableId stableId: String, fallbackArtistId: Int64?) throws -> String? {
+        let direction = ArtistNameNormalizer.direction
         artistDisplayNameCacheLock.lock()
-        let cached = artistDisplayNameCache[stableId]
+        let cached = artistDisplayNameCache[stableId]?.name(matching: direction)
         artistDisplayNameCacheLock.unlock()
         if let cached { return cached }
 
@@ -252,9 +253,14 @@ extension DatabaseManager {
             )
 
             if !names.isEmpty {
-                let display = names.map { ArtistNameNormalizer.displayName($0) }.joined(separator: " / ")
+                let display = names
+                    .map { ArtistNameNormalizer.displayName($0, direction: direction) }
+                    .joined(separator: " / ")
                 self.artistDisplayNameCacheLock.lock()
-                self.artistDisplayNameCache[stableId] = display
+                self.artistDisplayNameCache[stableId] = ArtistDisplayNameCacheEntry(
+                    direction: direction,
+                    name: display
+                )
                 self.artistDisplayNameCacheLock.unlock()
                 return display
             }
@@ -271,9 +277,10 @@ extension DatabaseManager {
     ) throws -> [String: String] {
         guard !stableIds.isEmpty else { return [:] }
 
+        let direction = ArtistNameNormalizer.direction
         artistDisplayNameCacheLock.lock()
         let cachedValues = stableIds.reduce(into: [String: String]()) { result, stableId in
-            if let cached = artistDisplayNameCache[stableId] {
+            if let cached = artistDisplayNameCache[stableId]?.name(matching: direction) {
                 result[stableId] = cached
             }
         }
@@ -313,7 +320,9 @@ extension DatabaseManager {
             }
 
             for (stableId, names) in groupedNames where !names.isEmpty {
-                result[stableId] = names.map { ArtistNameNormalizer.displayName($0) }.joined(separator: " / ")
+                result[stableId] = names
+                    .map { ArtistNameNormalizer.displayName($0, direction: direction) }
+                    .joined(separator: " / ")
             }
 
             let fallbackArtistIds = Set(missingStableIds.compactMap { stableId in
@@ -339,7 +348,10 @@ extension DatabaseManager {
 
         artistDisplayNameCacheLock.lock()
         for (stableId, displayName) in result {
-            artistDisplayNameCache[stableId] = displayName
+            artistDisplayNameCache[stableId] = ArtistDisplayNameCacheEntry(
+                direction: direction,
+                name: displayName
+            )
         }
         artistDisplayNameCacheLock.unlock()
 

@@ -57,6 +57,44 @@ struct ArtistNameNormalizerTests {
         }
     }
 
+    // MARK: - App 内语言选择（热切换）
+
+    @Test("App 内语言选择优先于系统语言")
+    func directionFollowsAppLanguage() {
+        // 与系统语言相反时仍按 App 内选择
+        #expect(
+            ArtistNameNormalizer.direction(forUI: "zh-Hant", preferredLocalizations: ["zh-Hans"])
+                == .toTraditional
+        )
+        #expect(
+            ArtistNameNormalizer.direction(forUI: "zh-Hans", preferredLocalizations: ["zh-Hant"])
+                == .toSimplified
+        )
+        #expect(
+            ArtistNameNormalizer.direction(forUI: "en", preferredLocalizations: ["zh-Hant"])
+                == .toSimplified
+        )
+        // nil / 空串 = 跟随系统 → 回退 preferredLocalizations
+        #expect(
+            ArtistNameNormalizer.direction(forUI: nil, preferredLocalizations: ["zh-Hant"])
+                == .toTraditional
+        )
+        #expect(
+            ArtistNameNormalizer.direction(forUI: "", preferredLocalizations: ["zh-Hans"])
+                == .toSimplified
+        )
+        #expect(ArtistNameNormalizer.direction(forUI: nil, preferredLocalizations: []) == .toSimplified)
+    }
+
+    @Test("歌手显示名缓存按方向失效")
+    func artistDisplayNameCacheEntryInvalidatesOnDirectionChange() {
+        let entry = ArtistDisplayNameCacheEntry(direction: .toTraditional, name: "周杰倫")
+        #expect(entry.name(matching: .toTraditional) == "周杰倫")
+        // 用户切到简体后，旧方向条目必须 miss（否则播放条/列表继续显示繁体）
+        #expect(entry.name(matching: .toSimplified) == nil)
+        #expect(entry.name(matching: .identity) == nil)
+    }
+
     // MARK: - normalizedKey
 
     @Test("toSimplified：繁体名归并为简体")

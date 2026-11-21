@@ -8,8 +8,8 @@
 //  被当作两个歌手。按当前 UI 语言归一字形：
 //  - 繁体中文 UI（zh-Hant/zh-HK/zh-TW/zh-MO）→ 显示繁体名（简体名归并）
 //  - 其余全部（zh-Hans/en/fr/ru/空/未知）→ 显示简体名（繁体名归并）
-//  方向由系统语言决定（App 无应用内语言设置）：Bundle.main.preferredLocalizations 首位；
-//  方向判定委托 DisplayScriptNormalizer（显示层字形归一的唯一入口），
+//  方向跟随 App 内语言选择（设置 → 外观 → 语言，热切换立即生效）；
+//  未选择时回退启动期系统语言。方向判定委托 DisplayScriptNormalizer（显示层字形归一的唯一入口），
 //  保证歌手名与曲名/专辑名/歌词的字形方向完全一致。
 //  （2026-09-13 语义变更：en/ru/fr 由 identity 改为 toSimplified——英文界面也显示简体字形。）
 //
@@ -37,16 +37,33 @@ enum ArtistNameNormalizer {
 
     // MARK: - 方向
 
-    /// 当前 UI 语言决定的归一方向（App 无应用内语言设置，跟随系统）
+    /// 当前 UI 语言决定的归一方向：跟随 App 内语言选择（设置里热切换立即生效），
+    /// 未选择（跟随系统）时回退启动期系统语言。方向判定统一走 DisplayScriptNormalizer.current，
+    /// 不再自己读 Bundle —— 否则歌手名会与曲名 / 歌词出现新旧字形不一致。
     static var direction: Direction {
-        direction(for: Bundle.main.preferredLocalizations)
+        mapped(DisplayScriptNormalizer.current)
+    }
+
+    /// 纯函数：App 内语言码优先，nil / 空串 → 回退 preferredLocalizations，便于测试。
+    /// 语义与 DisplayScriptNormalizer 完全一致：
+    /// zh-Hant*/zh-HK/zh-TW/zh-MO → toTraditional；其余（zh-Hans/en/fr/ru/空/未知）→ toSimplified。
+    static func direction(forUI code: String?, preferredLocalizations: [String]) -> Direction {
+        mapped(
+            DisplayScriptNormalizer.direction(
+                forUI: code,
+                preferredLocalizations: preferredLocalizations
+            )
+        )
     }
 
     /// 纯函数：由 preferredLocalizations 首位决定方向，便于测试（不依赖宿主语言）。
-    /// 委托 DisplayScriptNormalizer，与之保持同一语义：
-    /// zh-Hant*/zh-HK/zh-TW/zh-MO → toTraditional；其余（zh-Hans/en/fr/ru/空/未知）→ toSimplified。
     static func direction(for preferredLocalizations: [String]) -> Direction {
-        switch DisplayScriptNormalizer.direction(for: preferredLocalizations) {
+        mapped(DisplayScriptNormalizer.direction(for: preferredLocalizations))
+    }
+
+    /// DisplayScriptNormalizer.Direction → 本类型的 Direction（两者语义一一对应）
+    private static func mapped(_ direction: DisplayScriptNormalizer.Direction) -> Direction {
+        switch direction {
         case .toSimplified: return .toSimplified
         case .toTraditional: return .toTraditional
         case .identity: return .identity

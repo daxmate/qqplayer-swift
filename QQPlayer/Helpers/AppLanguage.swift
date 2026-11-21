@@ -72,8 +72,10 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         code.isEmpty ? .current : Locale(identifier: code)
     }
 
-    /// 切换语言：写选择 + AppleLanguages。
-    /// 当前进程的热生效由 `String.localized` 的 lproj Bundle 直接兑现，这里只负责持久化。
+    /// 切换语言：写选择 + AppleLanguages，并广播热切换事件。
+    /// 当前进程的界面文案由 `String.localized` 的 lproj Bundle 直接兑现；
+    /// 显示层简繁方向则由 `DisplayScriptNormalizer.current` 现读存储值兑现。
+    /// 通知只给「已经推出去、不会随视图重建自动更新」的消费者用（锁屏 / 控制中心文案）。
     static func apply(_ language: AppLanguage) {
         let defaults = UserDefaults.standard
         defaults.set(language.storageValue, forKey: storageKey)
@@ -83,6 +85,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         } else {
             defaults.set([language.rawValue], forKey: appleLanguagesKey)
         }
+        NotificationCenter.default.post(name: .qqplayerLanguageDidChange, object: nil)
     }
 
     private static var storedCode: String {
