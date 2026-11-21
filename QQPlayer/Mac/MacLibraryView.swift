@@ -50,6 +50,13 @@ struct MacLibraryView: View {
     )
     /// 设置（工具栏迷你按钮可见性 = showMiniWindowButton，设置改动即时刷新）
     @State private var deleteSettings = DeleteSettings.load()
+    /// 整窗封面毛玻璃（键 / 默认值的唯一来源见 `PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 系统「降低透明度」：开启时回落纯色窗口
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
+    /// 当前曲目封面（整窗底的来源；由 loadWindowArtwork 按曲目标识刷新）
+    @State var windowArtwork: ArtworkImage?
+    @State var windowArtworkTrackId: String?
     /// 分片：跨文件可见（原 private）
     @State var albums: [Album] = []
     /// 分片：跨文件可见（原 private）
@@ -110,27 +117,74 @@ struct MacLibraryView: View {
     /// 分片：跨文件可见（原 private）
     @State var searchTask: Task<Void, Never>?
 
-    var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
-        } content: {
-            contentList
-                .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
-        } detail: {
-            MacPlayerView(
-                track: player.currentTrack,
-                artistName: currentArtistName,
-                isPlaying: player.isPlaying,
-                duration: player.duration,
-                playbackTime: player.progress.playbackTime,
-                onPlayPause: togglePlayPause,
-                onNext: { Task { await player.nextTrack(autoplay: true) } },
-                onPrevious: { Task { await player.previousTrack(autoplay: true) } },
-                onSeek: { time in
-                    Task { await player.seek(to: time) }
-                }
+    // MARK: - 整窗毛玻璃（Apple Music 式）
+
+    /// 整窗毛玻璃是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
+    var isWindowGlassActive: Bool {
+        PlayerGlassBackground.isActive(
+            isEnabled: glassBackgroundEnabled,
+            hasArtwork: windowArtwork != nil,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    /// 整窗底：当前封面模糊（`ArtworkBlurBackground` 内含 0.45s 切歌交叉淡入）+ 外观自适应雾面
+    @ViewBuilder
+    var windowGlassBackground: some View {
+        if isWindowGlassActive {
+            MacWindowGlass(
+                artwork: windowArtwork,
+                cacheKey: windowArtworkTrackId ?? player.currentTrack?.stableId
             )
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.3), value: glassBackgroundEnabled)
+        }
+    }
+
+    /// 拉取当前曲目封面（整窗底用；切歌后旧结果丢弃，与播放页同款守卫）
+    func loadWindowArtwork() async {
+        guard let track = player.currentTrack else {
+            windowArtwork = nil
+            windowArtworkTrackId = nil
+            return
+        }
+        let trackId = track.stableId
+        let artwork = await services.artworkManager.getArtwork(for: track)
+        guard player.currentTrack?.stableId == trackId else { return }
+        windowArtwork = artwork
+        windowArtworkTrackId = trackId
+    }
+
+    var body: some View {
+        ZStack {
+            windowGlassBackground
+            NavigationSplitView {
+                sidebar
+                    .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
+            } content: {
+                contentList
+                    // 整窗毛玻璃生效时：中栏滚动背景透明（列表/表格/网格统一走一处）
+                    .macWindowGlassTransparency()
+                    .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
+            } detail: {
+                MacPlayerView(
+                    track: player.currentTrack,
+                    artistName: currentArtistName,
+                    isPlaying: player.isPlaying,
+                    duration: player.duration,
+                    playbackTime: player.progress.playbackTime,
+                    onPlayPause: togglePlayPause,
+                    onNext: { Task { await player.nextTrack(autoplay: true) } },
+                    onPrevious: { Task { await player.previousTrack(autoplay: true) } },
+                    onSeek: { time in
+                        Task { await player.seek(to: time) }
+                    }
+                )
+            }
+        }
+        .environment(\.macWindowGlassActive, isWindowGlassActive)
+        .task(id: player.currentTrack?.stableId) {
+            await loadWindowArtwork()
         }
         .navigationTitle("QQPlayer")
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小

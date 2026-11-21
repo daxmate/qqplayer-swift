@@ -100,7 +100,7 @@ struct MacPlayerView: View {
 
     var body: some View {
         ZStack {
-            playerBackground
+            // 整窗底由 MacLibraryView 铺（模糊封面）；本页只在上面叠信息面板玻璃卡片
             glassPanelLayer
             GeometryReader { geo in
                 VStack(spacing: DesignTokens.space0) {
@@ -130,7 +130,6 @@ struct MacPlayerView: View {
                     .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
                 }
                 .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
-                .environment(\.playerSurfaceStyle, surfaceStyle)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -94,7 +94,10 @@ extension MacLibraryView {
                 }
             }
             .listStyle(.sidebar)
+            // 整窗毛玻璃生效时：侧栏列表背景透明（露出窗底），行底色关掉交替
+            .macWindowGlassTransparency()
         }
+        .background(MacSidebarGlassBackdrop())
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: DesignTokens.space6) {
                 if indexer.isIndexing {

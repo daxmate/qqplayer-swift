@@ -148,6 +148,8 @@ struct MacSearchResultsView: View {
                     }
                 }
                 .macTrackMenu(menu)
+                // 整窗毛玻璃生效时：搜索结果列表背景透明（窗底透出）
+                .macWindowGlassTransparency()
             }
         }
         .sheet(isPresented: $showAlbumSheet) {
