@@ -20,7 +20,8 @@ extension LyricsView {
     /// 分片：跨文件可见（原 private）
     func syncedLyricsView(_ lines: [LyricsLine]) -> some View {
         GeometryReader { geometry in
-            let centerInset = LyricsCenterMetrics.topInset(
+            // 占位：优先用高亮行**实测高度**（含 padding / 译文 / 罗马音）；测量前回落档位公式
+            let centerInset = measuredInset ?? LyricsCenterMetrics.topInset(
                 viewportHeight: geometry.size.height,
                 rowHalfHeight: LyricsCenterMetrics.rowHalfHeight(
                     emphasis: 1.0,
@@ -116,13 +117,21 @@ extension LyricsView {
                 // 点它恢复自动跟随并立刻把当前行滚回中央
                 .overlay(alignment: .bottom) {
                     if !karaoke.isKaraokeOn, !isFollowing {
-                        backToCurrentLineButton(lines: lines, proxy: proxy)
-                            .padding(.bottom, DesignTokens.space32)
-                            .transition(.opacity)
+                        backToCurrentLineButton(
+                            lines: lines,
+                            proxy: proxy,
+                            viewportHeight: geometry.size.height
+                        )
+                        .padding(.bottom, DesignTokens.space32)
+                        .transition(.opacity)
                     }
                 }
                 .onChange(of: currentTime) { _, _ in
-                    updateActiveLineAndScroll(for: lines, in: proxy)
+                    updateActiveLineAndScroll(
+                        for: lines,
+                        in: proxy,
+                        viewportHeight: geometry.size.height
+                    )
                 }
                 // 切歌 / 歌词变化：恢复自动跟随（需求 3）
                 .onChange(of: lines) { _, _ in
@@ -133,23 +142,43 @@ extension LyricsView {
                     isFollowing = true
                 }
                 .onAppear {
-                    updateActiveLineAndScroll(for: lines, in: proxy)
+                    updateActiveLineAndScroll(
+                        for: lines,
+                        in: proxy,
+                        viewportHeight: geometry.size.height
+                    )
                 }
                 // 尺寸变化（旋转 / 分屏 / sheet 高度）：任何变化都重锚回中心
                 .onChange(of: geometry.size) { _, _ in
-                    reanchorActiveLine(for: lines, in: proxy)
+                    reanchorActiveLine(
+                        for: lines,
+                        in: proxy,
+                        viewportHeight: geometry.size.height
+                    )
                 }
             }
         }
     }
 
-    /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行中心与视口中心之差，确认后删除。
+    /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行实测高度 / 中心偏差 / 当前占位，确认后删除。
     private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
+        let rowHeight = centerProbe.rowHeight
+            ?? 2 * LyricsCenterMetrics.rowHalfHeight(
+                emphasis: 1.0,
+                karaoke: karaoke.isKaraokeOn,
+                fontScale: 1.0
+            )
+        let inset = measuredInset
+            ?? LyricsCenterMetrics.topInset(viewportHeight: viewportHeight, rowHalfHeight: rowHeight / 2)
         LyricsCenterLogger.log(
             platform: "ios",
             mode: "fullscreen",
-            rowMidY: rowMidY,
-            viewportHeight: viewportHeight
+            sample: LyricsCenterMetrics.Sample(
+                rowHeight: rowHeight,
+                rowMidY: rowMidY,
+                viewportHeight: viewportHeight,
+                inset: inset
+            )
         ) { message in
             AppLog.info(.ui, message)
         }
@@ -162,9 +191,11 @@ extension LyricsView {
         isActive: Bool
     ) {
         guard isActive else { return }
-        let midY = rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
-        centerProbe.delta = midY - viewportHeight / 2
-        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+        // 实测整行 frame（含 padding / 译文 / 罗马音）：占位与诊断都用它
+        let frame = rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName))
+        centerProbe.delta = frame.midY - viewportHeight / 2
+        centerProbe.rowHeight = frame.height
+        scheduleCenterLog(rowMidY: frame.midY, viewportHeight: viewportHeight)
     }
 
     /// 用实测偏移（delta）落日志：重锚路径也能打点，不依赖行内几何再次变化。
@@ -417,7 +448,12 @@ extension LyricsView {
 
     // MARK: - Helper Methods
 
-    private func updateActiveLineAndScroll(for lines: [LyricsLine], in proxy: ScrollViewProxy, force: Bool = false) {
+    private func updateActiveLineAndScroll(
+        for lines: [LyricsLine],
+        in proxy: ScrollViewProxy,
+        viewportHeight: CGFloat,
+        force: Bool = false
+    ) {
         // AB 等选终点（b == nil）：关闭自动滚动，让用户手动滚动找 B 句（用户拍板 2026-08-29）
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
         guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines) else { return }
@@ -449,26 +485,57 @@ extension LyricsView {
         }
         // ② 落定后重锚（0.45s / 0.90s）：padding 逐帧插值使行高在动画中变化，
         //    首次 scrollTo 按当时布局算偏移 → 只在实测偏移超容差时补滚（无偏差完全不动）。
-        scheduleSettleReanchor(proxy: proxy, index: activeIndex)
+        scheduleSettleReanchor(proxy: proxy, index: activeIndex, viewportHeight: viewportHeight)
     }
 
-    /// 动画落定后的幂等重锚：0.45s / 0.90s 各读一次实测偏移，只有 |delta| > 0.5pt 才补滚。
+    /// 动画落定后的幂等重锚：0.45s / 0.90s 各先用实测行高刷新占位，再按需补滚（index 幂等）。
     /// 补滚不带 `withAnimation` → 同一 index 的重复 scrollTo 无可见位移。
-    private func scheduleSettleReanchor(proxy: ScrollViewProxy, index: Int) {
-        let probe = centerProbe
+    private func scheduleSettleReanchor(proxy: ScrollViewProxy, index: Int, viewportHeight: CGFloat) {
         for delay in LyricsCenterMetrics.settleReanchorDelays {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard abs(probe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance else { return }
-                proxy.scrollTo(index, anchor: .center)
+                refreshInsetThenReanchor(proxy: proxy, index: index, viewportHeight: viewportHeight)
             }
         }
     }
 
+    /// 重锚前先用高亮行**实测高度**刷新占位；占位或偏差任一变过才滚动（同一拍：先占位、后滚动）。
+    private func refreshInsetThenReanchor(proxy: ScrollViewProxy, index: Int, viewportHeight: CGFloat) {
+        let insetChanged = refreshMeasuredInset(viewportHeight: viewportHeight)
+        let offCenter = abs(centerProbe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance
+        guard insetChanged || offCenter else { return }
+        DispatchQueue.main.async {
+            proxy.scrollTo(index, anchor: .center)
+        }
+    }
+
+    /// 用实测行高算占位 `max(viewport/2 - rowH/2, 0)`；|Δ| ≤ 0.5pt 不写（防抖）。返回是否写入。
+    @discardableResult
+    private func refreshMeasuredInset(viewportHeight: CGFloat) -> Bool {
+        guard let rowHeight = centerProbe.rowHeight else { return false }
+        let inset = max(viewportHeight / 2 - rowHeight / 2, 0)
+        let fallbackHalf = LyricsCenterMetrics.rowHalfHeight(
+            emphasis: 1.0,
+            karaoke: karaoke.isKaraokeOn,
+            fontScale: 1.0
+        )
+        let current = measuredInset
+            ?? LyricsCenterMetrics.topInset(viewportHeight: viewportHeight, rowHalfHeight: fallbackHalf)
+        guard abs(inset - current) > LyricsCenterMetrics.settleReanchorTolerance else { return false }
+        measuredInset = inset
+        return true
+    }
+
     /// 视口尺寸变化（旋转 / 分屏 / sheet 高度）：无动画重锚回中心（拖动中每 tick 都跟得上）。
-    private func reanchorActiveLine(for lines: [LyricsLine], in proxy: ScrollViewProxy) {
+    private func reanchorActiveLine(
+        for lines: [LyricsLine],
+        in proxy: ScrollViewProxy,
+        viewportHeight: CGFloat
+    ) {
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
         guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines) else { return }
         if !karaoke.isKaraokeOn, !isFollowing { return }
+        // 视口变了：用实测行高重算占位（有变化才写，写入后下一拍滚动才按新布局算）
+        _ = refreshMeasuredInset(viewportHeight: viewportHeight)
         DispatchQueue.main.async {
             proxy.scrollTo(activeIndex, anchor: .center)
         }
@@ -479,10 +546,19 @@ extension LyricsView {
     }
 
     /// 「回到当前行」按钮：恢复自动跟随并立刻把当前行滚回中央（普通模式手动滚动后浮出）
-    private func backToCurrentLineButton(lines: [LyricsLine], proxy: ScrollViewProxy) -> some View {
+    private func backToCurrentLineButton(
+        lines: [LyricsLine],
+        proxy: ScrollViewProxy,
+        viewportHeight: CGFloat
+    ) -> some View {
         Button {
             isFollowing = true
-            updateActiveLineAndScroll(for: lines, in: proxy, force: true)
+            updateActiveLineAndScroll(
+                for: lines,
+                in: proxy,
+                viewportHeight: viewportHeight,
+                force: true
+            )
         } label: {
             HStack(spacing: DesignTokens.space4) {
                 Image(systemName: "arrow.down.to.line.compact")

@@ -73,6 +73,10 @@ struct MacLyricsView: View {
     /// ② 居中诊断日志两种模式（docked / fullscreen）共用同一来源。
     /// 分片：跨文件可见（原 private）
     @State var centerProbe = LyricsCenterMetrics.Probe()
+    /// 高亮行实测高度推出的占位（pt）；nil = 首次测量前（回落档位公式）。
+    /// 只在落定重锚前刷新，且 |新占位 − 当前值| > 0.5pt 才写入（避免逐帧抖动）。
+    /// 分片：跨文件可见（原 private）
+    @State var measuredInset: CGFloat?
 
     /// 面板底色（对齐 iOS 的 systemBackground）
     /// 分片：跨文件可见（原 private）
@@ -86,7 +90,6 @@ struct MacLyricsView: View {
     /// 观感是二次突变；统一成一条 0.55s / 阻尼 0.92 的柔和曲线（2026-09-13 用户反馈）。
     /// 分片：跨文件可见（原 private）
     static let lyricAnimation = Animation.spring(response: 0.55, dampingFraction: 0.92)
-
 
     var body: some View {
         VStack(spacing: DesignTokens.space0) {

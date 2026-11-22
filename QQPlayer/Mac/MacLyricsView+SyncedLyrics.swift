@@ -17,16 +17,16 @@ extension MacLyricsView {
     func syncedView(_ lines: [LyricsLine]) -> some View {
         // 歌词轴时间（音频时间 - offset，web lyricTime 语义）：高亮行与跟唱 tick 同轴
         let activeIndex = LyricTiming.activeLineIndex(time: currentTime - lyricOffset, in: lines)
-        // 高亮行半高：档位字号 + padding 的纯函数（占位与居中口径同源）
-        let rowHalfHeight = LyricsCenterMetrics.rowHalfHeight(
+        // 档位公式只做**首次测量前的 fallback**：测量到位后一律用高亮行实测高度
+        let fallbackHalfHeight = LyricsCenterMetrics.rowHalfHeight(
             emphasis: 1.0,
             karaoke: karaoke.isKaraokeOn,
             fontScale: fontScale
         )
         return GeometryReader { geometry in
-            let centerInset = LyricsCenterMetrics.topInset(
+            let centerInset = measuredInset ?? LyricsCenterMetrics.topInset(
                 viewportHeight: geometry.size.height,
-                rowHalfHeight: rowHalfHeight
+                rowHalfHeight: fallbackHalfHeight
             )
             ScrollViewReader { proxy in
                 ZStack {
@@ -149,13 +149,18 @@ extension MacLyricsView {
                 // 尺寸变化（拖动分隔条逐帧 / 窗口缩放 / 全屏切换）：任何变化都无动画重锚，
                 // 拖动中每个 tick 都保持居中（用动画会跟不上手）。
                 .onChange(of: geometry.size) { _, _ in
-                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                    reanchorAfterPanelResize(
+                        proxy: proxy,
+                        activeIndex: activeIndex,
+                        viewportHeight: geometry.size.height
+                    )
                 }
                 // 字号设置 / 译文 / 罗马音开关改变行高：同样触发重锚（用户要求「任何改变布局的行为」）
                 .onChange(of: fontScale) { _, _ in
                     reanchorAfterPanelResize(
                         proxy: proxy,
                         activeIndex: activeIndex,
+                        viewportHeight: geometry.size.height,
                         settleDelay: LyricsCenterMetrics.settleReanchorDelays.first
                     )
                 }
@@ -163,6 +168,7 @@ extension MacLyricsView {
                     reanchorAfterPanelResize(
                         proxy: proxy,
                         activeIndex: activeIndex,
+                        viewportHeight: geometry.size.height,
                         settleDelay: LyricsCenterMetrics.settleReanchorDelays.first
                     )
                 }
@@ -170,6 +176,7 @@ extension MacLyricsView {
                     reanchorAfterPanelResize(
                         proxy: proxy,
                         activeIndex: activeIndex,
+                        viewportHeight: geometry.size.height,
                         settleDelay: LyricsCenterMetrics.settleReanchorDelays.first
                     )
                 }
@@ -186,11 +193,14 @@ extension MacLyricsView {
     private func reanchorAfterPanelResize(
         proxy: ScrollViewProxy,
         activeIndex: Int?,
+        viewportHeight: CGFloat,
         settleDelay: TimeInterval? = nil
     ) {
         guard let activeIndex else { return }
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
         if !karaoke.isKaraokeOn, !isFollowing { return }
+        // 视口变了：用实测行高重算占位（有变化才写，写入后下一拍滚动才按新布局算）
+        _ = refreshMeasuredInset(viewportHeight: viewportHeight)
         // 几何变化当帧内容尚未按新尺寸重排：下一轮主队列再滚，才滚到新布局的中心
         DispatchQueue.main.async {
             proxy.scrollTo(activeIndex, anchor: .center)
@@ -199,29 +209,54 @@ extension MacLyricsView {
         DispatchQueue.main.asyncAfter(deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay) {
             proxy.scrollTo(activeIndex, anchor: .center)
         }
-        // 行高类改动（字号 / 译文 / 罗马音开关）会触发动画：再在 +0.45s 补一次（有偏差才动）
+        // 行高类改动（字号 / 译文 / 罗马音开关）会触发动画：再在 +0.45s 补一次（占位/偏差变过才动）
         if let settleDelay {
             DispatchQueue.main.asyncAfter(deadline: .now() + settleDelay) {
-                guard abs(centerProbe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance else { return }
-                proxy.scrollTo(activeIndex, anchor: .center)
+                refreshInsetThenReanchor(proxy: proxy, index: activeIndex, viewportHeight: viewportHeight)
             }
         }
     }
 
-    /// 动画落定后的幂等重锚：0.45s / 0.90s 各读一次实测偏移，只有 |delta| > 0.5pt 才补滚。
-    /// 补滚不带 `withAnimation` → 同一 index 的重复 scrollTo 无可见位移；无偏差时完全不动。
+    /// 动画落定后的幂等重锚：0.45s / 0.90s 各先用实测行高刷新占位，再按需补滚（带 index 幂等）。
+    /// 补滚不带 `withAnimation` → 同一 index 的重复 scrollTo 无可见位移；占位与偏差都没变时完全不动。
     /// 末拍附一次居中诊断日志（两种呈现模式共用，避免只有 fullscreen 有日志）。
     private func scheduleSettleReanchor(proxy: ScrollViewProxy, index: Int, viewportHeight: CGFloat) {
-        let probe = centerProbe
         for delay in LyricsCenterMetrics.settleReanchorDelays {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard abs(probe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance else { return }
-                proxy.scrollTo(index, anchor: .center)
+                refreshInsetThenReanchor(proxy: proxy, index: index, viewportHeight: viewportHeight)
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            scheduleCenterLog(delta: probe.delta, viewportHeight: viewportHeight)
+            scheduleCenterLog(delta: centerProbe.delta, viewportHeight: viewportHeight)
         }
+    }
+
+    /// 重锚前先用高亮行**实测高度**刷新占位；占位或偏差任一变过才滚动（同一拍：先占位、后滚动）。
+    private func refreshInsetThenReanchor(proxy: ScrollViewProxy, index: Int, viewportHeight: CGFloat) {
+        let insetChanged = refreshMeasuredInset(viewportHeight: viewportHeight)
+        let offCenter = abs(centerProbe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance
+        guard insetChanged || offCenter else { return }
+        // 占位是 @State：写入后下一拍布局才生效，滚动放到下一拍完成（避免按旧占位算偏移）
+        DispatchQueue.main.async {
+            proxy.scrollTo(index, anchor: .center)
+        }
+    }
+
+    /// 用实测行高算占位 `max(viewport/2 - rowH/2, 0)`；|Δ| ≤ 0.5pt 不写（防抖）。返回是否写入。
+    @discardableResult
+    private func refreshMeasuredInset(viewportHeight: CGFloat) -> Bool {
+        guard let rowHeight = centerProbe.rowHeight else { return false }
+        let inset = max(viewportHeight / 2 - rowHeight / 2, 0)
+        let fallbackHalf = LyricsCenterMetrics.rowHalfHeight(
+            emphasis: 1.0,
+            karaoke: karaoke.isKaraokeOn,
+            fontScale: fontScale
+        )
+        let current = measuredInset
+            ?? LyricsCenterMetrics.topInset(viewportHeight: viewportHeight, rowHalfHeight: fallbackHalf)
+        guard abs(inset - current) > LyricsCenterMetrics.settleReanchorTolerance else { return false }
+        measuredInset = inset
+        return true
     }
 
     /// 边缘渐隐用的底色色阶（top = 自上而下；bottom = 反向）
@@ -247,13 +282,25 @@ extension MacLyricsView {
         }
     }
 
-    /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行中心与视口中心之差，确认后删除。
+    /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行实测高度 / 中心偏差 / 当前占位，确认后删除。
     private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
+        let rowHeight = centerProbe.rowHeight
+            ?? 2 * LyricsCenterMetrics.rowHalfHeight(
+                emphasis: 1.0,
+                karaoke: karaoke.isKaraokeOn,
+                fontScale: fontScale
+            )
+        let inset = measuredInset
+            ?? LyricsCenterMetrics.topInset(viewportHeight: viewportHeight, rowHalfHeight: rowHeight / 2)
         LyricsCenterLogger.log(
             platform: "mac",
             mode: lyricsSurfaceMode,
-            rowMidY: rowMidY,
-            viewportHeight: viewportHeight
+            sample: LyricsCenterMetrics.Sample(
+                rowHeight: rowHeight,
+                rowMidY: rowMidY,
+                viewportHeight: viewportHeight,
+                inset: inset
+            )
         ) { message in
             AppLog.info(.ui, message)
         }
@@ -266,9 +313,11 @@ extension MacLyricsView {
         isActive: Bool
     ) {
         guard isActive else { return }
-        let midY = rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
-        centerProbe.delta = midY - viewportHeight / 2
-        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+        // 实测整行 frame（含 padding / 译文 / 罗马音）：占位与诊断都用它，不再靠档位公式估算
+        let frame = rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName))
+        centerProbe.delta = frame.midY - viewportHeight / 2
+        centerProbe.rowHeight = frame.height
+        scheduleCenterLog(rowMidY: frame.midY, viewportHeight: viewportHeight)
     }
 
     /// 用实测偏移（delta）落日志：滚动 / 重锚路径也能打点，不依赖行内几何再次变化。

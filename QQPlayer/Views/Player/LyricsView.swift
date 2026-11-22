@@ -29,6 +29,10 @@ struct LyricsView: View {
     /// 高亮行居中探针（引用类型：几何回调写、滚动回调读）：落定后重锚的偏差判定 + 诊断日志。
     /// 分片：跨文件可见（原 private）
     @State var centerProbe = LyricsCenterMetrics.Probe()
+    /// 高亮行实测高度推出的占位（pt）；nil = 首次测量前（回落档位公式）。
+    /// 只在落定重锚 / 尺寸变化时刷新，且 |Δ| > 0.5pt 才写入。
+    /// 分片：跨文件可见（原 private）
+    @State var measuredInset: CGFloat?
     /// 「手动滚动 → 暂停自动跟随」状态（用户拍板 2026-10-12）：
     /// true = 自动滚动跟随当前行；普通模式用户手动滚动后置 false（画面不再被自动拉回），
     /// 点「回到当前行」/ 点任意歌词行 / 切歌（歌词变化）/ 切换跟唱模式 → 恢复 true。

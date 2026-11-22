@@ -11,10 +11,20 @@ import CoreGraphics
 import Foundation
 
 enum LyricsCenterMetrics {
+    /// 一次居中采样（诊断日志用；rowHeight 必须是实测值）。
+    struct Sample: Sendable {
+        var rowHeight: CGFloat
+        var rowMidY: CGFloat
+        var viewportHeight: CGFloat
+        var inset: CGFloat
+    }
+
     /// 高亮行居中的最新实测偏移（引用类型：几何回调写、滚动回调读）。
     final class Probe: @unchecked Sendable {
         /// 高亮行中心 − 视口中心（pt）；尚未测得时为 nil。
         var delta: CGFloat?
+        /// 高亮行实测 frame 高度（含 padding / 译文 / 罗马音）；尚未测得时为 nil。
+        var rowHeight: CGFloat?
         init() {}
     }
 
@@ -102,24 +112,16 @@ final class LyricsCenterLogger: @unchecked Sendable {
     static func log(
         platform: String,
         mode: String,
-        rowMidY: CGFloat,
-        viewportHeight: CGFloat,
+        sample: LyricsCenterMetrics.Sample,
         emit: @escaping @Sendable (String) -> Void
     ) {
-        shared.schedule(
-            platform: platform,
-            mode: mode,
-            rowMidY: rowMidY,
-            viewportHeight: viewportHeight,
-            log: emit
-        )
+        shared.schedule(platform: platform, mode: mode, sample: sample, log: emit)
     }
 
     func schedule(
         platform: String,
         mode: String,
-        rowMidY: CGFloat,
-        viewportHeight: CGFloat,
+        sample: LyricsCenterMetrics.Sample,
         delay: TimeInterval = 0.3,
         log: @escaping @Sendable (String) -> Void
     ) {
@@ -131,10 +133,10 @@ final class LyricsCenterLogger: @unchecked Sendable {
         // 防抖但设硬上限：动画逐帧改 midY 时旧的「只保留最后一次」会永远推迟
         let wait = max(0, min(delay, Self.maximumDebounce - elapsed))
         let work = DispatchWorkItem { [weak self] in
-            let center = viewportHeight / 2
+            let center = sample.viewportHeight / 2
             log(String(
-                format: "[lyrics.center] platform=%@ mode=%@ viewportH=%.1f rowMidY=%.1f viewCenterY=%.1f delta=%.1f",
-                platform, mode, viewportHeight, rowMidY, center, rowMidY - center
+                format: "[lyrics.center] platform=%@ mode=%@ rowH=%.1f viewportH=%.1f rowMidY=%.1f viewCenterY=%.1f delta=%.1f inset=%.1f",
+                platform, mode, sample.rowHeight, sample.viewportHeight, sample.rowMidY, center, sample.rowMidY - center, sample.inset
             ))
             self?.lock.lock()
             self?.pendingSince = nil
