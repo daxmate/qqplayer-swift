@@ -59,6 +59,13 @@ private enum EnvironmentInjectionContract {
             modifierCall: ".actionFeedbackToast()",
             environmentType: "ActionFeedbackCenter"
         ),
+        // 整窗玻璃：工具栏背景可见性由窗口内容根决定，判定结果来自 MacLibraryView
+        .init(
+            platform: "macOS",
+            rootPath: "QQPlayer/QQPlayerMacApp.swift",
+            modifierCall: ".modifier(MacWindowChromeToolbarBackground())",
+            environmentType: "MacWindowGlassChromeState"
+        ),
     ]
 
     enum ContractError: Error, CustomStringConvertible {

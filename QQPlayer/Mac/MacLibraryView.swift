@@ -34,6 +34,8 @@ struct MacLibraryView: View {
     @Environment(AppServices.self) var services
     /// 桌面浮窗管理器（批 5b：Mac 组合根注入；迷你模式入口按钮直调方法，不读属性）
     @Environment(DesktopWindowsManager.self) private var desktopWindows
+    /// 整窗玻璃判定结果的上送通道（窗口内容根据此切工具栏背景可见性）
+    @Environment(MacWindowGlassChromeState.self) private var glassChromeState
 
     /// 侧栏选中项（分区 / 自动歌单 / 用户歌单）；语义与回退口径见 `MacLibrarySelection`
     /// 分片：跨文件可见（原 private）
@@ -187,6 +189,11 @@ struct MacLibraryView: View {
             loadArtwork: { await loadWindowArtwork() }
         ))
         .navigationTitle("QQPlayer")
+        // 玻璃判定结果上送（工具栏背景由窗口内容根读，见 MacWindowGlassChromeState）：
+        // 判定点只有 isWindowGlassActive 一处，这里只搬运，不重复判定。
+        .onChange(of: isWindowGlassActive, initial: true) { _, active in
+            glassChromeState.isActive = active
+        }
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小
         // 由这里决定，scene 侧配 `.windowResizability(.contentMinSize)` 才生效。
         .frame(minWidth: MacMainWindowMetrics.minWidth, minHeight: MacMainWindowMetrics.minHeight)
@@ -490,10 +497,15 @@ private struct MacWindowGlassLayer: ViewModifier {
         content
             .background {
                 if isActive {
+                    // 玻璃只铺在 background 内容上、只允许**它**越界到安全区（标题栏），
+                    // 正文仍由系统安全区决定位置：不 padding、不 safeAreaInset、不包 ZStack。
                     MacWindowGlass(artwork: artwork, cacheKey: cacheKey)
+                        .ignoresSafeArea()
                 }
             }
             .background { MacWindowGlassSafeAreaProbe(isActive: isActive) }
+            // 窗口 chrome（标题栏透明 + 内容铺满整窗）：与玻璃同条件生效，关闭逐项还原
+            .background { MacWindowGlassChrome(active: isActive) }
             .environment(\.macWindowGlassActive, isActive)
             .task(id: trackId) {
                 await loadArtwork()
@@ -503,10 +515,13 @@ private struct MacWindowGlassLayer: ViewModifier {
 
 // MARK: - 玻璃安全区诊断（真机核对「安全区链路没丢」）
 
-/// 玻璃生效时 `onAppear` 打**一条**日志（不逐帧、不重复）：
-/// - `safeTop` = 窗口高度 − 内容布局高度（= 标题栏高度；正常 > 0）
+/// 玻璃生效时 `onAppear` / 开关切换各打**一条**日志（不逐帧、不重复）。
+/// 统一坐标系：**y 向下、原点 = 窗口顶边**（SwiftUI `.global` 的口径）。
+/// - `safeTop` = 窗口高度 − 内容布局高度（= 标题栏高度；铺满整窗时为 0，属正常）
 /// - `windowH` = 窗口高度
-/// - `sidebarMinY` = 三栏根视图顶边在窗口空间下的 y（正常 ≈ `safeTop`，即内容从标题栏下方开始）
+/// - `sidebarMinY` = 三栏根视图顶边在窗口里的 y
+/// - `trafficBottom` = 三个交通灯按钮的下沿（同样 y 向下）——判据：`sidebarMinY >= trafficBottom`
+///   为正常（三栏内容没钻到红绿灯底下或与之重叠）
 ///
 /// 只做观测：`Color.clear` 不画任何东西，不改布局、不占尺寸。
 private struct MacWindowGlassSafeAreaProbe: View {
@@ -516,16 +531,39 @@ private struct MacWindowGlassSafeAreaProbe: View {
         GeometryReader { proxy in
             let rootTop = proxy.frame(in: .global).minY
             Color.clear
-                .onAppear {
-                    guard isActive, let window = NSApp.keyWindow else { return }
-                    let safeTop = window.frame.height - window.contentLayoutRect.height
-                    AppLog.info(.ui, String(
-                        format: "[glass] active safeTop=%.1f windowH=%.1f sidebarMinY=%.1f",
-                        safeTop, window.frame.height, rootTop
-                    ))
-                }
+                .onAppear { log(sidebarMinY: rootTop) }
+                // 开关（含「降低透明度」/ 切歌后有无封面）变化时补一条，仍不逐帧
+                .onChange(of: isActive) { _, _ in log(sidebarMinY: rootTop) }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func log(sidebarMinY: CGFloat) {
+        guard isActive, let window = glassProbeWindow() else { return }
+        let safeTop = window.frame.height - window.contentLayoutRect.height
+        AppLog.info(.ui, String(
+            format: "[glass] active safeTop=%.1f windowH=%.1f sidebarMinY=%.1f trafficBottom=%.1f",
+            safeTop, window.frame.height, sidebarMinY, trafficLightBottom(in: window)
+        ))
+    }
+
+    /// 主窗（设置窗 / 浮窗是 NSPanel 或独立窗口，量它们没有意义）
+    private func glassProbeWindow() -> NSWindow? {
+        for candidate in [NSApp.keyWindow, NSApp.mainWindow] {
+            guard let candidate, !(candidate is NSPanel) else { continue }
+            return candidate
+        }
+        return nil
+    }
+
+    /// 交通灯下沿：窗口底向左为原点时取 `frame.minY`，再换算成 **y 向下** 的窗口坐标
+    /// （`windowH − minY`），三个按钮里取最低的那个；取不到按钮时返回 0。
+    private func trafficLightBottom(in window: NSWindow) -> CGFloat {
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+            .compactMap { window.standardWindowButton($0) }
+            .filter { !$0.isHidden }
+        let bottoms = buttons.map { window.frame.height - $0.convert($0.bounds, to: nil).minY }
+        return bottoms.max() ?? 0
     }
 }

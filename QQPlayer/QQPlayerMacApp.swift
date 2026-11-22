@@ -187,9 +187,16 @@ struct QQPlayerMacApp: App {
                         .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
                 }
             }
-            // macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar 内容会延伸到
-            // 标题栏区域、第一行与交通灯重叠。强制工具栏背景不透明后内容从标题栏下方开始。
-            .toolbarBackground(.visible, for: .windowToolbar)
+            // 工具栏背景跟随整窗玻璃（唯一落点仍在这里，只是值由条件给出）：
+            //   玻璃生效 → .hidden：窗底模糊封面一直铺到标题栏背后（整窗一块）；
+            //   否则     → .visible：macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar
+            //              内容会延伸到标题栏区域、第一行与交通灯重叠 —— 改前正靠这条
+            //              不透明背景压住，关玻璃时必须原样保留。
+            // 「玻璃是否生效」由 MacLibraryView 判定（只有它知道有没有封面）后上送，
+            // 见 MacWindowGlassChromeState。
+            .modifier(MacWindowChromeToolbarBackground())
+            // 整窗玻璃的生效判定结果（判定点唯一：MacLibraryView；这里只是装配点）
+            .environment(MacWindowGlassChromeState.shared)
             // 视图层单例收口（「下降预算」批 3a）：App 级叶子 store 的**唯一装配点**。
             // 纪律：视图层不得直连 `.shared`（棘轮 `ViewSharedSingletonContractTests`）；
             // 新增一个对象 = 在此与 `Settings` 根各登记一行。
