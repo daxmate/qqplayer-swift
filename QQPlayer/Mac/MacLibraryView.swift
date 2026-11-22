@@ -110,6 +110,13 @@ struct MacLibraryView: View {
     /// 分片：跨文件可见（原 private）
     @State var searchTask: Task<Void, Never>?
 
+    /// 是否处于搜索态（唯一判据：**trim 后**非空，与 `performSearch` 的 `SearchQuery.isEmpty`
+    /// 同口径）。原先用原始串判空：只输入一个空白字符 → 中栏切到搜索结果视图，但结果是空集
+    /// ⇒ 稳定显示「未找到结果」空态。
+    var isSearching: Bool {
+        !SearchQuery.isEmpty(debouncedSearchText)
+    }
+
     // MARK: - 整窗玻璃（最小实现：只铺窗口底 + 让底色透出）
 
     /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
