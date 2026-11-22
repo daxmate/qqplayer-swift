@@ -132,4 +132,40 @@ enum MacPlaybackGate {
         let maxHeight = Swift.max(lyricsPanelMaxHeightFloor, containerHeight - playerSectionMinHeight)
         return Swift.min(Swift.max(height, lyricsPanelMinHeight), maxHeight)
     }
+
+    // MARK: - 歌词面板「可用高度」（实测口径，2026-11-22）
+
+    /// 面板之上内容**实测高度**留给歌词面板的可用空间。
+    ///
+    /// 背景（2026-11-22 高亮行偏下的真根因）：面板高度此前只用 `playerSectionMinHeight`（360）
+    /// 这个常量估算上限，而播放区真实高度远大于它（封面 240 + 曲目信息 + 进度条 + 控制行 +
+    /// 频谱 + 内边距）。于是面板 frame 溢出容器、底部被窗口裁掉；`MacLyricsView` 里的
+    /// `GeometryReader` 量到的仍是**未裁的布局高度**，`scrollTo(anchor: .center)` 按它居中
+    /// → 日志 delta=0，但高亮行在**可见**区域里偏下约 40–55pt。
+    /// 因此上限必须来自实测：容器高 − 面板上方实测内容高。
+    ///
+    /// - Parameters:
+    ///   - containerHeight: 播放页容器（播放区 + 分隔条 + 歌词面板）实测高度
+    ///   - playerTopHeight: 面板之上内容的实测高度（播放区 + 分隔条）
+    ///   - minHeight: 面板最小高度（容器极矮时保底，不返回负数）
+    static func availableLyricsHeight(
+        containerHeight: CGFloat,
+        playerTopHeight: CGFloat,
+        minHeight: CGFloat = lyricsPanelMinHeight
+    ) -> CGFloat {
+        Swift.max(minHeight, containerHeight - Swift.max(0, playerTopHeight))
+    }
+
+    /// 渲染用面板高度 = min(用户 / 记忆高度, 可用高度)，且不低于最小高度。
+    ///
+    /// 语义（2026-11-22 用户拍板）：用户值只表达「想要多高」的意图，窗口变小只压**渲染**值，
+    /// 不改写用户值 —— 窗口再变大时面板能回到用户想要的高度。
+    /// - Parameters:
+    ///   - userHeight: 用户拖拽 / 记忆的面板高度
+    ///   - available: 当前窗口实测可用高度（由 `availableLyricsHeight` 算出）
+    ///   - minHeight: 面板最小高度（可用空间不足时取它）
+    static func effectiveLyricsHeight(userHeight: CGFloat, available: CGFloat, minHeight: CGFloat) -> CGFloat {
+        let capped = Swift.min(Swift.max(userHeight, minHeight), available)
+        return Swift.max(minHeight, capped)
+    }
 }

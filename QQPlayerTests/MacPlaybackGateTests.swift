@@ -288,9 +288,10 @@ struct MacPlaybackGateLyricsHeightTests {
     }
 }
 
-/// 窗口尺寸变化时的面板高度回归（2026-11-22）：
-/// 之前 `lyricsPanelHeight` 只在拖拽时 clamp，窗口缩小后仍按 330 / 记忆值排队 → 歌词整块被裁掉。
-/// `MacPlayerView` 现在在 `onAppear` 与 `onChange(of: geo.size.height)` 复用同一个纯函数，这里锁住它的语义。
+/// 面板高度 clamp 语义（2026-11-22；2026-11-22 二次修订）：
+/// 拖拽路径继续用 `clampedLyricsHeight`（容器 − 360 只为手感，不代表播放区真实高度）。
+/// 窗口缩放的渲染上限改由 `availableLyricsHeight` 实测决定（见 MacPlaybackGateLyricsPanelAvailableTests），
+/// 这里锁住的是仍在用的 clamp 语义：下限 140 / 上限 max(180, h − 360) / 幂等。
 struct MacPlaybackGateLyricsHeightWindowResizeTests {
     @Test("窗口变小：面板高度被 clamp 收缩")
     func shrinkingWindowClampsPanel() {
@@ -318,6 +319,72 @@ struct MacPlaybackGateLyricsHeightWindowResizeTests {
             let twice = MacPlaybackGate.clampedLyricsHeight(once, containerHeight: container)
             #expect(once >= MacPlaybackGate.lyricsPanelMinHeight)
             #expect(twice == once)
+        }
+    }
+}
+
+/// 面板「实测可用高度」与渲染高度（2026-11-22 高亮行偏下的真根因）：
+/// 面板此前只用 `playerSectionMinHeight`（360）估算上限，而播放区真实高度远大于它 →
+/// 面板 frame 溢出容器、底部被窗口裁掉；歌词视图的 `GeometryReader` 量到未裁的布局高度 →
+/// `scrollTo` 按「假视口」居中，日志 delta=0 而肉眼偏低。上限改为「容器 − 面板上方实测内容高」。
+struct MacPlaybackGateLyricsPanelAvailableTests {
+    private let minHeight = MacPlaybackGate.lyricsPanelMinHeight // 140
+
+    @Test("可用高度 = 容器 − 面板上方实测内容高（播放区 + 分隔条）")
+    func availableSubtractsMeasuredTop() {
+        // 实测口径：容器 933、播放区内容固有高 466、分隔条 18 → 933 − 484 = 449
+        #expect(MacPlaybackGate.availableLyricsHeight(
+            containerHeight: 933, playerTopHeight: 466 + 18) == 449)
+    }
+
+    @Test("容器比面板上方内容还矮：可用高度保底 140，不返回负数")
+    func tinyContainerFloorsAtMin() {
+        #expect(MacPlaybackGate.availableLyricsHeight(containerHeight: 400, playerTopHeight: 484) == 140)
+        #expect(MacPlaybackGate.availableLyricsHeight(containerHeight: 0, playerTopHeight: 484) == 140)
+    }
+
+    @Test("实测可用大于用户值：渲染用户值（用户意图优先）")
+    func availableLargerKeepsUserHeight() {
+        #expect(MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: 330, available: 449, minHeight: minHeight) == 330)
+    }
+
+    @Test("实测可用小于用户值：渲染收窄到可用高度（不再溢出被裁）")
+    func availableSmallerClampsToAvailable() {
+        #expect(MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: 532.6, available: 449, minHeight: minHeight) == 449)
+    }
+
+    @Test("可用空间小于最小高度：取最小高度（保底可拖空间）")
+    func availableBelowMinFloors() {
+        #expect(MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: 532.6, available: 100, minHeight: minHeight) == 140)
+    }
+
+    @Test("相等边界：可用 == 用户值 → 原值")
+    func equalBoundary() {
+        #expect(MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: 449, available: 449, minHeight: minHeight) == 449)
+    }
+
+    @Test("用户值低于最小高度：抬到最小高度（不出现 0 高面板）")
+    func userBelowMinFloors() {
+        #expect(MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: 40, available: 600, minHeight: minHeight) == 140)
+    }
+
+    @Test("幂等：渲染结果再算一次不变（布局每轮重算不抖动）")
+    func effectiveIsIdempotent() {
+        for user in [CGFloat(140), 330, 449, 532.6, 900] {
+            for available in [CGFloat(140), 300, 449, 700] {
+                let once = MacPlaybackGate.effectiveLyricsHeight(
+                    userHeight: user, available: available, minHeight: minHeight)
+                let twice = MacPlaybackGate.effectiveLyricsHeight(
+                    userHeight: once, available: available, minHeight: minHeight)
+                #expect(once >= minHeight)
+                #expect(once <= Swift.max(available, minHeight))
+                #expect(twice == once)
+            }
         }
     }
 }
