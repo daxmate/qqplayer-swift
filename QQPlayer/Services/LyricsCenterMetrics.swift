@@ -17,6 +17,12 @@ enum LyricsCenterMetrics {
         var rowMidY: CGFloat
         var viewportHeight: CGFloat
         var inset: CGFloat
+        /// 面板在容器里实际占用的高度（docked = min(用户/记忆高度, 实测可用)）。
+        /// 与 viewportHeight 的关系是验收判据：panelHeight − header − divider ≈ viewportHeight。
+        var panelHeight: CGFloat = 0
+        /// 容器实测留给面板的可用高度（容器高 − 面板上方实测内容高）。
+        /// 验收判据：panelHeight ≤ availableHeight。
+        var availableHeight: CGFloat = 0
     }
 
     /// 高亮行居中的最新实测偏移（引用类型：几何回调写、滚动回调读）。
@@ -25,6 +31,19 @@ enum LyricsCenterMetrics {
         var delta: CGFloat?
         /// 高亮行实测 frame 高度（含 padding / 译文 / 罗马音）；尚未测得时为 nil。
         var rowHeight: CGFloat?
+        init() {}
+    }
+
+    /// 面板布局实测（引用类型：布局放置子视图时写、居中日志读）。
+    ///
+    /// 为什么需要：面板高度现在由「容器实测高 − 面板上方内容实测高」决定（见
+    /// `MacPlaybackGate.availableLyricsHeight`），这个值只在布局里算得出来。
+    /// View 层不持 `.shared`（结构性预算基线不动）：实例由宿主创建，同时交给布局与歌词视图。
+    final class PanelGeometry: @unchecked Sendable {
+        /// 面板**实际**占用高度（由面板自身背景几何实测写入，不是布局计划的数）
+        var panelHeight: CGFloat = 0
+        /// 面板可用高度上限（布局实测：容器高 − 面板上方内容实测高）
+        var availableHeight: CGFloat = 0
         init() {}
     }
 
@@ -135,8 +154,10 @@ final class LyricsCenterLogger: @unchecked Sendable {
         let work = DispatchWorkItem { [weak self] in
             let center = sample.viewportHeight / 2
             log(String(
-                format: "[lyrics.center] platform=%@ mode=%@ rowH=%.1f viewportH=%.1f rowMidY=%.1f viewCenterY=%.1f delta=%.1f inset=%.1f",
-                platform, mode, sample.rowHeight, sample.viewportHeight, sample.rowMidY, center, sample.rowMidY - center, sample.inset
+                format: "[lyrics.center] platform=%@ mode=%@ rowH=%.1f viewportH=%.1f rowMidY=%.1f viewCenterY=%.1f "
+                    + "delta=%.1f inset=%.1f panelH=%.1f availableH=%.1f",
+                platform, mode, sample.rowHeight, sample.viewportHeight, sample.rowMidY, center,
+                sample.rowMidY - center, sample.inset, sample.panelHeight, sample.availableHeight
             ))
             self?.lock.lock()
             self?.pendingSince = nil

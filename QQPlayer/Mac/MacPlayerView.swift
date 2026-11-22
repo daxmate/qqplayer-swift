@@ -68,6 +68,8 @@ struct MacPlayerView: View {
     @State private var dragStartPanelHeight: CGFloat?
     /// 歌词面板高度持久化 key
     private static let lyricsPanelHeightKey = "QQPlayer.lyricsPanelHeight"
+    /// 歌词面板布局实测（布局放置子视图时写、居中日志读；见 `LyricsCenterMetrics.PanelGeometry`）
+    @State private var panelGeometry = LyricsCenterMetrics.PanelGeometry()
     /// 播放区可用宽度（窄面板降档用；由 `playerSection` 背景几何量一次，2026-11-17）。
     /// 分片：跨文件可见
     @State var playerSectionWidth: CGFloat = 0
@@ -77,6 +79,20 @@ struct MacPlayerView: View {
     private static let lyricsResizeBarHeight: CGFloat = 6
     /// 分隔条可拖命中区高度（pt）：视觉仍 6pt 细条，上下各外扩 6pt 便于抓取（2026-11-17 用户反馈太窄）
     private static let lyricsResizeHitHeight: CGFloat = 18
+
+    /// 当前窗口下面板的**渲染**高度 = min(用户 / 记忆值, 实测可用高度)。
+    ///
+    /// 拖拽起点用它（2026-11-22）：用户值可能大于当前窗口的可用空间（窗口曾很小 / 记忆值来自大窗口），
+    /// 若直接从用户值起拖，面板会在前几十 pt 拖动里毫无反应。用户值本身不被改写。
+    private var renderedLyricsPanelHeight: CGFloat {
+        let available = panelGeometry.availableHeight
+        guard available > 0 else { return lyricsPanelHeight }
+        return MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: lyricsPanelHeight,
+            available: available,
+            minHeight: MacPlaybackGate.lyricsPanelMinHeight
+        )
+    }
 
     /// 播放区是否隐藏/歌词是否撑满：跟唱或放大（决策上收 MacPlaybackGate，有测试）
     private var isLyricsFullscreen: Bool {
@@ -88,7 +104,15 @@ struct MacPlayerView: View {
 
     var body: some View {
         GeometryReader { geo in
-            VStack(spacing: DesignTokens.space0) {
+            // 竖向布局走自定义 Layout（不是 VStack）：面板是固定高度、播放区是弹性高度，
+            // VStack 在空间不足时会保住固定高度、让总高溢出容器 → 面板底部被窗口裁掉，
+            // 而歌词视图量到的仍是未裁的布局高度 → 居中按「假视口」算，高亮行肉眼偏下。
+            MacPlayerVerticalLayout(
+                userPanelHeight: lyricsPanelHeight,
+                handleHeight: Self.lyricsResizeHitHeight,
+                minPanelHeight: MacPlaybackGate.lyricsPanelMinHeight,
+                report: panelGeometry
+            ) {
                 if !MacPlaybackGate.shouldHidePlayerSection(
                     isKaraokeOn: karaoke.isKaraokeOn,
                     isLyricsExpanded: lyricsExpanded
@@ -107,19 +131,22 @@ struct MacPlayerView: View {
                     },
                     // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
                     onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
-                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil
+                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil,
+                    panelGeometry: panelGeometry
                 )
-                .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
+                // 面板实际高度（实测，日志用；布局只上报可用上限）
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: LyricsPanelHeightKey.self, value: proxy.size.height)
+                    }
+                )
+                .onPreferenceChange(LyricsPanelHeightKey.self) { height in
+                    panelGeometry.panelHeight = height
+                }
+                // 保险：面板高度已由布局按实测可用空间算好，万一内容仍要画到窗口外，一律裁掉
+                .clipped()
             }
             .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
-            // 窗口变小后必须重新规整面板高度：否则面板仍按旧高度（330 / 记忆值）排队 → 被挤出可视区、歌词整块看不见。
-            .onAppear {
-                // 延后一拍：先让外层 onAppear 把记忆高度读进来，再按当前容器高度 clamp
-                DispatchQueue.main.async { normalizeLyricsPanelHeight(containerHeight: geo.size.height) }
-            }
-            .onChange(of: geo.size.height) { _, newHeight in
-                normalizeLyricsPanelHeight(containerHeight: newHeight)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -291,10 +318,11 @@ struct MacPlayerView: View {
             DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.lyricsResizeCoordinateSpace))
                 .onChanged { value in
                     if dragStartPanelHeight == nil {
-                        dragStartPanelHeight = lyricsPanelHeight
+                        // 从渲染高度起拖（用户值可能大于当前可用空间，见 renderedLyricsPanelHeight）
+                        dragStartPanelHeight = renderedLyricsPanelHeight
                     }
                     // 向上拖 = 歌词变高；clamp 数学上收 MacPlaybackGate（有测试）
-                    let start = dragStartPanelHeight ?? lyricsPanelHeight
+                    let start = dragStartPanelHeight ?? renderedLyricsPanelHeight
                     lyricsPanelHeight = MacPlaybackGate.clampedLyricsHeight(
                         start: start,
                         translation: value.translation.height,
@@ -314,22 +342,9 @@ struct MacPlayerView: View {
         )
     }
 
-    /// 窗口尺寸变化后把歌词面板高度规整回可视范围。
-    ///
-    /// 回归（2026-11-22）：`lyricsPanelHeight`（默认 330 / 拖拽记忆值）此前只在拖拽时 clamp，
-    /// 窗口缩小后面板仍按旧高度排队 → 被挤出可视区 / 被裁掉，小窗口里歌词整块看不见。
-    /// 这里**复用** `MacPlaybackGate.clampedLyricsHeight`（不新写 clamp），有变化才回写 UserDefaults
-    /// （与拖拽路径同一 key），避免下次启动又回到溢出值。
-    private func normalizeLyricsPanelHeight(containerHeight: CGFloat) {
-        guard containerHeight > 0 else { return }
-        let clamped = MacPlaybackGate.clampedLyricsHeight(
-            lyricsPanelHeight,
-            containerHeight: containerHeight
-        )
-        guard abs(clamped - lyricsPanelHeight) > 0.5 else { return }
-        lyricsPanelHeight = clamped
-        UserDefaults.standard.set(Double(clamped), forKey: Self.lyricsPanelHeightKey)
-    }
+    // 注（2026-11-22）：窗口缩放不再改写 `lyricsPanelHeight`（原 normalizeLyricsPanelHeight 已删除）。
+    // 面板渲染高度由布局按**实测**可用空间 clamp（`MacPlaybackGate.availableLyricsHeight`），
+    // 用户值保持原样 → 窗口再变大时面板能回到用户想要的高度。
 
     // MARK: - Playback order
 
@@ -358,4 +373,83 @@ struct MacPlayerView: View {
         playOrderMode != .sequential
     }
 
+}
+
+// MARK: - 播放页竖向布局（2026-11-22）
+
+/// 播放页竖向布局：播放区（+ 可拖分隔条）在上，歌词面板在下。
+///
+/// **为什么不用 `VStack`**：面板是固定高度、播放区是弹性高度。空间不足时 VStack 保住固定高度、
+/// 让总高溢出容器 → 面板底部被窗口裁掉；而 `MacLyricsView` 里的 `GeometryReader` 量到的仍是
+/// **未裁的布局高度**，`scrollTo(anchor: .center)` 按这个「假视口」居中 → 日志 delta=0，
+/// 肉眼却明显偏低（2026-11-22 用户截图 + 运行日志定位的真根因）。
+///
+/// 这里先用 `sizeThatFits(height: nil)` 量出播放区的**内容固有高度**（弹性 maxHeight 帧在 nil
+/// 提案下回落到内容固有高，与「当前被分到多少」无关），再按
+/// `面板高 = min(用户/记忆高度, 容器 − 分隔条 − 内容固有高)` 放置；播放区吃掉剩余空间。
+/// 决策数学在 `MacPlaybackGate`（有单测），本类型只负责取值与摆放。
+private struct MacPlayerVerticalLayout: Layout {
+    /// 用户 / 记忆的面板高度（拖拽产物）：只在渲染时被 clamp，不被改写
+    var userPanelHeight: CGFloat
+    /// 分隔条命中区高度（面板上方内容的一部分）
+    var handleHeight: CGFloat
+    /// 面板最小高度（容器极矮时保底）
+    var minPanelHeight: CGFloat
+    /// 布局实测上报（居中日志核对 `panelH ≤ availableH`）
+    var report: LyricsCenterMetrics.PanelGeometry
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        CGSize(width: proposal.width ?? 0, height: proposal.height ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        guard let first = subviews.first else { return }
+        // 单子视图 = 歌词大画面（跟唱 / 双击放大）：播放区不参与，面板占满整个区域
+        guard subviews.count > 1 else {
+            first.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+            report.availableHeight = bounds.height
+            return
+        }
+        let player = subviews[0]
+        let handle = subviews[1]
+        let panel = subviews[2]
+        // 内容固有高度：height 提 nil 提案 → 弹性的 maxHeight 帧回落到内容固有高，
+        // 不受「当前被分到多少」影响（这正是 VStack 分配算不出、又必须拿来 clamp 的那个数）。
+        let measured = player.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)).height
+        // 兜底：理论上不会出现非有限值；真出现时退回常量，宁可面板矮一点也不溢出
+        let playerContentHeight = (measured.isFinite && measured > 0)
+            ? measured
+            : MacPlaybackGate.playerSectionMinHeight
+        let available = MacPlaybackGate.availableLyricsHeight(
+            containerHeight: bounds.height,
+            playerTopHeight: playerContentHeight + handleHeight,
+            minHeight: minPanelHeight
+        )
+        let panelHeight = MacPlaybackGate.effectiveLyricsHeight(
+            userHeight: userPanelHeight,
+            available: available,
+            minHeight: minPanelHeight
+        )
+        let playerHeight = Swift.max(0, bounds.height - handleHeight - panelHeight)
+        player.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: playerHeight))
+        handle.place(
+            at: CGPoint(x: bounds.minX, y: bounds.minY + playerHeight),
+            proposal: ProposedViewSize(width: bounds.width, height: handleHeight)
+        )
+        panel.place(
+            at: CGPoint(x: bounds.minX, y: bounds.minY + playerHeight + handleHeight),
+            proposal: ProposedViewSize(width: bounds.width, height: panelHeight)
+        )
+        report.availableHeight = available
+    }
+}
+
+/// 面板实际高度的实测上报（日志核对 `panelH − header − divider ≈ viewportH`）。
+/// 由面板自身背景几何写入；布局只上报可用上限，两者分开写，避免互相覆盖。
+private struct LyricsPanelHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
 }

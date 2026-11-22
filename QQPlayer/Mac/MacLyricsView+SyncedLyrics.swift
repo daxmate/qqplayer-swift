@@ -301,7 +301,9 @@ extension MacLyricsView {
                 rowHeight: rowHeight,
                 rowMidY: rowMidY,
                 viewportHeight: viewportHeight,
-                inset: inset
+                inset: inset,
+                panelHeight: panelGeometry?.panelHeight ?? 0,
+                availableHeight: panelGeometry?.availableHeight ?? 0
             )
         ) { message in
             AppLog.info(.ui, message)

@@ -30,6 +30,8 @@ struct MacLyricsView: View {
     var onAlignTimeline: (() -> Void)?
     /// 恢复原歌词时间轴（nil = 不显示）
     var onRevertTimeline: (() -> Void)?
+    /// 面板布局实测（居中日志核对 panelH / availableH 用；nil = 宿主未提供）
+    var panelGeometry: LyricsCenterMetrics.PanelGeometry?
 
     /// 分片：跨文件可见（原 private）
     @Environment(KaraokeController.self) var karaoke
