@@ -57,6 +57,9 @@ struct MacLibraryView: View {
     /// 当前曲目封面（整窗底的来源；由 loadWindowArtwork 按曲目标识刷新）
     @State var windowArtwork: ArtworkImage?
     @State var windowArtworkTrackId: String?
+    /// 标题栏 + 工具栏的**实测高度**（玻璃生效时由 MacWindowChrome 上报；关闭 / 全屏 = 0）。
+    /// 内容据此整体下移，避免被红绿灯/工具栏压住；背景层仍 ignoresSafeArea 通顶。
+    @State var titlebarInset: CGFloat = 0
     /// 分片：跨文件可见（原 private）
     @State var albums: [Album] = []
     /// 分片：跨文件可见（原 private）
@@ -165,6 +168,10 @@ struct MacLibraryView: View {
     var body: some View {
         ZStack {
             windowGlassBackground
+            // 内容整体下移 titlebarInset，避免压在红绿灯/工具栏下面。
+            // 选 `.padding` 而不是 `.safeAreaPadding`：这里要的是**整块位移**（三栏一起下移），
+            // safeAreaPadding 改的是 safe-area 尺寸语义，会被子视图各自消费（ScrollView 变成
+            // contentInset、List 只挪内容不挪边框），无法保证每一栏整体下移同一个量。
             NavigationSplitView {
                 sidebar
                     .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
@@ -188,6 +195,8 @@ struct MacLibraryView: View {
                     }
                 )
             }
+            // 标题栏 + 工具栏实测高度（0 = 无留白：关闭玻璃 / 全屏）
+            .padding(.top, titlebarInset)
         }
         .environment(\.macWindowGlassActive, isWindowGlassActive)
         .task(id: player.currentTrack?.stableId) {
@@ -197,8 +206,12 @@ struct MacLibraryView: View {
         // 全版本再用 AppKit 把 titlebar 透明化；关闭开关即还原（见 MacWindowChrome）
         .macWindowToolbarBackgroundHidden(isWindowGlassActive)
         .background {
-            MacWindowChromeTransparency(transparent: isWindowGlassActive)
-                .frame(width: 0, height: 0)
+            MacWindowChromeTransparency(transparent: isWindowGlassActive) { height in
+                // 实测高度回调（MacWindowChrome 在 flags 生效后的下一轮 runloop 测，
+                // resize / 进出全屏 / 换屏 / 成为 key 窗口时重测）
+                titlebarInset = height
+            }
+            .frame(width: 0, height: 0)
         }
         .navigationTitle("QQPlayer")
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小
