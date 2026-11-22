@@ -188,6 +188,10 @@
 "override_system_appearance" = "Override system appearance and force the app to use dark mode.";
 "player_glass_background" = "Artwork Glass Background";
 "player_glass_background_footnote" = "Use the current artwork as a blurred background on the player page. Turn off to go back to the gradient background.";
+"appearance_style" = "Display Style";
+"appearance_style_glass" = "Glass";
+"appearance_style_classic" = "Classic";
+"appearance_style_footnote" = "Glass uses the current artwork as a blurred background across the whole app. Classic keeps the accent-colored shape background. With no track playing, the system background is used.";
 "background_color" = "Background Color";
 "choose_color_theme" = "Choose the color theme for background effects across all screens.";
 "library_section" = "Library";

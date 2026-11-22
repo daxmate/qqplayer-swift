@@ -13,8 +13,9 @@ struct SettingsAppearanceView: View {
     @State private var deleteSettings = DeleteSettings.load()
     /// 语言选择（App 内热切换；跟随系统 = 空字符串）
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
-    /// 播放页封面毛玻璃背景（键与默认值唯一来源见 `PlayerGlassBackground`）
-    @AppStorage(PlayerGlassBackground.storageKey) private var playerGlassBackground = PlayerGlassBackground.enabledByDefault
+    /// 显示风格（毛玻璃 / 经典）：键与默认值唯一来源见 `PlayerGlassBackground`，
+    /// 判定与写入唯一入口 = `AppAppearanceStyle`（本页只做选择器绑定）
+    @AppStorage(PlayerGlassBackground.storageKey) private var glassEnabled = PlayerGlassBackground.enabledByDefault
 
     var body: some View {
         Form {
@@ -46,9 +47,14 @@ struct SettingsAppearanceView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Toggle(Localized.playerGlassBackground, isOn: $playerGlassBackground)
+                // 二选一显示风格（不是「开/关毛玻璃」）：关掉 = 回到继承上游的强调色形状风格
+                Picker(Localized.appearanceStyle, selection: appearanceStyleBinding) {
+                    Text(Localized.appearanceStyleGlass).tag(AppAppearanceStyle.glass)
+                    Text(Localized.appearanceStyleClassic).tag(AppAppearanceStyle.classic)
+                }
+                .pickerStyle(.segmented)
 
-                Text(Localized.playerGlassBackgroundFootnote)
+                Text(Localized.appearanceStyleFootnote)
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -100,6 +106,14 @@ struct SettingsAppearanceView: View {
         }
         .navigationTitle(Localized.appearance)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// 显示风格绑定：读写都走 `AppAppearanceStyle`（持久化仍只有那一个 key）
+    private var appearanceStyleBinding: Binding<AppAppearanceStyle> {
+        Binding(
+            get: { AppAppearanceStyle(glassEnabled: glassEnabled) },
+            set: { glassEnabled = $0.glassEnabled }
+        )
     }
 
     /// 语言选择绑定：写持久化（含 AppleLanguages），AppStorage 触发本页重绘。

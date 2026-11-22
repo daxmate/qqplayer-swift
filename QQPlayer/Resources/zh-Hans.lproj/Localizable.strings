@@ -188,6 +188,10 @@
 "override_system_appearance" = "无视 iOS 系统外观设置，强制让应用保持深色模式。";
 "player_glass_background" = "封面毛玻璃背景";
 "player_glass_background_footnote" = "播放页用当前封面做模糊背景；关闭后回到渐变背景。";
+"appearance_style" = "显示风格";
+"appearance_style_glass" = "毛玻璃";
+"appearance_style_classic" = "经典";
+"appearance_style_footnote" = "毛玻璃用当前封面作为全 App 的模糊背景；经典保留强调色形状背景。没有播放曲目时使用系统背景。";
 "background_color" = "背景颜色";
 "choose_color_theme" = "为所有界面的背景效果选择你喜欢的主题色。";
 "library_section" = "媒体库";

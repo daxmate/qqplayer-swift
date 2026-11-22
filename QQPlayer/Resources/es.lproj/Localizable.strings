@@ -188,6 +188,10 @@
 "override_system_appearance" = "Omite la apariencia del sistema y fuerza el modo oscuro en la app.";
 "player_glass_background" = "Fondo de cristal con carátula";
 "player_glass_background_footnote" = "Usa la carátula actual como fondo desenfocado en la pantalla de reproducción. Desactívalo para volver al fondo degradado.";
+"appearance_style" = "Estilo de visualización";
+"appearance_style_glass" = "Cristal";
+"appearance_style_classic" = "Clásico";
+"appearance_style_footnote" = "Cristal usa la carátula actual como fondo desenfocado en toda la app. Clásico mantiene el fondo de formas en el color de acento. Sin pista en reproducción se usa el fondo del sistema.";
 "background_color" = "Color de fondo";
 "choose_color_theme" = "Elige el tema de color para los efectos de fondo en todas las pantallas.";
 "library_section" = "Biblioteca";

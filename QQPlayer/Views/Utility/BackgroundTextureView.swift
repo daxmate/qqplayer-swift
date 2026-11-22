@@ -26,8 +26,21 @@ enum ScreenType {
 
 struct ScreenSpecificBackgroundView: View {
     let screen: ScreenType
+    /// 生效的显示风格（`ContentView` 唯一注入）：玻璃风格下整屏玻璃底由
+    /// `IOSWindowGlass` 统一铺，这里让位；经典风格与迁移前逐行一致。
+    @Environment(\.appAppearanceStyle) private var appearanceStyle
 
     var body: some View {
+        if appearanceStyle == .glass {
+            // 让位 = 透明（不是删掉本视图：16 处调用点零改动，单点收口）
+            Color.clear
+        } else {
+            classicBackground
+        }
+    }
+
+    /// 经典风格：每屏一套固定的强调色形状底（= 继承上游的设计，逐行未改）
+    private var classicBackground: some View {
         ZStack {
             // Each screen gets a unique fixed design, details match their parent screens
             switch screen {
