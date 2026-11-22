@@ -4,9 +4,13 @@
 #  ① main 上不得出现 merge 提交（历史必须线性；违反 = 「提交线又乱了」）
 #  ② swiftformat --lint + swiftlint（本次推送范围内改动的 .swift）
 #  ③ target 成员归属（QQPlayer 新增文件必须显式表态，纯 python，毫秒级）
-#  ④ 非 main 分支一律拦（2026-09-22 用户拍板）：只允许直推 main；
+#  ④ 非 main **分支**一律拦（2026-09-22 用户拍板）：只允许直推 main；
 #     推候选分支 = PR 流程的前置步骤，会绕过「本地自验 → 合入本地 main → 直推 main」的口径；
 #     本项**不可绕过**（2026-09-22 拆掉 QQPLAYER_ALLOW_BRANCH_PUSH=1 例外开关）。本项最前置、fail-fast。
+#  ⓪ 发版 tag 放行（2026-11-22 用户拍板修）：④ 原先用 `remote_ref != refs/heads/main` 判，
+#     把 refs/tags/* 也当成「非 main 分支」拦掉 —— 与发版流程（PROJECT_RULES/qqplayer-swift.md
+#     第 7 步 git push origin vx.y.z）冲突，v1.10.0 的 tag 就这样漏在本地。
+#     现在只放行 refs/tags/v*（发版 tag），其余 tag 照拦；分支口径一字未改。
 #
 # 为什么不跑编译/测试：那是 CI（.github/workflows/ci.yml 两个 job）的活，CI 仍在 main 上跑作最终兜底；
 # 本钩子只做「推送前必须拦的、秒级的」判断，避免 10 分钟级构建卡住每一次 push。
@@ -24,7 +28,19 @@ tmp_added="$tmp_files.added"
 trap 'rm -f "$tmp_files" "$tmp_added"' EXIT
 
 while read -r _local_ref local_sha remote_ref remote_sha; do
-  [ "$local_sha" = "$ZERO" ] && continue # 删除分支（清理是正常运维，不拦）
+  [ "$local_sha" = "$ZERO" ] && continue # 删除分支 / 删 tag（清理是正常运维，不拦）
+
+  # ---- ⓪ 发版 tag 放行（2026-11-22）----
+  # tag 没有分支语义，也不该参与「线性历史 / 文件范围」检查；只认发版 tag（refs/tags/v*）。
+  case "$remote_ref" in
+    refs/tags/v*)
+      continue
+      ;;
+    refs/tags/*)
+      echo "❌ 拒绝推送非发版 tag：$remote_ref（只允许 refs/tags/v*，如 v1.11.0）"
+      exit 1
+      ;;
+  esac
 
   # ---- ④ 非 main 分支一律拦（最前置，fail-fast：早于 lint/成员检查；不可绕过）----
   if [ "$remote_ref" != "refs/heads/main" ]; then
