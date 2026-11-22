@@ -261,6 +261,7 @@
 		D70619E4A5BF4061A5815BAE /* NowPlayingArtworkGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D34E2732CC4449E8A04991E /* NowPlayingArtworkGateTests.swift */; };
 		DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */; };
 		93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */; };
+		A7C0FFEE1A2B3C4D5E6F7789 /* LyricsCenterMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -571,6 +572,7 @@
 		1D34E2732CC4449E8A04991E /* NowPlayingArtworkGateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NowPlayingArtworkGateTests.swift; sourceTree = "<group>"; };
 		2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackStoredPathGuardTests.swift; sourceTree = "<group>"; };
 		2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpeechAssetInstallPlannerTests.swift; sourceTree = "<group>"; };
+		A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsCenterMetricsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1563,6 +1565,7 @@
 				1D34E2732CC4449E8A04991E /* NowPlayingArtworkGateTests.swift */,
 				2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */,
 				2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */,
+				A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2125,6 +2128,7 @@
 				D70619E4A5BF4061A5815BAE /* NowPlayingArtworkGateTests.swift in Sources */,
 				DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */,
 				93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */,
+				A7C0FFEE1A2B3C4D5E6F7789 /* LyricsCenterMetricsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
