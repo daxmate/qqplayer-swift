@@ -262,6 +262,7 @@
 		DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */; };
 		93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */; };
 		A7C0FFEE1A2B3C4D5E6F7789 /* LyricsCenterMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */; };
+		AC79967080D1437E8565EA04 /* PlayerGlassBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6687632448654CD7B2FA1906 /* PlayerGlassBackgroundTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -573,6 +574,7 @@
 		2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackStoredPathGuardTests.swift; sourceTree = "<group>"; };
 		2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpeechAssetInstallPlannerTests.swift; sourceTree = "<group>"; };
 		A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsCenterMetricsTests.swift; sourceTree = "<group>"; };
+		6687632448654CD7B2FA1906 /* PlayerGlassBackgroundTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGlassBackgroundTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -671,6 +673,7 @@
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
 				Mac/MacVolumeControl.swift,
+				Mac/MacWindowGlass.swift,
 				Mac/SyncDataPane.swift,
 				Mac/SyncDevicePane.swift,
 				Mac/SyncHostCenter.swift,
@@ -831,6 +834,7 @@
 				Mac/MacTrackListView.swift,
 				Mac/MacVisualizerView.swift,
 				Mac/MacVolumeControl.swift,
+				Mac/MacWindowGlass.swift,
 				Mac/SyncDataPane.swift,
 				Mac/SyncDevicePane.swift,
 				Mac/SyncHostCenter.swift,
@@ -841,11 +845,13 @@
 				Models/AppNotifications.swift,
 				Models/DatabaseModels.swift,
 				"Models/DisplayText+Models.swift",
+				Models/PlayerGlassSetting.swift,
 				Models/SettingsModels.swift,
 				Models/SFBTrack.swift,
 				Models/StateModels.swift,
 				Models/WidgetData.swift,
 				Services/AppleMusicChartClient.swift,
+				Services/ArtworkBlurCache.swift,
 				Services/ChartPopularityIndex.swift,
 				Services/LyricsAlignment/LyricAlignmentActions.swift,
 				Services/LyricsAlignment/LyricAlignmentController.swift,
@@ -1136,7 +1142,9 @@
 				Views/Player/KaraokeControlBar.swift,
 				Views/Player/LyricAlignmentProgressSheet.swift,
 				Views/Player/PlayerGestureLogic.swift,
+				Views/Utility/ArtworkBlurBackground.swift,
 				Views/Utility/HintCardView.swift,
+				Views/Utility/PlayerSurfaceStyle.swift,
 				Views/Utility/WhatsNewView.swift,
 				Services/RecommendationPlanning.swift,
 				Services/RecommendationRequest.swift,
@@ -1566,6 +1574,7 @@
 				2AA7864798FD44B8B3A96CE2 /* TrackStoredPathGuardTests.swift */,
 				2C69136F6CD041828930EB69 /* SpeechAssetInstallPlannerTests.swift */,
 				A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */,
+				6687632448654CD7B2FA1906 /* PlayerGlassBackgroundTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2129,6 +2138,7 @@
 				DDA5B8B26BDB4D26AEF38239 /* TrackStoredPathGuardTests.swift in Sources */,
 				93F6CA7664E34199A008DFA6 /* SpeechAssetInstallPlannerTests.swift in Sources */,
 				A7C0FFEE1A2B3C4D5E6F7789 /* LyricsCenterMetricsTests.swift in Sources */,
+				AC79967080D1437E8565EA04 /* PlayerGlassBackgroundTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

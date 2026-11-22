@@ -285,6 +285,13 @@ enum MacSettingsCatalog {
         aliases: ["语言", "語言", "语言选择", "language", "言語", "언어", "idioma"]
     )
 
+    static let appearancePlayerGlassBackground = Item(
+        id: "settings.appearance.playerGlassBackground",
+        category: .appearance,
+        titleKey: "player_glass_background",
+        aliases: ["毛玻璃", "封面", "背景", "模糊", "播放页", "glass", "blur", "background", "artwork"]
+    )
+
     static let recommendationWeightLibrary = Item(
         id: "settings.recommendation.weight.library",
         category: .recommendations,

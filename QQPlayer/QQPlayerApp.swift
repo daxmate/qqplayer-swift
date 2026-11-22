@@ -117,6 +117,8 @@ struct QQPlayerApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // 「封面毛玻璃背景」默认开：未写过该键的用户读到 true（两端同一份默认值）
+        PlayerGlassBackground.registerDefaults()
         if #available(iOS 26.0, *) {
             AppIntentsDependencies.register()
         }

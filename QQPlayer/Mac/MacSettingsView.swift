@@ -267,6 +267,8 @@ private struct MacAppearanceSettingsView: View {
     @State private var deleteSettings = DeleteSettings.load()
     /// 语言选择（App 内热切换；跟随系统 = 空字符串）
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
+    /// 播放页封面毛玻璃背景（与 iOS 同一个键 / 默认值）
+    @AppStorage(PlayerGlassBackground.storageKey) private var playerGlassBackground = PlayerGlassBackground.enabledByDefault
 
     /// 当前生效主题（含旧数据迁移推导），Picker 绑定。
     private var theme: AppearanceTheme {
@@ -307,6 +309,15 @@ private struct MacAppearanceSettingsView: View {
                 }
                 .padding(.vertical, DesignTokens.space4)
                 .settingsAnchor(MacSettingsCatalog.appearanceAccentColor)
+            }
+
+            Section(Localized.playerGlassBackground) {
+                Toggle(Localized.playerGlassBackground, isOn: $playerGlassBackground)
+                    .settingsAnchor(MacSettingsCatalog.appearancePlayerGlassBackground)
+
+                Text(Localized.playerGlassBackgroundFootnote)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)

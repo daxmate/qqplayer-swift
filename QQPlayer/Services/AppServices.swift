@@ -65,6 +65,10 @@ final class AppServices {
     /// 故走容器而非 `@Environment(ArtworkManager.self)`（与批 4/5 同款）。
     let artworkManager = ArtworkManager.shared
 
+    /// 播放页「封面毛玻璃」渲染缓存（无状态入口：LRU 位图缓存 + 后台渲染，视图只取图）。
+    /// 视图层经 `@Environment(AppServices.self)` 取用，不直连 `.shared`（棘轮口径）。
+    let artworkBlurCache = ArtworkBlurCache.shared
+
     #if os(macOS)
         /// 曲库文件夹监视（Mac 专属；`start(paths:)` / `stop()` 由曲库加载路径驱动）。
         let folderMonitor = MacFolderMonitor.shared
