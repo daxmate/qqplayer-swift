@@ -42,7 +42,8 @@ enum LyricsCenterMetrics {
     /// 行上下内边距（点，不乘 fontScale）：普通 1.0 → 24 / 0.66 及更远 → 16；跟唱 18。
     static func verticalPadding(emphasis: Double, karaoke: Bool) -> CGFloat {
         guard !karaoke else { return 18 }
-        return emphasis >= 0.66 ? 24 : 16
+        // 只有当前高亮行（目标档 1.0）取 24；0.66 及更远一律 16（对齐改前 lerp [(1.0, 24), (0.66, 16)]）。
+        return emphasis >= 0.99 ? 24 : 16
     }
 
     /// 单行文本行高（近似）。
