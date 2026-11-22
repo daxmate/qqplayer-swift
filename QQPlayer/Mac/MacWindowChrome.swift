@@ -216,6 +216,34 @@ struct MacWindowChromeTransparency: NSViewRepresentable {
     }
 }
 
+// MARK: - 标题栏留白探针（临时诊断）
+
+/// 侧栏内容顶部的一次测量读数。
+/// `contentTopY` = 探针在窗口坐标系里的 y；`safeTop` = 该处 SwiftUI 认为的顶部安全区。
+struct MacTitlebarProbeReading: Equatable {
+    var contentTopY: CGFloat
+    var safeTop: CGFloat
+}
+
+/// 零高度探针：放在侧栏最顶部（内容顶），把实测位置回吐给 MacLibraryView 写诊断日志。
+/// 只测量、不绘制、不占高度 → 对布局零影响。
+struct MacTitlebarProbe: View {
+    var onReading: (MacTitlebarProbeReading) -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(height: 0)
+            .onGeometryChange(for: MacTitlebarProbeReading.self) { proxy in
+                MacTitlebarProbeReading(
+                    contentTopY: proxy.frame(in: .global).minY,
+                    safeTop: proxy.safeAreaInsets.top
+                )
+            } action: { reading in
+                onReading(reading)
+            }
+    }
+}
+
 // MARK: - 工具栏背景（SwiftUI，macOS 15+）
 
 /// 工具栏背景可见性：macOS 15+ 走原生 `toolbarBackgroundVisibility`；

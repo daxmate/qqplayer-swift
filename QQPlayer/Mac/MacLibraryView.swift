@@ -60,6 +60,11 @@ struct MacLibraryView: View {
     /// 标题栏 + 工具栏的**实测高度**（玻璃生效时由 MacWindowChrome 上报；关闭 / 全屏 = 0）。
     /// 内容据此整体下移，避免被红绿灯/工具栏压住；背景层仍 ignoresSafeArea 通顶。
     @State var titlebarInset: CGFloat = 0
+    /// 临时诊断（用户确认「双倍留白」后再删）：侧栏内容顶探针读数
+    /// 分片：跨文件可见（MacLibraryView+Sidebar 里的探针写入）
+    @State var titlebarProbe: MacTitlebarProbeReading?
+    /// 临时诊断：已写过的诊断行（同一组读数不重复刷日志）
+    @State private var lastTitlebarLog: String?
     /// 分片：跨文件可见（原 private）
     @State var albums: [Album] = []
     /// 分片：跨文件可见（原 private）
@@ -144,6 +149,33 @@ struct MacLibraryView: View {
         }
     }
 
+    // MARK: - 临时诊断（用户确认「双倍留白」后再删）
+
+    /// 记一行标题栏留白实测：
+    ///   `[mac.titlebar] T=… safeTop=… contentTopY=… inflation=…`
+    /// - `T` = MacWindowChrome 上报的实测「标题栏 + 工具栏」高度；
+    /// - `contentTopY` = 侧栏内容顶探针的窗口坐标 y；
+    /// - `inflation = contentTopY − T`：≈0 表示留白刚好；≈T 表示 SwiftUI 自己也让了一次
+    ///   （双倍留白）；关闭玻璃时 T=0，`inflation` 应≈0。
+    /// 同一组读数只写一次（避免 SwiftUI 频繁更新刷屏）。
+    func logTitlebarProbe() {
+        let payload: String
+        if let probe = titlebarProbe {
+            payload = "T=\(numberText(titlebarInset)) safeTop=\(numberText(probe.safeTop)) "
+                + "contentTopY=\(numberText(probe.contentTopY)) "
+                + "inflation=\(numberText(probe.contentTopY - titlebarInset))"
+        } else {
+            payload = "T=\(numberText(titlebarInset)) safeTop=nil contentTopY=nil inflation=nil"
+        }
+        guard payload != lastTitlebarLog else { return }
+        lastTitlebarLog = payload
+        AppLog.info(.ui, "[mac.titlebar] \(payload)")
+    }
+
+    private func numberText(_ value: CGFloat) -> String {
+        String(format: "%.1f", value)
+    }
+
     /// 拉取当前曲目封面（整窗底用；切歌后旧结果丢弃，与播放页同款守卫）
     func loadWindowArtwork() async {
         guard let track = player.currentTrack else {
@@ -210,6 +242,7 @@ struct MacLibraryView: View {
                 // 实测高度回调（MacWindowChrome 在 flags 生效后的下一轮 runloop 测，
                 // resize / 进出全屏 / 换屏 / 成为 key 窗口时重测）
                 titlebarInset = height
+                logTitlebarProbe() // 临时诊断：T 变化即记一行
             }
             .frame(width: 0, height: 0)
         }

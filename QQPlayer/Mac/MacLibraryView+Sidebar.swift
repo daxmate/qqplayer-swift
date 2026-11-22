@@ -34,6 +34,11 @@ extension MacLibraryView {
     /// 分片：跨文件可见（原 private）
     var sidebar: some View {
         VStack(spacing: DesignTokens.space0) {
+            // 临时诊断：零高度探针，量侧栏内容顶的窗口坐标 y（判「双倍留白」用）
+            MacTitlebarProbe { reading in
+                titlebarProbe = reading
+                logTitlebarProbe() // 临时诊断：探针读数变化即记一行
+            }
             MacSearchField(text: $searchText)
             List(selection: $selection) {
                 // 一级分区（歌曲 / 我喜欢 / 专辑 / 艺术家）
