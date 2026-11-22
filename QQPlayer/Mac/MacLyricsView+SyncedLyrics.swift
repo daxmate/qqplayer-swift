@@ -283,6 +283,8 @@ extension MacLyricsView {
     }
 
     /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行实测高度 / 中心偏差 / 当前占位，确认后删除。
+    /// `viewportH` 来自包住 ScrollView 的 GeometryReader（header + Divider 之下），
+    /// 即歌词区高度：docked 时 ≈ 面板高 − 头部（量级 200–400），不是整窗高度。
     private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
         let rowHeight = centerProbe.rowHeight
             ?? 2 * LyricsCenterMetrics.rowHalfHeight(

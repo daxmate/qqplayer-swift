@@ -287,3 +287,37 @@ struct MacPlaybackGateLyricsHeightTests {
         }
     }
 }
+
+/// 窗口尺寸变化时的面板高度回归（2026-11-22）：
+/// 之前 `lyricsPanelHeight` 只在拖拽时 clamp，窗口缩小后仍按 330 / 记忆值排队 → 歌词整块被裁掉。
+/// `MacPlayerView` 现在在 `onAppear` 与 `onChange(of: geo.size.height)` 复用同一个纯函数，这里锁住它的语义。
+struct MacPlaybackGateLyricsHeightWindowResizeTests {
+    @Test("窗口变小：面板高度被 clamp 收缩")
+    func shrinkingWindowClampsPanel() {
+        // 600 - 360 = 240 → 330 收到 240
+        #expect(MacPlaybackGate.clampedLyricsHeight(330, containerHeight: 600) == 240)
+        // 500 - 360 = 140，但保底 180 → 收到 180
+        #expect(MacPlaybackGate.clampedLyricsHeight(420, containerHeight: 500) == 180)
+    }
+
+    @Test("窗口变大：只受用户设定值约束（不会自动放大）")
+    func growingWindowKeepsPanel() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(330, containerHeight: 1400) == 330)
+    }
+
+    @Test("窗口极矮：仍保留最小高度 140，且不超过保底上限")
+    func tinyWindowKeepsMinimum() {
+        #expect(MacPlaybackGate.clampedLyricsHeight(330, containerHeight: 300) == 180)
+        #expect(MacPlaybackGate.clampedLyricsHeight(100, containerHeight: 1400) == 140)
+    }
+
+    @Test("反复 resize 幂等：clamp 结果再 clamp 不变")
+    func resizeIsIdempotent() {
+        for container in [240.0, 400, 500, 600, 900, 1200] as [CGFloat] {
+            let once = MacPlaybackGate.clampedLyricsHeight(330, containerHeight: container)
+            let twice = MacPlaybackGate.clampedLyricsHeight(once, containerHeight: container)
+            #expect(once >= MacPlaybackGate.lyricsPanelMinHeight)
+            #expect(twice == once)
+        }
+    }
+}

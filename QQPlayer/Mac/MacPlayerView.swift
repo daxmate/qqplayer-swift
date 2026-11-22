@@ -112,6 +112,14 @@ struct MacPlayerView: View {
                 .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
             }
             .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
+            // 窗口变小后必须重新规整面板高度：否则面板仍按旧高度（330 / 记忆值）排队 → 被挤出可视区、歌词整块看不见。
+            .onAppear {
+                // 延后一拍：先让外层 onAppear 把记忆高度读进来，再按当前容器高度 clamp
+                DispatchQueue.main.async { normalizeLyricsPanelHeight(containerHeight: geo.size.height) }
+            }
+            .onChange(of: geo.size.height) { _, newHeight in
+                normalizeLyricsPanelHeight(containerHeight: newHeight)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -304,6 +312,23 @@ struct MacPlayerView: View {
                     dragStartPanelHeight = nil
                 }
         )
+    }
+
+    /// 窗口尺寸变化后把歌词面板高度规整回可视范围。
+    ///
+    /// 回归（2026-11-22）：`lyricsPanelHeight`（默认 330 / 拖拽记忆值）此前只在拖拽时 clamp，
+    /// 窗口缩小后面板仍按旧高度排队 → 被挤出可视区 / 被裁掉，小窗口里歌词整块看不见。
+    /// 这里**复用** `MacPlaybackGate.clampedLyricsHeight`（不新写 clamp），有变化才回写 UserDefaults
+    /// （与拖拽路径同一 key），避免下次启动又回到溢出值。
+    private func normalizeLyricsPanelHeight(containerHeight: CGFloat) {
+        guard containerHeight > 0 else { return }
+        let clamped = MacPlaybackGate.clampedLyricsHeight(
+            lyricsPanelHeight,
+            containerHeight: containerHeight
+        )
+        guard abs(clamped - lyricsPanelHeight) > 0.5 else { return }
+        lyricsPanelHeight = clamped
+        UserDefaults.standard.set(Double(clamped), forKey: Self.lyricsPanelHeightKey)
     }
 
     // MARK: - Playback order
