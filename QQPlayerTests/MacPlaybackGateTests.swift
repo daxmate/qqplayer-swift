@@ -287,4 +287,3 @@ struct MacPlaybackGateLyricsHeightTests {
         }
     }
 }
-
