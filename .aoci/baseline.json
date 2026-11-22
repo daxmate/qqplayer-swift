@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-22T07:39:35Z",
+  "updated_at": "2026-11-22T08:05:32Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -5558,9 +5558,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "5af56e279c93b35257a5f5342faefbac797aac6932b860871e6f782feadba951",
-      "size": 439667,
-      "normalized_sha256": "5af56e279c93b35257a5f5342faefbac797aac6932b860871e6f782feadba951"
+      "sha256": "bf364d399a6fbaa68f604854c5b95d8fb8c5f2269c2095024050a0fb57d7fc54",
+      "size": 439810,
+      "normalized_sha256": "bf364d399a6fbaa68f604854c5b95d8fb8c5f2269c2095024050a0fb57d7fc54"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5738,9 +5738,9 @@
     },
     "scripts/git-hooks/pre-push": {
       "role": "index",
-      "sha256": "00df47c33a3deab2fee9f44b4373bbc2e9043e4a39ce2cf8efb4267c20642a2b",
-      "size": 5619,
-      "normalized_sha256": "00df47c33a3deab2fee9f44b4373bbc2e9043e4a39ce2cf8efb4267c20642a2b"
+      "sha256": "7c9fb434f6c2ee845d4edab339166c7ade927b099918ca9203647731b2401bb8",
+      "size": 6440,
+      "normalized_sha256": "7c9fb434f6c2ee845d4edab339166c7ade927b099918ca9203647731b2401bb8"
     },
     "scripts/git-hooks/pre-push-branch-guard-test.sh": {
       "role": "observe",

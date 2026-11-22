@@ -1009,7 +1009,7 @@ preflight.sh[XQ7S]: F:推送前本地预检脚本：quick（静态检查）/ ful
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/git-hooks/===
 pre-commit[XQ6S]: F:提交前钩子：swiftformat/swiftlint 加编译警告零容忍加 target 成员检查 | R:code:scripts/git-hooks/pre-push | A:- | S:构建一律走 scripts/xcbuild.sh 禁裸 xcodebuild；环境问题可 SKIP_WARNING_CHECK=1 绕过 CI 兜底
-pre-push[XQ6S]: F:推送前门禁：main 禁 merge 提交加 swiftformat/swiftlint 加 target 成员归属加非 main 分支拦截 | R:code:scripts/git-hooks/pre-commit | A:- | S:只允许直推 main，候选分支不可绕过（ALLOW_BRANCH_PUSH 例外已拆）；口径依据指本机工作区 ~/.openclaw/coding/AGENTS.md；不跑编译测试
+pre-push[XQ6S]: F:推送前门禁：main 禁 merge 提交加 swiftformat/swiftlint 加 target 成员归属加非 main 分支拦截加 tag 分型放行 | R:code:scripts/git-hooks/pre-commit | A:- | S:只允许直推 main，候选分支不可绕过（ALLOW_BRANCH_PUSH 例外已拆）；refs/tags/v* 发版 tag 直接放行，其他 tag 一律拒绝（tag 无分支语义，不参与线性历史与文件范围检查）；本地 sha 全零的删除分支/删 tag 不拦；不跑编译测试
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/sync-harness/===
 GRDBShim.swift[TN4T]: F:harness 专用最小 GRDB 模块桩（两个 Record 协议）不参与 App target | R:- | A:- | S:只给出同名空协议即可编译未改动的生产源码；单独编为 module GRDB 后 link
