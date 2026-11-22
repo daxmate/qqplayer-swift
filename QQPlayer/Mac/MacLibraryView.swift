@@ -116,12 +116,47 @@ struct MacLibraryView: View {
     /// 分片：跨文件可见（原 private）
     @State var searchTask: Task<Void, Never>?
 
+    // MARK: - 整窗玻璃（最小实现：只铺窗口底 + 让底色透出）
+
+    /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 系统「降低透明度」：开启时回落原纯色窗口
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
+    /// 当前曲目封面（窗口底的来源）
+    @State var windowArtwork: ArtworkImage?
+    @State var windowArtworkTrackId: String?
+
+    /// 整窗玻璃是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
+    var isWindowGlassActive: Bool {
+        PlayerGlassBackground.isActive(
+            isEnabled: glassBackgroundEnabled,
+            hasArtwork: windowArtwork != nil,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    /// 拉取当前曲目封面（切歌后旧结果丢弃），并打一条安全区诊断日志（真机核对用）
+    func loadWindowArtwork() async {
+        guard let track = player.currentTrack else {
+            windowArtwork = nil
+            windowArtworkTrackId = nil
+            return
+        }
+        let trackId = track.stableId
+        let image = await services.artworkManager.getArtwork(for: track)
+        guard player.currentTrack?.stableId == trackId else { return }
+        windowArtwork = image
+        windowArtworkTrackId = trackId
+    }
+
     var body: some View {
         NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } content: {
             contentList
+                // 玻璃生效时让窗底透出（关闭时恢复系统列表底色）
+                .scrollContentBackground(isWindowGlassActive ? .hidden : .automatic)
                 .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
         } detail: {
             MacPlayerView(
@@ -138,6 +173,16 @@ struct MacLibraryView: View {
                 }
             )
         }
+        // 玻璃只铺三栏内容区：`.background` 跟随 NavigationSplitView 尺寸，安全区链路不断。
+        // 三层修饰器收进 `MacWindowGlassLayer`（逐条平铺会顶到类型检查上限而 timeout），
+        // 每层效果一一对应、逐条不变。
+        .modifier(MacWindowGlassLayer(
+            isActive: isWindowGlassActive,
+            artwork: windowArtwork,
+            cacheKey: windowArtworkTrackId,
+            trackId: player.currentTrack?.stableId,
+            loadArtwork: { await loadWindowArtwork() }
+        ))
         .navigationTitle("QQPlayer")
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小
         // 由这里决定，scene 侧配 `.windowResizability(.contentMinSize)` 才生效。
@@ -356,15 +401,9 @@ struct MacLibraryView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.libraryImportFinished)) { note in
-            // 导入完成 toast（web 版 toast 对齐；歌单行 drop 复用同一通知）
-            let count = (note.userInfo?["count"] as? Int) ?? 0
-            let skipped = (note.userInfo?["skipped"] as? Int) ?? 0
-            // 审计 D2：跳过数以前写而不读（用户只看到「已导入 0 首」）→ 上屏
-            if count > 0, skipped > 0 {
-                showImportToast(Localized.dragImportPartial(imported: count, skipped: skipped))
-            } else {
-                showImportToast(Localized.dragImportSuccess(count: count))
-            }
+            // 导入完成 toast（web 版 toast 对齐；歌单行 drop 复用同一通知）。
+            // 抽成方法：body 表达式已到类型检查上限（加玻璃背景后报 timeout），行为不变。
+            handleLibraryImportFinished(note)
         }
         // 曲库加载失败上屏（审计 M6：loadError 以前只写不读 → 用户只看到空曲库）
         .alert("error".localized, isPresented: libraryLoadErrorBinding) {
@@ -405,6 +444,18 @@ struct MacLibraryView: View {
             .transition(.opacity)
     }
 
+    /// 曲库导入完成通知 → toast（原 body 内联实现，行为逐行不变）
+    private func handleLibraryImportFinished(_ note: Notification) {
+        let count: Int = (note.userInfo?["count"] as? Int) ?? 0
+        let skipped: Int = (note.userInfo?["skipped"] as? Int) ?? 0
+        // 审计 D2：跳过数以前写而不读（用户只看到「已导入 0 首」）→ 上屏
+        if count > 0, skipped > 0 {
+            showImportToast(Localized.dragImportPartial(imported: count, skipped: skipped))
+        } else {
+            showImportToast(Localized.dragImportSuccess(count: count))
+        }
+    }
+
     /// 分片：跨文件可见（原 private）
     func showImportToast(_ message: String) {
         importToastTask?.cancel()
@@ -416,4 +467,62 @@ struct MacLibraryView: View {
         }
     }
 
+}
+
+// MARK: - 整窗玻璃层（三层修饰器，作用于三栏内容区）
+
+/// 把「封面毛玻璃底 + 安全区诊断 + 环境值 + 封面拉取」收成一个修饰器：
+/// 与逐条平铺写法效果一一对应，只为准入编译器的类型检查预算（body 已在上限附近）。
+/// - 玻璃底用 `background` 贴在 `NavigationSplitView` 上：尺寸跟随三栏内容区，安全区链路不断；
+/// - 环境值供歌词面板把底色改为透明；
+/// - `.task(id:)` 跟随曲目切歌拉封面（切歌后旧结果丢弃见 `loadArtwork`）。
+private struct MacWindowGlassLayer: ViewModifier {
+    let isActive: Bool
+    let artwork: ArtworkImage?
+    let cacheKey: String?
+    let trackId: String?
+    let loadArtwork: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                if isActive {
+                    MacWindowGlass(artwork: artwork, cacheKey: cacheKey)
+                }
+            }
+            .background { MacWindowGlassSafeAreaProbe(isActive: isActive) }
+            .environment(\.macWindowGlassActive, isActive)
+            .task(id: trackId) {
+                await loadArtwork()
+            }
+    }
+}
+
+// MARK: - 玻璃安全区诊断（真机核对「安全区链路没丢」）
+
+/// 玻璃生效时 `onAppear` 打**一条**日志（不逐帧、不重复）：
+/// - `safeTop` = 窗口高度 − 内容布局高度（= 标题栏高度；正常 > 0）
+/// - `windowH` = 窗口高度
+/// - `sidebarMinY` = 三栏根视图顶边在窗口空间下的 y（正常 ≈ `safeTop`，即内容从标题栏下方开始）
+///
+/// 只做观测：`Color.clear` 不画任何东西，不改布局、不占尺寸。
+private struct MacWindowGlassSafeAreaProbe: View {
+    let isActive: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let rootTop = proxy.frame(in: .global).minY
+            Color.clear
+                .onAppear {
+                    guard isActive, let window = NSApp.keyWindow else { return }
+                    let safeTop = window.frame.height - window.contentLayoutRect.height
+                    AppLog.info(.ui, String(
+                        format: "[glass] active safeTop=%.1f windowH=%.1f sidebarMinY=%.1f",
+                        safeTop, window.frame.height, rootTop
+                    ))
+                }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
 }

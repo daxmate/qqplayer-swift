@@ -94,6 +94,8 @@ extension MacLibraryView {
                 }
             }
             .listStyle(.sidebar)
+            // 玻璃生效时让窗底透出（关闭时恢复系统列表底色）；选中 / 悬停态不变
+            .scrollContentBackground(isWindowGlassActive ? .hidden : .automatic)
         }
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: DesignTokens.space6) {

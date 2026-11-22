@@ -17,6 +17,8 @@ struct MacLyricsView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     /// 分片：跨文件可见（原 private）
     @Environment(\.appAccentColor) var appAccentColor
+    /// 整窗玻璃生效（读顶层注入的环境值：只用来把面板底色改为透明，其余布局不动）
+    @Environment(\.macWindowGlassActive) var windowGlassActive
     let lyrics: Lyrics?
     let currentTime: TimeInterval
     let isLoading: Bool
@@ -132,8 +134,19 @@ struct MacLyricsView: View {
         )
     }
 
-    /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）
+    /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）。
+    /// 玻璃生效时整层让位（`Color.clear`），否则面板实底会把窗底那块玻璃盖住、看起来像拼贴。
+    @ViewBuilder
     private var panelBackground: some View {
+        if windowGlassActive {
+            Color.clear
+        } else {
+            legacyPanelBackground
+        }
+    }
+
+    /// 非玻璃模式的面板底色（与玻璃改造前逐像素一致）
+    private var legacyPanelBackground: some View {
         ZStack {
             baseColor
 
