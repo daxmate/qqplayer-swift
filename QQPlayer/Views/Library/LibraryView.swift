@@ -236,8 +236,6 @@ struct LibraryView: View {
                 }
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.large)
-                // 玻璃风格：导航栏 / 滚动底让位（单点修饰器；必须在 NavigationStack 内容上才作用于本栈的栏）
-                .iosGlassChrome()
                 .refreshable {
                     // 并发互斥：进行中的刷新 / 握手未结束前不重入。
                     guard !isRefreshing else { return }
@@ -307,7 +305,6 @@ struct LibraryView: View {
             }
         }
         .background(.clear)
-        // 经典风格：导航栏底本来就让到透明（维持迁移前观感，逐行未改）。
         .toolbarBackground(.clear, for: .navigationBar)
         .toolbarBackground(.clear, for: .automatic)
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in

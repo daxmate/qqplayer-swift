@@ -4,12 +4,6 @@ struct ContentView: View {
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(AppServices.self) private var services
     @Environment(LibraryIndexer.self) private var libraryIndexer
-    /// 当前曲目（整屏玻璃底取封面用）
-    @Environment(PlayerEngine.self) private var playerEngine
-    /// 系统「降低透明度」：开了就回落经典风格（装饰底照旧），不做半透明
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    /// 显示风格开关（唯一 key）：注入成环境值，页面不要自己读
-    @AppStorage(PlayerGlassBackground.storageKey) private var glassEnabled = PlayerGlassBackground.enabledByDefault
 
     @State private var tracks: [Track] = []
     @State private var selectedTab = 0
@@ -23,51 +17,37 @@ struct ContentView: View {
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
 
     var body: some View {
-        ZStack {
-            // 整屏玻璃底：全 App 在这里装配一次（曲库 + 推入的详情页共用同一层）。
-            // 全屏播放页是独立 presentation，由 PlayerView 装配同一份 IOSWindowGlass。
-            IOSWindowGlassLayer(track: playerEngine.currentTrack)
-            mainContent
-        }
-        .background(.clear)
-        .environment(\.appAppearanceStyle, appearanceStyle)
-        .accentColor(accentColor)
-        // App 强调色环境值（iOS 唯一注入点，2026-09-15 I1）：值来自 8 色 iOS 名单
-        // `IOSAppearance`（输入 = 唯一配色字段 `settings.accentColorName`，2026-09-17 字段层收口）；
-        // 视图统一读 @Environment(\.appAccentColor)，不再直读 settings。
-        .environment(\.appAccentColor, accentColor)
-        .onAppear {
-            AppearanceResolver.apply(forceDark: settings.forceDarkMode)
-        }
-        .modifier(LifecycleModifier(
-            appCoordinator: appCoordinator,
-            libraryIndexer: libraryIndexer,
-            refreshTimer: $refreshTimer,
-            showTutorial: $showTutorial,
-            showWhatsNew: $showWhatsNew,
-            onRefresh: refreshLibrary
-        ))
-        .modifier(SheetModifier(
-            appCoordinator: appCoordinator,
-            showTutorial: $showTutorial,
-            showWhatsNew: $showWhatsNew,
-            showPlaylistManagement: $showPlaylistManagement,
-            showSettings: $showSettings,
-            appLanguageRaw: appLanguageRaw
-        ))
+        mainContent
+            .background(.clear)
+            .accentColor(accentColor)
+            // App 强调色环境值（iOS 唯一注入点，2026-09-15 I1）：值来自 8 色 iOS 名单
+            // `IOSAppearance`（输入 = 唯一配色字段 `settings.accentColorName`，2026-09-17 字段层收口）；
+            // 视图统一读 @Environment(\.appAccentColor)，不再直读 settings。
+            .environment(\.appAccentColor, accentColor)
+            .onAppear {
+                AppearanceResolver.apply(forceDark: settings.forceDarkMode)
+            }
+            .modifier(LifecycleModifier(
+                appCoordinator: appCoordinator,
+                libraryIndexer: libraryIndexer,
+                refreshTimer: $refreshTimer,
+                showTutorial: $showTutorial,
+                showWhatsNew: $showWhatsNew,
+                onRefresh: refreshLibrary
+            ))
+            .modifier(SheetModifier(
+                appCoordinator: appCoordinator,
+                showTutorial: $showTutorial,
+                showWhatsNew: $showWhatsNew,
+                showPlaylistManagement: $showPlaylistManagement,
+                showSettings: $showSettings,
+                appLanguageRaw: appLanguageRaw
+            ))
     }
 
     /// 当前强调色。唯一取数入口 = `IOSAppearance`（8 色名单），唯一字段 = `accentColorName`
     /// （2026-09-17 设置字段层收口：不再有 `backgroundColorChoice`）。
     private var accentColor: Color { IOSAppearance.accentColor(forKey: settings.accentColorName) }
-
-    /// 生效的显示风格（唯一判定 = `AppAppearanceStyle` + 降低透明度回落）
-    private var appearanceStyle: AppAppearanceStyle {
-        AppAppearanceStyle.resolved(
-            stored: AppAppearanceStyle(glassEnabled: glassEnabled),
-            reduceTransparency: reduceTransparency
-        )
-    }
 
     private var mainContent: some View {
         LibraryView(

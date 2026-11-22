@@ -142,11 +142,6 @@ struct Localized {
     /// 播放页封面毛玻璃背景开关（iOS 设置 → 外观 / macOS 设置 → 外观）
     static var playerGlassBackground: String { "player_glass_background".localized }
     static var playerGlassBackgroundFootnote: String { "player_glass_background_footnote".localized }
-    /// 显示风格（iOS 设置 → 外观：毛玻璃 / 经典，二选一）
-    static var appearanceStyle: String { "appearance_style".localized }
-    static var appearanceStyleGlass: String { "appearance_style_glass".localized }
-    static var appearanceStyleClassic: String { "appearance_style_classic".localized }
-    static var appearanceStyleFootnote: String { "appearance_style_footnote".localized }
     static var backgroundColor: String { "background_color".localized }
     static var chooseColorTheme: String { "choose_color_theme".localized }
     static var librarySection: String { "library_section".localized }

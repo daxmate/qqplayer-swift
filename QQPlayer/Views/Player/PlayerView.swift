@@ -104,9 +104,6 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
-            // 播放页在 fullScreenCover 里（独立 presentation，根视图的整屏玻璃到不了这里）：
-            // 装配同一份 `IOSWindowGlass`；玻璃风格下下面的装饰底会让位，经典风格两者零变化。
-            IOSWindowGlass(artwork: currentArtwork, cacheKey: playerEngine.currentTrack?.stableId)
             ScreenSpecificBackgroundView(screen: .player)
             // 解析下拉移动的宿主 UIView（fullScreenCover 的 hosting view）：
             // 透明背景层，通过 responder 链向上找 UIViewController.view
