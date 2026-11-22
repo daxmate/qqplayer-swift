@@ -155,6 +155,13 @@ struct MacLibraryView: View {
         windowArtworkTrackId = trackId
     }
 
+    /// 是否处于搜索态（唯一判据：**trim 后**非空，与 `performSearch` 的 `SearchQuery.isEmpty`
+    /// 同口径）。原先用原始串判空：只输入一个空格 → 中栏切到搜索结果但结果为空
+    /// ⇒ 看到「未找到结果」空态，且搜索框被顶出可视区时用户无法自证/清除。
+    var isSearching: Bool {
+        !SearchQuery.isEmpty(debouncedSearchText)
+    }
+
     var body: some View {
         ZStack {
             windowGlassBackground
@@ -328,6 +335,13 @@ struct MacLibraryView: View {
             }
         }
         .onChange(of: searchText) { _, newValue in
+            // 临时诊断（用户确认中栏不再莫名进搜索态后删除）：
+            // 只记录「输入框真的变了」，用于证明中栏搜索态的来源。
+            AppLog.info(
+                .ui,
+                "[mac.search] textChanged raw=\(newValue.debugDescription) "
+                    + "trimmedEmpty=\(SearchQuery.isEmpty(newValue))"
+            )
             debounceTask?.cancel()
             debounceTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 300ms

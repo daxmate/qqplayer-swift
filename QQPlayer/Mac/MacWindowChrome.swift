@@ -49,9 +49,6 @@ struct MacWindowChromeTransparency: NSViewRepresentable {
         private var originalTitlebarTransparent: Bool?
         private var originalSeparatorStyle: NSTitlebarSeparatorStyle?
         private var originalToolbarBaseline: Bool?
-        /// 是否由本类插入的 `.fullSizeContentView`（还原时只在「是我们加的」情况下移除）
-        private var didAddFullSizeContentView = false
-
         func apply(transparent: Bool, to window: NSWindow) {
             if self.window !== window {
                 restore()
@@ -69,12 +66,9 @@ struct MacWindowChromeTransparency: NSViewRepresentable {
             window.titlebarAppearsTransparent = true
             window.titlebarSeparatorStyle = .none
             window.toolbar?.showsBaselineSeparator = false
-            // 内容延伸到标题栏下方，窗口底（模糊封面）才能透到工具栏区域；
-            // 标题栏本身、红绿灯、拖拽区、按钮位置都不变（不是 hiddenTitleBar）
-            if !window.styleMask.contains(.fullSizeContentView) {
-                window.styleMask.insert(.fullSizeContentView)
-                didAddFullSizeContentView = true
-            }
+            // ⚠️ 不碰 styleMask：`.fullSizeContentView` 会让内容钻到标题栏/工具栏下面
+            // （侧栏首项压红绿灯、中栏表头顶工具栏、封面被顶部裁掉）。标题栏玻璃效果
+            // 只靠上面三项 + SwiftUI 的 toolbarBackgroundVisibility(.hidden) 就够。
         }
 
         /// 还原为接管前的值（关开关 / 视图移除都要走到这里）
@@ -88,10 +82,6 @@ struct MacWindowChromeTransparency: NSViewRepresentable {
             }
             if let baseline = originalToolbarBaseline {
                 window.toolbar?.showsBaselineSeparator = baseline
-            }
-            if didAddFullSizeContentView {
-                window.styleMask.remove(.fullSizeContentView)
-                didAddFullSizeContentView = false
             }
             originalTitlebarTransparent = nil
             originalSeparatorStyle = nil

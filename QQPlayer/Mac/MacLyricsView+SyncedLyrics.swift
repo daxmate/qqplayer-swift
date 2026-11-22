@@ -208,12 +208,13 @@ extension MacLyricsView {
         }
     }
 
-    // MARK: - 居中滚动（唯一入口：MacTableScroll.centerRect；几何口径见 LyricsCenterMath）
+    // MARK: - 居中滚动（框架原生：ScrollViewReader.scrollTo(anchor: .center)）
 
-    /// 把指定歌词行居中。AppKit 偏移与闭环校正全部走唯一滚动入口
-    /// `MacTableScroll.centerRect`（`Mac/MacTrackListView+LocateScroll.swift`，形状契约要求全仓
-    /// 只有那一处写 AppKit 滚动落点与 clip 反射）；本文件只做几何准备。
-    /// 取不到宿主滚动视图 / 行未量到 → 退回 `ScrollViewProxy.scrollTo(anchor: .center)`。
+    /// 把指定歌词行居中。**只用框架原生手段**：`ScrollViewReader.scrollTo(_:anchor: .center)`，
+    /// 目标是该行的容器视图；首尾各留「视口高/2」占位，所以首末行也能落到中心。
+    ///
+    /// 不再自己算 AppKit 偏移：真机三次反馈说明「内容坐标 → 文档坐标」的换算假设不可靠
+    /// （两者原点不同时，算出的偏移会稳定偏一个常量）。落定后的二次对中见 `scheduleRecenter`。
     func centerOnActiveLine(
         _ index: Int?,
         proxy: ScrollViewProxy,
@@ -221,28 +222,59 @@ extension MacLyricsView {
         animated: Bool
     ) {
         guard let index else { return }
-        guard let rect = lyricRowRects[index], lyricContentHeight > 0,
-              let scrollView = lyricsScrollView
-        else {
-            proxy.scrollTo(index, anchor: .center)
-            return
+        if animated {
+            withAnimation(.easeInOut(duration: MacLyricsView.lyricScrollDuration)) {
+                proxy.scrollTo(index, anchor: .center)
+            }
+        } else {
+            // 无动画事务：布局变化后的补中不能和上一段动画叠加（否则会来回抖）
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                proxy.scrollTo(index, anchor: .center)
+            }
         }
-        // 视口内边距（安全区/系统注入）计入「可见区中心」口径
-        let insets = scrollView.contentInsets
-        let initialOriginY = LyricsCenterMath.centeredOffset(
-            rowCenterY: rect.midY,
-            viewportHeight: viewportHeight,
-            contentHeight: lyricContentHeight,
-            topInset: insets.top,
-            bottomInset: insets.bottom
+        logCentering(index: index, viewportHeight: viewportHeight, phase: animated ? "scroll.animated" : "scroll.immediate")
+    }
+
+    // MARK: - 临时诊断（用户确认真机修复后整段删除）
+
+    /// 每次居中后记一行几何事实到 AppLog（macOS 落盘 `~/Library/Logs/QQPlayerMac/app.log`）。
+    ///
+    /// 过滤：
+    ///   · 文件：`grep 'lyrics.center' ~/Library/Logs/QQPlayerMac/app.log | tail -50`
+    ///   · 系统日志：`log show --last 5m --predicate 'subsystem == "com.daxmate.qqplayer" AND category == "ui"' | grep lyrics.center`
+    ///
+    /// `visibleCenterErr` = 行 rect（内容坐标）中心 − `clip.bounds`（文档坐标）中心。
+    /// 若真机看着已居中而该值稳定非 0，说明「内容坐标 ↔ 文档坐标」差一个常量 ——
+    /// 这正是此前自定义偏移总偏一点的根因，也是改用原生 `scrollTo(anchor: .center)` 的依据。
+    private func logCentering(index: Int, viewportHeight: CGFloat, phase: String) {
+        let rectText: String
+        let errorText: String
+        if let rect = lyricRowRects[index] {
+            rectText = "y=\(num(rect.minY)) h=\(num(rect.height)) mid=\(num(rect.midY))"
+            if let scrollView = lyricsScrollView {
+                let delta = LyricsCenterMath.centeringDelta(
+                    rowMidY: rect.midY,
+                    visibleMidY: scrollView.contentView.bounds.midY
+                )
+                errorText = num(delta)
+            } else {
+                errorText = "no-scrollview"
+            }
+        } else {
+            rectText = "unmeasured"
+            errorText = "na"
+        }
+        AppLog.info(
+            .ui,
+            "[lyrics.center] phase=\(phase) index=\(index) rect(\(rectText)) viewport=\(num(viewportHeight)) "
+                + "content=\(num(lyricContentHeight)) visibleCenterErr=\(errorText)"
         )
-        MacTableScroll.centerRect(
-            rect,
-            initialOriginY: initialOriginY,
-            in: scrollView,
-            animated: animated,
-            duration: MacLyricsView.lyricScrollDuration
-        )
+    }
+
+    private func num(_ value: CGFloat) -> String {
+        String(format: "%.1f", value)
     }
 
     /// 布局落定后再对一次中：切句时行高（强调内边距/译文行）变化会让本次滚屏动画
@@ -252,9 +284,11 @@ extension MacLyricsView {
         recenterTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(650))
             guard !Task.isCancelled else { return }
+            guard let index else { return }
             guard karaoke.isKaraokeOn || isFollowing else { return }
             if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
             centerOnActiveLine(index, proxy: proxy, viewportHeight: viewportHeight, animated: false)
+            logCentering(index: index, viewportHeight: viewportHeight, phase: "recenter.650ms")
         }
     }
 
