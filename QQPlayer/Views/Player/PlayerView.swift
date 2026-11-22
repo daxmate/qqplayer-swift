@@ -98,13 +98,24 @@ struct PlayerView: View {
     /// 分片：跨文件可见（原 private）
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    /// 播放页封面毛玻璃开关（键/默认值唯一来源：`PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) private var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 回落条件之一：系统「降低透明度」
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// 雾面按外观自适应（与 `MacWindowGlass` 同口径）
+    @Environment(\.colorScheme) private var colorScheme
     // 封面下拉关闭播放页：跟手限幅（阈值/快速回甩判定在 PlayerDismissGesture）
     /// 分片：跨文件可见（原 private）
     let pullMaxOffset: CGFloat = 160
 
     var body: some View {
         ZStack {
-            ScreenSpecificBackgroundView(screen: .player)
+            // 播放页背景（分步第 1 步：只改全屏播放页）：生效 → 封面毛玻璃，不生效 → 原装饰底
+            if isGlassBackgroundActive {
+                glassBackground
+            } else {
+                ScreenSpecificBackgroundView(screen: .player)
+            }
             // 解析下拉移动的宿主 UIView（fullScreenCover 的 hosting view）：
             // 透明背景层，通过 responder 链向上找 UIViewController.view
             // （Task 延迟赋值：避免在视图更新期间修改 @State）
@@ -216,6 +227,8 @@ struct PlayerView: View {
                 .zIndex(31)
             }
         }
+        // 表面样式顶层注入一次：子视图只读环境值，不各自判定开关（见 PlayerSurfaceStyle）
+        .environment(\.playerSurfaceStyle, isGlassBackgroundActive ? .active : .fallback)
         // 整页手势与区域 frame 回传共用的坐标空间（见 PlayerView+PageGestures）
         .coordinateSpace(name: PlayerPageCoordinateSpace.name)
         // 封面下拉跟手：播放页整体下移（UIKit transform 驱动，见 artworkDragGesture）
@@ -225,6 +238,40 @@ struct PlayerView: View {
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .animation(.easeInOut(duration: 0.25), value: playerEngine.playbackErrorMessage)
         .animation(.easeInOut(duration: 0.2), value: LyricAlignmentActions.controller.entryNotice)
+    }
+
+    /// 封面毛玻璃底是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
+    private var isGlassBackgroundActive: Bool {
+        PlayerGlassBackground.isActive(
+            isEnabled: glassBackgroundEnabled,
+            hasArtwork: currentArtwork != nil,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    /// 封面毛玻璃底：`ArtworkBlurBackground`（唯一模糊实现）+ 与 `MacWindowGlass` 同口径的雾面/暗角。
+    /// Mac 那份视图在 `QQPlayerMac` target（iOS 编不到），这里是最小等价实现；暗角数值沿用 f34fa71 的 IOSWindowGlass。
+    private var glassBackground: some View {
+        ZStack {
+            ArtworkBlurBackground(artwork: currentArtwork, cacheKey: playerEngine.currentTrack?.stableId)
+            // 均匀雾面：浅色 white 0.62 / 深色 black 0.36（`MacWindowGlass` 同口径）
+            if colorScheme == .dark {
+                Color.black.opacity(0.36)
+            } else {
+                Color.white.opacity(0.62)
+            }
+            // 暗角：压住四角，避免封面边缘过亮、与状态栏抢对比度
+            RadialGradient(
+                colors: [Color.black.opacity(0), Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10)],
+                center: .center,
+                startRadius: 180,
+                endRadius: 760
+            )
+        }
+        // 与装饰底同样铺到安全区外（状态栏 / Home 指示条背后）
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private var mainContent: some View {
