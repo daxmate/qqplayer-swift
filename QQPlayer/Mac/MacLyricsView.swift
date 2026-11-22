@@ -98,7 +98,9 @@ struct MacLyricsView: View {
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
             header
-            Divider()
+            // 玻璃生效时分隔线不可见（只用 opacity 隐藏、不改结构 / 高度 / 间距），
+            // 否则会在整窗一块的玻璃上切出一条缝，歌词区看起来仍是一块独立面板。
+            Divider().opacity(windowGlassActive ? 0 : 1)
             content
                 // 仅跟唱模式下歌词区可聚焦（普通态键盘/焦点行为不变）
                 .focusable(karaoke.isKaraokeOn)
@@ -107,7 +109,8 @@ struct MacLyricsView: View {
                 .focusEffectDisabled()
             // 对齐 iOS LyricsView：跟唱控制条常驻底部，无论歌词状态（加载中/纯文本/无歌词）都显示
             if karaoke.isKaraokeOn {
-                Divider()
+                // 同上：玻璃生效时跟唱控制条上方不画分隔线（布局不变）
+                Divider().opacity(windowGlassActive ? 0 : 1)
                 MacKaraokeControlBar(accentColor: appAccentColor)
                     .padding(.vertical, DesignTokens.space8)
             }
@@ -296,6 +299,50 @@ struct MacLyricsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DesignTokens.space32)
                 .padding(.vertical, DesignTokens.space16)
+        }
+    }
+}
+
+// MARK: - 玻璃模式边缘淡出（歌词滚动区）
+
+/// 边缘渐隐高度（面板可矮到 140pt → 随面板收缩；与改前同一口径）
+/// 分片：跨文件可见（`MacLyricsView+SyncedLyrics` 在玻璃模式下用它做遮罩）
+extension MacLyricsView {
+    func fadeHeight(_ viewportHeight: CGFloat) -> CGFloat {
+        min(150, viewportHeight * 0.22)
+    }
+}
+
+/// 整窗玻璃下的上下边缘淡出：把滚动内容**本身**按透明度遮罩淡出，不铺任何颜色
+/// （旧实现用 baseColor 渐变带，盖在玻璃上会显示成顶部/底部白带）。
+/// 关闭玻璃时原样返回内容——旧外观逐像素不变，也不多一次离屏渲染。
+struct LyricsGlassEdgeFade: ViewModifier {
+    let active: Bool
+    let height: CGFloat
+
+    func body(content: Content) -> some View {
+        if active {
+            content.mask {
+                VStack(spacing: DesignTokens.space0) {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.55), .black.opacity(0.92), .black],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: height)
+
+                    Color.black
+
+                    LinearGradient(
+                        colors: [.black, .black.opacity(0.92), .black.opacity(0.55), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: height)
+                }
+            }
+        } else {
+            content
         }
     }
 }

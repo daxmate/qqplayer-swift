@@ -157,6 +157,9 @@ struct MacLibraryView: View {
             contentList
                 // 玻璃生效时让窗底透出（关闭时恢复系统列表底色）
                 .scrollContentBackground(isWindowGlassActive ? .hidden : .automatic)
+                // 交替行底色也要关：Table 默认按系统风格铺条纹灰底，压在整窗玻璃上就是
+                // 「歌曲列表没做进玻璃」的那一块（关闭时 .automatic = 改前外观）。
+                .alternatingRowBackgrounds(isWindowGlassActive ? .disabled : .automatic)
                 .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
         } detail: {
             MacPlayerView(

@@ -76,19 +76,31 @@ extension MacLyricsView {
                         }
                     }
                     .coordinateSpace(name: LyricsCenterMetrics.coordinateSpaceName)
+                    // 玻璃模式：把滚动内容**本身**按透明度淡出，不铺任何颜色。
+                    // 旧实现的 baseColor 渐变带是不透明底，盖在整窗玻璃上就是顶部/底部一条白带，
+                    // 歌词区因此仍像「单独一块」（见 LyricsGlassEdgeFade）。
+                    .modifier(
+                        LyricsGlassEdgeFade(
+                            active: windowGlassActive,
+                            height: fadeHeight(geometry.size.height)
+                        )
+                    )
                     // 面板内不禁用滚动：Mac 无 iOS 的手势冲突，用户可手动翻，行变化时回中心
 
-                    // 上下边缘渐隐（面板可矮到 140pt → 渐隐高度随面板收缩）
-                    VStack(spacing: DesignTokens.space0) {
-                        LinearGradient(colors: fadeColors(top: true), startPoint: .top, endPoint: .bottom)
-                            .frame(height: min(150, geometry.size.height * 0.22))
+                    // 上下边缘渐隐（面板可矮到 140pt → 渐隐高度随面板收缩）；
+                    // 玻璃模式已由上面的遮罩完成淡出，这里不再铺任何底色。
+                    if !windowGlassActive {
+                        VStack(spacing: DesignTokens.space0) {
+                            LinearGradient(colors: fadeColors(top: true), startPoint: .top, endPoint: .bottom)
+                                .frame(height: fadeHeight(geometry.size.height))
 
-                        Spacer()
+                            Spacer()
 
-                        LinearGradient(colors: fadeColors(top: false), startPoint: .top, endPoint: .bottom)
-                            .frame(height: min(150, geometry.size.height * 0.22))
+                            LinearGradient(colors: fadeColors(top: false), startPoint: .top, endPoint: .bottom)
+                                .frame(height: fadeHeight(geometry.size.height))
+                        }
+                        .allowsHitTesting(false)
                     }
-                    .allowsHitTesting(false)
                 }
                 // 手动滚动暂停跟随后浮出的「回到当前行」按钮（仅普通模式）
                 .overlay(alignment: .bottom) {
@@ -260,6 +272,7 @@ extension MacLyricsView {
     }
 
     /// 边缘渐隐用的底色色阶（top = 自上而下；bottom = 反向）
+    /// ⚠️ 只用于**关闭玻璃**的旧外观：baseColor 不透明，盖在玻璃上就是一条白带。
     private func fadeColors(top: Bool) -> [Color] {
         let stops = [
             baseColor.opacity(0.95),

@@ -142,6 +142,14 @@ extension MacLibraryView {
         } message: {
             Text(sidebarCreateError ?? "")
         }
+        // 玻璃生效时剥离 AppKit 侧栏自带的 `.sidebar` 材质视图（见 MacSidebarMaterialStripper）：
+        // 它按窗口背后的桌面取景，会在整窗玻璃上压出一块色阶不同的矩形。
+        // 挂在整个侧栏外侧（材质视图是侧栏的兄弟/上级，不是列表内部）；关闭开关即移除并还原。
+        .background {
+            if isWindowGlassActive {
+                MacSidebarMaterialStripper()
+            }
+        }
     }
 
     // MARK: - 新建歌单（复用既有创建流程与唯一写入口）
