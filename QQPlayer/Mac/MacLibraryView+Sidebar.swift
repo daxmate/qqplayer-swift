@@ -34,11 +34,6 @@ extension MacLibraryView {
     /// 分片：跨文件可见（原 private）
     var sidebar: some View {
         VStack(spacing: DesignTokens.space0) {
-            // 临时诊断：零高度探针，量侧栏内容顶的窗口坐标 y（判「双倍留白」用）
-            MacTitlebarProbe { reading in
-                titlebarProbe = reading
-                logTitlebarProbe() // 临时诊断：探针读数变化即记一行
-            }
             MacSearchField(text: $searchText)
             List(selection: $selection) {
                 // 一级分区（歌曲 / 我喜欢 / 专辑 / 艺术家）
@@ -99,10 +94,9 @@ extension MacLibraryView {
                 }
             }
             .listStyle(.sidebar)
-            // 整窗毛玻璃生效时：侧栏列表背景透明（露出窗底），行底色关掉交替
-            .macWindowGlassTransparency()
+            // 玻璃生效时让窗底透出（关闭时恢复系统列表底色）
+            .scrollContentBackground(isWindowGlassActive ? .hidden : .automatic)
         }
-        .background(MacSidebarGlassBackdrop())
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: DesignTokens.space6) {
                 if indexer.isIndexing {

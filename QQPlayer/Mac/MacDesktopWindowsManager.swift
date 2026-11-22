@@ -219,16 +219,11 @@ final class DesktopWindowsManager {
                     .environment(AppServices.live)
             }
         case .lyric:
-            // 整窗毛玻璃：浮窗同样铺玻璃底（封面模糊 + 材质），与主窗一致
-            MacDesktopLyricGlassContainer {
-                MacDesktopLyricView()
-            }
-            // 批 6-6：桌面歌词窗读 `@Environment(PlayerEngine.self)`（playbackTime 驱动行定位）
-            .environment(PlayerEngine.shared)
-            // 批 6-7：桌面歌词窗读 `@Environment(KaraokeController.self)`（跟唱行/AB 态）
-            .environment(KaraokeController.shared)
-            // 玻璃底读 `@Environment(AppServices.self)`（封面加载入口；手工 hosting 不继承场景环境）
-            .environment(AppServices.live)
+            MacDesktopLyricView()
+                // 批 6-6：桌面歌词窗读 `@Environment(PlayerEngine.self)`（playbackTime 驱动行定位）
+                .environment(PlayerEngine.shared)
+                // 批 6-7：桌面歌词窗读 `@Environment(KaraokeController.self)`（跟唱行/AB 态）
+                .environment(KaraokeController.shared)
         }
     }
 

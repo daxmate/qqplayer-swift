@@ -28,8 +28,7 @@ struct MacPlayerView: View {
 
     /// 分片：跨文件可见（原 private）
     @State var artwork: ArtworkImage?
-    /// 分片：跨文件可见
-    @State var artworkTrackId: String?
+    @State private var artworkTrackId: String?
     /// 分片：跨文件可见（原 private）
     @State var dragTime: TimeInterval?
     /// 分片：跨文件可见（原 private）
@@ -75,16 +74,14 @@ struct MacPlayerView: View {
     /// 分片：跨文件可见
     @State var playerSectionWidth: CGFloat = 0
     /// 分隔条拖动坐标系：固定在播放页容器上，避免分隔条自身位移污染 translation（拖动抖动）
-    /// 分片：跨文件可见（原 private；MacPlayerView+PlayerSection 要用）
-    static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
+    private static let lyricsResizeCoordinateSpace = "macPlayerLyricsResize"
     /// 分隔条视觉细条高度（pt）
     private static let lyricsResizeBarHeight: CGFloat = 6
     /// 分隔条可拖命中区高度（pt）：视觉仍 6pt 细条，上下各外扩 6pt 便于抓取（2026-11-17 用户反馈太窄）
     private static let lyricsResizeHitHeight: CGFloat = 18
 
     /// 播放区是否隐藏/歌词是否撑满：跟唱或放大（决策上收 MacPlaybackGate，有测试）
-    /// 分片：跨文件可见（播放区 / 歌词区高度切换要用）
-    var isLyricsFullscreen: Bool {
+    private var isLyricsFullscreen: Bool {
         MacPlaybackGate.shouldExpandLyrics(
             isKaraokeOn: karaoke.isKaraokeOn,
             isLyricsExpanded: lyricsExpanded
@@ -92,38 +89,34 @@ struct MacPlayerView: View {
     }
 
     var body: some View {
-        ZStack {
-            // 整窗底由 MacLibraryView 铺（模糊封面 + 一层雾面）；本页**不再铺任何卡片**，
-            // 播放信息/进度/控制直接浮在这层底上（Apple Music macOS 观感）。
-            GeometryReader { geo in
-                VStack(spacing: DesignTokens.space0) {
-                    if !MacPlaybackGate.shouldHidePlayerSection(
-                        isKaraokeOn: karaoke.isKaraokeOn,
-                        isLyricsExpanded: lyricsExpanded
-                    ) {
-                        playerSection
-                        lyricsResizeHandle(containerHeight: geo.size.height)
-                    }
-                    MacLyricsView(
-                        lyrics: lyrics,
-                        currentTime: playbackTime,
-                        isLoading: lyricsLoading,
-                        isFullscreen: isLyricsFullscreen,
-                        onToggleExpand: handleLyricsDoubleTap,
-                        onLyricsSearch: {
-                            showLyricsSearch = true
-                        },
-                        // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
-                        onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
-                        onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil,
-                        // 拖动分隔条时补正歌词文字（2026-11-18 方案 A）：非拖动时 delta 必为 0
-                        isPanelResizing: isLyricsPanelResizing,
-                        panelResizeDelta: lyricsPanelHeight - (dragStartPanelHeight ?? lyricsPanelHeight)
-                    )
-                    .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
+        GeometryReader { geo in
+            VStack(spacing: DesignTokens.space0) {
+                if !MacPlaybackGate.shouldHidePlayerSection(
+                    isKaraokeOn: karaoke.isKaraokeOn,
+                    isLyricsExpanded: lyricsExpanded
+                ) {
+                    playerSection
+                    lyricsResizeHandle(containerHeight: geo.size.height)
                 }
-                .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
+                MacLyricsView(
+                    lyrics: lyrics,
+                    currentTime: playbackTime,
+                    isLoading: lyricsLoading,
+                    isFullscreen: isLyricsFullscreen,
+                    onToggleExpand: handleLyricsDoubleTap,
+                    onLyricsSearch: {
+                        showLyricsSearch = true
+                    },
+                    // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
+                    onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
+                    onRevertTimeline: hasAlignedLyricsTimeline ? { revertLyricAlignment() } : nil,
+                    // 拖动分隔条时补正歌词文字（2026-11-18 方案 A）：非拖动时 delta 必为 0
+                    isPanelResizing: isLyricsPanelResizing,
+                    panelResizeDelta: lyricsPanelHeight - (dragStartPanelHeight ?? lyricsPanelHeight)
+                )
+                .frame(height: isLyricsFullscreen ? geo.size.height : lyricsPanelHeight)
             }
+            .coordinateSpace(name: Self.lyricsResizeCoordinateSpace)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {

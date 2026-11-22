@@ -188,6 +188,7 @@ extension MacPlayerView {
                 .help("karaoke_mode_help".localized)
 
             }
+
             // 播放页频谱条（D4，web Visualizer 对齐——仅 native 引擎曲目有数据，
             // SFB 曲目 Opus/OGG/DSD 无 tap 数据源，自动隐藏；跟唱大画面时本区隐藏）
             if visualizerEnabled {

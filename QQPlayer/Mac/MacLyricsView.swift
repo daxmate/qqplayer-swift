@@ -74,26 +74,9 @@ struct MacLyricsView: View {
     /// 分片：跨文件可见（原 private）
     @State var lastFollowedIndex: Int?
 
-    /// 歌词内容坐标系（滚动内容 VStack）：行 frame / 内容高度都在这里量
-    static let lyricsContentSpace = "macLyricsContentSpace"
-    /// 切句滚屏时长（与 `lyricAnimation` 同一时长；AppKit 偏移动画用）
-    static let lyricScrollDuration: TimeInterval = 0.55
-
-    /// 每行在内容坐标系里的 frame（居中偏移的唯一数据源）
-    @State var lyricRowRects: [Int: CGRect] = [:]
-    /// 滚动内容总高（含首尾占位；内容高度变化 = 布局落定信号）
-    @State var lyricContentHeight: CGFloat = 0
-    /// 承载歌词滚动内容的 NSScrollView（由 MacLyricsScrollObserver 回传；精确滚屏用）
-    @State var lyricsScrollView: NSScrollView?
-    /// 布局变化后的补正任务（合并连续变化，动画结束后再对齐一次）
-    @State var recenterTask: Task<Void, Never>?
-
     /// 面板底色（对齐 iOS 的 systemBackground）
     /// 分片：跨文件可见（原 private）
     var baseColor: Color { Color(nsColor: .windowBackgroundColor) }
-
-    /// 整窗毛玻璃是否生效（由 MacLibraryView 顶层注入；见 MacWindowGlass）
-    @Environment(\.macWindowGlassActive) var windowGlassActive
     /// 字号整体缩放系数（对齐 iOS LyricsView 的固定字号体系）
     /// 分片：跨文件可见（原 private）
     var fontScale: CGFloat { CGFloat(fontSize / 15.0) }
@@ -107,10 +90,7 @@ struct MacLyricsView: View {
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
             header
-            // 玻璃模式：头部条不铺底色也不画分隔线（整窗只有一层底，出现细线即「分块」）
-            if !windowGlassActive {
-                Divider()
-            }
+            Divider()
             content
                 // 仅跟唱模式下歌词区可聚焦（普通态键盘/焦点行为不变）
                 .focusable(karaoke.isKaraokeOn)
@@ -146,20 +126,20 @@ struct MacLyricsView: View {
         )
     }
 
+    /// 整窗玻璃是否生效（由 MacLibraryView 顶层注入；见 MacWindowGlass）
+    @Environment(\.macWindowGlassActive) var windowGlassActive
+
     /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）。
-    /// 整窗毛玻璃生效时**完全不铺底**（面板与头部条共用这个背景 → 一并透明），
-    /// 歌词直接浮在窗底的模糊封面上；关闭开关即完全回到原来的纯色 + 辉光。
+    /// 整窗玻璃生效时**只把这一层改为透明**（渐隐带/滚动/间距一律不动），让窗底透上来。
     @ViewBuilder
     private var panelBackground: some View {
         if windowGlassActive {
             Color.clear
-                .allowsHitTesting(false)
         } else {
             legacyPanelBackground
         }
     }
 
-    /// 原面板底色（关闭毛玻璃时逐像素不变）
     private var legacyPanelBackground: some View {
         ZStack {
             baseColor

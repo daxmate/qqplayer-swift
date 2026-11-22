@@ -16,7 +16,7 @@ extension MacLibraryView {
     @ViewBuilder
     /// 分片：跨文件可见（原 private）
     var contentList: some View {
-        if isSearching {
+        if !debouncedSearchText.isEmpty {
             MacSearchResultsView(
                 results: searchResults,
                 activeTrackId: player.currentTrack?.stableId,

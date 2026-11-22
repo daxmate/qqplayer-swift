@@ -50,21 +50,6 @@ struct MacLibraryView: View {
     )
     /// 设置（工具栏迷你按钮可见性 = showMiniWindowButton，设置改动即时刷新）
     @State private var deleteSettings = DeleteSettings.load()
-    /// 整窗封面毛玻璃（键 / 默认值的唯一来源见 `PlayerGlassBackground`）
-    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
-    /// 系统「降低透明度」：开启时回落纯色窗口
-    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
-    /// 当前曲目封面（整窗底的来源；由 loadWindowArtwork 按曲目标识刷新）
-    @State var windowArtwork: ArtworkImage?
-    @State var windowArtworkTrackId: String?
-    /// 标题栏 + 工具栏的**实测高度**（玻璃生效时由 MacWindowChrome 上报；关闭 / 全屏 = 0）。
-    /// 内容据此整体下移，避免被红绿灯/工具栏压住；背景层仍 ignoresSafeArea 通顶。
-    @State var titlebarInset: CGFloat = 0
-    /// 临时诊断（用户确认「双倍留白」后再删）：侧栏内容顶探针读数
-    /// 分片：跨文件可见（MacLibraryView+Sidebar 里的探针写入）
-    @State var titlebarProbe: MacTitlebarProbeReading?
-    /// 临时诊断：已写过的诊断行（同一组读数不重复刷日志）
-    @State private var lastTitlebarLog: String?
     /// 分片：跨文件可见（原 private）
     @State var albums: [Album] = []
     /// 分片：跨文件可见（原 private）
@@ -125,9 +110,17 @@ struct MacLibraryView: View {
     /// 分片：跨文件可见（原 private）
     @State var searchTask: Task<Void, Never>?
 
-    // MARK: - 整窗毛玻璃（Apple Music 式）
+    // MARK: - 整窗玻璃（最小实现：只铺窗口底 + 让底色透出）
 
-    /// 整窗毛玻璃是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
+    /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 系统「降低透明度」：开启时回落原纯色窗口
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
+    /// 当前曲目封面（窗口底的来源）
+    @State var windowArtwork: ArtworkImage?
+    @State var windowArtworkTrackId: String?
+
+    /// 整窗玻璃是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
     var isWindowGlassActive: Bool {
         PlayerGlassBackground.isActive(
             isEnabled: glassBackgroundEnabled,
@@ -136,7 +129,7 @@ struct MacLibraryView: View {
         )
     }
 
-    /// 整窗底：当前封面模糊（`ArtworkBlurBackground` 内含 0.45s 切歌交叉淡入）+ 外观自适应雾面
+    /// 窗口底：模糊封面 + 均匀雾面（切歌时 `ArtworkBlurBackground` 自带 0.45s 交叉淡入）
     @ViewBuilder
     var windowGlassBackground: some View {
         if isWindowGlassActive {
@@ -144,39 +137,10 @@ struct MacLibraryView: View {
                 artwork: windowArtwork,
                 cacheKey: windowArtworkTrackId ?? player.currentTrack?.stableId
             )
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.3), value: glassBackgroundEnabled)
         }
     }
 
-    // MARK: - 临时诊断（用户确认「双倍留白」后再删）
-
-    /// 记一行标题栏留白实测：
-    ///   `[mac.titlebar] T=… safeTop=… contentTopY=… inflation=…`
-    /// - `T` = MacWindowChrome 上报的实测「标题栏 + 工具栏」高度；
-    /// - `contentTopY` = 侧栏内容顶探针的窗口坐标 y；
-    /// - `inflation = contentTopY − T`：≈0 表示留白刚好；≈T 表示 SwiftUI 自己也让了一次
-    ///   （双倍留白）；关闭玻璃时 T=0，`inflation` 应≈0。
-    /// 同一组读数只写一次（避免 SwiftUI 频繁更新刷屏）。
-    func logTitlebarProbe() {
-        let payload: String
-        if let probe = titlebarProbe {
-            payload = "T=\(numberText(titlebarInset)) safeTop=\(numberText(probe.safeTop)) "
-                + "contentTopY=\(numberText(probe.contentTopY)) "
-                + "inflation=\(numberText(probe.contentTopY - titlebarInset))"
-        } else {
-            payload = "T=\(numberText(titlebarInset)) safeTop=nil contentTopY=nil inflation=nil"
-        }
-        guard payload != lastTitlebarLog else { return }
-        lastTitlebarLog = payload
-        AppLog.info(.ui, "[mac.titlebar] \(payload)")
-    }
-
-    private func numberText(_ value: CGFloat) -> String {
-        String(format: "%.1f", value)
-    }
-
-    /// 拉取当前曲目封面（整窗底用；切歌后旧结果丢弃，与播放页同款守卫）
+    /// 拉取当前曲目封面（切歌后旧结果丢弃）
     func loadWindowArtwork() async {
         guard let track = player.currentTrack else {
             windowArtwork = nil
@@ -184,33 +148,22 @@ struct MacLibraryView: View {
             return
         }
         let trackId = track.stableId
-        let artwork = await services.artworkManager.getArtwork(for: track)
+        let image = await services.artworkManager.getArtwork(for: track)
         guard player.currentTrack?.stableId == trackId else { return }
-        windowArtwork = artwork
+        windowArtwork = image
         windowArtworkTrackId = trackId
-    }
-
-    /// 是否处于搜索态（唯一判据：**trim 后**非空，与 `performSearch` 的 `SearchQuery.isEmpty`
-    /// 同口径）。原先用原始串判空：只输入一个空格 → 中栏切到搜索结果但结果为空
-    /// ⇒ 看到「未找到结果」空态，且搜索框被顶出可视区时用户无法自证/清除。
-    var isSearching: Bool {
-        !SearchQuery.isEmpty(debouncedSearchText)
     }
 
     var body: some View {
         ZStack {
             windowGlassBackground
-            // 内容整体下移 titlebarInset，避免压在红绿灯/工具栏下面。
-            // 选 `.padding` 而不是 `.safeAreaPadding`：这里要的是**整块位移**（三栏一起下移），
-            // safeAreaPadding 改的是 safe-area 尺寸语义，会被子视图各自消费（ScrollView 变成
-            // contentInset、List 只挪内容不挪边框），无法保证每一栏整体下移同一个量。
             NavigationSplitView {
                 sidebar
                     .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
             } content: {
                 contentList
-                    // 整窗毛玻璃生效时：中栏滚动背景透明（列表/表格/网格统一走一处）
-                    .macWindowGlassTransparency()
+                    // 玻璃生效时让窗底透出（关闭时恢复系统列表底色）
+                    .scrollContentBackground(isWindowGlassActive ? .hidden : .automatic)
                     .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
             } detail: {
                 MacPlayerView(
@@ -227,24 +180,11 @@ struct MacLibraryView: View {
                     }
                 )
             }
-            // 标题栏 + 工具栏实测高度（0 = 无留白：关闭玻璃 / 全屏）
-            .padding(.top, titlebarInset)
         }
+        // 歌词面板据此把底色改为透明（其余区域不读它：只靠背景透出）
         .environment(\.macWindowGlassActive, isWindowGlassActive)
         .task(id: player.currentTrack?.stableId) {
             await loadWindowArtwork()
-        }
-        // 顶部标题栏 / 工具栏跟着玻璃走：macOS 15+ 隐藏工具栏背景，
-        // 全版本再用 AppKit 把 titlebar 透明化；关闭开关即还原（见 MacWindowChrome）
-        .macWindowToolbarBackgroundHidden(isWindowGlassActive)
-        .background {
-            MacWindowChromeTransparency(transparent: isWindowGlassActive) { height in
-                // 实测高度回调（MacWindowChrome 在 flags 生效后的下一轮 runloop 测，
-                // resize / 进出全屏 / 换屏 / 成为 key 窗口时重测）
-                titlebarInset = height
-                logTitlebarProbe() // 临时诊断：T 变化即记一行
-            }
-            .frame(width: 0, height: 0)
         }
         .navigationTitle("QQPlayer")
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小
@@ -381,13 +321,6 @@ struct MacLibraryView: View {
             }
         }
         .onChange(of: searchText) { _, newValue in
-            // 临时诊断（用户确认中栏不再莫名进搜索态后删除）：
-            // 只记录「输入框真的变了」，用于证明中栏搜索态的来源。
-            AppLog.info(
-                .ui,
-                "[mac.search] textChanged raw=\(newValue.debugDescription) "
-                    + "trimmedEmpty=\(SearchQuery.isEmpty(newValue))"
-            )
             debounceTask?.cancel()
             debounceTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
