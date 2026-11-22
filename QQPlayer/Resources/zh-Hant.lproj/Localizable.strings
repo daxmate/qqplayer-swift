@@ -269,8 +269,6 @@
 "use_simple_icons" = "在媒體庫介面中移除圖標的彩色背景，使用極簡風格。";
 
 "override_system_appearance" = "無視 iOS 系統外觀設定，強制讓應用保持深色模式。";
-"player_glass_background" = "封面毛玻璃背景";
-"player_glass_background_footnote" = "播放頁以目前封面做模糊背景；關閉後回到漸層背景。";
 
 "background_color" = "背景顏色";
 

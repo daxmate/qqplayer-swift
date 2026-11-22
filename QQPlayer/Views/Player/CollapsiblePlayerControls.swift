@@ -20,8 +20,6 @@ struct CollapsiblePlayerControls: View {
     let duration: TimeInterval
     /// App 强调色（读环境值；根注入见 ContentView）
     @Environment(\.appAccentColor) private var accentColor
-    /// 播放页表面样式（毛玻璃背景下控制图标转白色）
-    @Environment(\.playerSurfaceStyle) private var surfaceStyle
     let onSeek: (TimeInterval) -> Void
     let showSleepTimerButton: Bool
     let sleepTimerEndDate: Date?
@@ -160,7 +158,7 @@ struct CollapsiblePlayerControls: View {
         }) {
             Image(systemName: playOrderIcon)
                 .font(.title3)
-                .foregroundColor(isPlayOrderActive ? accentColor : surfaceStyle.primaryText)
+                .foregroundColor(isPlayOrderActive ? accentColor : .primary)
                 .frame(width: 56, height: 56)
                 .contentShape(Rectangle())
         }
@@ -199,7 +197,7 @@ struct CollapsiblePlayerControls: View {
         }) {
             Image(systemName: "list.bullet")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title2 : .title)
-                .foregroundColor(surfaceStyle.primaryText)
+                .foregroundColor(.primary)
                 .frame(width: 56, height: 56)
                 .contentShape(Rectangle())
         }
@@ -212,7 +210,7 @@ struct CollapsiblePlayerControls: View {
         }) {
             Image(systemName: "airplayaudio")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title2 : .title)
-                .foregroundColor(surfaceStyle.primaryText)
+                .foregroundColor(.primary)
                 .frame(width: 56, height: 56)
                 .contentShape(Rectangle())
         }
@@ -244,7 +242,7 @@ struct CollapsiblePlayerControls: View {
         } label: {
             Image(systemName: sleepTimerEndDate == nil ? "timer" : "timer.circle.fill")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title2 : .title)
-                .foregroundColor(sleepTimerEndDate == nil ? surfaceStyle.primaryText : accentColor)
+                .foregroundColor(sleepTimerEndDate == nil ? .primary : accentColor)
                 .frame(width: 56, height: 56)
                 .contentShape(Rectangle())
         }
@@ -260,7 +258,7 @@ struct CollapsiblePlayerControls: View {
         }) {
             Image(systemName: "trash")
                 .font(UIScreen.main.scale < UIScreen.main.nativeScale ? .title2 : .title)
-                .foregroundColor(surfaceStyle.primaryText)
+                .foregroundColor(.primary)
                 .frame(width: 56, height: 56)
                 .contentShape(Rectangle())
         }

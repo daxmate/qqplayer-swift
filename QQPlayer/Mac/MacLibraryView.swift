@@ -104,94 +104,39 @@ struct MacLibraryView: View {
     @State var searchText = ""
     /// 分片：跨文件可见（原 private）
     @State var debouncedSearchText = ""
-    /// 分片：跨文件可见（原 private）
-    @State var searchResults = MacSearchResults()
-    @State private var debounceTask: Task<Void, Never>?
-    /// 分片：跨文件可见（原 private）
-    @State var searchTask: Task<Void, Never>?
-
     /// 是否处于搜索态（唯一判据：**trim 后**非空，与 `performSearch` 的 `SearchQuery.isEmpty`
     /// 同口径）。原先用原始串判空：只输入一个空白字符 → 中栏切到搜索结果视图，但结果是空集
     /// ⇒ 稳定显示「未找到结果」空态。
     var isSearching: Bool {
         !SearchQuery.isEmpty(debouncedSearchText)
     }
-
-    // MARK: - 整窗玻璃（最小实现：只铺窗口底 + 让底色透出）
-
-    /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
-    @AppStorage(PlayerGlassBackground.storageKey) var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
-    /// 系统「降低透明度」：开启时回落原纯色窗口
-    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
-    /// 当前曲目封面（窗口底的来源）
-    @State var windowArtwork: ArtworkImage?
-    @State var windowArtworkTrackId: String?
-
-    /// 整窗玻璃是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
-    var isWindowGlassActive: Bool {
-        PlayerGlassBackground.isActive(
-            isEnabled: glassBackgroundEnabled,
-            hasArtwork: windowArtwork != nil,
-            reduceTransparency: reduceTransparency
-        )
-    }
-
-    /// 窗口底：模糊封面 + 均匀雾面（切歌时 `ArtworkBlurBackground` 自带 0.45s 交叉淡入）
-    @ViewBuilder
-    var windowGlassBackground: some View {
-        if isWindowGlassActive {
-            MacWindowGlass(
-                artwork: windowArtwork,
-                cacheKey: windowArtworkTrackId ?? player.currentTrack?.stableId
-            )
-        }
-    }
-
-    /// 拉取当前曲目封面（切歌后旧结果丢弃）
-    func loadWindowArtwork() async {
-        guard let track = player.currentTrack else {
-            windowArtwork = nil
-            windowArtworkTrackId = nil
-            return
-        }
-        let trackId = track.stableId
-        let image = await services.artworkManager.getArtwork(for: track)
-        guard player.currentTrack?.stableId == trackId else { return }
-        windowArtwork = image
-        windowArtworkTrackId = trackId
-    }
+    /// 分片：跨文件可见（原 private）
+    @State var searchResults = MacSearchResults()
+    @State private var debounceTask: Task<Void, Never>?
+    /// 分片：跨文件可见（原 private）
+    @State var searchTask: Task<Void, Never>?
 
     var body: some View {
-        ZStack {
-            windowGlassBackground
-            NavigationSplitView {
-                sidebar
-                    .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
-            } content: {
-                contentList
-                    // 玻璃生效时让窗底透出（关闭时恢复系统列表底色）
-                    .scrollContentBackground(isWindowGlassActive ? .hidden : .automatic)
-                    .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
-            } detail: {
-                MacPlayerView(
-                    track: player.currentTrack,
-                    artistName: currentArtistName,
-                    isPlaying: player.isPlaying,
-                    duration: player.duration,
-                    playbackTime: player.progress.playbackTime,
-                    onPlayPause: togglePlayPause,
-                    onNext: { Task { await player.nextTrack(autoplay: true) } },
-                    onPrevious: { Task { await player.previousTrack(autoplay: true) } },
-                    onSeek: { time in
-                        Task { await player.seek(to: time) }
-                    }
-                )
-            }
-        }
-        // 歌词面板据此把底色改为透明（其余区域不读它：只靠背景透出）
-        .environment(\.macWindowGlassActive, isWindowGlassActive)
-        .task(id: player.currentTrack?.stableId) {
-            await loadWindowArtwork()
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
+        } content: {
+            contentList
+                .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
+        } detail: {
+            MacPlayerView(
+                track: player.currentTrack,
+                artistName: currentArtistName,
+                isPlaying: player.isPlaying,
+                duration: player.duration,
+                playbackTime: player.progress.playbackTime,
+                onPlayPause: togglePlayPause,
+                onNext: { Task { await player.nextTrack(autoplay: true) } },
+                onPrevious: { Task { await player.previousTrack(autoplay: true) } },
+                onSeek: { time in
+                    Task { await player.seek(to: time) }
+                }
+            )
         }
         .navigationTitle("QQPlayer")
         // 三栏主界面的最小尺寸走单一事实源（见 MacMainWindowMetrics）：窗口能缩到多小

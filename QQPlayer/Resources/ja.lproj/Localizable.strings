@@ -186,8 +186,6 @@
 "github_repository" = "GitHubリポジトリ";
 "use_simple_icons" = "ライブラリの各セクションで色付き背景のないシンプルなアイコンを使用します。";
 "override_system_appearance" = "システムの外観設定を上書きし、常にダークモードを使用します。";
-"player_glass_background" = "アートワークのグラス背景";
-"player_glass_background_footnote" = "再生画面の背景に現在のアートワークをぼかして表示します。オフにするとグラデーション背景に戻ります。";
 "background_color" = "背景色";
 "choose_color_theme" = "すべての画面の背景エフェクトに使用するカラーテーマを選択します。";
 "library_section" = "ライブラリ";

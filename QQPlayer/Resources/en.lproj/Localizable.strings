@@ -186,8 +186,6 @@
 "github_repository" = "GitHub Repository";
 "use_simple_icons" = "Use simple icons without colored backgrounds in the library sections.";
 "override_system_appearance" = "Override system appearance and force the app to use dark mode.";
-"player_glass_background" = "Artwork Glass Background";
-"player_glass_background_footnote" = "Use the current artwork as a blurred background on the player page. Turn off to go back to the gradient background.";
 "background_color" = "Background Color";
 "choose_color_theme" = "Choose the color theme for background effects across all screens.";
 "library_section" = "Library";

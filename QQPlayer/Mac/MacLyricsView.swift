@@ -126,21 +126,8 @@ struct MacLyricsView: View {
         )
     }
 
-    /// 整窗玻璃是否生效（由 MacLibraryView 顶层注入；见 MacWindowGlass）
-    @Environment(\.macWindowGlassActive) var windowGlassActive
-
-    /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）。
-    /// 整窗玻璃生效时**只把这一层改为透明**（渐隐带/滚动/间距一律不动），让窗底透上来。
-    @ViewBuilder
+    /// 面板底色：系统窗口底色铺满 + 主题色低透明径向辉光（对齐 iOS 的媒体库背景光晕）
     private var panelBackground: some View {
-        if windowGlassActive {
-            Color.clear
-        } else {
-            legacyPanelBackground
-        }
-    }
-
-    private var legacyPanelBackground: some View {
         ZStack {
             baseColor
 

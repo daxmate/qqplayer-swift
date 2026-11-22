@@ -13,8 +13,6 @@ struct SettingsAppearanceView: View {
     @State private var deleteSettings = DeleteSettings.load()
     /// 语言选择（App 内热切换；跟随系统 = 空字符串）
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = ""
-    /// 播放页封面毛玻璃背景（键与默认值唯一来源见 `PlayerGlassBackground`）
-    @AppStorage(PlayerGlassBackground.storageKey) private var playerGlassBackground = PlayerGlassBackground.enabledByDefault
 
     var body: some View {
         Form {
@@ -43,12 +41,6 @@ struct SettingsAppearanceView: View {
                     }
 
                 Text(Localized.overrideSystemAppearance)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Toggle(Localized.playerGlassBackground, isOn: $playerGlassBackground)
-
-                Text(Localized.playerGlassBackgroundFootnote)
                     .font(.caption)
                     .foregroundColor(.secondary)
 

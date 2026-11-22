@@ -186,8 +186,6 @@
 "github_repository" = "Repositorio de GitHub";
 "use_simple_icons" = "Usa iconos simples sin fondos de color en las secciones de la biblioteca.";
 "override_system_appearance" = "Omite la apariencia del sistema y fuerza el modo oscuro en la app.";
-"player_glass_background" = "Fondo de cristal con carátula";
-"player_glass_background_footnote" = "Usa la carátula actual como fondo desenfocado en la pantalla de reproducción. Desactívalo para volver al fondo degradado.";
 "background_color" = "Color de fondo";
 "choose_color_theme" = "Elige el tema de color para los efectos de fondo en todas las pantallas.";
 "library_section" = "Biblioteca";
