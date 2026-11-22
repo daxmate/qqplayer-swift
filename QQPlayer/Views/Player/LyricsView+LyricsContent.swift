@@ -20,13 +20,21 @@ extension LyricsView {
     /// 分片：跨文件可见（原 private）
     func syncedLyricsView(_ lines: [LyricsLine]) -> some View {
         GeometryReader { geometry in
+            let centerInset = LyricsCenterMetrics.topInset(
+                viewportHeight: geometry.size.height,
+                rowHalfHeight: LyricsCenterMetrics.rowHalfHeight(
+                    emphasis: 1.0,
+                    karaoke: karaoke.isKaraokeOn,
+                    fontScale: 1.0
+                )
+            )
             ScrollViewReader { proxy in
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: DesignTokens.space0) {
-                            // Reduced spacer at top - use more space
+                            // 上下等距撑开 → 高亮行视觉中心 = 视口垂直中心（占位按当前档位行高算）
                             Spacer()
-                                .frame(height: geometry.size.height / 2 - 40)
+                                .frame(height: centerInset)
 
                             // 每次 body 求值只算一次 activeIndex，isActive/distance 变 O(1) 查表
                             // （替代逐行全量遍历 + distanceFromActive 每行 O(n) 遍历）。
@@ -41,15 +49,16 @@ extension LyricsView {
                                     line: line,
                                     isActive: isActive,
                                     distance: distance,
-                                    index: index
+                                    index: index,
+                                    viewportHeight: geometry.size.height
                                 )
                             }
 
-                            // Reduced spacer at bottom - use more space
                             Spacer()
-                                .frame(height: geometry.size.height / 2 - 40)
+                                .frame(height: centerInset)
                         }
                     }
+                    .coordinateSpace(name: LyricsCenterMetrics.coordinateSpaceName)
                     // 手动滚动检测：普通模式手动滚动 → 暂停自动跟随（画面不再被自动拉回）。
                     // 用 onScrollPhaseChange（iOS 18+）：tracking / interacting / decelerating 仅由
                     // 用户发起；程序化 proxy.scrollTo 是 .animating —— 故自动滚动不会误判成手动。
@@ -126,11 +135,32 @@ extension LyricsView {
                 .onAppear {
                     updateActiveLineAndScroll(for: lines, in: proxy)
                 }
+                // 尺寸变化（旋转 / 分屏 / sheet 高度）：任何变化都重锚回中心
+                .onChange(of: geometry.size) { _, _ in
+                    reanchorActiveLine(for: lines, in: proxy)
+                }
             }
         }
     }
 
-    private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
+    /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行中心与视口中心之差，确认后删除。
+    private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
+        LyricsCenterLogger.log(
+            platform: "ios",
+            rowMidY: rowMidY,
+            viewportHeight: viewportHeight
+        ) { message in
+            AppLog.info(.ui, message)
+        }
+    }
+
+    private func lyricLineView(
+        line: LyricsLine,
+        isActive: Bool,
+        distance: Int,
+        index: Int,
+        viewportHeight: CGFloat
+    ) -> some View {
         // 阅读态（用户拍板 2026-10-12）：普通模式用户手动滚动后，整页关距离分级「灰度」+ 正常字号，
         // 直到回中（isFollowing 恢复 true）。跟唱模式不受影响（reading 恒 false）。
         let reading = !karaoke.isKaraokeOn && !isFollowing
@@ -170,7 +200,6 @@ extension LyricsView {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, DesignTokens.space32)
-        .padding(.vertical, karaoke.isKaraokeOn ? DesignTokens.space16 : (isActive ? DesignTokens.space24 : DesignTokens.space16))
         .id(index)
         // 阅读态 scaleEffect 1.0（用户定）：关距离分级的同时不再缩放。
         .scaleEffect(karaoke.isKaraokeOn || reading ? 1.0 : (isActive ? 1.02 : (distance <= 1 ? 0.97 : 0.94)), anchor: .center)
@@ -183,6 +212,30 @@ extension LyricsView {
                 initialVelocity: 0
             ),
             value: isActive
+        )
+        // 垂直 padding 放在动画修饰符**外层**：按目标档位同帧跳变，不参与插值
+        // （否则行高在切句动画中变化，scrollTo 按旧布局算偏移 → 高亮行偏上）
+        .padding(.vertical, LyricsCenterMetrics.verticalPadding(
+            emphasis: isActive ? 1.0 : 0.66,
+            karaoke: karaoke.isKaraokeOn
+        ))
+        .background(
+            GeometryReader { rowProxy in
+                Color.clear
+                    .onAppear {
+                        guard isActive else { return }
+                        scheduleCenterLog(
+                            rowMidY: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY,
+                            viewportHeight: viewportHeight
+                        )
+                    }
+                    .onChange(
+                        of: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
+                    ) { _, midY in
+                        guard isActive else { return }
+                        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+                    }
+            }
         )
         // 单击行：跟唱模式 = 跳转 / 等选终点 = 设 B（决策在 KaraokeController.clickLine）；
         // 普通模式 = 跳到该行播放（KaraokeController.seekToLyricLine）并恢复自动跟随。
@@ -364,14 +417,33 @@ extension LyricsView {
         if !karaoke.isKaraokeOn, !isFollowing, !force { return }
         guard force || activeIndex != lastScrolledIndex else { return }
         lastScrolledIndex = activeIndex
-        withAnimation(
-            .interpolatingSpring(
-                mass: 1.0,
-                stiffness: 170,
-                damping: 25,
-                initialVelocity: 0
-            )
-        ) {
+        // 布局落定后再滚：本帧字号 / padding 已按目标档位落定，下一拍滚一次，
+        // 再补一拍幂等校正（第二次滚到同一位置，无可见二次位移）。
+        DispatchQueue.main.async {
+            withAnimation(
+                .interpolatingSpring(
+                    mass: 1.0,
+                    stiffness: 170,
+                    damping: 25,
+                    initialVelocity: 0
+                )
+            ) {
+                proxy.scrollTo(activeIndex, anchor: .center)
+            }
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay
+            ) {
+                proxy.scrollTo(activeIndex, anchor: .center)
+            }
+        }
+    }
+
+    /// 视口尺寸变化（旋转 / 分屏 / sheet 高度）：无动画重锚回中心（拖动中每 tick 都跟得上）。
+    private func reanchorActiveLine(for lines: [LyricsLine], in proxy: ScrollViewProxy) {
+        if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
+        guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines) else { return }
+        if !karaoke.isKaraokeOn, !isFollowing { return }
+        DispatchQueue.main.async {
             proxy.scrollTo(activeIndex, anchor: .center)
         }
     }

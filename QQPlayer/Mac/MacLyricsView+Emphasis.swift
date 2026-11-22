@@ -72,9 +72,37 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         content
-            .font(.system(size: mainSize, weight: mainWeight))
             .foregroundColor(mainColor)
             .shadow(color: shadowColor, radius: shadowRadius)
+    }
+
+    /// 目标档位字体（**非逐帧插值**）：字号按档位取值、字重按阈值切换。
+    /// 布局属性（字号 / padding）必须脱离 Animatable 插值路径，否则行高在切句动画中持续变化 → 滚动偏移。
+    static func lineFont(
+        emphasis: Double,
+        karaoke: Bool,
+        reading: Bool,
+        fontScale: CGFloat
+    ) -> Font {
+        .system(
+            size: LyricsCenterMetrics.fontSize(
+                emphasis: emphasis,
+                karaoke: karaoke,
+                reading: reading,
+                fontScale: fontScale
+            ),
+            weight: lineWeight(emphasis: emphasis, karaoke: karaoke, reading: reading)
+        )
+    }
+
+    /// 字重不可插值 → 按 emphasis 阈值切换（切换点前后颜色/透明度连续变化，视觉上被掩盖）。
+    static func lineWeight(emphasis: Double, karaoke: Bool, reading: Bool) -> Font.Weight {
+        // 阅读态：当前行加粗保留、其余统一 semibold（正常大小那一档；emphasis 1.0 = 当前行）
+        if reading { return emphasis > 0.85 ? .bold : .semibold }
+        if karaoke { return emphasis > 0.85 ? .bold : .regular }
+        if emphasis > 0.85 { return .bold }
+        if emphasis > 0.45 { return .semibold }
+        return .medium
     }
 
     // MARK: 行级度量（透明度/缩放/行距作用于整行，含译文行）
@@ -98,32 +126,7 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
         return CGFloat(lyricLerp(emphasis, [(1.0, 1.02), (0.66, 0.97), (0.40, 0.94)]))
     }
 
-    /// 整行垂直内边距（改前 当前行 24 / 其余 16；跟唱固定 18）
-    static func linePadding(_ emphasis: Double, karaoke: Bool) -> CGFloat {
-        guard !karaoke else { return 18 }
-        return CGFloat(lyricLerp(emphasis, [(1.0, 24), (0.66, 16)]))
-    }
-
     // MARK: 主行样式
-
-    /// 字号（×fontScale）：1.0 → 26、0.66 → 19、0.40 及更远 → 16（跟唱 22 / 19）
-    private var mainSize: CGFloat {
-        // 阅读态：正常大小 = 高亮行下一行那档（19），不随距离分级
-        if reading { return 19 * fontScale }
-        let size = karaoke
-            ? lyricLerp(emphasis, [(1.0, 22), (0.66, 19)])
-            : lyricLerp(emphasis, [(1.0, 26), (0.66, 19), (0.40, 16)])
-        return CGFloat(size) * fontScale
-    }
-
-    private var mainWeight: Font.Weight {
-        // 阅读态：当前行加粗保留、其余统一 semibold（正常大小那一档；emphasis 1.0 = 当前行）
-        if reading { return emphasis > 0.85 ? .bold : .semibold }
-        if karaoke { return emphasis > 0.85 ? .bold : .regular }
-        if emphasis > 0.85 { return .bold }
-        if emphasis > 0.45 { return .semibold }
-        return .medium
-    }
 
     /// 颜色：≤0.66 只插值 primary 的 alpha（0.75 / 0.40 / 0.18），>0.66 才由 primary 混向 accent
     private var mainColor: Color {
@@ -179,12 +182,34 @@ struct LyricTranslationEmphasis: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         content
-            .font(.system(size: size * fontScale))
             .foregroundColor(color)
     }
 
+    /// 目标档位字体（**非逐帧插值**）：译文 / 罗马音字号按档位取整，避免文字块行高在动画中变化。
+    static func font(
+        emphasis: Double,
+        karaoke: Bool,
+        reading: Bool,
+        fontScale: CGFloat,
+        tier: Tier
+    ) -> Font {
+        .system(size: fontSize(
+            emphasis: emphasis,
+            karaoke: karaoke,
+            reading: reading,
+            fontScale: fontScale,
+            tier: tier
+        ))
+    }
+
     /// 字号阶梯：译文与罗马音共用这一张表（罗马音整体小一档）
-    private var size: CGFloat {
+    static func fontSize(
+        emphasis: Double,
+        karaoke: Bool,
+        reading: Bool,
+        fontScale: CGFloat,
+        tier: Tier
+    ) -> CGFloat {
         // 阅读态：译文 14 / 罗马音 12（正常大小那一档），不随距离分级
         if reading { return (tier == .roman ? 12 : 14) * fontScale }
         let table: [(Double, Double)]

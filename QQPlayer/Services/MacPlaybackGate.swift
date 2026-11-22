@@ -126,21 +126,6 @@ enum MacPlaybackGate {
         clampedLyricsHeight(start - translation, containerHeight: containerHeight)
     }
 
-    /// 拖动分隔条期间歌词内容的顶部补偿占位（2026-11-18 用户拍板「方案 A」）。
-    ///
-    /// 面板高度 +Δ 时：面板顶边上移 Δ，而歌词内容顶部占位 = 视口高/2 - 40 同时 +Δ/2，
-    /// 两者叠加使文字在屏幕上漂移 -Δ/2；额外补 Δ/2 占位即抵消（-Δ + Δ/2 + Δ/2 = 0）。
-    /// 仅在「拖动中 且 自动跟随」时生效：阅读态（手动滚动后 isFollowing=false）不补偿，
-    /// 松手也不会被拉回（沿用 2026-10-12 拍板的跟随语义）。
-    static func lyricsResizePinInset(
-        isResizing: Bool,
-        isFollowing: Bool,
-        heightDelta: CGFloat
-    ) -> CGFloat {
-        guard isResizing, isFollowing else { return 0 }
-        return heightDelta / 2
-    }
-
     /// 把任意高度规整到 [140, max(180, containerHeight - 360)]。
     /// 松手时也走这里：保留拖动结束时的当前高度，只做 clamp（2026-11-03 修松手回弹）。
     static func clampedLyricsHeight(_ height: CGFloat, containerHeight: CGFloat) -> CGFloat {

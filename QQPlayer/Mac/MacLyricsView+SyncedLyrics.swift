@@ -17,13 +17,17 @@ extension MacLyricsView {
     func syncedView(_ lines: [LyricsLine]) -> some View {
         // 歌词轴时间（音频时间 - offset，web lyricTime 语义）：高亮行与跟唱 tick 同轴
         let activeIndex = LyricTiming.activeLineIndex(time: currentTime - lyricOffset, in: lines)
-        // 拖动分隔条时的顶部补偿（方案 A）：跟随态下补 delta/2，使文字在屏幕上不动
-        let resizePinInset = MacPlaybackGate.lyricsResizePinInset(
-            isResizing: isPanelResizing,
-            isFollowing: isFollowing,
-            heightDelta: panelResizeDelta
+        // 高亮行半高：档位字号 + padding 的纯函数（占位与居中口径同源）
+        let rowHalfHeight = LyricsCenterMetrics.rowHalfHeight(
+            emphasis: 1.0,
+            karaoke: karaoke.isKaraokeOn,
+            fontScale: fontScale
         )
         return GeometryReader { geometry in
+            let centerInset = LyricsCenterMetrics.topInset(
+                viewportHeight: geometry.size.height,
+                rowHalfHeight: rowHalfHeight
+            )
             ScrollViewReader { proxy in
                 ZStack {
                     ScrollView(.vertical, showsIndicators: false) {
@@ -49,9 +53,9 @@ extension MacLyricsView {
                             .frame(width: 0, height: 0)
                             .allowsHitTesting(false)
 
-                            // 上下等距撑开 → 当前行恒在面板垂直中央
+                            // 上下等距撑开 → 当前行恒在面板垂直中央（占位按当前档位行高算）
                             Spacer()
-                                .frame(height: max(geometry.size.height / 2 - 40, 0))
+                                .frame(height: centerInset)
 
                             // 保持普通 VStack（非 LazyVStack）：iOS 注释写明 LazyVStack 下
                             // scrollTo 未实例化行有已知失败风险，自动滚动可靠性优先。
@@ -62,18 +66,16 @@ extension MacLyricsView {
                                     line: line,
                                     isActive: isActive,
                                     distance: distance,
-                                    index: index
+                                    index: index,
+                                    viewportHeight: geometry.size.height
                                 )
                             }
 
                             Spacer()
-                                .frame(height: max(geometry.size.height / 2 - 40, 0))
+                                .frame(height: centerInset)
                         }
-                        // 拖动分隔条时的顶部补偿（方案 A；非拖动/非跟随恒为 0）：
-                        // 用 padding 而非撑高 Spacer——面板拖到最矮时 Spacer 会触零截断，
-                        // 负补偿必须能继续把内容上提，否则底部大位移会残留漂移。
-                        .padding(.top, resizePinInset)
                     }
+                    .coordinateSpace(name: LyricsCenterMetrics.coordinateSpaceName)
                     // 面板内不禁用滚动：Mac 无 iOS 的手势冲突，用户可手动翻，行变化时回中心
 
                     // 上下边缘渐隐（面板可矮到 140pt → 渐隐高度随面板收缩）
@@ -113,8 +115,17 @@ extension MacLyricsView {
                     }
                     // 普通模式手动滚动后暂停跟随：不自动拉回（用户拍板 2026-10-12）
                     if !karaoke.isKaraokeOn, !isFollowing { return }
-                    withAnimation(Self.lyricAnimation) {
-                        proxy.scrollTo(newIndex, anchor: .center)
+                    // 布局落定后再滚：本帧字号 / padding 已按目标档位落定，
+                    // 下一拍滚一次，再补一拍幂等校正（第二次滚到同一位置，无可见二次位移）。
+                    DispatchQueue.main.async {
+                        withAnimation(Self.lyricAnimation) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
+                        DispatchQueue.main.asyncAfter(
+                            deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay
+                        ) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
                     }
                     lastFollowedIndex = newIndex
                 }
@@ -126,41 +137,43 @@ extension MacLyricsView {
                     guard let activeIndex else { return }
                     lastFollowedIndex = activeIndex
                     // 首帧滚动：面板高度可能来自窗口尺寸 / 记忆值，当帧布局尚未落定
-                    // → 下一轮主队列再滚（避免首屏高亮行偏出中心，2026-11-17）
+                    // → 下一轮主队列再滚，再补一拍幂等校正（避免首屏高亮行偏出中心）
                     DispatchQueue.main.async {
                         proxy.scrollTo(activeIndex, anchor: .center)
+                        DispatchQueue.main.asyncAfter(
+                            deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay
+                        ) {
+                            proxy.scrollTo(activeIndex, anchor: .center)
+                        }
                     }
                 }
-                // 面板尺寸变化（窗口缩放 / 拖分隔条 / 记忆高度恢复）：把当前行重锚回中心
-                // 拖动中跳过（补偿占位负责让文字不动），松手后统一重锚一次
+                // 尺寸变化（拖动分隔条逐帧 / 窗口缩放 / 全屏切换）：任何变化都无动画重锚，
+                // 拖动中每个 tick 都保持居中（用动画会跟不上手）。
                 .onChange(of: geometry.size) { _, _ in
-                    guard !isPanelResizing else { return }
                     reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
                 }
-                // 松手：补偿占位以 spring 归零，数学上恰好把当前行送到新面板中心
-                // （顶部占位 = 视口高/2 - 40 ⇒ Δ/2 归零 = 屏幕中心上移 Δ/2）。
-                // 兜底：动画结束后再对齐一次，修「拖动期间切句」造成的偏移；正常路径是空操作，
-                // 因此不会和归零动画叠加成两倍位移（2026-11-18）。
-                .onChange(of: isPanelResizing) { wasResizing, resizing in
-                    guard wasResizing, !resizing else { return }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
-                    }
+                // 字号设置 / 译文 / 罗马音开关改变行高：同样触发重锚（用户要求「任何改变布局的行为」）
+                .onChange(of: fontScale) { _, _ in
+                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                }
+                .onChange(of: showTranslation) { _, _ in
+                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                }
+                .onChange(of: showRoman) { _, _ in
+                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
                 }
             }
         }
     }
 
-    /// 面板尺寸变化后把当前行重锚回中心（2026-11-17 修复：窗口缩放 / 拖分隔条后高亮行漂出可见区）。
+    /// 视口尺寸 / 行高变化后把当前行重锚回中心（窗口缩放 / 拖分隔条 / 全屏 / 字号 / 译文开关）。
     ///
-    /// 成因：歌词内容底部占位 = 视口高/2 - 40，面板高度一变内容高度就跟着变，而 `NSScrollView`
-    /// 的 `contentOffset` 不会随内容高度修正 ⇒ 高亮行相对视口漂移，面板变矮时会被挤出可见区。
-    /// 跟随语义与「行变化回中」一致：普通模式阅读态（手动滚动后）不拉回用户位置；跟唱等 AB
-    /// 终点（`ab.b == nil`）时同样暂停。resize 路径不带动画——几何每帧都在变，动画会叠加成抖动。
+    /// 成因：占位与内容高度随视口变，而 `NSScrollView` 的 `contentOffset` 不会自动修正
+    /// ⇒ 高亮行相对视口漂移。跟随语义与「行变化回中」一致：普通模式阅读态（手动滚动后）
+    /// 不拉回用户位置；跟唱等 AB 终点（`ab.b == nil`）时同样暂停。
+    /// 不带动画：拖动中几何每帧都在变，动画会跟不上手、叠加成抖动。
     private func reanchorAfterPanelResize(proxy: ScrollViewProxy, activeIndex: Int?) {
         guard let activeIndex else { return }
-        // 拖动中不重锚：补偿占位负责让文字不动（2026-11-18）
-        guard !isPanelResizing else { return }
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
         if !karaoke.isKaraokeOn, !isFollowing { return }
         // 几何变化当帧内容尚未按新尺寸重排：下一轮主队列再滚，才滚到新布局的中心
@@ -192,7 +205,24 @@ extension MacLyricsView {
         }
     }
 
-    private func lyricLineView(line: LyricsLine, isActive: Bool, distance: Int, index: Int) -> some View {
+    /// 验收日志：滚动停稳后（0.3s 防抖）打印高亮行中心与视口中心之差，确认后删除。
+    private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
+        LyricsCenterLogger.log(
+            platform: "mac",
+            rowMidY: rowMidY,
+            viewportHeight: viewportHeight
+        ) { message in
+            AppLog.info(.ui, message)
+        }
+    }
+
+    private func lyricLineView(
+        line: LyricsLine,
+        isActive: Bool,
+        distance: Int,
+        index: Int,
+        viewportHeight: CGFloat
+    ) -> some View {
         let emphasis = emphasisValue(isActive: isActive, distance: distance)
         let isKaraoke = karaoke.isKaraokeOn
         // 阅读态（用户拍板 2026-10-12）：普通模式用户手动滚动后，整页关距离分级「灰度」+ 正常字号，
@@ -200,6 +230,12 @@ extension MacLyricsView {
         let reading = !isKaraoke && !isFollowing
         return VStack(spacing: DesignTokens.space4) {
             Text(line.displayText)
+                .font(LyricLineEmphasis.lineFont(
+                    emphasis: emphasis,
+                    karaoke: isKaraoke,
+                    reading: reading,
+                    fontScale: fontScale
+                ))
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
@@ -215,6 +251,13 @@ extension MacLyricsView {
 
             if showRoman, let roman = line.displayRoman, !roman.isEmpty {
                 Text(roman)
+                    .font(LyricTranslationEmphasis.font(
+                        emphasis: emphasis,
+                        karaoke: isKaraoke,
+                        reading: reading,
+                        fontScale: fontScale,
+                        tier: .roman
+                    ))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.center)
@@ -232,6 +275,13 @@ extension MacLyricsView {
 
             if showTranslation, let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)
+                    .font(LyricTranslationEmphasis.font(
+                        emphasis: emphasis,
+                        karaoke: isKaraoke,
+                        reading: reading,
+                        fontScale: fontScale,
+                        tier: .translation
+                    ))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.center)
@@ -248,13 +298,33 @@ extension MacLyricsView {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, DesignTokens.space32)
-        .padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))
         .id(index)
         .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke, reading: reading), anchor: .center)
         .opacity(LyricLineEmphasis.lineOpacity(emphasis, karaoke: isKaraoke, reading: reading))
         // 行强调由播放 tick 驱动的 body 重算得出（不是用户事件）→ 靠 .animation(value:) 触发，
         // 与滚屏共用同一条曲线（不要再套 withAnimation）
         .animation(Self.lyricAnimation, value: emphasis)
+        // 垂直 padding 放在动画修饰符**外层**：按目标档位同帧跳变，不参与逐帧插值
+        // （否则行高在切句动画中持续变化，scrollTo 按旧布局算偏移 → 高亮行偏上）
+        .padding(.vertical, LyricsCenterMetrics.verticalPadding(emphasis: emphasis, karaoke: isKaraoke))
+        .background(
+            GeometryReader { rowProxy in
+                Color.clear
+                    .onAppear {
+                        guard isActive else { return }
+                        scheduleCenterLog(
+                            rowMidY: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY,
+                            viewportHeight: viewportHeight
+                        )
+                    }
+                    .onChange(
+                        of: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
+                    ) { _, midY in
+                        guard isActive else { return }
+                        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+                    }
+            }
+        )
         .contentShape(Rectangle())
         // 单击行：跟唱模式 = 跳转 / 等选终点 = 设 B（决策统一走 KaraokeController.clickLine）；
         // 普通模式 = 跳到该行播放（KaraokeController.seekToLyricLine）并恢复自动跟随。

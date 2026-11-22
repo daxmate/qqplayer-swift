@@ -1159,6 +1159,7 @@
 				"Mac/MacRecommendationModel+Downloaded.swift",
 				Mac/MacTrackDetailSheet.swift,
 				Services/MacTrackDetailModel.swift,
+				Services/LyricsCenterMetrics.swift,
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};
