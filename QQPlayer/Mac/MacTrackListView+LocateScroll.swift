@@ -22,7 +22,6 @@
 //
 
 import AppKit
-import QuartzCore
 import SwiftUI
 
 /// 「把 Table 行滚动到可视区垂直居中」的唯一入口（Mac 专属）。
@@ -49,74 +48,6 @@ enum MacTableScroll {
         scrollView.reflectScrolledClipView(clipView)
     }
 
-    // MARK: - 通用：文档坐标 rect 居中（歌词滚动等非 Table 场景的唯一入口）
-
-    /// 把「文档坐标系里的 `rectInDocument`」滚到可见区垂直居中。
-    ///
-    /// 两步：
-    ///   ① 初值 = 调用方给的 `initialOriginY`（纯几何口径见 `LyricsCenterMath` /
-    ///      `MacTableScrollGeometry`，本文件不重复推导）；`constrainBoundsRect` 夹到合法范围；
-    ///   ② **闭环校正**：设完偏移后回读真实几何（rect 在 clip 坐标系里的中心 vs
-    ///      `clip.bounds` 中心），`|残差| > 0.5pt` 就再补，最多 2 次。
-    ///      这样 flipped 文档 / `contentInsets` / SwiftUI 额外 padding / clamp 的偏差
-    ///      都会被实测吃掉，不依赖我们对坐标系的假设。
-    @MainActor
-    static func centerRect(
-        _ rectInDocument: NSRect,
-        initialOriginY: CGFloat,
-        in scrollView: NSScrollView,
-        animated: Bool,
-        duration: TimeInterval
-    ) {
-        guard scrollView.documentView != nil, rectInDocument.height > 0 else { return }
-        let clip = scrollView.contentView
-        var bounds = clip.bounds
-        bounds.origin.y = initialOriginY
-        let target = clip.constrainBoundsRect(bounds).origin
-
-        guard animated, duration > 0 else {
-            setOrigin(target, clip: clip, scrollView: scrollView)
-            correctResidual(of: rectInDocument, in: scrollView, remaining: 2)
-            return
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            clip.animator().setBoundsOrigin(target)
-        } completionHandler: {
-            // 动画回调不是 actor 隔离的 → 显式切回主线程再做测量/补正
-            Task { @MainActor in
-                scrollView.reflectScrolledClipView(clip)
-                correctResidual(of: rectInDocument, in: scrollView, remaining: 2)
-            }
-        }
-    }
-
-    /// 闭环校正：逐轮重测残差并补偏移（同一坐标系内直接相加 → 不受 flipped 方向影响）。
-    @MainActor
-    private static func correctResidual(of rectInDocument: NSRect, in scrollView: NSScrollView, remaining: Int) {
-        guard remaining > 0, let documentView = scrollView.documentView else { return }
-        Task { @MainActor in
-            // 等一帧：让布局/裁剪跟上刚设的偏移，再测才有意义
-            try? await Task.sleep(nanoseconds: 16_000_000)
-            let clip = scrollView.contentView
-            let rectInClip = documentView.convert(rectInDocument, to: clip)
-            let delta = LyricsCenterMath.centeringDelta(rowMidY: rectInClip.midY, visibleMidY: clip.bounds.midY)
-            guard !LyricsCenterMath.isCentered(delta: delta) else { return }
-            var bounds = clip.bounds
-            bounds.origin.y += delta
-            let target = clip.constrainBoundsRect(bounds).origin
-            guard abs(target.y - clip.bounds.origin.y) > 0.01 else { return }
-            setOrigin(target, clip: clip, scrollView: scrollView)
-            correctResidual(of: rectInDocument, in: scrollView, remaining: remaining - 1)
-        }
-    }
-
-    @MainActor
-    private static func setOrigin(_ origin: NSPoint, clip: NSClipView, scrollView: NSScrollView) {
-        clip.setBoundsOrigin(origin)
-        scrollView.reflectScrolledClipView(clip)
-    }
     /// 找承载「本 representable 所衬的那张 Table」的 `NSTableView`。
     ///
     /// SwiftUI 没有公开途径把自定义视图塞进 `Table` 的 AppKit 子树，故 `.background` 挂上的

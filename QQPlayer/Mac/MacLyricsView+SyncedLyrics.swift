@@ -254,11 +254,7 @@ extension MacLyricsView {
         if let rect = lyricRowRects[index] {
             rectText = "y=\(num(rect.minY)) h=\(num(rect.height)) mid=\(num(rect.midY))"
             if let scrollView = lyricsScrollView {
-                let delta = LyricsCenterMath.centeringDelta(
-                    rowMidY: rect.midY,
-                    visibleMidY: scrollView.contentView.bounds.midY
-                )
-                errorText = num(delta)
+                errorText = num(rect.midY - scrollView.contentView.bounds.midY)
             } else {
                 errorText = "no-scrollview"
             }
