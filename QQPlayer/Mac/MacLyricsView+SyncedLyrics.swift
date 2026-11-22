@@ -115,18 +115,17 @@ extension MacLyricsView {
                     }
                     // 普通模式手动滚动后暂停跟随：不自动拉回（用户拍板 2026-10-12）
                     if !karaoke.isKaraokeOn, !isFollowing { return }
-                    // 布局落定后再滚：本帧字号 / padding 已按目标档位落定，
-                    // 下一拍滚一次，再补一拍幂等校正（第二次滚到同一位置，无可见二次位移）。
-                    DispatchQueue.main.async {
-                        withAnimation(Self.lyricAnimation) {
-                            proxy.scrollTo(newIndex, anchor: .center)
-                        }
-                        DispatchQueue.main.asyncAfter(
-                            deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay
-                        ) {
-                            proxy.scrollTo(newIndex, anchor: .center)
-                        }
+                    // ① 立刻带同一条 spring 滚过去：与字号 / padding 动画同步起势（平滑推进）。
+                    withAnimation(Self.lyricAnimation) {
+                        proxy.scrollTo(newIndex, anchor: .center)
                     }
+                    // ② 落定后重锚（0.45s / 0.90s）：字号与 padding 逐帧插值使行高在动画中变化，
+                    //    首次 scrollTo 按当时布局算偏移，落定后可能仍偏一点 → 只在实测偏移超容差时补滚。
+                    scheduleSettleReanchor(
+                        proxy: proxy,
+                        index: newIndex,
+                        viewportHeight: geometry.size.height
+                    )
                     lastFollowedIndex = newIndex
                 }
                 // 切歌 / 歌词变化：恢复自动跟随（需求 3）
@@ -154,13 +153,25 @@ extension MacLyricsView {
                 }
                 // 字号设置 / 译文 / 罗马音开关改变行高：同样触发重锚（用户要求「任何改变布局的行为」）
                 .onChange(of: fontScale) { _, _ in
-                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                    reanchorAfterPanelResize(
+                        proxy: proxy,
+                        activeIndex: activeIndex,
+                        settleDelay: LyricsCenterMetrics.settleReanchorDelays.first
+                    )
                 }
                 .onChange(of: showTranslation) { _, _ in
-                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                    reanchorAfterPanelResize(
+                        proxy: proxy,
+                        activeIndex: activeIndex,
+                        settleDelay: LyricsCenterMetrics.settleReanchorDelays.first
+                    )
                 }
                 .onChange(of: showRoman) { _, _ in
-                    reanchorAfterPanelResize(proxy: proxy, activeIndex: activeIndex)
+                    reanchorAfterPanelResize(
+                        proxy: proxy,
+                        activeIndex: activeIndex,
+                        settleDelay: LyricsCenterMetrics.settleReanchorDelays.first
+                    )
                 }
             }
         }
@@ -172,13 +183,44 @@ extension MacLyricsView {
     /// ⇒ 高亮行相对视口漂移。跟随语义与「行变化回中」一致：普通模式阅读态（手动滚动后）
     /// 不拉回用户位置；跟唱等 AB 终点（`ab.b == nil`）时同样暂停。
     /// 不带动画：拖动中几何每帧都在变，动画会跟不上手、叠加成抖动。
-    private func reanchorAfterPanelResize(proxy: ScrollViewProxy, activeIndex: Int?) {
+    private func reanchorAfterPanelResize(
+        proxy: ScrollViewProxy,
+        activeIndex: Int?,
+        settleDelay: TimeInterval? = nil
+    ) {
         guard let activeIndex else { return }
         if karaoke.isKaraokeOn, let ab = karaoke.abLoop, ab.b == nil { return }
         if !karaoke.isKaraokeOn, !isFollowing { return }
         // 几何变化当帧内容尚未按新尺寸重排：下一轮主队列再滚，才滚到新布局的中心
         DispatchQueue.main.async {
             proxy.scrollTo(activeIndex, anchor: .center)
+        }
+        // 再补一拍（+0.05s）：字号 / 译文开关会改变行高，布局常有第二跳（文字重新换行）
+        DispatchQueue.main.asyncAfter(deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay) {
+            proxy.scrollTo(activeIndex, anchor: .center)
+        }
+        // 行高类改动（字号 / 译文 / 罗马音开关）会触发动画：再在 +0.45s 补一次（有偏差才动）
+        if let settleDelay {
+            DispatchQueue.main.asyncAfter(deadline: .now() + settleDelay) {
+                guard abs(centerProbe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance else { return }
+                proxy.scrollTo(activeIndex, anchor: .center)
+            }
+        }
+    }
+
+    /// 动画落定后的幂等重锚：0.45s / 0.90s 各读一次实测偏移，只有 |delta| > 0.5pt 才补滚。
+    /// 补滚不带 `withAnimation` → 同一 index 的重复 scrollTo 无可见位移；无偏差时完全不动。
+    /// 末拍附一次居中诊断日志（两种呈现模式共用，避免只有 fullscreen 有日志）。
+    private func scheduleSettleReanchor(proxy: ScrollViewProxy, index: Int, viewportHeight: CGFloat) {
+        let probe = centerProbe
+        for delay in LyricsCenterMetrics.settleReanchorDelays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard abs(probe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance else { return }
+                proxy.scrollTo(index, anchor: .center)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            scheduleCenterLog(delta: probe.delta, viewportHeight: viewportHeight)
         }
     }
 
@@ -209,11 +251,36 @@ extension MacLyricsView {
     private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
         LyricsCenterLogger.log(
             platform: "mac",
+            mode: lyricsSurfaceMode,
             rowMidY: rowMidY,
             viewportHeight: viewportHeight
         ) { message in
             AppLog.info(.ui, message)
         }
+    }
+
+    /// 行内几何探针：写入实测偏移（供落定后重锚判定）+ 打居中日志。
+    private func recordCenter(
+        _ rowProxy: GeometryProxy,
+        viewportHeight: CGFloat,
+        isActive: Bool
+    ) {
+        guard isActive else { return }
+        let midY = rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
+        centerProbe.delta = midY - viewportHeight / 2
+        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+    }
+
+    /// 用实测偏移（delta）落日志：滚动 / 重锚路径也能打点，不依赖行内几何再次变化。
+    private func scheduleCenterLog(delta: CGFloat?, viewportHeight: CGFloat) {
+        guard let delta else { return }
+        scheduleCenterLog(rowMidY: viewportHeight / 2 + delta, viewportHeight: viewportHeight)
+    }
+
+    /// 诊断用的「呈现模式」：docked = 底部歌词面板，fullscreen = 独立歌词页 / 跟唱大画面。
+    /// 之前日志只在 fullscreen 出现，是因为打点只挂在行内几何变化上；本值让两种模式都可区分。
+    private var lyricsSurfaceMode: String {
+        isFullscreen ? "fullscreen" : "docked"
     }
 
     private func lyricLineView(
@@ -230,12 +297,6 @@ extension MacLyricsView {
         let reading = !isKaraoke && !isFollowing
         return VStack(spacing: DesignTokens.space4) {
             Text(line.displayText)
-                .font(LyricLineEmphasis.lineFont(
-                    emphasis: emphasis,
-                    karaoke: isKaraoke,
-                    reading: reading,
-                    fontScale: fontScale
-                ))
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
@@ -251,13 +312,6 @@ extension MacLyricsView {
 
             if showRoman, let roman = line.displayRoman, !roman.isEmpty {
                 Text(roman)
-                    .font(LyricTranslationEmphasis.font(
-                        emphasis: emphasis,
-                        karaoke: isKaraoke,
-                        reading: reading,
-                        fontScale: fontScale,
-                        tier: .roman
-                    ))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.center)
@@ -275,13 +329,6 @@ extension MacLyricsView {
 
             if showTranslation, let translation = line.displayTranslation, !translation.isEmpty {
                 Text(translation)
-                    .font(LyricTranslationEmphasis.font(
-                        emphasis: emphasis,
-                        karaoke: isKaraoke,
-                        reading: reading,
-                        fontScale: fontScale,
-                        tier: .translation
-                    ))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.center)
@@ -298,30 +345,31 @@ extension MacLyricsView {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, DesignTokens.space32)
+        // 垂直 padding 在动画修饰符**内层** → 随 emphasis 逐帧插值（视觉要求：行高平滑变化）。
+        // 居中不靠冻结布局，而靠「滚动时机 + 落定后重锚」（见 onChange(activeIndex)）。
+        .padding(.vertical, LyricLineEmphasis.linePadding(emphasis, karaoke: isKaraoke))
         .id(index)
         .scaleEffect(LyricLineEmphasis.lineScale(emphasis, karaoke: isKaraoke, reading: reading), anchor: .center)
         .opacity(LyricLineEmphasis.lineOpacity(emphasis, karaoke: isKaraoke, reading: reading))
         // 行强调由播放 tick 驱动的 body 重算得出（不是用户事件）→ 靠 .animation(value:) 触发，
         // 与滚屏共用同一条曲线（不要再套 withAnimation）
         .animation(Self.lyricAnimation, value: emphasis)
-        // 垂直 padding 放在动画修饰符**外层**：按目标档位同帧跳变，不参与逐帧插值
-        // （否则行高在切句动画中持续变化，scrollTo 按旧布局算偏移 → 高亮行偏上）
-        .padding(.vertical, LyricsCenterMetrics.verticalPadding(emphasis: emphasis, karaoke: isKaraoke))
         .background(
             GeometryReader { rowProxy in
                 Color.clear
                     .onAppear {
-                        guard isActive else { return }
-                        scheduleCenterLog(
-                            rowMidY: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY,
-                            viewportHeight: viewportHeight
-                        )
+                        recordCenter(rowProxy, viewportHeight: viewportHeight, isActive: isActive)
                     }
                     .onChange(
                         of: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
-                    ) { _, midY in
-                        guard isActive else { return }
-                        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+                    ) { _, _ in
+                        recordCenter(rowProxy, viewportHeight: viewportHeight, isActive: isActive)
+                    }
+                    // 行「变高亮」本身就是几何可能变化的时刻（字号 / padding 档位变了），
+                    // 只靠 midY onChange 会漏掉「本轮刚成为高亮行」这一拍 → docked 模式下一条日志都没有。
+                    .onChange(of: isActive) { _, active in
+                        guard active else { return }
+                        recordCenter(rowProxy, viewportHeight: viewportHeight, isActive: true)
                     }
             }
         )

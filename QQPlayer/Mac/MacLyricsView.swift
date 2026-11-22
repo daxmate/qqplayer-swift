@@ -68,6 +68,11 @@ struct MacLyricsView: View {
     /// 见 LyricsFollowPolicy）。iOS 端等价物为 lastScrolledIndex。
     /// 分片：跨文件可见（原 private）
     @State var lastFollowedIndex: Int?
+    /// 高亮行居中探针（引用类型：几何回调写、滚动回调读，避免 View 值捕获读到旧值）。
+    /// ① 「落定后重锚」只在真的偏了（|delta| > 0.5pt）时才补滚，避免可见二次位移；
+    /// ② 居中诊断日志两种模式（docked / fullscreen）共用同一来源。
+    /// 分片：跨文件可见（原 private）
+    @State var centerProbe = LyricsCenterMetrics.Probe()
 
     /// 面板底色（对齐 iOS 的 systemBackground）
     /// 分片：跨文件可见（原 private）
@@ -81,6 +86,7 @@ struct MacLyricsView: View {
     /// 观感是二次突变；统一成一条 0.55s / 阻尼 0.92 的柔和曲线（2026-09-13 用户反馈）。
     /// 分片：跨文件可见（原 private）
     static let lyricAnimation = Animation.spring(response: 0.55, dampingFraction: 0.92)
+
 
     var body: some View {
         VStack(spacing: DesignTokens.space0) {

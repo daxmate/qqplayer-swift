@@ -15,17 +15,8 @@ import SwiftUI
 /// 分段线性插值：节点按 emphasis 降序给出，超出两端取端值。
 /// 每个节点值 = 改前（3ff6474）该档位的静态渲染值，故静态效果不变，只有节点之间才插值。
 private func lyricLerp(_ value: Double, _ nodes: [(Double, Double)]) -> Double {
-    guard let first = nodes.first, let last = nodes.last else { return value }
-    if value >= first.0 { return first.1 }
-    if value <= last.0 { return last.1 }
-    for index in 0 ..< (nodes.count - 1) {
-        let (highEmphasis, highValue) = nodes[index]
-        let (lowEmphasis, lowValue) = nodes[index + 1]
-        guard value <= highEmphasis, value >= lowEmphasis else { continue }
-        let ratio = (value - lowEmphasis) / (highEmphasis - lowEmphasis)
-        return lowValue + (highValue - lowValue) * ratio
-    }
-    return last.1
+    // 单一实现：`LyricsCenterMetrics.lerp`（同一文件被 macOS / iOS 共用），避免两份插值漂移。
+    LyricsCenterMetrics.lerp(value, nodes)
 }
 
 /// 0.66 → 1.0 的归一化进度：只有这一段跨色相（语义色 → accent），低段只动 alpha。
@@ -72,12 +63,22 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         content
+            // 字号随 animatableData 逐帧插值（视觉要求：高亮行平滑放大 / 缩小）。
+            // 行高在动画中会连续变化 → 居中由「滚动时机 + 落定后重锚」保证，不靠冻结布局。
+            .font(
+                Self.lineFont(
+                    emphasis: emphasis,
+                    karaoke: karaoke,
+                    reading: reading,
+                    fontScale: fontScale
+                )
+            )
             .foregroundColor(mainColor)
             .shadow(color: shadowColor, radius: shadowRadius)
     }
 
-    /// 目标档位字体（**非逐帧插值**）：字号按档位取值、字重按阈值切换。
-    /// 布局属性（字号 / padding）必须脱离 Animatable 插值路径，否则行高在切句动画中持续变化 → 滚动偏移。
+    /// 插值字体：emphasis 逐帧传入（`LyricsCenterMetrics.fontSize` 是分段线性插值），
+    /// 字重不可插值 → 按阈值切换；`reading` 时字号固定为正常大小那一档。
     static func lineFont(
         emphasis: Double,
         karaoke: Bool,
@@ -124,6 +125,13 @@ struct LyricLineEmphasis: ViewModifier, Animatable {
         if reading { return 1.0 } // 阅读态：不缩放（用户定）
         guard !karaoke else { return 1.0 }
         return CGFloat(lyricLerp(emphasis, [(1.0, 1.02), (0.66, 0.97), (0.40, 0.94)]))
+    }
+
+    /// 整行垂直内边距（逐帧插值：1.0 → 24 / 0.66 及更远 → 16；跟唱固定 18）。
+    /// 必须放在行的 `.animation(value: emphasis)` **内层**才会随动画连续变化。
+    static func linePadding(_ emphasis: Double, karaoke: Bool) -> CGFloat {
+        guard !karaoke else { return 18 }
+        return CGFloat(lyricLerp(emphasis, [(1.0, 24), (0.66, 16)]))
     }
 
     // MARK: 主行样式
@@ -182,10 +190,20 @@ struct LyricTranslationEmphasis: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         content
+            // 同主行：字号跟随 animatableData 逐帧插值（`fontSize` 本身就是分段线性插值）。
+            .font(
+                Self.font(
+                    emphasis: emphasis,
+                    karaoke: karaoke,
+                    reading: reading,
+                    fontScale: fontScale,
+                    tier: tier
+                )
+            )
             .foregroundColor(color)
     }
 
-    /// 目标档位字体（**非逐帧插值**）：译文 / 罗马音字号按档位取整，避免文字块行高在动画中变化。
+    /// 插值字体：emphasis 逐帧传入（字号表按分段线性插值）。
     static func font(
         emphasis: Double,
         karaoke: Bool,

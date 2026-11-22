@@ -147,11 +147,30 @@ extension LyricsView {
     private func scheduleCenterLog(rowMidY: CGFloat, viewportHeight: CGFloat) {
         LyricsCenterLogger.log(
             platform: "ios",
+            mode: "fullscreen",
             rowMidY: rowMidY,
             viewportHeight: viewportHeight
         ) { message in
             AppLog.info(.ui, message)
         }
+    }
+
+    /// 行内几何探针：写入实测偏移（落定后重锚判定）+ 打居中日志。
+    private func recordCenter(
+        _ rowProxy: GeometryProxy,
+        viewportHeight: CGFloat,
+        isActive: Bool
+    ) {
+        guard isActive else { return }
+        let midY = rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
+        centerProbe.delta = midY - viewportHeight / 2
+        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+    }
+
+    /// 用实测偏移（delta）落日志：重锚路径也能打点，不依赖行内几何再次变化。
+    private func scheduleCenterLog(delta: CGFloat?, viewportHeight: CGFloat) {
+        guard let delta else { return }
+        scheduleCenterLog(rowMidY: viewportHeight / 2 + delta, viewportHeight: viewportHeight)
     }
 
     private func lyricLineView(
@@ -200,6 +219,12 @@ extension LyricsView {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, DesignTokens.space32)
+        // 垂直 padding 在动画修饰符**内层** → 随切句动画逐帧插值（视觉要求：行高平滑变化）。
+        // 居中不靠冻结布局，而靠「滚动时机 + 落定后重锚」（见 updateActiveLineAndScroll）。
+        .padding(.vertical, LyricsCenterMetrics.verticalPadding(
+            emphasis: isActive ? 1.0 : 0.66,
+            karaoke: karaoke.isKaraokeOn
+        ))
         .id(index)
         // 阅读态 scaleEffect 1.0（用户定）：关距离分级的同时不再缩放。
         .scaleEffect(karaoke.isKaraokeOn || reading ? 1.0 : (isActive ? 1.02 : (distance <= 1 ? 0.97 : 0.94)), anchor: .center)
@@ -213,27 +238,21 @@ extension LyricsView {
             ),
             value: isActive
         )
-        // 垂直 padding 放在动画修饰符**外层**：按目标档位同帧跳变，不参与插值
-        // （否则行高在切句动画中变化，scrollTo 按旧布局算偏移 → 高亮行偏上）
-        .padding(.vertical, LyricsCenterMetrics.verticalPadding(
-            emphasis: isActive ? 1.0 : 0.66,
-            karaoke: karaoke.isKaraokeOn
-        ))
         .background(
             GeometryReader { rowProxy in
                 Color.clear
                     .onAppear {
-                        guard isActive else { return }
-                        scheduleCenterLog(
-                            rowMidY: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY,
-                            viewportHeight: viewportHeight
-                        )
+                        recordCenter(rowProxy, viewportHeight: viewportHeight, isActive: isActive)
                     }
                     .onChange(
                         of: rowProxy.frame(in: .named(LyricsCenterMetrics.coordinateSpaceName)).midY
-                    ) { _, midY in
-                        guard isActive else { return }
-                        scheduleCenterLog(rowMidY: midY, viewportHeight: viewportHeight)
+                    ) { _, _ in
+                        recordCenter(rowProxy, viewportHeight: viewportHeight, isActive: isActive)
+                    }
+                    // 刚成为高亮行这一拍也测一次（只靠 midY 变化会漏掉「行身份切换」）
+                    .onChange(of: isActive) { _, active in
+                        guard active else { return }
+                        recordCenter(rowProxy, viewportHeight: viewportHeight, isActive: true)
                     }
             }
         )
@@ -417,23 +436,30 @@ extension LyricsView {
         if !karaoke.isKaraokeOn, !isFollowing, !force { return }
         guard force || activeIndex != lastScrolledIndex else { return }
         lastScrolledIndex = activeIndex
-        // 布局落定后再滚：本帧字号 / padding 已按目标档位落定，下一拍滚一次，
-        // 再补一拍幂等校正（第二次滚到同一位置，无可见二次位移）。
-        DispatchQueue.main.async {
-            withAnimation(
-                .interpolatingSpring(
-                    mass: 1.0,
-                    stiffness: 170,
-                    damping: 25,
-                    initialVelocity: 0
-                )
-            ) {
-                proxy.scrollTo(activeIndex, anchor: .center)
-            }
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay
-            ) {
-                proxy.scrollTo(activeIndex, anchor: .center)
+        // ① 立刻带 spring 滚过去：与字号 / padding 动画同步起势（平滑推进）。
+        withAnimation(
+            .interpolatingSpring(
+                mass: 1.0,
+                stiffness: 170,
+                damping: 25,
+                initialVelocity: 0
+            )
+        ) {
+            proxy.scrollTo(activeIndex, anchor: .center)
+        }
+        // ② 落定后重锚（0.45s / 0.90s）：padding 逐帧插值使行高在动画中变化，
+        //    首次 scrollTo 按当时布局算偏移 → 只在实测偏移超容差时补滚（无偏差完全不动）。
+        scheduleSettleReanchor(proxy: proxy, index: activeIndex)
+    }
+
+    /// 动画落定后的幂等重锚：0.45s / 0.90s 各读一次实测偏移，只有 |delta| > 0.5pt 才补滚。
+    /// 补滚不带 `withAnimation` → 同一 index 的重复 scrollTo 无可见位移。
+    private func scheduleSettleReanchor(proxy: ScrollViewProxy, index: Int) {
+        let probe = centerProbe
+        for delay in LyricsCenterMetrics.settleReanchorDelays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard abs(probe.delta ?? 0) > LyricsCenterMetrics.settleReanchorTolerance else { return }
+                proxy.scrollTo(index, anchor: .center)
             }
         }
     }
@@ -444,6 +470,10 @@ extension LyricsView {
         guard let activeIndex = LyricTiming.activeLineIndex(time: currentTime, in: lines) else { return }
         if !karaoke.isKaraokeOn, !isFollowing { return }
         DispatchQueue.main.async {
+            proxy.scrollTo(activeIndex, anchor: .center)
+        }
+        // 再补一拍（+0.05s）：padding / 换行会让布局有第二跳
+        DispatchQueue.main.asyncAfter(deadline: .now() + LyricsCenterMetrics.settleCorrectionDelay) {
             proxy.scrollTo(activeIndex, anchor: .center)
         }
     }

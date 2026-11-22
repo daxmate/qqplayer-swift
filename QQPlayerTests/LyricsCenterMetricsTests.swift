@@ -21,6 +21,16 @@ struct LyricsCenterMetricsFontSizeTests {
         #expect(LyricsCenterMetrics.fontSize(emphasis: 0.08, karaoke: false, fontScale: 1.0) == 16)
     }
 
+    @Test("档位之间逐帧插值（视觉要求：高亮行平滑放大 / 缩小）")
+    func interpolatesBetweenTiers() {
+        // 0.66 → 1.0 的中点是 0.83：字号 19 + (26 - 19) / 2 = 22.5
+        #expect(abs(LyricsCenterMetrics.fontSize(emphasis: 0.83, karaoke: false, fontScale: 1.0) - 22.5) < 0.001)
+        // 0.40 → 0.66 的中点 0.53：16 + (19 - 16) / 2 = 17.5
+        #expect(abs(LyricsCenterMetrics.fontSize(emphasis: 0.53, karaoke: false, fontScale: 1.0) - 17.5) < 0.001)
+        // padding 同样插值：0.83 → 16 + (24 - 16) / 2 = 20
+        #expect(abs(LyricsCenterMetrics.verticalPadding(emphasis: 0.83, karaoke: false) - 20) < 0.001)
+    }
+
     @Test("跟唱字号档位：1.0 → 22 / 0.66 → 19")
     func karaokeTiers() {
         #expect(LyricsCenterMetrics.fontSize(emphasis: 1.0, karaoke: true, fontScale: 1.0) == 22)
