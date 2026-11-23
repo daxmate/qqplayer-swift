@@ -80,6 +80,8 @@ struct MacSearchResultsView: View {
     @State private var showArtistSheet = false
     /// 歌曲行的选中态：macOS 惯例「单击选中高亮、双击播放」（List 原生 selection + primaryAction）
     @State private var selectedSongIds = Set<String>()
+    /// 整窗玻璃是否生效（只用于「让窗底透出」，不参与布局）
+    @Environment(\.macWindowGlassActive) private var windowGlassActive
     /// 曲目右键菜单状态（与曲库 / ⌘K 浮层同一份实现，见 MacTrackContextMenu.swift）
     @State private var menu = MacTrackMenuModel()
 
@@ -148,6 +150,9 @@ struct MacSearchResultsView: View {
                     }
                 }
                 .macTrackMenu(menu)
+                // 玻璃生效时清掉 List 自带的系统底色，让窗底玻璃透出；
+                // 关闭时 `.automatic` = 改动前外观。
+                .scrollContentBackground(windowGlassActive ? .hidden : .automatic)
             }
         }
         .sheet(isPresented: $showAlbumSheet) {

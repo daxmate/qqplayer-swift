@@ -173,6 +173,8 @@ struct MacSmartPlaylistDetailView: View {
     @State private var bucketTracks: [Track] = []
     @State private var isLoading = true
     @State private var loadError: String?
+    /// 整窗玻璃是否生效（只用于「让窗底透出」，不参与布局）
+    @Environment(\.macWindowGlassActive) private var windowGlassActive
     /// 重算任务句柄（审计 M2：全量重算移出主线程后可取消）
     @State private var loadTask: Task<Void, Never>?
 
@@ -277,6 +279,9 @@ struct MacSmartPlaylistDetailView: View {
             }
             .buttonStyle(.plain)
         }
+        // 玻璃生效时清掉 List 自带的系统底色，让窗底玻璃透出；
+        // 关闭时 `.automatic` = 改动前外观。
+        .scrollContentBackground(windowGlassActive ? .hidden : .automatic)
     }
 
     @ViewBuilder

@@ -80,6 +80,8 @@ private enum MacTrackListMetrics {
 struct MacTrackListView: View {
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）
     @Environment(\.appAccentColor) private var appAccentColor
+    /// 整窗玻璃是否生效：只为「让窗底透出」用，不参与布局（见 MacTrackListView 的 table）
+    @Environment(\.macWindowGlassActive) private var windowGlassActive
     let tracks: [Track]
     let activeTrackId: String?
     let isPlaying: Bool
@@ -370,6 +372,11 @@ struct MacTrackListView: View {
                 play(row.track)
             }
         }
+        // 玻璃生效时清掉 Table 自带的系统内容底色（条纹行底已由中栏容器的
+        // `.alternatingRowBackgrounds(.disabled)` 关掉）：这里按同一生效值再声明一次，
+        // 页面被复用到别的宿主 / 宿主修饰顺序变化时也不会把窗底玻璃整块挡住。
+        // 关闭时 `.automatic` = 改动前外观。
+        .scrollContentBackground(windowGlassActive ? .hidden : .automatic)
         // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
         // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
         .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false))
