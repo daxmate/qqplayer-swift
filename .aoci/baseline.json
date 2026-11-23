@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T06:24:55Z",
+  "updated_at": "2026-11-23T06:42:52Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -572,9 +572,9 @@
     },
     "QQPlayer/Mac/MacAlbumArtistViews.swift": {
       "role": "index",
-      "sha256": "2f145a7550920c7b0000b116c275faba483a3512f00d497a4fa95e032e38ff6d",
-      "size": 20181,
-      "normalized_sha256": "2f145a7550920c7b0000b116c275faba483a3512f00d497a4fa95e032e38ff6d"
+      "sha256": "a377a8b45542e2bd2ee51a5496c26a5743739f62deccfdf58fdc1b47e608b45f",
+      "size": 19801,
+      "normalized_sha256": "a377a8b45542e2bd2ee51a5496c26a5743739f62deccfdf58fdc1b47e608b45f"
     },
     "QQPlayer/Mac/MacAlbumGrid.swift": {
       "role": "index",
@@ -884,9 +884,9 @@
     },
     "QQPlayer/Mac/MacRecommendationView.swift": {
       "role": "index",
-      "sha256": "1b4c4f72a0cb1aef36a816f08f5f656460c9a77eabc507a08b03ba5c6f14a033",
-      "size": 14123,
-      "normalized_sha256": "1b4c4f72a0cb1aef36a816f08f5f656460c9a77eabc507a08b03ba5c6f14a033"
+      "sha256": "089e357f71d53628f93d1e359f72efa98ba94554b5d9607c5e9df760d8554f0c",
+      "size": 13761,
+      "normalized_sha256": "089e357f71d53628f93d1e359f72efa98ba94554b5d9607c5e9df760d8554f0c"
     },
     "QQPlayer/Mac/MacScanLogger.swift": {
       "role": "index",
@@ -938,9 +938,9 @@
     },
     "QQPlayer/Mac/MacSearchView.swift": {
       "role": "index",
-      "sha256": "826a436b0b3f21937af6b0ca04ca25185deafbd6485bac94ac413f94ced27b65",
-      "size": 13903,
-      "normalized_sha256": "826a436b0b3f21937af6b0ca04ca25185deafbd6485bac94ac413f94ced27b65"
+      "sha256": "c43ff6df9220233346fae90983dd688aec42148e66af9e21586899a533d5aa66",
+      "size": 13546,
+      "normalized_sha256": "c43ff6df9220233346fae90983dd688aec42148e66af9e21586899a533d5aa66"
     },
     "QQPlayer/Mac/MacSettingsCatalog.swift": {
       "role": "index",
@@ -962,9 +962,9 @@
     },
     "QQPlayer/Mac/MacSmartPlaylistViews.swift": {
       "role": "index",
-      "sha256": "0ba8c14b470bd72afb6e2881289d5ec7fe7caec4e23260cb2dd9a4a4dd47d777",
-      "size": 17612,
-      "normalized_sha256": "0ba8c14b470bd72afb6e2881289d5ec7fe7caec4e23260cb2dd9a4a4dd47d777"
+      "sha256": "462e7682ca8027a8108b2c39ca7e8ea4a012bd7ef17339b5cb3c197a6f547474",
+      "size": 17271,
+      "normalized_sha256": "462e7682ca8027a8108b2c39ca7e8ea4a012bd7ef17339b5cb3c197a6f547474"
     },
     "QQPlayer/Mac/MacSpectrumAnalyzer.swift": {
       "role": "index",
@@ -1130,9 +1130,9 @@
     },
     "QQPlayer/Mac/MacTrackListView.swift": {
       "role": "index",
-      "sha256": "400bf6849cb488ec06633d99f43c67431c3236577b120ff7fd1883639dd2ea1e",
-      "size": 29719,
-      "normalized_sha256": "400bf6849cb488ec06633d99f43c67431c3236577b120ff7fd1883639dd2ea1e"
+      "sha256": "9d701fd586aa16fcb9c2ae5ed9bd307a6960999780be525a53521d9b08b6ee37",
+      "size": 29103,
+      "normalized_sha256": "9d701fd586aa16fcb9c2ae5ed9bd307a6960999780be525a53521d9b08b6ee37"
     },
     "QQPlayer/Mac/MacVisualizerView.swift": {
       "role": "index",
@@ -1154,9 +1154,9 @@
     },
     "QQPlayer/Mac/MacWindowGlass.swift": {
       "role": "index",
-      "sha256": "af6930156ded42d5219ba0e3de69dd9eccf55183b08ec7e5654e77bdb57466bb",
-      "size": 4986,
-      "normalized_sha256": "af6930156ded42d5219ba0e3de69dd9eccf55183b08ec7e5654e77bdb57466bb"
+      "sha256": "41f5f1a51f1c8e13e7af1fe2f55259dc9382a5eba9dcdc550afddb9a76095b46",
+      "size": 5735,
+      "normalized_sha256": "41f5f1a51f1c8e13e7af1fe2f55259dc9382a5eba9dcdc550afddb9a76095b46"
     },
     "QQPlayer/Mac/MacWindowGlassChrome.swift": {
       "role": "index",
@@ -5642,9 +5642,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "c9b0df54624a924a52dbd4ca7d4842781c1005143914032a47b24a9e4a1d2834",
-      "size": 453737,
-      "normalized_sha256": "c9b0df54624a924a52dbd4ca7d4842781c1005143914032a47b24a9e4a1d2834"
+      "sha256": "1cf65fe91954f7d820696bf844755ab08170e82c5153584a6162065f2baf434b",
+      "size": 453656,
+      "normalized_sha256": "1cf65fe91954f7d820696bf844755ab08170e82c5153584a6162065f2baf434b"
     },
     "aoci.meta.txt": {
       "role": "index",
