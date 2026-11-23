@@ -98,8 +98,6 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ScreenSpecificBackgroundView(screen: .library)
-
                 VStack(spacing: DesignTokens.space0) {
                     // Search bar
                     HStack {
@@ -199,6 +197,13 @@ struct SearchView: View {
                         }
                         .foregroundColor(accentColor)
                     }
+                }
+            }
+            // 封面毛玻璃底：走「背景修饰器」接法（不能包 ZStack，否则整页被撑宽，见 f21a109）。
+            // 装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）。
+            .background {
+                ArtworkGlassScreenBackground {
+                    ScreenSpecificBackgroundView(screen: .library)
                 }
             }
             .onChange(of: searchText) { _, newValue in
