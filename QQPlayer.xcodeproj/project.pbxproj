@@ -1147,6 +1147,7 @@
 				Views/Player/LyricAlignmentProgressSheet.swift,
 				Views/Player/PlayerGestureLogic.swift,
 				Views/Utility/ArtworkBlurBackground.swift,
+				Views/Utility/ArtworkGlassBackdrop.swift,
 				Views/Utility/HintCardView.swift,
 				Views/Utility/PlayerSurfaceStyle.swift,
 				Views/Utility/WhatsNewView.swift,
