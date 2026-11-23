@@ -89,6 +89,10 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
+            .artworkGlassGroupedList {
+                ScreenSpecificBackgroundView(screen: .library)
+            }
             .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 100)
             }

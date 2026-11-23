@@ -78,7 +78,12 @@ struct LikedSongsScreen: View {
 
     var body: some View {
         TrackListView(tracks: likedTracks, listIdentifier: "liked_songs", isLikedSongsScreen: true)
-            .background(ScreenSpecificBackgroundView(screen: .likedSongs))
+            // 封面毛玻璃底：装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）
+            .background {
+                ArtworkGlassScreenBackground {
+                    ScreenSpecificBackgroundView(screen: .likedSongs)
+                }
+            }
             .navigationTitle(Localized.likedSongs)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

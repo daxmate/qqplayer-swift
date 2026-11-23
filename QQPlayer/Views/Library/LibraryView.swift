@@ -301,13 +301,15 @@ struct LibraryView: View {
             .navigationDestination(isPresented: $allSongsToNavigate) {
                 AllSongsScreen(tracks: tracks, locateTrackId: locateTrackId)
             }
-        }
-        // 封面毛玻璃底：走「背景修饰器」接法 —— 作为 ZStack 子节点会参与布局尺寸，
-        // `scaledToFill` 的超额理想尺寸会把整页撑宽后居中裁切（2026-11-23 真机回归，见 f21a109）。
-        // 装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）。
-        .background {
-            ArtworkGlassScreenBackground {
-                ScreenSpecificBackgroundView(screen: .library)
+            // 封面毛玻璃底：走「背景修饰器」接法 —— 作为 ZStack 子节点会参与布局尺寸，
+            // `scaledToFill` 的超额理想尺寸会把整页撑宽后居中裁切（2026-11-23 真机回归，见 f21a109）。
+            // 位置必须在 NavigationStack **内部**的根容器上：挂在外层会被导航容器自身的视图底
+            // 整个盖住（2026-11-23 真机：主界面「没做」，其余页面正常，即为这一处）。
+            // 装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）。
+            .background {
+                ArtworkGlassScreenBackground {
+                    ScreenSpecificBackgroundView(screen: .library)
+                }
             }
         }
         .background(.clear)

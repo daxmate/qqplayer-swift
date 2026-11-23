@@ -147,3 +147,77 @@ struct ArtworkGlassScreenBackground<Decoration: View>: View {
         artwork = image
     }
 }
+
+// MARK: - 分组列表页接法（设置页 `Form` / 分组 `List`）
+
+/// 设置类页面接入封面毛玻璃：视觉层与库列表页同源（`ArtworkGlassScreenBackground` + 各页原装饰底）。
+///
+/// 与库列表页唯一差别：`Form` / 分组 `List` 自带系统分组底，会整个压在玻璃上
+/// （真机上就是「设置页没做进玻璃」的那一块），所以玻璃生效时把它隐藏；
+/// 玻璃未生效（开关关 / 当前曲目无封面 / 系统「降低透明度」）时回落 `.automatic`，
+/// 外观与接入前逐像素一致。
+///
+/// 装饰底由调用方以 `@ViewBuilder` 传入（本文件编进双端 target，不在此处引用 iOS 专属的
+/// `ScreenSpecificBackgroundView` / `ScreenType`）。
+private struct ArtworkGlassGroupedListModifier<Decoration: View>: ViewModifier {
+    /// 页面装饰底（各页原有节点，玻璃生效时由容器隐藏）
+    private let decoration: () -> Decoration
+
+    @Environment(AppServices.self) private var services
+    @Environment(PlayerEngine.self) private var playerEngine
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// 沿用唯一开关（键 / 默认值唯一来源：`PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) private var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 当前曲目封面：只用于「要不要隐藏分组底」的判定（取图命中 `ArtworkManager` 缓存）
+    @State private var artwork: ArtworkImage?
+
+    init(@ViewBuilder decoration: @escaping () -> Decoration) {
+        self.decoration = decoration
+    }
+
+    private var currentTrack: Track? { playerEngine.currentTrack }
+
+    /// 开关变化也要重跑取图（关 → 清空，开 → 重新取）
+    private var glassTaskId: String {
+        "\(currentTrack?.stableId ?? "-")#\(glassBackgroundEnabled)"
+    }
+
+    private var isActive: Bool {
+        ArtworkGlassScreenActivation.isActive(
+            hasCurrentTrack: currentTrack != nil,
+            hasArtwork: artwork != nil,
+            isEnabled: glassBackgroundEnabled,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(isActive ? .hidden : .automatic)
+            .background {
+                ArtworkGlassScreenBackground(decoration: decoration)
+            }
+            .task(id: glassTaskId) {
+                await loadArtwork()
+            }
+    }
+
+    @MainActor
+    private func loadArtwork() async {
+        guard glassBackgroundEnabled, let track = currentTrack else {
+            artwork = nil
+            return
+        }
+        let image = await services.artworkManager.getArtwork(for: track)
+        // 取图期间又切歌：这次结果作废（与 `ArtworkGlassScreenBackground` 同款身份校验）
+        guard !Task.isCancelled, currentTrack?.stableId == track.stableId else { return }
+        artwork = image
+    }
+}
+
+extension View {
+    /// 设置页 / 分组列表接入封面毛玻璃（实现见 `ArtworkGlassGroupedListModifier`）。
+    func artworkGlassGroupedList<Decoration: View>(@ViewBuilder decoration: @escaping () -> Decoration) -> some View {
+        modifier(ArtworkGlassGroupedListModifier(decoration: decoration))
+    }
+}

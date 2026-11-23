@@ -65,6 +65,10 @@ struct SettingsAudioView: View {
                     .foregroundColor(.secondary)
             }
         }
+        // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
+        .artworkGlassGroupedList {
+            ScreenSpecificBackgroundView(screen: .library)
+        }
         .navigationTitle(Localized.audioSettings)
         .navigationBarTitleDisplayMode(.inline)
     }
