@@ -20,8 +20,6 @@ struct MacRecommendationView: View {
     @Environment(\.openSettings) private var openSettings
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）。
     @Environment(\.appAccentColor) private var accentColor
-    /// 整窗玻璃是否生效（只用于「让窗底透出」，不参与布局）
-    @Environment(\.macWindowGlassActive) private var windowGlassActive
 
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
@@ -228,9 +226,7 @@ struct MacRecommendationView: View {
             }
         }
         .listStyle(.inset)
-        // 玻璃生效时清掉 List 自带的系统底色（inset 分组底），让窗底玻璃透出；
-        // 关闭时 `.automatic` = 改动前外观。
-        .scrollContentBackground(windowGlassActive ? .hidden : .automatic)
+        .macGlassListBackground()
     }
 
     /// 点名艺人结果不足时如实说明（用**本人匹配数**，不拿整批数量冒充）。

@@ -166,8 +166,6 @@ struct MacArtistListView: View {
 
     /// 歌手行曲目数缓存（审计 M2：以前每行每帧 1 次整表查询）
     @Environment(MacLibraryFactsStore.self) private var facts
-    /// 整窗玻璃是否生效（只用于「让窗底透出」，不参与布局）
-    @Environment(\.macWindowGlassActive) private var windowGlassActive
     /// 进歌手失败提示（审计 L7）
     @State private var openError: String?
 
@@ -195,9 +193,7 @@ struct MacArtistListView: View {
             }
             .buttonStyle(.plain)
         }
-        // 玻璃生效时清掉 List 自带的系统底色，让窗底玻璃透出；
-        // 关闭时 `.automatic` = 改动前外观（与中栏容器同一生效判据）。
-        .scrollContentBackground(windowGlassActive ? .hidden : .automatic)
+        .macGlassListBackground()
         .task {
             // 头像代表曲目：一次批量预取（审计 M2：禁止逐行查库）；已查过的 id 不重取
             await facts.prefetchArtistArtworkTracks(artistIds: artists.compactMap(\.id))

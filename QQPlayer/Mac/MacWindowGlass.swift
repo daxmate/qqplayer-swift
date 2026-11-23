@@ -30,6 +30,26 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - 列表 / 表格让路
+
+/// 玻璃生效时清掉 List / Table 自带的系统内容底色，让窗底玻璃透出；
+/// 关闭时 .automatic = 改动前外观。
+/// 必须直接贴在 List / Table 上：只靠宿主祖先声明时，Table 内容底实测仍有残留不透明度。
+struct MacGlassListBackground: ViewModifier {
+    @Environment(\.macWindowGlassActive) private var isActive
+
+    func body(content: Content) -> some View {
+        content.scrollContentBackground(isActive ? .hidden : .automatic)
+    }
+}
+
+extension View {
+    /// 页面 / 表格底让路给整窗玻璃（唯一入口，见 MacGlassListBackground）。
+    func macGlassListBackground() -> some View {
+        modifier(MacGlassListBackground())
+    }
+}
+
 // MARK: - 窗口底
 
 /// 整窗背景：模糊封面 + 外观自适应雾面。调用方负责判定「开关 / 有封面 / 降低透明度」。
