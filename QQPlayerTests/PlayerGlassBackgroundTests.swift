@@ -78,6 +78,27 @@ struct ArtworkBlurCacheTests {
         #expect(cache.count == 1)
         #expect(cache.cachedImage(for: "a") === second)
     }
+
+    @Test("同键换封面不命中旧图（切歌竞态：旧封面 + 新键的污染条目不得复用）")
+    func staleSourceUnderSameKeyIsNotReused() {
+        let cache = ArtworkBlurCache()
+        let oldCover = makeImage(0.1)
+        let newCover = makeImage(0.9)
+        let blurOfOld = makeImage(0.2)
+        cache.store(blurOfOld, forKey: "track", sourceID: ObjectIdentifier(oldCover))
+
+        // 不带身份的老查询口径不变
+        #expect(cache.cachedImage(for: "track") === blurOfOld)
+        #expect(cache.cachedImage(for: "track", source: oldCover) === blurOfOld)
+        // 换了封面：同键也不算命中（否则背景会永远停在上一首）
+        #expect(cache.cachedImage(for: "track", source: newCover) == nil)
+
+        // 用新封面重写后，身份校验随之更新
+        let blurOfNew = makeImage(0.8)
+        cache.store(blurOfNew, forKey: "track", sourceID: ObjectIdentifier(newCover))
+        #expect(cache.cachedImage(for: "track", source: newCover) === blurOfNew)
+        #expect(cache.cachedImage(for: "track", source: oldCover) == nil)
+    }
 }
 
 struct PlayerGlassSettingTests {

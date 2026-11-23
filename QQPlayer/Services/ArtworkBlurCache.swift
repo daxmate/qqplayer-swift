@@ -10,6 +10,7 @@
 //  切歌只做两张图的交叉淡入（见 `ArtworkBlurBackground`）。
 //
 //  线程模型：命中查询同步（主线程要立刻拿到图）；渲染在后台 task 里做，结果回主线程写入。
+//  缓存身份：键 = 曲目标识，条目同时记「源封面身份」；身份不符的条目不算命中（切歌竞态）。
 //
 
 import CoreImage
@@ -42,7 +43,18 @@ final class ArtworkBlurCache: @unchecked Sendable {
     static let brightness: CGFloat = -0.06
 
     private let lock = NSLock()
-    private var storage: [String: ArtworkImage] = [:]
+
+    /// 一条缓存记录：模糊图 + 生成它的**源封面身份**。
+    /// 为什么要记身份：切歌瞬间调用方先换键、后换封面（`PlayerView` / `MacWindowGlass`
+    /// 的 `cacheKey` 来自当前曲目，`artwork` 要等异步取图才更新），
+    /// 于是「旧封面 + 新键」会被渲染并写进新键 —— 若不校验身份，新封面到达后
+    /// 这里仍会把旧封面的模糊图当命中返回，背景就永远停在上一首（2026-11-23 真机 bug）。
+    private struct Entry {
+        let image: ArtworkImage
+        let sourceID: ObjectIdentifier?
+    }
+
+    private var storage: [String: Entry] = [:]
     /// 最近使用顺序：末尾 = 最新。命中与写入都移到末尾。
     private var order: [String] = []
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -53,9 +65,19 @@ final class ArtworkBlurCache: @unchecked Sendable {
     func cachedImage(for key: String) -> ArtworkImage? {
         lock.lock()
         defer { lock.unlock() }
-        guard let image = storage[key] else { return nil }
+        guard let entry = storage[key] else { return nil }
         touchLocked(key)
-        return image
+        return entry.image
+    }
+
+    /// 带封面身份的命中判定：键相同但**源封面不是同一张** → 视为未命中。
+    /// 这样「旧封面 + 新键」留下的污染条目不会被新封面复用。
+    func cachedImage(for key: String, source: ArtworkImage) -> ArtworkImage? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let entry = storage[key], entry.sourceID == ObjectIdentifier(source) else { return nil }
+        touchLocked(key)
+        return entry.image
     }
 
     /// 缓存张数（测试用）
@@ -72,11 +94,16 @@ final class ArtworkBlurCache: @unchecked Sendable {
         return order
     }
 
-    /// 写入（命中已有键时覆盖并移到最新）
+    /// 写入（命中已有键时覆盖并移到最新）；不带源封面身份的旧入口（仅测试 / 兼容用）
     func store(_ image: ArtworkImage, forKey key: String) {
+        store(image, forKey: key, sourceID: nil)
+    }
+
+    /// 写入并记录源封面身份（渲染路径用）
+    func store(_ image: ArtworkImage, forKey key: String, sourceID: ObjectIdentifier?) {
         lock.lock()
         defer { lock.unlock() }
-        storage[key] = image
+        storage[key] = Entry(image: image, sourceID: sourceID)
         touchLocked(key)
         while order.count > Self.capacity, let oldest = order.first {
             order.removeFirst()
@@ -96,15 +123,16 @@ final class ArtworkBlurCache: @unchecked Sendable {
     /// 取毛玻璃图：命中直接返回，未命中后台渲染后写入缓存。
     @MainActor
     func image(for key: String, source: ArtworkImage) async -> ArtworkImage? {
-        if let cached = cachedImage(for: key) {
+        if let cached = cachedImage(for: key, source: source) {
             return cached
         }
+        let sourceID = ObjectIdentifier(source)
         let box = SendableArtwork(image: source)
         let rendered = await Task.detached(priority: .userInitiated) { [self] in
             Self.render(source: box.image, context: ciContext).map(SendableArtwork.init)
         }.value
         guard let rendered else { return nil }
-        store(rendered.image, forKey: key)
+        store(rendered.image, forKey: key, sourceID: sourceID)
         return rendered.image
     }
 

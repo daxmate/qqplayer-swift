@@ -28,11 +28,19 @@ struct ArtworkBlurBackground: View {
 
     private struct RenderRequest: Equatable {
         let key: String?
+        /// 封面身份：切歌瞬间 `cacheKey` 先变、`artwork` 还是上一首的图，
+        /// 只按 key 起 task 会让这次渲染（旧图 + 新键）成为最后一次 —— 新封面到达后不再触发。
+        /// 把身份纳入 id：封面换了就重启 task，用新封面重新渲染。
+        let artworkID: ObjectIdentifier?
         let reduceTransparency: Bool
     }
 
     private var request: RenderRequest {
-        RenderRequest(key: cacheKey, reduceTransparency: reduceTransparency)
+        RenderRequest(
+            key: cacheKey,
+            artworkID: artwork.map { ObjectIdentifier($0) },
+            reduceTransparency: reduceTransparency
+        )
     }
 
     var body: some View {
@@ -102,7 +110,10 @@ struct ArtworkBlurBackground: View {
             return
         }
         let rendered = await services.artworkBlurCache.image(for: key, source: artwork)
-        // 请求期间又切歌了：这次结果作废（下一次 task 会重新取）
+        // 请求期间又切歌 / 换封面了：这次结果作废（下一次 task 会重新取）。
+        // 判据用任务取消状态 —— `.task(id:)` 的 id 含封面身份，封面一变 SwiftUI 就取消本任务；
+        // 不能比对 `self.artwork`：闭包捕获的是启动时那份 View 快照，它永远等于本次渲染用的图。
+        guard !Task.isCancelled else { return }
         guard cacheKey == key else { return }
         guard let rendered else { return }
         apply(rendered)
