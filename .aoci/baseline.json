@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-22T08:52:38Z",
+  "updated_at": "2026-11-23T00:26:40Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -3740,9 +3740,9 @@
     },
     "QQPlayer/Views/Player/PlayerView.swift": {
       "role": "index",
-      "sha256": "d659448d21836e1d99dfa365502fdaf6cf03e8a3af435ab7fcd688ea7dc60b51",
-      "size": 19662,
-      "normalized_sha256": "d659448d21836e1d99dfa365502fdaf6cf03e8a3af435ab7fcd688ea7dc60b51"
+      "sha256": "e61ef712001d2a8b9d927f8a3f99d03144bcf1b6c649468ebe958e56a0e569f5",
+      "size": 22093,
+      "normalized_sha256": "e61ef712001d2a8b9d927f8a3f99d03144bcf1b6c649468ebe958e56a0e569f5"
     },
     "QQPlayer/Views/Player/QueueManagementView.swift": {
       "role": "index",
