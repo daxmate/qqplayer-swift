@@ -137,6 +137,65 @@ struct MacLibraryView: View {
         )
     }
 
+    // MARK: - 工具栏
+
+    /// 工具栏 4 个按钮（迷你模式 / 外观主题 / 在线搜索 / 局域网同步）的单一真相源；
+    /// 抽出来只为在外面套一层「共享背景可见性」，按钮定义不重复。
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
+        // 迷你模式入口（v2：主窗 ⇄ 迷你互斥，仅主窗态可见此按钮；
+        // 可见性 = 设置「迷你窗与桌面歌词」分类开关）
+        ToolbarItem {
+            if deleteSettings.showMiniWindowButton {
+                Button {
+                    desktopWindows.enterMiniMode()
+                } label: {
+                    Image(systemName: "pip.enter")
+                }
+                .help("enter_mini_mode".localized)
+            }
+        }
+        ToolbarItem {
+            Button {
+                cycleTheme()
+            } label: {
+                Image(systemName: themeIconName)
+            }
+            .help(Localized.appearanceTheme)
+        }
+        ToolbarItem {
+            Button {
+                showOnlineSearch = true
+            } label: {
+                Image(systemName: "icloud.and.arrow.down")
+            }
+            .help("online_search_title".localized)
+        }
+        // 局域网同步入口（重要功能常驻主界面；同步只能由桌面端发起）
+        ToolbarItem {
+            Button {
+                showSyncPanel = true
+            } label: {
+                Image(systemName: "arrow.triangle.2.circlepath")
+            }
+            .help("sync_run_panel_title".localized)
+        }
+    }
+
+    /// 整窗玻璃生效时，macOS 26 会给工具栏 item 自动套一层系统玻璃胶囊
+    /// （层级里的 `NSToolbarPlatterView` / `NSGlassEffectView`）：图标不贴合、还压在分隔线上。
+    /// 这里按玻璃判定只隐藏 **item 的共享背景**；工具栏条带背景由
+    /// `MacWindowChromeToolbarBackground` 管（.windowToolbar 的 .hidden），两件事互不替代。
+    /// ⚠️ 玻璃关闭时必须还原成 .visible（系统默认胶囊保留），否则外观会与改动前不一致。
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if #available(macOS 26.0, *) {
+            toolbarItems.sharedBackgroundVisibility(isWindowGlassActive ? .hidden : .visible)
+        } else {
+            toolbarItems
+        }
+    }
+
     /// 拉取当前曲目封面（切歌后旧结果丢弃），并打一条安全区诊断日志（真机核对用）
     func loadWindowArtwork() async {
         guard let track = player.currentTrack else {
@@ -198,43 +257,7 @@ struct MacLibraryView: View {
         // 由这里决定，scene 侧配 `.windowResizability(.contentMinSize)` 才生效。
         .frame(minWidth: MacMainWindowMetrics.minWidth, minHeight: MacMainWindowMetrics.minHeight)
         .toolbar {
-            // 迷你模式入口（v2：主窗 ⇄ 迷你互斥，仅主窗态可见此按钮；
-            // 可见性 = 设置「迷你窗与桌面歌词」分类开关）
-            ToolbarItem {
-                if deleteSettings.showMiniWindowButton {
-                    Button {
-                        desktopWindows.enterMiniMode()
-                    } label: {
-                        Image(systemName: "pip.enter")
-                    }
-                    .help("enter_mini_mode".localized)
-                }
-            }
-            ToolbarItem {
-                Button {
-                    cycleTheme()
-                } label: {
-                    Image(systemName: themeIconName)
-                }
-                .help(Localized.appearanceTheme)
-            }
-            ToolbarItem {
-                Button {
-                    showOnlineSearch = true
-                } label: {
-                    Image(systemName: "icloud.and.arrow.down")
-                }
-                .help("online_search_title".localized)
-            }
-            // 局域网同步入口（重要功能常驻主界面；同步只能由桌面端发起）
-            ToolbarItem {
-                Button {
-                    showSyncPanel = true
-                } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                }
-                .help("sync_run_panel_title".localized)
-            }
+            toolbarContent
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
