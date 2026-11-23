@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T11:41:00Z",
+  "updated_at": "2026-11-23T11:52:53Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -1100,9 +1100,9 @@
     },
     "QQPlayer/Mac/MacTrackColumnResizer.swift": {
       "role": "index",
-      "sha256": "33957d779693622e52388b187ab2feaed8d7ba536fd42d8baa092a5798dbbc78",
-      "size": 23404,
-      "normalized_sha256": "33957d779693622e52388b187ab2feaed8d7ba536fd42d8baa092a5798dbbc78"
+      "sha256": "ed66e18d4f569774f1743d81e41529384f26e0f96f8231d41fc227201e7a40c0",
+      "size": 23507,
+      "normalized_sha256": "ed66e18d4f569774f1743d81e41529384f26e0f96f8231d41fc227201e7a40c0"
     },
     "QQPlayer/Mac/MacTrackContextMenu.swift": {
       "role": "index",
@@ -5654,9 +5654,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "04a2163fb657dd4e0008d17593f6e7e336a1fa455f1cbe507406e44e3bbab058",
-      "size": 455873,
-      "normalized_sha256": "04a2163fb657dd4e0008d17593f6e7e336a1fa455f1cbe507406e44e3bbab058"
+      "sha256": "28ef75d0cd8e847c50421e21a1b50129d3c4c597b8ace1f39bad00d61989db60",
+      "size": 455897,
+      "normalized_sha256": "28ef75d0cd8e847c50421e21a1b50129d3c4c597b8ace1f39bad00d61989db60"
     },
     "aoci.meta.txt": {
       "role": "index",
