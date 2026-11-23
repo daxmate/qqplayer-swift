@@ -155,11 +155,20 @@ struct FeatureGuideView: View {
                         .padding(.vertical, DesignTokens.space2)
                     }
                 }
+                // 分区卡片透明（玻璃生效时清掉行背景；分隔线 / 行高 / listStyle 不碰）
+                .glassClearRowBackground()
             }
         }
         .navigationTitle(Localized.featureGuide)
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
+            .artworkGlassGroupedList {
+                ScreenSpecificBackgroundView(screen: .library)
+            }
+            // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+            .toolbarBackground(.clear, for: .navigationBar)
+            .toolbarBackground(.clear, for: .automatic)
         #endif
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()

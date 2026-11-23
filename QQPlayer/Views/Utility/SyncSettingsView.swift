@@ -76,6 +76,7 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("sync_passive_footer".localized)
             }
+            .glassClearRowBackground()
 
             // MARK: 同步数据（帧 8/9）账目 —— 手机侧也能看见「同步了什么 / 丢了多少」（2026-09-15）
             Section {
@@ -95,6 +96,7 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("sync_run_data_description".localized)
             }
+            .glassClearRowBackground()
 
             // MARK: 本机
             Section {
@@ -129,6 +131,7 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("sync_client_identity_footer".localized)
             }
+            .glassClearRowBackground()
 
             // MARK: 跳端续播（播放位置）——与 Mac 同步面板**同一个设置项**（默认关）
             //
@@ -150,6 +153,7 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("sync_run_playback_position_help".localized)
             }
+            .glassClearRowBackground()
 
             // MARK: 已配对主机
             Section {
@@ -168,6 +172,7 @@ struct SyncSettingsView: View {
             } header: {
                 Text("sync_paired_hosts".localized)
             }
+            .glassClearRowBackground()
 
             // MARK: 添加主机
             Section {
@@ -186,9 +191,17 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("sync_add_host_footer".localized)
             }
+            .glassClearRowBackground()
+        }
+        // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
+        .artworkGlassGroupedList {
+            ScreenSpecificBackgroundView(screen: .library)
         }
         .navigationTitle("sync_settings".localized)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
         .onAppear {
             loadIdentityIfNeeded()
             reloadHosts()
