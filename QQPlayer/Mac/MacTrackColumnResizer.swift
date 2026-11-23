@@ -20,6 +20,13 @@
 //  `rect(ofColumn:)`（相邻两列之间的间隙中点）再 convert 到本视图坐标——与 AppKit
 //  实际布局同源，intercellSpacing 变了也不会错位；窗口缩放/横向滚动后同样实时读取。
 //
+//  光标（2026-11-23 修）：光靠 `resetCursorRects` / `.cursorUpdate` 在这套结构里不够——
+//  cursor rect 是软废弃 API（见 NSView.h），而 `.cursorUpdate` 按 SDK 头文件说明只在
+//  「进入区域」时投递一次，表格随后任何一次光标矩形重算都会把光标改回箭头。因此光标
+//  改由四层共同声明：cursor rect（第一步）＋ 随移动重复的 tracking area（mouseMoved）
+//  ＋ 窗口级 mouseMoved 本地监听（去掉对 hitTest / tracking 时序的依赖）＋ 事件派发后
+//  的一次异步补写（`scheduleCursorReassert`）。监听在离开窗口时摘除，不泄漏。
+//
 
 import AppKit
 import SwiftUI
@@ -102,6 +109,14 @@ final class MacTrackColumnResizerView: NSView {
     private var appliedInitialWidths = false
     private var dragState: DragState?
     private var cursorTrackingAreas: [NSTrackingArea] = []
+    private var isRefreshingTrackingAreas = false
+    /// 当前是否处于「列边界热区」状态（只用来决定离开时要不要把光标还原成箭头，
+    /// 避免抢走表格里其它视图自己声明的光标）。
+    private var isHotHover = false
+    private var isCursorReassertScheduled = false
+    /// 窗口级 mouseMoved 本地监听（见 `installCursorMonitorIfNeeded`）。
+    private var cursorEventMonitor: Any?
+    private var didEnableMouseMovedEvents = false
     private var lastHotZoneSignature: [CGFloat] = []
     private var resolveAttempts = 0
     private var hasScheduledResolve = false
@@ -122,10 +137,20 @@ final class MacTrackColumnResizerView: NSView {
         guard window != nil else {
             // 只断引用：观察者统一在 deinit / 重新解析时按对象摘除（swiftlint 口径）
             table = nil
+            removeCursorMonitor()
             return
         }
         _ = resolveTableIfNeeded()
         refreshCursorHotZones()
+    }
+
+    /// 视图离开窗口（含换窗口）时立刻摘掉窗口级监听：窗口级监听的生命周期不能
+    /// 依赖 deinit（deinit 不一定在主线程上下文里跑，且窗口销毁顺序不可控）。
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow !== window {
+            removeCursorMonitor()
+        }
     }
 
     override func layout() {
@@ -178,33 +203,145 @@ final class MacTrackColumnResizerView: NSView {
         }
     }
 
-    /// 光标路径二（cursor rect 的兜底）：按边界分块登记 tracking area，
-    /// 进入边界块给缩放光标，进入其余区域给默认箭头——两者都在，任一路径失效仍有光标。
+    /// 光标路径二：光标更新块。只在「状态变化」时改光标——每次进入都写会抢走
+    /// 行内按钮等其它视图自己声明的光标。
     override func cursorUpdate(with event: NSEvent) {
-        let local = convert(event.locationInWindow, from: nil)
-        if boundary(near: local) != nil {
-            NSCursor.resizeLeftRight.set()
+        updateCursor(at: convert(event.locationInWindow, from: nil))
+    }
+
+    /// 光标路径三：随鼠标移动反复声明。`.cursorUpdate` 只在进入 tracking area 时
+    /// 投递一次，而表格 / 滚动视图在这之后任何一次光标矩形重算都会把光标改回箭头，
+    /// 且同一区域里不会再触发 cursorUpdate —— 这是「拖得动、光标不变」的直接成因。
+    override func mouseMoved(with event: NSEvent) {
+        updateCursor(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        updateCursor(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        updateCursor(at: NSPoint(x: -1, y: -1))
+    }
+
+    /// 光标状态的唯一出口：hot = 拖拽中，或鼠标落在列边界 ±hitHalfWidth 内。
+    private func updateCursor(at localPoint: NSPoint) {
+        guard !isHiddenOrHasHiddenAncestor else { return }
+        let hot = dragState != nil
+            || (bounds.contains(localPoint) && boundary(near: localPoint) != nil)
+        if hot {
+            isHotHover = true
+            if NSCursor.current !== NSCursor.resizeLeftRight {
+                NSCursor.resizeLeftRight.set()
+            }
         } else {
+            guard isHotHover else { return }
+            isHotHover = false
+            NSCursor.arrow.set()
+        }
+        scheduleCursorReassert()
+    }
+
+    /// 同一次事件派发里，AppKit 的 cursor rect 机制 / SwiftUI 表格可能在我们的
+    /// `set()` 之后又改一次光标。派发结束、runloop 回到空闲前，用鼠标实时位置
+    /// （`mouseLocationOutsideOfEventStream`，不依赖任何事件参数）再声明一次。
+    private func scheduleCursorReassert() {
+        guard !isCursorReassertScheduled else { return }
+        isCursorReassertScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isCursorReassertScheduled = false
+            self.reassertCursorAtCurrentMouseLocation()
+        }
+    }
+
+    private func reassertCursorAtCurrentMouseLocation() {
+        guard let window, window.isVisible, !isHiddenOrHasHiddenAncestor else { return }
+        let local = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        let hot = dragState != nil
+            || (bounds.contains(local) && boundary(near: local) != nil)
+        if hot {
+            isHotHover = true
+            if NSCursor.current !== NSCursor.resizeLeftRight {
+                NSCursor.resizeLeftRight.set()
+            }
+        } else if isHotHover {
+            isHotHover = false
             NSCursor.arrow.set()
         }
     }
 
+    /// 光标路径四（最外一层兜底）：窗口级 mouseMoved 本地监听。
+    /// `.overlay` 里的本视图只靠几何边界抢事件，而 SwiftUI 的 Table 仍是表格区域的
+    /// 事件主人；窗口级监听不看 hitTest / tracking area 时序，鼠标每动一次都能按
+    /// 实时几何重新声明光标，因此能稳定压过表格自身的光标管理。
+    private func installCursorMonitorIfNeeded() {
+        guard cursorEventMonitor == nil, let window else { return }
+        if !window.acceptsMouseMovedEvents {
+            window.acceptsMouseMovedEvents = true
+            didEnableMouseMovedEvents = true
+        }
+        cursorEventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged]
+        ) { [weak self] event in
+            guard let self, let window = self.window, event.window === window else { return event }
+            self.updateCursor(at: self.convert(event.locationInWindow, from: nil))
+            return event
+        }
+    }
+
+    private func removeCursorMonitor() {
+        if let monitor = cursorEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            cursorEventMonitor = nil
+        }
+        if didEnableMouseMovedEvents {
+            didEnableMouseMovedEvents = false
+            window?.acceptsMouseMovedEvents = false
+        }
+        isHotHover = false
+        isCursorReassertScheduled = false
+    }
+
     private func refreshCursorHotZones() {
+        installCursorMonitorIfNeeded()
         window?.invalidateCursorRects(for: self)
         refreshTrackingAreas()
     }
 
     private func refreshTrackingAreas() {
+        // `updateTrackingAreas` 里增删 tracking area 可能再触发一次本方法，防递归。
+        guard !isRefreshingTrackingAreas else { return }
+        isRefreshingTrackingAreas = true
+        defer { isRefreshingTrackingAreas = false }
         cursorTrackingAreas.forEach { removeTrackingArea($0) }
         cursorTrackingAreas.removeAll()
         guard table != nil, bounds.width > 0, bounds.height > 0 else { return }
-        let options: NSTrackingArea.Options = [.cursorUpdate, .activeInActiveApp]
-        let background = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(background)
-        cursorTrackingAreas.append(background)
+        // 整块区域：进入 / 离开 / 每一次移动都要收到（只有 `.cursorUpdate` 时
+        // 进区域只投递一次，之后被表格覆盖就再也纠正不回来）。`.inVisibleRect`
+        // 让 AppKit 自己跟随尺寸变化，不依赖我们是否已拿到最终 `bounds`。
+        let fullArea = NSTrackingArea(
+            rect: bounds,
+            options: [
+                .cursorUpdate,
+                .mouseMoved,
+                .mouseEnteredAndExited,
+                .activeInActiveApp,
+                .inVisibleRect,
+            ],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(fullArea)
+        cursorTrackingAreas.append(fullArea)
         for boundary in MacTrackColumnLayout.boundaries {
             guard let rect = boundaryRect(boundary) else { continue }
-            let area = NSTrackingArea(rect: rect, options: options, owner: self, userInfo: nil)
+            let area = NSTrackingArea(
+                rect: rect,
+                options: [.cursorUpdate, .mouseMoved, .activeInActiveApp],
+                owner: self,
+                userInfo: nil
+            )
             addTrackingArea(area)
             cursorTrackingAreas.append(area)
         }
@@ -388,6 +525,9 @@ final class MacTrackColumnResizerView: NSView {
 
     @objc private func geometryDidChange() {
         refreshCursorHotZones()
+        // 滚动 / 列宽变化会让 AppKit 重算光标矩形，可能把光标改回箭头；
+        // 状态没变也按当前鼠标位置补一次（原地不动时并没有 mouseMoved 事件）。
+        reassertCursorAtCurrentMouseLocation()
     }
 
     private func scheduleResolveIfNeeded() {
