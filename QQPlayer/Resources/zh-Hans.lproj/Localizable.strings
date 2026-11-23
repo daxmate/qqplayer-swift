@@ -1294,3 +1294,18 @@
 "lyrics.align.entry.running" = "正在对齐中…";
 "lyrics.align.entry.loading" = "歌词加载中，请稍候";
 "lyrics.align.action.realign" = "重新对齐（已对齐过）";
+
+/* ReplayGain（音量归一化） */
+"replaygain" = "音量归一化 (ReplayGain)";
+"replaygain_mode" = "模式";
+"replaygain_off" = "关闭";
+"replaygain_track" = "按曲目";
+"replaygain_album" = "按专辑";
+"replaygain_preamp" = "预放大";
+"replaygain_prevent_clipping" = "防削波";
+"replaygain_prevent_clipping_footer" = "峰值上限 -1 dBFS，放大后避免削波";
+"replaygain_analyze_missing" = "自动补算无标签曲目";
+"replaygain_analysis_progress" = "已分析 %d / %d";
+"replaygain_pause_analysis" = "暂停补算";
+"replaygain_resume_analysis" = "继续补算";
+"replaygain_current_gain" = "当前增益 %.1f dB";

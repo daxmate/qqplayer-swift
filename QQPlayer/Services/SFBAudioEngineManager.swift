@@ -95,8 +95,8 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
     func attachEqualizerToEngine(with format: AVAudioFormat?, retryCount: Int = 0) {
         guard let player = audioPlayer else { return }
 
-        // Skip EQ if not enabled by user
-        guard eqManager.isEnabled else {
+        // EQ 关闭但 ReplayGain 生效时仍要挂在图上（离散增益节点复用同一个 EQ 节点）
+        guard eqManager.isEnabled || eqManager.replayGainActive else {
             AppLog.info(.general, "ℹ️ EQ not enabled by user - skipping attachment")
             return
         }
@@ -358,16 +358,24 @@ class SFBAudioEngineManager: NSObject, AudioPlayer.Delegate {
             return
         }
 
-        // Apply enabled state
-        equalizer.bypass = !eqManager.isEnabled
+        // 节点级 bypass 只在「EQ 关 且 无 ReplayGain」时打开：
+        // EQ 关闭时靠逐 band bypass 静音，globalGain 仍生效（ReplayGain 需要）。
+        let replayGainActive = eqManager.replayGainActive
+        equalizer.bypass = !eqManager.isEnabled && !replayGainActive
 
-        // Apply global gain
-        equalizer.globalGain = Float(eqManager.globalGain)
+        // Apply global gain（用户预放大 + ReplayGain 偏移，拆开叠加）
+        equalizer.globalGain = Float(eqManager.effectiveGlobalGainDB)
 
         // Reconfigure bands with current EQ settings
         configureSFBEQBands(equalizer)
 
-        AppLog.info(.general, "🎛️ SFBAudioEngine EQ updated: enabled=\(eqManager.isEnabled), globalGain=\(eqManager.globalGain)dB")
+        // configureSFBEQBands 会取消各 band 的 bypass；EQ 关闭时再静音一次，
+        // 保证「EQ 关」= 只保留 globalGain（ReplayGain）这一条增益路径。
+        if !eqManager.isEnabled {
+            equalizer.bands.forEach { $0.bypass = true }
+        }
+
+        AppLog.info(.general, "🎛️ SFBAudioEngine EQ updated: enabled=\(eqManager.isEnabled), globalGain=\(eqManager.effectiveGlobalGainDB)dB")
     }
 
     // Store decoder properties for seeking when AudioFile properties are unavailable

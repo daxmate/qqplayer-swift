@@ -37,7 +37,7 @@ struct Album: Codable, FetchableRecord, PersistableRecord {
     }
 }
 
-struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
+struct Track: Codable, FetchableRecord, PersistableRecord, Equatable, Sendable {
     var id: Int64?
     var stableId: String
     var albumId: Int64?
@@ -67,6 +67,14 @@ struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
     var replaygainTrackPeak: Double?
     var replaygainAlbumPeak: Double?
     var hasEmbeddedArt: Bool = false
+    /// ReplayGain 数据来源（tag = 文件标签；analyzed = 本地分析）。NULL = 无数据。
+    var replaygainSource: String?
+    /// ReplayGain 分析状态（pending / done / failed）；NULL = 未跑过。
+    var replaygainAnalysisState: String?
+    /// ReplayGain 分析完成时间（epoch seconds）；NULL = 未跑过。
+    var replaygainAnalyzedAt: Int?
+    /// 专辑 gain 分析尝试时间（epoch seconds）；NULL = 未跑过（成功失败都记，避免反复重试）。
+    var replaygainAlbumAnalysisAt: Int?
 
     static let databaseTableName = "track"
 
@@ -91,6 +99,10 @@ struct Track: Codable, FetchableRecord, PersistableRecord, Equatable {
         case replaygainTrackPeak = "replaygain_track_peak"
         case replaygainAlbumPeak = "replaygain_album_peak"
         case hasEmbeddedArt = "has_embedded_art"
+        case replaygainSource = "replaygain_source"
+        case replaygainAnalysisState = "replaygain_analysis_state"
+        case replaygainAnalyzedAt = "replaygain_analyzed_at"
+        case replaygainAlbumAnalysisAt = "replaygain_album_analysis_at"
     }
 }
 

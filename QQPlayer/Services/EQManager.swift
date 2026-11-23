@@ -41,6 +41,27 @@ class EQManager {
         }
     }
 
+    /// ReplayGain 偏移（dB）：由 ReplayGainManager 在切歌 / 设置变化时写入。
+    /// 与用户预放大（globalGain）**拆开叠加**，互不覆盖；EQ 关闭时仍生效。
+    var replayGainOffset: Double = 0.0 {
+        didSet {
+            if abs(replayGainOffset - oldValue) > 0.001 {
+                applyGlobalGain()
+            }
+        }
+    }
+
+    /// ReplayGain 是否实际产生增益（非 0 dB）。
+    var replayGainActive: Bool {
+        abs(replayGainOffset) > 0.001
+    }
+
+    /// 实际下发给后端的总增益 = 用户预放大（沿用既有语义：仅 EQ 开启时生效）
+    /// + ReplayGain 偏移。EQ 全 band bypass（关闭）时 ReplayGain 仍生效。
+    var effectiveGlobalGainDB: Double {
+        (isEnabled ? globalGain : 0.0) + replayGainOffset
+    }
+
     var availablePresets: [EQPreset] = []
 
     /// 当前选中的内置预设 key（nil = 未使用内置预设；"custom" = 自定义 10 段）
@@ -117,6 +138,10 @@ class EQManager {
         if isEnabled {
             applyEQSettings()
         }
+
+        // 新建的 EQ 节点 globalGain 归零：把当前 ReplayGain 偏移重新下发一次
+        // （否则同曲重播 / 重建引擎时会丢掉增益，直到下次切歌）
+        applyGlobalGain()
     }
 
     // insertEQIntoAudioGraph(between:and:format:) 已删除（2026-09-12 审计死代码 ⚰️-7）：
@@ -210,7 +235,8 @@ class EQManager {
 
         if !isEnabled || currentPreset == nil {
             eqNode?.bands.forEach { $0.bypass = true }
-            eqNode?.globalGain = 0.0
+            // EQ 关闭 = 全 band bypass，但 ReplayGain 偏移仍要下发（独立增益需求）
+            eqNode?.globalGain = Float(effectiveGlobalGainDB)
 
             SFBAudioEngineManager.shared.updateEQSettings()
             AppLog.info(.general, "🚫 EQ disabled - all bands bypassed")
@@ -263,7 +289,7 @@ class EQManager {
     }
 
     private func applyGlobalGain() {
-        let globalGainFloat = Float(globalGain)
+        let globalGainFloat = Float(effectiveGlobalGainDB)
         eqNode?.globalGain = globalGainFloat
 
         SFBAudioEngineManager.shared.updateEQSettings()
@@ -338,7 +364,8 @@ extension EQManager {
 
         if !isEnabled {
             eqNode?.bands.forEach { $0.bypass = true }
-            eqNode?.globalGain = 0.0
+            // 同上：EQ 关闭仍保留 ReplayGain 偏移
+            eqNode?.globalGain = Float(effectiveGlobalGainDB)
             SFBAudioEngineManager.shared.updateEQSettings()
             AppLog.info(.general, "🚫 EQ disabled - all bands bypassed")
             return

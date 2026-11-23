@@ -24,6 +24,15 @@ struct SettingsAudioView: View {
                     }
                 }
 
+                NavigationLink(destination: ReplayGainSettingsView()) {
+                    HStack {
+                        Image(systemName: "waveform.badge.magnifyingglass")
+                            .foregroundColor(.blue)
+                            .font(.system(size: DesignTokens.font20))
+                        Text(Localized.replayGain)
+                    }
+                }
+
                 VStack(alignment: .leading, spacing: DesignTokens.space8) {
                     Text(Localized.dsdPlaybackMode)
                         .font(.headline)

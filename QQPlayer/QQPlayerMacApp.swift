@@ -216,6 +216,9 @@ struct QQPlayerMacApp: App {
             // 播放引擎（批 6-6）：Mac 视图（播放页 / 列表高亮 / 浮窗 / 卡拉OK 条）按属性追踪
             .environment(PlayerEngine.shared)
             .environment(KaraokeController.shared)
+            // ReplayGain（音量归一化）：设置页 / 播放增益的唯一运行时状态源
+            .environment(ReplayGainManager.shared)
+            .environment(ReplayGainAnalysisQueue.shared)
             // 同步三件（批 6-8）：`SyncHostCenter` / 装配自检事实 / 歌词补发事实迁 `@Observable`
             // ⇒ 同步面板（设置页与工具栏面板）、相关视图改环境注入。新增一个对象 = 三处都登记。
             .environment(SyncHostCenter.shared)
@@ -256,6 +259,9 @@ struct QQPlayerMacApp: App {
             .environment(AppServices.live)
             // 播放引擎（批 6-6）：Settings 是独立场景，不继承主窗环境
             .environment(PlayerEngine.shared)
+            // ReplayGain：Settings 是独立场景，同样需要显式注入
+            .environment(ReplayGainManager.shared)
+            .environment(ReplayGainAnalysisQueue.shared)
             .environment(KaraokeController.shared)
             // 同步三件（批 6-8）：Settings 是独立场景，不继承主窗环境（同上一行原因）
             .environment(SyncHostCenter.shared)

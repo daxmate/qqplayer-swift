@@ -55,6 +55,10 @@ extension DatabaseManager {
             // 与 TrackContentHashTests 老库补列测试共用同一实现。
             try Self.addTrackContentHashColumnIfNeeded(db)
 
+            // ReplayGain 后台补算元数据列（来源 / 状态 / 时间戳）。新库 createTables
+            // 已含；老库在此补列。幂等：列已存在即跳过。
+            try Self.addTrackReplayGainAnalysisColumnsIfNeeded(db)
+
             // Migration: Add custom_cover_image_path column to playlist table
             do {
                 try db.execute(sql: "ALTER TABLE playlist ADD COLUMN custom_cover_image_path TEXT")

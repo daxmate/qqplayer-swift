@@ -1289,3 +1289,18 @@
 "lyrics.align.entry.running" = "Alignement des paroles en cours…";
 "lyrics.align.entry.loading" = "Chargement des paroles, patientez";
 "lyrics.align.action.realign" = "Réaligner la chronologie (déjà alignée)";
+
+/* ReplayGain（音量归一化） */
+"replaygain" = "Normalisation du volume (ReplayGain)";
+"replaygain_mode" = "Mode";
+"replaygain_off" = "Désactivé";
+"replaygain_track" = "Par piste";
+"replaygain_album" = "Par album";
+"replaygain_preamp" = "Préampli";
+"replaygain_prevent_clipping" = "Éviter l'écrêtage";
+"replaygain_prevent_clipping_footer" = "Plafond de crête -1 dBFS pour éviter l'écrêtage après amplification";
+"replaygain_analyze_missing" = "Analyser les pistes sans étiquettes";
+"replaygain_analysis_progress" = "%d sur %d analysées";
+"replaygain_pause_analysis" = "Suspendre l'analyse";
+"replaygain_resume_analysis" = "Reprendre l'analyse";
+"replaygain_current_gain" = "Gain actuel %.1f dB";

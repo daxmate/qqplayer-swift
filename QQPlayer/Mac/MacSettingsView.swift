@@ -167,6 +167,9 @@ private struct MacPlaybackSettingsView: View {
                 .settingsAnchor(MacSettingsCatalog.playbackEqualizer)
             }
 
+            // ReplayGain（音量归一化）：设置 → 播放 → 音频
+            ReplayGainSettingsControls()
+
             Section(Localized.playerControls) {
                 Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
                     .onChange(of: deleteSettings.showSleepTimerButton) { _, _ in

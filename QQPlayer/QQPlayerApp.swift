@@ -137,6 +137,9 @@ struct QQPlayerApp: App {
                 .environment(PlaylistCoverLoadFailuresStore.shared)
                 .environment(LyricOffsetStore.shared)
                 .environment(EQManager.shared)
+                // ReplayGain（音量归一化）：设置页 / 播放增益的唯一运行时状态源
+                .environment(ReplayGainManager.shared)
+                .environment(ReplayGainAnalysisQueue.shared)
                 // 曲库索引器（批 6-2）：ContentView / LibraryView 读 isIndexing 按属性追踪
                 .environment(LibraryIndexer.shared)
                 // App 级无状态入口容器（方案 A；批 4 起 iOS 侧视图也用 `@Environment(AppServices.self)` 取

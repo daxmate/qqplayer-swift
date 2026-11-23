@@ -1291,3 +1291,18 @@
 "lyrics.align.entry.running" = "가사 정렬 중…";
 "lyrics.align.entry.loading" = "가사를 불러오는 중입니다. 잠시만 기다려 주세요";
 "lyrics.align.action.realign" = "가사 타임라인 다시 정렬(정렬됨)";
+
+/* ReplayGain（音量归一化） */
+"replaygain" = "볼륨 노멀라이제이션 (ReplayGain)";
+"replaygain_mode" = "모드";
+"replaygain_off" = "끔";
+"replaygain_track" = "트랙별";
+"replaygain_album" = "앨범별";
+"replaygain_preamp" = "프리앰프";
+"replaygain_prevent_clipping" = "클리핑 방지";
+"replaygain_prevent_clipping_footer" = "피크 상한 -1 dBFS (증폭 후 클리핑 방지)";
+"replaygain_analyze_missing" = "태그 없는 곡 자동 분석";
+"replaygain_analysis_progress" = "분석 완료 %d / %d";
+"replaygain_pause_analysis" = "분석 일시정지";
+"replaygain_resume_analysis" = "분석 재개";
+"replaygain_current_gain" = "현재 게인 %.1f dB";

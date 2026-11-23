@@ -264,6 +264,8 @@
 		A7C0FFEE1A2B3C4D5E6F7789 /* LyricsCenterMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */; };
 		AC79967080D1437E8565EA04 /* PlayerGlassBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6687632448654CD7B2FA1906 /* PlayerGlassBackgroundTests.swift */; };
 		499BFA3CADB44A6BBD176F72 /* LibraryGlassBackdropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37055D419606406795FABA61 /* LibraryGlassBackdropTests.swift */; };
+		F4FD180377354640854A1775 /* ReplayGainMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF625B50824403AA1C5107 /* ReplayGainMathTests.swift */; };
+		9ACD49E47E264D64BEDA65AE /* ReplayGainMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C71594BDD84FBC804390D8 /* ReplayGainMigrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -577,6 +579,8 @@
 		A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsCenterMetricsTests.swift; sourceTree = "<group>"; };
 		6687632448654CD7B2FA1906 /* PlayerGlassBackgroundTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGlassBackgroundTests.swift; sourceTree = "<group>"; };
 		37055D419606406795FABA61 /* LibraryGlassBackdropTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryGlassBackdropTests.swift; sourceTree = "<group>"; };
+		F2DF625B50824403AA1C5107 /* ReplayGainMathTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayGainMathTests.swift; sourceTree = "<group>"; };
+		44C71594BDD84FBC804390D8 /* ReplayGainMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayGainMigrationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1151,6 +1155,7 @@
 				Views/Utility/HintCardView.swift,
 				Views/Utility/PlayerSurfaceStyle.swift,
 				Views/Utility/WhatsNewView.swift,
+				Views/Utility/Settings/ReplayGainSettingsView.swift,
 				Services/RecommendationPlanning.swift,
 				Services/RecommendationRequest.swift,
 				Mac/MacRecommendationSettingsView.swift,
@@ -1161,6 +1166,7 @@
 				Services/RecommendationReasonPrompt.swift,
 				Services/RecommendationReasons.swift,
 				Models/RecommendationV3Settings.swift,
+				Models/ReplayGainModels.swift,
 				Services/RecommendationMetadataNormalizer.swift,
 				Services/RecommendationV3Types.swift,
 				Services/RecommendationLibraryMatcher.swift,
@@ -1175,6 +1181,11 @@
 				Mac/MacTrackDetailSheet.swift,
 				Services/MacTrackDetailModel.swift,
 				Services/LyricsCenterMetrics.swift,
+				"Services/DatabaseManager+ReplayGain.swift",
+				Services/ReplayGainAnalysisQueue.swift,
+				Services/ReplayGainManager.swift,
+				Services/ReplayGainMath.swift,
+				Services/ReplayGainTagReader.swift,
 			);
 			target = B1A000000000000000000007 /* QQPlayerMac */;
 		};
@@ -1581,6 +1592,8 @@
 				A7C0FFEE1A2B3C4D5E6F778A /* LyricsCenterMetricsTests.swift */,
 				6687632448654CD7B2FA1906 /* PlayerGlassBackgroundTests.swift */,
 				37055D419606406795FABA61 /* LibraryGlassBackdropTests.swift */,
+				F2DF625B50824403AA1C5107 /* ReplayGainMathTests.swift */,
+				44C71594BDD84FBC804390D8 /* ReplayGainMigrationTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2146,6 +2159,8 @@
 				A7C0FFEE1A2B3C4D5E6F7789 /* LyricsCenterMetricsTests.swift in Sources */,
 				AC79967080D1437E8565EA04 /* PlayerGlassBackgroundTests.swift in Sources */,
 				499BFA3CADB44A6BBD176F72 /* LibraryGlassBackdropTests.swift in Sources */,
+				F4FD180377354640854A1775 /* ReplayGainMathTests.swift in Sources */,
+				9ACD49E47E264D64BEDA65AE /* ReplayGainMigrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

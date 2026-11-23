@@ -54,7 +54,11 @@ struct TrackContentHashTests {
         replaygain_album_gain REAL,
         replaygain_track_peak REAL,
         replaygain_album_peak REAL,
-        has_embedded_art INTEGER DEFAULT 0
+        has_embedded_art INTEGER DEFAULT 0,
+        replaygain_source TEXT,
+        replaygain_analysis_state TEXT,
+        replaygain_analyzed_at INTEGER,
+        replaygain_album_analysis_at INTEGER
     )
     """
 

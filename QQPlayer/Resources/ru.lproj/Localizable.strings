@@ -1286,3 +1286,18 @@
 "lyrics.align.entry.running" = "Выравнивание текста…";
 "lyrics.align.entry.loading" = "Загрузка текста, подождите";
 "lyrics.align.action.realign" = "Выровнять текст заново (уже выровнен)";
+
+/* ReplayGain（音量归一化） */
+"replaygain" = "Нормализация громкости (ReplayGain)";
+"replaygain_mode" = "Режим";
+"replaygain_off" = "Выкл.";
+"replaygain_track" = "По треку";
+"replaygain_album" = "По альбому";
+"replaygain_preamp" = "Предусиление";
+"replaygain_prevent_clipping" = "Защита от клиппинга";
+"replaygain_prevent_clipping_footer" = "Потолок пиков -1 dBFS, чтобы избежать клиппинга после усиления";
+"replaygain_analyze_missing" = "Анализировать треки без тегов";
+"replaygain_analysis_progress" = "Проанализировано %d из %d";
+"replaygain_pause_analysis" = "Приостановить анализ";
+"replaygain_resume_analysis" = "Продолжить анализ";
+"replaygain_current_gain" = "Текущее усиление %.1f dB";

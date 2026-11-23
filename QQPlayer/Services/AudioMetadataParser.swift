@@ -27,6 +27,29 @@ struct AudioMetadata {
     let replaygainTrackPeak: Double?
     let replaygainAlbumPeak: Double?
     let hasEmbeddedArt: Bool
+
+    /// 用外部读到的 ReplayGain 数据补齐（仅补 nil 字段，已解析值优先）。
+    func mergingReplayGain(_ gains: ReplayGainMath.Gains) -> AudioMetadata {
+        AudioMetadata(
+            title: title,
+            artist: artist,
+            album: album,
+            albumArtist: albumArtist,
+            genre: genre,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+            year: year,
+            durationMs: durationMs,
+            sampleRate: sampleRate,
+            bitDepth: bitDepth,
+            channels: channels,
+            replaygainTrackGain: replaygainTrackGain ?? gains.trackGain,
+            replaygainAlbumGain: replaygainAlbumGain ?? gains.albumGain,
+            replaygainTrackPeak: replaygainTrackPeak ?? gains.trackPeak,
+            replaygainAlbumPeak: replaygainAlbumPeak ?? gains.albumPeak,
+            hasEmbeddedArt: hasEmbeddedArt
+        )
+    }
 }
 
 class AudioMetadataParser {
@@ -43,6 +66,22 @@ class AudioMetadataParser {
     }
 
     private static func parseAudioMetadataSync(from url: URL) async throws -> AudioMetadata {
+        let metadata = try await parseAudioMetadataSyncCore(from: url)
+        return enrichReplayGainIfNeeded(metadata, url: url)
+    }
+
+    /// 各格式解析完成后统一补 ReplayGain：
+    /// MP3(ID3 TXXX)/M4A/WAV 等解析器拿不到 ReplayGain 标签，这里用 SFBAudioEngine
+    /// 元数据接口统一兜底（已解析到的字段优先，只补 nil）。只读，不改写文件。
+    private static func enrichReplayGainIfNeeded(_ metadata: AudioMetadata, url: URL) -> AudioMetadata {
+        guard metadata.replaygainTrackGain == nil || metadata.replaygainAlbumGain == nil else {
+            return metadata
+        }
+        guard let gains = ReplayGainTagReader.readGains(from: url) else { return metadata }
+        return metadata.mergingReplayGain(gains)
+    }
+
+    private static func parseAudioMetadataSyncCore(from url: URL) async throws -> AudioMetadata {
         let ext = url.pathExtension.lowercased()
 
         switch ext {

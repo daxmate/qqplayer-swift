@@ -33,7 +33,11 @@ class PlayerEngine: NSObject {
     static let shared = PlayerEngine()
 
     var currentTrack: Track? {
-        didSet { currentTrackSubject.send(currentTrack) }
+        didSet {
+            currentTrackSubject.send(currentTrack)
+            // ReplayGain：切歌 / gapless promote 的唯一钩子（同 runloop 内设定增益）
+            ReplayGainManager.shared.trackDidChange(currentTrack)
+        }
     }
 
     var isPlaying = false {
@@ -261,6 +265,8 @@ class PlayerEngine: NSObject {
             // 届时 reapplyStoredVolume() 再写回混音器）。
             volumeModel = PlayerVolumePersistence.load()
         #endif
+        // ReplayGain：应用已存设置 + 恢复后台补算（不建音频图，首播才建）
+        ReplayGainManager.shared.activate()
     }
 
     // MARK: - Playback Control

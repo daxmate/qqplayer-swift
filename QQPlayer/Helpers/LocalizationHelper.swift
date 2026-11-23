@@ -580,4 +580,20 @@ struct Localized {
     static var whatsNewItemHints: String { "whats_new_item_hints".localized }
     static var whatsNewItemGuide: String { "whats_new_item_guide".localized }
     static var whatsNewItemAnnouncement: String { "whats_new_item_announcement".localized }
+
+    // MARK: - ReplayGain（音量归一化）
+
+    static var replayGain: String { "replaygain".localized }
+    static var replayGainMode: String { "replaygain_mode".localized }
+    static var replayGainOff: String { "replaygain_off".localized }
+    static var replayGainTrack: String { "replaygain_track".localized }
+    static var replayGainAlbum: String { "replaygain_album".localized }
+    static var replayGainPreamp: String { "replaygain_preamp".localized }
+    static var replayGainPreventClipping: String { "replaygain_prevent_clipping".localized }
+    static var replayGainPreventClippingFooter: String { "replaygain_prevent_clipping_footer".localized }
+    static var replayGainAnalyzeMissing: String { "replaygain_analyze_missing".localized }
+    static var replayGainAnalysisProgress: String { "replaygain_analysis_progress".localized }
+    static var replayGainPauseAnalysis: String { "replaygain_pause_analysis".localized }
+    static var replayGainResumeAnalysis: String { "replaygain_resume_analysis".localized }
+    static var replayGainCurrentGain: String { "replaygain_current_gain".localized }
 }

@@ -1291,3 +1291,18 @@
 "lyrics.align.entry.running" = "歌詞を整列中…";
 "lyrics.align.entry.loading" = "歌詞を読み込み中です。しばらくお待ちください";
 "lyrics.align.action.realign" = "歌詞タイムラインを再整列（整列済み）";
+
+/* ReplayGain（音量归一化） */
+"replaygain" = "音量の正規化 (ReplayGain)";
+"replaygain_mode" = "モード";
+"replaygain_off" = "オフ";
+"replaygain_track" = "トラック単位";
+"replaygain_album" = "アルバム単位";
+"replaygain_preamp" = "プリアンプ";
+"replaygain_prevent_clipping" = "クリッピング防止";
+"replaygain_prevent_clipping_footer" = "ピーク上限 -1 dBFS（増幅後のクリッピングを防止）";
+"replaygain_analyze_missing" = "タグなし曲を自動解析";
+"replaygain_analysis_progress" = "解析済み %d / %d";
+"replaygain_pause_analysis" = "解析を一時停止";
+"replaygain_resume_analysis" = "解析を再開";
+"replaygain_current_gain" = "現在のゲイン %.1f dB";

@@ -237,7 +237,8 @@ class LibraryIndexer: NSObject, IndexingStateProviding {
         sourceDescription: String,
         notifyImmediately: Bool = false
     ) async throws {
-        var track = parsedFile.track
+        // ReplayGain：重新扫描不得清掉已有分析结果（按 stableId 合并，见 Track 扩展）
+        var track = parsedFile.track.mergingReplayGainFromExisting(existingTrack)
         track.id = existingTrack?.id
 
         try databaseManager.upsertTrack(track)

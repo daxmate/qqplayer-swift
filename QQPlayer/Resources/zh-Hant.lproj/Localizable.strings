@@ -1615,3 +1615,18 @@
 "lyrics.align.entry.running" = "正在對齊中…";
 "lyrics.align.entry.loading" = "歌詞載入中，請稍候";
 "lyrics.align.action.realign" = "重新對齊（已對齊過）";
+
+/* ReplayGain（音量归一化） */
+"replaygain" = "音量正規化 (ReplayGain)";
+"replaygain_mode" = "模式";
+"replaygain_off" = "關閉";
+"replaygain_track" = "依曲目";
+"replaygain_album" = "依專輯";
+"replaygain_preamp" = "前置放大";
+"replaygain_prevent_clipping" = "防削波";
+"replaygain_prevent_clipping_footer" = "峰值上限 -1 dBFS，放大後避免削波";
+"replaygain_analyze_missing" = "自動補算無標籤曲目";
+"replaygain_analysis_progress" = "已分析 %d / %d";
+"replaygain_pause_analysis" = "暫停補算";
+"replaygain_resume_analysis" = "繼續補算";
+"replaygain_current_gain" = "目前增益 %.1f dB";
