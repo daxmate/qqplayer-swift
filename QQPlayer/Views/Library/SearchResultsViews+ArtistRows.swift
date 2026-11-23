@@ -16,6 +16,8 @@ import SwiftUI
 
 struct SearchArtistRowView: View {
     let artist: Artist
+    /// 头像拼贴代表曲目（≤4 条有封面）：由上层批量分组提供，行内零查询
+    let tracks: [Track]
     let onDismiss: () -> Void
     let onNavigate: (Artist, [Track]) -> Void
 
@@ -31,10 +33,11 @@ struct SearchArtistRowView: View {
             onNavigate(artist, artistTracks)
         }) {
             HStack(spacing: DesignTokens.space12) {
-                Image(systemName: "person.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.purple)
-                    .frame(width: 24, height: 24)
+                ArtistAvatarView(
+                    artistName: ArtistNameNormalizer.displayName(artist.name),
+                    tracks: tracks,
+                    size: 40
+                )
 
                 VStack(alignment: .leading, spacing: DesignTokens.space4) {
                     Text(ArtistNameNormalizer.displayName(artist.name))

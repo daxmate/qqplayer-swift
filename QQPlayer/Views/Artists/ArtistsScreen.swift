@@ -4,6 +4,9 @@ struct ArtistsScreen: View {
     let allTracks: [Track]
     @Environment(AppCoordinator.self) private var appCoordinator
     @State private var artists: [ArtistNameNormalizer.NormalizedArtist] = []
+    /// 艺人 → ≤4 条有封面代表曲目（头像拼贴用）。曲库曲目在内存里一次分组，
+    /// 行内只做字典查找（审计 M2：禁止每行查库）。
+    @State private var artworkTracks: [Int64: [Track]] = [:]
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
@@ -33,9 +36,15 @@ struct ArtistsScreen: View {
                         .opacity(0.0)
 
                         HStack {
-                            Image(systemName: "person")
-                                .foregroundColor(.purple)
-                                .frame(width: 24, height: 24)
+                            // 40pt = macOS 歌手列表同尺寸（原 24pt 紫色 person 图标）
+                            ArtistAvatarView(
+                                artistName: item.displayName,
+                                tracks: ArtistAvatarTracks.tracks(
+                                    for: item.artistIds,
+                                    groups: artworkTracks
+                                ),
+                                size: 40
+                            )
 
                             VStack(alignment: .leading, spacing: DesignTokens.space4) {
                                 Text(item.displayName)
@@ -98,6 +107,9 @@ struct ArtistsScreen: View {
             let allArtists = try appCoordinator.databaseManager.getAllArtists()
             // 简繁归一：同名简繁两行按归一 key 分组，每组一个显示项
             artists = ArtistNameNormalizer.groupedArtists(allArtists)
+            // 批量分组（纯内存，零额外查询）；规则与 macOS 共用
+            // `MacLibraryFactsStore.artistArtworkGroups`（每艺人 ≤4 条有封面曲目）
+            artworkTracks = MacLibraryFactsStore.artistArtworkGroups(tracks: allTracks)
         } catch {
             AppLog.error(.ui, "Failed to load artists: \(error)")
         }

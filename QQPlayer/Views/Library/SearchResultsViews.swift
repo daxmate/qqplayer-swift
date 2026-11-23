@@ -62,6 +62,8 @@ struct SearchResultsView: View {
     @State private var settings = DeleteSettings.load()
     @State private var artistNameCache: [Int64: String] = [:]
     @State private var artistDisplayNameCache: [String: String] = [:]
+    /// 歌手 → ≤4 条有封面代表曲目（头像拼贴用）：整库曲目一次内存分组，行内只查字典
+    @State private var artistArtworkTracks: [Int64: [Track]] = [:]
 
     private func loadArtistCache() {
         do {
@@ -157,6 +159,10 @@ struct SearchResultsView: View {
                                 VStack(alignment: .leading, spacing: DesignTokens.space0) {
                                     SearchArtistRowView(
                                         artist: group.primaryArtist,
+                                        tracks: ArtistAvatarTracks.tracks(
+                                            for: group.artistIds,
+                                            groups: artistArtworkTracks
+                                        ),
                                         onDismiss: onDismiss,
                                         onNavigate: onNavigateToArtist
                                     )
@@ -219,6 +225,14 @@ struct SearchResultsView: View {
             }
             .onChange(of: results.songs.map(\.stableId)) { _, _ in
                 loadArtistCache()
+            }
+            // 头像拼贴代表曲目：整库曲目一次分组（非渲染期，后台线程），
+            // 规则与 macOS 共用 `MacLibraryFactsStore.artistArtworkGroups`
+            .task(id: allTracks.count) {
+                let libraryTracks = allTracks
+                artistArtworkTracks = await Task.detached(priority: .utility) {
+                    MacLibraryFactsStore.artistArtworkGroups(tracks: libraryTracks)
+                }.value
             }
         }
     }

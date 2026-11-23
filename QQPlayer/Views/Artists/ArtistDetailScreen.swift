@@ -12,6 +12,8 @@ struct ArtistDetailScreen: View {
     @State private var unifiedArtist: UnifiedArtist?
     @State private var isLoading = false
     @State private var artistImage: UIImage?
+    /// 头像拼贴代表曲目（≤4 条有封面；与 macOS 同一分组规则）
+    @State private var avatarTracks: [Track] = []
     @State private var showFullProfile = false
     @State private var settings = DeleteSettings.load()
     @State private var isBulkMode = false
@@ -56,6 +58,13 @@ struct ArtistDetailScreen: View {
                 artists.contains { $0.id == track.artistId }
             }
         }
+
+        // 头像拼贴代表曲目：与本页曲目同一批数据在内存里分组（零额外查询；
+        // 规则与 macOS 共用 `MacLibraryFactsStore.artistArtworkGroups`）
+        avatarTracks = ArtistAvatarTracks.tracks(
+            for: artistIds,
+            groups: MacLibraryFactsStore.artistArtworkGroups(tracks: tracks)
+        )
 
         // CarPlay 连接时剔除不兼容格式（名单与判据的唯一入口 = CarPlayTrackFilter）
         cachedArtistTracks = CarPlayTrackFilter.filtered(tracks)
@@ -171,10 +180,6 @@ struct ArtistDetailScreen: View {
                                 .resizable().scaledToFill()
                                 .frame(width: geometry.size.width, height: imageHeight)
                                 .clipped()
-                        } else {
-                            Image(systemName: "person.circle")
-                                .font(.system(size: DesignTokens.font60))
-                                .foregroundColor(.secondary)
                         }
                     }
                     .overlay(
@@ -189,6 +194,12 @@ struct ArtistDetailScreen: View {
                             endPoint: .bottom
                         )
                     )
+                // 无远程图时：96pt 圆形头像（本地照片 → 封面拼贴 → 首字母色块），
+                // 叠在渐变层上（层次对照 macOS 歌手详情 96pt）
+                if artistImage == nil {
+                    ArtistAvatarView(artistName: displayName, tracks: avatarTracks, size: 96)
+                }
+
                 VStack {
                     HStack {
                         Spacer()
