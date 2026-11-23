@@ -671,7 +671,11 @@ struct ViewSharedSingletonContractTests {
         #expect(ViewSharedSingletonContract.occurrenceCount(in: viewSource) == 3)
         #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "// 整行注释 X.shared") == 0)
         #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let x = URLSession.shared") == 1)
-        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let y = something.sharedThing") == 1)
+        // 词边界（2026-11-23 与显式规则同步）：`shared` 后面还有标识符字符 → 不是单例访问
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let y = something.sharedThing") == 0)
+        // 方法名里带 `shared` 前缀（SwiftUI 工具栏修饰符）：不是单例访问
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "toolbarItems.sharedBackgroundVisibility(.visible)") == 0)
+        #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "let v = .sharedBackgroundVisibility") == 0)
 
         // 2026-09-19 收紧：前导点简写必须计入（此前正是「换写法压低上限」的漏洞）
         #expect(ViewSharedSingletonContract.occurrences(inCodeLine: "store: LocalDeviceNameStore = .shared") == 1)
