@@ -64,6 +64,7 @@ struct ReplayGainSettingsControls: View {
         } footer: {
             Text(Localized.replayGainPreventClippingFooter)
         }
+        .glassClearRowBackground()
 
         Section {
             Toggle(Localized.replayGainAnalyzeMissing, isOn: $manager.analyzeMissingTracks)
@@ -91,6 +92,7 @@ struct ReplayGainSettingsControls: View {
                 }
             }
         }
+        .glassClearRowBackground()
     }
 }
 
@@ -99,6 +101,10 @@ struct ReplayGainSettingsControls: View {
         var body: some View {
             Form {
                 ReplayGainSettingsControls()
+            }
+            // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
+            .artworkGlassGroupedList {
+                ScreenSpecificBackgroundView(screen: .library)
             }
             .navigationTitle(Localized.replayGain)
             .navigationBarTitleDisplayMode(.inline)
