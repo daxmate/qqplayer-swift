@@ -513,7 +513,8 @@ final class MacTrackColumnResizerView: NSView {
             name: NSTableView.columnDidResizeNotification,
             object: table
         )
-        if let clipView = table.enclosingScrollView?.contentView {
+        // 滚动特征只走唯一入口（形状契约扫全仓拦截第二份实现）
+        if let clipView = MacHostScrollView.enclosing(of: table)?.contentView {
             center.addObserver(
                 self,
                 selector: #selector(geometryDidChange),
