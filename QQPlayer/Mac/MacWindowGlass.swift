@@ -83,13 +83,16 @@ struct MacWindowGlass: View {
 ///   （`_NSSplitViewItemViewWrapper` → `NSGlassEffectView` → 内容），它按自己的规则取景加色，
 ///   盖在整窗玻璃上就是「一块不透明的米白面板 + 圆角硬边」。该视图由列控制器按
 ///   `NSSplitViewItem.behavior == .sidebar` 挂上，**隐藏无效**（实测 `isHidden` / `alphaValue` /
-///   `layer.isHidden` 都不生效，只有移出视图树才停画），而内容就在它里面，删它会把内容一起带走。
-///   所以做法是**换列**：把同一个 `viewController` 重新包成普通 `NSSplitViewItem`（非 sidebar 行为），
-///   厚度 / 折叠 / 全高布局等属性逐项照抄 —— 内容、宽度、行高、内边距全部不动，只是不再挂玻璃。
+///   `layer.isHidden` 都不生效），而内容就在它里面，删它会把内容一起带走。
+///   所以做法是「**摘玻璃、不换列**」：内容先搬进铺满 wrapper 的普通容器，再把玻璃本体移进
+///   一个隐藏的 1×1 裁剪容器 —— 玻璃不再参与绘制，而列仍保持 `.sidebar` behavior。
+///   ⚠️ 不能换列：换掉第 0 个 item 会破坏 `NSTrackingSeparatorToolbarItem` / 统一标题栏的
+///   右侧分区，工具栏按钮从最右跑到中间（实测数字见 `detachGlassPanel()` 注释）。
+///   ⚠️ 也不能把玻璃删出视图树：列折叠/展开会重新激活指向它的约束，直接抛异常。
 /// - **macOS 15 及更早**：侧栏材质来自 `.sidebar` 的 `NSVisualEffectView`（侧栏的兄弟视图），
 ///   整块隐藏即可；隐藏祖先会把内容一起抹掉，故只认非祖先的目标。
 ///
-/// 开关关闭 / 视图离开窗口时**还原**（列换回原 item、材质可见性还原）。只动可见性与列包装，
+/// 开关关闭 / 视图离开窗口时**还原**（内容装回玻璃、玻璃装回原位置、材质可见性还原）。
 /// 不改 frame、不改内容、不碰 SwiftUI 布局。
 struct MacSidebarMaterialStripper: NSViewRepresentable {
     func makeNSView(context: Context) -> StripperView {
@@ -110,10 +113,19 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
         private weak var strippedMaterial: NSVisualEffectView?
         private var materialWasHidden = false
 
-        /// macOS 26+：换列用到的原 item / 新 item / 控制器（都保持强引用，便于还原）
-        private var originalItem: NSSplitViewItem?
-        private var replacementItem: NSSplitViewItem?
-        private var splitController: NSSplitViewController?
+        /// macOS 26+：摘下来的侧栏玻璃与「停放位」（都保持强引用，便于还原）
+        private var parkedGlass: NSView?
+        private var glassContent: NSView?
+        private var glassHost: NSView?
+        private var glassParking: NSView?
+        private var glassWrapper: NSView?
+        /// 防重入：`strip()` 在 `layout()` 里反复调用，摘除本身也会触发布局
+        private var isDetachingGlass = false
+        /// 摘除期间挂上的三组约束：切换前必须整组撤掉，否则反复开关玻璃会越攒越多
+        private var hostConstraints: [NSLayoutConstraint] = []
+        private var contentInHostConstraints: [NSLayoutConstraint] = []
+        /// 装回时 content↔glass 的约束：留着给还原后的布局用，下一轮摘除前再撤
+        private var contentInGlassConstraints: [NSLayoutConstraint] = []
 
         /// 纯背景探针：不能参与命中测试（否则会挡住侧栏行的点击 / 拖拽）。
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -140,8 +152,8 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
         func strip() {
             guard window != nil else { return }
             if #available(macOS 26.0, *) {
-                // 26+：不再有列级 `.sidebar` 材质（只剩行内选中胶囊），只走「换列」一条路
-                _ = restyleSidebarItem()
+                // 26+：不再有列级 `.sidebar` 材质（只剩行内选中胶囊），走「摘玻璃不换列」一条路
+                _ = detachGlassPanel()
             } else {
                 stripLegacySidebarMaterial()
             }
@@ -154,59 +166,129 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
             }
             strippedMaterial = nil
 
-            if let original = originalItem,
-               let replacement = replacementItem,
-               let controller = splitController,
-               controller.splitViewItems.contains(where: { $0 === replacement }) {
-                controller.removeSplitViewItem(replacement)
-                controller.insertSplitViewItem(original, at: 0)
+            if #available(macOS 26.0, *) {
+                restoreGlassPanel()
             }
-            originalItem = nil
-            replacementItem = nil
-            splitController = nil
         }
 
-        // MARK: - macOS 26+：换掉带 Liquid Glass 的 sidebar 列
+        // MARK: - macOS 26+：摘掉侧栏玻璃底板（不换列，保住 .sidebar behavior）
 
+        /// 把侧栏列里的 `NSGlassEffectView` 底板摘掉，内容搬到铺满 wrapper 的普通容器里。
+        ///
+        /// 为什么**不能换列**：`NSTrackingSeparatorToolbarItem` / 统一标题栏的右侧分区依赖
+        /// 第 0 个 item 是 `.sidebar` behavior。换成普通 item 后标题栏几何整体垮掉
+        /// （探针实测：窗口 1280 / 侧栏 210 时 `NSToolbarTitleView` 从 `{{214, 748}, {930, 52}}`
+        /// 塌成 `{{92, 748}, {160, 52}}`，右侧 3 个按钮从 x=1144/1188/1232 移到 252/260/300 一带；
+        /// 换回原 item 立即复原）。
+        ///
+        /// 为什么玻璃**留在视图树里**（藏进 1×1 隐藏容器）而不是删掉：列控制器折叠/展开时
+        /// 会重新激活它自己那组指向玻璃的约束，玻璃一旦不在同一视图树里，
+        /// `NSSplitViewItem._setCollapsed:` 直接抛 "Unable to activate constraint" 崩溃（实测）。
         @available(macOS 26.0, *)
-        private func restyleSidebarItem() -> Bool {
-            if replacementItem != nil,
-               let controller = splitController,
-               controller.splitViewItems.first === replacementItem {
-                return true // 已经换过且仍生效
+        private func detachGlassPanel() -> Bool {
+            if isDetachingGlass { return true }
+            if let parked = parkedGlass, let parking = glassParking, parked.superview === parking {
+                return true // 已经摘过且仍生效
             }
-            guard let splitView = enclosingSplitView(),
-                  let controller = splitView.delegate as? NSSplitViewController,
-                  let item = controller.splitViewItems.first,
-                  item.behavior == .sidebar
+
+            isDetachingGlass = true
+            defer { isDetachingGlass = false }
+
+            restoreGlassPanel() // 列被重建过：旧状态先还原，再摘新的
+            guard let glass = enclosingGlassPanel(), let wrapper = glass.superview,
+                  let content = glass.contentView
             else { return false }
 
-            let replacement = NSSplitViewItem(viewController: item.viewController)
-            replacement.minimumThickness = item.minimumThickness
-            replacement.maximumThickness = item.maximumThickness
-            replacement.preferredThicknessFraction = item.preferredThicknessFraction
-            replacement.canCollapse = item.canCollapse
-            replacement.collapseBehavior = item.collapseBehavior
-            replacement.allowsFullHeightLayout = item.allowsFullHeightLayout
-            replacement.titlebarSeparatorStyle = item.titlebarSeparatorStyle
-            replacement.holdingPriority = item.holdingPriority
-            replacement.isSpringLoaded = item.isSpringLoaded
-            replacement.isCollapsed = item.isCollapsed
+            // 上一轮还原时挂的 content↔glass 约束先撤掉，否则每开关一次就多 4 条
+            NSLayoutConstraint.deactivate(contentInGlassConstraints)
+            contentInGlassConstraints = []
 
-            originalItem = item
-            replacementItem = replacement
-            splitController = controller
-            controller.removeSplitViewItem(item)
-            controller.insertSplitViewItem(replacement, at: 0)
+            // 1) 内容搬进铺满 wrapper 的普通容器（先摘内容，绝不能让内容跟着玻璃走）
+            let host = NSView()
+            host.translatesAutoresizingMaskIntoConstraints = false
+            wrapper.addSubview(host)
+            hostConstraints = [
+                host.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+                host.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+                host.topAnchor.constraint(equalTo: wrapper.topAnchor),
+                host.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+            ]
+            NSLayoutConstraint.activate(hostConstraints)
+            content.removeFromSuperview()
+            content.translatesAutoresizingMaskIntoConstraints = false
+            host.addSubview(content)
+            contentInHostConstraints = [
+                content.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                content.topAnchor.constraint(equalTo: host.topAnchor),
+                content.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            ]
+            NSLayoutConstraint.activate(contentInHostConstraints)
+
+            // 2) 玻璃本体移进「隐藏的 1×1 裁剪容器」：不在 wrapper 里画，列约束却始终有效
+            let parking = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+            parking.autoresizingMask = []
+            parking.wantsLayer = true
+            parking.layer?.masksToBounds = true
+            parking.isHidden = true
+            wrapper.addSubview(parking)
+            parking.addSubview(glass)
+
+            wrapper.layoutSubtreeIfNeeded()
+
+            parkedGlass = glass
+            glassContent = content
+            glassHost = host
+            glassParking = parking
+            glassWrapper = wrapper
             return true
         }
 
-        /// 沿 superview 链找侧栏所在的 `NSSplitView`（SwiftUI 的 NavigationSplitView 实现）。
-        private func enclosingSplitView() -> NSSplitView? {
+        /// 把玻璃与内容装回原位（玻璃对 wrapper 的约束一直挂着，无需重装）。
+        @available(macOS 26.0, *)
+        private func restoreGlassPanel() {
+            guard let glass = parkedGlass, let content = glassContent,
+                  let host = glassHost, let parking = glassParking, let wrapper = glassWrapper
+            else { return }
+
+            // 三组约束整组撤掉再装回，反复开关不累积
+            NSLayoutConstraint.deactivate(hostConstraints)
+            NSLayoutConstraint.deactivate(contentInHostConstraints)
+            NSLayoutConstraint.deactivate(contentInGlassConstraints)
+            hostConstraints = []
+            contentInHostConstraints = []
+            contentInGlassConstraints = []
+
+            content.removeFromSuperview()
+            glass.addSubview(content)
+            content.translatesAutoresizingMaskIntoConstraints = false
+            contentInGlassConstraints = [
+                content.leadingAnchor.constraint(equalTo: glass.leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: glass.trailingAnchor),
+                content.topAnchor.constraint(equalTo: glass.topAnchor),
+                content.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
+            ]
+            NSLayoutConstraint.activate(contentInGlassConstraints)
+
+            wrapper.addSubview(glass, positioned: .below, relativeTo: host)
+            parking.removeFromSuperview()
+            host.removeFromSuperview()
+            wrapper.layoutSubtreeIfNeeded()
+
+            parkedGlass = nil
+            glassContent = nil
+            glassHost = nil
+            glassParking = nil
+            glassWrapper = nil
+        }
+
+        /// 沿 superview 链找侧栏列自己的玻璃底板（SwiftUI 的侧栏内容就在它里面）。
+        @available(macOS 26.0, *)
+        private func enclosingGlassPanel() -> NSGlassEffectView? {
             var node = superview
             var depth = 0
             while let view = node, depth < 12 {
-                if let split = view as? NSSplitView { return split }
+                if let glass = view as? NSGlassEffectView { return glass }
                 node = view.superview
                 depth += 1
             }
