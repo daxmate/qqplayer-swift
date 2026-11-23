@@ -37,6 +37,7 @@ struct EQSettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            .glassClearRowBackground()
 
             // Common Presets (常用预设)
             Section(Localized.presetCommon) {
@@ -48,6 +49,7 @@ struct EQSettingsView: View {
                 }
                 .padding(.vertical, DesignTokens.space4)
             }
+            .glassClearRowBackground()
             Section(Localized.manualEQPresets) {
                 if eqManager.availablePresets.contains(where: { $0.presetType == .manual }) {
                     ForEach(eqManager.availablePresets.filter { $0.presetType == .manual }) { preset in
@@ -112,6 +114,7 @@ struct EQSettingsView: View {
                 }
                 .foregroundColor(.green)
             }
+            .glassClearRowBackground()
 
             // Imported GraphicEQ Presets
             Section(Localized.importedPresets) {
@@ -169,6 +172,7 @@ struct EQSettingsView: View {
                 }
                 .foregroundColor(appAccentColor)
             }
+            .glassClearRowBackground()
 
             // Global Gain (only show when EQ is enabled)
             if eqManager.isEnabled {
@@ -191,6 +195,7 @@ struct EQSettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                .glassClearRowBackground()
             }
 
             // Info Section
@@ -213,9 +218,17 @@ struct EQSettingsView: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .glassClearRowBackground()
+        }
+        // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
+        .artworkGlassGroupedList {
+            ScreenSpecificBackgroundView(screen: .library)
         }
         .navigationTitle(Localized.equalizer)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与设置页同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
         .sheet(isPresented: $showingImport) {
             GraphicEQImportView()
         }
