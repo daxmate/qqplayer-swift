@@ -114,6 +114,7 @@ struct MacTrackListView: View {
     @State private var menu = MacTrackMenuModel()
     /// 当前悬停行：由父视图唯一持有，单元格只上报（不把 hover 状态散进各格 @State）
     @State private var hoveredTrackId: String?
+    @State private var columnWidths = MacTrackColumnWidths()  // 拖拽列宽唯一真相源（MacTrackColumnResizer.swift）
     /// Table 排序状态（表头已隐藏；显示与播放队列都按 sortOrder 跟随）。
     /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
@@ -276,7 +277,7 @@ struct MacTrackListView: View {
                         .lineLimit(1)
                 }
             }
-            .width(min: 160, ideal: 300, max: .infinity)
+            .width(min: MacTrackColumnLayout.titleMinWidth, ideal: columnWidths.title, max: .infinity)
 
             TableColumn("artist".localized, value: \.artistName) { row in
                 cellChrome(row) {
@@ -285,7 +286,7 @@ struct MacTrackListView: View {
                         .lineLimit(1)
                 }
             }
-            .width(min: 90, ideal: 140, max: 260)
+            .width(min: MacTrackColumnLayout.artistMinWidth, ideal: columnWidths.artist, max: .infinity)
 
             TableColumn("album".localized) { row in
                 cellChrome(row) {
@@ -294,7 +295,7 @@ struct MacTrackListView: View {
                         .lineLimit(1)
                 }
             }
-            .width(min: 90, ideal: 180, max: 320)
+            .width(min: MacTrackColumnLayout.albumMinWidth, ideal: columnWidths.album, max: .infinity)
 
             // 2026-09-06 用户拍板曾去掉时长列（播放区进度条已有时长信息）；
             // 2026-11-16 视觉增强按新需求恢复：右对齐 + 等宽数字 + 固定 56 不可拉伸。
@@ -365,6 +366,7 @@ struct MacTrackListView: View {
         }
         // 表头整条隐藏（用户要求：列表不显示列名；「#」序号列已删）
         .tableColumnHeaders(.hidden)
+        .overlay { MacTrackColumnResizer(widths: columnWidths) { columnWidths = $0 } }
         // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
         // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
         .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false)).macGlassListBackground()
