@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T05:23:32Z",
+  "updated_at": "2026-11-23T05:29:57Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "CHANGELOG.md": {
       "role": "index",
-      "sha256": "cf15ddd2d04a6ae6b147aed5fb3b417ebd97c4b7e7f5f3f4048ac2a210681f14",
-      "size": 20906,
-      "normalized_sha256": "cf15ddd2d04a6ae6b147aed5fb3b417ebd97c4b7e7f5f3f4048ac2a210681f14"
+      "sha256": "22aaa3cffba36228569a4f540049650f4b2e60dc845dea9e1c76abc27c382fad",
+      "size": 21221,
+      "normalized_sha256": "22aaa3cffba36228569a4f540049650f4b2e60dc845dea9e1c76abc27c382fad"
     },
     "LICENSE": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "5215e24d2cb352947d682992a4713e5da6a559b4251582c1be9d973e170af1e2",
+      "sha256": "b75e214d29cf27903a55cdefe7cf848d0d5026f6e62cbe565fd2dbaacf2c6a87",
       "size": 201067,
-      "normalized_sha256": "5215e24d2cb352947d682992a4713e5da6a559b4251582c1be9d973e170af1e2"
+      "normalized_sha256": "b75e214d29cf27903a55cdefe7cf848d0d5026f6e62cbe565fd2dbaacf2c6a87"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -5642,9 +5642,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "04989f32fc3f3c90794e5f550be5ea4793e064566ea29b51362ce03bfd5e3e23",
-      "size": 452833,
-      "normalized_sha256": "04989f32fc3f3c90794e5f550be5ea4793e064566ea29b51362ce03bfd5e3e23"
+      "sha256": "d5515aaa1c1c3f52ee7666f6d3b29cd76f873636a21aca8039de5a0888e8e365",
+      "size": 452798,
+      "normalized_sha256": "d5515aaa1c1c3f52ee7666f6d3b29cd76f873636a21aca8039de5a0888e8e365"
     },
     "aoci.meta.txt": {
       "role": "index",

@@ -14,7 +14,7 @@ PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 ent
 QQPlayerMac-Info.plist[FN5T]: F:macOS target 的 Info.plist 补充片段：用显式 plist 承载数组型键 NSBonjourServices（_qqplayer-sync._tcp） | R:code:QQPlayer/Info.plist,code:QQPlayer/Sync/SyncListener.swift,code:QQPlayer/Sync/SyncBrowser.swift | A:NSBonjourServices | S:INFOPLIST_KEY_NSBonjourServices 不被 Xcode 支持，须显式 plist 合并；服务类型三处必须一致
 README.md[SZ7L]: F:项目总览：平台矩阵与版号口径（指向 CHANGELOG 与 git tag，App Store 版本单独发布）、双端功能清单、局域网配对与同步、技术架构、目录与脚本清单、测试与构建（CI 四 job）；含标签刮削与下载后自动刮削；产品页截图（macOS 3 + iPhone 4，WebP） | R:code:docs/logging.md,code:scripts/build-app.sh | A:- | S:功能矩阵须与 target 能力同步；CI main 走自托管 qqplayer-macos、PR 走 macos-latest；批量刮削取首候选写全字段且不改名，下载后自动刮削默认关；图只放 assets/screenshots（docs/ gitignore）
 QQPlayerMac.entitlements[FS8T]: F:macOS 授权：App Group B6FA37AYT5.dsqcommon（共享资源根）＋ network.client；未声明 App Sandbox（非沙盒，便于共享根与旧路径 symlink） | R:code:QQPlayer/Services/DSQSharedPaths.swift, code:QQPlayer/QQPlayer.entitlements | A:com.apple.security.application-groups | S:App Group ID 必须与 DSQSharedLocations.appGroupIdentifier 一致；删 network.client → 在线搜索/模型下载全断
-CHANGELOG.md[SV6M]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚙️改进 / 🐛修复 / 🔧工程；最新 2.1.0（2026-11-23：ReplayGain 音量归一化落地——标签读取 + 无标签后台补算 + 按曲目/专辑模式 + 防削波） | R:- | A:- | S:发版时与版本号同批更新；开发中条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
+CHANGELOG.md[SV6M]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚙️改进 / 🐛修复 / 🔧工程；最新 2.1.1（2026-11-23：iOS 艺术家封面头像——列表/详情/搜索统一 macOS 显示方式） | R:- | A:- | S:发版时与版本号同批更新；开发中条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/.github/workflows/===
 ci.yml[OQ7L]: F:GitHub Actions CI 四 job：Swift（设备判据自检/lint/format/成员校验/iOS 单测/零警告）、local-harness（同步与 DSQ 脚本）、macOS（构建 Mac 端 + 版号与资源断言）、Siri（运行时门控） | R:code:scripts/xcbuild.sh,code:.swiftlint.yml,code:scripts/run-local-sync-tests.sh,code:scripts/run-dsq-shared-tests.sh | A:jobs Swift,local-harness,macOS,Siri | S:push main 走自托管 qqplayer-macos、PR 回落 macos-latest；siri job 由模拟器运行时版本门控，禁加 CODE_SIGNING_ALLOWED=NO；iOS 测试按 UDID 选设备；不要再加 actions/cache——自托管在前置阶段下载头里所有 uses，慢网必撞 100s 超时卡死 Set up job；警告零容忍
@@ -40,7 +40,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.1.0/89；已登记 ReplayGain 源文件与测试、MacWindowGlassChrome、ArtistAvatar 三件套 | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only，不进 Mac 白名单
+project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.1.1/90；已登记 ReplayGain 源文件与测试、MacWindowGlassChrome、ArtistAvatar 三件套 | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only，不进 Mac 白名单
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
