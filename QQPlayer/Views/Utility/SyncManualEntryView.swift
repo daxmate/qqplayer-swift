@@ -46,8 +46,19 @@ struct SyncManualEntryView: View {
                 )
             }
         }
+        // 内容撑满整页：三种 flow（输入 / 待确认 / 结果）的玻璃底都要铺满，不留中段方框
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 封面毛玻璃底：视觉层与设置页同源（ArtworkGlassScreenBackground）。
+        // 装饰底 = 不透明系统底色 —— 玻璃关闭时与本页接入前逐像素一致（本页原本没有装饰底节点）。
+        .artworkGlassScreen {
+            Color(uiColor: .systemBackground)
+                .ignoresSafeArea()
+        }
         .navigationTitle("sync_manual_input".localized)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与设置页同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(Localized.cancel) { dismiss() }
