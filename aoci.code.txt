@@ -40,7 +40,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.1.2/91；已登记 ReplayGain 源文件与测试、MacWindowGlassChrome、ArtistAvatar 三件套 | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only，不进 Mac 白名单
+project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.1.2/91；已登记 ReplayGain 源文件与测试、MacWindowGlassChrome、ArtistAvatar 三件套、MacTrackSortMenu | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only，不进 Mac 白名单
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
@@ -213,7 +213,7 @@ MacTagEditorView+RenameSave.swift[AU6M]: F:MacTagEditorView 的重命名段/预�
 MacTagEditorView+Scrape.swift[AU6M]: F:MacTagEditorView 的刮削行/候选区/刮削逻辑：打开自动刮削、三源分组按设置顺序、流式（每源到达即更新）、点选候选填表+候选封面（ScrapeCoverLoader 唯一入口）+网易云补年份；本地指定封面（NSOpenPanel 选 JPEG/PNG） | R:code:QQPlayer/Mac/MacTagEditorView.swift,code:QQPlayer/Mac/MacTagEditorCandidateRow.swift,code:QQPlayer/Services/ScrapeBatchService.swift,code:QQPlayer/Services/ScrapeLogic.swift,code:QQPlayer/Services/ScrapeSource.swift | A:MacTagEditorView.scrapeRow,candidatesSection,runScrape,pick,downloadCandidateCover,chooseLocalCoverImage | S:runScrape 每次开新 sessionID 作会话守卫（晚到源按 id 丢弃）；点选即自动采用封面；本地选图与候选封面同走 coverState=.replace 暂存；封面下载走 ScrapeCoverLoader、格式判据复用 ScrapeLogic.validateCoverData
 MacTagEditorView.swift[AU6M]: F:标签编辑/刮削 sheet（web TagEditorModal+/api/tags 移植）：打开自动刮削、表单从文件现读（year 用 Album.year 兜底）、封面区、重命名开关、保存改名 | R:code:QQPlayer/Mac/MacTagEditorView+Scrape.swift,code:QQPlayer/Mac/MacTagEditorView+RenameSave.swift,code:QQPlayer/Mac/MacTagEditorView+CoverForm.swift,code:QQPlayer/Mac/MacTrackListView.swift | A:MacTagEditorView,scrapeSessionID,itunesCandidates | S:初始表单值从文件现读（文件才是真源，DB 可能旧）；重命名默认仅当文件名与模板渲染一致才 ON；分片成员可见性须 internal；@State scrapeSessionID/itunesCandidates 供 +Scrape 共用；本视图不直连 PlayerEngine，跟随走 AppCoordinator
 MacTrackListView+LocateScroll.swift[IU5S]: F:AppKit 滚动唯一入口：定位当前播放（沿视图树找承载 Table 的 NSTableView，按 MacTableScrollGeometry 居中）；MacHostScrollView 找宿主 NSScrollView | R:code:QQPlayer/Mac/MacTrackListView.swift,code:QQPlayer/Services/MacTableScrollGeometry.swift | A:MacTableScroll.centerRow,MacHostScrollView,MacTableLocateScroller | S:表行居中/找宿主 NSScrollView 的唯一入口；白名单只留 2 文件，禁别处直连 enclosingScrollView/scroll(to:)/contentView.scroll(；文档 rect 居中 centerRect 已删除（歌词改 scrollTo）；仅请求号变才滚
-MacTrackListView.swift[AU8L]: F:macOS「歌曲」列表：SwiftUI Table（封面/标题/艺人/专辑/时长/♥，无序号列与表头），列表/专辑网格/分组折叠三模式；播放行底色由 MacTableRowHighlight 画在行上；行尾 ♥ 下传 AppCoordinator；Table 按 macWindowGlassActive 自清底 | R:code:QQPlayer/Mac/MacAlbumGrid.swift,code:QQPlayer/Mac/MacTrackGroupedView.swift,code:QQPlayer/Mac/MacTrackFavoriteButton.swift,code:QQPlayer/Mac/MacArtworkThumbnail.swift,code:QQPlayer/Mac/MacTrackContextMenu.swift,code:QQPlayer/Mac/MacTableRowHighlight.swift,code:QQPlayer/Mac/MacWindowGlass.swift | A:MacTrackListView,MacTrackTableRow,MacTrackListMetrics,cellChrome | S:table 变量体即交互契约；三模式共用同一 Table 不许换 List；表头已用 .tableColumnHeaders(.hidden) 隐藏 ⇒ 点列头排序入口不存在，sortOrder 仅驱动排序；序号列已删 ⇒ 无喇叭图标，播放态只靠整行底色与标题强调；文件 579 行、预算 600，加逻辑先外移；播放行底色只走 MacTableRowHighlight（探针挂封面列单元格，沿 superview 找 NSTableRowView）；AppCoordinator 在本视图取，行按钮显式传参（行 hosting 无环境）；Table 系统内容底色只在直接贴 .macGlassListBackground() 时归零
+MacTrackListView.swift[AU8L]: F:macOS「歌曲」列表：SwiftUI Table（封面/标题/艺人/专辑/时长，无表头序号），列表/网格/分组三模式；工具条排序菜单写 sortOrder；播放行底色走 MacTableRowHighlight；行尾♥下传 AppCoordinator；Table 按 macWindowGlassActive 自清底 | R:code:QQPlayer/Mac/MacAlbumGrid.swift,code:QQPlayer/Mac/MacTrackGroupedView.swift,code:QQPlayer/Mac/MacTrackFavoriteButton.swift,code:QQPlayer/Mac/MacArtworkThumbnail.swift,code:QQPlayer/Mac/MacTrackContextMenu.swift,code:QQPlayer/Mac/MacTableRowHighlight.swift,code:QQPlayer/Mac/MacWindowGlass.swift,code:QQPlayer/Mac/MacTrackSortMenu.swift | A:MacTrackListView,MacTrackTableRow,MacTrackListMetrics,cellChrome | S:table 变量体即交互契约；三模式共用同一 Table 不许换 List；表头已用 .tableColumnHeaders(.hidden) 隐藏 ⇒ 无表头 ⇒ 排序入口在工具条 MacTrackSortMenu（只写 sortOrder）；序号列已删 ⇒ 无喇叭图标，播放态只靠整行底色与标题强调；文件 598 行、预算 600（余 2 行），加逻辑先外移；播放行底色只走 MacTableRowHighlight（探针挂封面列单元格，沿 superview 找 NSTableRowView）；AppCoordinator 在本视图取，行按钮显式传参（行 hosting 无环境）；Table 系统内容底色只在直接贴 .macGlassListBackground() 时归零
 MacVisualizerView.swift[AU5T]: F:播放页频谱条：Canvas 画 32 段对数频谱（数据源 MacSpectrumAnalyzer），数据驱动重绘；未激活且无冻结帧时不绘制 | R:code:QQPlayer/Mac/MacSpectrumAnalyzer.swift,code:QQPlayer/Mac/MacAppearance.swift | A:MacVisualizerView | S:levels 必须在 body 求值期读（渲染闭包内读 @Observable 不登记依赖→数据到达不重绘）；未激活且无冻结帧时整体不绘制；强调色读环境值 appAccentColor（AccentInjector 注入；不得自读静态 currentAccentColor）
 MacWindowGlassChrome.swift[IU7S]: F:整窗玻璃的窗口 chrome：生效时把主窗改为标题栏透明+内容铺满整窗，关开关/卸载时逐项还原；并含生效状态与工具栏背景条件切换 | R:code:QQPlayer/QQPlayerMacApp.swift,code:QQPlayer/Mac/MacLibraryView.swift | A:MacWindowGlassChromeState,MacWindowChromeToolbarBackground,MacWindowGlassChrome | S:只改四项属性且全记录原值（titlebarAppearsTransparent/isOpaque/backgroundColor/styleMask）；.fullSizeContentView 只在「本类插入的」时移除；NSPanel（设置/浮窗/迷你/歌词窗）不碰；探针 hitTest=nil
 SyncDataPane.swift[AU6M]: F:macOS 播放数据流面板：展示同步阶段/报告，触发一次数据同步（收藏、播放历史、歌单） | R:code:QQPlayer/Mac/MacSyncDataViewModel.swift, code:QQPlayer/Sync/SyncDataSyncCoordinator.swift | A:SyncDataPane | S:-
@@ -242,6 +242,7 @@ MacTrackGroupedView.swift[AU6L]: F:macOS 歌曲「分组折叠」模式：按专
 MacArtistAvatar.swift[AU6S]: F:macOS 艺人头像视图（AppKit）：本地照片 → ≤4 张代表曲目封面拼贴 → 首字符色块；纯文本规则已移至双 target 的 ArtistAvatarStyle | R:code:QQPlayer/Services/ArtistAvatarStyle.swift,code:QQPlayer/Mac/MacArtworkThumbnail.swift,code:QQPlayer/Services/MacLibraryFactsStore.swift,code:QQPlayer/Mac/MacAlbumArtistViews.swift | A:MacArtistAvatar,MacArtistAvatarPalette,typealias MacArtistAvatarStyle | S:首字符配色禁 hashValue（每进程随机化会重启换色）；代表曲目由 store 批量预取，本视图只查字典，禁每行每帧查库；MacArtistAvatarStyle 只是 ArtistAvatarStyle 的 typealias，禁在此重写规则
 MacTableRowHighlight.swift[AU6S]: F:macOS 表格「当前播放行」整行底色：零尺寸 NSViewRepresentable 挂进单元格，沿 superview 链上溯 NSTableRowView 设 backgroundColor，由行视图一次画满跨列连续底色 | R:code:QQPlayer/Mac/MacTrackListView.swift | A:MacTableRowHighlight,MacTableRowHighlightProbe | S:找不到 NSTableRowView 时静默不动（宁无底色也不留半截底色）；选中态交系统绘制不在此覆盖；逐格铺色会断且滚动残留，底色只能画在行视图上
 MacWindowGlass.swift[IU7S]: F:整窗封面毛玻璃底（macOS）：窗口背景=封面模糊图+外观自适应雾面，关闭还原；玻璃模式下剥离系统 .sidebar 材质；macWindowGlassActive 环境值决定各栏是否去掉自己的底；并提供 .macGlassListBackground() 统一让路修饰器 | R:code:QQPlayer/Views/Utility/ArtworkBlurBackground.swift,code:QQPlayer/Mac/MacWindowGlassChrome.swift | A:MacWindowGlass,MacSidebarMaterialStripper,macWindowGlassActive,MacGlassListBackground | S:关闭须还原窗底与侧栏材质；雾面 浅色 white 0.62 / 深色 black 0.36；不铺到安全区外（标题栏归 GlassChrome）；剥离不得隐藏祖先（会抹掉侧栏内容），dismantle 还原；探针 hitTest=nil；List/Table 让路统一走 .macGlassListBackground()，必须直接贴在 Table 上才归零
+MacTrackSortMenu.swift[AU7T]: F:macOS 歌曲列表工具条「排序」菜单：标题/艺人/专辑/时长×升/降，勾选当前项，另有「默认顺序」清空 sortOrder；只把字段翻译成 SortDescriptor，复用 Table 原生排序 | R:code:QQPlayer/Mac/MacTrackListView.swift,code:QQPlayer/Services/MacLibraryFactsStore.swift | A:MacTrackSortField,MacTrackSortMenu | S:排序 KeyPath 必须指向 MacTrackTableRow 的 @objc 存储属性（计算属性运行期 fatal）；只写单条 descriptor；SortDescriptor 取出的 PartialKeyPath 与字面量不等，当前态判定用整条 descriptor 比较；菜单在 viewMode == .albums 时不显示（专辑网格排序无意义）
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Models/===
 AppNotifications.swift[CM6T]: F:全 App 通知名唯一入口：Notification.Name 常量（曲库/歌单/收藏/设置/同步/导航/歌词变更/语言切换/定位当前播放），退役项在注释登记 | R:code:QQPlayer/Models/SettingsModels.swift | A:Notification.Name.libraryNeedsRefresh,playlistsChanged,qqplayerSettingsDidChange,qqplayerLanguageDidChange,lyricsDidChange | S:其它文件只能引用 .xxx 常量，禁再写 Notification.Name 字面量（契约测试守）；字符串值必须与历史字面量逐字相同；新通知必须同时进契约测试白名单两处（原始字符串 + 枚举分支）
@@ -265,31 +266,31 @@ TraditionalToSimplified.tsv[CL6L]: F:繁体→简体字形映射表（TSV 逐字
 AppIntentVocabulary.plist[FL4T]: F:英文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/QQPlayerApp.swift | A:- | S:IntentName 须为系统 INIntent 类名；词表仅辅助识别，不改 Intent 路由
 AppShortcuts.strings[FL4T]: F:英文 App Shortcuts Siri 调用短语（key 即短语，${applicationName} 为 App 名占位符） | R:code:QQPlayer/Resources/zh-Hans.lproj/AppShortcuts.strings | A:- | S:key 必须与 QQPlayerAppShortcuts.swift 的短语逐字一致，否则 Siri 认不出
 InfoPlist.strings[FL3T]: F:英文 Info.plist 权限文案本地化（相机=扫码配对、本地网络=发现同网设备） | R:code:QQPlayer/Resources/zh-Hans.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致（改单边会静默回退 base 文案）
-Localizable.strings[FL6L]: F:en 界面文案表（1126 键），键集与其余 7 语种逐一相等；含 ReplayGain 13 条（模式/预放大/防削波/补算进度） | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类），别当重复值修掉
+Localizable.strings[FL6L]: F:en 界面文案表（1130 键），键集与其余 7 语种逐一相等；含 ReplayGain 13 条（模式/预放大/防削波/补算进度）；含排序菜单 4 条（sort/升/降/默认） | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类），别当重复值修掉
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/fr.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:法文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:法文 App Shortcuts Siri 调用短语（key 同英文短语，${applicationName} 占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（仅 value 本地化）
 InfoPlist.strings[FL3T]: F:法文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:fr 界面文案表（1126 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
+Localizable.strings[FL6L]: F:fr 界面文案表（1130 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ru.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:俄文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:俄文 App Shortcuts Siri 调用短语（key 同英文短语，${applicationName} 占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（仅 value 本地化）
 InfoPlist.strings[FL3T]: F:俄文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:ru 界面文案表（1126 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
+Localizable.strings[FL6L]: F:ru 界面文案表（1130 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hans.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:简体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:简体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（${applicationName} 占位符保留）
 InfoPlist.strings[FL3T]: F:简体中文 Info.plist 权限文案本地化（相机扫码配对、本地网络发现设备） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1126 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回
+Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1130 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hant.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:繁体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:繁体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致
 InfoPlist.strings[FL3T]: F:繁体中文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hant 界面文案表（1126 键），键集与 zh-Hans 相等 | R:- | A:- | S:译文手工维护，别整份重跑 gen-zh-hant.py（会覆盖润色）
+Localizable.strings[FL6L]: F:zh-Hant 界面文案表（1130 键），键集与 zh-Hans 相等 | R:- | A:- | S:译文手工维护，别整份重跑 gen-zh-hant.py（会覆盖润色）
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Services/===
 AlignedLyricsStore.swift[PB7M]: F:局域网同步 aligned 歌词库唯一入口（docs/lan-sync-design §6.3）：写/读/删/枚举 + 接收侧安装；一歌一文件裸 Lyrics JSON、键=本端 stableId | R:code:QQPlayer/Sync/SyncAlignedLyrics.swift,code:QQPlayer/Services/LyricsManager.swift,code:QQPlayer/Services/LibraryRoot.swift | A:LyricsStoreKind,AlignedLyricsEntry,read,write,entries,install | S:install 移动原文件而非重编码，保字节原样使两侧 SHA-256 对得上；新位置=LibraryRoot.alignedLyricsDirectoryURL，旧 Documents/lyrics-aligned 只读兜底；只有 aligned 参与同步
@@ -1068,17 +1069,17 @@ SpeechAssetInstallPlanner.swift[IG6S]: F:语音模型资产安装的纯决策层
 AppIntentVocabulary.plist[FL4T]: F:es Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:es Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语用口语形，识别依赖固定结构，不要改成书面体
 InfoPlist.strings[FL5T]: F:es Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，不一致会静默回退基串
-Localizable.strings[FL6L]: F:es 界面文案表（1126 键），中性拉美西语；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:preset 统一 preajuste，Ajustes 专指设置；禁用 vosotros；引号用 «»
+Localizable.strings[FL6L]: F:es 界面文案表（1130 键），中性拉美西语；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:preset 统一 preajuste，Ajustes 专指设置；禁用 vosotros；引号用 «»
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ja.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:ja Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:ja Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语用口语形，与主 UI 敬体不同是刻意的，别统一
 InfoPlist.strings[FL5T]: F:ja Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
-Localizable.strings[FL6L]: F:ja 界面文案表（1126 键），です・ます体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:正文冒号用全角「：」，省略号用「…」；reclaim area 译「復元領域」
+Localizable.strings[FL6L]: F:ja 界面文案表（1130 键），です・ます体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:正文冒号用全角「：」，省略号用「…」；reclaim area 译「復元領域」
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ko.lproj/===
 AppIntentVocabulary.plist[FL4T]: F:ko Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:ko Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语结构与识别绑定，不要改语序
 InfoPlist.strings[FL5T]: F:ko Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
-Localizable.strings[FL6L]: F:ko 界面文案表（1126 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오
+Localizable.strings[FL6L]: F:ko 界面文案表（1130 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오
 
