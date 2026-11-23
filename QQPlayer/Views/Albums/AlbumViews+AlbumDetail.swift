@@ -61,8 +61,6 @@ struct AlbumDetailScreen: View {
 
     var body: some View {
         ZStack {
-            ScreenSpecificBackgroundView(screen: .albumDetail)
-
             ScrollView {
                 VStack(spacing: DesignTokens.space24) {
                     // Artwork + info
@@ -227,6 +225,14 @@ struct AlbumDetailScreen: View {
                     }
                 }
                 .padding(.bottom, DesignTokens.space100) // Add padding for mini player
+            }
+        }
+        // 封面毛玻璃底：走「背景修饰器」接法 —— 作为 ZStack 子节点会参与布局尺寸，
+        // `scaledToFill` 的超额理想尺寸会把整页撑宽后居中裁切（2026-11-23 真机回归，见 f21a109）。
+        // 装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）。
+        .background {
+            ArtworkGlassScreenBackground {
+                ScreenSpecificBackgroundView(screen: .albumDetail)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
