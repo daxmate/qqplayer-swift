@@ -194,6 +194,8 @@ private struct ArtworkGlassScreenModifier<Decoration: View>: ViewModifier {
             .environment(\.isArtworkGlassActive, isActive)
             .background {
                 ArtworkGlassScreenBackground(decoration: decoration)
+                    // 兜底：铺满状态栏 / home indicator 区域（自定义布局页多为满屏覆盖，安全区不该露底）
+                    .ignoresSafeArea()
             }
             .task(id: glassTaskId) {
                 await loadArtwork()
