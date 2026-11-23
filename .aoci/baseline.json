@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T11:27:13Z",
+  "updated_at": "2026-11-23T11:41:00Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -728,9 +728,9 @@
     },
     "QQPlayer/Mac/MacLibraryView.swift": {
       "role": "index",
-      "sha256": "98f6d6845d1ec370312b75434e15d9d583720be40cf64990c708235439513809",
-      "size": 28211,
-      "normalized_sha256": "98f6d6845d1ec370312b75434e15d9d583720be40cf64990c708235439513809"
+      "sha256": "b446de8ca9dd33f50975ac193ca14d1c08eb51ade3e23de213b2b0bac6ecc868",
+      "size": 29225,
+      "normalized_sha256": "b446de8ca9dd33f50975ac193ca14d1c08eb51ade3e23de213b2b0bac6ecc868"
     },
     "QQPlayer/Mac/MacLyricsResendAutoRunner.swift": {
       "role": "index",
@@ -5654,9 +5654,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "dcf98fd3c17eab91b272e1a12c70f51a29a5d4b9cdd1b3da67e468cb09b91439",
-      "size": 455625,
-      "normalized_sha256": "dcf98fd3c17eab91b272e1a12c70f51a29a5d4b9cdd1b3da67e468cb09b91439"
+      "sha256": "04a2163fb657dd4e0008d17593f6e7e336a1fa455f1cbe507406e44e3bbab058",
+      "size": 455873,
+      "normalized_sha256": "04a2163fb657dd4e0008d17593f6e7e336a1fa455f1cbe507406e44e3bbab058"
     },
     "aoci.meta.txt": {
       "role": "index",
