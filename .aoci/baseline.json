@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T00:58:48Z",
+  "updated_at": "2026-11-23T01:14:57Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -3506,9 +3506,9 @@
     },
     "QQPlayer/Views/Albums/AlbumViews.swift": {
       "role": "index",
-      "sha256": "17e23b76f04f1b47b21108b19eb4b38ee7316487753bc3ab5fcefa5fb19c123a",
-      "size": 6455,
-      "normalized_sha256": "17e23b76f04f1b47b21108b19eb4b38ee7316487753bc3ab5fcefa5fb19c123a"
+      "sha256": "2bf0c4dd585afc4a88dc140837109c4d8ff000920fc3cee0abc255153e00c110",
+      "size": 6562,
+      "normalized_sha256": "2bf0c4dd585afc4a88dc140837109c4d8ff000920fc3cee0abc255153e00c110"
     },
     "QQPlayer/Views/Artists/ArtistDetailScreen.swift": {
       "role": "index",
@@ -3524,9 +3524,9 @@
     },
     "QQPlayer/Views/Artists/ArtistsScreen.swift": {
       "role": "index",
-      "sha256": "5d6ccf16b9b8f64ff59f93a40aa68536e5a5e6eb300b666ee58ea8403d094035",
-      "size": 4514,
-      "normalized_sha256": "5d6ccf16b9b8f64ff59f93a40aa68536e5a5e6eb300b666ee58ea8403d094035"
+      "sha256": "fcd9cb7e8b4c42aa1472e06baeb5a5a8940ca7254b76510c23c6c57805cbe68a",
+      "size": 4457,
+      "normalized_sha256": "fcd9cb7e8b4c42aa1472e06baeb5a5a8940ca7254b76510c23c6c57805cbe68a"
     },
     "QQPlayer/Views/Library/BulkPlaylistSelectionView.swift": {
       "role": "index",
@@ -3818,9 +3818,9 @@
     },
     "QQPlayer/Views/Playlists/PlaylistsScreen.swift": {
       "role": "index",
-      "sha256": "9930448fb63c63385c298dc901f0bc1bfb7d2d02bf3bc0e79081b1fac4e13319",
-      "size": 19202,
-      "normalized_sha256": "9930448fb63c63385c298dc901f0bc1bfb7d2d02bf3bc0e79081b1fac4e13319"
+      "sha256": "ed861cdfe2cf16427f4bdecfb4f46e6fb8183a18a34dd271eed2ce2e409a9a67",
+      "size": 19480,
+      "normalized_sha256": "ed861cdfe2cf16427f4bdecfb4f46e6fb8183a18a34dd271eed2ce2e409a9a67"
     },
     "QQPlayer/Views/Playlists/SmartPlaylistCardView.swift": {
       "role": "index",
@@ -3848,15 +3848,15 @@
     },
     "QQPlayer/Views/Utility/ArtworkBlurBackground.swift": {
       "role": "index",
-      "sha256": "aaa794e506d7be5aea84926fa6715f435d754a81bce4a7dc29e2d560021779b0",
-      "size": 4792,
-      "normalized_sha256": "aaa794e506d7be5aea84926fa6715f435d754a81bce4a7dc29e2d560021779b0"
+      "sha256": "305defb7d692c0b3a6dae011224a72de047c3ecf45704e609136db238875221e",
+      "size": 5408,
+      "normalized_sha256": "305defb7d692c0b3a6dae011224a72de047c3ecf45704e609136db238875221e"
     },
     "QQPlayer/Views/Utility/ArtworkGlassBackdrop.swift": {
       "role": "index",
-      "sha256": "748f8d68c82ee471f08dc3a0b56281f8d8cb9f81244442a077bd27197ed3f31e",
-      "size": 6119,
-      "normalized_sha256": "748f8d68c82ee471f08dc3a0b56281f8d8cb9f81244442a077bd27197ed3f31e"
+      "sha256": "9e42f4909fd97e733363b238e0a8f7d867405915c394bc386f620feb7e47f078",
+      "size": 6537,
+      "normalized_sha256": "9e42f4909fd97e733363b238e0a8f7d867405915c394bc386f620feb7e47f078"
     },
     "QQPlayer/Views/Utility/BackgroundTextureView.swift": {
       "role": "index",
@@ -4424,9 +4424,9 @@
     },
     "QQPlayerTests/LibraryGlassBackdropTests.swift": {
       "role": "index",
-      "sha256": "cfd576c7d8351054727e707faa74562d55a86f25e313aa608f815b11ee9e5fd0",
-      "size": 10126,
-      "normalized_sha256": "cfd576c7d8351054727e707faa74562d55a86f25e313aa608f815b11ee9e5fd0"
+      "sha256": "5e51ad4b5e2828357d514abaf52b71f6657ea2c303e037db6dfb5ff2fb4c5ffc",
+      "size": 12708,
+      "normalized_sha256": "5e51ad4b5e2828357d514abaf52b71f6657ea2c303e037db6dfb5ff2fb4c5ffc"
     },
     "QQPlayerTests/LibraryHiddenLayoutMigrationTests.swift": {
       "role": "index",
@@ -5570,9 +5570,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "0f378440089c59599189f16ceaef3f17d3027730c9c48980f7dc8fdadc885560",
-      "size": 441491,
-      "normalized_sha256": "0f378440089c59599189f16ceaef3f17d3027730c9c48980f7dc8fdadc885560"
+      "sha256": "aa7a495e91745c3acf2f02aed3ceacdd6a65d3c74ec457d91b96f470e305fd4f",
+      "size": 441936,
+      "normalized_sha256": "aa7a495e91745c3acf2f02aed3ceacdd6a65d3c74ec457d91b96f470e305fd4f"
     },
     "aoci.meta.txt": {
       "role": "index",
