@@ -256,11 +256,11 @@ struct PlayerView: View {
     private var glassBackdrop: some View {
         ZStack {
             ArtworkBlurBackground(artwork: currentArtwork, cacheKey: playerEngine.currentTrack?.stableId)
-            // 均匀雾面：浅色 white 0.62 / 深色 black 0.36（`MacWindowGlass` 同口径）
+            // 均匀雾面：浅色 white 0.30（2026-11-23 真机反馈：0.62 把封面色洗掉，减淡让封面色透出来）/ 深色 black 0.36
             if colorScheme == .dark {
                 Color.black.opacity(0.36)
             } else {
-                Color.white.opacity(0.62)
+                Color.white.opacity(0.30)
             }
             // 暗角：压住四角，避免封面边缘过亮
             RadialGradient(
