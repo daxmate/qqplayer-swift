@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T10:28:09Z",
+  "updated_at": "2026-11-23T11:06:41Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "b6d5a521c33f7f9f5e8aee81bcce9f6d1f6436118a749230b256277ad56e49ff",
-      "size": 201131,
-      "normalized_sha256": "b6d5a521c33f7f9f5e8aee81bcce9f6d1f6436118a749230b256277ad56e49ff"
+      "sha256": "61ea9b350fc61905ad23c1836e34bd50675b6b64f80d526ed98770b5dfacfc73",
+      "size": 201205,
+      "normalized_sha256": "61ea9b350fc61905ad23c1836e34bd50675b6b64f80d526ed98770b5dfacfc73"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -1098,6 +1098,12 @@
       "size": 12100,
       "normalized_sha256": "747786f80cd182ff079217c2792d46844eb932df82adafb09b3e996c6e70febe"
     },
+    "QQPlayer/Mac/MacTrackColumnResizer.swift": {
+      "role": "index",
+      "sha256": "3f8b5a873ffc9e05854ce813fea342d7572eed126a7dc5a2f076e75fe0ed2c50",
+      "size": 16755,
+      "normalized_sha256": "3f8b5a873ffc9e05854ce813fea342d7572eed126a7dc5a2f076e75fe0ed2c50"
+    },
     "QQPlayer/Mac/MacTrackContextMenu.swift": {
       "role": "index",
       "sha256": "e3ac15e014bde26fffbc6c8e99afeba7b9daa55854b43cd0d7268b037fc8de3f",
@@ -1130,9 +1136,9 @@
     },
     "QQPlayer/Mac/MacTrackListView.swift": {
       "role": "index",
-      "sha256": "e7930aff97f49e99e17939ee84cd196c69ec2beeb98b2a7098e3d3ec11cfbf7c",
-      "size": 29285,
-      "normalized_sha256": "e7930aff97f49e99e17939ee84cd196c69ec2beeb98b2a7098e3d3ec11cfbf7c"
+      "sha256": "20eefa6d4541e203e0c9b7548b0d733eded79d8faf7662b2c548b031037d54bf",
+      "size": 29652,
+      "normalized_sha256": "20eefa6d4541e203e0c9b7548b0d733eded79d8faf7662b2c548b031037d54bf"
     },
     "QQPlayer/Mac/MacTrackSortMenu.swift": {
       "role": "index",
@@ -5648,9 +5654,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "95f653085753bfddf5827a61db334b242ddb988a41b7e84d9369742625b4fe73",
-      "size": 454684,
-      "normalized_sha256": "95f653085753bfddf5827a61db334b242ddb988a41b7e84d9369742625b4fe73"
+      "sha256": "a5a26f47d061548608b2cd5fe06b10d43bd8e693bca6550d4ca225191c0c9ad8",
+      "size": 455405,
+      "normalized_sha256": "a5a26f47d061548608b2cd5fe06b10d43bd8e693bca6550d4ca225191c0c9ad8"
     },
     "aoci.meta.txt": {
       "role": "index",
