@@ -8,7 +8,10 @@ struct ArtistsScreen: View {
 
     var body: some View {
         ZStack {
-            ScreenSpecificBackgroundView(screen: .artists)
+            // 封面毛玻璃底：装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）
+            ArtworkGlassScreenBackground {
+                ScreenSpecificBackgroundView(screen: .artists)
+            }
 
             VStack {
                 if artists.isEmpty {

@@ -15,7 +15,12 @@ struct AllSongsScreen: View {
 
     var body: some View {
         TrackListView(tracks: tracks, listIdentifier: "all_songs", locateTrackId: locateTrackId)
-            .background(ScreenSpecificBackgroundView(screen: .allSongs))
+            // 封面毛玻璃底：装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）
+            .background {
+                ArtworkGlassScreenBackground {
+                    ScreenSpecificBackgroundView(screen: .allSongs)
+                }
+            }
             .navigationTitle(Localized.allSongs)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

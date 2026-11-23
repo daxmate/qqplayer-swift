@@ -102,8 +102,6 @@ struct PlayerView: View {
     @AppStorage(PlayerGlassBackground.storageKey) private var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
     /// 回落条件之一：系统「降低透明度」
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    /// 雾面按外观自适应（与 `MacWindowGlass` 同口径）
-    @Environment(\.colorScheme) private var colorScheme
     // 封面下拉关闭播放页：跟手限幅（阈值/快速回甩判定在 PlayerDismissGesture）
     /// 分片：跨文件可见（原 private）
     let pullMaxOffset: CGFloat = 160
@@ -250,29 +248,12 @@ struct PlayerView: View {
         )
     }
 
-    /// 封面毛玻璃底内容：`ArtworkBlurBackground`（唯一模糊/缓存实现）+ 雾面 + 暗角。
+    /// 封面毛玻璃底内容：唯一视觉实现在 `ArtworkGlassBackdrop`
+    /// （`ArtworkBlurBackground` 模糊/缓存 + 雾面 + 暗角；库列表页共用同一份）。
     /// 只作为 `.background` 的内容出现；`.ignoresSafeArea()` 仅作用于这一背景内容。
     @ViewBuilder
     private var glassBackdrop: some View {
-        ZStack {
-            ArtworkBlurBackground(artwork: currentArtwork, cacheKey: playerEngine.currentTrack?.stableId)
-            // 均匀雾面：浅色 white 0.30（2026-11-23 真机反馈：0.62 把封面色洗掉，减淡让封面色透出来）/ 深色 black 0.36
-            if colorScheme == .dark {
-                Color.black.opacity(0.36)
-            } else {
-                Color.white.opacity(0.30)
-            }
-            // 暗角：压住四角，避免封面边缘过亮
-            RadialGradient(
-                colors: [Color.black.opacity(0), Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10)],
-                center: .center,
-                startRadius: 180,
-                endRadius: 760
-            )
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        ArtworkGlassBackdrop(artwork: currentArtwork, cacheKey: playerEngine.currentTrack?.stableId)
     }
 
     private var mainContent: some View {

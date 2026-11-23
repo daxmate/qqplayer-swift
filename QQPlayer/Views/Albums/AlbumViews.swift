@@ -20,7 +20,10 @@ struct AlbumsScreen: View {
 
     var body: some View {
         ZStack {
-            ScreenSpecificBackgroundView(screen: .albums)
+            // 封面毛玻璃底：装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）
+            ArtworkGlassScreenBackground {
+                ScreenSpecificBackgroundView(screen: .albums)
+            }
 
             VStack {
                 if albums.isEmpty {
