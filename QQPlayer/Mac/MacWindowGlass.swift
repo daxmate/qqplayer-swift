@@ -74,13 +74,23 @@ struct MacWindowGlass: View {
     }
 }
 
-// MARK: - 侧栏系统材质剥离（仅玻璃模式）
+// MARK: - 侧栏系统背板剥离（仅玻璃模式）
 
-/// 玻璃模式下关掉宿主侧栏自带的 `.sidebar` 材质视图：
-/// 它按「窗口背后」（桌面壁纸）取景，会在整窗玻璃上盖出一块色阶不同的矩形 —— 正是
-/// 「一块一块」的来源。只改可见性，不删视图、不改 frame、不碰布局。
+/// 玻璃模式下拆掉侧栏列自带的系统背板，让整窗玻璃（`MacWindowGlass`）原样透上来。
 ///
-/// 只在玻璃生效时被挂进视图树；开关关闭 / 视图离开窗口时移除并**还原原值**。
+/// 两个世代两套背板，必须分开处理：
+/// - **macOS 26+（Liquid Glass）**：侧栏整列被一个 `NSGlassEffectView` 包住
+///   （`_NSSplitViewItemViewWrapper` → `NSGlassEffectView` → 内容），它按自己的规则取景加色，
+///   盖在整窗玻璃上就是「一块不透明的米白面板 + 圆角硬边」。该视图由列控制器按
+///   `NSSplitViewItem.behavior == .sidebar` 挂上，**隐藏无效**（实测 `isHidden` / `alphaValue` /
+///   `layer.isHidden` 都不生效，只有移出视图树才停画），而内容就在它里面，删它会把内容一起带走。
+///   所以做法是**换列**：把同一个 `viewController` 重新包成普通 `NSSplitViewItem`（非 sidebar 行为），
+///   厚度 / 折叠 / 全高布局等属性逐项照抄 —— 内容、宽度、行高、内边距全部不动，只是不再挂玻璃。
+/// - **macOS 15 及更早**：侧栏材质来自 `.sidebar` 的 `NSVisualEffectView`（侧栏的兄弟视图），
+///   整块隐藏即可；隐藏祖先会把内容一起抹掉，故只认非祖先的目标。
+///
+/// 开关关闭 / 视图离开窗口时**还原**（列换回原 item、材质可见性还原）。只动可见性与列包装，
+/// 不改 frame、不改内容、不碰 SwiftUI 布局。
 struct MacSidebarMaterialStripper: NSViewRepresentable {
     func makeNSView(context: Context) -> StripperView {
         StripperView()
@@ -94,10 +104,16 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
         view.restore()
     }
 
-    /// 探针视图：沿 superview 链找侧栏材质视图并临时隐藏。
+    /// 探针视图：沿 superview 链定位侧栏背板并临时剥离。
     final class StripperView: NSView {
-        private weak var stripped: NSVisualEffectView?
-        private var originalHidden = false
+        /// macOS 15-：被隐藏的 `.sidebar` 材质视图
+        private weak var strippedMaterial: NSVisualEffectView?
+        private var materialWasHidden = false
+
+        /// macOS 26+：换列用到的原 item / 新 item / 控制器（都保持强引用，便于还原）
+        private var originalItem: NSSplitViewItem?
+        private var replacementItem: NSSplitViewItem?
+        private var splitController: NSSplitViewController?
 
         /// 纯背景探针：不能参与命中测试（否则会挡住侧栏行的点击 / 拖拽）。
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -116,22 +132,98 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
             strip()
         }
 
-        func strip() {
-            guard window != nil else { return }
-            guard let target = enclosingSidebarMaterial() else { return }
-            guard stripped !== target else { return }
-            restore()
-            originalHidden = target.isHidden
-            target.isHidden = true
-            stripped = target
+        override func layout() {
+            super.layout()
+            strip()
         }
 
-        /// 还原成接管前的可见性（视图卸载 / 开关关闭都要走到这里）。
-        func restore() {
-            if let stripped {
-                stripped.isHidden = originalHidden
+        func strip() {
+            guard window != nil else { return }
+            if #available(macOS 26.0, *) {
+                // 26+：不再有列级 `.sidebar` 材质（只剩行内选中胶囊），只走「换列」一条路
+                _ = restyleSidebarItem()
+            } else {
+                stripLegacySidebarMaterial()
             }
-            stripped = nil
+        }
+
+        /// 还原到接管前的状态（幂等）。
+        func restore() {
+            if let target = strippedMaterial {
+                target.isHidden = materialWasHidden
+            }
+            strippedMaterial = nil
+
+            if let original = originalItem,
+               let replacement = replacementItem,
+               let controller = splitController,
+               controller.splitViewItems.contains(where: { $0 === replacement }) {
+                controller.removeSplitViewItem(replacement)
+                controller.insertSplitViewItem(original, at: 0)
+            }
+            originalItem = nil
+            replacementItem = nil
+            splitController = nil
+        }
+
+        // MARK: - macOS 26+：换掉带 Liquid Glass 的 sidebar 列
+
+        @available(macOS 26.0, *)
+        private func restyleSidebarItem() -> Bool {
+            if replacementItem != nil,
+               let controller = splitController,
+               controller.splitViewItems.first === replacementItem {
+                return true // 已经换过且仍生效
+            }
+            guard let splitView = enclosingSplitView(),
+                  let controller = splitView.delegate as? NSSplitViewController,
+                  let item = controller.splitViewItems.first,
+                  item.behavior == .sidebar
+            else { return false }
+
+            let replacement = NSSplitViewItem(viewController: item.viewController)
+            replacement.minimumThickness = item.minimumThickness
+            replacement.maximumThickness = item.maximumThickness
+            replacement.preferredThicknessFraction = item.preferredThicknessFraction
+            replacement.canCollapse = item.canCollapse
+            replacement.collapseBehavior = item.collapseBehavior
+            replacement.allowsFullHeightLayout = item.allowsFullHeightLayout
+            replacement.titlebarSeparatorStyle = item.titlebarSeparatorStyle
+            replacement.holdingPriority = item.holdingPriority
+            replacement.isSpringLoaded = item.isSpringLoaded
+            replacement.isCollapsed = item.isCollapsed
+
+            originalItem = item
+            replacementItem = replacement
+            splitController = controller
+            controller.removeSplitViewItem(item)
+            controller.insertSplitViewItem(replacement, at: 0)
+            return true
+        }
+
+        /// 沿 superview 链找侧栏所在的 `NSSplitView`（SwiftUI 的 NavigationSplitView 实现）。
+        private func enclosingSplitView() -> NSSplitView? {
+            var node = superview
+            var depth = 0
+            while let view = node, depth < 12 {
+                if let split = view as? NSSplitView { return split }
+                node = view.superview
+                depth += 1
+            }
+            return nil
+        }
+
+        // MARK: - macOS 15-：`.sidebar` 材质视图
+
+        private func stripLegacySidebarMaterial() {
+            guard let target = enclosingSidebarMaterial() else { return }
+            guard strippedMaterial !== target else { return }
+            if let previous = strippedMaterial {
+                previous.isHidden = materialWasHidden
+            }
+            materialWasHidden = target.isHidden
+            target.isHidden = true
+            strippedMaterial = target
         }
 
         /// 只认 `.sidebar` 材质的 NSVisualEffectView，且必须**不是本视图的祖先**——

@@ -142,9 +142,11 @@ extension MacLibraryView {
         } message: {
             Text(sidebarCreateError ?? "")
         }
-        // 玻璃生效时剥离 AppKit 侧栏自带的 `.sidebar` 材质视图（见 MacSidebarMaterialStripper）：
-        // 它按窗口背后的桌面取景，会在整窗玻璃上压出一块色阶不同的矩形。
-        // 挂在整个侧栏外侧（材质视图是侧栏的兄弟/上级，不是列表内部）；关闭开关即移除并还原。
+        // 玻璃生效时剥离侧栏列自带的系统背板（见 MacSidebarMaterialStripper）：
+        // macOS 26+ 整列由 `NSGlassEffectView` 包住内容（盖在整窗玻璃上就是米白面板 + 圆角硬边），
+        // 隐藏无效、删了会带走内容 → 用「换列」把同一 viewController 重包成普通列；
+        // macOS 15- 则是 `.sidebar` 材质的 `NSVisualEffectView`，直接隐藏。
+        // 挂在整个侧栏外侧；关闭开关即移除并还原。
         .background {
             if isWindowGlassActive {
                 MacSidebarMaterialStripper()
