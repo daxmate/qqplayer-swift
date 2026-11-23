@@ -103,10 +103,14 @@ struct MacWindowGlassChrome: NSViewRepresentable {
             }
             // 翻转时刻要补一次工具栏重排：开玻璃（.hidden）和关玻璃（.visible）两个方向都需要，
             // 所以放在 restore() 之前（见 rebuildToolbarBackgroundPlatters）。
+            // 首次接管也要补一次（换窗口 / 退出迷你窗回来）：侧栏切换 item 的底衬是
+            // item 级状态，不跟着 SwiftUI 的视图重建走 —— 上一次可能把它留在「无底衬」，
+            // 玻璃已经关掉时还得靠这次重排把底衬还回去。
+            let isFirstApply = lastAppliedActive == nil
             let didFlip = lastAppliedActive != nil && lastAppliedActive != active
             lastAppliedActive = active
-            if didFlip {
-                rebuildToolbarBackgroundPlatters(in: window)
+            if didFlip || isFirstApply {
+                Self.rebuildToolbarBackgroundPlatters(in: window, glassActive: active)
             }
             guard active else {
                 restore()
@@ -140,18 +144,54 @@ struct MacWindowGlassChrome: NSViewRepresentable {
         /// 不变，只逼 NSToolbar 重排一次并按当前值重建胶囊。只动这一个公开属性，不碰布局 /
         /// 内容 / 自定义。
         ///
+        /// 同一次重排里还要顺带对齐系统「侧栏切换」item 的 `isBordered`（见
+        /// `setSidebarToggleBordered`）：它不是我们 `ToolbarContent` 里的 item，胶囊只能
+        /// 靠这个开关摘掉，且同样要等重排才生效。
+        ///
         /// 为什么跳两次主队列：SwiftUI 的工具栏更新晚于视图更新，一次跳转拿到的还是旧值
         /// （/tmp 探针实测：单次跳转失败，两次稳定；胶囊计数归零/恢复、按钮 frame 与「一开始
         /// 就是该状态」逐项一致）。
-        private func rebuildToolbarBackgroundPlatters(in window: NSWindow) {
+        /// - Parameter allowRetry: 冷启动 / 换窗口时系统 item 可能还没建出来，允许补一次延迟重试。
+        private static func rebuildToolbarBackgroundPlatters(in window: NSWindow, glassActive: Bool, allowRetry: Bool = true) {
             DispatchQueue.main.async { [weak window] in
                 DispatchQueue.main.async { [weak window] in
                     guard let window, let toolbar = window.toolbar else { return }
+                    // 侧栏切换按钮先对齐到与自家按钮相同的「无底衬」状态，再触发重排：
+                    // 光改 isBordered 不会立刻拆掉已建好的胶囊，要等 NSToolbar 重新布局。
+                    let didSync = Self.setSidebarToggleBordered(!glassActive, in: toolbar)
                     let mode = toolbar.displayMode
                     toolbar.displayMode = mode == .iconOnly ? .iconAndLabel : .iconOnly
                     toolbar.displayMode = mode
+                    if allowRetry, glassActive, !didSync {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak window] in
+                            guard let window else { return }
+                            Self.rebuildToolbarBackgroundPlatters(in: window, glassActive: true, allowRetry: false)
+                        }
+                    }
                 }
             }
+        }
+
+        /// 系统侧栏切换 item 的 identifier（SwiftUI 私有约定，macOS 26/27 实测）。
+        static let sidebarToggleItemIdentifier = "com.apple.SwiftUI.navigationSplitView.toggleSidebar"
+
+        /// 开关系统侧栏切换 item 的 `isBordered`；返回是否找到了该 item。
+        ///
+        /// 为什么要动它：macOS 26 起工具栏按钮的玻璃胶囊（`NSToolbarPlatterView`）只给
+        /// `isBordered == true` 的 item 生成。自家 4 个按钮经 `sharedBackgroundVisibility(.hidden)`
+        /// 落成 `isBordered == false`，唯独这个系统默认 item 始终是 true —— 整窗玻璃生效后，
+        /// 侧栏收起时它就变成压在玻璃上的一块白色圆底。它是 AppKit 建的默认 item，不在我们的
+        /// `ToolbarContent` 里，`sharedBackgroundVisibility` / `toolbar(removing:)` 都改不动它
+        /// （探针实测：两者对该 item 均无效），公开 API 里能对齐的只有 `isBordered`。
+        private static func setSidebarToggleBordered(_ bordered: Bool, in toolbar: NSToolbar) -> Bool {
+            var found = false
+            for item in toolbar.items where item.itemIdentifier.rawValue == sidebarToggleItemIdentifier {
+                found = true
+                if item.isBordered != bordered {
+                    item.isBordered = bordered
+                }
+            }
+            return found
         }
 
         /// 逐项还原成接管前的值（关开关 / 卸载 / 换窗口都要走到这里；幂等）。
@@ -162,6 +202,11 @@ struct MacWindowGlassChrome: NSViewRepresentable {
                 originalBackgroundColor = nil
             }
             guard let window = appliedWindow else { return }
+            // 兜底：离开玻璃模式（卸载 / 换窗口 / 视图拆除）时把系统侧栏按钮的底衬还回去，
+            // 免得「玻璃关着但按钮没有胶囊」这种半截状态留在窗口上（幂等，正常路径这里本来已是 true）。
+            if let toolbar = window.toolbar {
+                _ = Self.setSidebarToggleBordered(true, in: toolbar)
+            }
             window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent
             window.isOpaque = originalIsOpaque
             if let originalBackgroundColor {
