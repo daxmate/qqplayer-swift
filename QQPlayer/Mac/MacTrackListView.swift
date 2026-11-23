@@ -11,6 +11,8 @@
 //  forSelectionType）、定位当前播放（选中 + 尽量滚动可见）、播放队列跟随排序。
 //  2026-11-16 视觉增强：行内封面缩略图 / 时长列 / 当前播放行高亮 / 悬停收藏
 //  （只改呈现，单击选中·双击播放·列头排序·右键菜单等交互契约不变）。
+//  2026-11-23 精简：删除「#」序号列（该列同时承载当前播放喇叭图标，整列一并移除）
+//  并隐藏表头；sortOrder 排序状态 / 整行播放底色 / 右键菜单等交互契约不变。
 //
 
 import AppKit
@@ -24,8 +26,6 @@ import SwiftUI
 private final class MacTrackTableRow: NSObject, Identifiable {
     let id: String
     let track: Track
-    /// 当前列表显示序号（随排序同步刷新；非 @objc——不参与排序比较）
-    var displayIndex: Int = 0
     /// 排序/显示字段：@objc 存储属性（title/artist/durationMs）。
     /// ⚠️ 必须是存储属性：计算属性能过编译，但 Table 排序运行期 fatal（见文件头注释）。
     @objc let title: String
@@ -65,8 +65,6 @@ private enum MacTrackListMetrics {
     static let artworkCornerRadius: CGFloat = DesignTokens.radius4
     /// 封面列宽 = 封面 34 + 左右各 6
     static let artworkColumnWidth: CGFloat = 46
-    /// 序号列宽（固定窄列）
-    static let indexColumnWidth: CGFloat = 40
     /// 时长列宽（固定，不可拉伸）
     static let durationColumnWidth: CGFloat = 56
     /// 行尾操作列宽（悬停 ♥ 槽位）
@@ -108,7 +106,7 @@ struct MacTrackListView: View {
     @State private var menu = MacTrackMenuModel()
     /// 当前悬停行：由父视图唯一持有，单元格只上报（不把 hover 状态散进各格 @State）
     @State private var hoveredTrackId: String?
-    /// Table 原生列头排序（点击表头升/降；显示与播放队列都跟随）。
+    /// Table 排序状态（表头已隐藏；显示与播放队列都按 sortOrder 跟随）。
     /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
     /// 当前显示的排序后行（播放队列跟随，与 Table 显示一致）
@@ -152,14 +150,11 @@ struct MacTrackListView: View {
             }
             // 右键菜单弹窗宿主（新建歌单 / 编辑标签 / 删除确认）——与两个搜索面同一份实现
             .macTrackMenu(menu) { deletedIds in
-                // 本地即时移除（不等父级通知链）：当前列表立即消失，序号重排
+                // 本地即时移除（不等父级通知链）：当前列表立即消失
                 // （父级 reloadLibrary 随后全量重拉对齐歌单/专辑等其它视图）
                 selectedRows.removeAll()
                 guard !deletedIds.isEmpty else { return }
                 displayedRows.removeAll { deletedIds.contains($0.id) }
-                for (index, row) in displayedRows.enumerated() {
-                    row.displayIndex = index + 1
-                }
             }
             .onAppear {
                 syncDisplayedRows(album: albumFilter)
@@ -241,28 +236,6 @@ struct MacTrackListView: View {
 
     private var table: some View {
         Table(displayedRows, selection: $selectedRows, sortOrder: $sortOrder) {
-            TableColumn("#") { row in
-                cellChrome(row) {
-                    if row.track.stableId == activeTrackId {
-                        Image(systemName: isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                            .foregroundColor(appAccentColor)
-                    } else {
-                        // 显示列表序号（1 起，随排序同步），不显示专辑 trackNo
-                        Text("\(row.displayIndex)")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                // 当前播放行的整行底色：写到所在 NSTableRowView 上（跨列连续），
-                // 不再逐格铺（列间距会把底色切成几段）。找不到行视图时没有底色。
-                .background(
-                    MacTableRowHighlight(
-                        isActive: row.track.stableId == activeTrackId,
-                        tint: appAccentColor.opacity(MacTrackListMetrics.activeRowTintOpacity)
-                    )
-                )
-            }
-            .width(MacTrackListMetrics.indexColumnWidth)
-
             // 行内封面：无列头、不可排序；加载统一走 MacArtworkThumbnail（全项目唯一入口）
             TableColumn("") { row in
                 cellChrome(row) {
@@ -272,6 +245,14 @@ struct MacTrackListView: View {
                         cornerRadius: MacTrackListMetrics.artworkCornerRadius
                     )
                 }
+                // 当前播放行的整行底色：写到所在 NSTableRowView 上（跨列连续），
+                // 不再逐格铺（列间距会把底色切成几段）。找不到行视图时没有底色。
+                .background(
+                    MacTableRowHighlight(
+                        isActive: row.track.stableId == activeTrackId,
+                        tint: appAccentColor.opacity(MacTrackListMetrics.activeRowTintOpacity)
+                    )
+                )
             }
             .width(MacTrackListMetrics.artworkColumnWidth)
 
@@ -370,6 +351,8 @@ struct MacTrackListView: View {
                 play(row.track)
             }
         }
+        // 表头整条隐藏（用户要求：列表不显示列名；「#」序号列已删）
+        .tableColumnHeaders(.hidden)
         // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
         // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
         .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false)).macGlassListBackground()
@@ -422,7 +405,7 @@ struct MacTrackListView: View {
 
     /// 单元格公共外壳：铺满单元格 + 悬停上报。
     /// 当前播放行的整行底色不在这里铺（逐格 `.background` 会被列间距切成几段），
-    /// 改由序号列挂 `MacTableRowHighlight` 写到所在 `NSTableRowView` 上。
+    /// 改由封面列挂 `MacTableRowHighlight` 写到所在 `NSTableRowView` 上。
     private func cellChrome<Content: View>(
         _ row: MacTrackTableRow,
         alignment: Alignment = .leading,
@@ -462,8 +445,7 @@ struct MacTrackListView: View {
         onSelect(track)
     }
 
-    /// 让显示行与排序状态同步（Table 内部按 sortOrder 重排，此处镜像供播放队列用）
-    /// 同时按显示顺序赋 displayIndex（# 列序号随排序刷新）。
+    /// 让显示行与排序状态同步（Table 内部按 sortOrder 重排，此处镜像供播放队列用）。
     /// 重要：从 onChange 事件调用时必须把「新值」作为参数传入（freshTracks/freshSort）。
     /// onChange 闭包捕获的是变化前的旧 self，直接读 self.tracks/self.sortOrder 会拿到
     /// 旧数据，导致刚删除的行被旧数组重建复活（2026-09-03 现场探针定位的幽灵行根因）。
@@ -483,9 +465,6 @@ struct MacTrackListView: View {
         let sorted = sourceTracks
             .map { MacTrackTableRow(id: $0.stableId, track: $0, artistName: artistNameResolver($0) ?? "") }
             .sorted(using: sourceSort)
-        for (index, row) in sorted.enumerated() {
-            row.displayIndex = index + 1
-        }
         displayedRows = sorted
     }
 
