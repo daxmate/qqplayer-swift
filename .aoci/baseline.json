@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T11:57:37Z",
+  "updated_at": "2026-11-23T14:45:01Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "CHANGELOG.md": {
       "role": "index",
-      "sha256": "3a88f596638c93d0b456cf1619043b3459124cad355c8eae52336c25c8ec5ca6",
-      "size": 21516,
-      "normalized_sha256": "3a88f596638c93d0b456cf1619043b3459124cad355c8eae52336c25c8ec5ca6"
+      "sha256": "7c152be261c5398bf94308d1a5fea2e3ebfa9abc74e29fb02df27a2f39de6002",
+      "size": 23171,
+      "normalized_sha256": "7c152be261c5398bf94308d1a5fea2e3ebfa9abc74e29fb02df27a2f39de6002"
     },
     "LICENSE": {
       "role": "index",
@@ -1172,9 +1172,9 @@
     },
     "QQPlayer/Mac/MacWindowGlassChrome.swift": {
       "role": "index",
-      "sha256": "2ca342994d50a4cec68c33366a12a601ece0eaac5084be32d378b178c36a5b2c",
-      "size": 5884,
-      "normalized_sha256": "2ca342994d50a4cec68c33366a12a601ece0eaac5084be32d378b178c36a5b2c"
+      "sha256": "b718a90fd79787d51975fb74ae5865a20ddce0b57ae66718fa944ecd1a9d4be0",
+      "size": 8446,
+      "normalized_sha256": "b718a90fd79787d51975fb74ae5865a20ddce0b57ae66718fa944ecd1a9d4be0"
     },
     "QQPlayer/Mac/RecommendationPlannerFactory.swift": {
       "role": "index",
@@ -5588,9 +5588,9 @@
     },
     "QQPlayerTests/ViewSharedSingletonContractTests.swift": {
       "role": "index",
-      "sha256": "676e1a1a86ccc1323ff1e500c87ec6c5fd9af1ffb960db8d8d87afd14edd875d",
-      "size": 41563,
-      "normalized_sha256": "676e1a1a86ccc1323ff1e500c87ec6c5fd9af1ffb960db8d8d87afd14edd875d"
+      "sha256": "43d1bf64cf0725d179d2c421ece8a1a474433e415183a923b2457117c3551c65",
+      "size": 42295,
+      "normalized_sha256": "43d1bf64cf0725d179d2c421ece8a1a474433e415183a923b2457117c3551c65"
     },
     "QQPlayerTests/WhatsNewTests.swift": {
       "role": "index",
@@ -5654,9 +5654,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "99d5968eb8bde72a925892abdfe770d64c46b7aaa87f46f6bb5591e375f2955a",
-      "size": 455893,
-      "normalized_sha256": "99d5968eb8bde72a925892abdfe770d64c46b7aaa87f46f6bb5591e375f2955a"
+      "sha256": "f90420d990885cc94b72957522c61bf77288e7cf74b5ae98c44a7ae6c4725107",
+      "size": 456107,
+      "normalized_sha256": "f90420d990885cc94b72957522c61bf77288e7cf74b5ae98c44a7ae6c4725107"
     },
     "aoci.meta.txt": {
       "role": "index",
