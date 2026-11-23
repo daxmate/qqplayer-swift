@@ -75,6 +75,8 @@ struct MacWindowGlassChrome: NSViewRepresentable {
         private var originalTitlebarAppearsTransparent = false
         private var originalIsOpaque = true
         private var originalBackgroundColor: NSColor?
+        /// 上一次实际应用的玻璃状态（nil = 本视图还没接管过；只用来识别「翻转」这个时刻）
+        private var lastAppliedActive: Bool?
 
         /// 纯属性探针：不能参与命中测试，否则会挡住窗口内容的点击。
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -83,6 +85,8 @@ struct MacWindowGlassChrome: NSViewRepresentable {
             super.viewDidMoveToWindow()
             // 离开窗口（切迷你窗 / 场景重建）就先还原，避免把外观留在后台窗口上
             guard window != nil else {
+                // 离开窗口：外观还原，且下一次挂载按「首次接管」处理（不误判成翻转）
+                lastAppliedActive = nil
                 restore()
                 return
             }
@@ -96,6 +100,13 @@ struct MacWindowGlassChrome: NSViewRepresentable {
             guard !(window is NSPanel) else {
                 restore()
                 return
+            }
+            // 翻转时刻要补一次工具栏重排：开玻璃（.hidden）和关玻璃（.visible）两个方向都需要，
+            // 所以放在 restore() 之前（见 rebuildToolbarBackgroundPlatters）。
+            let didFlip = lastAppliedActive != nil && lastAppliedActive != active
+            lastAppliedActive = active
+            if didFlip {
+                rebuildToolbarBackgroundPlatters(in: window)
             }
             guard active else {
                 restore()
@@ -114,6 +125,32 @@ struct MacWindowGlassChrome: NSViewRepresentable {
             if !window.styleMask.contains(.fullSizeContentView) {
                 window.styleMask.insert(.fullSizeContentView)
                 didAddFullSizeContentView = true
+            }
+        }
+
+        /// 状态翻转后补一次工具栏重排，让玻璃胶囊按**新**的共享背景可见性重建。
+        ///
+        /// 为什么需要：`ToolbarContent.sharedBackgroundVisibility` 只更新 SwiftUI 侧的数据，
+        /// `NSToolbar` 不会为已经建好的 item viewer 重建背景胶囊（`NSToolbarPlatterView`）。
+        /// 真机表现：冷启动时封面还没就绪 ⇒ `isWindowGlassActive == false`，胶囊按 `.visible`
+        /// 建好；随后状态翻成 `.hidden`，4 个按钮仍然带着底色，点一次折叠侧栏（工具栏整体
+        /// 重排）才消失。反向同理：关开关后胶囊也不会自己回来。
+        ///
+        /// 做法：把工具栏 `displayMode` 设成另一档、紧接着设回原值——同一回合内完成，最终值
+        /// 不变，只逼 NSToolbar 重排一次并按当前值重建胶囊。只动这一个公开属性，不碰布局 /
+        /// 内容 / 自定义。
+        ///
+        /// 为什么跳两次主队列：SwiftUI 的工具栏更新晚于视图更新，一次跳转拿到的还是旧值
+        /// （/tmp 探针实测：单次跳转失败，两次稳定；胶囊计数归零/恢复、按钮 frame 与「一开始
+        /// 就是该状态」逐项一致）。
+        private func rebuildToolbarBackgroundPlatters(in window: NSWindow) {
+            DispatchQueue.main.async { [weak window] in
+                DispatchQueue.main.async { [weak window] in
+                    guard let window, let toolbar = window.toolbar else { return }
+                    let mode = toolbar.displayMode
+                    toolbar.displayMode = mode == .iconOnly ? .iconAndLabel : .iconOnly
+                    toolbar.displayMode = mode
+                }
             }
         }
 
