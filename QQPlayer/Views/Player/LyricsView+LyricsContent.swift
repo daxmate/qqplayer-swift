@@ -83,35 +83,8 @@ extension LyricsView {
                         }
                     }
 
-                    // Fade gradients at top and bottom（贴近系统底色，歌词边缘柔和融入背景）
-                    VStack(spacing: DesignTokens.space0) {
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(uiColor: .systemBackground).opacity(0.95),
-                                Color(uiColor: .systemBackground).opacity(0.7),
-                                Color(uiColor: .systemBackground).opacity(0.3),
-                                Color.clear,
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 150)
-
-                        Spacer()
-
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.clear,
-                                Color(uiColor: .systemBackground).opacity(0.3),
-                                Color(uiColor: .systemBackground).opacity(0.7),
-                                Color(uiColor: .systemBackground).opacity(0.95),
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 150)
-                    }
-                    .allowsHitTesting(false)
+                    // 边缘渐隐：跟随「封面玻璃是否在铺」自行让路（见 LyricsEdgeFade）
+                    LyricsEdgeFade()
                 }
                 // 手动滚动暂停跟随后浮出的「回到当前行」按钮（仅普通模式）：
                 // 点它恢复自动跟随并立刻把当前行滚回中央
@@ -572,5 +545,52 @@ extension LyricsView {
             .foregroundColor(accentColor)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - 边缘渐隐（贴合不透明底色；玻璃生效时让路）
+
+/// 同步歌词上下边缘的渐隐。
+///
+/// 色值取的是**不透明**系统底色（浅色即白）：只在「装饰底 = systemBackground + 光晕」上成立，
+/// 让歌词边缘柔和融入底色。封面毛玻璃生效时底色是模糊封面且一路铺到屏幕边缘，
+/// 这层白渐变就成了盖在歌纸上的第二层白雾（2026-11-23 真机：底部约 1/6 发白），
+/// 故此时整层不铺 —— 玻璃自己就是连续底，文字对比度由雾面保证。
+///
+/// 读环境值必须发生在**子视图**内：artworkGlassScreen 修饰器落在 LyricsView 的 body 里，
+/// 只对它返回的子树生效，LyricsView 自身的 @Environment 读不到（取到的是外层环境）。
+private struct LyricsEdgeFade: View {
+    @Environment(\.isArtworkGlassActive) private var isArtworkGlassActive
+
+    var body: some View {
+        VStack(spacing: DesignTokens.space0) {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(uiColor: .systemBackground).opacity(0.95),
+                    Color(uiColor: .systemBackground).opacity(0.7),
+                    Color(uiColor: .systemBackground).opacity(0.3),
+                    Color.clear,
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 150)
+
+            Spacer()
+
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.clear,
+                    Color(uiColor: .systemBackground).opacity(0.3),
+                    Color(uiColor: .systemBackground).opacity(0.7),
+                    Color(uiColor: .systemBackground).opacity(0.95),
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 150)
+        }
+        .allowsHitTesting(false)
+        .opacity(isArtworkGlassActive ? 0 : 1)
     }
 }

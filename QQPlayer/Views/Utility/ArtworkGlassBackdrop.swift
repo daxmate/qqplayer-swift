@@ -148,16 +148,89 @@ struct ArtworkGlassScreenBackground<Decoration: View>: View {
     }
 }
 
+// MARK: - 自定义布局页接法（内容侧也要知道玻璃是否在铺）
+
+/// 非分组列表页（自定义 `VStack` / `ZStack` 页面）接入封面毛玻璃。
+///
+/// 视觉层与库列表页完全同源（`ArtworkGlassScreenBackground`：装饰底 / 封面玻璃二选一），
+/// 唯一附加能力是把**生效状态**经 `\.isArtworkGlassActive` 下发给**内容层**——
+/// 供页面在玻璃铺上时撤掉自己那层「贴合系统底色」的白色渐变（全屏歌词页 2026-11-23 真机反馈）。
+/// 生效判定 / 取图 / 切歌身份校验与容器同款，不另写一套。
+private struct ArtworkGlassScreenModifier<Decoration: View>: ViewModifier {
+    /// 页面装饰底（各页原有节点，玻璃生效时由容器隐藏）
+    private let decoration: () -> Decoration
+
+    @Environment(AppServices.self) private var services
+    @Environment(PlayerEngine.self) private var playerEngine
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// 沿用唯一开关（键 / 默认值唯一来源：`PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) private var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 当前曲目封面：只用于「玻璃是否生效」的判定（取图命中 `ArtworkManager` 缓存）
+    @State private var artwork: ArtworkImage?
+
+    init(@ViewBuilder decoration: @escaping () -> Decoration) {
+        self.decoration = decoration
+    }
+
+    private var currentTrack: Track? { playerEngine.currentTrack }
+
+    /// 开关变化也要重跑取图（关 → 清空，开 → 重新取）
+    private var glassTaskId: String {
+        "\(currentTrack?.stableId ?? "-")#\(glassBackgroundEnabled)"
+    }
+
+    private var isActive: Bool {
+        ArtworkGlassScreenActivation.isActive(
+            hasCurrentTrack: currentTrack != nil,
+            hasArtwork: artwork != nil,
+            isEnabled: glassBackgroundEnabled,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    func body(content: Content) -> some View {
+        content
+            // 只在玻璃确实铺上时才告诉内容层「让路」；未生效时内容层保持原样
+            .environment(\.isArtworkGlassActive, isActive)
+            .background {
+                ArtworkGlassScreenBackground(decoration: decoration)
+            }
+            .task(id: glassTaskId) {
+                await loadArtwork()
+            }
+    }
+
+    @MainActor
+    private func loadArtwork() async {
+        guard glassBackgroundEnabled, let track = currentTrack else {
+            artwork = nil
+            return
+        }
+        let image = await services.artworkManager.getArtwork(for: track)
+        // 取图期间又切歌：这次结果作废（与容器同款身份校验）
+        guard !Task.isCancelled, currentTrack?.stableId == track.stableId else { return }
+        artwork = image
+    }
+}
+
+extension View {
+    /// 自定义布局页接入封面毛玻璃（实现见 `ArtworkGlassScreenModifier`）。
+    func artworkGlassScreen<Decoration: View>(@ViewBuilder decoration: @escaping () -> Decoration) -> some View {
+        modifier(ArtworkGlassScreenModifier(decoration: decoration))
+    }
+}
+
 // MARK: - 分区行背景（设置页卡片透明）
 
-/// 「封面玻璃正在铺」的生效标记：唯一判定由 `ArtworkGlassGroupedListModifier`
-/// 用 `ArtworkGlassScreenActivation` 算好后经环境下发，行内不再另算一套。
+/// 「封面玻璃正在铺」的生效标记：由 `ArtworkGlassGroupedListModifier`（分组列表）/
+/// `ArtworkGlassScreenModifier`（自定义布局页）用 `ArtworkGlassScreenActivation` 算好后
+/// 经环境下发（判定唯一，写入点 = 这两个容器），行内 / 内容层不再另算一套。
 private struct ArtworkGlassActiveKey: EnvironmentKey {
     static let defaultValue = false
 }
 
 extension EnvironmentValues {
-    /// 当前分组列表是否正铺着封面毛玻璃（写入点唯一：`ArtworkGlassGroupedListModifier`）。
+    /// 当前页面是否正铺着封面毛玻璃（写入点：`ArtworkGlassGroupedListModifier` / `ArtworkGlassScreenModifier`）。
     var isArtworkGlassActive: Bool {
         get { self[ArtworkGlassActiveKey.self] }
         set { self[ArtworkGlassActiveKey.self] = newValue }

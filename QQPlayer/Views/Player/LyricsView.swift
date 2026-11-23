@@ -81,16 +81,15 @@ struct LyricsView: View {
         // 封面毛玻璃底：走「背景修饰器」接法（不能包 ZStack，否则整页被撑宽，见 f21a109）。
         // 原「不透明底色 + 媒体库光晕」整体作为装饰底节点原地保留：玻璃生效时由容器隐藏，
         // 关闭时逐像素回原样（见 ArtworkGlassScreenBackground）。
-        .background {
-            ArtworkGlassScreenBackground {
-                ZStack {
-                    // 不透明底色：玻璃关闭时挡住宿主播放页封面（否则文字被下层封面干扰）
-                    Color(uiColor: .systemBackground)
-                    // 媒体库同款背景光晕（跟随设置主题色变化）
-                    ScreenSpecificBackgroundView(screen: .library)
-                }
-                .ignoresSafeArea()
+        // 用 `artworkGlassScreen`：视觉层同上，另把生效状态下发 —— 内容层的边缘渐隐据此让路。
+        .artworkGlassScreen {
+            ZStack {
+                // 不透明底色：玻璃关闭时挡住宿主播放页封面（否则文字被下层封面干扰）
+                Color(uiColor: .systemBackground)
+                // 媒体库同款背景光晕（跟随设置主题色变化）
+                ScreenSpecificBackgroundView(screen: .library)
             }
+            .ignoresSafeArea()
         }
         .onAppear {
             // 首次进入全屏歌词页：触发手势提示气泡（之后永不再现）
