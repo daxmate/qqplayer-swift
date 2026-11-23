@@ -268,9 +268,17 @@ struct EQSettingsView: View {
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DesignTokens.space8)
-                .background(isSelected ? appAccentColor : Color(.systemGray6))
+                // 预设 chip：未选中用薄材质 + 细描边（不再用实心 systemGray6，避免在封面玻璃上成白块）；
+                // 选中仍用强调色，白字。2026-11-23 真机反馈。
+                .background {
+                    RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous)
+                        .fill(isSelected ? AnyShapeStyle(appAccentColor) : AnyShapeStyle(.ultraThinMaterial))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: DesignTokens.radius8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(isSelected ? 0 : 0.08), lineWidth: 1)
+                }
                 .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(DesignTokens.radius8)
         }
         .buttonStyle(.plain)
     }
