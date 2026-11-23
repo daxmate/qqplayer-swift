@@ -98,13 +98,21 @@ struct PlayerView: View {
     /// 分片：跨文件可见（原 private）
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    /// 播放页封面毛玻璃开关（键 / 默认值唯一来源：`PlayerGlassBackground`）
+    @AppStorage(PlayerGlassBackground.storageKey) private var glassBackgroundEnabled = PlayerGlassBackground.enabledByDefault
+    /// 回落条件之一：系统「降低透明度」
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// 雾面按外观自适应（与 `MacWindowGlass` 同口径）
+    @Environment(\.colorScheme) private var colorScheme
     // 封面下拉关闭播放页：跟手限幅（阈值/快速回甩判定在 PlayerDismissGesture）
     /// 分片：跨文件可见（原 private）
     let pullMaxOffset: CGFloat = 160
 
     var body: some View {
         ZStack {
+            // 装饰底原地保留（结构/尺寸提案不变）：毛玻璃生效时只隐藏，不删节点
             ScreenSpecificBackgroundView(screen: .player)
+                .opacity(isGlassBackgroundActive ? 0 : 1)
             // 解析下拉移动的宿主 UIView（fullScreenCover 的 hosting view）：
             // 透明背景层，通过 responder 链向上找 UIViewController.view
             // （Task 延迟赋值：避免在视图更新期间修改 @State）
@@ -216,6 +224,12 @@ struct PlayerView: View {
                 .zIndex(31)
             }
         }
+        // 封面毛玻璃：只挂在 ZStack 的 background 修饰器上（不进入子视图层级 ⇒ 不参与主内容布局）
+        .background {
+            if isGlassBackgroundActive {
+                glassBackdrop
+            }
+        }
         // 整页手势与区域 frame 回传共用的坐标空间（见 PlayerView+PageGestures）
         .coordinateSpace(name: PlayerPageCoordinateSpace.name)
         // 封面下拉跟手：播放页整体下移（UIKit transform 驱动，见 artworkDragGesture）
@@ -225,6 +239,40 @@ struct PlayerView: View {
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .animation(.easeInOut(duration: 0.25), value: playerEngine.playbackErrorMessage)
         .animation(.easeInOut(duration: 0.2), value: LyricAlignmentActions.controller.entryNotice)
+    }
+
+    /// 封面毛玻璃底是否生效（开关 / 有封面 / 未开「降低透明度」；判定唯一实现见 `PlayerGlassBackground`）
+    private var isGlassBackgroundActive: Bool {
+        PlayerGlassBackground.isActive(
+            isEnabled: glassBackgroundEnabled,
+            hasArtwork: currentArtwork != nil,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    /// 封面毛玻璃底内容：`ArtworkBlurBackground`（唯一模糊/缓存实现）+ 雾面 + 暗角。
+    /// 只作为 `.background` 的内容出现；`.ignoresSafeArea()` 仅作用于这一背景内容。
+    @ViewBuilder
+    private var glassBackdrop: some View {
+        ZStack {
+            ArtworkBlurBackground(artwork: currentArtwork, cacheKey: playerEngine.currentTrack?.stableId)
+            // 均匀雾面：浅色 white 0.62 / 深色 black 0.36（`MacWindowGlass` 同口径）
+            if colorScheme == .dark {
+                Color.black.opacity(0.36)
+            } else {
+                Color.white.opacity(0.62)
+            }
+            // 暗角：压住四角，避免封面边缘过亮
+            RadialGradient(
+                colors: [Color.black.opacity(0), Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10)],
+                center: .center,
+                startRadius: 180,
+                endRadius: 760
+            )
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private var mainContent: some View {
