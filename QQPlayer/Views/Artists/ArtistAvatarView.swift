@@ -136,10 +136,19 @@ private enum ArtistPhotoLookup {
     }
 }
 
+/// 拼贴重载键：曲目集合或屏幕倍率变化才重拉封面（其它 body 变化不重载）。
+private struct CollageLoadKey: Equatable {
+    let trackIds: [String]
+    let displayScale: CGFloat
+}
+
 /// 代表曲目封面拼贴（≤4 张）：1 张铺满；其余 2x2 网格（不足留空）。
-/// 布局比例照 `MacArtworkCollage`（cell = size/2，间距 `DesignTokens.space2`）。
+/// 布局比例照 `MacArtworkCollage`：格子 = (size − 间距) / 2，间距 `DesignTokens.space2`，
+/// 整格刚好铺满 —— 不再靠外层 `clipped()` 切掉溢出的那一列。
 private struct ArtistCoverCollage: View {
     @Environment(AppServices.self) private var services
+    /// 屏幕倍率（@2x / @3x）：3x 屏按 pt 取图会发虚，故像素尺寸 = size × 倍率
+    @Environment(\.displayScale) private var displayScale
     let tracks: [Track]
     let size: CGFloat
 
@@ -159,8 +168,13 @@ private struct ArtistCoverCollage: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .task(id: tracks.map(\.stableId)) {
-            images = await Self.load(tracks: tracks, size: size, artwork: services.artworkManager)
+        .task(id: CollageLoadKey(trackIds: tracks.map(\.stableId), displayScale: displayScale)) {
+            images = await Self.load(
+                tracks: tracks,
+                size: size,
+                displayScale: displayScale,
+                artwork: services.artworkManager
+            )
         }
         // 封面被重写（标签保存刮削）后，stableId 不变不会自动重载 → 监听重拉
         .onReceive(NotificationCenter.default.publisher(
@@ -170,14 +184,20 @@ private struct ArtistCoverCollage: View {
                   tracks.contains(where: { $0.stableId == refreshedId })
             else { return }
             Task {
-                images = await Self.load(tracks: tracks, size: size, artwork: services.artworkManager)
+                images = await Self.load(
+                    tracks: tracks,
+                    size: size,
+                    displayScale: displayScale,
+                    artwork: services.artworkManager
+                )
             }
         }
     }
 
     private var collageContent: some View {
         let available = images.compactMap { $0 }
-        let cell = size / 2
+        // 两格 + 中间间距正好等于 size（旧写法 cell = size/2 会让总宽多出 2pt，被裁切）
+        let cell = (size - DesignTokens.space2) / 2
         return Group {
             if available.count == 1, let first = available.first {
                 Image(uiImage: first)
@@ -206,12 +226,15 @@ private struct ArtistCoverCollage: View {
     }
 
     /// 封面入口由调用方从 `AppServices` 容器取（静态方法无环境链，故显式传入）。
+    /// `displayScale` 由调用方读 `@Environment(\.displayScale)` 传入（不用 `UIScreen` 单例）。
     private static func load(
         tracks: [Track],
         size: CGFloat,
+        displayScale: CGFloat,
         artwork: ArtworkManager
     ) async -> [UIImage?] {
-        let pixelSize = max(size, 80)
+        // 像素上限按屏幕倍率：40pt@3x = 120px（旧写法只有 80px → 行内头像发虚）
+        let pixelSize = max(size * displayScale, 80)
         var result: [UIImage?] = []
         for track in tracks.prefix(4) {
             result.append(await artwork.getThumbnail(for: track, maxPixelSize: pixelSize))
