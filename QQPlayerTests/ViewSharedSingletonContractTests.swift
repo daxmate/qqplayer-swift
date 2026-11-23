@@ -182,7 +182,11 @@ private enum ViewSharedSingletonContract {
     }
 
     /// 显式写法（与用户侧口径一致：`grep -oE '[A-Za-z_]+\.shared'`）。
-    private static let explicitSharedPattern = try! NSRegularExpression(pattern: "[A-Za-z_]+[.]shared")
+    /// 尾部必须不是标识符字符：否则 `.sharedBackgroundVisibility`（SwiftUI 工具栏 API）会被误判成
+    /// 「视图层直连单例」，而它是方法名的一部分，不是单例访问（2026-11-23 实测踩到）。
+    private static let explicitSharedPattern = try! NSRegularExpression(
+        pattern: "[A-Za-z_]+[.]shared(?![A-Za-z0-9_])"
+    )
     /// **前导点简写** `.shared`：点号前不是标识符字符/点，点号后不是标识符字符。
     /// 例：`= .shared` / `: .shared` / `(wrappedValue: .shared)` / `?? .shared` / `foo().shared`。
     /// 与显式写法互斥（`Foo.shared` 的点号前是标识符 → 这里不重复计数）。
