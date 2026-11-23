@@ -53,6 +53,7 @@ struct SettingsAudioView: View {
                 }
                 .padding(.vertical, DesignTokens.space4)
             }
+            .glassClearRowBackground()
 
             Section(Localized.playerControls) {
                 Toggle(Localized.showSleepTimerButton, isOn: $deleteSettings.showSleepTimerButton)
@@ -64,6 +65,7 @@ struct SettingsAudioView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            .glassClearRowBackground()
         }
         // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
         .artworkGlassGroupedList {
@@ -71,6 +73,9 @@ struct SettingsAudioView: View {
         }
         .navigationTitle(Localized.audioSettings)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
     }
 }
 

@@ -148,6 +148,45 @@ struct ArtworkGlassScreenBackground<Decoration: View>: View {
     }
 }
 
+// MARK: - 分区行背景（设置页卡片透明）
+
+/// 「封面玻璃正在铺」的生效标记：唯一判定由 `ArtworkGlassGroupedListModifier`
+/// 用 `ArtworkGlassScreenActivation` 算好后经环境下发，行内不再另算一套。
+private struct ArtworkGlassActiveKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// 当前分组列表是否正铺着封面毛玻璃（写入点唯一：`ArtworkGlassGroupedListModifier`）。
+    var isArtworkGlassActive: Bool {
+        get { self[ArtworkGlassActiveKey.self] }
+        set { self[ArtworkGlassActiveKey.self] = newValue }
+    }
+}
+
+/// 设置页分区卡片透明：玻璃生效时清掉行背景，系统分组白底不再压在封面上；
+/// 玻璃未生效时**不产生任何修饰**（走 `content` 原样），与接入前逐像素一致。
+/// 只动行背景 —— 分隔线 / 行高 / padding / `listStyle` 一律不碰，层次靠分隔线保留。
+struct GlassClearRowBackground: ViewModifier {
+    @Environment(\.isArtworkGlassActive) private var isGlassActive
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isGlassActive {
+            content.listRowBackground(Color.clear)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// 见 `GlassClearRowBackground`。挂在 `Section` 上（行背景 trait 会下发到该分区每一行）。
+    func glassClearRowBackground() -> some View {
+        modifier(GlassClearRowBackground())
+    }
+}
+
 // MARK: - 分组列表页接法（设置页 `Form` / 分组 `List`）
 
 /// 设置类页面接入封面毛玻璃：视觉层与库列表页同源（`ArtworkGlassScreenBackground` + 各页原装饰底）。
@@ -194,6 +233,8 @@ private struct ArtworkGlassGroupedListModifier<Decoration: View>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollContentBackground(isActive ? .hidden : .automatic)
+            // 卡片行背景（`GlassClearRowBackground`）跟同一判定走：只在玻璃确实铺上时才清
+            .environment(\.isArtworkGlassActive, isActive)
             .background {
                 ArtworkGlassScreenBackground(decoration: decoration)
             }

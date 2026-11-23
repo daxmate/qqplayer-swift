@@ -50,6 +50,7 @@ struct SettingsView: View {
                         )
                     }
                 }
+                .glassClearRowBackground()
 
                 // S2 M1-UI：局域网同步设置（Client 侧：主机列表/扫码/手输配对）
                 // 2026-11-12 复核补回：原 Section 的 header / footer 文案（sync_settings /
@@ -69,6 +70,7 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                .glassClearRowBackground()
 
                 Section {
                     NavigationLink(destination: FeatureGuideView()) {
@@ -87,6 +89,7 @@ struct SettingsView: View {
                         )
                     }
                 }
+                .glassClearRowBackground()
             }
             .listStyle(.insetGrouped)
             // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
@@ -98,6 +101,9 @@ struct SettingsView: View {
             }
             .navigationTitle(Localized.settings)
             .navigationBarTitleDisplayMode(.inline)
+            // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+            .toolbarBackground(.clear, for: .navigationBar)
+            .toolbarBackground(.clear, for: .automatic)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(Localized.done) {

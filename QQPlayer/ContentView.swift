@@ -238,6 +238,9 @@ struct SheetModifier: ViewModifier {
                     .id(appLanguageRaw.isEmpty ? "system" : appLanguageRaw)
                     .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
                     .accentColor(accentColor)
+                    // 真透明弹层：系统 sheet 底色/材质让路，页面里的封面玻璃才是唯一底
+                    // （玻璃未生效时 Form 的 .automatic 分组底自己铺满，外观与接入前一致）
+                    .presentationBackground(.clear)
             }
             .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
                 settings = DeleteSettings.load()

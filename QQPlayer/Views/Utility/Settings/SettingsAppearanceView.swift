@@ -26,6 +26,7 @@ struct SettingsAppearanceView: View {
                 }
                 .pickerStyle(.menu)
             }
+            .glassClearRowBackground()
 
             Section(Localized.appearance) {
                 Toggle(Localized.minimalistLibraryIcons, isOn: $deleteSettings.minimalistIcons)
@@ -97,6 +98,7 @@ struct SettingsAppearanceView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            .glassClearRowBackground()
         }
         // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
         .artworkGlassGroupedList {
@@ -104,6 +106,9 @@ struct SettingsAppearanceView: View {
         }
         .navigationTitle(Localized.appearance)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
     }
 
     /// 语言选择绑定：写持久化（含 AppleLanguages），AppStorage 触发本页重绘。

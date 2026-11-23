@@ -25,6 +25,7 @@ struct SettingsLibraryView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            .glassClearRowBackground()
 
             // 回收区（2026-09-29 回收区管理批）：查看 / 恢复 / 彻底删除
             // （生产回收区 <曲库根>/.Trash；业务逻辑全在 Services，本页只做入口）。
@@ -42,6 +43,7 @@ struct SettingsLibraryView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            .glassClearRowBackground()
 
             Section {
                 ForEach($deleteSettings.homeSections) { $section in
@@ -72,6 +74,7 @@ struct SettingsLibraryView: View {
                         .font(.caption)
                 }
             }
+            .glassClearRowBackground()
         }
         // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
         .artworkGlassGroupedList {
@@ -79,6 +82,9 @@ struct SettingsLibraryView: View {
         }
         .navigationTitle(Localized.librarySection)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
     }
 }
 

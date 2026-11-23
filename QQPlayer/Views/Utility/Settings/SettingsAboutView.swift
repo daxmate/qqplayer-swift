@@ -47,6 +47,7 @@ struct SettingsAboutView: View {
                 }
                 .buttonStyle(PlainButtonStyle()) // Remove default button styling that might interfere
             }
+            .glassClearRowBackground()
         }
         // 封面毛玻璃底（分组底在玻璃生效时隐藏、未生效回落 .automatic，见 ArtworkGlassGroupedListModifier）
         .artworkGlassGroupedList {
@@ -54,6 +55,9 @@ struct SettingsAboutView: View {
         }
         .navigationTitle(Localized.information)
         .navigationBarTitleDisplayMode(.inline)
+        // 真透明导航栏（与库页面同款：背景让路给封面玻璃）
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(.clear, for: .automatic)
     }
 }
 
