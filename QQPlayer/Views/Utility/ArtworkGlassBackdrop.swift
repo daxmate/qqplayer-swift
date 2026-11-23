@@ -37,6 +37,10 @@ struct ArtworkGlassBackdrop: View {
             scrim
             vignette
         }
+        // 布局钳制（2026-11-23 真机回归）：内层 ArtworkBlurBackground 的 scaledToFill
+        // 会报告超额布局尺寸（≈844pt 见方）；这里同样取父级提议尺寸，保证本组件即使被误放成
+        // ZStack 子节点也不会把整页撑宽（背景修饰器接法下视觉零变化：只填父级提议区域）。
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)

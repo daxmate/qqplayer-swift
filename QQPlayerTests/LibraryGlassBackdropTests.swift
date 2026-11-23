@@ -6,6 +6,8 @@
 //    1. 生效判定矩阵：开关开 + 有当前曲目 + 有封面 + 未开「降低透明度」才生效，其余任一回落；
 //    2. 四页接入契约：所有歌曲 / 专辑 / 艺人 / 歌单四页都走同一个容器
 //       `ArtworkGlassScreenBackground`，且装饰底节点 `ScreenSpecificBackgroundView(screen: …)` 原地保留；
+//       且必须是「背景修饰器」接法（`.background { … }`）—— 2026-11-23 真机回归：
+//       把它当 ZStack 子节点会让 `scaledToFill` 的超额布局尺寸把整页撑宽后居中裁切；
 //    3. 唯一实现契约：模糊层 `ArtworkBlurBackground` 只允许出现在共享组件与 Mac 窗口玻璃里
 //       （页面不得自己拼第二份）；雾面 / 暗角数值只在共享组件里出现一次。
 //
@@ -23,6 +25,9 @@ private enum GlassBackdropContract {
 
     /// 唯一视觉实现（雾面 / 暗角数值唯一来源）
     static let sharedComponentPath = "QQPlayer/Views/Utility/ArtworkGlassBackdrop.swift"
+
+    /// 模糊层（`scaledToFill` 所在层）：必须自带布局钳制
+    static let blurLayerPath = "QQPlayer/Views/Utility/ArtworkBlurBackground.swift"
 
     /// 允许直接构造模糊层的文件：共享组件 + macOS 窗口玻璃（整窗玻璃数值独立，本批不动）
     static let blurLayerOwners: Set<String> = [
@@ -54,6 +59,23 @@ private enum GlassBackdropContract {
                 return line[line.startIndex ..< range.lowerBound]
             }
             .joined(separator: "\n")
+    }
+
+    /// 「背景修饰器」接法判定：`ArtworkGlassScreenBackground` 必须作为 `.background { … }` 的内容出现。
+    ///
+    /// 判据 = 该行上方第一条非空行是 `.background {`；直接写在 ZStack 里的子节点不满足（2026-11-23 真机回归：
+    /// 子节点参与布局尺寸 ⇒ `scaledToFill` 的超额理想尺寸把整页撑宽后居中裁切）。
+    static func usesBackgroundModifier(_ source: String) -> Bool {
+        let lines = source.split(separator: "\n", omittingEmptySubsequences: false)
+        guard let index = lines.firstIndex(where: { $0.contains("ArtworkGlassScreenBackground {") }),
+              index > 0
+        else { return false }
+        var probe = index - 1
+        while probe >= 0, lines[probe].trimmingCharacters(in: .whitespaces).isEmpty {
+            probe -= 1
+        }
+        guard probe >= 0 else { return false }
+        return lines[probe].contains(".background {") || lines[probe].contains(".background{")
     }
 
     /// 递归枚举 `QQPlayer/` 下的 .swift 文件（相对仓库根路径）
@@ -148,7 +170,7 @@ struct LibraryGlassActivationTests {
 // MARK: - 四页接入契约
 
 struct LibraryGlassPageContractTests {
-    @Test("四个列表页都通过共享容器接入玻璃底，装饰底节点原地保留")
+    @Test("四个列表页都通过共享容器接入玻璃底（背景修饰器接法），装饰底节点原地保留")
     func allLibraryPagesUseSharedContainer() {
         for page in GlassBackdropContract.libraryPages {
             guard let source = GlassBackdropContract.read(page.path) else {
@@ -160,6 +182,11 @@ struct LibraryGlassPageContractTests {
             #expect(
                 stripped.contains("ScreenSpecificBackgroundView(screen: \(page.screen))"),
                 "\(page.path) 的装饰底节点被改动或删除（应保留 ScreenSpecificBackgroundView(screen: \(page.screen))）"
+            )
+            // 2026-11-23 真机回归：ZStack 子节点参与布局尺寸 ⇒ 整页被撑宽后居中裁切。
+            #expect(
+                GlassBackdropContract.usesBackgroundModifier(stripped),
+                "\(page.path) 的玻璃底不是 .background 修饰器接法（ZStack 子节点会撑宽整页）"
             )
         }
     }
@@ -188,6 +215,25 @@ struct LibraryGlassPageContractTests {
         #expect(stripped.contains("ArtworkGlassBackdrop(artwork:"), "播放页未复用共享玻璃底")
         #expect(!stripped.contains("startRadius: 180"), "播放页仍内联暗角（应只在共享组件里）")
         #expect(!stripped.contains("opacity(0.36)"), "播放页仍内联雾面（应只在共享组件里）")
+    }
+}
+
+// MARK: - 布局钳制契约（2026-11-23 真机回归）
+
+struct ArtworkGlassLayoutClampTests {
+    @Test("模糊层与玻璃底都必须钳制布局尺寸（scaledToFill 会报告超额尺寸）")
+    func backdropComponentsClampLayoutSize() {
+        for path in [GlassBackdropContract.blurLayerPath, GlassBackdropContract.sharedComponentPath] {
+            guard let source = GlassBackdropContract.read(path) else {
+                Issue.record("组件读不到（fail-closed）：\(path)")
+                continue
+            }
+            let stripped = GlassBackdropContract.stripped(source)
+            #expect(
+                stripped.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)"),
+                "\(path) 缺少布局钳制：scaledToFill 的超额布局尺寸会撑宽整页"
+            )
+        }
     }
 }
 

@@ -59,6 +59,12 @@ struct ArtworkBlurBackground: View {
 
             mask
         }
+        // 布局钳制（2026-11-23 真机回归）：Image.resizable().scaledToFill() 按「填满提议尺寸」计算，
+        // 会把封面报成约 844pt 见方的**布局尺寸**（远超 390pt 屏宽）。
+        // .clipped() 只裁绘制、不改布局尺寸 —— 作为 .background{} 内容时无害，
+        // 但若被放进 ZStack 当子节点，ZStack 会取这个超额尺寸 ⇒ 整页被撑宽后居中裁切。
+        // 这里取父级提议尺寸（max ∞），把超额理想尺寸挡在本层之内，从根上防复发。
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .allowsHitTesting(false)
         .accessibilityHidden(true)

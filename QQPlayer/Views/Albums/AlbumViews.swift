@@ -19,39 +19,40 @@ struct AlbumsScreen: View {
     @State private var settings = DeleteSettings.load()
 
     var body: some View {
-        ZStack {
-            // 封面毛玻璃底：装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）
+        VStack {
+            if albums.isEmpty {
+                EmptyAlbumsView()
+            } else {
+                ScrollView {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: DesignTokens.space20),
+                            GridItem(.flexible()),
+                        ],
+                        spacing: DesignTokens.space16
+                    ) {
+                        ForEach(albums, id: \.id) { album in
+                            NavigationLink {
+                                AlbumDetailScreen(album: album, allTracks: allTracks)
+                            } label: {
+                                AlbumCardView(album: album,
+                                              tracks: albumTracks(album))
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(DesignTokens.space16)
+                    .padding(.bottom, DesignTokens.space100) // Add padding for mini player
+                }
+            }
+        }
+        // 封面毛玻璃底：必须走「背景修饰器」接法 —— 作为 ZStack 子节点会参与布局尺寸，
+        // `scaledToFill` 的超额理想尺寸会把整页撑宽后居中裁切（2026-11-23 真机回归）。
+        // 装饰底节点原地保留，玻璃生效时由容器隐藏（见 ArtworkGlassScreenBackground）。
+        .background {
             ArtworkGlassScreenBackground {
                 ScreenSpecificBackgroundView(screen: .albums)
-            }
-
-            VStack {
-                if albums.isEmpty {
-                    EmptyAlbumsView()
-                } else {
-                    ScrollView {
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), spacing: DesignTokens.space20),
-                                GridItem(.flexible()),
-                            ],
-                            spacing: DesignTokens.space16
-                        ) {
-                            ForEach(albums, id: \.id) { album in
-                                NavigationLink {
-                                    AlbumDetailScreen(album: album, allTracks: allTracks)
-                                } label: {
-                                    AlbumCardView(album: album,
-                                                  tracks: albumTracks(album))
-                                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(DesignTokens.space16)
-                        .padding(.bottom, DesignTokens.space100) // Add padding for mini player
-                    }
-                }
             }
         }
         .navigationTitle(Localized.albums)
