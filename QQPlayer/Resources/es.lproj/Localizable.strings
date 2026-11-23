@@ -354,6 +354,10 @@
 "dsd_mode_dop_description" = "Usa siempre codificación DoP (requiere un DAC externo compatible con DSD)";
 
 /* Sort Options */
+"sort" = "Ordenar";
+"sort_ascending" = "Ascendente";
+"sort_descending" = "Descendente";
+"sort_default" = "Orden predeterminado";
 "sort_date_newest" = "Fecha de adición (más recientes)";
 "sort_date_oldest" = "Fecha de adición (más antiguas)";
 "sort_name_az" = "Nombre (A-Z)";

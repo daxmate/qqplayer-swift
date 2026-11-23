@@ -354,6 +354,10 @@
 "dsd_mode_dop_description" = "항상 DoP 인코딩을 사용합니다(DSD를 지원하는 외부 DAC 필요)";
 
 /* Sort Options */
+"sort" = "정렬";
+"sort_ascending" = "오름차순";
+"sort_descending" = "내림차순";
+"sort_default" = "기본 순서";
 "sort_date_newest" = "추가한 날짜(최신순)";
 "sort_date_oldest" = "추가한 날짜(오래된순)";
 "sort_name_az" = "이름(A-Z)";

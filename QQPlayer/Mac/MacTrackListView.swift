@@ -13,6 +13,8 @@
 //  （只改呈现，单击选中·双击播放·列头排序·右键菜单等交互契约不变）。
 //  2026-11-23 精简：删除「#」序号列（该列同时承载当前播放喇叭图标，整列一并移除）
 //  并隐藏表头；sortOrder 排序状态 / 整行播放底色 / 右键菜单等交互契约不变。
+//  2026-11-23 排序入口补回：表头隐藏后由工具条「排序」菜单写 sortOrder
+//  （视图在 MacTrackSortMenu.swift，排序链路原样复用）。
 //
 
 import AppKit
@@ -23,23 +25,29 @@ import SwiftUI
 /// 继承 NSObject 且排序 KeyPath 指向 @objc 存储属性（OC runtime 内省）——
 /// 用计算属性/纯 Swift 属性会运行时 fatal："must be introspectable by the
 /// objective-c runtime"（2026-09-02 用户实测）。
-private final class MacTrackTableRow: NSObject, Identifiable {
+/// 非 private：工具条排序菜单（MacTrackSortMenu.swift）也要构造
+/// `SortDescriptor<MacTrackTableRow>`，故行类型需跨文件可见。
+final class MacTrackTableRow: NSObject, Identifiable {
     let id: String
     let track: Track
-    /// 排序/显示字段：@objc 存储属性（title/artist/durationMs）。
+    /// 排序/显示字段：@objc 存储属性（title/artistName/albumName/durationMs）。
     /// ⚠️ 必须是存储属性：计算属性能过编译，但 Table 排序运行期 fatal（见文件头注释）。
     @objc let title: String
     @objc let artistName: String
+    /// 专辑排序键（与专辑列同口径：facts 缓存标题 + 字形归一）。
+    /// 每行一次缓存命中（O(1) 字典读，非 DB 查询），数千行量级的重建开销可忽略。
+    @objc let albumName: String
     /// 时长排序键（毫秒；未知 = -1，让未知排在最短之前）
     @objc let durationMs: Int
     /// 时长展示文案（m:ss；未知为空串）——只用于显示，不参与排序
     let durationText: String
 
-    init(id: String, track: Track, artistName: String) {
+    init(id: String, track: Track, artistName: String, albumName: String) {
         self.id = id
         self.track = track
         self.title = track.title
         self.artistName = artistName
+        self.albumName = albumName
         let milliseconds = track.durationMs ?? -1
         self.durationMs = milliseconds
         self.durationText = milliseconds > 0 ? MacTimeFormat.format(Double(milliseconds) / 1000) : ""
@@ -225,6 +233,10 @@ struct MacTrackListView: View {
             }
             if viewMode == .grouped {
                 MacTrackGroupDimensionPicker(dimension: $groupDimension)
+            }
+            // 列表 / 分组都以 displayedRows 的顺序呈现（专辑网格是全库总览，排序无意义）
+            if viewMode != .albums {
+                MacTrackSortMenu(sortOrder: $sortOrder)
             }
             viewModePicker
         }
@@ -463,7 +475,14 @@ struct MacTrackListView: View {
         }
         let sourceSort = freshSort ?? sortOrder
         let sorted = sourceTracks
-            .map { MacTrackTableRow(id: $0.stableId, track: $0, artistName: artistNameResolver($0) ?? "") }
+            .map {
+                MacTrackTableRow(
+                    id: $0.stableId,
+                    track: $0,
+                    artistName: artistNameResolver($0) ?? "",
+                    albumName: albumTitle(for: $0)
+                )
+            }
             .sorted(using: sourceSort)
         displayedRows = sorted
     }

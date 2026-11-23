@@ -338,6 +338,10 @@
 "dsd_mode_dop_description" = "Всегда использовать кодирование DoP (требуется внешний DAC с поддержкой DSD)";
 
 /* Sort Options */
+"sort" = "Сортировка";
+"sort_ascending" = "По возрастанию";
+"sort_descending" = "По убыванию";
+"sort_default" = "По умолчанию";
 "sort_date_newest" = "Дата добавления (сначала новые)";
 "sort_date_oldest" = "Дата добавления (сначала старые)";
 "sort_name_az" = "Название (A-Z)";

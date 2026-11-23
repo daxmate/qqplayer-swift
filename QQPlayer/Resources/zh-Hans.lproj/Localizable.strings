@@ -354,6 +354,10 @@
 "dsd_mode_dop_description" = "强制打包为 DoP 源码输出（警告：必须连接支持 DSD 硬解的专业外接 DAC 设备，否则会产生严重爆音！）";
 
 /* Sort Options */
+"sort" = "排序";
+"sort_ascending" = "升序";
+"sort_descending" = "降序";
+"sort_default" = "默认顺序";
 "sort_date_newest" = "按添加时间 (从新到旧)";
 "sort_date_oldest" = "按添加时间 (从旧到新)";
 "sort_name_az" = "按名称 (A-Z)";

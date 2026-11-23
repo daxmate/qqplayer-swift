@@ -354,6 +354,10 @@
 "dsd_mode_dop_description" = "Always use DoP encoding (requires external DAC that supports DSD)";
 
 /* Sort Options */
+"sort" = "Sort";
+"sort_ascending" = "Ascending";
+"sort_descending" = "Descending";
+"sort_default" = "Default Order";
 "sort_date_newest" = "Date Added (Newest)";
 "sort_date_oldest" = "Date Added (Oldest)";
 "sort_name_az" = "Name (A-Z)";

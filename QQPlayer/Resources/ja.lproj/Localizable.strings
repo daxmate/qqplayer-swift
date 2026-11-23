@@ -354,6 +354,10 @@
 "dsd_mode_dop_description" = "常にDoPエンコードを使用します（DSD対応の外付けDACが必要）";
 
 /* Sort Options */
+"sort" = "並べ替え";
+"sort_ascending" = "昇順";
+"sort_descending" = "降順";
+"sort_default" = "デフォルト順";
 "sort_date_newest" = "追加日（新しい順）";
 "sort_date_oldest" = "追加日（古い順）";
 "sort_name_az" = "名前（A-Z）";

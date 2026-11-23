@@ -523,6 +523,14 @@
 "dsd_mode_dop_description" = "強制打包為 DoP 源碼輸出（警告：必須連接支援 DSD 硬解的專業外接 DAC 設備，否則會產生嚴重爆音！）";
 
 /* Sort Options */
+"sort" = "排序";
+
+"sort_ascending" = "遞增";
+
+"sort_descending" = "遞減";
+
+"sort_default" = "預設順序";
+
 "sort_date_newest" = "按添加時間 (從新到舊)";
 
 "sort_date_oldest" = "按添加時間 (從舊到新)";
