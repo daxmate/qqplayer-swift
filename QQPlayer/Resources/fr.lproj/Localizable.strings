@@ -25,7 +25,7 @@
 "albums_count_plural" = "%d albums";
 "created_date" = "Créée le %@";
 "no_songs_found" = "Aucune musique trouvée";
-"your_music_will_appear_here" = "Pour ajouter vos musiques :\n\n1. Ouvrez l\'app Fichiers (ou appuyez sur \'Ouvrir Fichiers\')\n2. Allez dans \'Sur mon iPhone\' → QQPlayer\n3. Copiez vos musiques dans ce dossier";
+"your_music_will_appear_here" = "Pour ajouter vos musiques :\n\n1. Ouvrez l\'app Fichiers (ou appuyez sur \'Ouvrir Fichiers\')\n2. Allez dans \'Sur mon iPhone\' → TingFi\n3. Copiez vos musiques dans ce dossier";
 "create_first_playlist" = "Créez votre première playlist pour commencer";
 
 /* General UI strings */
@@ -166,7 +166,7 @@
 "force_dark_mode" = "Mode sombre forcé";
 "version" = "Version";
 "app_name" = "Nom de l'app";
-"qqplayer" = "QQPlayer";
+"qqplayer" = "TingFi";
 "github_repository" = "Dépôt GitHub";
 "use_simple_icons" = "Utilisez des icônes simples sans arrière-plans colorés dans les sections de la bibliothèque.";
 "override_system_appearance" = "Remplacer l'apparence du système et forcer l'application à utiliser le mode sombre.";
@@ -191,19 +191,19 @@
 "all" = "Tout";
 
 /* Tutorial/Onboarding */
-"welcome_to_qqplayer" = "Bienvenue dans QQPlayer";
+"welcome_to_qqplayer" = "Bienvenue dans TingFi";
 "if_signed_in_continue" = "Si vous êtes connecté, vous pouvez continuer";
 "add_your_music" = "Ajoutez votre musique";
-"how_to_add_music" = "Ajoutez vos musiques dans le dossier QQPlayer de cet appareil (Fichiers → \'Sur mon iPhone\' → QQPlayer) :";
+"how_to_add_music" = "Ajoutez vos musiques dans le dossier TingFi de cet appareil (Fichiers → \'Sur mon iPhone\' → TingFi) :";
 "open_files_app" = "Ouvrir l'app Fichiers";
 "navigate_to_on_my_iphone" = "Allez dans \'Sur mon iPhone\'";
-"find_qqplayer_folder" = "Trouver le dossier QQPlayer";
+"find_qqplayer_folder" = "Trouver le dossier TingFi";
 "add_your_music_instruction" = "Ajoutez votre musique";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "Trouvez et ouvrez l'app Fichiers";
-"tap_on_my_iphone_sidebar" = "Choisissez \'Sur mon iPhone\' dans la barre latérale, puis le dossier QQPlayer";
-"look_for_qqplayer_folder" = "Trouvez le dossier 'QQPlayer' et ouvrez-le";
+"tap_on_my_iphone_sidebar" = "Choisissez \'Sur mon iPhone\' dans la barre latérale, puis le dossier TingFi";
+"look_for_qqplayer_folder" = "Trouvez le dossier 'TingFi' et ouvrez-le";
 "copy_music_files" = "Copiez vos fichiers FLAC ou MP3 dans ce dossier";
 
 /* Library Processing */
@@ -390,7 +390,7 @@
 "feature_guide_dark_mode_title" = "Mode sombre";
 "feature_guide_dark_mode_detail" = "Réglages → Apparence → Forcer le mode sombre pour remplacer l'apparence du système";
 "feature_guide_import_title" = "Import de fichiers musicaux";
-"feature_guide_import_detail" = "Placez vos fichiers dans le dossier QQPlayer de cet appareil (Fichiers → \'Sur mon iPhone\' → QQPlayer), ou touchez Ouvrir des fichiers dans la bibliothèque";
+"feature_guide_import_detail" = "Placez vos fichiers dans le dossier TingFi de cet appareil (Fichiers → \'Sur mon iPhone\' → TingFi), ou touchez Ouvrir des fichiers dans la bibliothèque";
 
 
 /* Sleep Timer */
@@ -439,17 +439,17 @@
 "Resumes playing your music where you left off." = "Reprend la lecture de votre musique là où vous vous étiez arrêté.";
 "Audio" = "Audio";
 "Play Music" = "Lire de la musique";
-"Plays a song, album, artist or playlist from your QQPlayer library." = "Lit un titre, un album, un artiste ou une playlist de votre bibliothèque QQPlayer.";
+"Plays a song, album, artist or playlist from your QQPlayer library." = "Lit un titre, un album, un artiste ou une playlist de votre bibliothèque TingFi.";
 "Playback" = "Lecture";
 "Add to Playlist" = "Ajouter à une playlist";
 "Generate Mix" = "Générer un mix";
-"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "Crée un mix à partir de votre bibliothèque QQPlayer selon une ambiance ou une description, puis lance la lecture.";
+"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "Crée un mix à partir de votre bibliothèque TingFi selon une ambiance ou une description, puis lance la lecture.";
 "Toggle Favorite" = "Basculer le favori";
 "Favorite Current Song" = "Ajouter le morceau en cours aux favoris";
-"Adds the currently playing QQPlayer song to Liked Songs." = "Ajoute le morceau en cours de lecture dans QQPlayer aux favoris.";
+"Adds the currently playing QQPlayer song to Liked Songs." = "Ajoute le morceau en cours de lecture dans TingFi aux favoris.";
 "%@ is already in your Liked Songs." = "%@ est déjà dans vos favoris.";
 "Added %@ to your Liked Songs." = "%@ a été ajouté à vos favoris.";
-"There isn't a song playing in QQPlayer right now." = "Aucun morceau n'est en cours de lecture dans QQPlayer.";
+"There isn't a song playing in QQPlayer right now." = "Aucun morceau n'est en cours de lecture dans TingFi.";
 "Add to Queue" = "Ajouter à la file d'attente";
 "Play Playlist" = "Lire la playlist";
 "Save Mix as Playlist" = "Enregistrer le mix comme playlist";
@@ -473,7 +473,7 @@
 "Now playing" = "En cours de lecture";
 
 /* Erreurs */
-"There's no music in your QQPlayer library yet." = "Il n'y a pas encore de musique dans votre bibliothèque QQPlayer.";
+"There's no music in your QQPlayer library yet." = "Il n'y a pas encore de musique dans votre bibliothèque TingFi.";
 "No matching music was found in your library." = "Aucune musique correspondante n'a été trouvée dans votre bibliothèque.";
 "You can only take that action on individual songs." = "Cette action n'est possible que sur des titres individuels.";
 "That song is already in this playlist." = "Ce titre est déjà dans cette playlist.";
@@ -772,7 +772,7 @@
 "sync_settings_entry" = "Synchronisation";
 "sync_settings_footer" = "Appairez votre Mac et votre iPhone pour synchroniser votre bibliothèque. L'appairage ne se fait que sur votre réseau local.";
 "sync_identity_section" = "Identité et code QR";
-"sync_identity_footer" = "Scannez ce code avec QQPlayer sur votre iPhone pour appairer ce Mac comme hôte.";
+"sync_identity_footer" = "Scannez ce code avec TingFi sur votre iPhone pour appairer ce Mac comme hôte.";
 "sync_this_device" = "Cet appareil";
 "sync_this_device_section" = "Cet appareil";
 "sync_device_id" = "ID de l'appareil";
@@ -787,7 +787,7 @@
 "sync_no_paired_devices" = "Aucun appareil appairé pour l'instant.";
 "sync_no_paired_hosts" = "Aucun hôte appairé pour l'instant.";
 "sync_add_host" = "Ajouter un hôte";
-"sync_add_host_footer" = "Appairez avec l'un de vos Mac QQPlayer. Le Mac doit approuver avant la fin de l'appairage.";
+"sync_add_host_footer" = "Appairez avec l'un de vos Mac TingFi. Le Mac doit approuver avant la fin de l'appairage.";
 "sync_unpair" = "Désappairer";
 "sync_unpair_confirm_title" = "Désappairer cet appareil ?";
 "sync_unpair_confirm_message" = "Retirer %@ ? Il devra être appairé de nouveau pour se synchroniser.";
@@ -803,12 +803,12 @@
 "sync_reject" = "Refuser";
 
 "sync_devices_section" = "Appareils";
-"sync_devices_footer" = "L’appareil sélectionné est la cible de cette synchronisation. Un appareil n’apparaît en ligne que lorsque QQPlayer y est ouvert (Réglages → Synchronisation).";
-"sync_devices_empty" = "Aucun appareil mobile appairé pour l’instant. Scannez le code QR ci-dessus avec QQPlayer sur votre téléphone pour appairer.";
+"sync_devices_footer" = "L’appareil sélectionné est la cible de cette synchronisation. Un appareil n’apparaît en ligne que lorsque TingFi y est ouvert (Réglages → Synchronisation).";
+"sync_devices_empty" = "Aucun appareil mobile appairé pour l’instant. Scannez le code QR ci-dessus avec TingFi sur votre téléphone pour appairer.";
 "sync_devices_target_badge" = "Cible de synchronisation";
 "sync_device_status_online" = "En ligne";
 "sync_device_status_offline" = "Hors ligne";
-"sync_device_offline_hint" = "Ouvrez QQPlayer sur cet appareil → Réglages → Synchronisation.";
+"sync_device_offline_hint" = "Ouvrez TingFi sur cet appareil → Réglages → Synchronisation.";
 "sync_target_waiting" = "En attente de la connexion de %@.";
 "sync_target_mismatch_format" = "Connecté à %@, mais votre cible de synchronisation est %@.";
 "sync_target_switch" = "Utiliser %@";
@@ -827,7 +827,7 @@
 "sync_added_awaiting_host" = "%@ ajouté. L'appairage se termine après approbation sur le Mac.";
 "sync_manual_added_awaiting_host" = "%@ ajouté. L'appairage se termine après approbation sur le Mac ; les informations de l'appareil seront complétées à la première connexion.";
 "sync_scan_failed_title" = "Pas un code d'appairage";
-"sync_invalid_qr_message" = "Ce code QR n'est pas un code d'appairage QQPlayer valide.";
+"sync_invalid_qr_message" = "Ce code QR n'est pas un code d'appairage TingFi valide.";
 "sync_expired_title" = "Code d'appairage expiré";
 "sync_expired_message" = "Demandez au Mac d'actualiser son code, puis scannez à nouveau.";
 "sync_store_failed_title" = "Échec de l'enregistrement";
@@ -894,8 +894,8 @@
 /* ── M6 T3（2026-09-11）同步操作区（连接状态 / 内容选择 / 执行 / 结果）字段 ── */
 "sync_run_connection_section" = "Connexion";
 "sync_run_connected_for" = "Connecté depuis %@";
-"sync_run_not_paired_hint" = "Aucun appareil appairé. Scannez le code QR ci-dessous avec QQPlayer sur votre iPhone.";
-"sync_run_not_connected_hint" = "Sur votre iPhone : QQPlayer → Réglages → Synchronisation, puis connectez-vous.";
+"sync_run_not_paired_hint" = "Aucun appareil appairé. Scannez le code QR ci-dessous avec TingFi sur votre iPhone.";
+"sync_run_not_connected_hint" = "Sur votre iPhone : TingFi → Réglages → Synchronisation, puis connectez-vous.";
 "sync_run_allow_lan" = "Autoriser les appareils du réseau local à se connecter";
 "sync_run_listener_off_hint" = "L'écoute est désactivée : ce Mac ne peut être ni détecté ni synchronisé.";
 "sync_run_selection_section" = "Contenu à synchroniser";
@@ -1112,12 +1112,12 @@
 "library_access_grant_failed" = "Impossible d'enregistrer l'autorisation : %@";
 "library_import_legacy" = "Importer la base d'une version précédente…";
 "library_import_legacy_prompt" = "Sélectionnez le dossier QQPlayerMac dans Application Support";
-"library_import_legacy_done" = "%d fichier(s) importé(s). Redémarrez QQPlayer si la bibliothèque ne se met pas à jour.";
+"library_import_legacy_done" = "%d fichier(s) importé(s). Redémarrez TingFi si la bibliothèque ne se met pas à jour.";
 "library_import_legacy_failed" = "Échec de l'import : %@ (votre base précédente est intacte)";
 "library_import_legacy_missing" = "Aucun qqplayer.db dans le dossier sélectionné";
 "library_import_legacy_backup" = "Base existante sauvegardée sous %@";
 "library_import_legacy_hint" = "Une base d'une version précédente (non sandboxée) a été détectée et peut être importée.";
-"library_import_legacy_confirm" = "Cette action remplace la base actuelle (une sauvegarde est créée automatiquement). Redémarrez QQPlayer ensuite. Continuer ?";
+"library_import_legacy_confirm" = "Cette action remplace la base actuelle (une sauvegarde est créée automatiquement). Redémarrez TingFi ensuite. Continuer ?";
 
 /* Local AI recommendations (P1) */
 "recommendations" = "Pour vous";

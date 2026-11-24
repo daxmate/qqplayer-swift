@@ -1,6 +1,6 @@
 /*
   AppShortcuts.strings (Español)
-  QQPlayer
+  TingFi
 
   Frases de invocación de Siri para los App Shortcuts declarados en QQPlayerAppShortcuts.swift. Las claves coinciden exactamente con las frases en inglés; ${applicationName} es el nombre de la app.
 */

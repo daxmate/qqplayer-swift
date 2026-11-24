@@ -210,7 +210,7 @@
 
         private func defaultTitle(for request: String) -> String {
             let trimmed = request.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? "QQPlayer Mix" : trimmed.capitalized
+            return trimmed.isEmpty ? Localized.qqplayerName + " Mix" : trimmed.capitalized
         }
     }
 

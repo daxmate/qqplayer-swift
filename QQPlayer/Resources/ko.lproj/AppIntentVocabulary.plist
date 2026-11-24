@@ -9,8 +9,8 @@
 			<string>INPlayMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>QQPlayer에서 내 음악 재생</string>
-				<string>QQPlayer에서 즐겨찾기 재생</string>
+				<string>TingFi에서 내 음악 재생</string>
+				<string>TingFi에서 즐겨찾기 재생</string>
 			</array>
 		</dict>
 		<dict>
@@ -18,8 +18,8 @@
 			<string>INAddMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>QQPlayer에서 이 곡을 즐겨찾기에 추가</string>
-				<string>QQPlayer에서 이 곡을 재생목록에 추가</string>
+				<string>TingFi에서 이 곡을 즐겨찾기에 추가</string>
+				<string>TingFi에서 이 곡을 재생목록에 추가</string>
 			</array>
 		</dict>
 	</array>

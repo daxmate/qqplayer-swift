@@ -109,7 +109,7 @@
             switch self {
             case .noAudioEntity:
                 LocalizedStringResource(
-                    "I couldn't find that song in your QQPlayer library.",
+                    "I couldn't find that song in your TingFi library.",
                     comment: "Spoken when Siri couldn't resolve any matching audio for a play request."
                 )
             case .unsupportedTarget:

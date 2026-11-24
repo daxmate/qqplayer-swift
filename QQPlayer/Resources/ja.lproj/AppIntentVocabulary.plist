@@ -9,8 +9,8 @@
 			<string>INPlayMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>QQPlayerで音楽を再生</string>
-				<string>QQPlayerでお気に入りを再生</string>
+				<string>TingFiで音楽を再生</string>
+				<string>TingFiでお気に入りを再生</string>
 			</array>
 		</dict>
 		<dict>
@@ -18,8 +18,8 @@
 			<string>INAddMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>QQPlayerでこの曲をお気に入りに追加</string>
-				<string>QQPlayerでこの曲をプレイリストに追加</string>
+				<string>TingFiでこの曲をお気に入りに追加</string>
+				<string>TingFiでこの曲をプレイリストに追加</string>
 			</array>
 		</dict>
 	</array>

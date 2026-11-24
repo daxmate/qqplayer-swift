@@ -1,6 +1,6 @@
 /*
   AppShortcuts.strings (한국어)
-  QQPlayer
+  TingFi
 
   QQPlayerAppShortcuts.swift에 선언된 App Shortcuts용 Siri 호출 문구입니다. 키는 영어 문구와 정확히 일치해야 하며 ${applicationName}은 앱 이름 자리 표시자입니다.
 */

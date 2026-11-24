@@ -1,9 +1,12 @@
 /*
   InfoPlist.strings (日本語)
-  QQPlayer
+  TingFi
 
   Info.plist の権限ダイアログをローカライズします（QQPlayer/Info.plist）。
 */
 
-"NSCameraUsageDescription" = "お使いのQQPlayerデバイスとペアリングして同期するためにQRコードをスキャンします（許可したペアリングのみ）。";
-"NSLocalNetworkUsageDescription" = "同じローカルネットワーク上のQQPlayerデバイス（Mac/Windows/NAS）を検出して接続し、音楽ライブラリをペアリング・同期するために使用します。";
+"CFBundleDisplayName" = "TingFi";
+"CFBundleName" = "TingFi";
+
+"NSCameraUsageDescription" = "お使いのTingFiデバイスとペアリングして同期するためにQRコードをスキャンします（許可したペアリングのみ）。";
+"NSLocalNetworkUsageDescription" = "同じローカルネットワーク上のTingFiデバイス（Mac/Windows/NAS）を検出して接続し、音楽ライブラリをペアリング・同期するために使用します。";

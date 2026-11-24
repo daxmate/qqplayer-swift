@@ -1,6 +1,6 @@
 /*
   AppShortcuts.strings (简体中文)
-  QQPlayer
+  婷听
 
   QQPlayerAppShortcuts.swift 中 App Shortcuts 的 Siri 调用短语。
   key 必须与英文短语完全一致（${applicationName} 为 App 名占位符），

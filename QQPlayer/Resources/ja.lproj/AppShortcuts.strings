@@ -1,6 +1,6 @@
 /*
   AppShortcuts.strings (日本語)
-  QQPlayer
+  TingFi
 
   QQPlayerAppShortcuts.swift で宣言されたApp Shortcuts用のSiri呼び出しフレーズです。キーは英語のフレーズと完全に一致させ、${applicationName}はアプリ名のプレースホルダーです。
 */

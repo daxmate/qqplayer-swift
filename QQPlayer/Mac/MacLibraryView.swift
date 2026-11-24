@@ -247,7 +247,7 @@ struct MacLibraryView: View {
             trackId: player.currentTrack?.stableId,
             loadArtwork: { await loadWindowArtwork() }
         ))
-        .navigationTitle("QQPlayer")
+        .navigationTitle(Localized.qqplayerName)
         // 玻璃判定结果上送（工具栏背景由窗口内容根读，见 MacWindowGlassChromeState）：
         // 判定点只有 isWindowGlassActive 一处，这里只搬运，不重复判定。
         .onChange(of: isWindowGlassActive, initial: true) { _, active in

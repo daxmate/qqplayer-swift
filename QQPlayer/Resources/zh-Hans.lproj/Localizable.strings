@@ -25,7 +25,7 @@
 "albums_count_plural" = "%d 张专辑";
 "created_date" = "创建于 %@";
 "no_songs_found" = "未找到歌曲";
-"your_music_will_appear_here" = "如何添加你的无损音乐：\n\n1. 打开 iOS 自带的「文件」App（或点击下方“打开文件”按钮）\n2. 进入「我的 iPhone」→「QQPlayer」\n3. 将你的音乐文件移动或拷贝到该文件夹中即可";
+"your_music_will_appear_here" = "如何添加你的无损音乐：\n\n1. 打开 iOS 自带的「文件」App（或点击下方“打开文件”按钮）\n2. 进入「我的 iPhone」→「婷听」\n3. 将你的音乐文件移动或拷贝到该文件夹中即可";
 "create_first_playlist" = "创建你的第一个播放列表开始听歌吧";
 
 /* 自动歌单 */
@@ -182,7 +182,7 @@
 "force_dark_mode" = "强制深色模式";
 "version" = "版本";
 "app_name" = "应用名称";
-"qqplayer" = "QQPlayer";
+"qqplayer" = "婷听";
 "github_repository" = "GitHub 开源仓库";
 "use_simple_icons" = "在媒体库界面中移除图标的彩色背景，使用极简风格。";
 "override_system_appearance" = "无视 iOS 系统外观设置，强制让应用保持深色模式。";
@@ -207,19 +207,19 @@
 "all" = "全部";
 
 /* Tutorial/Onboarding */
-"welcome_to_qqplayer" = "欢迎使用 QQPlayer";
+"welcome_to_qqplayer" = "欢迎使用婷听";
 "if_signed_in_continue" = "如果你已登录，请点击继续";
 "add_your_music" = "添加你的本地音乐";
-"how_to_add_music" = "请将音乐文件放入本机「文件」App 的 QQPlayer 文件夹（我的 iPhone → QQPlayer）：";
+"how_to_add_music" = "请将音乐文件放入本机「文件」App 的婷听文件夹（我的 iPhone → 婷听）：";
 "open_files_app" = "打开「文件」App";
 "navigate_to_on_my_iphone" = "进入「我的 iPhone」";
-"find_qqplayer_folder" = "找到「QQPlayer」文件夹";
+"find_qqplayer_folder" = "找到「婷听」文件夹";
 "add_your_music_instruction" = "导入你的音乐";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "在手机桌面上找到并打开蓝色的「文件」App";
-"tap_on_my_iphone_sidebar" = "在浏览页面选择「我的 iPhone」，再进入「QQPlayer」文件夹";
-"look_for_qqplayer_folder" = "找到名为「QQPlayer」的文件夹并点开";
+"tap_on_my_iphone_sidebar" = "在浏览页面选择「我的 iPhone」，再进入「婷听」文件夹";
+"look_for_qqplayer_folder" = "找到名为「婷听」的文件夹并点开";
 "copy_music_files" = "将你的 DSD、FLAC、WAV 等无损文件拷贝进这个文件夹";
 
 /* Library Processing */
@@ -454,7 +454,7 @@
 "feature_guide_dark_mode_title" = "深色模式开关";
 "feature_guide_dark_mode_detail" = "设置 → 外观 → 强制深色模式，可覆盖系统外观";
 "feature_guide_import_title" = "文件导入";
-"feature_guide_import_detail" = "将音乐文件放入本机「文件」App 的 QQPlayer 文件夹（我的 iPhone → QQPlayer），或在媒体库点击「打开文件」直接导入";
+"feature_guide_import_detail" = "将音乐文件放入本机「文件」App 的婷听文件夹（我的 iPhone → 婷听），或在媒体库点击「打开文件」直接导入";
 
 
 /* 播放顺序 */
@@ -507,14 +507,14 @@
 "Resumes playing your music where you left off." = "从上次停止的位置继续播放音乐。";
 "Audio" = "音频";
 "Play Music" = "播放音乐";
-"Plays a song, album, artist or playlist from your QQPlayer library." = "播放 QQPlayer 音乐库中的歌曲、专辑、艺术家或播放列表。";
+"Plays a song, album, artist or playlist from your QQPlayer library." = "播放婷听音乐库中的歌曲、专辑、艺术家或播放列表。";
 "Playback" = "播放";
 "Add to Playlist" = "添加到播放列表";
 "Generate Mix" = "生成合集";
-"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "根据心情或描述，从 QQPlayer 音乐库生成合集并开始播放。";
+"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "根据心情或描述，从婷听音乐库生成合集并开始播放。";
 "Toggle Favorite" = "切换收藏";
 "Favorite Current Song" = "收藏当前歌曲";
-"Adds the currently playing QQPlayer song to Liked Songs." = "将 QQPlayer 中正在播放的歌曲添加到“我喜欢的音乐”。";
+"Adds the currently playing QQPlayer song to Liked Songs." = "将婷听中正在播放的歌曲添加到“我喜欢的音乐”。";
 "Add to Queue" = "添加到播放队列";
 "Play Playlist" = "播放播放列表";
 "Save Mix as Playlist" = "将合集保存为播放列表";
@@ -532,7 +532,7 @@
 /* Dialogs */
 "%@ is already in your Liked Songs." = "%@ 已在“我喜欢的音乐”中。";
 "Added %@ to your Liked Songs." = "已将 %@ 添加到“我喜欢的音乐”。";
-"There isn't a song playing in QQPlayer right now." = "QQPlayer 当前没有正在播放的歌曲。";
+"There isn't a song playing in QQPlayer right now." = "婷听当前没有正在播放的歌曲。";
 "Added %@ to your favorites." = "已将 %@ 添加到收藏。";
 "Removed %@ from your favorites." = "已将 %@ 从收藏中移除。";
 "Added %@ to %@." = "已将 %1$@ 添加到 %2$@。";
@@ -541,7 +541,7 @@
 "Now playing" = "正在播放";
 
 /* Errors */
-"There's no music in your QQPlayer library yet." = "QQPlayer 音乐库中还没有音乐。";
+"There's no music in your QQPlayer library yet." = "婷听音乐库中还没有音乐。";
 "No matching music was found in your library." = "在你的音乐库中未找到匹配的音乐。";
 "You can only take that action on individual songs." = "该操作仅适用于单首歌曲。";
 "That song is already in this playlist." = "该歌曲已在此播放列表中。";
@@ -777,7 +777,7 @@
 "sync_settings_entry" = "同步";
 "sync_settings_footer" = "在 Mac 与 iPhone 之间配对以同步音乐资料库。配对只在本机局域网内进行。";
 "sync_identity_section" = "身份与二维码";
-"sync_identity_footer" = "用 iPhone 上的 QQPlayer 扫描此码，将这台 Mac 配对为主机。";
+"sync_identity_footer" = "用 iPhone 上的婷听扫描此码，将这台 Mac 配对为主机。";
 "sync_this_device" = "本机设备";
 "sync_this_device_section" = "本机设备";
 "sync_device_id" = "设备 ID";
@@ -792,7 +792,7 @@
 "sync_no_paired_devices" = "暂无已配对设备。";
 "sync_no_paired_hosts" = "暂无已配对主机。";
 "sync_add_host" = "添加主机";
-"sync_add_host_footer" = "与您自己的 QQPlayer Mac 配对。配对完成前需要在 Mac 上批准。";
+"sync_add_host_footer" = "与您自己的婷听 Mac 配对。配对完成前需要在 Mac 上批准。";
 "sync_unpair" = "撤销配对";
 "sync_unpair_confirm_title" = "撤销此设备的配对？";
 "sync_unpair_confirm_message" = "移除 %@？之后需重新配对才能同步。";
@@ -808,12 +808,12 @@
 "sync_reject" = "拒绝";
 
 "sync_devices_section" = "设备";
-"sync_devices_footer" = "选中的设备是本次同步的目标。设备上打开 QQPlayer（设置 → 同步）时才会显示为在线。";
-"sync_devices_empty" = "还没有配对的移动设备。用手机上的 QQPlayer 扫描上方二维码即可配对。";
+"sync_devices_footer" = "选中的设备是本次同步的目标。设备上打开婷听（设置 → 同步）时才会显示为在线。";
+"sync_devices_empty" = "还没有配对的移动设备。用手机上的婷听扫描上方二维码即可配对。";
 "sync_devices_target_badge" = "本次同步目标";
 "sync_device_status_online" = "在线";
 "sync_device_status_offline" = "离线";
-"sync_device_offline_hint" = "在该设备上打开 QQPlayer → 设置 → 同步。";
+"sync_device_offline_hint" = "在该设备上打开婷听 → 设置 → 同步。";
 "sync_target_waiting" = "等待 %@ 上线。";
 "sync_target_mismatch_format" = "当前连着 %@，你要同步的是 %@。";
 "sync_target_switch" = "改用 %@";
@@ -832,7 +832,7 @@
 "sync_added_awaiting_host" = "已添加 %@。在 Mac 上批准后完成配对。";
 "sync_manual_added_awaiting_host" = "已添加 %@。在 Mac 上批准后完成配对；设备信息将在首次连接时补全。";
 "sync_scan_failed_title" = "不是配对码";
-"sync_invalid_qr_message" = "此二维码不是有效的 QQPlayer 配对码。";
+"sync_invalid_qr_message" = "此二维码不是有效的婷听配对码。";
 "sync_expired_title" = "配对码已过期";
 "sync_expired_message" = "请在 Mac 上刷新二维码后重新扫描。";
 "sync_store_failed_title" = "保存失败";
@@ -899,8 +899,8 @@
 /* ── M6 T3（2026-09-11）同步操作区（连接状态 / 内容选择 / 执行 / 结果）字段 ── */
 "sync_run_connection_section" = "连接状态";
 "sync_run_connected_for" = "已连接 %@";
-"sync_run_not_paired_hint" = "还没有配对设备，用 iPhone 上的 QQPlayer 扫描下方二维码完成配对。";
-"sync_run_not_connected_hint" = "在 iPhone 上打开 QQPlayer → 设置 → 同步，即可连接。";
+"sync_run_not_paired_hint" = "还没有配对设备，用 iPhone 上的婷听扫描下方二维码完成配对。";
+"sync_run_not_connected_hint" = "在 iPhone 上打开婷听 → 设置 → 同步，即可连接。";
 "sync_run_allow_lan" = "允许局域网内的设备连接";
 "sync_run_listener_off_hint" = "监听已关闭，其他设备无法发现这台 Mac，也无法同步。";
 "sync_run_selection_section" = "同步内容";
@@ -1117,12 +1117,12 @@
 "library_access_grant_failed" = "无法保存文件夹授权：%@";
 "library_import_legacy" = "从旧版本导入数据库…";
 "library_import_legacy_prompt" = "请选择 Application Support 里的 QQPlayerMac 文件夹";
-"library_import_legacy_done" = "已导入 %d 个文件；若曲库未刷新请重启 QQPlayer。";
+"library_import_legacy_done" = "已导入 %d 个文件；若曲库未刷新请重启婷听。";
 "library_import_legacy_failed" = "导入失败：%@（旧数据库保持原样）";
 "library_import_legacy_missing" = "所选文件夹里没有 qqplayer.db";
 "library_import_legacy_backup" = "原有数据库已备份为 %@";
 "library_import_legacy_hint" = "检测到旧版本（非沙盒）的数据库，可以导入。";
-"library_import_legacy_confirm" = "导入会覆盖当前数据库（已自动备份），完成后需要重启 QQPlayer。继续？";
+"library_import_legacy_confirm" = "导入会覆盖当前数据库（已自动备份），完成后需要重启婷听。继续？";
 
 /* Local AI recommendations (P1) */
 "recommendations" = "为你推荐";

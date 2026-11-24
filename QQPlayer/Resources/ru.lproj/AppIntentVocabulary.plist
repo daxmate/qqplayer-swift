@@ -9,8 +9,8 @@
 			<string>INPlayMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>Включи мою музыку в QQPlayer</string>
-				<string>Включи мои любимые треки в QQPlayer</string>
+				<string>Включи мою музыку в TingFi</string>
+				<string>Включи мои любимые треки в TingFi</string>
 			</array>
 		</dict>
 		<dict>
@@ -18,8 +18,8 @@
 			<string>INAddMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>Добавь эту песню в избранное в QQPlayer</string>
-				<string>Добавь эту песню в плейлист в QQPlayer</string>
+				<string>Добавь эту песню в избранное в TingFi</string>
+				<string>Добавь эту песню в плейлист в TingFi</string>
 			</array>
 		</dict>
 	</array>

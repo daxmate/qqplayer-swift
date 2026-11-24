@@ -25,7 +25,7 @@
 "albums_count_plural" = "%d앨범";
 "created_date" = "%@에 생성";
 "no_songs_found" = "곡을 찾을 수 없습니다";
-"your_music_will_appear_here" = "음악을 추가하려면:\n\n1. '파일' 앱을 엽니다('파일 열기'를 눌러도 됩니다)\n2. '나의 iPhone' → QQPlayer로 이동합니다\n3. 해당 폴더에 음악 파일을 복사합니다";
+"your_music_will_appear_here" = "음악을 추가하려면:\n\n1. '파일' 앱을 엽니다('파일 열기'를 눌러도 됩니다)\n2. '나의 iPhone' → TingFi로 이동합니다\n3. 해당 폴더에 음악 파일을 복사합니다";
 "create_first_playlist" = "첫 재생목록을 만들어 시작하세요";
 
 /* Smart playlists (automatic playlists) */
@@ -182,7 +182,7 @@
 "force_dark_mode" = "강제 다크 모드";
 "version" = "버전";
 "app_name" = "앱 이름";
-"qqplayer" = "QQPlayer";
+"qqplayer" = "TingFi";
 "github_repository" = "GitHub 리포지토리";
 "use_simple_icons" = "라이브러리 섹션에서 색상 배경이 없는 단순한 아이콘을 사용합니다.";
 "override_system_appearance" = "시스템 모양 설정을 무시하고 앱을 항상 다크 모드로 사용합니다.";
@@ -207,19 +207,19 @@
 "all" = "전체";
 
 /* Tutorial/Onboarding */
-"welcome_to_qqplayer" = "QQPlayer에 오신 것을 환영합니다";
+"welcome_to_qqplayer" = "TingFi에 오신 것을 환영합니다";
 "if_signed_in_continue" = "이미 로그인했다면 계속할 수 있습니다";
 "add_your_music" = "음악 추가";
-"how_to_add_music" = "이 기기의 QQPlayer 폴더에 음악 파일을 추가합니다('파일' 앱 → '나의 iPhone' → QQPlayer):";
+"how_to_add_music" = "이 기기의 TingFi 폴더에 음악 파일을 추가합니다('파일' 앱 → '나의 iPhone' → TingFi):";
 "open_files_app" = "'파일' 앱 열기";
 "navigate_to_on_my_iphone" = "'나의 iPhone'으로 이동";
-"find_qqplayer_folder" = "QQPlayer 폴더 찾기";
+"find_qqplayer_folder" = "TingFi 폴더 찾기";
 "add_your_music_instruction" = "음악 추가";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "기기에서 '파일' 앱을 찾아 엽니다";
-"tap_on_my_iphone_sidebar" = "사이드바에서 '나의 iPhone'을 선택한 다음 QQPlayer 폴더를 엽니다";
-"look_for_qqplayer_folder" = "'QQPlayer' 폴더를 찾아 엽니다";
+"tap_on_my_iphone_sidebar" = "사이드바에서 '나의 iPhone'을 선택한 다음 TingFi 폴더를 엽니다";
+"look_for_qqplayer_folder" = "'TingFi' 폴더를 찾아 엽니다";
 "copy_music_files" = "FLAC 또는 MP3 파일을 이 폴더에 복사합니다";
 
 /* Library Processing */
@@ -406,7 +406,7 @@
 "feature_guide_dark_mode_title" = "다크 모드 전환";
 "feature_guide_dark_mode_detail" = "설정 → 모양 → 강제 다크 모드로 시스템 모양을 덮어쓸 수 있습니다";
 "feature_guide_import_title" = "음악 파일 가져오기";
-"feature_guide_import_detail" = "이 기기의 QQPlayer 폴더에 음악 파일을 넣습니다('파일' 앱 → '나의 iPhone' → QQPlayer). 또는 라이브러리에서 '파일 열기'를 탭합니다.";
+"feature_guide_import_detail" = "이 기기의 TingFi 폴더에 음악 파일을 넣습니다('파일' 앱 → '나의 iPhone' → TingFi). 또는 라이브러리에서 '파일 열기'를 탭합니다.";
 
 
 /* Sleep Timer */
@@ -455,17 +455,17 @@
 "Resumes playing your music where you left off." = "마지막으로 멈춘 위치에서 음악 재생을 다시 시작합니다.";
 "Audio" = "오디오";
 "Play Music" = "음악 재생";
-"Plays a song, album, artist or playlist from your QQPlayer library." = "QQPlayer 라이브러리의 곡, 앨범, 아티스트, 재생목록을 재생합니다.";
+"Plays a song, album, artist or playlist from your QQPlayer library." = "TingFi 라이브러리의 곡, 앨범, 아티스트, 재생목록을 재생합니다.";
 "Playback" = "재생";
 "Add to Playlist" = "재생목록에 추가";
 "Generate Mix" = "믹스 생성";
-"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "기분이나 설명에 맞는 믹스를 QQPlayer 라이브러리에서 만들어 재생합니다.";
+"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "기분이나 설명에 맞는 믹스를 TingFi 라이브러리에서 만들어 재생합니다.";
 "Toggle Favorite" = "즐겨찾기 전환";
 "Favorite Current Song" = "현재 곡 즐겨찾기";
-"Adds the currently playing QQPlayer song to Liked Songs." = "현재 재생 중인 QQPlayer 곡을 좋아하는 곡에 추가합니다.";
+"Adds the currently playing QQPlayer song to Liked Songs." = "현재 재생 중인 TingFi 곡을 좋아하는 곡에 추가합니다.";
 "%@ is already in your Liked Songs." = "%@은(는) 이미 좋아하는 곡에 있습니다.";
 "Added %@ to your Liked Songs." = "%@을(를) 좋아하는 곡에 추가했습니다.";
-"There isn't a song playing in QQPlayer right now." = "지금 QQPlayer에서 재생 중인 곡이 없습니다.";
+"There isn't a song playing in QQPlayer right now." = "지금 TingFi에서 재생 중인 곡이 없습니다.";
 "Add to Queue" = "대기열에 추가";
 "Play Playlist" = "재생목록 재생";
 "Save Mix as Playlist" = "믹스를 재생목록으로 저장";
@@ -489,7 +489,7 @@
 "Now playing" = "재생 중";
 
 /* Errors */
-"There's no music in your QQPlayer library yet." = "QQPlayer 라이브러리에 아직 음악이 없습니다.";
+"There's no music in your QQPlayer library yet." = "TingFi 라이브러리에 아직 음악이 없습니다.";
 "No matching music was found in your library." = "라이브러리에서 일치하는 음악을 찾지 못했습니다.";
 "You can only take that action on individual songs." = "해당 작업은 개별 곡에서만 할 수 있습니다.";
 "That song is already in this playlist." = "그 곡은 이미 이 재생목록에 있습니다.";
@@ -774,7 +774,7 @@
 "sync_settings_entry" = "동기화";
 "sync_settings_footer" = "Mac과 iPhone을 페어링하여 음악 라이브러리를 동기화합니다. 페어링은 로컬 네트워크에서만 이루어집니다.";
 "sync_identity_section" = "ID 및 QR 코드";
-"sync_identity_footer" = "iPhone의 QQPlayer로 이 코드를 스캔하여 이 Mac을 호스트로 페어링합니다.";
+"sync_identity_footer" = "iPhone의 TingFi로 이 코드를 스캔하여 이 Mac을 호스트로 페어링합니다.";
 "sync_this_device" = "이 기기";
 "sync_this_device_section" = "이 기기";
 "sync_device_id" = "기기 ID";
@@ -789,7 +789,7 @@
 "sync_no_paired_devices" = "아직 페어링된 기기가 없습니다.";
 "sync_no_paired_hosts" = "아직 페어링된 호스트가 없습니다.";
 "sync_add_host" = "호스트 추가";
-"sync_add_host_footer" = "본인의 QQPlayer Mac과 페어링합니다. 페어링이 완료되기 전에 Mac에서 승인을 요청합니다.";
+"sync_add_host_footer" = "본인의 TingFi Mac과 페어링합니다. 페어링이 완료되기 전에 Mac에서 승인을 요청합니다.";
 "sync_unpair" = "페어링 해제";
 "sync_unpair_confirm_title" = "이 기기의 페어링을 해제할까요?";
 "sync_unpair_confirm_message" = "%@을(를) 제거할까요? 동기화하려면 다시 페어링해야 합니다.";
@@ -805,12 +805,12 @@
 "sync_reject" = "거부";
 
 "sync_devices_section" = "기기";
-"sync_devices_footer" = "선택한 기기가 이 동기화의 대상입니다. 기기는 해당 기기에서 QQPlayer가 열려 있는 동안에만 온라인으로 표시됩니다(설정 → 동기화).";
-"sync_devices_empty" = "아직 페어링된 모바일 기기가 없습니다. 휴대폰의 QQPlayer로 위 QR 코드를 스캔하여 페어링하세요.";
+"sync_devices_footer" = "선택한 기기가 이 동기화의 대상입니다. 기기는 해당 기기에서 TingFi가 열려 있는 동안에만 온라인으로 표시됩니다(설정 → 동기화).";
+"sync_devices_empty" = "아직 페어링된 모바일 기기가 없습니다. 휴대폰의 TingFi로 위 QR 코드를 스캔하여 페어링하세요.";
 "sync_devices_target_badge" = "동기화 대상";
 "sync_device_status_online" = "온라인";
 "sync_device_status_offline" = "오프라인";
-"sync_device_offline_hint" = "해당 기기에서 QQPlayer를 엽니다 → 설정 → 동기화.";
+"sync_device_offline_hint" = "해당 기기에서 TingFi를 엽니다 → 설정 → 동기화.";
 "sync_target_waiting" = "%@이(가) 온라인이 되기를 기다리는 중입니다.";
 "sync_target_mismatch_format" = "%@에 연결되어 있지만 동기화 대상은 %@입니다.";
 "sync_target_switch" = "%@(으)로 전환";
@@ -829,7 +829,7 @@
 "sync_added_awaiting_host" = "%@을(를) 추가했습니다. Mac에서 승인되면 페어링이 완료됩니다.";
 "sync_manual_added_awaiting_host" = "%@을(를) 추가했습니다. Mac에서 승인되면 페어링이 완료되고, 기기 정보는 첫 연결 시 완성됩니다.";
 "sync_scan_failed_title" = "페어링 코드가 아닙니다";
-"sync_invalid_qr_message" = "이 QR 코드는 올바른 QQPlayer 페어링 코드가 아닙니다.";
+"sync_invalid_qr_message" = "이 QR 코드는 올바른 TingFi 페어링 코드가 아닙니다.";
 "sync_expired_title" = "페어링 코드 만료";
 "sync_expired_message" = "Mac에서 코드를 새로 고친 뒤 다시 스캔하세요.";
 "sync_store_failed_title" = "저장하지 못했습니다";
@@ -896,8 +896,8 @@
 /* ── M6 T3（2026-09-11）同步操作区（连接状态 / 内容选择 / 执行 / 结果）字段 ── */
 "sync_run_connection_section" = "연결";
 "sync_run_connected_for" = "%@ 연결됨";
-"sync_run_not_paired_hint" = "아직 페어링된 기기가 없습니다. 아래 QR 코드를 iPhone의 QQPlayer로 스캔하세요.";
-"sync_run_not_connected_hint" = "iPhone에서 QQPlayer → 설정 → 동기화 순서로 열어 연결하세요.";
+"sync_run_not_paired_hint" = "아직 페어링된 기기가 없습니다. 아래 QR 코드를 iPhone의 TingFi로 스캔하세요.";
+"sync_run_not_connected_hint" = "iPhone에서 TingFi → 설정 → 동기화 순서로 열어 연결하세요.";
 "sync_run_allow_lan" = "로컬 네트워크의 기기 연결 허용";
 "sync_run_listener_off_hint" = "수신이 꺼져 있어 이 Mac을 찾거나 동기화할 수 없습니다.";
 "sync_run_selection_section" = "동기화할 항목";
@@ -1114,12 +1114,12 @@
 "library_access_grant_failed" = "폴더 권한을 저장하지 못했습니다: %@";
 "library_import_legacy" = "이전 버전에서 데이터베이스 가져오기…";
 "library_import_legacy_prompt" = "Application Support 안의 QQPlayerMac 폴더를 선택하세요";
-"library_import_legacy_done" = "파일 %d개를 가져왔습니다. 라이브러리가 새로 고쳐지지 않으면 QQPlayer를 재시작하세요.";
+"library_import_legacy_done" = "파일 %d개를 가져왔습니다. 라이브러리가 새로 고쳐지지 않으면 TingFi를 재시작하세요.";
 "library_import_legacy_failed" = "가져오기 실패: %@(이전 데이터베이스는 그대로 유지됨)";
 "library_import_legacy_missing" = "선택한 폴더에서 qqplayer.db를 찾을 수 없습니다";
 "library_import_legacy_backup" = "기존 데이터베이스를 %@(으)로 백업했습니다";
 "library_import_legacy_hint" = "이전(샌드박스 아님) 버전의 데이터베이스를 찾았으며 가져올 수 있습니다.";
-"library_import_legacy_confirm" = "현재 데이터베이스를 대체합니다(백업은 자동으로 생성됨). 그 후 QQPlayer를 재시작하세요. 계속할까요?";
+"library_import_legacy_confirm" = "현재 데이터베이스를 대체합니다(백업은 자동으로 생성됨). 그 후 TingFi를 재시작하세요. 계속할까요?";
 
 /* Local AI recommendations (P1) */
 "recommendations" = "맞춤 추천";

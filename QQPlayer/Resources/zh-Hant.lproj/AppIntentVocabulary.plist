@@ -9,8 +9,8 @@
 			<string>INPlayMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>在 QQPlayer 上播放我的音樂</string>
-				<string>在 QQPlayer 上播放我的收藏</string>
+				<string>在婷听上播放我的音樂</string>
+				<string>在婷听上播放我的收藏</string>
 			</array>
 		</dict>
 		<dict>
@@ -18,8 +18,8 @@
 			<string>INAddMediaIntent</string>
 			<key>IntentExamples</key>
 			<array>
-				<string>在 QQPlayer 中將這首歌加入我的最愛</string>
-				<string>在 QQPlayer 中將這首歌加入播放清單</string>
+				<string>在婷听中將這首歌加入我的最愛</string>
+				<string>在婷听中將這首歌加入播放清單</string>
 			</array>
 		</dict>
 	</array>
