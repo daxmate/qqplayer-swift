@@ -47,9 +47,13 @@ struct MacEQSettingsView: View {
         .frame(minWidth: 480, minHeight: 560)
         .sheet(isPresented: $showingImport) {
             MacEQImportView()
+                // sheet 是独立窗口：设置窗玻璃照不进来；与设置窗 / 本页 sheet 同口径装配
+                // （`.macSheetGlass()` 检测到该场景后自动让位 ⇒ 始终只有一层玻璃）
+                .macSettingsGlassScene()
         }
         .sheet(isPresented: $showingCreateManual) {
             MacCreateManualEQView()
+                .macSettingsGlassScene()
         }
         .sheet(isPresented: $showingEditManual) {
             if let preset = eqManager.currentPreset, preset.presetType == .manual {
@@ -58,6 +62,7 @@ struct MacEQSettingsView: View {
         }
         .sheet(isPresented: $showingCustomEQ) {
             MacGraphicEQ10BandEditorView()
+                .macSettingsGlassScene()
         }
         .alert(Localized.eqDeleteConfirmTitle, isPresented: Binding(
             get: { presetPendingDelete != nil },

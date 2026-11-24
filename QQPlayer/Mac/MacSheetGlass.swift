@@ -16,6 +16,11 @@
 //    ④ 跟随当前曲目拉封面（切歌丢弃旧结果，路径与设置窗 `MacSettingsWindowGlass` 同一份）。
 //
 //  开关关闭 / 开「降低透明度」→ 不加层、不动窗口属性，逐像素还原现状。
+//
+//  ⚠️ **自去重**（2026-11-24 maintainer 裁决）：呈现处若已套 `macSettingsGlassScene()`
+//     （回收区 / 批量刮削的设置入口 / EQ 设置及其子 sheet），同一窗口里已经有一层
+//     `MacWindowGlass` + 窗口接管 → 本修饰器**自动让位**，绝不叠第二层；
+//     主窗入口的 sheet（`macSettingsGlassActive` 默认 false）照常铺层。
 //  生效判据只有一处：`PlayerGlassBackground.isActive`（本文件不另写条件）。
 //
 
@@ -51,6 +56,8 @@ struct MacSheetGlass: ViewModifier {
     @AppStorage(PlayerGlassBackground.storageKey) private var glassEnabled = PlayerGlassBackground.enabledByDefault
     /// 系统「降低透明度」：开启时回落原样
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    /// 呈现处是否已铺设置窗玻璃场景（`macSettingsGlassScene` 注入 `macSettingsGlassActive`）
+    @Environment(\.macSettingsGlassActive) private var settingsSceneActive
     /// 当前曲目（玻璃底的封面来源）
     @Environment(PlayerEngine.self) private var player
     @Environment(AppServices.self) private var services
@@ -58,14 +65,17 @@ struct MacSheetGlass: ViewModifier {
     @State private var artwork: ArtworkImage?
     @State private var artworkTrackId: String?
 
-    /// 生效判定仍走唯一实现；sheet 没有「当前曲目封面」这个前置条件 ⇒ hasArtwork 传 true
-    /// （与设置窗 `MacSettingsGlassScene` 同口径）。
+    /// 生效判定 = 唯一实现 + **自去重**：
+    /// - 开关 / 降低透明度仍只问 `PlayerGlassBackground.isActive`（sheet 无「无封面」前置，
+    ///   hasArtwork 传 true，与设置窗同口径）；
+    /// - 再与「呈现处已有设置窗玻璃场景」取反——同一窗口只允许一层玻璃。
     private var isActive: Bool {
-        PlayerGlassBackground.isActive(
-            isEnabled: glassEnabled,
-            hasArtwork: true,
-            reduceTransparency: reduceTransparency
-        )
+        !settingsSceneActive
+            && PlayerGlassBackground.isActive(
+                isEnabled: glassEnabled,
+                hasArtwork: true,
+                reduceTransparency: reduceTransparency
+            )
     }
 
     func body(content: Content) -> some View {
