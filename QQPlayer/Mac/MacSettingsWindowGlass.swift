@@ -124,12 +124,20 @@ struct MacSettingsGlassScene: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content
+        // 首帧同步 seed（见 `GlassArtworkSeed`）：`.task` 还没跑出结果前先用内存缓存里的封面，
+        // 避免 `MacWindowGlass` 先画一帧无图黑底（窗口打开瞬间的「深灰一闪」）。
+        let seed = GlassArtworkSeed.resolve(
+            loaded: artwork,
+            loadedTrackId: artworkTrackId,
+            player: player,
+            services: services
+        )
+        return content
             .background {
                 if isActive {
                     // 与主窗同一配方：封面模糊 + 外观自适应雾面（`MacWindowGlass`）。
                     // 只允许这一层越界到安全区（标题栏）；正文仍由系统安全区决定位置：不 padding、不改布局。
-                    MacWindowGlass(artwork: artwork, cacheKey: artworkTrackId)
+                    MacWindowGlass(artwork: seed?.artwork ?? artwork, cacheKey: seed?.cacheKey ?? artworkTrackId)
                         .ignoresSafeArea()
                 }
             }

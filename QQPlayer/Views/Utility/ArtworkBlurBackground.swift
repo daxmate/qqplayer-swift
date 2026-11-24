@@ -130,6 +130,16 @@ struct ArtworkBlurBackground: View {
         generation += 1
         let token = generation
 
+        // 首帧不淡入（当前无图 = 本视图第一次显示）：底下的黑/无图底会从 0 → 1 慢慢透出来，
+        // 打开瞬间就是用户看到的「深灰一闪」。直接到位，封面第一帧就满不透明。
+        // 已有 current（切歌）仍走原来的 0.45s 交叉淡入，时长与 opacity 语义不变。
+        if current == nil {
+            previous = nil
+            current = image
+            currentOpacity = 1
+            return
+        }
+
         previous = current
         current = image
         currentOpacity = 0

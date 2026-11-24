@@ -79,10 +79,18 @@ struct MacSheetGlass: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content
+        // 首帧同步 seed（见 `GlassArtworkSeed`）：`.task` 还没跑出结果前先用内存缓存里的封面，
+        // 避免 `MacWindowGlass` 先画一帧无图黑底（sheet 打开瞬间的「深灰一闪」）。
+        let seed = GlassArtworkSeed.resolve(
+            loaded: artwork,
+            loadedTrackId: artworkTrackId,
+            player: player,
+            services: services
+        )
+        return content
             .background {
                 if isActive {
-                    MacWindowGlass(artwork: artwork, cacheKey: artworkTrackId)
+                    MacWindowGlass(artwork: seed?.artwork ?? artwork, cacheKey: seed?.cacheKey ?? artworkTrackId)
                 }
             }
             // 非玻璃时用 SwiftUI 的默认 presentation 背景样式（`.background`），语义等价于「不覆盖」。
@@ -120,6 +128,41 @@ extension View {
     }
 }
 
+// MARK: - 首帧封面 seed（sheet / 设置窗共用）
+
+/// 玻璃底「打开瞬间」的同步封面 seed。
+///
+/// `MacWindowGlass` 的封面来自 `.task` 异步加载：第一帧 `artwork == nil`，
+/// `ArtworkBlurBackground` 露出的黑底就是用户看到的「打开瞬间深灰一闪」。
+/// 这里按**当前曲目**同步查一次内存缓存（主窗正在显示同一首歌时必有），
+/// 让玻璃第一帧就带上封面。
+///
+/// 为什么放在本文件：sheet 与设置窗两处逻辑完全一致，只保留这一份实现，
+/// 不各写一套（同一语义两处手工维护是本项目反复踩过的坑）。
+enum GlassArtworkSeed {
+    /// 返回与当前曲目对应的（封面, 缓存键）；没有可用封面时返回 nil。
+    ///
+    /// - `loaded` / `loadedTrackId`：视图自己已加载的状态，曲目一致时优先用它；
+    /// - 曲目不一致（刚切歌、`.task` 还没回来）时**不**把旧图当新图返回，
+    ///   交给调用方回落到原来的「旧图 + 旧键」，切歌作废判定（stableId 比对）不变。
+    @MainActor
+    static func resolve(
+        loaded: ArtworkImage?,
+        loadedTrackId: String?,
+        player: PlayerEngine,
+        services: AppServices
+    ) -> (artwork: ArtworkImage, cacheKey: String)? {
+        guard let track = player.currentTrack else { return nil }
+        if let loaded, loadedTrackId == track.stableId {
+            return (loaded, track.stableId)
+        }
+        guard let cached = services.artworkManager.memoryCache.object(forKey: track.stableId as NSString) else {
+            return nil
+        }
+        return (cached, track.stableId)
+    }
+}
+
 // MARK: - 窗口透明（AppKit 兜底）
 
 /// 把 sheet 宿主窗口设成透明，让 `MacWindowGlass` 那层模糊底真正透出来。
@@ -129,7 +172,11 @@ private struct MacSheetWindowTransparency: NSViewRepresentable {
     let active: Bool
 
     func makeNSView(context: Context) -> HostView {
-        HostView()
+        let view = HostView()
+        // 进树前先记下生效状态：窗口一出现（`viewDidMoveToWindow`）就接管，
+        // 不等下一轮 `updateNSView`——那之前的帧还是系统 sheet 默认不透明底。
+        view.apply(active: active)
+        return view
     }
 
     func updateNSView(_ view: HostView, context: Context) {
