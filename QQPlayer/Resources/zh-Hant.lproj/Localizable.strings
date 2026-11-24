@@ -49,7 +49,7 @@
 
 "no_songs_found" = "未找到歌曲";
 
-"your_music_will_appear_here" = "如何加入你的無損音樂：\n\n1. 打開 iOS 內建的「檔案」App（或點擊下方「打開檔案」按鈕）\n2. 進入「我的 iPhone」→「婷听」\n3. 將你的音樂檔案移動或拷貝到該資料夾中即可";
+"your_music_will_appear_here" = "如何加入你的無損音樂：\n\n1. 打開 iOS 內建的「檔案」App（或點擊下方「打開檔案」按鈕）\n2. 進入「我的 iPhone」→「婷聽」\n3. 將你的音樂檔案移動或拷貝到該資料夾中即可";
 
 "create_first_playlist" = "建立你的第一個播放列表開始聽歌吧";
 
@@ -262,7 +262,7 @@
 
 "app_name" = "應用名稱";
 
-"qqplayer" = "婷听";
+"qqplayer" = "婷聽";
 
 "github_repository" = "GitHub 開源倉庫";
 
@@ -303,28 +303,28 @@
 "all" = "全部";
 
 /* Tutorial/Onboarding */
-"welcome_to_qqplayer" = "歡迎使用婷听";
+"welcome_to_qqplayer" = "歡迎使用婷聽";
 
 "if_signed_in_continue" = "如果你已登入，請點擊繼續";
 
 "add_your_music" = "添加你的本地音樂";
 
-"how_to_add_music" = "請將音樂檔案放入本機「檔案」App 的婷听資料夾（我的 iPhone → 婷听）：";
+"how_to_add_music" = "請將音樂檔案放入本機「檔案」App 的婷聽資料夾（我的 iPhone → 婷聽）：";
 
 "open_files_app" = "打開「檔案」App";
 
 "navigate_to_on_my_iphone" = "進入「我的 iPhone」";
 
-"find_qqplayer_folder" = "找到「婷听」資料夾";
+"find_qqplayer_folder" = "找到「婷聽」資料夾";
 
 "add_your_music_instruction" = "匯入你的音樂";
 
 /* Tutorial Instructions */
 "find_open_files_app" = "在手機桌面上找到並打開藍色的「檔案」App";
 
-"tap_on_my_iphone_sidebar" = "在瀏覽頁面選擇「我的 iPhone」，再進入「婷听」資料夾";
+"tap_on_my_iphone_sidebar" = "在瀏覽頁面選擇「我的 iPhone」，再進入「婷聽」資料夾";
 
-"look_for_qqplayer_folder" = "找到名為「婷听」的資料夾並點開";
+"look_for_qqplayer_folder" = "找到名為「婷聽」的資料夾並點開";
 
 "copy_music_files" = "將你的 DSD、FLAC、WAV 等無損檔案拷貝進這個資料夾";
 
@@ -699,7 +699,7 @@
 
 "feature_guide_import_title" = "檔案匯入";
 
-"feature_guide_import_detail" = "將音樂檔案放入本機「檔案」App 的婷听資料夾（我的 iPhone → 婷听），或在媒體庫點擊「打開檔案」直接匯入";
+"feature_guide_import_detail" = "將音樂檔案放入本機「檔案」App 的婷聽資料夾（我的 iPhone → 婷聽），或在媒體庫點擊「打開檔案」直接匯入";
 
 
 /* 播放順序 */
@@ -778,7 +778,7 @@
 
 "Play Music" = "播放音樂";
 
-"Plays a song, album, artist or playlist from your QQPlayer library." = "播放婷听音樂庫中的歌曲、專輯、藝術家或播放列表。";
+"Plays a song, album, artist or playlist from your QQPlayer library." = "播放婷聽音樂庫中的歌曲、專輯、藝術家或播放列表。";
 
 "Playback" = "播放";
 
@@ -786,13 +786,13 @@
 
 "Generate Mix" = "生成合集";
 
-"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "根據心情或描述，從婷听音樂庫生成合集並開始播放。";
+"Builds a mix from your QQPlayer library matching a mood or description and starts playing it." = "根據心情或描述，從婷聽音樂庫生成合集並開始播放。";
 
 "Toggle Favorite" = "切換收藏";
 
 "Favorite Current Song" = "收藏當前歌曲";
 
-"Adds the currently playing QQPlayer song to Liked Songs." = "將婷听中正在播放的歌曲添加到“我喜歡的音樂”。";
+"Adds the currently playing QQPlayer song to Liked Songs." = "將婷聽中正在播放的歌曲添加到“我喜歡的音樂”。";
 
 "Add to Queue" = "添加到播放佇列";
 
@@ -822,7 +822,7 @@
 
 "Added %@ to your Liked Songs." = "已將 %@ 添加到“我喜歡的音樂”。";
 
-"There isn't a song playing in QQPlayer right now." = "婷听當前沒有正在播放的歌曲。";
+"There isn't a song playing in QQPlayer right now." = "婷聽當前沒有正在播放的歌曲。";
 
 "Added %@ to your favorites." = "已將 %@ 添加到收藏。";
 
@@ -837,7 +837,7 @@
 "Now playing" = "正在播放";
 
 /* Errors */
-"There's no music in your QQPlayer library yet." = "婷听音樂庫中還沒有音樂。";
+"There's no music in your QQPlayer library yet." = "婷聽音樂庫中還沒有音樂。";
 
 "No matching music was found in your library." = "在你的音樂庫中未找到匹配的音樂。";
 
@@ -1102,7 +1102,7 @@
 "sync_settings_entry" = "同步";
 "sync_settings_footer" = "在 Mac 與 iPhone 之間配對以同步音樂資料庫。配對只在本機區域網路內進行。";
 "sync_identity_section" = "身分與二維碼";
-"sync_identity_footer" = "用 iPhone 上的婷听掃描此碼，將這台 Mac 配對為主機。";
+"sync_identity_footer" = "用 iPhone 上的婷聽掃描此碼，將這台 Mac 配對為主機。";
 "sync_this_device" = "本機裝置";
 "sync_this_device_section" = "本機裝置";
 "sync_device_id" = "裝置 ID";
@@ -1117,7 +1117,7 @@
 "sync_no_paired_devices" = "目前沒有已配對的裝置。";
 "sync_no_paired_hosts" = "目前沒有已配對的主機。";
 "sync_add_host" = "加入主機";
-"sync_add_host_footer" = "與您自己的婷听 Mac 配對。配對完成前需要在 Mac 上核准。";
+"sync_add_host_footer" = "與您自己的婷聽 Mac 配對。配對完成前需要在 Mac 上核准。";
 "sync_unpair" = "取消配對";
 "sync_unpair_confirm_title" = "要取消此裝置的配對嗎？";
 "sync_unpair_confirm_message" = "移除 %@？之後需重新配對才能同步。";
@@ -1133,12 +1133,12 @@
 "sync_reject" = "拒絕";
 
 "sync_devices_section" = "裝置";
-"sync_devices_footer" = "選取的裝置是本次同步的目標。裝置上開啟婷听（設定 → 同步）時才會顯示為線上。";
-"sync_devices_empty" = "還沒有配對的行動裝置。用手機上的婷听掃描上方 QR Code 即可配對。";
+"sync_devices_footer" = "選取的裝置是本次同步的目標。裝置上開啟婷聽（設定 → 同步）時才會顯示為線上。";
+"sync_devices_empty" = "還沒有配對的行動裝置。用手機上的婷聽掃描上方 QR Code 即可配對。";
 "sync_devices_target_badge" = "本次同步目標";
 "sync_device_status_online" = "線上";
 "sync_device_status_offline" = "離線";
-"sync_device_offline_hint" = "在該裝置上開啟婷听 → 設定 → 同步。";
+"sync_device_offline_hint" = "在該裝置上開啟婷聽 → 設定 → 同步。";
 "sync_target_waiting" = "等待 %@ 上線。";
 "sync_target_mismatch_format" = "目前連著 %@，你要同步的是 %@。";
 "sync_target_switch" = "改用 %@";
@@ -1157,7 +1157,7 @@
 "sync_added_awaiting_host" = "已加入 %@。在 Mac 上核准後完成配對。";
 "sync_manual_added_awaiting_host" = "已加入 %@。在 Mac 上核准後完成配對；裝置資訊將在首次連線時補全。";
 "sync_scan_failed_title" = "不是配對碼";
-"sync_invalid_qr_message" = "此二維碼不是有效的婷听配對碼。";
+"sync_invalid_qr_message" = "此二維碼不是有效的婷聽配對碼。";
 "sync_expired_title" = "配對碼已過期";
 "sync_expired_message" = "請在 Mac 上重新整理二維碼後再次掃描。";
 "sync_store_failed_title" = "儲存失敗";
@@ -1224,8 +1224,8 @@
 /* ── M6 T3（2026-09-11）同步操作区（连接状态 / 内容选择 / 执行 / 结果）字段 ── */
 "sync_run_connection_section" = "連線狀態";
 "sync_run_connected_for" = "已連線 %@";
-"sync_run_not_paired_hint" = "還沒有配對裝置，請用 iPhone 上的婷听掃描下方 QR Code 完成配對。";
-"sync_run_not_connected_hint" = "在 iPhone 上開啟婷听 → 設定 → 同步，即可連線。";
+"sync_run_not_paired_hint" = "還沒有配對裝置，請用 iPhone 上的婷聽掃描下方 QR Code 完成配對。";
+"sync_run_not_connected_hint" = "在 iPhone 上開啟婷聽 → 設定 → 同步，即可連線。";
 "sync_run_allow_lan" = "允許區域網路內的裝置連線";
 "sync_run_listener_off_hint" = "監聽已關閉，其他裝置找不到這台 Mac，也無法同步。";
 "sync_run_selection_section" = "同步內容";
@@ -1442,12 +1442,12 @@
 "library_access_grant_failed" = "無法保存文件夾授權：%@";
 "library_import_legacy" = "從舊版本導入數據庫…";
 "library_import_legacy_prompt" = "請選擇 Application Support 裏的 QQPlayerMac 文件夾";
-"library_import_legacy_done" = "已導入 %d 個文件；若曲庫未刷新請重啟婷听。";
+"library_import_legacy_done" = "已導入 %d 個文件；若曲庫未刷新請重啟婷聽。";
 "library_import_legacy_failed" = "導入失敗：%@（舊數據庫保持原樣）";
 "library_import_legacy_missing" = "所選文件夾裏沒有 qqplayer.db";
 "library_import_legacy_backup" = "原有數據庫已備份為 %@";
 "library_import_legacy_hint" = "檢測到舊版本（非沙盒）的數據庫，可以導入。";
-"library_import_legacy_confirm" = "導入會覆蓋當前數據庫（已自動備份），完成後需要重啟婷听。繼續？";
+"library_import_legacy_confirm" = "導入會覆蓋當前數據庫（已自動備份），完成後需要重啟婷聽。繼續？";
 
 /* Local AI recommendations (P1) */
 "recommendations" = "為你推薦";
