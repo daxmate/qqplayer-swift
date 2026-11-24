@@ -21,3 +21,20 @@ struct ArtworkBlurBackground: View {
 
     var body: some View { Color.clear }
 }
+
+// MARK: - AppLog 桩（只为编译生产源码）
+
+//  生产 `AppLog` 落在 `QQPlayer/Services/AppLog.swift`（os_log + 落盘 / 轮转 / 上限），
+//  harness 不落盘、也不验证日志内容：日志行格式由 `MacWindowFrameAnchor.logLine` 的
+//  纯字符串断言（G4）覆盖，这里是**最小同形桩**，签名与生产一致 —— 漂移即 swiftc 编译失败。
+
+enum AppLogCategory {
+    case ui
+}
+
+enum AppLog {
+    static func info(_ category: AppLogCategory, _ message: @autoclosure () -> String) {
+        _ = category
+        _ = message
+    }
+}

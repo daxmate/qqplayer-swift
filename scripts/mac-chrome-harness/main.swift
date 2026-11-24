@@ -290,6 +290,144 @@ check(
     actual: "isBordered=\(String(describing: lateToggle.liveToggleItem?.isBordered))（重试没把后到的 item 同步成无底板）"
 )
 
+// MARK: - 几何：掩码手术锚定上边缘（MacWindowFrameAnchor）
+//
+// 为什么单独测几何：增删 `.fullSizeContentView` 只改窗口**高度**、不改 `origin`，
+// 观感就是「上边缘跳了一下」——用户报的「关掉设置窗后主窗向上移动一点」正是这一类。
+// 下面直接用生产实现算（`QQPlayer/Mac/MacWindowFrameAnchor.swift`），不复制公式。
+
+section("几何：anchoredFrame 保住上边缘（高度增 / 减 / 不变）")
+
+let anchorBase = NSRect(x: 120, y: 300, width: 900, height: 600)
+
+// ① 高度增加（unified 工具栏那一档 52pt）
+let anchorTaller = NSRect(x: 120, y: 300, width: 900, height: 652)
+let anchorKeptGrow = MacWindowFrameAnchor.anchoredFrame(before: anchorBase, after: anchorTaller)
+check(
+    anchorKeptGrow.size == anchorTaller.size,
+    "G1a 高度增加：size 用 after（不改尺寸，只挪 origin.y）",
+    expected: "\(anchorTaller.width)×\(anchorTaller.height)",
+    actual: "\(anchorKeptGrow.width)×\(anchorKeptGrow.height)"
+)
+check(
+    anchorKeptGrow.origin.x == anchorBase.origin.x,
+    "G1b 高度增加：origin.x 不动",
+    expected: "\(anchorBase.origin.x)",
+    actual: "\(anchorKeptGrow.origin.x)"
+)
+check(
+    anchorKeptGrow.maxY == anchorBase.maxY,
+    "G1c 高度增加：上边缘（maxY）不动",
+    expected: "\(anchorBase.maxY)",
+    actual: "\(anchorKeptGrow.maxY)"
+)
+check(
+    anchorKeptGrow.origin.y != anchorTaller.origin.y,
+    "G1d 高度增加：origin.y 真的被改写（否则等于没锚）",
+    expected: "≠\(anchorTaller.origin.y)",
+    actual: "\(anchorKeptGrow.origin.y)"
+)
+
+// ② 高度减少（移除 .fullSizeContentView 的反向）
+let anchorShorter = NSRect(x: 120, y: 300, width: 900, height: 548)
+let anchorKeptShrink = MacWindowFrameAnchor.anchoredFrame(before: anchorBase, after: anchorShorter)
+check(
+    anchorKeptShrink.size == anchorShorter.size,
+    "G2a 高度减少：size 用 after",
+    expected: "\(anchorShorter.width)×\(anchorShorter.height)",
+    actual: "\(anchorKeptShrink.width)×\(anchorKeptShrink.height)"
+)
+check(
+    anchorKeptShrink.maxY == anchorBase.maxY,
+    "G2b 高度减少：上边缘（maxY）不动",
+    expected: "\(anchorBase.maxY)",
+    actual: "\(anchorKeptShrink.maxY)"
+)
+check(
+    anchorKeptShrink.origin.x == anchorBase.origin.x && anchorKeptShrink.width == anchorBase.width,
+    "G2c 高度减少：origin.x / width 不动",
+    expected: "x=\(anchorBase.origin.x) w=\(anchorBase.width)",
+    actual: "x=\(anchorKeptShrink.origin.x) w=\(anchorKeptShrink.width)"
+)
+
+// ③ 高度不变 → 原样返回（哪怕 y / x 被别处挪过，也不归本工具管）
+let anchorSameHeight = NSRect(x: 40, y: 100, width: 700, height: 600)
+let anchorKeptSame = MacWindowFrameAnchor.anchoredFrame(before: anchorBase, after: anchorSameHeight)
+check(
+    anchorKeptSame == anchorSameHeight,
+    "G3 高度不变：原样返回 after（不越权挪窗口）",
+    expected: "\(anchorSameHeight)",
+    actual: "\(anchorKeptSame)"
+)
+
+// ④ 日志行格式（唯一出处）
+let anchorLine = MacWindowFrameAnchor.logLine(
+    op: "insert",
+    why: "设置窗玻璃",
+    title: "",
+    outcome: (anchorBase, anchorTaller, anchorKeptGrow)
+)
+check(anchorLine.contains("op=insert"), "G4a 日志带 op", expected: "op=insert", actual: anchorLine)
+check(anchorLine.contains("title=-"), "G4b 空标题落成 -", expected: "title=-", actual: anchorLine)
+check(anchorLine.contains("deltaH=52.0"), "G4c deltaH = after − before", expected: "deltaH=52.0", actual: anchorLine)
+check(anchorLine.contains("corrected=true"), "G4d 真校正过 → corrected=true", expected: "corrected=true", actual: anchorLine)
+check(anchorLine.contains("why=设置窗玻璃"), "G4e 日志带 why", expected: "why=设置窗玻璃", actual: anchorLine)
+check(!anchorLine.contains("\n"), "G4f 日志行内不换行", expected: "单行", actual: anchorLine)
+
+// ⑤ report 只在高度变了时发声（正常路径零噪音）
+var anchorEmitted: [String] = []
+MacWindowFrameAnchor.report((anchorBase, anchorTaller, anchorKeptGrow), op: "insert", why: "设置窗玻璃", title: "t") {
+    anchorEmitted.append($0)
+}
+check(anchorEmitted.count == 1, "G5a 高度变了 → 打一条", expected: "1", actual: "\(anchorEmitted.count)")
+anchorEmitted.removeAll()
+MacWindowFrameAnchor.report((anchorBase, anchorSameHeight, anchorSameHeight), op: "remove", why: "主窗chrome", title: "t") {
+    anchorEmitted.append($0)
+}
+check(anchorEmitted.isEmpty, "G5b 高度没变 → 不打日志", expected: "0", actual: "\(anchorEmitted.count)")
+
+// ⑥ perform：真实 NSWindow 上跑一遍（含 setFrame 生效路径）
+let anchorWindow = NSWindow(
+    contentRect: NSRect(x: 200, y: 200, width: 800, height: 600),
+    styleMask: [.titled, .closable],
+    backing: .buffered,
+    defer: false
+)
+anchorWindow.setFrame(NSRect(x: 200, y: 200, width: 800, height: 600), display: false)
+anchorWindow.orderFrontRegardless()
+pump(0.2)
+let anchorVisible = anchorWindow.isVisible
+let anchorBefore = anchorWindow.frame
+let anchorOutcome = MacWindowFrameAnchor.perform(on: anchorWindow) {
+    // 模拟掩码手术的真实效果：只改高度、origin 不动
+    anchorWindow.setFrame(NSRect(x: 200, y: 200, width: 800, height: 652), display: false)
+}
+check(
+    anchorOutcome.before == anchorBefore,
+    "G6a perform 记录手术前 frame",
+    expected: "\(anchorBefore)",
+    actual: "\(anchorOutcome.before)"
+)
+check(
+    anchorOutcome.after.height == 652,
+    "G6b perform 记录手术后 frame（高度已变）",
+    expected: "652.0",
+    actual: "\(anchorOutcome.after.height)"
+)
+check(
+    anchorOutcome.corrected.maxY == anchorBefore.maxY,
+    "G6c perform 把上边缘掰回 before.maxY",
+    expected: "maxY=\(anchorBefore.maxY)（窗口可见=\(anchorVisible)）",
+    actual: "maxY=\(anchorOutcome.corrected.maxY)"
+)
+check(
+    anchorWindow.frame.maxY == anchorBefore.maxY,
+    "G6d 窗口最终 frame 的上边缘 = 手术前（真 setFrame 生效）",
+    expected: "maxY=\(anchorBefore.maxY)",
+    actual: "maxY=\(anchorWindow.frame.maxY)"
+)
+anchorWindow.orderOut(nil)
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

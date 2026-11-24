@@ -135,6 +135,37 @@ enum MacWindowChromeShapeContract {
         }
         return result
     }
+
+    // MARK: ④ 掩码手术必须锚定上边缘
+
+    static let settingsGlassPath = "QQPlayer/Mac/MacSettingsWindowGlass.swift"
+    static let surgeryPaths = [settingsGlassPath, chromePath]
+    /// 手术句必须落在它的「前置窗口」里（apply / restore 两处都远小于 240 字符）。
+    static let surgeryAnchorToken = "MacWindowFrameAnchor.perform"
+
+    /// 增删 `.fullSizeContentView` 会让 AppKit 重算窗口 frame：**高度变、origin 不动**，
+    /// 观感就是「窗口自己往上跳了一下」（用户 2026-11-24 报的正是这个）。
+    /// 所以每一处手术都必须包进 `MacWindowFrameAnchor.perform`（保上边缘）——没包就是回归。
+    static func anchorViolations(in text: String) -> [String] {
+        var violations: [String] = []
+        for op in ["insert", "remove"] {
+            for range in ranges(of: "styleMask.\(op)(.fullSizeContentView)", in: text) {
+                let contextStart = text.index(
+                    range.lowerBound,
+                    offsetBy: -240,
+                    limitedBy: text.startIndex
+                ) ?? text.startIndex
+                let context = text[contextStart ..< range.lowerBound]
+                if !context.contains(surgeryAnchorToken) {
+                    violations.append(
+                        "掩码手术 styleMask.\(op)(.fullSizeContentView) 没包进 MacWindowFrameAnchor.perform："
+                            + "高度变了会让上边缘跳（用户可见的「窗口自己上移」）"
+                    )
+                }
+            }
+        }
+        return violations
+    }
 }
 
 // MARK: - 测试
@@ -178,6 +209,23 @@ struct MacWindowChromeShapeContractTests {
 
         #expect(!Contract.chromeViolations(in: "func apply(active: Bool) {}").isEmpty)
         #expect(Contract.chromeViolations(in: "item.isBordered = false; let id = sidebarToggleItemIdentifier").isEmpty)
+
+        // ④ 掩码手术没锚定 = 上边缘跳（用户可见的「窗口自己上移」）
+        #expect(!Contract.anchorViolations(in: "window.styleMask.insert(.fullSizeContentView)").isEmpty)
+        #expect(
+            Contract.anchorViolations(
+                in: "MacWindowFrameAnchor.perform(on: window) { window.styleMask.insert(.fullSizeContentView) }"
+            ).isEmpty
+        )
+    }
+
+    @Test("掩码手术（增删 .fullSizeContentView）必须包进 MacWindowFrameAnchor.perform：否则上边缘会跳")
+    func surgeryIsAnchored() throws {
+        for path in Contract.surgeryPaths {
+            let text = try Contract.read(path)
+            let violations = Contract.anchorViolations(in: text)
+            #expect(violations.isEmpty, "\(path)：\(violations.joined(separator: " / "))")
+        }
     }
 }
 

@@ -36,6 +36,10 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         // 拖拽，管不到已恢复的 frame，所以这里主动撑一次。
         Self.clampLaunchMainWindowIfNeeded()
 
+        // 主窗帧变化诊断（只读观察器，全生命周期只注册一次）：复现「关掉设置窗后主窗上跳」时，
+        // 由它把携带调用栈的那一行打进日志 —— 谁 post 的通知一目了然（详见 MacMainWindowFrameWatch）。
+        MacMainWindowFrameWatch.shared.start()
+
         // 启动瞬间 SwiftUI 常常还没把主窗建出来（WindowGroup 异步装配），直接取窗口会落空；
         // 所以主路径是「窗口成为 key」时再兜一次 —— 幂等：尺寸够大就直接返回。
         NotificationCenter.default.addObserver(

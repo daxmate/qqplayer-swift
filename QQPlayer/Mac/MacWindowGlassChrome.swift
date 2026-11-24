@@ -127,8 +127,13 @@ struct MacWindowGlassChrome: NSViewRepresentable {
             window.isOpaque = false
             window.backgroundColor = .clear
             if !window.styleMask.contains(.fullSizeContentView) {
-                window.styleMask.insert(.fullSizeContentView)
+                let surgery = MacWindowFrameAnchor.perform(on: window) {
+                    window.styleMask.insert(.fullSizeContentView)
+                }
                 didAddFullSizeContentView = true
+                MacWindowFrameAnchor.report(surgery, op: "insert", why: "主窗chrome", title: window.title) {
+                    AppLog.info(.ui, $0)
+                }
             }
         }
 
@@ -213,7 +218,12 @@ struct MacWindowGlassChrome: NSViewRepresentable {
                 window.backgroundColor = originalBackgroundColor
             }
             if didAddFullSizeContentView {
-                window.styleMask.remove(.fullSizeContentView)
+                let surgery = MacWindowFrameAnchor.perform(on: window) {
+                    window.styleMask.remove(.fullSizeContentView)
+                }
+                MacWindowFrameAnchor.report(surgery, op: "remove", why: "主窗chrome", title: window.title) {
+                    AppLog.info(.ui, $0)
+                }
             }
         }
     }
