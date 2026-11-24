@@ -28,9 +28,9 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 ## 截图 📸
 
 <p align="center">
-  <img src="assets/screenshots/macos-player.webp" width="32%" alt="macOS 播放页：曲库、封面与实时频谱">
-  <img src="assets/screenshots/macos-lyrics.webp" width="32%" alt="macOS 桌面歌词与迷你模式">
-  <img src="assets/screenshots/macos-settings.webp" width="32%" alt="macOS 设置">
+  <img src="assets/screenshots/macos-player.webp" width="32%" alt="macOS 播放页：曲库、封面与歌词（封面毛玻璃背景）">
+  <img src="assets/screenshots/macos-lyrics.webp" width="32%" alt="macOS 歌词面板与逐句跟唱">
+  <img src="assets/screenshots/macos-settings.webp" width="32%" alt="macOS 设置：外观与封面毛玻璃开关">
 </p>
 <p align="center">
   <img src="assets/screenshots/ios-player.webp" width="23%" alt="iPhone 播放页">
