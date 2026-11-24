@@ -68,7 +68,9 @@ struct MacLyricsSearchView: View {
                 .padding(.top, DesignTokens.space12)
         }
         .frame(minWidth: 520, minHeight: 440)
-        .background(Color(nsColor: .windowBackgroundColor))
+        // 不画自己的不透明底：sheet 玻璃由 `.macSheetGlass()` 唯一入口提供；玻璃未生效时
+        // 它已用 `.presentationBackground(.background)` 回落到系统默认底（与其余 sheet 一致）。
+        // 曾在此处铺 `Color(nsColor: .windowBackgroundColor)`，会把封面玻璃整块盖死。
         // 首次进入的手势提示气泡：顶部浮层（卡片自身不拦截卡片外区域）
         .overlay(alignment: .top) {
             if showHint {
