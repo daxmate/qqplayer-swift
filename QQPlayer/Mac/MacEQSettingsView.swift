@@ -58,6 +58,8 @@ struct MacEQSettingsView: View {
         .sheet(isPresented: $showingEditManual) {
             if let preset = eqManager.currentPreset, preset.presetType == .manual {
                 MacManualEQEditorView(preset: preset)
+                    // sheet 是独立窗口：与其它 EQ 子 sheet 同口径装配（设置场景提供唯一一层玻璃）
+                    .macSettingsGlassScene()
             }
         }
         .sheet(isPresented: $showingCustomEQ) {

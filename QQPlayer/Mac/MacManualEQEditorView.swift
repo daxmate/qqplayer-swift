@@ -222,6 +222,8 @@ struct MacManualEQEditorView: View {
                     }
                 }
                 .formStyle(.grouped)
+                // 设置窗谱系的 sheet：让路判据取两键并集（与其它 EQ 子页同款）
+                .macSheetGlassListBackground()
                 .onChange(of: editableBandCount) { _, newCount in
                     if newCount == 0 {
                         selectedBandIndex = nil
