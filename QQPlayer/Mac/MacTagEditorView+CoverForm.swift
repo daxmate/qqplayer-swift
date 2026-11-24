@@ -94,7 +94,7 @@ extension MacTagEditorView {
                 .font(.caption2)
                 .foregroundColor(.secondary)
             TextField("", text: text)
-                .textFieldStyle(.roundedBorder)
+                .macSettingsGlassField()
                 .disabled(disabled)
         }
     }

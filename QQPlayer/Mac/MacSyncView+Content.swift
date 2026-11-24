@@ -377,7 +377,7 @@ extension MacSyncRunSection {
         VStack(alignment: .leading, spacing: DesignTokens.space6) {
             sourcePicker
             TextField("sync_run_track_search_placeholder".localized, text: $content.trackQuery)
-                .textFieldStyle(.roundedBorder)
+                .macSettingsGlassField()
                 .onChange(of: content.trackQuery) { _, _ in
                     searchTask?.cancel()
                     searchTask = Task { @MainActor in

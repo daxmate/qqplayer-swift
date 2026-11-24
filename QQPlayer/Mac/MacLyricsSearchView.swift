@@ -148,11 +148,11 @@ struct MacLyricsSearchView: View {
     private var searchBar: some View {
         HStack(spacing: DesignTokens.space10) {
             TextField("lyrics_search_song_title".localized, text: $searchTitle)
-                .textFieldStyle(.roundedBorder)
+                .macSettingsGlassField()
                 .onSubmit { doSearch() }
 
             TextField("lyrics_search_artist".localized, text: $searchArtist)
-                .textFieldStyle(.roundedBorder)
+                .macSettingsGlassField()
                 .onSubmit { doSearch() }
 
             Button(action: doSearch) {
