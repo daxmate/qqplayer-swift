@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-23T15:12:20Z",
+  "updated_at": "2026-11-24T00:26:05Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -17,9 +17,9 @@
     },
     ".github/workflows/ci.yml": {
       "role": "index",
-      "sha256": "24157236a961e06a72ed1627b295c982fd817c2637d09983a91b05203ede0057",
-      "size": 26492,
-      "normalized_sha256": "24157236a961e06a72ed1627b295c982fd817c2637d09983a91b05203ede0057"
+      "sha256": "0188f83da65b1dd2ace6397de55e18efd2f9bfd71da346fdd664343b97fffd09",
+      "size": 27054,
+      "normalized_sha256": "0188f83da65b1dd2ace6397de55e18efd2f9bfd71da346fdd664343b97fffd09"
     },
     ".gitignore": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "61ea9b350fc61905ad23c1836e34bd50675b6b64f80d526ed98770b5dfacfc73",
-      "size": 201205,
-      "normalized_sha256": "61ea9b350fc61905ad23c1836e34bd50675b6b64f80d526ed98770b5dfacfc73"
+      "sha256": "8bce28771b253666c25ef7fb403a32bc2149c028d47b290b30e6f24395113a9e",
+      "size": 201793,
+      "normalized_sha256": "8bce28771b253666c25ef7fb403a32bc2149c028d47b290b30e6f24395113a9e"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -716,9 +716,9 @@
     },
     "QQPlayer/Mac/MacLibraryView+Sidebar.swift": {
       "role": "index",
-      "sha256": "6a9e5d2c5162b58f179c0bc20a1008016fcc64676ec97a46c49d678388b7a572",
-      "size": 9026,
-      "normalized_sha256": "6a9e5d2c5162b58f179c0bc20a1008016fcc64676ec97a46c49d678388b7a572"
+      "sha256": "f40840804db541246529783cb74b713c461b0f0bca64c4885ec8733d82bef015",
+      "size": 9294,
+      "normalized_sha256": "f40840804db541246529783cb74b713c461b0f0bca64c4885ec8733d82bef015"
     },
     "QQPlayer/Mac/MacLibraryView+SyncPanel.swift": {
       "role": "index",
@@ -4764,6 +4764,12 @@
       "size": 27872,
       "normalized_sha256": "8dce861b3c45a95ef65be2b3c43a3c6fcd34bbbb2501f68c767d1e860169b1c7"
     },
+    "QQPlayerTests/MacWindowChromeShapeContractTests.swift": {
+      "role": "index",
+      "sha256": "3a68a211abc20d1f76fca98801bf3eb6a586fad0f93bd4b423d691ded7a52866",
+      "size": 8711,
+      "normalized_sha256": "3a68a211abc20d1f76fca98801bf3eb6a586fad0f93bd4b423d691ded7a52866"
+    },
     "QQPlayerTests/MockURLProtocol.swift": {
       "role": "index",
       "sha256": "1fcd380b44f670ce73f2fe698e51108cf0140d962f1338fd798da3da5f978ab5",
@@ -5654,9 +5660,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "56dcad905db69ecfab8e72560999e385be97228f44cf025f2f31df380c904d55",
-      "size": 456112,
-      "normalized_sha256": "56dcad905db69ecfab8e72560999e385be97228f44cf025f2f31df380c904d55"
+      "sha256": "4bbac7e156b99895bb24db155465071631c48f5380427f50b2c2c3d2603db483",
+      "size": 457504,
+      "normalized_sha256": "4bbac7e156b99895bb24db155465071631c48f5380427f50b2c2c3d2603db483"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5844,6 +5850,24 @@
       "size": 5622,
       "normalized_sha256": "b7b2b261004b56e48d094ec2dd949f021be16ddc62edf08f77e4486c179a7e95"
     },
+    "scripts/mac-chrome-harness/HarnessSupport.swift": {
+      "role": "index",
+      "sha256": "53a8d72bbe78e0280385f007177e57e5faa2e4163fc1cc136a32040cae0a10b0",
+      "size": 14079,
+      "normalized_sha256": "53a8d72bbe78e0280385f007177e57e5faa2e4163fc1cc136a32040cae0a10b0"
+    },
+    "scripts/mac-chrome-harness/Stubs.swift": {
+      "role": "index",
+      "sha256": "53fde1c12b2314b63a9d89e440f22b35f24db980c27b8a713d3142f0c8c63a9b",
+      "size": 985,
+      "normalized_sha256": "53fde1c12b2314b63a9d89e440f22b35f24db980c27b8a713d3142f0c8c63a9b"
+    },
+    "scripts/mac-chrome-harness/main.swift": {
+      "role": "index",
+      "sha256": "0cc63a73e974e4ad93b01dc0ff3aa33169ddf8b4e4776cec0dcbd8fad026f31e",
+      "size": 15032,
+      "normalized_sha256": "0cc63a73e974e4ad93b01dc0ff3aa33169ddf8b4e4776cec0dcbd8fad026f31e"
+    },
     "scripts/pbxproj-membership.py": {
       "role": "index",
       "sha256": "b24daf1d2ac24cbe44dfe67c346692a246e6b32c7eab57d23cce09b49e17ab80",
@@ -5867,6 +5891,12 @@
       "sha256": "be65dfc6546238bb62920e6f97dbcff0ae58005c83723ed9ec214c6ca7fbf206",
       "size": 6495,
       "normalized_sha256": "be65dfc6546238bb62920e6f97dbcff0ae58005c83723ed9ec214c6ca7fbf206"
+    },
+    "scripts/run-mac-window-chrome-tests.sh": {
+      "role": "index",
+      "sha256": "7c1a011bd368abf6bf617541e74aec9102158fe544d2ad5dc37db6e839fd7ff6",
+      "size": 3855,
+      "normalized_sha256": "7c1a011bd368abf6bf617541e74aec9102158fe544d2ad5dc37db6e839fd7ff6"
     },
     "scripts/siri-tests-guard.py": {
       "role": "index",

@@ -17,7 +17,7 @@ QQPlayerMac.entitlements[FS8T]: F:macOS 授权：App Group B6FA37AYT5.dsqcommon�
 CHANGELOG.md[SV6M]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚙️改进 / 🐛修复 / 🔧工程；最新 2.1.2（2026-11-23：音量归一化设置页接入封面毛玻璃） | R:- | A:- | S:发版时与版本号同批更新；开发中条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/.github/workflows/===
-ci.yml[OQ7L]: F:GitHub Actions CI 四 job：Swift（设备判据自检/lint/format/成员校验/iOS 单测/零警告）、local-harness（同步与 DSQ 脚本）、macOS（构建 Mac 端 + 版号与资源断言）、Siri（运行时门控） | R:code:scripts/xcbuild.sh,code:.swiftlint.yml,code:scripts/run-local-sync-tests.sh,code:scripts/run-dsq-shared-tests.sh | A:jobs Swift,local-harness,macOS,Siri | S:push main 走自托管 qqplayer-macos、PR 回落 macos-latest；siri job 由模拟器运行时版本门控，禁加 CODE_SIGNING_ALLOWED=NO；iOS 测试按 UDID 选设备；不要再加 actions/cache——自托管在前置阶段下载头里所有 uses，慢网必撞 100s 超时卡死 Set up job；警告零容忍
+ci.yml[OQ7L]: F:GitHub Actions CI 四 job：Swift（设备判据/lint/format/成员校验/iOS 单测/零警告）、local-harness（同步与 DSQ）、macOS（构建 Mac 端 + 版号资源断言 + 窗口 chrome harness）、Siri（运行时门控） | R:code:scripts/xcbuild.sh,code:.swiftlint.yml,code:scripts/run-local-sync-tests.sh,code:scripts/run-dsq-shared-tests.sh | A:jobs Swift,local-harness,macOS,Siri | S:push main 走自托管 qqplayer-macos、PR 回落 macos-latest；iOS 测试按 UDID 选设备；不要再加 actions/cache；macOS job 多跑窗口 chrome harness；警告零容忍
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/PlayerWidget/===
 Info.plist[FV4T]: F:Widget 扩展 Info.plist，声明 NSExtensionPointIdentifier 为 com.apple.widgetkit-extension | R:- | A:- | S:-
@@ -40,7 +40,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.1.2/91；已登记 ReplayGain 源文件与测试、MacWindowGlassChrome、ArtistAvatar 三件套、MacTrackSortMenu、MacTrackColumnResizer | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护（Mac 白名单 + iOS 例外表两处同时登记），手改后跑 check-target-membership.py 复核；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only，不进 Mac 白名单
+project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.1.2/91；已登记 MacTrackSortMenu、MacTrackColumnResizer、MacWindowChromeShapeContractTests | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
@@ -157,7 +157,7 @@ MacLibraryRoot.swift[PD7M]: F:macOS「曲库=单一地址」唯一 IO 入口：�
 MacLibrarySettingsView.swift[AU7L]: F:设置「音乐库」分类：曲库唯一位置选择（默认 ~/Music/QQPlayer 或自定义）+ 音频格式 chips | R:code:QQPlayer/Models/SettingsModels.swift, code:QQPlayer/Mac/MacLibraryRoot.swift | A:MacLibrarySettingsView.applyRoot, pickRoot, resetToDefault | S:换根只走 MacLibraryRoot 入口，不直接写路径
 MacLibraryView+Content.swift[AU7M]: F:MacLibraryView 内容区与播放动作：歌曲/喜欢/专辑/歌手/歌单四态列表与双击播放，搜索输入经 SearchQuery 归一后下发；检索结果视图注入曲库同款右键菜单回调 | R:code:QQPlayer/Mac/MacLibraryView+Sidebar.swift,code:QQPlayer/Services/PlayerEngine.swift | A:sectionContent,playFromTrackList | S:纯搬家文件，改动前先确认没有同名实现残留；搜索统一走 SearchQuery；搜索态判据是 isSearching（trim 后非空），别用原始串判空；showArtist/showAlbum 跨分片须 internal
 MacLibraryView+Data.swift[AU7S]: F:MacLibraryView 数据与外观：窗口级拖入导入兜底、曲库/喜欢曲目重载与失败绑定、FSEvents 监控启动、外观三态循环与应用、当前歌手名解析 | R:code:QQPlayer/Mac/MacLibraryView.swift,code:QQPlayer/Mac/MacImportService.swift,code:QQPlayer/Mac/MacFolderMonitor.swift,code:QQPlayer/Services/MacLibraryFactsStore.swift | A:- | S:四表全量读移出主线程（审计 M2，此前同步跑主线程且被 7+ 通知反复触发）；reload 先 invalidate 在途事实再预取避免闪 0；外观用 NSApp.appearance
-MacLibraryView+Sidebar.swift[AU6S]: F:MacLibraryView 侧栏：分区/歌单选择、侧栏搜索框、曲库卡统计行；玻璃生效时列表底透明并剥离系统侧栏玻璃（macOS 26+ 换列） | R:code:QQPlayer/Services/MacLibrarySelection.swift,code:QQPlayer/Mac/MacLibraryView+Content.swift | A:MacLibrarySection | S:选择语义唯一源在 MacLibrarySelection；图标显式 foregroundStyle(appAccentColor)，选中行走系统高亮；玻璃底=scrollContentBackground(.hidden)+MacSidebarMaterialStripper（26+ 换列去 NSGlassEffectView，15- 藏 .sidebar 材质），关开关即还原
+MacLibraryView+Sidebar.swift[AU6S]: F:MacLibraryView 侧栏：分区/歌单选择、侧栏搜索框、曲库卡统计行；玻璃生效时列表底透明并剥离系统侧栏玻璃（26+ 摘玻璃不换列） | R:code:QQPlayer/Services/MacLibrarySelection.swift,code:QQPlayer/Mac/MacLibraryView+Content.swift | A:MacLibrarySection | S:选择语义唯一源在 MacLibrarySelection；玻璃底=scrollContentBackground(.hidden)+MacSidebarMaterialStripper（26+ 摘玻璃不换列、15- 藏 .sidebar 材质），关开关还原
 MacLibraryView+SyncPanel.swift[AU6T]: F:主窗口工具栏同步面板 MacSyncPanel：复用设置页同一 MacSyncCenterView（顶层两页默认「同步」），sheet 高度受控 | R:code:QQPlayer/Mac/MacSyncCenterView.swift,code:QQPlayer/Mac/MacLibraryView.swift | A:MacSyncPanel | S:sheet 高度必须受控（=屏幕可见高−52−24，限 420…720）：不受控时 macOS 每次关 sheet 会把主窗永久下移超出量（实测 12pt/次累积）；需显式关闭按钮
 MacLibraryView.swift[AU8L]: F:macOS 主窗口 NavigationSplitView：状态/工具栏/通知/FSEvents/拖入导入/搜索防抖；玻璃收进 MacWindowGlassLayer 一层铺底，开关上送 MacWindowGlassChromeState；玻璃生效时工具栏按钮隐藏系统玻璃胶囊（26+ 共享背景） | R:code:QQPlayer/Mac/MacLibraryView+Data.swift,code:QQPlayer/Mac/MacLibraryView+Sidebar.swift,code:QQPlayer/Mac/MacPlayerView.swift,code:QQPlayer/Mac/MacWindowGlassChrome.swift | A:MacLibraryView,isSearching,isWindowGlassActive,MacWindowGlassLayer,toolbarContent,toolbarItems | S:分片约定：body 引用的状态/方法必须 internal；通知统一 reloadLibrary；onDisappear 取消任务停 FSEvents；主窗 min 1100×720；玻璃只铺 background 并允许它越界安全区，body 不包 ZStack；中栏还要关 alternatingRowBackgrounds；诊断判据 sidebarMinY>=trafficBottom；工具栏 item 共享背景只按 isWindowGlassActive 隐藏，条带背景归 MacWindowChromeToolbarBackground，关玻璃必须 .visible
 MacLyricsResendAutoRunner.swift[AR6S]: F:歌词补发通道的 Mac 自动触发：连接就绪即自动对账 @lyrics/*（一次连接一次，重连重允许），前置门未开则订阅终态补跑；MacLyricsResendFactsStore 存最近一轮账目 | R:code:QQPlayer/Sync/SyncLyricsResendController.swift,code:QQPlayer/Sync/SyncLyricsResend.swift,code:QQPlayer/Services/IndexingGate.swift | A:MacLyricsResendAutoRunner,MacLyricsResendFactsStore | S:前置门唯一判定 IndexingGate.isReadyForChangeLogSync：索引未到终态对账会把「暂时查不到」当「本端没有」→ 拉回被判 orphan；纯逻辑在共享 Core 有单测，本文件不做单测
@@ -957,6 +957,7 @@ PlayerGlassBackgroundTests.swift[TQ4S]: F:毛玻璃背景纯逻辑测试（不�
 ReplayGainMathTests.swift[TB7S]: F:ReplayGain 计算全分支：轨道/专辑选增益、专辑缺 album gain 回退、preamp 边界、削波上限、[-24,+12] clamp、非有限值兜底 | R:code:QQPlayer/Services/ReplayGainMath.swift | A:ReplayGainMathTests | S:断言要覆盖回退与 clamp 边界，别只测 happy path；计算层无 IO/状态，测试不建 DB
 ReplayGainMigrationTests.swift[TP7T]: F:ReplayGain 补列迁移：老库缺 replaygain_* 列时幂等补列，重复执行不报错 | R:code:QQPlayer/Services/DatabaseManager+ReplayGain.swift, code:QQPlayer/Services/DatabaseManager+Migration.swift | A:ReplayGainMigrationTests | S:补列函数必须可重复调用（列已存在即跳过），测试连跑两次验证幂等
 ArtistAvatarStyleTests.swift[TQ5S]: F:ArtistAvatarStyle 纯文本规则单测：monogram（空名/中文/拉丁大写/前导空白）、paletteIndex 稳定性与范围、sanitizedFileName 清洗 | R:code:QQPlayer/Services/ArtistAvatarStyle.swift | A:ArtistAvatarStyleTests | S:清洗集与既有实现一致（只去列明的非法字符），扩大清洗集需同步改 macOS 行为
+MacWindowChromeShapeContractTests.swift[TQ6S]: F:macOS 窗口 chrome 形状契约（纯文本扫描，fail-closed）：禁 MacWindowGlass 换列、锁 sharedBackgroundVisibility 挂在玻璃判定上、锁侧栏按钮 isBordered 处理 | R:- | A:- | S:扫描不到文件必须红；判定逻辑抽成纯 Foundation 便于无模拟器复算；换列会丢 .sidebar behavior 导致工具栏按钮跑中间
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayerTests/Fixtures/===
 README.md[TQ3T]: F:测试夹具目录说明：棘轮基线只减不增、已清理无 target 归属的音频夹具 | R:- | A:- | S:音频夹具唯一来源是 TestAudioFixtures.swift（内嵌 base64）
@@ -1021,6 +1022,7 @@ bump-version.sh[OV6M]: F:升版脚本：改项目级 Debug/Release 的 MARKETING
 dsq-shared-migrate.sh[XV7T]: F:共享资源迁移 CLI 包装：swiftc 直编 DSQSharedPaths/Migrator 与 migrate/main.swift，默认 dry-run，--apply 才动盘，--help 打印用法 | R:code:scripts/dsq-shared/migrate/main.swift, code:QQPlayer/Services/DSQSharedMigrator.swift | A:--dry-run, --apply | S:未知参数以退出码 2 失败，不静默忽略
 run-dsq-shared-tests.sh[XQ7T]: F:DSQ 共享资源自检脚本：swiftc -O 直编解析层/迁移器与 selftest，跑完即退出；不启动模拟器、不依赖 Xcode 工程 | R:code:scripts/dsq-shared/selftest/main.swift, code:QQPlayer/Services/DSQSharedPaths.swift | A:- | S:断言失败即非零退出，CI local-harness 直接依赖该退出码
 preflight.sh[XQ7S]: F:推送前本地预检脚本：quick（静态检查）/ full（加两端编译级验证），失败即停并打印每步耗时 | R:code:docs/preflight.md,code:scripts/xcbuild.sh | A:preflight | S:不是 CI 替代品：不跑 xcodebuild test、不起模拟器；所有 xcodebuild 必须走 scripts/xcbuild.sh（共享 SPM 缓存）
+run-mac-window-chrome-tests.sh[TQ6T]: F:跑 macOS 窗口 chrome harness：swiftc 直编真实生产源码 + 夹具，执行断言并汇总，任一失败 exit 1；macOS 26 以下跳过玻璃用例并打印原因 | R:- | A:- | S:编译产物落 /tmp；warnings 必须为 0；不启模拟器、不截图；CI 的 macOS job 调用
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/git-hooks/===
 pre-commit[XQ6S]: F:提交前钩子：swiftformat/swiftlint 加编译警告零容忍加 target 成员检查 | R:code:scripts/git-hooks/pre-push | A:- | S:构建一律走 scripts/xcbuild.sh 禁裸 xcodebuild；环境问题可 SKIP_WARNING_CHECK=1 绕过 CI 兜底
@@ -1083,4 +1085,9 @@ AppIntentVocabulary.plist[FL4T]: F:ko Siri 词汇表（意图名词与例句） 
 AppShortcuts.strings[FL5T]: F:ko Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语结构与识别绑定，不要改语序
 InfoPlist.strings[FL5T]: F:ko Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
 Localizable.strings[FL6L]: F:ko 界面文案表（1130 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오
+
+===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/mac-chrome-harness/===
+HarnessSupport.swift[TQ5M]: F:窗口 chrome harness 夹具：真 NSWindow + NavigationSplitView（侧栏 210）+ 4 个 ToolbarItem，布局泵、视图树计数、断言与失败明细助手 | R:- | A:- | S:断言只做结构与几何；不截图；停放在 1×1 容器的玻璃计为不可见；每轮 flip 需等布局稳定再采样
+Stubs.swift[TQ2T]: F:harness 的最小绘制桩（ArtworkImage / ArtworkBlurBackground），只为让生产文件独立编译，不参与任何断言 | R:- | A:- | S:桩要与生产签名一致，改生产签名后这里会编译失败——这是有意的
+main.swift[TQ7M]: F:窗口 chrome 断言主程序：玻璃开/关两态 + 10 轮翻转 + 冷启动模拟，覆盖侧栏可见玻璃数、列宽、sidebar behavior、platter 数、isBordered、按钮贴右、标题不被挤 | R:- | A:- | S:platter 口径是「基线−1」；约束数增长未断言（实测 +8/轮，见脚本注释）；失败 exit 1
 
