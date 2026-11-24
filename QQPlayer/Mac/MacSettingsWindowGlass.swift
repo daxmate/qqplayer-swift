@@ -54,6 +54,41 @@ extension View {
     }
 }
 
+// MARK: - 设置窗内的输入框
+
+/// 设置窗内的输入框（TextField / SecureField）外观。
+///
+/// 玻璃生效：`.plain` + 低透明度纯色底 + 细描边，与整窗玻璃同调。
+/// 刻意**不叠 material**——输入框面积小，再引一层模糊采样会「雾上加雾」（v1 教训）；
+/// 浅色档 0.38、深色档 0.12，深色下不能出现白块。
+/// 不生效：维持原生 `.roundedBorder`，其余一切不加（与改造前逐像素一致）。
+struct MacSettingsGlassField: ViewModifier {
+    @Environment(\.macSettingsGlassActive) private var isActive
+    @Environment(\.colorScheme) private var colorScheme
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isActive {
+            let shape = RoundedRectangle(cornerRadius: DesignTokens.radius6, style: .continuous)
+            content
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(shape.fill(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.38)))
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+        } else {
+            content.textFieldStyle(.roundedBorder)
+        }
+    }
+}
+
+extension View {
+    /// 设置窗内的输入框统一挂这个（唯一入口，见 `MacSettingsGlassField`）。
+    func macSettingsGlassField() -> some View {
+        modifier(MacSettingsGlassField())
+    }
+}
+
 // MARK: - 设置窗（及其 sheet）根
 
 /// 设置窗根（以及设置窗内 sheet 根）的装配：铺「同一套封面模糊底」+ 窗口 chrome + 注入环境值。

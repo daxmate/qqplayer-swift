@@ -121,7 +121,7 @@ struct MacRecommendationSettingsView: View {
             }
             HStack {
                 SecureField("recommendation_lastfm_placeholder".localized, text: $lastFMKeyDraft)
-                    .textFieldStyle(.roundedBorder)
+                    .macSettingsGlassField()
                 Button("recommendation_lastfm_save".localized) {
                     saveLastFMKey()
                 }

@@ -71,7 +71,7 @@ struct MacOnlineSettingsView: View {
                         text: $deleteSettings.aria2Rpc,
                         prompt: Text("http://localhost:6800/jsonrpc")
                     )
-                    .textFieldStyle(.roundedBorder)
+                    .macSettingsGlassField()
                     .onChange(of: deleteSettings.aria2Rpc) { _, _ in
                         deleteSettings.save()
                     }
@@ -80,7 +80,7 @@ struct MacOnlineSettingsView: View {
                         text: $deleteSettings.aria2Secret,
                         prompt: Text("settings_download_aria2_secret_placeholder".localized)
                     )
-                    .textFieldStyle(.roundedBorder)
+                    .macSettingsGlassField()
                     .onChange(of: deleteSettings.aria2Secret) { _, _ in
                         deleteSettings.save()
                     }
@@ -91,7 +91,7 @@ struct MacOnlineSettingsView: View {
                     value: $deleteSettings.downloadMaxSpeed,
                     format: .number
                 )
-                .textFieldStyle(.roundedBorder)
+                .macSettingsGlassField()
                 .onChange(of: deleteSettings.downloadMaxSpeed) { _, _ in
                     deleteSettings.save()
                 }

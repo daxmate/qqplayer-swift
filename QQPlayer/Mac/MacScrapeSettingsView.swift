@@ -33,7 +33,7 @@ struct MacScrapeSettingsView: View {
             // 重命名模板（web「重命名规则」组：输入 + 占位符提示 + 实时预览）
             Section {
                 TextField("", text: renameTemplateBinding, prompt: Text("{artist} - {title}"))
-                    .textFieldStyle(.roundedBorder)
+                    .macSettingsGlassField()
                 Text("scraping_rename_template_hint".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
