@@ -9,6 +9,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Sheet item identity
+
+/// Album / Artist 的 `id` 就是数据库主键（稳定唯一），补 Identifiable 供 `.sheet(item:)` 驱动弹窗。
+/// 白框根因（2026-09-08 存档）：`.sheet(isPresented:)` 的 content 闭包在 present 瞬间读另一个
+/// state 存在时序竞态 —— 可能读到 nil ⇒ 空内容 sheet（≈90×70 白框）且 SwiftUI 不自动刷新。
+extension Album: Identifiable {}
+extension Artist: Identifiable {}
+
 // MARK: - Albums
 
 struct MacAlbumGridView: View {
@@ -26,6 +34,18 @@ struct MacAlbumGridView: View {
     @Environment(MacLibraryFactsStore.self) private var facts
     /// 进专辑失败提示（审计 L7：以前只 print）
     @State private var openError: String?
+
+    /// 专辑详情 sheet 由 item 非空驱动；`showAlbumSheet` 只保留给父层「右键 → 进专辑」外部触发。
+    /// 不用 isPresented + 内容判空：present 瞬间读到 nil 会弹出空内容 sheet（白框）且卡住。
+    private var albumSheetItem: Binding<Album?> {
+        Binding(
+            get: { showAlbumSheet ? selectedAlbum : nil },
+            set: { newValue in
+                guard newValue == nil else { return }
+                showAlbumSheet = false
+            }
+        )
+    }
 
     var body: some View {
         ScrollView {
@@ -61,15 +81,13 @@ struct MacAlbumGridView: View {
         } message: {
             Text(openError ?? "")
         }
-        .sheet(isPresented: $showAlbumSheet) {
-            if let album = selectedAlbum {
-                MacAlbumDetailSheet(
-                    album: album,
-                    tracks: albumTracks,
-                    artistNameResolver: artistNameResolver,
-                    onPlay: { onPlayAlbum(album, albumTracks) }
-                )
-            }
+        .sheet(item: albumSheetItem) { album in
+            MacAlbumDetailSheet(
+                album: album,
+                tracks: albumTracks,
+                artistNameResolver: artistNameResolver,
+                onPlay: { onPlayAlbum(album, albumTracks) }
+            )
         }
     }
 
@@ -171,6 +189,17 @@ struct MacArtistListView: View {
     /// 进歌手失败提示（审计 L7）
     @State private var openError: String?
 
+    /// 歌手详情 sheet 由 item 非空驱动（同 `albumSheetItem` 注释：规避 isPresented 判空白框竞态）。
+    private var artistSheetItem: Binding<Artist?> {
+        Binding(
+            get: { showArtistSheet ? selectedArtist : nil },
+            set: { newValue in
+                guard newValue == nil else { return }
+                showArtistSheet = false
+            }
+        )
+    }
+
     var body: some View {
         List(artists, id: \.id) { artist in
             Button {
@@ -205,16 +234,14 @@ struct MacArtistListView: View {
         } message: {
             Text(openError ?? "")
         }
-        .sheet(isPresented: $showArtistSheet) {
-            if let artist = selectedArtist {
-                MacArtistDetailSheet(
-                    artist: artist,
-                    tracks: artistTracks,
-                    avatarTracks: facts.artistArtworkTracks(for: artist),
-                    artistNameResolver: artistNameResolver,
-                    onPlay: { onPlayArtist(artist, artistTracks) }
-                )
-            }
+        .sheet(item: artistSheetItem) { artist in
+            MacArtistDetailSheet(
+                artist: artist,
+                tracks: artistTracks,
+                avatarTracks: facts.artistArtworkTracks(for: artist),
+                artistNameResolver: artistNameResolver,
+                onPlay: { onPlayArtist(artist, artistTracks) }
+            )
         }
     }
 

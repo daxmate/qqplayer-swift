@@ -83,6 +83,28 @@ struct MacSearchResultsView: View {
     /// 曲目右键菜单状态（与曲库 / ⌘K 浮层同一份实现，见 MacTrackContextMenu.swift）
     @State private var menu = MacTrackMenuModel()
 
+    /// 详情 sheet 由 item 非空驱动（同 MacAlbumArtistViews：isPresented + 内容判空在 present
+    /// 瞬间可能读到 nil ⇒ 空内容白框且卡住；Bool 仍保留，供右键「进歌手 / 进专辑」置真）
+    private var albumSheetItem: Binding<Album?> {
+        Binding(
+            get: { showAlbumSheet ? selectedAlbum : nil },
+            set: { newValue in
+                guard newValue == nil else { return }
+                showAlbumSheet = false
+            }
+        )
+    }
+
+    private var artistSheetItem: Binding<Artist?> {
+        Binding(
+            get: { showArtistSheet ? selectedArtist : nil },
+            set: { newValue in
+                guard newValue == nil else { return }
+                showArtistSheet = false
+            }
+        )
+    }
+
     var body: some View {
         Group {
             if results.isEmpty {
@@ -151,25 +173,21 @@ struct MacSearchResultsView: View {
                 .macGlassListBackground()
             }
         }
-        .sheet(isPresented: $showAlbumSheet) {
-            if let album = selectedAlbum {
-                MacAlbumDetailSheet(
-                    album: album,
-                    tracks: albumTracks,
-                    artistNameResolver: artistNameResolver,
-                    onPlay: { onPlayAlbum(album, albumTracks) }
-                )
-            }
+        .sheet(item: albumSheetItem) { album in
+            MacAlbumDetailSheet(
+                album: album,
+                tracks: albumTracks,
+                artistNameResolver: artistNameResolver,
+                onPlay: { onPlayAlbum(album, albumTracks) }
+            )
         }
-        .sheet(isPresented: $showArtistSheet) {
-            if let artist = selectedArtist {
-                MacArtistDetailSheet(
-                    artist: artist,
-                    tracks: artistTracks,
-                    artistNameResolver: artistNameResolver,
-                    onPlay: { onPlayArtist(artist, artistTracks) }
-                )
-            }
+        .sheet(item: artistSheetItem) { artist in
+            MacArtistDetailSheet(
+                artist: artist,
+                tracks: artistTracks,
+                artistNameResolver: artistNameResolver,
+                onPlay: { onPlayArtist(artist, artistTracks) }
+            )
         }
     }
 
