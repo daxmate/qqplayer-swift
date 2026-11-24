@@ -241,6 +241,13 @@ jobs:
             exit 1
           fi
           echo "✅ iOS 与 macOS 版本号同步：$(printf '%s ' $IOS)"
+      # macOS 整窗玻璃 / 工具栏的结构断言（无模拟器，swiftc 直编生产源码）：
+      # 2026-11-23 连踩三个只能靠肉眼发现的回归（侧栏被 Liquid Glass 包住 / 换列丢
+      # .sidebar behavior 导致 4 个按钮跑到中间 / 冷启动胶囊残留），用户要求变成自动断言。
+      # macOS 26 以下自动 SKIP 玻璃相关用例并打印原因；任一断言失败 exit 1。
+      - name: Run macOS window chrome harness (glass + toolbar assertions)
+        run: bash scripts/run-mac-window-chrome-tests.sh
+
       - name: Build QQPlayerMac
         run: |
           set -o pipefail
