@@ -62,9 +62,18 @@ extension View {
 /// 刻意**不叠 material**——输入框面积小，再引一层模糊采样会「雾上加雾」（v1 教训）；
 /// 浅色档 0.38、深色档 0.12，深色下不能出现白块。
 /// 不生效：维持原生 `.roundedBorder`，其余一切不加（与改造前逐像素一致）。
+///
+/// 判据（2026-11-24）：`macSettingsGlassActive || macWindowGlassActive` ——
+/// 设置窗内前者为真（外观零变化），主窗内容页（如「为你推荐」输入框）读后者；
+/// 两种场景互斥，**不允许**再写第二份输入框样式。
 struct MacSettingsGlassField: ViewModifier {
-    @Environment(\.macSettingsGlassActive) private var isActive
+    @Environment(\.macSettingsGlassActive) private var settingsActive
+    @Environment(\.macWindowGlassActive) private var windowActive
     @Environment(\.colorScheme) private var colorScheme
+
+    private var isActive: Bool {
+        settingsActive || windowActive
+    }
 
     @ViewBuilder
     func body(content: Content) -> some View {

@@ -84,7 +84,8 @@ struct MacRecommendationView: View {
         VStack(alignment: .leading, spacing: DesignTokens.space6) {
             HStack(spacing: DesignTokens.space8) {
                 TextField("recommendation_chat_placeholder".localized, text: $query)
-                    .textFieldStyle(.roundedBorder)
+                    // 玻璃生效 → 设置窗同款输入框外观；不生效 → 原生 .roundedBorder（逐像素还原）
+                    .macSettingsGlassField()
                     .onSubmit { submit() }
                     .disabled(model.phase == .loading)
 
