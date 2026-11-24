@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>QQPlayer</string>
+	<string>TingFi</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -99,9 +99,9 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>扫描二维码以与您自己的 QQPlayer 设备配对并同步（仅限您授权的配对操作）。</string>
+	<string>扫描二维码以与您自己的婷听设备配对并同步（仅限您授权的配对操作）。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>用于发现并连接同一局域网内的 QQPlayer 设备（Mac/Windows/NAS），以配对并同步音乐库。</string>
+	<string>用于发现并连接同一局域网内的婷听设备（Mac/Windows/NAS），以配对并同步音乐库。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_qqplayer-sync._tcp</string>

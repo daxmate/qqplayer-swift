@@ -2373,7 +2373,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = QQPlayer/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = QQPlayer;
+				INFOPLIST_KEY_CFBundleDisplayName = TingFi;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2402,7 +2402,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = QQPlayer/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = QQPlayer;
+				INFOPLIST_KEY_CFBundleDisplayName = TingFi;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2430,7 +2430,7 @@
 				DEVELOPMENT_TEAM = B6FA37AYT5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PlayerWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PlayerWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = TingFi;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2460,7 +2460,7 @@
 				DEVELOPMENT_TEAM = B6FA37AYT5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PlayerWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PlayerWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = TingFi;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2629,9 +2629,9 @@
 				MARKETING_VERSION = 2.2.1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "QQPlayerMac-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = QQPlayer;
+				INFOPLIST_KEY_CFBundleDisplayName = TingFi;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Used to discover and connect QQPlayer devices (Mac/Windows/NAS) on the same local network, so you can pair and sync your music library.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Used to discover and connect TingFi devices (Mac/Windows/NAS) on the same local network, so you can pair and sync your music library.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -2663,9 +2663,9 @@
 				MARKETING_VERSION = 2.2.1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "QQPlayerMac-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = QQPlayer;
+				INFOPLIST_KEY_CFBundleDisplayName = TingFi;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Used to discover and connect QQPlayer devices (Mac/Windows/NAS) on the same local network, so you can pair and sync your music library.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Used to discover and connect TingFi devices (Mac/Windows/NAS) on the same local network, so you can pair and sync your music library.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
