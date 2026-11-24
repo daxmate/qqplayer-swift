@@ -41,7 +41,8 @@ struct MacEQSettingsView: View {
                 formatInfoSection
             }
             .formStyle(.grouped)
-            .macSettingsGlassListBackground()
+            // 本页是设置窗弹出的 sheet：让路判据取两个键的并集（设置场景 / 主窗场景任一生效都清底）
+            .macSheetGlassListBackground()
         }
         .frame(minWidth: 480, minHeight: 560)
         .sheet(isPresented: $showingImport) {
