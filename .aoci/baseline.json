@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-24T02:22:30Z",
+  "updated_at": "2026-11-24T02:58:00Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -992,9 +992,9 @@
     },
     "QQPlayer/Mac/MacSyncContentModel.swift": {
       "role": "index",
-      "sha256": "88890bd6f239b66ca5072c2c01b41aa9de73f242aec27b3324bb7609b8e8073d",
-      "size": 25940,
-      "normalized_sha256": "88890bd6f239b66ca5072c2c01b41aa9de73f242aec27b3324bb7609b8e8073d"
+      "sha256": "bead35f2fae43243cedbbea5925e3d717d52aeaba7045b5f37984ec50d456593",
+      "size": 25669,
+      "normalized_sha256": "bead35f2fae43243cedbbea5925e3d717d52aeaba7045b5f37984ec50d456593"
     },
     "QQPlayer/Mac/MacSyncCoordinatorFactory.swift": {
       "role": "index",
