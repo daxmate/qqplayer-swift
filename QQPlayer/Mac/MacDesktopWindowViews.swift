@@ -146,6 +146,13 @@ struct MacMiniPlayerView: View {
             Spacer(minLength: DesignTokens.space0)
         }
         .padding(DesignTokens.space12)
+        // 拖动挂在卡片内部、`.compositingGroup()` / `.clipShape(...)` 之前，而不是整条修饰链最外层：
+        // 外层手势要穿过合成组 + 圆角裁切才命中，实测收不到 WindowDragGesture（同一 gesture
+        // 挂在纯文本的桌面歌词窗最外层就正常，差别只在迷你卡有合成组/裁切）。
+        // `.contentShape(Rectangle())` 让整张卡片（文字 / Spacer / padding 留白）都算命中区；
+        // 仍是普通 `.gesture`，卡片里的 Button / Slider 自身命中优先，不会被拖动吞掉。
+        .contentShape(Rectangle())
+        .macWindowDragGesture()
         // 玻璃生效 → 封面模糊底（与主窗同一配方 `MacWindowGlass`，只换底色）；
         // 不生效 → 原 `.ultraThinMaterial` 圆角卡（逐像素还原）。
         .background {
@@ -183,8 +190,6 @@ struct MacMiniPlayerView: View {
         .onDisappear {
             updateCursor(hovering: false)
         }
-        // 整窗拖动（隐式背景拖动在新系统上实测失效，见 macWindowDragGesture）
-        .macWindowDragGesture()
     }
 
     /// 拉取曲目封面（切歌后旧结果丢弃）——与设置窗 / sheet 同一路径。
