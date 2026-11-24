@@ -72,8 +72,8 @@ struct MacSettingsGlassField: ViewModifier {
             let shape = RoundedRectangle(cornerRadius: DesignTokens.radius6, style: .continuous)
             content
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, DesignTokens.space8)
+                .padding(.vertical, DesignTokens.space4)
                 .background(shape.fill(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.38)))
                 .overlay(shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
         } else {
