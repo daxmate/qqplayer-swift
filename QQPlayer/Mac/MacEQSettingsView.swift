@@ -18,7 +18,8 @@ struct MacEQSettingsView: View {
 
     @State private var showingImport = false
     @State private var showingCreateManual = false
-    @State private var showingEditManual = false
+    /// 手动预设编辑 sheet 由 item 非空驱动（不使用 isPresented + 内容判空）
+    @State private var editManualPreset: EQPreset?
     @State private var showingCustomEQ = false
     /// 待删除确认的预设（删除前必须确认弹窗）
     @State private var presetPendingDelete: EQPreset?
@@ -55,12 +56,13 @@ struct MacEQSettingsView: View {
             MacCreateManualEQView()
                 .macSettingsGlassScene()
         }
-        .sheet(isPresented: $showingEditManual) {
-            if let preset = eqManager.currentPreset, preset.presetType == .manual {
-                MacManualEQEditorView(preset: preset)
-                    // sheet 是独立窗口：与其它 EQ 子 sheet 同口径装配（设置场景提供唯一一层玻璃）
-                    .macSettingsGlassScene()
-            }
+        // 手动预设编辑 sheet 由 item 非空驱动：不用 isPresented + 内容判空 —— present 瞬间读到 nil
+        // 会弹出空内容 sheet（≈90×70 白框）且 SwiftUI 不自动刷新；sheet 关闭时 SwiftUI 把 item 置 nil，
+        // 重开同一预设也能再次弹出。
+        .sheet(item: $editManualPreset) { preset in
+            MacManualEQEditorView(preset: preset)
+                // sheet 是独立窗口：与其它 EQ 子 sheet 同口径装配（设置场景提供唯一一层玻璃）
+                .macSettingsGlassScene()
         }
         .sheet(isPresented: $showingCustomEQ) {
             MacGraphicEQ10BandEditorView()
@@ -142,7 +144,9 @@ struct MacEQSettingsView: View {
                         subtitleColor: .green
                     ) {
                         applyManualPreset(preset)
-                        showingEditManual = true
+                        // 先取当前预设再置 item；不满足手动类型就不置状态（宁可不弹，也不弹空 sheet）
+                        guard let current = eqManager.currentPreset, current.presetType == .manual else { return }
+                        editManualPreset = current
                     }
                 }
             } else {

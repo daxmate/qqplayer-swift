@@ -54,8 +54,8 @@ struct MacPlayerView: View {
     @State var visualizerEnabled: Bool = DeleteSettings.load().visualizerEnabled
     /// 分片：跨文件可见（原 private）
     @Environment(MacSpectrumAnalyzer.self) var spectrumAnalyzer
-    /// 歌词搜索 sheet（手动指定歌词）
-    @State private var showLyricsSearch = false
+    /// 歌词搜索 sheet（手动指定歌词）；由 item 非空驱动，避免 isPresented + 内容判空的空 sheet 竞态
+    @State private var lyricsSearchTrack: Track?
     /// 播放队列面板（B 组队列排序持久化：可拖排/删除/点行跳转，重排即持久化）
     /// 分片：跨文件可见（原 private）
     @State var showQueuePanel = false
@@ -127,7 +127,9 @@ struct MacPlayerView: View {
                     isFullscreen: isLyricsFullscreen,
                     onToggleExpand: handleLyricsDoubleTap,
                     onLyricsSearch: {
-                        showLyricsSearch = true
+                        // 没有当前曲目就不置状态：避免 present 瞬间读不到 track 弹出空 sheet（白框）
+                        guard let track = player.currentTrack else { return }
+                        lyricsSearchTrack = track
                     },
                     // 歌词时间轴对齐（macOS 26+；能力不足时整项隐藏）
                     onAlignTimeline: canAlignLyricsTimeline ? { startLyricAlignment() } : nil,
@@ -153,18 +155,18 @@ struct MacPlayerView: View {
             let saved = UserDefaults.standard.double(forKey: Self.lyricsPanelHeightKey)
             lyricsPanelHeight = saved > 0 ? CGFloat(saved) : 330
         }
-        .sheet(isPresented: $showLyricsSearch) {
-            if let track = player.currentTrack {
-                MacLyricsSearchView(
-                    track: track,
-                    onClose: { showLyricsSearch = false },
-                    onApply: { newLyrics in
-                        // 应用搜索结果：更新歌词显示 + 跟唱行注入（nil = 恢复自动）
-                        lyrics = newLyrics
-                        karaoke.setLyrics(newLyrics?.syncedLyrics ?? [])
-                    }
-                )
-            }
+        // 歌词搜索 sheet 由 item 非空驱动：present 瞬间读 player.currentTrack 可能为 nil ⇒ 空 sheet（白框）。
+        // sheet 关闭时 SwiftUI 把 item 置 nil，同一首歌也能再次弹出。
+        .sheet(item: $lyricsSearchTrack) { track in
+            MacLyricsSearchView(
+                track: track,
+                onClose: { lyricsSearchTrack = nil },
+                onApply: { newLyrics in
+                    // 应用搜索结果：更新歌词显示 + 跟唱行注入（nil = 恢复自动）
+                    lyrics = newLyrics
+                    karaoke.setLyrics(newLyrics?.syncedLyrics ?? [])
+                }
+            )
         }
         .sheet(isPresented: $showQueuePanel) {
             MacQueuePanelView()
