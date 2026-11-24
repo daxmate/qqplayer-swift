@@ -109,7 +109,19 @@ struct MacSettingsView: View {
         // 整窗玻璃原型（开关 + 未开「降低透明度」才生效；关闭逐项还原，见 `MacSettingsWindowGlass`）
         .macSettingsGlassScene()
         // 侧栏 / 标题栏的 AppKit 背板兜底剥离（只减色；生效条件与玻璃同源，失效严格还原）
-        .background { MacSettingsBackdropStripper(active: settingsGlassActive) }
+        .background { MacSettingsBackdropStripper(active: settingsGlassActive, page: selectedCategory) }
+        // 切页定因（A/B 对齐用）：切换时刻（epoch ms）与 settings.perf.* 同一时间基准
+        .onChange(of: selectedCategory) { oldCategory, newCategory in
+            AppLog.info(
+                .ui,
+                String(
+                    format: "settings.perf.category from=%@ to=%@ t=%.0f",
+                    oldCategory.rawValue,
+                    newCategory.rawValue,
+                    Date().timeIntervalSince1970 * 1000
+                )
+            )
+        }
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
                 // sheet 是独立窗口：同样按设置窗作用域装配（随设置窗开关即时生效）

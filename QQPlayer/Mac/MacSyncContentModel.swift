@@ -301,7 +301,27 @@ final class MacSyncContentModel: ObservableObject {
     }
 
     /// 重载歌单选项（本地 = DB；对端 = 异步清单）。
+    /// 定因打点（settings.perf.*）：ms / 条目数 / 是否主线程（本地分支是**同步**查库）
     func reloadPlaylists() {
+        let started = DispatchTime.now().uptimeNanoseconds
+        let onMainThread = Thread.isMainThread
+        let sourceName: String
+        switch source {
+        case .none: sourceName = "none"
+        case .local: sourceName = "local"
+        case .peer: sourceName = "peer"
+        }
+        defer {
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+            AppLog.info(
+                .ui,
+                String(
+                    format: "settings.perf.sync.playlists ms=%.2f count=%d source=%@ main=%d t=%.0f",
+                    ms, playlistOptions.count, sourceName, onMainThread ? 1 : 0,
+                    Date().timeIntervalSince1970 * 1000
+                )
+            )
+        }
         switch source {
         case .none:
             return

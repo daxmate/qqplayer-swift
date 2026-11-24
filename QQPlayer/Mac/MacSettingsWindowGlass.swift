@@ -266,11 +266,16 @@ struct MacSettingsWindowGlass: NSViewRepresentable {
 /// - `NSScrollView` / `NSClipView` → `drawsBackground = false`；`documentView` 是
 ///   `NSTableView`（含 `NSOutlineView`）时 `backgroundColor = .clear`。
 ///
-/// 遍历放在 `layout()`（AppKit 布局次数有限，不是逐帧），`isStripping` 防重入；
-/// 已记录目标只重放状态，不重复记录原值（否则会把「我们隐藏后的值」当成原值，还原不回去）。
+/// 扫描时机（v6）：`layout()` **只登记需求**，用 `DispatchQueue.main.async` 把同一轮 runloop
+/// 的多次布局合并成一次真实 pass（切页时 AppKit 会连发多轮 layout，逐轮全树扫是卡顿放大项）；
+/// 生效 / 换窗口 / 换页这些低频时刻仍当场扫一次（延后一帧会露出未剥离的底）。
+/// `isStripping` 防重入；已记录目标只重放状态，不重复记录原值（否则会把「我们隐藏后的值」
+/// 当成原值，还原不回去）。扫描范围见 `strip(in:nodes:)`：不进表格子树。
 struct MacSettingsBackdropStripper: NSViewRepresentable {
     /// 玻璃是否生效（判定唯一入口见 `MacSettingsGlassScene`）
     let active: Bool
+    /// 当前设置分类：只用于日志口径（「该页首次 pass」必须记一条）
+    let page: MacSettingsCatalog.Category
 
     func makeNSView(context: Context) -> StripperView {
         StripperView()
@@ -278,6 +283,7 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
 
     func updateNSView(_ view: StripperView, context: Context) {
         view.apply(active: active)
+        view.updatePage(page)
     }
 
     static func dismantleNSView(_ view: StripperView, coordinator: ()) {
@@ -294,10 +300,20 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
         private var pendingActive = false
         /// 已接管的窗口（弱引用：窗口关闭后自然置 nil，不阻止释放）
         private weak var appliedWindow: NSWindow?
-        /// 接管前的原值记录
-        private var adjustments: [Adjustment] = []
-        /// 防重入：`layout()` 里会反复进来，改属性本身也可能触发布局
+        /// 接管前的原值记录：`ObjectIdentifier` 索引 O(1) 查找；
+        /// `adjustmentOrder` 单独保留记录顺序供还原（v6：原先 `[Adjustment]` +
+        /// `firstIndex(where:)` 线性查找，每个节点一次 → 整趟 O(n²)）
+        private var adjustmentsByView: [ObjectIdentifier: Adjustment] = [:]
+        private var adjustmentOrder: [ObjectIdentifier] = []
+        /// 防重入：pass 里改属性本身也可能触发布局
         private var isStripping = false
+        /// 合并布局风暴：同一 runloop 内多次 `layout()` 只排一次真实扫描
+        private var needsStrip = false
+        private var stripScheduled = false
+        /// 当前分类（只影响日志口径）
+        private var page: MacSettingsCatalog.Category = .playback
+        /// 下一次真实 pass 是否强制记录（换页 / 重新生效 / 换窗口时用来确认扫了多少节点）
+        private var logNextPass = true
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -306,35 +322,76 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
                 restore()
                 return
             }
-            apply(active: pendingActive)
+            // 换到新窗口：状态没变也要重新接管（新窗口 = 新视图树）
+            guard pendingActive else { return }
+            stripNow()
         }
 
         override func layout() {
             super.layout()
-            stripIfNeeded()
+            // 玻璃未生效：不排任何工作（这类用户/关闭态下的布局开销保持为 0）
+            guard pendingActive else { return }
+            // 一次切页 AppKit 会连发多轮 layout（内容重建 + 我们自己的属性改写），
+            // 每轮都全树扫一遍是「切到同步页停顿」的直接放大项 → 这里只登记需求，
+            // 下一个 runloop 合并成一次真实扫描（`stripScheduled` 保证只排一个 block）。
+            scheduleStrip()
         }
 
         func apply(active: Bool) {
+            // SwiftUI 每次更新都会调 `updateNSView`：状态没变就不重复全树扫描
+            // （`layout()` 那边已经负责「新出现的底」的兜底扫描）
+            guard active != pendingActive else { return }
             pendingActive = active
             guard active else {
                 restore()
                 return
             }
-            stripIfNeeded()
+            // 生效是低频事件，且延后一帧会露出未剥离的底色 → 当场扫一次
+            stripNow()
+        }
+
+        /// 换页（SwiftUI 在分类变化时调 `updateNSView`）。
+        /// 新页的侧栏 / 表格是新视图树，**当场扫一次**：比等下一次 layout 少露一帧未剥离的底，
+        /// 并让这次 pass 一定进日志（用来对「该页首次 pass」的节点数与耗时）。
+        func updatePage(_ newPage: MacSettingsCatalog.Category) {
+            guard newPage != page else { return }
+            page = newPage
+            logNextPass = true
+            stripNow()
         }
 
         /// 逐项还原成接管前的值（幂等：没接管过也安全）。
         func restore() {
-            for adjustment in adjustments.reversed() {
-                adjustment.revert()
+            // 按记录顺序倒着还原（同一视图只记一次；顺序只影响中间态观感）
+            for id in adjustmentOrder.reversed() {
+                adjustmentsByView[id]?.revert()
             }
-            adjustments.removeAll()
+            adjustmentOrder.removeAll()
+            adjustmentsByView.removeAll()
             appliedWindow = nil
+            // 还原后再生效 = 重新扫一遍，按「首次 pass」记日志
+            logNextPass = true
         }
 
         // MARK: - 剥离 / 重放
 
-        private func stripIfNeeded() {
+        /// 登记一次「该扫了」；同一轮 runloop 内多次调用只排一个 async block（合并布局风暴）。
+        private func scheduleStrip() {
+            needsStrip = true
+            guard !stripScheduled else { return }
+            stripScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.stripScheduled = false
+                guard self.needsStrip else { return }
+                self.needsStrip = false
+                self.stripNow()
+            }
+        }
+
+        /// 真实扫描一趟。复杂度 O(n)（n = 窗口视图树节点数；表格子树已剪掉）。
+        private func stripNow() {
+            needsStrip = false
             guard pendingActive, !isStripping, let window else { return }
             isStripping = true
             defer { isStripping = false }
@@ -343,22 +400,46 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
                 // 换窗口（设置窗被重建）前先把旧窗口还原，避免属性残留
                 restore()
                 appliedWindow = window
+                logNextPass = true
             }
             guard let root = window.contentView else { return }
-            strip(in: root)
+
+            let started = DispatchTime.now().uptimeNanoseconds
+            var nodes = 0
+            strip(in: root, nodes: &nodes)
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+            // 低频：该页首次 pass 或明显慢（>4ms）才记，避免每次布局刷日志
+            if logNextPass || ms > 4 {
+                logNextPass = false
+                AppLog.info(
+                    .ui,
+                    String(
+                        format: "settings.perf.strip page=%@ nodes=%d ms=%.2f t=%.0f",
+                        page.rawValue, nodes, ms, Date().timeIntervalSince1970 * 1000
+                    )
+                )
+            }
         }
 
-        private func strip(in view: NSView) {
+        private func strip(in view: NSView, nodes: inout Int) {
+            nodes += 1
             adjustIfNeeded(view)
+            // 表格行不可能承载要剥离的背板：行内是 SwiftUI 自绘内容，不带
+            // `.sidebar` / `.underWindowBackground` 材质；而同步页（歌单 / 曲目列表）
+            // 行数最多、每行十几个视图，全树遍历是切页停顿的主要放大项 →
+            // **不进入** `NSTableView` / `NSOutlineView` 的子树（后者是前者子类，一并覆盖）。
+            // 表格自身的底色由外层 `NSScrollView` 分支清掉，不受影响。
+            if view is NSTableView { return }
             for subview in view.subviews {
-                strip(in: subview)
+                strip(in: subview, nodes: &nodes)
             }
         }
 
         private func adjustIfNeeded(_ view: NSView) {
             // 已记录过的目标：只重放状态（系统可能在重建后又把 hidden / 底色写回来）
-            if let index = adjustments.firstIndex(where: { $0.view === view }) {
-                adjustments[index].reapply()
+            // 用 `ObjectIdentifier` 直接索引：原先线性查找 + 逐个 `===`，整趟退化成 O(n²)
+            if let recorded = adjustmentsByView[ObjectIdentifier(view)], recorded.view === view {
+                recorded.reapply()
                 return
             }
 
@@ -366,24 +447,20 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
                 guard Self.strippedMaterials.contains(effect.material) else { return }
                 // 目标若是自己的祖先，隐藏会连内容一起抹掉 ⇒ 跳过（同主窗兜底逻辑）
                 guard !isDescendant(of: effect) else { return }
-                adjustments.append(
-                    Adjustment(view: effect, kind: .visualEffect, originalHidden: effect.isHidden)
-                )
+                record(Adjustment(view: effect, kind: .visualEffect, originalHidden: effect.isHidden))
                 effect.isHidden = true
                 return
             }
 
             if #available(macOS 26.0, *), let glass = view as? NSGlassEffectView {
                 guard !isDescendant(of: glass) else { return }
-                adjustments.append(
-                    Adjustment(view: glass, kind: .visualEffect, originalHidden: glass.isHidden)
-                )
+                record(Adjustment(view: glass, kind: .visualEffect, originalHidden: glass.isHidden))
                 glass.isHidden = true
                 return
             }
 
             if let scrollView = view as? NSScrollView {
-                adjustments.append(
+                record(
                     Adjustment(
                         view: scrollView,
                         kind: .scrollView,
@@ -394,7 +471,7 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
                 // List 的真底色在 documentView（NSTableView / NSOutlineView）上：
                 // 实测为 `_sourceListBackgroundColor`，不清掉就是那块不透明浅灰。
                 if let table = scrollView.documentView as? NSTableView {
-                    adjustments.append(
+                    record(
                         Adjustment(
                             view: table,
                             kind: .tableView,
@@ -407,7 +484,7 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
             }
 
             if let clipView = view as? NSClipView {
-                adjustments.append(
+                record(
                     Adjustment(
                         view: clipView,
                         kind: .clipView,
@@ -419,6 +496,14 @@ struct MacSettingsBackdropStripper: NSViewRepresentable {
         }
 
         // MARK: - 原值记录
+
+        /// 登记一次接管（O(1) 查 + 尾部追加；同一视图只登记一次）。
+        private func record(_ adjustment: Adjustment) {
+            guard let view = adjustment.view else { return }
+            let id = ObjectIdentifier(view)
+            adjustmentsByView[id] = adjustment
+            adjustmentOrder.append(id)
+        }
 
         private struct Adjustment {
             enum Kind {

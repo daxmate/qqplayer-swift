@@ -200,7 +200,17 @@ final class MacSyncRunViewModel: ObservableObject {
 
     /// 页面出现：刷新可用性 + 计时。内容（方向/清单）由内容侧自己管。
     func onAppear() {
+        // 定因打点（settings.perf.*）：切到同步页时这一跳的耗时（epoch ms 与其它几条对齐）
+        let started = DispatchTime.now().uptimeNanoseconds
         refreshAvailability()
+        let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+        AppLog.info(
+            .ui,
+            String(
+                format: "settings.perf.sync.onAppear ms=%.2f t=%.0f",
+                ms, Date().timeIntervalSince1970 * 1000
+            )
+        )
         if isConnected { startTicking() } else { stopTicking() }
     }
 
