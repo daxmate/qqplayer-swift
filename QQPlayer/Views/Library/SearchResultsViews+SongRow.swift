@@ -19,6 +19,8 @@ struct SearchSongRowView: View {
     @Environment(\.appAccentColor) private var accentColor // App 强调色（读环境值；根注入见 ContentView / QQPlayerMacApp）
     let track: Track
     let allTracks: [Track]
+    /// 本次搜索结果页的歌曲列表（展示顺序）——点歌即把整页加入队列，与 PlaylistDetailScreen 口径一致
+    let songs: [Track]
     let artistName: String?
     let onDismiss: () -> Void
     @Environment(AppCoordinator.self) private var appCoordinator
@@ -178,8 +180,8 @@ struct SearchSongRowView: View {
             .onTapGesture {
                 onDismiss()
                 Task {
-                    // Only queue the selected song from search
-                    await appCoordinator.playTrack(track, queue: [track])
+                    // 点歌 = 本次搜索结果的整页歌曲（保持展示顺序）；单曲队列会让「下一首」失效
+                    await appCoordinator.playTrack(track, queue: songs)
                 }
             }
             .contextMenu {

@@ -106,7 +106,8 @@ extension PlayerEngine {
     }
 
     func nextTrack(autoplay: Bool? = nil) async {
-        guard !playbackQueue.isEmpty else { return }
+        // 队列 ≤ 1 首时「下一首」只会重新加载同一曲（重头播）→ 视为无事可做（判定纯函数，有单测）
+        guard PlaybackQueueSelection.canStep(queueCount: playbackQueue.count) else { return }
         normalizeIndexAndTrack()
         let shouldAutoplay = autoplay ?? isPlaying
 
@@ -138,7 +139,8 @@ extension PlayerEngine {
     }
 
     func previousTrack(autoplay: Bool? = nil) async {
-        guard !playbackQueue.isEmpty else { return }
+        // 队列 ≤ 1 首时「上一首」只会回到同一曲 → 直接返回（含 >3s 回开头分支，任务包口径）
+        guard PlaybackQueueSelection.canStep(queueCount: playbackQueue.count) else { return }
         normalizeIndexAndTrack()
 
         let wasPlaying = autoplay ?? isPlaying

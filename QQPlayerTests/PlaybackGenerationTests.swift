@@ -189,6 +189,24 @@ struct PlaybackQueueSelectionTests {
             #expect(result.index >= 0 && result.index < queue.count)
         }
     }
+
+    // MARK: - canStep：单曲队列不得「切歌」到同一首
+
+    @Test("canStep：空队列（0）不可切歌")
+    func cannotStepOnEmptyQueue() {
+        #expect(PlaybackQueueSelection.canStep(queueCount: 0) == false)
+    }
+
+    @Test("canStep：单曲队列（1）不可切歌——否则 (i+1) % 1 永远回到同一首")
+    func cannotStepOnSingleTrackQueue() {
+        #expect(PlaybackQueueSelection.canStep(queueCount: 1) == false)
+    }
+
+    @Test("canStep：两首及以上可切歌（守住 count > 1 的现有行为）")
+    func canStepOnMultiTrackQueue() {
+        #expect(PlaybackQueueSelection.canStep(queueCount: 2) == true)
+        #expect(PlaybackQueueSelection.canStep(queueCount: 10) == true)
+    }
 }
 
 // MARK: - ③ 无缝衔接格式兼容（原直接比 AVAudioFormat，判定零覆盖）

@@ -112,6 +112,7 @@ struct SearchResultsView: View {
                                 SearchSongRowView(
                                     track: track,
                                     allTracks: allTracks,
+                                    songs: results.songs,
                                     artistName: artistDisplayNameCache[track.stableId] ?? track.artistId.flatMap { artistNameCache[$0] },
                                     onDismiss: onDismiss
                                 )

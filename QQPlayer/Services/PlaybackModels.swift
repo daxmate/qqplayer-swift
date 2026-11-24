@@ -210,6 +210,14 @@ enum PlaybackQueueSelection {
         let clamped = max(0, min(currentIndex, queueTrackIds.count - 1))
         return Result(index: clamped, trackId: queueTrackIds[clamped])
     }
+
+    /// 「上一首 / 下一首」是否有意义：队列里至少要有 2 首。
+    ///
+    /// count ≤ 1 时 `(currentIndex + 1) % count` 只会回到同一首 —— 结果是重新 loadTrack
+    /// 同一曲（重头播），用户看到的是「切歌失效」。判定上收纯函数，next/prev 共用。
+    static func canStep(queueCount: Int) -> Bool {
+        queueCount > 1
+    }
 }
 
 /// 无缝衔接的格式兼容判定（纯函数，可单测）。
