@@ -167,6 +167,7 @@ struct MacSyncRunSection: View {
                 syncPage
             }
             .formStyle(.grouped)
+            .macSettingsGlassListBackground()
 
             // 2026-11-16 P0：执行区（选择摘要 + 开始/取消）固定在底栏，不再随 `Form` 滚动、
             // 不再被 sheet 底边裁切。P1a 起内容区恒为「同步」页 ⇒ 底栏恒在（无设备页）。

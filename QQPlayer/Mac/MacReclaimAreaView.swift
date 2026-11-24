@@ -121,6 +121,8 @@ struct MacReclaimAreaView: View {
                         .tag(entry.id)
                 }
             }
+            // 回收区 sheet 设置窗玻璃生效时让路（设置窗作用域环境值；其它场景仍按系统默认）
+            .macSettingsGlassListBackground()
         }
     }
 

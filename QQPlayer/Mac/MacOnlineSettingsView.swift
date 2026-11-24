@@ -105,6 +105,7 @@ struct MacOnlineSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }

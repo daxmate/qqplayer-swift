@@ -42,6 +42,7 @@ struct MacShortcutsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onChange(of: recordingID) { _, newValue in
             refreshRecorder(for: newValue)
         }

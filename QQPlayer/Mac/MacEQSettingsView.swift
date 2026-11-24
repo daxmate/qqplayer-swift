@@ -41,6 +41,7 @@ struct MacEQSettingsView: View {
                 formatInfoSection
             }
             .formStyle(.grouped)
+            .macSettingsGlassListBackground()
         }
         .frame(minWidth: 480, minHeight: 560)
         .sheet(isPresented: $showingImport) {

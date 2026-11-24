@@ -108,6 +108,7 @@ struct MacScrapeSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onAppear {
             refreshRenamePreview()
         }
@@ -119,6 +120,7 @@ struct MacScrapeSettingsView: View {
         }
         .sheet(isPresented: $showBatchProgress) {
             MacScrapeBatchProgressView(paths: [], libraryMode: true)
+                .macSettingsGlassScene()
         }
     }
 

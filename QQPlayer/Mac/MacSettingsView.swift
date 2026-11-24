@@ -14,6 +14,8 @@ import SwiftUI
 struct MacSettingsView: View {
     /// 分类图标的上色来源（根场景已由 AccentInjector 注入，换色即时生效）
     @Environment(\.appAccentColor) private var appAccentColor
+    /// 设置窗玻璃是否生效（设置窗作用域环境值，见 `MacSettingsWindowGlass`）
+    @Environment(\.macSettingsGlassActive) private var settingsGlassActive
 
     @State private var selectedCategory: MacSettingsCatalog.Category = .playback
     @State private var deleteSettings = DeleteSettings.load()
@@ -48,6 +50,13 @@ struct MacSettingsView: View {
             }
             .listStyle(.sidebar)
             .frame(width: 220)
+            // 玻璃生效时剥离侧栏 List 自带的系统材质（复用曲库侧栏同一实现）：
+            // macOS 26+ 摘掉列级玻璃底板；15- 隐藏 `.sidebar` 材质视图。
+            .background {
+                if settingsGlassActive {
+                    MacSidebarMaterialStripper()
+                }
+            }
 
             Divider()
 
@@ -99,8 +108,12 @@ struct MacSettingsView: View {
             }
         }
         .frame(minWidth: 620, minHeight: 420)
+        // 整窗玻璃原型（开关 + 未开「降低透明度」才生效；关闭逐项还原，见 `MacSettingsWindowGlass`）
+        .macSettingsGlassScene()
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
+                // sheet 是独立窗口：同样按设置窗作用域装配（随设置窗开关即时生效）
+                .macSettingsGlassScene()
         }
         // 与 MacLibraryView 双向同步：任何一处写入 DeleteSettings 都会发
         // .qqplayerSettingsDidChange，这里重读。
@@ -184,6 +197,7 @@ private struct MacPlaybackSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
@@ -255,6 +269,7 @@ private struct MacLyricsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
@@ -324,6 +339,7 @@ private struct MacAppearanceSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()
         }
@@ -427,6 +443,7 @@ private struct MacAboutSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
     }
 }
 

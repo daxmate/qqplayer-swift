@@ -155,8 +155,10 @@ struct MacLibrarySettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .sheet(isPresented: $showReclaimArea) {
             MacReclaimAreaView()
+                .macSettingsGlassScene()
         }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             deleteSettings = DeleteSettings.load()

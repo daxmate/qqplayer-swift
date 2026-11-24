@@ -31,6 +31,7 @@ struct MacRecommendationSettingsView: View {
             artistRelationSection
         }
         .formStyle(.grouped)
+        .macSettingsGlassListBackground()
         .onAppear {
             settings = DeleteSettings.load()
             lastFMKeySaved = KeychainLastFMKeyStore().apiKey() != nil

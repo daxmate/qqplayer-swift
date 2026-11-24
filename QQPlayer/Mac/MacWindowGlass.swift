@@ -152,8 +152,13 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
         func strip() {
             guard window != nil else { return }
             if #available(macOS 26.0, *) {
-                // 26+：不再有列级 `.sidebar` 材质（只剩行内选中胶囊），走「摘玻璃不换列」一条路
-                _ = detachGlassPanel()
+                // 26+：不再有列级 `.sidebar` 材质（只剩行内选中胶囊），走「摘玻璃不换列」一条路。
+                // 没有 NSSplitViewItem 包裹的 `.sidebar` List（如设置窗的侧栏）不满足摘玻璃前提
+                // （找不到单层玻璃底板 / 无 wrapper）⇒ 退回隐藏 `.sidebar` 材质视图；
+                // 主窗上该材质不存在，行为不变。
+                if !detachGlassPanel() {
+                    stripLegacySidebarMaterial()
+                }
             } else {
                 stripLegacySidebarMaterial()
             }
