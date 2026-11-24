@@ -1,14 +1,14 @@
-# QQPlayer 🎵
+# 婷听 TingFi 🎵
 
 > **fork 声明**：本项目基于 [Cosmos Music Player](https://github.com/clquwu/Cosmos-Music-Player)（GPL-3.0，作者 Raphael Boullay Le Fur）二次开发，详见 [NOTICE.md](NOTICE.md)。本仓库整体以 GPL-3.0 发布。
 
-QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发烧友与外语学习者打造。
+婷听 TingFi（原 QQPlayer）是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发烧友与外语学习者打造。
 
 - 支持 FLAC、WAV、M4A、MP3、Opus、OGG、DSD（DoP / PCM 转换）、DSF 等格式
 - 内建图形均衡器、ReplayGain 音量标准化、双源歌词、跟唱练习（倍速 / AB 循环）
 - **局域网配对与同步**：Mac 与 iPhone 扫码配对、端到端加密会话、音乐文件分块传输与校验、播放数据与对齐歌词随歌同步
 - iOS 端深度整合 Apple 生态：本地沙盒音乐库、CarPlay、Siri、主屏幕小组件
-- macOS 原生版（QQPlayer）提供桌面级体验：本地曲库扫描、在线搜索下载（网易云 / 歌曲海 + 夸克网盘，aria2 下载引擎）、标签刮削（MusicBrainz）、迷你模式与桌面歌词窗
+- macOS 原生版（TingFi）提供桌面级体验：本地曲库扫描、在线搜索下载（网易云 / 歌曲海 + 夸克网盘，aria2 下载引擎）、标签刮削（MusicBrainz）、迷你模式与桌面歌词窗
 
 ---
 
@@ -16,8 +16,8 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 | 平台 | 形态 | 系统要求 |
 |------|------|----------|
-| 📱 iOS | App Store「QQPlayer」（iPhone / iPad，付费买断·无内购） | iOS 18.5+ |
-| 🖥️ macOS | QQPlayer 原生应用（仓库内 target，自行构建） | macOS 14.0+ |
+| 📱 iOS | App Store「婷听 TingFi」（iPhone / iPad，付费买断·无内购） | iOS 18.5+ |
+| 🖥️ macOS | TingFi 原生应用（仓库内 target，自行构建） | macOS 14.0+ |
 
 - **iOS 与 macOS 共享同一套 Core 逻辑**（数据库、播放引擎、歌词 / 跟唱、均衡器、元数据解析、本地化），两平台行为一致、同步演进。
 - 仓库：<https://github.com/daxmate/qqplayer-swift>（原 qqplayer-ios，2026-08-30 更名）
@@ -115,7 +115,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 - Spotify + Discogs 双源（可选 API key，见「依赖 📦」），歌手生平、照片，缓存离线可用，支持「歌手不对？」切换来源
 
 **🎤 Siri**
-- AppIntents + 意图扩展：支持「播放我的音乐 / 收藏 / 歌单 / 指定歌曲」等命令，名称模糊匹配（示例：*"Hey Siri, play my favorites on QQPlayer"* / *"Dis Siri, joue mes favoris sur QQPlayer"*）
+- AppIntents + 意图扩展：支持「播放我的音乐 / 收藏 / 歌单 / 指定歌曲」等命令，名称模糊匹配（示例：*"Hey Siri, play my favorites on TingFi"* / *"Dis Siri, joue mes favoris sur TingFi"*）
 
 **🌍 国际化与存储**
 - 5 语言本地化；音乐存本地沙盒（无需 iCloud 登录）；无网络完整可用（本地文件）
@@ -126,7 +126,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 
 ---
 
-### 🖥️ macOS（QQPlayer 原生版）
+### 🖥️ macOS（TingFi 原生版）
 
 > 纯 SwiftUI 原生桌面应用，与 iOS 共享 Core。默认曲库目录 `~/Music/QQPlayer`，可添加任意外部文件夹。
 
@@ -194,7 +194,7 @@ QQPlayer 是一款 **iOS + macOS 双平台高品质音乐播放器**，专为发
 **角色与拓扑**
 
 ```
-macOS QQPlayer（主机 / 内容源）        iOS QQPlayer（移动端）
+macOS TingFi（主机 / 内容源）          iOS TingFi（移动端）
 ├─ 曲库 ~/Music/QQPlayer          ├─ 本地沙盒 Documents 曲库
 ├─ 内嵌同步服务（App 运行即在听）    ├─ 同步客户端（活跃时自动回连）
 └─ 本地数据库（真源）              └─ 本地数据库（同 schema）
@@ -344,7 +344,7 @@ cd qqplayer-swift
 3. 真机运行（iOS 18.5+）
 4. **添加音乐**（二选一）：
    - 应用内「文件」导入 / Share 扩展导入（推荐）
-   - 直接放「文件」App → 我的 iPhone → QQPlayer → Documents 目录
+   - 直接放「文件」App → 我的 iPhone → 婷听 → Documents 目录
 5. 首次启动自动扫描沙盒并索引，即可开听；若旧版本曾用 iCloud 存音乐，首次启动会自动迁移到本地沙盒（幂等可断点）
 
 > 可选：歌手信息使用 Spotify / Discogs 时配置 API key（见下）。
@@ -479,7 +479,7 @@ LICENSE / NOTICE.md / PRIVACY.md
 ## 常见问题 🔧
 
 **iOS：看不到导入的音乐？**
-确认文件在「文件」App → 我的 iPhone → QQPlayer（或经应用内导入 / 分享导入）；再确认格式是否受支持。旧版放在 iCloud 的音乐会在首次启动时自动迁移到本地沙盒，请保持 App 在前台等迁移完成。
+确认文件在「文件」App → 我的 iPhone → 婷听（或经应用内导入 / 分享导入）；再确认格式是否受支持。旧版放在 iCloud 的音乐会在首次启动时自动迁移到本地沙盒，请保持 App 在前台等迁移完成。
 
 **macOS：曲库是空的？**
 确认音乐在曲库文件夹（默认 `~/Music/QQPlayer`）或已添加的外部文件夹内；可在设置中「立即扫描」或查看 `~/Library/Logs/QQPlayerMac/scan.log`。
@@ -521,4 +521,4 @@ LICENSE / NOTICE.md / PRIVACY.md
 
 ---
 
-**祝你享受 QQPlayer 带来的高品质音乐体验！** 🎵✨
+**祝你享受婷听 TingFi 带来的高品质音乐体验！** 🎵✨

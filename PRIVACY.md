@@ -1,4 +1,4 @@
-# QQPlayer 隐私政策（Privacy Policy）
+# 婷听 TingFi 隐私政策（Privacy Policy）
 
 > 托管方式待定：提交到仓库后用 GitHub Pages 或 raw 链接；中文/英文双语页面。
 > 最后更新：2026-08-30
@@ -7,11 +7,11 @@
 
 ## 简体中文
 
-**QQPlayer 隐私政策**
+**婷听 TingFi 隐私政策**
 
 生效日期：2026 年 8 月 30 日
 
-QQPlayer（"本应用"）是一款本地音乐播放器。我们致力于保护你的隐私：**本应用不收集、不存储、不上传任何个人身份信息**。
+婷听 TingFi（"本应用"，原 QQPlayer）是一款本地音乐播放器。我们致力于保护你的隐私：**本应用不收集、不存储、不上传任何个人身份信息**。
 
 **1. 数据收集**
 
@@ -58,11 +58,11 @@ QQPlayer（"本应用"）是一款本地音乐播放器。我们致力于保护�
 
 ## English
 
-**QQPlayer Privacy Policy**
+**TingFi Privacy Policy**
 
 Effective date: August 30, 2026
 
-QQPlayer ("the App") is a local music player. We are committed to protecting your privacy: **the App does not collect, store, or upload any personally identifiable information.**
+TingFi ("the App", formerly QQPlayer) is a local music player. We are committed to protecting your privacy: **the App does not collect, store, or upload any personally identifiable information.**
 
 **1. Data Collection**
 
