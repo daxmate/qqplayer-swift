@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-24T04:35:31Z",
+  "updated_at": "2026-11-24T05:02:20Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -602,15 +602,15 @@
     },
     "QQPlayer/Mac/MacDesktopWindowViews.swift": {
       "role": "index",
-      "sha256": "bfe858748b9161fa07df803f86f5f21be7ea1c07549bfbffde61c63a851c1935",
-      "size": 15575,
-      "normalized_sha256": "bfe858748b9161fa07df803f86f5f21be7ea1c07549bfbffde61c63a851c1935"
+      "sha256": "3bc75277a167387728d0df030caa246521e4a68de7e126e152b34f2e79429566",
+      "size": 13721,
+      "normalized_sha256": "3bc75277a167387728d0df030caa246521e4a68de7e126e152b34f2e79429566"
     },
     "QQPlayer/Mac/MacDesktopWindowsManager.swift": {
       "role": "index",
-      "sha256": "050d8c9bfe5df76b851d5d5e07fdbc91b0b288b7e74b70b95e7e8c1c70b715a7",
-      "size": 14936,
-      "normalized_sha256": "050d8c9bfe5df76b851d5d5e07fdbc91b0b288b7e74b70b95e7e8c1c70b715a7"
+      "sha256": "aa4b61be350751cba8425efe9ed38f6f23967740f1f2df79f7c543304779a5aa",
+      "size": 14573,
+      "normalized_sha256": "aa4b61be350751cba8425efe9ed38f6f23967740f1f2df79f7c543304779a5aa"
     },
     "QQPlayer/Mac/MacDesktopWindowsSettingsView.swift": {
       "role": "index",
@@ -776,9 +776,9 @@
     },
     "QQPlayer/Mac/MacOnlineSearchView+HistoryResults.swift": {
       "role": "index",
-      "sha256": "a90f4db2f7cd13b09f270d4d4aa79b886124369fe53c369c1a0d935bbabb4f35",
-      "size": 5922,
-      "normalized_sha256": "a90f4db2f7cd13b09f270d4d4aa79b886124369fe53c369c1a0d935bbabb4f35"
+      "sha256": "43595ce877e6abc4ad616a0de8b33430a874452b4bd60a63f68284f7905820b0",
+      "size": 6182,
+      "normalized_sha256": "43595ce877e6abc4ad616a0de8b33430a874452b4bd60a63f68284f7905820b0"
     },
     "QQPlayer/Mac/MacOnlineSearchView+ResultRow.swift": {
       "role": "index",
@@ -794,9 +794,9 @@
     },
     "QQPlayer/Mac/MacOnlineSearchView.swift": {
       "role": "index",
-      "sha256": "dc0aea1eee441797b61841f3fe686c7f04c7b543607be167b79d8e2cbdae2114",
-      "size": 10554,
-      "normalized_sha256": "dc0aea1eee441797b61841f3fe686c7f04c7b543607be167b79d8e2cbdae2114"
+      "sha256": "7cac8a7558491130d768425cb5937e5f9ca2270cdefbc0028cc13bc528185815",
+      "size": 10669,
+      "normalized_sha256": "7cac8a7558491130d768425cb5937e5f9ca2270cdefbc0028cc13bc528185815"
     },
     "QQPlayer/Mac/MacOnlineSettingsView.swift": {
       "role": "index",
@@ -1064,15 +1064,15 @@
     },
     "QQPlayer/Mac/MacSyncView+Run.swift": {
       "role": "index",
-      "sha256": "129f18e975350a154396a95956064ab035e12b4f807745bb462fc69707adacfc",
-      "size": 20589,
-      "normalized_sha256": "129f18e975350a154396a95956064ab035e12b4f807745bb462fc69707adacfc"
+      "sha256": "66636b7a76d20203fa61dffd08f8612b5971d84d4b0429f226ef4b6680350825",
+      "size": 20602,
+      "normalized_sha256": "66636b7a76d20203fa61dffd08f8612b5971d84d4b0429f226ef4b6680350825"
     },
     "QQPlayer/Mac/MacSyncView.swift": {
       "role": "index",
-      "sha256": "aa65ac11835d86453a0f8056190648adcc74589190cc5d9c1d6ebc02ebd802ea",
-      "size": 25381,
-      "normalized_sha256": "aa65ac11835d86453a0f8056190648adcc74589190cc5d9c1d6ebc02ebd802ea"
+      "sha256": "9925df44e3a6efb87b68b82d8b3c473cdb20cefb881ef7ce914c8ecf4092ab90",
+      "size": 26035,
+      "normalized_sha256": "9925df44e3a6efb87b68b82d8b3c473cdb20cefb881ef7ce914c8ecf4092ab90"
     },
     "QQPlayer/Mac/MacTableRowHighlight.swift": {
       "role": "index",
@@ -5672,9 +5672,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "46c8494a2cba6a78ebce10c62089a46e2bf889d3605601d3564be93139c327a9",
-      "size": 460217,
-      "normalized_sha256": "46c8494a2cba6a78ebce10c62089a46e2bf889d3605601d3564be93139c327a9"
+      "sha256": "97733d68d401b41fd9b32b1030df343cfc950547a8a0f64c3847475f466a26fe",
+      "size": 460418,
+      "normalized_sha256": "97733d68d401b41fd9b32b1030df343cfc950547a8a0f64c3847475f466a26fe"
     },
     "aoci.meta.txt": {
       "role": "index",
