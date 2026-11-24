@@ -98,7 +98,8 @@ extension MacSyncRunSection {
             .padding(.horizontal, DesignTokens.space20)
             .padding(.vertical, DesignTokens.space12)
         }
-        .background(.bar)
+        // 设置窗玻璃生效时不画底 ⇒ 直接透出整窗封面模糊底（上分隔线已在 VStack 首行）。
+        .background(settingsGlassActive ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.bar))
     }
 
     /// 底栏摘要文案：空选择用既有「请先选择…」键，其余三态复用 `selectionTotalText`

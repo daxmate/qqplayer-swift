@@ -71,6 +71,10 @@ struct MacSyncRunSection: View {
     /// App 强调色（读环境值，与主窗同源；macOS 上 `Color.accentColor` 跟随系统强调色而非
     /// App tint——2026-09-05 已统一，本文件 2026-09-11 新增时复发，见 M1）
     @Environment(\.appAccentColor) var accentColor
+    /// 设置窗玻璃是否生效（设置窗作用域环境值，见 `MacSettingsWindowGlass`）。
+    /// 只在设置窗注入；主窗 / 工具栏面板入口读到的恒为默认值 `false` ⇒ 外观不变。
+    /// 注意：本属性在 `MacSyncView+Run.swift` 的扩展里也要读（底栏背景），故不能用 `private`。
+    @Environment(\.macSettingsGlassActive) var settingsGlassActive
     /// 执行侧（阶段 / 进度 / 结果）。
     @StateObject var model: MacSyncRunViewModel
     /// 内容侧（方向 / 内容源 / 选项 / 选择集）。
@@ -306,12 +310,13 @@ struct MacSyncRunSection: View {
     /// （用户 2026-09-29：「最上面的 tab 需要永远置顶，不滚动」）。
     /// 只剩一行头部（流分段 + 设备入口）；picker 唯一实现见 `SyncFlowPicker`（`SyncTracksPane.swift`）。
     /// 背景 + 分隔线对齐 macOS 原生分组外观（`.bar` 随明暗外观自适应）。
+    /// 设置窗玻璃生效时不画底 ⇒ 直接透出整窗封面模糊底（分隔线保留）。
     private var pinnedHeader: some View {
         VStack(spacing: DesignTokens.space0) {
             titleRow
             Divider()
         }
-        .background(.bar)
+        .background(settingsGlassActive ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.bar))
     }
 
     // MARK: - 三块 Pane（批 D：独立 struct；父只做「值输入 + 回调」装配）
