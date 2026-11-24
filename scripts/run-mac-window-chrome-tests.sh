@@ -18,6 +18,15 @@
 #     QQPlayerTests/MacWindowChromeShapeContractTests.swift 的文本契约锁；
 #   - macOS 26 以下的 Liquid Glass 摘除 → 自动 SKIP 并打印，legacy 材质 / chrome / 工具栏用例照跑。
 #
+# 「约束数为何不断言」（2026-11-24 复核后如实标注）：
+#   反复翻转 10 轮时，本窗口视图树的约束总数实测每轮 +8（第 1 轮 519 → 第 10 轮 591），
+#   但增长**不能归因给生产代码**：
+#     · 真窗口的侧栏玻璃涂层由 AppKit 托管，摘/装过程中会重建涂层，
+#       `StripperView.restore()` 会作用在被替换前的旧玻璃实例上（装回态在本夹具里复现不了）；
+#     · `restoreGlassPanel()` 末尾的 `layoutSubtreeIfNeeded()` 会让仍挂着的 stripper
+#       再走一次 `layout() → strip()`（重入），这 8 条正是 detach 那一组约束的数目。
+#   因此 C1 只断言「每轮 a–f 仍成立」，约束稳定性由单独任务核查（不在这里假装通过）。
+#
 # 用法：scripts/run-mac-window-chrome-tests.sh [--verbose]
 # 退出码：0 = 全部断言通过；1 = 有失败或编译失败；2 = 参数错误。
 
