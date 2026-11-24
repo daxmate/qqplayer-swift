@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-24T09:45:04Z",
+  "updated_at": "2026-11-24T10:26:15Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "c1b58a2c741e62b1ad510f3d7d13c94a42d5ecb89ff9e91c32235f6bcb3dfa25",
-      "size": 202007,
-      "normalized_sha256": "c1b58a2c741e62b1ad510f3d7d13c94a42d5ecb89ff9e91c32235f6bcb3dfa25"
+      "sha256": "a93d5c1126798c6481abc6d76fb4ba3caa2c780a96ed05039675c80bbc8d4d93",
+      "size": 202157,
+      "normalized_sha256": "a93d5c1126798c6481abc6d76fb4ba3caa2c780a96ed05039675c80bbc8d4d93"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -768,6 +768,12 @@
       "size": 16725,
       "normalized_sha256": "9ca487e0319785d03130e95c607603c9025ee587b5470297c087d61b250e6617"
     },
+    "QQPlayer/Mac/MacMainWindowFrameWatch.swift": {
+      "role": "index",
+      "sha256": "be31ab18c3ff70f8e960b76a6afd426af75da52c7c0b36f6e5fbe80314f8df4f",
+      "size": 3287,
+      "normalized_sha256": "be31ab18c3ff70f8e960b76a6afd426af75da52c7c0b36f6e5fbe80314f8df4f"
+    },
     "QQPlayer/Mac/MacManualEQEditorView.swift": {
       "role": "index",
       "sha256": "7358ca234304779d935fd5a8dc837b536dd84efe1d01fe1ec5a6b46f7577b163",
@@ -956,9 +962,9 @@
     },
     "QQPlayer/Mac/MacSettingsWindowGlass.swift": {
       "role": "index",
-      "sha256": "0f48694f576d9bb307af397d8d2b4a55103aadb38f6885e19f6f0303bdabd894",
-      "size": 25718,
-      "normalized_sha256": "0f48694f576d9bb307af397d8d2b4a55103aadb38f6885e19f6f0303bdabd894"
+      "sha256": "15914057c21f17fa6fb3a372dde410536bb2eac69596f8072362ce738a4aaa42",
+      "size": 26274,
+      "normalized_sha256": "15914057c21f17fa6fb3a372dde410536bb2eac69596f8072362ce738a4aaa42"
     },
     "QQPlayer/Mac/MacSheetGlass.swift": {
       "role": "index",
@@ -1182,6 +1188,12 @@
       "size": 5027,
       "normalized_sha256": "2cf2f722ff62c2c621e65dc8882822f26734a60f9c08b44a425614246fbf5cd4"
     },
+    "QQPlayer/Mac/MacWindowFrameAnchor.swift": {
+      "role": "index",
+      "sha256": "ac58686515c3be5dc105a5b5bc483b7429317f3ae07556227e3ee2fb14443ada",
+      "size": 4386,
+      "normalized_sha256": "ac58686515c3be5dc105a5b5bc483b7429317f3ae07556227e3ee2fb14443ada"
+    },
     "QQPlayer/Mac/MacWindowGlass.swift": {
       "role": "index",
       "sha256": "b189af11c786104e06d998fd637b1974f9db657f10f77762ae00f0520d4da00a",
@@ -1190,9 +1202,9 @@
     },
     "QQPlayer/Mac/MacWindowGlassChrome.swift": {
       "role": "index",
-      "sha256": "52d51f9d35411de43f3a1aaa41c40bb467ec1dceb5c68f5cbbf899008c3d8d7f",
-      "size": 11860,
-      "normalized_sha256": "52d51f9d35411de43f3a1aaa41c40bb467ec1dceb5c68f5cbbf899008c3d8d7f"
+      "sha256": "1f3fad2844ef958640c4f96cb6e168d38eaa912399f79e5c6ffc5e370bc7c8b7",
+      "size": 12390,
+      "normalized_sha256": "1f3fad2844ef958640c4f96cb6e168d38eaa912399f79e5c6ffc5e370bc7c8b7"
     },
     "QQPlayer/Mac/RecommendationPlannerFactory.swift": {
       "role": "index",
@@ -1328,9 +1340,9 @@
     },
     "QQPlayer/QQPlayerMacApp.swift": {
       "role": "index",
-      "sha256": "5b218efa25f3a059e13375df353597c64cbe038c4eb3ea54bd1574d935e74e92",
-      "size": 17792,
-      "normalized_sha256": "5b218efa25f3a059e13375df353597c64cbe038c4eb3ea54bd1574d935e74e92"
+      "sha256": "6e3b58e1ed79f1f94e8a4047f80c72d7e782d1ee8d63ea70c10ba8c3041a8bcd",
+      "size": 18115,
+      "normalized_sha256": "6e3b58e1ed79f1f94e8a4047f80c72d7e782d1ee8d63ea70c10ba8c3041a8bcd"
     },
     "QQPlayer/Resources/SimplifiedToTraditional.tsv": {
       "role": "index",
@@ -4784,9 +4796,9 @@
     },
     "QQPlayerTests/MacWindowChromeShapeContractTests.swift": {
       "role": "index",
-      "sha256": "3a68a211abc20d1f76fca98801bf3eb6a586fad0f93bd4b423d691ded7a52866",
-      "size": 8711,
-      "normalized_sha256": "3a68a211abc20d1f76fca98801bf3eb6a586fad0f93bd4b423d691ded7a52866"
+      "sha256": "d752645af068215a42fcde040c175ccdefbd21044f060cb659c1be126c43313c",
+      "size": 11172,
+      "normalized_sha256": "d752645af068215a42fcde040c175ccdefbd21044f060cb659c1be126c43313c"
     },
     "QQPlayerTests/MockURLProtocol.swift": {
       "role": "index",
@@ -5678,9 +5690,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "a7564bb037acbb9de7f0f6ba0fd8e24b0791d61f90ccd925571183cc477fc3f5",
-      "size": 463628,
-      "normalized_sha256": "a7564bb037acbb9de7f0f6ba0fd8e24b0791d61f90ccd925571183cc477fc3f5"
+      "sha256": "9a530679ebb90767628bd25025e18e8b35a9d70efa65919936e7d430360c80e4",
+      "size": 464505,
+      "normalized_sha256": "9a530679ebb90767628bd25025e18e8b35a9d70efa65919936e7d430360c80e4"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5876,15 +5888,15 @@
     },
     "scripts/mac-chrome-harness/Stubs.swift": {
       "role": "index",
-      "sha256": "53fde1c12b2314b63a9d89e440f22b35f24db980c27b8a713d3142f0c8c63a9b",
-      "size": 985,
-      "normalized_sha256": "53fde1c12b2314b63a9d89e440f22b35f24db980c27b8a713d3142f0c8c63a9b"
+      "sha256": "dfa2c3a86e5015fa71dccb7f16a34808accb575fa33bfd06edf7725728482328",
+      "size": 1568,
+      "normalized_sha256": "dfa2c3a86e5015fa71dccb7f16a34808accb575fa33bfd06edf7725728482328"
     },
     "scripts/mac-chrome-harness/main.swift": {
       "role": "index",
-      "sha256": "0cc63a73e974e4ad93b01dc0ff3aa33169ddf8b4e4776cec0dcbd8fad026f31e",
-      "size": 15032,
-      "normalized_sha256": "0cc63a73e974e4ad93b01dc0ff3aa33169ddf8b4e4776cec0dcbd8fad026f31e"
+      "sha256": "1b39d728de74bf7cdea3970e96643cb0361229b4dff4bdc80a05e6d97c575244",
+      "size": 21154,
+      "normalized_sha256": "1b39d728de74bf7cdea3970e96643cb0361229b4dff4bdc80a05e6d97c575244"
     },
     "scripts/mac-column-width-harness/Stubs.swift": {
       "role": "index",
@@ -5930,9 +5942,9 @@
     },
     "scripts/run-mac-window-chrome-tests.sh": {
       "role": "index",
-      "sha256": "7c1a011bd368abf6bf617541e74aec9102158fe544d2ad5dc37db6e839fd7ff6",
-      "size": 3855,
-      "normalized_sha256": "7c1a011bd368abf6bf617541e74aec9102158fe544d2ad5dc37db6e839fd7ff6"
+      "sha256": "b8ef28235f402dd331b96846a5609902f0246e18c2ce03532337be8a185147b7",
+      "size": 3899,
+      "normalized_sha256": "b8ef28235f402dd331b96846a5609902f0246e18c2ce03532337be8a185147b7"
     },
     "scripts/siri-tests-guard.py": {
       "role": "index",
