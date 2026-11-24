@@ -267,6 +267,7 @@
 		F4FD180377354640854A1775 /* ReplayGainMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF625B50824403AA1C5107 /* ReplayGainMathTests.swift */; };
 		9ACD49E47E264D64BEDA65AE /* ReplayGainMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C71594BDD84FBC804390D8 /* ReplayGainMigrationTests.swift */; };
 		EAC0B9D81A5A4033A476BCB3 /* ArtistAvatarStyleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91B494DC1111498C844F77EB /* ArtistAvatarStyleTests.swift */; };
+		AC01D567691449A38B9EE4ED /* MacWindowChromeShapeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 659A23446F2344CFA49FB66D /* MacWindowChromeShapeContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -583,6 +584,7 @@
 		F2DF625B50824403AA1C5107 /* ReplayGainMathTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayGainMathTests.swift; sourceTree = "<group>"; };
 		44C71594BDD84FBC804390D8 /* ReplayGainMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReplayGainMigrationTests.swift; sourceTree = "<group>"; };
 		91B494DC1111498C844F77EB /* ArtistAvatarStyleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtistAvatarStyleTests.swift; sourceTree = "<group>"; };
+		659A23446F2344CFA49FB66D /* MacWindowChromeShapeContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacWindowChromeShapeContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1602,6 +1604,7 @@
 				F2DF625B50824403AA1C5107 /* ReplayGainMathTests.swift */,
 				44C71594BDD84FBC804390D8 /* ReplayGainMigrationTests.swift */,
 				91B494DC1111498C844F77EB /* ArtistAvatarStyleTests.swift */,
+				659A23446F2344CFA49FB66D /* MacWindowChromeShapeContractTests.swift */,
 			);
 			path = QQPlayerTests;
 			sourceTree = "<group>";
@@ -2170,6 +2173,7 @@
 				F4FD180377354640854A1775 /* ReplayGainMathTests.swift in Sources */,
 				9ACD49E47E264D64BEDA65AE /* ReplayGainMigrationTests.swift in Sources */,
 				EAC0B9D81A5A4033A476BCB3 /* ArtistAvatarStyleTests.swift in Sources */,
+				AC01D567691449A38B9EE4ED /* MacWindowChromeShapeContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
