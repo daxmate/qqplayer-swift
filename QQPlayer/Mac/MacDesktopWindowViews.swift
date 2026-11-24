@@ -183,6 +183,8 @@ struct MacMiniPlayerView: View {
         .onDisappear {
             updateCursor(hovering: false)
         }
+        // 整窗拖动（隐式背景拖动在新系统上实测失效，见 macWindowDragGesture）
+        .macWindowDragGesture()
     }
 
     /// 拉取曲目封面（切歌后旧结果丢弃）——与设置窗 / sheet 同一路径。
@@ -252,6 +254,8 @@ struct MacDesktopLyricView: View {
             showRoman = settings.lyricShowRoman
             lyricOffset = settings.lyricOffset
         }
+        // 整窗拖动（隐式背景拖动在新系统上实测失效，见 macWindowDragGesture）
+        .macWindowDragGesture()
     }
 
     @ViewBuilder
@@ -291,5 +295,30 @@ struct MacDesktopLyricView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - 浮窗整窗拖动
+
+extension View {
+    /// 给无边框 `NSPanel` 的内容根加上「拖整窗」能力。
+    ///
+    /// 迷你播放窗 / 桌面歌词窗原本只靠 `isMovableByWindowBackground = true`
+    /// 这条 AppKit 隐式背景拖动机制；实测在 macOS 27.2.1（xmini）上两个浮窗
+    /// 完全拖不动，同一 App 在 macOS 27.0.1（xhome）上正常 —— 隐式机制在新系统上
+    /// 不可靠，所以在内容根显式叠加 SwiftUI 原生 `WindowDragGesture`。
+    ///
+    /// - 用普通 `.gesture` 而不是 `highPriorityGesture`：子控件（封面返回主窗、
+    ///   上一首/播放/下一首）的手势优先，按钮照旧可点。
+    /// - deployment target 是 macOS 14.0，`WindowDragGesture` 只有 macOS 15+ 才有
+    ///   → `#available` 兜底：低版本原样返回，继续走 `isMovableByWindowBackground`
+    ///   的旧路径（两者叠加不冲突）。
+    @ViewBuilder
+    func macWindowDragGesture() -> some View {
+        if #available(macOS 15.0, *) {
+            gesture(WindowDragGesture())
+        } else {
+            self
+        }
     }
 }

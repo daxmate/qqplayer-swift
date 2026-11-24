@@ -240,6 +240,9 @@ final class DesktopWindowsManager {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.level = .floating
+        // 旧系统（< macOS 15）与正常版本仍走这条隐式背景拖动；macOS 27.2.1 上它
+        // 实测失效（浮窗拖不动），因此内容根另叠了 SwiftUI WindowDragGesture
+        // （见 MacDesktopWindowViews.swift 的 macWindowDragGesture）。两者叠加不冲突。
         panel.isMovableByWindowBackground = true
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
