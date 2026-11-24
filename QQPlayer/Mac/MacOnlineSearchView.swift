@@ -182,7 +182,8 @@ struct MacOnlineSearchView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             TextField("online_search_placeholder".localized, text: $query)
-                .textFieldStyle(.roundedBorder)
+                // 与设置窗 / 推荐页同一个输入框实现；不生效时该修饰器自身回落 .roundedBorder
+                .macSettingsGlassField()
                 .onSubmit {
                     startSearch()
                     recordHistory()

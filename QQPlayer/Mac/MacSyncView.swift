@@ -75,6 +75,15 @@ struct MacSyncRunSection: View {
     /// 只在设置窗注入；主窗 / 工具栏面板入口读到的恒为默认值 `false` ⇒ 外观不变。
     /// 注意：本属性在 `MacSyncView+Run.swift` 的扩展里也要读（底栏背景），故不能用 `private`。
     @Environment(\.macSettingsGlassActive) var settingsGlassActive
+    /// 主窗玻璃是否生效（主窗根注入；主窗工具栏弹出的同步面板是 sheet，
+    /// 由 `macSheetGlass()` 在 sheet 根注入为 true）。
+    @Environment(\.macWindowGlassActive) var windowGlassActive
+    /// 顶部 / 底部条带是否让路给玻璃：**设置窗场景 或 主窗 sheet 场景**任一生效都清底
+    /// （分隔线保留）。两个入口共用本视图，故判据取并集。
+    /// 注意：`MacSyncView+Run.swift` 的扩展也要读（底栏背景），故不能用 `private`。
+    var glassChromeLetsBackgroundThrough: Bool {
+        settingsGlassActive || windowGlassActive
+    }
     /// 执行侧（阶段 / 进度 / 结果）。
     @StateObject var model: MacSyncRunViewModel
     /// 内容侧（方向 / 内容源 / 选项 / 选择集）。
@@ -317,7 +326,7 @@ struct MacSyncRunSection: View {
             titleRow
             Divider()
         }
-        .background(settingsGlassActive ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.bar))
+        .background(glassChromeLetsBackgroundThrough ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.bar))
     }
 
     // MARK: - 三块 Pane（批 D：独立 struct；父只做「值输入 + 回调」装配）

@@ -146,12 +146,11 @@ struct MacMiniPlayerView: View {
             Spacer(minLength: DesignTokens.space0)
         }
         .padding(DesignTokens.space12)
-        // 玻璃生效 → 封面模糊底（与主窗同一配方 `MacWindowGlass`，圆角裁切 + 描边/阴影保持原样）；
+        // 玻璃生效 → 封面模糊底（与主窗同一配方 `MacWindowGlass`，只换底色）；
         // 不生效 → 原 `.ultraThinMaterial` 圆角卡（逐像素还原）。
         .background {
             if glassActive {
                 MacWindowGlass(artwork: artwork, cacheKey: artworkTrackId)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous))
             } else {
                 RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous)
                     .fill(.ultraThinMaterial)
@@ -161,6 +160,11 @@ struct MacMiniPlayerView: View {
             RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
+        // 圆角裁切提到内容根上（背景 / 内容 / 描边一起裁，半径与卡片同一个 radius16）：
+        // `.compositingGroup()` 先把整棵子树合成一层再裁，否则毛玻璃层的 `.blur` / `.scaleEffect(1.15)`
+        // 越界部分会从圆角外漏出来（真机表现为「迷你窗变硬角」）。
+        .compositingGroup()
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous))
         .task(id: player.currentTrack?.stableId) {
             guard let track = player.currentTrack else {
                 artistName = ""
@@ -181,7 +185,6 @@ struct MacMiniPlayerView: View {
         }
     }
 
-    /// hover 手型光标（审计 L2）：用标志记录栈上是否有本视图压入的一项，
     /// 拉取曲目封面（切歌后旧结果丢弃）——与设置窗 / sheet 同一路径。
     private func loadArtwork(for track: Track) async {
         let trackId = track.stableId
@@ -191,6 +194,7 @@ struct MacMiniPlayerView: View {
         artworkTrackId = trackId
     }
 
+    /// hover 手型光标（审计 L2）：用标志记录栈上是否有本视图压入的一项，
     /// 保证 push/pop 严格成对（重复 hover(true) / 孤立 hover(false) 都不会失衡）。
     private func updateCursor(hovering: Bool) {
         if hovering, !cursorPushed {
@@ -224,14 +228,6 @@ struct MacMiniPlayerView: View {
 struct MacDesktopLyricView: View {
     @Environment(KaraokeController.self) private var karaoke
     @Environment(PlayerEngine.self) private var player
-    /// 「封面毛玻璃背景」开关（键与默认值的唯一来源见 `PlayerGlassBackground`）
-    @AppStorage(PlayerGlassBackground.storageKey) private var glassEnabled = PlayerGlassBackground.enabledByDefault
-    /// 系统「降低透明度」：开启时完全无底（现状）
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    /// 封面来源（玻璃模式下雾面底的图）
-    @Environment(AppServices.self) private var services
-    @State private var artwork: ArtworkImage?
-    @State private var artworkTrackId: String?
     /// 字号（设置页改动经 qqplayerSettingsDidChange 刷新）
     @State private var fontSize: Double = DeleteSettings.load().desktopLyricFontSize
     @State private var showTranslation = DeleteSettings.load().lyricShowTranslation
@@ -249,18 +245,6 @@ struct MacDesktopLyricView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, DesignTokens.space24)
         .padding(.vertical, DesignTokens.space12)
-        // 玻璃生效 → 歌词文本下加同配方雾面底（圆角、铺满面板、低透明度）；
-        // 不生效 → 完全无底（现状）。只加 background 层：字号 / 行距 / 动画 / 拖动都不动。
-        .background {
-            if glassActive {
-                MacWindowGlass(artwork: artwork, cacheKey: artworkTrackId)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.radius16, style: .continuous))
-                    .opacity(Self.glassBackgroundOpacity)
-            }
-        }
-        .task(id: player.currentTrack?.stableId) {
-            await loadArtwork()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             let settings = DeleteSettings.load()
             fontSize = settings.desktopLyricFontSize
@@ -268,32 +252,6 @@ struct MacDesktopLyricView: View {
             showRoman = settings.lyricShowRoman
             lyricOffset = settings.lyricOffset
         }
-    }
-
-    /// 桌面歌词的雾面底透明度：保持白字可读又不抢戏（雾面本身就是均匀低对比）。
-    private static let glassBackgroundOpacity: Double = 0.75
-
-    /// 生效判定走唯一实现（同主窗 / 设置窗 / sheet 口径）。
-    private var glassActive: Bool {
-        PlayerGlassBackground.isActive(
-            isEnabled: glassEnabled,
-            hasArtwork: true,
-            reduceTransparency: reduceTransparency
-        )
-    }
-
-    /// 拉取当前曲目封面（切歌后旧结果丢弃）。
-    private func loadArtwork() async {
-        guard let track = player.currentTrack else {
-            artwork = nil
-            artworkTrackId = nil
-            return
-        }
-        let trackId = track.stableId
-        let image = await services.artworkManager.getArtwork(for: track)
-        guard player.currentTrack?.stableId == trackId else { return }
-        artwork = image
-        artworkTrackId = trackId
     }
 
     @ViewBuilder

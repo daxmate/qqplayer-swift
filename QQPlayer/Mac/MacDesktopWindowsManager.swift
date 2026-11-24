@@ -224,10 +224,6 @@ final class DesktopWindowsManager {
                 .environment(PlayerEngine.shared)
                 // 批 6-7：桌面歌词窗读 `@Environment(KaraokeController.self)`（跟唱行/AB 态）
                 .environment(KaraokeController.shared)
-                // 桌面歌词玻璃底（2026-11-24）：视图读 `@Environment(AppServices.self)` 取封面，
-                // 手工 hosting 不继承场景环境 ⇒ 与迷你窗同因，必须在此显式注入
-                // （漏注入 = 运行期 EXC_BREAKPOINT，编译与单测都看不见）。
-                .environment(AppServices.live)
         }
     }
 

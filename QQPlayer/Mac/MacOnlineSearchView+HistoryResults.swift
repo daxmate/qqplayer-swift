@@ -52,6 +52,8 @@ extension MacOnlineSearchView {
                 }
             }
             .listStyle(.inset)
+            // 玻璃生效（主窗 / 设置窗场景任一生效）→ 清掉 List 自带白底，透出 sheet 的模糊底
+            .macSheetGlassListBackground()
         }
     }
 
@@ -136,6 +138,8 @@ extension MacOnlineSearchView {
             )
         }
         .listStyle(.inset)
+        // 同历史列表：让路给 sheet 玻璃
+        .macSheetGlassListBackground()
         .overlay(alignment: .bottom) {
             if let errorMessage {
                 Text(errorMessage)
