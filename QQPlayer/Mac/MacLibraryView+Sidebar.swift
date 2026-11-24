@@ -144,9 +144,11 @@ extension MacLibraryView {
         }
         // 玻璃生效时剥离侧栏列自带的系统背板（见 MacSidebarMaterialStripper）：
         // macOS 26+ 整列由 `NSGlassEffectView` 包住内容（盖在整窗玻璃上就是米白面板 + 圆角硬边），
-        // 隐藏无效、删了会带走内容 → 用「换列」把同一 viewController 重包成普通列；
+        // 隐藏无效、删了会带走内容 → 做法是「**摘玻璃、不换列**」：把内容搬进铺满列的普通容器，
+        // 再把玻璃本体移进一个隐藏的 1×1 容器，玻璃不再参与绘制，而列仍是同一个
+        // `NSSplitViewItem`（`.sidebar` behavior 不变——换列会让工具栏右侧分区垮掉、按钮跑到中间）。
         // macOS 15- 则是 `.sidebar` 材质的 `NSVisualEffectView`，直接隐藏。
-        // 挂在整个侧栏外侧；关闭开关即移除并还原。
+        // 挂在整个侧栏外侧；关闭开关即还原并移除。
         .background {
             if isWindowGlassActive {
                 MacSidebarMaterialStripper()
