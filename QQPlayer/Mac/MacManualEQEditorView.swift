@@ -55,8 +55,10 @@ struct MacCreateManualEQView: View {
                 }
             }
             .formStyle(.grouped)
+            .macSheetGlassListBackground()
         }
         .frame(minWidth: 420, minHeight: 380)
+        .macSheetGlass()
     }
 
     private var header: some View {

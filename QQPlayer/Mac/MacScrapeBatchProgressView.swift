@@ -58,6 +58,7 @@ struct MacScrapeBatchProgressView: View {
             footer
         }
         .frame(width: 560, height: 500)
+        .macSheetGlass()
         .task { await run() }
     }
 

@@ -81,6 +81,10 @@ struct WhatsNewView: View {
             }
             #endif
         }
+        // macOS sheet：玻璃底（iOS 外观零变化——修饰器只在 macOS 编译）
+        #if os(macOS)
+        .macSheetGlass()
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: .qqplayerSettingsDidChange)) { _ in
             settings = DeleteSettings.load()
         }

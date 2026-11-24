@@ -86,6 +86,7 @@ struct MacLyricsSearchView: View {
                 .padding(.horizontal, DesignTokens.space20)
             }
         }
+        .macSheetGlass()
         .onAppear {
             // 首次进入歌词搜索页：触发提示气泡（之后永不再现）
             withAnimation(.easeOut(duration: 0.3)) {

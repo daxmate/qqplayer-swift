@@ -65,6 +65,7 @@ struct MacQuarkLoginView: View {
             .padding(.vertical, DesignTokens.space16)
         }
         .frame(width: 320)
+        .macSheetGlass()
         .onAppear {
             fetchQRCode()
         }

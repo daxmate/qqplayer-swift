@@ -59,8 +59,10 @@ struct MacEQImportView: View {
                 }
             }
             .formStyle(.grouped)
+            .macSheetGlassListBackground()
         }
         .frame(minWidth: 460, minHeight: 520)
+        .macSheetGlass()
     }
 
     // MARK: - Header

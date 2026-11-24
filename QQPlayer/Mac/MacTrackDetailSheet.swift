@@ -40,8 +40,10 @@ struct MacTrackDetailSheet: View {
                 playbackSection
             }
             .formStyle(.grouped)
+            .macSheetGlassListBackground()
         }
         .frame(width: 560, height: 640)
+        .macSheetGlass()
         .task { await model.load() }
         .sheet(isPresented: $showTagEditor) {
             MacTagEditorView(track: track)

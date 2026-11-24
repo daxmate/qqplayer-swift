@@ -52,6 +52,7 @@ struct MacSyncPanel: View {
             MacSyncCenterView(initialPage: .sync)
         }
         .frame(width: 620, height: Self.sheetHeight)
+        .macSheetGlass()
     }
 
     /// 与其它 Mac sheet 一致的标题栏：标题 + 关闭按钮（Esc 也可关）。

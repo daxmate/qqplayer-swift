@@ -60,6 +60,7 @@ struct MacReclaimAreaView: View {
             actionBar
         }
         .frame(minWidth: 620, minHeight: 440)
+        .macSheetGlass()
         .overlay {
             if isLoading || isWorking {
                 ProgressView()

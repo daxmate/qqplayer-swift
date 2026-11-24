@@ -33,6 +33,7 @@ struct MacQueuePanelView: View {
             content
         }
         .frame(minWidth: 420, minHeight: 360)
+        .macSheetGlass()
     }
 
     private var header: some View {
@@ -75,6 +76,7 @@ struct MacQueuePanelView: View {
                     .onMove(perform: player.moveQueueItems)
                 }
                 .listStyle(.plain)
+                .macSheetGlassListBackground()
             }
         }
     }

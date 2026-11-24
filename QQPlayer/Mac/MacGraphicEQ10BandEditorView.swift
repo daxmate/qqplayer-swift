@@ -66,11 +66,13 @@ struct MacGraphicEQ10BandEditorView: View {
                 }
             }
             .formStyle(.grouped)
+            .macSheetGlassListBackground()
             .onAppear {
                 loadInitialGains()
             }
         }
         .frame(minWidth: 480, minHeight: 600)
+        .macSheetGlass()
     }
 
     // MARK: - Header

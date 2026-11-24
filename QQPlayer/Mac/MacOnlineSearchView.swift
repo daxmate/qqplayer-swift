@@ -111,6 +111,7 @@ struct MacOnlineSearchView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 520, height: 480)
+        .macSheetGlass()
         .onChange(of: source) { _, _ in
             switchSource()
         }

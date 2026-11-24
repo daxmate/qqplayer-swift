@@ -143,8 +143,10 @@ struct MacAlbumDetailSheet: View {
                 }
             }
             .frame(minWidth: 480, minHeight: 360)
+            .macSheetGlassListBackground()
         }
         .padding()
+        .macSheetGlass()
     }
 
     private func duration(for track: Track) -> TimeInterval {
@@ -281,8 +283,10 @@ struct MacArtistDetailSheet: View {
                 }
             }
             .frame(minWidth: 480, minHeight: 360)
+            .macSheetGlassListBackground()
         }
         .padding()
+        .macSheetGlass()
     }
 
     private func albumTitle(for track: Track) -> String {

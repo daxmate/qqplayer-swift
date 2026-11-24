@@ -142,6 +142,7 @@ struct MacTagEditorView: View {
             footer
         }
         .frame(width: 560, height: 640)
+        .macSheetGlass()
         .task { await loadAndAutoScrape() }
         .onDisappear {
             activeTasks.values.forEach { $0.cancel() }
