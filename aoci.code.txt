@@ -9,10 +9,10 @@
 ANALYSIS.md[SD5S]: F:2026-08-29 只读架构分析：技术栈、轻 MVVM 架构、15 个 Service 职责、数据模型与歌词/播放引擎要点 | R:- | A:- | S:快照式分析（基于当时单 commit），统计与结论会随代码演进而过期，引用前须复核现状
 LICENSE[SG3L]: F:GNU GPL-3.0 许可证全文，本仓库整体遵循该许可 | R:code:NOTICE.md | A:- | S:-
 NOTICE.md[SG6T]: F:来源声明：QQPlayer 是 Cosmos Music Player 的 GPL-3.0 衍生作品，列明上游作者与本地修改范围 | R:code:LICENSE | A:- | S:上游已就 GPLv3 §7 书面同意（2026-09-14）允许经 App Store 分发，但不免除源码公开义务
-PRIVACY.md[SG6S]: F:中英双语隐私政策：不收集个人数据；音乐文件仅本地/iCloud；歌词请求会向第三方发送曲名与艺术家 | R:- | A:- | S:歌词功能联网向网易云音乐与 LRCLIB 发送歌曲标题与歌手名（政策已披露），新增联网或数据功能须同步更新本政策
+PRIVACY.md[SG6S]: F:中英双语《婷听 TingFi 隐私政策》（原 QQPlayer）：不收集个人数据；音乐文件仅本地/iCloud；歌词请求会向第三方发送曲名与艺术家 | R:- | A:- | S:歌词功能联网向网易云音乐与 LRCLIB 发送歌曲标题与歌手名（政策已披露），新增联网或数据功能须同步更新本政策
 PlayerWidgetExtension.entitlements[FI4T]: F:PlayerWidgetExtension target 的 entitlements，App Group group.com.daxmate.qqplayer.ios | R:code:PlayerWidget/PlayerWidget.entitlements | A:- | S:App Group 必须与主 App 一致，否则 Widget 扩展无法访问共享容器
 QQPlayerMac-Info.plist[FN5T]: F:macOS target 的 Info.plist 补充片段：用显式 plist 承载数组型键 NSBonjourServices（_qqplayer-sync._tcp） | R:code:QQPlayer/Info.plist,code:QQPlayer/Sync/SyncListener.swift,code:QQPlayer/Sync/SyncBrowser.swift | A:NSBonjourServices | S:INFOPLIST_KEY_NSBonjourServices 不被 Xcode 支持，须显式 plist 合并；服务类型三处必须一致
-README.md[SZ7L]: F:项目总览：平台矩阵与版号口径（指向 CHANGELOG 与 git tag，App Store 版本单独发布）、双端功能清单、局域网配对与同步、技术架构、目录与脚本清单、测试与构建（CI 四 job）；含标签刮削与下载后自动刮削；产品页截图（macOS 3 张 2.2.0 毛玻璃主题 + iPhone 4，WebP） | R:code:docs/logging.md,code:scripts/build-app.sh | A:- | S:功能矩阵须与 target 能力同步；CI main 走自托管 qqplayer-macos、PR 走 macos-latest；批量刮削取首候选写全字段且不改名，下载后自动刮削默认关；图只放 assets/screenshots（docs/ gitignore）
+README.md[SZ7L]: F:项目总览：现名「婷听 TingFi」（原 QQPlayer）、平台矩阵与版号口径（见 CHANGELOG 与 git tag；App Store 版本另发）、双端功能清单、局域网配对与同步、目录/脚本清单、测试与构建（CI 四 job）；含标签刮削与下载后自动刮削；产品页截图（macOS/iPhone，WebP） | R:code:docs/logging.md,code:scripts/build-app.sh | A:- | S:功能矩阵须与 target 能力同步；CI main 走自托管 qqplayer-macos、PR 走 macos-latest；批量刮削取首候选写全字段且不改名，下载后自动刮削默认关；图只放 assets/screenshots（docs/ gitignore）；改名后文案统一「婷听 TingFi」，引导路径「我的 iPhone → 婷听」与显示名一致
 QQPlayerMac.entitlements[FS8T]: F:macOS 授权：App Group B6FA37AYT5.dsqcommon（共享资源根）＋ network.client；未声明 App Sandbox（非沙盒，便于共享根与旧路径 symlink） | R:code:QQPlayer/Services/DSQSharedPaths.swift, code:QQPlayer/QQPlayer.entitlements | A:com.apple.security.application-groups | S:App Group ID 必须与 DSQSharedLocations.appGroupIdentifier 一致；删 network.client → 在线搜索/模型下载全断
 CHANGELOG.md[SV6M]: F:版本变更记录（Keep a Changelog / 中文）：按版本分节记 ✨新增 / ⚙️改进 / 🐛修复 / 🔧工程；最新 2.2.1（2026-11-24：歌词搜索接毛玻璃 / sheet 首帧不闪灰 / 浮窗拖动改 WindowDragGesture） | R:- | A:- | S:发版时与版本号同批更新；开发中条目先落「未发布」段，发版时并入版本节并保留 compare 链接；每条只写能对上真实提交的事实，tag 必须已存在
 
@@ -40,7 +40,7 @@ Contents.json[FU2T]: F:PlayerWidget 资源目录（Assets.xcassets）的根声�
 Contents.json[FU2T]: F:Widget 背景颜色集声明（universal，无显式色值） | R:- | A:- | S:-
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/===
-project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.2.1/93；已登记 MacWindowFrameAnchor 与 MacMainWindowFrameWatch（Mac 白名单 + iOS 例外表） | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only；Mac 专属新文件要同时进 ios-exceptions 与 mac-whitelist 两份清单
+project.pbxproj[FV8L]: F:Xcode 工程：target 成员、build settings、资源/SPM；版号 2.2.1/93；显示名 TingFi（iOS/Mac/小组件）；已登记 MacWindowFrameAnchor 与 MacMainWindowFrameWatch（Mac 白名单 + iOS 例外表） | R:- | A:- | S:target 归属由 scripts/pbxproj-membership.py 维护；新增测试用 scripts/add-test-file.py；CarPlay 文件标 target: ios-only；Mac 专属新文件要同时进 ios-exceptions 与 mac-whitelist 两份清单；中文显示名不在此文件，由各语种 InfoPlist.strings 覆盖
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer.xcodeproj/project.xcworkspace/===
 contents.xcworkspacedata[FV2T]: F:Xcode workspace 元数据，仅自引用 container:QQPlayer.xcodeproj | R:- | A:- | S:-
@@ -77,14 +77,14 @@ PlaybackAttributes.swift[FU4T]: F:@AppEnum(schema:.audio.playbackAttributes)：s
 QueueInsertionLocation.swift[FU4T]: F:@AppEnum(schema:.audio.queueInsertionLocation)：next（插到当前曲后）与 tail（追加队尾） | R:code:QQPlayer/AppIntents/Intents/PlayAudioIntent.swift | A:QueueInsertionLocation | S:tail 的显示标签刻意用「Last」，与 case 名不一致
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/AppIntents/FoundationModels/===
-MixGenerator.swift[KA7M]: F:端上 Foundation Models 混音生成：从编号候选列表（请求命中优先→收藏→其余，上限 120）中选 10–25 首；模型不可用或输出无效时回退 token 匹配 | R:code:QQPlayer/AppIntents/Intents/GenerateMixIntent.swift | A:MixGenerator,GeneratedMixSelection,MixGenerationError | S:模型只能从候选编号中选（不会发明歌曲）；选曲 <3 首即判无效走 fallback；候选上限 120 以适配端上上下文窗口；空库抛 emptyLibrary
+MixGenerator.swift[KA7M]: F:端上 Foundation Models 混音生成：从编号候选列表（请求命中优先→收藏→其余，上限 120）中选 10–25 首；模型不可用或输出无效时回退 token 匹配 | R:code:QQPlayer/AppIntents/Intents/GenerateMixIntent.swift | A:MixGenerator,GeneratedMixSelection,MixGenerationError | S:模型只能从候选编号中选（不会发明歌曲）；选曲 <3 首即判无效走 fallback；候选上限 120 以适配端上上下文窗口；空库抛 emptyLibrary；请求为空时歌单名取 Localized.qqplayerName + " Mix"（不走文案表，改品牌须改此处）
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/AppIntents/Intents/===
 AddToPlaylistIntent.swift[IU6T]: F:schema:.audio.addToPlaylist 意图：把歌曲加入指定歌单；非歌曲目标报 unsupportedTarget，重复加入报 alreadyInPlaylist，成功后返回 PlaylistCardSnippetIntent | R:code:QQPlayer/AppIntents/Intents/PlayAudioIntent.swift,code:QQPlayer/AppIntents/Snippets/PlaylistCardSnippetIntent.swift | A:AddToPlaylistIntent | S:-
 DebugIntents.swift[TQ3T]: F:DEBUG 专用意图：ClearSpotlightIntent 清空 Spotlight 索引、ReindexSpotlightIntent 全量重建，供 AppIntentsTesting 把索引置为已知状态 | R:code:QQPlayer/AppIntents/SpotlightLibraryIndexer.swift | A:ClearSpotlightIntent,ReindexSpotlightIntent | S:#if DEBUG 门控，不进 release；isDiscoverable=false 不可发现
 FavoriteCurrentSongIntent.swift[IU6T]: F:无参数 App Shortcut：把当前播放曲加入收藏；已收藏时提示不重复操作，无播放曲目时抛 nothingPlaying | R:code:QQPlayer/AppIntents/IntentPlaybackService.swift,code:QQPlayer/AppIntents/QQPlayerAppShortcuts.swift | A:FavoriteCurrentSongIntent,FavoriteCurrentSongError | S:无参数是刻意设计——Siri 无法稳定把「this song」绑定到当前曲，此意图使该用法确定化；openAppWhenRun=false
 GenerateMixIntent.swift[IU7S]: F:混音意图族：GenerateMixIntent 端上生成并按描述立即播放；隐藏的 SaveMixIntent 保存为歌单；MixCardSnippetIntent/MixCardSnippetView 渲染结果卡片（含保存按钮） | R:code:QQPlayer/AppIntents/FoundationModels/MixGenerator.swift,code:QQPlayer/AppIntents/IntentPlaybackService.swift | A:GenerateMixIntent,SaveMixIntent,MixCardSnippetIntent,MixCardSnippetView | S:受 canImport(FoundationModels) 门控；SaveMixIntent/MixCardSnippetIntent 均 isDiscoverable=false，仅由结果卡片触发；MixCardSnippetView 是 SwiftUI 视图
-PlayAudioIntent.swift[IU8S]: F:schema:.audio.playAudio 核心播放意图：Siri 从实体/查询填充 audioEntity，按 queueLocation 播放/插队/追加并应用 shuffle/repeat；同时定义意图层共享错误 AudioIntentError 与 Logger.appIntents | R:code:QQPlayer/AppIntents/Entities/AudioEntity.swift,code:QQPlayer/AppIntents/IntentPlaybackService.swift,code:QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift | A:PlayAudioIntent,AudioIntentError,Logger.appIntents | S:仅 queueLocation 为 nil 时应用 shuffle/repeat（插队/追加忽略修饰）；解析不到曲目抛 noAudioEntity；成功返回 SongCardSnippetIntent；错误经 AppIntentError(wrapping:) 口语化
+PlayAudioIntent.swift[IU8S]: F:schema:.audio.playAudio 核心播放意图：Siri 从实体/查询填充 audioEntity，按 queueLocation 播放/插队/追加并应用 shuffle/repeat；同时定义意图层共享错误 AudioIntentError 与 Logger.appIntents | R:code:QQPlayer/AppIntents/Entities/AudioEntity.swift,code:QQPlayer/AppIntents/IntentPlaybackService.swift,code:QQPlayer/AppIntents/Snippets/SongCardSnippetIntent.swift | A:PlayAudioIntent,AudioIntentError,Logger.appIntents | S:仅 queueLocation 为 nil 时应用 shuffle/repeat（插队/追加忽略修饰）；解析不到曲目抛 noAudioEntity；成功返回 SongCardSnippetIntent；错误经 AppIntentError(wrapping:) 口语化；面向用户的错误文案是代码内英文 LocalizedStringResource（含产品名 TingFi），不在 Localizable.strings，改名须逐处改源码
 ResumePlaybackIntent.swift[IU6T]: F:恢复播放意图（新 App Intents 栈的链路验证样本）：有当前曲即 resume，冷启动无曲则回退播放全部资料库 | R:code:QQPlayer/AppIntents/IntentPlaybackService.swift | A:ResumePlaybackIntent,ResumePlaybackError | S:空资料库抛 emptyLibrary
 SnippetActionIntents.swift[IU6S]: F:交互式结果卡片按钮背后的隐藏意图：ToggleFavoriteIntent 切换收藏、EnqueueTrackIntent 播放下一首/加入队列、PlayPlaylistIntent 播放歌单 | R:code:QQPlayer/AppIntents/IntentPlaybackService.swift,code:QQPlayer/AppIntents/Intents/PlayAudioIntent.swift | A:ToggleFavoriteIntent,EnqueueTrackIntent,PlayPlaylistIntent | S:三者均 isDiscoverable=false；按钮点击后系统会重跑展示它的 SnippetIntent 以刷新卡片状态
 UpdateAudioAffinityIntent.swift[IU6T]: F:schema:.audio.updateAudioAffinity 意图：like 加收藏、dislike/unset 移除收藏（QQPlayer 只有收藏语义），非歌曲目标报 unsupportedTarget | R:code:QQPlayer/AppIntents/Enums/AffinityState.swift,code:QQPlayer/AppIntents/IntentPlaybackService.swift | A:UpdateAudioAffinityIntent | S:语义映射在此：仅 .like 设 isFavorite=true，dislike 与 unset 都设 false
@@ -120,7 +120,7 @@ CarPlay+Playback.swift[IU6T]: F:CarPlay 播放 helper（CarPlaySceneDelegate 扩
 CarPlay+PlayerPage.swift[IU7L]: F:CarPlay 自建播放页：页头（封面+歌名/歌手/控制键+自绘进度条）+ 三行歌词；纯函数 Builder 与控制器；仅在可见时 2s 刷新，页头封面有界重试并支持真图晚到补画 | R:code:QQPlayer/CarPlay+Lyrics.swift,code:QQPlayer/CarPlaySceneDelegate.swift,code:QQPlayer/CarPlay+PlayerPageCache.swift,code:QQPlayer/CarPlay+PlayerPageThumbnail.swift | A:CarPlayPlayerPageController,CarPlayPlayerPageBuilder,CarPlayPlayerPageContent,setVisible | S:不占 tab 位、右上角按钮推入；<iOS26.4 退化为三行歌词；进度 30s 量化；不可见停刷；上屏那次无图而后来有图必须补画一次
 CarPlaySceneDelegate.swift[EU7L]: F:CarPlay 场景生命周期与根界面：didConnect 装配播放链路、TabBar 与列表模板、列表封面自绘；歌单页分自动歌单+用户歌单两段；自动歌单封面与用户歌单共用拼贴工具；实现 CPInterfaceControllerDelegate 驱动播放页可见性 | R:code:QQPlayer/CarPlay+Playback.swift,code:QQPlayer/CarPlay+SmartPlaylists.swift,code:QQPlayer/CarPlay+PlayerPage.swift,code:QQPlayer/Services/AppLaunchBootstrap.swift,code:QQPlayer/Info.plist | A:CarPlaySceneDelegate,createPlaylistsTab,makeSongItems,showArtists,showAlbums | S:不兼容格式 ogg/opus/dsf/dff；分页 200、队列上限 5000；didDisconnect label 必须写 didDisconnectInterfaceController；didConnect 只建 UI，播放链路必须显式 AppLaunchBootstrap.ensure；单文件须<600 行
 ContentView.swift[AU7M]: F:iOS 根视图：LibraryView + 迷你播放条 + 启动流程与 sheet 装配；主内容按 App 语言 .id 重建并注入 Locale；设置 sheet 用 .presentationBackground(.clear) 透出 | R:code:QQPlayer/Helpers/AppLanguage.swift, code:QQPlayer/Services/CarPlayTrackFilter.swift, code:QQPlayer/Services/LibraryReads.swift | A:ContentView,LifecycleModifier,SheetModifier,refreshLibrary,performRefresh | S:.id 挂主内容与设置 sheet，不挂 WindowGroup 根，否则选语言会关掉设置页
-Info.plist[FC7S]: F:iOS 主 App 配置声明：URL scheme qqplayer、CarPlay 场景委托、后台 audio、文件共享、arm64、二维码相机与局域网/Bonjour 同步用途说明、INAlternativeAppNames | R:code:QQPlayer/QQPlayer.entitlements | A:- | S:UISceneConfigurations 声明 CPTemplateApplicationScene → CarPlaySceneDelegate；NSBonjourServices 为 _qqplayer-sync._tcp；ITSAppUsesNonExemptEncryption=false
+Info.plist[FC7S]: F:iOS 主 App 配置声明：显示名 TingFi（中文由各语种 InfoPlist.strings 覆盖）、URL scheme qqplayer、CarPlay 场景委托、后台 audio、文件共享、arm64、二维码相机与局域网/Bonjour 同步用途说明、INAlternativeAppNames | R:code:QQPlayer/QQPlayer.entitlements | A:- | S:UISceneConfigurations 声明 CPTemplateApplicationScene→CarPlaySceneDelegate；NSBonjourServices 为 _qqplayer-sync._tcp；ITSAppUsesNonExemptEncryption=false；INAlternativeAppNames 保留旧名 QQPlayer/QQ Player
 QQPlayer-Bridging-Header.h[IG3T]: F:Objective-C 桥接头：把 Helpers/ObjCExceptionCatcher.h 暴露给 Swift（唯一 import） | R:code:QQPlayer/Helpers/ObjCExceptionCatcher.h | A:- | S:-
 QQPlayer.entitlements[FS7T]: F:iOS 主 App 授权：CarPlay 音频、Siri、App Group group.com.daxmate.qqplayer.ios | R:code:QQPlayer/PrivacyInfo.xcprivacy | A:com.apple.security.application-groups | S:App Group id 必须与数据库/同步路径一致
 QQPlayerApp.swift[EG8L]: F:iOS App 入口（@main）：AppDelegate（隐藏布局预占、App Group 语言、Siri 词表）+场景环境注入组合根+scene/前后台/URL/Siri 处理与 SFB 缓冲优化；注入 ReplayGainManager 与分析队列 | R:code:QQPlayer/Services/AppCoordinator.swift, code:QQPlayer/Services/PlayerEngine.swift, code:QQPlayer/Services/MemoryDiagnostics.swift, code:QQPlayer/Services/IOSPassiveSyncCenter.swift | A:QQPlayerApp,AppDelegate | S:INVocabulary 需 Siri entitlement，模拟器/CI 调用会崩故跳过；隐藏布局预占必须是 launch 首句且同步；CarPlay/scene 切换后强制主窗重布局；ActionFeedbackCenter 必须在内层注入
@@ -269,34 +269,34 @@ SimplifiedToTraditional.tsv[CL6L]: F:简体→繁体字形映射表（TSV 逐字
 TraditionalToSimplified.tsv[CL6L]: F:繁体→简体字形映射表（TSV 逐字一行；由 scripts/gen-traditional-to-simplified.py 生成，显示字形归一用） | R:code:QQPlayer/Services/TraditionalToSimplifiedMap.swift,code:QQPlayer/Resources/SimplifiedToTraditional.tsv | A:- | S:生成物，勿手改（baseline sha256 契约测试比对）；与简→繁表互为反向但非严格对称（多对一/异体字）
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/en.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:英文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/QQPlayerApp.swift | A:- | S:IntentName 须为系统 INIntent 类名；词表仅辅助识别，不改 Intent 路由
+AppIntentVocabulary.plist[FL4T]: F:英文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语，例句内品牌名写字面量 TingFi（不用 ${applicationName} 占位） | R:code:QQPlayer/QQPlayerApp.swift | A:- | S:IntentName 须为系统 INIntent 类名；词表仅辅助识别，不改 Intent 路由
 AppShortcuts.strings[FL4T]: F:英文 App Shortcuts Siri 调用短语（key 即短语，${applicationName} 为 App 名占位符） | R:code:QQPlayer/Resources/zh-Hans.lproj/AppShortcuts.strings | A:- | S:key 必须与 QQPlayerAppShortcuts.swift 的短语逐字一致，否则 Siri 认不出
-InfoPlist.strings[FL3T]: F:英文 Info.plist 权限文案本地化（相机=扫码配对、本地网络=发现同网设备） | R:code:QQPlayer/Resources/zh-Hans.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致（改单边会静默回退 base 文案）
-Localizable.strings[FL6L]: F:en 界面文案表（1130 键），键集与其余 7 语种逐一相等；含 ReplayGain 13 条（模式/预放大/防削波/补算进度）；含排序菜单 4 条（sort/升/降/默认） | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类），别当重复值修掉
+InfoPlist.strings[FL3T]: F:英文 Info.plist 本地化：CFBundleDisplayName 与 CFBundleName 均为 TingFi，另含权限文案（相机=扫码配对、本地网络=发现同网设备） | R:code:QQPlayer/Resources/zh-Hans.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致（改单边会静默回退 base 文案）
+Localizable.strings[FL6L]: F:en 界面文案表（1130 键），键集与其余 7 语种逐一相等；产品名由 key "qqplayer" 承载（值 TingFi），引导文案也写 TingFi 文件夹名；含 ReplayGain 13 条（模式/预放大/防削波/补算进度）；含排序菜单 4 条（sort/升/降/默认） | R:code:QQPlayer/Resources/zh-Hans.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动（集合相等由测试强制）；引导文案里的按钮名要与 add_songs 实际值一致；引导里「On My iPhone → TingFi」文件夹名就是显示名，改显示名要同步 8 语种引导文案；lyrics_display 与 settings_category_lyrics 同为 Lyrics 是有意（设置项 vs 分类），别当重复值修掉
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/fr.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:法文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
+AppIntentVocabulary.plist[FL4T]: F:法文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语，例句品牌名写字面量 TingFi（不用 ${applicationName} 占位） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:法文 App Shortcuts Siri 调用短语（key 同英文短语，${applicationName} 占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（仅 value 本地化）
-InfoPlist.strings[FL3T]: F:法文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:fr 界面文案表（1130 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
+InfoPlist.strings[FL3T]: F:法文 Info.plist 权限文案本地化（相机、本地网络）；CFBundleDisplayName/CFBundleName=TingFi | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
+Localizable.strings[FL6L]: F:fr 界面文案表（1130 键），键集与其余 7 语种逐一相等；产品名由 key "qqplayer" 承载（值 TingFi） | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制；引导文案里「我的 iPhone → TingFi」文件夹名就是显示名，改显示名要同步 8 语种引导文案
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ru.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:俄文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
+AppIntentVocabulary.plist[FL4T]: F:俄文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语，例句品牌名写字面量 TingFi（不用 ${applicationName} 占位） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:俄文 App Shortcuts Siri 调用短语（key 同英文短语，${applicationName} 占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（仅 value 本地化）
-InfoPlist.strings[FL3T]: F:俄文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:ru 界面文案表（1130 键），键集与其余 7 语种逐一相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制
+InfoPlist.strings[FL3T]: F:俄文 Info.plist 权限文案本地化（相机、本地网络）；CFBundleDisplayName/CFBundleName=TingFi | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
+Localizable.strings[FL6L]: F:ru 界面文案表（1130 键），键集与其余 7 语种逐一相等；产品名由 key "qqplayer" 承载（值 TingFi） | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:新增/删除 key 必须 8 语种同时动；键集相等由测试强制；引导文案里「我的 iPhone → TingFi」文件夹名就是显示名，改显示名要同步 8 语种引导文案
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hans.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:简体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
+AppIntentVocabulary.plist[FL4T]: F:简体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语，例句品牌名写字面量 婷听（不用 ${applicationName} 占位） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:简体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致（${applicationName} 占位符保留）
-InfoPlist.strings[FL3T]: F:简体中文 Info.plist 权限文案本地化（相机扫码配对、本地网络发现设备） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1130 键，其余语种键集与它相等）；设置分类标签统一「外观」 | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回
+InfoPlist.strings[FL3T]: F:简体中文 Info.plist 权限文案本地化（相机扫码配对、本地网络发现设备）；CFBundleDisplayName/CFBundleName=婷听 | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
+Localizable.strings[FL6L]: F:zh-Hans 界面文案表（1130 键，其余语种键集与它相等）；设置分类标签统一「外观」；产品名由 key "qqplayer" 承载（值 婷听） | R:- | A:- | S:新增 key 先落这里再等量同步其余 7 语种；%d%% 的 %% 不能省；lyrics_display 与 settings_category_lyrics 同为「歌词」是有意（原「显示」易与分类混淆），别改回；引导文案里「我的 iPhone → 婷听」文件夹名就是显示名，改显示名要同步 8 语种引导文案
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/zh-Hant.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:繁体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语 | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
+AppIntentVocabulary.plist[FL4T]: F:繁体中文 Siri 意图词表：INPlayMediaIntent/INAddMediaIntent 的 IntentExamples 语音短语，例句品牌名写字面量 婷聽（不用 ${applicationName} 占位） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:IntentName 须与 en 版一致（仅短语本地化）
 AppShortcuts.strings[FL4T]: F:繁体中文 App Shortcuts Siri 调用短语（key 为英文短语，仅 value 本地化） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:key 必须与英文短语逐字一致
-InfoPlist.strings[FL3T]: F:繁体中文 Info.plist 权限文案本地化（相机、本地网络） | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
-Localizable.strings[FL6L]: F:zh-Hant 界面文案表（1130 键），键集与 zh-Hans 相等 | R:- | A:- | S:译文手工维护，别整份重跑 gen-zh-hant.py（会覆盖润色）
+InfoPlist.strings[FL3T]: F:繁体中文 Info.plist 权限文案本地化（相机、本地网络）；CFBundleDisplayName/CFBundleName=婷聽 | R:code:QQPlayer/Resources/en.lproj/InfoPlist.strings | A:- | S:key 必须与 Info.plist 完全一致
+Localizable.strings[FL6L]: F:zh-Hant 界面文案表（1130 键），键集与 zh-Hans 相等；产品名由 key "qqplayer" 承载（值 婷聽） | R:- | A:- | S:译文手工维护，别整份重跑 gen-zh-hant.py（会覆盖润色）；引导文案里「我的 iPhone → 婷聽」文件夹名就是显示名，改显示名要同步 8 语种引导文案
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Services/===
 AlignedLyricsStore.swift[PB7M]: F:局域网同步 aligned 歌词库唯一入口（docs/lan-sync-design §6.3）：写/读/删/枚举 + 接收侧安装；一歌一文件裸 Lyrics JSON、键=本端 stableId | R:code:QQPlayer/Sync/SyncAlignedLyrics.swift,code:QQPlayer/Services/LyricsManager.swift,code:QQPlayer/Services/LibraryRoot.swift | A:LyricsStoreKind,AlignedLyricsEntry,read,write,entries,install | S:install 移动原文件而非重编码，保字节原样使两侧 SHA-256 对得上；新位置=LibraryRoot.alignedLyricsDirectoryURL，旧 Documents/lyrics-aligned 只读兜底；只有 aligned 参与同步
@@ -1075,22 +1075,22 @@ LyricsAlignmentAudioFile.swift[DU5S]: F:歌词对齐音频转码：任意源音�
 SpeechAssetInstallPlanner.swift[IG6S]: F:语音模型资产安装的纯决策层：SpeechAssetStatus→SpeechAssetStep 映射与预算判断（pollInterval 0.5s、budget 120s），不依赖 Speech 运行时，任意 iOS 版本可单测 | R:code:QQPlayer/Services/LyricsAlignment/LyricsSpeechEngine.swift | A:SpeechAssetStatus,SpeechAssetStep,step,hasBudgetRemaining | S:nil 安装请求必须映射为 wait（系统正在下载/排队），不得当失败；预算按严格小于判断，elapsed==budget 即放弃
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/es.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:es Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
+AppIntentVocabulary.plist[FL4T]: F:es Siri 词汇表（意图名词与例句），品牌名按语种写字面量 TingFi | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:es Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语用口语形，识别依赖固定结构，不要改成书面体
-InfoPlist.strings[FL5T]: F:es Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，不一致会静默回退基串
-Localizable.strings[FL6L]: F:es 界面文案表（1130 键），中性拉美西语；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:preset 统一 preajuste，Ajustes 专指设置；禁用 vosotros；引号用 «»
+InfoPlist.strings[FL5T]: F:es Info.plist 本地化：CFBundleDisplayName 与 CFBundleName 均为 TingFi，另含权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，不一致会静默回退基串
+Localizable.strings[FL6L]: F:es 界面文案表（1130 键），中性拉美西语；键集与其余语种相等；产品名由 key "qqplayer" 承载（值 TingFi） | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:preset 统一 preajuste，Ajustes 专指设置；禁用 vosotros；引号用 «»
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ja.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:ja Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
+AppIntentVocabulary.plist[FL4T]: F:ja Siri 词汇表（意图名词与例句），例句品牌名写字面量 TingFi（不用 ${applicationName} 占位） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:ja Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语用口语形，与主 UI 敬体不同是刻意的，别统一
-InfoPlist.strings[FL5T]: F:ja Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
-Localizable.strings[FL6L]: F:ja 界面文案表（1130 键），です・ます体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:正文冒号用全角「：」，省略号用「…」；reclaim area 译「復元領域」
+InfoPlist.strings[FL5T]: F:ja Info.plist 权限提示（相机/本地网络）；CFBundleDisplayName/CFBundleName=TingFi | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
+Localizable.strings[FL6L]: F:ja 界面文案表（1130 键），です・ます体；键集与其余语种相等；产品名由 key "qqplayer" 承载（值 TingFi） | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:正文冒号用全角「：」，省略号用「…」；reclaim area 译「復元領域」；引导文案里「我的 iPhone → TingFi」文件夹名就是显示名，改显示名要同步 8 语种引导文案
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/QQPlayer/Resources/ko.lproj/===
-AppIntentVocabulary.plist[FL4T]: F:ko Siri 词汇表（意图名词与例句） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
+AppIntentVocabulary.plist[FL4T]: F:ko Siri 词汇表（意图名词与例句），例句品牌名写字面量 TingFi（不用 ${applicationName} 占位） | R:code:QQPlayer/Resources/en.lproj/AppIntentVocabulary.plist | A:- | S:结构须与 en 一致，只译字符串值
 AppShortcuts.strings[FL5T]: F:ko Siri 短语（11 条，含占位符） | R:code:QQPlayer/Resources/en.lproj/AppShortcuts.strings | A:- | S:短语结构与识别绑定，不要改语序
-InfoPlist.strings[FL5T]: F:ko Info.plist 权限提示（相机/本地网络） | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
-Localizable.strings[FL6L]: F:ko 界面文案表（1130 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等 | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오
+InfoPlist.strings[FL5T]: F:ko Info.plist 权限提示（相机/本地网络）；CFBundleDisplayName/CFBundleName=TingFi | R:code:QQPlayer/Info.plist | A:- | S:键必须与 Info.plist 完全一致，否则静默回退基串
+Localizable.strings[FL6L]: F:ko 界面文案表（1130 键），陈述句 합니다 体、命令句 하세요 体；键集与其余语种相等；产品名由 key "qqplayer" 承载（值 TingFi） | R:code:QQPlayer/Resources/en.lproj/Localizable.strings | A:- | S:混用两种语体是韩语 UI 惯例，不要强统一成 십시오；引导文案里「我的 iPhone → TingFi」文件夹名就是显示名，改显示名要同步 8 语种引导文案
 
 ===/Users/dax/codes/qqplayer-swift/.worktrees/aoci-index/scripts/mac-chrome-harness/===
 HarnessSupport.swift[TQ5M]: F:窗口 chrome harness 夹具：真 NSWindow + NavigationSplitView（侧栏 210）+ 4 个 ToolbarItem，布局泵、视图树计数、断言与失败明细助手 | R:- | A:- | S:断言只做结构与几何；不截图；停放在 1×1 容器的玻璃计为不可见；每轮 flip 需等布局稳定再采样
