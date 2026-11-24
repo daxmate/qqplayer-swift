@@ -114,7 +114,7 @@ struct MacTrackListView: View {
     @State private var menu = MacTrackMenuModel()
     /// 当前悬停行：由父视图唯一持有，单元格只上报（不把 hover 状态散进各格 @State）
     @State private var hoveredTrackId: String?
-    @State private var columnWidths = MacTrackColumnWidths()  // 拖拽列宽唯一真相源（MacTrackColumnResizer.swift）
+    @State private var columnWidths = MacTrackColumnWidthStore().load()  // 唯一真相源；启动取回上次宽度（MacTrackColumnWidthStore.swift）
     /// Table 排序状态（表头已隐藏；显示与播放队列都按 sortOrder 跟随）。
     /// macOS 26 SDK 的 Table sortOrder 使用 SortDescriptor。
     @State private var sortOrder: [SortDescriptor<MacTrackTableRow>] = []
@@ -366,7 +366,7 @@ struct MacTrackListView: View {
         }
         // 表头整条隐藏（用户要求：列表不显示列名；「#」序号列已删）
         .tableColumnHeaders(.hidden)
-        .overlay { MacTrackColumnResizer(widths: columnWidths) { columnWidths = $0 } }
+        .macTrackColumnWidthDrag(widths: $columnWidths)  // 拖拽结束（mouseUp）才写盘，见 MacTrackColumnResizer.swift
         // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
         // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
         .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false)).macGlassListBackground()

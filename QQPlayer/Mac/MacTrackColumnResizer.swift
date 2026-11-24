@@ -100,6 +100,25 @@ struct MacTrackColumnResizer: NSViewRepresentable {
     }
 }
 
+extension View {
+    /// 给列表挂「拖拽改列宽 + 拖拽结束即持久化」的唯一入口（调用点：MacTrackListView）。
+    ///
+    /// 写盘只发生在 resizer 的 onCommit（mouseUp）里，本修饰符不读写盘，
+    /// 因此不会落进 body / updateNSView 的求值路径。抽成 View 扩展是为了让
+    /// MacTrackListView 不涨行数（该文件已贴结构预算 600 行上限）。
+    func macTrackColumnWidthDrag(
+        widths: Binding<MacTrackColumnWidths>,
+        store: MacTrackColumnWidthStore = MacTrackColumnWidthStore()
+    ) -> some View {
+        overlay {
+            MacTrackColumnResizer(widths: widths.wrappedValue) { newWidths in
+                widths.wrappedValue = newWidths
+                store.save(newWidths)
+            }
+        }
+    }
+}
+
 /// 透明热区视图：只有 `hitTest` 命中列边界时才参与事件，其余全部穿透。
 final class MacTrackColumnResizerView: NSView {
     var onCommit: ((MacTrackColumnWidths) -> Void)?

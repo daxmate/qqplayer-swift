@@ -248,6 +248,12 @@ jobs:
       - name: Run macOS window chrome harness (glass + toolbar assertions)
         run: bash scripts/run-mac-window-chrome-tests.sh
 
+      # 曲目列表列宽持久化（UserDefaults round-trip / 夹紧 / 脏值回落）：Mac 专属代码
+      # 不编 iOS，仓库无 macOS 单测 target，故与上面 chrome harness 同策略用 swiftc 直编
+      # 生产源码断言（2026-11-24 用户要求「拖完列宽重启要保持」）。
+      - name: Run macOS column width persistence harness
+        run: bash scripts/run-mac-column-width-tests.sh
+
       - name: Build QQPlayerMac
         run: |
           set -o pipefail
