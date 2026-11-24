@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-24T01:15:55Z",
+  "updated_at": "2026-11-24T01:28:15Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -950,15 +950,15 @@
     },
     "QQPlayer/Mac/MacSettingsView.swift": {
       "role": "index",
-      "sha256": "1811378631309bcdd224aaedd74e338a11dd8698bf37391bb5eceec5005bbcb7",
-      "size": 19628,
-      "normalized_sha256": "1811378631309bcdd224aaedd74e338a11dd8698bf37391bb5eceec5005bbcb7"
+      "sha256": "a7ce1bf8c8edaeeb886f3e6a9f789b841559cf9e0e0a68465ded1df00ea8d9a7",
+      "size": 19989,
+      "normalized_sha256": "a7ce1bf8c8edaeeb886f3e6a9f789b841559cf9e0e0a68465ded1df00ea8d9a7"
     },
     "QQPlayer/Mac/MacSettingsWindowGlass.swift": {
       "role": "index",
-      "sha256": "3b03c86448fbffe66d7b7dfe68eb2c8d2b798883c2d4970422c42f3362f6a9f4",
-      "size": 9502,
-      "normalized_sha256": "3b03c86448fbffe66d7b7dfe68eb2c8d2b798883c2d4970422c42f3362f6a9f4"
+      "sha256": "1ab7e3e2dcd71bef3e557b6299c78ba3302a6167582358ac00fd3d755d46d2ce",
+      "size": 17950,
+      "normalized_sha256": "1ab7e3e2dcd71bef3e557b6299c78ba3302a6167582358ac00fd3d755d46d2ce"
     },
     "QQPlayer/Mac/MacShortcutsSettingsView.swift": {
       "role": "index",
@@ -5666,9 +5666,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "a4d2c851ecc9ee44cf321769f6fb6038410ea1406aa7df727b648cbce47c3381",
-      "size": 458917,
-      "normalized_sha256": "a4d2c851ecc9ee44cf321769f6fb6038410ea1406aa7df727b648cbce47c3381"
+      "sha256": "b61e484ce32a3d9c1c8ec1d74dc83f3db6f55c563786b0b90e2168cf68d6a4bf",
+      "size": 459126,
+      "normalized_sha256": "b61e484ce32a3d9c1c8ec1d74dc83f3db6f55c563786b0b90e2168cf68d6a4bf"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5954,9 +5954,9 @@
     },
     "scripts/xcbuild.sh": {
       "role": "index",
-      "sha256": "d93f120ba7a61f7055d9afb2d1c74a8ed4a0c0c3e80a00eb312cec31ad0713ba",
-      "size": 6085,
-      "normalized_sha256": "d93f120ba7a61f7055d9afb2d1c74a8ed4a0c0c3e80a00eb312cec31ad0713ba"
+      "sha256": "8db2615ce416d9ee4afecc08325a3e04c53f6227484fe07a297045eb7b106199",
+      "size": 12808,
+      "normalized_sha256": "8db2615ce416d9ee4afecc08325a3e04c53f6227484fe07a297045eb7b106199"
     }
   },
   "managed_scope": {
