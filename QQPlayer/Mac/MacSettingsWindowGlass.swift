@@ -214,3 +214,218 @@ struct MacSettingsWindowGlass: NSViewRepresentable {
         }
     }
 }
+
+// MARK: - 设置窗专用：AppKit 背板兜底剥离
+
+/// 设置窗专用兜底：把系统给侧栏 / 标题栏铺的 AppKit 背板临时摘掉，
+/// 让设置窗自己那层封面模糊底（`MacWindowGlass`）露出来。
+///
+/// 与主窗的 `MacSidebarMaterialStripper` 分家：主窗必须保住
+/// `NSSplitViewItem.behavior == .sidebar`（换列会破坏工具栏右分区），只能摘玻璃板；
+/// 设置窗侧栏是普通 SwiftUI `List(.sidebar)`，没有列语义，直接隐藏背板视图即可。
+///
+/// 只动三类「底」，全部记录原值、失效 / 卸载 / 换窗口时逐项还原（幂等）：
+/// - `NSVisualEffectView`：`.sidebar` / `.underWindowBackground` / `.headerView` → `isHidden = true`；
+///   `.contentBackground` 明令不碰（那是右侧分组面板的底，用户认可现状）。
+/// - macOS 26+ `NSGlassEffectView` → `isHidden = true`（设置窗目前实测没有，留作系统换代兜底）。
+/// - `NSScrollView` / `NSClipView` → `drawsBackground = false`；`documentView` 是
+///   `NSTableView`（含 `NSOutlineView`）时 `backgroundColor = .clear`。
+///
+/// 遍历放在 `layout()`（AppKit 布局次数有限，不是逐帧），`isStripping` 防重入；
+/// 已记录目标只重放状态，不重复记录原值（否则会把「我们隐藏后的值」当成原值，还原不回去）。
+struct MacSettingsBackdropStripper: NSViewRepresentable {
+    /// 玻璃是否生效（判定唯一入口见 `MacSettingsGlassScene`）
+    let active: Bool
+
+    func makeNSView(context: Context) -> StripperView {
+        StripperView()
+    }
+
+    func updateNSView(_ view: StripperView, context: Context) {
+        view.apply(active: active)
+    }
+
+    static func dismantleNSView(_ view: StripperView, coordinator: ()) {
+        view.restore()
+    }
+
+    /// 只改背板属性、不画任何东西的宿主视图。
+    final class StripperView: NSView {
+        /// 需要隐藏的材质：只减侧栏 / 标题栏的底
+        private static let strippedMaterials: [NSVisualEffectView.Material] = [
+            .sidebar, .underWindowBackground, .headerView,
+        ]
+
+        private var pendingActive = false
+        /// 已接管的窗口（弱引用：窗口关闭后自然置 nil，不阻止释放）
+        private weak var appliedWindow: NSWindow?
+        /// 接管前的原值记录
+        private var adjustments: [Adjustment] = []
+        /// 防重入：`layout()` 里会反复进来，改属性本身也可能触发布局
+        private var isStripping = false
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            // 离开窗口（关设置窗 / 场景重建）：先还原，别把透明留在已关闭的窗口上
+            guard window != nil else {
+                restore()
+                return
+            }
+            apply(active: pendingActive)
+        }
+
+        override func layout() {
+            super.layout()
+            stripIfNeeded()
+        }
+
+        func apply(active: Bool) {
+            pendingActive = active
+            guard active else {
+                restore()
+                return
+            }
+            stripIfNeeded()
+        }
+
+        /// 逐项还原成接管前的值（幂等：没接管过也安全）。
+        func restore() {
+            for adjustment in adjustments.reversed() {
+                adjustment.revert()
+            }
+            adjustments.removeAll()
+            appliedWindow = nil
+        }
+
+        // MARK: - 剥离 / 重放
+
+        private func stripIfNeeded() {
+            guard pendingActive, !isStripping, let window else { return }
+            isStripping = true
+            defer { isStripping = false }
+
+            if appliedWindow !== window {
+                // 换窗口（设置窗被重建）前先把旧窗口还原，避免属性残留
+                restore()
+                appliedWindow = window
+            }
+            guard let root = window.contentView else { return }
+            strip(in: root)
+        }
+
+        private func strip(in view: NSView) {
+            adjustIfNeeded(view)
+            for subview in view.subviews {
+                strip(in: subview)
+            }
+        }
+
+        private func adjustIfNeeded(_ view: NSView) {
+            // 已记录过的目标：只重放状态（系统可能在重建后又把 hidden / 底色写回来）
+            if let index = adjustments.firstIndex(where: { $0.view === view }) {
+                adjustments[index].reapply()
+                return
+            }
+
+            if let effect = view as? NSVisualEffectView {
+                guard Self.strippedMaterials.contains(effect.material) else { return }
+                // 目标若是自己的祖先，隐藏会连内容一起抹掉 ⇒ 跳过（同主窗兜底逻辑）
+                guard !isDescendant(of: effect) else { return }
+                adjustments.append(
+                    Adjustment(view: effect, kind: .visualEffect, originalHidden: effect.isHidden)
+                )
+                effect.isHidden = true
+                return
+            }
+
+            if #available(macOS 26.0, *), let glass = view as? NSGlassEffectView {
+                guard !isDescendant(of: glass) else { return }
+                adjustments.append(
+                    Adjustment(view: glass, kind: .visualEffect, originalHidden: glass.isHidden)
+                )
+                glass.isHidden = true
+                return
+            }
+
+            if let scrollView = view as? NSScrollView {
+                adjustments.append(
+                    Adjustment(
+                        view: scrollView,
+                        kind: .scrollView,
+                        originalDrawsBackground: scrollView.drawsBackground
+                    )
+                )
+                scrollView.drawsBackground = false
+                // List 的真底色在 documentView（NSTableView / NSOutlineView）上：
+                // 实测为 `_sourceListBackgroundColor`，不清掉就是那块不透明浅灰。
+                if let table = scrollView.documentView as? NSTableView {
+                    adjustments.append(
+                        Adjustment(
+                            view: table,
+                            kind: .tableView,
+                            originalTableBackground: table.backgroundColor
+                        )
+                    )
+                    table.backgroundColor = .clear
+                }
+                return
+            }
+
+            if let clipView = view as? NSClipView {
+                adjustments.append(
+                    Adjustment(
+                        view: clipView,
+                        kind: .clipView,
+                        originalDrawsBackground: clipView.drawsBackground
+                    )
+                )
+                clipView.drawsBackground = false
+            }
+        }
+
+        // MARK: - 原值记录
+
+        private struct Adjustment {
+            enum Kind {
+                case visualEffect
+                case scrollView
+                case clipView
+                case tableView
+            }
+
+            weak var view: NSView?
+            let kind: Kind
+            var originalHidden = false
+            var originalDrawsBackground = false
+            var originalTableBackground: NSColor?
+
+            func revert() {
+                switch kind {
+                case .visualEffect:
+                    view?.isHidden = originalHidden
+                case .scrollView:
+                    (view as? NSScrollView)?.drawsBackground = originalDrawsBackground
+                case .clipView:
+                    (view as? NSClipView)?.drawsBackground = originalDrawsBackground
+                case .tableView:
+                    if let color = originalTableBackground {
+                        (view as? NSTableView)?.backgroundColor = color
+                    }
+                }
+            }
+
+            func reapply() {
+                switch kind {
+                case .visualEffect:
+                    view?.isHidden = true
+                case .scrollView:
+                    (view as? NSScrollView)?.drawsBackground = false
+                case .clipView:
+                    (view as? NSClipView)?.drawsBackground = false
+                case .tableView:
+                    (view as? NSTableView)?.backgroundColor = .clear
+                }
+            }
+        }
+    }
+}

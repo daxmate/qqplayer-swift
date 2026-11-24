@@ -50,13 +50,11 @@ struct MacSettingsView: View {
             }
             .listStyle(.sidebar)
             .frame(width: 220)
-            // 玻璃生效时剥离侧栏 List 自带的系统材质（复用曲库侧栏同一实现）：
-            // macOS 26+ 摘掉列级玻璃底板；15- 隐藏 `.sidebar` 材质视图。
-            .background {
-                if settingsGlassActive {
-                    MacSidebarMaterialStripper()
-                }
-            }
+            // 玻璃生效时 List 自己让路（右侧内容页同一入口 `.macSettingsGlassListBackground()`）：
+            // 实测 `.listStyle(.sidebar)` 的背板来自 NSTableView 的 `_sourceListBackgroundColor`
+            // + 兄弟层 `.sidebar` NSVisualEffectView；`.scrollContentBackground(.hidden)` 会同时
+            // 把表格底清成透明、并让 SwiftUI 摘掉那层 `.sidebar` 效果视图（见任务验证记录）。
+            .macSettingsGlassListBackground()
 
             Divider()
 
@@ -110,6 +108,8 @@ struct MacSettingsView: View {
         .frame(minWidth: 620, minHeight: 420)
         // 整窗玻璃原型（开关 + 未开「降低透明度」才生效；关闭逐项还原，见 `MacSettingsWindowGlass`）
         .macSettingsGlassScene()
+        // 侧栏 / 标题栏的 AppKit 背板兜底剥离（只减色；生效条件与玻璃同源，失效严格还原）
+        .background { MacSettingsBackdropStripper(active: settingsGlassActive) }
         .sheet(isPresented: $showEQSettings) {
             MacEQSettingsView()
                 // sheet 是独立窗口：同样按设置窗作用域装配（随设置窗开关即时生效）
