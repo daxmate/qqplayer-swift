@@ -62,6 +62,9 @@ struct MacMiniPlayerView: View {
             // 封面（点击返回主窗——v2 迷你模式与主窗互斥，封面是返回出口；
             // hover 手型提示可点击）
             Button {
+                // 低噪声唯一入口：封面就是返回主窗的出口。
+                // 有这条 = 点击到了（剩下的是窗口解析/前置问题）；没有 = 手势根本没到按钮。
+                AppLog.info(.ui, "ℹ️ mini artwork tapped")
                 desktopWindows.showMainWindow()
             } label: {
                 MacArtworkThumbnail(track: player.currentTrack, size: 76, cornerRadius: DesignTokens.radius8)
