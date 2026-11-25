@@ -296,13 +296,17 @@
 | INV-20 「已应用」= 真的落库 | `SyncChangeLogApplier.swift:223-255` 注释自承「v1 不落库」 | **行为用例**（sink nil ⇒ 不算 applied）+ 面板披露 |
 | ~~INV-23 封面路径不可跨端引用~~ **已收（2026-09-15）** | — | 已落：`playlistCoverNeverComesFromPeer` + `SyncCoverValueContract`（静态 + 合成自证） |
 
-### INV-26　跨端续播（`playback_position`）必须由**同一个开关**门控，且**默认关**（关 = 零出站零入站）
+### INV-26　跨端续播（`playback_position`）必须由**同一个开关**门控，且**默认开**（关 = 零出站零入站）
 
-- **现有守护：✅ 已收（2026-09-15）**
-  - 设置：`DeleteSettings.syncPlaybackPositionEnabled` 默认 **false**（`decodeIfPresent ?? false` 兜底旧设置）；
+- **现有守护：✅ 已收（2026-09-15；2026-11-25 口径更新为默认开 + 一次性迁移）**
+  - 设置：`DeleteSettings.syncPlaybackPositionEnabled` 默认 **true**（`decodeIfPresent ?? true` 兜底旧设置）；
+    老用户保存过设置时 false 已是显式值 → 由 `DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded`
+    在两端 App 启动（iOS / macOS 各一处）**一次性**翻转；marker `qqplayer.syncPlaybackPositionDefaultOnMigrated.v1`
+    保证幂等（写过后用户再手动关 = 永远保持关，不反弹）；
   - 出站：`PlaybackPositionCapture.recordIfEnabled` 开关关 → **直接 return（零 DB 访问）**；开 → 换歌必记 / 同曲 60s 节流；
   - 入站：`SyncChangeLogApplier.playbackPositionSyncEnabled` 关 → 不落点 + 计 `unsupportedEntries`；开且同曲才落（`PlaybackPositionResumeSink`，LWW，**绝不改 isPlaying**）；
-  - 用例：`SyncDataSyncCoreTests`（旧设置无 key → false；开关关 → 不落点不计「已应用」；开但无落点 / 落点未接受 → 同）。
+  - 用例：`SyncDataSyncCoreTests`（旧设置无 key → true；迁移三例：显式 false → true + marker / marker 已存在不翻转 /
+    迁移后用户手动关 → 仍保持关；开关关 → 不落点不计「已应用」；开但无落点 / 落点未接受 → 同）。
 - **建议**：两端门控读**同一设置项**这条事实源不要漂移（捕获/落点/装配三处）；补静态契约前先保持。
 
 ### INV-27　连接就绪后必须**自动**跑一轮「同步数据」（补发不得依赖用户动作）

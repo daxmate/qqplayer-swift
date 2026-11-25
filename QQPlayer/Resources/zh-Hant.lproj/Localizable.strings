@@ -1306,7 +1306,7 @@
 "sync_run_data_description" = "獨立於檔案傳輸，只同步收藏 / 播放紀錄 / 播放列表，不傳歌曲。";
 // 跨端續播開關（2026-09-14）：預設關；本步開啟也只允許兩端交換，上報/落點見下個版本
 "sync_run_playback_position_toggle" = "跨端續播（播放位置）";
-"sync_run_playback_position_help" = "預設關閉：本機不上報也不接受播放位置。開啟後兩端交換播放位置——本機上報正在聽的位置，也接受對端位置；同一首歌可在另一台裝置上接著播。";
+"sync_run_playback_position_help" = "預設開啟：本機上報正在聽的位置，也接受對端位置——同一首歌可在另一台裝置上接著播。關閉後兩端都不交換播放位置（本機既不上報也不接受）。";
 "sync_run_data_button" = "同步資料";
 "sync_run_data_help" = "把收藏、播放紀錄、播放列表與 iPhone 合併";
 "sync_run_data_cancel" = "取消";

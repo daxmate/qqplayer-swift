@@ -283,8 +283,10 @@ struct DeleteSettings: Codable {
 
     // MARK: - 跨端续播（播放位置）
 
-    /// 跨端续播（播放位置）开关；默认关（2026-09-14 用户拍板）。关 = 本端既不上报也不接受 playback_position
-    var syncPlaybackPositionEnabled: Bool = false
+    /// 跨端续播（播放位置）开关；**默认开**（2026-11-25 用户拍板，覆盖 2026-09-14 的默认关）。
+    /// 开 = 本端上报正在听的位置并接受对端位置；关 = 既不上报也不接受 playback_position。
+    /// 老用户已落盘的显式 false 由 migratePlaybackPositionDefaultOnIfNeeded 一次性翻成 true。
+    var syncPlaybackPositionEnabled: Bool = true
 
     // MARK: - 同步目标设备（批 B2，2026-09-26）
 
@@ -412,10 +414,11 @@ struct DeleteSettings: Codable {
         scrapingAutoAfterDownload = try container.decodeIfPresent(
             Bool.self, forKey: .scrapingAutoAfterDownload
         ) ?? false
-        // 跨端续播开关：旧设置文件（无此 key）必须是「关」——decodeIfPresent 兜底，绝不解码失败。
+        // 跨端续播开关：旧设置文件（无此 key）按「开」兜底（2026-11-25 用户拍板默认开），绝不解码失败。
+        // 注意：用户保存过设置时 false 已是显式值 → 靠启动时的一次性迁移翻转，不能只靠这里。
         syncPlaybackPositionEnabled = try container.decodeIfPresent(
             Bool.self, forKey: .syncPlaybackPositionEnabled
-        ) ?? false
+        ) ?? true
         // 同步目标设备（批 B2）：旧设置文件（无此 key）必须是「未选」——同上兜底。
         syncTargetDeviceID = try container.decodeIfPresent(String.self, forKey: .syncTargetDeviceID) ?? ""
         // 本地 AI 推荐（P1）：旧设置文件无 key → 默认 20 条 / 自动刷新开，且读取即夹到 1–50。
@@ -449,8 +452,11 @@ struct DeleteSettings: Codable {
         homeSections = decoded
     }
 
+    /// 整个设置对象的 UserDefaults 落点（Codable blob）。
+    private static let storageKey = "DeleteSettings"
+
     static func load() -> DeleteSettings {
-        guard let data = UserDefaults.standard.data(forKey: "DeleteSettings"),
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
               let settings = try? JSONDecoder().decode(DeleteSettings.self, from: data) else {
             return DeleteSettings()
         }
@@ -459,7 +465,7 @@ struct DeleteSettings: Codable {
 
     func save() {
         if let data = try? JSONEncoder().encode(self) {
-            UserDefaults.standard.set(data, forKey: "DeleteSettings")
+            UserDefaults.standard.set(data, forKey: Self.storageKey)
             // 内联通知，避免 non-Sendable 闭包跨线程转换警告（2026-08-30 警告清理）
             if Thread.isMainThread {
                 NotificationCenter.default.post(name: .qqplayerSettingsDidChange, object: nil)
@@ -468,6 +474,37 @@ struct DeleteSettings: Codable {
                     NotificationCenter.default.post(name: .qqplayerSettingsDidChange, object: nil)
                 }
             }
+        }
+    }
+
+    // MARK: - 跨端续播默认开：一次性迁移（2026-11-25 用户拍板）
+
+    /// marker：写过即视为已迁移（v1 定版，之后不再改语义）。
+    static let playbackPositionDefaultOnMigrationKey = "qqplayer.syncPlaybackPositionDefaultOnMigrated.v1"
+
+    /// 把老用户设置里显式落盘的「跨端续播 = 关」一次性翻成「开」。
+    ///
+    /// 为什么必须迁移：DeleteSettings 整体 Codable 落 UserDefaults[storageKey]——
+    /// 用户只要保存过任何设置，false 就已经作为显式值写进 blob，只改 struct 默认值对他们无效。
+    /// 幂等：marker 已写 → 直接返回；迁移后用户手动关 → 永远保持关（不反弹）。
+    /// 调用点只有 App 启动（iOS / macOS 各一处）；禁止塞进 load()（高频调用且需保持纯读）。
+    static func migratePlaybackPositionDefaultOnIfNeeded(_ defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: playbackPositionDefaultOnMigrationKey) else { return }
+
+        var didFlip = false
+        if let data = defaults.data(forKey: storageKey),
+           var settings = try? JSONDecoder().decode(DeleteSettings.self, from: data),
+           !settings.syncPlaybackPositionEnabled {
+            settings.syncPlaybackPositionEnabled = true
+            if let migrated = try? JSONEncoder().encode(settings) {
+                defaults.set(migrated, forKey: storageKey)
+                didFlip = true
+            }
+        }
+        // 原值本来就是 true / 从没存过设置，也要写 marker：迁移只做一次。
+        defaults.set(true, forKey: playbackPositionDefaultOnMigrationKey)
+        if didFlip {
+            AppLog.info(.sync, "ℹ️ 跨端续播默认值迁移：老设置的「关」已翻为「开」（一次性，用户再关不再反弹）")
         }
     }
 

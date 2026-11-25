@@ -119,6 +119,8 @@ struct QQPlayerApp: App {
     init() {
         // 「封面毛玻璃背景」默认开：未写过该键的用户读到 true（两端同一份默认值）
         PlayerGlassBackground.registerDefaults()
+        // 跨端续播默认开（2026-11-25）：老用户显式落盘的「关」一次性翻成「开」
+        DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded()
         if #available(iOS 26.0, *) {
             AppIntentsDependencies.register()
         }

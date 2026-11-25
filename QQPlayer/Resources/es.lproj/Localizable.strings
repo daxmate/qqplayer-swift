@@ -978,7 +978,7 @@
 "sync_run_data_description" = "Sincroniza favoritos, historial de reproducción y listas por sí solo; no se transfieren canciones.";
 // Cross-device resume switch (2026-09-14): off by default; turning it on only allows exchange for now
 "sync_run_playback_position_toggle" = "Reanudación entre dispositivos (posición de reproducción)";
-"sync_run_playback_position_help" = "Desactivado de forma predeterminada: este dispositivo no informa ni acepta posiciones de reproducción. Si se activa, ambos dispositivos intercambian posiciones: este informa dónde estás y acepta la posición del otro, así la misma canción continúa donde la dejaste.";
+"sync_run_playback_position_help" = "Activado por defecto: este dispositivo informa de su posición y acepta la del otro, así que puedes continuar la misma canción en el otro dispositivo. Desactivado, no se intercambia nada: ni se informa ni se acepta.";
 "sync_run_data_button" = "Sincronizar datos";
 "sync_run_data_help" = "Combina favoritos, historial y listas con tu iPhone";
 "sync_run_data_cancel" = "Cancelar";

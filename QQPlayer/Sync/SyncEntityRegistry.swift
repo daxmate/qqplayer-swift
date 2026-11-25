@@ -181,7 +181,7 @@ enum SyncEntityRegistry {
             entity: .playbackPosition,
             title: "跨端续播（playbackPosition）",
             syncMode: .gatedBySetting(
-                reason: "默认关（`DeleteSettings.syncPlaybackPositionEnabled` 兜底 false）；"
+                reason: "默认开（`DeleteSettings.syncPlaybackPositionEnabled` 兜底 true；老设置由启动时一次性迁移翻转）；"
                     + "关 = 零出站零入站（捕获直接 return、落点直接拒），见 INV-26"
             ),
             channel: .changeLog,

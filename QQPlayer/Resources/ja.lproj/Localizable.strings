@@ -978,7 +978,7 @@
 "sync_run_data_description" = "お気に入り、再生履歴、プレイリストを単独で同期します。曲は転送されません。";
 // Cross-device resume switch (2026-09-14): off by default; turning it on only allows exchange for now
 "sync_run_playback_position_toggle" = "デバイス間の再生位置の引き継ぎ";
-"sync_run_playback_position_help" = "既定ではオフです。このデバイスは再生位置を送信も受信もしません。オンにすると、2台のデバイスが位置を交換します。このデバイスが現在位置を送信し、もう一方の位置も受け入れるため、同じ曲を続きから再生できます。";
+"sync_run_playback_position_help" = "既定でオンです。このデバイスは再生位置を送信し、もう一方の位置も受け入れます。同じ曲を別のデバイスで続きから再生できます。オフにすると、このデバイスは送信も受信もしません。";
 "sync_run_data_button" = "データを同期";
 "sync_run_data_help" = "iPhoneとお気に入り、再生履歴、プレイリストを統合します";
 "sync_run_data_cancel" = "キャンセル";

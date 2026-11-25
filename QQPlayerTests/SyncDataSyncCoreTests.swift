@@ -489,7 +489,7 @@ struct SyncDataSyncCoreTests {
         #expect(coordinator.report.isFinished)
     }
 
-    // MARK: - 跨端续播开关（2026-09-14：默认关；关 = 不上报也不接受播放位置）
+    // MARK: - 跨端续播开关（2026-11-25 起默认开；关 = 不上报也不接受播放位置）
 
     /// 单端内存库（applier 用例不需要双端会话）。
     private func makeManager() throws -> DatabaseManager {
@@ -594,18 +594,83 @@ struct SyncDataSyncCoreTests {
         body()
     }
 
-    @Test("开关：旧数据（无 syncPlaybackPositionEnabled）→ false；save/load 往返 true")
-    func playbackPositionSwitchDefaultsOffAndRoundTrips() throws {
-        // 1) 旧设置文件（JSON 里没有这个 key）必须解出「关」，且不得解码失败
+    @Test("开关：旧数据（无 syncPlaybackPositionEnabled）→ true；save/load 往返一致")
+    func playbackPositionSwitchDefaultsOnAndRoundTrips() throws {
+        // 1) 旧设置文件（JSON 里没有这个 key）按「开」兜底（2026-11-25 用户拍板），且不得解码失败
         let legacy = try JSONDecoder().decode(DeleteSettings.self, from: Data("{}".utf8))
-        #expect(legacy.syncPlaybackPositionEnabled == false)
+        #expect(legacy.syncPlaybackPositionEnabled == true)
 
-        // 2) 写 true → load 回来 true（真 UserDefaults；测后恢复原值，不污染其它用例）
+        // 2) 显式 false / true 都能原样往返（真 UserDefaults；测后恢复原值，不污染其它用例）
         withSettingsBackup {
             var settings = DeleteSettings.load()
+            settings.syncPlaybackPositionEnabled = false
+            settings.save()
+            #expect(DeleteSettings.load().syncPlaybackPositionEnabled == false, "写 false 后 load 回来必须是 false")
             settings.syncPlaybackPositionEnabled = true
             settings.save()
             #expect(DeleteSettings.load().syncPlaybackPositionEnabled, "写 true 后 load 回来必须是 true")
+        }
+    }
+
+    // MARK: - 跨端续播默认开：一次性迁移（2026-11-25 用户拍板）
+
+    /// 隔离 UserDefaults（独立 suite，测完删域——不碰 standard）。
+    private func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) throws {
+        let suiteName = "qqplayer.tests.playbackPositionMigration.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        try body(defaults)
+    }
+
+    /// 按生产格式（整体 Codable blob）写一份设置到指定 UserDefaults。
+    private static func storeSettings(_ syncEnabled: Bool, in defaults: UserDefaults) throws {
+        var settings = DeleteSettings()
+        settings.syncPlaybackPositionEnabled = syncEnabled
+        defaults.set(try JSONEncoder().encode(settings), forKey: "DeleteSettings")
+    }
+
+    /// 读取生产格式 blob 并解码。
+    private static func storedSettings(in defaults: UserDefaults) throws -> DeleteSettings {
+        let data = try #require(defaults.data(forKey: "DeleteSettings"))
+        return try JSONDecoder().decode(DeleteSettings.self, from: data)
+    }
+
+    @Test("迁移：老设置显式 false → 启动迁移翻成 true，并写 marker")
+    func migrationFlipsExplicitFalse() throws {
+        try withIsolatedDefaults { defaults in
+            try Self.storeSettings(false, in: defaults)
+
+            DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded(defaults)
+
+            #expect(try Self.storedSettings(in: defaults).syncPlaybackPositionEnabled, "老设置的「关」必须被翻成「开」")
+            #expect(defaults.bool(forKey: DeleteSettings.playbackPositionDefaultOnMigrationKey), "迁移后必须写 marker")
+        }
+    }
+
+    @Test("迁移：marker 已存在 → 不翻转显式 false（幂等）")
+    func migrationDoesNothingWhenMarkerExists() throws {
+        try withIsolatedDefaults { defaults in
+            try Self.storeSettings(false, in: defaults)
+            defaults.set(true, forKey: DeleteSettings.playbackPositionDefaultOnMigrationKey)
+
+            DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded(defaults)
+
+            #expect(try Self.storedSettings(in: defaults).syncPlaybackPositionEnabled == false, "已迁移过就不再翻转")
+        }
+    }
+
+    @Test("迁移：迁移后用户手动关 → 再调迁移仍保持关（不反弹）")
+    func migrationKeepsUserChoiceAfterMigration() throws {
+        try withIsolatedDefaults { defaults in
+            try Self.storeSettings(false, in: defaults)
+            DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded(defaults)
+            #expect(try Self.storedSettings(in: defaults).syncPlaybackPositionEnabled)
+
+            // 用户在设置页手动关（同一 Codable 格式写回）
+            try Self.storeSettings(false, in: defaults)
+            DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded(defaults)
+
+            #expect(try Self.storedSettings(in: defaults).syncPlaybackPositionEnabled == false, "用户手动关必须保持关")
         }
     }
 
@@ -658,7 +723,7 @@ struct SyncDataSyncCoreTests {
         #expect(unsupported.value == 1)
     }
 
-    @Test("端到端：开关关（默认）→ 对端推来的播放位置不计「应用」，计入未支持")
+    @Test("端到端：开关关 → 对端推来的播放位置不计「应用」，计入未支持")
     func coordinatorCountsUnsupportedPlaybackPosition() throws {
         let pair = try makePair()
         let responder = makePeer(pair.fixture.clientSession, manager: pair.clientManager, peerID: pair.hostID)

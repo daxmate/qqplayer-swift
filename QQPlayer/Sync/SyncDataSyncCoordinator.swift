@@ -138,7 +138,7 @@ final class SyncDataSyncCoordinator: @unchecked Sendable {
         self.libraryRoot = libraryRoot
         self.retryPolicy = retryPolicy
         var applier = SyncChangeLogApplier(database: database)
-        // 跨端续播（默认关）：开关开且落点可用才注入落点；关 = 本端不接受播放位置（INV-26）。
+        // 跨端续播（2026-11-25 起默认开）：开关开且落点可用才注入落点；关 = 本端不接受播放位置（INV-26）。
         if applier.playbackPositionSyncEnabled {
             applier.playbackPositionSink = { PlaybackPositionResumeSink.apply($0) }
         }

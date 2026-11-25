@@ -978,7 +978,7 @@
 "sync_run_data_description" = "Syncs favorites, play history and playlists on their own — no songs are transferred.";
 // Cross-device resume switch (2026-09-14): off by default; turning it on only allows exchange for now
 "sync_run_playback_position_toggle" = "Cross-device resume (playback position)";
-"sync_run_playback_position_help" = "Off by default: this device neither reports nor accepts playback positions. When on, the two devices exchange positions — this device reports where you are and accepts the other device's position, so the same song continues where you left off.";
+"sync_run_playback_position_help" = "On by default: this device reports and accepts playback positions. When off, the two devices exchange nothing — this device neither reports nor accepts. While on, the same song can continue on your other device.";
 "sync_run_data_button" = "Sync Data";
 "sync_run_data_help" = "Merge favorites, play history and playlists with your iPhone";
 "sync_run_data_cancel" = "Cancel";

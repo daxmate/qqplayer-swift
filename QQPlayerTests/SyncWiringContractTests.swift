@@ -1830,7 +1830,7 @@ struct SyncEntityRegistryContractTests {
                 "\(entity.rawValue) 的引用歌曲判定变了"
             )
         }
-        // 门控实体（跨端续播，默认关）不在 v1 无条件清单里 —— 与收口前一致
+        // 门控实体（跨端续播，2026-11-25 起默认开、可关）不在 v1 无条件清单里 —— 与收口前一致
         #expect(
             SyncChangeEntity.v1Synced.contains(.playbackPosition) == false,
             "门控实体不得混进 v1 无条件同步清单"

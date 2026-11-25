@@ -127,6 +127,8 @@ struct QQPlayerMacApp: App {
     init() {
         // 「封面毛玻璃背景」默认开：未写过该键的用户读到 true（两端同一份默认值）
         PlayerGlassBackground.registerDefaults()
+        // 跨端续播默认开（2026-11-25）：老用户显式落盘的「关」一次性翻成「开」
+        DeleteSettings.migratePlaybackPositionDefaultOnIfNeeded()
         // 诊断基建：stderr + stdout 重定向落盘（print 走 stdout，Swift fatal 走 stderr），
         // 运行时报错/业务日志可离线读取（~/Library/Logs/QQPlayerMac/{stdout,stderr}.log）
         MacScanLogger.redirectStderr()

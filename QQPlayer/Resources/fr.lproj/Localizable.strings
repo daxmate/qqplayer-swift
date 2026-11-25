@@ -976,7 +976,7 @@
 "sync_run_data_description" = "Synchronise les favoris, l'historique et les playlists indépendamment des fichiers — aucune chanson n'est transférée.";
 // Interrupteur de reprise entre appareils (2026-09-14) : désactivé par défaut
 "sync_run_playback_position_toggle" = "Reprise entre appareils (position de lecture)";
-"sync_run_playback_position_help" = "Désactivé par défaut : cet appareil ne signale ni n'accepte de position de lecture. Activé, les deux appareils échangent leur position — cet appareil signale la sienne et accepte celle de l'autre, pour reprendre le même morceau là où vous l'avez laissé.";
+"sync_run_playback_position_help" = "Activé par défaut : cet appareil signale sa position et accepte celle de l’autre, pour reprendre le même morceau sur l’autre appareil. Désactivé, rien n’est échangé : ni signalé ni accepté.";
 "sync_run_data_button" = "Synchroniser les données";
 "sync_run_data_help" = "Fusionner les favoris, l'historique et les playlists avec votre iPhone";
 "sync_run_data_cancel" = "Annuler";

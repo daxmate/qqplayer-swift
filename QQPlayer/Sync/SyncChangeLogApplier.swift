@@ -36,7 +36,7 @@
 //    v1 不落库：通过 playbackPositionSink 注入回调（测试用内存捕获）；生产
 //    接线（写 UserDefaults QQPlayerState / 未来 DB 行）留 M4-2 定本地载体。
 //    entity 枚举/行模型/LWW/协议层已支持，payload 见 SyncPlaybackPositionSnapshot。
-//    ⚠️ 跨端续播开关（2026-09-14）：`playbackPositionSyncEnabled` 关（默认）/ 开但
+//    ⚠️ 跨端续播开关（2026-11-25 起默认开，原 2026-09-14 默认关）：门控关 / 开但
 //    sink 未接时，该行**不落任何本地位置**——因此**不算「已应用」**（不返回 true），
 //    只触发 `onPlaybackPositionUnsupported`（面板据此披露「未支持」）。
 //    修复 INV-20：先前 sink == nil 时 print「丢弃」却 return true
