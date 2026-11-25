@@ -63,7 +63,7 @@ struct SyncDataPane: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // 跨端续播开关（默认关；关 = 本端既不上报也不接受播放位置）。
+            // 跨端续播开关（2026-11-25 起默认开；关 = 本端既不上报也不接受播放位置）。
             // 文案必须与真实行为逐字一致：本步开也只允许交换，上报/落点见下一版本。
             Toggle("sync_run_playback_position_toggle".localized, isOn: $deleteSettings.syncPlaybackPositionEnabled)
                 .onChange(of: deleteSettings.syncPlaybackPositionEnabled) { _, _ in

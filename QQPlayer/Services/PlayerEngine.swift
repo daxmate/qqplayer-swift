@@ -367,7 +367,7 @@ class PlayerEngine: NSObject {
         UserDefaults.standard.synchronize()
         AppLog.info(.general, "✅ Player state saved to UserDefaults (offline, per-device)")
 
-        // S2-T12+（2026-09-15）：跨端续播（同步面板开关，默认关）。
+        // S2-T12+（2026-09-15）：跨端续播（同步面板开关；2026-11-25 起默认开）。
         // 关 = `recordIfEnabled` 直接 return：不读设置外的任何东西、不碰 DB、不写 outbox。
         PlaybackPositionCapture.recordIfEnabled(
             trackStableId: currentTrack.stableId,
