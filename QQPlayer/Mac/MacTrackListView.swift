@@ -210,11 +210,11 @@ struct MacTrackListView: View {
             Button {
                 locateActiveTrack()
             } label: {
-                Label(Localized.locatePlayingTrack, systemImage: "location")
-                    .font(.callout)
+                MacTrackListToolbarLabel()
             }
             .buttonStyle(.borderless)
             .disabled(activeTrackId == nil)
+            .help(Localized.locatePlayingTrack)
             Spacer()
             // 批量删除进度 + 取消（审计 H1：修复前磁盘/DB 逐首同步跑在主线程、
             // 窗口卡死且无法取消——现在执行在后台，主线程只显示进度并允许取消）
