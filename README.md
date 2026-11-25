@@ -29,13 +29,13 @@
 
 <p align="center">
   <img src="assets/screenshots/macos-player.webp" width="32%" alt="macOS 播放页：曲库、封面与歌词（封面毛玻璃背景）">
-  <img src="assets/screenshots/macos-lyrics.webp" width="32%" alt="macOS 歌词面板与逐句跟唱">
-  <img src="assets/screenshots/macos-settings.webp" width="32%" alt="macOS 设置：外观与封面毛玻璃开关">
+  <img src="assets/screenshots/macos-lyrics.webp" width="32%" alt="macOS 全屏歌词：中日双语对照与逐句高亮">
+  <img src="assets/screenshots/macos-settings.webp" width="32%" alt="macOS 设置：主题、强调色与封面毛玻璃开关">
 </p>
 <p align="center">
   <img src="assets/screenshots/ios-player.webp" width="23%" alt="iPhone 播放页">
   <img src="assets/screenshots/ios-lyrics.webp" width="23%" alt="iPhone 歌词">
-  <img src="assets/screenshots/ios-karaoke.webp" width="23%" alt="iPhone 跟唱练习">
+  <img src="assets/screenshots/ios-playlists.webp" width="23%" alt="iPhone 播放列表">
   <img src="assets/screenshots/ios-library.webp" width="23%" alt="iPhone 曲库">
 </p>
 
