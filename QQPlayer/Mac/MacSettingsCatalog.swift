@@ -341,20 +341,6 @@ enum MacSettingsCatalog {
         aliases: ["Last.fm", "lastfm", "API key", "密钥"]
     )
 
-    static let recommendationChatRounds = Item(
-        id: "settings.recommendation.chatRounds",
-        category: .recommendations,
-        titleKey: "recommendation_chat_rounds_title",
-        aliases: ["对话上下文", "上下文", "轮数", "追问", "chat", "context", "rounds"]
-    )
-
-    static let recommendationRelatedShare = Item(
-        id: "settings.recommendation.relatedShare",
-        category: .recommendations,
-        titleKey: "recommendation_related_share_title",
-        aliases: ["相似艺人", "相似比例", "补位", "related artist share", "share"]
-    )
-
     static let recommendationArtistRelation = Item(
         id: "settings.recommendation.artistRelation",
         category: .recommendations,
@@ -415,8 +401,6 @@ enum MacSettingsCatalog {
         recommendationLastFMToggle,
         recommendationLastFMKey,
         recommendationITunesLookup,
-        recommendationChatRounds,
-        recommendationRelatedShare,
         recommendationArtistRelation,
         aboutVersion,
         aboutAppName,

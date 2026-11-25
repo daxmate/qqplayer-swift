@@ -15,7 +15,6 @@ struct MacRecommendationView: View {
     @State private var model = MacRecommendationModel()
     @State private var settings = DeleteSettings.load()
     @State private var downloadTarget: RecommendedCandidate?
-    @State private var query = ""
     @State private var hoveredRowID: String?
     @Environment(\.openSettings) private var openSettings
     /// App 强调色（macOS 上 Color.accentColor 跟随系统而非 App tint，统一读环境值）。
@@ -24,8 +23,6 @@ struct MacRecommendationView: View {
     var body: some View {
         VStack(spacing: DesignTokens.space0) {
             header
-            Divider()
-            chatBar
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -73,78 +70,8 @@ struct MacRecommendationView: View {
         .padding(.vertical, DesignTokens.space12)
     }
 
-    // MARK: - 指令输入
-
-    private var canSubmit: Bool {
-        model.phase != .loading
-            && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var chatBar: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.space6) {
-            HStack(spacing: DesignTokens.space8) {
-                TextField("recommendation_chat_placeholder".localized, text: $query)
-                    // 玻璃生效 → 设置窗同款输入框外观；不生效 → 原生 .roundedBorder（逐像素还原）
-                    .macSettingsGlassField()
-                    .onSubmit { submit() }
-                    .disabled(model.phase == .loading)
-
-                Button {
-                    submit()
-                } label: {
-                    if model.phase == .loading {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                    }
-                }
-                .buttonStyle(.borderless)
-                .disabled(!canSubmit)
-                .help("recommendation_chat_send".localized)
-            }
-
-            if let text = model.activeRequestText {
-                HStack(spacing: DesignTokens.space6) {
-                    Image(systemName: "text.bubble")
-                        .font(.caption)
-                    Text(text)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Button {
-                        query = ""
-                        Task { await model.clearRequest(count: settings.recommendationCount) }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("recommendation_chat_clear".localized)
-                    Spacer(minLength: DesignTokens.space0)
-                }
-                .padding(.horizontal, DesignTokens.space8)
-                .padding(.vertical, DesignTokens.space4)
-                .background(
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.12))
-                )
-            }
-        }
-        .padding(.horizontal, DesignTokens.space16)
-        .padding(.bottom, DesignTokens.space8)
-    }
-
-    private func submit() {
-        guard canSubmit else { return }
-        let text = query
-        Task { await model.submit(text, count: settings.recommendationCount, rounds: settings.recommendationChatRounds) }
-    }
-
     private func refresh() async {
-        await model.refresh(
-            count: settings.recommendationCount,
-            rounds: settings.recommendationChatRounds
-        )
+        await model.refresh(count: settings.recommendationCount)
     }
 
     /// 页脚小字：生成来源 +（命中缓存时）「缓存结果 · X 分钟前」与「刷新」。
@@ -216,36 +143,12 @@ struct MacRecommendationView: View {
                     row(candidate)
                 }
             } header: {
-                Text(resultsTitle)
+                Text("recommendation_results_for_you".localized)
                     .font(.caption.weight(.semibold))
-            } footer: {
-                if let notice = artistShortfallNotice {
-                    Text(notice)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
         .listStyle(.inset)
         .macGlassListBackground()
-    }
-
-    /// 点名艺人结果不足时如实说明（用**本人匹配数**，不拿整批数量冒充）。
-    private var artistShortfallNotice: String? {
-        guard let artist = model.requestedArtist else { return nil }
-        return RecommendationArtistMix.shortfallNotice(
-            artist: artist,
-            directCount: model.directArtistMatchCount,
-            relatedCount: model.relatedArtistMatchCount,
-            target: min(settings.recommendationCount, RecommendationBatchPolicy.batchSize)
-        )
-    }
-
-    /// 结果标题：有指令 = 按你的要求；否则 = 为你推荐（不展示任何历史消息）。
-    private var resultsTitle: String {
-        model.activeRequestText == nil
-            ? "recommendation_results_for_you".localized
-            : "recommendation_chat_results_title".localized
     }
 
     private func row(_ candidate: RecommendedCandidate) -> some View {
@@ -325,7 +228,7 @@ struct MacRecommendationView: View {
             Image(systemName: "sparkles")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text(artistShortfallNotice ?? "recommendation_empty".localized)
+            Text("recommendation_empty".localized)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("recommendation_refresh".localized) {

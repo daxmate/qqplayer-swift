@@ -5,7 +5,7 @@
 //  推荐 P1/P2：N 选（同艺人 / 同专辑 / 意图 / 来源上限 + 多样性放宽）。
 //  从 RecommendationEngine.swift 拆出：加 P2 专辑上限后文件触及 600 行结构预算，本次只搬家。
 //
-//  点名艺人（artistConstraint）走独立口径：本人优先填满、相似补位 ≤ 批次 1/3（见 select 的点名分支）。
+//  批次 C（2026-11-25）：点名艺人配额口径随输入框一并移除，只剩通用 N 选。ct 的点名分支）。
 //
 
 import Foundation
@@ -14,8 +14,7 @@ extension RecommendationEngine {
     func select(
         _ ranked: [RankedItem],
         count: Int,
-        profile: TasteProfile,
-        artistConstraint: RecommendationArtistConstraint? = nil
+        profile: TasteProfile
     ) -> [RecommendedCandidate] {
         let target = max(1, count)
         let perIntentCap = max(2, min(maxSongsPerIntent, target / 3 + 1))
@@ -63,8 +62,7 @@ extension RecommendationEngine {
 
             var reasons = reasonsFor(
                 item.item,
-                previousPrimary: previousPrimary,
-                artistConstraint: artistConstraint
+                previousPrimary: previousPrimary
             )
             // 榜单命中：追加「近期热门」并保证它落在 UI 展示的前两条里（规则理由上限仍为 2 条）。
             if item.isChartHit {
@@ -89,59 +87,6 @@ extension RecommendationEngine {
             // P3：曲风只用来约束批次多样性（缺 genre 的条目不参与该约束）。
             candidate.genre = item.item.intent.kind == .genre ? item.item.intent.genre : nil
             picked.append(candidate)
-        }
-
-        // 点名艺人：本人 / 相似按固定比例取满（share=0 = 纯本人）；某段不足由另一段补位（本人优先）。
-        if let artistConstraint {
-            let quota = RecommendationArtistMix.quota(displayTarget: target, share: relatedArtistShare)
-            for pass in 0 ..< 2 {
-                for item in ranked where artistConstraint.matches(artist: item.item.song.artist) {
-                    guard picked.count < quota.direct else { break }
-                    guard admits(item, intentCap: nil, sourceCap: pass == 0 ? perSourceCap : nil) else { continue }
-                    take(item)
-                }
-            }
-            var relatedPicked = 0
-            for pass in 0 ..< 2 {
-                for item in ranked where !artistConstraint.matches(artist: item.item.song.artist) {
-                    guard picked.count < target, relatedPicked < quota.related else { break }
-                    guard admits(
-                        item,
-                        intentCap: pass == 0 ? perIntentCap : nil,
-                        sourceCap: pass == 0 ? perSourceCap : nil
-                    ) else { continue }
-                    take(item)
-                    relatedPicked += 1
-                }
-            }
-            // 本人优先补位：相似段不足时用本人凑满 target（相似段不再超过名额）。
-            if picked.count < target {
-                for pass in 0 ..< 2 {
-                    for item in ranked where artistConstraint.matches(artist: item.item.song.artist) {
-                        guard picked.count < target else { break }
-                        guard admits(item, intentCap: nil, sourceCap: pass == 0 ? perSourceCap : nil) else { continue }
-                        take(item)
-                    }
-                }
-            }
-            // 反方向补位：本人段不足时用相似条目补满 target（总数优先，此时候选不足才是真的少）。
-            // 补位行仍带 relatedTo 标记，不得被当成点名人本人的歌。
-            if picked.count < target {
-                for pass in 0 ..< 2 {
-                    for item in ranked where !artistConstraint.matches(artist: item.item.song.artist) {
-                        guard picked.count < target else { break }
-                        guard admits(
-                            item,
-                            intentCap: pass == 0 ? perIntentCap : nil,
-                            sourceCap: pass == 0 ? perSourceCap : nil
-                        ) else { continue }
-                        take(item)
-                        relatedPicked += 1
-                    }
-                }
-            }
-            // 展示顺序：本人行在前、相似补位行在后（补位行可能因凑满被排到直采之后）。
-            return picked.filter { $0.relatedTo == nil } + picked.filter { $0.relatedTo != nil }
         }
 
         // 第一轮守多样性上限；条数不够时第二轮放宽意图 / 来源上限（艺人上限始终保留）。

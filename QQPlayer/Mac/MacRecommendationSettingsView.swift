@@ -25,8 +25,6 @@ struct MacRecommendationSettingsView: View {
             profileWeightsSection
             lastFMSection
             iTunesSection
-            requestSection
-            relatedArtistSection
             artistRelationSection
         }
         .formStyle(.grouped)
@@ -170,58 +168,7 @@ struct MacRecommendationSettingsView: View {
         }
     }
 
-    // MARK: - 指令
-
-    private var requestSection: some View {
-        Section {
-            Stepper(value: $settings.recommendationChatRounds, in: DeleteSettings.recommendationChatRoundsRange) {
-                HStack {
-                    Text("recommendation_chat_rounds_title".localized)
-                    Spacer()
-                    Text("\(settings.recommendationChatRounds)")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            }
-            .settingsAnchor(MacSettingsCatalog.recommendationChatRounds)
-            .onChange(of: settings.recommendationChatRounds) { _, newValue in
-                settings.recommendationChatRounds = DeleteSettings.clampRecommendationChatRounds(newValue)
-                settings.save()
-            }
-        } footer: {
-            Text("recommendation_chat_rounds_footer".localized)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     // MARK: - 相似艺人比例
-
-    private var relatedArtistSection: some View {
-        Section {
-            HStack {
-                Text("recommendation_related_share_title".localized)
-                Spacer()
-                Text("\(Int((settings.relatedArtistShare * 100).rounded()))%")
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            Slider(
-                value: $settings.relatedArtistShare,
-                in: DeleteSettings.relatedArtistShareRange,
-                step: DeleteSettings.relatedArtistShareStep
-            )
-            .settingsAnchor(MacSettingsCatalog.recommendationRelatedShare)
-            .onChange(of: settings.relatedArtistShare) { _, newValue in
-                settings.relatedArtistShare = DeleteSettings.clampRelatedArtistShare(newValue)
-                settings.save()
-            }
-        } footer: {
-            Text("recommendation_related_share_footer".localized)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
 
     // MARK: - MusicBrainz 关系扩展
 

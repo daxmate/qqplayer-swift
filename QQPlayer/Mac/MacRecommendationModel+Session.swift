@@ -30,7 +30,7 @@ extension MacRecommendationModel {
         blacklist.markRecommended(batch, at: clock())
         _ = RecommendationBlacklistStore.save(blacklist, to: blacklistURL)
         if let key = lastCacheKey {
-            storeCache(key, planSource: planSource, candidates: batch, requestedArtist: requestedArtist)
+            storeCache(key, planSource: planSource, candidates: batch)
         }
         return true
     }
@@ -41,9 +41,7 @@ extension MacRecommendationModel {
     /// 只有「补池后为空或已耗尽」才允许返回剩余。
     func applyPool(
         _ pool: [RecommendedCandidate],
-        count: Int,
-        namedArtist: Bool = false,
-        relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
+        count: Int
     ) -> [RecommendedCandidate] {
         let target = min(max(1, count), RecommendationBatchPolicy.batchSize)
         var working: RecallSession
@@ -52,17 +50,7 @@ extension MacRecommendationModel {
             working = existing
             added = working.append(pool: pool)
         } else {
-            // 点名艺人：本人 / 相似按比例取满（share=0 = 纯本人），本人可占满自己那一段。
-            let share = RecommendationArtistMix.quota(
-                displayTarget: RecommendationBatchPolicy.batchSize,
-                share: relatedArtistShare
-            )
-            working = RecallSession(
-                pool: pool,
-                maxPerArtist: RecommendationArtistMix.batchMaxPerArtist(namedArtist: namedArtist),
-                minDistinctArtists: RecommendationArtistMix.batchMinDistinctArtists(namedArtist: namedArtist),
-                quota: namedArtist ? RecallSession.Quota(direct: share.direct, related: share.related) : nil
-            )
+            working = RecallSession(pool: pool)
         }
 
         if let batch = working.takeFullBatchOrNil(minimum: target) {
@@ -88,16 +76,6 @@ extension MacRecommendationModel {
         return []
     }
 
-    /// 本人匹配数（点名场景）：当前展示批次里直接命中点名艺人的条数（不是整批数量）。
-    var directArtistMatchCount: Int {
-        RecommendationArtistMix.directCount(in: candidates)
-    }
-
-    /// 相似补位条数（点名场景）。
-    var relatedArtistMatchCount: Int {
-        max(0, candidates.count - directArtistMatchCount)
-    }
-
     /// 召回排除集：会话内 seen ∪ 最近 7 天软黑名单（跨会话）。
     var excludedTrackKeys: Set<String> {
         blacklist.activeRecentKeys(at: clock()).union(session?.seen ?? [])
@@ -119,11 +97,9 @@ extension MacRecommendationModel {
         )
         engine.maxSongsPerIntent = 20
         engine.maxSourceShare = 1.0
-        engine.relatedArtistShare = DeleteSettings.load().relatedArtistShare
         // P4：艺人关系扩展（设置关 = nil，召回行为与 P3 完全一致）。
         engine.artistRelation = RecommendationArtistRelation.fromSettings()
         // 点名场景：即使设置为关也启用相似补位（查询失败静默降级为纯本人）。
-        engine.namedArtistRelationFallback = RecommendationArtistRelation()
         // 榜单热度：Apple Music tw/us 日榜（6 小时缓存；失败静默降级为中性 0.5）。
         engine.chartClient = AppleMusicChartClient()
         return engine

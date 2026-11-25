@@ -301,8 +301,6 @@ struct DeleteSettings: Codable {
     var recommendationCount: Int = DeleteSettings.defaultRecommendationCount
     /// 打开 App 时是否按 24h 自动刷新（P1 只存值，不做定时器）。
     var recommendationAutoRefresh: Bool = true
-    /// 指令输入的后台上下文轮数（0–9；只用于理解追问，界面不显示）。
-    var recommendationChatRounds: Int = DeleteSettings.defaultRecommendationChatRounds
 
     // MARK: - 推荐 v3（口味画像权重 / 通道配额 / Last.fm）
     var recommendationV3 = RecommendationV3Settings()
@@ -310,37 +308,13 @@ struct DeleteSettings: Codable {
     /// P4：MusicBrainz 艺人关系扩展（默认关 = 召回与 P3 完全一致、零额外请求）。
     /// 旧设置文件没有该 key 时必须解码为 false（见 init(from:)），不得整份解码失败。
     var recommendationArtistRelationExpansion: Bool = false
-    /// 点名艺人时相似补位在批次中的最大占比（0...0.5，默认 0.30；UI 按 5% 步进）。
-    var relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
-
     /// 推荐条数默认值 / 边界（唯一口径）。
     static let defaultRecommendationCount = 15
     static let recommendationCountRange = 1 ... 50
 
-    /// 指令输入上下文轮数默认值 / 边界（唯一口径）。
-    static let defaultRecommendationChatRounds = 3
-    static let recommendationChatRoundsRange = 0 ... 9
-
     /// 读取时的边界归一（旧数据 / 手改 UserDefaults 都不越界）。
     static func clampRecommendationCount(_ value: Int) -> Int {
         min(recommendationCountRange.upperBound, max(recommendationCountRange.lowerBound, value))
-    }
-
-    static func clampRecommendationChatRounds(_ value: Int) -> Int {
-        min(recommendationChatRoundsRange.upperBound, max(recommendationChatRoundsRange.lowerBound, value))
-    }
-
-    /// 相似补位比例默认值 / 边界 / 步进（唯一口径）。
-    static let defaultRelatedArtistShare = 0.30
-    static let relatedArtistShareRange = 0.0 ... 0.5
-    static let relatedArtistShareStep = 0.05
-
-    /// 比例归一：先夹 0...0.5，再按 5% 步进取整（浮点误差按两位小数收口）。
-    static func clampRelatedArtistShare(_ value: Double) -> Double {
-        guard value.isFinite else { return defaultRelatedArtistShare }
-        let clamped = min(relatedArtistShareRange.upperBound, max(relatedArtistShareRange.lowerBound, value))
-        let steps = (clamped / relatedArtistShareStep).rounded()
-        return (steps * relatedArtistShareStep * 100).rounded() / 100
     }
 
     // Home screen section visibility & order
@@ -426,10 +400,6 @@ struct DeleteSettings: Codable {
             ?? Self.defaultRecommendationCount
         recommendationCount = Self.clampRecommendationCount(storedRecommendationCount)
         recommendationAutoRefresh = try container.decodeIfPresent(Bool.self, forKey: .recommendationAutoRefresh) ?? true
-        recommendationChatRounds = Self.clampRecommendationChatRounds(
-            try container.decodeIfPresent(Int.self, forKey: .recommendationChatRounds)
-                ?? Self.defaultRecommendationChatRounds
-        )
         recommendationV3 = try container.decodeIfPresent(
             RecommendationV3Settings.self, forKey: .recommendationV3
         ) ?? RecommendationV3Settings()
@@ -437,11 +407,6 @@ struct DeleteSettings: Codable {
         recommendationArtistRelationExpansion = try container.decodeIfPresent(
             Bool.self, forKey: .recommendationArtistRelationExpansion
         ) ?? false
-        // 相似补位比例：旧设置文件无 key → 0.30（decodeIfPresent 兜底 + 读取即归一）。
-        relatedArtistShare = Self.clampRelatedArtistShare(
-            try container.decodeIfPresent(Double.self, forKey: .relatedArtistShare)
-                ?? Self.defaultRelatedArtistShare
-        )
 
         var decoded = try container.decodeIfPresent([HomeSectionItem].self, forKey: .homeSections) ?? HomeSectionItem.defaultSections
         // Ensure any new sections added in future updates are included

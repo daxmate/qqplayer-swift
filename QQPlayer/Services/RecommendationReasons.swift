@@ -2,13 +2,12 @@
 //  RecommendationReasons.swift
 //  QQPlayer
 //
-//  推荐 v2 P3：逐曲理由的「可替换来源」契约。
+//  推荐：逐曲理由的「可替换来源」契约。
 //
-//  - `RecommendationReasonProviding`：理由来源（默认规则；Mac 注入本地模型）。
+//  - `RecommendationReasonProviding`：理由来源（默认规则；Mac 注入模板文案）。
 //  - `RuleRecommendationReasonProvider`：原样返回引擎在选片阶段产出的规则理由（行为不变）。
-//  - `RecommendationReasonPrompt` / `RecommendationReasonParser`：一次整批的严格 JSON prompt 与校验。
-//  - 校验铁律：条数匹配、非空、长度上限、只许出现输入里的名字、不得带 JSON 残片/引号；
-//    任一条不合格就**逐条**回落规则理由，整批失败则全用规则理由（功能不退化）。
+//  - `RecommendationReasonBinder`：把来源给出的理由按归一化键绑回候选，逐条回落规则理由。
+//  批次 C（2026-11-25）：本地模型 prompt / parser 随之删除，契约只剩规则与模板来源。
 //
 //  ⚠️ 纯逻辑层：iOS / macOS 共享，只依赖 Foundation，不引入平台 API。
 //

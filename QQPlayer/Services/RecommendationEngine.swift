@@ -39,10 +39,6 @@ struct RecommendationEngine: Sendable {
     var maxSimilarProbes: Int = 3
     /// P4：MusicBrainz 艺人关系扩展（nil = 关：零额外请求，召回行为与 P3 完全一致）。
     var artistRelation: RecommendationArtistRelation?
-    /// 点名场景的关系扩展兜底（设置为关也启用，用于相似补位）；nil = 不自动启用（测试默认）。
-    var namedArtistRelationFallback: RecommendationArtistRelation?
-    /// 点名场景的相似补位比例（0...0.5，默认 0.30）：相似名额 = round(target × share)。
-    var relatedArtistShare: Double = DeleteSettings.defaultRelatedArtistShare
     /// 榜单热度客户端（nil = 不取榜单，热度恒为中性 0.5；测试默认 nil，生产由 `configured()` 接线）。
     var chartClient: AppleMusicChartClient?
 
@@ -167,15 +163,12 @@ struct RecommendationEngine: Sendable {
     func gather(
         profile: TasteProfile,
         intents: [RecommendationIntent],
-        excludedArtists: Set<String> = [],
-        artistConstraint: RecommendationArtistConstraint? = nil,
         excludedTrackKeys: Set<String> = []
     ) async -> GatherResult {
         var items: [GatheredItem] = []
         var indexByKey: [String: Int] = [:]
         var failedAttempts = 0
         var succeededSources = 0
-        var rejectedByArtist = 0
         var gateStats: [String: (inCount: Int, outCount: Int)] = [:]
         var rejectionCounts: [String: Int] = [:]
         var flaggedCounts: [String: Int] = [:]
@@ -217,14 +210,6 @@ struct RecommendationEngine: Sendable {
             if song.songID == nil {
                 flaggedCounts[RecommendationAdmissionRejection.missingSongID.rawValue, default: 0] += 1
             }
-            // 点名艺人是硬约束：主艺人不在点名集合内直接剔除（标题命中也不算）。
-            // 相似补位行（relatedTo != nil）是被点名艺人的「相关艺人」，放行但不计本人。
-            if let artistConstraint, relatedTo == nil {
-                guard passGate("artist_constraint", artistConstraint.matches(artist: song.artist)) else {
-                    rejectedByArtist += 1
-                    return
-                }
-            }
             // 准入闸：唯一判定入口 isLikelyNonSong 的原因版本（顺序判定，宁严）。
             if let reason = RecommendationCandidateFilter.admissionRejection(for: song) {
                 _ = passGate("admission", false)
@@ -239,7 +224,6 @@ struct RecommendationEngine: Sendable {
                 "blacklist",
                 !profile.blacklistTracks.contains(key) && !profile.blacklistArtists.contains(artistKey)
             ) else { return }
-            guard passGate("excluded_artists", !excludedArtists.contains(artistKey)) else { return }
             // P2 软黑名单：最近 7 天推过的曲目直接跳过（跨会话，不永久拉黑）。
             guard passGate("recent", !excludedTrackKeys.contains(key)) else { return }
 
@@ -319,25 +303,18 @@ struct RecommendationEngine: Sendable {
         }
 
         // P4：可选艺人关系扩展（默认关 = 零请求）。
-        // 点名场景即使设置为关也启用（相似补位）：结果带 relatedTo 标记、不被硬约束闸剔除；
-        // 比例 0（纯本人）时不召回相似，避免无谓的 MB / 源请求。
-        let expansion = artistRelation ?? (artistConstraint == nil ? nil : namedArtistRelationFallback)
-        if let expansion, artistConstraint == nil || relatedArtistShare > 0 {
+        if let expansion = artistRelation {
             let related = await relatedArtistSongs(
                 intents: resolvedIntents,
                 limit: perIntentLimit,
                 expansion: expansion
             )
             for produced in related {
-                // 相关艺人自己就是点名艺人时不打标记（仍按本人行算）。
-                let relatedTo = artistConstraint.flatMap {
-                    $0.matches(artist: produced.song.artist) ? nil : $0.displayName
-                }
                 accept(
                     produced.song,
                     providerSource: .musicbrainz,
                     intent: produced.intent,
-                    relatedTo: relatedTo
+                    relatedTo: nil
                 )
             }
             if !related.isEmpty {
@@ -346,13 +323,6 @@ struct RecommendationEngine: Sendable {
                     "🎵 推荐艺人关系扩展：召回 \(related.count) 条（\(expansion.budget.summary)）"
                 )
             }
-        }
-
-        if let artistConstraint {
-            AppLog.info(
-                .general,
-                "🎵 推荐艺人约束：\(artistConstraint.displayName) 剔除 artist 不符 \(rejectedByArtist) 条，保留 \(items.count) 条"
-            )
         }
 
         let allFailed = succeededSources == 0 && failedAttempts > 0
@@ -455,8 +425,7 @@ struct RecommendationEngine: Sendable {
     /// 逐曲理由：由**产生该候选的意图**生成；相邻行首条理由不能相同。
     func reasonsFor(
         _ item: GatheredItem,
-        previousPrimary: String?,
-        artistConstraint: RecommendationArtistConstraint? = nil
+        previousPrimary: String?
     ) -> [String] {
         var reasons: [String] = []
         let display = RecommendationKey.displayPrimaryArtist(item.intent.artist ?? item.song.artist)
@@ -467,10 +436,7 @@ struct RecommendationEngine: Sendable {
 
         switch item.intent.kind {
         case .artist:
-            if let artistConstraint, artistConstraint.matches(artist: item.song.artist) {
-                // 点名艺人的结果不说「常听 X」（用户可能从没听过）。
-                reasons.append("recommendation_reason_requested_artist".localized)
-            } else if !display.isEmpty {
+            if !display.isEmpty {
                 reasons.append("recommendation_reason_artist".localized(with: display))
             }
         case .similar:
@@ -508,11 +474,8 @@ struct RecommendationEngine: Sendable {
             unique.append("recommendation_reason_matched_taste".localized)
         }
 
-        // 点名艺人理由可以相邻重复：整份列表本来就都是「你点名的艺人」。
-        let requestedArtistReason = "recommendation_reason_requested_artist".localized
-        // 来源标记行（点名本人 / 相似补位）不受相邻去重影响：否则连续同艺人会把来源盖掉。
-        if let previousPrimary, unique.first == previousPrimary, unique.first != requestedArtistReason,
-           relatedArtist == nil {
+        // 相似补位行及其来源标记不受相邻去重影响：否则连续同艺人会把来源盖掉。
+        if let previousPrimary, unique.first == previousPrimary, relatedArtist == nil {
             if unique.count > 1 {
                 unique.removeFirst()
             } else {

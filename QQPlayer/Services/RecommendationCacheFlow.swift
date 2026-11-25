@@ -19,7 +19,6 @@ import Foundation
 struct RecommendationRecompute: Equatable, Sendable {
     var candidates: [RecommendedCandidate]
     var planSource: RecommendationPlanSource
-    var requestedArtist: String?
 }
 
 /// 缓存命中决策 + 后台重算编排。
@@ -78,8 +77,7 @@ final class RecommendationCacheFlow {
         cache?.store(
             key,
             planSource: recompute.planSource,
-            candidates: recompute.candidates,
-            requestedArtist: recompute.requestedArtist
+            candidates: recompute.candidates
         )
     }
 
