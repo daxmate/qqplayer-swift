@@ -214,17 +214,21 @@ enum RecommendationRankerV3 {
         return applyDiversity(scored)
     }
 
-    /// 单艺人 ≤2、单专辑 ≤1（专辑缺失不去重；纯函数、保持原顺序）。
+    /// 池级：单艺人 ≤maxSongsPerArtist、单专辑 ≤maxSongsPerAlbum（v4 为 4/2）；
+    /// 批级上限由 RecommendationSelectionV4 执行。（专辑缺失不参与专辑上限；纯函数、保持原顺序）
     static func applyDiversity(_ sorted: [RecommendationV3Candidate]) -> [RecommendationV3Candidate] {
         var artistCounts: [String: Int] = [:]
-        var albums = Set<String>()
+        var albumCounts: [String: Int] = [:]
         var out: [RecommendationV3Candidate] = []
         for candidate in sorted {
             let artistKey = RecommendationLibraryMatcher.artistKey(candidate.song.artist)
             let artistCount = artistCounts[artistKey, default: 0]
             guard artistCount < maxSongsPerArtist else { continue }
-            if let album = candidate.song.album.map({ RecommendationLibraryMatcher.normalize($0) }), !album.isEmpty {
-                guard albums.insert(album).inserted else { continue }
+            let albumKey = candidate.albumKey
+            if !albumKey.isEmpty {
+                let albumCount = albumCounts[albumKey, default: 0]
+                guard albumCount < maxSongsPerAlbum else { continue }
+                albumCounts[albumKey] = albumCount + 1
             }
             artistCounts[artistKey] = artistCount + 1
             out.append(candidate)

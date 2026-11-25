@@ -278,15 +278,15 @@ struct RecommendationRankerV3Tests {
         #expect(ranked.allSatisfy { $0.song.artist == "Solo" })
     }
 
-    @Test("池级专辑上限：同一专辑不能刷屏（≤ maxSongsPerAlbum）")
+    @Test("池级专辑上限：同一专辑按计数截到 maxSongsPerAlbum（不是 1）")
     func poolAlbumCap() {
         // 艺人各不相同，只让专辑约束生效。
         let crowded = (0 ..< 5).map { index in
             candidate("Same \(index)", "Band \(index)", album: "Same Album")
         }
         let ranked = RecommendationRankerV3.rank(crowded, profile: profile())
-        #expect(ranked.count >= 1)
-        #expect(ranked.count <= RecommendationRankerV3.maxSongsPerAlbum)
+        // 计数语义：5 首同专辑 → 恰好 min(5, maxSongsPerAlbum) 首（Set 去重会只剩 1 首）。
+        #expect(ranked.count == min(5, RecommendationRankerV3.maxSongsPerAlbum))
     }
 
     @Test("排序稳定：同一批候选打乱输入顺序 → 结果顺序一致")
