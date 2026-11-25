@@ -31,55 +31,6 @@
 import AppKit
 import SwiftUI
 
-/// 三根弹性列的宽度（**单一真相源**，语义见文件头）。
-struct MacTrackColumnWidths: Equatable {
-    var title = MacTrackColumnLayout.titleInitialWidth
-    var artist = MacTrackColumnLayout.artistInitialWidth
-    var album = MacTrackColumnLayout.albumInitialWidth
-}
-
-/// 列布局口径：列序 / 最小宽度 / 可拖边界。列序与 TableColumn 声明顺序一致。
-enum MacTrackColumnLayout {
-    // 列序：0 封面(固定) / 1 标题 / 2 艺人 / 3 专辑 / 4 时长(固定) / 5 ♥(固定)
-    static let titleIndex = 1
-    static let artistIndex = 2
-    static let albumIndex = 3
-    static let minimumColumnCount = 6
-
-    static let titleInitialWidth: CGFloat = 300
-    static let artistInitialWidth: CGFloat = 140
-    static let albumInitialWidth: CGFloat = 180
-
-    static let titleMinWidth: CGFloat = 120
-    static let artistMinWidth: CGFloat = 60
-    static let albumMinWidth: CGFloat = 60
-
-    /// 热区半宽：边界 ±4pt
-    static let boundaryHitHalfWidth: CGFloat = 4
-
-    /// 一条可拖边界 = 相邻两列的列序
-    struct Boundary {
-        let left: Int
-        let right: Int
-    }
-
-    /// 只接「两根都是弹性列」的边界：标题|艺人、艺人|专辑。
-    /// 固定列（封面/时长/♥）的边界不接管——拖动它们没有合理语义。
-    static let boundaries = [
-        Boundary(left: titleIndex, right: artistIndex),
-        Boundary(left: artistIndex, right: albumIndex),
-    ]
-
-    static func minWidth(ofColumn index: Int) -> CGFloat {
-        switch index {
-        case titleIndex: titleMinWidth
-        case artistIndex: artistMinWidth
-        case albumIndex: albumMinWidth
-        default: 0
-        }
-    }
-}
-
 /// 以 `.overlay` 挂在 Table 上的透明热区。
 struct MacTrackColumnResizer: NSViewRepresentable {
     /// 当前（被 SwiftUI 采用的）列宽；只在首次解析到 NSTableView 时铺开一次。
@@ -502,18 +453,56 @@ final class MacTrackColumnResizerView: NSView {
     /// 最小宽度交给 NSTableColumn 自己兜一层（拖动路径已在 `clampedDelta` 里钳过）。
     private func configureColumns(_ table: NSTableView) {
         guard table.numberOfColumns > MacTrackColumnLayout.albumIndex else { return }
-        for index in [
+        // 首屏也要按可用宽收敛：持久化宽只是用户意图，直接铺上去会一开就出横向滚动条
+        let initial = fittedWidths(for: table)
+        let flexibleIndexes = [
             MacTrackColumnLayout.titleIndex,
             MacTrackColumnLayout.artistIndex,
             MacTrackColumnLayout.albumIndex,
-        ] {
-            table.tableColumns[index].minWidth = MacTrackColumnLayout.minWidth(ofColumn: index)
+        ]
+        let fittedValues = [initial.title, initial.artist, initial.album]
+        for (offset, index) in flexibleIndexes.enumerated() {
+            // 窗口极窄时 fitted 可能低于最小宽：此处的 minWidth 也要跟着降，否则会硬撑出滚动条
+            table.tableColumns[index].minWidth = min(
+                MacTrackColumnLayout.minWidth(ofColumn: index),
+                fittedValues[offset]
+            )
         }
         guard !appliedInitialWidths else { return }
         appliedInitialWidths = true
-        table.tableColumns[MacTrackColumnLayout.titleIndex].width = preferredWidths.title
-        table.tableColumns[MacTrackColumnLayout.artistIndex].width = preferredWidths.artist
-        table.tableColumns[MacTrackColumnLayout.albumIndex].width = preferredWidths.album
+        for (offset, index) in flexibleIndexes.enumerated() {
+            table.tableColumns[index].width = fittedValues[offset]
+        }
+    }
+
+    /// 容器宽度变化后把三根弹性列压回可用宽（只压不放；值没变就不写，避免与布局通知互相激怒）
+    private func applyFittedColumnWidthsIfNeeded() {
+        guard let table, table.numberOfColumns > MacTrackColumnLayout.albumIndex else { return }
+        let fitted = fittedWidths(for: table)
+        let targets: [(index: Int, width: CGFloat)] = [
+            (MacTrackColumnLayout.titleIndex, fitted.title),
+            (MacTrackColumnLayout.artistIndex, fitted.artist),
+            (MacTrackColumnLayout.albumIndex, fitted.album),
+        ]
+        for target in targets {
+            let column = table.tableColumns[target.index]
+            guard abs(column.width - target.width) >= 0.5 else { continue }
+            column.minWidth = min(MacTrackColumnLayout.minWidth(ofColumn: target.index), target.width)
+            column.width = target.width
+        }
+    }
+
+    /// 首屏列宽 = 持久化宽按「表格所在滚动容器的可视宽」收敛（与 MacTrackListView 同一算法）
+    private func fittedWidths(for table: NSTableView) -> MacTrackColumnWidths {
+        // 走仓库唯一入口（MacHostScrollView），不自己写第二份 enclosingScrollView（形状契约测试会拦）
+        let available = MacHostScrollView.enclosing(of: table)?.contentSize.width ?? table.bounds.width
+        guard available > 0 else { return preferredWidths }
+        return MacTrackColumnFit.fitted(
+            preferredWidths,
+            availableWidth: available - MacTrackColumnLayout.columnFitSlack,
+            fixedWidth: MacTrackColumnLayout.fixedColumnsWidth,
+            minimums: MacTrackColumnLayout.minimumWidths
+        )
     }
 
     /// 列宽变化 / 横向滚动 / 自身尺寸变化都重算光标热区，避免错位。
@@ -544,6 +533,7 @@ final class MacTrackColumnResizerView: NSView {
     }
 
     @objc private func geometryDidChange() {
+        applyFittedColumnWidthsIfNeeded()
         refreshCursorHotZones()
         // 滚动 / 列宽变化会让 AppKit 重算光标矩形，可能把光标改回箭头；
         // 状态没变也按当前鼠标位置补一次（原地不动时并没有 mouseMoved 事件）。

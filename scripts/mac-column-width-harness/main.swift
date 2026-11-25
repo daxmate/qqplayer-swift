@@ -172,6 +172,101 @@ do {
     expectEqual(widths.album, MacTrackColumnLayout.albumInitialWidth, "缺专辑列")
 }
 
+// MARK: - 渲染期列宽收敛（MacTrackColumnFit）
+
+section("渲染期列宽收敛：只压不放、保底不溢出")
+
+let columnMinimums = MacTrackColumnLayout.minimumWidths
+let fixedColumns = MacTrackColumnLayout.fixedColumnsWidth
+
+do {
+    // ① 放得下 → 原样（只向下取整）
+    let roomy = MacTrackColumnFit.fitted(
+        MacTrackColumnWidths(title: 160, artist: 100, album: 90),
+        availableWidth: 520,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    expectEqual(roomy.title, 160, "F1a 放得下：标题列原样")
+    expectEqual(roomy.artist, 100, "F1b 放得下：艺人列原样")
+    expectEqual(roomy.album, 90, "F1c 放得下：专辑列原样")
+
+    // ② 默认初始宽（300/140/180）在中栏 420 宽：必须压到预算内
+    let defaultWidths = MacTrackColumnWidths(
+        title: MacTrackColumnLayout.titleInitialWidth,
+        artist: MacTrackColumnLayout.artistInitialWidth,
+        album: MacTrackColumnLayout.albumInitialWidth
+    )
+    let budget420 = 420 - fixedColumns
+    let fitted420 = MacTrackColumnFit.fitted(
+        defaultWidths,
+        availableWidth: 420,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    let fitted420Total = MacTrackColumnFit.total(of: fitted420)
+    expect(fitted420Total <= budget420, "F2a 420 宽：总宽不超预算（\(fitted420Total) ≤ \(budget420)）")
+    expect(fitted420.title >= MacTrackColumnLayout.titleMinWidth, "F2b 420 宽：标题列保住最小宽")
+    expect(fitted420.artist >= MacTrackColumnLayout.artistMinWidth, "F2c 420 宽：艺人列保住最小宽")
+    expect(fitted420.album >= MacTrackColumnLayout.albumMinWidth, "F2d 420 宽：专辑列保住最小宽")
+    expect(fitted420Total < MacTrackColumnFit.total(of: defaultWidths), "F2e 420 宽：确实压缩了")
+
+    // ③ 只压不放：窗口很宽也不把列撑大
+    let wide = MacTrackColumnFit.fitted(
+        defaultWidths,
+        availableWidth: 1_400,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    expectEqual(wide, defaultWidths, "F3 只压不放：可用宽富余时列宽不变")
+
+    // ④ 极窄（中栏最小 320）：连最小宽都放不下时按比例硬压，仍不溢出
+    let budgetNarrow = 320 - fixedColumns
+    let narrow = MacTrackColumnFit.fitted(
+        defaultWidths,
+        availableWidth: 320,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    let narrowTotal = MacTrackColumnFit.total(of: narrow)
+    expect(narrowTotal <= budgetNarrow, "F4a 320 宽：总宽不超预算（\(narrowTotal) ≤ \(budgetNarrow)）")
+    expect(narrow.title > 0 && narrow.artist > 0 && narrow.album > 0, "F4b 320 宽：三列都还有宽度（不压成 0）")
+
+    // ⑤ 预算 ≤ 0（窗口被拖得比固定列还窄）→ 全 0，不返回负宽
+    let collapsed = MacTrackColumnFit.fitted(
+        defaultWidths,
+        availableWidth: fixedColumns - 10,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    expectEqual(collapsed, MacTrackColumnWidths(title: 0, artist: 0, album: 0), "F5 预算不足：三列归零")
+
+    // ⑥ 脏值（NaN / 负数）不能让夹紧结果变成 NaN
+    let dirty = MacTrackColumnFit.fitted(
+        MacTrackColumnWidths(title: .nan, artist: -50, album: 180),
+        availableWidth: 420,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    expect(dirty.title.isFinite && dirty.title >= 0, "F6a NaN → 0")
+    expect(dirty.artist >= 0, "F6b 负数 → 0")
+    expect(MacTrackColumnFit.total(of: dirty) <= budget420, "F6c 脏值输入也不超预算")
+
+    // ⑦ 整数化：向下取整后总宽仍然 ≤ 预算（半像素累积是横向滚动条的常见来源）
+    let fractional = MacTrackColumnFit.fitted(
+        MacTrackColumnWidths(title: 300.7, artist: 140.7, album: 180.7),
+        availableWidth: 421.3,
+        fixedWidth: fixedColumns,
+        minimums: columnMinimums
+    )
+    let fractionalValues = [fractional.title, fractional.artist, fractional.album]
+    expect(fractionalValues.allSatisfy { $0 == $0.rounded(.down) }, "F7a 列宽都是整数")
+    expect(
+        MacTrackColumnFit.total(of: fractional) <= (421.3 - fixedColumns).rounded(.down),
+        "F7b 取整后仍不超预算"
+    )
+}
+
 // MARK: - 源码契约：写盘唯一入口
 
 section("接线契约（源码扫描，防渲染期写盘 / 第二处 @State）")

@@ -27,6 +27,7 @@ OUT_DIR="${TMPDIR:-/tmp}/qqp-mac-column-width-harness"
 mkdir -p "$OUT_DIR" || { echo "❌ 无法创建构建目录 $OUT_DIR"; exit 1; }
 
 PROD_SOURCES=(
+  "QQPlayer/Mac/MacTrackColumnFit.swift"
   "QQPlayer/Mac/MacTrackColumnResizer.swift"
   "QQPlayer/Mac/MacTrackColumnWidthStore.swift"
 )

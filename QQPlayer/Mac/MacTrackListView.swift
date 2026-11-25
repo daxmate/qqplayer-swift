@@ -71,12 +71,12 @@ private enum MacTrackListMetrics {
     static let artworkSize: CGFloat = 34
     /// 封面圆角（DesignTokens 圆角档位里的 4）
     static let artworkCornerRadius: CGFloat = DesignTokens.radius4
-    /// 封面列宽 = 封面 34 + 左右各 6
-    static let artworkColumnWidth: CGFloat = 46
+    /// 封面列宽 = 封面 34 + 左右各 6（数值唯一口径在 MacTrackColumnLayout）
+    static let artworkColumnWidth = MacTrackColumnLayout.artworkColumnWidth
     /// 时长列宽（固定，不可拉伸）
-    static let durationColumnWidth: CGFloat = 56
+    static let durationColumnWidth = MacTrackColumnLayout.durationColumnWidth
     /// 行尾操作列宽（悬停 ♥ 槽位）
-    static let actionColumnWidth: CGFloat = 40
+    static let actionColumnWidth = MacTrackColumnLayout.actionColumnWidth
     /// 当前播放行底色不透明度（accent 8%）
     static let activeRowTintOpacity: Double = 0.08
     /// 专辑列在 secondary 基础上压暗一档
