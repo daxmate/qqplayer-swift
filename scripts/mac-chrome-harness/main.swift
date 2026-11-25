@@ -570,6 +570,30 @@ do {
     } else {
         check(false, "S0 读不到 MacGlassBackdropSupport.swift：\(supportPath)")
     }
+
+    let resizerPath = repoRoot.appendingPathComponent("QQPlayer/Mac/MacTrackColumnResizer.swift").path
+    if let resizerSource = try? String(contentsOfFile: resizerPath, encoding: .utf8) {
+        check(
+            resizerSource.contains("MacTrackColumnFit.fitted("),
+            "S6 列宽走渲染期收敛（NSTableColumn 侧）"
+        )
+        check(
+            resizerSource.contains("applyFittedColumnWidthsIfNeeded()"),
+            "S6b 容器宽度变化后重放收敛"
+        )
+    } else {
+        check(false, "S0 读不到 MacTrackColumnResizer.swift：\(resizerPath)")
+    }
+
+    let listPath = repoRoot.appendingPathComponent("QQPlayer/Mac/MacTrackListView.swift").path
+    if let listSource = try? String(contentsOfFile: listPath, encoding: .utf8) {
+        check(
+            listSource.contains("MacGlassTableBackdropStripper("),
+            "S5 中栏 Table 挂上玻璃背板剥离器"
+        )
+    } else {
+        check(false, "S0 读不到 MacTrackListView.swift：\(listPath)")
+    }
 }
 
 // MARK: - 汇总

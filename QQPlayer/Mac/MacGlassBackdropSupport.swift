@@ -249,3 +249,86 @@ final class MacGlassBackdropAdjustments {
         order.append(id)
     }
 }
+
+/// 中栏曲目列表的滚动背板剥离器（玻璃生效时挂在 Table 上）。
+///
+/// 白底来源不是 Table 内容（`.scrollContentBackground(.hidden)` 已清掉），
+/// 而是滚动容器自己：`NSScrollView.drawsBackground` + `NSClipView.drawsBackground`
+/// 在表格内容之外（含底部水平滚动条槽位）铺系统背景色。
+/// 这里只改属性并记录原值，玻璃关闭 / 视图拆除时整组还原。
+///
+/// **为什么不改 `NSScroller` 的 knobStyle / scrollerStyle**：白底来自滚动容器自己的
+/// `drawsBackground`，关掉后滚动条槽位直接继承窗底玻璃；强行改成 `.overlay` 会覆盖
+/// 用户「始终显示滚动条」的系统偏好（macOS 15 那台机器正是常显滚动条），属于越权改观感。
+/// 因此只关背景，不碰滚动条样式。
+struct MacGlassTableBackdropStripper: NSViewRepresentable {
+    /// 玻璃是否生效（唯一入口：`macWindowGlassActive` 环境值；调用点不用重复传参）
+    @Environment(\.macWindowGlassActive) private var isWindowGlassActive
+
+    func makeNSView(context: Context) -> BackdropView {
+        BackdropView()
+    }
+
+    func updateNSView(_ view: BackdropView, context: Context) {
+        view.apply(active: isWindowGlassActive)
+    }
+
+    static func dismantleNSView(_ view: BackdropView, coordinator: ()) {
+        view.restore()
+    }
+
+    /// 只改背板属性、不画任何东西的宿主视图。
+    final class BackdropView: NSView {
+        private let adjustments = MacGlassBackdropAdjustments()
+        private var active = false
+        /// 日志节流：同一种结果只记一条（layout 每帧都会重放）
+        private var lastLogCode: String?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func apply(active: Bool) {
+            self.active = active
+            if active {
+                reapply()
+            } else {
+                restore()
+            }
+        }
+
+        func restore() {
+            adjustments.revert()
+            lastLogCode = nil
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window == nil {
+                restore()
+            } else {
+                reapply()
+            }
+        }
+
+        override func layout() {
+            super.layout()
+            // 视图重建 / 列宽变化后重放（幂等：只补写，不重记原值）
+            reapply()
+        }
+
+        private func reapply() {
+            guard active, window != nil else { return }
+            guard let scrollView = MacGlassBackdropSearch.tableScrollView(above: self) else {
+                logOnce("result=miss")
+                return
+            }
+            adjustments.apply(in: scrollView)
+            logOnce("result=hit views=\(adjustments.count)")
+        }
+
+        private func logOnce(_ detail: String) {
+            guard lastLogCode != detail else { return }
+            lastLogCode = detail
+            AppLog.info(.ui, "[glass] table.background \(detail)")
+        }
+    }
+}

@@ -369,7 +369,7 @@ struct MacTrackListView: View {
         .macTrackColumnWidthDrag(widths: $columnWidths)  // 拖拽结束（mouseUp）才写盘，见 MacTrackColumnResizer.swift
         // 定位当前播放：先选中（下表 onChange 设 selection），再滚到可视区垂直居中
         // （Table 无公开 scrollTo ⇒ AppKit 桥接；滚动唯一入口 MacTableScroll）
-        .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false)).macGlassListBackground()
+        .background(MacTableLocateScroller(request: locateRequestID, row: locateRow).allowsHitTesting(false)).macGlassListBackground().background(MacGlassTableBackdropStripper())  // 玻璃生效时剥掉滚动容器背景（白底来源）
         // ⌘I：打开选中曲目的「歌曲详情」（与右键菜单同一 sheet 宿主：菜单状态 model）。
         // 用 SwiftUI 键盘快捷键注册（仓库既有做法，见 MacAlbumArtistViews 的
         // .keyboardShortcut(.return/.cancelAction)）；全局快捷键表 MacKeyboardShortcuts
