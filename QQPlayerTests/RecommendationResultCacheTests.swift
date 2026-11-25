@@ -224,8 +224,7 @@ struct RecommendationResultCacheTests {
             planSource: .rule,
             keySummary: RecommendationCacheKeySummary(input: key),
             candidates: [makeCandidate("a")],
-            baseKey: key.baseKey,
-            requestedArtist: nil
+            baseKey: key.baseKey
         )
         try encoder.encode(entry).write(to: url)
 
@@ -248,8 +247,7 @@ struct RecommendationResultCacheTests {
             planSource: .localModel,
             keySummary: RecommendationCacheKeySummary(input: key),
             candidates: [makeCandidate("1990s")],
-            baseKey: key.baseKey,
-            requestedArtist: nil
+            baseKey: key.baseKey
         )
         try JSONEncoder().encode(entry).write(to: url)
 

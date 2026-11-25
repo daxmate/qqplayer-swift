@@ -212,52 +212,13 @@ struct RecommendationDiversityTests {
 
 // MARK: - 理由校验
 
-@Suite("推荐 P3 · 理由校验与回落")
+@Suite("推荐 P3 · 理由绑定与回落")
 struct RecommendationReasonValidationTests {
     @Test("默认来源原样返回规则理由（两端行为不变）")
     func ruleProviderKeepsRules() async {
         let candidates = [p3Candidate("Title", "Artist", reasons: ["常听 Artist"])]
         let map = await RuleRecommendationReasonProvider().reasons(for: p3Items(candidates), locale: .current)
         #expect(map[RecommendationKey.normalize(title: "Title", artist: "Artist")] == ["常听 Artist"])
-    }
-
-    @Test("合法 JSON 一批解析：条目按序映射且不接受多余残片")
-    func parsesBatch() {
-        let items = p3Items([p3Candidate("Title", "Artist"), p3Candidate("Other", "Band")])
-        let text = #"{ "1": "Artist 的作品，与你常听的口味接近", "2": "Band 的新歌" }"#
-        let map = RecommendationReasonParser.parse(text, items: items)
-        #expect(map.count == 2)
-        #expect(map[RecommendationKey.normalize(title: "Title", artist: "Artist")]?.first?.hasPrefix("Artist") == true)
-    }
-
-    @Test("超长 / 引号 / JSON 残片被拒")
-    func rejectsMarkupAndLongText() {
-        let item = p3Items([p3Candidate("Title", "Artist")])[0]
-        let allowed = RecommendationReasonParser.allowedNames(in: [item])
-        #expect(RecommendationReasonParser.validate(String(repeating: "长", count: 61), item: item, allowedNames: allowed) == nil)
-        #expect(RecommendationReasonParser.validate("{\"1\":\"x\"}", item: item, allowedNames: allowed) == nil)
-        #expect(RecommendationReasonParser.validate("他说 \"好听\"", item: item, allowedNames: allowed) == nil)
-        #expect(RecommendationReasonParser.validate("曲库里的老歌", item: item, allowedNames: allowed) != nil)
-    }
-
-    @Test("引用输入之外的名字被拒；引用本批名字通过")
-    func rejectsFabricatedNames() {
-        let item = p3Items([p3Candidate("Title", "Artist")])[0]
-        let allowed = RecommendationReasonParser.allowedNames(in: [item])
-        #expect(RecommendationReasonParser.validate("来自「不存在的乐队」", item: item, allowedNames: allowed) == nil)
-        #expect(RecommendationReasonParser.validate("「Artist」的早期作品", item: item, allowedNames: allowed) != nil)
-    }
-
-    @Test("年份不符 / 缺失年份时编年份被拒")
-    func rejectsFabricatedYear() {
-        let item = p3Items([p3Candidate("Title", "Artist", year: 1998)])[0]
-        let allowed = RecommendationReasonParser.allowedNames(in: [item])
-        #expect(RecommendationReasonParser.validate("1998 年的经典", item: item, allowedNames: allowed) != nil)
-        #expect(RecommendationReasonParser.validate("1972 年的经典", item: item, allowedNames: allowed) == nil)
-
-        let unknownYear = p3Items([p3Candidate("Title", "Artist", year: nil)])[0]
-        let allowedUnknown = RecommendationReasonParser.allowedNames(in: [unknownYear])
-        #expect(RecommendationReasonParser.validate("2001 年的作品", item: unknownYear, allowedNames: allowedUnknown) == nil)
     }
 
     @Test("模型失败 / 空结果 → 逐条回落规则理由（理由不清空）")
@@ -272,9 +233,8 @@ struct RecommendationReasonValidationTests {
     func partialReplaceKeepsOthers() {
         let first = p3Candidate("Title", "Artist", reasons: ["规则一"])
         let second = p3Candidate("Other", "Band", reasons: ["规则二"])
-        let items = p3Items([first, second])
-        let text = #"{ "1": "「Artist」的推荐" }"#
-        let map = RecommendationReasonParser.parse(text, items: items)
+        let key = RecommendationKey.normalize(title: "Title", artist: "Artist")
+        let map = [key: ["「Artist」的推荐"]]
         let bound = RecommendationReasonBinder.bind(map, to: [first, second])
 
         #expect(bound.replaced == 1)

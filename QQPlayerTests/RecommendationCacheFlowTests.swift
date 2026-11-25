@@ -185,8 +185,7 @@ struct RecommendationCacheFlowTests {
             await gate.wait()
             return RecommendationRecompute(
                 candidates: [flowCandidate("new")],
-                planSource: .rule,
-                requestedArtist: nil
+                planSource: .rule
             )
         } apply: { recompute, changed in
             applied = recompute
@@ -225,8 +224,7 @@ struct RecommendationCacheFlowTests {
             await gate.wait()
             return RecommendationRecompute(
                 candidates: [flowCandidate("same")],
-                planSource: .rule,
-                requestedArtist: nil
+                planSource: .rule
             )
         } apply: { _, changed in
             appliedChanged = changed
@@ -262,8 +260,7 @@ struct RecommendationCacheFlowTests {
             await gate.wait()
             return RecommendationRecompute(
                 candidates: [flowCandidate("stale-task")],
-                planSource: .rule,
-                requestedArtist: nil
+                planSource: .rule
             )
         } apply: { _, _ in
             applied = true
