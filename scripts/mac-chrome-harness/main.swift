@@ -428,6 +428,150 @@ check(
 )
 anchorWindow.orderOut(nil)
 
+// MARK: - 背板剥离判据（MacGlassBackdropPolicy / 材质族归一）
+
+// 为什么单测纯逻辑：macOS 15 侧栏背板「剥了又回来」是运行期现象，本机（macOS 27）
+// 复现不了；判据与深度上限抽成纯函数后，至少能锁死「哪些材质要剥 / 多深还剥 / 祖先不剥」，
+// 以及「不再是一次性剥离」这条源码契约。
+
+section("背板剥离判据：材质族 / 深度 / 祖先 / 已隐藏")
+
+for material in MacGlassBackdropMaterial.allCases {
+    check(
+        MacGlassBackdropPolicy.decision(
+            material: material,
+            depth: 0,
+            isAncestorOfProbe: false,
+            alreadyHidden: false
+        ) == .strip,
+        "P1-\(material.rawValue) 背板族材质应剥离"
+    )
+}
+
+check(
+    MacGlassBackdropPolicy.decision(
+        material: nil,
+        depth: 0,
+        isAncestorOfProbe: false,
+        alreadyHidden: false
+    ) == .skipNotBackdropMaterial,
+    "P2 非背板族材质不剥离"
+)
+
+check(
+    MacGlassBackdropPolicy.decision(
+        material: .sidebar,
+        depth: MacGlassBackdropPolicy.maxAncestorDepth - 1,
+        isAncestorOfProbe: false,
+        alreadyHidden: false
+    ) == .strip,
+    "P3a 深度上限内仍剥离（depth = max - 1）"
+)
+
+check(
+    MacGlassBackdropPolicy.decision(
+        material: .sidebar,
+        depth: MacGlassBackdropPolicy.maxAncestorDepth,
+        isAncestorOfProbe: false,
+        alreadyHidden: false
+    ) == .skipTooDeep,
+    "P3b 超出深度上限不剥离（depth = max）"
+)
+
+check(
+    MacGlassBackdropPolicy.decision(
+        material: .sidebar,
+        depth: -1,
+        isAncestorOfProbe: false,
+        alreadyHidden: false
+    ) == .skipTooDeep,
+    "P3c 负深度按超限处理"
+)
+
+check(
+    MacGlassBackdropPolicy.decision(
+        material: .sidebar,
+        depth: 2,
+        isAncestorOfProbe: true,
+        alreadyHidden: false
+    ) == .skipAncestorOfProbe,
+    "P4 祖先层不隐藏（否则连侧栏内容一起抹掉）"
+)
+
+check(
+    MacGlassBackdropPolicy.decision(
+        material: .sidebar,
+        depth: 1,
+        isAncestorOfProbe: false,
+        alreadyHidden: true
+    ) == .skipAlreadyHidden,
+    "P5 已隐藏不重复写入"
+)
+
+check(
+    MacGlassBackdropPolicy.maxAncestorDepth >= 12,
+    "P6 深度上限放宽到 ≥12 层（macOS 15 背板挂在 10 层之外）",
+    expected: ">= 12",
+    actual: "\(MacGlassBackdropPolicy.maxAncestorDepth)"
+)
+
+// 材质族归一（NSVisualEffectView.Material → 判据枚举）
+check(NSVisualEffectView.Material.sidebar.macGlassBackdropFamily == .sidebar, "P7a .sidebar 归一")
+check(
+    NSVisualEffectView.Material.underWindowBackground.macGlassBackdropFamily == .underWindowBackground,
+    "P7b .underWindowBackground 归一"
+)
+check(NSVisualEffectView.Material.headerView.macGlassBackdropFamily == .headerView, "P7c .headerView 归一")
+check(NSVisualEffectView.Material.contentBackground.macGlassBackdropFamily == nil, "P7d 其他材质不归一")
+
+// 源码契约：剥离必须每次复查，不能再是「一次性」
+do {
+    let repoRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let glassPath = repoRoot.appendingPathComponent("QQPlayer/Mac/MacWindowGlass.swift").path
+    if let rawGlassSource = try? String(contentsOfFile: glassPath, encoding: .utf8) {
+        // 只看代码：注释里引用旧实现（说明修复原因）不算「还在用」
+        let glassSource = rawGlassSource
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        check(
+            !glassSource.contains("guard strippedMaterial !== target else { return }"),
+            "S1 侧栏剥离不再用「同实例直接 return」的一次性守卫"
+        )
+        check(
+            glassSource.contains("NSWindow.didBecomeKeyNotification"),
+            "S2 窗口激活后复查（观察 didBecomeKey）"
+        )
+        check(
+            glassSource.contains("MacGlassBackdropSearch.tableScrollView"),
+            "S3 侧栏 / 中栏共用表格滚动容器查找"
+        )
+        check(
+            glassSource.contains("MacGlassBackdropAdjustments"),
+            "S4 侧栏走属性接管记录器（原值还原）"
+        )
+    } else {
+        check(false, "S0 读不到 MacWindowGlass.swift：\(glassPath)")
+    }
+
+    let supportPath = repoRoot.appendingPathComponent("QQPlayer/Mac/MacGlassBackdropSupport.swift").path
+    if let supportSource = try? String(contentsOfFile: supportPath, encoding: .utf8) {
+        check(
+            supportSource.contains("drawsBackground = false"),
+            "S4b 滚动容器背景关闭（白底来源）"
+        )
+        check(
+            supportSource.contains("tableView.backgroundColor = .clear"),
+            "S4c 表格内容底色清空"
+        )
+    } else {
+        check(false, "S0 读不到 MacGlassBackdropSupport.swift：\(supportPath)")
+    }
+}
+
 // MARK: - 汇总
 
 print("\n================ 结果 ================")

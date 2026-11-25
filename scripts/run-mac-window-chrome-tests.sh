@@ -48,6 +48,7 @@ mkdir -p "$OUT_DIR" || { echo "❌ 无法创建构建目录 $OUT_DIR"; exit 1; }
 
 PROD_SOURCES=(
   "QQPlayer/Mac/MacWindowGlass.swift"
+  "QQPlayer/Mac/MacGlassBackdropSupport.swift"
   "QQPlayer/Mac/MacWindowGlassChrome.swift"
   "QQPlayer/Mac/MacWindowFrameAnchor.swift"
 )

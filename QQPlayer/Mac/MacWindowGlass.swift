@@ -112,6 +112,20 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
         /// macOS 15-：被隐藏的 `.sidebar` 材质视图
         private weak var strippedMaterial: NSVisualEffectView?
         private var materialWasHidden = false
+        /// 侧栏列表（NSScrollView / NSTableView）的底色兜底：只记原值，关玻璃时逐项还原
+        private let backdropAdjustments = MacGlassBackdropAdjustments()
+        /// 日志节流：同一种判定结果只记一条（layout 里每帧都会调 strip()）
+        private var lastStripLogCode: String?
+        /// 窗口激活复查的观察者（跟随窗口注册 / 注销）
+        private var activationObserver: NSObjectProtocol?
+        /// 上次找到的侧栏列表滚动容器（命中就复用，避免每帧再全子树搜）
+        private weak var sidebarScrollView: NSScrollView?
+
+        deinit {
+            if let observer = activationObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+        }
 
         /// macOS 26+：摘下来的侧栏玻璃与「停放位」（都保持强引用，便于还原）
         private var parkedGlass: NSView?
@@ -132,6 +146,7 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            observeActivation(ifNeeded: window != nil)
             if window == nil {
                 restore()
             } else {
@@ -142,6 +157,25 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
         override func viewDidMoveToSuperview() {
             super.viewDidMoveToSuperview()
             strip()
+        }
+
+        /// 窗口重新激活 / 变成主窗时系统会重建列内的外观层（macOS 15 实测会把背板重新显示），
+        /// 这里补一次复查；观察者跟随窗口注册，离开窗口时注销。
+        private func observeActivation(ifNeeded active: Bool) {
+            let center = NotificationCenter.default
+            if active {
+                guard activationObserver == nil, let window else { return }
+                activationObserver = center.addObserver(
+                    forName: NSWindow.didBecomeKeyNotification,
+                    object: window,
+                    queue: .main
+                ) { [weak self] _ in
+                    self?.strip()
+                }
+            } else if let observer = activationObserver {
+                center.removeObserver(observer)
+                activationObserver = nil
+            }
         }
 
         override func layout() {
@@ -158,9 +192,14 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
                 // 主窗上该材质不存在，行为不变。
                 if !detachGlassPanel() {
                     stripLegacySidebarMaterial()
+                    stripSidebarBackdrops()
+                } else {
+                    // 26+ 摘掉玻璃本体后，滚动容器的兜底不再需要
+                    backdropAdjustments.revert()
                 }
             } else {
                 stripLegacySidebarMaterial()
+                stripSidebarBackdrops()
             }
         }
 
@@ -170,6 +209,9 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
                 target.isHidden = materialWasHidden
             }
             strippedMaterial = nil
+            sidebarScrollView = nil
+            backdropAdjustments.revert()
+            lastStripLogCode = nil
 
             if #available(macOS 26.0, *) {
                 restoreGlassPanel()
@@ -302,27 +344,78 @@ struct MacSidebarMaterialStripper: NSViewRepresentable {
 
         // MARK: - macOS 15-：`.sidebar` 材质视图
 
+        /// 复查式剥离（macOS 15 修复点）：
+        /// 原实现 `guard strippedMaterial !== target else { return }` 让剥离变成一次性动作——
+        /// 系统把背板重新显示（窗口激活 / 侧栏重建 / 全屏切换）后就永久失效。
+        /// 现在每轮 `strip()` 都复查：同一个实例被写回可见就再隐藏，换了实例就接管新的。
         private func stripLegacySidebarMaterial() {
-            guard let target = enclosingSidebarMaterial() else { return }
-            guard strippedMaterial !== target else { return }
-            if let previous = strippedMaterial {
-                previous.isHidden = materialWasHidden
+            guard let hit = enclosingSidebarMaterial() else {
+                logStripDecision(.skipNotBackdropMaterial, depth: nil, material: nil)
+                return
             }
-            materialWasHidden = target.isHidden
-            target.isHidden = true
-            strippedMaterial = target
+            let target = hit.view
+            let decision = MacGlassBackdropPolicy.decision(
+                material: target.material.macGlassBackdropFamily,
+                depth: hit.depth,
+                isAncestorOfProbe: false,
+                alreadyHidden: target.isHidden
+            )
+            if strippedMaterial !== target {
+                // 侧栏重建：先把上一个实例还原，再接管新实例
+                if let previous = strippedMaterial {
+                    previous.isHidden = materialWasHidden
+                }
+                materialWasHidden = target.isHidden
+                strippedMaterial = target
+            }
+            if case .strip = decision {
+                target.isHidden = true
+            }
+            logStripDecision(decision, depth: hit.depth, material: target.material.macGlassBackdropFamily)
         }
 
-        /// 只认 `.sidebar` 材质的 NSVisualEffectView，且必须**不是本视图的祖先**——
+        /// 侧栏列表自身的底色兜底（移植设置窗那套）：
+        /// macOS 15 的侧栏 List 内核仍是 NSScrollView + NSTableView，系统会给滚动容器铺浅灰底，
+        /// 只剥 `.sidebar` 材质透不出整窗玻璃。
+        private func stripSidebarBackdrops() {
+            if let cached = sidebarScrollView, let contentView = window?.contentView,
+               cached.isDescendant(of: contentView) {
+                backdropAdjustments.apply(in: cached)
+                return
+            }
+            guard let scrollView = MacGlassBackdropSearch.tableScrollView(above: self) else { return }
+            sidebarScrollView = scrollView
+            backdropAdjustments.apply(in: scrollView)
+        }
+
+        private func logStripDecision(
+            _ decision: MacGlassStripDecision,
+            depth: Int?,
+            material: MacGlassBackdropMaterial?
+        ) {
+            let code = "\(decision.logCode)|\(material?.rawValue ?? "none")|\(depth.map(String.init) ?? "-")"
+            guard lastStripLogCode != code else { return }
+            lastStripLogCode = code
+            AppLog.info(
+                .ui,
+                "[glass] sidebar.material decision=\(decision.logCode) material=\(material?.rawValue ?? "none") depth=\(depth.map(String.init) ?? "-")"
+            )
+        }
+
+        /// 只认背板族材质（`.sidebar` / `.underWindowBackground` / `.headerView`）的
+        /// NSVisualEffectView，且必须**不是本视图的祖先**——
         /// 在祖先上做隐藏会把侧栏内容一起抹掉。找不到就什么都不做（保守：宁可不改也不错改）。
-        private func enclosingSidebarMaterial() -> NSVisualEffectView? {
+        private func enclosingSidebarMaterial() -> (view: NSVisualEffectView, depth: Int)? {
             var node = superview
             var depth = 0
-            while let view = node, depth < 10 {
+            while let view = node, depth < MacGlassBackdropPolicy.maxAncestorDepth {
                 for sub in view.subviews {
-                    guard let effect = sub as? NSVisualEffectView, effect.material == .sidebar else { continue }
+                    guard let effect = sub as? NSVisualEffectView,
+                          effect.material.macGlassBackdropFamily != nil
+                    else { continue }
+                    // 祖先上的背板不能隐藏：会把侧栏内容一起抹掉
                     guard !isDescendant(of: effect) else { continue }
-                    return effect
+                    return (effect, depth)
                 }
                 node = view.superview
                 depth += 1
