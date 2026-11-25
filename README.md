@@ -38,8 +38,11 @@
   <img src="assets/screenshots/ios-playlists.webp" width="23%" alt="iPhone 播放列表">
   <img src="assets/screenshots/ios-library.webp" width="23%" alt="iPhone 曲库">
 </p>
+<p align="center">
+  <img src="assets/screenshots/carplay.webp" width="64%" alt="CarPlay 车载播放">
+</p>
 
-> 截图取自 <https://www.daxmate.cn/products/qqplayer>（macOS 版与 iPhone 版实机界面）。
+> 截图取自 <https://www.daxmate.cn/products/qqplayer>（macOS、iPhone 与 CarPlay 实机界面）。
 
 ---
 
