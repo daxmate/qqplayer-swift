@@ -190,6 +190,8 @@ struct MacTrackGroupDimensionPicker: View {
 /// 本模式保留双击播放 + 悬停 ♥（详情 / 标签编辑等从 list 模式进入）。
 struct MacTrackGroupedListView: View {
     @Environment(\.appAccentColor) private var appAccentColor
+    /// 整窗玻璃是否生效（唯一判据入口，见 MacWindowGlass）；吸顶头在玻璃模式下不得铺不透明底
+    @Environment(\.macWindowGlassActive) private var isWindowGlassActive
     /// 收藏切换唯一入口：行尾 ♥ 由宿主取环境后显式传入按钮（按钮本身不读环境，见其文件头）
     @Environment(AppCoordinator.self) private var appCoordinator
 
@@ -283,11 +285,32 @@ struct MacTrackGroupedListView: View {
             .padding(.horizontal, DesignTokens.space12)
             .padding(.vertical, DesignTokens.space6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
+            .background(sectionHeaderBackdrop)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(displayTitle(for: section))
+    }
+
+    /// 吸顶头底色：玻璃模式下与列表行同底（透明，让窗底玻璃透出），只留一条发丝分隔线
+    /// 保持「正在吸顶」的可辨识度；非玻璃模式保持改动前的 `.bar` 材质观感。
+    ///
+    /// 为什么不能一视同仁用 `.bar`：整窗玻璃生效时 `.bar` 会整条铺不透明浅色、比列表
+    /// 底色更亮（2026-11-25 回归：每组头一整条白，还透过左侧半透明侧栏渗出一条白）。
+    @ViewBuilder
+    private var sectionHeaderBackdrop: some View {
+        if isWindowGlassActive {
+            Rectangle()
+                .fill(Color.clear)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(Metrics.headerSeparatorOpacity))
+                        .frame(height: Metrics.headerSeparatorHeight)
+                }
+        } else {
+            Rectangle()
+                .fill(Material.bar)
+        }
     }
 
     /// 空标题兜底（未入库专辑 / 未知艺人）：只影响展示，不参与分组键。
@@ -406,5 +429,9 @@ struct MacTrackGroupedListView: View {
         static let selectedTintOpacity: Double = 0.14
         /// 悬停行底色不透明度
         static let hoverTintOpacity: Double = 0.06
+        /// 玻璃模式吸顶头的发丝分隔线不透明度（不铺底，只给一条界线）
+        static let headerSeparatorOpacity: Double = 0.12
+        /// 玻璃模式吸顶头分隔线高度（0.5pt 发丝）
+        static let headerSeparatorHeight: CGFloat = 0.5
     }
 }
