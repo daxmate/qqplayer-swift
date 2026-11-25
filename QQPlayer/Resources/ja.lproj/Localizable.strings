@@ -408,7 +408,6 @@
 "feature_guide_import_title" = "音楽ファイルの読み込み";
 "feature_guide_import_detail" = "このデバイスのTingFiフォルダに音楽ファイルを入れます（「ファイル」App → 「このiPhone内」 → TingFi）。ライブラリの「ファイルを開く」をタップしてもかまいません。";
 
-
 /* Sleep Timer */
 "sleep_timer" = "スリープタイマー";
 "sleep_timer_off" = "スリープタイマーはオフ";
@@ -657,7 +656,6 @@
 "online_search_history_title" = "最近の検索";
 "online_search_clear_history" = "クリア";
 "online_search_history_delete_help" = "この項目を削除";
-
 
 /* C-group: search anything + settings download (web SearchAnything/settings parity) */
 "settings_category_download" = "ダウンロード";
@@ -1135,8 +1133,6 @@
 "recommendation_dismiss" = "興味なし";
 "recommendation_reason_artist" = "よく再生する：%@";
 "recommendation_reason_requested_artist" = "リクエストされたアーティスト";
-"recommendation_artist_shortfall" = "%@の曲は%d曲しか見つかりませんでした";
-"recommendation_artist_shortfall_filled" = "%@は%d曲のみのため、似たアーティストから%d曲を追加しました";
 "recommendation_reason_era" = "あなたの%d年代に一致";
 "recommendation_reason_trend" = "最近の再生で人気：%@";
 "recommendation_reason_chart_hot" = "Apple Musicのチャートで人気";
@@ -1156,23 +1152,11 @@
 "recommendation_reason_matched_taste" = "あなたの好みに一致";
 
 // MARK: - 本地 AI 推荐：指令输入（2026-11-04）
-"recommendation_chat_placeholder" = "聴きたい音楽を説明してください…";
-"recommendation_chat_send" = "送信";
-"recommendation_chat_model_not_ready" = "ローカルモデルの準備ができていません。設定でダウンロードするとリクエストを利用できます。";
-"recommendation_chat_go_to_settings" = "設定を開く";
-"recommendation_chat_clear" = "リクエストをクリア";
-"recommendation_chat_results_title" = "リクエストに基づく";
 "recommendation_results_for_you" = "あなた向け";
-"recommendation_chat_rounds_title" = "コンテキスト保持数";
-"recommendation_chat_rounds_footer" = "追加のリクエストを理解するためだけに使われ、アプリ内に表示されることはありません。";
 "recommendation_empty_request" = "そのリクエストを理解できませんでした。別の言い方でお試しください。";
-"recommendation_chat_invalid_output" = "ローカルモデルが読み取れない結果を返しました。もう一度お試しください。";
-"recommendation_chat_timeout" = "ローカルモデルがタイムアウトしました。もう一度お試しください。";
 "recommendation_reason_request" = "リクエストに一致：%@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
-"recommendation_related_share_title" = "似たアーティストの割合";
-"recommendation_related_share_footer" = "アーティストを指定したとき、各バッチで似たアーティストから取得できる最大割合です。";
 "recommendation_artist_relation_title" = "MusicBrainzで関連アーティストを拡張";
 "recommendation_artist_relation_footer" = "よく聴くアーティストに関連するアーティストから候補を追加します（1回につき最大2クエリ、各3アーティスト）。失敗は通知せずスキップし、おすすめを妨げません。";
 /* App volume (macOS player bar) */

@@ -288,8 +288,6 @@
 
 "player_controls" = "播放器控制";
 
-
-
 "show_sleep_timer_button" = "顯示睡眠定時按鈕";
 
 "show_sleep_timer_button_description" = "用睡眠定時按鈕替換播放器中的歌詞按鈕。";
@@ -590,7 +588,6 @@
 "hint_search_line1" = "向左滑：返回播放頁";
 "hint_search_mac_line1" = "點選結果即可套用為歌詞";
 
-
 "cancel_sleep_timer" = "取消睡眠定時";
 
 /* Bulk Selection */
@@ -700,7 +697,6 @@
 "feature_guide_import_title" = "檔案匯入";
 
 "feature_guide_import_detail" = "將音樂檔案放入本機「檔案」App 的婷聽資料夾（我的 iPhone → 婷聽），或在媒體庫點擊「打開檔案」直接匯入";
-
 
 /* 播放順序 */
 "play_order_sequential" = "順序播放";
@@ -981,7 +977,6 @@
 "quark_login_required_hint" = "下載前需先登入夸克網盤（已開啟掃碼登入，登入後自動重試）";
 "quark_login_success" = "登入成功：%@";
 "quark_login_retrying" = "正在重試下載…";
-
 
 /* B2 批：線上搜尋歷史（合併清單） */
 "online_search_history_title" = "最近搜尋";
@@ -1463,8 +1458,6 @@
 "recommendation_dismiss" = "不再推薦";
 "recommendation_reason_artist" = "常聽 %@";
 "recommendation_reason_requested_artist" = "你點名的藝人";
-"recommendation_artist_shortfall" = "只找到 %d 首 %@ 的歌";
-"recommendation_artist_shortfall_filled" = "%@ 的歌只有 %d 首，補了 %d 首相似藝人";
 "recommendation_reason_era" = "符合你愛聽的 %d 年代";
 "recommendation_reason_trend" = "最近常聽 %@";
 "recommendation_reason_chart_hot" = "近期熱門";
@@ -1484,23 +1477,11 @@
 "recommendation_reason_matched_taste" = "與你口味相近";
 
 // MARK: - 本地 AI 推薦：指令輸入（2026-11-04）
-"recommendation_chat_placeholder" = "描述你想聽什麼，例如：推薦一些和五月天風格類似的歌手的歌";
-"recommendation_chat_send" = "傳送";
-"recommendation_chat_model_not_ready" = "本機模型尚未就緒，請先在設定中下載模型。";
-"recommendation_chat_go_to_settings" = "前往設定";
-"recommendation_chat_clear" = "清除指令";
-"recommendation_chat_results_title" = "依你的要求";
 "recommendation_results_for_you" = "為你推薦";
-"recommendation_chat_rounds_title" = "對話上下文輪數";
-"recommendation_chat_rounds_footer" = "僅用於理解追問，不會顯示在介面上。";
 "recommendation_empty_request" = "聽不懂你的要求，換個說法試試。";
-"recommendation_chat_invalid_output" = "本機模型回傳了無法解析的結果，請重試。";
-"recommendation_chat_timeout" = "本機模型回應逾時，請重試。";
 "recommendation_reason_request" = "符合你的要求：%@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
-"recommendation_related_share_title" = "相似藝人比例";
-"recommendation_related_share_footer" = "點名藝人時，批次中最多有多少比例來自相似藝人";
 "recommendation_artist_relation_title" = "用 MusicBrainz 擴充相關藝人";
 "recommendation_artist_relation_footer" = "依藝人關係補充候選：每個藝人意圖最多 3 位相關藝人，整輪最多 2 次查詢。失敗自動跳過，不影響推薦結果。";
 /* App 級音量（macOS 播放條） */

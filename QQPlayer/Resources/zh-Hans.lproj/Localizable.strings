@@ -456,7 +456,6 @@
 "feature_guide_import_title" = "文件导入";
 "feature_guide_import_detail" = "将音乐文件放入本机「文件」App 的婷听文件夹（我的 iPhone → 婷听），或在媒体库点击「打开文件」直接导入";
 
-
 /* 播放顺序 */
 "play_order_sequential" = "顺序播放";
 "play_order_shuffle" = "随机播放";
@@ -1138,8 +1137,6 @@
 "recommendation_dismiss" = "不再推荐";
 "recommendation_reason_artist" = "常听 %@";
 "recommendation_reason_requested_artist" = "你点名的艺人";
-"recommendation_artist_shortfall" = "只找到 %d 首 %@ 的歌";
-"recommendation_artist_shortfall_filled" = "%@ 的歌只有 %d 首，补了 %d 首相似艺人";
 "recommendation_reason_era" = "符合你爱听的 %d 年代";
 "recommendation_reason_trend" = "最近常听 %@";
 "recommendation_reason_chart_hot" = "近期热门";
@@ -1159,23 +1156,11 @@
 "recommendation_reason_matched_taste" = "与你口味相近";
 
 // MARK: - 本地 AI 推荐：指令输入（2026-11-04）
-"recommendation_chat_placeholder" = "描述你想听什么，例如：推荐一些和五月天风格类似的歌手的歌";
-"recommendation_chat_send" = "发送";
-"recommendation_chat_model_not_ready" = "本地模型尚未就绪，请先在设置中下载模型。";
-"recommendation_chat_go_to_settings" = "去设置";
-"recommendation_chat_clear" = "清除指令";
-"recommendation_chat_results_title" = "按你的要求";
 "recommendation_results_for_you" = "为你推荐";
-"recommendation_chat_rounds_title" = "对话上下文轮数";
-"recommendation_chat_rounds_footer" = "仅用于理解追问，不会显示在界面上。";
 "recommendation_empty_request" = "没听懂你的要求，换个说法试试。";
-"recommendation_chat_invalid_output" = "本地模型返回了无法解析的结果，请重试。";
-"recommendation_chat_timeout" = "本地模型响应超时，请重试。";
 "recommendation_reason_request" = "符合你的要求：%@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
-"recommendation_related_share_title" = "相似艺人比例";
-"recommendation_related_share_footer" = "点名艺人时，批次中最多有多少比例来自相似艺人";
 "recommendation_artist_relation_title" = "用 MusicBrainz 扩展相关艺人";
 "recommendation_artist_relation_footer" = "按艺人关系补充候选：每个艺人意图最多 3 位相关艺人，整轮最多 2 次查询。失败自动跳过，不影响推荐结果。";
 /* App 级音量（macOS 播放条） */

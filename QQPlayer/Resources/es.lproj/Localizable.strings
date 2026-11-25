@@ -408,7 +408,6 @@
 "feature_guide_import_title" = "Importar archivos de música";
 "feature_guide_import_detail" = "Coloca archivos de música en la carpeta TingFi de este dispositivo (app Archivos → «En mi iPhone» → TingFi) o toca Abrir archivos en la biblioteca";
 
-
 /* Sleep Timer */
 "sleep_timer" = "Temporizador";
 "sleep_timer_off" = "Temporizador desactivado";
@@ -657,7 +656,6 @@
 "online_search_history_title" = "Búsquedas recientes";
 "online_search_clear_history" = "Borrar";
 "online_search_history_delete_help" = "Eliminar esta entrada";
-
 
 /* C-group: search anything + settings download (web SearchAnything/settings parity) */
 "settings_category_download" = "Descargar";
@@ -1135,8 +1133,6 @@
 "recommendation_dismiss" = "No me interesa";
 "recommendation_reason_artist" = "Sueles reproducir %@";
 "recommendation_reason_requested_artist" = "Artista solicitado";
-"recommendation_artist_shortfall" = "Solo se encontraron %d canciones de %@";
-"recommendation_artist_shortfall_filled" = "%@ solo tiene %d canciones; se añadieron %d de artistas similares";
 "recommendation_reason_era" = "Coincide con tu década de los %d";
 "recommendation_reason_trend" = "Tendencia en tus reproducciones recientes: %@";
 "recommendation_reason_chart_hot" = "Tendencia en las listas de Apple Music";
@@ -1156,23 +1152,11 @@
 "recommendation_reason_matched_taste" = "Coincide con tus gustos";
 
 // MARK: - 本地 AI 推荐：指令输入（2026-11-04）
-"recommendation_chat_placeholder" = "Describe lo que quieres escuchar…";
-"recommendation_chat_send" = "Enviar";
-"recommendation_chat_model_not_ready" = "El modelo local no está listo. Descárgalo en Ajustes para usar las peticiones.";
-"recommendation_chat_go_to_settings" = "Abrir ajustes";
-"recommendation_chat_clear" = "Borrar petición";
-"recommendation_chat_results_title" = "Según tu petición";
 "recommendation_results_for_you" = "Para ti";
-"recommendation_chat_rounds_title" = "Rondas de contexto";
-"recommendation_chat_rounds_footer" = "Solo se usa para entender peticiones posteriores; nunca se muestra en la app.";
 "recommendation_empty_request" = "No se pudo entender esa petición. Prueba a decirlo de otra forma.";
-"recommendation_chat_invalid_output" = "El modelo local devolvió un resultado ilegible. Inténtalo de nuevo.";
-"recommendation_chat_timeout" = "El modelo local agotó el tiempo. Inténtalo de nuevo.";
 "recommendation_reason_request" = "Coincide con tu petición: %@";
 
 // MARK: - 本地 AI 推荐 P4（MusicBrainz 艺人关系扩展）
-"recommendation_related_share_title" = "Proporción de artistas similares";
-"recommendation_related_share_footer" = "Cuando nombras un artista, la proporción máxima de cada lote que puede venir de artistas similares.";
 "recommendation_artist_relation_title" = "Ampliar artistas relacionados con MusicBrainz";
 "recommendation_artist_relation_footer" = "Añade candidatos de artistas relacionados con tus artistas principales (hasta 2 consultas por ejecución, 3 artistas cada una). Los fallos se omiten en silencio y nunca bloquean las recomendaciones.";
 /* App volume (macOS player bar) */
