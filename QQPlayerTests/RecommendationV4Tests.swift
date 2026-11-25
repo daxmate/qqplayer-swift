@@ -209,7 +209,11 @@ struct RecommendationProfileV4Tests {
         let profile = RecommendationProfileV3Builder.build(RecommendationProfileV3Input(tracks: tracks))
         #expect(profile.seeds.count == 2)
         let first = profile.seeds.first
-        #expect(first?.artist == "乙") // 曲库规模权重更高
+        // 无播放历史 → 退化权重按 (0.35 曲库 + 0.15 收藏) / 0.90 归一化（play 恒 0）：
+        //   甲 = (0.35 × log1p(1)/log1p(2) + 0.15) / 0.90 ≈ 0.412
+        //   乙 = (0.35 × 1.0 + 0) / 0.90 ≈ 0.389
+        // 收藏一项折算后 ≈0.167，比「2 首 vs 1 首」的曲库规模差 ≈0.144 略强，所以只收藏的甲排前。
+        #expect(first?.artist == "甲")
         #expect((first?.affinity ?? 0) > 0)
         #expect(RecommendationProfileV3Builder.artistBehaviorScores(
             RecommendationProfileV3Input(tracks: tracks), tracks: tracks

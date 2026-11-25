@@ -2,7 +2,7 @@
 //  RecommendationV3Tests.swift
 //  QQPlayerTests
 //
-//  推荐 v3：画像权重 / 配额拆分 / 曲库排除归一化 / 排序稳定性 / 设置默认值 / 五语种文案键。
+//  推荐 v3：画像权重 / 通道配额 / 曲库排除归一化 / 排序与池级多样度 / 设置默认值 / 全语言文案键。
 //
 
 import Foundation
@@ -265,17 +265,28 @@ struct RecommendationRankerV3Tests {
         #expect(admitted.count == 1)
     }
 
-    @Test("单艺人 ≤2、单专辑 ≤1")
-    func diversity() {
-        let candidates = [
-            candidate("A1", "Band", album: "Album"),
-            candidate("A2", "Band", album: "Album"),
-            candidate("A3", "Band", album: "Other"),
-            candidate("A4", "Band", album: nil),
-        ]
-        let ranked = RecommendationRankerV3.rank(candidates, profile: profile())
-        #expect(ranked.count == 2)
-        #expect(ranked.filter { $0.song.artist == "Band" }.count == 2)
+    // v4：池级上限放宽到「艺人 ≤4 / 专辑 ≤2」，批次级「艺人 2 / 专辑 1」下移到
+    // RecommendationSelectionV4（那边有独立用例 batchCaps）。这里只钉池级，
+    // 原始意图不变：同一个艺人 / 专辑不能刷屏。
+    @Test("池级上限：单艺人 ≤4（批次级 2 首由 SelectionV4 再收紧）")
+    func poolArtistCap() {
+        let crowded = (0 ..< 6).map { index in
+            candidate("Solo \(index)", "Solo", album: "Album \(index)")
+        }
+        let ranked = RecommendationRankerV3.rank(crowded, profile: profile())
+        #expect(ranked.count == RecommendationRankerV3.maxSongsPerArtist)
+        #expect(ranked.allSatisfy { $0.song.artist == "Solo" })
+    }
+
+    @Test("池级专辑上限：同一专辑不能刷屏（≤ maxSongsPerAlbum）")
+    func poolAlbumCap() {
+        // 艺人各不相同，只让专辑约束生效。
+        let crowded = (0 ..< 5).map { index in
+            candidate("Same \(index)", "Band \(index)", album: "Same Album")
+        }
+        let ranked = RecommendationRankerV3.rank(crowded, profile: profile())
+        #expect(ranked.count >= 1)
+        #expect(ranked.count <= RecommendationRankerV3.maxSongsPerAlbum)
     }
 
     @Test("排序稳定：同一批候选打乱输入顺序 → 结果顺序一致")
@@ -426,9 +437,22 @@ struct RecommendationV3SettingsTests {
 
 // MARK: - 本地化
 
-@Suite("推荐 v3：五语种文案键")
+@Suite("推荐 v3：全语言文案键（8 个 lproj）")
 struct RecommendationV3LocalizationTests {
-    private static let languages = ["en", "fr", "ru", "zh-Hans", "zh-Hant"]
+    /// 语种列表从 `QQPlayer/Resources/*.lproj` 现场枚举（不写死）：当前是
+    /// en / es / fr / ja / ko / ru / zh-Hans / zh-Hant 八个，新增语种自动纳入检查。
+    /// 「各 lproj key 集合一致」另有专项契约（MacSettingsSearchContractTests）。
+    private static let languages: [String] = {
+        let resources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("QQPlayer/Resources")
+        let entries = (try? FileManager.default.contentsOfDirectory(at: resources, includingPropertiesForKeys: nil)) ?? []
+        return entries
+            .filter { $0.pathExtension == "lproj" }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted()
+    }()
     private static let requiredKeys = [
         "recommendation_v3_reason_seed",
         "recommendation_v3_reason_similar",
@@ -450,10 +474,6 @@ struct RecommendationV3LocalizationTests {
         "recommendation_weight_play",
         "recommendation_weight_favorite",
         "recommendation_weight_recency",
-        "recommendation_quotas_title",
-        "recommendation_quota_seed",
-        "recommendation_quota_similar",
-        "recommendation_quota_explore",
         "recommendation_lastfm_title",
         "recommendation_lastfm_footer",
         "recommendation_profile_empty_library",
@@ -461,11 +481,12 @@ struct RecommendationV3LocalizationTests {
         "source_lastfm",
     ]
 
-    @Test("五个语种都包含 v3 必需文案键")
+    @Test("全部 lproj 都包含 v3 必需文案键")
     func allLanguagesHaveKeys() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+        #expect(!Self.languages.isEmpty, "一个 lproj 都没枚举到（资源路径解析错会静默通过，fail-closed）")
         for language in Self.languages {
             let url = root.appendingPathComponent("QQPlayer/Resources/\(language).lproj/Localizable.strings")
             let text = try String(contentsOf: url, encoding: .utf8)
