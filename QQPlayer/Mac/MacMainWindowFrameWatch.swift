@@ -43,9 +43,13 @@ final class MacMainWindowFrameWatch {
         }
     }
 
-    /// 只认标题「QQPlayer」的非 panel 主窗（与 `MacAppDelegate.clampTitleMainWindowIfNeeded` 同一判据）。
+    /// 只认主窗（与 became-key 路径**同一判据**：登记弱引用 / identifier，不看窗口标题）。
+    /// 仍是纯只读：这里只决定「记不记这一次帧变化」，绝不改 frame。
     private func noteFrameChange(of window: NSWindow) {
-        guard !(window is NSPanel), window.title == "QQPlayer" else { return }
+        guard MacMainWindowResolver.isMainWindow(
+            window,
+            registered: DesktopWindowsManager.shared.registeredMainWindow
+        ) else { return }
         let frame = window.frame
 
         // live resize = 用户自己在拖边：只更新基准、不打日志，否则拖一次刷一屏。

@@ -74,6 +74,24 @@ final class DesktopWindowsManager {
 
     private init() {}
 
+    /// 主窗弱引用：由主窗内容根的 `MacMainWindowRegistration` 登记（唯一事实源，不看标题）。
+    /// 只服务窗口查找，视图不该因窗口换引用而重算 → `@ObservationIgnored`。
+    @ObservationIgnored private(set) weak var registeredMainWindow: NSWindow?
+
+    /// 登记主窗（视图侧探针调用）：打稳定 identifier + 保存弱引用。
+    func registerMainWindow(_ window: NSWindow) {
+        window.identifier = MacMainWindowResolver.windowIdentifier
+        registeredMainWindow = window
+        AppLog.info(.ui, "ℹ️ 主窗已登记 id=\(window.identifier?.rawValue ?? "-")")
+    }
+
+    /// 主窗卸载（窗口销毁 / 内容树重建）时清引用，避免留下即将销毁的窗口。
+    func unregisterMainWindow(_ window: NSWindow) {
+        guard registeredMainWindow === window else { return }
+        registeredMainWindow = nil
+        AppLog.info(.ui, "ℹ️ 主窗已注销")
+    }
+
     // MARK: - 生命周期
 
     /// App 启动调用一次：监听设置变化并收敛歌词窗显隐。
@@ -107,6 +125,8 @@ final class DesktopWindowsManager {
     /// 返回主窗（迷你窗封面/标题点击、Dock 重开）：收迷你窗 + 歌词窗，恢复主窗。
     /// 幂等：主窗态调用仅激活 + 前置主窗，无副作用。
     func showMainWindow() {
+        // 入口留现场：迷你窗可见但主窗没回来时，这条日志决定「点击到没到 / 窗口找到没」。
+        AppLog.info(.ui, "ℹ️ showMainWindow 入口: isMiniActive=\(mode.isMiniActive) miniPanelVisible=\(panel(.mini)?.isVisible ?? false) lyricPanelVisible=\(panel(.lyric)?.isVisible ?? false)")
         if mode.showMainWindow() {
             isMiniActive = false
             isLyricVisible = false
@@ -114,9 +134,8 @@ final class DesktopWindowsManager {
             panel(.lyric)?.orderOut(nil)
         }
         NSApp.activate(ignoringOtherApps: true)
-        if let window = Self.findMainWindow() {
-            window.makeKeyAndOrderFront(nil)
-        }
+        guard let window = findMainWindow(context: "showMainWindow") else { return }
+        window.makeKeyAndOrderFront(nil)
     }
 
     /// 迷你模式内桌面歌词开关（mini 窗歌词按钮 / 设置页开关共用：只写设置，收敛交给 reconcile）。
@@ -298,9 +317,10 @@ final class DesktopWindowsManager {
         return NSRect(origin: origin, size: kind.contentSize)
     }
 
-    /// 锚点屏：优先主窗口所在屏，其次 NSScreen.main
+    /// 锚点屏：优先主窗口所在屏，其次 NSScreen.main（解析失败走兜底，这里不重复打日志）
     private func anchorScreen() -> NSScreen {
-        if let window = Self.findMainWindow(), let screen = window.screen {
+        if let window = MacMainWindowResolver.resolve(registered: registeredMainWindow)?.window,
+           let screen = window.screen {
             return screen
         }
         return NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
@@ -308,13 +328,24 @@ final class DesktopWindowsManager {
 
     /// 收起主窗（进入迷你模式时；orderOut 非 close，SwiftUI WindowGroup 状态保留）
     private func hideMainWindow() {
-        guard let window = Self.findMainWindow() else { return }
+        guard let window = findMainWindow(context: "hideMainWindow") else { return }
         window.orderOut(nil)
     }
 
-    /// 主窗口定位：WindowGroup 的标题为「QQPlayer」；找不到退化为第一个非 panel 主窗口
-    private static func findMainWindow() -> NSWindow? {
-        NSApp.windows.first { !($0 is NSPanel) && $0.title == "QQPlayer" }
-            ?? NSApp.windows.first { !($0 is NSPanel) && $0.canBecomeMain }
+    /// 主窗定位（**全仓唯一入口**，不看窗口标题）：
+    /// ① 视图侧登记的弱引用 → ② identifier 命中 → ③ 非 panel + canBecomeMain 兜底（打日志）。
+    /// 解析失败打 error + 窗口清单 —— 历史缺陷就是这里完全静默。
+    private func findMainWindow(context: String) -> NSWindow? {
+        guard let hit = MacMainWindowResolver.resolve(registered: registeredMainWindow) else {
+            let registration = registeredMainWindow == nil ? "nil" : "set"
+            AppLog.error(.ui, "❌ \(context): 找不到主窗（registered=\(registration)）\n" + MacMainWindowResolver.windowDump())
+            return nil
+        }
+        if hit.source == .canBecomeMain {
+            AppLog.info(.ui, "⚠️ \(context): 主窗走了兜底判据 canBecomeMain（登记 / identifier 都未命中）")
+        } else {
+            AppLog.info(.ui, "ℹ️ \(context): 主窗命中（判据=\(hit.source.rawValue)）")
+        }
+        return hit.window
     }
 }

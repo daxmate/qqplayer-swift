@@ -49,7 +49,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         ) { note in
             guard let window = note.object as? NSWindow else { return }
             MainActor.assumeIsolated {
-                MacAppDelegate.clampTitleMainWindowIfNeeded(window)
+                MacAppDelegate.clampMainWindowIfNeeded(window)
             }
         }
     }
@@ -59,21 +59,24 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// 启动时的主窗兜底：此刻通常只有主窗，但标题可能还没设上（未授权引导页没有
-    /// navigationTitle）→ 判据与 `DesktopWindowsManager.findMainWindow` 对齐：
-    /// 标题「QQPlayer」优先，退化为第一个可成为主窗的非 panel 窗口。
-    /// 迷你窗 / 歌词窗 / 桌面浮窗都是 `NSPanel`，被 `!($0 is NSPanel)` 天然排除。
+    /// 启动时的主窗兜底：此刻视图侧探针可能还没登记（主窗内容树异步装配）
+    /// → 走与运行期**同一个解析入口**（登记 → identifier → canBecomeMain 兜底，兜底会打日志）。
+    /// 迷你窗 / 歌词窗 / 桌面浮窗都是 `NSPanel`，天然排除。
     private static func clampLaunchMainWindowIfNeeded() {
-        guard let window = NSApp.windows.first(where: { !($0 is NSPanel) && $0.title == "QQPlayer" })
-            ?? NSApp.windows.first(where: { !($0 is NSPanel) && $0.canBecomeMain })
-        else { return }
-        clampToMinimumSize(window)
+        guard let hit = MacMainWindowResolver.resolve(
+            registered: DesktopWindowsManager.shared.registeredMainWindow
+        ) else { return }
+        clampToMinimumSize(hit.window)
     }
 
-    /// became-key 路径：只认标题「QQPlayer」的主窗。不能退化到 `canBecomeMain` ——
-    /// 设置窗也是普通窗口、也能成为 key，退化会把它撑到三栏主界面的最小尺寸。
-    private static func clampTitleMainWindowIfNeeded(_ window: NSWindow) {
-        guard !(window is NSPanel), window.title == "QQPlayer" else { return }
+    /// became-key 路径：只认**登记过的主窗**（弱引用 / identifier），不看窗口标题。
+    /// 不能退化到 `canBecomeMain` —— 设置窗也是普通窗口、也能成为 key，
+    /// 退化会把它撑到三栏主界面的最小尺寸。
+    private static func clampMainWindowIfNeeded(_ window: NSWindow) {
+        guard MacMainWindowResolver.isMainWindow(
+            window,
+            registered: DesktopWindowsManager.shared.registeredMainWindow
+        ) else { return }
         clampToMinimumSize(window)
     }
 
@@ -193,6 +196,9 @@ struct QQPlayerMacApp: App {
                         .environment(\.locale, AppLanguage.locale(forStoredCode: appLanguageRaw))
                 }
             }
+            // 主窗身份登记：把所在 NSWindow 交给 DesktopWindowsManager（弱引用 + 稳定 identifier）。
+            // 窗口标题随产品显示名变（2026-11-24 改「婷听 / TingFi」），不再参与主窗查找。
+            .background { MacMainWindowRegistration() }
             // 工具栏背景跟随整窗玻璃（唯一落点仍在这里，只是值由条件给出）：
             //   玻璃生效 → .hidden：窗底模糊封面一直铺到标题栏背后（整窗一块）；
             //   否则     → .visible：macOS 26 (Tahoe) 上 unified 工具栏默认透明，sidebar
