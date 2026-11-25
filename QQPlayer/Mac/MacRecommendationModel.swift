@@ -25,7 +25,8 @@ final class MacRecommendationModel {
     var phase: Phase = .idle
     var candidates: [RecommendedCandidate] = []
     /// 已下载判定状态（曲库键 + 可注入读取器；生成时赋值，下载落库/面板关闭后再刷）。
-    var downloadedIndex = RecommendationDownloadedIndex()
+    /// 已下载判定（协议注入：单测换桩，无需真实曲库）。
+    var downloadedIndex: any RecommendationDownloadedIndexProviding = RecommendationDownloadedIndex()
     /// 合并突发刷新通知的待执行任务（连续 `.trackFound` / `.libraryNeedsRefresh` 只读一次曲库）。
     @ObservationIgnored var downloadedKeysRefreshTask: Task<Void, Never>?
     /// 最近一次生成用的画像输入（后台重算复用，避免二次 DB 读）。
@@ -315,7 +316,7 @@ final class MacRecommendationModel {
             RecommendationProfileV3Input(legacy: input),
             weights: settings.recommendationProfileWeights
         )
-        downloadedIndex.replaceKeys(profileV3.libraryKeys)
+        downloadedIndex = downloadedIndex.withKeys(profileV3.libraryKeys)
         lastProfileInput = input
         if let reason = profileV3.emptyReason {
             phase = .failed(reason.localizationKey.localized)
@@ -508,11 +509,21 @@ final class MacRecommendationModel {
         let result = await RecommendationV3Engine.configured().recommend(
             profile: profileV3,
             count: count,
-            excludedTrackKeys: excludedTrackKeys
+            excludedTrackKeys: excludedTrackKeys,
+            // 后台重算不是「换一批」：本批已下载的曲目保留并打标，不从列表凭空消失。
+            keepKeys: retainedDownloadedKeys()
         )
         if Task.isCancelled { return nil }
         guard case let .success(list) = result else { return nil }
-        return RecommendationRecompute(candidates: list, planSource: .rule, requestedArtist: nil)
+        return RecommendationRecompute(
+            candidates: RecommendationDownloadedRetention.merge(
+                previous: candidates,
+                fresh: list,
+                isDownloaded: isDownloaded
+            ),
+            planSource: .rule,
+            requestedArtist: nil
+        )
     }
 
     private func computeChatRecompute(context: ChatRefreshContext) async -> RecommendationRecompute? {

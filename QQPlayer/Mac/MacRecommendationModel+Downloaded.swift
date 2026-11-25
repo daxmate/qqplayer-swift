@@ -22,9 +22,18 @@ extension MacRecommendationModel {
         downloadedIndex.isDownloaded(title: candidate.title, artist: candidate.artist)
     }
 
+    /// 当前批里已下载条目的匹配键（后台重算时放行，不从列表消失）。
+    func retainedDownloadedKeys() -> Set<String> {
+        var keys = Set<String>()
+        for candidate in candidates where isDownloaded(candidate) {
+            keys.formUnion(RecommendationLibraryMatcher.keys(title: candidate.title, artist: candidate.artist))
+        }
+        return keys
+    }
+
     /// 重新读曲库键（下载面板关闭 / 下载完成后调用）。
     func refreshDownloadedKeys() async {
-        downloadedIndex = await downloadedIndex.refreshed()
+        downloadedIndex = await downloadedIndex.refreshedIndex()
     }
 
     /// 通知驱动的合并刷新：短去抖后只读一次曲库；连续通知会取消上一次未执行的刷新。
