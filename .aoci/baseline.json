@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-05T04:26:56Z",
-  "updated_at": "2026-11-25T05:24:32Z",
+  "updated_at": "2026-11-25T07:49:32Z",
   "files": {
     ".env.template": {
       "role": "index",
@@ -143,9 +143,9 @@
     },
     "QQPlayer.xcodeproj/project.pbxproj": {
       "role": "index",
-      "sha256": "0e9060e00d263346f0521f2e951bc2f411c1eeec6c87b9af19394461c8272d20",
-      "size": 202133,
-      "normalized_sha256": "0e9060e00d263346f0521f2e951bc2f411c1eeec6c87b9af19394461c8272d20"
+      "sha256": "693946dcf49a27a0db3dd22eaa495c40fffe3dc7567a19f96f6e673688aad91a",
+      "size": 200805,
+      "normalized_sha256": "693946dcf49a27a0db3dd22eaa495c40fffe3dc7567a19f96f6e673688aad91a"
     },
     "QQPlayer.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
       "role": "index",
@@ -860,9 +860,9 @@
     },
     "QQPlayer/Mac/MacRecommendationModel+Downloaded.swift": {
       "role": "index",
-      "sha256": "58bc086ad2bf20f29ef21a35b91585e62c7354d1fd7c402b0e309810bd33cf7f",
-      "size": 1938,
-      "normalized_sha256": "58bc086ad2bf20f29ef21a35b91585e62c7354d1fd7c402b0e309810bd33cf7f"
+      "sha256": "0d4465b5d1e85889839363b69869ad344af62b8116a01dd316e6102d78c98389",
+      "size": 2343,
+      "normalized_sha256": "0d4465b5d1e85889839363b69869ad344af62b8116a01dd316e6102d78c98389"
     },
     "QQPlayer/Mac/MacRecommendationModel+Reasons.swift": {
       "role": "index",
@@ -872,27 +872,27 @@
     },
     "QQPlayer/Mac/MacRecommendationModel+Session.swift": {
       "role": "index",
-      "sha256": "638ef5c45672905be370e5ef06399d47ba01656baa8204038e9b33d00a1df5b1",
-      "size": 5718,
-      "normalized_sha256": "638ef5c45672905be370e5ef06399d47ba01656baa8204038e9b33d00a1df5b1"
+      "sha256": "a1394114dac6f33da060573edde56008566d99bd096120a0e4915ec97cda4fe9",
+      "size": 4383,
+      "normalized_sha256": "a1394114dac6f33da060573edde56008566d99bd096120a0e4915ec97cda4fe9"
     },
     "QQPlayer/Mac/MacRecommendationModel.swift": {
       "role": "index",
-      "sha256": "61d549925d093c2ae2442333b18c4a960ad33623af39bae262422188a44b0571",
-      "size": 22357,
-      "normalized_sha256": "61d549925d093c2ae2442333b18c4a960ad33623af39bae262422188a44b0571"
+      "sha256": "78e3448b0279bafee43c7b502c3101c5bad6357aae30384ab8dccb9ab43d294f",
+      "size": 14001,
+      "normalized_sha256": "78e3448b0279bafee43c7b502c3101c5bad6357aae30384ab8dccb9ab43d294f"
     },
     "QQPlayer/Mac/MacRecommendationSettingsView.swift": {
       "role": "index",
-      "sha256": "e487483f00f7655dc434d77964094296db8019be71cf0badf3db52279428b431",
-      "size": 11034,
-      "normalized_sha256": "e487483f00f7655dc434d77964094296db8019be71cf0badf3db52279428b431"
+      "sha256": "110cddadef77af5b5f1f0fa69b4750d7a057b91d7875cad1995ab138d983f316",
+      "size": 7410,
+      "normalized_sha256": "110cddadef77af5b5f1f0fa69b4750d7a057b91d7875cad1995ab138d983f316"
     },
     "QQPlayer/Mac/MacRecommendationView.swift": {
       "role": "index",
-      "sha256": "150267c2ed827fa7e5a7c37ad4c306c4ed3de1cf845b122437b6a290415859ae",
-      "size": 13884,
-      "normalized_sha256": "150267c2ed827fa7e5a7c37ad4c306c4ed3de1cf845b122437b6a290415859ae"
+      "sha256": "d9289a9b60b3a486ef1b6dde34ed31137b48b01274642908faf40414d24578f3",
+      "size": 10034,
+      "normalized_sha256": "d9289a9b60b3a486ef1b6dde34ed31137b48b01274642908faf40414d24578f3"
     },
     "QQPlayer/Mac/MacScanLogger.swift": {
       "role": "index",
@@ -950,9 +950,9 @@
     },
     "QQPlayer/Mac/MacSettingsCatalog.swift": {
       "role": "index",
-      "sha256": "2e6578a5e1550d602e91b8a5daf69925385ae8d1470ad990fb3539f80bb5a6d0",
-      "size": 23777,
-      "normalized_sha256": "2e6578a5e1550d602e91b8a5daf69925385ae8d1470ad990fb3539f80bb5a6d0"
+      "sha256": "0de813fa9ae309cd9a58bd29957299c2523c0908edc207394ab92cc95195a9bb",
+      "size": 22246,
+      "normalized_sha256": "0de813fa9ae309cd9a58bd29957299c2523c0908edc207394ab92cc95195a9bb"
     },
     "QQPlayer/Mac/MacSettingsView.swift": {
       "role": "index",
@@ -1208,9 +1208,9 @@
     },
     "QQPlayer/Mac/RecommendationPlannerFactory.swift": {
       "role": "index",
-      "sha256": "b154a07cd102398bc562ab13cc6c03d5812cc318cd3dbadf6d4aaf0ad2596d90",
-      "size": 1815,
-      "normalized_sha256": "b154a07cd102398bc562ab13cc6c03d5812cc318cd3dbadf6d4aaf0ad2596d90"
+      "sha256": "6a423f828b7a1eadc54cc59d81f1a6ffd572f55d4800c9fff804583dbd17801a",
+      "size": 1298,
+      "normalized_sha256": "6a423f828b7a1eadc54cc59d81f1a6ffd572f55d4800c9fff804583dbd17801a"
     },
     "QQPlayer/Mac/SyncDataPane.swift": {
       "role": "index",
@@ -1280,9 +1280,9 @@
     },
     "QQPlayer/Models/RecommendationV3Settings.swift": {
       "role": "index",
-      "sha256": "1ade5e54d7eb92c75920444b3628c04a482e47ba05760627e13bb53738ca060f",
-      "size": 5605,
-      "normalized_sha256": "1ade5e54d7eb92c75920444b3628c04a482e47ba05760627e13bb53738ca060f"
+      "sha256": "95ee52012009f61d96ce5174849cb128da6e2464e6b95cf90132dac90047350b",
+      "size": 5878,
+      "normalized_sha256": "95ee52012009f61d96ce5174849cb128da6e2464e6b95cf90132dac90047350b"
     },
     "QQPlayer/Models/ReplayGainModels.swift": {
       "role": "index",
@@ -1298,9 +1298,9 @@
     },
     "QQPlayer/Models/SettingsModels.swift": {
       "role": "index",
-      "sha256": "325b318fffe521f2cefd921d53c5dcf2f49a28775038e85b45d8767fa3f5ebfc",
-      "size": 31749,
-      "normalized_sha256": "325b318fffe521f2cefd921d53c5dcf2f49a28775038e85b45d8767fa3f5ebfc"
+      "sha256": "5354f0278a36acbbf14599fdb1beb3fa77a5975947477667d7037db6d3058188",
+      "size": 29745,
+      "normalized_sha256": "5354f0278a36acbbf14599fdb1beb3fa77a5975947477667d7037db6d3058188"
     },
     "QQPlayer/Models/StateModels.swift": {
       "role": "index",
@@ -1376,9 +1376,9 @@
     },
     "QQPlayer/Resources/en.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "859f27e789bb92ae3017c25d0bd2e82f5424ba859f8f07140b29efdfa67098ef",
-      "size": 71371,
-      "normalized_sha256": "859f27e789bb92ae3017c25d0bd2e82f5424ba859f8f07140b29efdfa67098ef"
+      "sha256": "9aa8eca9d6202cd822aca7ef5604297cc966672fad49de7c52a627c7c0371afa",
+      "size": 69926,
+      "normalized_sha256": "9aa8eca9d6202cd822aca7ef5604297cc966672fad49de7c52a627c7c0371afa"
     },
     "QQPlayer/Resources/es.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1400,9 +1400,9 @@
     },
     "QQPlayer/Resources/es.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "54aa63131f725b55355c20dda76f94ea94c5fee518f99c3ea578a60766b946d6",
-      "size": 79459,
-      "normalized_sha256": "54aa63131f725b55355c20dda76f94ea94c5fee518f99c3ea578a60766b946d6"
+      "sha256": "ed0087c16f3133971c31a8db25d6e43d5f6f852c43403522a34cd99f352efb18",
+      "size": 77859,
+      "normalized_sha256": "ed0087c16f3133971c31a8db25d6e43d5f6f852c43403522a34cd99f352efb18"
     },
     "QQPlayer/Resources/fr.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1424,9 +1424,9 @@
     },
     "QQPlayer/Resources/fr.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "d3a4b57821eedadb6e741437e1c1253a2c89b9377ea3ba6c37468b15c9855cd8",
-      "size": 80364,
-      "normalized_sha256": "d3a4b57821eedadb6e741437e1c1253a2c89b9377ea3ba6c37468b15c9855cd8"
+      "sha256": "86da1790adcb62172b0e15d00512673f9c02cc1638e8e10fbc1c771b2b083b9f",
+      "size": 78790,
+      "normalized_sha256": "86da1790adcb62172b0e15d00512673f9c02cc1638e8e10fbc1c771b2b083b9f"
     },
     "QQPlayer/Resources/ja.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1448,9 +1448,9 @@
     },
     "QQPlayer/Resources/ja.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "03f094f2229f3e37ab28ab3d6854959d11289d03030d8a34e81c02d40178958e",
-      "size": 87807,
-      "normalized_sha256": "03f094f2229f3e37ab28ab3d6854959d11289d03030d8a34e81c02d40178958e"
+      "sha256": "67a79ea2f0acc5825c7ef70dbed0efeaad59f46d278bd9d8eeb9b56100b92d58",
+      "size": 85888,
+      "normalized_sha256": "67a79ea2f0acc5825c7ef70dbed0efeaad59f46d278bd9d8eeb9b56100b92d58"
     },
     "QQPlayer/Resources/ko.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1472,9 +1472,9 @@
     },
     "QQPlayer/Resources/ko.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "afb6cdce8139e0768a755a92091f8e67419159b13038b036d83bfdbf64ffdb94",
-      "size": 81212,
-      "normalized_sha256": "afb6cdce8139e0768a755a92091f8e67419159b13038b036d83bfdbf64ffdb94"
+      "sha256": "df469544f4e4c7d99508586a788665da9c2ae365b61f0fb6eda5f977bd16711d",
+      "size": 79490,
+      "normalized_sha256": "df469544f4e4c7d99508586a788665da9c2ae365b61f0fb6eda5f977bd16711d"
     },
     "QQPlayer/Resources/ru.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1496,9 +1496,9 @@
     },
     "QQPlayer/Resources/ru.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "9eea1bc69ff95352da72f10d66acb4a4acc58fa392ab725283e24676aacbe43c",
-      "size": 104667,
-      "normalized_sha256": "9eea1bc69ff95352da72f10d66acb4a4acc58fa392ab725283e24676aacbe43c"
+      "sha256": "b861aa47125c65343d8303943489dc9f89b4e1ca9c16deed7e3c2de308866134",
+      "size": 102539,
+      "normalized_sha256": "b861aa47125c65343d8303943489dc9f89b4e1ca9c16deed7e3c2de308866134"
     },
     "QQPlayer/Resources/zh-Hans.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1520,9 +1520,9 @@
     },
     "QQPlayer/Resources/zh-Hans.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "d230b90eb957880162b565ca5b0b7ff704f8fe8a357c7e51bd9a53b310459069",
-      "size": 70324,
-      "normalized_sha256": "d230b90eb957880162b565ca5b0b7ff704f8fe8a357c7e51bd9a53b310459069"
+      "sha256": "5b405df6331bddde3caf1edc4297e6956ce84ebbb7285a357c5493b4a4592947",
+      "size": 68916,
+      "normalized_sha256": "5b405df6331bddde3caf1edc4297e6956ce84ebbb7285a357c5493b4a4592947"
     },
     "QQPlayer/Resources/zh-Hant.lproj/AppIntentVocabulary.plist": {
       "role": "index",
@@ -1544,9 +1544,9 @@
     },
     "QQPlayer/Resources/zh-Hant.lproj/Localizable.strings": {
       "role": "index",
-      "sha256": "38dd7fac0104f74340734d3a27d894b74652aff41c19de6e98d7d233af3ae7d8",
-      "size": 70778,
-      "normalized_sha256": "38dd7fac0104f74340734d3a27d894b74652aff41c19de6e98d7d233af3ae7d8"
+      "sha256": "3be20f91006e0075c1ceea1cfd6b02e04a1a54a18fbaf479f91f17f20e1bd817",
+      "size": 69363,
+      "normalized_sha256": "3be20f91006e0075c1ceea1cfd6b02e04a1a54a18fbaf479f91f17f20e1bd817"
     },
     "QQPlayer/Services/AlignedLyricsStore.swift": {
       "role": "index",
@@ -2576,9 +2576,9 @@
     },
     "QQPlayer/Services/RecallSession.swift": {
       "role": "index",
-      "sha256": "3a14a6c9b4d33fef7419c2726df5ff49f53f94cef9e249f776b32042b7041c0d",
-      "size": 7085,
-      "normalized_sha256": "3a14a6c9b4d33fef7419c2726df5ff49f53f94cef9e249f776b32042b7041c0d"
+      "sha256": "526ee727f2a73029c9c97b0d6fab98f257cc60c154b14b03cd594a7890f2afb0",
+      "size": 6561,
+      "normalized_sha256": "526ee727f2a73029c9c97b0d6fab98f257cc60c154b14b03cd594a7890f2afb0"
     },
     "QQPlayer/Services/ReclaimAreaCatalog.swift": {
       "role": "index",
@@ -2618,21 +2618,27 @@
     },
     "QQPlayer/Services/RecommendationBatchDiversity.swift": {
       "role": "index",
-      "sha256": "9fcdef500ce92ed7ae6e3c38fe58e2d75581df0ee5e8b770d748a8eb1405724e",
-      "size": 13118,
-      "normalized_sha256": "9fcdef500ce92ed7ae6e3c38fe58e2d75581df0ee5e8b770d748a8eb1405724e"
+      "sha256": "7a866283524abd22dbb168f9a4cfab12d5349c559532fb01adf5055dbc72eb62",
+      "size": 10764,
+      "normalized_sha256": "7a866283524abd22dbb168f9a4cfab12d5349c559532fb01adf5055dbc72eb62"
     },
     "QQPlayer/Services/RecommendationCacheFlow.swift": {
       "role": "index",
-      "sha256": "9f4f44519c50c90e8e45e9171385049be35f652ead61e9d50131045893c2b414",
-      "size": 4769,
-      "normalized_sha256": "9f4f44519c50c90e8e45e9171385049be35f652ead61e9d50131045893c2b414"
+      "sha256": "d7c3e328e6687e8ae8bb25e02dd9bcf20d3ac6d737f87e22fe07b0452c52e015",
+      "size": 4680,
+      "normalized_sha256": "d7c3e328e6687e8ae8bb25e02dd9bcf20d3ac6d737f87e22fe07b0452c52e015"
     },
     "QQPlayer/Services/RecommendationDownloadedIndex.swift": {
       "role": "index",
-      "sha256": "ead045fb70729df24010762915e6e8a7dddc5b83c8dac4ea0f6e676b636a6855",
-      "size": 1801,
-      "normalized_sha256": "ead045fb70729df24010762915e6e8a7dddc5b83c8dac4ea0f6e676b636a6855"
+      "sha256": "9675d3d4c2d1c955e6c712c0c02f913c6534726d74f7e7f7646c7bd8126ff08c",
+      "size": 3025,
+      "normalized_sha256": "9675d3d4c2d1c955e6c712c0c02f913c6534726d74f7e7f7646c7bd8126ff08c"
+    },
+    "QQPlayer/Services/RecommendationDownloadedRetention.swift": {
+      "role": "index",
+      "sha256": "38cca9ddf5157accd5b4ac22cc77bd6fcb2e673a6fbb1aba741f92c79e5c4b76",
+      "size": 2325,
+      "normalized_sha256": "38cca9ddf5157accd5b4ac22cc77bd6fcb2e673a6fbb1aba741f92c79e5c4b76"
     },
     "QQPlayer/Services/RecommendationEngine+ArtistConstraint.swift": {
       "role": "index",
@@ -2654,21 +2660,21 @@
     },
     "QQPlayer/Services/RecommendationEngine+Selection.swift": {
       "role": "index",
-      "sha256": "a89238fb02ee9100777c56da328ef930c6ec242557598f2e07f2d02c4817150c",
-      "size": 8136,
-      "normalized_sha256": "a89238fb02ee9100777c56da328ef930c6ec242557598f2e07f2d02c4817150c"
+      "sha256": "0c70dc13a8c7aa97aee6c723da4b2ae1a302a9bded51593696383aec4c3e5da3",
+      "size": 5080,
+      "normalized_sha256": "0c70dc13a8c7aa97aee6c723da4b2ae1a302a9bded51593696383aec4c3e5da3"
     },
     "QQPlayer/Services/RecommendationEngine.swift": {
       "role": "index",
-      "sha256": "3345bdc4904a99eb959ef2880dacab30c9a08a3809de3cdc3c6199f213cdce77",
-      "size": 27494,
-      "normalized_sha256": "3345bdc4904a99eb959ef2880dacab30c9a08a3809de3cdc3c6199f213cdce77"
+      "sha256": "ea375ee6f122f42b4018892046bd7180db97cdb598a1f1a3eb8bf9cb7c41b39a",
+      "size": 24888,
+      "normalized_sha256": "ea375ee6f122f42b4018892046bd7180db97cdb598a1f1a3eb8bf9cb7c41b39a"
     },
     "QQPlayer/Services/RecommendationLibraryMatcher.swift": {
       "role": "index",
-      "sha256": "17e35e0705361794130d0336d9b0dafaa8d47bd80599c7624eefe7ce0ff29642",
-      "size": 4652,
-      "normalized_sha256": "17e35e0705361794130d0336d9b0dafaa8d47bd80599c7624eefe7ce0ff29642"
+      "sha256": "d9f53b30ad65a0166b076905dff585817c411c5f6daa3268e374e7d81b90221d",
+      "size": 13839,
+      "normalized_sha256": "d9f53b30ad65a0166b076905dff585817c411c5f6daa3268e374e7d81b90221d"
     },
     "QQPlayer/Services/RecommendationMetadataNormalizer.swift": {
       "role": "index",
@@ -2690,9 +2696,9 @@
     },
     "QQPlayer/Services/RecommendationPlanning.swift": {
       "role": "index",
-      "sha256": "ddb55f39596edd000f0f1b1fe356503af264e449c3810837cb24c6e573068a84",
-      "size": 14465,
-      "normalized_sha256": "ddb55f39596edd000f0f1b1fe356503af264e449c3810837cb24c6e573068a84"
+      "sha256": "cbc19f2366cc4eb941bbb94de3b99da0c01e9e8c486b95b058f41a10afc953f4",
+      "size": 4539,
+      "normalized_sha256": "cbc19f2366cc4eb941bbb94de3b99da0c01e9e8c486b95b058f41a10afc953f4"
     },
     "QQPlayer/Services/RecommendationProfile.swift": {
       "role": "index",
@@ -2702,9 +2708,9 @@
     },
     "QQPlayer/Services/RecommendationProfileV3.swift": {
       "role": "index",
-      "sha256": "8a80caf0ece4d15a0190b860e13b4baadc9b855fc30aaf9be549c50e7df07f9d",
-      "size": 10717,
-      "normalized_sha256": "8a80caf0ece4d15a0190b860e13b4baadc9b855fc30aaf9be549c50e7df07f9d"
+      "sha256": "b7b7ebdd72e05741f2721663621c087259eb485500c7abead4076a61e231174d",
+      "size": 14413,
+      "normalized_sha256": "b7b7ebdd72e05741f2721663621c087259eb485500c7abead4076a61e231174d"
     },
     "QQPlayer/Services/RecommendationProviders.swift": {
       "role": "index",
@@ -2714,9 +2720,9 @@
     },
     "QQPlayer/Services/RecommendationRankerV3.swift": {
       "role": "index",
-      "sha256": "fe749ca1bee56d962e4fb5e40df9daf1aff2215c1475cf85daeba9966e2dd3f2",
-      "size": 10137,
-      "normalized_sha256": "fe749ca1bee56d962e4fb5e40df9daf1aff2215c1475cf85daeba9966e2dd3f2"
+      "sha256": "943bb63fe46b2366884d3b3db1b3e5d59269764da97724dcfe4515b3bcd6e3b4",
+      "size": 11586,
+      "normalized_sha256": "943bb63fe46b2366884d3b3db1b3e5d59269764da97724dcfe4515b3bcd6e3b4"
     },
     "QQPlayer/Services/RecommendationReasonParser.swift": {
       "role": "index",
@@ -2738,9 +2744,9 @@
     },
     "QQPlayer/Services/RecommendationReasons.swift": {
       "role": "index",
-      "sha256": "ce1997559b4b71c0de97a8909dcd2acdbac5c55c2626c167c703c028dc4fdbc2",
-      "size": 4011,
-      "normalized_sha256": "ce1997559b4b71c0de97a8909dcd2acdbac5c55c2626c167c703c028dc4fdbc2"
+      "sha256": "5d52c8b756e6f35d94e1e9830365325aba9db4cc11f2748e6643265c547a6baa",
+      "size": 3880,
+      "normalized_sha256": "5d52c8b756e6f35d94e1e9830365325aba9db4cc11f2748e6643265c547a6baa"
     },
     "QQPlayer/Services/RecommendationRequest+Rule.swift": {
       "role": "index",
@@ -2756,15 +2762,27 @@
     },
     "QQPlayer/Services/RecommendationResultCache.swift": {
       "role": "index",
-      "sha256": "6c3fce204b1b08e870a122deb4030b203084c3a523387323ade8eb2d5c52f77d",
-      "size": 18020,
-      "normalized_sha256": "6c3fce204b1b08e870a122deb4030b203084c3a523387323ade8eb2d5c52f77d"
+      "sha256": "5fddd4aecdb37f12d653a63a775d040d72d8ff87f4bfb6173f2fec6b80f57b7f",
+      "size": 17669,
+      "normalized_sha256": "5fddd4aecdb37f12d653a63a775d040d72d8ff87f4bfb6173f2fec6b80f57b7f"
     },
     "QQPlayer/Services/RecommendationScoring.swift": {
       "role": "index",
       "sha256": "ca81aa6664eee9382ca15ad2275dcf1694d99c0bc74e9d0d3b9bbc95ddf490dc",
       "size": 4593,
       "normalized_sha256": "ca81aa6664eee9382ca15ad2275dcf1694d99c0bc74e9d0d3b9bbc95ddf490dc"
+    },
+    "QQPlayer/Services/RecommendationSeedSampler.swift": {
+      "role": "index",
+      "sha256": "6b972adf1306ee7e3fbc36d339e3dd33941510086c19a4e7673e58727e6b41a1",
+      "size": 3740,
+      "normalized_sha256": "6b972adf1306ee7e3fbc36d339e3dd33941510086c19a4e7673e58727e6b41a1"
+    },
+    "QQPlayer/Services/RecommendationSelectionV4.swift": {
+      "role": "index",
+      "sha256": "8c13b51a10e550e89ff7d5d53e0efcdd881ecf39139eb15c89d591102a6c9872",
+      "size": 7476,
+      "normalized_sha256": "8c13b51a10e550e89ff7d5d53e0efcdd881ecf39139eb15c89d591102a6c9872"
     },
     "QQPlayer/Services/RecommendationSourceChain.swift": {
       "role": "index",
@@ -2792,9 +2810,9 @@
     },
     "QQPlayer/Services/RecommendationV3Engine.swift": {
       "role": "index",
-      "sha256": "99183894c9ee10819daa9ff918ceb24bc32e850c45fd3cd0c020cf4f0ef772e5",
-      "size": 22646,
-      "normalized_sha256": "99183894c9ee10819daa9ff918ceb24bc32e850c45fd3cd0c020cf4f0ef772e5"
+      "sha256": "5f874ef57a507ab67620a4e1c9417ef7b4ecfda84352ce258e4945089abfb976",
+      "size": 25181,
+      "normalized_sha256": "5f874ef57a507ab67620a4e1c9417ef7b4ecfda84352ce258e4945089abfb976"
     },
     "QQPlayer/Services/RecommendationV3Types.swift": {
       "role": "index",
@@ -4292,9 +4310,9 @@
     },
     "QQPlayerTests/DisplayScriptContractTests.swift": {
       "role": "index",
-      "sha256": "5a0e01f96bf7bb5bb1a8b457a9b4911aeb95ebf955f2a910ab118b2238076f97",
-      "size": 33041,
-      "normalized_sha256": "5a0e01f96bf7bb5bb1a8b457a9b4911aeb95ebf955f2a910ab118b2238076f97"
+      "sha256": "e924fd89e04e7803ea726212616c2112d643ae659ad4a7d9855e1517183ae9fd",
+      "size": 33387,
+      "normalized_sha256": "e924fd89e04e7803ea726212616c2112d643ae659ad4a7d9855e1517183ae9fd"
     },
     "QQPlayerTests/DisplayScriptLanguageOverrideTests.swift": {
       "role": "index",
@@ -5000,9 +5018,9 @@
     },
     "QQPlayerTests/RecommendationCacheFlowTests.swift": {
       "role": "index",
-      "sha256": "70d3898b69e47fe21853adeb2f8d68ab40092bea4d0781788f59bc4990934794",
-      "size": 9392,
-      "normalized_sha256": "70d3898b69e47fe21853adeb2f8d68ab40092bea4d0781788f59bc4990934794"
+      "sha256": "9bff53fcf3a869c59a3ae27f14514cc4c1a38f7406ed39c8be3bddc0d5c4dd5c",
+      "size": 9278,
+      "normalized_sha256": "9bff53fcf3a869c59a3ae27f14514cc4c1a38f7406ed39c8be3bddc0d5c4dd5c"
     },
     "QQPlayerTests/RecommendationChartPopularityTests.swift": {
       "role": "index",
@@ -5030,9 +5048,9 @@
     },
     "QQPlayerTests/RecommendationP3Tests.swift": {
       "role": "index",
-      "sha256": "e50e10515fa16d3c728166111e27c56077929b838e83c08646fe0ea89f54a039",
-      "size": 12493,
-      "normalized_sha256": "e50e10515fa16d3c728166111e27c56077929b838e83c08646fe0ea89f54a039"
+      "sha256": "a8851fe2e16f5cbd7e546bdf4963709d649e5b2fb4e55a1f4769d542b926d816",
+      "size": 9915,
+      "normalized_sha256": "a8851fe2e16f5cbd7e546bdf4963709d649e5b2fb4e55a1f4769d542b926d816"
     },
     "QQPlayerTests/RecommendationP4Tests.swift": {
       "role": "index",
@@ -5054,9 +5072,9 @@
     },
     "QQPlayerTests/RecommendationResultCacheTests.swift": {
       "role": "index",
-      "sha256": "fee948cba0d2c16b0858931b4c724f6c37fcc40dc47392548c44c18f9b9af8ed",
-      "size": 15752,
-      "normalized_sha256": "fee948cba0d2c16b0858931b4c724f6c37fcc40dc47392548c44c18f9b9af8ed"
+      "sha256": "7acd5218e1774e5eaeacf4a66da4d623e05df2209876f1ca9a6c1c50db217a7e",
+      "size": 15684,
+      "normalized_sha256": "7acd5218e1774e5eaeacf4a66da4d623e05df2209876f1ca9a6c1c50db217a7e"
     },
     "QQPlayerTests/RecommendationTests.swift": {
       "role": "index",
@@ -5066,9 +5084,15 @@
     },
     "QQPlayerTests/RecommendationV3Tests.swift": {
       "role": "index",
-      "sha256": "d829feb25de78c76111b425f946d57d9757d69582b17181e7b03131725ee3ffa",
-      "size": 30533,
-      "normalized_sha256": "d829feb25de78c76111b425f946d57d9757d69582b17181e7b03131725ee3ffa"
+      "sha256": "260e1752da01f66b404c7d882f4f501d42548b183dc27d349ace2b2330a04a09",
+      "size": 32288,
+      "normalized_sha256": "260e1752da01f66b404c7d882f4f501d42548b183dc27d349ace2b2330a04a09"
+    },
+    "QQPlayerTests/RecommendationV4Tests.swift": {
+      "role": "index",
+      "sha256": "a3908a88a1f1a3642b6197d269f76ca0cfd15727d6ae24d440997151e4e43ce7",
+      "size": 24713,
+      "normalized_sha256": "a3908a88a1f1a3642b6197d269f76ca0cfd15727d6ae24d440997151e4e43ce7"
     },
     "QQPlayerTests/ReinstallLibraryPurgeTests.swift": {
       "role": "index",
@@ -5690,9 +5714,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "eef84e8c6010e5278b3f3b082b11ec848df5b45e9198606741d65040a471faca",
-      "size": 468788,
-      "normalized_sha256": "eef84e8c6010e5278b3f3b082b11ec848df5b45e9198606741d65040a471faca"
+      "sha256": "46f1a10560c08984bda39db13579d10fdb7b6cd5d47ec78f6ca316ad0460661e",
+      "size": 459709,
+      "normalized_sha256": "46f1a10560c08984bda39db13579d10fdb7b6cd5d47ec78f6ca316ad0460661e"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -5753,6 +5777,12 @@
       "sha256": "a6ae1ff529656ed5b95d40cf0cfbaf1ac80324dc013266a88dbdc3c44a3f0cde",
       "size": 9109,
       "normalized_sha256": "a6ae1ff529656ed5b95d40cf0cfbaf1ac80324dc013266a88dbdc3c44a3f0cde"
+    },
+    "docs/recommendation-v4.md": {
+      "role": "index",
+      "sha256": "8feb6f1dc5f07944e0660bf53680f1556247c0f3b5f9caba3731dabccc63faed",
+      "size": 10447,
+      "normalized_sha256": "8feb6f1dc5f07944e0660bf53680f1556247c0f3b5f9caba3731dabccc63faed"
     },
     "docs/sync-contract.md": {
       "role": "index",
@@ -5922,6 +5952,18 @@
       "size": 5394,
       "normalized_sha256": "fbe9a7d451eee5a221847d2da0e502c8f786038919ef5a274a7372787b1d7f11"
     },
+    "scripts/reco-v4-harness/main.swift": {
+      "role": "index",
+      "sha256": "8bbd27745c221b4fd29c3a51d02525d727627fe86f356ff83800617464157a32",
+      "size": 17079,
+      "normalized_sha256": "8bbd27745c221b4fd29c3a51d02525d727627fe86f356ff83800617464157a32"
+    },
+    "scripts/reco-v4-harness/shims.swift": {
+      "role": "index",
+      "sha256": "6bbc8733b97849997f5bf5143cff4ab42f066b87d6722d65e2fab9a2360bea40",
+      "size": 2506,
+      "normalized_sha256": "6bbc8733b97849997f5bf5143cff4ab42f066b87d6722d65e2fab9a2360bea40"
+    },
     "scripts/run-dsq-shared-tests.sh": {
       "role": "index",
       "sha256": "d610270c103c48c3b240ad487bdecbb4ff745885245946d78f50b4f514074eab",
@@ -5945,6 +5987,12 @@
       "sha256": "b8ef28235f402dd331b96846a5609902f0246e18c2ce03532337be8a185147b7",
       "size": 3899,
       "normalized_sha256": "b8ef28235f402dd331b96846a5609902f0246e18c2ce03532337be8a185147b7"
+    },
+    "scripts/run-reco-v4-tests.sh": {
+      "role": "index",
+      "sha256": "67c73b4bb1e5ffe034e9642612905fe85b81c651deb72721dc14442f25016b36",
+      "size": 2047,
+      "normalized_sha256": "67c73b4bb1e5ffe034e9642612905fe85b81c651deb72721dc14442f25016b36"
     },
     "scripts/siri-tests-guard.py": {
       "role": "index",
