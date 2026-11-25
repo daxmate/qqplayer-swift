@@ -136,7 +136,15 @@ struct RecommendationV3Engine: Sendable {
     /// 榜单热度参照（C；只当热度，不当相似源）。
     var chartClient: AppleMusicChartClient?
     var quotas: RecommendationChannelQuotas = .defaults
+    /// 通用在线搜索深度（风格关键词 / 艺名搜索；再深只会引入噪声）。
     var perSourceLimit: Int = 10
+    /// 单艺人热歌深度（v4 从 10 提到 50：池子要够大，选择阶段才有得挑。
+    /// 网易云 `artist/top/song` 实测上限 50，provider 内部 `min(50, limit)` 兜底）。
+    var topSongsLimit: Int = 50
+    /// 种子通道并发上限（每个种子 2 个 HTTP；串行会让首屏等太久）。
+    var maxSeedConcurrency: Int = 4
+    /// 每轮刷新用的随机种子（测试注入固定值；生产走系统熵）。
+    var seedProvider: @Sendable () -> UInt64 = { UInt64.random(in: .min ... .max) }
     /// A 通道最多探测多少个种子艺人。
     var maxSeedArtists: Int = 8
     /// B 通道最多为多少个种子艺人找相似。
@@ -201,17 +209,23 @@ struct RecommendationV3Engine: Sendable {
     func recommend(
         profile: RecommendationTasteProfileV3,
         count: Int,
-        excludedTrackKeys: Set<String> = []
+        excludedTrackKeys: Set<String> = [],
+        keepKeys: Set<String> = []
     ) async -> Result<[RecommendedCandidate], RecommendationError> {
         guard !profile.isEmpty else { return .success([]) }
         let target = max(1, count)
         await itunesBudget?.beginRun(maxITunesCalls: metadataNormalizer?.maxLookups ?? 0)
 
+        // 种子：每次刷新重新抽（加权无放回，只在前 20 名里抽）；批次内复用这一份，不中途重抽。
+        var working = profile
+        let sampledSeeds = RecommendationSeedSampler.sample(profile.seeds, k: maxSeedArtists, seed: seedProvider())
+        if !sampledSeeds.isEmpty { working.seeds = sampledSeeds }
+
         var pool: [RecommendationV3Candidate] = []
-        pool.append(contentsOf: await recallSeedChannel(profile: profile))
-        pool.append(contentsOf: await recallSimilarChannel(profile: profile))
+        pool.append(contentsOf: await recallSeedChannel(profile: working))
+        pool.append(contentsOf: await recallSimilarChannel(profile: working))
         let chartIndex = await chartClient?.index()
-        pool.append(contentsOf: await recallExploreChannel(profile: profile, chartIndex: chartIndex))
+        pool.append(contentsOf: await recallExploreChannel(profile: working, chartIndex: chartIndex))
 
         // iTunes 元数据标准化：只补高分段（缓存 + 限速 + 预算内），失败不阻塞。
         var metadataHits = 0
@@ -221,48 +235,41 @@ struct RecommendationV3Engine: Sendable {
             metadataHits = normalized.hits
         }
 
-        var effectiveProfile = profile
+        var effectiveProfile = working
         effectiveProfile.libraryKeys.formUnion(excludedTrackKeys)
-        let ranked = RecommendationRankerV3.rank(pool, profile: effectiveProfile)
+        // 本批刚下载完的曲目放行（保留并打标）；超过 3 首由选择阶段按分数丢弃。
+        let ranked = RecommendationRankerV3.rank(pool, profile: effectiveProfile, keepKeys: keepKeys)
         guard !ranked.isEmpty else { return .success([]) }
 
-        let allocation = quotas.allocation(total: target)
-        let picked = select(ranked, allocation: allocation, total: target)
+        let floors = RecommendationSelectionV4.minimums(total: target)
+        let picked = select(ranked, total: target, keepKeys: keepKeys)
         AppLog.info(
             .general,
-            "reco=v3 seeds=\(profile.seeds.count) clusters=\(profile.clusters.count) pooled=\(pool.count) normalized=\(metadataHits) ranked=\(ranked.count) picked=\(picked.count) alloc=\(allocation.seed)/\(allocation.similar)/\(allocation.explore)"
+            "reco=v4 seeds=\(effectiveProfile.seeds.count)/\(profile.seeds.count) clusters=\(profile.clusters.count) pooled=\(pool.count) normalized=\(metadataHits) ranked=\(ranked.count) picked=\(picked.count) floors=\(floors.seed)/\(floors.similar)/\(floors.explore) keep=\(keepKeys.count)"
         )
         return .success(picked.map { convert($0) })
     }
 
-    /// 配额选择：先按通道各取配额内最高分，再用全局排序补满；全程按归一化键去重。
+    /// 选择（v4）：通道下限先占（不参与者不吃 MMR），剩余位置按全局 MMR 竞争。
+    /// 批内上限（艺人 2 / 专辑 1）与「保留已下载 ≤3」都在 `RecommendationSelectionV4` 里统一执行。
     private func select(
         _ ranked: [RecommendationV3Candidate],
-        allocation: (seed: Int, similar: Int, explore: Int),
-        total: Int
+        total: Int,
+        keepKeys: Set<String>
     ) -> [RecommendationV3Candidate] {
-        var picked: [RecommendationV3Candidate] = []
-        var used = Set<String>()
-        let planned: [(RecommendationChannel, Int)] = [
-            (.seed, allocation.seed),
-            (.similar, allocation.similar),
-            (.explore, allocation.explore),
-        ]
-        for (channel, quota) in planned where quota > 0 {
-            var taken = 0
-            for candidate in ranked where candidate.context.channel == channel && taken < quota {
-                guard used.insert(candidate.libraryKey).inserted else { continue }
-                picked.append(candidate)
-                taken += 1
-            }
+        let items = ranked.map { candidate in
+            RecommendationSelectionItem(
+                key: candidate.libraryKey,
+                channel: candidate.context.channel,
+                artistKey: RecommendationLibraryMatcher.artistKey(candidate.song.artist),
+                albumKey: candidate.albumKey,
+                genre: candidate.context.genre,
+                year: candidate.context.year ?? candidate.song.year,
+                score: candidate.score,
+                isRetainedDownload: !keepKeys.isEmpty && !candidate.libraryMatchKeys.isDisjoint(with: keepKeys)
+            )
         }
-        if picked.count < total {
-            for candidate in ranked where picked.count < total {
-                guard used.insert(candidate.libraryKey).inserted else { continue }
-                picked.append(candidate)
-            }
-        }
-        return picked
+        return RecommendationSelectionV4.select(items, total: total).map { ranked[$0] }
     }
 
     private func convert(_ candidate: RecommendationV3Candidate) -> RecommendedCandidate {
@@ -288,9 +295,39 @@ struct RecommendationV3Engine: Sendable {
 
     /// A：种子艺人热歌。
     private func recallSeedChannel(profile: RecommendationTasteProfileV3) async -> [RecommendationV3Candidate] {
+        let seeds = Array(profile.seeds.prefix(maxSeedArtists))
+        guard !seeds.isEmpty else { return [] }
+        // 并发受限（≤ maxSeedConcurrency）：每个种子 2 次 HTTP，8 个种子串行会把首屏拖住。
+        // 结果按种子原序回填，池顺序保持稳定（去重「首次出现优先」依赖这一点）。
+        var songsBySeed: [[RecommendationRemoteSong]] = Array(repeating: [], count: seeds.count)
+        let width = max(1, maxSeedConcurrency)
+        var start = 0
+        while start < seeds.count {
+            let end = min(start + width, seeds.count)
+            let base = start
+            let batch = Array(seeds[base ..< end])
+            var collected: [(Int, [RecommendationRemoteSong])] = []
+            collected.reserveCapacity(batch.count)
+            await withTaskGroup(of: (Int, [RecommendationRemoteSong]).self) { group in
+                for (offset, seed) in batch.enumerated() {
+                    group.addTask {
+                        let songs = await self.artistTopSongs(artist: seed.artist)
+                        return (base + offset, songs)
+                    }
+                }
+                for await result in group {
+                    collected.append(result)
+                }
+            }
+            for (position, songs) in collected {
+                songsBySeed[position] = songs
+            }
+            start = end
+        }
+
         var out: [RecommendationV3Candidate] = []
-        for seed in profile.seeds.prefix(maxSeedArtists) {
-            let songs = await artistTopSongs(artist: seed.artist)
+        for (position, seed) in seeds.enumerated() {
+            let songs = songsBySeed[position]
             for (index, song) in songs.enumerated() {
                 let language = RecommendationLanguageDetector.detect(in: [song.artist, song.title])
                 out.append(
@@ -414,7 +451,7 @@ struct RecommendationV3Engine: Sendable {
     /// Last.fm 艺人的热歌（无 key / 空结果 → nil）。
     private func lastFMTopSongs(artist: String) async -> [RecommendationRemoteSong]? {
         guard let lastFM else { return nil }
-        let tracks = await lastFM.topTracks(artist: artist, limit: perSourceLimit)
+        let tracks = await lastFM.topTracks(artist: artist, limit: topSongsLimit)
         guard !tracks.isEmpty else { return nil }
         let total = tracks.count
         return tracks.enumerated().map { index, track in
@@ -432,7 +469,7 @@ struct RecommendationV3Engine: Sendable {
     /// 网易云艺人热歌（无客户端 / 失败 / 空结果 → nil；`pop` 直接当热度）。
     private func neteaseTopSongs(artist: String) async -> [RecommendationRemoteSong]? {
         guard let netease else { return nil }
-        guard let songs = try? await netease.artistTopSongs(artistName: artist, limit: perSourceLimit),
+        guard let songs = try? await netease.artistTopSongs(artistName: artist, limit: topSongsLimit),
               !songs.isEmpty
         else { return nil }
         return songs.map { song in

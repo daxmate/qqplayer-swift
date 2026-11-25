@@ -346,10 +346,12 @@ struct RecommendationProfileV3Tests {
         let profile = RecommendationProfileV3Builder.build(RecommendationProfileV3Input(tracks: tracks, now: now))
         #expect(profile.seeds.count == RecommendationProfileV3Builder.maxSeeds)
         #expect(profile.seeds.first?.artist == "Artist 0")
-        // 亲和度是四项加权（库 / 播放 / 收藏 / 最近），权重之和为 1：
-        // 本夹具只有「曲库曲目数」一维满档（播放 0 / 无收藏 / 无加入时间），
-        // 所以排序第一的艺人亲和度 = 库维度权重，而不是 1。
-        #expect(profile.seeds.first?.affinity == RecommendationProfileWeights.defaults.normalized().library)
+        // v4：无播放历史 → 退化到「库 / 播放 / 收藏」三维（去掉 recency 后按权重比例归一）。
+        // 本夹具只有「曲库曲目数」一维满档，所以排序第一的艺人亲和度 = 库权重 / 三维权重和。
+        let degradedWeights = RecommendationProfileWeights.defaults.normalized()
+        let degradedSum = degradedWeights.library + degradedWeights.play + degradedWeights.favorite
+        let first = profile.seeds.first?.affinity ?? 0
+        #expect(abs(first - degradedWeights.library / degradedSum) < 1e-9)
         let affinities = profile.seeds.map(\.affinity)
         #expect(affinities == affinities.sorted(by: >))
     }

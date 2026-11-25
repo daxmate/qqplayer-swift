@@ -37,9 +37,21 @@ struct RecommendationV3Candidate: Sendable, Equatable {
         self.sourceRank = sourceRank
     }
 
-    /// 归一化曲目键（与曲库排除 / 已下载标记同一口径）。
+    /// 归一化曲目键（与曲库排除 / 已下载标记同一口径；去重 / 缓存用）。
     var libraryKey: String {
         RecommendationLibraryMatcher.key(title: song.title, artist: song.artist)
+    }
+
+    /// 归一化曲目**匹配键集合**（多艺人 / 版本后缀 / 繁简都会展开成多个键）。
+    /// 曲库排除与已下载判定必须用它，单键会漏掉「A & B」「(Live)」这类写法差异。
+    var libraryMatchKeys: Set<String> {
+        RecommendationLibraryMatcher.keys(title: song.title, artist: song.artist)
+    }
+
+    /// 归一化专辑键（MMR 同专辑相似度用；无专辑 → 空串）。
+    var albumKey: String {
+        guard let album = song.album else { return "" }
+        return RecommendationLibraryMatcher.normalize(album)
     }
 }
 
@@ -47,17 +59,21 @@ enum RecommendationRankerV3 {
     /// 时长边界（毫秒）。
     static let minDurationMs = 30_000
     static let maxDurationMs = 600_000
-    static let maxSongsPerArtist = 2
-    static let maxSongsPerAlbum = 1
+    /// 池级上限（召回池够大才有得挑）：艺人 4 / 专辑 2。
+    /// 批次级上限（艺人 2 / 专辑 1）由 `RecommendationSelectionV4` 在选句阶段执行。
+    static let maxSongsPerArtist = 4
+    static let maxSongsPerAlbum = 2
 
     // MARK: - 过滤
 
     /// 固定顺序的准入过滤（不排序、不截断）。
     static func admit(
         _ candidates: [RecommendationV3Candidate],
-        profile: RecommendationTasteProfileV3
+        profile: RecommendationTasteProfileV3,
+        keepKeys: Set<String> = []
     ) -> [RecommendationV3Candidate] {
-        let library = profile.libraryKeys
+        // keepKeys = 本批可见、刚下载完的曲目：它们已在曲库里，但这一批不能凭空消失。
+        let library = profile.libraryKeys.subtracting(keepKeys)
         let blacklistTracks = profile.blacklistTracks
         let blacklistArtists = Set(profile.blacklistArtists.map { RecommendationLibraryMatcher.artistKey($0) })
 
@@ -67,10 +83,11 @@ enum RecommendationRankerV3 {
         for candidate in candidates {
             let key = candidate.libraryKey
             guard !key.isEmpty else { continue }
-            // 1. 曲库排除（硬需求）
-            guard !library.contains(key) else { continue }
-            // 2. 黑名单
-            guard !blacklistTracks.contains(key) else { continue }
+            let matchKeys = candidate.libraryMatchKeys
+            // 1. 曲库排除（多键口径；本批保留项放行）
+            guard !RecommendationLibraryMatcher.matches(matchKeys, libraryKeys: library) else { continue }
+            // 2. 黑名单（同样多键口径）
+            guard !RecommendationLibraryMatcher.matches(matchKeys, libraryKeys: blacklistTracks) else { continue }
             guard !blacklistArtists.contains(RecommendationLibraryMatcher.artistKey(candidate.song.artist)) else { continue }
             // 3. 时长
             if let duration = candidate.song.durationMs, duration < minDurationMs || duration > maxDurationMs {
@@ -172,9 +189,10 @@ enum RecommendationRankerV3 {
     static func rank(
         _ candidates: [RecommendationV3Candidate],
         profile: RecommendationTasteProfileV3,
-        now: Date = Date()
+        now: Date = Date(),
+        keepKeys: Set<String> = []
     ) -> [RecommendationV3Candidate] {
-        let admitted = admit(candidates, profile: profile)
+        let admitted = admit(candidates, profile: profile, keepKeys: keepKeys)
         var scored = admitted.map { candidate -> RecommendationV3Candidate in
             var copy = candidate
             copy.score = score(candidate, profile: profile, now: now)

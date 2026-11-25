@@ -65,7 +65,16 @@ struct RecommendationProfileV3Input: Sendable, Equatable {
         }
     }
 
+    /// 一次播放会话（DB 的 `play_history` 行；v4 行为信号的唯一原始输入）。
+    struct Play: Sendable, Equatable {
+        var trackStableId: String
+        var playedAt: Date
+        var playDurationMs: Int64
+    }
+
     var tracks: [Track] = []
+    /// 播放历史（30 天半衰加权；空 = 退化到曲库规模 + 收藏）。
+    var plays: [Play] = []
     var blacklistTracks: Set<String> = []
     var blacklistArtists: Set<String> = []
     var now: Date = Date()
@@ -91,6 +100,13 @@ extension RecommendationProfileV3Input {
         }
         self.init(
             tracks: tracks,
+            plays: legacy.plays.map { play in
+                Play(
+                    trackStableId: play.trackStableId,
+                    playedAt: play.playedAt,
+                    playDurationMs: play.playDurationMs
+                )
+            },
             blacklistTracks: legacy.blacklist.trackKeys,
             blacklistArtists: legacy.blacklist.artists,
             now: legacy.now
@@ -101,8 +117,10 @@ extension RecommendationProfileV3Input {
 enum RecommendationProfileV3Builder {
     static let maxSeeds = 15
     static let maxClusters = 5
-    /// 亲和度时间衰减半衰天数。
-    static let recencyHalfLifeDays: Double = 180
+    /// 播放行为半衰期（天）：一个月前的一次播放权重只剩一半。
+    static let behaviorHalfLifeDays: Double = 30
+    /// 完成率中性值：曲目时长缺失时按 0.6 算（既不奖励也不重罚）。
+    static let neutralCompletion: Double = 0.6
 
     static func build(
         _ input: RecommendationProfileV3Input,
@@ -113,10 +131,11 @@ enum RecommendationProfileV3Builder {
         profile.blacklistArtists = input.blacklistArtists
 
         let tracks = input.tracks.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        profile.libraryKeys = Set(tracks.map { RecommendationLibraryMatcher.key(title: $0.title, artist: $0.artist) })
+        // 多键口径：多艺人 / 版本后缀 / 繁简都要能命中（单键会漏「A & B」「(Live)」这类写法）。
+        profile.libraryKeys = Set(tracks.flatMap { RecommendationLibraryMatcher.keys(title: $0.title, artist: $0.artist) })
         profile.playedKeys = Set(
             tracks.filter { $0.playCount > 0 }
-                .map { RecommendationLibraryMatcher.key(title: $0.title, artist: $0.artist) }
+                .flatMap { RecommendationLibraryMatcher.keys(title: $0.title, artist: $0.artist) }
         )
 
         guard !tracks.isEmpty else {
@@ -138,6 +157,13 @@ enum RecommendationProfileV3Builder {
         let maxLibraryCount = groups.values.map(\.count).max() ?? 0
         let maxPlayCount = groups.values.map { $0.reduce(0) { $0 + $1.playCount } }.max() ?? 0
         let normalizedWeights = weights.normalized()
+        // v4 行为信号：30 天半衰 + 完成率加权；无播放历史 → 空字典（退化到曲库规模 + 收藏）。
+        let behavior = artistBehaviorScores(input, tracks: tracks)
+        let hasBehavior = !behavior.isEmpty
+        let fallbackWeightSum = max(
+            0.001,
+            normalizedWeights.library + normalizedWeights.play + normalizedWeights.favorite
+        )
 
         var seeds: [RecommendationSeedArtist] = []
         seeds.reserveCapacity(groups.count)
@@ -148,11 +174,17 @@ enum RecommendationProfileV3Builder {
             let lib = logRatio(libraryCount, maxLibraryCount)
             let play = logRatio(playCount, maxPlayCount)
             let fav = favorite ? 1.0 : 0.0
-            let rec = recency(items.compactMap(\.addedAt).max(), now: input.now)
-            let affinity = normalizedWeights.library * lib
-                + normalizedWeights.play * play
-                + normalizedWeights.favorite * fav
-                + normalizedWeights.recency * rec
+            // v4：0.7 行为 + 0.2 曲库规模 + 0.1 收藏。
+            // 不再把「文件修改时间 / addedAt」当 recency——那是入库动作，不是听歌口味。
+            let affinity: Double
+            if hasBehavior {
+                affinity = 0.7 * (behavior[key] ?? 0) + 0.2 * lib + 0.1 * fav
+            } else {
+                // 退化：无播放历史时按原权重比例（去掉 recency 后重新归一化），冷启动不崩。
+                affinity = (normalizedWeights.library * lib
+                    + normalizedWeights.play * play
+                    + normalizedWeights.favorite * fav) / fallbackWeightSum
+            }
             let displayArtist = items.first?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? key
             seeds.append(
                 RecommendationSeedArtist(
@@ -187,11 +219,48 @@ enum RecommendationProfileV3Builder {
         return min(1, log1p(Double(value)) / denominator)
     }
 
-    private static func recency(_ addedAt: Date?, now: Date) -> Double {
-        guard let addedAt else { return 0 }
-        let days = now.timeIntervalSince(addedAt) / 86_400
-        guard days.isFinite else { return 0 }
-        return exp(-max(0, days) / recencyHalfLifeDays)
+    /// 完成率分档：≥0.9 记满权；<0.3 记 0.1（跳过）；中间线性过渡。
+    static func completionFactor(_ completion: Double) -> Double {
+        guard completion.isFinite else { return 0.1 }
+        if completion >= 0.9 { return 1.0 }
+        if completion < 0.3 { return 0.1 }
+        // 0.3 → 0.1、0.9 → 1.0 线性
+        return 0.1 + (completion - 0.3) / 0.6 * 0.9
+    }
+
+    /// 艺人行为分：Σ(半衰权重 × 完成率分档)，按全体最大值归一（0…1）。
+    ///
+    /// - 半衰：`exp(-ln2 × days / 30)`（一个月前的播放权重减半）；
+    /// - 时长缺失：完成率按 0.6 中性，不因此惩罚也不奖励；
+    /// - 无播放历史 / 全部落在曲库外：返回空字典，调用方退化到曲库规模 + 收藏。
+    static func artistBehaviorScores(
+        _ input: RecommendationProfileV3Input,
+        tracks: [RecommendationProfileV3Input.Track]
+    ) -> [String: Double] {
+        guard !input.plays.isEmpty else { return [:] }
+        var byStableId: [String: RecommendationProfileV3Input.Track] = [:]
+        byStableId.reserveCapacity(tracks.count)
+        for track in tracks where byStableId[track.stableId] == nil {
+            byStableId[track.stableId] = track
+        }
+        var scores: [String: Double] = [:]
+        for play in input.plays {
+            guard let track = byStableId[play.trackStableId] else { continue }
+            let artist = RecommendationLibraryMatcher.artistKey(track.artist)
+            guard !artist.isEmpty else { continue }
+            let days = max(0, input.now.timeIntervalSince(play.playedAt) / 86_400)
+            guard days.isFinite else { continue }
+            let decay = exp(-log(2.0) * days / behaviorHalfLifeDays)
+            let completion: Double
+            if let duration = track.durationMs, duration > 0 {
+                completion = min(1, max(0, Double(play.playDurationMs) / Double(duration)))
+            } else {
+                completion = neutralCompletion
+            }
+            scores[artist, default: 0] += decay * completionFactor(completion)
+        }
+        guard let maxScore = scores.values.max(), maxScore > 0 else { return [:] }
+        return scores.mapValues { $0 / maxScore }
     }
 
     private static func clamp01(_ value: Double) -> Double {
