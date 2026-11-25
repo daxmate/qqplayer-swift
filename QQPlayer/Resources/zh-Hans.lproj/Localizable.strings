@@ -1213,11 +1213,6 @@
 "recommendation_weight_play" = "播放次数";
 "recommendation_weight_favorite" = "收藏 / 歌单";
 "recommendation_weight_recency" = "最近加入";
-"recommendation_quotas_title" = "推荐配额";
-"recommendation_quotas_footer" = "三项会归一到 100%：常听艺人热歌 / 相似艺人热歌 / 同风格其他艺人。";
-"recommendation_quota_seed" = "常听艺人";
-"recommendation_quota_similar" = "相似艺人";
-"recommendation_quota_explore" = "风格探索";
 "recommendation_lastfm_title" = "Last.fm";
 "recommendation_lastfm_footer" = "填 API key 后可用 Last.fm 的艺人热歌与相似艺人；留空则只用内置在线源。key 存在系统钥匙串，不上传、不写日志。";
 "recommendation_lastfm_placeholder" = "粘贴 Last.fm API key";

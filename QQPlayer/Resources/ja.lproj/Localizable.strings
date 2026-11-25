@@ -1210,11 +1210,6 @@
 "recommendation_weight_play" = "再生回数";
 "recommendation_weight_favorite" = "お気に入り／プレイリスト";
 "recommendation_weight_recency" = "最近追加";
-"recommendation_quotas_title" = "おすすめの配分";
-"recommendation_quotas_footer" = "3つの配分は100%に正規化されます：お気に入りアーティストのヒット曲／似たアーティストのヒット曲／同スタイルの発見。";
-"recommendation_quota_seed" = "お気に入りのアーティスト";
-"recommendation_quota_similar" = "似たアーティスト";
-"recommendation_quota_explore" = "スタイルの発見";
 "recommendation_lastfm_title" = "Last.fm";
 "recommendation_lastfm_footer" = "APIキーを設定すると、Last.fmからアーティストのヒット曲と似たアーティストを取得します。空欄の場合は内蔵ソースのみを使用します。キーはシステムのキーチェーンに保存され、アップロードもログ出力もされません。";
 "recommendation_lastfm_placeholder" = "Last.fmのAPIキーを貼り付け";

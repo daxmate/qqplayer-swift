@@ -1205,11 +1205,6 @@
 "recommendation_weight_play" = "Прослушивания";
 "recommendation_weight_favorite" = "Избранное / плейлисты";
 "recommendation_weight_recency" = "Недавно добавлено";
-"recommendation_quotas_title" = "Квоты рекомендаций";
-"recommendation_quotas_footer" = "Три квоты нормализуются до 100 %: хиты любимых исполнителей / похожие исполнители / поиск по стилю.";
-"recommendation_quota_seed" = "Любимые исполнители";
-"recommendation_quota_similar" = "Похожие исполнители";
-"recommendation_quota_explore" = "Поиск по стилю";
 "recommendation_lastfm_title" = "Last.fm";
 "recommendation_lastfm_footer" = "С ключом API Last.fm даёт хиты и похожих исполнителей; пустое поле — только встроенные источники. Ключ хранится в связке ключей системы, не отправляется и не пишется в журнал.";
 "recommendation_lastfm_placeholder" = "Вставьте ключ API Last.fm";

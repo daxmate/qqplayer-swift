@@ -421,6 +421,14 @@ struct RecommendationMatcherV4Tests {
         }
     }
 
+    @Test("默认繁简折叠委托仓库唯一数据源（RecommendationNormalization）")
+    func defaultFoldDelegates() {
+        #expect(RecommendationScriptFolding.current("周杰倫") == RecommendationNormalization.toSimplified("周杰倫"))
+        #expect(RecommendationScriptFolding.current("周杰倫") == "周杰伦")
+        #expect(RecommendationScriptFolding.current("愛你") == "爱你")
+        #expect(RecommendationScriptFolding.current("abc") == "abc")
+    }
+
     @Test("繁简折叠：只改键，不改展示")
     func scriptFolding() {
         #expect(RecommendationLibraryMatcher.matches(

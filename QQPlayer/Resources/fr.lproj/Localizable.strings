@@ -1208,11 +1208,6 @@
 "recommendation_weight_play" = "Écoutes";
 "recommendation_weight_favorite" = "Favoris / playlists";
 "recommendation_weight_recency" = "Ajout récent";
-"recommendation_quotas_title" = "Quotas de recommandation";
-"recommendation_quotas_footer" = "Les trois quotas sont normalisés à 100 % : tubes des artistes favoris / artistes similaires / découverte de style.";
-"recommendation_quota_seed" = "Artistes favoris";
-"recommendation_quota_similar" = "Artistes similaires";
-"recommendation_quota_explore" = "Découverte de style";
 "recommendation_lastfm_title" = "Last.fm";
 "recommendation_lastfm_footer" = "Avec une clé API, Last.fm fournit les tubes et les artistes similaires ; laissez vide pour n'utiliser que les sources intégrées. La clé est stockée dans le trousseau système, jamais envoyée ni journalisée.";
 "recommendation_lastfm_placeholder" = "Collez votre clé API Last.fm";

@@ -31,6 +31,8 @@ SOURCES=(
   "$SERVICES/RecommendationScoring.swift"
   "$SERVICES/RecommendationStore.swift"
   "$SERVICES/RecommendationV3Types.swift"
+  "$SERVICES/CharacterMapResourceLoader.swift"
+  "$SERVICES/RecommendationNormalization.swift"
   "$SERVICES/RecommendationLibraryMatcher.swift"
   "$SERVICES/RecommendationSeedSampler.swift"
   "$SERVICES/RecommendationSelectionV4.swift"

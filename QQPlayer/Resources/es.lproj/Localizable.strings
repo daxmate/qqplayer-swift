@@ -1210,11 +1210,6 @@
 "recommendation_weight_play" = "Número de reproducciones";
 "recommendation_weight_favorite" = "Favoritos / listas";
 "recommendation_weight_recency" = "Añadidos recientemente";
-"recommendation_quotas_title" = "Cuotas de recomendación";
-"recommendation_quotas_footer" = "Las tres cuotas se normalizan al 100 %: éxitos de artistas favoritos, éxitos de artistas similares y descubrimiento del mismo estilo.";
-"recommendation_quota_seed" = "Artistas favoritos";
-"recommendation_quota_similar" = "Artistas similares";
-"recommendation_quota_explore" = "Descubrimiento de estilos";
 "recommendation_lastfm_title" = "Last.fm";
 "recommendation_lastfm_footer" = "Con una clave de API, Last.fm proporciona éxitos de artistas y artistas similares; déjala vacía para usar solo las fuentes integradas. La clave se guarda en el llavero del sistema y nunca se sube ni se registra.";
 "recommendation_lastfm_placeholder" = "Pega tu clave de API de Last.fm";

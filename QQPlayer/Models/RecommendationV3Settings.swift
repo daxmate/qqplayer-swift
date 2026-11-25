@@ -18,7 +18,8 @@ struct RecommendationV3Settings: Codable, Sendable, Equatable {
     var weightFavorite: Double = RecommendationProfileWeights.defaults.favorite
     var weightRecency: Double = RecommendationProfileWeights.defaults.recency
 
-    /// 三通道配额（落盘前归一到和 1）。
+    /// 三通道配额（**v4 起不再驱动选择**：选择阶段改成固定下限 2/2/1。
+    /// 字段仅用于旧 JSON 解码兼容 / 诊断回显，设置 UI 已移除对应滑块）。
     var quotaSeed: Double = RecommendationChannelQuotas.defaults.seed
     var quotaSimilar: Double = RecommendationChannelQuotas.defaults.similar
     var quotaExplore: Double = RecommendationChannelQuotas.defaults.explore
@@ -113,6 +114,7 @@ extension DeleteSettings {
         }
     }
 
+    /// 兼容读取入口：v4 起没有任何生产消费方（引擎不再读配额），保留只为旧调用与 JSON 解码。
     var recommendationChannelQuotas: RecommendationChannelQuotas {
         get { recommendationV3.channelQuotas }
         set {

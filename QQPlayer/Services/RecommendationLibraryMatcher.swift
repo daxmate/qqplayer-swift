@@ -5,7 +5,11 @@
 //  推荐 v4：曲库匹配 / 已下载标记的唯一归一化入口（纯逻辑、无 IO）。
 //
 //  归一化口径（顺序固定）：
-//   0. 繁简折叠（ICU `Hant-Hans`）：库里「周杰倫」与候选「周杰伦」必须同键；**只影响键，不改展示**；
+//   0. 繁简折叠：库里「周杰倫」与候选「周杰伦」必须同键；**只影响键，不改展示**。
+//      唯一数据源 = `RecommendationNormalization.toSimplified`
+//      （= CharacterMapResourceLoader 的 OpenCC 表，与入库 canonicalize 同一张表；
+//       禁止 StringTransform、禁止第二份简繁数据）。`RecommendationScriptFolding` 提供
+//      仅给本地 harness 的注入口令，生产默认实现恒等于该唯一数据源。
 //   1. 标题剥版本后缀（最多 4 轮）：半角/全角括号副标题、`【…】`、
 //      `- 现场版 / - Live / - 演唱会 / - Remastered / - 伴奏 / - DJ版 / - 片段`、
 //      `feat. X` 等；剥离后与原键**同时**参与匹配（原键做二次尝试，见 `titleKeys`）；
@@ -19,6 +23,36 @@
 //
 
 import Foundation
+
+/// 繁→简折叠的**唯一入口**（默认实现 = 仓库唯一数据源）。
+///
+/// 为什么要一层间接：本地 harness 用 swiftc 直编、没有 App bundle 资源，
+/// `CharacterMapResourceLoader` 是 fail-closed（读不到表直接 fatalError），
+/// 所以 harness 启动时注入一张最小映射；生产路径永远走默认实现。
+///
+/// 契约：`defaultFold` 必须恒等于 `RecommendationNormalization.toSimplified`
+/// （单测 `RecommendationV4Tests` 直接断言行为，改到这里会红）。
+enum RecommendationScriptFolding {
+    /// 生产默认实现（唯一数据源：OpenCC 表，与入库 canonicalize 同一张）。
+    static let defaultFold: @Sendable (String) -> String = { RecommendationNormalization.toSimplified($0) }
+
+    private static let lock = NSLock()
+    private nonisolated(unsafe) static var injected: (@Sendable (String) -> String)?
+
+    /// 当前生效的折叠实现。
+    static var current: @Sendable (String) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return injected ?? defaultFold
+    }
+
+    /// 仅供本地 harness / 单测：替换折叠实现（`nil` = 恢复生产默认）。
+    static func setInjection(_ fold: (@Sendable (String) -> String)?) {
+        lock.lock()
+        defer { lock.unlock() }
+        injected = fold
+    }
+}
 
 enum RecommendationLibraryMatcher {
     // MARK: - 版本后缀
@@ -114,7 +148,7 @@ enum RecommendationLibraryMatcher {
 
     /// 归一化（繁简 / 大小写 / 全半角 / 变音 / 标点 / 空白全部折叠）。**只用于键，不改展示。**
     static func normalize(_ raw: String) -> String {
-        let folded = foldScript(raw)
+        let folded = RecommendationScriptFolding.current(raw)
             .folding(options: [.widthInsensitive, .diacriticInsensitive, .caseInsensitive], locale: nil)
         var out = String()
         out.reserveCapacity(folded.count)
@@ -124,10 +158,7 @@ enum RecommendationLibraryMatcher {
         return out
     }
 
-    /// 繁简折叠（ICU Hant-Hans）：繁体 → 简体。失败时原样返回。
-    private static func foldScript(_ raw: String) -> String {
-        raw.applyingTransform(StringTransform(rawValue: "Hant-Hans"), reverse: false) ?? raw
-    }
+
 
     /// 全部艺人键（多艺人拆开；去重保序）。
     static func artistKeys(_ raw: String) -> [String] {

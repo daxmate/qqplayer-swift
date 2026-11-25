@@ -23,7 +23,6 @@ struct MacRecommendationSettingsView: View {
     var body: some View {
         Form {
             profileWeightsSection
-            channelQuotaSection
             lastFMSection
             iTunesSection
             requestSection
@@ -65,40 +64,6 @@ struct MacRecommendationSettingsView: View {
             Slider(value: value, in: 0 ... 1, step: RecommendationProfileWeights.valueStep) { editing in
                 guard !editing else { return }
                 settings.recommendationV3.normalizeWeights()
-                settings.save()
-            }
-            Text("\(Int((value.wrappedValue * 100).rounded()))%")
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .frame(width: 44, alignment: .trailing)
-        }
-    }
-
-    // MARK: - 通道配额
-
-    private var channelQuotaSection: some View {
-        Section {
-            quotaRow("recommendation_quota_seed", value: $settings.recommendationV3.quotaSeed)
-                .settingsAnchor(MacSettingsCatalog.recommendationQuotaSeed)
-            quotaRow("recommendation_quota_similar", value: $settings.recommendationV3.quotaSimilar)
-                .settingsAnchor(MacSettingsCatalog.recommendationQuotaSimilar)
-            quotaRow("recommendation_quota_explore", value: $settings.recommendationV3.quotaExplore)
-                .settingsAnchor(MacSettingsCatalog.recommendationQuotaExplore)
-        } header: {
-            Text("recommendation_quotas_title".localized)
-        } footer: {
-            Text("recommendation_quotas_footer".localized)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func quotaRow(_ titleKey: String, value: Binding<Double>) -> some View {
-        HStack {
-            Text(titleKey.localized)
-            Slider(value: value, in: 0 ... 1, step: RecommendationChannelQuotas.valueStep) { editing in
-                guard !editing else { return }
-                settings.recommendationV3.normalizeQuotas()
                 settings.save()
             }
             Text("\(Int((value.wrappedValue * 100).rounded()))%")

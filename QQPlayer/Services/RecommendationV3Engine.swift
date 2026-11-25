@@ -135,7 +135,8 @@ struct RecommendationV3Engine: Sendable {
     var itunesBudget: RecommendationRunBudget?
     /// 榜单热度参照（C；只当热度，不当相似源）。
     var chartClient: AppleMusicChartClient?
-    var quotas: RecommendationChannelQuotas = .defaults
+    // v4 起不再有配额属性：选择改为固定下限（见 `RecommendationSelectionV4`），
+    // 设置里的 40/40/20 只做旧 JSON 解码兼容。
     /// 通用在线搜索深度（风格关键词 / 艺名搜索；再深只会引入噪声）。
     var perSourceLimit: Int = 10
     /// 单艺人热歌深度（v4 从 10 提到 50：池子要够大，选择阶段才有得挑。
@@ -185,7 +186,7 @@ struct RecommendationV3Engine: Sendable {
         let lastFM: LastFMClient? = settings.recommendationV3.lastFMEnabled
             ? LastFMClient(timeout: RecommendationV3Settings.lastFMTimeout)
             : nil
-        var engine = RecommendationV3Engine(
+        let engine = RecommendationV3Engine(
             lastFM: lastFM,
             netease: .shared,
             similarArtistSource: NeteaseSimilarArtistSource(
@@ -200,7 +201,6 @@ struct RecommendationV3Engine: Sendable {
             itunesBudget: budget,
             chartClient: AppleMusicChartClient()
         )
-        engine.quotas = settings.recommendationChannelQuotas
         return engine
     }
 

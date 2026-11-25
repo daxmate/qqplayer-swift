@@ -320,27 +320,6 @@ enum MacSettingsCatalog {
         aliases: ["新鲜度", "最近加入", "recency"]
     )
 
-    static let recommendationQuotaSeed = Item(
-        id: "settings.recommendation.quota.seed",
-        category: .recommendations,
-        titleKey: "recommendation_quota_seed",
-        aliases: ["种子艺人", "配额", "quota", "seed"]
-    )
-
-    static let recommendationQuotaSimilar = Item(
-        id: "settings.recommendation.quota.similar",
-        category: .recommendations,
-        titleKey: "recommendation_quota_similar",
-        aliases: ["相似艺人", "配额", "similar", "quota"]
-    )
-
-    static let recommendationQuotaExplore = Item(
-        id: "settings.recommendation.quota.explore",
-        category: .recommendations,
-        titleKey: "recommendation_quota_explore",
-        aliases: ["风格探索", "探索", "explore", "quota"]
-    )
-
     static let recommendationLastFMToggle = Item(
         id: "settings.recommendation.lastFMEnabled",
         category: .recommendations,
@@ -433,9 +412,6 @@ enum MacSettingsCatalog {
         recommendationWeightPlay,
         recommendationWeightFavorite,
         recommendationWeightRecency,
-        recommendationQuotaSeed,
-        recommendationQuotaSimilar,
-        recommendationQuotaExplore,
         recommendationLastFMToggle,
         recommendationLastFMKey,
         recommendationITunesLookup,

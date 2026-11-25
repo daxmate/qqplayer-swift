@@ -8,6 +8,17 @@
 
 import Foundation
 
+// 繁简折叠：harness 没有 App bundle 资源（CharacterMapResourceLoader fail-closed），
+// 注入一张最小映射；生产默认实现是 RecommendationNormalization.toSimplified，
+// 「默认实现委托唯一数据源」由 QQPlayerTests/RecommendationV4Tests 断言（那里有资源）。
+let harnessScriptMap: [Character: Character] = ["倫": "伦", "傑": "杰", "愛": "爱", "體": "体", "張": "张"]
+RecommendationScriptFolding.setInjection { text in
+    var out = String()
+    out.reserveCapacity(text.count)
+    for character in text { out.append(harnessScriptMap[character] ?? character) }
+    return out
+}
+
 var failures: [String] = []
 var checks = 0
 

@@ -1210,11 +1210,6 @@
 "recommendation_weight_play" = "재생 횟수";
 "recommendation_weight_favorite" = "즐겨찾기 / 재생목록";
 "recommendation_weight_recency" = "최근 추가";
-"recommendation_quotas_title" = "추천 할당량";
-"recommendation_quotas_footer" = "세 가지 할당량은 100%로 정규화됩니다: 즐겨찾는 아티스트 히트곡 / 비슷한 아티스트 히트곡 / 같은 스타일 발견.";
-"recommendation_quota_seed" = "즐겨찾는 아티스트";
-"recommendation_quota_similar" = "비슷한 아티스트";
-"recommendation_quota_explore" = "스타일 발견";
 "recommendation_lastfm_title" = "Last.fm";
 "recommendation_lastfm_footer" = "API 키를 설정하면 Last.fm에서 아티스트 히트곡과 비슷한 아티스트를 가져옵니다. 비워 두면 내장 소스만 사용합니다. 키는 시스템 키체인에 저장되며 업로드되거나 로그에 남지 않습니다.";
 "recommendation_lastfm_placeholder" = "Last.fm API 키 붙여넣기";
